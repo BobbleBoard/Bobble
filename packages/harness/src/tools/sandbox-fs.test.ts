@@ -203,3 +203,43 @@ describe('registerSandboxFileTools gating', () => {
     expect(names.sort()).toEqual(['edit', 'ls', 'read', 'write']);
   });
 });
+
+/*
+ * the user: "an earlier godot max effort run left a folder on my desktop that is
+ * called 'users' and has a hilarious path in it:
+ * /Users/user/Desktop/Users/user/Desktop/platformer_game".
+ *
+ * One dropped character turns an absolute path into a relative one that resolves
+ * happily against the cwd — nothing errors, it just builds an absurd tree
+ * somewhere real and reports success.
+ */
+describe('a dropped leading slash is not a relative path', () => {
+  it('repairs the exact shape the user found', () => {
+    expect(resolveWorkspacePath('Users/the user/Desktop/platformer_game', '/Users/user/Desktop')).toBe(
+      '/Users/user/Desktop/platformer_game',
+    );
+  });
+
+  it('covers the other root-only directories', () => {
+    expect(resolveWorkspacePath('Applications/Bobble.app', '/tmp/w')).toBe(
+      '/Applications/Bobble.app',
+    );
+    expect(resolveWorkspacePath('var/log/x', '/tmp/w')).toBe('/var/log/x');
+  });
+
+  /* The repair must not eat genuine relative paths, which are the common case. */
+  it('leaves real relative paths joined to the workspace', () => {
+    expect(resolveWorkspacePath('src/main.ts', '/tmp/w')).toBe('/tmp/w/src/main.ts');
+    expect(resolveWorkspacePath('notes.md', '/tmp/w')).toBe('/tmp/w/notes.md');
+    expect(resolveWorkspacePath('./a/b', '/tmp/w')).toBe('/tmp/w/a/b');
+  });
+
+  it('does not fire on a lookalike that is not a root directory', () => {
+    expect(resolveWorkspacePath('userscripts/x.js', '/tmp/w')).toBe('/tmp/w/userscripts/x.js');
+    expect(resolveWorkspacePath('username.txt', '/tmp/w')).toBe('/tmp/w/username.txt');
+  });
+
+  it('still passes absolute paths straight through', () => {
+    expect(resolveWorkspacePath('/Users/user/x', '/tmp/w')).toBe('/Users/user/x');
+  });
+});
