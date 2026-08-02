@@ -100,10 +100,14 @@ const REMEDIES: ReadonlyArray<{ readonly when: RegExp; readonly fix: string }> =
   {
     when: /\.tscn.*(?:Parse Error|Unknown tag|Unexpected end of file)/i,
     fix:
-      'A .tscn you typed by hand is malformed. Do not hand-edit it again — build the ' +
-      'scene with a script instead: a GDScript that `extends SceneTree`, creates the ' +
-      "nodes in `_init()`, sets each child's `owner` to the root, packs a PackedScene " +
-      'and calls ResourceSaver.save(), run with `godot --headless --script build.gd`.',
+      'A .tscn you typed by hand is malformed. DELETE it and generate it instead — ' +
+      'and if you already wrote a build script, check it actually builds: a file ' +
+      'that does not call `ResourceSaver.save()` is not a build script. The whole ' +
+      'thing is: a GDScript that `extends SceneTree`, creates the nodes in ' +
+      "`_init()`, sets each child's `owner` to the root, packs them with " +
+      '`PackedScene.pack(root)`, calls `ResourceSaver.save(packed, "res://x.tscn")` ' +
+      'and `quit()` — then RUN it: `godot --headless --script build.gd`. Writing the ' +
+      'script and still typing the .tscn by hand leaves you exactly where you are.',
   },
 ];
 
