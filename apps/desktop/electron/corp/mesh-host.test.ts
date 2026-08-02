@@ -1,3 +1,4 @@
+import { buildCorpRoster } from '@pi-desktop/harness/corp';
 /**
  * The parts of the mesh host that can be checked without a model.
  *
@@ -19,8 +20,7 @@ import {
   taskNote,
   excerptFailures,
   listProject,
-  emptyProjectComplaint,
-} from './mesh-host';
+  emptyProjectComplaint, MESH_ENTRY } from './mesh-host';
 
 describe('what a run hands through to its host', () => {
   it('carries every passthrough setting that was supplied', () => {
@@ -179,3 +179,31 @@ describe('only one sentence means success', () => {
   });
 });
 
+
+describe('the mesh entry point exists', () => {
+  /*
+   * THE BUG THIS EXISTS FOR. The harness has its own `runCorpMesh`, which the
+   * desktop does not use — mesh-host builds the roster and runs the mesh itself.
+   * So when the `ceo` seat was removed from `buildCorpRoster`, the harness path
+   * was updated and green while the desktop still delivered to 'ceo'. Delivering
+   * to an id that is not in the roster is not an error: the mesh answers
+   * `(there is no "ceo" to talk to.)` and the run "completes" instantly with that
+   * as its product. The CEO read it as "the manager is unavailable", built the
+   * whole thing itself, and shipped a project.godot that degenerated into
+   * hundreds of lines of repeated tokens.
+   *
+   * A whole suite passed through that. This is the invariant that would not have.
+   */
+  it('MESH_ENTRY names an agent that is actually in the roster', () => {
+    const roster = buildCorpRoster({ task: 'build a game' });
+    expect(roster.map((a) => a.id)).toContain(MESH_ENTRY);
+  });
+
+  it('the entry is the root of the org chart — nothing is above it', () => {
+    const roster = buildCorpRoster({ task: 'build a game' });
+    const entry = roster.find((a) => a.id === MESH_ENTRY);
+    // The entry reports by RETURNING; it has no peer above it to message.
+    expect(entry).toBeDefined();
+    expect(entry?.peers ?? []).not.toContain('ceo');
+  });
+});

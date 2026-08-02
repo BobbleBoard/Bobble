@@ -63,7 +63,6 @@ class MeshEventStream implements AsyncIterable<CoordinationEvent> {
 
 /** Human label for a mesh agent id. */
 function nameFor(agent: MeshAgent): string {
-  if (agent.id === 'ceo') return 'CEO';
   if (agent.id === 'manager') return 'Manager';
   if (agent.id.startsWith('engineer:')) return `Engineer ${agent.id.split(':')[1] ?? ''}`.trim();
   if (agent.id.startsWith('specialist:'))
@@ -71,12 +70,16 @@ function nameFor(agent: MeshAgent): string {
   return agent.id;
 }
 
-/** The parent node for the tree: manager under CEO, engineers under the manager,
- * specialists under the CEO (they're commissioned by everyone). */
+/**
+ * The parent node for the tree. The MANAGER is the root — there is no CEO inside
+ * a production; the only CEO is the chat the user is talking to, and it is
+ * blocked in `talk_to_manager` for as long as this runs. Everyone else hangs off
+ * the manager: engineers because it contracts them, specialists because anyone
+ * may commission them and the manager is the one seat always present.
+ */
 function parentFor(agent: MeshAgent): string | undefined {
-  if (agent.id === 'ceo') return undefined;
-  if (agent.id.startsWith('engineer:')) return 'manager';
-  return 'ceo';
+  if (agent.id === 'manager') return undefined;
+  return 'manager';
 }
 
 /**
@@ -105,10 +108,10 @@ function buildMeshChart(
   const nodes: OrgNodeView[] = [];
   const edges: Array<{ from: string; to: string }> = [];
   for (const agent of roster) {
-    // The CEO is always present — it is the one seat that exists by virtue of the
-    // task existing. Everyone else has to have been engaged.
+    // The MANAGER is always present — it is the one seat that exists by virtue of
+    // the production existing. Everyone else has to have been engaged.
     const state = states.get(agent.id);
-    if (state === undefined && agent.id !== 'ceo') continue;
+    if (state === undefined && agent.id !== 'manager') continue;
     const parentId = parentFor(agent);
     nodes.push({
       id: agent.id,
@@ -300,7 +303,7 @@ export function startMeshTask(opts: {
       // roster done would resurrect the untouched pool at the final frame — the
       // same "team that never ran" the chart filter exists to stop.
       for (const [id, state] of states) if (state !== 'retired') states.set(id, 'done');
-      states.set('ceo', 'done');
+      states.set('manager', 'done');
       emitChart();
       stream.push({ type: 'status', status: 'done' });
       const taskResult: TaskResult = { outcome: 'completed', summary: result.reply };

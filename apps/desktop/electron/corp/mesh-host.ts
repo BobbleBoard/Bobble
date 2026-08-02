@@ -520,6 +520,19 @@ export function taskNote(task?: string): string {
   return `--- WHAT WAS ASKED FOR (unchanged — re-read it before you judge anything) ---\n${task.trim()}`;
 }
 
+/**
+ * WHERE A PRODUCTION STARTS.
+ *
+ * The manager. There is no CEO inside the mesh — the only CEO is the chat the
+ * user is talking to, which is blocked in `talk_to_manager` for as long as this
+ * runs (the user: "don't spawn a fake CEO clone for the corp harness"). This used to
+ * be the literal 'ceo', and when that seat was removed from the roster the entry
+ * delivered to nobody: the run came straight back as `(there is no "ceo" to talk
+ * to.)`, which the CEO then read as "the manager is unavailable" and built the
+ * whole thing itself.
+ */
+export const MESH_ENTRY = 'manager';
+
 /** Map a mesh role to a corp turn purpose (for sampling + telemetry). */
 const ROLE_PURPOSE: Record<string, string> = {
   ceo: 'ceo',
@@ -1209,14 +1222,14 @@ export async function runCorpMeshTask(opts: {
       async (question: string) =>
         (
           await host({
-            agentId: 'ceo',
+            agentId: MESH_ENTRY,
             from: 'user',
             message: question,
             talk: async () => '(not routed for a direct question)',
           })
         ).reply,
     );
-    const reply = await mesh.run('ceo', openingMessage);
+    const reply = await mesh.run(MESH_ENTRY, openingMessage);
     return {
       reply,
       hops: mesh.hops,
