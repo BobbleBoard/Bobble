@@ -129,6 +129,40 @@ export async function describeProject(
   return head.join('\n');
 }
 
+
+/**
+ * Run a Godot project for a few seconds and return a PNG of what appeared, or
+ * null when it is not a Godot project / produced no window.
+ *
+ * `--headless` renders nothing, so the game runs for real and the frame is taken
+ * from the screen. Deliberately short-lived and always killed: a Godot window
+ * that outlives its capture is the hang that wedged two runs.
+ */
+async function captureGodotFrame(dir: string): Promise<string | null> {
+  const { existsSync } = await import('node:fs');
+  const { spawn } = await import('node:child_process');
+  if (!existsSync(path.join(dir, 'project.godot'))) return null;
+  const shot = path.join(tmpdir(), `pd-game-${randomBytes(4).toString('hex')}.png`);
+  const child = spawn('godot', ['--path', dir, '--resolution', '900x600'], {
+    stdio: 'ignore',
+    detached: false,
+  });
+  try {
+    await new Promise((r) => setTimeout(r, 7_000));
+    await run('screencapture', ['-x', shot], { timeout: 15_000 });
+    const buf = await readFile(shot);
+    return buf.toString('base64');
+  } catch {
+    return null;
+  } finally {
+    try {
+      child.kill('SIGTERM');
+    } catch {
+      /* already gone */
+    }
+  }
+}
+
 /** Produce the preview for one artefact. Pure-ish; the renderer is injected. */
 export async function buildPreview(
   target: string,
@@ -173,8 +207,27 @@ export async function buildPreview(
               : 'Running it printed nothing at all.',
         };
       }
-      case 'project':
-        return { text: await describeProject(target) };
+      case 'project': {
+        /*
+         * A GAME IS SHOWN, NOT DESCRIBED.
+         *
+         * the user's standard for "verified": "did it attempt to get a screenshot or
+         * compile and run the project at all? if it did that and got and read a
+         * screenshot, then i'm willing to concede a model failure, short of
+         * that, I disagree." Listing files never met it — a folder listing
+         * cannot tell you the player is off-screen or the level is empty.
+         *
+         * So a runnable project is RUN and photographed, and the model gets the
+         * frame back. Falls through to the description when there is nothing to
+         * run or the run produced no picture.
+         */
+        const described = await describeProject(target);
+        const frame = await captureGodotFrame(target);
+        if (frame !== null) {
+          return { imageBase64: frame, mimeType: 'image/png', text: described };
+        }
+        return { text: described };
+      }
       case 'text': {
         const body = await readFile(target, 'utf8');
         return {
