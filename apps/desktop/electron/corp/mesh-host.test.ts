@@ -243,3 +243,19 @@ describe('the scene recipe is the verified one', () => {
     expect(out).toContain('child.owner = root');
   });
 });
+
+describe('get_tree() inside a SceneTree script', () => {
+  /* Run 28's build.gd was otherwise correct — extends SceneTree, _init(),
+   * PackedScene.new() then packed.pack(root), ResourceSaver.save(). One extra
+   * line it added on its own initiative broke it. */
+  it('tells it to delete the line', () => {
+    const out = remediesFor('SCRIPT ERROR: Parse Error: Function "get_tree()" not found in base self.');
+    expect(out).toContain('the script IS the tree');
+    expect(out).toContain('Delete that');
+  });
+
+  it('the recipe itself forbids it', () => {
+    const out = remediesFor('ERROR: res://main.tscn:19 - Parse Error: Unknown tag.');
+    expect(out).toContain('Do NOT add the root to the scene tree');
+  });
+});

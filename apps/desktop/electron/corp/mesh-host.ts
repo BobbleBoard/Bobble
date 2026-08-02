@@ -88,6 +88,10 @@ const SCENE_RECIPE = `
       packed.pack(root)
       ResourceSaver.save(packed, "res://scenes/main.tscn")
       quit()
+    That is the WHOLE script. Do NOT add the root to the scene tree first — there
+    is no \`get_tree()\` inside a SceneTree script (the script IS the tree), and
+    packing does not need the nodes to be in it. Point \`run/main_scene\` at the
+    exact path you saved.
 `;
 
 
@@ -133,6 +137,14 @@ const REMEDIES: ReadonlyArray<{ readonly when: RegExp; readonly fix: string }> =
       'and a `*` to make it a singleton: `Counter="*res://scripts/counter.gd"`. ' +
       'Simpler still, a platformer does not need autoloads at all: DELETE the ' +
       '[autoload] section and keep the coin counter on a node in the scene.',
+  },
+  {
+    when: /get_tree\(\).*not found|Function "get_tree\(\)" not found/i,
+    fix:
+      'Your build script calls `get_tree()`. Inside a script that `extends ' +
+      'SceneTree` there is no such function — the script IS the tree. Delete that ' +
+      'line: you do not need to add anything to the tree to pack it. Build the ' +
+      'nodes, set each `owner`, pack, save, quit.',
   },
   {
     when: /Failed loading scene: res:\/\/[\w./ -]+\.gd/i,
