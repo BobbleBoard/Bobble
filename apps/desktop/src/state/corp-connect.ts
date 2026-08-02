@@ -131,6 +131,20 @@ export async function startCorpTask(prompt: string, ctx?: TaskContext): Promise<
     ...(withCwd ? { ctx: withCwd } : {}),
     effort,
   });
+  return attachCorpTask(taskId);
+}
+
+/**
+ * Bind to a run that ALREADY EXISTS, without starting one.
+ *
+ * `talk_to_manager` blocks the CEO until the team delivers, so main starts that
+ * run itself and announces it on `corp:attached` — the situation room has to join
+ * a production already under way rather than kicking off a second one. The
+ * per-task inbox has been buffering its events since the first one arrived, so
+ * nothing is missed by joining late.
+ */
+export function attachCorpTask(taskId: string): CorpTaskHandle {
+  connectCorp();
   const inbox = inboxFor(taskId);
   const stream = new PushStream<CoordinationEvent>();
   // Flush anything that raced ahead of this response, then attach for live tail.

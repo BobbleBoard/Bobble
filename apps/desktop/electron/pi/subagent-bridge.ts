@@ -19,6 +19,7 @@ import path from 'node:path';
 import { createLogger } from '@pi-desktop/shared';
 import { type IpcMainInvokeEvent, ipcMain, type WebContents } from 'electron';
 import { isTrustedIpcEvent } from '../trusted-senders';
+import { runCorpForBridge } from '../corp/corp-main';
 import type { ChildAgents } from './child-agents';
 
 const log = createLogger('desktop:subagent-bridge');
@@ -47,6 +48,8 @@ interface SpawnRequest {
     childId?: string;
     timeoutMs?: number;
     specialist?: string;
+    /** `corp` only: the CEO's brief to its manager. */
+    message?: string;
   };
 }
 
@@ -128,6 +131,26 @@ async function handleLine(socket: net.Socket, line: string): Promise<void> {
   };
   if (req.token !== token) {
     respond({ ok: false, error: 'unauthorized' });
+    return;
+  }
+  /*
+   * `corp` — the CEO's `talk_to_manager`, which BLOCKS until the team delivers.
+   * Same socket as `spawn` because it is the same trust boundary and the same
+   * shape: the child asks the app to run something it cannot run itself, and
+   * waits for the result. No timeout: a production runs for tens of minutes and
+   * the app owns its lifetime (see corp/bridge-client.ts).
+   */
+  if (req.method === 'corp') {
+    try {
+      const message = typeof req.params?.message === 'string' ? req.params.message : '';
+      if (message === '') {
+        respond({ ok: false, error: 'talk_to_manager needs a message for the manager' });
+        return;
+      }
+      respond(await runCorpForBridge(getWindow(), message));
+    } catch (err) {
+      respond({ ok: false, error: err instanceof Error ? err.message : String(err) });
+    }
     return;
   }
   if (req.method !== 'spawn') {

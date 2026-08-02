@@ -17,6 +17,7 @@
 import type { ExtensionAPI } from '@mariozechner/pi-coding-agent';
 import { type Static, Type } from '@sinclair/typebox';
 import type { EffortLevel } from '../effort/effort.js';
+import { type CorpRunRequest, type CorpRunResult, corpBridgeRunFromEnv } from './bridge-client.js';
 import {
   CREATE_PRODUCTION_HIERARCHY,
   CREATE_PRODUCTION_HIERARCHY_TOOL,
@@ -81,6 +82,46 @@ export interface PromoteToolDeps {
   readonly getEffort: () => EffortLevel;
   /** Monotonic id source for the promote signal (tests inject a fixed one). */
   readonly nextId?: () => string;
+  /**
+   * Run the corporation and RESOLVE WITH WHAT IT DELIVERED. Injected by tests;
+   * in the app it comes from {@link corpBridgeRunFromEnv}. Null/absent outside
+   * Pi Desktop, where there is no team to wait for.
+   */
+  readonly runCorp?: ((req: CorpRunRequest) => Promise<CorpRunResult>) | null;
+}
+
+/**
+ * What the manager actually receives. `message` is the CEO's own words and is
+ * what we want; it is OPTIONAL though (a divisions-only call is valid), so a
+ * call without one is turned into a brief from whatever the CEO did give rather
+ * than handing the manager an empty string to start a production from.
+ */
+function briefForManager(args: {
+  readonly message?: string;
+  readonly reason: string;
+  readonly divisions: readonly { readonly name: string; readonly purpose: string }[];
+}): string {
+  const parts: string[] = [];
+  if (args.message !== undefined && args.message !== '') parts.push(args.message);
+  if (parts.length === 0 && args.reason !== '') parts.push(args.reason);
+  /*
+   * Only divisions the CEO ACTUALLY named. `parseCreateHierarchyArgs` synthesises
+   * a single `Production` division whose purpose is just the message echoed back
+   * when none were given — passing that on would hand the manager a fabricated
+   * org chart and its own brief twice, when splitting the work is the manager's
+   * first job.
+   */
+  const named = args.divisions.filter(
+    (d) => !(d.name === 'Production' && d.purpose === (args.message ?? '')),
+  );
+  if (named.length > 0) {
+    parts.push(
+      `Divisions the CEO already has in mind:\n${named
+        .map((d) => `- ${d.name}: ${d.purpose}`)
+        .join('\n')}`,
+    );
+  }
+  return parts.join('\n\n');
 }
 
 /**
@@ -131,7 +172,8 @@ export function registerCreateHierarchyTool(pi: ExtensionAPI, deps: PromoteToolD
         };
       }
       // Cross the process boundary: the pi child can't run corp orchestration, so
-      // publish the intent to the renderer, which launches the corp run.
+      // publish the intent to the renderer. This drives the situation room; it is
+      // no longer what starts the work when the bridge is available.
       if (ctx.hasUI === true) {
         const signal: PromoteSignal = {
           id: nextId(),
@@ -140,7 +182,57 @@ export function registerCreateHierarchyTool(pi: ExtensionAPI, deps: PromoteToolD
         };
         ctx.ui.setStatus(PROMOTE_STATUS_KEY, JSON.stringify(signal));
       }
-      // Terminal ack — the model's building job is done the instant it delegates.
+
+      /*
+       * BLOCK UNTIL THE TEAM DELIVERS.
+       *
+       * the user: "the ceo calls the manager, this should stop the CEO cold ... the
+       * ceo should not get a tool result from the manager until the manager has
+       * run everything and is ready to submit the whole working product. as far
+       * as the ceo knows they call manager and receive the complete working
+       * product."
+       *
+       * This returned a fixed ack immediately, which is why a CEO could say "your
+       * manager has it" eleven seconds in and then — still holding its own tools,
+       * as it should — build the whole thing itself while the manager sat queued.
+       * Awaiting the run is what stops that, and it takes nothing away from the
+       * CEO: a pending tool call suspends it structurally.
+       *
+       * The CEO's OWN message is the task. The renderer used to start the run
+       * from the last USER message instead, so the vision the CEO had just
+       * composed for the manager was discarded and the mesh began by re-deriving
+       * it from the raw prompt — two CEOs, one of them working from notes it
+       * never wrote.
+       */
+      const runCorp = deps.runCorp ?? corpBridgeRunFromEnv();
+      if (runCorp !== null) {
+        const result = await runCorp({ message: briefForManager(args) });
+        if (result.ok) {
+          return {
+            content: [{ type: 'text', text: result.product }],
+            details: { promoted: true, delivered: true },
+          };
+        }
+        return {
+          content: [
+            {
+              type: 'text',
+              text:
+                `The production did not complete: ${result.error ?? 'unknown error'}. ` +
+                'Nothing was delivered. Tell the user plainly what happened — do not ' +
+                'describe the product as finished.',
+            },
+          ],
+          isError: true,
+          details: { promoted: true, delivered: false },
+        };
+      }
+
+      /*
+       * NO BRIDGE (a headless harness outside Pi Desktop). There is no team to
+       * wait for, so the honest thing is the ack — but it must not imply a
+       * delivery that cannot happen here.
+       */
       return {
         content: [{ type: 'text', text: HIERARCHY_CREATED_ACK }],
         details: { promoted: true, divisions: args.divisions.length },

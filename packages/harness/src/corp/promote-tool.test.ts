@@ -4,6 +4,7 @@ import type { EffortLevel } from '../effort/effort.js';
 import {
   corpToolEnabled,
   PROMOTE_STATUS_KEY,
+  type PromoteToolDeps,
   registerCreateHierarchyTool,
 } from './promote-tool.js';
 import { CREATE_PRODUCTION_HIERARCHY, HIERARCHY_CREATED_ACK } from './promotion.js';
@@ -11,11 +12,16 @@ import { CREATE_PRODUCTION_HIERARCHY, HIERARCHY_CREATED_ACK } from './promotion.
 // biome-ignore lint/suspicious/noExplicitAny: minimal structural tool capture for tests
 type CapturedTool = any;
 
-/** Register the tool at a given effort and return the captured tool spec. */
-function register(effort: EffortLevel): CapturedTool {
+/** Register the tool at a given effort and return the captured tool spec.
+ * `runCorp` defaults to null — no bridge, i.e. a headless harness. */
+function register(effort: EffortLevel, runCorp: PromoteToolDeps['runCorp'] = null): CapturedTool {
   const tools: CapturedTool[] = [];
   const pi = { registerTool: (t: CapturedTool) => tools.push(t) } as unknown as ExtensionAPI;
-  registerCreateHierarchyTool(pi, { getEffort: () => effort, nextId: () => 'fixed-id' });
+  registerCreateHierarchyTool(pi, {
+    getEffort: () => effort,
+    nextId: () => 'fixed-id',
+    runCorp,
+  });
   return tools[0];
 }
 
@@ -88,5 +94,91 @@ describe('create_production_hierarchy — normal-chat tool', () => {
     const res = await tool.execute('c', { reason: 'x', divisions: [] }, undefined, undefined, ctx);
     expect(res.isError).toBe(true);
     expect(statuses[PROMOTE_STATUS_KEY]).toBeUndefined();
+  });
+});
+
+
+describe('talk_to_manager BLOCKS until the team delivers', () => {
+  /*
+   * the user, watching a CEO answer "the manager has accepted the task" in eleven
+   * seconds and then build the whole thing itself while the manager sat queued:
+   * "the ceo calls the manager, this should stop the CEO cold, and run the
+   * manager. the ceo should not get a tool result from the manager until the
+   * manager has run everything and is ready to submit the whole working product.
+   * as far as the ceo knows they call manager and receive the complete working
+   * product."
+   */
+  it('does not resolve until the production delivers, and returns the PRODUCT', async () => {
+    let release: (r: { ok: boolean; product: string }) => void = () => {};
+    const pending = new Promise<{ ok: boolean; product: string }>((r) => {
+      release = r;
+    });
+    const tool = register('max', () => pending);
+    const { ctx } = fakeCtx();
+
+    let settled = false;
+    const call = tool
+      .execute('c', { message: 'Build the game', divisions: [] }, undefined, undefined, ctx)
+      .then((r: { content: Array<{ type: string; text?: string }> }) => {
+        settled = true;
+        return r;
+      });
+
+    // The team is still working: the CEO's tool call must still be pending.
+    await Promise.resolve();
+    expect(settled).toBe(false);
+
+    release({ ok: true, product: 'The game is built and runs: 3 platforms, a coin counter.' });
+    const res = await call;
+    // The tool result IS the delivered product — not an ack about a delegation.
+    expect(text(res)).toContain('The game is built and runs');
+    expect(text(res)).not.toContain(HIERARCHY_CREATED_ACK);
+  });
+
+  it("sends the CEO's OWN words to the manager, not the user's prompt", async () => {
+    // The renderer used to start the run from the last USER message, discarding
+    // the brief the CEO had just written — so the mesh opened with a second CEO
+    // re-deriving a vision that had already been formed.
+    let seen = '';
+    const tool = register('max', async (req) => {
+      seen = req.message;
+      return { ok: true, product: 'done' };
+    });
+    const { ctx } = fakeCtx();
+    await tool.execute(
+      'c',
+      { message: 'A 2D platformer, warm and hand-drawn, three levels.', divisions: [] },
+      undefined,
+      undefined,
+      ctx,
+    );
+    expect(seen).toBe('A 2D platformer, warm and hand-drawn, three levels.');
+  });
+
+  it('reports a failed production as a failure instead of a finished product', async () => {
+    const tool = register('max', async () => ({ ok: false, product: '', error: 'aborted' }));
+    const { ctx } = fakeCtx();
+    const res = await tool.execute(
+      'c',
+      { message: 'Build the game', divisions: [] },
+      undefined,
+      undefined,
+      ctx,
+    );
+    expect(res.isError).toBe(true);
+    expect(text(res)).toContain('aborted');
+  });
+
+  it('without a bridge (headless) still returns the ack — there is no team to await', async () => {
+    const tool = register('max');
+    const { ctx } = fakeCtx();
+    const res = await tool.execute(
+      'c',
+      { message: 'Build the game', divisions: [] },
+      undefined,
+      undefined,
+      ctx,
+    );
+    expect(text(res)).toBe(HIERARCHY_CREATED_ACK);
   });
 });

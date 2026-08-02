@@ -76,4 +76,11 @@ export type CorpEventMap = {
   /** One coordination event for a running task, tagged with its id so the
    * renderer can rebuild a per-task `AsyncIterable<CoordinationEvent>`. */
   'corp:event': { taskId: string; event: CoordinationEvent };
+  /**
+   * A run MAIN started (for a CEO blocked in `talk_to_manager`) that the
+   * situation room should attach to. The renderer normally starts its own run
+   * and knows the id already; here the run exists first, because the tool call
+   * that asked for it is suspended until the team delivers.
+   */
+  'corp:attached': { taskId: string };
 };

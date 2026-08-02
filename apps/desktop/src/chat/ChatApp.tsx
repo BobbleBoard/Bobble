@@ -29,7 +29,12 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { SettingsSection } from '../settings/SettingsView';
 import { registerCanvasController, useCanvasStore } from '../state/canvas-store';
 import { useChildAgentStore } from '../state/child-agent-store';
-import { askCorpTask, startCorpTask } from '../state/corp-connect';
+import {
+  askCorpTask,
+  attachCorpTask,
+  type CorpTaskHandle,
+  startCorpTask,
+} from '../state/corp-connect';
 import { useCorpStore } from '../state/corp-store';
 import { getModels, setSessionName, startPi } from '../state/pi-connect';
 import { usePiStore } from '../state/pi-slice';
@@ -45,7 +50,6 @@ import { ChatTitle } from './ChatTitle';
 import { ChildChatView } from './ChildChatView';
 import { CanvasTabsPanel } from './canvas/CanvasTabsPanel';
 import { CorpDebugHud } from './corp/CorpDebugHud';
-import { PROMOTE_STATUS_KEY, parsePromoteSignal } from './harness-status';
 import { useHarnessTitleSync } from './harness-title';
 import { InputNeededBanner } from './InputNeededBanner';
 import { SessionSidebar, type SidebarStub } from './SessionSidebar';
@@ -246,75 +250,77 @@ export function ChatApp({
   // `appendUser` echoes the user's bubble for a fresh corp-mode submit; the
   // promote-tool path (the model escalated MID-chat) passes false because the
   // user's message is already in the thread.
+  const bindCorp = (handle: CorpTaskHandle) => {
+    useCorpStore.getState().setTask(handle.taskId);
+    // A REPLAYABLE stream: this loop folds it into the corp store (drives the
+    // inline chat feed's follow target), and the situation tab — opened late,
+    // on promotion — replays the same buffered events to reconstruct its state.
+    const events = replayableEvents(handle.events);
+    let situationOpened = false;
+    void (async () => {
+      for await (const event of events) {
+        if (useCorpStore.getState().taskId !== handle.taskId) return;
+        // Token-level PUSH: route per-node deltas into the block accumulator the
+        // inline chat feed streams from (never poll). The situation fold ignores
+        // this additive type, so there's no need to also run it through foldEvent.
+        if (event.type === 'worker-activity') {
+          useCorpStore.getState().foldWorkerActivity(event);
+          continue;
+        }
+        useCorpStore.getState().foldEvent(event);
+        if (event.type === 'org-chart') {
+          useCorpStore.getState().trackChart(event.chart);
+          // Promotion = a team exists (root + subagents). Bring up the
+          // situation room ONCE, the moment the corp structure initiates.
+          if (!situationOpened && event.chart.nodes.length > 1) {
+            situationOpened = true;
+            canvasController.current?.upsertTab(`situation:${handle.taskId}`, {
+              kind: 'situation',
+              title: 'Situation room',
+              situationEvents: events,
+              situationTaskId: handle.taskId,
+              situationUserMode: userMode,
+            });
+            useCanvasStore.getState().setCanvasOpen(true);
+          }
+        }
+      }
+    })();
+  };
+
   const launchCorp = (echo: string, imageUris: string[], appendUser = true) => {
     if (appendUser) usePiStore.getState().appendUser(echo, imageUris);
     void startCorpTask(echo, imageUris.length > 0 ? { images: imageUris } : undefined).then(
-      (handle) => {
-        useCorpStore.getState().setTask(handle.taskId);
-        // A REPLAYABLE stream: this loop folds it into the corp store (drives the
-        // inline chat feed's follow target), and the situation tab — opened late,
-        // on promotion — replays the same buffered events to reconstruct its state.
-        const events = replayableEvents(handle.events);
-        let situationOpened = false;
-        void (async () => {
-          for await (const event of events) {
-            if (useCorpStore.getState().taskId !== handle.taskId) return;
-            // Token-level PUSH: route per-node deltas into the block accumulator the
-            // inline chat feed streams from (never poll). The situation fold ignores
-            // this additive type, so there's no need to also run it through foldEvent.
-            if (event.type === 'worker-activity') {
-              useCorpStore.getState().foldWorkerActivity(event);
-              continue;
-            }
-            useCorpStore.getState().foldEvent(event);
-            if (event.type === 'org-chart') {
-              useCorpStore.getState().trackChart(event.chart);
-              // Promotion = a team exists (root + subagents). Bring up the
-              // situation room ONCE, the moment the corp structure initiates.
-              if (!situationOpened && event.chart.nodes.length > 1) {
-                situationOpened = true;
-                canvasController.current?.upsertTab(`situation:${handle.taskId}`, {
-                  kind: 'situation',
-                  title: 'Situation room',
-                  situationEvents: events,
-                  situationTaskId: handle.taskId,
-                  situationUserMode: userMode,
-                });
-                useCanvasStore.getState().setCanvasOpen(true);
-              }
-            }
-          }
-        })();
-      },
+      bindCorp,
     );
   };
 
   const onCorpSubmit = (echo: string, imageUris: string[]) => launchCorp(echo, imageUris, true);
 
-  // The model called `create_production_hierarchy` in NORMAL chat (the user: the corp
-  // system is an OPTION at high/max effort, not a mode). The harness publishes the
-  // intent on PROMOTE_STATUS_KEY; launch the corp run ONCE per signal with the
-  // user's original prompt — already echoed in the thread, so don't re-append it.
-  // A run already owning this chat is left alone (the team owns the build).
-  const promoteRaw = usePiStore((s) => s.extensionStatus[PROMOTE_STATUS_KEY]);
-  const lastPromoteId = useRef<string | null>(null);
-  // biome-ignore lint/correctness/useExhaustiveDependencies: fire exactly once per new promote signal.
+  /*
+   * The model called `talk_to_manager` in NORMAL chat (the user: the corp system is an
+   * OPTION at high/max effort, not a mode).
+   *
+   * MAIN owns starting the run now, because the tool BLOCKS the CEO until the team
+   * delivers — so the run has to exist before the tool can wait on it. It tells us
+   * the id on `corp:attached` and we bind the situation room to it.
+   *
+   * This used to start the run HERE, off the promote status signal, using the last
+   * USER message as the task. Two things fell out of that. The CEO got an instant
+   * ack and — still holding its own tools — carried on building the thing itself
+   * while the manager sat queued. And the brief the CEO had just written for its
+   * manager was discarded in favour of the raw prompt, so the mesh opened with a
+   * second CEO re-deriving a vision that had already been formed. One CEO, one
+   * vision, and the tool result is the finished product.
+   */
+  // biome-ignore lint/correctness/useExhaustiveDependencies: bindCorp is stable for the session.
   useEffect(() => {
-    const signal = parsePromoteSignal(promoteRaw);
-    if (signal === null || signal.id === lastPromoteId.current) return;
-    lastPromoteId.current = signal.id;
-    if (useCorpStore.getState().taskId !== null) return;
-    const msgs = usePiStore.getState().messages;
-    let prompt = '';
-    for (let i = msgs.length - 1; i >= 0; i -= 1) {
-      const m = msgs[i];
-      if (m?.kind === 'user') {
-        prompt = m.text;
-        break;
-      }
-    }
-    if (prompt.length > 0) launchCorp(prompt, [], false);
-  }, [promoteRaw]);
+    const off = window.piDesktop.onEvent('corp:attached', ({ taskId }) => {
+      if (useCorpStore.getState().taskId === taskId) return;
+      bindCorp(attachCorpTask(taskId));
+    });
+    return off;
+  }, []);
 
   // A1/A4 — a follow-up while a corp task already exists is ANSWERED by the CEO from
   // its retained context, NOT a fresh vision ceremony. The question echoes as the

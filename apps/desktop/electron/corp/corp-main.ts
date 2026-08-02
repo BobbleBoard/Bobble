@@ -57,6 +57,24 @@ interface RunningTask {
 
 const tasks = new Map<string, RunningTask>();
 
+/**
+ * Callers BLOCKED on a run's delivery, by taskId.
+ *
+ * `talk_to_manager` suspends the CEO until the team delivers (the user: "the ceo
+ * should not get a tool result from the manager until the manager has run
+ * everything and is ready to submit the whole working product"). The run itself
+ * lives out here in main, so the waiter parks in this map and the event loop
+ * that already drains the task's events releases it on `done`.
+ */
+const deliveries = new Map<string, (result: TaskResult | null) => void>();
+
+function settleDelivery(taskId: string, result: TaskResult | null): void {
+  const waiter = deliveries.get(taskId);
+  if (waiter === undefined) return;
+  deliveries.delete(taskId);
+  waiter(result);
+}
+
 /** How many TERMINAL (done/errored) tasks to retain so the situation room + build
  * snapshot keep resolving after completion — `corp:peek`/`get-org-chart`/
  * `worker-transcript` read the on-disk product through the retained engine, and the
@@ -338,6 +356,9 @@ async function handleStart(
       for await (const event of handle.events) {
         if (event.type === 'done') {
           recordCorpOutcome(handle.taskId, event.result, Date.now() - startedAt);
+          // Hand the delivered product to whoever is BLOCKED on this run — the
+          // CEO's `talk_to_manager` call is suspended until this fires.
+          settleDelivery(handle.taskId, event.result);
         }
         if (wc.isDestroyed()) continue;
         events.send(wc, 'corp:event', { taskId: handle.taskId, event: event as CoordinationEvent });
@@ -348,6 +369,12 @@ async function handleStart(
         error: err instanceof Error ? err.message : String(err),
       });
     } finally {
+      /*
+       * A caller blocked on delivery must ALWAYS be released. If the stream ends
+       * or throws without a `done`, resolving here is what stops the CEO waiting
+       * forever on a run that is no longer going anywhere.
+       */
+      settleDelivery(handle.taskId, null);
       // Do NOT drop the record on terminal — peek / org-chart / worker-transcript must
       // keep resolving AFTER `done` (the build snapshot reads the on-disk product once
       // the run finishes; the workspace persists). Retain the most recent terminal
@@ -443,6 +470,56 @@ const handlers: CorpHandlers = {
 
 /** Register the corp channels (sender-aware + trusted-sender gated). Always
  * registered; only reached when the experimental flag / env override is on. */
+/**
+ * Run a corporation TO COMPLETION for a blocked caller, and resolve with what it
+ * delivered. This is the app half of `talk_to_manager`.
+ *
+ * The CEO calls the tool, the tool blocks on this, the team runs, and the tool's
+ * result IS the finished product — "as far as the ceo knows they call manager
+ * and receive the complete working product" (the user). Nothing here starts a second
+ * CEO or re-reads the user's prompt: the `task` is the CEO's own brief to its
+ * manager, passed through verbatim.
+ *
+ * The renderer is told the taskId so the situation room attaches to the run it is
+ * already receiving events for — main starts it now, rather than the renderer
+ * starting a parallel one off a status signal.
+ */
+export async function runCorpForBridge(
+  wc: WebContents | null,
+  task: string,
+): Promise<{ ok: boolean; product: string; error?: string }> {
+  if (wc === null || wc.isDestroyed()) {
+    return { ok: false, product: '', error: 'no window to run the production in' };
+  }
+  let started: { taskId: string };
+  try {
+    started = await handleStart(wc, { prompt: task, effort: 'max' });
+  } catch (err) {
+    return { ok: false, product: '', error: err instanceof Error ? err.message : String(err) };
+  }
+  const { taskId } = started;
+  // Let the situation room bind to this run (it did not start it).
+  try {
+    if (!wc.isDestroyed()) events.send(wc, 'corp:attached', { taskId });
+  } catch {
+    /* the run proceeds whether or not anyone is watching */
+  }
+  const result = await new Promise<TaskResult | null>((resolve) => {
+    deliveries.set(taskId, resolve);
+  });
+  if (result === null) {
+    return { ok: false, product: '', error: 'the production ended without delivering' };
+  }
+  if (result.outcome !== 'completed') {
+    return {
+      ok: false,
+      product: result.summary ?? '',
+      error: result.error ?? `production ${result.outcome}`,
+    };
+  }
+  return { ok: true, product: result.summary ?? '' };
+}
+
 export function registerCorpIpc(): void {
   for (const channel of CORP_INVOKE_CHANNELS) {
     ipcMain.handle(channel, (event: IpcMainInvokeEvent, request: unknown) => {
