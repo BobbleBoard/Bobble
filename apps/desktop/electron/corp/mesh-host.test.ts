@@ -196,3 +196,13 @@ describe('excerpting both Godot position formats', () => {
     expect(out).toContain('>> 3| c');
   });
 });
+
+describe('the missing-main-scene remedy', () => {
+  /* Runs 15 and 23 both stalled on `run/main_scene` naming a file that was never
+   * created — the malformed-.tscn remedy does not match a MISSING one. */
+  it('fires when the main scene does not exist', () => {
+    const out = remediesFor("3 problem(s):\nERROR: Cannot open file 'res://main.tscn'.");
+    expect(out).toContain('run/main_scene');
+    expect(out).toContain('or point');
+  });
+});

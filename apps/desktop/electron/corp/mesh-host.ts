@@ -98,6 +98,16 @@ const REMEDIES: ReadonlyArray<{ readonly when: RegExp; readonly fix: string }> =
       '[autoload] section and keep the coin counter on a node in the scene.',
   },
   {
+    when: /(?:Cannot open file 'res:\/\/[\w./ -]+\.tscn'|Failed loading scene)/i,
+    fix:
+      "`run/main_scene` in project.godot points at a scene that does not exist. " +
+      'Look at the file listing above: either GENERATE that scene (a GDScript that ' +
+      '`extends SceneTree`, builds the nodes, packs a PackedScene and calls ' +
+      '`ResourceSaver.save()`, run with `godot --headless --script`), or point ' +
+      '`run/main_scene` at a scene you did actually create. Runs have burned four ' +
+      'rounds on this by re-reading the error instead of comparing it to the listing.',
+  },
+  {
     when: /\.tscn.*(?:Parse Error|Unknown tag|Unexpected end of file)/i,
     fix:
       'A .tscn you typed by hand is malformed. DELETE it and generate it instead — ' +
