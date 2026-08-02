@@ -45,6 +45,7 @@ import {
   type VerificationProfile,
   verificationBriefing,
 } from '@pi-desktop/harness/corp';
+import { createLogger } from '@pi-desktop/shared';
 import { AgentPool } from './agent-pool';
 import {
   blockedCapabilities,
@@ -61,6 +62,8 @@ import {
 } from './submit-work';
 import { TeamBook } from './team-record';
 import { repairNote, repairShadowTree } from './workspace-paths';
+
+const log = createLogger('desktop:corp');
 
 /** A pi tool result carrying a single text block (the reply the calling agent reads). */
 function textResult(text: string): {
@@ -169,8 +172,15 @@ const ROLE_PURPOSE: Record<string, string> = {
  * failure it guards against is not slowness, it is a role that never stops and
  * therefore never reports. Measured against run 7, where an engineer passed
  * thirty calls inside one message and was still going.
+ *
+ * RAISED FROM 24 after runs 9 and 10 both ended "(ceo ran out of steps after 31
+ * / 33 tool calls without ever replying)". Seventeen files of a Godot project is
+ * simply more than 24 calls of work, so the cap was landing mid-build every time
+ * — and a role cut off mid-build never reaches the part where it RUNS what it
+ * wrote. The guard is against a role that never stops; 60 still guarantees that
+ * and stops deciding the outcome of ordinary work.
  */
-export const DEFAULT_STEPS_PER_MESSAGE = 24;
+export const DEFAULT_STEPS_PER_MESSAGE = 60;
 
 /**
  * The settings a run passes STRAIGHT THROUGH to its agent host.
@@ -536,6 +546,9 @@ export function createMeshAgentHost(config: MeshAgentHostConfig): MeshAgentHost 
                      * one more turn, spent finishing rather than building.
                      */
                     if (claims.length === 0) {
+                      if (finalText.trim() === '') {
+                        log.info('corp bump: rescuing a spent budget', { agentId });
+                      }
                       return finalText.trim() === ''
                         ? 'You ran out of tool calls before you replied. Do NOT start anything new ' +
                             'and do not keep building. Check what is actually on disk right now, run ' +
@@ -543,6 +556,11 @@ export function createMeshAgentHost(config: MeshAgentHostConfig): MeshAgentHost 
                             'found — what is there, what works, what does not.'
                         : undefined;
                     }
+                    log.info('corp bump: final check', {
+                      agentId,
+                      claims: claims.length,
+                      perspective: agent.role === 'ceo' ? 'ceo' : 'manager',
+                    });
                     return finalCheck({
                       claims,
                       profile: contractProfile.get(agentId) ?? taskProfileRef.value,
