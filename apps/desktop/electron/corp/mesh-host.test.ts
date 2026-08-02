@@ -230,3 +230,16 @@ describe('main_scene pointing at a script', () => {
     expect(out).toContain('--headless --script');
   });
 });
+
+describe('the scene recipe is the verified one', () => {
+  /* I paraphrased my own working script as `PackedScene.pack(root)` — a static
+   * call Godot refuses. Run 27's build script failed on exactly that, having
+   * done what the remedy said. */
+  it('never tells anyone to call pack() statically', () => {
+    const out = remediesFor('ERROR: res://main.tscn:19 - Parse Error: Unknown tag.');
+    expect(out).toContain('PackedScene.new()');
+    expect(out).toContain('packed.pack(root)');
+    expect(out).not.toMatch(/PackedScene\.pack\(root\)(?!\s*—)/);
+    expect(out).toContain('child.owner = root');
+  });
+});

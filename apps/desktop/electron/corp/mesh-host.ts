@@ -67,6 +67,31 @@ import { repairNote, repairShadowTree, stripBrokenInputMap } from './workspace-p
 const log = createLogger('desktop:corp');
 
 /**
+ * The scene-saving sequence, verbatim, because paraphrasing it broke a run.
+ *
+ * I wrote "packs them with `PackedScene.pack(root)`" into the remedy. That is a
+ * STATIC call and Godot refuses it — "Cannot call non-static function pack() on
+ * the class PackedScene directly". Run 27's build script failed on exactly that,
+ * having done what the remedy told it. My own verified test script had used
+ * `PackedScene.new()` then `packed.pack(root)`; the remedy was a bad paraphrase
+ * of code I had actually run.
+ *
+ * Same mistake as putting `timeout 60` in a prompt on a machine with no
+ * `timeout`: if the harness names a mechanism, the mechanism has to work.
+ */
+const SCENE_RECIPE = `
+      var root := Node2D.new()          # build your nodes
+      var child := Sprite2D.new()
+      root.add_child(child)
+      child.owner = root                 # EVERY child needs this or it is dropped
+      var packed := PackedScene.new()    # NOT PackedScene.pack(root) — pack() is not static
+      packed.pack(root)
+      ResourceSaver.save(packed, "res://scenes/main.tscn")
+      quit()
+`;
+
+
+/**
  * Known-failure → the fix that actually works, delivered at the moment it fails.
  *
  * The general principle ("use the tool's defaults", "do not hand-write a format
@@ -122,8 +147,9 @@ const REMEDIES: ReadonlyArray<{ readonly when: RegExp; readonly fix: string }> =
     fix:
       "`run/main_scene` in project.godot points at a scene that does not exist. " +
       'Look at the file listing above: either GENERATE that scene (a GDScript that ' +
-      '`extends SceneTree`, builds the nodes, packs a PackedScene and calls ' +
-      '`ResourceSaver.save()`, run with `godot --headless --script`), or point ' +
+      '`extends SceneTree` and does, in `_init()`:' +
+      `${SCENE_RECIPE}` +
+      'run with `godot --headless --script build.gd`), or point ' +
       '`run/main_scene` at a scene you did actually create. Runs have burned four ' +
       'rounds on this by re-reading the error instead of comparing it to the listing.',
   },
@@ -133,11 +159,10 @@ const REMEDIES: ReadonlyArray<{ readonly when: RegExp; readonly fix: string }> =
       'A .tscn you typed by hand is malformed. DELETE it and generate it instead — ' +
       'and if you already wrote a build script, check it actually builds: a file ' +
       'that does not call `ResourceSaver.save()` is not a build script. The whole ' +
-      'thing is: a GDScript that `extends SceneTree`, creates the nodes in ' +
-      "`_init()`, sets each child's `owner` to the root, packs them with " +
-      '`PackedScene.pack(root)`, calls `ResourceSaver.save(packed, "res://x.tscn")` ' +
-      'and `quit()` — then RUN it: `godot --headless --script build.gd`. Writing the ' +
-      'script and still typing the .tscn by hand leaves you exactly where you are.',
+      'thing is a GDScript that `extends SceneTree` and does, in `_init()`:' +
+      `${SCENE_RECIPE}` +
+      'then RUN it: `godot --headless --script build.gd`. Writing the script and ' +
+      'still typing the .tscn by hand leaves you exactly where you are.',
   },
 ];
 
@@ -346,7 +371,7 @@ function buildScriptReport(cwd: string): string {
     `\nI ALSO RAN YOUR ${name}, AND IT IS BROKEN:\n${errs.slice(0, 10).join('\n')}\n` +
     'Fix the build script first — nothing it should have produced exists until it runs clean. ' +
     'For `--script` it must `extends SceneTree` with `_init()` (not `extends Node`/`_ready()`), ' +
-    'and `ResourceSaver.save()` takes a PackedScene from `PackedScene.pack(root)`, never a Node.'
+    `and the saving sequence is exactly:${SCENE_RECIPE}`
   );
 }
 
