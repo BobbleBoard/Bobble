@@ -131,35 +131,42 @@ export async function describeProject(
 
 
 /**
- * Run a Godot project for a few seconds and return a PNG of what appeared, or
- * null when it is not a Godot project / produced no window.
+ * Render a Godot project and return a PNG of what it actually draws, or null.
  *
- * `--headless` renders nothing, so the game runs for real and the frame is taken
- * from the screen. Deliberately short-lived and always killed: a Godot window
- * that outlives its capture is the hang that wedged two runs.
+ * NOT a screen capture. `screencapture` needs Screen Recording permission this
+ * process does not have ("could not create image from display"), and a live
+ * Godot window is the hang that wedged two runs. Instead Godot renders the game
+ * itself: `--write-movie` with `--quit-after` runs a fixed number of frames,
+ * writes them, and EXITS on its own — no permission, no window to leak, no
+ * timeout needed. ffmpeg then lifts one late frame, late enough that the first
+ * frame's half-initialised state is not what gets judged.
+ *
+ * Verified end to end on a known-good project before being trusted here.
  */
 async function captureGodotFrame(dir: string): Promise<string | null> {
   const { existsSync } = await import('node:fs');
-  const { spawn } = await import('node:child_process');
+  const { unlink } = await import('node:fs/promises');
   if (!existsSync(path.join(dir, 'project.godot'))) return null;
-  const shot = path.join(tmpdir(), `pd-game-${randomBytes(4).toString('hex')}.png`);
-  const child = spawn('godot', ['--path', dir, '--resolution', '900x600'], {
-    stdio: 'ignore',
-    detached: false,
-  });
+  const stem = path.join(tmpdir(), `pd-game-${randomBytes(4).toString('hex')}`);
+  const movie = `${stem}.avi`;
+  const frame = `${stem}.png`;
   try {
-    await new Promise((r) => setTimeout(r, 7_000));
-    await run('screencapture', ['-x', shot], { timeout: 15_000 });
-    const buf = await readFile(shot);
-    return buf.toString('base64');
+    await run(
+      'godot',
+      ['--path', dir, '--write-movie', movie, '--fixed-fps', '30', '--quit-after', '40'],
+      { timeout: 90_000 },
+    );
+    await run(
+      'ffmpeg',
+      ['-loglevel', 'error', '-y', '-i', movie, '-vf', 'select=eq(n\\,35)', '-vframes', '1', frame],
+      { timeout: 60_000 },
+    );
+    return (await readFile(frame)).toString('base64');
   } catch {
     return null;
   } finally {
-    try {
-      child.kill('SIGTERM');
-    } catch {
-      /* already gone */
-    }
+    await unlink(movie).catch(() => {});
+    await unlink(frame).catch(() => {});
   }
 }
 
