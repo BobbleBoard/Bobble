@@ -96,8 +96,11 @@ describe('finalCheck', () => {
     // The instruction that hung two runs: "open it in its runtime" made the CEO
     // launch the Godot EDITOR, which never exits. Two processes were still alive
     // 1h19m and 19m later, each blocking its whole run.
-    expect(text).toContain('RUN IT IN A WAY THAT EXITS');
-    expect(text).toContain('timeout 60');
+    expect(text).toContain('RUN IT IN A WAY THAT EXITS BY ITSELF');
+    // `timeout` is NOT on macOS — naming it sent every role at a command that
+    // does not exist. The exit flags are the whole protection.
+    expect(text).not.toContain('timeout 60');
+    expect(text).toContain('godot --headless --quit --path .');
   });
 
   it('offers specialists always, and drops the checks that do not apply', () => {

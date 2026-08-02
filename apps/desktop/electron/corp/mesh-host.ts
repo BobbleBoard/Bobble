@@ -521,10 +521,28 @@ export function createMeshAgentHost(config: MeshAgentHostConfig): MeshAgentHost 
           ...(agent.role === 'manager' || agent.role === 'ceo'
             ? {
                 bump: {
-                  maxBumps: 1,
+                  // Two: one to rescue a spent budget, one for the final check.
+                  maxBumps: 2,
                   nextPrompt: ({ finalText }: { finalText: string }) => {
                     const claims = extractClaims(finalText);
-                    if (claims.length === 0) return undefined; // nothing asserted, nothing to discharge
+                    /*
+                     * A SPENT STEP BUDGET IS NOT AN ENDING.
+                     *
+                     * "(ceo ran out of steps after 31 tool calls without ever
+                     * replying)" was the whole verdict of run 9 — thirteen files
+                     * on disk, a broken game, and nothing said about any of it.
+                     * The budget caps WORK per message; it was never meant to
+                     * decide when a role stops talking. So an empty reply buys
+                     * one more turn, spent finishing rather than building.
+                     */
+                    if (claims.length === 0) {
+                      return finalText.trim() === ''
+                        ? 'You ran out of tool calls before you replied. Do NOT start anything new ' +
+                            'and do not keep building. Check what is actually on disk right now, run ' +
+                            'the one command that proves whether it works, and REPLY with what you ' +
+                            'found — what is there, what works, what does not.'
+                        : undefined;
+                    }
                     return finalCheck({
                       claims,
                       profile: contractProfile.get(agentId) ?? taskProfileRef.value,
