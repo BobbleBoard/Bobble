@@ -240,3 +240,25 @@ short of instruction, it is short of *ground truth delivered at the moment it ca
 act on it*. Every fix that has moved the needle works by putting a real fact in
 front of it — the errors, the lines, the file list — rather than by asking it to
 remember something.
+
+## Runs 19–20
+
+**A shadow tree my own fix created.** Run 19 built its entire game in
+`platformer/platformer/2D Platformer/` — inside a workspace already called
+`platformer`. `shadowRoots` missed it because `MIN_PREFIX` is 2: it looks for a
+repeat of the last TWO path components, and a lone repeated leaf slips through.
+That threshold was right when the corp worked in the chat's folder; rooting it at
+the directory the task NAMES makes the single-leaf repeat the common case. Now
+detected on evidence — the inner directory holds the project's entry point and the
+outer does not — so a genuine `src/src` is left alone.
+
+**Run 20 is the first structurally clean output.** Flat tree, no nesting, and a
+`project.godot` that PARSES — the config failure that killed runs 10, 16, 17 and
+18 is gone. What remains is a different and more tractable class: an autoload
+written as `counter="Counter"` where Godot wants a real path.
+
+**Worth knowing: the mesh is serial.** `concurrency: 1, parallelOptIn: false`
+against `ramFittedMax: 3`. Delegation currently buys no wall-clock, which is part
+of why the CEO builds alone while the manager and sixteen specialists sit
+`queued` in every run. That is a deliberate OOM-safety setting on a single
+machine, not a bug — but it does mean the corp's central promise is untested.
