@@ -232,8 +232,33 @@ async function handleStart(
   let engine: CorpEngine | undefined;
   let handle: TaskHandle;
   let abortMesh: (() => void) | undefined;
+
+  /*
+   * ONE ANSWER TO "WHERE DOES THE WORK GO", FOR BOTH BRANCHES.
+   *
+   * This lived inside the mesh branch only, so a team worked in the directory the
+   * user named while a SOLO run — the same request, one effort level lower —
+   * wrote into a random directory under the OS temp dir. Same product, same
+   * question, two different answers, and the solo one produced exactly the
+   * `/var/folders/4h/nq1c73.../T/...` paths the user has asked never to see again.
+   *
+   * the user, on the nested-folder symptom: "this nested folder stuff is also leading
+   * me to belive you have conflicting systems." He was right that there were two.
+   * There is one now: the directory the task names, else the chat's folder, else
+   * a per-task workspace as the last resort.
+   */
+  // A working `timeout` on PATH before any role gets a shell — four runs have
+  // been wedged by one command that never returned.
+  ensureTimeoutShim();
+  const meshTaskId = `corp-mesh-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+  const named = workspaceFromTask(req.prompt, os.homedir());
+  const projectPath =
+    named ??
+    (typeof req.ctx?.cwd === 'string' && req.ctx.cwd.trim() !== ''
+      ? req.ctx.cwd
+      : path.join(corpWorkspaceRoot(), meshTaskId));
+
   if (resolved.ok && corpParamsForEffort(req.effort).promotionAllowed) {
-    const meshTaskId = `corp-mesh-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
     /*
      * THE TEAM BELONGS TO THE PROJECT, AND OUTLIVES THE RUN.
      *
@@ -256,15 +281,6 @@ async function handleStart(
      * `workspaceFromTask`. Falls back to the chat's folder, then to a per-task
      * workspace, exactly as before.
      */
-    // A working `timeout` on PATH before any role gets a shell — four runs have
-    // been wedged by one command that never returned.
-    ensureTimeoutShim();
-    const named = workspaceFromTask(req.prompt, os.homedir());
-    const projectPath =
-      named ??
-      (typeof req.ctx?.cwd === 'string' && req.ctx.cwd.trim() !== ''
-        ? req.ctx.cwd
-        : path.join(corpWorkspaceRoot(), meshTaskId));
     const hierarchy = openHierarchy(app.getPath('userData'), projectPath);
     const cwd = projectPath;
     fs.mkdirSync(cwd, { recursive: true });
@@ -331,7 +347,9 @@ async function handleStart(
       // Unused on the unavailable path (startUnavailable never calls the model).
       chat: resolved.ok ? resolved.chat : noopCorpChat,
       ...(runRoleAgent !== undefined ? { runRoleAgent } : {}),
-      workspaceFor: createNodeWorkspaceFactory(corpWorkspaceRoot()),
+      // The SAME directory the mesh would have used — see the note above the
+      // branch. A solo run is still the user's work, in the user's folder.
+      workspaceFor: createNodeWorkspaceFactory(projectPath),
       concurrency,
       ...corpParamsForEffort(req.effort),
     });
