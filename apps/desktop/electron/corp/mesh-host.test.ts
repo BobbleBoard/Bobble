@@ -8,7 +8,7 @@
  * observer is silent, and silence is what makes it expensive: you go looking for
  * a wiring bug that isn't there.
  */
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -17,6 +17,9 @@ import {
   hostPassthrough,
   PASSTHROUGH_KEYS,
   taskNote,
+  remediesFor,
+  excerptFailures,
+  listProject,
 } from './mesh-host';
 
 describe('what a run hands through to its host', () => {
@@ -60,7 +63,6 @@ describe('what a run hands through to its host', () => {
     expect(hostPassthrough({})).toEqual({});
   });
 
-
   it('lists the keys once, where they can be read', () => {
     expect([...PASSTHROUGH_KEYS]).toEqual([
       'maxTokens',
@@ -100,9 +102,67 @@ describe('what the manager is told, every time', () => {
 
 describe('the per-message work budget', () => {
   it('is generous enough for real work and finite enough to end', () => {
-    // Real work is a dozen reads, a few writes and several test runs. Run 7's
-    // engineer passed forty-eight calls in ONE message and had not stopped.
+    /*
+     * Real work is a dozen reads, a few writes and several test runs. Run 7's
+     * engineer passed forty-eight calls in ONE message and had not stopped —
+     * which is what the upper bound was originally written against.
+     *
+     * RAISED to allow 60. Runs 9 and 10 both ended "(ceo ran out of steps after
+     * 31 / 33 tool calls without ever replying)": seventeen files of a Godot
+     * project is more than 24 calls of work, so the cap was landing mid-build
+     * and a role cut off mid-build never reaches the part where it RUNS what it
+     * wrote. The cap is a runaway guard, not a work budget — it must not be the
+     * thing that decides the outcome of ordinary work — but it stays finite,
+     * because a role that never stops never reports.
+     */
     expect(DEFAULT_STEPS_PER_MESSAGE).toBeGreaterThanOrEqual(12);
-    expect(DEFAULT_STEPS_PER_MESSAGE).toBeLessThan(48);
+    expect(DEFAULT_STEPS_PER_MESSAGE).toBeLessThanOrEqual(60);
+  });
+});
+
+describe('what the does-not-load bump carries', () => {
+  const tmpdir = (): string => mkdtempSync(path.join(os.tmpdir(), 'bump-'));
+
+  /* Runs 10, 16, 17 and 18 all died on a hand-written project.godot while the
+   * charter already said not to hand-write formats a program owns. A remedy at
+   * the point of failure beats a rule read once at the start. */
+  it('hands over the known fix for a corrupted project.godot', () => {
+    const out = remediesFor(
+      "2 problem(s):\nERROR: Error parsing '/x/project.godot' at line 27: Unexpected identifier 'deadzone' File might be corrupted.",
+    );
+    expect(out).toContain('DELETE the entire [input] section');
+    expect(out).toContain('ui_left');
+  });
+
+  it('hands over the scene-building fix for a broken .tscn', () => {
+    const out = remediesFor('1 problem(s):\nERROR: res://main.tscn:2 - Parse Error: Unexpected end of file.');
+    expect(out).toContain('extends SceneTree');
+    expect(out).toContain('ResourceSaver.save()');
+  });
+
+  it('says nothing when it does not recognise the failure', () => {
+    expect(remediesFor('1 problem(s):\nERROR: something entirely new')).toBe('');
+  });
+
+  /* "line 27: Unexpected identifier" is only actionable next to line 27. */
+  it('excerpts the line an error points at, and marks it', () => {
+    const dir = tmpdir();
+    writeFileSync(path.join(dir, 'thing.gd'), 'a\nb\nc\nd\ne\nf\n');
+    const out = excerptFailures(`ERROR: res://thing.gd:3 - Parse Error`, dir);
+    expect(out).toContain('thing.gd around line 3');
+    expect(out).toContain('>> 3| c');
+    expect(out).toContain('  2| b');
+  });
+
+  /* Run 15 spent four bumps on a missing main.tscn without ever being told the
+   * project contained no .tscn at all. */
+  it('lists what the directory actually holds', () => {
+    const dir = tmpdir();
+    mkdirSync(path.join(dir, 'scripts'), { recursive: true });
+    writeFileSync(path.join(dir, 'project.godot'), 'x');
+    writeFileSync(path.join(dir, 'scripts', 'player.gd'), 'y');
+    const out = listProject(dir);
+    expect(out).toContain('project.godot');
+    expect(out).toContain('scripts/player.gd');
   });
 });

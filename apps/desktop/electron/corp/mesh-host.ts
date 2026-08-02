@@ -100,7 +100,7 @@ const REMEDIES: ReadonlyArray<{ readonly when: RegExp; readonly fix: string }> =
 ];
 
 /** Any remedies matching this failure text, as instructions. */
-function remediesFor(state: string): string {
+export function remediesFor(state: string): string {
   const hits = REMEDIES.filter((r) => r.when.test(state)).map((r) => `  - ${r.fix}`);
   return hits.length === 0 ? '' : `KNOWN FIX FOR WHAT YOU ARE HITTING:\n${hits.join('\n')}`;
 }
@@ -111,7 +111,7 @@ function remediesFor(state: string): string {
  * sometimes an absolute path); showing those lines beside the message is the
  * difference between "fix line 27" and being able to.
  */
-function excerptFailures(state: string, cwd: string): string {
+export function excerptFailures(state: string, cwd: string): string {
   const seen = new Set<string>();
   const out: string[] = [];
   for (const line of state.split('\n')) {
@@ -141,7 +141,7 @@ function excerptFailures(state: string, cwd: string): string {
 
 
 /** The workspace's files, relative and sorted — context for a missing-file error. */
-function listProject(cwd: string): string {
+export function listProject(cwd: string): string {
   const walk = (dir: string, prefix: string, out: string[]): void => {
     if (out.length > 60) return;
     for (const e of readdirSync(dir, { withFileTypes: true }).sort((a, b) =>
