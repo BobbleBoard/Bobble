@@ -7,6 +7,7 @@
  * APP's job (it alone can restart the server + pi). This module stays pure +
  * dependency-free so both the harness and the renderer import it cheaply.
  */
+import type { EffortLevel } from '../effort/effort.js';
 import type { TaskClass } from './classify.js';
 
 /** Coarse task complexity the classifier emits (the user's quick/balanced/complex). */
@@ -75,4 +76,51 @@ export function coarseTier(cls: TaskClass): CoarseTier {
 /** The user-facing model tier a task class routes to. */
 export function modelTierForClass(cls: TaskClass): ModelTier {
   return COARSE_TO_MODEL[coarseTier(cls)];
+}
+
+/**
+ * The effort ADAPTIVE should use for a task — the classifier's judgement, not a
+ * function of which model happens to be loaded.
+ *
+ * Adaptive used to be `autoEffortForTier(activeModelTier)`: fast→low,
+ * balanced→medium, intelligent→high. Two consequences, both wrong:
+ *
+ *  - MAX WAS UNREACHABLE. No adaptive setting could ever produce it, so anything
+ *    gated on high/max — the corp system among them — was off unless the user
+ *    dragged the slider by hand.
+ *  - PINNING THE MODEL PINNED THE THINKING. With the model held on Fast, effort
+ *    resolved to `low` however large the task was. the user asked, on Adaptive with
+ *    Fast selected, for a manager to be given a Godot project, and the model
+ *    replied that it had no way to contact a manager and offered to draft an
+ *    email — because `talk_to_manager` needs high/max and low is what the loaded
+ *    model tier produced. The team was not declining to help; it did not exist.
+ *
+ * the user: "adaptive should be able to be anything based on classifier". So the
+ * effort comes from the task class, spans the whole range, and says nothing
+ * about model choice — a small model asked to build a game should still think
+ * hard and still have its team.
+ */
+export function effortForClass(cls: TaskClass): EffortLevel {
+  switch (cls) {
+    case 'simple-QA':
+      return 'low';
+    case 'basic-tools':
+    case 'other':
+    case 'connectors':
+    case 'file-ops':
+    case 'perception':
+      return 'medium';
+    case '2d-art':
+    case 'video-edit':
+    case 'browser-use':
+      return 'high';
+    // The multi-part builds: a project, not an errand. These are the ones that
+    // want the whole apparatus — the team, and the verification that comes with
+    // it — so they reach the top of the range.
+    case 'coding':
+    case '3d':
+    case 'motion-graphics':
+    case 'advanced-video':
+      return 'max';
+  }
 }

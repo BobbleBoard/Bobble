@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { TASK_CLASSES, type TaskClass } from './classify.js';
+import { classify, TASK_CLASSES, type TaskClass } from './classify.js';
 import {
   COARSE_TO_MODEL,
   type CoarseTier,
   coarseTier,
+  effortForClass,
   isCoarseTier,
   isModelTier,
   MODEL_TIERS,
@@ -80,5 +81,37 @@ describe('tier constants + guards', () => {
     expect(isModelTier('quick')).toBe(false);
     expect(isModelTier('wizard')).toBe(false);
     expect(isModelTier(42)).toBe(false);
+  });
+});
+
+describe('effortForClass', () => {
+  it('sends the multi-part builds to the top of the range', () => {
+    // These are projects, not errands: they want the team and the verification
+    // that comes with it, and both are gated on high/max.
+    expect(effortForClass('coding')).toBe('max');
+    expect(effortForClass('3d')).toBe('max');
+    expect(effortForClass('motion-graphics')).toBe('max');
+    expect(effortForClass('advanced-video')).toBe('max');
+  });
+
+  it('keeps a plain question cheap', () => {
+    expect(effortForClass('simple-QA')).toBe('low');
+    expect(effortForClass('basic-tools')).toBe('medium');
+    expect(effortForClass('file-ops')).toBe('medium');
+  });
+
+  it('reaches an effort that enables the corporation for a build request', () => {
+    /*
+     * THE REGRESSION THIS EXISTS FOR. Adaptive effort used to come from the
+     * active MODEL tier, so with the Fast model pinned it was 'low' whatever was
+     * asked — and `create_production_hierarchy`/`talk_to_manager` are offered
+     * only at high/max. Asking Bobble to have the manager set up a Godot demo
+     * therefore answered that it had no tool for contacting a manager. It was
+     * right: it didn't have one. Effort follows the TASK now.
+     */
+    const cls = classify({ prompt: 'Ask the manager to set up a sample Godot game to demo Godot' })
+      .class;
+    const effort = effortForClass(cls);
+    expect(['high', 'max']).toContain(effort);
   });
 });

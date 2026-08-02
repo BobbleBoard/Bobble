@@ -22,7 +22,7 @@
 import type { ChatMsg } from '@pi-desktop/engine';
 import { type ModelTier, TIER_LABEL } from '../../../../packages/harness/src/classify/tier.ts';
 import type { EffortLevel, EffortMode } from '../../electron/settings/settings-contract';
-import { autoEffortForTier, EFFORT_STEPS, levelToSlider } from '../state/model-selection';
+import { EFFORT_STEPS, levelToSlider } from '../state/model-selection';
 import { classLabel } from './harness-status';
 
 /** The number of effort detents the slider snaps to (low/medium/high/max). */
@@ -125,9 +125,9 @@ export interface EffortSliderView {
 }
 
 /**
- * Resolve the slider surface. In Auto the fill follows the active tier
- * (fast→min, balanced→mid, intelligent→the tick below max via
- * `autoEffortForTier`); with no tier yet it rests on the last explicit level. The
+ * Resolve the slider surface. In Auto the fill follows the level the classifier
+ * last resolved for a message (any of the four, max included); before any
+ * message it rests on the last explicit level. The
  * Auto readout is "Effort · Adaptive" (a distinct word from the model chip's
  * "Auto", the user #12), while the slider position still shows where routing would
  * land. In level mode it
@@ -143,10 +143,11 @@ export function effortSliderView(
     // In Auto the readout says "Adaptive" ("Effort · Adaptive"), NOT the resolved
     // level — it means "let routing pick the effort". A distinct word from the
     // model chip's "Auto" (the user #12) so the two never read as duplicate "Auto"s.
-    // The tier still drives the slider POSITION (index/fill) via `autoEffortForTier`
-    // so the knob rests where routing would land; before the classifier runs (no
-    // tier) it rests on the last explicit level.
-    const level = activeTier !== null ? autoEffortForTier(activeTier) : effort;
+    // The knob rests at the level Adaptive last RESOLVED, which the classifier
+    // writes into `effort` per message. It used to be re-derived from the active
+    // model tier, so the knob could never reach max and disagreed with the level
+    // the harness was actually running.
+    const level = effort;
     const index = Math.max(0, EFFORT_STEPS.indexOf(level));
     const fill = levelToSlider(level);
     return {

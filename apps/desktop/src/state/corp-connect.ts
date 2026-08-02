@@ -9,7 +9,7 @@
  * that race ahead of `corp:start`'s response are never lost: a fresh consumer
  * flushes the buffer, then tails live events to the terminal `done`.
  */
-import { useProjectStore } from './project-store';
+
 import type {
   CoordinationEvent,
   OrgChartView,
@@ -20,6 +20,7 @@ import type {
 import { parseHarnessStatus } from '../chat/harness-status';
 import { resolveEffort } from './model-selection';
 import { usePiStore } from './pi-slice';
+import { useProjectStore } from './project-store';
 import { useSettingsStore } from './settings-store';
 
 /** A minimal single-consumer async iterable the situation room drains. */
@@ -104,12 +105,11 @@ export interface CorpTaskHandle {
  */
 export async function startCorpTask(prompt: string, ctx?: TaskContext): Promise<CorpTaskHandle> {
   connectCorp();
-  // The EFFECTIVE effort the user has selected (the slider level, or the tier-derived
-  // level in Auto mode) — the harness gates the corporation on it (only 'high'/'max'
-  // offer create_production_hierarchy; lower levels run a single solo agent).
-  const activeTier =
-    parseHarnessStatus(usePiStore.getState().extensionStatus.harness)?.activeTier ?? null;
-  const effort = resolveEffort(useSettingsStore.getState().settings, activeTier);
+  // The EFFECTIVE effort for this task — the slider level, or in Adaptive the
+  // level the classifier resolved for the message. The harness gates the
+  // corporation on it (only 'high'/'max' offer create_production_hierarchy;
+  // lower levels run a single solo agent).
+  const effort = resolveEffort(useSettingsStore.getState().settings);
   /*
    * THE CORP WORKS IN THE CHAT'S OWN PROJECT.
    *
@@ -125,9 +125,7 @@ export async function startCorpTask(prompt: string, ctx?: TaskContext): Promise<
    */
   const activePath = useProjectStore.getState().activePath;
   const withCwd: TaskContext | undefined =
-    activePath !== null && activePath !== ''
-      ? { ...(ctx ?? {}), cwd: activePath }
-      : ctx;
+    activePath !== null && activePath !== '' ? { ...(ctx ?? {}), cwd: activePath } : ctx;
   const { taskId } = await window.piDesktop.invoke('corp:start', {
     prompt,
     ...(withCwd ? { ctx: withCwd } : {}),

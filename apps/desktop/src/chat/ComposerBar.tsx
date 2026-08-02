@@ -33,7 +33,6 @@ import { useMemo, useRef } from 'react';
 import { assignChat, createProject, useChatOrg } from '../state/chat-org';
 import { useCorpStore } from '../state/corp-store';
 import { useLlmStore } from '../state/llm-store';
-import { autoEffortForTier } from '../state/model-selection';
 import { restartPi } from '../state/pi-connect';
 import { usePiStore } from '../state/pi-slice';
 import { useProjectStore } from '../state/project-store';
@@ -278,17 +277,14 @@ function EffortRegion() {
   const view = effortSliderView(effortMode, effort, activeTier);
 
   // Dragging/keying to a detent pins an explicit level; the Auto affordance
-  // returns to auto, resolving the tier's level so the harness runs it now.
-  // Both go through the store's `update` (persist + `/harness effort`).
+  // returns to auto and leaves the level where it is — the next message's
+  // classification moves it. (It used to snap to the active model tier's level,
+  // which is how choosing a small model quietly capped thinking at `low`.)
   const onLevelChange = (index: number): void => {
     void useSettingsStore.getState().update({ effortMode: 'level', effort: levelForIndex(index) });
   };
   const onAuto = (): void => {
-    const patch =
-      activeTier !== null
-        ? { effortMode: 'auto' as const, effort: autoEffortForTier(activeTier) }
-        : { effortMode: 'auto' as const };
-    void useSettingsStore.getState().update(patch);
+    void useSettingsStore.getState().update({ effortMode: 'auto' });
   };
 
   return (

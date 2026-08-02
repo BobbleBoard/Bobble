@@ -38,6 +38,7 @@ import { classify, type TaskClass } from '../../../../packages/harness/src/class
 import {
   MODEL_TIERS,
   type ModelTier,
+  effortForClass,
   modelTierForClass,
   TIER_LABEL,
 } from '../../../../packages/harness/src/classify/tier.ts';
@@ -45,9 +46,8 @@ import type { LlmTierPick } from '../../electron/ipc-contract';
 import type { EffortLevel, ModelSelection } from '../../electron/settings/settings-contract';
 import { useLlmStore } from '../state/llm-store';
 import { activateLocalModel } from '../state/local-model';
-import { autoEffortForTier } from '../state/model-selection';
 import { type DowngradeMemory, useModelSelectionStore } from '../state/model-selection-store';
-import { agentInFlight, applyHarnessConfig } from '../state/pi-connect';
+import { agentInFlight } from '../state/pi-connect';
 import { usePiStore } from '../state/pi-slice';
 import { setModelSelection, useSettingsStore } from '../state/settings-store';
 import { parseHarnessStatus } from './harness-status';
@@ -77,6 +77,24 @@ export function tierRank(tier: ModelTier): number {
  * harness's classification for a task (see {@link maybeRouteAuto}) — without it
  * the app would reclassify a bare "continue" from scratch and disagree on the
  * model mid-task. */
+export function classForPrompt(
+  prompt: string,
+  opts: {
+    hasImages?: boolean;
+    forcedClass?: TaskClass;
+    priorClass?: TaskClass;
+    turnIndex?: number;
+  } = {},
+): TaskClass {
+  return classify({
+    prompt,
+    hasImages: opts.hasImages,
+    forcedClass: opts.forcedClass,
+    priorClass: opts.priorClass,
+    turnIndex: opts.turnIndex,
+  }).class;
+}
+
 export function tierForPrompt(
   prompt: string,
   opts: {
@@ -86,15 +104,7 @@ export function tierForPrompt(
     turnIndex?: number;
   } = {},
 ): ModelTier {
-  return modelTierForClass(
-    classify({
-      prompt,
-      hasImages: opts.hasImages,
-      forcedClass: opts.forcedClass,
-      priorClass: opts.priorClass,
-      turnIndex: opts.turnIndex,
-    }).class,
-  );
+  return modelTierForClass(classForPrompt(prompt, opts));
 }
 
 /** The tier whose resolved model matches `modelId` (the currently-running one),
@@ -415,12 +425,14 @@ let lastAutoEffort: EffortLevel | null = null;
  * mid-task/mid-stream. Combined with the harness-continuity tier resolution, the
  * level only moves when the TASK's tier actually changes at a boundary.
  */
-function pushAutoEffort(tier: ModelTier): void {
+function pushAutoEffort(level: EffortLevel): void {
   if (useSettingsStore.getState().settings.effortMode !== 'auto') return;
-  const level = autoEffortForTier(tier);
   if (level === lastAutoEffort) return;
   lastAutoEffort = level;
-  void applyHarnessConfig({ effort: level });
+  // Through the store, not straight at the harness: this level IS the resolved
+  // effort now, so the slider, the corp gate and `/harness effort` must all read
+  // the same one. `update` persists it and forwards the slash command itself.
+  void useSettingsStore.getState().update({ effort: level });
 }
 
 /**
@@ -482,16 +494,25 @@ export async function maybeRouteAuto(
     // `activeClass` into our tier-1 as the continuity prior, and anchor the
     // hysteresis on its published `activeTier`.
     const { priorClass, activeTier } = harnessTaskContext();
-    const desiredTier = tierForPrompt(prompt, {
+    // Classify ONCE and use it for both decisions: which model to run, and how
+    // hard to think. They are different questions about the same judgement.
+    const taskClass = classForPrompt(prompt, {
       hasImages: opts.hasImages,
       forcedClass: opts.forcedClass,
       priorClass,
       turnIndex: priorUserTurns(),
     });
+    const desiredTier = modelTierForClass(taskClass);
 
-    // Auto effort follows the task tier, but ONLY at an idle boundary — never
-    // silently mid-stream/mid-task. Skipped entirely while a turn is in flight.
-    if (!inFlight) pushAutoEffort(desiredTier);
+    /*
+     * Auto effort follows the TASK, not the loaded model — only at an idle
+     * boundary, never mid-stream. It used to be derived from the model tier, so
+     * pinning the model to Fast pinned thinking to `low` however big the task
+     * was, and `max` was unreachable from adaptive at all. That is why the user's
+     * "ask the manager to set up a Godot demo" got "I don't have access to tools
+     * that can contact your manager": `talk_to_manager` needs high/max.
+     */
+    if (!inFlight) pushAutoEffort(effortForClass(taskClass));
 
     const pick = models[desiredTier];
     // Prefer the harness's authoritative tier for "where we are"; fall back to the
@@ -717,8 +738,13 @@ export async function selectTier(tier: ModelTier): Promise<void> {
   }
 
   await setModelSelection({ mode: 'tier', tier });
-  // A pinned tier is fixed, so push its auto effort once (if effort is 'auto').
-  pushAutoEffort(tier);
+  /*
+   * Pinning a MODEL must not pin the THINKING. This used to push the tier's
+   * effort, which is how choosing "Fast" quietly capped every later task at
+   * `low`. Adaptive effort now comes from the next message's classification, so
+   * a small model asked to build something still thinks hard — and still has a
+   * team.
+   */
   if (pick === undefined) return; // catalog not loaded — pin persisted, nothing to launch
 
   useModelSelectionStore.getState().setPendingDownload(null);

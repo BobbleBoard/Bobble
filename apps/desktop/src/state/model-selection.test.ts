@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_ADVANCED, type DesktopSettings } from '../../electron/settings/settings-contract';
 import {
-  autoEffortForTier,
   EFFORT_STEPS,
   isPinnedSelection,
   levelToSlider,
@@ -36,14 +35,6 @@ const base: DesktopSettings = {
   hideDeleteChatConfirm: false,
 };
 
-describe('autoEffortForTier', () => {
-  it('maps fast→low, balanced→medium, intelligent→high (max never auto)', () => {
-    expect(autoEffortForTier('fast')).toBe('low');
-    expect(autoEffortForTier('balanced')).toBe('medium');
-    expect(autoEffortForTier('intelligent')).toBe('high');
-  });
-});
-
 describe('sliderToLevel / levelToSlider', () => {
   it('snaps 0..1 to the nearest detent', () => {
     expect(sliderToLevel(0)).toBe('low');
@@ -66,17 +57,18 @@ describe('sliderToLevel / levelToSlider', () => {
 });
 
 describe('resolveEffort', () => {
-  it('auto mode derives from the active tier', () => {
-    expect(resolveEffort({ ...base, effortMode: 'auto' }, 'fast')).toBe('low');
-    expect(resolveEffort({ ...base, effortMode: 'auto' }, 'intelligent')).toBe('high');
+  it('uses the resolved level in both modes', () => {
+    // Adaptive writes the classifier's level into `effort`, so there is exactly
+    // one resolved level and no reader re-derives it.
+    expect(resolveEffort({ ...base, effortMode: 'auto', effort: 'max' })).toBe('max');
+    expect(resolveEffort({ ...base, effortMode: 'level', effort: 'max' })).toBe('max');
+    expect(resolveEffort({ ...base, effortMode: 'auto', effort: 'low' })).toBe('low');
   });
 
-  it('auto mode with no active tier falls back to the explicit level', () => {
-    expect(resolveEffort({ ...base, effortMode: 'auto', effort: 'high' }, null)).toBe('high');
-  });
-
-  it('level mode always uses the explicit level, ignoring the tier', () => {
-    expect(resolveEffort({ ...base, effortMode: 'level', effort: 'max' }, 'fast')).toBe('max');
+  it('lets Adaptive reach max — the level the corp harness gates on', () => {
+    // The old tier-derived mapping topped out at 'high', so a small pinned model
+    // capped Adaptive at 'low' and create_production_hierarchy was never offered.
+    expect(resolveEffort({ ...base, effortMode: 'auto', effort: 'max' })).toBe('max');
   });
 });
 

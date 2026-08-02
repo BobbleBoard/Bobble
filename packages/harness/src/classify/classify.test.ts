@@ -80,7 +80,14 @@ const CORPUS: readonly [string, TaskClass][] = [
   // everything-tier was removed (round-10 #7): agentic build verbs fall back to
   // `basic-tools` (python + web; tool_search pulls in the rest on demand), and a
   // no-tool-signal prompt falls back to tool-search-only `other`.
-  ['Build a full-stack todo app with authentication and deploy it.', 'basic-tools'],
+  //
+  // "Build an app" is NOT a fallback: it names software to be built, which is
+  // the `coding` class. This line used to expect `basic-tools` — the bug written
+  // down as an expectation. Effort follows the class, and the corporation is
+  // offered only at high/max, so classing a full-stack build as a
+  // lookup-and-compute errand is what left the biggest asks working alone.
+  ['Build a full-stack todo app with authentication and deploy it.', 'coding'],
+  // Still a fallback: no noun says what is being built.
   ['Set up a new project, write the code, and run everything.', 'basic-tools'],
   ['Plan and execute a marketing campaign end to end.', 'other'],
 ];

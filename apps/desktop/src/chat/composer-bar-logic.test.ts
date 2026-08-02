@@ -93,9 +93,14 @@ describe('effortDisplay', () => {
 });
 
 describe('effortSliderView', () => {
-  it('auto: the label reads "Effort · Adaptive" while the tier still drives the slider position', () => {
-    // fast → the knob rests at the low detent, but the readout says "Adaptive".
-    expect(effortSliderView('auto', 'medium', 'fast')).toMatchObject({
+  it('auto: the label reads "Effort · Adaptive" while the RESOLVED level drives the position', () => {
+    /*
+     * The knob follows the level Adaptive last resolved for a message, NOT the
+     * active model tier — so a small pinned model no longer drags the knob (and
+     * the harness) down to `low`, and the position always agrees with the effort
+     * actually running. The third argument is the tier, and it is now inert here.
+     */
+    expect(effortSliderView('auto', 'low', 'intelligent')).toMatchObject({
       auto: true,
       index: 0,
       fill: 0,
@@ -103,20 +108,19 @@ describe('effortSliderView', () => {
       valueText: 'Effort, adaptive',
     });
 
-    // balanced → the knob sits at the mid detent; the label stays "Effort · Adaptive".
-    const bal = effortSliderView('auto', 'low', 'balanced');
+    const bal = effortSliderView('auto', 'medium', 'fast');
     expect(bal.auto).toBe(true);
     expect(bal.label).toBe('Effort · Adaptive');
     expect(bal.valueText).toBe('Effort, adaptive');
-    expect(bal.index).toBe(1); // medium — the routed position, not the readout
+    expect(bal.index).toBe(1);
     expect(bal.fill).toBeCloseTo(1 / 3, 5);
 
-    // intelligent → the knob rests at the tick below max; still "Effort · Adaptive".
-    const smart = effortSliderView('auto', 'low', 'intelligent');
-    expect(smart.label).toBe('Effort · Adaptive');
-    expect(smart.valueText).toBe('Effort, adaptive');
-    expect(smart.index).toBe(2);
-    expect(smart.fill).toBeCloseTo(2 / 3, 5);
+    // max is REACHABLE from Adaptive now — the old tier mapping topped out at
+    // 'high', which is the whole reason the corporation went unoffered.
+    const top = effortSliderView('auto', 'max', 'fast');
+    expect(top.label).toBe('Effort · Adaptive');
+    expect(top.index).toBe(3);
+    expect(top.fill).toBeCloseTo(1, 5);
   });
 
   it('auto + no tier yet: still reads "Effort · Adaptive", resting the knob on the explicit level', () => {

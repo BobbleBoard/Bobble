@@ -25,15 +25,6 @@ export const EFFORT_STEPS = [
   'max',
 ] as const satisfies readonly EffortLevel[];
 
-/**
- * effort 'auto' → the level derived from the active tier:
- *   fast → low, balanced → medium, intelligent → high.
- * ('max' is reserved for an explicit drag to the far right — never auto.)
- */
-export function autoEffortForTier(tier: ModelTier): EffortLevel {
-  return tier === 'fast' ? 'low' : tier === 'balanced' ? 'medium' : 'high';
-}
-
 /** 4-detent slider (0..1) → the nearest effort level. Detents: 0=low, .33=medium,
  * .66=high, 1=max. Out-of-range inputs clamp to the ends. */
 export function sliderToLevel(v01: number): EffortLevel {
@@ -52,11 +43,22 @@ export function levelToSlider(level: EffortLevel): number {
 }
 
 /**
- * The effort level the harness should actually run this turn: in 'auto' mode with
- * a known active tier, derive it from the tier; otherwise use the explicit level.
+ * The effort level the harness should actually run this turn.
+ *
+ * This used to derive Auto's level from the ACTIVE MODEL TIER (fast→low,
+ * balanced→medium, intelligent→high), which had two consequences nobody chose:
+ * `max` was unreachable from Adaptive at all, and pinning the model to Fast
+ * pinned thinking to `low` no matter how large the task was. Since
+ * `create_production_hierarchy` is gated on high/max, that is precisely why
+ * "ask the manager to set up a Godot demo" answered that it had no tool to
+ * contact a manager — on Adaptive + Fast it genuinely didn't.
+ *
+ * Adaptive now writes the classifier's level into `settings.effort` at each idle
+ * boundary (see `pushAutoEffort`), so there is ONE resolved level and every
+ * reader — the slider, the harness, the corp gate — sees the same number.
  */
-export function resolveEffort(s: DesktopSettings, activeTier: ModelTier | null): EffortLevel {
-  return s.effortMode === 'auto' && activeTier !== null ? autoEffortForTier(activeTier) : s.effort;
+export function resolveEffort(s: DesktopSettings): EffortLevel {
+  return s.effort;
 }
 
 /** True when the selection pins a model/tier (the Auto router is disabled). */

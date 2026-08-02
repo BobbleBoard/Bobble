@@ -270,8 +270,31 @@ const CATEGORY_RULES: readonly CategoryRule[] = [
     ],
   },
   {
+    /*
+     * Two different jobs land here. The original patterns are all MAINTENANCE on
+     * code that already exists — refactor, debug, stack trace, the repo. Missing
+     * entirely was the other half: BUILDING software that doesn't exist yet.
+     * "Build me a 2D platformer game in Godot" scored nothing here, fell through
+     * to the agentic fallback, and came out `basic-tools` — a lookup-and-compute
+     * errand. Since effort follows the class and the corporation is gated on
+     * high/max, the largest requests Bobble receives were also the ones it
+     * refused to bring a team to.
+     *
+     * Named engines and frameworks carry weight because naming one is a strong
+     * statement of intent: nobody names a build tool in passing.
+     */
     category: 'coding',
     patterns: [
+      [
+        /\b(build|make|create|write|develop|code)\b[^.!?]{0,40}\b(app|application|game|website|web ?app|site|tool|cli|dashboard|extension|plugin|bot|server|library|prototype|clone)\b/,
+        2,
+      ],
+      [
+        /\b(godot|unity|unreal|react|next\.?js|svelte|vue|angular|django|flask|rails|express|electron|swiftui|flutter|tauri|pygame|phaser|love2d)\b/,
+        2,
+      ],
+      [/\bfrom scratch\b/, 1],
+      [/\b(platformer|roguelike|side-?scroller|top-?down) \w*\s?game\b/, 2],
       [/\brefactor\b/, 2],
       [/\bdebug\b/, 2],
       [/\bstack trace\b/, 2],
