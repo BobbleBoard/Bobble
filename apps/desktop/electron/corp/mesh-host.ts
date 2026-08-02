@@ -230,9 +230,53 @@ export function runtimeCheck(runtime: string | null, cwd: string): string {
   const text = `${r.stdout ?? ''}\n${r.stderr ?? ''}`;
   const errs = text.split('\n').filter((l) => /ERROR|SCRIPT ERROR/.test(l));
   if (r.error !== undefined) return `The check could not run: ${r.error.message}`;
-  return errs.length === 0
-    ? 'It loaded with NO errors.'
-    : `${errs.length} problem(s):\n${errs.slice(0, 20).join('\n')}`;
+  if (errs.length === 0) return 'It loaded with NO errors.';
+  return [`${errs.length} problem(s):`, errs.slice(0, 20).join('\n'), buildScriptReport(cwd)]
+    .filter((part) => part !== '')
+    .join('\n');
+}
+
+/**
+ * If a scene-building script is sitting there unrun, RUN IT and report what it
+ * said.
+ *
+ * Run 23 wrote a build.gd that calls `ResourceSaver.save()` — the remedy landed —
+ * and then never executed it, so the project stayed sceneless and nobody ever saw
+ * that the script was itself broken: `extends Node` with `_ready()` where
+ * `--script` needs a SceneTree and `_init()`, a Node handed to `ResourceSaver`
+ * instead of a packed scene, and an invented `MODE_2DOFTHREE` constant.
+ *
+ * An unrun script is not evidence of anything. Running it is bounded (`--script`
+ * exits on its own) and turns a file nobody looked at into the specific errors
+ * the model needs. Same principle as running the load check rather than asking
+ * for it.
+ */
+function buildScriptReport(cwd: string): string {
+  let scripts: string[] = [];
+  try {
+    scripts = readdirSync(cwd).filter((f) => /^build.*\.gd$/i.test(f));
+  } catch {
+    return '';
+  }
+  if (scripts.length === 0) return '';
+  const name = scripts[0] as string;
+  const r = spawnSync('godot', ['--headless', '--script', name], {
+    cwd,
+    encoding: 'utf8',
+    timeout: 90_000,
+  });
+  const out = `${r.stdout ?? ''}\n${r.stderr ?? ''}`;
+  const errs = out.split('\n').filter((l) => /ERROR|SCRIPT ERROR/.test(l));
+  if (errs.length === 0) {
+    return `\nI ALSO RAN YOUR ${name} — it reported no errors. If the scene it should ` +
+      'produce is still missing, it is not actually saving one.';
+  }
+  return (
+    `\nI ALSO RAN YOUR ${name}, AND IT IS BROKEN:\n${errs.slice(0, 10).join('\n')}\n` +
+    'Fix the build script first — nothing it should have produced exists until it runs clean. ' +
+    'For `--script` it must `extends SceneTree` with `_init()` (not `extends Node`/`_ready()`), ' +
+    'and `ResourceSaver.save()` takes a PackedScene from `PackedScene.pack(root)`, never a Node.'
+  );
 }
 
 
