@@ -282,3 +282,37 @@ main-process activity, not file count.
 
 Both of these are instrumentation failures, not product failures, and both would
 have been reported as findings if I had not looked at the picture.
+
+## Runs 22–23: the remedies land, one layer at a time
+
+The point-of-failure remedies work, and each run now gets a layer further before
+failing:
+
+| | |
+|---|---|
+| 21 | `project.godot` corrupt, no scenes at all |
+| 22 | `[input]` **deleted by the remedy** · `build.gd` created · scene still hand-typed |
+| 23 | `project.godot` **valid** · three real `.tscn` files · `build.gd` **calls ResourceSaver** · never run |
+
+Run 22 is the first time the harness repaired a class of failure on its own: the
+`[input]` section that killed runs 10, 16, 17, 18 and 21 was deleted exactly as
+the remedy instructed. The same general advice had been sitting in the builder
+charter since run 17 and never once changed behaviour.
+
+**Run 23's lesson: an unrun script is not evidence of anything.** It wrote a
+build.gd that genuinely calls `ResourceSaver.save()` — what the remedy asked for —
+and never executed it. Running it by hand showed the script was broken three
+ways nobody had seen:
+
+    extends Node / func _ready()     -- `--script` needs SceneTree and _init()
+    ResourceSaver.save(node, path)   -- takes a PackedScene, never a Node
+    Camera2D.MODE_2DOFTHREE          -- invented outright
+
+So the harness runs it now, exactly as it runs the load check rather than asking
+for one. That is the same mistake one level down, and I had been making it too.
+
+**And it cost me a run.** Adding a second synchronous godot call to `runtimeCheck`
+blocked the Electron main process long enough that my probe's screenshot timed
+out and threw, killing run 24 before it started. Both spawns are bounded at 45s
+now, and the probe no longer treats a failed observation as a reason to stop
+observing. The real fix is an async `nextPrompt`.
