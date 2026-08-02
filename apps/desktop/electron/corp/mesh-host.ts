@@ -67,6 +67,46 @@ import { repairNote, repairShadowTree } from './workspace-paths';
 const log = createLogger('desktop:corp');
 
 /**
+ * Known-failure → the fix that actually works, delivered at the moment it fails.
+ *
+ * The general principle ("use the tool's defaults", "do not hand-write a format
+ * a program owns") is in the builder charter and has not held: runs 10, 16, 17
+ * and 18 all died on a hand-written `project.godot`, the last one inventing an
+ * `InputActionMap` identifier outright. A rule read once at the start loses to a
+ * remedy handed over at the point of failure — the same reason the load errors
+ * themselves had to be fed back rather than requested.
+ *
+ * Same shape as `capabilities.ts`'s `ifMissing` notes, which already do this for
+ * absent toolchains. Kept to failures seen repeatedly in real runs.
+ */
+const REMEDIES: ReadonlyArray<{ readonly when: RegExp; readonly fix: string }> = [
+  {
+    when: /project\.godot.*(?:Unexpected identifier|Expected '\}'|might be corrupted)/i,
+    fix:
+      "Your project.godot is malformed. Godot's input-map format (those " +
+      'Object(InputEventKey,…) blocks) cannot be hand-written reliably and you do not ' +
+      'need it: DELETE the entire [input] section and use the actions Godot already ' +
+      'ships — ui_left, ui_right, ui_up, ui_down, ui_accept — in your scripts. Keep ' +
+      'project.godot down to config_version, [application] and [display].',
+  },
+  {
+    when: /\.tscn.*(?:Parse Error|Unknown tag|Unexpected end of file)/i,
+    fix:
+      'A .tscn you typed by hand is malformed. Do not hand-edit it again — build the ' +
+      'scene with a script instead: a GDScript that `extends SceneTree`, creates the ' +
+      "nodes in `_init()`, sets each child's `owner` to the root, packs a PackedScene " +
+      'and calls ResourceSaver.save(), run with `godot --headless --script build.gd`.',
+  },
+];
+
+/** Any remedies matching this failure text, as instructions. */
+function remediesFor(state: string): string {
+  const hits = REMEDIES.filter((r) => r.when.test(state)).map((r) => `  - ${r.fix}`);
+  return hits.length === 0 ? '' : `KNOWN FIX FOR WHAT YOU ARE HITTING:\n${hits.join('\n')}`;
+}
+
+
+/**
  * Pull the actual lines an error points at. Godot names `file:line` (and
  * sometimes an absolute path); showing those lines beside the message is the
  * difference between "fix line 27" and being able to.
@@ -675,6 +715,8 @@ export function createMeshAgentHost(config: MeshAgentHostConfig): MeshAgentHost 
                          * line number and never shown the line.
                          */
                         excerptFailures(state, config.cwd),
+                        '',
+                        remediesFor(state),
                         '',
                         'Fix exactly these errors and nothing else. Do not add features, do not',
                         'refactor, do not write new files unless one of these says a file is',
