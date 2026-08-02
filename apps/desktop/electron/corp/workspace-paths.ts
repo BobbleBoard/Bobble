@@ -29,7 +29,15 @@
  * workspace's last folder is untouched.
  */
 
-import { existsSync, mkdirSync, readdirSync, renameSync, statSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  renameSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import path from 'node:path';
 
 /** Split a path into components, dropping the root and any empties. */
@@ -265,4 +273,43 @@ export function workspaceFromTask(task: string, home: string): string | null {
     if (best === null || abs.length > best.length) best = abs;
   }
   return best;
+}
+
+/**
+ * Strip a malformed `[input]` block out of `project.godot`.
+ *
+ * SIX runs died on this one section. The model hand-writes Godot's
+ * `Object(InputEventKey,…)` serialisation — the hairiest format the engine has —
+ * to redefine `ui_left`/`ui_right`, which Godot ALREADY ships. Run 25's had a
+ * stray escaped quote in the middle of it. The builder charter says not to, and
+ * the point-of-failure remedy does fix it, but only after burning a whole turn.
+ *
+ * So it is repaired, the way a shadow tree is: the section is removed, the model
+ * is TOLD it was removed, and its scripts keep working because the `ui_*` actions
+ * it was redefining exist by default. Deliberately narrow — it only fires when the
+ * project fails to load AND the file has an `[input]` section, it only ever
+ * deletes that one section, and it never touches a project that loads.
+ *
+ * Returns true when something was removed.
+ */
+export function stripBrokenInputMap(cwd: string): boolean {
+  const file = path.join(cwd, 'project.godot');
+  let body: string;
+  try {
+    body = readFileSync(file, 'utf8');
+  } catch {
+    return false;
+  }
+  const start = body.search(/^\[input\]\s*$/m);
+  if (start === -1) return false;
+  const after = body.slice(start + 1);
+  const nextSection = after.search(/^\[[a-z_]+\]\s*$/m);
+  const end = nextSection === -1 ? body.length : start + 1 + nextSection;
+  const stripped = `${body.slice(0, start)}${body.slice(end)}`.replace(/\n{3,}/g, '\n\n');
+  try {
+    writeFileSync(file, stripped, 'utf8');
+    return true;
+  } catch {
+    return false;
+  }
 }

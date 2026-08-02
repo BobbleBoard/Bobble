@@ -62,7 +62,7 @@ import {
   submissionNote,
 } from './submit-work';
 import { TeamBook } from './team-record';
-import { repairNote, repairShadowTree } from './workspace-paths';
+import { repairNote, repairShadowTree, stripBrokenInputMap } from './workspace-paths';
 
 const log = createLogger('desktop:corp');
 
@@ -247,6 +247,32 @@ export function runtimeCheck(runtime: string | null, cwd: string): string {
   const errs = text.split('\n').filter((l) => /ERROR|SCRIPT ERROR/.test(l));
   if (r.error !== undefined) return `The check could not run: ${r.error.message}`;
   if (errs.length === 0) return 'It loaded with NO errors.';
+  /*
+   * REPAIR THE ONE SECTION THAT HAS KILLED SIX RUNS, then check again.
+   *
+   * A hand-written `[input]` map is both unnecessary (Godot ships `ui_left`,
+   * `ui_right`, `ui_accept`) and unwritable by this model. Removing it is the
+   * same kind of act as `repairShadowTree` moving misplaced files: the harness
+   * fixing its workspace, and saying so.
+   */
+  if (/project\.godot/i.test(text) && stripBrokenInputMap(cwd)) {
+    log.info('corp repair: removed a malformed [input] section', { cwd });
+    const again = spawnSync('godot', ['--headless', '--quit', '--path', cwd], {
+      encoding: 'utf8',
+      timeout: 45_000,
+    });
+    const left = `${again.stdout ?? ''}\n${again.stderr ?? ''}`
+      .split('\n')
+      .filter((l) => /ERROR|SCRIPT ERROR/.test(l));
+    const note =
+      'NOTE: your project.godot had a malformed [input] section and I REMOVED it. ' +
+      'Do not put it back — use the ui_left / ui_right / ui_up / ui_down / ui_accept ' +
+      'actions Godot ships, which is what your scripts should call.';
+    if (left.length === 0) return `It loaded with NO errors.\n${note}`;
+    return [`${left.length} problem(s):`, left.slice(0, 20).join('\n'), note, buildScriptReport(cwd)]
+      .filter((part) => part !== '')
+      .join('\n');
+  }
   return [`${errs.length} problem(s):`, errs.slice(0, 20).join('\n'), buildScriptReport(cwd)]
     .filter((part) => part !== '')
     .join('\n');
