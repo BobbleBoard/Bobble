@@ -25,7 +25,7 @@
  */
 
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, readdirSync, readFileSync } from 'node:fs';
+import { mkdirSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import nodePath from 'node:path';
 import type { ExtensionFactory, ToolDefinition } from '@mariozechner/pi-coding-agent';
 import {
@@ -108,6 +108,14 @@ const REMEDIES: ReadonlyArray<{ readonly when: RegExp; readonly fix: string }> =
       'and a `*` to make it a singleton: `Counter="*res://scripts/counter.gd"`. ' +
       'Simpler still, a platformer does not need autoloads at all: DELETE the ' +
       '[autoload] section and keep the coin counter on a node in the scene.',
+  },
+  {
+    when: /Failed loading scene: res:\/\/[\w./ -]+\.gd/i,
+    fix:
+      '`run/main_scene` in project.godot points at a SCRIPT (.gd), not a scene ' +
+      '(.tscn). A script is not a scene and never will be. If you wrote a build ' +
+      'script, RUN it (`godot --headless --script <that file>`) to produce the ' +
+      '.tscn, then point run/main_scene at the .tscn it saved.',
   },
   {
     when: /(?:Cannot open file 'res:\/\/[\w./ -]+\.tscn'|Failed loading scene)/i,
@@ -294,12 +302,33 @@ export function runtimeCheck(runtime: string | null, cwd: string): string {
  * for it.
  */
 function buildScriptReport(cwd: string): string {
-  let scripts: string[] = [];
-  try {
-    scripts = readdirSync(cwd).filter((f) => /^build.*\.gd$/i.test(f));
-  } catch {
-    return '';
-  }
+  /*
+   * LOOK IN SUBDIRECTORIES. Run 26 put its build script at `scripts/build_game.gd`
+   * and a top-level-only readdir missed it entirely — so the runner I had just
+   * added never fired on the very run it was written for.
+   */
+  const find = (dir: string, prefix: string, depth: number, out: string[]): void => {
+    if (depth > 2) return;
+    let entries: string[] = [];
+    try {
+      entries = readdirSync(dir);
+    } catch {
+      return;
+    }
+    for (const name of entries) {
+      if (name.startsWith('.')) continue;
+      const full = nodePath.join(dir, name);
+      const rel = prefix === '' ? name : `${prefix}/${name}`;
+      try {
+        if (statSync(full).isDirectory()) find(full, rel, depth + 1, out);
+        else if (/^build.*\.gd$/i.test(name)) out.push(rel);
+      } catch {
+        /* unreadable entry */
+      }
+    }
+  };
+  const scripts: string[] = [];
+  find(cwd, '', 0, scripts);
   if (scripts.length === 0) return '';
   const name = scripts[0] as string;
   const r = spawnSync('godot', ['--headless', '--script', name], {

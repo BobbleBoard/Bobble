@@ -220,3 +220,13 @@ describe('the project.godot remedy gives the whole file', () => {
     expect(out).toContain('Do NOT copy the comment header');
   });
 });
+
+describe('main_scene pointing at a script', () => {
+  /* Run 26's single remaining error: run/main_scene="res://scripts/build_game.gd"
+   * — it pointed the entry scene at its own build script and never ran it. */
+  it('says a .gd is not a scene, and to run the build script', () => {
+    const out = remediesFor('ERROR: Failed loading scene: res://scripts/build_game.gd.');
+    expect(out).toContain('points at a SCRIPT');
+    expect(out).toContain('--headless --script');
+  });
+});
