@@ -225,7 +225,11 @@ export function runtimeCheck(runtime: string | null, cwd: string): string {
    */
   const r = spawnSync('godot', ['--headless', '--quit', '--path', cwd], {
     encoding: 'utf8',
-    timeout: 120_000,
+    // Kept SHORT because this blocks the main process (see the note above). A
+    // load check that has not answered in 45s is a hang, not a slow project —
+    // and adding a second godot call here made an over-long block visible as an
+    // unresponsive window.
+    timeout: 45_000,
   });
   const text = `${r.stdout ?? ''}\n${r.stderr ?? ''}`;
   const errs = text.split('\n').filter((l) => /ERROR|SCRIPT ERROR/.test(l));
@@ -263,7 +267,7 @@ function buildScriptReport(cwd: string): string {
   const r = spawnSync('godot', ['--headless', '--script', name], {
     cwd,
     encoding: 'utf8',
-    timeout: 90_000,
+    timeout: 45_000,
   });
   const out = `${r.stdout ?? ''}\n${r.stderr ?? ''}`;
   const errs = out.split('\n').filter((l) => /ERROR|SCRIPT ERROR/.test(l));
