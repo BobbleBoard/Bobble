@@ -25,7 +25,7 @@
  */
 
 import { spawnSync } from 'node:child_process';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, readdirSync } from 'node:fs';
 import nodePath from 'node:path';
 import type { ExtensionFactory, ToolDefinition } from '@mariozechner/pi-coding-agent';
 import {
@@ -65,6 +65,29 @@ import { TeamBook } from './team-record';
 import { repairNote, repairShadowTree } from './workspace-paths';
 
 const log = createLogger('desktop:corp');
+
+/** The workspace's files, relative and sorted — context for a missing-file error. */
+function listProject(cwd: string): string {
+  const walk = (dir: string, prefix: string, out: string[]): void => {
+    if (out.length > 60) return;
+    for (const e of readdirSync(dir, { withFileTypes: true }).sort((a, b) =>
+      a.name.localeCompare(b.name),
+    )) {
+      if (e.name.startsWith('.')) continue;
+      const rel = prefix === '' ? e.name : `${prefix}/${e.name}`;
+      if (e.isDirectory()) walk(nodePath.join(dir, e.name), rel, out);
+      else out.push(rel);
+    }
+  };
+  try {
+    const out: string[] = [];
+    walk(cwd, '', out);
+    return out.length === 0 ? '  (nothing at all)' : out.map((f) => `  ${f}`).join('\n');
+  } catch {
+    return '  (could not be listed)';
+  }
+}
+
 
 /**
  * Run the one command that proves whether a runtime-typed project actually loads,
@@ -598,6 +621,17 @@ export function createMeshAgentHost(config: MeshAgentHostConfig): MeshAgentHost 
                         'STOP. I ran the project check myself and IT DOES NOT LOAD:',
                         '',
                         state,
+                        '',
+                        /*
+                         * WHAT IS ACTUALLY THERE, next to what is missing. Run 15
+                         * looped twice on "Cannot open file 'res://main.tscn'"
+                         * against a project containing no .tscn file at all — the
+                         * error names what is absent and never what is present,
+                         * which is exactly the gap a listing closes. General, not
+                         * Godot-specific: an error about a file is easier to act
+                         * on beside the file list.
+                         */
+                        `The project directory actually contains:\n${listProject(config.cwd)}`,
                         '',
                         'Fix exactly these errors and nothing else. Do not add features, do not',
                         'refactor, do not write new files unless one of these says a file is',
