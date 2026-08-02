@@ -22,6 +22,7 @@ import {
   stripPriorThinking,
   TOOL_SEARCH_NAME,
   toolResultText,
+  wouldHang,
 } from './role-agent';
 
 describe('roleActiveTools — full-harness parity starting active set', () => {
@@ -618,5 +619,36 @@ describe('role separation is enforced by CAPABILITY, not by the prompt', () => {
   it('still catches the shell route it always caught', () => {
     const block = bashWriteGate('bash', { command: 'cat > src/x.py << EOF\nx\nEOF' }, false);
     expect(block?.block).toBe(true);
+  });
+});
+
+describe('commands that open a window and wait', () => {
+  /* Five runs died on this, each a different spelling. Run 24 had built every
+   * scene and script the task asked for, then sat behind a Godot window for
+   * twenty-two minutes. The per-call watchdog cannot catch it — during a tool
+   * call no timer is armed — and the model never once used the timeout shim. */
+  it('refuses the three forms that hung real runs', () => {
+    expect(wouldHang('cd /x && godot --path .')).toContain('never returns');
+    expect(wouldHang('godot --headless -e game')).toContain('never returns');
+    expect(wouldHang('godot --headless --path .')).toContain('never returns');
+  });
+
+  it('allows every form that exits by itself', () => {
+    expect(wouldHang('godot --headless --quit --path .')).toBeNull();
+    expect(wouldHang('godot --headless --script build.gd')).toBeNull();
+    expect(wouldHang('godot --path . --write-movie out.avi --quit-after 40')).toBeNull();
+    expect(wouldHang('godot --version')).toBeNull();
+    expect(wouldHang('timeout 60 godot --path .')).toBeNull();
+  });
+
+  it('ignores commands that are not godot', () => {
+    expect(wouldHang('ls -la')).toBeNull();
+    expect(wouldHang('echo "godotisnotacommandhere"')).toBeNull();
+  });
+
+  it('is wired into the gate', () => {
+    const blocked = bashDenylistGate('bash', { command: 'godot --path .' });
+    expect(blocked?.block).toBe(true);
+    expect(bashDenylistGate('bash', { command: 'godot --headless --quit --path .' })).toBeUndefined();
   });
 });

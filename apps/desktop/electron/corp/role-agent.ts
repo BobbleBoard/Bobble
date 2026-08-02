@@ -410,7 +410,45 @@ export function bashDenylistGate(toolName: string, input: unknown): StepCapBlock
       ? (input as { command: string }).command
       : '';
   const reason = checkScaryBash(command);
-  return reason !== null ? { block: true, reason: `blocked by denylist: ${reason}` } : undefined;
+  if (reason !== null) return { block: true, reason: `blocked by denylist: ${reason}` };
+  const hang = wouldHang(command);
+  return hang !== null ? { block: true, reason: hang } : undefined;
+}
+
+/**
+ * Commands that open a window and WAIT — the single most expensive failure this
+ * harness has.
+ *
+ * FIVE runs died here, each a different spelling of the same mistake:
+ * `godot --headless -e game`, a bare `godot --path .`, `godot --headless --path .`
+ * without `--quit`. Each held its run hostage until the probe gave up — run 24
+ * had built every scene and script the task asked for and then sat behind a
+ * Godot window for twenty-two minutes.
+ *
+ * The per-call watchdog cannot save this: it is armed on `before_provider_request`
+ * and cleared when that response arrives, so during a long TOOL call no timer is
+ * armed at all. And the `timeout` shim only helps when the model remembers to
+ * type it, which across five runs it did not once.
+ *
+ * So the gate refuses, and says what to run instead. Blocking is honest here —
+ * the command genuinely cannot succeed in a headless harness, and the model gets
+ * the correction immediately rather than after twenty minutes of nothing.
+ */
+export function wouldHang(command: string): string | null {
+  const c = command.trim();
+  if (!/(^|[\s;&|(])godot(\s|$)/.test(c)) return null;
+  // These all terminate on their own.
+  if (/--quit(\b|-after)/.test(c) || /--script\b/.test(c) || /--write-movie\b/.test(c)) return null;
+  if (/--version\b|--help\b|-h\b/.test(c)) return null;
+  // Wrapped in something that will kill it — the shim we install on PATH.
+  if (/(^|[\s;&|(])timeout\s+\d+/.test(c)) return null;
+  return (
+    'that Godot command never returns — `-e` and a bare `--path` open the editor or ' +
+    'the project manager and wait forever, and `--headless` alone still runs the ' +
+    'game loop. It would hang this entire run, so it was not executed. Use a form ' +
+    'that exits by itself: `godot --headless --quit --path .` to load and report ' +
+    'every error, or `godot --headless --script build.gd` to run a script.'
+  );
 }
 
 /**
