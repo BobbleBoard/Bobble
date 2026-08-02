@@ -549,12 +549,29 @@ export function createMeshAgentHost(config: MeshAgentHostConfig): MeshAgentHost 
                       if (finalText.trim() === '') {
                         log.info('corp bump: rescuing a spent budget', { agentId });
                       }
-                      return finalText.trim() === ''
-                        ? 'You ran out of tool calls before you replied. Do NOT start anything new ' +
-                            'and do not keep building. Check what is actually on disk right now, run ' +
-                            'the one command that proves whether it works, and REPLY with what you ' +
-                            'found — what is there, what works, what does not.'
-                        : undefined;
+                      if (finalText.trim() !== '') return undefined;
+                      /*
+                       * NAME THE COMMAND. The first version of this said "run the
+                       * one command that proves whether it works" and run 11 spent
+                       * 66 tool calls without ever running one. A 4B told to run
+                       * "the one command" goes looking for it; told
+                       * `godot --headless --quit --path .` it runs that.
+                       */
+                      const rt = taskProfileRef.value.runtime;
+                      const prove =
+                        rt === 'godot'
+                          ? 'godot --headless --quit --path .'
+                          : rt !== null
+                            ? `the ${rt} command that loads this and exits`
+                            : 'the command that runs it';
+                      return (
+                        'STOP BUILDING. You ran out of tool calls before you replied, and you have ' +
+                        'now done that more than once. Do NOT write or edit another file. ' +
+                        `Run exactly this, in the workspace: \`${prove}\` — it loads everything and ` +
+                        'prints every error. Then REPLY with what it printed: what exists, what ' +
+                        'loads, and what is broken. A short honest report of a half-working project ' +
+                        'is worth more than more files nobody has run.'
+                      );
                     }
                     log.info('corp bump: final check', {
                       agentId,
