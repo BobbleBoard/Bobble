@@ -136,11 +136,20 @@ export function emptyProjectComplaint(cwd: string): string | null {
  * `timeout`: if the harness names a mechanism, the mechanism has to work.
  */
 const SCENE_RECIPE = `
+    COPY THIS FILE EXACTLY as build.gd and only change what is between the marked
+    lines. Do not restructure it; every line outside the marks is required and
+    runs 27, 28 and 30 each failed by altering one of them.
+
+      extends SceneTree                 # NOT \`extends Node\`
+
+      func _init():                     # NOT \`_ready()\`
+        # ---- your nodes go here ----
       var root := Node2D.new()          # build your nodes
       var child := Sprite2D.new()
       root.add_child(child)
       child.owner = root                 # EVERY child needs this or it is dropped
       var packed := PackedScene.new()    # NOT PackedScene.pack(root) — pack() is not static
+        # ---- end of your nodes ----
       packed.pack(root)
       ResourceSaver.save(packed, "res://scenes/main.tscn")
       quit()
