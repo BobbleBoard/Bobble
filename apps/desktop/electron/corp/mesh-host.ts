@@ -378,6 +378,8 @@ export function createMeshAgentHost(config: MeshAgentHostConfig): MeshAgentHost 
   const submitted = new Map<string, SubmittedWork>();
   /** Per-agent: what verifying means for the contract it was last handed. */
   const contractProfile = new Map<string, VerificationProfile>();
+  /** Roles that have already had their one final claim check. */
+  const finalChecked = new Set<string>();
   /** The run-level profile, as a ref so the host can be built before it is known. */
   const taskProfileRef: { value: VerificationProfile } = {
     value: classifyVerification(config.task ?? ''),
@@ -565,66 +567,49 @@ export function createMeshAgentHost(config: MeshAgentHostConfig): MeshAgentHost 
           ...(agent.role === 'manager' || agent.role === 'ceo'
             ? {
                 bump: {
-                  // Two: one to rescue a spent budget, one for the final check.
-                  maxBumps: 2,
+                  /*
+                   * ITERATE AGAINST GROUND TRUTH, NOT A FIXED COUNT.
+                   *
+                   * Run 14 went from six load errors to three across two bumps
+                   * and then simply ran out of them. The loop was working; it was
+                   * being stopped early. So the bump now keeps going WHILE the
+                   * project fails to load, driven by what the check actually
+                   * says, and stops the moment it is clean. Six is a backstop
+                   * against a role that cannot converge, not a work budget.
+                   */
+                  maxBumps: 6,
                   nextPrompt: ({ finalText }: { finalText: string }) => {
+                    const state = runtimeCheck(taskProfileRef.value.runtime, config.cwd);
+                    const broken = /^\d+ problem/.test(state);
+                    if (broken) {
+                      log.info('corp bump: project does not load, sending it back', {
+                        agentId,
+                        state: state.split('\n')[0],
+                      });
+                      return [
+                        'STOP. I ran the project check myself and IT DOES NOT LOAD:',
+                        '',
+                        state,
+                        '',
+                        'Fix exactly these errors and nothing else. Do not add features, do not',
+                        'refactor, do not write new files unless one of these says a file is',
+                        'missing. Read the file named in each error and correct the line it names.',
+                        'This is the only thing standing between the user and a working product.',
+                      ].join('\n');
+                    }
+                    // Clean. One last look at the claims, then done.
+                    if (finalChecked.has(agentId)) return undefined;
+                    finalChecked.add(agentId);
                     const claims = extractClaims(finalText);
-                    /*
-                     * A SPENT STEP BUDGET IS NOT AN ENDING.
-                     *
-                     * "(ceo ran out of steps after 31 tool calls without ever
-                     * replying)" was the whole verdict of run 9 — thirteen files
-                     * on disk, a broken game, and nothing said about any of it.
-                     * The budget caps WORK per message; it was never meant to
-                     * decide when a role stops talking. So an empty reply buys
-                     * one more turn, spent finishing rather than building.
-                     */
-                    if (claims.length === 0) {
-                      if (finalText.trim() === '') {
-                        log.info('corp bump: rescuing a spent budget', { agentId });
-                      }
-                      if (finalText.trim() !== '') return undefined;
-                      /*
-                       * NAME THE COMMAND. The first version of this said "run the
-                       * one command that proves whether it works" and run 11 spent
-                       * 66 tool calls without ever running one. A 4B told to run
-                       * "the one command" goes looking for it; told
-                       * `godot --headless --quit --path .` it runs that.
-                       */
-                      /*
-                       * THE HARNESS RUNS THE CHECK, AND HANDS BACK THE ERRORS.
-                       *
-                       * Naming the command was not enough: runs 11 and 12 spent 66
-                       * and 65 tool calls without once running it, and shipped a
-                       * project that does not load. Asking has now failed four
-                       * consecutive runs, so this stops asking. The same principle
-                       * that made the claim-discharge work — the harness DOING it
-                       * rather than requesting it.
-                       */
-                      const verdictText = runtimeCheck(taskProfileRef.value.runtime, config.cwd);
+                    if (claims.length === 0 && finalText.trim() === '') {
+                      log.info('corp bump: loads clean but nothing was said', { agentId });
                       return (
-                        'STOP BUILDING. You ran out of tool calls before you replied. Do NOT write ' +
-                        'or edit another file yet.\n\n' +
-                        `I RAN THE CHECK FOR YOU. This is what your project actually does:\n\n${verdictText}\n\n` +
-                        'If there are errors above, they are the ONLY thing that matters — fix ' +
-                        'exactly those, nothing else, and say what you fixed. If it loaded ' +
-                        'cleanly, reply now with what exists and what works. Either way this is ' +
-                        'your last turn: a short honest report beats more files nobody has run.'
+                        'The project LOADS CLEANLY — I checked. You never replied, though. ' +
+                        'Do not build anything more: say what exists and what it does.'
                       );
                     }
-                    log.info('corp bump: final check', {
-                      agentId,
-                      claims: claims.length,
-                      perspective: agent.role === 'ceo' ? 'ceo' : 'manager',
-                    });
-                    /*
-                     * THE REAL STATE, ALONGSIDE THE CLAIMS. A final check that
-                     * asks "is each of these true?" without saying what IS true
-                     * leaves the model grading its own memory. Run 13 replied
-                     * "Project loads cleanly" about a project with five parse
-                     * errors, so the check now arrives with the answer attached.
-                     */
-                    const state = runtimeCheck(taskProfileRef.value.runtime, config.cwd);
+                    if (claims.length === 0) return undefined;
+                    log.info('corp bump: final check', { agentId, claims: claims.length });
                     return [
                       finalCheck({
                         claims,
@@ -633,12 +618,7 @@ export function createMeshAgentHost(config: MeshAgentHostConfig): MeshAgentHost 
                         ...(config.task !== undefined ? { vision: config.task } : {}),
                       }),
                       '',
-                      `I RAN THE PROJECT CHECK MYSELF. This is the truth about it right now:`,
-                      state,
-                      '',
-                      'If that shows problems, they outrank every claim above: fix them and say',
-                      'what you fixed. Do NOT describe this project as working while that says',
-                      'otherwise.',
+                      `I RAN THE PROJECT CHECK MYSELF: ${state}`,
                     ].join('\n');
                   },
                 },
