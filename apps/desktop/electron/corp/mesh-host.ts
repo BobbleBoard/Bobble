@@ -123,9 +123,19 @@ export function excerptFailures(state: string, cwd: string): string {
   const seen = new Set<string>();
   const out: string[] = [];
   for (const line of state.split('\n')) {
-    const m = /(?:res:\/\/|\/)([\w./-]+?):(\d+)/.exec(line);
+    /*
+     * Godot writes file positions two ways, and only one of them is `file:line`:
+     *   res://scenes/game.tscn:15 - Parse Error: …
+     *   Error parsing '/abs/project.godot' at line 25: …
+     * The second is the format of the failure that has killed the most runs, and
+     * the first version of this regex missed it entirely — so the excerpt never
+     * fired for exactly the case it was written for.
+     */
+    const m =
+      /(?:res:\/\/|\/)([\w./ -]+?):(\d+)/.exec(line) ??
+      /'[^']*?([\w./ -]+)'\s+at line\s+(\d+)/.exec(line);
     if (m === null) continue;
-    const rel = m[1] ?? '';
+    const rel = (m[1] ?? '').trim();
     const at = Number(m[2]);
     const key = `${rel}:${at}`;
     if (seen.has(key) || out.length > 3) continue;

@@ -179,3 +179,20 @@ describe('the autoload remedy', () => {
     expect(out).toContain('DELETE the');
   });
 });
+
+describe('excerpting both Godot position formats', () => {
+  /* Godot writes `res://x.tscn:15 - Parse Error` in one place and
+   * `Error parsing '/abs/project.godot' at line 25` in another. The second is
+   * the failure that has killed the most runs, and the first regex missed it —
+   * the excerpt never fired for the case it existed for. */
+  it("handles \"'file' at line N\", not just file:line", () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), 'pos-'));
+    writeFileSync(path.join(dir, 'project.godot'), 'a\nb\nc\nd\ne\n');
+    const out = excerptFailures(
+      `ERROR: Error parsing '${path.join(dir, 'project.godot')}' at line 3: Unexpected identifier`,
+      dir,
+    );
+    expect(out).toContain('around line 3');
+    expect(out).toContain('>> 3| c');
+  });
+});
