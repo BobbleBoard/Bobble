@@ -1,4 +1,4 @@
-# Corp harness — first completing runs
+# Corp harness — runs 1–15
 
 Six runs, 2026-08-01. Forced corp (`?corpForce`), max effort, qwen3.5-4b-mtp,
 identical prompt: a complete 2D platformer in Godot 4 at a named path.
@@ -144,3 +144,71 @@ Run 5 was spoiled by testbed contamination: the CEO found a prior run's
 `PlatformerGame` and adopted it instead of building the requested project. My
 fault, not the harness's. `~/bobble-testbed` is now archived to
 `~/bobble-archive` and runs start clean.
+
+---
+
+# Part two: runs 9–15, chasing an actually-working game
+
+the user's standing order: rerun until *I* have visually verified, as the user, that
+the game was delivered. Everything below was found by doing that.
+
+## What was wrong, in the order it was found
+
+**The corp worked in the wrong directory.** It rooted at the CHAT's folder — the
+Desktop for most of the user's chats — so a task naming
+`~/bobble-testbed/platformer` had its whole team in `~/Desktop`, and every
+relative shell command landed there. The write fence had stopped this for the pi
+file tools, but bash is not fenced and sensibly cannot be. `ad184ec` puts the
+roles IN the directory the task names. It also closed the "vanished run-8 files"
+mystery: they were at `/Users/user/Desktop/platformer` the whole time.
+
+**My own instruction hung two runs.** Telling every role to "OPEN THE WORK IN IT"
+made the CEO run `godot --headless -e game` and `godot --path .` — both open the
+EDITOR, which never exits. Two processes were still alive when I went looking, at
+1h19m and 19m, each holding its run hostage.
+
+**And it named a command that does not exist.** I had written "wrap it in
+`timeout 60`"; macOS ships no `timeout`. Found by running my own advice.
+
+**The step budget was deciding the outcome.** Runs 9 and 10 ended "(ceo ran out
+of steps after 31/33 tool calls without ever replying)" — 24 calls is less than a
+17-file Godot project takes, so the cap landed mid-build every time and nobody
+ever reached the verification. Raised to 60, plus a bump that rescues a spent
+budget rather than letting the work vanish.
+
+**The check itself was lying.** This is the important one. Godot prints every
+error to STDERR and exits 0; `execFileSync` returns STDOUT only. So the harness
+read an empty stream, found no errors, and told the CEO **"It loaded with NO
+errors"** about a project with five parse errors. The CEO then reported "Project
+loads cleanly" — and I called that a model failure. It was not. It did exactly
+what the harness told it. the user pushed back ("did it attempt to get a screenshot
+or compile and run the project at all?") and that is what found it.
+
+## What the harness does now
+
+- Works in the directory the task names, and logs `cwd` + `cwdFrom`.
+- Classifies verification at task start AND per contract.
+- `submit_work` lists the engineer's own claims back, numbered, with the proof
+  that contract admits.
+- Manager and CEO get the same through the bump, reading as the CEO and as the
+  user respectively.
+- **Runs `godot --headless --quit` itself** and sends the real errors back with
+  "fix exactly these", looping WHILE the project fails to load rather than a
+  fixed number of times.
+- `present` renders a Godot project via `--write-movie` + ffmpeg and hands the
+  frame back — no screen-recording permission, exits by itself.
+
+## Measured
+
+Run 14 went **6 load errors → 3** across two bumps: the CEO read the errors the
+harness gave it and fixed the one in `player.gd`. That is the loop working. It
+then ran out of bumps, which is why the loop is now driven by the check instead
+of a count.
+
+## Still true
+
+- **Corp roles are text-only** (`launchMode: 'fast-text'`), so no role can read an
+  image whatever the harness hands it.
+- No run has yet produced a Godot project that loads cleanly.
+- Delegation still does not happen: the manager and 16 specialists sit `queued`
+  while the CEO builds alone.
