@@ -692,12 +692,30 @@ export function createMeshAgentHost(config: MeshAgentHostConfig): MeshAgentHost 
    * A small model given no anchor invents one. So every agent is told its
    * directory outright, and told that it is already the shell's cwd.
    */
+  /*
+   * ...AND THAT THE DIRECTORY THE TASK NAMES IS THE ONE THEY ARE STANDING IN.
+   *
+   * The note above was not enough on its own, because the TASK TEXT names the
+   * same directory by absolute path — "set up a sample Godot game in
+   * /Users/user/bobble-testbed/demo" — and the roles are rooted there. So "set up
+   * the demo directory" reads as an instruction to CREATE one, and a whole team
+   * built the product into `demo/demo/`. Measured: four engineers, seven files,
+   * one level too deep, and the handback check then ran against the empty parent.
+   *
+   * Naming the collision is the fix — the fact, at the moment it can be acted on,
+   * rather than another rule about paths.
+   */
+  const here = nodePath.basename(config.cwd);
   const workspaceNote = [
     ``,
     `YOUR WORKING DIRECTORY is ${config.cwd}`,
     `It is already the current directory for your shell and your file tools. Address`,
     `everything RELATIVE to it — a bare filename, or a path below it. Never prefix a`,
     `path with the workspace's own directories, and never write outside it.`,
+    `The task may name this directory by its full path. When it says "${here}", it`,
+    `means the directory you are ALREADY IN. It exists. Do not create a "${here}"`,
+    `inside it — that buries the product one level down, where the user is not`,
+    `looking and the checks do not run.`,
   ].join('\n');
 
   // The run-only roles get a corner they CAN write in, so "test it like a user"
