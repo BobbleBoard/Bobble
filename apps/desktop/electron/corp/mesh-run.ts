@@ -79,7 +79,24 @@ function parentFor(agent: MeshAgent): string | undefined {
   return 'ceo';
 }
 
-/** Build the org chart from the roster + the current per-agent states. */
+/**
+ * Build the org chart from the roster + the current per-agent states.
+ *
+ * ONLY PEOPLE WHO HAVE ACTUALLY BEEN GIVEN WORK.
+ *
+ * The roster is a POOL, built up front: four engineer slots and twelve specialty
+ * seats that anyone may commission. Emitting all of it meant the situation room
+ * opened with seventeen names sitting at `queued` before a single message had
+ * been sent, which reads as a team that has been assembled and contracted. the user,
+ * looking at exactly that: "the contracts had to have been premade by either you
+ * or you hardcoded the godot contracts from an earlier run." Neither — but the
+ * room gave him no way to tell, and the one agent that mattered (the manager)
+ * looked hired when it had never been spoken to.
+ *
+ * So a seat appears when it is first engaged. The room now grows in the order
+ * work is actually handed out, and "the manager is in the room" means the
+ * manager is really on the job.
+ */
 function buildMeshChart(
   taskId: string,
   roster: readonly MeshAgent[],
@@ -88,13 +105,17 @@ function buildMeshChart(
   const nodes: OrgNodeView[] = [];
   const edges: Array<{ from: string; to: string }> = [];
   for (const agent of roster) {
+    // The CEO is always present — it is the one seat that exists by virtue of the
+    // task existing. Everyone else has to have been engaged.
+    const state = states.get(agent.id);
+    if (state === undefined && agent.id !== 'ceo') continue;
     const parentId = parentFor(agent);
     nodes.push({
       id: agent.id,
       role: agent.role as OrgNodeView['role'],
       name: nameFor(agent),
       ...(parentId !== undefined ? { parentId } : {}),
-      state: states.get(agent.id) ?? 'idle',
+      state: state ?? 'idle',
     });
     if (parentId !== undefined) edges.push({ from: parentId, to: agent.id });
   }
@@ -275,7 +296,11 @@ export function startMeshTask(opts: {
       // right after (its hops all refuse), so swallow this to avoid double-done.
       if (terminated) return;
       terminated = true;
-      for (const agent of roster) states.set(agent.id, 'done');
+      // Only people who actually WORKED can be finished. Marking the whole
+      // roster done would resurrect the untouched pool at the final frame — the
+      // same "team that never ran" the chart filter exists to stop.
+      for (const [id, state] of states) if (state !== 'retired') states.set(id, 'done');
+      states.set('ceo', 'done');
       emitChart();
       stream.push({ type: 'status', status: 'done' });
       const taskResult: TaskResult = { outcome: 'completed', summary: result.reply };
