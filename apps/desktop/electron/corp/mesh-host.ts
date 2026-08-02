@@ -90,6 +90,14 @@ const REMEDIES: ReadonlyArray<{ readonly when: RegExp; readonly fix: string }> =
       'project.godot down to config_version, [application] and [display].',
   },
   {
+    when: /(?:Failed to instantiate an autoload|Resource file not found: res:\/\/[A-Z])/i,
+    fix:
+      'Your [autoload] entries point at NAMES, not files — Godot needs a real path ' +
+      'and a `*` to make it a singleton: `Counter="*res://scripts/counter.gd"`. ' +
+      'Simpler still, a platformer does not need autoloads at all: DELETE the ' +
+      '[autoload] section and keep the coin counter on a node in the scene.',
+  },
+  {
     when: /\.tscn.*(?:Parse Error|Unknown tag|Unexpected end of file)/i,
     fix:
       'A .tscn you typed by hand is malformed. Do not hand-edit it again — build the ' +

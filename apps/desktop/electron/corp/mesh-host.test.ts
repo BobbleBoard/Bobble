@@ -166,3 +166,16 @@ describe('what the does-not-load bump carries', () => {
     expect(out).toContain('scripts/player.gd');
   });
 });
+
+describe('the autoload remedy', () => {
+  /* Run 20's errors went UP across two bumps (22 -> 26) on `counter="Counter"`:
+   * autoload entries pointing at names rather than paths. Same shape as the
+   * input map — unnecessary configuration, written wrong. */
+  it('explains autoload paths, and that a platformer needs none', () => {
+    const out = remediesFor(
+      '26 problem(s):\nERROR: Failed to instantiate an autoload, can\'t load from path: Counter.',
+    );
+    expect(out).toContain('*res://');
+    expect(out).toContain('DELETE the');
+  });
+});
