@@ -316,3 +316,57 @@ blocked the Electron main process long enough that my probe's screenshot timed
 out and threw, killing run 24 before it started. Both spawns are bounded at 45s
 now, and the probe no longer treats a failed observation as a reason to stop
 observing. The real fix is an async `nextPrompt`.
+
+---
+
+# Runs 24–35: what the failures actually are
+
+Every run in this stretch produced a structurally complete game — scenes,
+scripts, a player, an enemy, coins, a win condition — and was defeated by ONE
+unfamiliar API call. A different one each time:
+
+| run | the single line |
+|---|---|
+| 27 | `PackedScene.pack(root)` static — **my** guidance was wrong |
+| 28 | a stray `get_tree()` inside a `SceneTree` script |
+| 30 | `Vector2.truncate()`, `StaticBody_2D`, `anchor_point` |
+| 33 | a `CanvasLayer` scene root with a movement script on it (loaded, then segfaulted) |
+| 34 | `[sub_resource type="TextureRect"]` — a Node, not a resource |
+| 35 | `add_child(RectangleShape2D)` — a shape where a Node belongs |
+
+Never the logic, never the architecture, never the decomposition. **The
+bottleneck is API recall, not reasoning.** That points at a larger model in the
+CEO seat or fine-tuning far more than at more harness rules — and it sharpens the
+untested question below, because four engineers each owning one file would each
+need less of that surface in mind at once.
+
+## The corp's premise is still untested
+
+`concurrency: 1, parallelOptIn: false` against `ramFittedMax: 3`. In all
+thirty-five runs the manager and sixteen specialists sat `queued` while the CEO
+built alone. Every failure above is one 4B holding an entire Godot project in one
+context — the exact problem a team with per-engineer budgets and a tester who did
+not write the code was built to solve.
+
+## An overfitting line I crossed
+
+The `REMEDIES` table drifted from "known failure → fix" into a Godot cheat-sheet
+(input maps, autoload syntax, PackedScene incantations, main_scene extensions),
+and the harness began EDITING project.godot. Two mechanisms there are general and
+worth keeping — running the load check, and running the build script — because
+they work for any runtime. The rest teaches one engine, and was flagged as
+overfitting.
+
+Their diagnostic value was real: they are how the table above got written. That
+does not make them a harness feature.
+
+## And a UI bug that had nothing to do with any of it
+
+the user's window had its bottom bar and sidebar footer cut off, worse after
+fullscreen. MEASURED: usable area 1512x868, window created at 1440x940 — 72px too
+tall, so Electron centred it to y=-31 and clipped both ends, on every launch.
+
+I had "verified the layout at every size" using `setViewportSize`, which resizes
+the VIEWPORT and not the window, so it could never see this. The CSS was always
+fine and the window was always wrong. `fitToWorkArea` clamps whatever the window
+ends up with; bounds now come back 1440x868 at y=33.
