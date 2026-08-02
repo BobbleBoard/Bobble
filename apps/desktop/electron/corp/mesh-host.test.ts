@@ -20,6 +20,7 @@ import {
   remediesFor,
   excerptFailures,
   listProject,
+  emptyProjectComplaint,
 } from './mesh-host';
 
 describe('what a run hands through to its host', () => {
@@ -257,5 +258,38 @@ describe('get_tree() inside a SceneTree script', () => {
   it('the recipe itself forbids it', () => {
     const out = remediesFor('ERROR: res://main.tscn:19 - Parse Error: Unknown tag.');
     expect(out).toContain('Do NOT add the root to the scene tree');
+  });
+});
+
+describe('an empty project is not a clean load', () => {
+  const tmp = (): string => mkdtempSync(path.join(os.tmpdir(), 'empty-'));
+
+  /* Run 29's project.godot was a YAML build config with GCC flags and
+   * `engine_hollywood` in it, and the project had no .tscn at all. Godot ignores
+   * what it cannot parse, opens nothing, and reports no errors — which would
+   * have ended the convergence loop on an empty directory. */
+  it('says so when there is no scene to open', () => {
+    const dir = tmp();
+    writeFileSync(path.join(dir, 'project.godot'), 'config_version=5\nrun/main_scene="res://x.tscn"\n');
+    expect(emptyProjectComplaint(dir)).toContain('NOTHING TO LOAD');
+  });
+
+  it('says so when nothing names a main scene', () => {
+    const dir = tmp();
+    mkdirSync(path.join(dir, 'scenes'), { recursive: true });
+    writeFileSync(path.join(dir, 'scenes', 'main.tscn'), '[gd_scene]');
+    writeFileSync(path.join(dir, 'project.godot'), 'config_version=5\n');
+    expect(emptyProjectComplaint(dir)).toContain('no `run/main_scene`');
+  });
+
+  it('is silent about a project that really is set up', () => {
+    const dir = tmp();
+    mkdirSync(path.join(dir, 'scenes'), { recursive: true });
+    writeFileSync(path.join(dir, 'scenes', 'main.tscn'), '[gd_scene]');
+    writeFileSync(
+      path.join(dir, 'project.godot'),
+      'config_version=5\n\n[application]\nrun/main_scene="res://scenes/main.tscn"\n',
+    );
+    expect(emptyProjectComplaint(dir)).toBeNull();
   });
 });

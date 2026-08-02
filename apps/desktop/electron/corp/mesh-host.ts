@@ -67,6 +67,62 @@ import { repairNote, repairShadowTree, stripBrokenInputMap } from './workspace-p
 const log = createLogger('desktop:corp');
 
 /**
+ * "No errors" from an empty project is not success — see the note in
+ * {@link runtimeCheck}. A game needs a scene, and project.godot has to name it.
+ */
+export function emptyProjectComplaint(cwd: string): string | null {
+  const scenes: string[] = [];
+  const walk = (dir: string, depth: number): void => {
+    if (depth > 3 || scenes.length > 0) return;
+    let entries: string[] = [];
+    try {
+      entries = readdirSync(dir);
+    } catch {
+      return;
+    }
+    for (const name of entries) {
+      if (name.startsWith('.')) continue;
+      const full = nodePath.join(dir, name);
+      try {
+        if (statSync(full).isDirectory()) walk(full, depth + 1);
+        else if (name.endsWith('.tscn')) scenes.push(name);
+      } catch {
+        /* unreadable */
+      }
+    }
+  };
+  walk(cwd, 0);
+  let cfg = '';
+  try {
+    cfg = readFileSync(nodePath.join(cwd, 'project.godot'), 'utf8');
+  } catch {
+    return 'There is no project.godot at all, so this is not a Godot project yet.';
+  }
+  if (scenes.length === 0) {
+    return (
+      'It reported no errors — because there is NOTHING TO LOAD. There is not a ' +
+      'single .tscn in the project, so Godot opened an empty window. A game needs a ' +
+      'scene: build one with a script and save it, then point run/main_scene at it. ' +
+      'No errors from an empty project is not success.'
+    );
+  }
+  if (!/^\s*run\/main_scene\s*=/m.test(cfg)) {
+    return (
+      `It reported no errors, but project.godot has no \`run/main_scene\` line, so ` +
+      `Godot has nothing to open. Point it at a scene you built (found: ${scenes.join(', ')}).`
+    );
+  }
+  if (!/^\s*config_version\s*=/m.test(cfg)) {
+    return (
+      'It reported no errors, but project.godot has no `config_version=5` line — ' +
+      'Godot is ignoring the file entirely and running defaults, not your game.'
+    );
+  }
+  return null;
+}
+
+
+/**
  * The scene-saving sequence, verbatim, because paraphrasing it broke a run.
  *
  * I wrote "packs them with `PackedScene.pack(root)`" into the remedy. That is a
@@ -291,7 +347,19 @@ export function runtimeCheck(runtime: string | null, cwd: string): string {
   const text = `${r.stdout ?? ''}\n${r.stderr ?? ''}`;
   const errs = text.split('\n').filter((l) => /ERROR|SCRIPT ERROR/.test(l));
   if (r.error !== undefined) return `The check could not run: ${r.error.message}`;
-  if (errs.length === 0) return 'It loaded with NO errors.';
+  if (errs.length === 0) {
+    /*
+     * LOADING CLEANLY IS NOT THE SAME AS BEING A GAME.
+     *
+     * Run 29's project.godot was not Godot syntax at all — a YAML-ish build
+     * config with GCC flags and `engine_hollywood` — and the project contained
+     * no .tscn whatsoever. Godot ignores what it cannot parse, loads nothing,
+     * and reports no errors. Both this check and my own verifier called that
+     * clean, which would have ended the convergence loop on an empty directory.
+     */
+    const empty = emptyProjectComplaint(cwd);
+    return empty ?? 'It loaded with NO errors.';
+  }
   /*
    * REPAIR THE ONE SECTION THAT HAS KILLED SIX RUNS, then check again.
    *
