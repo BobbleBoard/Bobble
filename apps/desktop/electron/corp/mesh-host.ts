@@ -66,6 +66,10 @@ import { repairNote, repairShadowTree, stripBrokenInputMap } from './workspace-p
 
 const log = createLogger('desktop:corp');
 
+/** The ONLY string that means the project is fine. Everything else is a failure,
+ * however it is worded — see the note in the bump. */
+const CLEAN_LOAD = 'It loaded with NO errors.';
+
 /**
  * "No errors" from an empty project is not success — see the note in
  * {@link runtimeCheck}. A game needs a scene, and project.godot has to name it.
@@ -369,7 +373,7 @@ export function runtimeCheck(runtime: string | null, cwd: string): string {
      * clean, which would have ended the convergence loop on an empty directory.
      */
     const empty = emptyProjectComplaint(cwd);
-    return empty ?? 'It loaded with NO errors.';
+    return empty ?? CLEAN_LOAD;
   }
   /*
    * REPAIR THE ONE SECTION THAT HAS KILLED SIX RUNS, then check again.
@@ -392,7 +396,7 @@ export function runtimeCheck(runtime: string | null, cwd: string): string {
       'NOTE: your project.godot had a malformed [input] section and I REMOVED it. ' +
       'Do not put it back — use the ui_left / ui_right / ui_up / ui_down / ui_accept ' +
       'actions Godot ships, which is what your scripts should call.';
-    if (left.length === 0) return `It loaded with NO errors.\n${note}`;
+    if (left.length === 0) return `${CLEAN_LOAD}\n${note}`;
     return [`${left.length} problem(s):`, left.slice(0, 20).join('\n'), note, buildScriptReport(cwd)]
       .filter((part) => part !== '')
       .join('\n');
@@ -948,7 +952,18 @@ export function createMeshAgentHost(config: MeshAgentHostConfig): MeshAgentHost 
                   maxBumps: 6,
                   nextPrompt: ({ finalText }: { finalText: string }) => {
                     const state = runtimeCheck(taskProfileRef.value.runtime, config.cwd);
-                    const broken = /^\d+ problem/.test(state);
+                    /*
+                     * ANYTHING THAT IS NOT THE CLEAN SENTENCE IS BROKEN.
+                     *
+                     * This tested for a leading "N problem(s):", so the
+                     * empty-project complaint I added — "There is no
+                     * project.godot at all" — fell through to the CLEAN branch
+                     * and run 32 was told "loads clean but nothing was said"
+                     * about a directory with two scripts and no project in it.
+                     * A new failure message must never be able to read as
+                     * success just because it is phrased differently.
+                     */
+                    const broken = !state.startsWith(CLEAN_LOAD);
                     if (broken) {
                       log.info('corp bump: project does not load, sending it back', {
                         agentId,

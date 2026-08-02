@@ -293,3 +293,21 @@ describe('an empty project is not a clean load', () => {
     expect(emptyProjectComplaint(dir)).toBeNull();
   });
 });
+
+describe('only one sentence means success', () => {
+  /* Run 32 was told "loads clean but nothing was said" about a directory holding
+   * two scripts and no project.godot: the bump tested for a leading
+   * "N problem(s):", so the empty-project complaint read as success. A new
+   * failure message must never pass just because it is phrased differently. */
+  it('treats every complaint as broken, however worded', () => {
+    const clean = 'It loaded with NO errors.';
+    const isBroken = (state: string): boolean => !state.startsWith(clean);
+    expect(isBroken('3 problem(s):\nERROR: x')).toBe(true);
+    expect(isBroken('There is no project.godot at all, so this is not a Godot project yet.')).toBe(
+      true,
+    );
+    expect(isBroken('It reported no errors — because there is NOTHING TO LOAD.')).toBe(true);
+    expect(isBroken(clean)).toBe(false);
+    expect(isBroken(`${clean}\nNOTE: I removed your [input] section.`)).toBe(false);
+  });
+});
