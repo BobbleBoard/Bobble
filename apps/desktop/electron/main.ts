@@ -181,6 +181,29 @@ const SHARED_WEB_PREFERENCES: WebPreferences = {
 
 /** Load index.html (packaged) or the dev server, threading the E2E opt-in plus
  * any window-specific query (e.g. the canvas pop-out flag). */
+
+/**
+ * Shrink and nudge a window until it lies inside the display's usable area.
+ * A window taller than the screen has its chrome behind the menu bar and its
+ * footer under the dock, and no amount of CSS can help.
+ */
+export function fitToWorkArea(win: BrowserWindow): void {
+  try {
+    const b = win.getBounds();
+    const area = screen.getDisplayMatching(b).workArea;
+    const width = Math.min(b.width, area.width);
+    const height = Math.min(b.height, area.height);
+    const x = Math.min(Math.max(b.x, area.x), area.x + area.width - width);
+    const y = Math.min(Math.max(b.y, area.y), area.y + area.height - height);
+    if (width !== b.width || height !== b.height || x !== b.x || y !== b.y) {
+      log.info('window clamped to the usable area', { from: b, to: { x, y, width, height } });
+      win.setBounds({ x, y, width, height });
+    }
+  } catch {
+    // A display we cannot read is not a reason to fail to open a window.
+  }
+}
+
 function loadRenderer(win: BrowserWindow, extraQuery?: Record<string, string>): void {
   const target = resolveRendererTarget({
     isPackaged: app.isPackaged,
@@ -311,6 +334,21 @@ function createMainWindow(): BrowserWindow {
   if (process.env.PI_DESKTOP_CORP_HUD === '1') devQuery.corphud = '1';
   // Tripo 3D workspace preview (UI-only view): PI_DESKTOP_TRIPO=1 surfaces `?tripo=1`.
   if (process.env.PI_DESKTOP_TRIPO === '1') devQuery.tripo = '1';
+  /*
+   * CLAMP TO THE SCREEN — the DEFAULT size too, not just adopted bounds.
+   *
+   * MEASURED on the user's machine: work area 1512x868, window created at 1440x940.
+   * Electron centres what does not fit, so y came out at -31 — the title bar
+   * behind the menu bar AND the bottom 8px below the usable area. Both ends
+   * clipped, permanently, and resizing cannot recover it because the size is
+   * re-applied on every launch. the user: "the bottom left is cut off again … the
+   * whole chat input bar is cut off also when I try resizing."
+   *
+   * `firstRunClaudeBounds` already clamps the bounds it adopts; this clamps
+   * whatever the window actually ended up with, which is the only place that
+   * catches a default taller than somebody's screen.
+   */
+  fitToWorkArea(win);
   loadRenderer(win, Object.keys(devQuery).length > 0 ? devQuery : undefined);
 
   win.on('closed', () => {
