@@ -63,7 +63,7 @@ import {
   submissionNote,
 } from './submit-work';
 import { TeamBook } from './team-record';
-import { repairNote, repairShadowTree, stripBrokenInputMap } from './workspace-paths';
+import { repairNote, repairShadowTree } from './workspace-paths';
 
 const log = createLogger('desktop:corp');
 
@@ -166,144 +166,27 @@ export function emptyProjectComplaint(cwd: string): string | null {
 }
 
 
-/**
- * The scene-saving sequence, verbatim, because paraphrasing it broke a run.
+
+
+/*
+ * THE GODOT CHEAT-SHEET LIVED HERE, AND HAS BEEN REMOVED.
  *
- * I wrote "packs them with `PackedScene.pack(root)`" into the remedy. That is a
- * STATIC call and Godot refuses it — "Cannot call non-static function pack() on
- * the class PackedScene directly". Run 27's build script failed on exactly that,
- * having done what the remedy told it. My own verified test script had used
- * `PackedScene.new()` then `packed.pack(root)`; the remedy was a bad paraphrase
- * of code I had actually run.
+ * A REMEDIES table grew here mapping specific Godot errors to specific fixes —
+ * malformed [input] maps, autoload path syntax, PackedScene incantations,
+ * main_scene extensions. It measurably worked, and the user called it correctly:
+ * "that sounds like overfitting the harness to this specific task." It was a
+ * harness learning one engine.
  *
- * Same mistake as putting `timeout 60` in a prompt on a machine with no
- * `timeout`: if the harness names a mechanism, the mechanism has to work.
+ * What stays is the mechanism, which is engine-agnostic: RUN the check, RUN the
+ * build script, show the failing lines, show the file listing, and refuse to
+ * call an empty or crashing project a success. Those work for a Rust binary or a
+ * notebook exactly as well.
+ *
+ * The diagnostic value was real and is preserved in CORP-RUN-REPORT.md: it is
+ * how we learned that every failure was one unfamiliar API call rather than a
+ * reasoning failure.
  */
-const SCENE_RECIPE = `
-    COPY THIS FILE VERBATIM as build.gd. Add your nodes where marked and change
-    nothing else — runs 27, 28, 30 and 31 each broke it by altering a line.
 
-extends SceneTree
-
-func _init():
-	var root := Node2D.new()
-	var player := CharacterBody2D.new()
-	root.add_child(player)
-	player.owner = root
-	var packed := PackedScene.new()
-	packed.pack(root)
-	ResourceSaver.save(packed, "res://main.tscn")
-	quit()
-
-    Add more nodes by repeating the three lines in the middle — create it,
-    \`root.add_child(x)\`, then \`x.owner = root\`. A child without an owner is
-    silently dropped. Notes, so you do not have to guess: it must be
-    \`extends SceneTree\` and \`_init()\` (a \`--script\` run has no \`_ready()\`);
-    \`pack()\` is not static, so \`PackedScene.new()\` first; there is no
-    \`get_tree()\` here because the script IS the tree, and the nodes do not need
-    to be in a tree to be packed. Then point \`run/main_scene\` at the exact path
-    you saved.
-`;
-
-
-/**
- * Known-failure → the fix that actually works, delivered at the moment it fails.
- *
- * The general principle ("use the tool's defaults", "do not hand-write a format
- * a program owns") is in the builder charter and has not held: runs 10, 16, 17
- * and 18 all died on a hand-written `project.godot`, the last one inventing an
- * `InputActionMap` identifier outright. A rule read once at the start loses to a
- * remedy handed over at the point of failure — the same reason the load errors
- * themselves had to be fed back rather than requested.
- *
- * Same shape as `capabilities.ts`'s `ifMissing` notes, which already do this for
- * absent toolchains. Kept to failures seen repeatedly in real runs.
- */
-const REMEDIES: ReadonlyArray<{ readonly when: RegExp; readonly fix: string }> = [
-  {
-    when: /project\.godot.*(?:Unexpected identifier|Expected '\}'|might be corrupted)/i,
-    fix:
-      "Your project.godot is malformed. Godot's input-map format (those " +
-      'Object(InputEventKey,…) blocks) cannot be hand-written reliably and you do not ' +
-      'need it: DELETE the entire [input] section and use the actions Godot already ' +
-      'ships — ui_left, ui_right, ui_up, ui_down, ui_accept — in your scripts.\n' +
-      '    REPLACE THE WHOLE FILE with exactly this, changing only the scene path:\n' +
-      '      config_version=5\n' +
-      '      \n' +
-      '      [application]\n' +
-      '      config/name="Game"\n' +
-      '      run/main_scene="res://scenes/main.tscn"\n' +
-      '      \n' +
-      '      [display]\n' +
-      '      window/size/viewport_width=900\n' +
-      '      window/size/viewport_height=600\n' +
-      '    Nothing else belongs in it. Do NOT copy the comment header Godot writes — ' +
-      'one run copied its `====` illustration in as if it were syntax, and another ' +
-      'wrote `version=5` for `config_version=5`.',
-  },
-  {
-    when: /(?:Failed to instantiate an autoload|Resource file not found: res:\/\/[A-Z])/i,
-    fix:
-      'Your [autoload] entries point at NAMES, not files — Godot needs a real path ' +
-      'and a `*` to make it a singleton: `Counter="*res://scripts/counter.gd"`. ' +
-      'Simpler still, a platformer does not need autoloads at all: DELETE the ' +
-      '[autoload] section and keep the coin counter on a node in the scene.',
-  },
-  {
-    when: /get_tree\(\).*not found|Function "get_tree\(\)" not found/i,
-    fix:
-      'Your build script calls `get_tree()`. Inside a script that `extends ' +
-      'SceneTree` there is no such function — the script IS the tree. Delete that ' +
-      'line: you do not need to add anything to the tree to pack it. Build the ' +
-      'nodes, set each `owner`, pack, save, quit.',
-  },
-  {
-    when: /Failed loading scene: res:\/\/[\w./ -]+\.gd/i,
-    fix:
-      '`run/main_scene` in project.godot points at a SCRIPT (.gd), not a scene ' +
-      '(.tscn). A script is not a scene and never will be. If you wrote a build ' +
-      'script, RUN it (`godot --headless --script <that file>`) to produce the ' +
-      '.tscn, then point run/main_scene at the .tscn it saved.',
-  },
-  {
-    when: /(?:Cannot open file 'res:\/\/[\w./ -]+\.tscn'|Failed loading scene)/i,
-    fix:
-      "`run/main_scene` in project.godot points at a scene that does not exist. " +
-      'Look at the file listing above: either GENERATE that scene (a GDScript that ' +
-      '`extends SceneTree` and does, in `_init()`:' +
-      `${SCENE_RECIPE}` +
-      'run with `godot --headless --script build.gd`), or point ' +
-      '`run/main_scene` at a scene you did actually create. Runs have burned four ' +
-      'rounds on this by re-reading the error instead of comparing it to the listing.',
-  },
-  {
-    when: /Program crashed with signal|handle_crash/i,
-    fix:
-      'The project loads and then crashes when it runs. Almost always a node has a ' +
-      'script written for a different node type — a movement script on a ' +
-      'CanvasLayer or a plain Node2D, so it calls methods that node does not have. ' +
-      'The player must be a CharacterBody2D, the coin an Area2D, the platform a ' +
-      'StaticBody2D, and the scene root a Node2D. Check every `script =` line ' +
-      'against the type of the node it sits on.',
-  },
-  {
-    when: /\.tscn.*(?:Parse Error|Unknown tag|Unexpected end of file)/i,
-    fix:
-      'A .tscn you typed by hand is malformed. DELETE it and generate it instead — ' +
-      'and if you already wrote a build script, check it actually builds: a file ' +
-      'that does not call `ResourceSaver.save()` is not a build script. The whole ' +
-      'thing is a GDScript that `extends SceneTree` and does, in `_init()`:' +
-      `${SCENE_RECIPE}` +
-      'then RUN it: `godot --headless --script build.gd`. Writing the script and ' +
-      'still typing the .tscn by hand leaves you exactly where you are.',
-  },
-];
-
-/** Any remedies matching this failure text, as instructions. */
-export function remediesFor(state: string): string {
-  const hits = REMEDIES.filter((r) => r.when.test(state)).map((r) => `  - ${r.fix}`);
-  return hits.length === 0 ? '' : `KNOWN FIX FOR WHAT YOU ARE HITTING:\n${hits.join('\n')}`;
-}
 
 
 /**
@@ -427,32 +310,6 @@ export function runtimeCheck(runtime: string | null, cwd: string): string {
     return crashComplaint(cwd) ?? CLEAN_LOAD;
   }
   /*
-   * REPAIR THE ONE SECTION THAT HAS KILLED SIX RUNS, then check again.
-   *
-   * A hand-written `[input]` map is both unnecessary (Godot ships `ui_left`,
-   * `ui_right`, `ui_accept`) and unwritable by this model. Removing it is the
-   * same kind of act as `repairShadowTree` moving misplaced files: the harness
-   * fixing its workspace, and saying so.
-   */
-  if (/project\.godot/i.test(text) && stripBrokenInputMap(cwd)) {
-    log.info('corp repair: removed a malformed [input] section', { cwd });
-    const again = spawnSync('godot', ['--headless', '--quit', '--path', cwd], {
-      encoding: 'utf8',
-      timeout: 45_000,
-    });
-    const left = `${again.stdout ?? ''}\n${again.stderr ?? ''}`
-      .split('\n')
-      .filter((l) => /ERROR|SCRIPT ERROR/.test(l));
-    const note =
-      'NOTE: your project.godot had a malformed [input] section and I REMOVED it. ' +
-      'Do not put it back — use the ui_left / ui_right / ui_up / ui_down / ui_accept ' +
-      'actions Godot ships, which is what your scripts should call.';
-    if (left.length === 0) return `${CLEAN_LOAD}\n${note}`;
-    return [`${left.length} problem(s):`, left.slice(0, 20).join('\n'), note, buildScriptReport(cwd)]
-      .filter((part) => part !== '')
-      .join('\n');
-  }
-  /*
    * RUN THE BUILD SCRIPT AND SEE IF THAT FIXES IT.
    *
    * Runs 30, 33 and 34 each wrote a build script AND hand-wrote the scene it was
@@ -565,9 +422,7 @@ function buildScriptReport(cwd: string): string {
   }
   return (
     `\nI ALSO RAN YOUR ${name}, AND IT IS BROKEN:\n${errs.slice(0, 10).join('\n')}\n` +
-    'Fix the build script first — nothing it should have produced exists until it runs clean. ' +
-    'For `--script` it must `extends SceneTree` with `_init()` (not `extends Node`/`_ready()`), ' +
-    `and the saving sequence is exactly:${SCENE_RECIPE}`
+    'Fix the build script first — nothing it should have produced exists until it runs clean.'
   );
 }
 
@@ -1094,8 +949,6 @@ export function createMeshAgentHost(config: MeshAgentHostConfig): MeshAgentHost 
                          * line number and never shown the line.
                          */
                         excerptFailures(state, config.cwd),
-                        '',
-                        remediesFor(state),
                         '',
                         'Fix exactly these errors and nothing else. Do not add features, do not',
                         'refactor, do not write new files unless one of these says a file is',

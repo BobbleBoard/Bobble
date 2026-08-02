@@ -4,6 +4,7 @@ import {
   COMMISSION_SPECIALIST_TOOL,
   ceoMeshPrompt,
   engineerId,
+  engineerMeshPrompt,
   MESH_SPECIALIST_KINDS,
   managerMeshPrompt,
   runCorpMesh,
@@ -366,9 +367,15 @@ describe('the runtime must exist', () => {
    * visual tests." No corp role could have: the mesh preamble is separate from
    * the capability prompt, so the clause telling an agent to check its runtime
    * never reached the building at all. */
-  it('tells every role to check the runtime before building for it', () => {
-    for (const p of [ceoMeshPrompt('x'), managerMeshPrompt('x'), specialistMeshPrompt('tester')]) {
+  it('tells every BUILDER to check the runtime first', () => {
+    for (const p of [ceoMeshPrompt('x'), managerMeshPrompt('x'), engineerMeshPrompt()]) {
       expect(p).toContain('ESTABLISH THAT PROGRAM IS ON THIS MACHINE');
     }
+  });
+
+  /* Specialists review and measure; the builder charter is not theirs, and
+   * loading them up blew past the user's 4000-char guard on the image specialist. */
+  it('leaves the specialists out of it', () => {
+    expect(specialistMeshPrompt('tester')).not.toContain('ESTABLISH THAT PROGRAM IS ON THIS');
   });
 });

@@ -9,7 +9,6 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { repairNote, repairShadowTree, shadowRoots, unmanglePath,
   workspaceFromTask,
-  stripBrokenInputMap,
 } from './workspace-paths';
 
 describe('the path the agent meant', () => {
@@ -184,37 +183,3 @@ describe('the one-component shadow', () => {
   });
 });
 
-describe('stripBrokenInputMap', () => {
-  const tmp = (): string => mkdtempSync(path.join(os.tmpdir(), 'inputmap-'));
-
-  /* Six runs died on a hand-written [input] map redefining actions Godot already
-   * ships. Run 25's had a stray escaped quote mid-serialisation. */
-  it('removes the [input] section and leaves the rest intact', () => {
-    const dir = tmp();
-    writeFileSync(
-      path.join(dir, 'project.godot'),
-      'config_version=5\n\n[application]\nconfig/name="G"\n\n[input]\nui_right={\n"deadzone": 0.5\n}\n\n[display]\nwindow/size/viewport_width=900\n',
-    );
-    expect(stripBrokenInputMap(dir)).toBe(true);
-    const after = readFileSync(path.join(dir, 'project.godot'), 'utf8');
-    expect(after).not.toContain('[input]');
-    expect(after).not.toContain('deadzone');
-    expect(after).toContain('config_version=5');
-    expect(after).toContain('[display]');
-    expect(after).toContain('window/size/viewport_width=900');
-  });
-
-  it('removes a trailing [input] section with nothing after it', () => {
-    const dir = tmp();
-    writeFileSync(path.join(dir, 'project.godot'), 'config_version=5\n\n[input]\nui_left={}\n');
-    expect(stripBrokenInputMap(dir)).toBe(true);
-    expect(readFileSync(path.join(dir, 'project.godot'), 'utf8')).not.toContain('[input]');
-  });
-
-  it('does nothing when there is no input section, or no file', () => {
-    const dir = tmp();
-    writeFileSync(path.join(dir, 'project.godot'), 'config_version=5\n');
-    expect(stripBrokenInputMap(dir)).toBe(false);
-    expect(stripBrokenInputMap(path.join(dir, 'nope'))).toBe(false);
-  });
-});
