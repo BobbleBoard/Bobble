@@ -92,6 +92,25 @@ export interface PromoteToolDeps {
 }
 
 /**
+ * Did the team actually deliver something?
+ *
+ * A mesh refusal is a PARENTHETICAL NOTE — `(there is no "x" to talk to.)`,
+ * `(the run was stopped …)` — and the mesh reports those as ordinary replies, so
+ * a run can "succeed" while its product is an apology. That happened: the entry
+ * point named a seat that had been removed, the refusal came back as the
+ * product, and the final-check scaffold wrapped it and listed it to the CEO as
+ * claim 1 about the finished work. The CEO concluded the manager was
+ * unavailable and built the thing itself.
+ *
+ * Wrapping a failure in a verification ceremony is worse than not verifying:
+ * it launders it. An empty or bare-parenthetical reply is not a delivery.
+ */
+function looksUndelivered(product: string): boolean {
+  const t = product.trim();
+  return t === '' || (t.startsWith('(') && t.endsWith(')'));
+}
+
+/**
  * What the manager actually receives. `message` is the CEO's own words and is
  * what we want; it is OPTIONAL though (a divisions-only call is valid), so a
  * call without one is turned into a brief from whatever the CEO did give rather
@@ -209,7 +228,7 @@ export function registerCreateHierarchyTool(pi: ExtensionAPI, deps: PromoteToolD
       if (runCorp !== null) {
         const brief = briefForManager(args);
         const result = await runCorp({ message: brief });
-        if (result.ok) {
+        if (result.ok && !looksUndelivered(result.product)) {
           /*
            * THE FINAL REVIEW RIDES IN THE TOOL RESULT.
            *
@@ -242,14 +261,18 @@ export function registerCreateHierarchyTool(pi: ExtensionAPI, deps: PromoteToolD
             details: { promoted: true, delivered: true },
           };
         }
+        const why = result.ok
+          ? `the team returned nothing usable: ${result.product.trim()}`
+          : (result.error ?? 'unknown error');
         return {
           content: [
             {
               type: 'text',
               text:
-                `The production did not complete: ${result.error ?? 'unknown error'}. ` +
+                `The production did not complete: ${why}. ` +
                 'Nothing was delivered. Tell the user plainly what happened — do not ' +
-                'describe the product as finished.',
+                'describe the product as finished, and do not quietly build it yourself ' +
+                'instead: say that the hand-off failed.',
             },
           ],
           isError: true,

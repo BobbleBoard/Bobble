@@ -182,3 +182,67 @@ describe('talk_to_manager BLOCKS until the team delivers', () => {
     expect(text(res)).toBe(HIERARCHY_CREATED_ACK);
   });
 });
+
+describe('a refusal is not a product', () => {
+  /*
+   * MEASURED. The desktop entry named a seat that had been removed, so the mesh
+   * answered `(there is no "ceo" to talk to.)` and the run "completed" with that
+   * as its product. The final-check scaffold then wrapped it and listed it back
+   * to the CEO as claim 1 about the finished work. The CEO concluded the manager
+   * was unavailable and built the whole thing itself — shipping a project.godot
+   * that degenerated into hundreds of lines of repeated tokens.
+   *
+   * Wrapping a failure in a verification ceremony launders it.
+   */
+  it('treats a bare parenthetical refusal as a FAILED hand-off', async () => {
+    const tool = register('max', async () => ({
+      ok: true,
+      product: '(there is no "ceo" to talk to.)',
+    }));
+    const { ctx } = fakeCtx();
+    const res = await tool.execute(
+      'c',
+      { message: 'Build the game', divisions: [] },
+      undefined,
+      undefined,
+      ctx,
+    );
+    expect(res.isError).toBe(true);
+    expect(text(res)).toContain('did not complete');
+    // The giveaway that this went wrong before: the final-check scaffold.
+    expect(text(res)).not.toContain('THIS IS THE FINAL CHECK');
+    // And it must not invite the CEO to quietly do the job itself.
+    expect(text(res)).toContain('do not quietly build it yourself');
+  });
+
+  it('treats an empty delivery as a failure too', async () => {
+    const tool = register('max', async () => ({ ok: true, product: '   ' }));
+    const { ctx } = fakeCtx();
+    const res = await tool.execute(
+      'c',
+      { message: 'Build the game', divisions: [] },
+      undefined,
+      undefined,
+      ctx,
+    );
+    expect(res.isError).toBe(true);
+  });
+
+  it('still delivers a real product, with the final check attached', async () => {
+    const tool = register('max', async () => ({
+      ok: true,
+      product: 'Built it: three platforms, a coin counter, and it loads clean in Godot.',
+    }));
+    const { ctx } = fakeCtx();
+    const res = await tool.execute(
+      'c',
+      { message: 'Build the game', divisions: [] },
+      undefined,
+      undefined,
+      ctx,
+    );
+    expect(res.isError).toBeUndefined();
+    expect(text(res)).toContain('three platforms');
+    expect(text(res)).toContain('THIS IS THE FINAL CHECK');
+  });
+});
