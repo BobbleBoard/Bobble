@@ -24,7 +24,7 @@
  * is verified end-to-end only on a LIVE run — no unit test exercises a real model.
  */
 
-import { execFileSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
 import nodePath from 'node:path';
 import type { ExtensionFactory, ToolDefinition } from '@mariozechner/pi-coding-agent';
@@ -78,20 +78,24 @@ const log = createLogger('desktop:corp');
  */
 export function runtimeCheck(runtime: string | null, cwd: string): string {
   if (runtime !== 'godot') return '(no automatic check exists for this kind of project.)';
-  try {
-    const out = execFileSync('godot', ['--headless', '--quit', '--path', cwd], {
-      encoding: 'utf8',
-      timeout: 120_000,
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
-    const errs = `${out}`.split('\n').filter((l) => /ERROR|SCRIPT ERROR/.test(l));
-    return errs.length === 0 ? 'It loaded with NO errors.' : errs.slice(0, 20).join('\n');
-  } catch (err) {
-    const e = err as { stdout?: string; stderr?: string; message?: string };
-    const text = `${e.stdout ?? ''}${e.stderr ?? ''}` || (e.message ?? 'the check could not run');
-    const errs = text.split('\n').filter((l) => /ERROR|SCRIPT ERROR/.test(l));
-    return errs.length === 0 ? text.slice(0, 1200) : errs.slice(0, 20).join('\n');
-  }
+  /*
+   * BOTH STREAMS. Godot prints every error to STDERR and still exits 0, and
+   * `execFileSync` returns STDOUT only — so the first version of this read an
+   * empty stream, found no errors in it, and told the CEO "It loaded with NO
+   * errors." The CEO then reported "Project loads cleanly" about a project with
+   * five parse errors. It did exactly what the harness told it; the lie was
+   * mine. Measured: 0 error lines on stdout, 5 on stderr, for the same project.
+   */
+  const r = spawnSync('godot', ['--headless', '--quit', '--path', cwd], {
+    encoding: 'utf8',
+    timeout: 120_000,
+  });
+  const text = `${r.stdout ?? ''}\n${r.stderr ?? ''}`;
+  const errs = text.split('\n').filter((l) => /ERROR|SCRIPT ERROR/.test(l));
+  if (r.error !== undefined) return `The check could not run: ${r.error.message}`;
+  return errs.length === 0
+    ? 'It loaded with NO errors.'
+    : `${errs.length} problem(s):\n${errs.slice(0, 20).join('\n')}`;
 }
 
 
@@ -613,12 +617,29 @@ export function createMeshAgentHost(config: MeshAgentHostConfig): MeshAgentHost 
                       claims: claims.length,
                       perspective: agent.role === 'ceo' ? 'ceo' : 'manager',
                     });
-                    return finalCheck({
-                      claims,
-                      profile: contractProfile.get(agentId) ?? taskProfileRef.value,
-                      perspective: agent.role === 'ceo' ? 'ceo' : 'manager',
-                      ...(config.task !== undefined ? { vision: config.task } : {}),
-                    });
+                    /*
+                     * THE REAL STATE, ALONGSIDE THE CLAIMS. A final check that
+                     * asks "is each of these true?" without saying what IS true
+                     * leaves the model grading its own memory. Run 13 replied
+                     * "Project loads cleanly" about a project with five parse
+                     * errors, so the check now arrives with the answer attached.
+                     */
+                    const state = runtimeCheck(taskProfileRef.value.runtime, config.cwd);
+                    return [
+                      finalCheck({
+                        claims,
+                        profile: contractProfile.get(agentId) ?? taskProfileRef.value,
+                        perspective: agent.role === 'ceo' ? 'ceo' : 'manager',
+                        ...(config.task !== undefined ? { vision: config.task } : {}),
+                      }),
+                      '',
+                      `I RAN THE PROJECT CHECK MYSELF. This is the truth about it right now:`,
+                      state,
+                      '',
+                      'If that shows problems, they outrank every claim above: fix them and say',
+                      'what you fixed. Do NOT describe this project as working while that says',
+                      'otherwise.',
+                    ].join('\n');
                   },
                 },
               }
