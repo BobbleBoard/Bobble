@@ -86,6 +86,14 @@ export function runtimeCheck(runtime: string | null, cwd: string): string {
    * five parse errors. It did exactly what the harness told it; the lie was
    * mine. Measured: 0 error lines on stdout, 5 on stderr, for the same project.
    */
+  /*
+   * SYNCHRONOUS ON PURPOSE, and it does block the main process for a few
+   * seconds. `bump.nextPrompt` is a synchronous seam, and this only runs BETWEEN
+   * turns of a corp run — never while anything is streaming — so the cost is a
+   * brief pause in a window that is already showing a situation room. Worth
+   * naming rather than leaving to be discovered: if nextPrompt ever becomes
+   * async, this should be the first thing moved off the main thread.
+   */
   const r = spawnSync('godot', ['--headless', '--quit', '--path', cwd], {
     encoding: 'utf8',
     timeout: 120_000,
