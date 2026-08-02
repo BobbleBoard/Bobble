@@ -212,3 +212,31 @@ of a count.
 - No run has yet produced a Godot project that loads cleanly.
 - Delegation still does not happen: the manager and 16 specialists sit `queued`
   while the CEO builds alone.
+
+## Runs 16–18: the last three things
+
+**A `timeout` that exists.** Four runs were wedged by one shell call that never
+returned — `godot --headless -e game`, a bare `--path`, and `--headless --path .`
+without `--quit` (headless still runs the game loop forever). Naming each variant
+in the prompt never kept up. macOS ships no `timeout(1)`, so the app now ships
+one: a POSIX sh shim on PATH before any role gets a shell. When a prompt names a
+mechanism the machine lacks, provide the mechanism rather than delete the advice.
+
+**Show the failing line.** "line 27: Unexpected identifier 'deadzone'" is only
+actionable next to line 27. The does-not-load bump now excerpts the lines the
+errors point at, marked, plus the directory's real file listing — run 15 spent
+four bumps on a missing `main.tscn` while never being told the project contained
+no `.tscn` at all.
+
+**Use the defaults before writing configuration.** Runs 10, 16 and 17 all died on
+a hand-written `project.godot`. Run 17's was an `Object(InputEventKey,…)` block
+with an unclosed brace and `"W"` where a keycode number belongs — Godot's hairiest
+serialisation, hand-typed, purely to redefine keys the engine already ships.
+`ui_left`/`ui_right`/`ui_accept` exist out of the box and a platformer needs no
+input map at all.
+
+The three of these share a shape with everything above them: the model is not
+short of instruction, it is short of *ground truth delivered at the moment it can
+act on it*. Every fix that has moved the needle works by putting a real fact in
+front of it — the errors, the lines, the file list — rather than by asking it to
+remember something.
