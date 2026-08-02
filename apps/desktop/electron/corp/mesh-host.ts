@@ -136,27 +136,29 @@ export function emptyProjectComplaint(cwd: string): string | null {
  * `timeout`: if the harness names a mechanism, the mechanism has to work.
  */
 const SCENE_RECIPE = `
-    COPY THIS FILE EXACTLY as build.gd and only change what is between the marked
-    lines. Do not restructure it; every line outside the marks is required and
-    runs 27, 28 and 30 each failed by altering one of them.
+    COPY THIS FILE VERBATIM as build.gd. Add your nodes where marked and change
+    nothing else — runs 27, 28, 30 and 31 each broke it by altering a line.
 
-      extends SceneTree                 # NOT \`extends Node\`
+extends SceneTree
 
-      func _init():                     # NOT \`_ready()\`
-        # ---- your nodes go here ----
-      var root := Node2D.new()          # build your nodes
-      var child := Sprite2D.new()
-      root.add_child(child)
-      child.owner = root                 # EVERY child needs this or it is dropped
-      var packed := PackedScene.new()    # NOT PackedScene.pack(root) — pack() is not static
-        # ---- end of your nodes ----
-      packed.pack(root)
-      ResourceSaver.save(packed, "res://scenes/main.tscn")
-      quit()
-    That is the WHOLE script. Do NOT add the root to the scene tree first — there
-    is no \`get_tree()\` inside a SceneTree script (the script IS the tree), and
-    packing does not need the nodes to be in it. Point \`run/main_scene\` at the
-    exact path you saved.
+func _init():
+	var root := Node2D.new()
+	var player := CharacterBody2D.new()
+	root.add_child(player)
+	player.owner = root
+	var packed := PackedScene.new()
+	packed.pack(root)
+	ResourceSaver.save(packed, "res://main.tscn")
+	quit()
+
+    Add more nodes by repeating the three lines in the middle — create it,
+    \`root.add_child(x)\`, then \`x.owner = root\`. A child without an owner is
+    silently dropped. Notes, so you do not have to guess: it must be
+    \`extends SceneTree\` and \`_init()\` (a \`--script\` run has no \`_ready()\`);
+    \`pack()\` is not static, so \`PackedScene.new()\` first; there is no
+    \`get_tree()\` here because the script IS the tree, and the nodes do not need
+    to be in a tree to be packed. Then point \`run/main_scene\` at the exact path
+    you saved.
 `;
 
 
