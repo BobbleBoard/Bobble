@@ -25,7 +25,7 @@
  */
 
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, readdirSync } from 'node:fs';
+import { mkdirSync, readdirSync, readFileSync } from 'node:fs';
 import nodePath from 'node:path';
 import type { ExtensionFactory, ToolDefinition } from '@mariozechner/pi-coding-agent';
 import {
@@ -65,6 +65,40 @@ import { TeamBook } from './team-record';
 import { repairNote, repairShadowTree } from './workspace-paths';
 
 const log = createLogger('desktop:corp');
+
+/**
+ * Pull the actual lines an error points at. Godot names `file:line` (and
+ * sometimes an absolute path); showing those lines beside the message is the
+ * difference between "fix line 27" and being able to.
+ */
+function excerptFailures(state: string, cwd: string): string {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const line of state.split('\n')) {
+    const m = /(?:res:\/\/|\/)([\w./-]+?):(\d+)/.exec(line);
+    if (m === null) continue;
+    const rel = m[1] ?? '';
+    const at = Number(m[2]);
+    const key = `${rel}:${at}`;
+    if (seen.has(key) || out.length > 3) continue;
+    seen.add(key);
+    const abs = rel.startsWith(cwd) ? rel : nodePath.join(cwd, rel.replace(`${cwd}/`, ''));
+    try {
+      const body = readFileSync(abs, 'utf8').split('\n');
+      const from = Math.max(0, at - 3);
+      const to = Math.min(body.length, at + 2);
+      const shown = body
+        .slice(from, to)
+        .map((t, i) => `${from + i + 1 === at ? '>>' : '  '} ${from + i + 1}| ${t}`)
+        .join('\n');
+      out.push(`--- ${rel} around line ${at} ---\n${shown}`);
+    } catch {
+      out.push(`--- ${rel} could not be read ---`);
+    }
+  }
+  return out.length === 0 ? '' : `The lines those errors point at:\n${out.join('\n')}`;
+}
+
 
 /** The workspace's files, relative and sorted — context for a missing-file error. */
 function listProject(cwd: string): string {
@@ -632,6 +666,15 @@ export function createMeshAgentHost(config: MeshAgentHostConfig): MeshAgentHost 
                          * on beside the file list.
                          */
                         `The project directory actually contains:\n${listProject(config.cwd)}`,
+                        '',
+                        /*
+                         * THE OFFENDING LINES THEMSELVES. An error that says
+                         * "line 27: Unexpected identifier 'deadzone'is only
+                         * actionable next to line 27. Runs 10 and 16 both died on
+                         * a malformed project.godot while the model was told the
+                         * line number and never shown the line.
+                         */
+                        excerptFailures(state, config.cwd),
                         '',
                         'Fix exactly these errors and nothing else. Do not add features, do not',
                         'refactor, do not write new files unless one of these says a file is',
