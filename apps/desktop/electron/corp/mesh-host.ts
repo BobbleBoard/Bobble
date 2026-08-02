@@ -24,6 +24,7 @@
  * is verified end-to-end only on a LIVE run — no unit test exercises a real model.
  */
 
+import { execFileSync } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
 import nodePath from 'node:path';
 import type { ExtensionFactory, ToolDefinition } from '@mariozechner/pi-coding-agent';
@@ -64,6 +65,35 @@ import { TeamBook } from './team-record';
 import { repairNote, repairShadowTree } from './workspace-paths';
 
 const log = createLogger('desktop:corp');
+
+/**
+ * Run the one command that proves whether a runtime-typed project actually loads,
+ * and return what it printed. The harness does this itself because asking the
+ * model to failed four consecutive runs (11 and 12 spent 66 and 65 tool calls
+ * without running it once, and both shipped a project that does not open).
+ *
+ * Godot's `--headless --quit` loads every script and scene, prints every parse
+ * error, and exits on its own — there is no `timeout` on macOS to fall back on,
+ * so a command that self-terminates is the whole requirement.
+ */
+export function runtimeCheck(runtime: string | null, cwd: string): string {
+  if (runtime !== 'godot') return '(no automatic check exists for this kind of project.)';
+  try {
+    const out = execFileSync('godot', ['--headless', '--quit', '--path', cwd], {
+      encoding: 'utf8',
+      timeout: 120_000,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    const errs = `${out}`.split('\n').filter((l) => /ERROR|SCRIPT ERROR/.test(l));
+    return errs.length === 0 ? 'It loaded with NO errors.' : errs.slice(0, 20).join('\n');
+  } catch (err) {
+    const e = err as { stdout?: string; stderr?: string; message?: string };
+    const text = `${e.stdout ?? ''}${e.stderr ?? ''}` || (e.message ?? 'the check could not run');
+    const errs = text.split('\n').filter((l) => /ERROR|SCRIPT ERROR/.test(l));
+    return errs.length === 0 ? text.slice(0, 1200) : errs.slice(0, 20).join('\n');
+  }
+}
+
 
 /** A pi tool result carrying a single text block (the reply the calling agent reads). */
 function textResult(text: string): {
@@ -557,20 +587,25 @@ export function createMeshAgentHost(config: MeshAgentHostConfig): MeshAgentHost 
                        * "the one command" goes looking for it; told
                        * `godot --headless --quit --path .` it runs that.
                        */
-                      const rt = taskProfileRef.value.runtime;
-                      const prove =
-                        rt === 'godot'
-                          ? 'godot --headless --quit --path .'
-                          : rt !== null
-                            ? `the ${rt} command that loads this and exits`
-                            : 'the command that runs it';
+                      /*
+                       * THE HARNESS RUNS THE CHECK, AND HANDS BACK THE ERRORS.
+                       *
+                       * Naming the command was not enough: runs 11 and 12 spent 66
+                       * and 65 tool calls without once running it, and shipped a
+                       * project that does not load. Asking has now failed four
+                       * consecutive runs, so this stops asking. The same principle
+                       * that made the claim-discharge work — the harness DOING it
+                       * rather than requesting it.
+                       */
+                      const verdictText = runtimeCheck(taskProfileRef.value.runtime, config.cwd);
                       return (
-                        'STOP BUILDING. You ran out of tool calls before you replied, and you have ' +
-                        'now done that more than once. Do NOT write or edit another file. ' +
-                        `Run exactly this, in the workspace: \`${prove}\` — it loads everything and ` +
-                        'prints every error. Then REPLY with what it printed: what exists, what ' +
-                        'loads, and what is broken. A short honest report of a half-working project ' +
-                        'is worth more than more files nobody has run.'
+                        'STOP BUILDING. You ran out of tool calls before you replied. Do NOT write ' +
+                        'or edit another file yet.\n\n' +
+                        `I RAN THE CHECK FOR YOU. This is what your project actually does:\n\n${verdictText}\n\n` +
+                        'If there are errors above, they are the ONLY thing that matters — fix ' +
+                        'exactly those, nothing else, and say what you fixed. If it loaded ' +
+                        'cleanly, reply now with what exists and what works. Either way this is ' +
+                        'your last turn: a short honest report beats more files nobody has run.'
                       );
                     }
                     log.info('corp bump: final check', {
