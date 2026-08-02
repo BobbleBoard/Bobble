@@ -16,6 +16,7 @@
 
 import fs from 'node:fs';
 import os from 'node:os';
+import { ensureTimeoutShim } from './timeout-shim';
 import { workspaceFromTask } from './workspace-paths';
 import path from 'node:path';
 import { BrowserAgentClient, registerBrowserUseTools } from '@pi-desktop/browser-use';
@@ -237,6 +238,9 @@ async function handleStart(
      * `workspaceFromTask`. Falls back to the chat's folder, then to a per-task
      * workspace, exactly as before.
      */
+    // A working `timeout` on PATH before any role gets a shell — four runs have
+    // been wedged by one command that never returned.
+    ensureTimeoutShim();
     const named = workspaceFromTask(req.prompt, os.homedir());
     const projectPath =
       named ??
