@@ -262,3 +262,23 @@ against `ramFittedMax: 3`. Delegation currently buys no wall-clock, which is par
 of why the CEO builds alone while the manager and sixteen specialists sit
 `queued` in every run. That is a deliberate OOM-safety setting on a single
 machine, not a bug — but it does mean the corp's central promise is untested.
+
+## Run 21: two false signals, one mine
+
+**"RENDER: 3 frames" was a photograph of a file dialog.** When `project.godot`
+fails to parse, `godot --path` falls back to the PROJECT MANAGER — the
+"You don't have any projects yet" picker — and my verifier dutifully recorded
+three frames of it as evidence the game drew. It also explains the hangs: that
+picker is a GUI that waits forever, which is what `godot --path .` on a broken
+project has been doing since run 16. The verifier now refuses to render at all
+while the load check reports errors, because a project that does not load cannot
+be judged by looking.
+
+**And my probe killed a working run.** Run 21 was declared wedged after nineteen
+minutes without a new file — but the ten-minute per-call watchdog never fired, so
+the model was still making provider requests: reading and planning, not hung. A
+run that thinks without writing is working. Liveness is now measured from
+main-process activity, not file count.
+
+Both of these are instrumentation failures, not product failures, and both would
+have been reported as findings if I had not looked at the picture.
