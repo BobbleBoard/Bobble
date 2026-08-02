@@ -306,3 +306,43 @@ describe('CorpInlineTurn — done state', () => {
     await unmount();
   });
 });
+
+describe('the summary counts who worked, not who was hired', () => {
+  /* the user, seeing "Stopped, with a team of 18" after a CEO wrote 19 files alone:
+   * "how can the contracts have been written if talk_to_manager … wasn't
+   * called." They had not been. The chart lists the whole roster; every agent
+   * shows until something moves it off `idle`. */
+  it('says the lead worked alone when nobody else ran', () => {
+    const nodes = [
+      { id: 'ceo', role: 'ceo', name: 'CEO', state: 'done' },
+      ...Array.from({ length: 17 }, (_, i) => ({
+        id: `x${i}`,
+        role: 'engineer',
+        name: `X${i}`,
+        state: 'idle',
+      })),
+    ];
+    const worked = nodes.filter((n) => n.state !== 'idle').length;
+    expect(worked).toBe(1);
+    const phrase = worked <= 1 ? 'the lead working alone' : `a team of ${nodes.length}`;
+    expect(phrase).toBe('the lead working alone');
+  });
+
+  it('names the fraction when only part of the roster ran', () => {
+    const nodes = [
+      { state: 'done' },
+      { state: 'done' },
+      { state: 'done' },
+      { state: 'idle' },
+      { state: 'idle' },
+    ];
+    const worked = nodes.filter((n) => n.state !== 'idle').length;
+    const phrase =
+      worked <= 1
+        ? 'the lead working alone'
+        : worked < nodes.length
+          ? `${worked} of a team of ${nodes.length}`
+          : `a team of ${nodes.length}`;
+    expect(phrase).toBe('3 of a team of 5');
+  });
+});

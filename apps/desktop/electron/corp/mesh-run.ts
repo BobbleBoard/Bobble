@@ -178,8 +178,16 @@ export function startMeshTask(opts: {
   /** Extension packages every role's session loads — the chat's own tool dirs. */
   readonly additionalExtensionPaths?: readonly string[];
   readonly maxTokens?: number;
-}): TaskHandle & { readonly abort: () => void } {
+}): TaskHandle & {
+  readonly abort: () => void;
+  /** Ask the CEO a question mid-run. Null until the team is live. */
+  readonly ask: (question: string) => Promise<string>;
+} {
   const stream = new MeshEventStream();
+  /* Set once the host exists — see `onAskable`. Until then a question has nowhere
+   * to go, which is a fact worth stating rather than a reason to send the user
+   * away to a new chat. */
+  let askCeo: ((question: string) => Promise<string>) | null = null;
   const roster = buildCorpRoster({ task: opts.task });
   const states = new Map<string, OrgNodeView['state']>();
   const emitChart = (): void => {
@@ -225,6 +233,9 @@ export function startMeshTask(opts: {
   };
 
   void runCorpMeshTask({
+    onAskable: (ask) => {
+      askCeo = ask;
+    },
     handle: opts.handle,
     task: opts.task,
     cwd: opts.cwd,
@@ -284,5 +295,11 @@ export function startMeshTask(opts: {
       stream.end();
     });
 
-  return { taskId: opts.taskId, events: stream, abort };
+  const ask = async (question: string): Promise<string> => {
+    if (askCeo === null) {
+      return 'The team has not started yet — ask again in a moment.';
+    }
+    return askCeo(question);
+  };
+  return { taskId: opts.taskId, events: stream, abort, ask };
 }

@@ -1105,6 +1105,16 @@ export async function runCorpMeshTask(opts: {
   readonly maxStepsPerMessage?: number;
   /** Skip the capability probe (tests — it shells out). */
   readonly skipCapabilityProbe?: boolean;
+  /**
+   * Hand back a way to ASK THE CEO A QUESTION while the run is alive.
+   *
+   * `corp:ask` bailed with "that production isn't loaded any more" for every
+   * corp run ever started: it required `task.engine`, and a mesh run has no
+   * engine. The mesh IS the implementation, so a follow-up question has never
+   * once reached a running corporation — the user asked one mid-run and was told to
+   * start a new chat.
+   */
+  readonly onAskable?: (ask: (question: string) => Promise<string>) => void;
 }): Promise<CorpMeshRunResult> {
   /*
    * WHAT THIS MACHINE ACTUALLY HAS, measured before anyone is prompted.
@@ -1195,6 +1205,17 @@ export async function runCorpMeshTask(opts: {
      * So this awaits one thing: the CEO's answer. Everything else is the team's
      * own business, and the loops live where the judgement lives.
      */
+    opts.onAskable?.(
+      async (question: string) =>
+        (
+          await host({
+            agentId: 'ceo',
+            from: 'user',
+            message: question,
+            talk: async () => '(not routed for a direct question)',
+          })
+        ).reply,
+    );
     const reply = await mesh.run('ceo', openingMessage);
     return {
       reply,

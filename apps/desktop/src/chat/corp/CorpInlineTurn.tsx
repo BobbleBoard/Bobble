@@ -60,12 +60,21 @@ function actionText(action: string): string {
   return action === 'thinking' ? 'thinking…' : action;
 }
 
-/** The one-line status a subagent row shows for its node's live state. */
-function rowStatusLine(node: OrgNodeView): string {
+/**
+ * The one-line status a subagent row shows for its node's live state.
+ *
+ * `anyoneElseWorking` decides whether a lead is coordinating or building. It
+ * used to be assumed: a working CEO always read "waiting for other subagents to
+ * finish", so the user watched a CEO write nineteen files alone under a label
+ * claiming it was waiting for a team that had never been sent a single message.
+ * A lead with nobody working IS the one doing the work, and should say so.
+ */
+function rowStatusLine(node: OrgNodeView, anyoneElseWorking: boolean): string {
   switch (node.state) {
     case 'working':
-      // A lead's "work" is coordination — say so instead of echoing an action.
-      if (node.role === 'ceo' || node.role === 'manager') {
+      // A lead's "work" is coordination — but only when somebody else is actually
+      // going. Otherwise it is building, like anyone else.
+      if ((node.role === 'ceo' || node.role === 'manager') && anyoneElseWorking) {
         return 'waiting for other subagents to finish';
       }
       return node.currentAction !== undefined ? actionText(node.currentAction) : 'working…';
@@ -197,6 +206,25 @@ export function CorpInlineTurn({
   const delivered = state.status === 'done';
   const eta = terminal ? '' : formatEta(state.eta);
   const agentCount = state.chart.nodes.length;
+  /*
+   * HOW MANY ACTUALLY WORKED, not how many were hired.
+   *
+   * The chart lists the whole ROSTER — eighteen agents built up front by
+   * buildCorpRoster — and every one of them shows until something moves it off
+   * `idle`. So "Finished with a team of 18" was true of the configuration and
+   * false about the work: the user watched a CEO write nineteen files alone and
+   * asked, reasonably, how contracts could have been written when `talk_to`
+   * appeared nowhere in the tool history. They had not been. Nobody was hired;
+   * a roster was printed.
+   */
+  const workedCount = state.chart.nodes.filter((n) => n.state !== 'idle').length;
+  /** "a team of 18" / "the CEO alone" — whichever is true. */
+  const teamPhrase =
+    workedCount <= 1
+      ? 'the lead working alone'
+      : workedCount < agentCount
+        ? `${workedCount} of a team of ${agentCount}`
+        : `a team of ${agentCount}`;
   const remaining = Math.max(0, progress.total - progress.done);
 
   // Honest pre-plan fallback (no checklist yet): the surface's plain phrasing.
@@ -222,12 +250,12 @@ export function CorpInlineTurn({
   const counted = progress.total > 0;
   const terminalLabel = delivered
     ? counted
-      ? `Delivered ${progress.total} tasks with a team of ${agentCount}`
-      : `Finished with a team of ${agentCount} — see what they built below`
+      ? `Delivered ${progress.total} tasks with ${teamPhrase}`
+      : `Finished with ${teamPhrase} — see what they built below`
     : state.status === 'aborted'
       ? counted
         ? `Stopped after ${progress.done} of ${progress.total} tasks`
-        : `Stopped, with a team of ${agentCount}`
+        : `Stopped, with ${teamPhrase}`
       : (state.result?.error ?? 'Something went wrong');
 
   return (
@@ -329,6 +357,11 @@ export function CorpInlineTurn({
           <ul className="pd-corpturn-rows" data-testid="corp-inline-rows">
             {orderRows(state.chart.nodes).map((node) => {
               const open = openNodeId === node.id;
+              // Is anyone OTHER than this row actually going? That is the
+              // difference between a lead coordinating and a lead building.
+              const anyoneElseWorking = state.chart.nodes.some(
+                (n) => n.id !== node.id && n.state === 'working',
+              );
               return (
                 <li key={node.id} className="pd-corpturn-rowwrap">
                   <button
@@ -342,7 +375,7 @@ export function CorpInlineTurn({
                     <RowGlyph state={node.state} />
                     <span className="pd-corpturn-row-name">{node.name}</span>
                     <span className="pd-corpturn-row-status" data-state={node.state}>
-                      {rowStatusLine(node)}
+                      {rowStatusLine(node, anyoneElseWorking)}
                     </span>
                     {node.state === 'working' ? (
                       <Spinner size={11} className="pd-corpturn-row-spinner" />

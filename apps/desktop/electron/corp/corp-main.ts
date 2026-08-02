@@ -385,12 +385,23 @@ const handlers: CorpHandlers = {
   },
   'corp:ask': async (_wc, req) => {
     const task = tasks.get(req.taskId);
-    if (task?.engine === undefined) {
+    if (task === undefined) {
       return {
         answer: "That production isn't loaded any more — start a new chat to begin a fresh one.",
       };
     }
-    return { answer: await task.engine.ask(task.handle, req.question) };
+    if (task.engine !== undefined) return { answer: await task.engine.ask(task.handle, req.question) };
+    /*
+     * A MESH RUN CAN BE TALKED TO. It could not before: this branch required
+     * `task.engine`, a mesh run has none, and the mesh is the implementation —
+     * so every follow-up question ever asked of a corporation, running or not,
+     * got told to start a new chat. the user asked one mid-run and got exactly that.
+     */
+    const ask = (task.handle as { ask?: (q: string) => Promise<string> }).ask;
+    if (typeof ask !== 'function') {
+      return { answer: "That production isn't loaded any more — start a new chat to begin a fresh one." };
+    }
+    return { answer: await ask(req.question) };
   },
   'corp:abort': (_wc, req) => {
     const task = tasks.get(req.taskId);
