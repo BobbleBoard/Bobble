@@ -613,7 +613,9 @@ export function createMeshAgentHost(config: MeshAgentHostConfig): MeshAgentHost 
                       log.info('corp bump: loads clean but nothing was said', { agentId });
                       return (
                         'The project LOADS CLEANLY — I checked. You never replied, though. ' +
-                        'Do not build anything more: say what exists and what it does.'
+                        'Do not build anything more. `present` it so the user actually gets it ' +
+                        'in front of them, look at the preview that comes back, and then say ' +
+                        'what exists and what it does.'
                       );
                     }
                     if (claims.length === 0) return undefined;
@@ -627,6 +629,11 @@ export function createMeshAgentHost(config: MeshAgentHostConfig): MeshAgentHost 
                       }),
                       '',
                       `I RAN THE PROJECT CHECK MYSELF: ${state}`,
+                      '',
+                      'It loads. Before you sign off, `present` it — that is what puts the',
+                      'finished thing in front of the user and hands you back a picture of what',
+                      'they will see. Look at that picture. If it is empty or wrong, the project',
+                      'loading is not the same as the game working.',
                     ].join('\n');
                   },
                 },
