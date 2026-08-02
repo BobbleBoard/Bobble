@@ -150,3 +150,35 @@ describe('workspaceFromTask', () => {
     expect(workspaceFromTask('compare with /Users/other/thing/here', home)).toBeNull();
   });
 });
+
+describe('the one-component shadow', () => {
+  /* Rooting the corp at the directory the task names made this common: the model
+   * is told "build at .../platformer", is already standing in platformer, and
+   * creates platformer/ again. Run 19 built its whole game in
+   * platformer/platformer/2D Platformer/. */
+  const tmp = (): string => mkdtempSync(path.join(os.tmpdir(), 'shadow-'));
+
+  it('finds a repeated leaf holding the project', () => {
+    const root = tmp();
+    mkdirSync(path.join(root, path.basename(root)), { recursive: true });
+    writeFileSync(path.join(root, path.basename(root), 'project.godot'), 'x');
+    expect(shadowRoots(root)).toContain(path.join(root, path.basename(root)));
+  });
+
+  it('finds it one level deeper, the way run 19 nested it', () => {
+    const root = tmp();
+    const inner = path.join(root, path.basename(root), '2D Platformer');
+    mkdirSync(inner, { recursive: true });
+    writeFileSync(path.join(inner, 'project.godot'), 'x');
+    expect(shadowRoots(root)).toContain(path.join(root, path.basename(root)));
+  });
+
+  /* A genuine nested package (src/src, a python package inside its project) has
+   * no marker that the outer level lacks, and must be left alone. */
+  it('leaves a legitimate nested directory alone', () => {
+    const root = tmp();
+    writeFileSync(path.join(root, 'project.godot'), 'x'); // real project at the top
+    mkdirSync(path.join(root, path.basename(root)), { recursive: true });
+    expect(shadowRoots(root)).not.toContain(path.join(root, path.basename(root)));
+  });
+});

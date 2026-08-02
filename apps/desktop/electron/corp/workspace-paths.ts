@@ -74,8 +74,59 @@ export function shadowRoots(cwd: string): string[] {
     const candidate = path.join(abs, ...cwdParts.slice(-k));
     if (existsSync(candidate) && statSync(candidate).isDirectory()) found.push(candidate);
   }
+  const leaf = leafShadowRoot(abs);
+  if (leaf !== undefined && !found.includes(leaf)) found.push(leaf);
   return found;
 }
+
+/**
+ * The ONE-component shadow: `<cwd>/<leaf>` where `<leaf>` is the workspace's own
+ * name — `.../platformer/platformer`.
+ *
+ * `MIN_PREFIX` is 2 because a lone repeated name is often legitimate (`src/src`,
+ * a Python package inside its project). Rooting the corp at the directory the
+ * task names made this case common rather than exotic: the model is told to
+ * build "at .../platformer", is already standing in `platformer`, and creates
+ * `platformer/` again. Run 19 built its whole game in
+ * `platformer/platformer/2D Platformer/`.
+ *
+ * So it is detected on EVIDENCE rather than on the name: the inner directory
+ * holds the project's entry point and the outer one does not. A genuine nested
+ * package has no such marker at the inner level only, and is left alone.
+ */
+function leafShadowRoot(abs: string): string | undefined {
+  const leaf = path.basename(abs);
+  const candidate = path.join(abs, leaf);
+  try {
+    if (!statSync(candidate).isDirectory()) return undefined;
+  } catch {
+    return undefined;
+  }
+  const marker = (dir: string): boolean =>
+    ENTRY_MARKERS.some((m) => existsSync(path.join(dir, m)));
+  if (marker(abs)) return undefined; // the real project is already at the top
+  if (marker(candidate)) return candidate;
+  // Or one level further in, which is how run 19 nested it.
+  try {
+    for (const name of readdirSync(candidate)) {
+      const deep = path.join(candidate, name);
+      if (statSync(deep).isDirectory() && marker(deep)) return candidate;
+    }
+  } catch {
+    return undefined;
+  }
+  return undefined;
+}
+
+/** Files that mark "this directory is the project", not a subfolder of one. */
+const ENTRY_MARKERS = [
+  'project.godot',
+  'package.json',
+  'Cargo.toml',
+  'pyproject.toml',
+  'index.html',
+  'main.py',
+];
 
 /** One file moved out of a shadow tree. */
 export interface RepairedFile {
