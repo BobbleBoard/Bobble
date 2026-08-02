@@ -19,7 +19,6 @@
  * Pure roster + orchestration; the model work is behind the injected seam.
  */
 
-import { PRESENT_TOOL_NAME } from '../tools/present.js';
 import {
   AgentMesh,
   DEFAULT_MESH_BUDGET,
@@ -101,32 +100,6 @@ This conversation persists. Anything you and your colleagues have already said o
 You get things done by TALKING to the right people: ${TALK_TO_TOOL} messages a colleague and returns their reply, and ${COMMISSION_SPECIALIST_TOOL} brings in a specialist to measure or review something. You can also search the web and read documentation when you need to look something up.
 
 Whoever prompted you is waiting for YOUR reply — but do the work FIRST. Replying is one action and the work is many, so the pull to answer early is strong and always wrong. When you do reply, keep it concrete and short.${builder ? builderClauses() : ''}`;
-}
-
-export function ceoMeshPrompt(task: string): string {
-  return `${meshPreamble(true)}
-
-You are the CEO. The user asked for: ${task}
-
-You hold the VISION. Nobody else in this building has spoken to the user, so what they actually wanted lives with you, and the only question that finally matters is yours: is this the thing they asked for?
-
-YOU DECIDE WHETHER THIS NEEDS A TEAM. You have the full set of tools — read, write, edit, a shell, the browser, the web — and you can simply do the work. For a great many requests that IS the right answer, and convening anybody would be absurd: a question, a single file, a small change to something that already exists, anything you can build and check yourself in a few minutes. Do those yourself, properly, and answer.
-
-BRING IN THE MANAGER FOR A PROJECT — something big, with real parts to it. ${TALK_TO_TOOL} it when the work genuinely splits into pieces different people could build at once, when doing it alone would take hours rather than minutes, or when it needs checking by people who did not write it. Then your job changes: you brief, you wait, and you judge what comes back against what the user actually asked for.
-
-NOTHING OBLIGES YOU TO USE THEM. There is a whole team here and it costs you nothing to leave it idle. A greeting, a question, a small fix, one file — answer it yourself and be done. Convening a corporation because a corporation exists is the most expensive way to say hello.
-
-Weigh the two mistakes honestly, because they cost different things. Convening a corporation to produce one HTML file wastes everybody's time and produces a worse file. Building a large project alone means one agent with one context doing serially what four could have done at once — the more expensive mistake, because you will not notice you are making it until you are hours in.
-
-BRIEF ONCE AND LET THEM BUILD. Do not ask the manager to confirm the scope back to you before it starts — that is a round trip that buys nothing, and while you wait, nobody is building. Say what you want clearly enough that it does not need confirming. Your ${TALK_TO_TOOL} returns the manager's reply when it has finished the work, and THAT is when you start checking.
-
-WHEN THE MANAGER SAYS IT IS FINISHED, DO NOT TAKE ITS WORD. It has been staring at this for hours and it wants to be done — that is exactly when things get missed. Go through the user's request one item at a time and ask, of each: is this actually here, and does it actually work? Look for the piece that was quietly dropped because it was hard, the capability that got narrowed to something easier, the thing that exists but does nothing.
-
-Use your people to look, even where you could look yourself — a second pair of eyes that did not build it is the point. ${COMMISSION_SPECIALIST_TOOL} the tester and name the specific things the user asked for, one by one, so it tries each rather than reporting in general. If any of it is on a screen, commission the visual specialist — a build that compiles tells you nothing about whether a window opens. If you suspect something is missing but cannot tell where, the auditor will go and find out.
-
-BE HARD TO SATISFY, on the user's behalf. "The team says it is finished" is not evidence. Neither is "the tests pass" — those were written by the same people who wrote the work. If something is missing or broken, ${TALK_TO_TOOL} the manager with exactly what you asked for, exactly what you got, and have it fixed. Send it back as many times as it takes; that is not failure, it is the job.
-
-Only when the product genuinely does what the user asked, and you have had somebody LOOK, do you finish. Then \`present\` the finished thing — that is what actually puts it in front of the user and opens it beside the conversation, and it hands you back a preview of what they are about to see. LOOK at that preview before you write a word: if the product needs a program that is not installed on this machine, or the preview is empty or wrong, it is not finished and you send it back. Then reply with what was built, how to use it, and anything you decided to leave out and why.`;
 }
 
 /**
@@ -421,7 +394,6 @@ export interface CorpMeshOptions {
    * work to; default 4). */
   readonly engineerCount?: number;
   /** Built-in tool allowlists per role (the desktop host maps these to real tools). */
-  readonly ceoTools?: readonly string[];
   readonly managerTools?: readonly string[];
   readonly engineerTools?: readonly string[];
   readonly specialistTools?: readonly string[];
@@ -550,19 +522,13 @@ const VIDEO_TOOLS = ['generate_video'];
  * was in nobody's. So a corp run could not present at all: it built the thing,
  * wrote a verdict, and left the user to go hunting for their own deliverable.
  *
- * The CEO is the one role that has spoken to the user and whose reply they read,
- * which makes it the top-level model of a corp run in the only sense that
- * matters. Engineers, managers and specialists report UPWARD, so the user's rule
- * ("no subagent ever has this") holds for them exactly as before.
+ * PRESENTING BELONGS TO THE REAL CEO — the chat the user is actually talking to,
+ * which holds `present` on its ordinary tool surface and is the only party the
+ * user hears from. Nobody inside the mesh gets it: engineers, the manager and
+ * the specialists all report upward, so the user's rule ("no subagent ever has
+ * this") holds for them exactly as before.
  */
-const DEFAULT_CEO_TOOLS: readonly string[] = [
-  ...FILE_TOOLS,
-  'bash',
-  ...RESEARCH_TOOLS,
-  ...BROWSER_TOOLS,
-  ...CONNECTOR_TOOLS,
-  PRESENT_TOOL_NAME,
-];
+
 /*
  * THE MANAGER GETS A SHELL — to RUN, never to write. MEASURED, run 15: with no
  * way to execute one command it used an engineer as a remote terminal, nine times:
@@ -645,18 +611,29 @@ export function buildCorpRoster(opts: CorpMeshOptions): MeshAgent[] {
   const specs = specialistIds();
   const engIds = Array.from({ length: engineers }, (_, i) => engineerId(i + 1));
 
-  const ceo: MeshAgent = {
-    id: 'ceo',
-    role: 'ceo',
-    systemPrompt: ceoMeshPrompt(opts.task),
-    peers: ['manager', ...specs],
-    tools: opts.ceoTools ?? DEFAULT_CEO_TOOLS,
-  };
+  /*
+   * THERE IS NO CEO IN THE MESH. the user: "don't spawn a fake CEO clone for the corp
+   * harness. the ceo, the only ceo, that does that final review is the original
+   * one that originally talked to the [user]."
+   *
+   * The mesh used to open with its own CEO agent holding a full builder's
+   * toolkit, seeded with the brief the REAL CEO had just written. Measured on the
+   * run that exposed this: that agent called `write` ten times and `bash` seven,
+   * and `talk_to` exactly zero — it built the entire game itself while the
+   * manager it was supposed to hand off to sat untouched, never once messaged.
+   * The chat CEO had already delegated correctly; this second one simply did the
+   * job again, alone, one level down.
+   *
+   * So a production STARTS AT THE MANAGER, with the CEO's brief as its incoming
+   * message. The manager's peer for escalation is nobody inside the mesh: it
+   * reports by returning, and that return value travels back to the real CEO as
+   * the result of its `talk_to_manager` call.
+   */
   const manager: MeshAgent = {
     id: 'manager',
     role: 'manager',
     systemPrompt: managerMeshPrompt(opts.task),
-    peers: ['ceo', ...engIds, ...specs],
+    peers: [...engIds, ...specs],
     tools: opts.managerTools ?? DEFAULT_MANAGER_TOOLS,
   };
   const engineerAgents: MeshAgent[] = engIds.map((id) => ({
@@ -672,16 +649,17 @@ export function buildCorpRoster(opts: CorpMeshOptions): MeshAgent[] {
     systemPrompt: specialistMeshPrompt(kind),
     // A specialist replies via the commission's return value; it may consult OTHER
     // specialists, and talk to the manager/CEO to escalate.
-    peers: ['manager', 'ceo', ...specs.filter((s) => s !== specialistId(kind))],
+    peers: ['manager', ...specs.filter((s) => s !== specialistId(kind))],
     tools: opts.specialistTools ?? specialistToolsFor(kind),
   }));
 
-  return [ceo, manager, ...engineerAgents, ...specialistAgents];
+  return [manager, ...engineerAgents, ...specialistAgents];
 }
 
 /** The outcome of a corp mesh run. */
 export interface CorpMeshResult {
-  /** The CEO's final reply — the product of the whole emergent conversation. */
+  /** The manager's final reply — the product of the whole emergent conversation,
+   * handed back to the real CEO as its `talk_to_manager` result. */
   readonly reply: string;
   /** Every talk that happened, in settle order (telemetry / the situation room). */
   readonly hops: readonly MeshHop[];
@@ -717,6 +695,8 @@ export async function runCorpMesh(
     if (opts.signal.aborted) mesh.abort();
     else opts.signal.addEventListener('abort', () => mesh.abort(), { once: true });
   }
-  const reply = await mesh.run('ceo', opts.task);
+  // The MANAGER is the entry point — see buildCorpRoster. The reply it returns is
+  // what the real CEO receives from `talk_to_manager`.
+  const reply = await mesh.run('manager', opts.task);
   return { reply, hops: mesh.hops, turns: mesh.turns, exhausted: mesh.exhausted };
 }

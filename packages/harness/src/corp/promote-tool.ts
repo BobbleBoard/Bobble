@@ -18,6 +18,7 @@ import type { ExtensionAPI } from '@mariozechner/pi-coding-agent';
 import { type Static, Type } from '@sinclair/typebox';
 import type { EffortLevel } from '../effort/effort.js';
 import { type CorpRunRequest, type CorpRunResult, corpBridgeRunFromEnv } from './bridge-client.js';
+import { classifyVerification, extractClaims, finalCheck } from './verification.js';
 import {
   CREATE_PRODUCTION_HIERARCHY,
   CREATE_PRODUCTION_HIERARCHY_TOOL,
@@ -206,10 +207,38 @@ export function registerCreateHierarchyTool(pi: ExtensionAPI, deps: PromoteToolD
        */
       const runCorp = deps.runCorp ?? corpBridgeRunFromEnv();
       if (runCorp !== null) {
-        const result = await runCorp({ message: briefForManager(args) });
+        const brief = briefForManager(args);
+        const result = await runCorp({ message: brief });
         if (result.ok) {
+          /*
+           * THE FINAL REVIEW RIDES IN THE TOOL RESULT.
+           *
+           * the user: "that final review does not have to be part of the mesh
+           * harness, it's just part of the tool result that the talk to tool
+           * gives it — e.g. from the manager 'I've built the requested game...'
+           * — the harness then injects into that tool result 'now verify this
+           * result as if you were the user testing it before giving it finally
+           * back to them'."
+           *
+           * This is the SAME mechanical lever the engineers and the manager get
+           * at submit time — the role's own claims listed back, plus the kinds of
+           * proof this job admits — aimed at the one perspective that had nowhere
+           * to live once the mesh stopped spawning a CEO of its own: the user's.
+           * The real CEO is the only CEO, so it does this review itself, here,
+           * before it answers.
+           */
           return {
-            content: [{ type: 'text', text: result.product }],
+            content: [
+              {
+                type: 'text',
+                text: `${result.product}\n\n${'—'.repeat(20)}\n\n${finalCheck({
+                  claims: extractClaims(result.product),
+                  profile: classifyVerification(brief),
+                  perspective: 'ceo',
+                  vision: brief,
+                })}`,
+              },
+            ],
             details: { promoted: true, delivered: true },
           };
         }

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { PROMOTION_SYSTEM_PROMPT } from './promotion.js';
 import {
   buildCorpRoster,
   COMMISSION_SPECIALIST_TOOL,
-  ceoMeshPrompt,
   engineerId,
   engineerMeshPrompt,
   MESH_SPECIALIST_KINDS,
@@ -16,10 +16,17 @@ import {
 import type { AgentTurnRequest, RunAgentTurn } from './mesh.js';
 
 describe('buildCorpRoster', () => {
-  it('makes the CEO, manager, an engineer pool, and one specialist per kind', () => {
+  it('makes the manager, an engineer pool, and one specialist per kind — NO ceo', () => {
     const roster = buildCorpRoster({ task: 'build a game', engineerCount: 3 });
     const ids = roster.map((a) => a.id);
-    expect(ids).toContain('ceo');
+    /*
+     * the user: "don't spawn a fake CEO clone for the corp harness. the ceo, the only
+     * ceo, ... is the original one that originally talked to the [user]." The mesh
+     * used to open with its own CEO holding a builder's toolkit; measured, it
+     * called `write` ten times and `talk_to` zero, building the whole thing while
+     * the manager it should have handed to was never messaged.
+     */
+    expect(ids).not.toContain('ceo');
     expect(ids).toContain('manager');
     expect(ids).toContain(engineerId(1));
     expect(ids).toContain(engineerId(3));
@@ -30,14 +37,15 @@ describe('buildCorpRoster', () => {
     const roster = buildCorpRoster({ task: 't', engineerCount: 2 });
     const by = Object.fromEntries(roster.map((a) => [a.id, a]));
     // Every non-specialist can reach every specialist.
-    for (const id of ['ceo', 'manager', engineerId(1), engineerId(2)]) {
+    for (const id of ['manager', engineerId(1), engineerId(2)]) {
       for (const kind of MESH_SPECIALIST_KINDS) {
         expect(by[id]?.peers).toContain(specialistId(kind));
       }
     }
-    // The CEO talks to the manager; the manager to the CEO + engineers.
-    expect(by.ceo?.peers).toContain('manager');
-    expect(by.manager?.peers).toContain('ceo');
+    // The manager is the entry point and talks to its engineers. It reports by
+    // RETURNING — the real CEO is blocked on the tool call, so there is no `ceo`
+    // peer inside the mesh to send to.
+    expect(by.manager?.peers).not.toContain('ceo');
     expect(by.manager?.peers).toContain(engineerId(1));
     // Engineers report to the manager.
     expect(by[engineerId(1)]?.peers).toContain('manager');
@@ -45,7 +53,7 @@ describe('buildCorpRoster', () => {
 });
 
 describe('runCorpMesh — an emergent build from a scripted conversation', () => {
-  it('CEO → manager → engineers (contracts) → manager commissions tester → back to CEO', async () => {
+  it('manager → engineers (contracts) → manager commissions tester → returns the product', async () => {
     const seen: string[] = [];
     // A scripted multi-agent conversation: each agent decides what to do from its
     // incoming message. This is the shape a real run takes — the model drives it; here
@@ -53,13 +61,9 @@ describe('runCorpMesh — an emergent build from a scripted conversation', () =>
     const runAgentTurn: RunAgentTurn = async (req: AgentTurnRequest) => {
       seen.push(`${req.from}->${req.agentId}`);
       switch (req.agentId) {
-        case 'ceo': {
-          // Prompted by the user with the task → talk to the manager with a vision.
-          const delivered = await req.talk('ceo', 'manager', 'vision: a snake game');
-          return { reply: `Shipped for the user. Manager said: ${delivered}` };
-        }
         case 'manager': {
-          // Prompted by the CEO → assign two contracts, then commission the tester.
+          // Prompted with the real CEO's brief → assign two contracts, then
+          // commission the tester. Its REPLY is the delivery.
           const a = await req.talk('manager', engineerId(1), 'contract: game loop → game.js');
           const b = await req.talk('manager', engineerId(2), 'contract: input → input.js');
           const test = await req.talk('manager', specialistId('tester'), 'does it run?');
@@ -78,19 +82,18 @@ describe('runCorpMesh — an emergent build from a scripted conversation', () =>
 
     const result = await runCorpMesh({ task: 'make a snake game', engineerCount: 2, runAgentTurn });
 
-    // The CEO's final reply carries the whole chain up.
-    expect(result.reply).toContain('Shipped for the user');
+    // The manager's reply carries the whole chain up — this is exactly what the
+    // real CEO receives back from `talk_to_manager`.
     expect(result.reply).toContain('game.js written');
     expect(result.reply).toContain('input.js written');
     expect(result.reply).toContain('PASS');
     // The emergent conversation actually happened, in the right shape.
-    expect(seen[0]).toBe('user->ceo');
-    expect(seen).toContain('ceo->manager');
+    expect(seen[0]).toBe('user->manager');
     expect(seen).toContain(`manager->${engineerId(1)}`);
     expect(seen).toContain(`manager->${engineerId(2)}`);
     expect(seen).toContain(`manager->${specialistId('tester')}`);
-    // Turns: ceo + manager + 2 engineers + tester.
-    expect(result.turns).toBe(5);
+    // Turns: manager + 2 engineers + tester.
+    expect(result.turns).toBe(4);
     expect(result.exhausted).toBe(false);
   });
 
@@ -98,8 +101,6 @@ describe('runCorpMesh — an emergent build from a scripted conversation', () =>
     let engineerCommissioned = false;
     const runAgentTurn: RunAgentTurn = async (req) => {
       switch (req.agentId) {
-        case 'ceo':
-          return { reply: await req.talk('ceo', 'manager', 'go') };
         case 'manager':
           return { reply: await req.talk('manager', engineerId(1), 'build it') };
         case engineerId(1): {
@@ -194,30 +195,37 @@ describe('the producing specialists (the user's presets)', () => {
 });
 
 describe('the CEO is the chat you were already talking to', () => {
-  // the user: the initial model IS the CEO — it just becomes one the moment it calls
-  // talk_to. Stripping its tools at that moment means "hi" and "hi, and build me
-  // this" put you in front of two different assistants.
-  const ceo = () => buildCorpRoster({ task: 't' }).find((a) => a.id === 'ceo');
-
-  it('keeps the ordinary tool surface — it does not lose the web when it delegates', () => {
-    const tools = ceo()?.tools ?? [];
-    for (const t of ['read', 'write', 'edit', 'ls', 'bash', 'web_search', 'browser_navigate']) {
-      expect(tools).toContain(t);
-    }
+  /*
+   * the user: the initial model IS the CEO — it just becomes one the moment it calls
+   * talk_to_manager. It is NOT a mesh agent and never was one honestly: the mesh
+   * used to build a second `ceo` seeded with the real CEO's brief, and that clone
+   * (holding a full builder's toolkit) did the whole job itself rather than hand
+   * it on. the user: "don't spawn a fake CEO clone for the corp harness."
+   *
+   * So the assertion is now the absence: no seat in the mesh is a CEO, and the
+   * real one keeps the ordinary chat tool surface because nothing here touches it.
+   */
+  it('is not in the mesh at all — no seat, no clone', () => {
+    const roster = buildCorpRoster({ task: 't' });
+    expect(roster.find((a) => a.id === 'ceo')).toBeUndefined();
+    expect(roster.some((a) => a.role === 'ceo')).toBe(false);
   });
 
-  it('still has the manager and the specialists as peers', () => {
-    expect(ceo()?.peers).toContain('manager');
-    expect(ceo()?.peers).toContain(specialistId('auditor'));
+  it('is the mesh ENTRY that the manager reports back to, by returning', () => {
+    // Nobody inside can message a CEO, because the real one is blocked in its
+    // tool call — the manager's reply IS the report.
+    for (const agent of buildCorpRoster({ task: 't' })) {
+      expect(agent.peers).not.toContain('ceo');
+    }
   });
 });
 
-describe('the CEO’s brief matches the tools it actually has', () => {
-  // The lead IS the chat the user was already talking to. the user: "the CEO should
-  // have all the tools ... it should be able to write and work and do small
-  // things itself ... it needs to call the manager of its own volition and make
-  // it do the task when it's a project that needs it, not a single html file."
-  const p = (): string => ceoMeshPrompt('build a thing');
+describe('the real CEO’s brief matches the tools it actually has', () => {
+  // the user: "the CEO should have all the tools ... it should be able to write and
+  // work and do small things itself ... it needs to call the manager of its own
+  // volition when it's a project that needs it, not a single html file." This is
+  // the prompt the CHAT model reads — the only CEO there is.
+  const p = (): string => PROMOTION_SYSTEM_PROMPT;
 
   it('never claims to be toolless', () => {
     expect(p()).not.toContain('you have no editor');
@@ -227,21 +235,12 @@ describe('the CEO’s brief matches the tools it actually has', () => {
 
   it('does not MANDATE delegating — it is a judgement call', () => {
     expect(p()).not.toContain('YOUR FIRST ACTION IS TO');
-    expect(p()).toContain('YOU DECIDE WHETHER THIS NEEDS A TEAM');
+    expect(p()).toContain('If the task is genuinely small enough');
   });
 
-  it('names the judgement in both directions, with the small case first', () => {
-    expect(p()).toContain('single file');
-    expect(p()).toContain('one HTML file');
-    expect(p()).toContain('BRING IN THE MANAGER FOR A PROJECT');
-  });
-
-  it('says outright that a team is never an obligation', () => {
-    // the user: "we wouldn't want the CEO to call the talk_to tool on a 'hi how are
-    // you today' — ensure your system prompt is framing it as a task for huge
-    // problems and projects, not forced."
-    expect(p()).toContain('NOTHING OBLIGES YOU TO USE THEM');
-    expect(p()).toContain('A greeting');
+  it('tells it the manager knows only what it is told', () => {
+    // The brief IS the hand-off: the manager has never spoken to the user.
+    expect(p()).toContain('they have not spoken to the user');
   });
 });
 
@@ -346,19 +345,16 @@ describe('the CEO presents', () => {
    * `present` was registered but in no role's allowlist, so it could never fire.
    * The CEO is the only role the user hears from, so it is the one that hands
    * over — everyone else reports upward. */
-  it('gives present to the CEO and to nobody else', () => {
-    const agents = buildCorpRoster({ task: 'build a game' });
-    const ceo = agents.find((a) => a.id === 'ceo');
-    expect(ceo?.tools).toContain('present');
-    for (const other of agents.filter((a) => a !== ceo)) {
-      expect(other.tools ?? []).not.toContain('present');
+  it('gives present to NOBODY in the mesh — it belongs to the real CEO', () => {
+    /*
+     * `present` is on the chat model's ordinary tool surface (verified live: it
+     * is advertised alongside read/write/bash to the CEO). The mesh roles all
+     * report upward, so the user's rule — no subagent ever presents — holds for
+     * every seat here.
+     */
+    for (const agent of buildCorpRoster({ task: 'build a game' })) {
+      expect(agent.tools ?? []).not.toContain('present');
     }
-  });
-
-  it('tells the CEO to present, since an unmentioned tool is inert', () => {
-    const prompt = ceoMeshPrompt('build a game');
-    expect(prompt).toContain('present');
-    expect(prompt).toContain('LOOK at that preview');
   });
 });
 
@@ -368,7 +364,7 @@ describe('the runtime must exist', () => {
    * the capability prompt, so the clause telling an agent to check its runtime
    * never reached the building at all. */
   it('tells every BUILDER to check the runtime first', () => {
-    for (const p of [ceoMeshPrompt('x'), managerMeshPrompt('x'), engineerMeshPrompt()]) {
+    for (const p of [managerMeshPrompt('x'), engineerMeshPrompt()]) {
       expect(p).toContain('ESTABLISH THAT PROGRAM IS ON THIS MACHINE');
     }
   });
