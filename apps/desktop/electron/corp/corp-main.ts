@@ -14,9 +14,9 @@
  * model — only main frames of app-created windows may reach it).
  */
 
-import { openHierarchy } from './hierarchy-store';
-import { piToolExtensionPaths } from '../pi/pi-main';
 import fs from 'node:fs';
+import os from 'node:os';
+import { workspaceFromTask } from './workspace-paths';
 import path from 'node:path';
 import { BrowserAgentClient, registerBrowserUseTools } from '@pi-desktop/browser-use';
 import type { CoordinationEvent, TaskHandle, TaskResult } from '@pi-desktop/coordination';
@@ -27,6 +27,7 @@ import { type BrowserSearchFn, registerWebTools } from '@pi-desktop/web-tools';
 import { app, type IpcMainInvokeEvent, ipcMain, type WebContents } from 'electron';
 import { ensureCorpInferenceServer } from '../inference/llm-main';
 import type { AppEventMap } from '../ipc-contract';
+import { piToolExtensionPaths } from '../pi/pi-main';
 import type { EffortLevel } from '../settings/settings-contract';
 import { isTrustedIpcEvent } from '../trusted-senders';
 import { corpConcurrencyForHost } from './concurrency';
@@ -34,6 +35,7 @@ import { createLlamaCorpChat } from './corp-chat';
 import type { CorpInvokeMap } from './corp-contract';
 import { CORP_INVOKE_CHANNELS } from './corp-contract';
 import { createBrowserSearch } from './corp-search';
+import { openHierarchy } from './hierarchy-store';
 import { startMeshTask } from './mesh-run';
 import { createCorpModelProvider } from './role-agent';
 import { createRunRoleAgent } from './role-agent-seam-impl';
@@ -228,15 +230,28 @@ async function handleStart(
      * same project reaches the same hierarchy and therefore the same people, and
      * the user's folder stays free of machine transcripts they did not ask for.
      */
+    /*
+     * WORK WHERE THE USER SAID. A task that names a directory IS the instruction
+     * about where the work goes, and rooting the team anywhere else guarantees
+     * every relative shell command lands in the wrong tree — see
+     * `workspaceFromTask`. Falls back to the chat's folder, then to a per-task
+     * workspace, exactly as before.
+     */
+    const named = workspaceFromTask(req.prompt, os.homedir());
     const projectPath =
-      typeof req.ctx?.cwd === 'string' && req.ctx.cwd.trim() !== ''
+      named ??
+      (typeof req.ctx?.cwd === 'string' && req.ctx.cwd.trim() !== ''
         ? req.ctx.cwd
-        : path.join(corpWorkspaceRoot(), meshTaskId);
+        : path.join(corpWorkspaceRoot(), meshTaskId));
     const hierarchy = openHierarchy(app.getPath('userData'), projectPath);
     const cwd = projectPath;
     fs.mkdirSync(cwd, { recursive: true });
     log.info('corp MESH hierarchy', {
       project: hierarchy.projectPath,
+      // TRACKABILITY: say where the work will land and why, once, in the log the
+      // run is read from. "Where did the files go" has cost several runs.
+      cwd,
+      cwdFrom: named !== null ? 'named-in-task' : 'chat-folder',
       team: hierarchy.dir,
       returning: hierarchy.existed,
     });

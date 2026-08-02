@@ -180,3 +180,38 @@ export function productFingerprint(cwd: string): string {
   }
   return items.sort().join('|');
 }
+
+/**
+ * THE PLACE THE USER NAMED — the corp's working directory.
+ *
+ * The corp used to root at the CHAT's folder (`req.ctx.cwd`), which in practice
+ * is whatever project the conversation belongs to — the Desktop, for most of
+ * the user's chats. Ask for a game at `/Users/user/bobble-testbed/platformer` and the
+ * roles would work in `~/Desktop` instead, so every relative shell command landed
+ * there: `mkdir -p platformer/scripts` built `~/Desktop/bobble-testbed/platformer`
+ * while the reply named the path that had been asked for.
+ *
+ * The sandbox fence stopped this for the pi file tools (`isNamedDestination`),
+ * but BASH is not fenced and never will be sensibly — a shell can write a hundred
+ * ways. The durable fix is to put the roles IN the directory the user named, so
+ * relative and absolute both land in the same right place.
+ *
+ * Returns the deepest path the task names under HOME, or null when it names none.
+ * Two levels minimum and never bare HOME — the same rule the write fence uses,
+ * for the same reason: `~/notes.txt` is a dump, `~/games/x` is a destination.
+ */
+export function workspaceFromTask(task: string, home: string): string | null {
+  const escaped = home.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const re = new RegExp(`(?:~|${escaped})(?:/[\\w.@-]+)+`, 'g');
+  const candidates = task.match(re) ?? [];
+  let best: string | null = null;
+  for (const raw of candidates) {
+    const abs = path.resolve(raw.startsWith('~') ? path.join(home, raw.slice(1)) : raw);
+    const rest = abs.startsWith(`${home}/`) ? abs.slice(home.length + 1) : '';
+    // Needs a folder under home, and must not be application state.
+    if (!rest.includes('/') || rest.startsWith('.') || rest.startsWith('Library/')) continue;
+    // Deepest wins: "at ~/a/b/game" beats a passing mention of "~/a".
+    if (best === null || abs.length > best.length) best = abs;
+  }
+  return best;
+}

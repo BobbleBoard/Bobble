@@ -7,14 +7,16 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { repairNote, repairShadowTree, shadowRoots, unmanglePath } from './workspace-paths';
+import { repairNote, repairShadowTree, shadowRoots, unmanglePath,
+  workspaceFromTask,
+} from './workspace-paths';
 
 describe('the path the agent meant', () => {
   it('undoes run 11’s mangling — the whole absolute path, minus its leading slash', () => {
     const cwd = '/private/tmp/claude-501/abc-123/scratchpad/mesh11/ws';
-    expect(unmanglePath(cwd, 'private/tmp/claude-501/abc-123/scratchpad/mesh11/ws/src/cli.py')).toBe(
-      'src/cli.py',
-    );
+    expect(
+      unmanglePath(cwd, 'private/tmp/claude-501/abc-123/scratchpad/mesh11/ws/src/cli.py'),
+    ).toBe('src/cli.py');
   });
 
   it('undoes run 9’s mangling — only the tail of the path', () => {
@@ -105,5 +107,46 @@ describe('rescuing a shadow tree', () => {
     const note = repairNote([{ from: 'private/tmp/x/ws/src/cli.py', to: 'src/cli.py' }]);
     expect(note).toContain('src/cli.py');
     expect(note).toContain('BARE relative paths');
+  });
+});
+
+describe('workspaceFromTask', () => {
+  const home = '/Users/user';
+
+  /* The exact task that put ten files on the Desktop: the corp rooted at the
+   * chat's folder, so every relative `mkdir` landed there instead. */
+  it('roots the team at the directory the task names', () => {
+    expect(
+      workspaceFromTask(
+        'Build me a 2D platformer in Godot 4 at /Users/user/bobble-testbed/platformer: a player…',
+        home,
+      ),
+    ).toBe('/Users/user/bobble-testbed/platformer');
+  });
+
+  it('understands ~ and takes the deepest path named', () => {
+    expect(workspaceFromTask('put it in ~/bobble-testbed/games/run1 please', home)).toBe(
+      '/Users/user/bobble-testbed/games/run1',
+    );
+    expect(workspaceFromTask('somewhere under ~/projects, say ~/projects/app/src', home)).toBe(
+      '/Users/user/projects/app/src',
+    );
+  });
+
+  it('falls through when the task names nowhere', () => {
+    expect(workspaceFromTask('build me a platformer game', home)).toBeNull();
+  });
+
+  /* Same rule as the write fence: a direct child of HOME is a dump, and
+   * application state is never a workspace. */
+  it('refuses bare HOME, its direct children, dot-dirs and Library', () => {
+    expect(workspaceFromTask('write to ~ please', home)).toBeNull();
+    expect(workspaceFromTask('use ~/notes.txt', home)).toBeNull();
+    expect(workspaceFromTask('use ~/.ssh/keys', home)).toBeNull();
+    expect(workspaceFromTask('use ~/Library/Caches/x', home)).toBeNull();
+  });
+
+  it('ignores paths belonging to somebody else', () => {
+    expect(workspaceFromTask('compare with /Users/other/thing/here', home)).toBeNull();
   });
 });
