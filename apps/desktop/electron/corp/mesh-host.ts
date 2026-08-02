@@ -452,6 +452,49 @@ export function runtimeCheck(runtime: string | null, cwd: string): string {
       .filter((part) => part !== '')
       .join('\n');
   }
+  /*
+   * RUN THE BUILD SCRIPT AND SEE IF THAT FIXES IT.
+   *
+   * Runs 30, 33 and 34 each wrote a build script AND hand-wrote the scene it was
+   * meant to generate, and the hand-written one — `[sub_resource type=
+   * "TextureRect"]`, a CanvasLayer root, function-call ext_resource syntax — is
+   * what broke the project. The script was right there, unrun.
+   *
+   * So when the scene is the problem and a build script exists, run it and check
+   * again. Either it produces a valid scene (and the run continues) or it does
+   * not, and the model is told exactly why its own script fails — which is more
+   * than it had before either way.
+   */
+  const sceneBroken = /\.tscn/i.test(text);
+  if (sceneBroken) {
+    const ran = runBuildScript(cwd);
+    if (ran !== null) {
+      const retry = spawnSync('godot', ['--headless', '--quit', '--path', cwd], {
+        encoding: 'utf8',
+        timeout: 45_000,
+      });
+      const after = `${retry.stdout ?? ''}\n${retry.stderr ?? ''}`
+        .split('\n')
+        .filter((l) => /ERROR|SCRIPT ERROR/.test(l));
+      if (after.length === 0) {
+        log.info('corp repair: build script produced a working scene', { cwd });
+        const empty = emptyProjectComplaint(cwd);
+        if (empty === null) {
+          return `${CLEAN_LOAD}\nNOTE: I ran your ${ran.name} for you and it produced a working scene. Point run/main_scene at what it saved and do not hand-edit the .tscn.`;
+        }
+      }
+      return [
+        `${errs.length} problem(s):`,
+        errs.slice(0, 20).join('\n'),
+        ran.report,
+        after.length > 0 && after.length < errs.length
+          ? `After running it, ${after.length} problem(s) remain.`
+          : '',
+      ]
+        .filter((part) => part !== '')
+        .join('\n');
+    }
+  }
   return [`${errs.length} problem(s):`, errs.slice(0, 20).join('\n'), buildScriptReport(cwd)]
     .filter((part) => part !== '')
     .join('\n');
@@ -472,6 +515,13 @@ export function runtimeCheck(runtime: string | null, cwd: string): string {
  * the model needs. Same principle as running the load check rather than asking
  * for it.
  */
+function runBuildScript(cwd: string): { name: string; report: string } | null {
+  const report = buildScriptReport(cwd);
+  if (report === '') return null;
+  const name = /I ALSO RAN YOUR ([\w./-]+)/.exec(report)?.[1] ?? 'build script';
+  return { name, report };
+}
+
 function buildScriptReport(cwd: string): string {
   /*
    * LOOK IN SUBDIRECTORIES. Run 26 put its build script at `scripts/build_game.gd`
