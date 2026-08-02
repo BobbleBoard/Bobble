@@ -240,8 +240,9 @@ describe('the scene recipe is the verified one', () => {
     const out = remediesFor('ERROR: res://main.tscn:19 - Parse Error: Unknown tag.');
     expect(out).toContain('PackedScene.new()');
     expect(out).toContain('packed.pack(root)');
-    expect(out).not.toMatch(/PackedScene\.pack\(root\)(?!\s*—)/);
-    expect(out).toContain('child.owner = root');
+    expect(out).not.toMatch(/PackedScene\.pack\(root\)/);
+    // Every child needs an owner or it is silently dropped from the packed scene.
+    expect(out).toContain('.owner = root');
   });
 });
 
@@ -255,9 +256,9 @@ describe('get_tree() inside a SceneTree script', () => {
     expect(out).toContain('Delete that');
   });
 
-  it('the recipe itself forbids it', () => {
+  it('the recipe itself rules it out', () => {
     const out = remediesFor('ERROR: res://main.tscn:19 - Parse Error: Unknown tag.');
-    expect(out).toContain('Do NOT add the root to the scene tree');
+    expect(out).toContain('the script IS the tree');
   });
 });
 
@@ -309,5 +310,16 @@ describe('only one sentence means success', () => {
     expect(isBroken('It reported no errors — because there is NOTHING TO LOAD.')).toBe(true);
     expect(isBroken(clean)).toBe(false);
     expect(isBroken(`${clean}\nNOTE: I removed your [input] section.`)).toBe(false);
+  });
+});
+
+describe('a project that loads and then crashes', () => {
+  /* Run 33 loaded with zero errors and segfaulted on the first frame: its
+   * MainScene.tscn parsed fine but made a CanvasLayer the root with Player.gd
+   * on it. A parser cannot see that; only running can. */
+  it('names the node-type mismatch', () => {
+    const out = remediesFor('handle_crash: Program crashed with signal 11');
+    expect(out).toContain('script written for a different node type');
+    expect(out).toContain('CharacterBody2D');
   });
 });

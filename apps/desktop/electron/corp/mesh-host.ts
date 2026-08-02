@@ -25,7 +25,8 @@
  */
 
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { mkdirSync, readdirSync, readFileSync, statSync, unlinkSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import nodePath from 'node:path';
 import type { ExtensionFactory, ToolDefinition } from '@mariozechner/pi-coding-agent';
 import {
@@ -69,6 +70,45 @@ const log = createLogger('desktop:corp');
 /** The ONLY string that means the project is fine. Everything else is a failure,
  * however it is worded — see the note in the bump. */
 const CLEAN_LOAD = 'It loaded with NO errors.';
+
+/**
+ * LOADING IS NOT RUNNING.
+ *
+ * Run 33 produced a project that loaded with zero errors and then crashed Godot
+ * with signal 11 the moment it drew a frame: its MainScene.tscn parsed fine but
+ * made a `CanvasLayer` the root and attached `Player.gd` to it, so a character
+ * script ran against a node type that has none of its methods. A parser cannot
+ * see that; only running can.
+ *
+ * So a clean load is followed by twenty frames of actual play. `--write-movie`
+ * with `--quit-after` renders and exits by itself, which is the only reason this
+ * is safe to do from a synchronous seam.
+ */
+function crashComplaint(cwd: string): string | null {
+  const movie = nodePath.join(tmpdir(), `pd-crash-${Date.now().toString(36)}.avi`);
+  const r = spawnSync(
+    'godot',
+    ['--path', cwd, '--write-movie', movie, '--fixed-fps', '30', '--quit-after', '20'],
+    { encoding: 'utf8', timeout: 45_000 },
+  );
+  try {
+    unlinkSync(movie);
+  } catch {
+    /* never written */
+  }
+  const out = `${r.stdout ?? ''}\n${r.stderr ?? ''}`;
+  if (!/Program crashed with signal|handle_crash/.test(out)) return null;
+  const script = /res:\/\/[\w./-]+\.gd/.exec(out)?.[0] ?? '';
+  return (
+    'It LOADS without errors and then CRASHES as soon as it draws a frame ' +
+    `(signal 11)${script === '' ? '' : `, around ${script}`}. Parsing a scene is not ` +
+    'running it. The usual cause is a node given a script meant for a different ' +
+    'type — a CharacterBody2D script on a CanvasLayer or a Node2D, say, so the ' +
+    'script calls methods that node does not have. Check that every `script =` in ' +
+    'your scene is on a node of the type that script expects.'
+  );
+}
+
 
 /**
  * "No errors" from an empty project is not success — see the note in
@@ -237,6 +277,16 @@ const REMEDIES: ReadonlyArray<{ readonly when: RegExp; readonly fix: string }> =
       'rounds on this by re-reading the error instead of comparing it to the listing.',
   },
   {
+    when: /Program crashed with signal|handle_crash/i,
+    fix:
+      'The project loads and then crashes when it runs. Almost always a node has a ' +
+      'script written for a different node type — a movement script on a ' +
+      'CanvasLayer or a plain Node2D, so it calls methods that node does not have. ' +
+      'The player must be a CharacterBody2D, the coin an Area2D, the platform a ' +
+      'StaticBody2D, and the scene root a Node2D. Check every `script =` line ' +
+      'against the type of the node it sits on.',
+  },
+  {
     when: /\.tscn.*(?:Parse Error|Unknown tag|Unexpected end of file)/i,
     fix:
       'A .tscn you typed by hand is malformed. DELETE it and generate it instead — ' +
@@ -373,7 +423,8 @@ export function runtimeCheck(runtime: string | null, cwd: string): string {
      * clean, which would have ended the convergence loop on an empty directory.
      */
     const empty = emptyProjectComplaint(cwd);
-    return empty ?? CLEAN_LOAD;
+    if (empty !== null) return empty;
+    return crashComplaint(cwd) ?? CLEAN_LOAD;
   }
   /*
    * REPAIR THE ONE SECTION THAT HAS KILLED SIX RUNS, then check again.
