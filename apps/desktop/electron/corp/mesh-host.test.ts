@@ -206,3 +206,17 @@ describe('the missing-main-scene remedy', () => {
     expect(out).toContain('or point');
   });
 });
+
+describe('the project.godot remedy gives the whole file', () => {
+  /* Run 24 copied Godot's comment header and wrote its `====` illustration in as
+   * literal syntax, then `version=5` for `config_version=5`. Describing the
+   * sections in prose was not enough; the minimal file itself is. */
+  it('spells out a valid minimal project.godot', () => {
+    const out = remediesFor(
+      "ERROR: Error parsing '/x/project.godot' at line 8: Expected value, got '=' File might be corrupted.",
+    );
+    expect(out).toContain('config_version=5');
+    expect(out).toContain('run/main_scene=');
+    expect(out).toContain('Do NOT copy the comment header');
+  });
+});

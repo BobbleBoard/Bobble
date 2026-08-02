@@ -86,8 +86,20 @@ const REMEDIES: ReadonlyArray<{ readonly when: RegExp; readonly fix: string }> =
       "Your project.godot is malformed. Godot's input-map format (those " +
       'Object(InputEventKey,…) blocks) cannot be hand-written reliably and you do not ' +
       'need it: DELETE the entire [input] section and use the actions Godot already ' +
-      'ships — ui_left, ui_right, ui_up, ui_down, ui_accept — in your scripts. Keep ' +
-      'project.godot down to config_version, [application] and [display].',
+      'ships — ui_left, ui_right, ui_up, ui_down, ui_accept — in your scripts.\n' +
+      '    REPLACE THE WHOLE FILE with exactly this, changing only the scene path:\n' +
+      '      config_version=5\n' +
+      '      \n' +
+      '      [application]\n' +
+      '      config/name="Game"\n' +
+      '      run/main_scene="res://scenes/main.tscn"\n' +
+      '      \n' +
+      '      [display]\n' +
+      '      window/size/viewport_width=900\n' +
+      '      window/size/viewport_height=600\n' +
+      '    Nothing else belongs in it. Do NOT copy the comment header Godot writes — ' +
+      'one run copied its `====` illustration in as if it were syntax, and another ' +
+      'wrote `version=5` for `config_version=5`.',
   },
   {
     when: /(?:Failed to instantiate an autoload|Resource file not found: res:\/\/[A-Z])/i,
