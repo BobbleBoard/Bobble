@@ -20,7 +20,7 @@ import {
   taskNote,
   excerptFailures,
   listProject,
-  emptyProjectComplaint, MESH_ENTRY } from './mesh-host';
+  emptyProjectComplaint, MESH_ENTRY, isUncheckable, runtimeCheck } from './mesh-host';
 
 describe('what a run hands through to its host', () => {
   it('carries every passthrough setting that was supplied', () => {
@@ -205,5 +205,36 @@ describe('the mesh entry point exists', () => {
     // The entry reports by RETURNING; it has no peer above it to message.
     expect(entry).toBeDefined();
     expect(entry?.peers ?? []).not.toContain('ceo');
+  });
+});
+
+describe('"could not check" is not "broken"', () => {
+  /*
+   * MEASURED on a Python app the team had built correctly. The bump decided
+   * broken as `!state.startsWith(CLEAN_LOAD)` — two states — so
+   * "(no automatic check exists for this kind of project.)" read as failure and
+   * the manager was told "STOP. I ran the project check myself and IT DOES NOT
+   * LOAD ... Fix exactly these errors and nothing else" about a project with no
+   * errors. It would have spent all six bumps chasing a phantom.
+   *
+   * That is five of the six corp benchmarks: Python, web, decks, documents.
+   * Only Godot escaped, because Godot is the only runtime runtimeCheck drives.
+   */
+  it('reports a non-Godot project as UNCHECKABLE, not as failing', () => {
+    const state = runtimeCheck(null, '/tmp');
+    expect(isUncheckable(state)).toBe(true);
+    // The exact predicate the bump uses to decide "send it back".
+    expect(!state.startsWith('It loaded with NO errors.') && !isUncheckable(state)).toBe(false);
+  });
+
+  it('says the same for any runtime it does not drive', () => {
+    for (const rt of ['python', 'node', 'unity', 'blender']) {
+      expect(isUncheckable(runtimeCheck(rt, '/tmp'))).toBe(true);
+    }
+  });
+
+  it('does NOT call a real failure uncheckable', () => {
+    expect(isUncheckable('3 problem(s):\nres://main.tscn:5 Parse Error')).toBe(false);
+    expect(isUncheckable('It loaded with NO errors.')).toBe(false);
   });
 });

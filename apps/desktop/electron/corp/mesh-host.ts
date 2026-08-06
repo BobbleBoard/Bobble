@@ -70,6 +70,26 @@ const log = createLogger('desktop:corp');
 /** The ONLY string that means the project is fine. Everything else is a failure,
  * however it is worded — see the note in the bump. */
 const CLEAN_LOAD = 'It loaded with NO errors.';
+/**
+ * There is no runtime we know how to check for this project.
+ *
+ * A THIRD state, and the reason it has to be one. The bump decided "broken" as
+ * `!state.startsWith(CLEAN_LOAD)` — two states, success or failure — so this
+ * message, which is neither, read as failure. MEASURED on a Python app the team
+ * had built correctly: the manager was told "STOP. I ran the project check
+ * myself and IT DOES NOT LOAD" and "Fix exactly these errors and nothing else",
+ * about a project with no errors and no check. It would have spent all six bumps
+ * chasing a phantom.
+ *
+ * That is five of the six corp benchmarks — Python, web, decks, documents,
+ * anything without a runtime we drive. Only Godot escaped, because Godot is the
+ * only runtime `runtimeCheck` knows.
+ */
+const NO_CHECK = '(no automatic check exists for this kind of project.)';
+/** Is this the "we could not check" state rather than a verdict? */
+export function isUncheckable(state: string): boolean {
+  return state.startsWith(NO_CHECK);
+}
 
 /**
  * LOADING IS NOT RUNNING.
@@ -267,7 +287,7 @@ export function listProject(cwd: string): string {
  * so a command that self-terminates is the whole requirement.
  */
 export function runtimeCheck(runtime: string | null, cwd: string): string {
-  if (runtime !== 'godot') return '(no automatic check exists for this kind of project.)';
+  if (runtime !== 'godot') return NO_CHECK;
   /*
    * BOTH STREAMS. Godot prints every error to STDERR and still exits 0, and
    * `execFileSync` returns STDOUT only — so the first version of this read an
@@ -950,7 +970,13 @@ export function createMeshAgentHost(config: MeshAgentHostConfig): MeshAgentHost 
                      * A new failure message must never be able to read as
                      * success just because it is phrased differently.
                      */
-                    const broken = !state.startsWith(CLEAN_LOAD);
+                    /*
+                     * THREE STATES, NOT TWO. "Could not check" is not a verdict:
+                     * sending a correct project back to be repaired is worse
+                     * than not checking it, because it burns the verification
+                     * budget and tells the team something false about its work.
+                     */
+                    const broken = !state.startsWith(CLEAN_LOAD) && !isUncheckable(state);
                     if (broken) {
                       log.info('corp bump: project does not load, sending it back', {
                         agentId,
@@ -1010,12 +1036,29 @@ export function createMeshAgentHost(config: MeshAgentHostConfig): MeshAgentHost 
                         ...(config.task !== undefined ? { vision: config.task } : {}),
                       }),
                       '',
-                      `I RAN THE PROJECT CHECK MYSELF: ${state}`,
-                      '',
-                      'It loads. Before you sign off, `present` it — that is what puts the',
-                      'finished thing in front of the user and hands you back a picture of what',
-                      'they will see. Look at that picture. If it is empty or wrong, the project',
-                      'loading is not the same as the game working.',
+                      /*
+                       * SAY WHICH OF THE TWO THIS IS. The clean branch told every
+                       * role "It loads." — including when no check had run at
+                       * all, which is the harness asserting something it did not
+                       * verify, to the one agent whose job is to stop exactly
+                       * that. When we cannot check, the honest move is to say so
+                       * and hand the burden back rather than quietly bless it.
+                       */
+                      ...(isUncheckable(state)
+                        ? [
+                            'I COULD NOT CHECK THIS ONE AUTOMATICALLY — there is no runtime',
+                            'check I know how to run for this kind of project. So nothing has',
+                            'verified it except you. RUN IT YOURSELF, the way the user will,',
+                            'and say what you actually saw happen.',
+                          ]
+                        : [
+                            `I RAN THE PROJECT CHECK MYSELF: ${state}`,
+                            '',
+                            'It loads. Before you sign off, `present` it — that is what puts the',
+                            'finished thing in front of the user and hands you back a picture of',
+                            'what they will see. Look at that picture. If it is empty or wrong,',
+                            'the project loading is not the same as the game working.',
+                          ]),
                     ].join('\n');
                   },
                 },
