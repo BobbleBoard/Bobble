@@ -13,18 +13,15 @@ import { modelFitsInRam } from './model-fit';
 const GB = 1024 ** 3;
 
 describe('modelFitsInRam', () => {
-  it('ALLOWS one 27B on a 24GB machine — a single one genuinely fits', () => {
+  it('refuses a 27B on a 24GB machine — MEASURED, it does not fit', () => {
     /*
-     * Correcting my own first diagnosis. The desktop stutter came from TWO
-     * 27B servers racing up, not from one being too big: 24 − 2 = 22GB, and the
-     * model is ~16GB. Sizing the guard to catch the race would punish every
-     * legitimate large-model user for a bug that lives in the start path.
+     * I claimed twice that one 27B fits on 24GB. It does not. 17.1GB of weights
+     * leaves ~7GB for Electron, the renderer, the pi child, the role sessions
+     * and the KV cache: swap hit 5.4GB, free memory 17%, and the turn produced
+     * nothing. The reserve is 7GiB now because that is what the run measured,
+     * not because it sounded safe.
      */
-    expect(modelFitsInRam(16.5 * GB, 24 * GB).ok).toBe(true);
-  });
-
-  it('refuses a model that cannot fit alongside the OS at all', () => {
-    const res = modelFitsInRam(30 * GB, 24 * GB);
+    const res = modelFitsInRam(17.1 * GB, 24 * GB);
     expect(res.ok).toBe(false);
     if (res.ok) throw new Error('expected a refusal');
     expect(res.reason).toContain('swap');
@@ -33,8 +30,16 @@ describe('modelFitsInRam', () => {
   });
 
   it('allows a big model on a machine built for it', () => {
-    expect(modelFitsInRam(16.5 * GB, 64 * GB).ok).toBe(true);
+    expect(modelFitsInRam(17.1 * GB, 64 * GB).ok).toBe(true);
     expect(modelFitsInRam(45 * GB, 128 * GB).ok).toBe(true);
+  });
+
+  it('still allows every tier the recommender ships at 24GB and below', () => {
+    // A guard that blocks the app's own defaults is worse than no guard.
+    expect(modelFitsInRam(4.6 * GB, 8 * GB).ok).toBe(true); // 4B Q8, 8GB tier
+    expect(modelFitsInRam(6.6 * GB, 16 * GB).ok).toBe(true); // gemma-12B, 16GB tier
+    expect(modelFitsInRam(6.6 * GB, 24 * GB).ok).toBe(true); // gemma-12B, 24GB balanced
+    expect(modelFitsInRam(5.5 * GB, 24 * GB).ok).toBe(true); // qwen 9B
   });
 
   it('allows every tier the recommender itself ships', () => {

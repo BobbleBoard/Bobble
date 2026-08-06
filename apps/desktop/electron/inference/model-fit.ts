@@ -19,9 +19,26 @@
 
 const GiB = 1024 ** 3;
 
-/** Held back for the OS and everything else running — mirrors the corp's reserve
- * (`CORP_RESERVE_BYTES`) so the two never disagree about what this box can take. */
-export const RAM_RESERVE_BYTES = 2 * GiB;
+/**
+ * Held back for macOS **and this app** — as a FRACTION of the machine, not a
+ * constant.
+ *
+ * MEASURED, and this is a correction twice over. It began at 2GiB ("the OS"),
+ * which let a 17.1GB Qwen3.6-27B pass on a 24GB Mac. It does not fit: Electron,
+ * the renderer, the pi child, the role sessions and the KV cache all want memory
+ * too, and the app is the thing ASKING for the model. Swap climbed to 5.4GB,
+ * free memory hit 17%, the turn produced nothing, and the user watched an empty
+ * thread wondering what was going on.
+ *
+ * Raising it to a flat 7GiB then broke the other end: an 8GB machine would have
+ * had 1GB left and been refused the 4.6GB model that IS its shipping default. A
+ * constant cannot be right at both ends of a 16× range. 30% scales: it refuses
+ * the 27B on 24GB (16.8GB usable vs 17.1GB needed) while leaving an 8GB machine
+ * 5.6GB — comfortably enough for the 4B it is meant to run.
+ */
+export const RAM_RESERVE_FRACTION = 0.3;
+/** Never reserve less than this, however small the machine claims to be. */
+export const RAM_RESERVE_FLOOR_BYTES = 2 * GiB;
 
 /*
  * NOTE the corp's 75% usable-fraction is deliberately NOT used here. That figure
@@ -53,14 +70,15 @@ const gb = (b: number): string => `${(b / GiB).toFixed(1)}GB`;
 export function modelFitsInRam(modelBytes: number, totalRamBytes: number): FitResult {
   if (!Number.isFinite(modelBytes) || modelBytes <= 0) return { ok: true };
   if (!Number.isFinite(totalRamBytes) || totalRamBytes <= 0) return { ok: true };
-  const budget = totalRamBytes - RAM_RESERVE_BYTES;
+  const reserve = Math.max(RAM_RESERVE_FLOOR_BYTES, totalRamBytes * RAM_RESERVE_FRACTION);
+  const budget = totalRamBytes - reserve;
   if (modelBytes <= budget) return { ok: true };
   return {
     ok: false,
     reason:
       `This model needs about ${gb(modelBytes)} of memory and this machine has ` +
-      `${gb(totalRamBytes)} in total, leaving about ${gb(Math.max(0, budget))} once the ` +
-      `system has its share. ` +
+      `${gb(totalRamBytes)} in total, leaving about ${gb(Math.max(0, budget))} once macOS ` +
+      `and this app have their share. ` +
       `Running it would push the whole system into swap. Choose a smaller model.`,
   };
 }
