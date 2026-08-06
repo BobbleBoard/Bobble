@@ -29,6 +29,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { SettingsSection } from '../settings/SettingsView';
 import { registerCanvasController, useCanvasStore } from '../state/canvas-store';
 import { useChildAgentStore } from '../state/child-agent-store';
+import { resetCorpChildren, syncCorpChildren } from '../state/corp-child-bridge';
 import {
   askCorpTask,
   attachCorpTask,
@@ -252,6 +253,16 @@ export function ChatApp({
   // user's message is already in the thread.
   const bindCorp = (handle: CorpTaskHandle) => {
     useCorpStore.getState().setTask(handle.taskId);
+    /*
+     * THE TEAM SHOWS UP AS SUBCHATS. Each role is mirrored into the child-agent
+     * store as the run goes, so it appears in the sidebar under this chat and
+     * OPENS as a chat when clicked — the same path a spawn_subagent child takes.
+     * The sidebar used to render corp rows of its own that only pinned a node in
+     * the situation room, so they looked like subchats and were not.
+     */
+    resetCorpChildren();
+    // Keyed on the SESSION FILE, which is what the sidebar nests children under.
+    const parentId = usePiStore.getState().session?.sessionFile ?? '';
     // A REPLAYABLE stream: this loop folds it into the corp store (drives the
     // inline chat feed's follow target), and the situation tab — opened late,
     // on promotion — replays the same buffered events to reconstruct its state.
@@ -265,9 +276,11 @@ export function ChatApp({
         // this additive type, so there's no need to also run it through foldEvent.
         if (event.type === 'worker-activity') {
           useCorpStore.getState().foldWorkerActivity(event);
+          if (parentId !== '') syncCorpChildren(parentId);
           continue;
         }
         useCorpStore.getState().foldEvent(event);
+        if (parentId !== '') syncCorpChildren(parentId);
         if (event.type === 'org-chart') {
           useCorpStore.getState().trackChart(event.chart);
           // Promotion = a team exists (root + subagents). Bring up the

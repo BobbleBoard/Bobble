@@ -231,9 +231,6 @@ function RailButton({
   );
 }
 
-/** Stable empty-nodes reference so the corp-nodes selector never thrashes zustand. */
-const NO_CORP_NODES: readonly OrgNodeView[] = [];
-
 function relativeTime(iso: string): string {
   const then = new Date(iso).getTime();
   if (Number.isNaN(then)) return '';
@@ -344,11 +341,6 @@ export function SessionSidebar({
   const childUnread = useChildAgentStore((s) => s.unread);
   // Running corp/hierarchy roles appear in the SAME nested dropdown under the chat
   // hosting the run; clicking one pins it so corp's own inline view shows it.
-  // Default to a STABLE empty array OUTSIDE the selector — a `?? []` inside would
-  // return a fresh reference every render and thrash zustand's snapshot.
-  const corpNodes = useCorpStore((s) => s.situation?.chart.nodes) ?? NO_CORP_NODES;
-  const pinnedNode = useCorpStore((s) => s.pinnedNode);
-  const selectCorpNode = useCorpStore((s) => s.selectNode);
   const [collapsedParents, setCollapsedParents] = useState<Set<string>>(new Set());
   const toggleParent = (file: string) =>
     setCollapsedParents((prev) => {
@@ -625,8 +617,15 @@ export function SessionSidebar({
      * Still scoped to the chat that hosts the run: another conversation's team is
      * not this conversation's business.
      */
-    const corpKids = effectiveCurrentFile === s.file ? corpNodes : [];
-    const hasKids = kids.length > 0 || corpKids.length > 0;
+    /*
+     * Corp roles are CHILDREN now — mirrored into the child-agent store by
+     * `syncCorpChildren`, so they arrive in `kids` with every other subagent and
+     * open as chats. There used to be a second row type here that only pinned a
+     * node in the situation room: it looked exactly like a subchat and did not
+     * open one, which is the whole of the user's complaint. One row type, one way to
+     * view a team member.
+     */
+    const hasKids = kids.length > 0;
     const expanded = hasKids && !collapsedParents.has(s.file);
     const isFocused = effectiveCurrentFile === s.file && viewedChildId === null;
     const title = displayTitle(s, org);
@@ -803,25 +802,6 @@ export function SessionSidebar({
                 ) : childUnread[c.childId] !== undefined ? (
                   <span className="pd-chat-dot pd-chat-dot--finished" />
                 ) : null}
-              </button>
-            ))}
-            {corpKids.map((node) => (
-              <button
-                type="button"
-                key={`corp:${node.id}`}
-                className="pd-child-row pd-focusable"
-                data-testid={`corp-row-${node.id}`}
-                data-selected={pinnedNode?.id === node.id || undefined}
-                onClick={() => {
-                  setViewedChild(null);
-                  selectCorpNode(node);
-                }}
-              >
-                <span className="pd-child-row-icon">
-                  <IconChat size={13} />
-                </span>
-                <span className="pd-child-row-label">{node.name}</span>
-                {node.state === 'working' ? <Spinner size={12} /> : null}
               </button>
             ))}
           </div>
