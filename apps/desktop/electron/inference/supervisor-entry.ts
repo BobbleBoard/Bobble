@@ -11,7 +11,8 @@
 import { createHash } from 'node:crypto';
 import { createReadStream, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { rm, unlink } from 'node:fs/promises';
-import { homedir } from 'node:os';
+import { homedir, totalmem } from 'node:os';
+import { modelFitsInRam } from './model-fit';
 import { dirname, join } from 'node:path';
 import {
   buildMlxProviderBlock,
@@ -658,7 +659,41 @@ async function startMlxServer(
   }
 }
 
-async function startServer(
+/*
+ * ONE START AT A TIME.
+ *
+ * `startServer` disposes the running server before spawning the next — but it is
+ * async and had no serialisation, so two concurrent callers both observed
+ * `current === null`, both disposed nothing, and both spawned. MEASURED on a
+ * 24GB Mac picking the Intelligent tier: two llama-servers came up 2s apart
+ * (ports 60860 and 60828) BOTH holding the same ~16GB Qwen3.6-27B. The machine
+ * went to swap, pi died at startup and retried with no extensions at all, the
+ * turn never completed, and the user's whole desktop stuttered — "purple flashes ...
+ * checkerboarding".
+ *
+ * Serialising is the actual fix: a second start now waits for the first to
+ * settle, then runs against a known state (and usually finds its model already
+ * resident, so it is a no-op).
+ */
+let startInFlight: Promise<{ success: boolean; baseUrl?: string; error?: string }> | null = null;
+
+
+function startServer(
+  modelId: string,
+  quant?: string,
+  launchMode: LaunchMode = 'fast-text',
+  parallel?: number,
+): Promise<{ success: boolean; baseUrl?: string; error?: string }> {
+  const run = (startInFlight ?? Promise.resolve()).then(() =>
+    startServerExclusive(modelId, quant, launchMode, parallel),
+  );
+  // Keep the chain alive even when a start fails, so one failure cannot wedge
+  // every later start behind a rejected promise.
+  startInFlight = run.catch(() => ({ success: false }));
+  return run;
+}
+
+async function startServerExclusive(
   modelId: string,
   quant?: string,
   launchMode: LaunchMode = 'fast-text',
@@ -674,6 +709,40 @@ async function startServer(
 
   const modelPath = modelPathFor(model, file);
   if (!existsSync(modelPath)) return { success: false, error: 'model not downloaded' };
+
+  /*
+   * ALREADY RESIDENT → REUSE IT. Restarting a server onto the model it is
+   * already running costs a full unload/reload of tens of gigabytes for no
+   * change. With starts now serialised, the common case of two callers racing
+   * for the same model resolves here: the first starts it, the second finds it
+   * up and returns the same endpoint.
+   */
+  if (
+    current !== null &&
+    current.model.id === model.id &&
+    current.file.quant === file.quant &&
+    current.launchMode === launchMode
+  ) {
+    return { success: true, baseUrl: current.baseUrl };
+  }
+
+  /*
+   * WILL IT EVEN FIT? A model whose weights exceed what this machine can hold
+   * does not fail cleanly — it swaps, and the whole desktop goes with it. the user,
+   * watching a 27B come up on a 24GB Mac: "whole computer now has lots of lag
+   * and purple flashes ... stuttering of mouse cursor ... checkerboardings."
+   *
+   * Refusing with a readable reason is strictly better than delivering that. The
+   * budget mirrors the corp's (75% of physical RAM, 2GiB held back for the OS)
+   * so the two do not disagree about what this box can take.
+   */
+  const fit = modelFitsInRam(file.bytes, totalmem());
+  if (!fit.ok) {
+    phase = 'error';
+    lastError = fit.reason;
+    emitStatus();
+    return { success: false, error: fit.reason };
+  }
 
   phase = 'starting';
   lastError = undefined;
