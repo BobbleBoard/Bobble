@@ -69,6 +69,9 @@ export interface TaskContext {
   /** Names the projectless folder (~/Bobble/<name>) so it is findable in Finder
    * rather than an opaque id. Ignored when a project IS selected. */
   readonly conversationName?: string;
+  /** Keys that folder to the CHAT: two chats with the same generated title get
+   * their own, and the placeholder is renamed once the real title arrives. */
+  readonly conversationId?: string;
   /** Review thoroughness for this task. */
   readonly effort?: EffortLevel;
   /** CEO disposition for ambiguous requests. */

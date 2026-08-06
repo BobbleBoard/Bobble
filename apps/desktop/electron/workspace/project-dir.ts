@@ -71,7 +71,7 @@ export function bobbleProjectPath(name: string, home: string = os.homedir()): st
  * always resolves to the same directory, and a different chat with the same
  * title gets `-2`. Re-running a chat never migrates its files.
  */
-function uniqueDir(base: string, owner: string, home: string): string {
+function uniqueDir(base: string, owner: string): string {
   const claimFile = path.join(base, '.bobble-chat');
   for (let n = 1; n < 200; n += 1) {
     const dir = n === 1 ? base : `${base}-${n}`;
@@ -95,6 +95,20 @@ function uniqueDir(base: string, owner: string, home: string): string {
     }
   }
   return base;
+}
+
+/** Is `dir` an EMPTY folder this chat owns? The two conditions for a safe
+ * rename: nobody else's, and nothing in it to move. `.bobble-chat` is the claim
+ * file and does not count as content. */
+function ownsEmptyDir(dir: string, owner: string): boolean {
+  try {
+    if (!fs.existsSync(dir)) return false;
+    const claim = path.join(dir, '.bobble-chat');
+    if (!fs.existsSync(claim) || fs.readFileSync(claim, 'utf8').trim() !== owner) return false;
+    return fs.readdirSync(dir).filter((f) => f !== '.bobble-chat').length === 0;
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -133,5 +147,27 @@ export function resolveProjectDir(
     }
     return base;
   }
-  return uniqueDir(base, conversationId, home);
+  /*
+   * THE TITLE ARRIVES AFTER THE FOLDER IS NEEDED.
+   *
+   * A chat is nameless at its first turn — the harness derives a title from the
+   * first message — so the folder gets made as `new-chat` and renamed once the
+   * real name lands. MEASURED on the first clean run: `~/Bobble/new-chat`
+   * appeared, and without this a second folder would have been created under the
+   * real title, splitting one chat's work across two places.
+   *
+   * ONLY while the folder is still empty. Once anything has been written, the
+   * name is cosmetic and moving files under a running team is not worth it —
+   * paths the model has already used would stop existing mid-turn.
+   */
+  const placeholder = bobbleProjectPath('new chat', home);
+  if (base !== placeholder && ownsEmptyDir(placeholder, conversationId)) {
+    try {
+      fs.renameSync(placeholder, base);
+      return base;
+    } catch {
+      /* a rename we cannot do is not worth failing the run over */
+    }
+  }
+  return uniqueDir(base, conversationId);
 }

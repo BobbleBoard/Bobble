@@ -263,7 +263,18 @@ async function handleStart(
    * path bug came from, and each one failed silently: the team works perfectly
    * wherever it is put, so the only symptom is the chosen folder being empty.
    */
-  const projectPath = resolveProjectDir(req.ctx?.cwd, req.ctx?.conversationName ?? req.prompt);
+  /*
+   * NEVER the prompt as a folder name. Falling back to `req.prompt` produced
+   * `~/Bobble/build-a-small-command-line-todo-list-tool-in-python.-require` —
+   * a sixty-character directory named after a sentence. The chat's title is the
+   * name; absent one, the neutral placeholder is renamed when the title lands.
+   */
+  const projectPath = resolveProjectDir(
+    req.ctx?.cwd,
+    req.ctx?.conversationName ?? 'new chat',
+    os.homedir(),
+    req.ctx?.conversationId,
+  );
   /*
    * A path NAMED IN THE PROMPT is a delivery destination, never a root. Writing
    * there is already permitted (`isNamedDestination`); the team is simply told

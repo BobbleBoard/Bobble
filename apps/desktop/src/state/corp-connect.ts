@@ -18,6 +18,7 @@ import type {
   WorkerTranscriptView,
 } from '@pi-desktop/coordination';
 import { resolveEffort } from './model-selection';
+import { conversationId as piConversationId } from './pi-connect';
 import { usePiStore } from './pi-slice';
 import { useProjectStore } from './project-store';
 import { useSettingsStore } from './settings-store';
@@ -137,6 +138,7 @@ export async function startCorpTask(prompt: string, ctx?: TaskContext): Promise<
     ...(ctx ?? {}),
     ...(activePath !== null && activePath !== '' ? { cwd: activePath } : {}),
     conversationName,
+    conversationId: piConversationId(),
   };
   const { taskId } = await window.piDesktop.invoke('corp:start', {
     prompt,

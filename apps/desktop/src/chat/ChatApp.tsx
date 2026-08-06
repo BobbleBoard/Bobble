@@ -191,6 +191,26 @@ export function ChatApp({
       .then(() => preloadFastestModel());
   }, []);
 
+  /*
+   * THE DROPDOWN MOVED — move the work with it, live.
+   *
+   * Watching `activePath` rather than patching each handler covers every route
+   * into a selection: picking a folder, picking a sidebar project, and clearing
+   * back to "No project". Re-resolving on the chat's TITLE too, because a
+   * projectless chat's folder is named from it and the title arrives after the
+   * first turn.
+   *
+   * No respawn: `/harness workspace` retargets the file tools and bash on their
+   * next call.
+   */
+  const activeProjectPath = useProjectStore((s) => s.activePath);
+  useEffect(() => {
+    void syncWorkspace({
+      selected: activeProjectPath,
+      conversationName: windowTitle ?? 'new chat',
+    });
+  }, [activeProjectPath, windowTitle]);
+
   // Tiny-window adaptation (adversarial finding): a narrow window lets the fixed
   // ~300px sidebar squeeze the chat and overflow the pane. Auto-collapse it below
   // this breakpoint (chosen above the window's 640px minWidth so it can actually

@@ -177,7 +177,7 @@ function mintConversationId(): string {
   return `c-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
-function conversationId(): string {
+export function conversationId(): string {
   if (conversationIdCache !== null) return conversationIdCache;
   let store: Storage | null = null;
   try {
@@ -847,13 +847,18 @@ export async function applyWorkspace(dir: string): Promise<void> {
 export async function syncWorkspace(opts: {
   selected: string | null;
   conversationName: string;
-  conversationId?: string;
 }): Promise<string | null> {
   const res = await window.piDesktop
     .invoke('project:resolve-workspace', {
       ...(opts.selected !== null && opts.selected !== '' ? { selected: opts.selected } : {}),
       conversationName: opts.conversationName,
-      ...(opts.conversationId !== undefined ? { conversationId: opts.conversationId } : {}),
+      /*
+       * ALWAYS the conversation id. Without it main takes the anonymous branch —
+       * no claim file, so no de-duplication between same-titled chats and no
+       * rename when the real title arrives. Measured: the first clean run left a
+       * bare `~/Bobble/new-chat` for exactly this reason.
+       */
+      conversationId: conversationId(),
     })
     .catch(() => null);
   const dir = res?.path ?? null;

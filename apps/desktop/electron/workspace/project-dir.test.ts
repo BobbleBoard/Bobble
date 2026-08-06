@@ -5,7 +5,7 @@
  * be all, everything is THAT DROPDOWN'S SELECTION. always always always nothing
  * competes with that." Otherwise ~/Bobble/<conversation name>.
  */
-import { mkdirSync, mkdtempSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -98,5 +98,40 @@ describe('duplicate chat names get their own folders', () => {
     const p = join(tmp, 'A Real Project');
     expect(resolveProjectDir(p, 'anything', tmp, 'chat-1')).toBe(p);
     expect(resolveProjectDir(p, 'anything', tmp, 'chat-2')).toBe(p);
+  });
+});
+
+describe('the placeholder folder is renamed when the title arrives', () => {
+  /*
+   * MEASURED on the first clean run: a chat is nameless at its first turn (the
+   * harness derives a title from the first message), so the folder is created as
+   * `new-chat` and the real name lands seconds later. Without a rename the chat
+   * ends up with TWO folders and its work split across them.
+   */
+  const tmp = mkdtempSync(join(tmpdir(), 'bobble-rename-'));
+
+  it('renames new-chat to the real title while it is still empty', () => {
+    const first = resolveProjectDir(null, 'new chat', tmp, 'chat-r');
+    expect(first).toBe(join(tmp, 'Bobble', 'new-chat'));
+
+    const renamed = resolveProjectDir(null, 'Todo CLI tool', tmp, 'chat-r');
+    expect(renamed).toBe(join(tmp, 'Bobble', 'todo-cli-tool'));
+    expect(existsSync(join(tmp, 'Bobble', 'new-chat'))).toBe(false);
+  });
+
+  it('does NOT move work that already exists — the name is cosmetic by then', () => {
+    const dir = resolveProjectDir(null, 'new chat', tmp, 'chat-busy');
+    writeFileSync(join(dir, 'main.py'), 'print(1)');
+    const after = resolveProjectDir(null, 'Some Real Title', tmp, 'chat-busy');
+    // A fresh folder for the new name; the written file stays where the model put it.
+    expect(existsSync(join(dir, 'main.py'))).toBe(true);
+    expect(after).not.toBe(dir);
+  });
+
+  it("never steals another chat's placeholder", () => {
+    resolveProjectDir(null, 'new chat', tmp, 'chat-owner');
+    const other = resolveProjectDir(null, 'Different Title', tmp, 'chat-thief');
+    expect(other).toBe(join(tmp, 'Bobble', 'different-title'));
+    expect(existsSync(join(tmp, 'Bobble', 'new-chat'))).toBe(true);
   });
 });
