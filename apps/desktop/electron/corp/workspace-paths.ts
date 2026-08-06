@@ -264,6 +264,8 @@ export function workspaceFromTask(task: string, home: string): string | null {
   const re = new RegExp(`(?:~|${escaped})(?:/[\\w.@-]+)+`, 'g');
   const candidates = task.match(re) ?? [];
   let best: string | null = null;
+  const dirish: string[] = [];
+  const fileish: string[] = [];
   for (const candidate of candidates) {
     /*
      * A SENTENCE-ENDING FULL STOP IS NOT PART OF THE PATH.
@@ -288,7 +290,33 @@ export function workspaceFromTask(task: string, home: string): string | null {
     const rest = abs.startsWith(`${home}/`) ? abs.slice(home.length + 1) : '';
     // Needs a folder under home, and must not be application state.
     if (!rest.includes('/') || rest.startsWith('.') || rest.startsWith('Library/')) continue;
-    // Deepest wins: "at ~/a/b/game" beats a passing mention of "~/a".
+    /*
+     * A WORKSPACE IS A DIRECTORY, NOT A FILE.
+     *
+     * "Deepest wins" was written for prompts naming one path. The moment a task
+     * names an INPUT and an OUTPUT the deepest one is usually the input file,
+     * and the whole team gets rooted there. MEASURED:
+     *
+     *   "build a tool in .../salestool that loads .../salesdata/sales.csv"
+     *      -> .../salesdata/sales.csv
+     *   "convert ~/Downloads/report.pdf and put the result in ~/work/out"
+     *      -> ~/Downloads/report.pdf
+     *
+     * The second is the one that matters: a corporation rooted inside the user's
+     * Downloads, at a PDF. Every task that reads something and writes somewhere
+     * else has this shape, which is most real work.
+     *
+     * So directories are PREFERRED over file-looking candidates, rather than
+     * file-looking ones being banned — a directory genuinely named `my.project`
+     * still wins when it is the only thing named.
+     */
+    const looksLikeFile = /\.[a-z0-9]{1,6}$/i.test(path.basename(abs));
+    const bucket = looksLikeFile ? fileish : dirish;
+    bucket.push(abs);
+  }
+  // Deepest within the preferred bucket: "at ~/a/b/game" still beats "~/a".
+  const pool = dirish.length > 0 ? dirish : fileish;
+  for (const abs of pool) {
     if (best === null || abs.length > best.length) best = abs;
   }
   return best;

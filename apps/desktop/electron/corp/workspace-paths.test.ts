@@ -223,3 +223,40 @@ describe('workspaceFromTask — sentence punctuation is not part of the path', (
     );
   });
 });
+
+describe('workspaceFromTask — the workspace is a directory, not an input file', () => {
+  const HOME = '/Users/user';
+
+  /*
+   * MEASURED. "Deepest wins" was written for prompts naming one path. As soon as
+   * a task names an input AND an output, the deepest is usually the input file
+   * and the whole team gets rooted there — inside the user's Downloads, at a PDF.
+   */
+  it('picks the output directory over a deeper input file', () => {
+    expect(
+      workspaceFromTask(
+        'build a tool in /Users/user/work/salestool that loads /Users/user/data/sales.csv',
+        HOME,
+      ),
+    ).toBe('/Users/user/work/salestool');
+  });
+
+  it('does not root the team in Downloads because a source file was named', () => {
+    expect(
+      workspaceFromTask('convert ~/Downloads/report.pdf and put the result in ~/work/out', HOME),
+    ).toBe('/Users/user/work/out');
+  });
+
+  it('still picks the deepest DIRECTORY when several are named', () => {
+    expect(workspaceFromTask('work in ~/a and really in ~/a/b/game', HOME)).toBe(
+      '/Users/user/a/b/game',
+    );
+  });
+
+  it('falls back to a file-looking path when nothing else is named', () => {
+    // A directory genuinely named `my.project` must still win when it is alone.
+    expect(workspaceFromTask('set it up in ~/work/my.project', HOME)).toBe(
+      '/Users/user/work/my.project',
+    );
+  });
+});
