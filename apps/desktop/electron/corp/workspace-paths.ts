@@ -264,7 +264,26 @@ export function workspaceFromTask(task: string, home: string): string | null {
   const re = new RegExp(`(?:~|${escaped})(?:/[\\w.@-]+)+`, 'g');
   const candidates = task.match(re) ?? [];
   let best: string | null = null;
-  for (const raw of candidates) {
+  for (const candidate of candidates) {
+    /*
+     * A SENTENCE-ENDING FULL STOP IS NOT PART OF THE PATH.
+     *
+     * The character class above allows `.` (real directories contain dots), so
+     * "build it in ~/work/mygame." captures the period too and the whole team
+     * is rooted in a directory called `mygame.` — which it then creates, works
+     * in correctly, and delivers to. Nothing errors. The user looks in `mygame`,
+     * finds nothing, and the run appears to have produced no output at all.
+     *
+     * MEASURED: cost most of a 20-minute run, and I had already walked past the
+     * same symptom once (a hierarchy directory named `demo.-b0654bf7`) and
+     * dismissed the dot as phrasing.
+     *
+     * Trailing dots are stripped, never interior ones: `~/a/my.project` keeps
+     * its dot, `~/a/my.project.` loses only the last. A directory whose name
+     * genuinely ends in a period is legal and never intended.
+     */
+    const raw = candidate.replace(/\.+$/, '');
+    if (raw === '' || raw === '~') continue;
     const abs = path.resolve(raw.startsWith('~') ? path.join(home, raw.slice(1)) : raw);
     const rest = abs.startsWith(`${home}/`) ? abs.slice(home.length + 1) : '';
     // Needs a folder under home, and must not be application state.

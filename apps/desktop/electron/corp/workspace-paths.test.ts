@@ -183,3 +183,43 @@ describe('the one-component shadow', () => {
   });
 });
 
+
+describe('workspaceFromTask — sentence punctuation is not part of the path', () => {
+  const HOME = '/Users/user';
+
+  /*
+   * MEASURED. The prompt was "Ask the manager to set up a sample Godot game to
+   * demo Godot in /Users/user/bobble-testbed/godotdemo." — the full stop was
+   * captured, the whole team was rooted in a directory named `godotdemo.`, and
+   * it built there perfectly. Nothing errored. The target directory stayed
+   * empty and the run looked like it had produced nothing for 20 minutes.
+   */
+  it('drops a sentence-ending full stop', () => {
+    expect(
+      workspaceFromTask('set up a Godot game in /Users/user/bobble-testbed/godotdemo.', HOME),
+    ).toBe('/Users/user/bobble-testbed/godotdemo');
+  });
+
+  it('drops it after a tilde path too', () => {
+    expect(workspaceFromTask('build it in ~/work/mygame.', HOME)).toBe('/Users/user/work/mygame');
+  });
+
+  it('KEEPS interior dots — only the trailing one goes', () => {
+    expect(workspaceFromTask('put it in ~/work/my.project', HOME)).toBe(
+      '/Users/user/work/my.project',
+    );
+    expect(workspaceFromTask('put it in ~/work/my.project.', HOME)).toBe(
+      '/Users/user/work/my.project',
+    );
+  });
+
+  it('handles an ellipsis without leaving a stray dot', () => {
+    expect(workspaceFromTask('start in ~/work/game...', HOME)).toBe('/Users/user/work/game');
+  });
+
+  it('still finds the path when the sentence continues normally', () => {
+    expect(workspaceFromTask('build in ~/work/game and tell me when done', HOME)).toBe(
+      '/Users/user/work/game',
+    );
+  });
+});
