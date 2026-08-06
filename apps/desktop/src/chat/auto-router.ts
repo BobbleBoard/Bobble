@@ -38,6 +38,7 @@ import { classify, type TaskClass } from '../../../../packages/harness/src/class
 import {
   MODEL_TIERS,
   type ModelTier,
+  asksForTheTeam,
   effortForClass,
   modelTierForClass,
   TIER_LABEL,
@@ -425,14 +426,22 @@ let lastAutoEffort: EffortLevel | null = null;
  * mid-task/mid-stream. Combined with the harness-continuity tier resolution, the
  * level only moves when the TASK's tier actually changes at a boundary.
  */
-function pushAutoEffort(level: EffortLevel): void {
+async function pushAutoEffort(level: EffortLevel): Promise<void> {
   if (useSettingsStore.getState().settings.effortMode !== 'auto') return;
   if (level === lastAutoEffort) return;
   lastAutoEffort = level;
-  // Through the store, not straight at the harness: this level IS the resolved
-  // effort now, so the slider, the corp gate and `/harness effort` must all read
-  // the same one. `update` persists it and forwards the slash command itself.
-  void useSettingsStore.getState().update({ effort: level });
+  /*
+   * AWAITED, not fire-and-forget. The level has to reach the harness BEFORE the
+   * prompt does, because the harness decides the advertised tool set from the
+   * effort it holds at that moment — dispatching first means the turn that asked
+   * for a team is the one turn that can't have one. `maybeRouteAuto` is already
+   * awaited by the sender, so awaiting here puts the effort ahead of the send.
+   *
+   * Through the store rather than straight at the harness: this level IS the
+   * resolved effort now, so the slider, the corp gate and `/harness effort` all
+   * read one value. `update` persists it and forwards the slash command itself.
+   */
+  await useSettingsStore.getState().update({ effort: level });
 }
 
 /**
@@ -478,17 +487,11 @@ export async function maybeRouteAuto(
   opts: { hasImages?: boolean; forcedClass?: TaskClass } = {},
 ): Promise<void> {
   try {
-    if (useSettingsStore.getState().settings.modelSelection.mode !== 'auto') return;
-    const models = tierModels();
-    if (models === undefined) return; // catalog not loaded → nothing to route to
-
     // The model is LOCKED once a turn is in flight — Auto only (re)picks a model
     // and re-derives effort at a clean idle boundary. A restart already in flight
     // (a live "switching…" banner) is treated the same, so overlapping sends never
     // stack two llama restarts.
     const inFlight = agentInFlight() || useModelSelectionStore.getState().switching !== null;
-
-    const currentModelId = useLlmStore.getState().status.model?.id ?? null;
 
     // Agree with the harness (see {@link harnessTaskContext}): feed its authoritative
     // `activeClass` into our tier-1 as the continuity prior, and anchor the
@@ -502,17 +505,35 @@ export async function maybeRouteAuto(
       priorClass,
       turnIndex: priorUserTurns(),
     });
-    const desiredTier = modelTierForClass(taskClass);
 
     /*
-     * Auto effort follows the TASK, not the loaded model — only at an idle
-     * boundary, never mid-stream. It used to be derived from the model tier, so
-     * pinning the model to Fast pinned thinking to `low` however big the task
-     * was, and `max` was unreachable from adaptive at all. That is why the user's
-     * "ask the manager to set up a Godot demo" got "I don't have access to tools
-     * that can contact your manager": `talk_to_manager` needs high/max.
+     * EFFORT IS DECIDED FOR EVERY SEND, PINNED MODEL OR NOT.
+     *
+     * Choosing a model and choosing how hard to think are different decisions,
+     * and only the first one is disabled by pinning. This whole function used to
+     * return early when the selection wasn't Auto, so pinning any model froze
+     * Adaptive at whatever level it happened to hold — that plus the old
+     * tier-derived mapping is why "ask the manager to set up a Godot demo"
+     * replied that it had no tool for contacting a manager. It didn't:
+     * talk_to_manager is gated on high/max, and effort was stuck at medium.
+     *
+     * Still only at an idle boundary — never silently mid-stream.
      */
-    if (!inFlight) pushAutoEffort(effortForClass(taskClass));
+    /*
+     * An EXPLICIT request for the team overrides the classifier. "Ask the
+     * manager to ..." is not a hint about modality, it is an instruction, and
+     * answering "I don't have a tool for that" because a topic classifier
+     * guessed `basic-tools` is the harness overruling the user.
+     */
+    const level = asksForTheTeam(prompt) ? 'max' : effortForClass(taskClass);
+    if (!inFlight) await pushAutoEffort(level);
+
+    if (useSettingsStore.getState().settings.modelSelection.mode !== 'auto') return;
+    const models = tierModels();
+    if (models === undefined) return; // catalog not loaded → nothing to route to
+
+    const currentModelId = useLlmStore.getState().status.model?.id ?? null;
+    const desiredTier = modelTierForClass(taskClass);
 
     const pick = models[desiredTier];
     // Prefer the harness's authoritative tier for "where we are"; fall back to the

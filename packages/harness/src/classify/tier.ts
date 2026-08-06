@@ -100,6 +100,35 @@ export function modelTierForClass(cls: TaskClass): ModelTier {
  * about model choice — a small model asked to build a game should still think
  * hard and still have its team.
  */
+/**
+ * Did the user ASK for the team, in so many words?
+ *
+ * Effort is otherwise derived from the task CLASS, and a class says what
+ * MODALITY a task is — never how big it is. The corporation is gated on
+ * high/max, so a size question is being answered by a topic classifier, and
+ * plenty of genuinely large work lands under the gate: "research X and build me
+ * a slideshow" classes as `basic-tools` (medium), "add dark mode to the project"
+ * as `other` (medium). That mismatch is a real design gap and is NOT fixed here.
+ *
+ * What IS fixed here is the indefensible case. When someone writes "ask the
+ * manager to ...", they have said what they want in plain words, and answering
+ * "I don't have access to tools that can contact your manager" — which is what
+ * the user got, twice — is the harness overruling an explicit instruction with a
+ * guess about size. MEASURED: a run whose prompt opened "Ask the manager to
+ * research ... and build me a slideshow" was classed medium, so
+ * `talk_to_manager` was stripped from the tool list and ten minutes were spent
+ * with no team and no explanation.
+ *
+ * Deliberately narrow: it matches an explicit request to delegate, not a passing
+ * mention of a manager as a person or a topic.
+ */
+const ASKS_FOR_THE_TEAM =
+  /\b(?:ask|tell|get|have)\s+(?:the|your|our|a)\s+(?:manager|team)\b|\b(?:talk|speak)\s+to\s+(?:the|your)\s+manager\b|\bdelegate\s+(?:this|it|that)\b|\bhand\s+(?:this|it|that)\s+(?:off|over)\s+to\s+(?:the|your)\s+(?:manager|team)\b/i;
+
+export function asksForTheTeam(prompt: string): boolean {
+  return ASKS_FOR_THE_TEAM.test(prompt);
+}
+
 export function effortForClass(cls: TaskClass): EffortLevel {
   switch (cls) {
     case 'simple-QA':
