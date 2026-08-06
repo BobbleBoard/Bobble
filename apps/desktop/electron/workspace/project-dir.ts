@@ -60,9 +60,51 @@ export function bobbleProjectPath(name: string, home: string = os.homedir()): st
 }
 
 /**
+ * Two chats called the same thing get their own folders.
+ *
+ * Chat titles are generated, so collisions are ordinary, not exotic: "Godot game
+ * demo" twice in an afternoon happened repeatedly while testing. Sharing one
+ * directory would let a second chat overwrite the first one's work with no
+ * warning, which is the same silent-damage shape as every other path bug here.
+ *
+ * `owner` keys the folder to the CHAT, so the mapping is stable: the same chat
+ * always resolves to the same directory, and a different chat with the same
+ * title gets `-2`. Re-running a chat never migrates its files.
+ */
+function uniqueDir(base: string, owner: string, home: string): string {
+  const claimFile = path.join(base, '.bobble-chat');
+  for (let n = 1; n < 200; n += 1) {
+    const dir = n === 1 ? base : `${base}-${n}`;
+    const claim = n === 1 ? claimFile : path.join(dir, '.bobble-chat');
+    try {
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+        fs.writeFileSync(claim, owner);
+        return dir;
+      }
+      // An existing folder is ours if it carries our id, or if nobody claimed it
+      // (a folder the user made by hand should be usable, not skipped).
+      const existing = fs.existsSync(claim) ? fs.readFileSync(claim, 'utf8').trim() : '';
+      if (existing === owner) return dir;
+      if (existing === '') {
+        fs.writeFileSync(claim, owner);
+        return dir;
+      }
+    } catch {
+      return dir; // unreadable/unwritable — the caller will fail loudly, not silently
+    }
+  }
+  return base;
+}
+
+/**
  * Resolve the workspace. THE dropdown wins; otherwise `~/Bobble/<name>`.
  *
  * `selected` is the composer's folder selection — null/empty means "No project".
+ * A selected project is used EXACTLY as given: no slugging, no de-duplication,
+ * no surprises. the user: "that dropdown right there is the end all be all ... always
+ * always always nothing competes with that."
+ *
  * The directory is created either way, because a workspace that does not exist
  * is how relative writes end up somewhere else.
  */
@@ -70,13 +112,26 @@ export function resolveProjectDir(
   selected: string | null | undefined,
   conversationName: string,
   home: string = os.homedir(),
+  conversationId?: string,
 ): string {
   const chosen = typeof selected === 'string' ? selected.trim() : '';
-  const dir = chosen !== '' ? path.resolve(chosen) : bobbleProjectPath(conversationName, home);
-  try {
-    fs.mkdirSync(dir, { recursive: true });
-  } catch {
-    // A workspace we cannot create is one the run will fail on anyway, loudly.
+  if (chosen !== '') {
+    const dir = path.resolve(chosen);
+    try {
+      fs.mkdirSync(dir, { recursive: true });
+    } catch {
+      // A workspace we cannot create is one the run will fail on anyway, loudly.
+    }
+    return dir;
   }
-  return dir;
+  const base = bobbleProjectPath(conversationName, home);
+  if (conversationId === undefined || conversationId === '') {
+    try {
+      fs.mkdirSync(base, { recursive: true });
+    } catch {
+      /* see above */
+    }
+    return base;
+  }
+  return uniqueDir(base, conversationId, home);
 }

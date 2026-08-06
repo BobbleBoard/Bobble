@@ -5,6 +5,7 @@
  * file-tree root; this module only persists the list and runs the native
  * folder picker for "New project". Trusted-sender gated like the other channels.
  */
+import { resolveProjectDir } from '../workspace/project-dir';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -131,6 +132,14 @@ function activatePath(abs: string): ProjectsDoc {
 }
 
 const handlers: IpcHandlers<ProjectInvokeMap> = {
+  /*
+   * ONE workspace decision per chat — the dropdown, or ~/Bobble/<name>. Main
+   * resolves it because main owns the filesystem: the directory must EXIST
+   * before any tool resolves a relative path against it.
+   */
+  'project:resolve-workspace': (req) => ({
+    path: resolveProjectDir(req.selected, req.conversationName, os.homedir(), req.conversationId),
+  }),
   'project:list': () => {
     // STALE-CLEAR (round-2 #3): on load, an active project whose folder no longer
     // exists is cleared to none so the dead name is never surfaced anywhere; the

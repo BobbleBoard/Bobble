@@ -95,7 +95,9 @@ import { detectOpenedApp, openedAppNote } from './tools/opened-app.js';
 import { registerPlanTool } from './tools/plan-tool.js';
 import { registerPresentTool } from './tools/present.js';
 import { presentBridgeFromEnv } from './tools/present-bridge.js';
-import { registerSandboxFileTools } from './tools/sandbox-fs.js';
+import { homedir } from 'node:os';
+import { createBashToolDefinition } from '@mariozechner/pi-coding-agent';
+import { registerSandboxFileTools, resolveWorkspaceRoot } from './tools/sandbox-fs.js';
 import { truncateToolOutput } from './tools/tool-output-truncate.js';
 import { captureRegisteredTools } from './tools/tool-registry.js';
 import { registerUseTool } from './tools/use-tool.js';
@@ -112,6 +114,24 @@ export const packageName = '@pi-desktop/harness';
 
 interface HarnessRuntime {
   config: HarnessConfig;
+  /**
+   * THE WORKSPACE. One value, decided once per chat, that every tool resolves
+   * against — write, edit, read, ls, bash, and anything a role or subagent runs.
+   *
+   * MUTABLE ON PURPOSE. It used to be fixed at spawn (the env / pi's cwd), so
+   * changing the composer's folder dropdown mid-chat could not move the work
+   * without respawning pi. the user: "you don't have to restart pi ... it's not like
+   * functionally anything should need a restart just because we're essentially
+   * typing into a terminal session cd '<changed working directory path>'."
+   *
+   * He is right, and pi supports it: our file tools already override pi's by
+   * name and resolve their root per call, and pi's bash takes a `spawnHook` that
+   * can rewrite cwd per command. So the root is a live value here, set by
+   * `/harness workspace <path>` over the same channel that already carries
+   * effort changes. Null until the app sets one — then the old spawn-time
+   * resolution is the fallback, never the override.
+   */
+  workspaceRoot: string | null;
   activeClass: TaskClass | null;
   /** Conversation title from the classify+title piggyback (computed once). */
   title: string | null;
@@ -366,6 +386,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
   const toolRegistry = captureRegisteredTools(pi);
   const runtime: HarnessRuntime = {
     config: DEFAULT_CONFIG,
+    workspaceRoot: null,
     activeClass: null,
     title: null,
     canonicalSystemPrompt: null,
@@ -834,7 +855,33 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
   // sandbox/project cwd — never HOME — and mutating ops are fenced to the
   // workspace + sandbox roots. No-op unless the desktop set PI_DESKTOP_FS_FENCE=1,
   // so a plain CLI `pi` user keeps the unfenced built-ins. See tools/sandbox-fs.ts.
-  registerSandboxFileTools(pi);
+  /*
+   * All four resolve against the LIVE workspace (runtime.workspaceRoot), falling
+   * back to the spawn-time resolution only until the app has set one. Per call,
+   * so moving the dropdown moves the work immediately.
+   */
+  registerSandboxFileTools(pi, {
+    getRoot: (ctx) =>
+      runtime.workspaceRoot ?? resolveWorkspaceRoot(ctx.cwd, process.env, homedir()),
+  });
+
+  /*
+   * BASH AND THE FILE TOOLS MUST AGREE ON "HERE".
+   *
+   * Overriding only the file tools left bash running in pi's process cwd, so
+   * `write("notes.md")` and `echo > notes.md` could land in different
+   * directories — and bash is not fenced, so the second one wins silently. pi's
+   * own bash takes a `spawnHook` that may rewrite cwd per command, which is
+   * exactly the seam for this: no respawn, and `cd elsewhere && ...` still works
+   * because the model is only ever choosing to leave a known place.
+   */
+  const liveRoot = (): string =>
+    runtime.workspaceRoot ?? resolveWorkspaceRoot(undefined, process.env, homedir());
+  pi.registerTool(
+    createBashToolDefinition(liveRoot(), {
+      spawnHook: (c) => ({ ...c, cwd: liveRoot() }),
+    }) as never,
+  );
 
   /*
    * CAPABILITIES, not search. the user: "remove tool search entirely, and instead
@@ -1627,11 +1674,44 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
           // Re-push repair deps so the new abortThreshold / repairAttempts take
           // effect on the provider's live ladder immediately.
           bridge.push();
+          /*
+           * RE-DERIVE THE TOOL SET. Effort decides whether the corporation is on
+           * offer, but only `applyPreset` ever adds or removes
+           * `create_production_hierarchy` — so raising effort used to change the
+           * number and nothing else, leaving the tool absent until some later
+           * turn happened to reclassify. Adaptive effort now moves per message,
+           * which makes that gap the normal case rather than a corner: the user
+           * raised effort, asked for a manager, and was told no such tool existed.
+           * `applyPreset` only touches the active set when it actually changed,
+           * so re-applying the SAME class here is free when nothing moved.
+           */
+          if (runtime.activeClass !== null) applyPreset(runtime.activeClass, ctx);
           publishStatus(ctx);
           const k = effortKnobs(rest);
           ctx.ui.notify(
             `effort → ${rest} (repairAttempts ${k.repairAttempts}, abortThreshold ${k.abortThreshold}, reviewPasses ${k.reviewPasses}, adversarial ${k.adversarialChecks})`,
           );
+          return;
+        }
+
+        /*
+         * THE WORKSPACE, CHANGED LIVE. the user: "you don't have to restart pi ...
+         * it's not like functionally anything should need a restart just because
+         * we're essentially typing into a terminal session cd '<path>'."
+         *
+         * Every tool reads `runtime.workspaceRoot` per call, so this takes effect
+         * on the very next one — files and bash together. Sent by the app when a
+         * chat opens and whenever the folder dropdown changes.
+         */
+        case 'workspace': {
+          const dir = rest.trim();
+          if (dir === '') {
+            ctx.ui.notify('Usage: /harness workspace <absolute path>', 'error');
+            return;
+          }
+          runtime.workspaceRoot = dir;
+          publishStatus(ctx);
+          ctx.ui.notify(`workspace → ${dir}`);
           return;
         }
 

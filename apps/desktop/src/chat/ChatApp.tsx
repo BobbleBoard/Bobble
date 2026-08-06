@@ -37,7 +37,7 @@ import {
   startCorpTask,
 } from '../state/corp-connect';
 import { useCorpStore } from '../state/corp-store';
-import { getModels, setSessionName, startPi } from '../state/pi-connect';
+import { getModels, setSessionName, startPi, syncWorkspace } from '../state/pi-connect';
 import { usePiStore } from '../state/pi-slice';
 import { connectPresent } from '../state/present-store';
 import { useProjectStore } from '../state/project-store';
@@ -176,6 +176,18 @@ export function ChatApp({
         return startPi(cwd !== undefined ? { cwd } : {});
       })
       .then(() => applySavedHarnessConfig())
+      /*
+       * THE WORKSPACE, decided once and pushed live. One value for the chat
+       * model, the corp roles and every subagent — there is no separate "corp
+       * workspace", because a chat's effort can change at any time and the work
+       * must not move under the user's feet when it does.
+       */
+      .then(() =>
+        syncWorkspace({
+          selected: useProjectStore.getState().activePath,
+          conversationName: usePiStore.getState().windowTitle ?? 'new chat',
+        }),
+      )
       .then(() => preloadFastestModel());
   }, []);
 

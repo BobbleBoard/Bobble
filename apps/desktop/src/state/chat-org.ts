@@ -159,11 +159,20 @@ function pinnedFirst(chats: SessionSummary[], pinned: Set<string>): SessionSumma
   return [...pin, ...rest];
 }
 
-/** Folder name for a directory-derived project — the cwd's last path segment. */
+/**
+ * Folder name for a directory-derived project — the cwd's last path segment.
+ *
+ * A folder Bobble made for a projectless chat (`~/Bobble/<slug>`) is shown with
+ * SPACES, because the slug is a filesystem detail and the name is the chat's.
+ * the user: "the dropdown should still show spaces rather than dashes or whatever
+ * you're using as replacement." Scoped to ~/Bobble so a user's own hyphenated
+ * directory elsewhere keeps the name they gave it.
+ */
 function folderName(s: SessionSummary): string {
   const label = (s.cwdLabel || s.cwd || '').replace(/\/+$/, '');
   const base = label.split('/').pop() ?? label;
-  return base.length > 0 ? base : label;
+  const name = base.length > 0 ? base : label;
+  return /\/Bobble\/[^/]+$/.test(label) ? name.replace(/-/g, ' ') : name;
 }
 
 /**

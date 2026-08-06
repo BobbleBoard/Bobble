@@ -80,6 +80,15 @@ export type ProjectInvokeMap = {
     request: { id: string };
     response: { path: string };
   };
+  /**
+   * THE workspace for a chat, resolved and created. `selected` is the composer
+   * dropdown verbatim (absent = "No project" → ~/Bobble/<name>); `conversationId`
+   * keeps two chats with the same generated title from sharing a folder.
+   */
+  'project:resolve-workspace': {
+    request: { selected?: string; conversationName: string; conversationId?: string };
+    response: { path: string };
+  };
 };
 
 export const PROJECT_INVOKE_CHANNELS = [
@@ -89,4 +98,5 @@ export const PROJECT_INVOKE_CHANNELS = [
   'project:clear',
   'project:pick-folder',
   'project:project-sandbox',
+  'project:resolve-workspace',
 ] as const satisfies readonly (keyof ProjectInvokeMap)[];

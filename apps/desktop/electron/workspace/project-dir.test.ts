@@ -5,6 +5,9 @@
  * be all, everything is THAT DROPDOWN'S SELECTION. always always always nothing
  * competes with that." Otherwise ~/Bobble/<conversation name>.
  */
+import { mkdirSync, mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { bobbleProjectPath, projectSlug, resolveProjectDir } from './project-dir';
 
@@ -56,5 +59,44 @@ describe('projectSlug — this is a folder a human opens in Finder', () => {
 
   it('bobbleProjectPath lands under ~/Bobble', () => {
     expect(bobbleProjectPath('My Deck', HOME)).toBe('/Users/user/Bobble/my-deck');
+  });
+});
+
+describe('duplicate chat names get their own folders', () => {
+  /*
+   * Chat titles are GENERATED, so collisions are ordinary — "Godot game demo"
+   * came up repeatedly in one afternoon of testing. Sharing a directory would
+   * let a second chat overwrite the first one's work silently, which is the same
+   * shape as every other path bug in this harness.
+   */
+  const tmp = mkdtempSync(join(tmpdir(), 'bobble-dirs-'));
+
+  it('gives a second chat with the same title its own -2 folder', () => {
+    const a = resolveProjectDir(null, 'Godot game demo', tmp, 'chat-a');
+    const b = resolveProjectDir(null, 'Godot game demo', tmp, 'chat-b');
+    expect(a).not.toBe(b);
+    expect(a.endsWith('godot-game-demo')).toBe(true);
+    expect(b.endsWith('godot-game-demo-2')).toBe(true);
+  });
+
+  it('is STABLE — the same chat always lands in the same folder', () => {
+    const first = resolveProjectDir(null, 'Sales tool', tmp, 'chat-x');
+    const again = resolveProjectDir(null, 'Sales tool', tmp, 'chat-x');
+    expect(again).toBe(first);
+  });
+
+  it('adopts a folder the user made by hand rather than skipping past it', () => {
+    // The projectless base is <home>/Bobble/<slug>.
+    mkdirSync(join(tmp, 'Bobble', 'hand-made'), { recursive: true });
+    expect(resolveProjectDir(null, 'hand made', tmp, 'chat-h')).toBe(
+      join(tmp, 'Bobble', 'hand-made'),
+    );
+  });
+
+  it('a SELECTED project is never slugged or de-duplicated', () => {
+    // The dropdown is verbatim: two chats on one project share it, by design.
+    const p = join(tmp, 'A Real Project');
+    expect(resolveProjectDir(p, 'anything', tmp, 'chat-1')).toBe(p);
+    expect(resolveProjectDir(p, 'anything', tmp, 'chat-2')).toBe(p);
   });
 });

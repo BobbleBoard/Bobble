@@ -814,6 +814,53 @@ export async function applyHarnessConfig(opts: {
  * echo; a no-harness session ignores it). The harness republishes its status so
  * the UI's active-class reflects the change.
  */
+/**
+ * Tell the harness where the work happens — live, no respawn.
+ *
+ * ONE decision per chat, applied to everything: the chat model's own writes and
+ * shell, plus every corp role and subagent. There is deliberately no
+ * "corp workspace" separate from a "chat workspace"; a chat's effort can change
+ * at any time, so a workspace that depended on which path ran would move under
+ * the user's feet.
+ *
+ * pi's cwd is fixed at spawn, but nothing here needs pi's cwd: our file tools
+ * override pi's by name and resolve their root per call, and pi's bash takes a
+ * spawnHook that rewrites cwd per command. the user: "it's not like functionally
+ * anything should need a restart just because we're essentially typing into a
+ * terminal session cd '<changed working directory path>'."
+ */
+export async function applyWorkspace(dir: string): Promise<void> {
+  if (dir.trim() === '') return;
+  await window.piDesktop
+    .invoke('pi:prompt', { message: `/harness workspace ${dir}` })
+    .catch(() => {});
+}
+
+/**
+ * Decide THE workspace for this chat and push it to the harness.
+ *
+ * Called when a chat opens and whenever the folder dropdown changes — the only
+ * two moments the answer can differ. Main resolves and creates the directory
+ * (it owns the filesystem); the harness is then told, and every tool picks it up
+ * on its next call.
+ */
+export async function syncWorkspace(opts: {
+  selected: string | null;
+  conversationName: string;
+  conversationId?: string;
+}): Promise<string | null> {
+  const res = await window.piDesktop
+    .invoke('project:resolve-workspace', {
+      ...(opts.selected !== null && opts.selected !== '' ? { selected: opts.selected } : {}),
+      conversationName: opts.conversationName,
+      ...(opts.conversationId !== undefined ? { conversationId: opts.conversationId } : {}),
+    })
+    .catch(() => null);
+  const dir = res?.path ?? null;
+  if (dir !== null) await applyWorkspace(dir);
+  return dir;
+}
+
 export async function applyHarnessPreset(preset: string): Promise<void> {
   await window.piDesktop
     .invoke('pi:prompt', { message: `/harness preset ${preset}` })
