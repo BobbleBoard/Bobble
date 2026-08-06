@@ -8,7 +8,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { repairNote, repairShadowTree, shadowRoots, unmanglePath,
-  workspaceFromTask,
+  deliveryFromTask,
 } from './workspace-paths';
 
 describe('the path the agent meant', () => {
@@ -110,14 +110,14 @@ describe('rescuing a shadow tree', () => {
   });
 });
 
-describe('workspaceFromTask', () => {
+describe('deliveryFromTask', () => {
   const home = '/Users/user';
 
   /* The exact task that put ten files on the Desktop: the corp rooted at the
    * chat's folder, so every relative `mkdir` landed there instead. */
   it('roots the team at the directory the task names', () => {
     expect(
-      workspaceFromTask(
+      deliveryFromTask(
         'Build me a 2D platformer in Godot 4 at /Users/user/bobble-testbed/platformer: a player…',
         home,
       ),
@@ -125,29 +125,29 @@ describe('workspaceFromTask', () => {
   });
 
   it('understands ~ and takes the deepest path named', () => {
-    expect(workspaceFromTask('put it in ~/bobble-testbed/games/run1 please', home)).toBe(
+    expect(deliveryFromTask('put it in ~/bobble-testbed/games/run1 please', home)).toBe(
       '/Users/user/bobble-testbed/games/run1',
     );
-    expect(workspaceFromTask('somewhere under ~/projects, say ~/projects/app/src', home)).toBe(
+    expect(deliveryFromTask('somewhere under ~/projects, say ~/projects/app/src', home)).toBe(
       '/Users/user/projects/app/src',
     );
   });
 
   it('falls through when the task names nowhere', () => {
-    expect(workspaceFromTask('build me a platformer game', home)).toBeNull();
+    expect(deliveryFromTask('build me a platformer game', home)).toBeNull();
   });
 
   /* Same rule as the write fence: a direct child of HOME is a dump, and
    * application state is never a workspace. */
   it('refuses bare HOME, its direct children, dot-dirs and Library', () => {
-    expect(workspaceFromTask('write to ~ please', home)).toBeNull();
-    expect(workspaceFromTask('use ~/notes.txt', home)).toBeNull();
-    expect(workspaceFromTask('use ~/.ssh/keys', home)).toBeNull();
-    expect(workspaceFromTask('use ~/Library/Caches/x', home)).toBeNull();
+    expect(deliveryFromTask('write to ~ please', home)).toBeNull();
+    expect(deliveryFromTask('use ~/notes.txt', home)).toBeNull();
+    expect(deliveryFromTask('use ~/.ssh/keys', home)).toBeNull();
+    expect(deliveryFromTask('use ~/Library/Caches/x', home)).toBeNull();
   });
 
   it('ignores paths belonging to somebody else', () => {
-    expect(workspaceFromTask('compare with /Users/other/thing/here', home)).toBeNull();
+    expect(deliveryFromTask('compare with /Users/other/thing/here', home)).toBeNull();
   });
 });
 
@@ -184,7 +184,7 @@ describe('the one-component shadow', () => {
 });
 
 
-describe('workspaceFromTask — sentence punctuation is not part of the path', () => {
+describe('deliveryFromTask — sentence punctuation is not part of the path', () => {
   const HOME = '/Users/user';
 
   /*
@@ -196,35 +196,35 @@ describe('workspaceFromTask — sentence punctuation is not part of the path', (
    */
   it('drops a sentence-ending full stop', () => {
     expect(
-      workspaceFromTask('set up a Godot game in /Users/user/bobble-testbed/godotdemo.', HOME),
+      deliveryFromTask('set up a Godot game in /Users/user/bobble-testbed/godotdemo.', HOME),
     ).toBe('/Users/user/bobble-testbed/godotdemo');
   });
 
   it('drops it after a tilde path too', () => {
-    expect(workspaceFromTask('build it in ~/work/mygame.', HOME)).toBe('/Users/user/work/mygame');
+    expect(deliveryFromTask('build it in ~/work/mygame.', HOME)).toBe('/Users/user/work/mygame');
   });
 
   it('KEEPS interior dots — only the trailing one goes', () => {
-    expect(workspaceFromTask('put it in ~/work/my.project', HOME)).toBe(
+    expect(deliveryFromTask('put it in ~/work/my.project', HOME)).toBe(
       '/Users/user/work/my.project',
     );
-    expect(workspaceFromTask('put it in ~/work/my.project.', HOME)).toBe(
+    expect(deliveryFromTask('put it in ~/work/my.project.', HOME)).toBe(
       '/Users/user/work/my.project',
     );
   });
 
   it('handles an ellipsis without leaving a stray dot', () => {
-    expect(workspaceFromTask('start in ~/work/game...', HOME)).toBe('/Users/user/work/game');
+    expect(deliveryFromTask('start in ~/work/game...', HOME)).toBe('/Users/user/work/game');
   });
 
   it('still finds the path when the sentence continues normally', () => {
-    expect(workspaceFromTask('build in ~/work/game and tell me when done', HOME)).toBe(
+    expect(deliveryFromTask('build in ~/work/game and tell me when done', HOME)).toBe(
       '/Users/user/work/game',
     );
   });
 });
 
-describe('workspaceFromTask — the workspace is a directory, not an input file', () => {
+describe('deliveryFromTask — a delivery target is a directory, not an input file', () => {
   const HOME = '/Users/user';
 
   /*
@@ -234,7 +234,7 @@ describe('workspaceFromTask — the workspace is a directory, not an input file'
    */
   it('picks the output directory over a deeper input file', () => {
     expect(
-      workspaceFromTask(
+      deliveryFromTask(
         'build a tool in /Users/user/work/salestool that loads /Users/user/data/sales.csv',
         HOME,
       ),
@@ -243,19 +243,19 @@ describe('workspaceFromTask — the workspace is a directory, not an input file'
 
   it('does not root the team in Downloads because a source file was named', () => {
     expect(
-      workspaceFromTask('convert ~/Downloads/report.pdf and put the result in ~/work/out', HOME),
+      deliveryFromTask('convert ~/Downloads/report.pdf and put the result in ~/work/out', HOME),
     ).toBe('/Users/user/work/out');
   });
 
   it('still picks the deepest DIRECTORY when several are named', () => {
-    expect(workspaceFromTask('work in ~/a and really in ~/a/b/game', HOME)).toBe(
+    expect(deliveryFromTask('work in ~/a and really in ~/a/b/game', HOME)).toBe(
       '/Users/user/a/b/game',
     );
   });
 
   it('falls back to a file-looking path when nothing else is named', () => {
     // A directory genuinely named `my.project` must still win when it is alone.
-    expect(workspaceFromTask('set it up in ~/work/my.project', HOME)).toBe(
+    expect(deliveryFromTask('set it up in ~/work/my.project', HOME)).toBe(
       '/Users/user/work/my.project',
     );
   });

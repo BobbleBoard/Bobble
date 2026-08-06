@@ -259,7 +259,29 @@ export function productFingerprint(cwd: string): string {
  * Two levels minimum and never bare HOME — the same rule the write fence uses,
  * for the same reason: `~/notes.txt` is a dump, `~/games/x` is a destination.
  */
-export function workspaceFromTask(task: string, home: string): string | null {
+/**
+ * A directory the user NAMED IN THE PROMPT — a place to DELIVER to, not a place
+ * to live.
+ *
+ * THIS USED TO DECIDE THE WORKSPACE ROOT, and that was the misconception behind
+ * every path bug this harness has produced. Inferring a root from English prose
+ * cannot work: a sentence-ending full stop became part of the directory
+ * (`godotdemo.`); the deepest match won, so naming an input and an output rooted
+ * the whole team at the input (`~/Downloads/report.pdf`); and each time it went
+ * wrong it went wrong SILENTLY, because a team works perfectly wherever you put
+ * it.
+ *
+ * the user settled it: "the workspace should be the workspace. default: no project,
+ * which makes a project specific folder that all the model's write commands,
+ * terminal python etc immediately start from automatically ... or they might
+ * start in a specified directory." A path in the prompt is delivery — "make a
+ * slide deck and put it in this folder" says where the OUTPUT goes.
+ *
+ * So this now answers only "did they name somewhere to deliver?". Writing there
+ * is already permitted: `isNamedDestination` exists for exactly this case.
+ * Returns null when the task names no destination.
+ */
+export function deliveryFromTask(task: string, home: string): string | null {
   const escaped = home.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const re = new RegExp(`(?:~|${escaped})(?:/[\\w.@-]+)+`, 'g');
   const candidates = task.match(re) ?? [];

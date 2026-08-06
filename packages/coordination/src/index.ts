@@ -60,8 +60,15 @@ export interface TaskContext {
    * an ephemeral, projectless chat.
    */
   readonly projectId?: string;
-  /** Working directory the task runs against (where git isolation applies). */
+  /**
+   * The workspace — THE composer folder dropdown's selection, verbatim. Absent
+   * means "No project", which resolves to ~/Bobble/<conversationName>. Nothing
+   * else may decide this: not the prompt text, not a temp directory.
+   */
   readonly cwd?: string;
+  /** Names the projectless folder (~/Bobble/<name>) so it is findable in Finder
+   * rather than an opaque id. Ignored when a project IS selected. */
+  readonly conversationName?: string;
   /** Review thoroughness for this task. */
   readonly effort?: EffortLevel;
   /** CEO disposition for ambiguous requests. */

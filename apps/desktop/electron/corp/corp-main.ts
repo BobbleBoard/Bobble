@@ -17,7 +17,8 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import { ensureTimeoutShim } from './timeout-shim';
-import { workspaceFromTask } from './workspace-paths';
+import { resolveProjectDir } from '../workspace/project-dir';
+import { deliveryFromTask } from './workspace-paths';
 import path from 'node:path';
 import { BrowserAgentClient, registerBrowserUseTools } from '@pi-desktop/browser-use';
 import type { CoordinationEvent, TaskHandle, TaskResult } from '@pi-desktop/coordination';
@@ -251,12 +252,24 @@ async function handleStart(
   // been wedged by one command that never returned.
   ensureTimeoutShim();
   const meshTaskId = `corp-mesh-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
-  const named = workspaceFromTask(req.prompt, os.homedir());
-  const projectPath =
-    named ??
-    (typeof req.ctx?.cwd === 'string' && req.ctx.cwd.trim() !== ''
-      ? req.ctx.cwd
-      : path.join(corpWorkspaceRoot(), meshTaskId));
+  /*
+   * THE DROPDOWN DECIDES. the user: "if they have a project selected that dropdown
+   * right there is the end all be all ... always always always nothing competes
+   * with that." `req.ctx.cwd` IS that selection; "No project" arrives as absent,
+   * and becomes ~/Bobble/<conversation name>.
+   *
+   * This used to start from `workspaceFromTask(req.prompt)` — a regex over the
+   * prompt prose — which OUTRANKED the user's own choice. That is where every
+   * path bug came from, and each one failed silently: the team works perfectly
+   * wherever it is put, so the only symptom is the chosen folder being empty.
+   */
+  const projectPath = resolveProjectDir(req.ctx?.cwd, req.ctx?.conversationName ?? req.prompt);
+  /*
+   * A path NAMED IN THE PROMPT is a delivery destination, never a root. Writing
+   * there is already permitted (`isNamedDestination`); the team is simply told
+   * about it so the output lands where it was asked for.
+   */
+  const deliverTo = deliveryFromTask(req.prompt, os.homedir());
 
   if (resolved.ok && corpParamsForEffort(req.effort).promotionAllowed) {
     /*
@@ -289,7 +302,9 @@ async function handleStart(
       // TRACKABILITY: say where the work will land and why, once, in the log the
       // run is read from. "Where did the files go" has cost several runs.
       cwd,
-      cwdFrom: named !== null ? 'named-in-task' : 'chat-folder',
+      // The ONLY two possibilities now — see resolveProjectDir.
+      cwdFrom: req.ctx?.cwd ? 'project-dropdown' : 'bobble-default',
+      deliverTo: deliverTo ?? '(none named)',
       team: hierarchy.dir,
       returning: hierarchy.existed,
     });

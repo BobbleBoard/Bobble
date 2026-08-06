@@ -17,7 +17,6 @@ import type {
   TaskContext,
   WorkerTranscriptView,
 } from '@pi-desktop/coordination';
-import { parseHarnessStatus } from '../chat/harness-status';
 import { resolveEffort } from './model-selection';
 import { usePiStore } from './pi-slice';
 import { useProjectStore } from './project-store';
@@ -123,12 +122,25 @@ export async function startCorpTask(prompt: string, ctx?: TaskContext): Promise<
    * the mesh directly and never touches this path, so it looked healthy while the
    * product was writing everything to /var/folders.
    */
+  /*
+   * THE DROPDOWN, VERBATIM. the user: "if they have a project selected that dropdown
+   * right there is the end all be all, everything is THAT DROPDOWN'S SELECTION.
+   * always always always nothing competes with that."
+   *
+   * `activePath` IS that selection. "No project" is null, and main turns that
+   * into ~/Bobble/<conversation name> — named, so the user can find it in Finder
+   * instead of hunting an opaque sandbox id.
+   */
   const activePath = useProjectStore.getState().activePath;
-  const withCwd: TaskContext | undefined =
-    activePath !== null && activePath !== '' ? { ...(ctx ?? {}), cwd: activePath } : ctx;
+  const conversationName = usePiStore.getState().windowTitle ?? 'new chat';
+  const withCwd: TaskContext = {
+    ...(ctx ?? {}),
+    ...(activePath !== null && activePath !== '' ? { cwd: activePath } : {}),
+    conversationName,
+  };
   const { taskId } = await window.piDesktop.invoke('corp:start', {
     prompt,
-    ...(withCwd ? { ctx: withCwd } : {}),
+    ctx: withCwd,
     effort,
   });
   return attachCorpTask(taskId);
