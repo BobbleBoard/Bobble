@@ -187,3 +187,28 @@ describe('conversationNameFrom — the name exists before any tool runs', () => 
     );
   });
 });
+
+describe('names read like names, not truncations', () => {
+  /* MEASURED live: the first working run produced `make-me-a-python-script-that`
+   * from "Please make me a python script that renames photos by their EXIF date". */
+  it('trims a trailing relative pronoun', () => {
+    expect(conversationNameFrom('Please make me a python script that renames photos')).toBe(
+      'make me a python script',
+    );
+  });
+
+  it('trims trailing connectors generally', () => {
+    expect(conversationNameFrom('build a dashboard which shows sales')).toBe(
+      'build a dashboard which shows sales',
+    );
+    // Six words first, THEN the trim — 'from' never survives to be counted.
+    expect(conversationNameFrom('write a parser for the logs from')).toBe(
+      'write a parser for the logs',
+    );
+  });
+
+  it('never trims away the whole name', () => {
+    expect(conversationNameFrom('the')).toBe('the');
+    expect(conversationNameFrom('a of to')).toBe('a');
+  });
+});

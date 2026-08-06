@@ -877,8 +877,19 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
    */
   const liveRoot = (): string =>
     runtime.workspaceRoot ?? resolveWorkspaceRoot(undefined, process.env, homedir());
+  /*
+   * `process.cwd()` for the definition's static cwd, NOT liveRoot().
+   *
+   * liveRoot() calls resolveWorkspaceRoot, which CREATES its `_fallback`
+   * directory when nothing resolves — and at registration time nothing has, so
+   * every launch left an empty ~/.pi/desktop/sandbox/_fallback behind. Measured
+   * after purging the sandbox: it came straight back.
+   *
+   * The static value is irrelevant anyway: the spawnHook rewrites cwd on every
+   * command, and by the time one runs the workspace has been set.
+   */
   pi.registerTool(
-    createBashToolDefinition(liveRoot(), {
+    createBashToolDefinition(process.cwd(), {
       spawnHook: (c) => ({ ...c, cwd: liveRoot() }),
     }) as never,
   );

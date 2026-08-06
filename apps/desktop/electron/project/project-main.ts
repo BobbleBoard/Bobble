@@ -137,9 +137,22 @@ const handlers: IpcHandlers<ProjectInvokeMap> = {
    * resolves it because main owns the filesystem: the directory must EXIST
    * before any tool resolves a relative path against it.
    */
-  'project:resolve-workspace': (req) => ({
-    path: resolveProjectDir(req.selected, req.conversationName, os.homedir(), req.conversationId),
-  }),
+  'project:resolve-workspace': (req) => {
+    const path = resolveProjectDir(
+      req.selected,
+      req.conversationName,
+      os.homedir(),
+      req.conversationId,
+    );
+    // TRACKABILITY: "where did the files go" has cost more runs than any other
+    // question here. Say the answer, and what decided it, every time.
+    log.info('workspace resolved', {
+      path,
+      from: req.selected ? 'project-dropdown' : 'bobble-default',
+      name: req.conversationName,
+    });
+    return { path };
+  },
   'project:list': () => {
     // STALE-CLEAR (round-2 #3): on load, an active project whose folder no longer
     // exists is cleared to none so the dead name is never surfaced anywhere; the

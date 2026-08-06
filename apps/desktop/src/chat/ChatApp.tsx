@@ -172,23 +172,28 @@ export function ChatApp({
     void useProjectStore
       .getState()
       .load()
-      .then(() => {
-        const cwd = useProjectStore.getState().activePath ?? undefined;
-        return startPi(cwd !== undefined ? { cwd } : {});
+      .then(async () => {
+        /*
+         * SPAWN PI AT THE WORKSPACE, not at the conversation sandbox.
+         *
+         * Retargeting the harness's tools was not enough: main still rooted the
+         * pi child at ~/.pi/desktop/sandbox/<uuid> when no project was selected,
+         * so that directory (and `_fallback`) kept appearing. MEASURED after
+         * purging 455 of them — two came straight back on the next launch.
+         *
+         * Nothing was WRITTEN there, because our tools resolve their own root.
+         * But pi's cwd is the fallback for anything that does not go through
+         * them, which is the same silent-relocation shape this whole change
+         * exists to remove.
+         */
+        const selected = useProjectStore.getState().activePath;
+        const cwd =
+          (await syncWorkspace({ selected, conversationName: 'new chat' })) ??
+          selected ??
+          undefined;
+        return startPi(cwd !== undefined && cwd !== null ? { cwd } : {});
       })
       .then(() => applySavedHarnessConfig())
-      /*
-       * THE WORKSPACE, decided once and pushed live. One value for the chat
-       * model, the corp roles and every subagent — there is no separate "corp
-       * workspace", because a chat's effort can change at any time and the work
-       * must not move under the user's feet when it does.
-       */
-      .then(() =>
-        syncWorkspace({
-          selected: useProjectStore.getState().activePath,
-          conversationName: usePiStore.getState().windowTitle ?? 'new chat',
-        }),
-      )
       .then(() => preloadFastestModel());
   }, []);
 
@@ -215,13 +220,22 @@ export function ChatApp({
    * there the instant the user hits enter, before any tool runs.
    */
   const firstUserText = usePiStore((s) => s.messages.find((m) => m.kind === 'user')?.text ?? '');
+  const projectsLoaded = useProjectStore((s) => s.loaded);
   useEffect(() => {
+    /*
+     * WAIT FOR THE PROJECT STORE. `load()` is async, so resolving before it
+     * settles means briefly believing there is no project — which created a
+     * stray ~/Bobble/new-chat on EVERY launch, even for users who have a project
+     * selected. Measured: two resolutions a millisecond apart, `bobble-default`
+     * then `project-dropdown`.
+     */
+    if (!projectsLoaded) return;
     void syncWorkspace({
       selected: activeProjectPath,
       conversationName:
         firstUserText.trim() !== '' ? conversationNameFrom(firstUserText) : (windowTitle ?? 'new chat'),
     });
-  }, [activeProjectPath, windowTitle, firstUserText]);
+  }, [activeProjectPath, windowTitle, firstUserText, projectsLoaded]);
 
   // Tiny-window adaptation (adversarial finding): a narrow window lets the fixed
   // ~300px sidebar squeeze the chat and overflow the pane. Auto-collapse it below

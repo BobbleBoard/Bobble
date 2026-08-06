@@ -78,7 +78,37 @@ export function conversationNameFrom(firstMessage: string): string {
     .slice(0, 6);
   // A name ending in a preposition reads like a truncation, because it is:
   // "build a todo list tool in" -> "build a todo list tool".
-  const TRAILING = new Set(['in', 'on', 'of', 'to', 'a', 'an', 'the', 'with', 'and', 'for', 'at']);
+  const TRAILING = new Set([
+    'in',
+    'on',
+    'of',
+    'to',
+    'a',
+    'an',
+    'the',
+    'with',
+    'and',
+    'for',
+    'at',
+    // Relative pronouns and connectors read even worse at the end: measured
+    // live, "make me a python script that" was the real output for
+    // "Please make me a python script that renames photos by their EXIF date".
+    'that',
+    'which',
+    'who',
+    'whose',
+    'when',
+    'where',
+    'from',
+    'by',
+    'using',
+    'about',
+    'into',
+    'so',
+    'is',
+    'it',
+    'my',
+  ]);
   while (words.length > 1 && TRAILING.has((words[words.length - 1] ?? '').toLowerCase())) {
     words.pop();
   }
