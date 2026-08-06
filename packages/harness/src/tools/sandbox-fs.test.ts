@@ -23,6 +23,7 @@ import {
   resolveWorkspacePath,
   resolveWorkspaceRoot,
   sandboxBaseDir,
+  stripCodeFence,
 } from './sandbox-fs.js';
 
 const norm = (p: string) => path.resolve(p);
@@ -286,5 +287,45 @@ describe('a dropped leading slash is not a relative path', () => {
 
   it('still passes absolute paths straight through', () => {
     expect(resolveWorkspacePath('/Users/user/x', '/tmp/w')).toBe('/Users/user/x');
+  });
+});
+
+describe('stripCodeFence — a markdown fence must never reach disk', () => {
+  /*
+   * MEASURED: an engineer wrote scenes/main.tscn ending in a bare ``` line.
+   * Godot could not parse it, so a scene that was otherwise nearly right failed
+   * to load and the team spent its remaining budget repairing the wrong thing.
+   */
+  it('drops a DANGLING closing fence (the measured case)', () => {
+    const body = '[gd_scene format=3]\n\n[node name="Main" type="Node2D"]\n```\n';
+    expect(stripCodeFence(body, '/w/scenes/main.tscn')).toBe(
+      '[gd_scene format=3]\n\n[node name="Main" type="Node2D"]\n',
+    );
+  });
+
+  it('unwraps a body fenced top and bottom', () => {
+    expect(stripCodeFence('```gdscript\nextends Node2D\n```', '/w/s.gd')).toBe('extends Node2D');
+    expect(stripCodeFence('```\nhello\n```\n', '/w/a.txt')).toBe('hello');
+  });
+
+  it('leaves ordinary content completely alone', () => {
+    const plain = 'extends Node2D\n\nfunc _ready():\n\tprint("hi")\n';
+    expect(stripCodeFence(plain, '/w/s.gd')).toBe(plain);
+  });
+
+  it('leaves INTERIOR fences alone — they are not wrappers', () => {
+    const doc = 'intro\n```js\ncode\n```\noutro\n';
+    expect(stripCodeFence(doc, '/w/notes.txt')).toBe(doc);
+  });
+
+  it('never touches markdown — a fence there is content, not an artifact', () => {
+    const md = '```js\nconsole.log(1)\n```\n';
+    expect(stripCodeFence(md, '/w/README.md')).toBe(md);
+    expect(stripCodeFence(md, '/w/doc.mdx')).toBe(md);
+  });
+
+  it('is safe on empty and whitespace bodies', () => {
+    expect(stripCodeFence('', '/w/a.txt')).toBe('');
+    expect(stripCodeFence('   \n', '/w/a.txt')).toBe('   \n');
   });
 });

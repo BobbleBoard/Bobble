@@ -257,6 +257,50 @@ function argPath(params: unknown): string | undefined {
  * desktop renders tool rows itself and RPC mode never invokes them, and keeping
  * them would fight TypeBox generic variance for no runtime benefit.
  */
+/**
+ * Strip a MARKDOWN code fence that a model wrapped its file content in.
+ *
+ * (Nothing to do with the sandbox fence above — this is ``` .)
+ *
+ * MEASURED: an engineer wrote `scenes/main.tscn` ending in a bare ``` line. Godot
+ * cannot parse it, so a scene that was otherwise close to correct failed to load
+ * and the run spent its remaining budget repairing the wrong thing. The model had
+ * emitted a closing fence without an opening one — the tail of a habit, not a
+ * decision — and no amount of prompting reliably suppresses that.
+ *
+ * Two unambiguous shapes are removed:
+ *   - the WHOLE body wrapped: ```lang\n …\n``` → the middle.
+ *   - a DANGLING closer: a body whose last non-empty line is exactly ``` with no
+ *     opening fence anywhere → drop that line.
+ *
+ * Anything else is left alone, and `.md` files are skipped entirely: a fence in
+ * markdown is content, not an artifact.
+ */
+export function stripCodeFence(content: string, absPath: string): string {
+  if (/\.(md|markdown|mdx)$/i.test(absPath)) return content;
+  const lines = content.split('\n');
+  const firstIdx = lines.findIndex((l) => l.trim() !== '');
+  let lastIdx = -1;
+  for (let i = lines.length - 1; i >= 0; i -= 1) {
+    if (lines[i]?.trim() !== '') {
+      lastIdx = i;
+      break;
+    }
+  }
+  if (firstIdx === -1 || lastIdx <= firstIdx) return content;
+  const first = lines[firstIdx]?.trim() ?? '';
+  const last = lines[lastIdx]?.trim() ?? '';
+  const opens = /^```[\w+-]*$/.test(first);
+  const closes = last === '```';
+  // Whole body wrapped → keep the middle.
+  if (opens && closes) return lines.slice(firstIdx + 1, lastIdx).join('\n');
+  // Dangling closer with no opener anywhere → drop just that line.
+  if (closes && !lines.some((l, i) => i < lastIdx && /^```[\w+-]*$/.test(l.trim()))) {
+    return [...lines.slice(0, lastIdx), ...lines.slice(lastIdx + 1)].join('\n');
+  }
+  return content;
+}
+
 function fenceTool<S extends TSchema, D>(
   base: ToolDefinition<S, D>,
   fence: boolean,
@@ -292,6 +336,11 @@ function fenceTool<S extends TSchema, D>(
       // Hand pi an already-absolute path so its own resolveToCwd is a passthrough
       // and it writes/reads EXACTLY where we fenced.
       const next = { ...(params as Record<string, unknown>), path: abs } as unknown as Static<S>;
+      // ...and never let a markdown code fence reach disk (see stripCodeFence).
+      const body = (next as Record<string, unknown>).content;
+      if (typeof body === 'string') {
+        (next as Record<string, unknown>).content = stripCodeFence(body, abs);
+      }
       return base.execute(toolCallId, next, signal, onUpdate as never, ctx);
     },
   };
