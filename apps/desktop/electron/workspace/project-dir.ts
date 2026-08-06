@@ -54,6 +54,38 @@ export function projectSlug(name: string): string {
   return cleaned.length > 0 ? cleaned : 'untitled';
 }
 
+/**
+ * A folder name from the FIRST USER MESSAGE.
+ *
+ * The generated chat title would be nicer, but it does not exist yet: it is
+ * derived FROM the first message, and by the time it lands a corp run has
+ * already created `.scratch` in the placeholder — which correctly blocks the
+ * rename, because moving a directory under a running team makes paths the model
+ * has already used stop existing. MEASURED: every clean run ended up stuck at
+ * `~/Bobble/new-chat`.
+ *
+ * The first message is available the instant the user hits enter, before any
+ * tool runs, so naming from it means no rename is ever needed. Six words, not
+ * the whole sentence — an earlier attempt used the raw prompt and produced
+ * `build-a-small-command-line-todo-list-tool-in-python.-require`.
+ */
+export function conversationNameFrom(firstMessage: string): string {
+  const words: string[] = firstMessage
+    .trim()
+    .replace(/^(please|can you|could you|hey|hi|ok|okay)[,\s]+/i, '')
+    .split(/\s+/)
+    .filter((w) => w.length > 0)
+    .slice(0, 6);
+  // A name ending in a preposition reads like a truncation, because it is:
+  // "build a todo list tool in" -> "build a todo list tool".
+  const TRAILING = new Set(['in', 'on', 'of', 'to', 'a', 'an', 'the', 'with', 'and', 'for', 'at']);
+  while (words.length > 1 && TRAILING.has((words[words.length - 1] ?? '').toLowerCase())) {
+    words.pop();
+  }
+  const name = words.join(' ');
+  return name.length > 0 ? name : 'new chat';
+}
+
 /** The absolute path for a projectless conversation's folder. No fs touch. */
 export function bobbleProjectPath(name: string, home: string = os.homedir()): string {
   return path.join(bobbleBaseDir(home), projectSlug(name));

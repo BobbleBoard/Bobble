@@ -38,6 +38,7 @@ import {
 } from '../state/corp-connect';
 import { useCorpStore } from '../state/corp-store';
 import { getModels, setSessionName, startPi, syncWorkspace } from '../state/pi-connect';
+import { conversationNameFrom } from '../../electron/workspace/project-dir';
 import { usePiStore } from '../state/pi-slice';
 import { connectPresent } from '../state/present-store';
 import { useProjectStore } from '../state/project-store';
@@ -204,12 +205,23 @@ export function ChatApp({
    * next call.
    */
   const activeProjectPath = useProjectStore((s) => s.activePath);
+  /*
+   * The name comes from the FIRST USER MESSAGE, not the generated title.
+   *
+   * The title would read better but does not exist yet — it is derived from that
+   * same first message, and by the time it arrives a corp run has already
+   * written into the placeholder, which correctly blocks the rename. Measured:
+   * every clean run ended stuck at `~/Bobble/new-chat`. The first message is
+   * there the instant the user hits enter, before any tool runs.
+   */
+  const firstUserText = usePiStore((s) => s.messages.find((m) => m.kind === 'user')?.text ?? '');
   useEffect(() => {
     void syncWorkspace({
       selected: activeProjectPath,
-      conversationName: windowTitle ?? 'new chat',
+      conversationName:
+        firstUserText.trim() !== '' ? conversationNameFrom(firstUserText) : (windowTitle ?? 'new chat'),
     });
-  }, [activeProjectPath, windowTitle]);
+  }, [activeProjectPath, windowTitle, firstUserText]);
 
   // Tiny-window adaptation (adversarial finding): a narrow window lets the fixed
   // ~300px sidebar squeeze the chat and overflow the pane. Auto-collapse it below

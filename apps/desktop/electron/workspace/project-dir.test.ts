@@ -9,27 +9,42 @@ import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { bobbleProjectPath, projectSlug, resolveProjectDir } from './project-dir';
+import {
+  bobbleProjectPath,
+  conversationNameFrom,
+  projectSlug,
+  resolveProjectDir,
+} from './project-dir';
 
-const HOME = '/Users/user';
+/*
+ * A TEMP HOME, NEVER THE REAL ONE. `resolveProjectDir` CREATES the directory, so
+ * an earlier version of this file — which passed '/Users/user' — quietly made
+ * ~/Bobble/godot-game-demo and ~/Bobble/sales-data-tool in the user's home every
+ * time the suite ran. I found them while hunting a leak in the app, and they
+ * were mine. A test that writes outside its sandbox is the same silent-damage
+ * shape this whole module exists to prevent.
+ */
+const HOME = mkdtempSync(join(tmpdir(), 'bobble-home-'));
 
 describe('resolveProjectDir', () => {
   it('uses the selected project EXACTLY, whatever it is', () => {
-    expect(resolveProjectDir('/Users/user/Desktop', 'anything', HOME)).toBe('/Users/user/Desktop');
-    expect(resolveProjectDir('/Users/user/work/my app', 'anything', HOME)).toBe(
-      '/Users/user/work/my app',
-    );
+    // A selected project is used verbatim — inside the temp home so the test
+    // cannot create directories anywhere real.
+    const picked = join(HOME, 'Desktop');
+    const spaced = join(HOME, 'work', 'my app');
+    expect(resolveProjectDir(picked, 'anything', HOME)).toBe(picked);
+    expect(resolveProjectDir(spaced, 'anything', HOME)).toBe(spaced);
   });
 
   it('falls back to ~/Bobble/<name> only when there is NO project', () => {
     expect(resolveProjectDir(null, 'Godot game demo', HOME)).toBe(
-      '/Users/user/Bobble/godot-game-demo',
+      join(HOME, 'Bobble', 'godot-game-demo'),
     );
     expect(resolveProjectDir('', 'Godot game demo', HOME)).toBe(
-      '/Users/user/Bobble/godot-game-demo',
+      join(HOME, 'Bobble', 'godot-game-demo'),
     );
     expect(resolveProjectDir('   ', 'Sales Data Tool', HOME)).toBe(
-      '/Users/user/Bobble/sales-data-tool',
+      join(HOME, 'Bobble', 'sales-data-tool'),
     );
   });
 });
@@ -58,7 +73,7 @@ describe('projectSlug — this is a folder a human opens in Finder', () => {
   });
 
   it('bobbleProjectPath lands under ~/Bobble', () => {
-    expect(bobbleProjectPath('My Deck', HOME)).toBe('/Users/user/Bobble/my-deck');
+    expect(bobbleProjectPath('My Deck', HOME)).toBe(join(HOME, 'Bobble', 'my-deck'));
   });
 });
 
@@ -133,5 +148,42 @@ describe('the placeholder folder is renamed when the title arrives', () => {
     const other = resolveProjectDir(null, 'Different Title', tmp, 'chat-thief');
     expect(other).toBe(join(tmp, 'Bobble', 'different-title'));
     expect(existsSync(join(tmp, 'Bobble', 'new-chat'))).toBe(true);
+  });
+});
+
+describe('conversationNameFrom — the name exists before any tool runs', () => {
+  /*
+   * The generated title reads better but arrives too late: it is derived FROM
+   * the first message, and by then a corp run has written into the placeholder,
+   * which correctly blocks the rename. Every clean run ended stuck at
+   * ~/Bobble/new-chat. The first message is available at send.
+   */
+  it('takes the first few words, not the whole sentence', () => {
+    expect(
+      conversationNameFrom(
+        'Ask the manager to build a small command line todo list tool in python, with add, list, done and remove',
+      ),
+    ).toBe('Ask the manager to build');
+    // The bug this replaces produced a sixty-character directory.
+    expect(projectSlug(conversationNameFrom('Build a small command line todo tool in python')).length)
+      .toBeLessThan(40);
+  });
+
+  it('drops throat-clearing so the name is about the work', () => {
+    expect(conversationNameFrom('please build me a todo app')).toBe('build me a todo app');
+    expect(conversationNameFrom('Can you make a slideshow about ferns')).toBe(
+      'make a slideshow about ferns',
+    );
+  });
+
+  it('falls back rather than producing an empty name', () => {
+    expect(conversationNameFrom('')).toBe('new chat');
+    expect(conversationNameFrom('   ')).toBe('new chat');
+  });
+
+  it('produces a readable folder', () => {
+    expect(projectSlug(conversationNameFrom('Build a todo list tool in python'))).toBe(
+      'build-a-todo-list-tool',
+    );
   });
 });
