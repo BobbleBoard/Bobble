@@ -1,3 +1,4 @@
+import { CanvasProvider, createCanvasController } from '@pi-desktop/canvas';
 import { Spinner, ToastProvider, TooltipProvider } from '@pi-desktop/ui';
 import { lazy, Suspense, useEffect, useState } from 'react';
 import type { AppInfo } from '../electron/ipc-contract';
@@ -159,11 +160,20 @@ export function App() {
   }
 
   if (IS_SITUATION_DEMO) {
+    /*
+     * The demo route renders the REAL corp surfaces off a scripted run, and
+     * those reach for the canvas controller exactly as they do in the chat —
+     * so it threw "useCanvasTabs requires a CanvasController" and painted a
+     * blank window. The main path gets its provider from ChatApp; this one had
+     * none. Found by driving the route to verify a UI change on it.
+     */
     return (
       <TooltipProvider delayDuration={200}>
-        <div className="h-full">
-          <SituationDemoView />
-        </div>
+        <CanvasProvider controller={createCanvasController()}>
+          <div className="h-full">
+            <SituationDemoView />
+          </div>
+        </CanvasProvider>
       </TooltipProvider>
     );
   }
