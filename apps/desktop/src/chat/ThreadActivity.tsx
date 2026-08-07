@@ -109,12 +109,35 @@ export function ThreadActivityChain({
     .filter((b): b is Extract<ActivityBlock, { type: 'thinking' }> => b.type === 'thinking')
     .map((b) => b.thinking)
     .join('');
-  const thinkingMs =
+  /*
+   * DO NOT REPORT A DURATION THIS CHAIN DID NOT TAKE.
+   *
+   * `firstToolResultTs - turnStartedAt` measures from the start of the whole
+   * TURN, which is only this chain's own thinking time when the chain is the
+   * first thing in the turn. For a chain eight minutes into a long turn it
+   * reports the entire turn. the user, on a three-second thought: "that thought
+   * block did not take 7 minutes? it was like 3 seconds" — the label read
+   * "Thought for 7m 55s", off by more than a hundredfold.
+   *
+   * There is no per-block timestamp to fix this properly and no prop saying
+   * which chain this is, but the token estimate IS per-chain: it comes from this
+   * chain's own thinking text. So use the wall-clock delta only when the two
+   * agree in scale; when the delta dwarfs the estimate it is measuring the wrong
+   * window, and the estimate — imprecise but attributable — is the honest number.
+   */
+  const estimated = estimateThoughtMs(thinkingText, tps);
+  const wallDelta =
     turnStartedAt !== undefined && firstToolResultTs !== undefined
       ? Math.max(0, firstToolResultTs - turnStartedAt)
-      : hasTools
-        ? 0
-        : (estimateThoughtMs(thinkingText, tps) ?? 0);
+      : undefined;
+  const wallIsPlausible =
+    wallDelta !== undefined &&
+    (estimated === undefined || wallDelta <= Math.max(estimated * 4, estimated + 15_000));
+  const thinkingMs = wallIsPlausible
+    ? (wallDelta ?? 0)
+    : hasTools
+      ? (estimated ?? 0)
+      : (estimated ?? 0);
   const firstThinkingIdx = blocks.findIndex((b) => b.type === 'thinking');
 
   // E1: only the LAST block of a live chain is present-tense; every settled prior

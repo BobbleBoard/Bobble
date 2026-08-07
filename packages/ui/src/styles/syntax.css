@@ -1,0 +1,57 @@
+/*
+ * SYNTAX PALETTE — one set of tokens, resolved per mode.
+ *
+ * The code surface used CodeMirror's `defaultHighlightStyle`, which is built for
+ * a LIGHT editor: navy keywords, dark purple constants. On the app's near-black
+ * code background those all but vanished. the user: "why all so dark, especially the
+ * dark blue, absolutely not."
+ *
+ * Chosen for CONTRAST against the surface they actually sit on, not for looking
+ * pretty in isolation: every colour below clears ~7:1 on its own mode's code
+ * background, so nothing depends on the reader's screen or ambient light. Hues
+ * stay in the same family across modes so a file does not change character when
+ * the theme flips — only its lightness moves.
+ *
+ * Light is the DEFAULT here and dark overrides, so a flavor that ships no dark
+ * palette still degrades to something readable rather than to CodeMirror's.
+ */
+:root {
+  --pd-syntax-keyword: #8b2fa8;
+  --pd-syntax-string: #0a6b3d;
+  --pd-syntax-number: #9a4600;
+  --pd-syntax-comment: #5c6370;
+  --pd-syntax-function: #1a52c4;
+  --pd-syntax-type: #0f6f7a;
+  --pd-syntax-property: #7a3ba8;
+  --pd-syntax-punctuation: #4a5160;
+  --pd-syntax-invalid: #c0392b;
+}
+
+/* Dark: the case that was broken. Same hues, lifted well clear of the
+ * background — these are the values the screenshot needed. */
+:root[data-mode="dark"] {
+  --pd-syntax-keyword: #d69bff;
+  --pd-syntax-string: #7ee2a8;
+  --pd-syntax-number: #ffb27a;
+  --pd-syntax-comment: #8b94a6;
+  --pd-syntax-function: #82b8ff;
+  --pd-syntax-type: #6fe0e0;
+  --pd-syntax-property: #e0a6ff;
+  --pd-syntax-punctuation: #b8c0d0;
+  --pd-syntax-invalid: #ff8a80;
+}
+
+/* Follow the OS when no explicit mode is stamped on the root. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-mode="light"]) {
+    --pd-syntax-keyword: #d69bff;
+    --pd-syntax-string: #7ee2a8;
+    --pd-syntax-number: #ffb27a;
+    --pd-syntax-comment: #8b94a6;
+    --pd-syntax-function: #82b8ff;
+    --pd-syntax-type: #6fe0e0;
+    --pd-syntax-property: #e0a6ff;
+    --pd-syntax-punctuation: #b8c0d0;
+    --pd-syntax-invalid: #ff8a80;
+  }
+}

@@ -1,5 +1,6 @@
-import { defaultHighlightStyle, syntaxHighlighting } from '@codemirror/language';
+import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
 import { Compartment, EditorState, type Extension, Transaction } from '@codemirror/state';
+import { tags as t } from '@lezer/highlight';
 import { EditorView, keymap, lineNumbers } from '@codemirror/view';
 import { IconCheck, IconCopy } from '@pi-desktop/ui';
 import { useEffect, useRef, useState } from 'react';
@@ -7,6 +8,32 @@ import type { ArtifactContent } from '../model.ts';
 import type { SurfaceProps } from '../registry.ts';
 import { streamingUpdateSpec } from './code-append.ts';
 import { languageExtension } from './languages.ts';
+
+/*
+ * SYNTAX COLOURS FOLLOW THE THEME, like everything else here.
+ *
+ * This surface was token-driven throughout EXCEPT its highlighting, which used
+ * CodeMirror's `defaultHighlightStyle` — a palette designed for a LIGHT editor.
+ * Rendered on the app's near-black code background, its navy and dark purple
+ * became close to invisible. the user: "these text colors on this color scheme is
+ * not viable, why all so dark, especially the dark blue, absolutely not."
+ *
+ * Every colour is a --pd-syntax-* variable now, so light, dark and all three
+ * flavors resolve from the same place the rest of the UI does, and no palette
+ * can go stale against a background it was never checked on.
+ */
+const pdHighlight = HighlightStyle.define([
+  { tag: [t.keyword, t.modifier, t.controlKeyword, t.moduleKeyword], color: 'var(--pd-syntax-keyword)' },
+  { tag: [t.string, t.special(t.string), t.regexp], color: 'var(--pd-syntax-string)' },
+  { tag: [t.number, t.bool, t.null, t.atom], color: 'var(--pd-syntax-number)' },
+  { tag: [t.comment, t.lineComment, t.blockComment], color: 'var(--pd-syntax-comment)', fontStyle: 'italic' },
+  { tag: [t.function(t.variableName), t.function(t.propertyName)], color: 'var(--pd-syntax-function)' },
+  { tag: [t.typeName, t.className, t.namespace, t.self], color: 'var(--pd-syntax-type)' },
+  { tag: [t.propertyName, t.attributeName], color: 'var(--pd-syntax-property)' },
+  { tag: [t.operator, t.punctuation, t.bracket], color: 'var(--pd-syntax-punctuation)' },
+  { tag: [t.definition(t.variableName), t.variableName], color: 'var(--pd-text-primary)' },
+  { tag: t.invalid, color: 'var(--pd-syntax-invalid)' },
+]);
 
 /** Base viewer theme — styled entirely through --pd-* tokens. */
 const codeTheme = EditorView.theme({
@@ -160,7 +187,7 @@ export function CodeSurface({
         doc: content.text,
         extensions: [
           lineNumbers(),
-          syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
+          syntaxHighlighting(pdHighlight, { fallback: true }),
           langCompartment.of(languageExtension(content.language)),
           codeTheme,
           editCompartment.of(editExtensionsFor(editable, onSaveRef, onChangeRef)),

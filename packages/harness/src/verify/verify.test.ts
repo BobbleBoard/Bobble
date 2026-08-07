@@ -1,3 +1,4 @@
+import os from 'node:os';
 import { describe, expect, it, vi } from 'vitest';
 import {
   type CheckOutcome,
@@ -203,3 +204,36 @@ const _sample: CheckOutcome = {
   kind: 'test',
 };
 void _sample;
+
+describe('a ~ inside quotes is never expanded by the shell', () => {
+  /*
+   * MEASURED: the syntax check ran
+   *   python3 -m py_compile '~/bobble-testbed/buggyapp/app.py'
+   * which cannot resolve, and the harness reported its OWN broken command to the
+   * model as a code failure. The model diagnosed it correctly — "I don't control
+   * the check's arguments, I control the file content" — and was sent to fix code
+   * that was not broken.
+   */
+  it('expands a leading ~/ so the command can actually find the file', () => {
+    const cmd = syntaxCheckCommand(['~/proj/app.py'])?.command ?? '';
+    expect(cmd).not.toContain("'~/");
+    expect(cmd).toContain(`${os.homedir()}/proj/app.py`);
+  });
+
+  it('leaves an absolute path alone', () => {
+    const cmd = syntaxCheckCommand(['/tmp/app.py'])?.command ?? '';
+    expect(cmd).toContain("'/tmp/app.py'");
+  });
+
+  it('keeps a tilde that is part of a filename', () => {
+    // `weird~name.py` is a real file; only a LEADING ~/ means home.
+    const cmd = syntaxCheckCommand(['/tmp/weird~name.py'])?.command ?? '';
+    expect(cmd).toContain('weird~name.py');
+    expect(cmd).not.toContain(os.homedir() + 'name');
+  });
+
+  it('still quotes, so a path with spaces survives', () => {
+    const cmd = syntaxCheckCommand(['/tmp/my app/x.py'])?.command ?? '';
+    expect(cmd).toContain("'/tmp/my app/x.py'");
+  });
+});

@@ -16,6 +16,7 @@
  * this module owns detection and the single check run.
  */
 
+import { homedir } from 'node:os';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -167,7 +168,24 @@ export function detectProjectCheck(probe: ProjectProbe): ProjectCheck | null {
 
 /** Single-quote a path for `sh -c` (escapes embedded quotes). */
 function shQuote(p: string): string {
-  return `'${p.replace(/'/g, `'\\''`)}'`;
+  /*
+   * EXPAND ~ BEFORE QUOTING. Quoting is right — a path can contain spaces — but
+   * a tilde inside single quotes is never expanded by the shell, so a path the
+   * model wrote as `~/x/app.py` becomes a literal directory named "~".
+   *
+   * MEASURED: the syntax check ran
+   *   python3 -m py_compile '~/bobble-testbed/buggyapp/app.py'
+   * which failed with "No such file or directory", and the harness reported its
+   * OWN broken command to the model as a code failure. The model diagnosed it
+   * correctly — "I don't control the check's arguments, I control the file
+   * content" — and was then sent to fix code that was not broken, burning the
+   * verify budget on a phantom.
+   *
+   * Only a LEADING ~/ is a home reference; a tilde anywhere else is a literal
+   * character in a filename and must survive untouched.
+   */
+  const expanded = p.startsWith('~/') ? `${homedir()}${p.slice(1)}` : p;
+  return `'${expanded.replace(/'/g, `'\\''`)}'`;
 }
 
 /**
