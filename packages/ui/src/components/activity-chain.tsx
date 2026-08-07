@@ -1,6 +1,6 @@
 import { clsx } from 'clsx';
 import type { HTMLAttributes, ReactNode } from 'react';
-import { forwardRef, useState } from 'react';
+import { forwardRef, useEffect, useRef, useState } from 'react';
 import { DiffStat } from './activity.tsx';
 import { type DiffFileData, DiffView } from './diff-view.tsx';
 import { IconCheck, IconChevronRight, IconExternal } from './icons.tsx';
@@ -708,17 +708,35 @@ export const ActivityChain = forwardRef<HTMLDivElement, ActivityChainProps>(func
   ref,
 ) {
   const [internalExpanded, setInternalExpanded] = useState(defaultExpanded);
-  // While streaming (active), force open; when the run ends, active→false and the
-  // chain falls back to internalExpanded (collapsed by default) → it collapses.
-  const isExpanded = expanded ?? (active ? true : internalExpanded);
+  /*
+   * A LIVE CHAIN CAN BE COLLAPSED. It could not before: `isExpanded` ignored
+   * `internalExpanded` while active AND `toggleChain` returned early, so clicking
+   * the summary of a running step did nothing at all until the run finished.
+   * the user: "'working/thinking/using tool' expansion is not collapsable until it is
+   * complete". On a long turn that is the whole time it matters — a chain that
+   * opens itself and then refuses to shut is a wall of text you cannot get past.
+   *
+   * Auto-open is still the default, because seeing work as it happens is the
+   * point. It is just no longer compulsory: once the user says otherwise, their
+   * choice holds for the rest of the run. A NEW run clears it, so the next turn
+   * opens again rather than inheriting a decision about a different piece of work.
+   */
+  const [userChose, setUserChose] = useState(false);
+  const wasActive = useRef(active);
+  useEffect(() => {
+    if (active && !wasActive.current) setUserChose(false);
+    wasActive.current = active;
+  }, [active]);
+  const isExpanded = expanded ?? (userChose || !active ? internalExpanded : true);
   const [openStep, setOpenStep] = useState<number | null>(defaultOpenStep ?? null);
 
   const running = steps.some((s) => s.status === 'running');
   const toggleChain = () => {
-    // No manual toggle while streaming — the live run stays open until it's done.
-    if (active) return;
     const next = !isExpanded;
-    if (expanded === undefined) setInternalExpanded(next);
+    if (expanded === undefined) {
+      setInternalExpanded(next);
+      if (active) setUserChose(true);
+    }
     onExpandedChange?.(next);
   };
   const toggleStep = (index: number) => setOpenStep((cur) => (cur === index ? null : index));

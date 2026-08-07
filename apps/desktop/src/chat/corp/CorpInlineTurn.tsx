@@ -29,19 +29,20 @@ import { contractProgress, formatEta, type SituationState, workingCount } from '
 import type { OrgNodeView, WorkerTranscriptView } from '@pi-desktop/coordination';
 import { Button, IconCheck, IconChevronRight, IconEye, ShimmerText, Spinner } from '@pi-desktop/ui';
 import { useEffect, useState } from 'react';
-import { CorpWorkerFeed } from './CorpWorkerPane';
+import { useChildAgentStore } from '../../state/child-agent-store';
+import { corpChildId } from '../../state/corp-child-bridge';
 import './CorpInlineTurn.css';
-
-/** Transcript poll cadence — mirrors CorpWorkerPane (fast while streaming). */
-const POLL_MS = 900;
-const POLL_STREAMING_MS = 350;
 
 export interface CorpInlineTurnProps {
   taskId: string;
   /** The folded corp event stream (reduceSituation output). */
   state: SituationState;
   /** One node's live transcript (IPC in the app; the mock in demos/tests). */
-  fetchTranscript: (nodeId: string) => Promise<WorkerTranscriptView | null>;
+  /** RETAINED, not read here. Drilling into an agent now opens its real chat
+   * (the same one the sidebar opens), so this component no longer fetches or
+   * renders a transcript itself; the situation-room canvas panel still does.
+   * Kept on the props so existing callers are unaffected. */
+  fetchTranscript?: (nodeId: string) => Promise<WorkerTranscriptView | null>;
   /** There is a build snapshot to open — the peek button only renders then. */
   peekAvailable: boolean;
   /** Open the Build snapshot. */
@@ -132,72 +133,22 @@ function RowGlyph({ state }: { state: OrgNodeView['state'] }) {
   );
 }
 
-/** Poll-burst dedupe (the worker pane's rule): a fresh snapshot that shows
- * nothing new must not re-render the feed. Compares the growth surface. */
-function sameSnapshot(prev: WorkerTranscriptView, next: WorkerTranscriptView): boolean {
-  if (prev.nodeId !== next.nodeId || prev.lines.length !== next.lines.length) return false;
-  if (prev.streaming !== next.streaming || prev.currentAction !== next.currentAction) return false;
-  const a = prev.lines[prev.lines.length - 1];
-  const b = next.lines[next.lines.length - 1];
-  return a?.text === b?.text && a?.streaming === b?.streaming;
-}
-
-interface RowFeedProps {
-  node: OrgNodeView;
-  fetchTranscript: (nodeId: string) => Promise<WorkerTranscriptView | null>;
-}
-
-/** State C: the expanded row's live stream — fetch, then poll while working. */
-function RowFeed({ node, fetchTranscript }: RowFeedProps) {
-  const [transcript, setTranscript] = useState<WorkerTranscriptView | null>(null);
-  const [loading, setLoading] = useState(true);
-  const working = node.state === 'working';
-
-  useEffect(() => {
-    let cancelled = false;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const pull = () => {
-      void fetchTranscript(node.id).then((t) => {
-        if (cancelled) return;
-        setLoading(false);
-        if (t !== null) {
-          setTranscript((prev) => (prev !== null && sameSnapshot(prev, t) ? prev : t));
-        }
-        // Keep polling only while the node is actually working (the worker
-        // pane's cadence: fast while the model streams, calm otherwise).
-        if (!working) return;
-        timer = setTimeout(pull, t?.streaming === true ? POLL_STREAMING_MS : POLL_MS);
-      });
-    };
-    pull();
-    return () => {
-      cancelled = true;
-      if (timer !== undefined) clearTimeout(timer);
-    };
-  }, [node.id, fetchTranscript, working]);
-
-  return (
-    <div className="pd-corpturn-rowfeed" data-testid="corp-inline-feed">
-      <CorpWorkerFeed
-        transcript={transcript}
-        working={working}
-        loading={loading}
-        nodeState={node.state}
-      />
-    </div>
-  );
-}
-
 export function CorpInlineTurn({
   taskId,
   state,
-  fetchTranscript,
   peekAvailable,
   onPeek,
   onFocusSituation,
 }: CorpInlineTurnProps) {
   const [expanded, setExpanded] = useState(false);
-  const [openNodeId, setOpenNodeId] = useState<string | null>(null);
+  /*
+   * The selection lives in the CHILD-AGENT STORE, not here. A local
+   * `openNodeId` was the whole reason this panel and the sidebar disagreed:
+   * two independent notions of "which agent am I looking at", neither aware of
+   * the other. There is one now, and both read it.
+   */
+  const viewedChildId = useChildAgentStore((s) => s.viewedChildId);
+  const setViewedChild = useChildAgentStore((s) => s.setViewedChild);
 
   const progress = contractProgress(state);
   const busy = workingCount(state.chart);
@@ -356,7 +307,6 @@ export function CorpInlineTurn({
         {expanded ? (
           <ul className="pd-corpturn-rows" data-testid="corp-inline-rows">
             {orderRows(state.chart.nodes).map((node) => {
-              const open = openNodeId === node.id;
               // Is anyone OTHER than this row actually going? That is the
               // difference between a lead coordinating and a lead building.
               const anyoneElseWorking = state.chart.nodes.some(
@@ -369,8 +319,25 @@ export function CorpInlineTurn({
                     className="pd-corpturn-row pd-focusable"
                     data-state={node.state}
                     data-node-id={node.id}
-                    aria-expanded={open}
-                    onClick={() => setOpenNodeId((cur) => (cur === node.id ? null : node.id))}
+                    /*
+                     * ONE ENTITY, ONE SELECTION. This row and the sidebar's
+                     * subchat row are the same agent, and they used to do
+                     * completely different things: the sidebar opened the agent
+                     * as a chat, while this expanded a little feed inside the
+                     * panel. the user: "the buttons in the situation room to check on
+                     * a subagent and the buttons in the left sidebar showing
+                     * subagents as 'subchats' don't do the same thing?? why don't
+                     * they? ... clicking in the situation room should also put
+                     * the chat just like that left sidebar does."
+                     *
+                     * So both now drive `setViewedChild` on the SAME id — the
+                     * bridge already mirrors every corp role into the child store
+                     * as `corp:<nodeId>`, which is what made two selections
+                     * possible in the first place. Selecting from either place
+                     * now lights up both.
+                     */
+                    data-selected={viewedChildId === corpChildId(node.id) || undefined}
+                    onClick={() => setViewedChild(corpChildId(node.id))}
                   >
                     <RowGlyph state={node.state} />
                     <span className="pd-corpturn-row-name">{node.name}</span>
@@ -381,9 +348,11 @@ export function CorpInlineTurn({
                       <Spinner size={11} className="pd-corpturn-row-spinner" />
                     ) : null}
                   </button>
-                  {open ? (
-                    <RowFeed key={node.id} node={node} fetchTranscript={fetchTranscript} />
-                  ) : null}
+                  {/* The inline RowFeed is gone. It was a SECOND, smaller way to
+                   * read an agent — a cramped feed inside a panel, showing the
+                   * same transcript the sidebar shows properly as a chat. Two
+                   * viewers for one thing is what made this confusing; the row
+                   * now opens the real one. */}
                 </li>
               );
             })}

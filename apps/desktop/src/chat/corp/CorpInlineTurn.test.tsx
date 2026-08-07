@@ -33,6 +33,7 @@ import type { ReactNode } from 'react';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { describe, expect, it, vi } from 'vitest';
+import { useChildAgentStore } from '../../state/child-agent-store';
 import { CorpInlineTurn } from './CorpInlineTurn';
 
 // React's act() warns unless this flag is set in a test environment.
@@ -226,40 +227,39 @@ describe('CorpInlineTurn — State B (expanded)', () => {
   });
 });
 
-describe('CorpInlineTurn — State C (a row expanded)', () => {
-  it('fetches the transcript on row click and renders the shared worker feed', async () => {
-    const fetchTranscript = vi.fn(
-      (nodeId: string): Promise<WorkerTranscriptView | null> =>
-        Promise.resolve(nodeId === 'eng-live' ? EMITTER_TRANSCRIPT : null),
-    );
+describe('CorpInlineTurn — clicking a row selects that agent', () => {
+  /*
+   * This used to expand a small transcript feed INSIDE the panel, while the
+   * sidebar's row for the same agent opened it as a full chat. Two viewers, two
+   * selections, neither aware of the other. the user: "the buttons in the situation
+   * room to check on a subagent and the buttons in the left sidebar showing
+   * subagents as 'subchats' don't do the same thing?? why don't they?"
+   *
+   * One selection now, in the child-agent store, keyed `corp:<nodeId>` — the id
+   * the bridge already mirrors every role under. Both places drive it and both
+   * reflect it.
+   */
+  it('drives the same child selection the sidebar does', async () => {
+    useChildAgentStore.getState().setViewedChild(null);
     const { container, unmount } = await render(
-      // The expanded row's feed can render an ActivityChain (a tool-call line),
-      // which needs a canvas controller — exactly as it lives in the real app.
       <CanvasProvider>
-        <CorpInlineTurn
-          taskId="t1"
-          state={RUNNING_STATE}
-          fetchTranscript={fetchTranscript}
-          peekAvailable={false}
-        />
+        <CorpInlineTurn taskId="t1" state={RUNNING_STATE} peekAvailable={false} />
       </CanvasProvider>,
     );
     await click(container.querySelector('[data-testid="corp-inline-summary"]'));
     await click(container.querySelector('[data-node-id="eng-live"]'));
     await flush();
 
-    expect(fetchTranscript).toHaveBeenCalledWith('eng-live');
-    expect(container.querySelectorAll('[data-testid="corp-inline-feed"]')).toHaveLength(1);
-    // The feed rendered the transcript's real content (briefing + message).
-    expect(container.textContent).toContain('Starting on the emitter now.');
-    expect(container.textContent).toContain('Build the particle emitter');
+    expect(useChildAgentStore.getState().viewedChildId).toBe('corp:eng-live');
+    expect(container.querySelector('[data-node-id="eng-live"]')?.getAttribute('data-selected')).toBe(
+      'true',
+    );
 
-    // Only ONE row expanded at a time: opening another closes the first.
+    // Selecting another moves the selection; it never opens a second viewer.
     await click(container.querySelector('[data-node-id="mgr"]'));
     await flush();
-    expect(fetchTranscript).toHaveBeenCalledWith('mgr');
-    expect(container.querySelectorAll('[data-testid="corp-inline-feed"]')).toHaveLength(1);
-    expect(container.textContent).not.toContain('Starting on the emitter now.');
+    expect(useChildAgentStore.getState().viewedChildId).toBe('corp:mgr');
+    expect(container.querySelectorAll('[data-testid="corp-inline-feed"]')).toHaveLength(0);
     await unmount();
   });
 });

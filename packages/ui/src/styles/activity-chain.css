@@ -372,6 +372,30 @@ button.pd-chain-step-row:hover .pd-chain-step-chevron {
   line-height: var(--pd-leading-footnote);
 }
 
+/* the user UI#1: a numbered list inside a thought came out double-spaced.
+ *
+ * Two margins stack. A list whose items are separated by blank lines is a LOOSE
+ * list, so each item's content is wrapped in a `<p>` — which picks up
+ * `.pd-prose p { margin: 0 0 12px }` — and that lands on top of the flavor's own
+ * `li + li { margin-top: 10px }`. Neither rule is wrong on its own; together, in
+ * a footnote-sized block, they push a five-item plan to nearly a screen.
+ *
+ * Models write loose lists constantly (a blank line between numbered points is
+ * the natural way to type one), so this is the common case, not the edge one.
+ * Tighten it HERE rather than in prose.css: a thought is a dense aside, and the
+ * same spacing that reads as generous in a reply reads as broken in one. */
+.pd-chain-thought .pd-markdown li > p {
+  margin: 0;
+}
+
+.pd-chain-thought .pd-markdown li + li {
+  margin-top: 2px;
+}
+
+.pd-chain-thought .pd-markdown :is(ul, ol) {
+  margin-bottom: 6px;
+}
+
 /* Long in-chain thought: clamp + bottom fade (never a scrollbar). The shared
  * .pd-showmore sits below the fade so it never overlaps the text (round-5 #4). */
 .pd-chain-thought-text[data-clamped="true"] {
