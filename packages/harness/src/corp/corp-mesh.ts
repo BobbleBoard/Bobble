@@ -297,6 +297,8 @@ FIRST, WORK OUT WHAT KIND OF THING THIS IS, then use the matching method:
 
   - COMMAND LINE — run it as a user would, with real arguments, from a directory a user would be in. Feed it the empty case, the huge case, the malformed case. Capture stdout/stderr and the exit code for every one.
   - PYTHON GUI (tkinter/PyQt/wx) — do NOT give up because there is no mouse. Import the app module, construct the window, call update(), then invoke the real callbacks with real arguments (the drop handler with a list of paths, the button command, the menu action) exactly as the widget would. Between steps call update() and screenshot the window (macOS: screencapture -x -o out.png, or the toolkit's own postscript/grab). A drag-and-drop is just its handler called with paths — simulate it.
+  - NEVER LET THE HARNESS HANG. A GUI script that reaches mainloop() blocks forever and takes your whole turn with it — MEASURED: a tkinter test script sat for minutes at 855MB doing nothing, and the agent waited with it. Use update() to pump the event loop, NEVER mainloop(), destroy the window at the end, and run the script under a timeout so a block is a failed test rather than a dead run. Same for anything that might wait on a permission prompt or a server that never exits.
+
   - WEB / HTML — serve it (python3 -m http.server) and drive it headlessly if a browser driver exists; otherwise open it and screenshot. Check the console for errors, not just the page.
   - GAME / ENGINE — run the engine headless if it has such a mode, and render a frame to an image. A project that loads is not a game that plays.
   - LIBRARY / MODULE — write a throwaway script that uses it the way its README says a caller would, and run that. Not its own tests.
