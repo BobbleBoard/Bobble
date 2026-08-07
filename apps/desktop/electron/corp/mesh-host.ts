@@ -357,6 +357,153 @@ export function testSuiteReport(cwd: string): string {
   return `I ran your tests: ${out.split('\n').slice(-1)[0] ?? 'passed'}`;
 }
 
+/**
+ * WRITTEN, BUT NOT REACHABLE. The file exists and nothing can ever get to it.
+ *
+ * MEASURED (run 9, Godot): the team wrote `main_scene.tscn` and `main_scene.gd`,
+ * announced a working game, and never added `run/main_scene` to `project.godot`.
+ * The scene was perfect and unreachable, so Godot started with nothing to run and
+ * hung — which surfaced as a 45s timeout three layers away from the cause.
+ *
+ * This is the same shape as the two before it: `test_merger.py` containing no
+ * test function, and a mesh entry id naming a seat that did not exist. A thing is
+ * registered, and separately it is REACHABLE, and this harness keeps assuming the
+ * first implies the second. So check the general property, not the Godot one:
+ * which files does nothing else mention?
+ *
+ * Deliberately conservative, because a false accusation costs more than a miss:
+ *   - matches on the STEM, so `player.gd` counts as referenced by `player.tscn`;
+ *   - exempts conventional entry points, which nothing is supposed to reference;
+ *   - exempts tests, which are discovered by name rather than referenced;
+ *   - only considers files that must be wired up to do anything — a stray .md or
+ *     .csv is a legitimate standalone deliverable and is never flagged.
+ *
+ * And it reports EVIDENCE, not a verdict. "Nothing references these" is a fact;
+ * "these are broken" is a guess, and this file has already been burned once by
+ * stating a conclusion it had not verified.
+ */
+const ENTRY_NAMES = new Set([
+  'main.py',
+  'app.py',
+  '__init__.py',
+  '__main__.py',
+  'index.html',
+  'index.js',
+  'index.ts',
+  'main.js',
+  'main.ts',
+  'main.go',
+  'main.rs',
+  'main.c',
+  'main.cpp',
+  'project.godot',
+  'package.json',
+  'pyproject.toml',
+  'setup.py',
+  'cargo.toml',
+  'go.mod',
+  'makefile',
+  'dockerfile',
+  'cmakelists.txt',
+  'tsconfig.json',
+]);
+
+/** Files that are inert unless something points at them. Docs and data are
+ * excluded on purpose: an unreferenced README is not a defect. */
+const MUST_BE_WIRED = new Set([
+  '.gd',
+  '.tscn',
+  '.tres',
+  '.py',
+  '.js',
+  '.ts',
+  '.jsx',
+  '.tsx',
+  '.css',
+  '.scss',
+  '.html',
+  '.vue',
+  '.svelte',
+  '.glsl',
+  '.shader',
+  '.rb',
+  '.go',
+  '.rs',
+  '.java',
+  '.c',
+  '.cpp',
+  '.h',
+]);
+
+function isTestFile(rel: string): boolean {
+  const base = nodePath.basename(rel).toLowerCase();
+  return (
+    /^(test_.*|.*_test)\.[a-z]+$/.test(base) ||
+    /\.(test|spec)\.[a-z]+$/.test(base) ||
+    rel.toLowerCase().split('/').includes('tests') ||
+    rel.toLowerCase().split('/').includes('test')
+  );
+}
+
+export function orphanReport(cwd: string): string {
+  const files: string[] = [];
+  const walk = (dir: string, prefix: string, depth: number): void => {
+    if (depth > 4 || files.length > 400) return;
+    let entries: import('node:fs').Dirent[] = [];
+    try {
+      entries = readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const e of entries) {
+      if (e.name.startsWith('.') || e.name === 'node_modules') continue;
+      const rel = prefix === '' ? e.name : `${prefix}/${e.name}`;
+      if (e.isDirectory()) walk(nodePath.join(dir, e.name), rel, depth + 1);
+      else files.push(rel);
+    }
+  };
+  walk(cwd, '', 0);
+  if (files.length < 2) return '';
+
+  const text = new Map<string, string>();
+  for (const rel of files) {
+    try {
+      const full = nodePath.join(cwd, rel);
+      if (statSync(full).size > 400_000) continue;
+      text.set(rel, readFileSync(full, 'utf8').toLowerCase());
+    } catch {
+      /* binary or unreadable — it simply cannot mention anything */
+    }
+  }
+
+  const orphans = files.filter((rel) => {
+    const base = nodePath.basename(rel).toLowerCase();
+    if (ENTRY_NAMES.has(base) || isTestFile(rel)) return false;
+    if (!MUST_BE_WIRED.has(nodePath.extname(base))) return false;
+    const stem = base.slice(0, base.length - nodePath.extname(base).length);
+    if (stem.length < 3) return false; // too short to match on without noise
+    for (const [other, body] of text) {
+      if (other === rel) continue;
+      if (body.includes(stem)) return false;
+    }
+    return true;
+  });
+  if (orphans.length === 0) return '';
+
+  return [
+    'NOTHING REFERENCES THESE FILES:',
+    '',
+    ...orphans.slice(0, 8).map((f) => `  ${f}`),
+    ...(orphans.length > 8 ? [`  …and ${orphans.length - 8} more`] : []),
+    '',
+    'I searched every other file in the workspace and none of them mention these',
+    'by name. A file nothing points at never runs, however correct it is — it is',
+    'not part of the product yet. Either wire each one in where it belongs (an',
+    'import, an entry-point setting, a link, a scene reference) or delete it.',
+    'If one is genuinely meant to stand alone, say which and why.',
+  ].join('\n');
+}
+
 export function runtimeCheck(runtime: string | null, cwd: string): string {
   if (runtime !== 'godot') return NO_CHECK;
   /*
@@ -1133,6 +1280,9 @@ export function createMeshAgentHost(config: MeshAgentHostConfig): MeshAgentHost 
                     // Empty when the project has no tests, so a task that never
                     // asked for any is never nagged about them.
                     const tests = testSuiteReport(config.cwd);
+                    // Files nothing points at — see orphanReport. Also silent
+                    // when there is nothing to say.
+                    const orphans = orphanReport(config.cwd);
                     return [
                       finalCheck({
                         claims,
@@ -1150,6 +1300,7 @@ export function createMeshAgentHost(config: MeshAgentHostConfig): MeshAgentHost 
                        * and hand the burden back rather than quietly bless it.
                        */
                       ...(tests !== '' ? [tests, ''] : []),
+                      ...(orphans !== '' ? [orphans, ''] : []),
                       ...(isUncheckable(state)
                         ? [
                             'I COULD NOT CHECK THIS ONE AUTOMATICALLY — there is no runtime',

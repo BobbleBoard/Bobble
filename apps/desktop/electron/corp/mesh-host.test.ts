@@ -20,7 +20,7 @@ import {
   taskNote,
   excerptFailures,
   listProject,
-  emptyProjectComplaint, MESH_ENTRY, isUncheckable, runtimeCheck, testSuiteReport } from './mesh-host';
+  emptyProjectComplaint, MESH_ENTRY, isUncheckable, orphanReport, runtimeCheck, testSuiteReport } from './mesh-host';
 
 describe('what a run hands through to its host', () => {
   it('carries every passthrough setting that was supplied', () => {
@@ -273,6 +273,78 @@ describe('testSuiteReport — a file named test_* with no tests in it', () => {
     const out = testSuiteReport(dir);
     expect(out).toContain('I ran your tests');
     expect(out).not.toContain('THERE ARE NONE');
+  });
+});
+
+describe('orphanReport — written, but nothing can reach it', () => {
+  /*
+   * MEASURED on run 9: `main_scene.tscn` and `main_scene.gd` were written and
+   * announced, and `run/main_scene` was never added to project.godot. A perfect
+   * scene nothing could reach, which surfaced 45 seconds later as a timeout.
+   *
+   * The same shape as test_merger.py (a test file with no test) and a mesh entry
+   * naming a seat that did not exist: registered is not reachable.
+   */
+  const tmp = mkdtempSync(path.join(os.tmpdir(), 'bobble-orphan-'));
+  const mk = (name: string, files: Record<string, string>): string => {
+    const dir = path.join(tmp, name);
+    mkdirSync(dir, { recursive: true });
+    for (const [f, body] of Object.entries(files)) writeFileSync(path.join(dir, f), body);
+    return dir;
+  };
+
+  it('catches the run 9 delivery: a scene no project.godot points at', () => {
+    const dir = mk('godot', {
+      'project.godot': 'config_version=5\n\n[application]\nconfig/name="Godot Test"\n',
+      'main_scene.tscn': '[gd_scene load_steps=2]\n[ext_resource path="res://player.tscn"]\n',
+      'player.tscn': '[gd_scene]\n[ext_resource path="res://player.gd"]\n',
+      'player.gd': 'extends Node2D\n',
+    });
+    const out = orphanReport(dir);
+    expect(out).toContain('NOTHING REFERENCES THESE FILES');
+    expect(out).toContain('main_scene.tscn');
+    // player.gd and player.tscn ARE referenced — they must not be dragged in.
+    expect(out).not.toContain('player.gd');
+    expect(out).not.toContain('player.tscn');
+  });
+
+  it('is SILENT when everything is wired up', () => {
+    const dir = mk('wired', {
+      'project.godot': 'config_version=5\nrun/main_scene="res://main_scene.tscn"\n',
+      'main_scene.tscn': '[gd_scene]\n[ext_resource path="res://player.gd"]\n',
+      'player.gd': 'extends Node2D\n',
+    });
+    expect(orphanReport(dir)).toBe('');
+  });
+
+  it('never flags entry points, tests, or standalone docs', () => {
+    // Nothing references main.py, and nothing is supposed to. pytest finds
+    // test_x.py by NAME, not by reference. A README stands alone by design.
+    const dir = mk('conventions', {
+      'main.py': 'import helper\nhelper.go()\n',
+      'helper.py': 'def go(): pass\n',
+      'test_helper.py': 'def test_go(): pass\n',
+      'README.md': '# notes\n',
+      'data.csv': 'a,b\n1,2\n',
+    });
+    expect(orphanReport(dir)).toBe('');
+  });
+
+  it('catches an unimported python module and an unlinked stylesheet', () => {
+    // The same defect in two ecosystems the Godot check knows nothing about.
+    const dir = mk('mixed', {
+      'main.py': 'print("hi")\n',
+      'utils.py': 'def helper(): pass\n',
+      'index.html': '<html><body>hi</body></html>\n',
+      'styles.css': 'body { color: red }\n',
+    });
+    const out = orphanReport(dir);
+    expect(out).toContain('utils.py');
+    expect(out).toContain('styles.css');
+  });
+
+  it('says nothing about a single-file deliverable', () => {
+    expect(orphanReport(mk('solo', { 'main.py': 'print(1)\n' }))).toBe('');
   });
 });
 
