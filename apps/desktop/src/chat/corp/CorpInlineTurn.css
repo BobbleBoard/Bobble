@@ -240,3 +240,60 @@
   max-width: none;
   padding: 0;
 }
+
+/* the user UI#3: WHAT WAS DELEGATED, shown by default.
+ *
+ * The reference is his own "delegated n tasks" card: the checklist IS the
+ * card's body, not something you unfold to reach. It was already computed
+ * (SituationState.checklist, one row per contract) and only shown to someone
+ * who went looking. The team roster stays behind the expand — WHO is doing the
+ * work is a follow-up to WHAT is being done. */
+.pd-corpturn-checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pd-corpturn-check {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  font-size: var(--pd-font-size-footnote);
+  line-height: var(--pd-leading-footnote);
+  color: var(--pd-text-secondary);
+}
+
+/* A finished row stops competing for attention; the one in flight leads. */
+.pd-corpturn-check[data-state="done"] .pd-corpturn-check-label {
+  color: var(--pd-text-tertiary, var(--pd-text-secondary));
+}
+
+.pd-corpturn-check[data-state="in-progress"] .pd-corpturn-check-label,
+.pd-corpturn-check[data-state="in-review"] .pd-corpturn-check-label {
+  color: var(--pd-text-primary);
+}
+
+.pd-corpturn-check-glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+  /* Optical: line up the glyph with the first line of a wrapping label. */
+  margin-top: 1px;
+  color: var(--pd-text-secondary);
+}
+
+.pd-corpturn-check[data-state="done"] .pd-corpturn-check-glyph {
+  color: var(--pd-accent, var(--pd-text-secondary));
+}
+
+.pd-corpturn-check-label {
+  min-width: 0;
+  /* A contract label is a sentence, not a chip — let it wrap rather than clip. */
+  overflow-wrap: anywhere;
+}

@@ -311,6 +311,39 @@ export function CorpInlineTurn({
           />
         </div>
 
+        {/*
+         * WHAT WAS DELEGATED, BY DEFAULT. the user, scrolling a live run: "as a
+         * user this is the most confusing chat interface i've ever encountered
+         * in my life ... implementing a special UI card for each tool it should
+         * show something like shown in the 'delegated n tasks' checklist ...
+         * that's what should be shown by default at the top level, before the
+         * user has clicked on any subagent."
+         *
+         * The checklist is the ANSWER to "what did it just go and do", and it
+         * was already being computed — `SituationState.checklist`, one row per
+         * contract — and then only shown to someone who went looking for it.
+         * The team roster stays behind the expand, because WHO is doing the
+         * work is a follow-up question to WHAT is being done.
+         */}
+        {state.checklist.length > 0 ? (
+          <ul className="pd-corpturn-checklist" data-testid="corp-inline-checklist">
+            {state.checklist.map((item) => (
+              <li key={item.id} className="pd-corpturn-check" data-state={item.state}>
+                <span className="pd-corpturn-check-glyph" aria-hidden>
+                  {item.state === 'done' ? (
+                    <IconCheck size={11} />
+                  ) : item.state === 'in-progress' || item.state === 'in-review' ? (
+                    <Spinner size={11} />
+                  ) : (
+                    <span className="pd-corpturn-glyph-hollow" />
+                  )}
+                </span>
+                <span className="pd-corpturn-check-label">{item.label}</span>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+
         {expanded ? (
           <ul className="pd-corpturn-rows" data-testid="corp-inline-rows">
             {orderRows(state.chart.nodes).map((node) => {

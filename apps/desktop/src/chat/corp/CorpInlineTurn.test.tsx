@@ -251,9 +251,9 @@ describe('CorpInlineTurn — clicking a row selects that agent', () => {
     await flush();
 
     expect(useChildAgentStore.getState().viewedChildId).toBe('corp:eng-live');
-    expect(container.querySelector('[data-node-id="eng-live"]')?.getAttribute('data-selected')).toBe(
-      'true',
-    );
+    expect(
+      container.querySelector('[data-node-id="eng-live"]')?.getAttribute('data-selected'),
+    ).toBe('true');
 
     // Selecting another moves the selection; it never opens a second viewer.
     await click(container.querySelector('[data-node-id="mgr"]'));
@@ -344,5 +344,62 @@ describe('the summary counts who worked, not who was hired', () => {
           ? `${worked} of a team of ${nodes.length}`
           : `a team of ${nodes.length}`;
     expect(phrase).toBe('3 of a team of 5');
+  });
+});
+
+describe('CorpInlineTurn — the delegated checklist is the default view', () => {
+  /*
+   * the user, scrolling a live run: "as a user this is the most confusing chat
+   * interface i've ever encountered in my life ... a special UI card for each
+   * tool ... that's what should be shown by default at the top level, before the
+   * user has clicked on any subagent."
+   *
+   * The checklist answers "what did it just go and do". It was already being
+   * computed and then shown only to someone who expanded the card.
+   */
+  const withChecklist: SituationState = {
+    ...RUNNING_STATE,
+    checklist: [
+      { id: 'c1', label: 'Build the data engine', state: 'done' },
+      { id: 'c2', label: 'Build the dashboard UI', state: 'in-progress' },
+      { id: 'c3', label: 'Package it for the desktop', state: 'queued' },
+    ],
+  };
+
+  it('renders every contract WITHOUT expanding anything', async () => {
+    const { container, unmount } = await render(
+      <CorpInlineTurn taskId="t1" state={withChecklist} peekAvailable={false} />,
+    );
+    // No click: this is the default state.
+    expect(container.querySelectorAll('[data-testid="corp-inline-checklist"] li')).toHaveLength(3);
+    expect(container.textContent).toContain('Build the data engine');
+    expect(container.textContent).toContain('Package it for the desktop');
+    // The roster stays behind the expand — who is a follow-up to what.
+    expect(container.querySelectorAll('[data-testid="corp-inline-rows"]')).toHaveLength(0);
+    await unmount();
+  });
+
+  it('marks each row with its real contract state', async () => {
+    const { container, unmount } = await render(
+      <CorpInlineTurn taskId="t1" state={withChecklist} peekAvailable={false} />,
+    );
+    const states = [...container.querySelectorAll('[data-testid="corp-inline-checklist"] li')].map(
+      (li) => li.getAttribute('data-state'),
+    );
+    expect(states).toEqual(['done', 'in-progress', 'queued']);
+    await unmount();
+  });
+
+  it('says nothing when there are no contracts to show', async () => {
+    // A run that has not split any work yet must not render an empty card.
+    const { container, unmount } = await render(
+      <CorpInlineTurn
+        taskId="t1"
+        state={{ ...RUNNING_STATE, checklist: [] }}
+        peekAvailable={false}
+      />,
+    );
+    expect(container.querySelectorAll('[data-testid="corp-inline-checklist"]')).toHaveLength(0);
+    await unmount();
   });
 });
