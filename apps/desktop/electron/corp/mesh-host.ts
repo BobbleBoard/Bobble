@@ -1275,8 +1275,18 @@ export function createMeshAgentHost(config: MeshAgentHostConfig): MeshAgentHost 
                         'what exists and what it does.'
                       );
                     }
-                    if (claims.length === 0) return undefined;
-                    log.info('corp bump: final check', { agentId, claims: claims.length });
+                    /*
+                     * GATHER THE EVIDENCE BEFORE DECIDING THERE IS NOTHING TO SAY.
+                     *
+                     * This used to `return undefined` right here whenever the
+                     * agent made no extractable claim, which put every check
+                     * below it — the suite, the orphans, the auditor — behind the
+                     * implementer's own choice of words. An audit that only
+                     * happens when the builder asserted something is an audit the
+                     * builder controls, which is the exact coupling the blind
+                     * critic exists to remove. The checks run either way now, and
+                     * we stop only when NOBODY has anything to report.
+                     */
                     // The harness runs the suite itself — see testSuiteReport.
                     // Empty when the project has no tests, so a task that never
                     // asked for any is never nagged about them.
@@ -1307,14 +1317,30 @@ export function createMeshAgentHost(config: MeshAgentHostConfig): MeshAgentHost 
                           task: config.task ?? '',
                         })
                       : '';
+                    // Nobody has anything to report — no claims to discharge, no
+                    // suite, no orphans, no auditor. Stop, as before.
+                    if (claims.length === 0 && tests === '' && orphans === '' && critic === '') {
+                      return undefined;
+                    }
+                    log.info('corp bump: final check', {
+                      agentId,
+                      claims: claims.length,
+                      critic: critic !== '',
+                    });
                     return [
-                      finalCheck({
-                        claims,
-                        profile: contractProfile.get(agentId) ?? taskProfileRef.value,
-                        perspective: agent.role === 'ceo' ? 'ceo' : 'manager',
-                        ...(config.task !== undefined ? { vision: config.task } : {}),
-                      }),
-                      '',
+                      // No claims means nothing to quote back; the evidence below
+                      // still stands on its own.
+                      ...(claims.length > 0
+                        ? [
+                            finalCheck({
+                              claims,
+                              profile: contractProfile.get(agentId) ?? taskProfileRef.value,
+                              perspective: agent.role === 'ceo' ? 'ceo' : 'manager',
+                              ...(config.task !== undefined ? { vision: config.task } : {}),
+                            }),
+                            '',
+                          ]
+                        : []),
                       /*
                        * SAY WHICH OF THE TWO THIS IS. The clean branch told every
                        * role "It loads." — including when no check had run at
