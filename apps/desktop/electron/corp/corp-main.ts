@@ -17,6 +17,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import { ensureTimeoutShim } from './timeout-shim';
+import { currentWorkspaceDir } from '../project/project-main';
 import { resolveProjectDir } from '../workspace/project-dir';
 import { deliveryFromTask } from './workspace-paths';
 import path from 'node:path';
@@ -537,7 +538,22 @@ export async function runCorpForBridge(
   }
   let started: { taskId: string };
   try {
-    started = await handleStart(wc, { prompt: task, effort: 'max' });
+    /*
+     * THE CHAT'S WORKSPACE, not a fresh resolution.
+     *
+     * This path — the CEO's blocking `talk_to_manager` — is how a corporation
+     * actually starts, and it passed no ctx at all. So handleStart fell back to
+     * `'new chat'` and the team worked in ~/Bobble/new-chat while the chat had
+     * already renamed itself from its first message. MEASURED twice: two folders
+     * for one conversation, the work split. Fixing the renderer's startCorpTask
+     * was not enough, because the renderer is not the caller here.
+     */
+    const workspace = currentWorkspaceDir();
+    started = await handleStart(wc, {
+      prompt: task,
+      effort: 'max',
+      ...(workspace !== null ? { ctx: { cwd: workspace } } : {}),
+    });
   } catch (err) {
     return { ok: false, product: '', error: err instanceof Error ? err.message : String(err) };
   }
