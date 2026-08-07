@@ -844,6 +844,20 @@ export async function applyWorkspace(dir: string): Promise<void> {
  * (it owns the filesystem); the harness is then told, and every tool picks it up
  * on its next call.
  */
+/**
+ * The workspace this chat resolved to, remembered so NOBODY re-resolves it.
+ *
+ * The corp used to call resolveProjectDir itself with `windowTitle ?? 'new chat'`
+ * — and the title does not exist yet — so it landed in `~/Bobble/new-chat` while
+ * the chat, naming from the first message, landed in
+ * `~/Bobble/ask-the-manager-to-research-how`. TWO folders for one chat, with the
+ * work split between them. One resolution, one answer, shared.
+ */
+let currentWorkspace: string | null = null;
+export function resolvedWorkspace(): string | null {
+  return currentWorkspace;
+}
+
 export async function syncWorkspace(opts: {
   selected: string | null;
   conversationName: string;
@@ -862,7 +876,10 @@ export async function syncWorkspace(opts: {
     })
     .catch(() => null);
   const dir = res?.path ?? null;
-  if (dir !== null) await applyWorkspace(dir);
+  if (dir !== null) {
+    currentWorkspace = dir;
+    await applyWorkspace(dir);
+  }
   return dir;
 }
 

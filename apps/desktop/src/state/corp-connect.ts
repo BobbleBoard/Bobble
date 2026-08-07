@@ -18,7 +18,7 @@ import type {
   WorkerTranscriptView,
 } from '@pi-desktop/coordination';
 import { resolveEffort } from './model-selection';
-import { conversationId as piConversationId } from './pi-connect';
+import { conversationId as piConversationId, resolvedWorkspace } from './pi-connect';
 import { usePiStore } from './pi-slice';
 import { useProjectStore } from './project-store';
 import { useSettingsStore } from './settings-store';
@@ -132,7 +132,15 @@ export async function startCorpTask(prompt: string, ctx?: TaskContext): Promise<
    * into ~/Bobble/<conversation name> — named, so the user can find it in Finder
    * instead of hunting an opaque sandbox id.
    */
-  const activePath = useProjectStore.getState().activePath;
+  /*
+   * USE THE WORKSPACE THE CHAT ALREADY RESOLVED. Re-resolving here produced a
+   * SECOND folder: the corp had only `windowTitle` (absent on a first turn) so it
+   * chose `~/Bobble/new-chat`, while the chat had already named itself from the
+   * first message. One chat, two directories, work split across them. MEASURED
+   * live: `new-chat/.scratch` alongside `ask-the-manager-to-research-how/`.
+   */
+  const resolved = resolvedWorkspace();
+  const activePath = resolved ?? useProjectStore.getState().activePath;
   const conversationName = usePiStore.getState().windowTitle ?? 'new chat';
   const withCwd: TaskContext = {
     ...(ctx ?? {}),
