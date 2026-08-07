@@ -153,9 +153,21 @@ export function registerAdvancedParamsHook(
         // reproducer for "does the model know only its initial tools?". Set
         // PI_ADV_DEBUG_TOOLS to a file path to capture it per request.
         const cwdLine = gt.systemPrompt.match(/Current working directory: (.+)/)?.[1] ?? '?';
+        /*
+         * IS THE TEAM FRAMING ACTUALLY THERE? The tool being advertised and the
+         * instructions for it being present are two different things, and they
+         * have already come apart once: two max-effort runs carried a prompt
+         * byte-identical to a default-effort one, with the TEAM section nowhere
+         * in it, so the CEO kept building alone. `syncTeamPrompt` fixes that —
+         * but "the tool is in the list" was never evidence for it, and this line
+         * existed while that bug was live and could not have caught it.
+         * Literal rather than an import: this is a diagnostic in the provider
+         * package, and it must not create a dependency on the harness.
+         */
+        const team = gt.systemPrompt.includes('You lead a TEAM');
         appendFileSync(
           dbg,
-          `cwd=${cwdLine} tools[${names.length}] sysPromptChars=${gt.systemPrompt.length}: ${names.join(', ')}\n`,
+          `cwd=${cwdLine} team=${team} tools[${names.length}] sysPromptChars=${gt.systemPrompt.length}: ${names.join(', ')}\n`,
         );
       } catch {
         // never break a turn for a diagnostic write.
