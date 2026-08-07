@@ -384,15 +384,23 @@ button.pd-chain-step-row:hover .pd-chain-step-chevron {
  * the natural way to type one), so this is the common case, not the edge one.
  * Tighten it HERE rather than in prose.css: a thought is a dense aside, and the
  * same spacing that reads as generous in a reply reads as broken in one. */
-.pd-chain-thought .pd-markdown li > p {
+/* SPECIFICITY, measured rather than assumed. The first version of these rules
+ * lost outright: the flavor's `:root[data-flavor="x"] .pd-prose li + li` scores
+ * (0,3,3) and a plain `.pd-chain-thought .pd-markdown li + li` only (0,2,2), so
+ * the 10px item gap survived and this did nothing. Driving a real turn and
+ * measuring the rendered gap is what caught it — it read 20px, which is neither
+ * the 2px intended here nor a value anyone chose. Anchoring on
+ * `:root[data-flavor]` takes it to (0,4,2), above every flavor rule, and keeps
+ * it scoped to thoughts. */
+:root[data-flavor] .pd-chain-thought .pd-markdown li > p {
   margin: 0;
 }
 
-.pd-chain-thought .pd-markdown li + li {
+:root[data-flavor] .pd-chain-thought .pd-markdown li + li {
   margin-top: 2px;
 }
 
-.pd-chain-thought .pd-markdown :is(ul, ol) {
+:root[data-flavor] .pd-chain-thought .pd-markdown :is(ul, ol) {
   margin-bottom: 6px;
 }
 
