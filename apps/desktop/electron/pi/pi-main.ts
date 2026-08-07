@@ -23,6 +23,7 @@ import {
 } from '../inference/llm-main';
 import type { AppEventMap } from '../ipc-contract';
 import { activeProjectPath } from '../project/project-main';
+import { currentWorkspaceDir } from '../project/project-main';
 import { resolveSessionCwd } from '../sandbox';
 import { advancedSamplingFilePath, generationExperimentEnabled } from '../settings/settings-main';
 import { isTrustedIpcEvent } from '../trusted-senders';
@@ -207,7 +208,15 @@ function createChildBridge(
   opts: { cwd?: string; specialist?: string },
   onEvent: (event: PiBridgeEvent) => void,
 ): PiBridge {
-  const cwd = resolveSessionCwd({ cwd: opts.cwd ?? activeProjectPath() ?? undefined });
+  /*
+   * A CHILD INHERITS THE CHAT'S WORKSPACE. Without `currentWorkspaceDir()` this
+   * had no cwd and no conversationId whenever no project was selected, so every
+   * subagent and corp role landed in the shared sandbox `default` — a different
+   * directory from the chat that spawned it.
+   */
+  const cwd = resolveSessionCwd({
+    cwd: opts.cwd ?? currentWorkspaceDir() ?? activeProjectPath() ?? undefined,
+  });
   return new PiBridge(
     {
       cwd,

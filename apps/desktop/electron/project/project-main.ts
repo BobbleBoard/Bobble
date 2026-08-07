@@ -16,6 +16,23 @@ import type { ProjectEntry, ProjectInvokeMap } from './project-contract';
 
 const log = createLogger('desktop:project');
 
+/**
+ * THE workspace this window last resolved — so a pi instance spawned later
+ * inherits it.
+ *
+ * MEASURED: `createChildBridge` (subagents and corp roles) passed no
+ * conversationId and, with no project selected, no cwd either — so every child
+ * fell through to the SHARED `~/.pi/desktop/sandbox/default`. A role would then
+ * be working in a different directory from the chat that created it, which is
+ * the one thing the workspace rule exists to prevent. the user: the workspace covers
+ * "all the model's write commands, terminal python etc ... including engineers
+ * and subagents".
+ */
+let lastResolvedWorkspace: string | null = null;
+export function currentWorkspaceDir(): string | null {
+  return lastResolvedWorkspace;
+}
+
 const HOME = os.homedir();
 const PROJECTS_PATH = path.join(HOME, '.pi', 'desktop', 'projects.json');
 
@@ -138,6 +155,9 @@ const handlers: IpcHandlers<ProjectInvokeMap> = {
    * before any tool resolves a relative path against it.
    */
   'project:resolve-workspace': (req) => {
+    // Remembered for every pi instance main spawns LATER — subagents and corp
+    // roles included. See `currentWorkspaceDir`.
+
     const path = resolveProjectDir(
       req.selected,
       req.conversationName,
@@ -146,6 +166,7 @@ const handlers: IpcHandlers<ProjectInvokeMap> = {
     );
     // TRACKABILITY: "where did the files go" has cost more runs than any other
     // question here. Say the answer, and what decided it, every time.
+    lastResolvedWorkspace = path;
     log.info('workspace resolved', {
       path,
       from: req.selected ? 'project-dropdown' : 'bobble-default',
