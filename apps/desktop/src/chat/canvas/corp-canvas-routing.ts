@@ -27,6 +27,8 @@ import type { CanvasController, CanvasTabSpec } from '@pi-desktop/canvas';
 import type { OrgNodeView } from '@pi-desktop/coordination';
 import { useEffect, useRef } from 'react';
 import { useCanvasStore } from '../../state/canvas-store';
+import { useChildAgentStore } from '../../state/child-agent-store';
+import { CORP_CHILD_PREFIX } from '../../state/corp-child-bridge';
 import { type CorpBlock, useCorpStore } from '../../state/corp-store';
 import { corpFileBaseName, corpHtmlArtifact } from '../corp/corp-file-canvas';
 import { corpBashSteps, currentCorpFile, isHtmlPath } from '../corp/corp-file-content';
@@ -69,7 +71,9 @@ export function activitySpec(blocks: readonly CorpBlock[]): CanvasTabSpec | unde
     // Everything the agent has run, in one mirror — the shell it would have if
     // you were sitting next to it, not one terminal per command.
     const mirrorText = bash
-      .map((s, i) => mirrorCommandText(s.command, s.output, i === bash.length - 1 && s.output === ''))
+      .map((s, i) =>
+        mirrorCommandText(s.command, s.output, i === bash.length - 1 && s.output === ''),
+      )
       .join('\n');
     return {
       kind: 'terminal',
@@ -170,6 +174,31 @@ export function useCorpCanvasRouting(controller: CanvasController): void {
   const shownId = useCorpStore((s) => s.pinnedNode?.id);
   const nodeCount = useCorpStore((s) => s.situation?.chart.nodes.length ?? 0);
 
+  /*
+   * the user UI#5: THE ACTIVITY TAB FOLLOWS THE SELECTION, WHEREVER IT WAS MADE.
+   *
+   * The tab tracks `pinnedNode` in the corp store, but selecting an agent from
+   * the sidebar sets `viewedChildId` in the CHILD store and nothing else — so
+   * you would open Engineer 1 as a chat and the activity tab would carry on
+   * showing whichever node had last been clicked in the situation room. the user:
+   * "clicking the left sidebar chat/subchat should have the agent activity tab
+   * always turn straight to whatever it's supposed to be, corresponding agent."
+   *
+   * Mirrored HERE rather than in the child store, which must not import the corp
+   * store. Set directly instead of through `selectNode`, which TOGGLES — routing
+   * a selection through a toggle would unpin the very node just chosen.
+   */
+  const viewedChildId = useChildAgentStore((s) => s.viewedChildId);
+  const chartNodes = useCorpStore((s) => s.situation?.chart.nodes);
+  useEffect(() => {
+    if (viewedChildId === null || !viewedChildId.startsWith(CORP_CHILD_PREFIX)) return;
+    const nodeId = viewedChildId.slice(CORP_CHILD_PREFIX.length);
+    const node = chartNodes?.find((n) => n.id === nodeId);
+    if (node === undefined) return;
+    if (useCorpStore.getState().pinnedNode?.id === node.id) return;
+    useCorpStore.setState({ pinnedNode: node });
+  }, [viewedChildId, chartNodes]);
+
   // The activity tab is opened ONCE per run and then updated in place. A key in
   // `closedByUser` was deliberately dismissed and is never reopened — the point
   // of a background surface is that dismissing it means something.
@@ -221,7 +250,10 @@ export function useCorpCanvasRouting(controller: CanvasController): void {
     if (spec.streaming !== undefined && existing.streaming !== spec.streaming) {
       patch.streaming = spec.streaming;
     }
-    if (spec.artifact !== undefined && existing.artifact?.content.text !== spec.artifact.content.text) {
+    if (
+      spec.artifact !== undefined &&
+      existing.artifact?.content.text !== spec.artifact.content.text
+    ) {
       patch.artifact = spec.artifact;
     }
     if (spec.data !== undefined && existing.data?.mirrorText !== spec.data.mirrorText) {

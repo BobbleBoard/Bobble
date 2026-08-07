@@ -26,7 +26,12 @@ import { type CorpBlock, useCorpStore } from './corp-store';
 
 /** A corp role's child id. Namespaced so it can never collide with a real
  * subagent's id, and so the corp rows can be recognised for cleanup. */
-export const corpChildId = (nodeId: string): string => `corp:${nodeId}`;
+/** The one prefix that ties a corp node to its mirrored child chat. Exported so
+ * the canvas router can read a selection back the other way without re-deriving
+ * the convention. */
+export const CORP_CHILD_PREFIX = 'corp:';
+
+export const corpChildId = (nodeId: string): string => `${CORP_CHILD_PREFIX}${nodeId}`;
 
 /**
  * One role's accumulated blocks → the single streaming assistant turn the child
