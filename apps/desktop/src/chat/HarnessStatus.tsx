@@ -62,8 +62,10 @@ function ProcessingRing({
   elapsedMs?: number;
 }): ReactElement {
   const value = percent === null ? 0 : Math.min(1, Math.max(0, percent / 100));
-  const base = percent === null ? label.toLowerCase() : `${Math.round(percent)}% ${label.toLowerCase()}`;
-  const timer = elapsedMs !== undefined && elapsedMs >= 100 ? ` · ${(elapsedMs / 1000).toFixed(1)}s` : '';
+  const base =
+    percent === null ? label.toLowerCase() : `${Math.round(percent)}% ${label.toLowerCase()}`;
+  const timer =
+    elapsedMs !== undefined && elapsedMs >= 100 ? ` · ${(elapsedMs / 1000).toFixed(1)}s` : '';
   const text = `${base}${timer}`;
   return (
     <div
@@ -106,9 +108,7 @@ export function ThreadStatusIndicator(): ReactElement | null {
   // instant a token lands (the block gains content) OR the turn ends (the message
   // stops streaming), so — unlike keying off `isStreaming`, which stays true
   // through an ask_user pause or a long multi-step turn — it can never stick.
-  const streamingAssistant = messages.find(
-    (m) => m.kind === 'assistant' && m.isStreaming === true,
-  );
+  const streamingAssistant = messages.find((m) => m.kind === 'assistant' && m.isStreaming === true);
   const hasContent = (m: (typeof messages)[number]): boolean =>
     m.kind === 'assistant' &&
     m.blocks.some((b) =>

@@ -226,34 +226,19 @@ export function stripToolCatalog(base: string): string {
  * Gated with the team section: it names a manager, and prose about a tool the
  * model does not have is the phantom-tool failure this file exists to prevent.
  */
-export const DECIDE_FIRST_PROMPT = `You are working at HIGH/MAXIMUM effort, and two things follow from that.
 
-FIRST, YOU HAVE A TEAM. \`talk_to_manager\` outsources a large task to a manager who has a dedicated team of engineers on standby. Think of anything reasonably project-sized that could be broken down — anything decomposable, anything that benefits from several people working at once — and give it to the manager. Do NOT use it for something you can quickly do yourself, or for a linear task that cannot be parallelised. Make this decision explicitly before you begin, and say which you chose: a single pass yourself, or a project for the team. Deciding by default — just starting — is how a project gets built badly by one person.
-
-SECOND, VERIFY BEFORE YOU SUBMIT. Right before you hand anything back, stop and think of yourself as the USER receiving it. Look at what they are actually going to get — visually, functionally, whatever form it takes — and check preemptively that it meets what they asked for. At this effort level that check is not optional; it is the difference between finishing and merely stopping.`;
-
-/** Marker used to tell whether a cached prompt already carries the team section. */
+/** Retained so an older cached prompt can still be recognised; nothing writes it. */
 export const TEAM_PROMPT_MARKER = 'You lead a TEAM';
 
-export const TEAM_PROMPT = `You lead a TEAM, and for a big build you should use it.
-
-\`talk_to_manager\` hands the work to a manager who splits it across their engineers, runs it, checks it, and delivers the finished product back to you for review. Send them a message saying what you want built — in full, including how it should look and feel, because they have not spoken to the user and know only what you tell them. You do not design the team or the divisions; splitting the work is the manager's job.
-
-Reach for it when the work has real parts to it — several files or components that different people could build at once, or anything that would take you many turns alone. Do NOT reach for it for a question, a single file, a quick edit, or anything you can finish well yourself in one pass; convening a team for those is slower and worse.
-
-Building a large project alone is the more expensive mistake, and the easier one to make, because it does not feel like a mistake while you are doing it — you are busy the whole time.`;
+/** The half of the old team section worth keeping, now unconditional. */
+export const VERIFY_PROMPT = `VERIFY BEFORE YOU SUBMIT. Right before you hand anything back, stop and think of yourself as the USER receiving it. Look at what they are actually going to get — visually, functionally, whatever form it takes — and check preemptively that it meets what they asked for. That check is not optional; it is the difference between finishing and merely stopping.`;
 
 export function augmentSystemPrompt(
   base: string | undefined,
-  opts: { team?: boolean } = {},
+  _opts: { team?: boolean } = {},
 ): string {
   const trimmed = stripToolCatalog((base ?? '').trim());
-  // The decision goes FIRST and the team detail LAST — measured better than
-  // either alone, and better than repeating it (see DECIDE_FIRST_PROMPT).
-  const section =
-    opts.team === true
-      ? `${DECIDE_FIRST_PROMPT}\n\n${CAPABILITY_PROMPT}\n\n${TEAM_PROMPT}`
-      : CAPABILITY_PROMPT;
+  const section = `${CAPABILITY_PROMPT}\n\n${VERIFY_PROMPT}`;
   if (trimmed.includes(CAPABILITY_PROMPT_MARKER)) return trimmed;
   if (trimmed.length === 0) return section;
   return `${trimmed}\n\n${section}`;

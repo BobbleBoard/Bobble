@@ -7,7 +7,7 @@
  * — the model itself decides scope, the harness never guesses. This module ships
  * the three pure pieces that seam needs:
  *
- *  - {@link PROMOTION_SYSTEM_PROMPT} — the minimal system prompt that tells the
+ *  - the tool DESCRIPTION, which is where the model learns when to use it (there
  *    solo worker when to just do the work vs. when to promote.
  *  - {@link CREATE_PRODUCTION_HIERARCHY_TOOL} — the OpenAI-compatible function
  *    schema the worker calls to promote, naming the divisions it would set up.
@@ -56,13 +56,17 @@ export const TALK_TO_MANAGER = 'talk_to_manager';
 /** Back-compat alias — the host, the corp run and the effort gate key off this. */
 export const CREATE_PRODUCTION_HIERARCHY = TALK_TO_MANAGER;
 
-export const PROMOTION_SYSTEM_PROMPT = `You are the CEO, and you have just formed the vision. Now you decide HOW it gets built. You do NOT build it yourself — you hand it to your MANAGER by calling ${TALK_TO_MANAGER}.
-
-If the task is genuinely small enough to finish well in ONE focused pass, just do it. But for anything larger or multi-part — which is most real projects — ${TALK_TO_MANAGER} and tell them what you want built. Say it in your own words, in full: they have not spoken to the user and know only what you tell them, so include how it should look and feel, not just what it must do. You do NOT need to design divisions or an org chart — splitting the work across their engineers is the manager's own first job, and they do it better with the whole vision in hand.
-
-The manager is your partner and is very capable — they and their team handle all the technical implementation, so you are free to focus on the USER and the highest level of abstraction, and to keep the user informed about what is going on. This is a conversation, not a hand-off: talk to them again any time to ask how something works, check progress, change direction, or commission more.
-
-Understand this so you are never confused: delegating IS how the user's request gets fulfilled — it is NOT leaving the work undone. Once the manager owns the build, do not try to build it yourself in parallel.`;
+/**
+ * REMOVED: there is no promotion system prompt any more.
+ *
+ * the user: "what's 'promotion system prompt' supposed to be... let's remove that,
+ * max effort just adds this talk to manager tool" — and the wording he wrote
+ * lives on the TOOL DESCRIPTION, which is where a model actually reads when and
+ * how to use a tool. A second prompt telling it to be a CEO only made
+ * delegating an identity instead of a choice.
+ *
+ * Max effort now means exactly one thing: the tool is in the list.
+ */
 
 /**
  * The system prompt for the SOLO EXECUTION turn — the two lower effort levels, where
@@ -98,15 +102,26 @@ export const CREATE_PRODUCTION_HIERARCHY_TOOL: OpenAiFunctionTool = {
   type: 'function',
   function: {
     name: CREATE_PRODUCTION_HIERARCHY,
+    /*
+     * the user's wording, verbatim — he wrote it and asked for it unedited.
+     *
+     * This is the TOOL DESCRIPTION, which is the only place it needs to live:
+     * the tool is simply added to the list at high/max effort, so the
+     * description IS how the model learns when and how to use it. There is no
+     * separate prompt telling it who to be.
+     */
     description:
-      'Hand this build to your MANAGER. Send them what you want made, in your own words, and ' +
-      'they take it from there — they split the work across their engineers, run it, check it, ' +
-      'and deliver the finished product back to you for review. This is a conversation, not a ' +
-      'form: you can talk to them again at any time to change direction, ask how something ' +
-      'works, or commission more. Use it for a large or multi-part build rather than attempting ' +
-      'it alone; for a question, a quick edit, or a single file, just do it yourself. Give them ' +
-      'the FULL vision, including anything the user said about how it should look or feel — ' +
-      'they have not spoken to the user and only know what you tell them.',
+      "now that you're in max effort mode you are now connected to a manager, the manager is a " +
+      'powerful coordinator that has a team of workers at their disposal to help you achieve ' +
+      'large projects/goals, if you have something large, that could benefit from handing off ' +
+      'and allow you to handle the user requests at a higher level of abstraction, please ' +
+      "utilize this tool, this should be for anything large, it's really simple to use, you " +
+      'just tell the manager what you want, a spec maybe, or simply the vision you want ' +
+      "fufilled, and you'll get back a fully made product, you should then focus on testing " +
+      "this product and iterating with the manager until you have fufilled the user's large " +
+      'request. anything *genuinely* quick you are still free to do without this tool though. ' +
+      "start by asking yourself at each turn, 'genuinely quick or should I call in the " +
+      "manager?'.",
     parameters: {
       type: 'object',
       properties: {

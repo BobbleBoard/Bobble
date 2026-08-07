@@ -28,9 +28,11 @@ describe('a mirror only ever grows', () => {
     // Distinct from "still going" — the corp's old copy reported every quiet
     // mkdir as running forever.
     expect(mirrorCommandText('mkdir -p out', '', false)).toBe('$ mkdir -p out\n\n(no output)\n');
-    expect(mirrorCommandText('mkdir -p out', '', false).startsWith(
-      mirrorCommandText('mkdir -p out', '', true),
-    )).toBe(true);
+    expect(
+      mirrorCommandText('mkdir -p out', '', false).startsWith(
+        mirrorCommandText('mkdir -p out', '', true),
+      ),
+    ).toBe(true);
   });
 
   it('a second command extends the transcript rather than replacing it', () => {

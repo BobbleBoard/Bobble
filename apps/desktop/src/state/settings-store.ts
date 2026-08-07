@@ -134,13 +134,23 @@ export const useSettingsStore = create<SettingsStoreState>((set, get) => ({
     applyIconStroke(settings.iconStroke);
     applyUiScales(settings);
 
-    // Harness picks up permission/effort only via its slash commands — fire the
-    // ones that actually changed (best-effort; a no-pi session just no-ops).
+    /*
+     * Harness picks up permission/effort only via its slash commands — fire the
+     * ones that actually changed (best-effort; a no-pi session just no-ops).
+     *
+     * AWAITED. This was fire-and-forget, which is fine for a settings toggle the
+     * user flips between turns but wrong for Adaptive, which resolves the effort
+     * for the very message about to be sent: the harness decides the advertised
+     * tool set from the effort it holds when the prompt arrives, so a racing push
+     * means the turn that asked for a team is the one that can't have one.
+     * `applyHarnessConfig` swallows its own errors, so awaiting cannot fail a
+     * settings write.
+     */
     const harness: Parameters<typeof applyHarnessConfig>[0] = {};
     if (patch.permissionMode !== undefined) harness.permissionMode = settings.permissionMode;
     if (patch.effort !== undefined) harness.effort = settings.effort;
     if (harness.permissionMode !== undefined || harness.effort !== undefined) {
-      void applyHarnessConfig(harness);
+      await applyHarnessConfig(harness);
     }
   },
 

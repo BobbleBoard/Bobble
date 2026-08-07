@@ -3,10 +3,9 @@ import {
   augmentSystemPrompt,
   CAPABILITY_PROMPT,
   CAPABILITY_PROMPT_MARKER,
-  DECIDE_FIRST_PROMPT,
   stripToolCatalog,
-  TEAM_PROMPT,
   TEAM_PROMPT_MARKER,
+  VERIFY_PROMPT,
 } from './capability-prompt.js';
 
 // pi's default base prompt shape (abbreviated): a full-registry tool catalog
@@ -60,9 +59,9 @@ describe('augmentSystemPrompt', () => {
   });
 
   it('returns the capability section alone for an empty/whitespace base', () => {
-    expect(augmentSystemPrompt('')).toBe(CAPABILITY_PROMPT);
-    expect(augmentSystemPrompt('   \n  ')).toBe(CAPABILITY_PROMPT);
-    expect(augmentSystemPrompt(undefined)).toBe(CAPABILITY_PROMPT);
+    expect(augmentSystemPrompt('')).toBe(`${CAPABILITY_PROMPT}\n\n${VERIFY_PROMPT}`);
+    expect(augmentSystemPrompt('   \n  ')).toBe(`${CAPABILITY_PROMPT}\n\n${VERIFY_PROMPT}`);
+    expect(augmentSystemPrompt(undefined)).toBe(`${CAPABILITY_PROMPT}\n\n${VERIFY_PROMPT}`);
   });
 
   it('is idempotent — a base already carrying the marker is not doubled', () => {
@@ -258,35 +257,6 @@ describe('multi-step and destructive work leave a trail', () => {
  * JSON description among sixteen. Measured: a max-effort platformer request with
  * the tool advertised produced 8 and then 78 solo turns and zero delegation.
  */
-describe('the team section', () => {
-  it('is absent when the delegation tool is not advertised', () => {
-    const out = augmentSystemPrompt('Base.', {});
-    expect(out).not.toMatch(/talk_to_manager/);
-    // Naming an unadvertised tool is the phantom-tool failure this file exists to
-    // prevent — the grammar would land a bid for it on the nearest real name.
-    expect(out).not.toMatch(/You lead a TEAM/);
-  });
-
-  it('appears when it is', () => {
-    const out = augmentSystemPrompt('Base.', { team: true });
-    expect(out).toMatch(/You lead a TEAM/);
-    expect(out).toMatch(/talk_to_manager/);
-  });
-
-  it('says the CEO does not design the team', () => {
-    expect(TEAM_PROMPT).toMatch(/You do not design the team or the divisions/);
-  });
-
-  it('names both mistakes, not just the over-delegation one', () => {
-    expect(TEAM_PROMPT).toMatch(/Do NOT reach for it for a question, a single file/);
-    expect(TEAM_PROMPT).toMatch(/Building a large project alone is the more expensive mistake/);
-  });
-
-  it('keeps the capability section either way', () => {
-    expect(augmentSystemPrompt('Base.', { team: true })).toContain(CAPABILITY_PROMPT_MARKER);
-    expect(augmentSystemPrompt('Base.', {})).toContain(CAPABILITY_PROMPT_MARKER);
-  });
-});
 
 /*
  * THE PROMPT MUST NOT ARGUE WITH ITSELF.
@@ -306,47 +276,32 @@ describe('delegation is not forbidden by the do-the-task clause', () => {
     expect(CAPABILITY_PROMPT).toContain('never hand it back TO THE USER');
   });
 
-  it('says using the team still counts as doing it', () => {
-    expect(CAPABILITY_PROMPT).toMatch(/Getting it built by your own team counts as doing it/);
-  });
-
   it('no longer tells the model to build every artifact itself', () => {
     expect(CAPABILITY_PROMPT).not.toMatch(/BUILD it and put it in place yourself/);
   });
 });
 
-describe('the delegation decision is made explicitly', () => {
-  it('puts the decision first and the team detail last', () => {
-    const out = augmentSystemPrompt('Base.', { team: true });
-    expect(out.indexOf(DECIDE_FIRST_PROMPT)).toBeLessThan(out.indexOf(TEAM_PROMPT_MARKER));
-    // Measured: the clause at top AND bottom scored WORSE (2/5 vs 3/5).
-    expect(out.split('Deciding by default').length - 1).toBe(1);
+describe('the verification bar, now unconditional', () => {
+  /*
+   * REPLACES 'the delegation decision is made explicitly', which pinned
+   * DECIDE_FIRST_PROMPT — the effort-gated block that also carried the team
+   * framing. The delegation guidance moved to the tool description (the user's
+   * wording); the verify half stayed, and stopped being conditional, because
+   * checking your work before handing it over should not switch off at lower
+   * effort — and a prompt that never changes is the point.
+   */
+  it('asks for a verify-as-the-user pass before submitting', () => {
+    expect(VERIFY_PROMPT).toContain('think of yourself as the USER receiving it');
+    expect(VERIFY_PROMPT).toContain('not optional');
   });
 
-  it('is absent without a team, like everything else that names the manager', () => {
-    expect(augmentSystemPrompt('Base.', {})).not.toContain('hand it to your manager');
+  it('is present at every effort', () => {
+    expect(augmentSystemPrompt('Base.')).toContain(VERIFY_PROMPT);
+    expect(augmentSystemPrompt('Base.', { team: true })).toContain(VERIFY_PROMPT);
   });
 
-  it('asks for the choice to be stated, not just made', () => {
-    expect(DECIDE_FIRST_PROMPT).toMatch(/say which you chose/);
-  });
-
-  it('names the effort level, so the standard is explicit', () => {
-    expect(DECIDE_FIRST_PROMPT).toMatch(/HIGH\/MAXIMUM effort/);
-  });
-
-  it('rules out the linear and the trivial, not just ruling delegation in', () => {
-    expect(DECIDE_FIRST_PROMPT).toMatch(/quickly do yourself/);
-    expect(DECIDE_FIRST_PROMPT).toMatch(/cannot be parallelised/);
-  });
-
-  /* The doc's top open item: nothing structurally prompted verification, so a
-   * Godot project was written and never opened. At high effort it is required. */
-  it('requires a verify-as-the-user pass before submitting', () => {
-    expect(DECIDE_FIRST_PROMPT).toMatch(/VERIFY BEFORE YOU SUBMIT/);
-    expect(DECIDE_FIRST_PROMPT).toMatch(/think of yourself as the USER/);
-    expect(DECIDE_FIRST_PROMPT).toMatch(/visually, functionally/);
-    expect(DECIDE_FIRST_PROMPT).toMatch(/finishing and merely stopping/);
+  it('no longer names an effort level, since it applies to all of them', () => {
+    expect(VERIFY_PROMPT).not.toContain('HIGH/MAXIMUM');
   });
 });
 

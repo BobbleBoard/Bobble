@@ -15,6 +15,7 @@ import {
   type ToolSchemaLike,
   wireHarness,
 } from './index.js';
+import { augmentSystemPrompt } from './prompt/capability-prompt.js';
 
 describe('hasAttachedFileBlock', () => {
   const folded = 'Attached file `pasted content`:\n```\nsome pasted text\n```';
@@ -453,34 +454,24 @@ describe('wireHarness — rung-4 schema relaxation wiring', () => {
  * never fired: the first observation has nothing to compare against, and that IS
  * the transition that matters. So the check reads the cached TEXT.
  */
-describe('team prompt invalidation', () => {
-  const fire = async (f: ReturnType<typeof makeFakePi>, ctx: unknown) =>
-    (
-      await f.fire(
-        'before_agent_start',
-        {
-          type: 'before_agent_start',
-          prompt: 'build me a thing',
-          systemPrompt: 'You are a helpful coding agent.',
-          systemPromptOptions: {},
-        },
-        ctx as never,
-      )
-    )[0] as { systemPrompt?: string } | undefined;
+describe('the system prompt no longer changes mid-session', () => {
+  /*
+   * REPLACES 'team prompt invalidation'. That suite pinned the old behaviour:
+   * the cached prompt was thrown away whenever the team appeared, so the
+   * instructions changed underneath a running session and cost a full KV
+   * re-prefill. the user: "ensure there's not conflicting 'mid run changes' ...
+   * tampering with the system prompt/tools mid run for 'promotion'."
+   *
+   * The team guidance lives on the tool description now, so the prompt is
+   * identical at every effort — which is exactly what this asserts.
+   */
+  it('builds the same prompt regardless of effort', () => {
+    const base = 'You are a helpful coding agent.';
+    expect(augmentSystemPrompt(base, { team: true })).toBe(augmentSystemPrompt(base));
+    expect(augmentSystemPrompt(base, { team: false })).toBe(augmentSystemPrompt(base));
+  });
 
-  it('rebuilds the prompt when the team becomes available', async () => {
-    const f = makeFakePi(['read', 'write', 'bash', 'talk_to_manager']);
-    wireHarness(f.pi);
-    const { ctx } = makeCtx(f.entries);
-    await f.fire('session_start', { type: 'session_start', reason: 'startup' }, ctx);
-
-    // Default effort → no team on offer, so no team section.
-    const before = await fire(f, ctx);
-    expect(before?.systemPrompt).not.toContain(TEAM_PROMPT_MARKER);
-
-    // Raised to max → the tool is advertised, so the framing must appear too.
-    await (f.getCommand()?.handler('effort max', ctx) ?? Promise.resolve());
-    const after = await fire(f, ctx);
-    expect(after?.systemPrompt).toContain(TEAM_PROMPT_MARKER);
+  it('never carries the old team section', () => {
+    expect(augmentSystemPrompt('Base.', { team: true })).not.toMatch(/You lead a TEAM/);
   });
 });

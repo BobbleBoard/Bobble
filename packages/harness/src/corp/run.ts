@@ -106,7 +106,6 @@ import {
   createPromotionGuard,
   type HierarchyDivisionSpec,
   type OpenAiFunctionTool,
-  PROMOTION_SYSTEM_PROMPT,
   SOLO_EXECUTION_PROMPT,
 } from './promotion.js';
 import { composeNodePrompt, getRolePrompt, roleThinkingEnabled } from './prompts.js';
@@ -938,7 +937,14 @@ export async function runCorp(options: RunCorpOptions): Promise<CorpRunResult> {
     // judgment turn WITH the create_production_hierarchy tool; otherwise it is a
     // capable SOLO turn WITH real tools (read/write/bash/web) and NO hierarchy — a
     // single agent doing the task directly. Thinking ON either way.
-    const workerSystemPrompt = promotionAllowed ? PROMOTION_SYSTEM_PROMPT : SOLO_EXECUTION_PROMPT;
+    /*
+     * ONE WORKER PROMPT, whether or not the team is on offer. There used to be a
+     * second prompt for the promotion case, which is precisely the mid-run
+     * swap the user asked to remove: the same agent got different instructions
+     * depending on effort, and the team guidance it carried is now on the tool's
+     * own description. Offering the tool is the only difference effort makes.
+     */
+    const workerSystemPrompt = SOLO_EXECUTION_PROMPT;
     const workerTools: string[] = promotionAllowed
       ? [CREATE_PRODUCTION_HIERARCHY]
       : ['read', 'write', 'bash', ...BROWSER_TOOL_NAMES, 'web_search', 'web_fetch'];

@@ -14,9 +14,10 @@ afterEach(() => {
 beforeEach(() => clearFaviconCache());
 
 /** A fetch that answers `ok` for the listed paths and 404s everything else. */
-function fakeFetch(
-  ok: Record<string, { type: string; body: Uint8Array }>,
-): { calls: string[]; fn: typeof fetch } {
+function fakeFetch(ok: Record<string, { type: string; body: Uint8Array }>): {
+  calls: string[];
+  fn: typeof fetch;
+} {
   const calls: string[] = [];
   const fn = (async (input: string | URL) => {
     const url = String(input);

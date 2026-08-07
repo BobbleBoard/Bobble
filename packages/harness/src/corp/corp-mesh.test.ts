@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { PROMOTION_SYSTEM_PROMPT } from './promotion.js';
 import {
   buildCorpRoster,
   COMMISSION_SPECIALIST_TOOL,
@@ -14,6 +13,7 @@ import {
   TALK_TO_TOOL,
 } from './corp-mesh.js';
 import type { AgentTurnRequest, RunAgentTurn } from './mesh.js';
+import { CREATE_PRODUCTION_HIERARCHY_TOOL } from './promotion.js';
 
 describe('buildCorpRoster', () => {
   it('makes the manager, an engineer pool, and one specialist per kind — NO ceo', () => {
@@ -225,7 +225,12 @@ describe('the real CEO’s brief matches the tools it actually has', () => {
   // work and do small things itself ... it needs to call the manager of its own
   // volition when it's a project that needs it, not a single html file." This is
   // the prompt the CHAT model reads — the only CEO there is.
-  const p = (): string => PROMOTION_SYSTEM_PROMPT;
+  /*
+   * There is no promotion system prompt any more — max effort just adds the
+   * tool, and its DESCRIPTION is what the model reads to decide. These same
+   * three properties are now asserted against that description.
+   */
+  const p = (): string => CREATE_PRODUCTION_HIERARCHY_TOOL.function.description;
 
   it('never claims to be toolless', () => {
     expect(p()).not.toContain('you have no editor');
@@ -235,12 +240,14 @@ describe('the real CEO’s brief matches the tools it actually has', () => {
 
   it('does not MANDATE delegating — it is a judgement call', () => {
     expect(p()).not.toContain('YOUR FIRST ACTION IS TO');
-    expect(p()).toContain('If the task is genuinely small enough');
+    // the user's wording for the same judgement call.
+    expect(p()).toContain('*genuinely* quick you are still free to do without this tool');
   });
 
   it('tells it the manager knows only what it is told', () => {
     // The brief IS the hand-off: the manager has never spoken to the user.
-    expect(p()).toContain('they have not spoken to the user');
+    // Same intent in his wording: you supply the vision, they build from it.
+    expect(p()).toContain('you just tell the manager what you want');
   });
 });
 

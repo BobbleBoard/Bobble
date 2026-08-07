@@ -65,7 +65,8 @@ const PROBES: readonly Probe[] = [
     command: 'python3',
     args: ['-c', 'import yaml, sys; sys.stdout.write(yaml.__version__)'],
     relevantTo: ['yaml', 'yml'],
-    ifMissing: 'Install it (`pip3 install pyyaml`) — that is faster and safer than hand-rolling a YAML parser.',
+    ifMissing:
+      'Install it (`pip3 install pyyaml`) — that is faster and safer than hand-rolling a YAML parser.',
   },
   {
     name: 'pytest',
@@ -88,7 +89,8 @@ const PROBES: readonly Probe[] = [
     command: 'ffmpeg',
     args: ['-version'],
     relevantTo: ['convert', 'video', 'audio', 'media'],
-    ifMissing: 'Install it if you can (`brew install ffmpeg`); otherwise handle the formats you can and name the ones you cannot.',
+    ifMissing:
+      'Install it if you can (`brew install ffmpeg`); otherwise handle the formats you can and name the ones you cannot.',
   },
   {
     name: 'git',

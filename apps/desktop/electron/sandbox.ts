@@ -151,7 +151,8 @@ export function resolveSessionCwd(
   if (cwdRequested && !isHomeDir(req.cwd, home) && directoryExists(req.cwd as string)) {
     return req.cwd;
   }
-  const resuming = !cwdRequested && typeof req.sessionPath === 'string' && req.sessionPath.length > 0;
+  const resuming =
+    !cwdRequested && typeof req.sessionPath === 'string' && req.sessionPath.length > 0;
   if (resuming) {
     // Defer to the session's own recorded cwd — UNLESS that cwd is HOME. Those
     // sessions exist (40 of them on this machine): anything that reached pi

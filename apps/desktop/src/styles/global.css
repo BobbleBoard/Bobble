@@ -1903,7 +1903,7 @@ body {
  * cut look broken. With it, quiet is a level meter at rest and speech rises
  * out of the line. */
 .pd-dictation-wave::before {
-  content: '';
+  content: "";
   position: absolute;
   left: 0;
   right: 0;
@@ -1947,7 +1947,7 @@ body {
 }
 /* Transcribing: the last waveform stays, dimmed — clearing it reads as "it
  * lost what I said". */
-.pd-dictation[data-phase='transcribing'] .pd-dictation-bar {
+.pd-dictation[data-phase="transcribing"] .pd-dictation-bar {
   background: var(--pd-text-muted);
   opacity: 0.55;
 }

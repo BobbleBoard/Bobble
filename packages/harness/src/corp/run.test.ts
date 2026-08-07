@@ -1,10 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { newRunBudget } from './budget.js';
-import {
-  CREATE_PRODUCTION_HIERARCHY,
-  PROMOTION_SYSTEM_PROMPT,
-  SOLO_EXECUTION_PROMPT,
-} from './promotion.js';
+import { CREATE_PRODUCTION_HIERARCHY, SOLO_EXECUTION_PROMPT } from './promotion.js';
 import { SUBMIT_FINDINGS_TOOL } from './review.js';
 import type { RoleAgentRunInput, RoleAgentRunOutput, RunRoleAgentFn } from './role-agent-seam.js';
 import { type CorpChatFn, type CorpChatResult, type CorpTurnPurpose, runCorp } from './run.js';
@@ -227,7 +223,7 @@ describe('runCorp — effort gate (promotionAllowed)', () => {
     // The worker turn was a SOLO execution turn — the solo prompt, and the hierarchy
     // tool was NOT offered.
     expect(workerSystem).toBe(SOLO_EXECUTION_PROMPT);
-    expect(workerSystem).not.toBe(PROMOTION_SYSTEM_PROMPT);
+    // (There is no second, promotion-only prompt to differ from any more.)
     expect(workerTools).toBeUndefined();
   });
 
@@ -258,7 +254,9 @@ describe('runCorp — effort gate (promotionAllowed)', () => {
     });
 
     expect(visionCalls).toBe(1);
-    expect(workerSystem).toBe(PROMOTION_SYSTEM_PROMPT);
+    // Same prompt either way now — offering the tool is the only difference
+    // effort makes (no mid-run prompt swap).
+    expect(workerSystem).toBe(SOLO_EXECUTION_PROMPT);
     expect(workerToolNames).toContain(CREATE_PRODUCTION_HIERARCHY);
     // (It stayed solo only because this mock chose not to call the offered tool.)
     expect(result.terminatedReason).toBe('solo');

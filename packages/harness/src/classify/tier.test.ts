@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { classify, TASK_CLASSES, type TaskClass } from './classify.js';
 import {
+  asksForTheTeam,
   COARSE_TO_MODEL,
   type CoarseTier,
   coarseTier,
-  asksForTheTeam,
   effortForClass,
   isCoarseTier,
   isModelTier,
@@ -110,8 +110,9 @@ describe('effortForClass', () => {
      * therefore answered that it had no tool for contacting a manager. It was
      * right: it didn't have one. Effort follows the TASK now.
      */
-    const cls = classify({ prompt: 'Ask the manager to set up a sample Godot game to demo Godot' })
-      .class;
+    const cls = classify({
+      prompt: 'Ask the manager to set up a sample Godot game to demo Godot',
+    }).class;
     const effort = effortForClass(cls);
     expect(['high', 'max']).toContain(effort);
   });

@@ -9,21 +9,45 @@ import {
   DEFAULT_PROMOTION_PROJECT_ID,
   HIERARCHY_ALREADY_CREATED_ACK,
   HIERARCHY_CREATED_ACK,
-  PROMOTION_SYSTEM_PROMPT,
   parseCreateHierarchyArgs,
 } from './promotion.js';
 
-describe('PROMOTION_SYSTEM_PROMPT', () => {
-  it('names the promotion tool and the "one focused pass" trigger', () => {
-    expect(PROMOTION_SYSTEM_PROMPT).toContain(CREATE_PRODUCTION_HIERARCHY);
-    expect(PROMOTION_SYSTEM_PROMPT.toLowerCase()).toContain('one focused pass');
+describe("the talk_to_manager tool description — the user's wording", () => {
+  /*
+   * There is no promotion system prompt any more. the user: "max effort just adds
+   * this talk to manager tool", and what he wrote is the tool DESCRIPTION —
+   * which is the only place it needs to be, because a description is how a
+   * model learns when and how to use a tool. Pinned here because the wording is
+   * his and a well-meaning rewrite would quietly change the behaviour.
+   */
+  const DESC = CREATE_PRODUCTION_HIERARCHY_TOOL.function.description;
+
+  it('keeps the per-turn question that decides it', () => {
+    expect(DESC).toContain('genuinely quick or should I call in the manager?');
   });
 
-  /* The CEO no longer goes silent after delegating — it still reviews what comes
-   * back. What it must not do is build the same thing in parallel. */
-  it('bounds the worker: hand it over, do not build it too', () => {
-    expect(PROMOTION_SYSTEM_PROMPT).toContain('do not try to build it yourself in parallel');
-    expect(PROMOTION_SYSTEM_PROMPT).toContain('delegating IS how the user');
+  it('leaves quick work with the model rather than forcing a hand-off', () => {
+    expect(DESC).toContain('*genuinely* quick you are still free to do without this tool');
+  });
+
+  it('says what you send and what comes back', () => {
+    expect(DESC).toContain('you just tell the manager what you want');
+    expect(DESC).toContain('a fully made product');
+  });
+
+  it('says the job afterwards is testing and iterating, not signing off', () => {
+    expect(DESC).toContain('focus on testing this product and iterating with the manager');
+  });
+
+  it('frames it as a coordinator with a team, for anything large', () => {
+    expect(DESC).toContain('powerful coordinator that has a team of workers');
+    expect(DESC).toContain('this should be for anything large');
+  });
+
+  it('no longer role-plays a CEO', () => {
+    // The identity framing is what made delegating feel compulsory.
+    expect(DESC).not.toContain('You are the CEO');
+    expect(DESC).not.toContain('Hand this build to your MANAGER');
   });
 });
 
@@ -38,7 +62,7 @@ describe('CREATE_PRODUCTION_HIERARCHY_TOOL', () => {
     expect(t.function.description.toLowerCase()).toContain('manager');
     expect(t.function.description.toLowerCase()).toContain('manager');
     // …and names the CEO↔manager channel it promises.
-    expect(t.function.description).toContain('talk to them again');
+    expect(t.function.description).toContain('you just tell the manager what you want');
 
     const params = t.function.parameters as {
       type: string;
@@ -204,21 +228,11 @@ describe('createPromotionGuard — idempotent-terminal (J5)', () => {
 });
 
 describe('PROMOTION one-shot messaging (J5)', () => {
-  it('the system prompt tells the CEO it need not design divisions', () => {
-    expect(PROMOTION_SYSTEM_PROMPT).toContain(
-      "splitting the work across their engineers is the manager's own first job",
+  it('the description tells it to iterate with the manager afterwards', () => {
+    // Replaces the old "conversation, not a form" assertion: same intent — the
+    // hand-off is not the end — in the user's wording.
+    expect(CREATE_PRODUCTION_HIERARCHY_TOOL.function.description).toContain(
+      'iterating with the manager',
     );
-    expect(PROMOTION_SYSTEM_PROMPT.toLowerCase()).toContain(
-      'do not try to build it yourself in parallel',
-    );
-    // The original bounded-stop language is preserved.
-    expect(PROMOTION_SYSTEM_PROMPT).toContain('do not try to build it yourself in parallel');
-  });
-
-  it('the tool description frames it as a conversation, not a form', () => {
-    const d = CREATE_PRODUCTION_HIERARCHY_TOOL.function.description;
-    expect(d).toContain('conversation, not a');
-    expect(d.toLowerCase()).toContain('conversation, not a form');
-    expect(d.toLowerCase()).toContain('talk to them again at any time');
   });
 });

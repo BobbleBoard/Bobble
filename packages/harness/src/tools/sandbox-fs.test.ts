@@ -66,7 +66,11 @@ describe('isNamedDestination', () => {
    * reported as if it were at the requested path. */
   it('honours an absolute path the caller wrote out in full', () => {
     expect(
-      isNamedDestination('/Users/user/bobble-testbed/corp-run', '/Users/user/bobble-testbed/corp-run', home),
+      isNamedDestination(
+        '/Users/user/bobble-testbed/corp-run',
+        '/Users/user/bobble-testbed/corp-run',
+        home,
+      ),
     ).toBe(true);
   });
 

@@ -33,8 +33,8 @@ import type { ReactNode } from 'react';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { corpChatView } from '../corp/corp-thread-view';
 import { useCorpStore } from '../../state/corp-store';
+import { corpChatView } from '../corp/corp-thread-view';
 import {
   AGENT_ACTIVITY_TAB_KEY,
   AGENT_ACTIVITY_TITLE,

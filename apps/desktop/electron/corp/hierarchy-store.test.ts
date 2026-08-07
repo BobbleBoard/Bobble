@@ -36,7 +36,11 @@ describe('the same project always reaches the same team', () => {
 
   it('does not care how the path was spelled', () => {
     const a = openHierarchy(appData, '/Users/user/Desktop');
-    for (const spelling of ['/Users/user/Desktop/', '/Users/user/./Desktop', '/Users/user/x/../Desktop']) {
+    for (const spelling of [
+      '/Users/user/Desktop/',
+      '/Users/user/./Desktop',
+      '/Users/user/x/../Desktop',
+    ]) {
       expect(openHierarchy(appData, spelling).dir).toBe(a.dir);
     }
   });
@@ -60,13 +64,17 @@ describe('the same project always reaches the same team', () => {
 describe('a human can tell what a folder is for', () => {
   it('records the absolute project path next to the team', () => {
     const h = openHierarchy(appData, '/Users/user/Desktop');
-    expect(readFileSync(path.join(h.dir, PROJECT_POINTER), 'utf8').trim()).toBe('/Users/user/Desktop');
+    expect(readFileSync(path.join(h.dir, PROJECT_POINTER), 'utf8').trim()).toBe(
+      '/Users/user/Desktop',
+    );
   });
 
   it('lists every team the app is holding, with what each is for', () => {
     openHierarchy(appData, '/Users/user/Desktop');
     openHierarchy(appData, '/Users/user/code/thing');
-    const all = listHierarchies(appData).map((h) => h.projectPath).sort();
+    const all = listHierarchies(appData)
+      .map((h) => h.projectPath)
+      .sort();
     expect(all).toEqual(['/Users/user/Desktop', '/Users/user/code/thing']);
   });
 

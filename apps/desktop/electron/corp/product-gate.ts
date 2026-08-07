@@ -23,7 +23,7 @@
  */
 
 import { execFile } from 'node:child_process';
-import { accessSync, constants as fsConstants, existsSync } from 'node:fs';
+import { accessSync, existsSync, constants as fsConstants } from 'node:fs';
 import path from 'node:path';
 
 /** What the gate found and what happened when it ran it. */
@@ -50,9 +50,6 @@ export interface GateCandidate {
 }
 
 const MAX_OUTPUT = 6000;
-
-
-
 
 /** The names a team may leave its check under. First one that exists wins. */
 export const DECLARED_CHECKS = ['check', 'check.sh', 'verify.sh', 'run_checks.sh'] as const;
@@ -164,7 +161,8 @@ export async function runProductGate(
          * merely contains "fail" does not match.
          */
         const saidItFailed =
-          /^(FAIL(ED)?|ERROR)\b/m.test(output) || /^Traceback \(most recent call last\)/m.test(output);
+          /^(FAIL(ED)?|ERROR)\b/m.test(output) ||
+          /^Traceback \(most recent call last\)/m.test(output);
         const falseGreen = error === null && saidItFailed;
         resolve({
           ran: true,

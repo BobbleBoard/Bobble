@@ -13,14 +13,13 @@ export function InputNeededBanner() {
   const bgFile = usePiStore((s) => s.bgRun?.sessionFile ?? null);
   // The first pending request tagged for a chat OTHER than the one being viewed.
   const pendingFile = usePiStore((s) => {
-    const req = s.uiRequests.find(
-      (r) => r.sessionFile !== undefined && r.sessionFile !== viewed,
-    );
+    const req = s.uiRequests.find((r) => r.sessionFile !== undefined && r.sessionFile !== viewed);
     return req?.sessionFile ?? null;
   });
 
   if (pendingFile === null) return null;
-  const title = bgFile === pendingFile && bgTitle !== null && bgTitle.length > 0 ? bgTitle : 'A chat';
+  const title =
+    bgFile === pendingFile && bgTitle !== null && bgTitle.length > 0 ? bgTitle : 'A chat';
 
   return (
     <div className="pd-input-banner fixed top-3 left-1/2 z-[80] -translate-x-1/2">

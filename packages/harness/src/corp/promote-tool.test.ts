@@ -97,7 +97,6 @@ describe('create_production_hierarchy — normal-chat tool', () => {
   });
 });
 
-
 describe('talk_to_manager BLOCKS until the team delivers', () => {
   /*
    * the user, watching a CEO answer "the manager has accepted the task" in eleven

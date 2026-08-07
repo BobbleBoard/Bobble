@@ -18,13 +18,13 @@ import type { ExtensionAPI } from '@mariozechner/pi-coding-agent';
 import { type Static, Type } from '@sinclair/typebox';
 import type { EffortLevel } from '../effort/effort.js';
 import { type CorpRunRequest, type CorpRunResult, corpBridgeRunFromEnv } from './bridge-client.js';
-import { classifyVerification, extractClaims, finalCheck } from './verification.js';
 import {
   CREATE_PRODUCTION_HIERARCHY,
   CREATE_PRODUCTION_HIERARCHY_TOOL,
   HIERARCHY_CREATED_ACK,
   parseCreateHierarchyArgs,
 } from './promotion.js';
+import { classifyVerification, extractClaims, finalCheck } from './verification.js';
 
 /**
  * The `ctx.ui.setStatus` key the tool publishes the promote intent on. The desktop

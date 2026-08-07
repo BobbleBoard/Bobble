@@ -496,7 +496,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
 
   function maybeWarmPrefix(ctx: ExtensionContext): void {
     if (callModel === undefined || typeof ctx.getSystemPrompt !== 'function') return;
-    const canonical = augmentSystemPrompt(ctx.getSystemPrompt(), { team: teamAvailable() });
+    const canonical = augmentSystemPrompt(ctx.getSystemPrompt());
     if (canonical.trim().length === 0 || canonical === warmedCanonical) return;
     warmedCanonical = canonical;
     runtime.canonicalSystemPrompt = canonical;
@@ -1189,52 +1189,21 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
    * about a tool the model does not have is the phantom-tool failure that
    * produces a plausible wrong call instead of a clean one.
    */
-  function teamAvailable(): boolean {
-    return (
-      corpToolEnabled(runtime.config.effort) &&
-      pi.getAllTools().some((t) => t.name === CREATE_PRODUCTION_HIERARCHY)
-    );
-  }
 
   /*
-   * DROP THE CACHED SYSTEM PROMPT WHEN THE TEAM APPEARS OR DISAPPEARS.
-   *
-   * `canonicalSystemPrompt` is computed ONCE at warm-up and reused for every turn
-   * after — and at warm-up the effort is still the default, so a session later
-   * raised to high/max kept a prompt that never mentioned the team. Measured: two
-   * max-effort runs whose system prompt was byte-identical (11675 chars) to a
-   * default-effort one, with the TEAM section nowhere in it. The tool was
-   * advertised and the framing for it was not, which is the whole reason the CEO
-   * kept building alone.
-   *
-   * Checked here because applyPreset is the one place EVERY path funnels through
-   * (the desktop never uses the /effort command; effort arrives with the restored
-   * session config). Only fires when availability actually FLIPS: the prompt heads
-   * the KV-cached prefix, so rebuilding it costs a full re-prefill and must not
-   * happen on every turn.
+   * `syncTeamPrompt` is GONE. It threw away the cached system prompt whenever
+   * the team's availability flipped, so the prompt changed underneath a running
+   * session and cost a full KV re-prefill. It existed only because the team
+   * guidance lived IN the prompt; it lives on the tool description now, so the
+   * prompt is the same at every effort and there is nothing to resynchronise.
+   * the user: "ensure there's not conflicting 'mid run changes'".
    */
-  function syncTeamPrompt(): void {
-    const cached = runtime.canonicalSystemPrompt;
-    if (cached === null) return;
-    /*
-     * Compare the CACHED TEXT against what is wanted, not a tracked boolean.
-     * My first attempt tracked the previous value and invalidated on a change —
-     * which never fired, because the very first observation has nothing to
-     * compare against and that IS the transition that matters (warm-up caches at
-     * default effort; the session is raised to max immediately after). Reading
-     * the cache itself has no state to get out of sync.
-     */
-    if (cached.includes(TEAM_PROMPT_MARKER) !== teamAvailable()) {
-      runtime.canonicalSystemPrompt = null;
-    }
-  }
 
   function applyPreset(
     cls: TaskClass,
     ctx: ExtensionContext,
     extraTools: readonly string[] = [],
   ): void {
-    syncTeamPrompt();
     const available = pi.getAllTools().map((t) => t.name);
     /*
      * A SPECIALIST CHILD IS PINNED, not preset. the user: "with just these tools
@@ -1410,10 +1379,8 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     // Correct the frozen prompt if the TEAM has appeared or gone since it was
     // built — the freeze below is what made the team section unreachable, because
     // warm-up runs at default effort and the session is raised afterwards.
-    syncTeamPrompt();
     const augmentedSystemPrompt =
-      runtime.canonicalSystemPrompt ??
-      augmentSystemPrompt(event.systemPrompt, { team: teamAvailable() });
+      runtime.canonicalSystemPrompt ?? augmentSystemPrompt(event.systemPrompt);
     runtime.canonicalSystemPrompt = augmentedSystemPrompt;
     // Classification REMOVED from the turn path (the user: "we seldom use it at all,
     // let's just completely remove"). The turn-1 {title,class} piggyback cost
@@ -1488,9 +1455,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
         runtime.canonicalSystemPrompt ??
         augmentSystemPrompt(
           typeof ctx.getSystemPrompt === 'function' ? ctx.getSystemPrompt() : '',
-          {
-            team: teamAvailable(),
-          },
+          {},
         );
       const input: ClassifyInput = {
         prompt: namePrompt,
@@ -1932,8 +1897,6 @@ export {
   augmentSystemPrompt,
   CAPABILITY_PROMPT,
   CAPABILITY_PROMPT_MARKER,
-  DECIDE_FIRST_PROMPT,
-  TEAM_PROMPT,
   TEAM_PROMPT_MARKER,
 } from './prompt/capability-prompt.js';
 export {

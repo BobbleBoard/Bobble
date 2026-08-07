@@ -71,16 +71,18 @@ function deriveActivity(blocks: readonly CorpBlock[], nodeState: string | undefi
     return { label: last.streaming ? 'THINKING' : 'thought (settled)', canvas: 'situation room' };
   }
   if (last.kind === 'text') {
-    const w = /<function=(?:write|edit)>[\s\S]*?(?:<parameter=path>|["']path["']\s*:\s*["'])([^<"']+)/.exec(
-      last.text,
-    );
+    const w =
+      /<function=(?:write|edit)>[\s\S]*?(?:<parameter=path>|["']path["']\s*:\s*["'])([^<"']+)/.exec(
+        last.text,
+      );
     if (w?.[1] !== undefined) {
       const p = w[1].trim();
       return { label: `WRITING ${p}`, canvas: `file ${p} (streaming)` };
     }
-    const b = /<function=bash>[\s\S]*?(?:<parameter=command>|["']command["']\s*:\s*["'])([^<"']+)/.exec(
-      last.text,
-    );
+    const b =
+      /<function=bash>[\s\S]*?(?:<parameter=command>|["']command["']\s*:\s*["'])([^<"']+)/.exec(
+        last.text,
+      );
     if (b?.[1] !== undefined) {
       return { label: `EXECUTING ${b[1].trim()}`, canvas: 'terminal' };
     }
@@ -166,7 +168,9 @@ export function CorpDebugHud(): React.ReactElement | null {
   // While a node is working but no token has streamed for a beat, the model is
   // PROCESSING (prefilling the prompt, or blocked on a slow tool) — surface that
   // instead of a stale "thought (settled)", so a gap never reads as frozen.
-  const displayLabel = stalled ? `PROCESSING… (${(sinceDelta / 1000).toFixed(1)}s)` : activity.label;
+  const displayLabel = stalled
+    ? `PROCESSING… (${(sinceDelta / 1000).toFixed(1)}s)`
+    : activity.label;
 
   return (
     <div
@@ -190,18 +194,33 @@ export function CorpDebugHud(): React.ReactElement | null {
         boxShadow: '0 8px 30px rgba(0,0,0,0.5)',
       }}
     >
-      <div style={{ fontSize: 26, fontWeight: 700, letterSpacing: 1, fontVariantNumeric: 'tabular-nums' }}>
+      <div
+        style={{
+          fontSize: 26,
+          fontWeight: 700,
+          letterSpacing: 1,
+          fontVariantNumeric: 'tabular-nums',
+        }}
+      >
         {clockOf(now)}
       </div>
       <div style={{ opacity: 0.7, marginTop: 2 }}>
         node: {node?.name ?? '—'} · {node?.state ?? '—'}
       </div>
-      <div style={{ marginTop: 6, fontSize: 13, fontWeight: 600, color: stalled ? '#ffd166' : '#e6edf3' }}>
+      <div
+        style={{
+          marginTop: 6,
+          fontSize: 13,
+          fontWeight: 600,
+          color: stalled ? '#ffd166' : '#e6edf3',
+        }}
+      >
         now: {displayLabel}
       </div>
       <div style={{ opacity: 0.85 }}>canvas: {activity.canvas}</div>
       <div style={{ marginTop: 4, color: stalled ? '#ff6b6b' : '#7ee787' }}>
-        since last stream: {(sinceDelta / 1000).toFixed(1)}s{stalled ? '  ← processing, no tokens' : ''}
+        since last stream: {(sinceDelta / 1000).toFixed(1)}s
+        {stalled ? '  ← processing, no tokens' : ''}
       </div>
       <div
         style={{
@@ -217,7 +236,10 @@ export function CorpDebugHud(): React.ReactElement | null {
           const next = log[i + 1];
           const dur = ((next !== undefined ? next.t : now) - e.t) / 1000;
           return (
-            <div key={`${e.t}-${i}`} style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            <div
+              key={`${e.t}-${i}`}
+              style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
+            >
               <span style={{ opacity: 0.6 }}>{clockOf(e.t)}</span> +{dur.toFixed(1)}s {e.label}
             </div>
           );

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parsePromoteSignal, PROMOTE_STATUS_KEY } from './harness-status';
+import { PROMOTE_STATUS_KEY, parsePromoteSignal } from './harness-status';
 
 describe('parsePromoteSignal (corp-promote intent from normal chat)', () => {
   it('parses a valid promote signal', () => {

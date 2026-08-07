@@ -183,7 +183,8 @@ export function verificationBriefing(profile: VerificationProfile): string {
   if (profile.functional) parts.push('something to RUN');
   if (profile.ui) parts.push('something to DRIVE');
   if (parts.length === 0) return '';
-  const list = parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(', ')} and ${parts.at(-1)}`;
+  const list =
+    parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(', ')} and ${parts.at(-1)}`;
   const runtime =
     profile.runtime !== null
       ? ` It is written for \`${profile.runtime}\` — verifying it means running it THERE, so make sure that exists before you build.`
