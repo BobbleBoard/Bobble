@@ -236,3 +236,26 @@ export function threadStatusView(inp: ThreadStatusInputs): ThreadStatusView | nu
 
   return { label, detail, showElapsed: true };
 }
+
+/**
+ * Should the "processing" ring show at all?
+ *
+ * THE BUG: the user opened Bobble, clicked around, and got "processing · 7.2s" on
+ * an empty thread — permanently, with nothing sent. `promptInFlight` is raised
+ * by the dispatch bridge and cleared by agent_start/agent_end, and the model
+ * warm-up on model_select raises it while producing NEITHER, so the flag never
+ * came down.
+ *
+ * A turn the user never started cannot be in progress. Requiring a user message
+ * makes that structurally true rather than trusting a flag with a path that
+ * never clears. Pure so it can be tested without a renderer.
+ */
+export function showProcessing(input: {
+  readonly hasUserMessage: boolean;
+  readonly promptInFlight: boolean;
+  readonly hasStreamingAssistant: boolean;
+  readonly turnHasContent: boolean;
+}): boolean {
+  if (!input.hasUserMessage) return false;
+  return input.promptInFlight || (input.hasStreamingAssistant && !input.turnHasContent);
+}

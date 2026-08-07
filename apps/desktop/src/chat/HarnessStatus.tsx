@@ -25,6 +25,7 @@ import {
   type PlanItem,
   PREFILL_STATUS_KEY,
   parsePrefillPercent,
+  showProcessing,
   useHarnessStatus,
 } from './harness-status';
 
@@ -135,7 +136,27 @@ export function ThreadStatusIndicator(): ReactElement | null {
   // exists but the turn hasn't produced ANY content yet (initial prefill only).
   // Both self-clear, so the ring fades on the first token and never shows on the
   // instant tool-call re-prefills. `prefillPct` drives only the displayed number.
-  const processing = promptInFlight || (streamingAssistant !== undefined && !turnHasContent);
+  /*
+   * NOTHING WAS SENT, SO NOTHING IS PROCESSING. the user: "I just opened bobble,
+   * clicked somewhere, there's no send button even visible and it just showed
+   * me this as if i sent something, and it's staying here like this
+   * permanently."
+   *
+   * `promptInFlight` is raised by the dispatch bridge, and the model warm-up on
+   * model_select goes through it — so a freshly opened app, with an empty
+   * thread and nothing typed, sat on "processing · 7.2s" forever: the flag is
+   * normally cleared by agent_start/agent_end, and a warm-up produces neither.
+   *
+   * A turn the user never started cannot be in progress. Requiring a user
+   * message in the thread makes that structurally true, rather than trusting a
+   * flag that has at least one path which never clears.
+   */
+  const processing = showProcessing({
+    hasUserMessage: messages.some((m) => m.kind === 'user'),
+    promptInFlight,
+    hasStreamingAssistant: streamingAssistant !== undefined,
+    turnHasContent,
+  });
 
   // Snap to 100% then fade ONLY once the first token lands (processing → false).
   const [fading, setFading] = useState(false);

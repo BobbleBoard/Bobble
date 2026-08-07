@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PROMOTE_STATUS_KEY, parsePromoteSignal } from './harness-status';
+import { PROMOTE_STATUS_KEY, parsePromoteSignal, showProcessing } from './harness-status';
 
 describe('parsePromoteSignal (corp-promote intent from normal chat)', () => {
   it('parses a valid promote signal', () => {
@@ -24,5 +24,48 @@ describe('parsePromoteSignal (corp-promote intent from normal chat)', () => {
 
   it('mirrors the harness status key exactly', () => {
     expect(PROMOTE_STATUS_KEY).toBe('harness-promote');
+  });
+});
+
+describe('showProcessing — the ring on an empty thread', () => {
+  /*
+   * MEASURED: the user opened Bobble, clicked around, and got "processing · 7.2s"
+   * on an empty thread, permanently, having sent nothing. The model warm-up on
+   * model_select raises `promptInFlight` and produces neither agent_start nor
+   * agent_end, so the flag that normally clears it never came down.
+   */
+  const base = {
+    hasUserMessage: true,
+    promptInFlight: false,
+    hasStreamingAssistant: false,
+    turnHasContent: false,
+  };
+
+  it('stays OFF on a fresh chat even with the flag stuck raised', () => {
+    expect(showProcessing({ ...base, hasUserMessage: false, promptInFlight: true })).toBe(false);
+  });
+
+  it('stays OFF on a fresh chat even if a stream is somehow reported', () => {
+    expect(showProcessing({ ...base, hasUserMessage: false, hasStreamingAssistant: true })).toBe(
+      false,
+    );
+  });
+
+  it('shows while a real send is dispatching', () => {
+    expect(showProcessing({ ...base, promptInFlight: true })).toBe(true);
+  });
+
+  it('shows during the initial prefill of a real turn', () => {
+    expect(showProcessing({ ...base, hasStreamingAssistant: true })).toBe(true);
+  });
+
+  it('clears the moment the turn produces content', () => {
+    expect(showProcessing({ ...base, hasStreamingAssistant: true, turnHasContent: true })).toBe(
+      false,
+    );
+  });
+
+  it('is off when nothing at all is happening', () => {
+    expect(showProcessing(base)).toBe(false);
   });
 });
