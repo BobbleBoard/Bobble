@@ -276,6 +276,47 @@ function argPath(params: unknown): string | undefined {
  * Anything else is left alone, and `.md` files are skipped entirely: a fence in
  * markdown is content, not an artifact.
  */
+/**
+ * A REWRITE THAT GUTS AN EXISTING FILE IS ALMOST NEVER INTENDED.
+ *
+ * MEASURED: asked to fix a 56-line tkinter app, the model rewrote app.py, wrote
+ * its own reasoning into the source as it went ("# Wait, it's value=\"Ready\"",
+ * "# I'll just rewrite the whole thing carefully"), and abandoned mid-rewrite.
+ * What landed was 21 lines with every method gone — handle_drop, convert and
+ * main all deleted. It still PARSES, so py_compile is happy; the app is
+ * destroyed. The user asked for five bugs fixed and got an empty shell.
+ *
+ * Generic on purpose: losing most of an existing file in a single write is a
+ * mistake in any language and any project, and the model that does it has no
+ * idea — it believes it wrote the whole file. Deleting code deliberately is
+ * what `edit` is for, which is also more precise.
+ *
+ * Deliberately conservative, because a false refusal costs real work: it only
+ * fires on a file that had real content to lose, and only when MOST of it would
+ * go. Returns the refusal text, or null to allow.
+ */
+export function guardDestructiveRewrite(
+  absPath: string,
+  next: string,
+  readFile: (p: string) => string | null,
+): string | null {
+  const before = readFile(absPath);
+  if (before === null) return null; // new file — nothing to lose
+  const beforeLines = before.split('\n').filter((l) => l.trim() !== '').length;
+  // Too small to have meaningful structure; churn here is ordinary.
+  if (beforeLines < 25) return null;
+  const afterLines = next.split('\n').filter((l) => l.trim() !== '').length;
+  if (afterLines >= beforeLines * 0.5) return null;
+  return (
+    `Refusing this write: it would cut ${path.basename(absPath)} from ${beforeLines} lines to ` +
+    `${afterLines}, deleting most of what is there. That is almost always a rewrite that ran ` +
+    'out partway rather than a deliberate deletion — and the file on disk is the only copy. ' +
+    'If you meant to change part of it, use `edit`, which touches only the lines you name. ' +
+    'If you really do mean to replace the whole file, write the COMPLETE new contents in one ' +
+    'go, including every function you intend to keep.'
+  );
+}
+
 export function stripCodeFence(content: string, absPath: string): string {
   if (/\.(md|markdown|mdx)$/i.test(absPath)) return content;
   const lines = content.split('\n');
@@ -339,7 +380,17 @@ function fenceTool<S extends TSchema, D>(
       // ...and never let a markdown code fence reach disk (see stripCodeFence).
       const body = (next as Record<string, unknown>).content;
       if (typeof body === 'string') {
-        (next as Record<string, unknown>).content = stripCodeFence(body, abs);
+        const cleaned = stripCodeFence(body, abs);
+        // ...and never let a rewrite silently gut an existing file.
+        const destructive = guardDestructiveRewrite(abs, cleaned, (fp) => {
+          try {
+            return fs.readFileSync(fp, 'utf8');
+          } catch {
+            return null;
+          }
+        });
+        if (destructive !== null) throw new Error(destructive);
+        (next as Record<string, unknown>).content = cleaned;
       }
       return base.execute(toolCallId, next, signal, onUpdate as never, ctx);
     },

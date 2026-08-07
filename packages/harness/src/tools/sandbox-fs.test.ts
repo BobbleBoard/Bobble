@@ -17,6 +17,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   allowedWriteRoots,
   createSandboxFileTools,
+  guardDestructiveRewrite,
   isInsideRoots,
   isNamedDestination,
   registerSandboxFileTools,
@@ -331,5 +332,44 @@ describe('stripCodeFence — a markdown fence must never reach disk', () => {
   it('is safe on empty and whitespace bodies', () => {
     expect(stripCodeFence('', '/w/a.txt')).toBe('');
     expect(stripCodeFence('   \n', '/w/a.txt')).toBe('   \n');
+  });
+});
+
+describe('guardDestructiveRewrite — a rewrite that ran out partway', () => {
+  /*
+   * MEASURED: asked to fix a 56-line tkinter app, the model rewrote app.py,
+   * wrote its own reasoning into the source as it went, and abandoned
+   * mid-rewrite. 21 lines landed with every method gone. It still PARSES, so
+   * py_compile passed and nothing noticed — the user asked for five bug fixes
+   * and got an empty shell.
+   */
+  const big = Array.from({ length: 56 }, (_, i) => `line ${i}`).join('\n');
+  const read = (body: string | null) => () => body;
+
+  it('refuses a write that deletes most of an existing file', () => {
+    const out = guardDestructiveRewrite('/w/app.py', 'line 0\nline 1\nline 2', read(big));
+    expect(out).not.toBeNull();
+    expect(out).toContain('56 lines');
+    // It must say what to do instead, not merely refuse.
+    expect(out).toContain('`edit`');
+  });
+
+  it('allows a new file — there is nothing to lose', () => {
+    expect(guardDestructiveRewrite('/w/new.py', 'a\nb', read(null))).toBeNull();
+  });
+
+  it('allows an ordinary edit that keeps most of the file', () => {
+    const trimmed = big.split('\n').slice(0, 40).join('\n');
+    expect(guardDestructiveRewrite('/w/app.py', trimmed, read(big))).toBeNull();
+  });
+
+  it('allows churn in a small file, where it is ordinary', () => {
+    const small = 'a\nb\nc\nd\n';
+    expect(guardDestructiveRewrite('/w/tiny.py', 'a', read(small))).toBeNull();
+  });
+
+  it('allows a genuine full rewrite of similar size', () => {
+    const rewritten = Array.from({ length: 50 }, (_, i) => `new ${i}`).join('\n');
+    expect(guardDestructiveRewrite('/w/app.py', rewritten, read(big))).toBeNull();
   });
 });
