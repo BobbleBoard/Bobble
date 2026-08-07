@@ -314,8 +314,19 @@ async function handleStart(
       // TRACKABILITY: say where the work will land and why, once, in the log the
       // run is read from. "Where did the files go" has cost several runs.
       cwd,
-      // The ONLY two possibilities now — see resolveProjectDir.
-      cwdFrom: req.ctx?.cwd ? 'project-dropdown' : 'bobble-default',
+      /*
+       * WHY this directory. `ctx.cwd` arrives from two different places now —
+       * the composer's folder dropdown, and the chat's already-resolved
+       * workspace handed over by runCorpForBridge — so reporting both as
+       * 'project-dropdown' made the log claim a selection that did not exist.
+       * A diagnostic that misnames its own branch is worse than none.
+       */
+      cwdFrom:
+        req.ctx?.cwd === undefined
+          ? 'bobble-default'
+          : req.ctx.cwd === currentWorkspaceDir()
+            ? 'chat-workspace'
+            : 'project-dropdown',
       deliverTo: deliverTo ?? '(none named)',
       team: hierarchy.dir,
       returning: hierarchy.existed,
