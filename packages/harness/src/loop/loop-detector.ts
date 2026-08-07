@@ -27,7 +27,7 @@
 import type { EffortKnobs } from '../effort/effort.js';
 
 /** Why the detector escalated. */
-export type LoopCause = 'identical' | 'error' | 'cap' | 'wander';
+export type LoopCause = 'identical' | 'error' | 'cap' | 'wander' | 'repeat-text';
 
 /** The action the wiring should take after feeding an event. */
 export type LoopSignal =
@@ -41,6 +41,12 @@ export type LoopSignal =
   | { readonly kind: 'abort'; readonly cause: LoopCause; readonly reason: string };
 
 const NONE: LoopSignal = { kind: 'none' };
+
+/** The one steer for a prose loop: name it and demand the next concrete act. */
+const REPEAT_TEXT_STEER =
+  'You have written the same sentence several times in a row. Saying it again ' +
+  'will not move it forward. Do the next CONCRETE thing instead — make the tool ' +
+  'call, write the file, or say plainly that you are stuck and why.';
 
 /** Thresholds driving the detector. `abortAfter` must be > `steerAfter`. */
 export interface LoopDetectorConfig {
@@ -195,6 +201,11 @@ export interface LoopDetector {
    * Tracks the consecutive-error streak.
    */
   onToolResult(isError: boolean): LoopSignal;
+  /**
+   * Record a settled line of ASSISTANT TEXT. Catches the loop no tool-call
+   * counter can see — see {@link createLoopDetector}'s textStreak.
+   */
+  onText(line: string): LoopSignal;
   /** Clear all per-turn state (call at the start of each user turn). */
   reset(): void;
   /** Introspection for telemetry / tests. */
@@ -204,6 +215,10 @@ export interface LoopDetector {
 /** Human-readable escalation reason per cause (differs slightly steer vs abort). */
 function reasonFor(cause: LoopCause, streak: number, aborting: boolean): string {
   switch (cause) {
+    case 'repeat-text':
+      return aborting
+        ? `writing the same sentence over and over (${streak}×) instead of acting`
+        : `repeating itself (${streak}×)`;
     case 'identical':
       return aborting
         ? `stuck repeating the same tool call for minutes without progress (${streak}×)`
@@ -233,6 +248,19 @@ export function createLoopDetector(config: LoopDetectorConfig): LoopDetector {
   // different file, starts a fresh streak + clock).
   let identicalStreakStart = now();
   let errorStreak = 0;
+  /*
+   * REPEATED TEXT. the user watched a turn emit "Actually, I'll just present the
+   * app.py." roughly forty times in a row, and nothing stopped it: every counter
+   * here watches TOOL CALLS, and that loop made none. A model can stall entirely
+   * in prose, which is both the most visible failure to a user and the one the
+   * harness was blind to.
+   *
+   * Compared on a normalised line so trivial drift does not reset the streak —
+   * the observed loop varied ("I'll just", "I_ll just", "!ll just") as sampling
+   * jittered around the same sentence.
+   */
+  let textStreak = 0;
+  let lastText: string | null = null;
   // Consecutive read-only/exploration calls since the last concrete action.
   let unproductiveStreak = 0;
   // Exactly ONE corrective steer per turn (across ALL streak causes), matching
@@ -322,6 +350,23 @@ export function createLoopDetector(config: LoopDetectorConfig): LoopDetector {
       );
     },
 
+    onText(line) {
+      const norm = line
+        .toLowerCase()
+        .replace(/[^a-z0-9 ]+/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+      // Short fragments repeat innocently ("ok", "done", a bare bullet).
+      if (norm.length < 12) return NONE;
+      if (norm === lastText) textStreak += 1;
+      else {
+        textStreak = 1;
+        lastText = norm;
+      }
+      // A person notices this by the third or fourth repeat; steering earlier
+      // than a tool loop is right, because there is no work being done at all.
+      return escalate(textStreak, 'repeat-text', REPEAT_TEXT_STEER, 4, 8);
+    },
     onToolResult(isError) {
       errorStreak = isError ? errorStreak + 1 : 0;
       if (errorStreak === 0) return NONE;
@@ -337,6 +382,8 @@ export function createLoopDetector(config: LoopDetectorConfig): LoopDetector {
       steered = false;
       lastSignature = null;
       recent.length = 0;
+      textStreak = 0;
+      lastText = null;
     },
 
     snapshot() {

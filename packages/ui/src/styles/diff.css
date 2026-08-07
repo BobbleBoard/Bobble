@@ -63,11 +63,11 @@
 
 /* The ported color math: rows tint at bg 88% / hue 12%. */
 .pd-diff-row--add {
-  background: color-mix(in lab, var(--pd-diff-surface) 88%, var(--pd-diff-added-fg));
+  background: color-mix(in lab, var(--pd-diff-surface) 94%, var(--pd-diff-added-fg));
 }
 
 .pd-diff-row--del {
-  background: color-mix(in lab, var(--pd-diff-surface) 88%, var(--pd-diff-deleted-fg));
+  background: color-mix(in lab, var(--pd-diff-surface) 94%, var(--pd-diff-deleted-fg));
 }
 
 /* Left edge bars on changed rows (observed in the codex popover). */
@@ -92,9 +92,21 @@
   grid-template-columns: 1fr;
 }
 
+/* the user: "that color scheme is terrible for the text coloring in the canvas ...
+ * I think that's an error that can't be intentional."
+ *
+ * A newly written file is 100% additions, so EVERY row is `--add` and the whole
+ * canvas becomes a green field. The row tint is fine on a handful of changed
+ * lines and awful as a full-page background, and the code itself was inheriting
+ * a hue from it rather than reading as text. Pin the code to the primary text
+ * colour so the tint stays a BACKGROUND signal and never a foreground one.
+ *
+ * Both of these resolve through theme tokens, so light/dark and all three
+ * flavors follow automatically — no per-theme special-casing to drift. */
 .pd-diff-text {
   padding-right: 12px;
   white-space: pre;
+  color: var(--pd-text-primary);
 }
 
 .pd-diff-marker {

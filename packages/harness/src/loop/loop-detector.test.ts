@@ -285,3 +285,72 @@ describe('loopDetectorConfig from effort knobs', () => {
     expect(max.maxSteps).toBeGreaterThan(low.maxSteps);
   });
 });
+
+describe('a loop made entirely of prose', () => {
+  /*
+   * MEASURED: a turn emitted "Actually, I'll just present the app.py." roughly
+   * forty times in a row and nothing stopped it. Every counter in this file
+   * watched TOOL CALLS, and that loop made none — so the harness was blind to
+   * the most visible failure a user can see.
+   */
+  const det = () => createLoopDetector({ steerAfter: 3, abortAfter: 6 });
+  const LINE = "Actually, I'll just present the app.py.";
+
+  it('steers once the same sentence keeps coming back', () => {
+    const d = det();
+    expect(d.onText(LINE).kind).toBe('none');
+    expect(d.onText(LINE).kind).toBe('none');
+    expect(d.onText(LINE).kind).toBe('none');
+    const s = d.onText(LINE);
+    expect(s.kind).toBe('steer');
+    if (s.kind === 'steer') expect(s.cause).toBe('repeat-text');
+  });
+
+  it('aborts if it just carries on', () => {
+    const d = det();
+    let last = d.onText(LINE);
+    for (let i = 0; i < 10; i++) last = d.onText(LINE);
+    expect(last.kind).toBe('abort');
+  });
+
+  it('survives punctuation, case and spacing drift', () => {
+    /*
+     * What normalisation actually buys, stated honestly. The observed run
+     * drifted its punctuation between repeats, and comparing raw bytes would
+     * have reset the streak on every one.
+     *
+     * It does NOT survive a dropped or corrupted letter ("!ll" normalises to
+     * "ll", not "ill"), which the same run also produced occasionally. That
+     * costs a little sensitivity and buys predictability: an exact match on a
+     * normalised line cannot accuse a model that merely wrote something similar,
+     * and a loop long enough to matter supplies plenty of clean repeats anyway.
+     */
+    const d = det();
+    d.onText("Actually, I'll just present the app.py.");
+    d.onText('Actually, Ill just present the app.py');
+    d.onText("  ACTUALLY, I'LL JUST PRESENT THE APP.PY!  ");
+    expect(d.onText("actually i'll just present the app.py").kind).toBe('steer');
+  });
+
+  it('leaves ordinary prose alone', () => {
+    const d = det();
+    expect(d.onText('First I will read the CSV files.').kind).toBe('none');
+    expect(d.onText('Then I will compute the totals.').kind).toBe('none');
+    expect(d.onText('Finally I will report what is wrong.').kind).toBe('none');
+    expect(d.onText('First I will read the CSV files.').kind).toBe('none');
+  });
+
+  it('ignores short fragments that repeat innocently', () => {
+    const d = det();
+    for (let i = 0; i < 12; i++) expect(d.onText('ok').kind).toBe('none');
+  });
+
+  it('forgets the streak on reset, so it never leaks across turns', () => {
+    const d = det();
+    d.onText(LINE);
+    d.onText(LINE);
+    d.onText(LINE);
+    d.reset();
+    expect(d.onText(LINE).kind).toBe('none');
+  });
+});

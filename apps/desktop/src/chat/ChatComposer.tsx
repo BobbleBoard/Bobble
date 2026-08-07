@@ -922,7 +922,7 @@ export function ChatComposer({
                     onClick={() => pauseBusy()}
                     data-testid="composer-pause"
                   >
-                    <IconPause size={13} />
+                    <IconPause size={16} />
                   </IconButton>
                 ) : null}
                 <IconButton
@@ -932,7 +932,7 @@ export function ChatComposer({
                   onClick={() => stopBusy()}
                   data-testid="composer-stop"
                 >
-                  <IconStop size={13} />
+                  <IconStop size={16} />
                 </IconButton>
               </div>
             ) : pausedChat !== null ? (
@@ -947,7 +947,7 @@ export function ChatComposer({
                   onClick={() => void resumePausedChat()}
                   data-testid="composer-resume"
                 >
-                  <IconPlay size={13} />
+                  <IconPlay size={16} />
                 </IconButton>
                 <IconButton
                   aria-label="Discard — don't resume this reply"
@@ -968,7 +968,7 @@ export function ChatComposer({
                 onClick={() => void submit()}
                 data-testid="composer-send"
               >
-                <IconArrowUp size={14} />
+                <IconArrowUp size={17} />
               </IconButton>
             ) : null}
           </div>

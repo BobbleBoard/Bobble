@@ -631,18 +631,44 @@ async function regenerateFromPrompt(text: string): Promise<void> {
  * continue. A no-op if nothing is paused.
  */
 export async function resumePausedChat(): Promise<void> {
-  const store = usePiStore.getState();
-  const paused = store.pausedChat;
+  const paused = usePiStore.getState().pausedChat;
   if (paused === null) return;
   usePiStore.setState({ pausedChat: null });
 
-  const partial = frozenPartialAssistant(store.messages);
+  /*
+   * LET THE PAUSE LAND FIRST. the user: "I just pressed the pause button then
+   * immediately pressed again to resume and it stayed stopped and wasn't at all
+   * instant or seamless because it didn't start again."
+   *
+   * `pausePi` records the pause and shows Resume SYNCHRONOUSLY, but the abort it
+   * fires settles a moment later — and until it does, the assistant row is still
+   * `isStreaming`, which `frozenPartialAssistant` (correctly) refuses to
+   * continue. Resuming inside that window therefore fell through to
+   * `regenerateFromPrompt`: the whole turn thrown away and started again from
+   * the prompt, which is the opposite of seamless, and reads as "it didn't start
+   * again" because the token-exact continuation never happened.
+   *
+   * So wait for the row to actually freeze before deciding. Bounded — if the
+   * abort never lands, regenerating is still the right fallback — and it exits
+   * the instant the partial settles, so a normal resume stays immediate.
+   */
+  let partial = frozenPartialAssistant(usePiStore.getState().messages);
+  for (let i = 0; i < 40 && partial === null; i++) {
+    const msgs = usePiStore.getState().messages;
+    const tail = [...msgs].reverse().find((m) => m.kind === 'assistant' || m.kind === 'user');
+    // No partial reply exists at all (paused before the model said anything):
+    // there is nothing to continue token-exact, so stop waiting immediately.
+    if (tail === undefined || tail.kind === 'user') break;
+    await new Promise((r) => setTimeout(r, 25));
+    partial = frozenPartialAssistant(usePiStore.getState().messages);
+  }
   if (partial === null) {
-    // Nothing to continue (empty/streaming/no assistant row) — regenerate.
+    // Nothing to continue (empty/no assistant row) — regenerate.
     await regenerateFromPrompt(paused.userText.trim());
     return;
   }
 
+  const store = usePiStore.getState();
   const messages = groundTruthMessages() ?? reconstructMessages(store.messages, partial.id);
   const partialBlocks = partialBlocksOf(partial);
   const enableThinking =

@@ -18,11 +18,13 @@
  */
 
 import { stat } from 'node:fs/promises';
+import { homedir } from 'node:os';
 import type {
   ExtensionAPI,
   ExtensionCommandContext,
   ExtensionContext,
 } from '@mariozechner/pi-coding-agent';
+import { createBashToolDefinition } from '@mariozechner/pi-coding-agent';
 import {
   type AsyncClassifier,
   type ClassifyInput,
@@ -95,8 +97,6 @@ import { detectOpenedApp, openedAppNote } from './tools/opened-app.js';
 import { registerPlanTool } from './tools/plan-tool.js';
 import { registerPresentTool } from './tools/present.js';
 import { presentBridgeFromEnv } from './tools/present-bridge.js';
-import { homedir } from 'node:os';
-import { createBashToolDefinition } from '@mariozechner/pi-coding-agent';
 import { registerSandboxFileTools, resolveWorkspaceRoot } from './tools/sandbox-fs.js';
 import { truncateToolOutput } from './tools/tool-output-truncate.js';
 import { captureRegisteredTools } from './tools/tool-registry.js';
@@ -555,19 +555,24 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
         return n;
       },
       getFailureCount: (t) => failureCounts.get(t) ?? 0,
-      confirmRelax: async ({ toolName, error, count }) => {
-        const ctx = runtime.currentCtx;
-        // A spawned child pi reports ctx.hasUI === true (it speaks the same rpc
-        // protocol) even though NO human is attached — blocking on ctx.ui.confirm
-        // there hangs the subagent forever and rung-5's abort never fires. Treat
-        // any headless OR subagent context as "no human present" and resolve the
-        // relax deterministically instead of awaiting a dialog nobody can answer.
-        if (readSubagentDepth(process.env) > 0 || ctx?.hasUI !== true) return true;
-        return ctx.ui.confirm(
-          `Relax "${toolName}" schema?`,
-          `${error} (attempt ${count}). Accept the arguments as-is?`,
-        );
-      },
+      /*
+       * NEVER ASK. the user, shown the dialog mid-run: "this popup doesn't need to
+       * exist."
+       *
+       * It read `Relax "edit" schema? — edit args failed schema validation
+       * (attempt 1). Accept the arguments as-is?` and it stopped the run dead
+       * until somebody clicked. That is an internal repair detail phrased as a
+       * decision, and it is not one a person can actually make: the only
+       * information a user has is the same string we already decided was a
+       * malformed tool call. Whichever button they press, the honest next step
+       * is identical — try the call with the looser schema and let the tool
+       * itself fail if the arguments are genuinely wrong.
+       *
+       * Headless and subagent contexts already auto-resolved for exactly this
+       * reason (a dialog nobody can answer hangs the run forever). A human
+       * watching a build is in the same position; they just had a button.
+       */
+      confirmRelax: async () => true,
       relaxSchema: ({ toolName, schema }) => {
         // Re-register the tool under a looser per-session schema (same-name): store
         // a maximally-permissive schema keyed by tool name, which the provider
@@ -964,6 +969,39 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     if (typeof payload !== 'object' || payload === null) return payload;
     const body = payload as Record<string, unknown>;
     if (!Array.isArray(body.messages)) return body;
+    /*
+     * WATCH THE PROSE, NOT JUST THE TOOL CALLS. the user watched a turn write
+     * "Actually, I'll just present the app.py." about forty times and nothing
+     * stopped it — every loop counter keyed off tool calls, and that loop made
+     * none.
+     *
+     * There is no per-message hook to feed, but every agent step issues a
+     * provider request carrying the conversation so far, so the tail assistant
+     * message here IS the previous step's output. Reading it costs nothing and
+     * needs no new plumbing. Best-effort and never throws: a loop check must not
+     * be able to break a turn.
+     */
+    try {
+      const detector = runtime.loopDetector;
+      if (detector !== null) {
+        const tail = [...body.messages]
+          .reverse()
+          .find(
+            (m): m is { role: string; content: unknown } =>
+              typeof m === 'object' && m !== null && (m as { role?: unknown }).role === 'assistant',
+          );
+        const text = typeof tail?.content === 'string' ? tail.content : '';
+        const line =
+          text
+            .trim()
+            .split('\n')
+            .filter((l) => l.trim() !== '')
+            .pop() ?? '';
+        if (line !== '') handleLoopSignal(detector.onText(line));
+      }
+    } catch {
+      // never let the loop check break a turn
+    }
     try {
       const thought = lastAssistantThought(body.messages);
       if (thought === '') return body;
