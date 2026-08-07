@@ -286,6 +286,77 @@ export function listProject(cwd: string): string {
  * error, and exits on its own — there is no `timeout` on macOS to fall back on,
  * so a command that self-terminates is the whole requirement.
  */
+/**
+ * RUN THE TESTS, and say what really happened.
+ *
+ * MEASURED: a run asked for a CSV merger "with tests". The team delivered
+ * `test_merger.py` — 35 lines, correctly named, containing NO test functions at
+ * all. It was a top-level script that made some files and called the merger.
+ * `pytest` collected zero items and printed "no tests ran", which reads as fine
+ * to anything not looking closely, and the claim "with tests" went undischarged.
+ *
+ * This is the pattern that works in this codebase: the harness DOES the check and
+ * puts the real output in front of the model, rather than asking it to. Zero
+ * collected tests is reported as the failure it is — a file named `test_*` that
+ * contains no test is worse than no file, because it answers the question
+ * falsely.
+ *
+ * Deliberately generic across ecosystems, and SILENT when there is nothing to
+ * run: a task that never asked for tests must not be nagged about them.
+ */
+export function testSuiteReport(cwd: string): string {
+  const has = (re: RegExp): boolean => {
+    const walk = (dir: string, depth: number): boolean => {
+      if (depth > 2) return false;
+      let entries: string[] = [];
+      try {
+        entries = readdirSync(dir);
+      } catch {
+        return false;
+      }
+      for (const name of entries) {
+        if (name.startsWith('.') || name === 'node_modules') continue;
+        const full = nodePath.join(dir, name);
+        try {
+          if (statSync(full).isDirectory()) {
+            if (walk(full, depth + 1)) return true;
+          } else if (re.test(name)) return true;
+        } catch {
+          /* unreadable entry */
+        }
+      }
+      return false;
+    };
+    return walk(cwd, 0);
+  };
+
+  if (!has(/^(test_.*|.*_test)\.py$/i)) return '';
+  const res = spawnSync('python3', ['-m', 'pytest', '-q'], {
+    cwd,
+    encoding: 'utf8',
+    timeout: 120_000,
+  });
+  const out = `${res.stdout ?? ''}${res.stderr ?? ''}`.trim();
+  if (/no tests ran|collected 0 items/i.test(out)) {
+    return [
+      'I RAN YOUR TESTS AND THERE ARE NONE.',
+      '',
+      out.split('\n').slice(-4).join('\n'),
+      '',
+      'A file named `test_*.py` that contains no test function is worse than no',
+      'file: it answers "did you write tests?" falsely. pytest collects functions',
+      'named `test_*` — top-level script code is never run. Write real tests, run',
+      'them, and tell me what passed.',
+    ].join('\n');
+  }
+  if (res.status !== 0) {
+    return ['I RAN YOUR TESTS AND THEY FAIL:', '', out.split('\n').slice(-25).join('\n')].join(
+      '\n',
+    );
+  }
+  return `I ran your tests: ${out.split('\n').slice(-1)[0] ?? 'passed'}`;
+}
+
 export function runtimeCheck(runtime: string | null, cwd: string): string {
   if (runtime !== 'godot') return NO_CHECK;
   /*
@@ -1028,6 +1099,10 @@ export function createMeshAgentHost(config: MeshAgentHostConfig): MeshAgentHost 
                     }
                     if (claims.length === 0) return undefined;
                     log.info('corp bump: final check', { agentId, claims: claims.length });
+                    // The harness runs the suite itself — see testSuiteReport.
+                    // Empty when the project has no tests, so a task that never
+                    // asked for any is never nagged about them.
+                    const tests = testSuiteReport(config.cwd);
                     return [
                       finalCheck({
                         claims,
@@ -1044,6 +1119,7 @@ export function createMeshAgentHost(config: MeshAgentHostConfig): MeshAgentHost 
                        * that. When we cannot check, the honest move is to say so
                        * and hand the burden back rather than quietly bless it.
                        */
+                      ...(tests !== '' ? [tests, ''] : []),
                       ...(isUncheckable(state)
                         ? [
                             'I COULD NOT CHECK THIS ONE AUTOMATICALLY — there is no runtime',

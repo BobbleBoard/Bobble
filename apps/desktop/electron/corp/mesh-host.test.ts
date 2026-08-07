@@ -20,7 +20,7 @@ import {
   taskNote,
   excerptFailures,
   listProject,
-  emptyProjectComplaint, MESH_ENTRY, isUncheckable, runtimeCheck } from './mesh-host';
+  emptyProjectComplaint, MESH_ENTRY, isUncheckable, runtimeCheck, testSuiteReport } from './mesh-host';
 
 describe('what a run hands through to its host', () => {
   it('carries every passthrough setting that was supplied', () => {
@@ -236,5 +236,42 @@ describe('"could not check" is not "broken"', () => {
   it('does NOT call a real failure uncheckable', () => {
     expect(isUncheckable('3 problem(s):\nres://main.tscn:5 Parse Error')).toBe(false);
     expect(isUncheckable('It loaded with NO errors.')).toBe(false);
+  });
+});
+
+describe('testSuiteReport — a file named test_* with no tests in it', () => {
+  /*
+   * MEASURED: a run asked for a CSV merger "with tests". The team delivered
+   * test_merger.py — 35 lines, correctly named, containing NO test functions.
+   * pytest collected zero items and printed "no tests ran", which reads as fine,
+   * and the claim went undischarged.
+   */
+  const tmp = mkdtempSync(path.join(os.tmpdir(), 'bobble-tests-'));
+
+  it('is SILENT when the project has no test files at all', () => {
+    const dir = path.join(tmp, 'no-tests');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(path.join(dir, 'main.py'), 'print(1)\n');
+    // A task that never asked for tests must not be nagged about them.
+    expect(testSuiteReport(dir)).toBe('');
+  });
+
+  it('reports zero-collected as the failure it is', () => {
+    const dir = path.join(tmp, 'fake-tests');
+    mkdirSync(dir, { recursive: true });
+    // Exactly the shape delivered: top-level script code, no test functions.
+    writeFileSync(path.join(dir, 'test_thing.py'), 'x = 1\nprint("ran")\n');
+    const out = testSuiteReport(dir);
+    expect(out).toContain('THERE ARE NONE');
+    expect(out).toContain('test_*');
+  });
+
+  it('passes a real suite through', () => {
+    const dir = path.join(tmp, 'real-tests');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(path.join(dir, 'test_ok.py'), 'def test_one():\n    assert 1 == 1\n');
+    const out = testSuiteReport(dir);
+    expect(out).toContain('I ran your tests');
+    expect(out).not.toContain('THERE ARE NONE');
   });
 });
