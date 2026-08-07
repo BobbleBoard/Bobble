@@ -90,6 +90,13 @@ function rowStatusLine(node: OrgNodeView, anyoneElseWorking: boolean): string {
   }
 }
 
+/** The root of the hierarchy — the chat model itself, which has no mesh seat
+ * and therefore no mirrored child chat. Selecting it means "back to the
+ * conversation", not "open a subagent". */
+function isRoot(n: OrgNodeView): boolean {
+  return n.parentId === undefined && (n.role === 'ceo' || n.role === 'solo');
+}
+
 /** Active rows on top: working → blocked → queued → done → stopped. */
 const STATE_RANK: Record<OrgNodeView['state'], number> = {
   working: 0,
@@ -336,8 +343,18 @@ export function CorpInlineTurn({
                      * possible in the first place. Selecting from either place
                      * now lights up both.
                      */
-                    data-selected={viewedChildId === corpChildId(node.id) || undefined}
-                    onClick={() => setViewedChild(corpChildId(node.id))}
+                    /*
+                     * The root row IS the chat. It has no mirrored child (there
+                     * is no ceo seat in the mesh), so selecting it means going
+                     * back to the top-level conversation — `viewedChild = null` —
+                     * which is exactly what the sidebar's own chat row does.
+                     */
+                    data-selected={
+                      (isRoot(node)
+                        ? viewedChildId === null
+                        : viewedChildId === corpChildId(node.id)) || undefined
+                    }
+                    onClick={() => setViewedChild(isRoot(node) ? null : corpChildId(node.id))}
                   >
                     <RowGlyph state={node.state} />
                     <span className="pd-corpturn-row-name">{node.name}</span>

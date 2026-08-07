@@ -293,8 +293,45 @@ export const useCorpStore = create<CorpStoreState>((set) => ({
     set((s) => (s.contextPercent === percent ? s : { contextPercent: percent })),
   selectNode: (node) => set((s) => ({ pinnedNode: s.pinnedNode?.id === node?.id ? null : node })),
   followLive: () => set({ pinnedNode: null }),
-  trackChart: (chart) =>
+  trackChart: (rawChart) =>
     set((s) => {
+      /*
+       * THE TOP-LEVEL ROLE IS IN THE ROOM. the user: "I just can't see the activity
+       * of the original model now ... the situation room doesn't show any top
+       * level role".
+       *
+       * A mesh production has NO ceo seat, deliberately — the user: "don't spawn a
+       * fake CEO clone ... the only ceo is the original one that originally
+       * talked to the user". That is right, and it left the room listing a
+       * manager at the top of a hierarchy with nothing above it and no way back
+       * to the agent you were actually talking to.
+       *
+       * The CEO is not a seat; it is the CHAT. So it is added HERE, at the view
+       * boundary, rather than to the roster — the situation surface already
+       * knows how to put a root first (`isRootNode`) and route a click back to
+       * its stream; it just never had one to show. Nothing about the mesh
+       * changes: no extra agent, no extra prompt, no second builder.
+       */
+      const chart = rawChart.nodes.some((n) => n.parentId === undefined && n.role === 'ceo')
+        ? rawChart
+        : {
+            ...rawChart,
+            nodes: [
+              {
+                id: 'ceo',
+                role: 'ceo' as const,
+                name: 'You and the assistant',
+                // Working whenever anyone below is: the chat model is parked
+                // inside its blocking talk_to_manager for exactly that long.
+                state: rawChart.nodes.some((n) => n.state === 'working')
+                  ? ('working' as const)
+                  : ('done' as const),
+              },
+              ...rawChart.nodes.map((n) =>
+                n.parentId === undefined ? { ...n, parentId: 'ceo' } : n,
+              ),
+            ],
+          };
       // PRESERVE THE CEO'S VISION across promotion: pre-promotion the vision streams
       // into `workerBlocks['solo']`; on promotion the chart swaps the `solo` node for a
       // `ceo` node, and the lead history feed reads `workerBlocks['ceo']` — which would
