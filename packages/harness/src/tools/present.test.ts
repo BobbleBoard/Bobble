@@ -125,3 +125,49 @@ describe('reviewInstruction', () => {
     expect(reviewInstruction()).toMatch(/you still have the turn/);
   });
 });
+
+describe('present resolves ~ before touching the filesystem', () => {
+  /*
+   * the user, from a screenshot: "I see a present file/folder tool call that didn't
+   * present anything." A model writes `~/proj/app.py` constantly; nothing
+   * downstream expanded it, so stat failed, present returned "There is nothing
+   * at ~/proj/app.py", no present:show was emitted, and the thread showed a
+   * present ROW with no card beneath it.
+   *
+   * Same root as the syntax check running py_compile on a quoted tilde.
+   */
+  it('stats, shows and previews the expanded path — never the tilde', async () => {
+    const seen: string[] = [];
+    let tool: { execute: (id: string, params: unknown) => Promise<unknown> } | null = null;
+    const pi = {
+      registerTool: (def: typeof tool) => {
+        tool = def;
+      },
+    };
+    registerPresentTool(
+      pi as never,
+      {
+        stat: async (path: string) => {
+          seen.push(path);
+          return { isDirectory: false, size: 10 };
+        },
+        bridge: {
+          show: async ({ path }: { path: string }) => {
+            seen.push(path);
+            return { ok: true };
+          },
+          preview: async ({ path }: { path: string }) => {
+            seen.push(path);
+            return { ok: true, text: 'hello' };
+          },
+        },
+      } as never,
+    );
+    expect(tool).not.toBeNull();
+    await tool?.execute('id', { path: '~/proj/app.py' });
+
+    expect(seen.length).toBeGreaterThan(0);
+    for (const p of seen) expect(p.startsWith('~')).toBe(false);
+    expect(seen.every((p) => p.endsWith('/proj/app.py'))).toBe(true);
+  });
+});

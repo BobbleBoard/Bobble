@@ -27,6 +27,7 @@
  * is pure and carries the whole policy.
  */
 
+import { homedir } from 'node:os';
 import type { ExtensionAPI } from '@mariozechner/pi-coding-agent';
 import { Type } from '@sinclair/typebox';
 
@@ -199,7 +200,19 @@ export function registerPresentTool(pi: ExtensionAPI, deps: PresentToolDeps): vo
           details: undefined,
         };
       }
-      const info = await deps.stat(p);
+      /*
+       * EXPAND ~ FIRST. A model writes `~/proj/app.py` constantly, and nothing
+       * downstream expands it: `stat` fails, present returns "There is nothing
+       * at ~/proj/app.py", no `present:show` is emitted, and the thread shows a
+       * present ROW from the tool call with no card under it — the user: "I see a
+       * present file/folder tool call that didn't present anything."
+       *
+       * Same root as the syntax check running py_compile on a quoted tilde. A
+       * leading ~/ is a home reference; a tilde anywhere else is a filename
+       * character and is left alone.
+       */
+      const resolved = p.startsWith('~/') ? `${homedir()}${p.slice(1)}` : p;
+      const info = await deps.stat(resolved);
       if (info === null) {
         return {
           content: [
@@ -214,14 +227,18 @@ export function registerPresentTool(pi: ExtensionAPI, deps: PresentToolDeps): vo
           details: undefined,
         };
       }
-      const plan = previewPlanFor({ path: p, isDirectory: info.isDirectory });
+      const plan = previewPlanFor({ path: resolved, isDirectory: info.isDirectory });
       const note = (params as { note?: string }).note;
-      const shown = await deps.bridge.show({ path: p, ...(note !== undefined ? { note } : {}) });
-      const preview = await deps.bridge.preview({ path: p, kind: plan.kind });
+      // The RESOLVED path — the renderer opens this, and it cannot open a tilde.
+      const shown = await deps.bridge.show({
+        path: resolved,
+        ...(note !== undefined ? { note } : {}),
+      });
+      const preview = await deps.bridge.preview({ path: resolved, kind: plan.kind });
 
       const content: Array<Record<string, unknown>> = [];
       const head = [
-        `Presented ${p} to the user${shown.ok ? '' : ` (the canvas could not open it: ${shown.error ?? 'unknown'})`}.`,
+        `Presented ${resolved} to the user${shown.ok ? '' : ` (the canvas could not open it: ${shown.error ?? 'unknown'})`}.`,
         `Preview: ${plan.because}.`,
       ].join(' ');
       content.push({ type: 'text', text: head });
