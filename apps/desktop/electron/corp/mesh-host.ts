@@ -1311,8 +1311,37 @@ export function createMeshAgentHost(config: MeshAgentHostConfig): MeshAgentHost 
                      * a START, not a finish — see hasProduct for the run this
                      * cost. Checked BEFORE `finalChecked` is set, so the real
                      * handback still gets its one check later.
+                     *
+                     * CONTINUE, DO NOT STOP. My first version returned undefined
+                     * here, which ended the bump loop — and run 12 showed what
+                     * that was really holding up: the manager wrote a plan, ended
+                     * its turn without commissioning anybody, and nothing started
+                     * it again. `manager:done`, zero files, no engineer ever run.
+                     *
+                     * The premature final check had been MASKING that. It was
+                     * wrong about what it said, but it was the kick that made the
+                     * manager delegate, so removing it removed the kick too. The
+                     * weakness is real and predates both: a manager that stops
+                     * after planning is exactly the premature stop the bump was
+                     * built for (see RoleAgentRunInput.bump). So say the true
+                     * thing instead of the false one, and keep it going.
+                     * Bounded by maxBumps like every other bump.
                      */
-                    if (!hasProduct(config.cwd)) return undefined;
+                    if (!hasProduct(config.cwd)) {
+                      log.info('corp bump: nothing built yet, continue', { agentId });
+                      return [
+                        'NOTHING HAS BEEN BUILT YET. I looked in the workspace and there is',
+                        'no product in it — only your own notes.',
+                        '',
+                        'This is not a criticism of the plan. It is that a plan is not the',
+                        'thing the user asked for, and your turn ended without the work',
+                        'starting. Get it underway now: commission the contracts you just',
+                        'described, or build the first piece yourself if it is small enough.',
+                        '',
+                        'Do not reply to me with the plan again. The next thing that happens',
+                        'should be a file existing.',
+                      ].join('\n');
+                    }
                     // Clean. One last look at the claims, then done.
                     if (finalChecked.has(agentId)) return undefined;
                     finalChecked.add(agentId);

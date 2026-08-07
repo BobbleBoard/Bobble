@@ -9,7 +9,7 @@ import { buildCorpRoster } from '@pi-desktop/harness/corp';
  * observer is silent, and silence is what makes it expensive: you go looking for
  * a wiring bug that isn't there.
  */
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -416,5 +416,27 @@ describe('hasProduct — a handback needs something to hand back', () => {
     const dir = mk('scratchonly', {}, ['.scratch']);
     writeFileSync(path.join(dir, '.scratch', 'notes.md'), 'thinking\n');
     expect(hasProduct(dir)).toBe(false);
+  });
+});
+
+describe('nothing built yet is a continue, not a stop', () => {
+  /*
+   * Run 12, after the hasProduct guard landed: the manager wrote a plan, ended
+   * its turn without commissioning anybody, and nothing restarted it —
+   * `manager:done`, zero files, no engineer ever run.
+   *
+   * The premature final check had been masking that. It said something false but
+   * it was the kick that made the manager delegate, so removing it removed the
+   * kick. hasProduct decides WHICH message to send, never whether to stop
+   * bumping: a manager that halts after planning is the premature stop the bump
+   * exists to catch.
+   */
+  it('keeps hasProduct as a message choice, not a termination', () => {
+    const src = readFileSync(path.join(__dirname, 'mesh-host.ts'), 'utf8');
+    const guard = src.slice(src.indexOf('if (!hasProduct(config.cwd))'));
+    const body = guard.slice(0, guard.indexOf('// Clean.'));
+    expect(body).toContain('NOTHING HAS BEEN BUILT YET');
+    // The regression in one line: this branch must never end the loop.
+    expect(body).not.toContain('return undefined');
   });
 });
