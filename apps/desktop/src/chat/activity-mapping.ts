@@ -233,6 +233,15 @@ function connectorTool(
 const TOOL_REGISTRY: Record<string, ToolResolution> = {
   // file read
   read: { kind: 'read' },
+  /*
+   * A FOLDER IS NOT A FILE. `ls` had no entry, so listing a directory rendered
+   * as "Read a file — buggyapp" with a file icon. Small, but a trace that
+   * mislabels what it did is a trace you cannot lean on, and this is the very
+   * first row of most runs. Same kind (the reveal and icon behave), honest verb.
+   */
+  ls: { kind: 'read', label: ['Listing a folder', 'Listed a folder'] },
+  list_dir: { kind: 'read', label: ['Listing a folder', 'Listed a folder'] },
+  listdir: { kind: 'read', label: ['Listing a folder', 'Listed a folder'] },
   view: { kind: 'read' },
   open_file: { kind: 'read' },
   read_file: { kind: 'read' },

@@ -676,3 +676,26 @@ describe('mapToolStep — commission_contract (D1 contract row)', () => {
     expect(step.argsText).toContain('src/combat/move.ts');
   });
 });
+
+describe('a folder is not a file', () => {
+  // Spotted by looking at a real run: the first row read "Read a file —
+  // buggyapp" with a file icon, and buggyapp is a directory.
+  it('labels a directory listing as a listing', () => {
+    const step = mapToolStep(
+      { type: 'toolCall', id: 't1', name: 'ls', args: { path: 'buggyapp' } } as never,
+      undefined,
+      false,
+    );
+    expect(step.data.label).toBe('Listed a folder');
+    expect(step.data.label).not.toContain('file');
+  });
+
+  it('still says file for an actual file read', () => {
+    const step = mapToolStep(
+      { type: 'toolCall', id: 't2', name: 'read', args: { path: 'app.py' } } as never,
+      undefined,
+      false,
+    );
+    expect(step.data.label).toBe('Read a file');
+  });
+});
