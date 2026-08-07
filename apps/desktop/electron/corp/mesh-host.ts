@@ -49,6 +49,7 @@ import {
 } from '@pi-desktop/harness/corp';
 import { createLogger } from '@pi-desktop/shared';
 import { AgentPool } from './agent-pool';
+import { blindCriticEnabled, blindCriticReport } from './blind-critic';
 import {
   blockedCapabilities,
   type Capability,
@@ -1205,7 +1206,7 @@ export function createMeshAgentHost(config: MeshAgentHostConfig): MeshAgentHost 
                    * against a role that cannot converge, not a work budget.
                    */
                   maxBumps: 6,
-                  nextPrompt: ({ finalText }: { finalText: string }) => {
+                  nextPrompt: async ({ finalText }: { finalText: string }) => {
                     const state = runtimeCheck(taskProfileRef.value.runtime, config.cwd);
                     /*
                      * ANYTHING THAT IS NOT THE CLEAN SENTENCE IS BROKEN.
@@ -1283,6 +1284,29 @@ export function createMeshAgentHost(config: MeshAgentHostConfig): MeshAgentHost 
                     // Files nothing points at — see orphanReport. Also silent
                     // when there is nothing to say.
                     const orphans = orphanReport(config.cwd);
+                    /*
+                     * THE PART CODE CANNOT CHECK. Everything above is a
+                     * deterministic critic — it opens the project, runs the
+                     * suite, asks what nothing points at. None of them can say
+                     * whether the thing is any GOOD, and the roles that can have
+                     * all watched the build and are grading the delta.
+                     *
+                     * So one auditor with no history, no claims and no ability to
+                     * write. It runs HERE, inside the `finalChecked` guard, which
+                     * means once per handback rather than once per bump — a fresh
+                     * context cannot reuse the KV prefix, and on this machine that
+                     * prefill is the single most expensive thing we can spend.
+                     * One, not six.
+                     */
+                    const critic = blindCriticEnabled()
+                      ? await blindCriticReport({
+                          handle: config.handle,
+                          cwd: config.cwd,
+                          // The ORIGINAL ask, never the agent's restatement of
+                          // it — a bar the implementer got to phrase is not a bar.
+                          task: config.task ?? '',
+                        })
+                      : '';
                     return [
                       finalCheck({
                         claims,
@@ -1301,6 +1325,7 @@ export function createMeshAgentHost(config: MeshAgentHostConfig): MeshAgentHost 
                        */
                       ...(tests !== '' ? [tests, ''] : []),
                       ...(orphans !== '' ? [orphans, ''] : []),
+                      ...(critic !== '' ? [critic, ''] : []),
                       ...(isUncheckable(state)
                         ? [
                             'I COULD NOT CHECK THIS ONE AUTOMATICALLY — there is no runtime',

@@ -1053,8 +1053,15 @@ export interface BumpConfig {
   readonly maxBumps: number;
   /** Given the run's current final assistant text, return the user turn to append to
    * CONTINUE the same session, or `undefined` to stop (deliverable present, or a
-   * terminal "unfulfillable" decision). */
-  readonly nextPrompt: (ctx: { readonly finalText: string }) => string | undefined;
+   * terminal "unfulfillable" decision).
+   *
+   * MAY BE ASYNC. The evidence stapled to a bump is not always something we
+   * already know: a blind critic has to actually go and run the product before it
+   * can say anything, which is a model call. Awaiting a plain string is free, so
+   * synchronous implementations are unaffected. */
+  readonly nextPrompt: (ctx: {
+    readonly finalText: string;
+  }) => string | undefined | Promise<string | undefined>;
 }
 
 /** The recorded terminal state of one role-agent run. */
@@ -1507,7 +1514,7 @@ export async function openRoleSession(
       // an ordinary user turn on the live session (its context preserved), NOT a fresh
       // run and NOT a work cap.
       while (options.bump !== undefined && bumps < options.bump.maxBumps) {
-        const next = options.bump.nextPrompt({ finalText: lastText() });
+        const next = await options.bump.nextPrompt({ finalText: lastText() });
         if (next === undefined) break; // deliverable present or unfulfillable declared
         bumps += 1;
         await session.prompt(next);
