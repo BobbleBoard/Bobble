@@ -20,7 +20,7 @@ import {
   taskNote,
   excerptFailures,
   listProject,
-  emptyProjectComplaint, MESH_ENTRY, isUncheckable, orphanReport, runtimeCheck, testSuiteReport } from './mesh-host';
+  emptyProjectComplaint, hasProduct, MESH_ENTRY, isUncheckable, orphanReport, runtimeCheck, testSuiteReport } from './mesh-host';
 
 describe('what a run hands through to its host', () => {
   it('carries every passthrough setting that was supplied', () => {
@@ -370,5 +370,51 @@ describe('a timed-out runtime check explains itself', () => {
     expect(complaint?.replace(/^It reported no errors,\s*but\s*/i, '')).not.toContain(
       'reported no errors',
     );
+  });
+});
+
+describe('hasProduct — a handback needs something to hand back', () => {
+  /*
+   * MEASURED, run 11: 2.5 minutes in, the manager had written a plan and its
+   * first contract, no engineer had run, and the workspace held only
+   * `.bobble-chat` and an empty `.scratch`. The harness called that a handback
+   * and demanded a FINAL CHECK, listing the plan back as twelve claims about a
+   * finished product.
+   *
+   * Cause: runtimeCheck returns NO_CHECK for anything non-Godot, so `broken` is
+   * false and the branch labelled "Clean" runs at the end of turn one. Five of
+   * six benchmarks have no runtime check.
+   */
+  const tmp = mkdtempSync(path.join(os.tmpdir(), 'bobble-product-'));
+  const mk = (name: string, files: Record<string, string>, dirs: string[] = []): string => {
+    const dir = path.join(tmp, name);
+    mkdirSync(dir, { recursive: true });
+    for (const d of dirs) mkdirSync(path.join(dir, d), { recursive: true });
+    for (const [f, body] of Object.entries(files)) writeFileSync(path.join(dir, f), body);
+    return dir;
+  };
+
+  it('is false for the exact shape run 11 was final-checked on', () => {
+    expect(hasProduct(mk('run11', { '.bobble-chat': 'id' }, ['.scratch']))).toBe(false);
+  });
+
+  it('is false for an empty workspace', () => {
+    expect(hasProduct(mk('empty', {}))).toBe(false);
+  });
+
+  it('is true as soon as one real file exists', () => {
+    expect(hasProduct(mk('one', { 'main.py': 'print(1)\n' }))).toBe(true);
+  });
+
+  it('finds a product nested in a subdirectory', () => {
+    const dir = mk('nested', {}, ['src']);
+    writeFileSync(path.join(dir, 'src', 'app.py'), 'x = 1\n');
+    expect(hasProduct(dir)).toBe(true);
+  });
+
+  it('does not count the roles own scratch area as a deliverable', () => {
+    const dir = mk('scratchonly', {}, ['.scratch']);
+    writeFileSync(path.join(dir, '.scratch', 'notes.md'), 'thinking\n');
+    expect(hasProduct(dir)).toBe(false);
   });
 });

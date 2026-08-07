@@ -505,6 +505,50 @@ export function orphanReport(cwd: string): string {
   ].join('\n');
 }
 
+/**
+ * Has anything been BUILT yet? The cheapest possible question, and nothing was
+ * asking it.
+ *
+ * MEASURED, run 11: 2.5 minutes in, the manager had written its plan and its
+ * first contract and no engineer had run. The workspace held `.bobble-chat` and
+ * an empty `.scratch`. The harness read that turn ending as a HANDBACK and told
+ * the manager "THIS IS THE FINAL CHECK. Do it now, in this turn", listing its
+ * plan back to it as twelve claims about a finished product.
+ *
+ * The cause is the fourth instance of one mistake: `runtimeCheck` returns
+ * `NO_CHECK` for anything that is not Godot, `broken` is false for it, and the
+ * branch below is labelled "Clean". So "there is no check for this kind of
+ * project" silently became "the work is done and it is fine" — after previously
+ * meaning "it does not load", and before that letting "It loads." be printed
+ * when nothing had been checked at all. Godot escapes only because its check is
+ * what drives its loop; the other five benchmarks have no check, so every one of
+ * them has been getting a final-check demand at the end of turn one.
+ *
+ * A blind critic found this by going and looking ("the directory is empty"), and
+ * this is that finding turned into something that costs nothing and always runs.
+ */
+export function hasProduct(cwd: string): boolean {
+  const walk = (dir: string, depth: number): boolean => {
+    if (depth > 3) return false;
+    let entries: import('node:fs').Dirent[] = [];
+    try {
+      entries = readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return false;
+    }
+    for (const e of entries) {
+      // `.scratch` is the roles' own working area and `.bobble-chat` is the
+      // folder's claim file — neither is a deliverable.
+      if (e.name.startsWith('.') || e.name === 'node_modules') continue;
+      if (e.isDirectory()) {
+        if (walk(nodePath.join(dir, e.name), depth + 1)) return true;
+      } else return true;
+    }
+    return false;
+  };
+  return walk(cwd, 0);
+}
+
 export function runtimeCheck(runtime: string | null, cwd: string): string {
   if (runtime !== 'godot') return NO_CHECK;
   /*
@@ -1262,6 +1306,13 @@ export function createMeshAgentHost(config: MeshAgentHostConfig): MeshAgentHost 
                         'This is the only thing standing between the user and a working product.',
                       ].join('\n');
                     }
+                    /*
+                     * A HANDBACK NEEDS A PRODUCT. Nothing built yet means this is
+                     * a START, not a finish — see hasProduct for the run this
+                     * cost. Checked BEFORE `finalChecked` is set, so the real
+                     * handback still gets its one check later.
+                     */
+                    if (!hasProduct(config.cwd)) return undefined;
                     // Clean. One last look at the claims, then done.
                     if (finalChecked.has(agentId)) return undefined;
                     finalChecked.add(agentId);
