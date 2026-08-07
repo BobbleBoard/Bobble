@@ -275,3 +275,28 @@ describe('testSuiteReport — a file named test_* with no tests in it', () => {
     expect(out).not.toContain('THERE ARE NONE');
   });
 });
+
+describe('a timed-out runtime check explains itself', () => {
+  /*
+   * MEASURED on run 9: a project.godot with a valid config_version and real
+   * scenes but NO `run/main_scene`. `godot --headless --quit` had nothing to run,
+   * so it never quit — my own check sat for over two minutes with no output.
+   * Reporting "spawnSync ETIMEDOUT" tells the model nothing it can act on, and
+   * the cause is one emptyProjectComplaint already knows how to name.
+   */
+  const tmp = mkdtempSync(path.join(os.tmpdir(), 'bobble-timeout-'));
+
+  it('names the missing main_scene rather than the errno', () => {
+    const dir = path.join(tmp, 'no-main-scene');
+    mkdirSync(path.join(dir, 'scenes'), { recursive: true });
+    writeFileSync(path.join(dir, 'project.godot'), 'config_version=5\n\n[application]\n');
+    writeFileSync(path.join(dir, 'scenes', 'a.tscn'), '[gd_scene format=3]\n');
+    const complaint = emptyProjectComplaint(dir);
+    expect(complaint).toBeTruthy();
+    expect(complaint).toContain('run/main_scene');
+    // And the wording must not claim a clean run when nothing ran.
+    expect(complaint?.replace(/^It reported no errors,\s*but\s*/i, '')).not.toContain(
+      'reported no errors',
+    );
+  });
+});

@@ -385,7 +385,37 @@ export function runtimeCheck(runtime: string | null, cwd: string): string {
   });
   const text = `${r.stdout ?? ''}\n${r.stderr ?? ''}`;
   const errs = text.split('\n').filter((l) => /ERROR|SCRIPT ERROR/.test(l));
-  if (r.error !== undefined) return `The check could not run: ${r.error.message}`;
+  if (r.error !== undefined) {
+    /*
+     * A TIMEOUT IS A DIAGNOSIS, NOT AN ACCIDENT.
+     *
+     * `godot --headless --quit` exits by itself — unless it has nothing to run,
+     * in which case it waits. MEASURED on this run: a project.godot with a valid
+     * config_version and real scenes but NO `run/main_scene` hung for over two
+     * minutes with no output at all. Reporting "spawnSync ETIMEDOUT" tells the
+     * model nothing it can act on, and the cause is nearly always the same one,
+     * which emptyProjectComplaint already knows how to name — it was just never
+     * consulted on this branch.
+     */
+    const timedOut = /ETIMEDOUT|timed out/i.test(r.error.message);
+    // The complaint opens "It reported no errors, but ..." — true on the success
+    // branch it was written for, false here, where nothing was reported at all.
+    // A harness statement that is not true is the thing this file keeps paying for.
+    const why = emptyProjectComplaint(cwd)?.replace(/^It reported no errors,\s*but\s*/i, '');
+    if (timedOut) {
+      return [
+        'The check TIMED OUT — Godot never exited.',
+        '',
+        why ??
+          'That means it had nothing to run and sat waiting. Almost always the ' +
+            'project has no `run/main_scene` set in project.godot, or that file is ' +
+            'malformed, so Godot fell back to a window instead of loading and quitting.',
+        '',
+        `The project directory contains:\n${listProject(cwd)}`,
+      ].join('\n');
+    }
+    return `The check could not run: ${r.error.message}`;
+  }
   if (errs.length === 0) {
     /*
      * LOADING CLEANLY IS NOT THE SAME AS BEING A GAME.
