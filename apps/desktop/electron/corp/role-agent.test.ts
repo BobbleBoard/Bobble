@@ -1,3 +1,6 @@
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   applySamplingMode,
@@ -649,6 +652,68 @@ describe('commands that open a window and wait', () => {
   it('is wired into the gate', () => {
     const blocked = bashDenylistGate('bash', { command: 'godot --path .' });
     expect(blocked?.block).toBe(true);
-    expect(bashDenylistGate('bash', { command: 'godot --headless --quit --path .' })).toBeUndefined();
+    expect(
+      bashDenylistGate('bash', { command: 'godot --headless --quit --path .' }),
+    ).toBeUndefined();
+  });
+});
+
+describe('wouldHang — a GUI app run in the foreground', () => {
+  /*
+   * MEASURED twice. Asked to "fix it and make sure it works", the model ran
+   * `python3 ~/bobble-testbed/buggyapp/app.py` to see if it worked; that calls
+   * root.mainloop(), the turn blocked, and the run ended having fixed nothing.
+   * A tester's own GUI script separately sat 2m42s at 855MB.
+   *
+   * `python3 app.py` is indistinguishable from any other script by its text, so
+   * the guard reads the file and looks for the loop that blocks.
+   */
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'hang-'));
+  const write = (name: string, body: string): string => {
+    writeFileSync(path.join(dir, name), body);
+    return name;
+  };
+
+  it('refuses a tkinter app and says how to drive it instead', () => {
+    write('gui.py', 'import tkinter as tk\nroot = tk.Tk()\nroot.mainloop()\n');
+    const out = wouldHang('python3 gui.py', dir);
+    expect(out).not.toBeNull();
+    expect(out).toContain('never returns');
+    expect(out).toContain('mainloop');
+    // It must say what to do instead, not merely refuse.
+    expect(out).toContain('update()');
+  });
+
+  it('refuses a Qt app', () => {
+    write(
+      'qt.py',
+      'from PySide6.QtWidgets import QApplication\napp = QApplication([])\napp.exec()\n',
+    );
+    expect(wouldHang('python3 qt.py', dir)).toContain('never returns');
+  });
+
+  it('refuses a foreground server', () => {
+    write('srv.py', 'from flask import Flask\napp = Flask(__name__)\napp.run()\n');
+    expect(wouldHang('python3 srv.py', dir)).toContain('never returns');
+  });
+
+  it('ALLOWS it under a timeout — a block becomes a failed test, not a dead run', () => {
+    write('gui2.py', 'import tkinter as tk\nroot = tk.Tk()\nroot.mainloop()\n');
+    expect(wouldHang('timeout 10 python3 gui2.py', dir)).toBeNull();
+  });
+
+  it('leaves ordinary scripts alone', () => {
+    write('calc.py', 'print(sum(range(10)))\n');
+    expect(wouldHang('python3 calc.py', dir)).toBeNull();
+  });
+
+  it('leaves a driving script alone — update(), never mainloop()', () => {
+    // This is exactly what the tester is told to write; it must not be blocked.
+    write('drive.py', 'import tkinter as tk\nroot = tk.Tk()\nroot.update()\nroot.destroy()\n');
+    expect(wouldHang('python3 drive.py', dir)).toBeNull();
+  });
+
+  it('never throws on a script that does not exist', () => {
+    expect(wouldHang('python3 nope-not-here.py', dir)).toBeNull();
   });
 });

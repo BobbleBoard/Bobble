@@ -27,7 +27,7 @@
  * real-server smoke can load it directly under Node's TS type-stripping.
  */
 
-import { mkdtempSync, rmSync, statSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 // TYPE-ONLY import of the pi SDK — erased at build, so it emits NO runtime code.
@@ -401,7 +401,11 @@ export function createStepCapCounter(
  * so EVERY corp role-agent that has `bash` (engineers, reviewers, CEO, consults)
  * is gated the same way, and the flagged command NEVER executes.
  */
-export function bashDenylistGate(toolName: string, input: unknown): StepCapBlock | undefined {
+export function bashDenylistGate(
+  toolName: string,
+  input: unknown,
+  cwd?: string,
+): StepCapBlock | undefined {
   if (toolName !== 'bash') return undefined;
   const command =
     input !== null &&
@@ -411,7 +415,8 @@ export function bashDenylistGate(toolName: string, input: unknown): StepCapBlock
       : '';
   const reason = checkScaryBash(command);
   if (reason !== null) return { block: true, reason: `blocked by denylist: ${reason}` };
-  const hang = wouldHang(command);
+  // cwd so a relative script path in the command resolves to a real file.
+  const hang = wouldHang(command, cwd);
   return hang !== null ? { block: true, reason: hang } : undefined;
 }
 
@@ -434,8 +439,52 @@ export function bashDenylistGate(toolName: string, input: unknown): StepCapBlock
  * the command genuinely cannot succeed in a headless harness, and the model gets
  * the correction immediately rather than after twenty minutes of nothing.
  */
-export function wouldHang(command: string): string | null {
+export function wouldHang(command: string, cwd?: string): string | null {
   const c = command.trim();
+  /*
+   * A GUI APP RUN IN THE FOREGROUND NEVER RETURNS — and it takes the agent with
+   * it. MEASURED: asked to fix a tkinter app, the model ran
+   * `python3 ~/bobble-testbed/buggyapp/app.py` to "see if it works". That calls
+   * root.mainloop(); the turn blocked, memory climbed, and the run ended having
+   * fixed nothing. Separately a tester's own GUI script sat 2m42s at 855MB.
+   *
+   * Not guessable from the command alone — `python3 app.py` looks like any other
+   * script — so READ the file and look for the loop that blocks. Cheap, and it
+   * only ever refuses a command that genuinely would not come back. Same shape
+   * as the Godot rule below, generalised: tkinter, Qt, pygame, and anything
+   * started as a foreground server.
+   */
+  const script = /(?:^|\s)(?:python3?|node)\s+(\S+\.(?:py|js|mjs))(?:\s|$)/.exec(c)?.[1];
+  if (script !== undefined && !/(^|[\s;&|(])timeout\s+\d+/.test(c)) {
+    try {
+      const abs = script.startsWith('/')
+        ? script
+        : path.resolve(cwd ?? process.cwd(), script.replace(/^~\//, `${os.homedir()}/`));
+      const body = readFileSync(abs.replace(/^~\//, `${os.homedir()}/`), 'utf8');
+      const blocker = /\.mainloop\s*\(/.test(body)
+        ? 'tkinter mainloop()'
+        : /\.exec_?\s*\(\)/.test(body) && /Q(Application|Widget)/.test(body)
+          ? "Qt's exec()"
+          : /pygame\.(display|event)/.test(body) && /while\s+(True|running)/.test(body)
+            ? 'a pygame event loop'
+            : /app\.run\s*\(/.test(body)
+              ? 'a foreground server (app.run)'
+              : null;
+      if (blocker !== null) {
+        return (
+          `that command never returns — ${script} opens ${blocker}, which blocks until the ` +
+          'window is closed by a human, and nothing here can close it. It would hang this ' +
+          'entire run, so it was not executed. To CHECK it works, drive it instead: import ' +
+          'the module, construct the window, call update() (not mainloop()), invoke the real ' +
+          'handlers with real arguments, screenshot it, then destroy it. Or run it under a ' +
+          'timeout so a block is a failed test rather than a dead run.'
+        );
+      }
+    } catch {
+      // Unreadable / not a real path — fall through; a guard must never be the
+      // thing that stops an ordinary command.
+    }
+  }
   if (!/(^|[\s;&|(])godot(\s|$)/.test(c)) return null;
   // These all terminate on their own.
   if (/--quit(\b|-after)/.test(c) || /--script\b/.test(c) || /--write-movie\b/.test(c)) return null;
@@ -1315,7 +1364,7 @@ export async function openRoleSession(
           emit({ kind: 'file-write', toolName: e.toolName, path: startPath, phase: 'start' });
         }
       }
-      const denied = bashDenylistGate(e.toolName, e.input);
+      const denied = bashDenylistGate(e.toolName, e.input, config.cwd);
       if (denied !== undefined) return denied;
       const cannotWrite = bashWriteGate(e.toolName, e.input, config.mayWriteFiles !== false);
       if (cannotWrite !== undefined) return cannotWrite;
