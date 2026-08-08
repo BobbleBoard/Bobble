@@ -818,7 +818,20 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
             return null;
           }
         }) ??
-        undemonstrated(readmeIn(runtime.workspaceRoot), runtime.ranCommands, runtime.touchedFiles);
+        /*
+         * `workspaceRoot` is set ONLY by an explicit `/harness workspace`
+         * command, so in any session without one it is null and this found no
+         * README at all — the check would have been silently inert in exactly
+         * the case it was built for. `ctx.cwd` is where the verify pass already
+         * runs its commands, i.e. where the work actually is. Caught by the
+         * reachability test in wiring.test.ts, before a single benchmark run
+         * ever managed to reach a turn end.
+         */
+        undemonstrated(
+          readmeIn(runtime.workspaceRoot ?? ctx.cwd),
+          runtime.ranCommands,
+          runtime.touchedFiles,
+        );
       if (unexercised !== null && runtime.verifyFixesRemaining > 0) {
         runtime.verifyFixesRemaining -= 1;
         runtime.verifyActive = true;

@@ -7,6 +7,9 @@
  * effort-gated reviewer pass — so they prove the bridge, not just the library.
  */
 
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import type {
   ExtensionAPI,
   ExtensionCommandContext,
@@ -607,5 +610,104 @@ describe('HarnessStatus.stage transitions publish at the seams', () => {
 
     await rig.fire('tool_execution_end', TOOL_END(false));
     expect(rig.handle.getStatus(rig.ctx).stage).toBe('working');
+  });
+});
+
+describe("the README's promises reach the model (reachability, not logic)", () => {
+  /*
+   * THIS CHECK HAS SHIPPED AND NEVER ONCE RUN.
+   *
+   * `undemonstrated` has unit tests and they pass. What was never proven is that
+   * anything CALLS it — and it lives at the very end of the turn, in the verify
+   * pass, so the only way I had been testing it was full benchmark runs. Two of
+   * those in a row died before reaching a turn end (one on a stalled edit loop,
+   * one starved of memory), so after shipping it the measured evidence was
+   * exactly zero.
+   *
+   * "Registered is not reachable" is the dominant bug of this whole session, and
+   * a check that only fires at turn end cannot be validated by runs that never
+   * finish. So it is driven directly here: a real workspace with a real README,
+   * a turn that touched a file and ran a command, and an assertion that the
+   * steer actually arrives.
+   */
+  const withWorkspace = (readme: string): string => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'pd-readme-'));
+    writeFileSync(path.join(dir, 'README.md'), readme, 'utf8');
+    writeFileSync(path.join(dir, 'notes.py'), 'print("hi")\n', 'utf8');
+    return dir;
+  };
+
+  const README = [
+    '# notes',
+    '',
+    'A tiny command-line note keeper.',
+    '',
+    '    notes add "buy milk"',
+    '    notes search milk',
+    '',
+    'Searching is case-insensitive.',
+    '',
+  ].join('\n');
+
+  /** A turn that edited a file and ran it — the shape the check is meant for. */
+  const workedOn = async (rig: ReturnType<typeof makeRig>, cwd: string, command: string) => {
+    await rig.fire('tool_call', {
+      type: 'tool_call',
+      toolName: 'edit',
+      input: { path: path.join(cwd, 'notes.py') },
+    });
+    await rig.fire('tool_call', { type: 'tool_call', toolName: 'bash', input: { command } });
+  };
+
+  it('steers on a README promise the turn never demonstrated', async () => {
+    const cwd = withWorkspace(README);
+    const rig = makeRig({
+      effort: 'max',
+      cwd,
+      // No project check in this workspace → the pass-branch, where the
+      // unexercised/undemonstrated chain lives.
+      verify: { runBash: passingBash(), detectCheck: () => null },
+    });
+    await startSession(rig);
+    rig.handle.applyPreset('coding', rig.ctx);
+    await workedOn(rig, cwd, `python3 ${path.join(cwd, 'notes.py')} add "buy milk"`);
+
+    expect(await rig.handle.verifyTurn(rig.ctx)).toBe(true);
+    const steer = rig.sentUserMessages.join('\n');
+    expect(steer).toContain('README IS PART OF THE SPEC');
+    expect(steer).toMatch(/case-insensitive/i);
+    /* The specific mistake run H made: testing with input that passes either way. */
+    expect(steer).toMatch(/would fail if the promise were broken/);
+  });
+
+  it('names a documented command the turn never ran', async () => {
+    const cwd = withWorkspace(README);
+    const rig = makeRig({
+      effort: 'max',
+      cwd,
+      verify: { runBash: passingBash(), detectCheck: () => null },
+    });
+    await startSession(rig);
+    rig.handle.applyPreset('coding', rig.ctx);
+    await workedOn(rig, cwd, `python3 ${path.join(cwd, 'notes.py')} add "buy milk"`);
+
+    await rig.handle.verifyTurn(rig.ctx);
+    expect(rig.sentUserMessages.join('\n')).toContain('notes search milk');
+  });
+
+  /* Silence is the common case and has to stay free. */
+  it('says nothing when the README promises nothing checkable', async () => {
+    const cwd = withWorkspace('# notes\n\nA tiny tool.\n\n    notes add x\n');
+    const rig = makeRig({
+      effort: 'max',
+      cwd,
+      verify: { runBash: passingBash(), detectCheck: () => null },
+    });
+    await startSession(rig);
+    rig.handle.applyPreset('coding', rig.ctx);
+    await workedOn(rig, cwd, `python3 ${path.join(cwd, 'notes.py')} add x`);
+
+    expect(await rig.handle.verifyTurn(rig.ctx)).toBe(false);
+    expect(rig.sentUserMessages.join('\n')).not.toContain('README IS PART OF THE SPEC');
   });
 });
