@@ -377,6 +377,22 @@ export function registerLlmIpc(ipcMain: IpcMain, allowSender: (event: unknown) =
     kill: (pid) => process.kill(pid),
     log: (message, meta) => log.info(message, meta),
   });
+  /*
+   * PI_E2E_NO_SERVER already means "this window is not here to talk to a model"
+   * — it skips the chat server in the renderer. It did NOT skip the inference
+   * supervisor, so every layout/CSS probe still spawned a full llama-server and
+   * paged the whole model in.
+   *
+   * MEASURED: a session of UI probes left six of them behind, three at 6.5GB,
+   * and the benchmark run launched afterwards produced nothing for eight
+   * minutes. A probe that only looks at pixels has no business holding a model
+   * in memory, let alone competing with a real run for it.
+   */
+  if (process.env.PI_E2E_NO_SERVER === '1') {
+    log.info('PI_E2E_NO_SERVER=1 — not standing up the inference supervisor');
+    app.on('will-quit', () => child?.kill());
+    return;
+  }
   // Stand the supervisor up now so its initial idle status broadcasts to the
   // window as soon as the renderer subscribes.
   ensureChild();

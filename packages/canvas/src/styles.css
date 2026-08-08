@@ -164,9 +164,23 @@
   margin: 0 2px;
 }
 
-/* macOS Safari bordered tab: a segmented, hairline-bordered pill with rounded
- * TOP corners. The 1px border makes each tab individually distinct (not a flat
- * merged strip). Inactive tabs are transparent (showing the recessed frame). */
+/*
+ * CHROME'S STRIP, not Safari's. the user, with a reference screenshot: "tabs in the
+ * canvas: some look ok, but it just doesn't look that great. note and utilize
+ * how the reference screenshot provided shows the active tab and the other
+ * tabs."
+ *
+ * This was modelled on Safari: every tab, active or not, carried its own 1px
+ * hairline. MEASURED alongside it, inactive tabs also painted at
+ * `--pd-text-secondary`, which in this theme is close enough to primary that
+ * the two states read the same. So three outlined boxes of equally bright text
+ * sat side by side and nothing said which one you were looking at.
+ *
+ * Chrome carries the whole hierarchy with FILL: the selected tab is a filled
+ * shape continuous with the content beneath it, and the others are quiet labels
+ * with no box at all. Inactive tabs lose their border and drop to muted text;
+ * the active tab keeps the fill that already matches the panel below it.
+ */
 .pd-canvas-tab {
   position: relative;
   display: inline-flex;
@@ -176,21 +190,25 @@
   max-width: 220px;
   height: 32px;
   padding: 0 4px 0 10px;
-  border: 1px solid var(--pd-border-subtle);
+  /* No box of its own — an unselected tab is a label, not a container. The
+   * transparent border keeps the active tab's own border from changing the
+   * layout when selection moves. */
+  border: 1px solid transparent;
   /* rounded TOP corners only — the bottom edge rests on the toolbar seam */
   border-radius: var(--pd-radius-md) var(--pd-radius-md) 0 0;
   background: transparent;
-  color: var(--pd-text-secondary);
+  color: var(--pd-text-muted);
   transition:
     background var(--pd-duration-fast) var(--pd-easing-standard),
     border-color var(--pd-duration-fast) var(--pd-easing-standard),
     color var(--pd-duration-fast) var(--pd-easing-standard);
 }
 
-/* Inactive tabs read as the (darker) frame — recessed — and lift on hover. */
+/* Hover is the only thing an unselected tab does, so it also brings the label up
+ * to full strength — a wash alone is easy to miss on a dark strip. */
 .pd-canvas-tab:not([data-active]):hover {
   background: var(--pd-bg-hover);
-  border-color: var(--pd-border-default);
+  color: var(--pd-text-primary);
 }
 
 /* The active tab is LIFTED and connected to the body: filled with the content
@@ -202,9 +220,12 @@
  * / trip a phantom scrollbar; the colour match already carries the connection). */
 .pd-canvas-tab[data-active] {
   background: var(--pd-bg-raised);
-  border-color: var(--pd-border-default);
+  border-color: var(--pd-border-subtle);
   border-bottom-color: transparent;
   color: var(--pd-text-primary);
+  /* The selected label carries a touch more weight, so the state survives even
+   * where the fill is subtle. */
+  font-weight: var(--pd-font-weight-medium, 500);
   /* Lift above neighbours so its side borders paint over theirs cleanly. */
   z-index: 1;
 }

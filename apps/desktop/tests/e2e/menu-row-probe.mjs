@@ -23,7 +23,7 @@ const udd = mkdtempSync(path.join(tmpdir(), 'pd-menurow-'));
 const app = await electron.launch({
   args: [appRoot, `--user-data-dir=${udd}`],
   executablePath: electronBinary,
-  env: { ...process.env, PI_DESKTOP_MOCK: '1', PI_E2E_BACKGROUND: '1' },
+  env: { ...process.env, PI_E2E: '1', PI_E2E_NO_SERVER: '1', PI_E2E_BACKGROUND: '1' },
 });
 const win = await app.firstWindow();
 await win.waitForLoadState('domcontentloaded');

@@ -25,11 +25,17 @@ const udd = mkdtempSync(path.join(tmpdir(), 'pd-tabs-'));
 const app = await electron.launch({
   args: [appRoot, `--user-data-dir=${udd}`],
   executablePath: electronBinary,
-  env: { ...process.env, PI_DESKTOP_MOCK: '1', PI_E2E_BACKGROUND: '1' },
+  env: { ...process.env, PI_E2E: '1', PI_E2E_NO_SERVER: '1', PI_E2E_BACKGROUND: '1' },
 });
 const win = await app.firstWindow();
 await win.waitForLoadState('domcontentloaded');
 await win.waitForTimeout(3000);
+
+// The canvas panel itself first — a fresh profile opens with it closed, and
+// without this the probe measured an empty document and reported nothing.
+const canvasToggle = win.locator('[aria-label*="canvas" i], [title*="canvas" i]').first();
+if ((await canvasToggle.count()) > 0) await canvasToggle.click().catch(() => {});
+await win.waitForTimeout(1200);
 
 // Open three tabs so active-vs-inactive is actually visible.
 for (const name of ['Terminal', 'Files', 'Browser']) {

@@ -33,7 +33,10 @@ if (!existsSync(OUT)) mkdirSync(OUT, { recursive: true });
 
 const udd = mkdtempSync(path.join(tmpdir(), 'pd-startup-'));
 const env = { ...process.env, PI_E2E_BACKGROUND: '1' };
-if (!REAL) env.PI_DESKTOP_MOCK = '1';
+if (!REAL) {
+  env.PI_E2E = '1';
+  env.PI_E2E_NO_SERVER = '1';
+}
 
 /** The exact inputs showProcessing() consumes, read straight from the store. */
 const readState = `(() => {
