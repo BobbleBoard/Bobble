@@ -701,3 +701,44 @@ describe('a folder is not a file', () => {
     expect(step.data.label).toBe('Read a file');
   });
 });
+
+describe('a rejected tool call is marked failed', () => {
+  const failed = (id: string, out: string): ToolResultMsg => ({
+    ...result(id, out),
+    isError: true,
+  });
+
+  /*
+   * RUN G: six `edit` calls, all rejected on an oldText mismatch, the file never
+   * written — and the thread summarised it as "edited 6 files". `isError` was on
+   * the result the whole time and simply never reached the step, so the roll-up
+   * had no way to tell a rejection from a success.
+   */
+  it('carries isError through to the step, so the summary can be honest', () => {
+    const step = mapToolStep(
+      call('e1', 'edit', { path: '/w/app.py' }),
+      failed('e1', 'Could not find edits[1] in /w/app.py. The oldText must match exactly'),
+      false,
+    );
+    expect(step.data.failed).toBe(true);
+  });
+
+  it('leaves a successful call unmarked rather than defaulting to false', () => {
+    const step = mapToolStep(call('e2', 'edit', { path: '/w/app.py' }), result('e2', 'ok'), false);
+    expect(step.data.failed).toBeUndefined();
+  });
+
+  it('marks a failure on any tool kind, not just edit', () => {
+    expect(
+      mapToolStep(call('b1', 'bash', { command: 'false' }), failed('b1', 'exit 1'), false).data
+        .failed,
+    ).toBe(true);
+  });
+
+  /* A call still in flight has no result yet — it must not read as failed. */
+  it('does not mark a running call', () => {
+    expect(
+      mapToolStep(call('e3', 'edit', { path: '/w/a.py' }), undefined, true).data.failed,
+    ).toBeUndefined();
+  });
+});

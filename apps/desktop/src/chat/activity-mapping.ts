@@ -637,8 +637,31 @@ export function generatedImageSrc(
   return firstMediaUrl(str(result?.text));
 }
 
-/** Map one tool-call block (+ its result) to a chain step and optional canvas tab. */
+/**
+ * A REJECTED CALL IS NOT WORK DONE.
+ *
+ * Run G: six `edit` calls, every one rejected, the file never written — and the
+ * collapsed thread summarised the turn as "Ran a command, thought for 15s,
+ * edited 6 files, read 9 files". `isError` was on the result the whole time and
+ * simply never reached the step, so a failure was indistinguishable from a
+ * success everywhere in the chain.
+ *
+ * The count itself was true — six calls were made. What made it a lie was
+ * "edited", a verb that asserts the file changed. {@link summarizeActivity} now
+ * says what actually happened to them.
+ */
 export function mapToolStep(
+  block: ToolCallBlock,
+  result: ToolResultMsg | undefined,
+  running: boolean,
+): MappedStep {
+  const step = mapToolStepData(block, result, running);
+  if (result?.isError !== true) return step;
+  return { ...step, data: { ...step.data, failed: true } };
+}
+
+/** Map one tool-call block (+ its result) to a chain step and optional canvas tab. */
+function mapToolStepData(
   block: ToolCallBlock,
   result: ToolResultMsg | undefined,
   running: boolean,

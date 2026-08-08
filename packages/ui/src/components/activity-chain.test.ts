@@ -143,3 +143,45 @@ describe('activitySummary', () => {
     expect(activitySummary([])).toBe('Working…');
   });
 });
+
+describe('a rejected call is not work done', () => {
+  const step = (kind: ActivityStepData['kind'], failed?: boolean): ActivityStepData =>
+    ({ kind, label: '', ...(failed === undefined ? {} : { failed }) }) as ActivityStepData;
+
+  /*
+   * RUN G, verbatim. Six `edit` calls, every one rejected on an oldText
+   * mismatch, the file left byte-identical to the fixture — and the collapsed
+   * thread read "Ran a command, thought for 15s, edited 6 files, read 9 files".
+   * The count was true; "edited" was the lie.
+   */
+  it('does not claim edits that were all rejected', () => {
+    const summary = summarizeActivity([
+      step('bash'),
+      ...Array.from({ length: 6 }, () => step('edit', true)),
+      ...Array.from({ length: 9 }, () => step('read')),
+    ]);
+    expect(summary).toContain('6 edits failed');
+    expect(summary).not.toContain('edited 6 files');
+    // The reads DID work and still read normally.
+    expect(summary).toContain('read 9 files');
+  });
+
+  it('reports a partial failure as both, never rounded up', () => {
+    const summary = summarizeActivity([step('edit'), step('edit'), step('edit', true)]);
+    expect(summary).toBe('Edited 2 files (1 failed)');
+  });
+
+  it('says "1 edit failed" for a single rejected call', () => {
+    expect(summarizeActivity([step('edit', true)])).toBe('1 edit failed');
+  });
+
+  /* The verbs are irregular — stemming "Ran"/"Read" produced "ran"/"rea". */
+  it('names the attempt for irregular verbs', () => {
+    expect(summarizeActivity([step('bash', true), step('bash', true)])).toBe('2 commands failed');
+    expect(summarizeActivity([step('read', true)])).toBe('1 read failed');
+  });
+
+  it('is unchanged when nothing failed', () => {
+    expect(summarizeActivity([step('edit'), step('edit')])).toBe('Edited 2 files');
+  });
+});

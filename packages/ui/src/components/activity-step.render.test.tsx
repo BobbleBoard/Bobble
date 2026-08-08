@@ -233,3 +233,49 @@ describe('ActivityChain — "Done" gating (A3 flash fix)', () => {
     expect(html).not.toContain('pd-chain-done');
   });
 });
+
+/**
+ * THE ELAPSED COUNTER, WHICH WAS BUILT AND NEVER RENDERED.
+ *
+ * the user asked for it watching a command sit there: "some 'seconds' timer going on
+ * here would be much appreciated, it's been going for a few minutes, seems like
+ * it should be timing out by now." `RunningFor` was written, the CSS was written
+ * — and nothing rendered it. A lint warning for an unused function was the only
+ * sign. Registered is not reachable, in my own work this time.
+ */
+describe('ActivityStep — elapsed counter on a running row', () => {
+  const running = (extra: Partial<ActivityStepData> = {}): ActivityStepData =>
+    ({
+      kind: 'bash',
+      label: 'Running a command',
+      detail: 'python3 app.py',
+      status: 'running',
+      startedAt: Date.now() - 42_000,
+      ...extra,
+    }) as ActivityStepData;
+
+  it('shows how long a running step has been going', () => {
+    const html = render(running());
+    expect(html).toContain('pd-chain-step-elapsed');
+    expect(html).toContain('42s');
+  });
+
+  it('reaches a file-op row too, not just the plain one', () => {
+    const html = render(
+      running({ kind: 'read', label: 'Reading a file', detail: '/w/app.py', filename: 'app.py' }),
+    );
+    expect(html).toContain('pd-chain-step-elapsed');
+  });
+
+  it('reads as minutes once past a minute — the case the user was looking at', () => {
+    expect(render(running({ startedAt: Date.now() - 185_000 }))).toContain('3m 5s');
+  });
+
+  it('shows nothing on a settled step', () => {
+    expect(render(running({ status: 'done' }))).not.toContain('pd-chain-step-elapsed');
+  });
+
+  it('does not flicker a count onto a step that just started', () => {
+    expect(render(running({ startedAt: Date.now() }))).not.toContain('pd-chain-step-elapsed');
+  });
+});

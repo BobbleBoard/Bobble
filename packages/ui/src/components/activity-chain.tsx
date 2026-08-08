@@ -53,6 +53,18 @@ interface ActivityStepCommon {
   /** `running` shimmers the row + spins; defaults to `done`. */
   status?: ActivityStatus;
   /**
+   * Epoch ms when this step began, when the caller knows it. Feeds the elapsed
+   * counter on a running row so it survives a remount rather than restarting.
+   */
+  startedAt?: number;
+  /**
+   * The tool REJECTED this call — nothing was written, run or fetched. Set from
+   * the result's `isError`. Without it a failure is indistinguishable from a
+   * success in the roll-up, which is how a turn whose six edits were all
+   * rejected came to read "edited 6 files".
+   */
+  failed?: boolean;
+  /**
    * Wall-clock this step took, in milliseconds. Summed per kind for the
    * aggregated summary line (thinking → "thought for 1h 20m").
    */
@@ -116,27 +128,38 @@ interface VerbSpec {
   singular: string;
   /** Empty = non-countable phrase (e.g. "searched the web"), never pluralized. */
   plural: string;
+  /**
+   * What ONE rejected call of this kind is called, for the failure phrasing
+   * ("6 edits failed"). The past-tense verbs are irregular — Ran, Read — so
+   * this is stated rather than stemmed. Defaults to "call".
+   */
+  attempt?: string;
 }
 
 const VERBS: Record<ActivityStepKind, VerbSpec> = {
   thinking: { verb: 'Thought', singular: '', plural: '' },
-  bash: { verb: 'Ran', singular: 'a command', plural: 'commands' },
-  python: { verb: 'Ran', singular: 'Python', plural: '' },
-  edit: { verb: 'Edited', singular: 'a file', plural: 'files' },
-  read: { verb: 'Read', singular: 'a file', plural: 'files' },
-  folder: { verb: 'Listed', singular: 'a folder', plural: 'folders' },
-  file: { verb: 'Presented', singular: 'a file', plural: 'files' },
-  skill: { verb: 'Read', singular: 'a skill', plural: 'skills' },
-  search: { verb: 'Searched', singular: 'the web', plural: '' },
+  bash: { verb: 'Ran', singular: 'a command', plural: 'commands', attempt: 'command' },
+  python: { verb: 'Ran', singular: 'Python', plural: '', attempt: 'Python run' },
+  edit: { verb: 'Edited', singular: 'a file', plural: 'files', attempt: 'edit' },
+  read: { verb: 'Read', singular: 'a file', plural: 'files', attempt: 'read' },
+  folder: { verb: 'Listed', singular: 'a folder', plural: 'folders', attempt: 'listing' },
+  file: { verb: 'Presented', singular: 'a file', plural: 'files', attempt: 'preview' },
+  skill: { verb: 'Read', singular: 'a skill', plural: 'skills', attempt: 'skill read' },
+  search: { verb: 'Searched', singular: 'the web', plural: '', attempt: 'search' },
   'tool-search': { verb: 'Searched', singular: 'tools', plural: '' },
-  'browser-navigate': { verb: 'Visited', singular: 'a page', plural: 'pages' },
+  'browser-navigate': {
+    verb: 'Visited',
+    singular: 'a page',
+    plural: 'pages',
+    attempt: 'page visit',
+  },
   'browser-click': { verb: 'Clicked', singular: '', plural: '' },
   'browser-type': { verb: 'Typed', singular: '', plural: '' },
   'browser-read': { verb: 'Read', singular: 'the page', plural: 'pages' },
   connector: { verb: 'Used', singular: 'a connector', plural: 'connectors' },
   tool: { verb: 'Used', singular: 'a tool', plural: 'tools' },
-  image: { verb: 'Generated', singular: 'an image', plural: 'images' },
-  pdf: { verb: 'Created', singular: 'a PDF', plural: 'PDFs' },
+  image: { verb: 'Generated', singular: 'an image', plural: 'images', attempt: 'image' },
+  pdf: { verb: 'Created', singular: 'a PDF', plural: 'PDFs', attempt: 'PDF' },
   'canvas-open': { verb: 'Opened', singular: 'the canvas', plural: '' },
 };
 
@@ -178,17 +201,28 @@ export function formatDuration(ms: number): string {
   return `${s}s`;
 }
 
-function phrase(kind: ActivityStepKind, count: number, durationMs: number): string {
+function phrase(kind: ActivityStepKind, count: number, durationMs: number, failed = 0): string {
   // Thinking is duration-first when we have one ("thought for 1h 20m").
   if (kind === 'thinking') {
     return durationMs > 0 ? `Thought for ${formatDuration(durationMs)}` : 'Thought';
   }
   const spec = VERBS[kind];
+  /*
+   * Every call of this kind was rejected, so the past-tense verb cannot be used
+   * at all — "edited 6 files" asserts six files changed when none did. Name the
+   * ATTEMPTS instead: "6 edits failed".
+   */
+  if (failed > 0 && failed === count) {
+    const attempt = spec.attempt ?? 'call';
+    return count > 1 ? `${count} ${attempt}s failed` : `1 ${attempt} failed`;
+  }
   if (!spec.plural) {
     return spec.singular ? `${spec.verb} ${spec.singular}` : spec.verb;
   }
-  const noun = count > 1 ? `${count} ${spec.plural}` : spec.singular;
-  return `${spec.verb} ${noun}`;
+  const done = count - failed;
+  const noun = done > 1 ? `${done} ${spec.plural}` : spec.singular;
+  // Some worked and some did not — report both rather than rounding up.
+  return failed > 0 ? `${spec.verb} ${noun} (${failed} failed)` : `${spec.verb} ${noun}`;
 }
 
 function lowerFirst(text: string): string {
@@ -202,17 +236,18 @@ function lowerFirst(text: string): string {
  * first phrase is capitalized, the rest lower-cased. Pure + deterministic.
  */
 export function summarizeActivity(steps: ActivityStepData[]): string {
-  const agg = new Map<ActivityStepKind, { count: number; durationMs: number }>();
+  const agg = new Map<ActivityStepKind, { count: number; durationMs: number; failed: number }>();
   for (const step of steps) {
-    const cur = agg.get(step.kind) ?? { count: 0, durationMs: 0 };
+    const cur = agg.get(step.kind) ?? { count: 0, durationMs: 0, failed: 0 };
     cur.count += 1;
     cur.durationMs += step.durationMs ?? 0;
+    if (step.failed === true) cur.failed += 1;
     agg.set(step.kind, cur);
   }
   const phrases: string[] = [];
   for (const kind of KIND_ORDER) {
     const entry = agg.get(kind);
-    if (entry) phrases.push(phrase(kind, entry.count, entry.durationMs));
+    if (entry) phrases.push(phrase(kind, entry.count, entry.durationMs, entry.failed));
   }
   return phrases.map((p, i) => (i === 0 ? p : lowerFirst(p))).join(', ');
 }
@@ -488,16 +523,27 @@ export interface ActivityStepProps {
  * question being asked ("how long have I been staring at this"), and needs no
  * per-step timestamp threaded through the engine.
  */
-function RunningFor() {
-  const [start] = useState(() => Date.now());
-  const [now, setNow] = useState(start);
+export function elapsedLabel(ms: number): string | null {
+  const secs = Math.max(0, Math.round(ms / 1000));
+  if (secs < 2) return null; // don't flicker a "0s" onto every quick step
+  return secs < 60 ? `${secs}s` : `${Math.floor(secs / 60)}m ${secs % 60}s`;
+}
+
+/**
+ * `since` is when the step actually began, when the caller knows it — the timer
+ * then survives a remount instead of restarting at zero. Without it the clock
+ * starts at mount, which is still the question being asked.
+ */
+function RunningFor({ since }: { since?: number }) {
+  const [mounted] = useState(() => Date.now());
+  const start = since ?? mounted;
+  const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
   }, []);
-  const secs = Math.max(0, Math.round((now - start) / 1000));
-  if (secs < 2) return null; // don't flicker a "0s" onto every quick step
-  const label = secs < 60 ? `${secs}s` : `${Math.floor(secs / 60)}m ${secs % 60}s`;
+  const label = elapsedLabel(now - start);
+  if (label === null) return null;
   return <span className="pd-chain-step-elapsed">{label}</span>;
 }
 
@@ -548,12 +594,22 @@ export const ActivityStep = forwardRef<HTMLDivElement, ActivityStepProps>(functi
   );
 
   const labelText = running ? <ShimmerText>{data.label}</ShimmerText> : data.label;
+  /*
+   * The elapsed counter rides on whichever row is running, and is folded into
+   * `contentEls` so it reaches EVERY row variant — canvas button, split file-op
+   * row, plain row. Built once and rendered from one branch, it would have shown
+   * on some rows and not others.
+   */
+  const elapsedEl = running ? <RunningFor since={data.startedAt} /> : null;
   // File-op rows read as a two-line stack (verb + filename subline); other rows
   // keep the verb + inline arg on one line.
   const contentEls =
     subline !== undefined ? (
       <span className="pd-chain-step-labels">
-        <span className="pd-chain-step-label">{labelText}</span>
+        <span className="pd-chain-step-label">
+          {labelText}
+          {elapsedEl}
+        </span>
         <span className="pd-chain-step-subline" title={detail}>
           {subline}
         </span>
@@ -566,6 +622,7 @@ export const ActivityStep = forwardRef<HTMLDivElement, ActivityStepProps>(functi
             {detailInline}
           </span>
         ) : null}
+        {elapsedEl}
       </>
     );
 
