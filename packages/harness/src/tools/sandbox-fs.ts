@@ -357,6 +357,28 @@ export function guardDestructiveRewrite(
   );
 }
 
+/**
+ * MARKDOWN ESCAPES THAT LEAKED INTO CODE.
+ *
+ * MEASURED: a rewrite wrote `self.status\_var.set(...)` into a .py file — the
+ * model escaped the underscore the way it would in prose, and the backslash went
+ * to disk. The file stopped compiling, so three genuinely correct bug fixes in
+ * the same write were worth nothing.
+ *
+ * Same shape as the code fence this file already strips: an artifact of the
+ * model's OUTPUT format reaching a file that is not markdown.
+ *
+ * ONLY `\_`, deliberately. `\*` looks like the same mistake but is ordinary in
+ * a regex (`r"\*"`), and stripping it would corrupt working code — the exact
+ * kind of overcorrection this guard exists to prevent. A backslash-underscore
+ * has no meaning in Python, JS or TS: it is an invalid string escape and a
+ * syntax error outside one. Markdown and LaTeX keep theirs, where it is real.
+ */
+export function stripMarkdownEscapes(content: string, absPath: string): string {
+  if (/\.(md|markdown|mdx|tex|latex)$/i.test(absPath)) return content;
+  return content.replace(/\\_/g, '_');
+}
+
 export function stripCodeFence(content: string, absPath: string): string {
   if (/\.(md|markdown|mdx)$/i.test(absPath)) return content;
   const lines = content.split('\n');
@@ -420,7 +442,7 @@ function fenceTool<S extends TSchema, D>(
       // ...and never let a markdown code fence reach disk (see stripCodeFence).
       const body = (next as Record<string, unknown>).content;
       if (typeof body === 'string') {
-        const cleaned = stripCodeFence(body, abs);
+        const cleaned = stripMarkdownEscapes(stripCodeFence(body, abs), abs);
         // ...and never let a rewrite silently gut an existing file.
         const destructive = guardDestructiveRewrite(abs, cleaned, (fp) => {
           try {

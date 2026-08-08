@@ -25,6 +25,7 @@ import {
   resolveWorkspaceRoot,
   sandboxBaseDir,
   stripCodeFence,
+  stripMarkdownEscapes,
 } from './sandbox-fs.js';
 
 const norm = (p: string) => path.resolve(p);
@@ -422,5 +423,36 @@ describe('guardDestructiveRewrite — losing definitions, not just lines', () =>
 
   it('still catches a gutting even when no definition survives to compare', () => {
     expect(guardDestructiveRewrite('/w/app.py', 'import os', read)).not.toBeNull();
+  });
+});
+
+describe('stripMarkdownEscapes — prose escaping that reached a code file', () => {
+  /*
+   * MEASURED: a rewrite wrote `self.status\_var.set(...)` into a .py file. The
+   * model escaped the underscore the way it would in prose; the file stopped
+   * compiling, and three genuinely correct bug fixes in the same write were
+   * worth nothing.
+   */
+  it('unescapes \\_ in source files', () => {
+    expect(stripMarkdownEscapes('self.status\\_var.set(1)', '/w/app.py')).toBe(
+      'self.status_var.set(1)',
+    );
+  });
+
+  it('leaves markdown and LaTeX alone, where the escape is real', () => {
+    for (const f of ['/w/README.md', '/w/notes.mdx', '/w/paper.tex']) {
+      expect(stripMarkdownEscapes('a\\_b', f)).toBe('a\\_b');
+    }
+  });
+
+  it('does NOT touch \\* — that is ordinary in a regex', () => {
+    // The overcorrection this guard must not make: r"\*" is working code.
+    const src = 'import re\npat = re.compile(r"\\*")';
+    expect(stripMarkdownEscapes(src, '/w/app.py')).toBe(src);
+  });
+
+  it('leaves other backslash escapes untouched', () => {
+    const src = 'print("a\\nb")\npath = "C:\\\\tmp"';
+    expect(stripMarkdownEscapes(src, '/w/app.py')).toBe(src);
   });
 });
