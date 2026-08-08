@@ -373,3 +373,54 @@ describe('guardDestructiveRewrite — a rewrite that ran out partway', () => {
     expect(guardDestructiveRewrite('/w/app.py', rewritten, read(big))).toBeNull();
   });
 });
+
+describe('guardDestructiveRewrite — losing definitions, not just lines', () => {
+  /*
+   * MEASURED, and it is why the line-count rule alone was not enough: a rewrite
+   * took app.py from 38 lines to 29 — 76% retained, comfortably "safe" — while
+   * `main()` and the __main__ block vanished, `convert` was left half-written
+   * ending in `# ...`, and the model's own thinking was in the source as
+   * `# Wait, I used self.fmt in __init__`. The file was ruined and the
+   * arithmetic said fine.
+   */
+  const before = [
+    'import os',
+    'class ConvertApp:',
+    '    def __init__(self, root):',
+    '        self.root = root',
+    ...Array.from({ length: 20 }, (_, i) => `        self.x${i} = ${i}`),
+    '    def handle_drop(self, path):',
+    '        self.convert(path)',
+    '    def convert(self, path):',
+    '        return path',
+    'def main():',
+    '    ConvertApp(None)',
+  ].join('\n');
+  const read = () => before;
+
+  it('refuses a rewrite that drops a function it was not asked to remove', () => {
+    const truncated = before
+      .split('\n')
+      .filter((l) => !l.startsWith('def main'))
+      .join('\n');
+    const out = guardDestructiveRewrite('/w/app.py', truncated, read);
+    expect(out).not.toBeNull();
+    expect(out).toContain('main');
+    expect(out).toContain('`edit`');
+  });
+
+  it('allows a rewrite that keeps every definition', () => {
+    const edited = before.replace('return path', 'return path.upper()');
+    expect(guardDestructiveRewrite('/w/app.py', edited, read)).toBeNull();
+  });
+
+  it('allows adding definitions', () => {
+    expect(
+      guardDestructiveRewrite('/w/app.py', `${before}\ndef extra():\n    pass`, read),
+    ).toBeNull();
+  });
+
+  it('still catches a gutting even when no definition survives to compare', () => {
+    expect(guardDestructiveRewrite('/w/app.py', 'import os', read)).not.toBeNull();
+  });
+});

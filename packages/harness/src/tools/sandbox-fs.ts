@@ -295,6 +295,20 @@ function argPath(params: unknown): string | undefined {
  * fires on a file that had real content to lose, and only when MOST of it would
  * go. Returns the refusal text, or null to allow.
  */
+/** Definition-ish lines: `def x`, `class X`, `function x`, `export function x`,
+ * `const x = (…) =>`. Language-agnostic enough to catch the shape that matters —
+ * "this file used to declare things it no longer declares". */
+function definitionsIn(body: string): Set<string> {
+  const out = new Set<string>();
+  for (const line of body.split('\n')) {
+    const m =
+      /^\s*(?:export\s+)?(?:async\s+)?(?:def|class|function)\s+([A-Za-z_][\w]*)/.exec(line) ??
+      /^\s*(?:export\s+)?(?:const|let|var)\s+([A-Za-z_][\w]*)\s*=\s*(?:async\s*)?\(/.exec(line);
+    if (m?.[1] !== undefined) out.add(m[1]);
+  }
+  return out;
+}
+
 export function guardDestructiveRewrite(
   absPath: string,
   next: string,
@@ -303,9 +317,35 @@ export function guardDestructiveRewrite(
   const before = readFile(absPath);
   if (before === null) return null; // new file — nothing to lose
   const beforeLines = before.split('\n').filter((l) => l.trim() !== '').length;
-  // Too small to have meaningful structure; churn here is ordinary.
-  if (beforeLines < 25) return null;
+  if (beforeLines < 25) return null; // too small to have structure worth guarding
   const afterLines = next.split('\n').filter((l) => l.trim() !== '').length;
+
+  /*
+   * DEFINITIONS ARE THE REAL SIGNAL, not line count.
+   *
+   * The first version of this guard only compared line counts at 50%, and a
+   * measured rewrite slipped straight through: 38 lines to 29 — 76% retained,
+   * comfortably "safe" — while `main()` and the `__main__` block vanished, a
+   * method was left half-written ending in `# ...`, and the model's own thinking
+   * was in the source as `# Wait, I used self.fmt in __init__`. The file was
+   * ruined and the arithmetic said fine.
+   *
+   * What actually happened is that the file stopped declaring things it used to
+   * declare. That is the property to check, and it holds in any language: losing
+   * a function you did not mention is a rewrite that ran out, not an edit.
+   */
+  const lost = [...definitionsIn(before)].filter((d) => !definitionsIn(next).has(d));
+  if (lost.length > 0) {
+    return (
+      `Refusing this write: ${path.basename(absPath)} currently defines ` +
+      `${lost.map((d) => `\`${d}\``).join(', ')}, and the version you are writing does not. ` +
+      'Dropping a definition you were not asked to remove is almost always a rewrite that ran ' +
+      'out partway — and the file on disk is the only copy. Use `edit` to change the parts you ' +
+      'mean to change; if you really are replacing the file, include every definition you intend ' +
+      'to keep.'
+    );
+  }
+
   if (afterLines >= beforeLines * 0.5) return null;
   return (
     `Refusing this write: it would cut ${path.basename(absPath)} from ${beforeLines} lines to ` +
