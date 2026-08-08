@@ -240,8 +240,10 @@ button.pd-chain-step-row:hover {
 
 /* The primary arg surfaced next to the verb ("Read a file: <path>"). Takes the
  * remaining row width and ellipsizes; the reveal + title carry the full value. */
+/* Was `1 1 auto`, which grew to fill the row and pushed the chevron away from
+ * the command it belongs to. It still SHRINKS (and ellipsizes) on a long one. */
 .pd-chain-step-detail {
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -288,10 +290,14 @@ button.pd-chain-step-row:hover .pd-chain-step-detail {
 
 /* Trailing chevron on a disclosable row; rotates down when the reveal is open.
  * Pinned right so it never crowds the inline arg (which absorbs the row width). */
+/* the user: "the dropdown arrow should be just immediately to the right of the
+ * command." It was pinned to the far right by `margin-left: auto`, so on a short
+ * command it floated in the middle of nowhere with no visible relationship to
+ * what it discloses. */
 .pd-chain-step-chevron {
   display: inline-flex;
   flex: none;
-  margin-left: auto;
+  margin-left: 2px;
   color: var(--pd-text-muted);
   transition: rotate var(--pd-duration-base) var(--pd-easing-standard);
 }
@@ -464,4 +470,17 @@ button.pd-chain-step-row:hover .pd-chain-step-chevron {
 .pd-term-cmd {
   color: var(--pd-text-primary);
   font-weight: 600;
+}
+
+
+/* Elapsed time on a step that is still running — see RunningFor. Sits after the
+ * command so the row reads "Running a command  python3 app.py  12s". Tabular
+ * figures so it does not jitter as the number ticks. */
+.pd-chain-step-elapsed {
+  flex: none;
+  margin-left: 6px;
+  color: var(--pd-text-muted);
+  font-size: var(--pd-font-size-caption);
+  line-height: var(--pd-leading-caption);
+  font-variant-numeric: tabular-nums;
 }

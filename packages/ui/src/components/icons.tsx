@@ -421,6 +421,17 @@ export function IconSparkles(props: IconProps) {
   );
 }
 
+/** Folder — a directory LISTING. Distinct from IconFolderPlus (which creates
+ * one) and from IconFile: "Listed a folder" showing a document sheet was the
+ * bug this exists for. */
+export function IconFolder(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M2.5 4.5a1 1 0 0 1 1-1h2.4l1.2 1.4h5.4a1 1 0 0 1 1 1v6.1a1 1 0 0 1-1 1H3.5a1 1 0 0 1-1-1z" />
+    </Icon>
+  );
+}
+
 export function IconFolderPlus(props: IconProps) {
   return (
     <Icon {...props}>

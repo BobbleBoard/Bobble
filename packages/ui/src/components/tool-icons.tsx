@@ -10,6 +10,7 @@ import {
   IconExternal,
   IconEye,
   IconFile,
+  IconFolder,
   IconGlobe,
   IconKeyboard,
   IconPencil,
@@ -36,6 +37,8 @@ export type ToolIconKind =
   | 'python'
   | 'edit'
   | 'read'
+  // A directory LISTING — a folder glyph, never the file sheet.
+  | 'folder'
   | 'search'
   // The `tool_search` builtin: a magnifier over the TOOL registry (not the web),
   // so it reads "Searched tools" with the search-glass glyph, never the web globe.
@@ -172,6 +175,8 @@ export function toolIcon(
       ) : (
         <IconPencil size={size} />
       );
+    case 'folder':
+      return <IconFolder size={size} />;
     case 'read':
     case 'file':
       return filename ? (

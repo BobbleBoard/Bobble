@@ -98,6 +98,7 @@ import { registerPlanTool } from './tools/plan-tool.js';
 import { registerPresentTool } from './tools/present.js';
 import { presentBridgeFromEnv } from './tools/present-bridge.js';
 import { registerSandboxFileTools, resolveWorkspaceRoot } from './tools/sandbox-fs.js';
+import { wouldHang } from './tools/hang-guard.js';
 import { truncateToolOutput } from './tools/tool-output-truncate.js';
 import { captureRegisteredTools } from './tools/tool-registry.js';
 import { registerUseTool } from './tools/use-tool.js';
@@ -1533,6 +1534,24 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
   // (before execution) and the consecutive-error streak (after execution).
   pi.on('tool_call', (event, ctx) => {
     runtime.currentCtx = ctx;
+    /*
+     * A COMMAND THAT NEVER RETURNS TAKES THE WHOLE TURN WITH IT — in the ORDINARY
+     * chat, not only inside a corporation.
+     *
+     * `wouldHang` was wired into the corp role-agent path and nowhere else, so a
+     * solo turn was ungated. MEASURED right after that fix landed: asked to fix a
+     * tkinter app, the plain chat ran `python3 .../app.py` to see if it worked and
+     * sat on root.mainloop() for over five minutes with nothing to close the
+     * window. Same failure the corp path had just been protected from, one door
+     * along — registered is not reachable.
+     */
+    if (event.toolName === 'bash') {
+      const cmd = (event.input as { command?: unknown })?.command;
+      if (typeof cmd === 'string') {
+        const hang = wouldHang(cmd, runtime.workspaceRoot ?? undefined);
+        if (hang !== null) return { block: true, reason: hang };
+      }
+    }
     // Remember files this turn writes/edits (for verify's syntax fallback, fix #4).
     if (event.toolName === 'write' || event.toolName === 'edit') {
       const input = event.input as Record<string, unknown>;

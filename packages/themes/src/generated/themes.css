@@ -158,6 +158,15 @@
   --pd-thread-prose-width: 576px;
   --pd-thinking-preview-height: 72px;
   --pd-menu-padding: 0px;
+  --pd-syntax-keyword: #8b2fa8;
+  --pd-syntax-string: #0a6b3d;
+  --pd-syntax-number: #9a4600;
+  --pd-syntax-comment: #5c6370;
+  --pd-syntax-function: #1a52c4;
+  --pd-syntax-type: #0f6f7a;
+  --pd-syntax-property: #7a3ba8;
+  --pd-syntax-punctuation: #4a5160;
+  --pd-syntax-invalid: #c0392b;
 }
 
 :root[data-flavor='claude'][data-mode='dark'] {
@@ -308,6 +317,15 @@
   --pd-thread-prose-width: 576px;
   --pd-thinking-preview-height: 72px;
   --pd-menu-padding: 0px;
+  --pd-syntax-keyword: #d69bff;
+  --pd-syntax-string: #7ee2a8;
+  --pd-syntax-number: #ffb27a;
+  --pd-syntax-comment: #8b94a6;
+  --pd-syntax-function: #82b8ff;
+  --pd-syntax-type: #6fe0e0;
+  --pd-syntax-property: #e0a6ff;
+  --pd-syntax-punctuation: #b8c0d0;
+  --pd-syntax-invalid: #ff8a80;
 }
 
 :root[data-flavor='codex'][data-mode='light'] {
@@ -458,6 +476,15 @@
   --pd-thread-prose-width: 640px;
   --pd-thinking-preview-height: 72px;
   --pd-menu-padding: 4px;
+  --pd-syntax-keyword: #8b2fa8;
+  --pd-syntax-string: #0a6b3d;
+  --pd-syntax-number: #9a4600;
+  --pd-syntax-comment: #5c6370;
+  --pd-syntax-function: #1a52c4;
+  --pd-syntax-type: #0f6f7a;
+  --pd-syntax-property: #7a3ba8;
+  --pd-syntax-punctuation: #4a5160;
+  --pd-syntax-invalid: #c0392b;
 }
 
 :root[data-flavor='codex'][data-mode='dark'] {
@@ -608,6 +635,15 @@
   --pd-thread-prose-width: 640px;
   --pd-thinking-preview-height: 72px;
   --pd-menu-padding: 4px;
+  --pd-syntax-keyword: #d69bff;
+  --pd-syntax-string: #7ee2a8;
+  --pd-syntax-number: #ffb27a;
+  --pd-syntax-comment: #8b94a6;
+  --pd-syntax-function: #82b8ff;
+  --pd-syntax-type: #6fe0e0;
+  --pd-syntax-property: #e0a6ff;
+  --pd-syntax-punctuation: #b8c0d0;
+  --pd-syntax-invalid: #ff8a80;
 }
 
 :root[data-flavor='bobble'][data-mode='light'] {
@@ -758,6 +794,15 @@
   --pd-thread-prose-width: 620px;
   --pd-thinking-preview-height: 72px;
   --pd-menu-padding: 5px;
+  --pd-syntax-keyword: #8b2fa8;
+  --pd-syntax-string: #0a6b3d;
+  --pd-syntax-number: #9a4600;
+  --pd-syntax-comment: #5c6370;
+  --pd-syntax-function: #1a52c4;
+  --pd-syntax-type: #0f6f7a;
+  --pd-syntax-property: #7a3ba8;
+  --pd-syntax-punctuation: #4a5160;
+  --pd-syntax-invalid: #c0392b;
 }
 
 :root[data-flavor='bobble'][data-mode='dark'] {
@@ -908,6 +953,15 @@
   --pd-thread-prose-width: 620px;
   --pd-thinking-preview-height: 72px;
   --pd-menu-padding: 5px;
+  --pd-syntax-keyword: #d69bff;
+  --pd-syntax-string: #7ee2a8;
+  --pd-syntax-number: #ffb27a;
+  --pd-syntax-comment: #8b94a6;
+  --pd-syntax-function: #82b8ff;
+  --pd-syntax-type: #6fe0e0;
+  --pd-syntax-property: #e0a6ff;
+  --pd-syntax-punctuation: #b8c0d0;
+  --pd-syntax-invalid: #ff8a80;
 }
 
 @supports (corner-shape: superellipse(1.5)) {

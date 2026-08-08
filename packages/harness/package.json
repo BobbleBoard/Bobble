@@ -12,7 +12,8 @@
     ".": "./src/index.ts",
     "./corp": "./src/corp/index.ts",
     "./permissions": "./src/permissions/rules.ts",
-    "./tool-search": "./src/tools/tool-search.ts"
+    "./tool-search": "./src/tools/tool-search.ts",
+    "./tools/hang-guard": "./src/tools/hang-guard.ts"
   },
   "pi": {
     "extensions": [

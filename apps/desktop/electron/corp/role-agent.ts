@@ -62,6 +62,7 @@ import type { CorpTurnPurpose, RoleAgentActivity } from '@pi-desktop/harness/cor
 // the permissions default is a static denylist flagged BY RULE — no LLM reviewer
 // in the loop.
 import { checkScaryBash } from '@pi-desktop/harness/permissions';
+import { wouldHang } from '@pi-desktop/harness/tools/hang-guard';
 // The SAME `tool_search` a solo agent gets — full-harness parity for corp roles.
 // Value-imported from the zero-dependency `./tool-search` subpath (only a pi type
 // + typebox), so it stays loadable under Node TS type-stripping and drags in none
@@ -439,66 +440,10 @@ export function bashDenylistGate(
  * the command genuinely cannot succeed in a headless harness, and the model gets
  * the correction immediately rather than after twenty minutes of nothing.
  */
-export function wouldHang(command: string, cwd?: string): string | null {
-  const c = command.trim();
-  /*
-   * A GUI APP RUN IN THE FOREGROUND NEVER RETURNS — and it takes the agent with
-   * it. MEASURED: asked to fix a tkinter app, the model ran
-   * `python3 ~/bobble-testbed/buggyapp/app.py` to "see if it works". That calls
-   * root.mainloop(); the turn blocked, memory climbed, and the run ended having
-   * fixed nothing. Separately a tester's own GUI script sat 2m42s at 855MB.
-   *
-   * Not guessable from the command alone — `python3 app.py` looks like any other
-   * script — so READ the file and look for the loop that blocks. Cheap, and it
-   * only ever refuses a command that genuinely would not come back. Same shape
-   * as the Godot rule below, generalised: tkinter, Qt, pygame, and anything
-   * started as a foreground server.
-   */
-  const script = /(?:^|\s)(?:python3?|node)\s+(\S+\.(?:py|js|mjs))(?:\s|$)/.exec(c)?.[1];
-  if (script !== undefined && !/(^|[\s;&|(])timeout\s+\d+/.test(c)) {
-    try {
-      const abs = script.startsWith('/')
-        ? script
-        : path.resolve(cwd ?? process.cwd(), script.replace(/^~\//, `${os.homedir()}/`));
-      const body = readFileSync(abs.replace(/^~\//, `${os.homedir()}/`), 'utf8');
-      const blocker = /\.mainloop\s*\(/.test(body)
-        ? 'tkinter mainloop()'
-        : /\.exec_?\s*\(\)/.test(body) && /Q(Application|Widget)/.test(body)
-          ? "Qt's exec()"
-          : /pygame\.(display|event)/.test(body) && /while\s+(True|running)/.test(body)
-            ? 'a pygame event loop'
-            : /app\.run\s*\(/.test(body)
-              ? 'a foreground server (app.run)'
-              : null;
-      if (blocker !== null) {
-        return (
-          `that command never returns — ${script} opens ${blocker}, which blocks until the ` +
-          'window is closed by a human, and nothing here can close it. It would hang this ' +
-          'entire run, so it was not executed. To CHECK it works, drive it instead: import ' +
-          'the module, construct the window, call update() (not mainloop()), invoke the real ' +
-          'handlers with real arguments, screenshot it, then destroy it. Or run it under a ' +
-          'timeout so a block is a failed test rather than a dead run.'
-        );
-      }
-    } catch {
-      // Unreadable / not a real path — fall through; a guard must never be the
-      // thing that stops an ordinary command.
-    }
-  }
-  if (!/(^|[\s;&|(])godot(\s|$)/.test(c)) return null;
-  // These all terminate on their own.
-  if (/--quit(\b|-after)/.test(c) || /--script\b/.test(c) || /--write-movie\b/.test(c)) return null;
-  if (/--version\b|--help\b|-h\b/.test(c)) return null;
-  // Wrapped in something that will kill it — the shim we install on PATH.
-  if (/(^|[\s;&|(])timeout\s+\d+/.test(c)) return null;
-  return (
-    'that Godot command never returns — `-e` and a bare `--path` open the editor or ' +
-    'the project manager and wait forever, and `--headless` alone still runs the ' +
-    'game loop. It would hang this entire run, so it was not executed. Use a form ' +
-    'that exits by itself: `godot --headless --quit --path .` to load and report ' +
-    'every error, or `godot --headless --script build.gd` to run a script.'
-  );
-}
+// Moved to the shared package so the ORDINARY chat is gated too, not just corp
+// roles — see tools/hang-guard.ts. Re-exported for existing importers; a bare
+// `export ... from` would NOT bind the name for bashDenylistGate's own call.
+export { wouldHang };
 
 /**
  * A role that may RUN but may not WRITE — role separation made mechanical.

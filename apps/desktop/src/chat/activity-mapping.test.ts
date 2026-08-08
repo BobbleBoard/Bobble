@@ -191,7 +191,9 @@ describe('resolveTool (R14 registry — each tool its own kind, neutral fallback
     expect(t.displayName).toBe('Summarize document');
     // Genuinely read-ish inspection tools DO still read as `read`.
     expect(toolStepKind('grep')).toBe('read');
-    expect(toolStepKind('ls')).toBe('read');
+    // `ls` used to be 'read' too, which is why a directory listing rendered as
+    // "Read a file — buggyapp" with a file sheet. A folder is not a file.
+    expect(toolStepKind('ls')).toBe('folder');
   });
 });
 

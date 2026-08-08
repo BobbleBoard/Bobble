@@ -314,6 +314,45 @@ const REDUCED_MOTION = `/* Reduced motion: collapse transition/animation duratio
   }
 }`;
 
+/*
+ * SYNTAX PALETTE — the one part of the code surface that was not token-driven.
+ *
+ * It used CodeMirror's `defaultHighlightStyle`, built for a LIGHT editor: navy
+ * keywords, dark purple constants. On the app's near-black code background they
+ * all but vanished. the user: "why all so dark, especially the dark blue, absolutely
+ * not."
+ *
+ * One pair for all flavors rather than six hand-authored sets: the hues carry
+ * meaning (keyword, string, number) rather than brand, so they should read the
+ * same everywhere; only lightness needs to follow the mode. Chosen for contrast
+ * against the code background each mode actually uses, not for looking pretty in
+ * isolation.
+ */
+const SYNTAX: Record<'light' | 'dark', Record<string, string>> = {
+  light: {
+    keyword: '#8b2fa8',
+    string: '#0a6b3d',
+    number: '#9a4600',
+    comment: '#5c6370',
+    function: '#1a52c4',
+    type: '#0f6f7a',
+    property: '#7a3ba8',
+    punctuation: '#4a5160',
+    invalid: '#c0392b',
+  },
+  dark: {
+    keyword: '#d69bff',
+    string: '#7ee2a8',
+    number: '#ffb27a',
+    comment: '#8b94a6',
+    function: '#82b8ff',
+    type: '#6fe0e0',
+    property: '#e0a6ff',
+    punctuation: '#b8c0d0',
+    invalid: '#ff8a80',
+  },
+};
+
 export function emitThemesCss(): string {
   const lines: string[] = [];
   lines.push('/* biome-ignore-all format: generated file */');
@@ -335,6 +374,9 @@ export function emitThemesCss(): string {
     lines.push(`  color-scheme: ${mode};`);
     for (const [name, value] of flattenTheme(themes[id])) {
       lines.push(`  ${name}: ${value};`);
+    }
+    for (const [name, value] of Object.entries(SYNTAX[mode])) {
+      lines.push(`  --pd-syntax-${name}: ${value};`);
     }
     lines.push('}');
     lines.push('');

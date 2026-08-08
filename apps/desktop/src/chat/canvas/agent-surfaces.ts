@@ -56,10 +56,37 @@ export function isInteractiveCommand(command: string): boolean {
  * going", and one the corp's own copy of this function used to get wrong: every
  * quiet `mkdir` sat there claiming to be running forever.
  */
-export function mirrorCommandText(command: string, output: string, running: boolean): string {
-  const head = `$ ${command}\n\n`;
+export function mirrorCommandText(
+  command: string,
+  output: string,
+  running: boolean,
+  cwd?: string,
+): string {
+  /*
+   * A REAL PROMPT LINE, not a bare `$`. the user: "would be appreciated if you can
+   * show in the terminal something like the user being 'bobble' and the
+   * directory ... this removes confusion about the initial working directory."
+   *
+   * That confusion is real and has cost runs: the model is told its cwd is the
+   * home directory while its tools resolve to the workspace, and a bare `$` in
+   * the mirror gave the reader nothing to check it against. Showing where the
+   * command actually ran makes the answer visible instead of inferred.
+   */
+  const where = cwd !== undefined && cwd.length > 0 ? shortCwd(cwd) : '';
+  const prompt = where === '' ? '$' : `bobble ${where} $`;
+  const head = `${prompt} ${command}\n\n`;
   if (output.length > 0) return `${head}${output}\n`;
   return running ? head : `${head}(no output)\n`;
+}
+
+/** The tail of a path, the way a shell prompt shows it: `~` for home, else the
+ * last segment. A full absolute path in a prompt is noise. */
+export function shortCwd(cwd: string): string {
+  const home = typeof process !== 'undefined' ? (process.env?.HOME ?? '') : '';
+  if (home !== '' && cwd === home) return '~';
+  const trimmed = cwd.replace(/\/+$/, '');
+  const seg = trimmed.split('/').filter(Boolean).pop();
+  return seg ?? trimmed;
 }
 
 /** First few words of a command, clipped — a terminal tab's short title. */

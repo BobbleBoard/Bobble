@@ -124,6 +124,7 @@ const VERBS: Record<ActivityStepKind, VerbSpec> = {
   python: { verb: 'Ran', singular: 'Python', plural: '' },
   edit: { verb: 'Edited', singular: 'a file', plural: 'files' },
   read: { verb: 'Read', singular: 'a file', plural: 'files' },
+  folder: { verb: 'Listed', singular: 'a folder', plural: 'folders' },
   file: { verb: 'Presented', singular: 'a file', plural: 'files' },
   skill: { verb: 'Read', singular: 'a skill', plural: 'skills' },
   search: { verb: 'Searched', singular: 'the web', plural: '' },
@@ -150,6 +151,7 @@ const KIND_ORDER: ActivityStepKind[] = [
   'thinking',
   'edit',
   'read',
+  'folder',
   'file',
   'skill',
   'search',
@@ -222,6 +224,7 @@ const RUNNING_PHRASE: Record<ActivityStepKind, string> = {
   python: 'Running Python',
   edit: 'Editing a file',
   read: 'Reading a file',
+  folder: 'Listing a folder',
   file: 'Presenting a file',
   skill: 'Reading a skill',
   search: 'Searching the web',
@@ -470,6 +473,32 @@ export interface ActivityStepProps {
    * to the plain disclosure toggle. Wired by the app (ThreadActivity).
    */
   onOpenFile?: () => void;
+}
+
+/**
+ * HOW LONG THIS STEP HAS BEEN GOING.
+ *
+ * the user, watching a command sit there: "some 'seconds' timer going on here would
+ * be much appreciated, it's been going for a few minutes, seems like it should
+ * be timing out by now." Without it a step that is working and a step that is
+ * wedged look identical — the same gap as the processing ring, one level down,
+ * and the reason a hung `python3 app.py` went unnoticed for five minutes.
+ *
+ * Measured from when the row first appeared as running, which is exactly the
+ * question being asked ("how long have I been staring at this"), and needs no
+ * per-step timestamp threaded through the engine.
+ */
+function RunningFor() {
+  const [start] = useState(() => Date.now());
+  const [now, setNow] = useState(start);
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  const secs = Math.max(0, Math.round((now - start) / 1000));
+  if (secs < 2) return null; // don't flicker a "0s" onto every quick step
+  const label = secs < 60 ? `${secs}s` : `${Math.floor(secs / 60)}m ${secs % 60}s`;
+  return <span className="pd-chain-step-elapsed">{label}</span>;
 }
 
 /** One row of the expanded chain: icon + verb + inline arg, then a disclosure reveal. */

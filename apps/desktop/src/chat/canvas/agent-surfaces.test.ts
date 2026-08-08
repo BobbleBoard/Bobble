@@ -65,3 +65,34 @@ describe('the short title', () => {
     expect(shortCommandTitle('a'.repeat(40)).length).toBeLessThanOrEqual(28);
   });
 });
+
+describe('the terminal mirror shows where the command ran', () => {
+  /*
+   * the user: "would be appreciated if you can show in the terminal something like
+   * the user being 'bobble' and the directory ... this removes confusion about
+   * the initial working directory."
+   *
+   * That confusion is real and has cost runs: the model is told its cwd is the
+   * home directory while its tools resolve to the workspace, and a bare `$` gave
+   * the reader nothing to check it against.
+   */
+  it('renders a prompt line with the folder name', () => {
+    const out = mirrorCommandText('ls -la', 'a\nb', false, '/Users/user/bobble-testbed/buggyapp');
+    expect(out.startsWith('bobble buggyapp $ ls -la')).toBe(true);
+    expect(out).toContain('a\nb');
+  });
+
+  it('shows ~ for the home directory, the way a shell does', () => {
+    const home = process.env.HOME ?? '';
+    if (home === '') return;
+    expect(mirrorCommandText('pwd', '', true, home).startsWith('bobble ~ $ pwd')).toBe(true);
+  });
+
+  it('falls back to a bare $ when there is no cwd to show', () => {
+    expect(mirrorCommandText('echo hi', 'hi', false).startsWith('$ echo hi')).toBe(true);
+  });
+
+  it('still marks a finished command with no output', () => {
+    expect(mirrorCommandText('true', '', false, '/w/proj')).toContain('(no output)');
+  });
+})

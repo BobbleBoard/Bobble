@@ -66,8 +66,12 @@ export function detectBashTerminals(messages: ChatMsg[]): BashTerminalEvent[] {
 const terminalTabKey = (callId: string): string => `term:${callId}`;
 
 /** The xterm text for a mirror terminal: the command prompt + its output. */
-function mirrorText(ev: BashTerminalEvent): string {
-  return mirrorCommandText(ev.command, ev.output, ev.running);
+/* `cwd` is passed IN rather than read from the project store here: this module
+ * is imported by node-environment tests, and pulling the store in drags
+ * browser-only code to module scope ("window is not defined"). The hook below
+ * reads it, where a browser is guaranteed. */
+function mirrorText(ev: BashTerminalEvent, cwd?: string): string {
+  return mirrorCommandText(ev.command, ev.output, ev.running, cwd);
 }
 
 /**
@@ -76,6 +80,9 @@ function mirrorText(ev: BashTerminalEvent): string {
  * output arrives; native-surfaces reconciles the xterm from `data.mirrorText`.
  */
 export function useBashTerminalCanvasRouting(): void {
+  // The workspace the commands actually ran in, so the mirror's prompt line
+  // reads `bobble buggyapp $ …` instead of a bare `$`.
+  const cwd = usePiStore((s) => s.session?.cwd) ?? undefined;
   const { controller } = useCanvasTabs();
   const messages = usePiStore((s) => s.messages) as ChatMsg[];
   const opened = useRef<Set<string>>(new Set());
@@ -83,7 +90,7 @@ export function useBashTerminalCanvasRouting(): void {
   useEffect(() => {
     for (const ev of detectBashTerminals(messages)) {
       const key = terminalTabKey(ev.callId);
-      const data: CanvasTab['data'] = { mirror: true, mirrorText: mirrorText(ev) };
+      const data: CanvasTab['data'] = { mirror: true, mirrorText: mirrorText(ev, cwd) };
       const existing = controller.getState().tabs.find((t) => t.key === key);
       if (existing === undefined) {
         if (opened.current.has(key)) continue;

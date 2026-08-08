@@ -179,6 +179,7 @@ const STEP_LABELS: Record<ActivityStepKind, [running: string, done: string]> = {
   python: ['Running Python', 'Ran Python'],
   edit: ['Editing a file', 'Edited a file'],
   read: ['Reading a file', 'Read a file'],
+  folder: ['Listing a folder', 'Listed a folder'],
   file: ['Presenting a file', 'Presented a file'],
   skill: ['Reading a skill', 'Read a skill'],
   search: ['Searching the web', 'Searched the web'],
@@ -239,9 +240,9 @@ const TOOL_REGISTRY: Record<string, ToolResolution> = {
    * mislabels what it did is a trace you cannot lean on, and this is the very
    * first row of most runs. Same kind (the reveal and icon behave), honest verb.
    */
-  ls: { kind: 'read', label: ['Listing a folder', 'Listed a folder'] },
-  list_dir: { kind: 'read', label: ['Listing a folder', 'Listed a folder'] },
-  listdir: { kind: 'read', label: ['Listing a folder', 'Listed a folder'] },
+  ls: { kind: 'folder' },
+  list_dir: { kind: 'folder' },
+  listdir: { kind: 'folder' },
   view: { kind: 'read' },
   open_file: { kind: 'read' },
   read_file: { kind: 'read' },
