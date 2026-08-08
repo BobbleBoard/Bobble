@@ -835,6 +835,44 @@ function mapToolStepData(
  * engine carries no per-block timestamps) feeds the aggregated summary line so
  * it can read "thought for Xm Ys". Only a positive value is attached.
  */
+/*
+ * CHAT-TEMPLATE MARKERS ARE NOT THOUGHTS.
+ *
+ * the user, from a screenshot of a live run: three "Thought" rows in a row whose
+ * entire visible content was `<|channel>thought`.
+ *
+ * MEASURED in that run's session log — the model prefixes its reasoning with a
+ * template marker, and often emits NOTHING ELSE:
+ *
+ *   block=thinking len=18   '<|channel>thought\n'
+ *   block=thinking len=1643 '<|channel>thought\nThe previous edit call failed…'
+ *
+ * So a real thought carried a junk first line, and an empty one became a row
+ * that said only the marker. Both are stripped here rather than in the delta
+ * stream, where the marker arrives split across chunks and cannot be matched.
+ *
+ * The pattern is deliberately loose — `<|channel>`, `<|channel|>`, `<|start|>`,
+ * with or without a trailing word — because these are model-family artefacts
+ * that vary, and none of them is ever content a person should read.
+ */
+const TEMPLATE_MARKER = /^\s*<\|[a-z_]+\|?>\s*[a-z_]*\s*\n?/i;
+
+export function cleanThought(text: string): string {
+  let out = text;
+  // A model can stack them ("<|start|><|channel>analysis"); strip until settled.
+  for (let i = 0; i < 3; i++) {
+    const next = out.replace(TEMPLATE_MARKER, '');
+    if (next === out) break;
+    out = next;
+  }
+  return out.trim();
+}
+
+/** A thinking block with nothing but a marker in it — a row that says nothing. */
+export function isEmptyThinking(block: { type: string; thinking?: string }): boolean {
+  return block.type === 'thinking' && cleanThought(block.thinking ?? '').length === 0;
+}
+
 export function mapThinkingStep(
   block: ThinkingBlock,
   running: boolean,
@@ -845,7 +883,7 @@ export function mapThinkingStep(
       kind: 'thinking',
       label: stepLabel('thinking', running),
       status: running ? 'running' : 'done',
-      thought: block.thinking.length > 0 ? block.thinking : undefined,
+      ...(cleanThought(block.thinking).length > 0 ? { thought: cleanThought(block.thinking) } : {}),
       ...(durationMs !== undefined && durationMs > 0 ? { durationMs } : {}),
     },
   };

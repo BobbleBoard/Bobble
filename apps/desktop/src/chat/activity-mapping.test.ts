@@ -7,9 +7,11 @@ import type { AssistantMsg, ContentBlock, ToolResultMsg } from '@pi-desktop/engi
 import { describe, expect, it } from 'vitest';
 import {
   chainRunningFlags,
+  cleanThought,
   firstMediaUrl,
   type GroupSegment,
   generatedImageSrc,
+  isEmptyThinking,
   mapThinkingStep,
   mapToolStep,
   resolveTool,
@@ -740,5 +742,56 @@ describe('a rejected tool call is marked failed', () => {
     expect(
       mapToolStep(call('e3', 'edit', { path: '/w/a.py' }), undefined, true).data.failed,
     ).toBeUndefined();
+  });
+});
+
+describe('chat-template markers are not thoughts', () => {
+  /*
+   * the user, from a screenshot of a live run: three "Thought" rows in a row whose
+   * entire visible content was `<|channel>thought`. MEASURED in that run's
+   * session log — the model prefixes its reasoning with a template marker and
+   * often emits nothing else:
+   *
+   *   block=thinking len=18   '<|channel>thought\n'
+   *   block=thinking len=1643 '<|channel>thought\nThe previous edit call failed…'
+   */
+  it('strips the marker off a real thought', () => {
+    expect(cleanThought('<|channel>thought\nThe previous edit call failed.')).toBe(
+      'The previous edit call failed.',
+    );
+  });
+
+  it('treats a marker-only block as empty', () => {
+    expect(cleanThought('<|channel>thought\n')).toBe('');
+    expect(isEmptyThinking({ type: 'thinking', thinking: '<|channel>thought\n' })).toBe(true);
+  });
+
+  it('handles the closed form and stacked markers', () => {
+    expect(cleanThought('<|channel|>analysis\nhello')).toBe('hello');
+    expect(cleanThought('<|start|><|channel>thought\nhello')).toBe('hello');
+  });
+
+  it('leaves an ordinary thought completely alone', () => {
+    const real = 'I need to read the README first.';
+    expect(cleanThought(real)).toBe(real);
+    expect(isEmptyThinking({ type: 'thinking', thinking: real })).toBe(false);
+  });
+
+  /* A tool call is never dropped, whatever it contains. */
+  it('never calls a tool call empty', () => {
+    expect(isEmptyThinking({ type: 'toolCall' })).toBe(false);
+  });
+
+  it('does not attach a thought when only the marker was emitted', () => {
+    const step = mapThinkingStep({ type: 'thinking', thinking: '<|channel>thought\n' }, false);
+    expect((step.data as { thought?: string }).thought).toBeUndefined();
+  });
+
+  it('attaches the cleaned text for a real thought', () => {
+    const step = mapThinkingStep(
+      { type: 'thinking', thinking: '<|channel>thought\nReading the file.' },
+      false,
+    );
+    expect((step.data as { thought?: string }).thought).toBe('Reading the file.');
   });
 });

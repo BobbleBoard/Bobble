@@ -23,6 +23,7 @@ import { usePiStore } from '../state/pi-slice';
 import {
   type ActivityBlock,
   chainRunningFlags,
+  isEmptyThinking,
   type MappedStep,
   mapThinkingStep,
   mapToolStep,
@@ -62,7 +63,7 @@ function resolveAbsPath(path: string, cwd: string | undefined): string {
  * live) state, so the chain collapses to its summary the instant the run ends.
  */
 export function ThreadActivityChain({
-  blocks,
+  blocks: allBlocks,
   resultForBlock,
   runningToolCalls,
   streaming,
@@ -95,6 +96,11 @@ export function ThreadActivityChain({
   // window — from the turn start to the earliest tool result in the chain. The
   // whole window is attributed to the FIRST thinking step (summarizeActivity
   // sums per kind, so the aggregate reads "thought for Xs" regardless of split).
+  /* A thinking block that is only a chat-template marker (`<|channel>thought`)
+   * renders as a "Thought" row with nothing under it — the user screenshotted three
+   * in a row. Drop them BEFORE the running flags are computed, so the indices
+   * stay aligned and they also stop inflating the collapsed summary's count. */
+  const blocks = allBlocks.filter((b) => !isEmptyThinking(b));
   const firstToolResultTs = blocks.reduce<number | undefined>((min, b) => {
     if (b.type !== 'toolCall') return min;
     const ts = resultForBlock.get(b.id)?.timestamp;
@@ -147,6 +153,9 @@ export function ThreadActivityChain({
     hasResult: (id) => resultForBlock.get(id) !== undefined,
     runningToolCalls,
   });
+  /* A thinking block that is only a chat-template marker renders as a "Thought"
+   * row with nothing under it — the user saw three in a row. Drop them before they
+   * become steps, so they also stop inflating the collapsed summary's count. */
   const steps: MappedStep[] = blocks.map((block, i) => {
     const running = runningFlags[i] ?? false;
     const mapped =
