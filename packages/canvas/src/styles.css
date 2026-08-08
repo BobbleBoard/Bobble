@@ -447,43 +447,19 @@
   padding: 0 2px;
 }
 
-/* Shared dropdown menu (Open-with, media download). */
-.pd-canvas-menu {
-  position: absolute;
-  top: calc(100% + 4px);
-  right: 0;
-  z-index: 3;
-  min-width: 160px;
-  padding: var(--pd-space-xs);
-  border: 1px solid var(--pd-border-default);
-  border-radius: var(--pd-radius-popover);
-  background: var(--pd-bg-overlay);
-  box-shadow: var(--pd-shadow-popover);
-}
-
-.pd-canvas-menu-item {
-  display: block;
-  width: 100%;
-  padding: 6px 8px;
-  border: none;
-  border-radius: var(--pd-radius-menu-item);
-  background: none;
-  color: var(--pd-text-primary);
-  font: inherit;
-  font-size: var(--pd-font-size-caption);
-  text-align: left;
-  cursor: pointer;
-}
-
-.pd-canvas-menu-item:hover {
-  background: var(--pd-bg-hover);
-}
-
-.pd-canvas-menu-sep {
-  height: 1px;
-  margin: var(--pd-space-xs) 0;
-  background: var(--pd-border-subtle);
-}
+/*
+ * `.pd-canvas-menu` used to be a SECOND dropdown surface living here: a real
+ * `1px solid` border, an opaque background, no blur, no entry animation and its
+ * own hover rule — while the "Open with" dropdown one control to its left used
+ * the shared `.pd-menu`. the user, from a screenshot: "the styling of the dropdowns
+ * and animations for opening them varies... that dropdown also has nice
+ * bordering that the others don't."
+ *
+ * They were two dropdowns in the SAME operation bar. The media-download menu now
+ * renders `.pd-menu .pd-canvas-popmenu` like every other one, so the frosted
+ * surface, the 0.5px hairline ring, the reveal animation and the row recipe all
+ * come from ui/styles/menu.css — change it there and every dropdown follows.
+ */
 
 /* Anchor for the .pd-menu popovers (new-tab +, project picker). */
 .pd-canvas-menu-anchor {

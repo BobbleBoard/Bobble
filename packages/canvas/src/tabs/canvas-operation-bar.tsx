@@ -560,13 +560,13 @@ function MediaOps({
               <IconChevronDown size={14} />
             </IconButton>
             {menuOpen ? (
-              <div className="pd-canvas-menu" role="menu">
+              <div className="pd-menu pd-canvas-popmenu" role="menu">
                 {formats.map((format) => (
                   <button
                     key={format}
                     type="button"
                     role="menuitem"
-                    className="pd-canvas-menu-item"
+                    className="pd-menu-item"
                     onClick={() => {
                       setMenuOpen(false);
                       onMediaDownload?.(format);

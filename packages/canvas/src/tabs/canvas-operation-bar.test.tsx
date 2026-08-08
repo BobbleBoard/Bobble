@@ -344,11 +344,11 @@ describe('CanvasOperationBar — media', () => {
       />,
     );
     await click(container.querySelector('[aria-label="Download options"]'));
-    const formats = [...container.querySelectorAll('.pd-canvas-menu-item')].map(
-      (n) => n.textContent,
-    );
-    expect(formats).toEqual(['PNG', 'JPG']);
-    await click(container.querySelectorAll('.pd-canvas-menu-item')[1] ?? null);
+    // The download menu is the shared `.pd-menu` surface now, same as every
+    // other dropdown — see menu-surface.test.ts for why it stopped being its own.
+    const rows = () => [...container.querySelectorAll('[role="menu"] .pd-menu-item')];
+    expect(rows().map((n) => n.textContent)).toEqual(['PNG', 'JPG']);
+    await click(rows()[1] ?? null);
     expect(onMediaDownload).toHaveBeenCalledWith('JPG');
   });
 });
