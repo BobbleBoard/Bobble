@@ -328,6 +328,22 @@ const REDUCED_MOTION = `/* Reduced motion: collapse transition/animation duratio
  * against the code background each mode actually uses, not for looking pretty in
  * isolation.
  */
+/*
+ * TERMINAL CURSOR — a caret you can actually see.
+ *
+ * the user: "the cursor should be a single blinking | ... should be blue in this
+ * style but claude orange codex probably still blue."
+ *
+ * Two flavors already say the right thing with their own accent — bobble's is
+ * blue, claude's is orange — but codex's accent is a near-black (#1a1c1f), so
+ * reusing it would paint the caret invisible on the terminal background. Only
+ * that one needs a value of its own; the rest defer to the accent so a flavor
+ * retheme carries the caret with it.
+ */
+const TERMINAL_CURSOR: Record<string, string> = {
+  codex: '#4a9eff',
+};
+
 const SYNTAX: Record<'light' | 'dark', Record<string, string>> = {
   light: {
     keyword: '#8b2fa8',
@@ -378,6 +394,9 @@ export function emitThemesCss(): string {
     for (const [name, value] of Object.entries(SYNTAX[mode])) {
       lines.push(`  --pd-syntax-${name}: ${value};`);
     }
+    lines.push(
+      `  --pd-terminal-cursor: ${TERMINAL_CURSOR[flavor] ?? 'var(--pd-accent-primary)'};`,
+    );
     lines.push('}');
     lines.push('');
   }

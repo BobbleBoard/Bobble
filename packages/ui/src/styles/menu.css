@@ -149,9 +149,23 @@
 
 /* ---- rows ---- */
 
+/*
+ * ONE ROW RECIPE, and the whole row is the target.
+ *
+ * the user: "the styling of the dropdowns and animations for opening them varies,
+ * ... standardize the one used for the ... new tab in the canvas dropdown, that
+ * one has the best bordering styling for button hover effects and selection."
+ *
+ * What actually made that one feel better was not its border — it was
+ * `width: 100%`, which the canvas menu set for itself. Without it a row is only
+ * as wide as its label, so the hover wash stops short of the panel edge and the
+ * gap beside a short item is dead space that looks clickable and is not. Moved
+ * here so every menu behaves the same and one change moves all of them.
+ */
 .pd-menu-item {
   position: relative;
   display: flex;
+  width: 100%;
   align-items: center;
   gap: calc(8px * var(--pd-menu-scale, 1));
   min-height: calc((var(--pd-row-height) - 2px) * var(--pd-menu-scale, 1));

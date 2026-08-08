@@ -47,12 +47,16 @@ function terminalTheme(): ITheme {
   const bg = cssVar('--pd-code-block-bg', '#1e1e24');
   const fg = cssVar('--pd-text-primary', '#e6e6ea');
   const accent = cssVar('--pd-accent-primary', '#8aa2ff');
+  // The caret has its own token: two flavors say the right thing with their
+  // accent (bobble blue, claude orange) but codex's accent is a near-black that
+  // would be invisible against the terminal background.
+  const caret = cssVar('--pd-terminal-cursor', accent);
   const muted = cssVar('--pd-text-muted', '#9aa0a6');
   const selection = cssVar('--pd-bg-selected', 'rgba(138,162,255,0.28)');
   return {
     background: bg,
     foreground: fg,
-    cursor: accent,
+    cursor: caret,
     cursorAccent: bg,
     selectionBackground: selection,
     black: bg,
@@ -358,6 +362,13 @@ export class NativeSurfaces {
       // A thin bar cursor (not the default chunky block) + the app theme so the
       // terminal matches the rest of the app (round-10 #5).
       cursorStyle: 'bar',
+      /*
+       * AND WHEN IT IS NOT FOCUSED. xterm draws a hollow BLOCK for an unfocused
+       * cursor regardless of cursorStyle, which is the "thick terminal like
+       * thing" the user saw — the terminal is unfocused most of the time it is being
+       * looked at, so that block was the cursor as far as anyone could tell.
+       */
+      cursorInactiveStyle: 'bar',
       cursorWidth: 2,
       disableStdin: mirror,
       fontFamily: cssVar('--pd-font-mono', MONO_STACK),

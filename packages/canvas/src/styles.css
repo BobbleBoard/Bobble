@@ -522,11 +522,8 @@
   animation: none;
 }
 
-/* Each `+` menu row fills the popmenu width so the WHOLE row is the single
- * interactive/hover-darkened target, not just the label. */
-.pd-canvas-popmenu .pd-menu-item {
-  width: 100%;
-}
+/* The full-width row rule that used to live here is now the shared
+ * `.pd-menu-item` default — every menu gets the behaviour this one had. */
 
 @media (prefers-reduced-motion: reduce) {
   .pd-menu.pd-canvas-popmenu {
@@ -989,7 +986,6 @@
   align-items: center;
   gap: var(--pd-space-xs);
   padding: var(--pd-space-xs) var(--pd-space-md);
-  border-bottom: 1px solid var(--pd-border-subtle);
   color: var(--pd-text-muted);
   font-size: var(--pd-font-size-footnote);
   flex: 0 0 auto;
