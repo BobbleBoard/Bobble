@@ -314,3 +314,42 @@ describe('emptyOutputs — the artifact nobody opened', () => {
     expect(emptyOutputs(['/w/gone.txt'], sizeOf)).toBeNull();
   });
 });
+
+describe("a delegate's commands are still commands", () => {
+  /*
+   * RUN N, and the irony is exact. This steer's own text recommends handing the
+   * work to `spawn_subagent` with specialist:"tester". The model did precisely
+   * that — the subagent drove the app, captured seven output files to
+   * `_testrun/`, and reported back. But a subagent's bash calls never touch the
+   * PARENT's `ranCommands`, so the only command the harness saw was a lone
+   * `chmod +x`, and it told the model it "never ran any of it".
+   *
+   * It spent a fix from the turn's budget on a false accusation AND shadowed the
+   * README check that would have run next in the same chain.
+   */
+  const TOUCHED = ['/Users/user/bobble-testbed/ledger/ledger.py'];
+  /* The real run's later turn ran nothing at all — `ranCommands` resets per
+   * turn, and the delegate did the driving. (A `chmod +x <file>` in an earlier
+   * turn does name the file, so the heuristic already counts that as exercise;
+   * this is the case where the parent truly issued nothing.) */
+  const NOTHING: string[] = [];
+
+  it('does not accuse a turn that delegated the testing', () => {
+    expect(neverExercised(TOUCHED, NOTHING, true)).toBeNull();
+  });
+
+  it('still accuses a turn that neither ran nor delegated', () => {
+    const note = neverExercised(TOUCHED, NOTHING, false);
+    expect(note).not.toBeNull();
+    expect(note).toContain('never ran any of it');
+  });
+
+  /* Delegation is not required when the turn ran the thing itself. */
+  it('is silent when the parent ran it directly', () => {
+    expect(neverExercised(TOUCHED, ['python3 ledger.py report'], false)).toBeNull();
+  });
+
+  it('defaults to the old behaviour when not told about delegation', () => {
+    expect(neverExercised(TOUCHED, NOTHING)).not.toBeNull();
+  });
+});

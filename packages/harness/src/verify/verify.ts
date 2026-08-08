@@ -309,9 +309,28 @@ const EXECUTABLE = /\.(py|js|mjs|cjs|ts|tsx|sh|rb|go|rs)$/i;
 export function neverExercised(
   touchedFiles: readonly string[],
   ranCommands: readonly string[],
+  delegated = false,
 ): string | null {
   const code = touchedFiles.filter((f) => EXECUTABLE.test(f));
   if (code.length === 0) return null;
+  /*
+   * A DELEGATE'S COMMANDS ARE STILL COMMANDS.
+   *
+   * MEASURED, and the irony is exact: this steer's own text recommends handing
+   * the work to `spawn_subagent` with specialist:"tester". A run took that
+   * advice — the subagent drove the app, captured seven output files to
+   * `_testrun/`, and reported back — and because a subagent's bash calls never
+   * touch the PARENT's `ranCommands`, the only command this saw was a lone
+   * `chmod +x`. So the harness told the model it "never ran any of it" after it
+   * did exactly what the harness asked, spent a fix from the turn's budget on a
+   * false accusation, and shadowed the README check that would have run next.
+   *
+   * The parent cannot see inside a child, so delegation is treated as exercise.
+   * That is deliberately generous: the failure mode of being wrong here is one
+   * missed reminder, and the failure mode of the old behaviour was actively
+   * punishing the right move.
+   */
+  if (delegated) return null;
   const ran = ranCommands.join('\n');
   const exercised = code.some((f) => {
     const base = f.split(/[\\/]/).pop() ?? f;

@@ -177,6 +177,9 @@ interface HarnessRuntime {
   touchedFiles: string[];
   /** Commands this turn actually ran — the other half of "did you exercise it". */
   ranCommands: string[];
+  /** This turn handed work to a subagent, whose commands never reach
+   *  `ranCommands` — so "nothing was run" cannot be concluded. */
+  delegatedThisTurn: boolean;
   /** Remaining REAL-verify fix steers allowed in the active verify sequence. */
   verifyFixesRemaining: number;
   /** True while inside a self-triggered verify fix sequence (so the budget isn't reset). */
@@ -414,6 +417,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     loopDetector: null,
     touchedFiles: [],
     ranCommands: [],
+    delegatedThisTurn: false,
     verifyFixesRemaining: 0,
     verifyActive: false,
   };
@@ -810,7 +814,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
        * than an undemonstrated promise, and only one steer is spent per turn.
        */
       const unexercised =
-        neverExercised(runtime.touchedFiles, runtime.ranCommands) ??
+        neverExercised(runtime.touchedFiles, runtime.ranCommands, runtime.delegatedThisTurn) ??
         emptyOutputs(runtime.touchedFiles, (fp) => {
           try {
             return statSync(fp).size;
@@ -1397,6 +1401,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     runtime.loopDetector = null;
     runtime.touchedFiles = [];
     runtime.ranCommands = [];
+    runtime.delegatedThisTurn = false;
     runtime.verifyActive = false;
     runtime.verifyFixesRemaining = 0;
     // A new/switched session must not inherit the previous session's relaxed
@@ -1450,6 +1455,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     );
     runtime.touchedFiles = [];
     runtime.ranCommands = [];
+    runtime.delegatedThisTurn = false;
     // Capability-affirming system prompt (fix: the model must KNOW it can act on
     // the machine and must not disclaim abilities it has). pi 0.68.1 applies a
     // `{ systemPrompt }` returned from this handler for the turn (agent-session's
@@ -1636,6 +1642,9 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
       }
     }
     // Remember files this turn writes/edits (for verify's syntax fallback, fix #4).
+    /* A subagent's own commands never reach `runtime.ranCommands`, so remember
+     * that the turn delegated — see neverExercised(). */
+    if (event.toolName === 'spawn_subagent') runtime.delegatedThisTurn = true;
     if (event.toolName === 'write' || event.toolName === 'edit') {
       const input = event.input as Record<string, unknown>;
       const path = input.path ?? input.file_path ?? input.filePath;
