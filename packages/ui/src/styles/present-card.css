@@ -111,16 +111,25 @@
 }
 
 /*
- * Secondary is a GHOST, not a second bordered button.
+ * "Show" carries its border ALL THE TIME now, and hover is a plain highlight.
  *
- * With both actions boxed, each row carried two equal-weight buttons and a list
- * of four carried eight — precisely the failure our own ui-critic charter names:
- * "the primary action shares its weight with three secondary buttons, so there
- * is nothing to look at first." Reveal only earns a border on hover.
+ * the user: "I need the reveal thing removed in favor of a '<folder icon> Show'
+ * button that has the border that is currently the hover effect by default and
+ * the hover effect to now be a standard highlight."
+ *
+ * It used to be a ghost that only grew a border on hover — the reasoning being
+ * that two boxed buttons compete for attention. That still holds, and it is why
+ * the border here stays the SUBTLE one while the primary action keeps its fill:
+ * the hierarchy is carried by fill, not by which control happens to have an
+ * outline. A ghost button that only appears on hover is also invisible to
+ * anyone who has not already found it.
  */
 .pd-present-action {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--pd-space-xs);
   padding: 6px 12px;
-  border: 1px solid transparent;
+  border: 1px solid var(--pd-border-subtle);
   border-radius: var(--pd-radius-md);
   color: var(--pd-text-secondary);
   background: transparent;
@@ -135,9 +144,10 @@
     border-color var(--pd-duration-base) var(--pd-easing-standard);
 }
 
+/* The standard highlight every other control uses — the border no longer moves,
+ * so hover is a change of surface rather than the button appearing. */
 .pd-present-action:hover {
-  background: var(--pd-surface-hover);
-  border-color: var(--pd-border-subtle);
+  background: var(--pd-bg-hover);
   color: var(--pd-text-primary);
 }
 

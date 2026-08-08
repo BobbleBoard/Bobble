@@ -62,6 +62,31 @@ export function kindLine(item: PresentedItem): string {
   return ext === '' ? label : `${label} · ${ext}`;
 }
 
+/*
+ * The folder on the "Show" button — it reveals the artefact in the OS file
+ * manager, and the word alone did not say that ("Reveal" said even less).
+ * Inline for the same reason as the kind glyphs: the card carries no icon
+ * dependency.
+ */
+function FolderGlyph() {
+  return (
+    <svg
+      width={14}
+      height={14}
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.5}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="pd-icon"
+      aria-hidden="true"
+    >
+      <path d="M2 4.5A1.5 1.5 0 0 1 3.5 3h2.3l1.4 1.5h5.3A1.5 1.5 0 0 1 14 6v5.5A1.5 1.5 0 0 1 12.5 13h-9A1.5 1.5 0 0 1 2 11.5z" />
+    </svg>
+  );
+}
+
 /** Glyphs, one per kind. Inline so the card needs no icon dependency. */
 function KindGlyph({ kind }: { kind: PresentKind }): ReactNode {
   const common = {
@@ -128,6 +153,8 @@ export interface PresentCardProps extends Omit<HTMLAttributes<HTMLElement>, 'onS
   onReveal?: (item: PresentedItem) => void;
   /** A specific app chosen from the Open dropdown. */
   onOpenWith?: (item: PresentedItem, appId: string) => void;
+  /** The card BODY was clicked — bring the artefact into the canvas. */
+  onActivate?: (item: PresentedItem) => void;
 }
 
 /**
@@ -138,17 +165,27 @@ export interface PresentCardProps extends Omit<HTMLAttributes<HTMLElement>, 'onS
  * because the name alone is not enough to know WHICH file this is.
  */
 export const PresentCard = forwardRef<HTMLDivElement, PresentCardProps>(function PresentCard(
-  { item, onOpen, onOpenWith, onReveal, className, ...rest },
+  { item, onActivate, onOpen, onOpenWith, onReveal, className, ...rest },
   ref,
 ) {
   const name = item.name ?? baseName(item.path);
   return (
     <div ref={ref} className={clsx('pd-present-card', className)} {...rest}>
+      {/*
+       * the user: "clicking anywhere on the card besides the 'open' button [should]
+       * open it in canvas ... it wouldn't make sense for the open button to open
+       * in canvas because this button is the same one shown when something IS
+       * open in canvas."
+       *
+       * So the two are deliberately different verbs and must not share a
+       * handler: the BODY brings the artefact into the canvas, the split button
+       * hands it to an application.
+       */}
       <button
         type="button"
         className="pd-present-main pd-focusable"
         title={item.path}
-        onClick={onOpen === undefined ? undefined : () => onOpen(item)}
+        onClick={onActivate === undefined ? undefined : () => onActivate(item)}
       >
         <span className="pd-present-thumb" aria-hidden>
           {item.thumbnailUrl !== undefined ? (
@@ -180,7 +217,8 @@ export const PresentCard = forwardRef<HTMLDivElement, PresentCardProps>(function
             className="pd-present-action pd-focusable"
             onClick={() => onReveal(item)}
           >
-            Reveal
+            <FolderGlyph />
+            Show
           </button>
         ) : null}
         {/*

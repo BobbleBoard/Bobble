@@ -498,7 +498,12 @@ export function ChatThread() {
                 <PresentCard
                   key={item.path}
                   item={item}
-                  onOpen={() => void openPresented(canvasController, item)}
+                  /* Body → the canvas. Split button → an application. Two
+                   * different verbs, deliberately not sharing a handler. */
+                  onActivate={() => void openPresented(canvasController, item)}
+                  onOpen={() => {
+                    void window.piDesktop.invoke('canvas:open-default', { path: item.path });
+                  }}
                   onOpenWith={(_it, appId) => {
                     void window.piDesktop.invoke('canvas:open-with', {
                       path: item.path,

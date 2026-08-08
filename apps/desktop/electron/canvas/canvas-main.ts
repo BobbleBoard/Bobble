@@ -413,6 +413,26 @@ export function registerCanvasIpc(
     },
   );
 
+  /*
+   * OPEN WITH WHATEVER THE OS USES — no `duti`, no Apple Events.
+   *
+   * The primary "Open" used to depend on us having IDENTIFIED the default app,
+   * which goes through `duti` (a Homebrew tool most machines do not have) and
+   * returns null when it is missing. On such a machine there was no default to
+   * open with, so the button did nothing while the dropdown's individual apps
+   * worked fine — exactly what the user reported.
+   *
+   * `shell.openPath` asks LaunchServices to do what a double-click in Finder
+   * does. It needs no third-party tool and no Apple Events permission (the
+   * osascript route asks Finder and is refused with -1743 until the user grants
+   * automation access).
+   */
+  ipcMain.handle('canvas:open-default', async (event, req: { path: string }) => {
+    guard(event, 'canvas:open-default');
+    const error = await shell.openPath(path.resolve(req.path));
+    return error === '' ? { ok: true } : { ok: false, error };
+  });
+
   // File operation bar "Open in folder" → reveal the file in Finder.
   ipcMain.handle('canvas:reveal', (event, req: { path: string }) => {
     guard(event, 'canvas:reveal');

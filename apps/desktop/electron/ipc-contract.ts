@@ -452,6 +452,9 @@ export type CanvasInvokeMap = {
     request: { path: string; appId: CanvasOpenWithAppId };
     response: { ok: boolean; error?: string };
   };
+  /** Open with the OS default handler — LaunchServices directly, no `duti` and
+   * no Apple Events, so it works on a machine with neither. */
+  'canvas:open-default': { request: { path: string }; response: { ok: boolean; error?: string } };
   /** File operation bar "Open in folder" → shell.showItemInFolder. */
   'canvas:reveal': { request: { path: string }; response: { ok: boolean } };
   /** Renderer → main: report a compact snapshot of what's on the canvas right now
@@ -473,6 +476,7 @@ export const CANVAS_INVOKE_CHANNELS = [
   'canvas:open-external',
   'canvas:list-open-apps',
   'canvas:open-with',
+  'canvas:open-default',
   'canvas:reveal',
   'canvas:report-state',
   'canvas:site-icon',
