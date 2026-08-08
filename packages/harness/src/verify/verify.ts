@@ -16,8 +16,8 @@
  * this module owns detection and the single check run.
  */
 
-import { homedir } from 'node:os';
 import { existsSync, readFileSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { join } from 'node:path';
 
 /** A resolved check the verify pass can run. */
@@ -288,6 +288,46 @@ export interface VerifyPassResult {
  * files), run it, and return the outcome. No steering / budget logic here — the
  * caller decides what to do with a `fail`.
  */
+/**
+ * DID THIS TURN ACTUALLY RUN WHAT IT WROTE?
+ *
+ * Measured across five runs given "fix it and make sure it works": the model
+ * edits code, reasons carefully about the edits, and never executes the result
+ * — then reports success. Telling it to commission a tester did not change that
+ * (the guidance is in the capability prompt and went unused every time), which
+ * is the usual finding here: a check the model must DECIDE to run is a check
+ * that does not get run.
+ *
+ * So state the fact instead. A turn that wrote executable code and issued no
+ * command that mentions any of it has not been exercised, whatever the reply
+ * says. Deliberately narrow — it asks only whether the written files were named
+ * in something that ran, which is the weakest claim that is still worth making,
+ * and it stays silent for prose, config, docs and data.
+ */
+const EXECUTABLE = /\.(py|js|mjs|cjs|ts|tsx|sh|rb|go|rs)$/i;
+
+export function neverExercised(
+  touchedFiles: readonly string[],
+  ranCommands: readonly string[],
+): string | null {
+  const code = touchedFiles.filter((f) => EXECUTABLE.test(f));
+  if (code.length === 0) return null;
+  const ran = ranCommands.join('\n');
+  const exercised = code.some((f) => {
+    const base = f.split(/[\\/]/).pop() ?? f;
+    const stem = base.replace(/\.[^.]+$/, '');
+    return ran.includes(base) || (stem.length > 2 && ran.includes(stem));
+  });
+  if (exercised) return null;
+  const names = code.slice(0, 4).map((f) => f.split(/[\\/]/).pop() ?? f);
+  return (
+    `You wrote ${names.join(', ')}${code.length > 4 ? ` and ${code.length - 4} more` : ''} ` +
+    'and never ran any of it. Nothing here has been executed, so "it works" is a guess. ' +
+    'Run it the way the user would — or hand it to spawn_subagent with specialist:"tester", ' +
+    'which works out how to drive it and comes back with screenshots and the failures.'
+  );
+}
+
 export async function runVerifyPass(deps: VerifyPassDeps): Promise<VerifyPassResult> {
   const check = deps.detectCheck(deps.cwd) ?? syntaxCheckCommand(deps.touchedFiles ?? []);
   if (check === null) return { check: null, outcome: null };

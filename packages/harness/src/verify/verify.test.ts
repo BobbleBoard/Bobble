@@ -4,6 +4,7 @@ import {
   type CheckOutcome,
   detectPackageManager,
   detectProjectCheck,
+  neverExercised,
   type ProjectProbe,
   runCheck,
   runVerifyPass,
@@ -235,5 +236,42 @@ describe('a ~ inside quotes is never expanded by the shell', () => {
   it('still quotes, so a path with spaces survives', () => {
     const cmd = syntaxCheckCommand(['/tmp/my app/x.py'])?.command ?? '';
     expect(cmd).toContain("'/tmp/my app/x.py'");
+  });
+});
+
+describe('neverExercised — wrote code, never ran it', () => {
+  /*
+   * Measured across five runs given "fix it and make sure it works": the model
+   * edits code, reasons carefully, never executes the result, and reports
+   * success. Telling it to commission a tester changed nothing — a check the
+   * model must DECIDE to run is a check that does not get run.
+   */
+  it('speaks up when python was written and nothing ran it', () => {
+    const out = neverExercised(['/w/app.py'], ['ls -la', 'cat README.md']);
+    expect(out).not.toBeNull();
+    expect(out).toContain('app.py');
+    expect(out).toContain('never ran');
+    // It must point at the way out, not just complain.
+    expect(out).toContain('tester');
+  });
+
+  it('stays quiet when the file was actually run', () => {
+    expect(neverExercised(['/w/app.py'], ['python3 /w/app.py'])).toBeNull();
+  });
+
+  it('accepts being run via its module stem', () => {
+    expect(neverExercised(['/w/converter.py'], ['python3 -c "import converter"'])).toBeNull();
+  });
+
+  it('accepts a test that names the file', () => {
+    expect(neverExercised(['/w/app.py'], ['pytest test_app.py -k app'])).toBeNull();
+  });
+
+  it('says nothing about prose, config or data', () => {
+    expect(neverExercised(['/w/README.md', '/w/data.csv', '/w/tsconfig.json'], [])).toBeNull();
+  });
+
+  it('says nothing when no files were written at all', () => {
+    expect(neverExercised([], ['python3 whatever.py'])).toBeNull();
   });
 });

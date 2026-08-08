@@ -91,6 +91,7 @@ import {
 } from './subagent/types.js';
 import { registerAskUser } from './tools/ask-user.js';
 import { registerCapabilityTool } from './tools/capability-tool.js';
+import { wouldHang } from './tools/hang-guard.js';
 import { registerImageTools } from './tools/image-tools.js';
 import { applyBias, lastAssistantThought, planBias } from './tools/intent-bias.js';
 import { detectOpenedApp, openedAppNote } from './tools/opened-app.js';
@@ -98,7 +99,6 @@ import { registerPlanTool } from './tools/plan-tool.js';
 import { registerPresentTool } from './tools/present.js';
 import { presentBridgeFromEnv } from './tools/present-bridge.js';
 import { registerSandboxFileTools, resolveWorkspaceRoot } from './tools/sandbox-fs.js';
-import { wouldHang } from './tools/hang-guard.js';
 import { truncateToolOutput } from './tools/tool-output-truncate.js';
 import { captureRegisteredTools } from './tools/tool-registry.js';
 import { registerUseTool } from './tools/use-tool.js';
@@ -106,6 +106,7 @@ import {
   detectProjectCheck,
   makeExecBashRunner,
   makeFsProbe,
+  neverExercised,
   type ProjectCheck,
   runVerifyPass,
   type VerifyBashRunner,
@@ -170,6 +171,8 @@ interface HarnessRuntime {
   loopDetector: LoopDetector | null;
   /** Files the current agent loop wrote/edited (for the verify syntax fallback). */
   touchedFiles: string[];
+  /** Commands this turn actually ran — the other half of "did you exercise it". */
+  ranCommands: string[];
   /** Remaining REAL-verify fix steers allowed in the active verify sequence. */
   verifyFixesRemaining: number;
   /** True while inside a self-triggered verify fix sequence (so the budget isn't reset). */
@@ -406,6 +409,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     stage: 'idle',
     loopDetector: null,
     touchedFiles: [],
+    ranCommands: [],
     verifyFixesRemaining: 0,
     verifyActive: false,
   };
@@ -772,6 +776,36 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
           status: pass.outcome.status,
           command: pass.outcome.command,
         });
+      }
+      /*
+       * A PASSING SYNTAX CHECK IS NOT A WORKING PRODUCT. This is where code that
+       * parses and was never executed slips out as "done" — measured five times
+       * over: the model edits, reasons well, runs nothing, reports success. It
+       * costs one steer, from the same budget as a real failure, and only when
+       * the turn genuinely wrote executable code and issued no command naming
+       * any of it.
+       */
+      const unexercised = neverExercised(runtime.touchedFiles, runtime.ranCommands);
+      if (unexercised !== null && runtime.verifyFixesRemaining > 0) {
+        runtime.verifyFixesRemaining -= 1;
+        runtime.verifyActive = true;
+        pi.appendEntry(HARNESS_VERIFY_ENTRY, {
+          effort: runtime.config.effort,
+          kind: 'unexercised',
+          status: 'fail',
+          command: '(nothing was run)',
+          fix: true,
+        });
+        setStage('revising', ctx);
+        // Same private-followUp mechanism the failing-check branch uses, so the
+        // steer never surfaces as meta narration in the user-facing reply.
+        pi.sendUserMessage?.(
+          `${unexercised}\n\nDo that now, then stop. This is an internal check — act on it silently and don't mention it in your reply.`,
+          {
+            deliverAs: 'followUp',
+          },
+        );
+        return true;
       }
       runtime.verifyActive = false;
       return false;
@@ -1316,6 +1350,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     runtime.stage = 'idle';
     runtime.loopDetector = null;
     runtime.touchedFiles = [];
+    runtime.ranCommands = [];
     runtime.verifyActive = false;
     runtime.verifyFixesRemaining = 0;
     // A new/switched session must not inherit the previous session's relaxed
@@ -1368,6 +1403,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
       loopDetectorConfig(effortKnobs(runtime.config.effort)),
     );
     runtime.touchedFiles = [];
+    runtime.ranCommands = [];
     // Capability-affirming system prompt (fix: the model must KNOW it can act on
     // the machine and must not disclaim abilities it has). pi 0.68.1 applies a
     // `{ systemPrompt }` returned from this handler for the turn (agent-session's
@@ -1548,6 +1584,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     if (event.toolName === 'bash') {
       const cmd = (event.input as { command?: unknown })?.command;
       if (typeof cmd === 'string') {
+        runtime.ranCommands.push(cmd);
         const hang = wouldHang(cmd, runtime.workspaceRoot ?? undefined);
         if (hang !== null) return { block: true, reason: hang };
       }
