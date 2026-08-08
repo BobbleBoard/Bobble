@@ -1,0 +1,73 @@
+import { beforeEach, describe, expect, it } from 'vitest';
+import { reportRejectedSend } from './pi-connect';
+import { usePiStore } from './pi-slice';
+
+/**
+ * A SEND THAT WAS REFUSED HAS TO SAY SO.
+ *
+ * the user, with a screenshot of a thread that stayed that way indefinitely: "it
+ * looked like this by the way that whole time, blank screen" — his message on
+ * screen, nothing beneath it, no reply, no error, no processing ring, no Stop
+ * button. The app looked idle and willing; it had swallowed the rejection.
+ *
+ * `pi:prompt` returns an ack. The already-processing case is retried as a
+ * follow-up; every OTHER failure was handed back to a caller that never looked,
+ * so the echo stranded and the turn simply never existed. The measured cause
+ * behind that screenshot was the machine having no room left for the model
+ * server — a thing the user can act on, reported as silence.
+ */
+/* An assistant message carries `blocks[]`, not a flat `text` — reading `.text`
+ * yields undefined and an assertion that cannot fail for the right reason. */
+function assistantText(msg: unknown): string {
+  const blocks = (msg as { blocks?: Array<{ type: string; text?: string }> }).blocks ?? [];
+  return blocks.map((b) => (b.type === 'text' ? (b.text ?? '') : '')).join('');
+}
+
+describe('reportRejectedSend', () => {
+  beforeEach(() => {
+    usePiStore.setState({ messages: [], promptInFlight: true });
+  });
+
+  it('tells the user, instead of leaving the thread blank forever', () => {
+    reportRejectedSend({ success: false, error: 'model server unavailable' });
+    const msgs = usePiStore.getState().messages;
+    expect(msgs).toHaveLength(1);
+    expect(msgs[0]?.kind).toBe('assistant');
+    expect(assistantText(msgs[0])).toContain("wasn't sent");
+    expect(assistantText(msgs[0])).toContain('model server unavailable');
+  });
+
+  /* Nothing downstream will ever clear this — the turn never started — so the
+   * composer would sit showing Stop with no turn behind it. */
+  it('clears promptInFlight, which no turn is left to clear', () => {
+    reportRejectedSend({ success: false, error: 'x' });
+    expect(usePiStore.getState().promptInFlight).toBe(false);
+  });
+
+  it('says the message is not lost, because it is not', () => {
+    reportRejectedSend({ success: false, error: 'x' });
+    expect(assistantText(usePiStore.getState().messages[0])).toMatch(/Nothing has been lost/);
+  });
+
+  it('handles an ack that gives no reason at all', () => {
+    reportRejectedSend({ success: false });
+    expect(assistantText(usePiStore.getState().messages[0])).toContain('no reason given');
+  });
+
+  /* The overwhelmingly common path: costs nothing and says nothing. */
+  it('is silent on a successful send', () => {
+    reportRejectedSend({ success: true });
+    expect(usePiStore.getState().messages).toEqual([]);
+    expect(usePiStore.getState().promptInFlight).toBe(true);
+  });
+
+  it('is silent on an undefined ack', () => {
+    reportRejectedSend(undefined);
+    expect(usePiStore.getState().messages).toEqual([]);
+  });
+
+  it('returns the ack unchanged, so callers still see it', () => {
+    const ack = { success: false as const, error: 'boom' };
+    expect(reportRejectedSend(ack)).toBe(ack);
+  });
+});

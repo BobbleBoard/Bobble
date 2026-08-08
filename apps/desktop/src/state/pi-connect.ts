@@ -444,8 +444,44 @@ export async function sendPrompt(
   // is authoritative, ours is a mirror): retry once as a follow-up instead of
   // surfacing the rejection.
   if (ack?.success === false && /already processing/i.test(ack.error ?? '')) {
-    return window.piDesktop.invoke('pi:prompt', { ...body, streamingBehavior: 'followUp' });
+    return reportRejectedSend(
+      await window.piDesktop.invoke('pi:prompt', { ...body, streamingBehavior: 'followUp' }),
+    );
   }
+  return reportRejectedSend(ack);
+}
+
+/**
+ * A SEND THAT WAS REFUSED HAS TO SAY SO.
+ *
+ * the user, with a screenshot of a thread that stayed like this indefinitely: "it
+ * looked like this by the way that whole time, blank screen" — his message on
+ * screen, nothing under it, no reply, no error, no processing ring, and no Stop
+ * button in the composer. The app looked idle and willing. It had simply
+ * swallowed the rejection.
+ *
+ * `pi:prompt` returns an ack. The already-processing case is retried as a
+ * follow-up just above; EVERY other failure was returned to a caller that never
+ * looked at it, so the echo stranded and the turn never existed. Measured cause
+ * in the run that produced that screenshot: the machine had run out of room for
+ * the model server, so the dispatch was refused — a condition the user can
+ * actually act on, reported as silence.
+ *
+ * The vision-unavailable path two blocks up already does exactly this. This is
+ * the same courtesy for the other way a send can die.
+ */
+export function reportRejectedSend<T extends { success?: boolean; error?: string } | undefined>(
+  ack: T,
+): T {
+  if (ack?.success !== false) return ack;
+  // The turn never started, so nothing downstream will ever clear this.
+  usePiStore.setState({ promptInFlight: false });
+  const reason = ack.error !== undefined && ack.error !== '' ? ack.error : 'no reason given';
+  usePiStore
+    .getState()
+    .appendAssistantText(
+      `That message wasn't sent — the agent refused it (${reason}). Nothing has been lost; send it again. If this keeps happening, check Settings → Models that a model is loaded and there is memory free for it.`,
+    );
   return ack;
 }
 
