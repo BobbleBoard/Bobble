@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Bobble icon tuner</title>
+<style>
+:root{
+  --bg:#f6f6f5; --card:#fff; --ink:#16150f; --dim:#6b6862; --line:#e2e0da; --line2:#c9c6be;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+}
+@media (prefers-color-scheme:dark){
+  :root{--bg:#17161a; --card:#1f1e23; --ink:#f0eeea; --dim:#9a968e; --line:#302e35; --line2:#454249;}
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.5;padding:22px}
+h1{font-size:17px;font-weight:600;margin:0 0 2px}
+.sub{color:var(--dim);font-size:13px;margin:0 0 20px}
+.wrap{display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap;max-width:1240px}
+.col{display:flex;flex-direction:column;gap:16px}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px}
+.lbl{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);margin-bottom:8px;font-weight:600}
+.art{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px;display:block;line-height:0}
+.art.inv{background:#0e0e10}
+.desk{background:linear-gradient(160deg,#5b7fa6,#2f4256);border-radius:14px;padding:20px;display:flex;
+  gap:16px;align-items:center;justify-content:center;line-height:0}
+.seg{display:flex;gap:5px;flex-wrap:wrap}
+button{font:inherit;font-size:12.5px;padding:6px 11px;border-radius:8px;border:1px solid var(--line2);
+  background:transparent;color:var(--dim);cursor:pointer;transition:.12s}
+button:hover{color:var(--ink);border-color:var(--ink)}
+button[aria-pressed=true]{background:var(--ink);color:var(--card);border-color:var(--ink)}
+.pal{display:flex;align-items:center;gap:7px;padding:5px 10px 5px 6px}
+.dots{display:flex;gap:3px}
+.dot{width:11px;height:11px;border-radius:3px}
+.ctl{display:flex;flex-direction:column;gap:3px;margin-bottom:11px;min-width:250px}
+.ctl .top{display:flex;justify-content:space-between;font-size:12.5px;color:var(--dim)}
+.ctl .top b{color:var(--ink);font-weight:600;font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;accent-color:var(--ink);height:18px;margin:0}
+.sizes{display:flex;gap:14px;align-items:flex-end}
+.sz{display:flex;flex-direction:column;align-items:center;gap:5px}
+.sz span{font-size:10.5px;color:var(--dim);font-variant-numeric:tabular-nums}
+.szbox{background:#fff;border:1px solid var(--line);border-radius:7px;padding:6px;display:flex;line-height:0}
+.szbox.inv{background:#0e0e10}
+.note{font-size:12px;color:var(--dim);max-width:262px;line-height:1.45;margin-top:4px}
+.grp{margin-bottom:14px}
+.grp:last-child{margin-bottom:0}
+</style>
+</head>
+<body>
+<h1>Bobble icon tuner</h1>
+<p class="sub">Loading is the bare marks. The app icon adds the tile, with a macOS-style rim light along the top edge.</p>
+
+<div class="wrap">
+  <div class="col">
+    <div class="panel">
+      <div class="lbl">Loading &mdash; no tile</div>
+      <div class="art" id="animCard"><svg id="anim" width="240" height="240" viewBox="0 0 120 120"></svg></div>
+    </div>
+    <div class="panel">
+      <div class="grp"><div class="lbl">Motion</div><div class="seg" id="variants"></div></div>
+      <div id="motion"></div>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="panel">
+      <div class="lbl">App icon</div>
+      <div class="art" id="statCard"><svg id="stat" width="176" height="176" viewBox="0 0 120 120"></svg></div>
+    </div>
+    <div class="panel">
+      <div class="lbl">In a dock</div>
+      <div class="desk" id="desk"></div>
+    </div>
+    <div class="panel">
+      <div class="grp"><div class="lbl">Missing slot</div><div class="seg" id="holes"></div></div>
+      <div class="grp"><div class="lbl">Legibility check</div><div class="sizes" id="sizes"></div></div>
+      <div class="seg"><button id="inv" aria-pressed="false">On dark</button><button id="cp">Copy SVG</button></div>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="panel">
+      <div class="grp"><div class="lbl">Palette</div><div class="seg" id="pals"></div></div>
+      <div class="grp"><div class="lbl">Fill</div><div class="seg" id="fills"></div></div>
+      <div id="shape"></div>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="panel">
+      <div class="grp"><div class="lbl">Tile</div><div class="seg" id="tiles"></div></div>
+      <div class="grp"><div class="lbl">Tile shape</div><div class="seg" id="shapes"></div></div>
+      <div id="tileCtl"></div>
+      <p class="note" id="note"></p>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+var PALS=[
+  {n:'Mono',c:['#111111','#111111','#111111'],d:['#f2f2f2','#f2f2f2','#f2f2f2']},
+  {n:'Aqua Pink Yellow',c:['#14C4C4','#FF4FA3','#FFC93C']},
+  {n:'Orange Green Pink',c:['#FF7A14','#25B36B','#FF4FA3']},
+  {n:'Bauhaus',c:['#E03127','#1C5FC9','#F5C518']},
+  {n:'Reef',c:['#FF6B4A','#FFB020','#16BFA8']},
+  {n:'Ink',c:['#0A2E6E','#2E6BD6','#5B93E8']}
+];
+var FILLS=[['outline','Outline'],['solid','Solid'],['inked','Inked'],['tint','Tint'],['depth','Depth'],['shaded','Shaded']];
+var TILES=[['none','None'],['tint','Tint'],['paper','Paper'],['colour','Colour'],['dark','Dark']];
+var SHAPES=[['round','Rounded'],['squircle','Squircle']];
+
+var S={bevel:54,thick:1.5,gap:4,depth:62,speed:1.15,pause:0,inset:15,
+       tbevel:52,rim:65,tshade:45,
+       variant:'slide',fill:'inked',tile:'tint',tshape:'squircle',hole:0,invert:false,pal:1};
+
+var VB=120,TM=4;
+
+function hx(v){v=Math.max(0,Math.min(255,Math.round(v)));return ('0'+v.toString(16)).slice(-2);}
+function mix(a,b,t){var p=function(h,i){return parseInt(h.slice(i,i+2),16);};
+  return '#'+hx(p(a,1)+(p(b,1)-p(a,1))*t)+hx(p(a,3)+(p(b,3)-p(a,3))*t)+hx(p(a,5)+(p(b,5)-p(a,5))*t);}
+function dk(h,t){return mix(h,'#000000',t);}
+function lt(h,t){return mix(h,'#ffffff',t);}
+
+function darkTile(){return S.tile==='dark';}
+function onDark(){return S.invert&&S.tile==='none'||darkTile();}
+function cols(){var p=PALS[S.pal];return (onDark()&&p.d)?p.d:p.c;}
+function ink(){return onDark()?'#f2f2f2':'#111111';}
+
+function geo(){var s=(VB-2*S.inset-S.gap)/2,o=s+S.gap,P=S.inset;
+  return {s:s,xy:[[P,P],[P+o,P],[P+o,P+o],[P,P+o]]};}
+
+function sqPath(x,y,w,h,n){
+  var cx=x+w/2,cy=y+h/2,a=w/2,b=h/2,N=80,d='',i,t,ct,st,e=2/n;
+  for(i=0;i<=N;i++){t=i/N*2*Math.PI;ct=Math.cos(t);st=Math.sin(t);
+    d+=(i?'L':'M')+(cx+a*(ct<0?-1:1)*Math.pow(Math.abs(ct),e)).toFixed(2)+' '+
+       (cy+b*(st<0?-1:1)*Math.pow(Math.abs(st),e)).toFixed(2);}
+  return d+'Z';}
+
+function tileShape(x,y,w,attrs){
+  if(S.tshape==='squircle')
+    return '<path d="'+sqPath(x,y,w,w,8-(S.tbevel/100)*5.5)+'" '+attrs+'/>';
+  return '<rect x="'+x.toFixed(2)+'" y="'+y.toFixed(2)+'" width="'+w.toFixed(2)+'" height="'+w.toFixed(2)+
+    '" rx="'+((S.tbevel/100)*(w/2)).toFixed(2)+'" '+attrs+'/>';}
+
+function tileBase(c){
+  if(S.tile==='paper')return '#ffffff';
+  if(S.tile==='dark')return '#1c1b20';
+  if(S.tile==='colour')return c[0];
+  return lt(PALS[S.pal].c[0],0.86);}
+
+function tileDefs(pfx,base){
+  if(S.tile==='none')return '';
+  var g=S.tshade/100,r=S.rim/100;
+  return '<linearGradient id="'+pfx+'tg" x1="0" y1="0" x2="0" y2="1">'+
+      '<stop offset="0" stop-color="'+lt(base,0.20*g)+'"/>'+
+      '<stop offset="1" stop-color="'+dk(base,0.17*g)+'"/></linearGradient>'+
+    '<linearGradient id="'+pfx+'rm" x1="0" y1="0" x2="0" y2="1">'+
+      '<stop offset="0" stop-color="#ffffff" stop-opacity="'+(0.92*r).toFixed(3)+'"/>'+
+      '<stop offset="0.30" stop-color="#ffffff" stop-opacity="'+(0.20*r).toFixed(3)+'"/>'+
+      '<stop offset="0.62" stop-color="#ffffff" stop-opacity="0"/>'+
+      '<stop offset="1" stop-color="#ffffff" stop-opacity="0"/></linearGradient>'+
+    '<linearGradient id="'+pfx+'st" x1="0" y1="0" x2="0" y2="1">'+
+      '<stop offset="0" stop-color="#000000" stop-opacity="0"/>'+
+      '<stop offset="0.55" stop-color="#000000" stop-opacity="0"/>'+
+      '<stop offset="1" stop-color="#000000" stop-opacity="'+(0.34*r).toFixed(3)+'"/></linearGradient>';}
+
+function tile(pfx,c){
+  if(S.tile==='none')return '';
+  var w=VB-2*TM,rw=Math.max(0.8,1.6*(S.rim/65)),o='';
+  o+=tileShape(TM,TM,w,'fill="url(#'+pfx+'tg)"');
+  o+=tileShape(TM+rw/2,TM+rw/2,w-rw,'fill="none" stroke="url(#'+pfx+'rm)" stroke-width="'+rw.toFixed(2)+'"');
+  o+=tileShape(TM+rw/2,TM+rw/2,w-rw,'fill="none" stroke="url(#'+pfx+'st)" stroke-width="'+rw.toFixed(2)+'"');
+  o+=tileShape(TM,TM,w,'fill="none" stroke="'+(darkTile()?'#000000':'#000000')+'" stroke-opacity="'+
+      (darkTile()?0.55:0.15)+'" stroke-width="0.7"');
+  return o;}
+
+function piece(g,slot,ci,c,pfx,tf){
+  var x=g.xy[slot][0],y=g.xy[slot][1],s=g.s,w=S.thick,col=c[ci],d=S.depth/100,t=tf||'';
+  var b='x="'+x.toFixed(2)+'" y="'+y.toFixed(2)+'" width="'+s.toFixed(2)+'" height="'+s.toFixed(2)+
+        '" rx="'+((S.bevel/100)*(s/2)).toFixed(2)+'"';
+  var lj=' stroke-linejoin="round"',ik=ink();
+  if(S.fill==='outline')return '<rect '+b+' fill="none" stroke="'+col+'" stroke-width="'+w+'"'+lj+t+'/>';
+  if(S.fill==='solid')return '<rect '+b+' fill="'+col+'"'+t+'/>';
+  if(S.fill==='inked')return '<rect '+b+' fill="'+col+'" stroke="'+ik+'" stroke-width="'+w+'"'+lj+t+'/>';
+  if(S.fill==='tint')return '<rect '+b+' fill="'+col+'" fill-opacity="'+(0.08+0.42*d).toFixed(3)+
+    '" stroke="'+col+'" stroke-width="'+w+'"'+lj+t+'/>';
+  if(S.fill==='depth'){var o=(0.5+7*d).toFixed(2);
+    return '<g'+t+'><rect '+b+' fill="'+dk(col,.28+.28*d)+'" transform="translate('+o+','+o+')"/>'+
+      '<rect '+b+' fill="'+col+'"/></g>';}
+  return '<rect '+b+' fill="url(#'+pfx+'g'+ci+')" stroke="'+dk(col,.34)+'" stroke-width="'+w+'"'+lj+t+'/>';}
+
+function pieceDefs(pfx,c){
+  if(S.fill!=='shaded')return '';
+  var d=S.depth/50;
+  return c.map(function(x,i){return '<linearGradient id="'+pfx+'g'+i+'" x1="0" y1="0" x2="0" y2="1">'+
+    '<stop offset="0" stop-color="'+lt(x,Math.min(.55,.30*d))+'"/>'+
+    '<stop offset="1" stop-color="'+dk(x,Math.min(.50,.24*d))+'"/></linearGradient>';}).join('');}
+
+function allDefs(pfx,c,withTile){
+  var d=pieceDefs(pfx,c)+(withTile?tileDefs(pfx,tileBase(c)):'');
+  return d?'<defs>'+d+'</defs>':'';}
+
+function staticMark(hole,c,pfx,withTile){
+  var g=geo(),o=allDefs(pfx,c,withTile)+(withTile?tile(pfx,c):''),k=0;
+  for(var i=0;i<4;i++){if(i!==hole){o+=piece(g,i,k,c,pfx);k++;}}
+  return o;}
+
+function ease(p){return p<.5?4*p*p*p:1-Math.pow(-2*p+2,3)/2;}
+function rotp(x,y,a){var GC=VB/2,r=a*Math.PI/180,cc=Math.cos(r),ss=Math.sin(r),dx=x-GC,dy=y-GC;
+  return [GC+dx*cc-dy*ss,GC+dx*ss+dy*cc];}
+function tf(g,from,to,p){
+  var GC=VB/2,hx0=g.xy[from][0],hy=g.xy[from][1],
+      dx=g.xy[to][0]-hx0,dy=g.xy[to][1]-hy,cx=hx0+g.s/2,cy=hy+g.s/2;
+  if(S.variant==='orbit')return ' transform="rotate('+(-90*p).toFixed(3)+','+GC+','+GC+')"';
+  if(S.variant==='arc'){var n=rotp(cx,cy,-90*p);
+    return ' transform="translate('+(n[0]-cx).toFixed(3)+','+(n[1]-cy).toFixed(3)+')"';}
+  if(S.variant==='hop'){var k=1-0.3*Math.sin(p*Math.PI);
+    return ' transform="translate('+(dx*p).toFixed(3)+','+(dy*p).toFixed(3)+') translate('+cx+','+cy+
+      ') scale('+k.toFixed(4)+') translate('+(-cx)+','+(-cy)+')"';}
+  return ' transform="translate('+(dx*p).toFixed(3)+','+(dy*p).toFixed(3)+')"';}
+
+var sq=[{c:0,slot:0},{c:1,slot:1},{c:2,slot:2}],hole=3,el=0,last=0;
+function moverAt(slot){for(var i=0;i<3;i++)if(sq[i].slot===slot)return sq[i];return null;}
+function draw(ts){
+  if(!last)last=ts;var dt=Math.min(80,ts-last);last=ts;
+  var moveMs=560/S.speed,total=moveMs+S.pause;
+  el+=dt;
+  if(el>=total){el-=total;var m=moverAt((hole+1)%4);if(m){m.slot=hole;hole=(hole+1)%4;}}
+  var save=S.tile;S.tile='none';
+  var g=geo(),c=cols(),from=(hole+1)%4,mv=moverAt(from),
+      p=ease(Math.min(1,el/moveMs)),o=allDefs('ga',c,false),i;
+  for(i=0;i<3;i++){if(sq[i]!==mv)o+=piece(g,sq[i].slot,sq[i].c,c,'ga');}
+  if(mv)o+=piece(g,mv.slot,mv.c,c,'ga',tf(g,mv.slot,hole,p));
+  S.tile=save;
+  document.getElementById('anim').innerHTML=o;
+  requestAnimationFrame(draw);}
+
+function svgStr(hole,px,inv){
+  var save=S.invert;S.invert=inv;
+  var c=cols(),body=staticMark(hole,c,'x'+px,true),bare=(S.tile==='none'),dark=onDark();S.invert=save;
+  return '<svg xmlns="http://www.w3.org/2000/svg" width="'+px+'" height="'+px+'" viewBox="0 0 120 120">'+
+    ((dark&&bare)?'<rect width="120" height="120" fill="#0e0e10"/>':'')+body+'</svg>';}
+
+function renderStatic(){
+  document.getElementById('stat').innerHTML=staticMark(S.hole,cols(),'gs',true);
+  var h='';[64,32,16].forEach(function(px){
+    h+='<div class="sz"><div class="szbox'+(S.invert&&S.tile==='none'?' inv':'')+'">'+
+       svgStr(S.hole,px,S.invert)+'</div><span>'+px+'px</span></div>';});
+  document.getElementById('sizes').innerHTML=h;
+  document.getElementById('desk').innerHTML=svgStr(S.hole,84,false)+svgStr(S.hole,56,false)+svgStr(S.hole,40,false);
+  document.getElementById('animCard').className='art'+(S.invert?' inv':'');
+  document.getElementById('statCard').className='art'+(S.invert&&S.tile==='none'?' inv':'');
+  var n=[];
+  if(S.tile==='none')n.push('No tile — the app icon is the bare marks, same as Loading.');
+  if(S.tile==='paper'&&S.rim<30)n.push('A white tile needs the hairline to separate from a light background; keep Rim above 30.');
+  if(S.fill==='depth'&&S.variant==='orbit')n.push('Depth + Orbit rotates the shadow with the square.');
+  document.getElementById('note').textContent=n.join(' ')||
+    'Rim drives the top-edge highlight, the bottom seat shadow and the hairline together — the macOS recipe. Squircle is the superellipse Apple actually uses; at 52% it sits at about n=5.';}
+
+function slider(host,key,label,min,max,step,fmt){
+  var w=document.createElement('div');w.className='ctl';
+  w.innerHTML='<div class="top"><span>'+label+'</span><b></b></div>'+
+    '<input type="range" min="'+min+'" max="'+max+'" step="'+step+'" value="'+S[key]+'" aria-label="'+label+'">';
+  var inp=w.querySelector('input'),out=w.querySelector('b');
+  function sync(){out.textContent=fmt(S[key]);}
+  inp.addEventListener('input',function(){S[key]=parseFloat(inp.value);sync();renderStatic();});
+  sync();document.getElementById(host).appendChild(w);}
+
+function group(id,items,key,after){var box=document.getElementById(id);
+  items.forEach(function(it){var b=document.createElement('button');
+    if(it.html)b.innerHTML=it.html;else b.textContent=it.label;
+    if(it.cls)b.className=it.cls;
+    b.setAttribute('aria-pressed',String(S[key]===it.val));
+    b.addEventListener('click',function(){S[key]=it.val;
+      box.querySelectorAll('button').forEach(function(x){x.setAttribute('aria-pressed','false');});
+      b.setAttribute('aria-pressed','true');if(after)after();});
+    box.appendChild(b);});}
+
+slider('shape','bevel','Bevel',0,100,1,function(v){return v+'%';});
+slider('shape','thick','Border weight',0.5,16,0.5,function(v){return v.toFixed(1);});
+slider('shape','gap','Gap',2,34,1,function(v){return v;});
+slider('shape','depth','Shading',0,100,1,function(v){return v+'%';});
+
+slider('tileCtl','tbevel','Tile bevel',0,100,1,function(v){return v+'%';});
+slider('tileCtl','rim','Rim',0,100,1,function(v){return v+'%';});
+slider('tileCtl','tshade','Tile shading',0,100,1,function(v){return v+'%';});
+slider('tileCtl','inset','Inset',4,34,1,function(v){return v;});
+
+slider('motion','speed','Speed',0.25,3,0.05,function(v){return v.toFixed(2)+'×';});
+slider('motion','pause','Pause',0,1000,10,function(v){return (v/1000).toFixed(2)+'s';});
+
+group('pals',PALS.map(function(p,i){return {val:i,cls:'pal',
+  html:'<span class="dots">'+p.c.map(function(x){return '<span class="dot" style="background:'+x+'"></span>';}).join('')+
+       '</span><span>'+p.n+'</span>'};}),'pal',renderStatic);
+group('fills',FILLS.map(function(f){return {val:f[0],label:f[1]};}),'fill',renderStatic);
+group('tiles',TILES.map(function(f){return {val:f[0],label:f[1]};}),'tile',renderStatic);
+group('shapes',SHAPES.map(function(f){return {val:f[0],label:f[1]};}),'tshape',renderStatic);
+group('variants',[['orbit','Orbit'],['slide','Slide'],['arc','Arc'],['hop','Hop']].map(function(v){
+  return {val:v[0],label:v[1]};}),'variant',null);
+group('holes',['Top left','Top right','Btm right','Btm left'].map(function(n,i){
+  return {val:i,label:n};}),'hole',renderStatic);
+
+document.getElementById('inv').addEventListener('click',function(){
+  S.invert=!S.invert;this.setAttribute('aria-pressed',String(S.invert));renderStatic();});
+document.getElementById('cp').addEventListener('click',function(){var b=this;
+  navigator.clipboard.writeText(svgStr(S.hole,1024,S.invert)).then(function(){b.textContent='Copied';
+    setTimeout(function(){b.textContent='Copy SVG';},1400);},function(){b.textContent='Cmd+C';});});
+
+renderStatic();requestAnimationFrame(draw);
+})();
+</script>
+</body>
+</html>
