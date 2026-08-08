@@ -57,6 +57,46 @@ if ((await emptyTerminal.count()) > 0) {
 await win.waitForTimeout(4000);
 await win.screenshot({ path: path.join(OUT, '02-terminal.png') });
 
+/*
+ * BOTH CURSOR STATES. the user, after I reported the caret fixed having looked only
+ * at the focused pane: "there's a bordered non filled blue rectangel you can see
+ * as the cursor that still remains when we click off, even though the flickering
+ * | is correct when we click onto it." xterm's default `cursorInactiveStyle` is
+ * 'outline' — a hollow block — and a canvas-rendered cursor has no DOM element to
+ * inspect, so the only way to know is to look at both.
+ */
+const term = win.locator('.xterm-screen').first();
+if ((await term.count()) > 0) {
+  await term.click();
+  await win.waitForTimeout(900);
+  await win.screenshot({ path: path.join(OUT, '03-cursor-FOCUSED.png'), clip: await (async () => {
+    const b = await term.boundingBox();
+    return { x: b.x, y: b.y, width: Math.min(320, b.width), height: 60 };
+  })() });
+  const focusOwner = () =>
+    win.evaluate(() => {
+      const a = document.activeElement;
+      return a === null ? 'none' : `${a.tagName.toLowerCase()}.${(a.className || '').toString().split(' ')[0]}`;
+    });
+  console.log('FOCUS while clicked into terminal:', await focusOwner());
+  // Click away — the composer — so the terminal blurs.
+  const composer = win.locator('[contenteditable="true"]').first();
+  if ((await composer.count()) > 0) await composer.click();
+  await win.waitForTimeout(900);
+  /* PROVE the blur happened. A click that silently missed would leave the pane
+   * focused and I would read the focused caret as the unfocused one — the same
+   * "passed for the wrong reason" trap that has already bitten twice today. */
+  const after = await focusOwner();
+  console.log('FOCUS after clicking away:', after);
+  console.log(
+    after.includes('xterm') ? 'BLUR FAILED — screenshot below is still the FOCUSED state' : 'blur confirmed',
+  );
+  await win.screenshot({ path: path.join(OUT, '04-cursor-BLURRED.png'), clip: await (async () => {
+    const b = await term.boundingBox();
+    return { x: b.x, y: b.y, width: Math.min(320, b.width), height: 60 };
+  })() });
+}
+
 const report = await win.evaluate(() => {
   const pick = (el) => {
     const c = getComputedStyle(el);
