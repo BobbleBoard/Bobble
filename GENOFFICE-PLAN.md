@@ -5,9 +5,62 @@ scope, size and sequence for adopting GenOffice as Bobble's office layer
 (`.docx` / `.xlsx` / `.pptx` viewing and editing). Licensing is settled
 separately in [LICENSING.md](LICENSING.md).
 
-**Confidence note.** This rests on a source read of the upstream repository, not
-on building or running it. Everything marked *unverified* is exactly that, and
-step 1 exists to settle the biggest one in a day before we commit to anything.
+**Confidence note.** The original draft rested on a source read alone. **Step 1
+has now been run** (2026-08-08, upstream `d8305ff`) — see §1a. It passed, and it
+also proved two of this document's assumptions wrong. Those are corrected inline
+and flagged **[corrected after probe]** so the diff is legible.
+
+---
+
+## 1a. Step 1 result — it runs, and it runs offline
+
+Built `@genoffice/docs` at upstream `d8305ff` and opened
+`fixtures/generated/simple.docx` in a probe that recorded every non-`file://`
+request before allowing it.
+
+| Question | Answer | How |
+|---|---|---|
+| Opens a real `.docx`? | **Yes** | Window titled `simple.docx`, content rendered, "Page 1 of 1 — 10 words" |
+| Needs a Genspark login? | **No** | No auth gate anywhere in `apps/docs`; every `Genspark` hit in the docs tree is an AI-credit i18n string |
+| Phones home? | **No** | `external: []` — **zero** network requests, measured not assumed |
+| Electron version clash? | **None** | Theirs 43.3.0, ours 43 |
+| Docs module size | **21 MB** | 4 MB main + 17 MB renderer, of which 13 MB is 22 font files |
+
+**The layout you asked for already exists.** The probe screenshot shows chat
+dock on the left, document on the right, ribbon on top — that is their
+standalone window, unmodified. Nothing to build for the dedicated-window case
+beyond hosting it.
+
+**Two corrections this probe forced:**
+
+1. **There is no consumable `@genoffice/docs` main library.** Their own shell
+   imports the seam from *source* — `from '../../../docs/src/main/docs-main'` —
+   and compiles it into its own main bundle. We must do the same: vendor the
+   TypeScript and build it into our Electron main. The transitive closure for
+   the main half is 8 workspace packages (`electron-utils`, `i18n`,
+   `project-store`, `ai-provider`, `ai-search`, `file-parse`, `docx-engine`,
+   `ui`). The renderer and preload we consume as built artifacts. **This is the
+   single biggest correction — it is the difference between "add a dependency"
+   and "vendor a subtree".**
+2. **`packages/ai-search` is not a clean delete.** `docs-main.ts` imports six
+   symbols from it directly (`ensureGenofficeLogin`, `gskApiKey`,
+   `gskLoginInfo`, `hasGskAuth`, `webSearch`, `imageSearch`). Dropping it means
+   a ~20-line stub, not `rm -rf`.
+
+**Three things that got better:**
+
+- `registerAiIpc()` is a **separate export** from `registerDocsIpc()`. The
+  Genspark-bound AI can simply never be registered — the AI-swap risk in §2 is
+  optional work, not a prerequisite.
+- Upstream ships `tools/gen-third-party-notices.mjs`. We can generate the
+  Apache-2.0 §4(d) notices with **their** tool instead of writing ours.
+- **Docs and slides need no cargo.** Only sheets carries the Rust sidecar, and
+  neither `apps/docs` nor `apps/slides` references it. A docs-first build keeps
+  cargo out of CI entirely.
+
+**Trademark surface, now seen rather than guessed:** a `Genspark AI` ribbon tab
+and a `Genspark` panel header with logo. Both are in the renderer, so the
+rebrand is a renderer patch and is exactly what the §6 build check must catch.
 
 ---
 
@@ -135,16 +188,28 @@ canvas tab kind on top of the browser-overlay machinery that already exists.
 
 ---
 
-## 6. Explicitly not verified
+## 6. Verification status **[corrected after probe]**
 
-Read from source; never built or run. Before trusting any estimate above:
+**Settled by step 1** (§1a):
 
-- whether the docs/slides renderers open a file with **no network and no
-  Genspark login**;
-- whether the `custom` AI provider is **reachable from their settings UI**;
-- the **actual** incremental bundle size;
-- whether `registerDocsIpc()` misbehaves inside a non-GenOffice main process
-  (32 global channels; no name collisions with our `browser:`/`canvas:`/`gen:`/
-  `pi:` namespaces, but unaudited).
+- docs opens a `.docx` with **no network and no Genspark login** — measured;
+- **actual** docs module size — 21 MB;
+- the AI dock is **optional**, not load-bearing (`registerAiIpc` is separate);
+- docs needs **no cargo**.
 
-Step 1 settles the first and most of the fourth.
+**Still open:**
+
+- whether the **slides** renderer behaves the same as docs (only docs was run);
+- whether the `custom` AI provider is **reachable from their settings UI** —
+  now a nice-to-have rather than a blocker, since the dock can stay unregistered;
+- whether `registerDocsIpc()`'s channels collide inside *our* main process. The
+  probe ran it in a bare host, not in Bobble's main alongside our
+  `browser:`/`canvas:`/`gen:`/`pi:` handlers. **This is now the top unverified
+  item** and it is the next thing to test;
+- how much of the 8-package main-process subtree survives contact with our
+  pnpm workspace (they use npm workspaces).
+
+**Not verifiable by probing at all:** upstream velocity. Head was `d8305ff`,
+dated the same day this was written, at PR #53 — the repo has moved a long way
+past the 24 commits §4 describes. That risk is a judgement call, not a
+measurement, and it remains the reason to budget this as a fork.
