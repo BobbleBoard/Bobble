@@ -202,11 +202,31 @@ export interface EditEntry {
 export function diagnoseEdit(fileText: string, edits: EditEntry[], fileName: string): string {
   const misses: string[] = [];
   const ambiguous: number[] = [];
+  const malformed: string[] = [];
   let matched = 0;
 
   for (let i = 0; i < edits.length; i++) {
     const oldText = edits[i]?.oldText;
-    if (typeof oldText !== 'string') continue;
+    /*
+     * MALFORMED, not mismatched. Run K: the model emitted `edits[0]` with no
+     * `oldText` at all, then with a non-string one, and the tool answered
+     * `must have required property 'oldText'` / `must be string` — schema
+     * language about a shape the model cannot see. Skipping these entries (what
+     * this loop used to do) meant the harness added NOTHING on exactly the
+     * calls that were hardest to recover from.
+     */
+    if (oldText !== undefined && typeof oldText !== 'string') {
+      malformed.push(
+        `edits[${i}].oldText is ${typeof oldText}, not text. Send the file's exact current text as a plain string.`,
+      );
+      continue;
+    }
+    if (oldText === undefined) {
+      malformed.push(
+        `edits[${i}] has no oldText. Every entry needs exactly two string fields — oldText (the text as it is in the file now) and newText (what replaces it) — and nothing else.`,
+      );
+      continue;
+    }
     const state = matchState(fileText, oldText);
     if (state === 'ok') {
       matched += 1;
@@ -237,7 +257,7 @@ export function diagnoseEdit(fileText: string, edits: EditEntry[], fileName: str
     );
   }
 
-  if (misses.length === 0 && ambiguous.length === 0) return '';
+  if (misses.length === 0 && ambiguous.length === 0 && malformed.length === 0) return '';
 
   const out: string[] = ['', `Checked every entry against ${fileName}:`];
   /* Say what was RIGHT. The batch is atomic, so a correct entry is thrown away
@@ -249,6 +269,14 @@ export function diagnoseEdit(fileText: string, edits: EditEntry[], fileName: str
     );
   }
   for (const m of misses) out.push(m);
+  for (const m of malformed) out.push(m);
+  if (malformed.length > 0) {
+    out.push(
+      '',
+      'The shape of one call:',
+      '  {"path": "…", "edits": [{"oldText": "…", "newText": "…"}]}',
+    );
+  }
   for (const i of ambiguous) {
     out.push(`edits[${i}]: appears more than once — include a surrounding line to make it unique.`);
   }

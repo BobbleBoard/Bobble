@@ -114,8 +114,33 @@ describe('diagnoseEdit', () => {
     ).toBe('');
   });
 
-  it('ignores entries whose oldText is not a string', () => {
-    expect(diagnoseEdit(APP, [{ oldText: undefined, newText: 'z' }], 'app.py')).toBe('');
+  /*
+   * RUN K. The model emitted `edits[0]` with no oldText at all, then with a
+   * non-string one, and got back `must have required property 'oldText'` /
+   * `must be string` — schema language about a shape it cannot see. This used to
+   * SKIP such entries, so the harness added nothing on precisely the calls that
+   * were hardest to recover from, and the run stalled on five of them.
+   */
+  it('names a missing oldText instead of staying silent', () => {
+    const note = diagnoseEdit(APP, [{ newText: 'z' }], 'app.py');
+    expect(note).toContain('edits[0] has no oldText');
+    expect(note).toContain('newText');
+  });
+
+  it('names an oldText that is not text', () => {
+    expect(diagnoseEdit(APP, [{ oldText: 42, newText: 'z' }], 'app.py')).toMatch(
+      /edits\[0\]\.oldText is number, not text/,
+    );
+  });
+
+  it('shows the shape one call should have', () => {
+    expect(diagnoseEdit(APP, [{ newText: 'z' }], 'app.py')).toContain('"oldText"');
+  });
+
+  it('still says nothing when every entry is well-formed and matches', () => {
+    expect(
+      diagnoseEdit(APP, [{ oldText: '        root.geometry("520x300")', newText: 'z' }], 'app.py'),
+    ).toBe('');
   });
 
   /* Over-indented, so it genuinely cannot be found — an UNDER-indented oldText is
