@@ -16,6 +16,33 @@ import type { FsInvokeMap, FsTreeNode, SessionSummary } from './ipc-contract';
 import { sandboxBaseDir } from './sandbox';
 
 const HOME = os.homedir();
+
+/**
+ * `~` EXPANDED BEFORE ANYTHING RESOLVES IT. The fourth door this has come
+ * through.
+ *
+ * The model writes `~/proj/app.py` constantly. `path.resolve('~/proj/app.py')`
+ * does NOT expand it — it produces `<cwd>/~/proj/app.py`, a path that cannot
+ * exist. Every caller here then treats that as "no such file" and returns its
+ * empty answer, which is indistinguishable from an empty file:
+ *
+ *   - run G: the canvas opened `~/bobble-testbed/buggyapp/app.py` and rendered
+ *     a blank editor — line 1, nothing — while the file had 38 lines on disk;
+ *   - `present` stat'd a literal `~` and drew a row with no card under it;
+ *   - the syntax check ran `py_compile` on a quoted `~` and checked nothing,
+ *     silently, for a whole session.
+ *
+ * Expansion happens BEFORE the sessions-dir and workspace fences, never after,
+ * so a fence still judges the real path.
+ */
+function resolveUserPath(p: string): string {
+  const trimmed = p.trim();
+  if (trimmed === '~') return HOME;
+  if (trimmed.startsWith('~/') || trimmed.startsWith(`~${path.sep}`)) {
+    return path.resolve(path.join(HOME, trimmed.slice(2)));
+  }
+  return path.resolve(trimmed);
+}
 const AGENT_DIR = path.join(HOME, '.pi', 'agent');
 const SESSIONS_DIR = path.join(AGENT_DIR, 'sessions');
 const PROJECTS_PATH = path.join(HOME, '.pi', 'desktop', 'projects.json');
@@ -181,7 +208,8 @@ const SKIP = new Set([
 /** Fuzzy file listing for the composer @-mention autocomplete. Hard depth/count
  * caps keep this from ever recursing into node_modules et al. */
 function listFiles(cwd: string, query: string, limit = 30): Array<{ path: string; rel: string }> {
-  const root = cwd && statSafe(cwd)?.isDirectory() === true ? cwd : HOME;
+  const expanded = cwd ? resolveUserPath(cwd) : '';
+  const root = expanded && statSafe(expanded)?.isDirectory() === true ? expanded : HOME;
   const out: Array<{ path: string; rel: string; score: number }> = [];
   const q = query.toLowerCase();
 
@@ -213,7 +241,7 @@ function listFiles(cwd: string, query: string, limit = 30): Array<{ path: string
  * trusted, yet this is the one channel that returns raw file contents by path,
  * so it is fenced to where sessions actually live. */
 function readSession(file: string): string | null {
-  const resolved = path.resolve(file);
+  const resolved = resolveUserPath(file);
   if (resolved !== SESSIONS_DIR && !resolved.startsWith(SESSIONS_DIR + path.sep)) return null;
   return safeRead(resolved);
 }
@@ -221,7 +249,7 @@ function readSession(file: string): string | null {
 /** Delete a session JSONL, fenced to the sessions dir (the sidebar "Delete chat"
  * action). Only `.jsonl` files under SESSIONS_DIR are eligible. */
 function deleteSession(file: string): { ok: boolean; error?: string } {
-  const resolved = path.resolve(file);
+  const resolved = resolveUserPath(file);
   if (!resolved.startsWith(SESSIONS_DIR + path.sep) || !resolved.endsWith('.jsonl')) {
     return { ok: false, error: 'refused: not a session file' };
   }
@@ -243,7 +271,11 @@ const TREE_MAX_ENTRIES = 2000;
 const TREE_MAX_DEPTH = 4;
 
 function listTree(root: string, maxDepth: number): FsTreeNode[] {
-  const base = statSafe(root)?.isDirectory() === true ? root : path.dirname(root);
+  /* Expand first: an unexpanded `~` fails the stat and falls through to
+   * `path.dirname('~')` === '.', which lists the PROCESS working directory —
+   * the wrong files rather than none, which is harder to notice. */
+  const resolved = resolveUserPath(root);
+  const base = statSafe(resolved)?.isDirectory() === true ? resolved : path.dirname(resolved);
   let count = 0;
 
   function walk(dir: string, depth: number): FsTreeNode[] {
@@ -289,7 +321,7 @@ function readFileBounded(
   file: string,
   maxBytes: number,
 ): { text: string | null; truncated: boolean; tooLarge: boolean; binary: boolean; bytes: number } {
-  const resolved = path.resolve(file);
+  const resolved = resolveUserPath(file);
   const st = statSafe(resolved);
   if (st === null || !st.isFile()) {
     return { text: null, truncated: false, tooLarge: false, binary: false, bytes: 0 };
@@ -335,7 +367,7 @@ function readFileBounded(
 const WRITE_FILE_MAX = 5 * 1024 * 1024;
 
 function normalizeRoot(p: string): string {
-  const abs = path.resolve(p.trim());
+  const abs = resolveUserPath(p);
   return abs.length > 1 && abs.endsWith(path.sep) ? abs.slice(0, -1) : abs;
 }
 
@@ -409,7 +441,7 @@ function lstatSafe(p: string): fs.Stats | null {
  * always does).
  */
 function realResolve(p: string): string | null {
-  const abs = path.resolve(p);
+  const abs = resolveUserPath(p);
   const missing: string[] = [];
   let cur = abs;
   for (;;) {
