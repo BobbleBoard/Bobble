@@ -28,7 +28,7 @@ import path from 'node:path';
 import { Readable } from 'node:stream';
 import { promisify } from 'node:util';
 import { createIpcEventSender, createLogger } from '@pi-desktop/shared';
-import { type IpcMainInvokeEvent, ipcMain, protocol, shell, type WebContents } from 'electron';
+import { app, type IpcMainInvokeEvent, ipcMain, protocol, shell, type WebContents } from 'electron';
 import { allowedWriteRoots } from '../fs-handlers';
 import type {
   AppEventMap,
@@ -691,6 +691,27 @@ async function appMeta(appPath: string): Promise<CanvasOpenApp> {
 }
 
 /** LaunchServices default app for an extension via `duti -x` (optional tool). */
+/*
+ * WITHOUT `duti`, THE DEFAULT WAS NEVER FOUND — and `duti` is a Homebrew tool.
+ *
+ * MEASURED on a machine without it: `defaultAppPath` threw, returned null, and
+ * three separate symptoms followed — the Open button showed a generic glyph, the
+ * dropdown filtered nothing (so every app including Terminal was listed), and
+ * there was no default to open with. the user reported all three.
+ *
+ * The two obvious alternatives are dead ends, both checked rather than assumed:
+ *   - `osascript` asking Finder for the default application is refused with
+ *     -1743 until the user grants automation access;
+ *   - LaunchServices records only USER OVERRIDES (`HandlerPref: 20 units` here,
+ *     none for html), so neither the plist nor `lsregister -dump` knows the
+ *     system default.
+ *
+ * What IS available without permissions or extra tooling is the default
+ * BROWSER, via Electron's own API — and for the artefacts this app presents
+ * (.html pages, rendered reports, SVG) the browser IS the OS default. So the
+ * browser answers the common case, and everything else falls back to the
+ * generic glyph while `shell.openPath` still opens correctly.
+ */
 async function defaultAppPath(ext: string): Promise<string | null> {
   if (ext === '') return null;
   try {
@@ -699,10 +720,35 @@ async function defaultAppPath(ext: string): Promise<string | null> {
       .split('\n')
       .map((l) => l.trim())
       .find((l) => l.endsWith('.app'));
-    return line ?? null;
+    if (line !== undefined) return line;
   } catch {
-    return null; // duti not installed / no association — default stays undetected.
+    // duti not installed — fall through to the browser fallback below.
   }
+  return browserAppPathFor(ext);
+}
+
+/** Extensions a browser is the OS default for; the ones this app presents most. */
+const BROWSER_EXTS = new Set(['html', 'htm', 'svg', 'xhtml', 'pdf', 'webp']);
+
+/** The default browser's .app path, via Electron (no permissions, no duti). */
+async function browserAppPathFor(ext: string): Promise<string | null> {
+  if (!BROWSER_EXTS.has(ext)) return null;
+  let name: string;
+  try {
+    name = app.getApplicationNameForProtocol('https://');
+  } catch (error) {
+    /* This catch previously hid a missing `app` import: the ReferenceError was
+     * swallowed and reported as "no default app", which looks exactly like the
+     * `duti` case it was written for. Log it so a real fault is never silent. */
+    log.warn('default-browser lookup failed', { error: String(error) });
+    return null;
+  }
+  if (name === '') return null;
+  for (const dir of ['/Applications', '/System/Applications']) {
+    const candidate = path.join(dir, `${name}.app`);
+    if (existsSync(candidate)) return candidate;
+  }
+  return null;
 }
 
 async function listOpenApps(

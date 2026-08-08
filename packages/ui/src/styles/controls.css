@@ -120,15 +120,19 @@
   align-items: center;
   justify-content: center;
   gap: 6px;
-  height: calc(var(--pd-control-md) - 6px);
+  /* Sizing is parameterised so a caller can shrink the control WITHOUT forking
+   * the recipe. Defaults are the previous hardcoded values, so nothing that does
+   * not set a knob moves. (Setting these on a wrapper did nothing until they
+   * existed here — the same silently-ignored-setting trap as the rail icons.) */
+  height: var(--pd-segment-height, calc(var(--pd-control-md) - 6px));
   margin: 0;
-  padding: 0 12px;
+  padding: 0 var(--pd-segment-padding-x, 12px);
   border: none;
   border-radius: min(var(--pd-radius-button), 24px);
   background: transparent;
   color: var(--pd-text-muted);
   font-family: var(--pd-font-sans);
-  font-size: var(--pd-font-size-body);
+  font-size: var(--pd-segment-font-size, var(--pd-font-size-body));
   line-height: var(--pd-leading-body);
   font-weight: var(--pd-font-weight-medium);
   white-space: nowrap;

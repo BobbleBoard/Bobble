@@ -21,11 +21,22 @@
   margin: 1px;
   padding: var(--pd-menu-padding);
   border-radius: var(--pd-radius-popover);
-  background: color-mix(
-    in srgb,
-    var(--pd-bg-overlay) calc(var(--pd-surface-translucency) * 100%),
-    transparent
-  );
+  /*
+   * SOLID, not frosted. the user: "why is this dropdown translucsent a bit and not
+   * similarly styled to the others."
+   *
+   * MEASURED, both menus live: they were already byte-identical —
+   * `color(srgb 0.137 0.137 0.153 / 0.664)` with `blur(20px)`. Nothing had
+   * diverged. What differs is what sits BEHIND them: over the near-black thread
+   * the blur has almost nothing to sample, so a 66%-opaque surface reads as a
+   * flat grey slab, while over the composer it picks up contrast and looks
+   * crisp. Consistent CSS, inconsistent appearance.
+   *
+   * A menu has to be readable wherever it opens, so the surface is opaque and
+   * the blur is kept only for the flavors that lean on it elsewhere. One recipe,
+   * so every menu still changes together.
+   */
+  background: var(--pd-bg-overlay);
   -webkit-backdrop-filter: blur(var(--pd-blur-overlay));
   backdrop-filter: blur(var(--pd-blur-overlay));
   box-shadow: var(--pd-shadow-hairline), var(--pd-shadow-popover);

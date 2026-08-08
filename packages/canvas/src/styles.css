@@ -604,8 +604,18 @@
  */
 
 /* Raw↔rendered segmented toggle sizing (surface styling comes from ui). */
+/*
+ * Smaller. the user sent a crop of the operation bar with this segmented control
+ * dominating it. At the shared default it is a chunky pill sitting beside 28px
+ * controls, so it read as the loudest thing in a bar of quiet ones.
+ * `--pd-segment-*` are the shared knobs, so this shrinks the control without
+ * forking the segmented recipe.
+ */
 .pd-canvas-view-toggle {
   flex: 0 0 auto;
+  --pd-segment-height: 24px;
+  --pd-segment-padding-x: 8px;
+  --pd-segment-font-size: var(--pd-font-size-footnote);
 }
 
 /* File-tree popover panel toggled by the two-folders button. */
