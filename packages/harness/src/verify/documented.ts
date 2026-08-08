@@ -146,6 +146,19 @@ export function documentedPromises(readme: string): readonly string[] {
 /**
  * The steer, or null when the README promises nothing checkable and every
  * documented command was run. Silence is the common case and must stay cheap.
+ *
+ * WHAT THIS CANNOT DO, stated plainly so it is not oversold: it cannot tell
+ * whether a promise was ALREADY well demonstrated. It knows the README makes a
+ * claim and that a command ran; it cannot read the output and judge whether that
+ * output discriminates. So on a turn where the model tested everything properly,
+ * this still fires once and costs one fix from the turn's budget.
+ *
+ * That is the right trade at high/max effort — measured on a run where the model
+ * fixed all three documented promises and then "proved" case-insensitivity with
+ * `find coffee` against an entry named `coffee`, which passes whether or not the
+ * bug exists. The fix was correct and the evidence was worthless, and nothing
+ * else in the harness would have said so. But it is a reminder, not a verifier,
+ * and it should not be described as one.
  */
 export function undemonstrated(
   readme: string | null,
