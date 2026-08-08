@@ -1,4 +1,5 @@
 import { readdirSync, readFileSync } from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 
 /*
@@ -203,4 +204,46 @@ export function readmeIn(
   if (root === null || root === undefined || root.length === 0) return null;
   const name = list(root).find((f) => /^readme(\.(md|txt|rst))?$/i.test(f));
   return name === undefined ? null : read(path.join(root, name));
+}
+
+/**
+ * WHERE THE WORK ACTUALLY IS.
+ *
+ * Three candidate roots, and two of them are wrong in the case that matters.
+ * MEASURED from a real run's session log:
+ *
+ *   session cwd : /Users/user                          ← HOME
+ *   touched     : ~/bobble-testbed/notesapp/notes.py   ← the project
+ *
+ * `runtime.workspaceRoot` is null unless someone issued `/harness workspace`,
+ * and `ctx.cwd` is HOME (task #19 — the model is told its cwd is HOME while its
+ * tools write elsewhere). Reading a README from either would find nothing, or
+ * find the user's own HOME README and treat it as this project's spec.
+ *
+ * The files the turn EDITED cannot lie about where the work is. `~` is expanded
+ * because the model writes tilde paths constantly and every layer that forgot
+ * has cost a run.
+ *
+ * HOME is refused outright as a root: a README sitting there belongs to the
+ * person, not to the thing being built.
+ */
+export function workRootOf(
+  touchedFiles: readonly string[],
+  workspaceRoot?: string | null,
+  cwd?: string | null,
+  home: string = os.homedir(),
+): string | null {
+  for (const file of touchedFiles) {
+    if (typeof file !== 'string' || file.length === 0) continue;
+    const expanded = file.startsWith('~') ? path.join(home, file.slice(1)) : file;
+    const dir = path.dirname(path.resolve(expanded));
+    if (dir !== home && dir !== '.' && dir !== '/') return dir;
+  }
+  for (const root of [workspaceRoot, cwd]) {
+    if (root === null || root === undefined || root.length === 0) continue;
+    const expanded = root.startsWith('~') ? path.join(home, root.slice(1)) : root;
+    const resolved = path.resolve(expanded);
+    if (resolved !== home) return resolved;
+  }
+  return null;
 }

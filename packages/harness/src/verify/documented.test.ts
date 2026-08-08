@@ -5,6 +5,7 @@ import {
   readmeIn,
   undemonstrated,
   unrunCommands,
+  workRootOf,
 } from './documented.js';
 
 /* The real run-H fixture README, verbatim. The promise on the last line is the
@@ -151,5 +152,47 @@ describe('readmeIn + the touched-files guard', () => {
    * lecture about undemonstrated promises. */
   it('says nothing on a turn that wrote no files', () => {
     expect(undemonstrated(README, [], [])).toBeNull();
+  });
+});
+
+describe('workRootOf — where the work actually is', () => {
+  const HOME = '/Users/user';
+
+  /*
+   * THE REAL SHAPE, read out of a run's session log:
+   *   session cwd : /Users/user                        ← HOME
+   *   touched     : ~/bobble-testbed/notesapp/notes.py ← the project
+   * `workspaceRoot` was null (no `/harness workspace` was ever issued).
+   * Rooting on either of the first two finds no README, or finds the user's own.
+   */
+  it('prefers the directory of the file the turn edited', () => {
+    expect(workRootOf(['~/bobble-testbed/notesapp/notes.py'], null, '/Users/user', HOME)).toBe(
+      '/Users/user/bobble-testbed/notesapp',
+    );
+  });
+
+  /* A README in HOME belongs to the person, not to the thing being built. */
+  it('refuses HOME as a root, from any of the three sources', () => {
+    expect(workRootOf([`${HOME}/notes.py`], null, HOME, HOME)).toBeNull();
+    expect(workRootOf([], HOME, HOME, HOME)).toBeNull();
+    expect(workRootOf([], '~', '~', HOME)).toBeNull();
+  });
+
+  it('falls back to an explicit workspace when nothing was touched', () => {
+    expect(workRootOf([], '/work/proj', HOME, HOME)).toBe('/work/proj');
+  });
+
+  it('falls back to cwd last, when it is not HOME', () => {
+    expect(workRootOf([], null, '/work/proj', HOME)).toBe('/work/proj');
+  });
+
+  it('skips a touched path it cannot use and keeps looking', () => {
+    expect(workRootOf(['', `${HOME}/x.py`, '/work/proj/a.py'], null, null, HOME)).toBe(
+      '/work/proj',
+    );
+  });
+
+  it('is null when there is nothing usable at all', () => {
+    expect(workRootOf([], null, null, HOME)).toBeNull();
   });
 });

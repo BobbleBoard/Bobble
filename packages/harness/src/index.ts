@@ -104,7 +104,7 @@ import { registerSandboxFileTools, resolveWorkspaceRoot } from './tools/sandbox-
 import { truncateToolOutput } from './tools/tool-output-truncate.js';
 import { captureRegisteredTools } from './tools/tool-registry.js';
 import { registerUseTool } from './tools/use-tool.js';
-import { readmeIn, undemonstrated } from './verify/documented.js';
+import { readmeIn, undemonstrated, workRootOf } from './verify/documented.js';
 import {
   detectProjectCheck,
   emptyOutputs,
@@ -828,7 +828,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
          * ever managed to reach a turn end.
          */
         undemonstrated(
-          readmeIn(runtime.workspaceRoot ?? ctx.cwd),
+          readmeIn(workRootOf(runtime.touchedFiles, runtime.workspaceRoot, ctx.cwd)),
           runtime.ranCommands,
           runtime.touchedFiles,
         );
