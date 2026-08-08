@@ -44,7 +44,12 @@ function cssVar(name: string, fallback: string): string {
  * foreground + a subtle accent cursor + selection all come from the theme.
  */
 function terminalTheme(): ITheme {
-  const bg = cssVar('--pd-code-block-bg', '#1e1e24');
+  /* Transparent, so the terminal has no rectangle of its own to draw edges on —
+   * `.pd-terminal` is transparent too and the rounded canvas panel shows through.
+   * MEASURED: this token is `rgba(255,255,255,0.04)`, a wash rather than a solid,
+   * so painting it here AND on the container double-applied it over the grid. The
+   * two must stay in step or the seam the user called "that akward border" returns. */
+  const bg = 'rgba(0, 0, 0, 0)';
   const fg = cssVar('--pd-text-primary', '#e6e6ea');
   const accent = cssVar('--pd-accent-primary', '#8aa2ff');
   // The caret has its own token: two flavors say the right thing with their
@@ -57,9 +62,9 @@ function terminalTheme(): ITheme {
     background: bg,
     foreground: fg,
     cursor: caret,
-    cursorAccent: bg,
+    cursorAccent: cssVar('--pd-code-block-bg', '#1e1e24'),
     selectionBackground: selection,
-    black: bg,
+    black: cssVar('--pd-code-block-bg', '#1e1e24'),
     brightBlack: muted,
   };
 }
@@ -358,6 +363,7 @@ export class NativeSurfaces {
     // tab spawns a PTY and forwards keystrokes.
     const mirror = this.#tab(tabId)?.data?.mirror === true;
     const term = new Terminal({
+      allowTransparency: true,
       cursorBlink: !mirror,
       // A thin bar cursor (not the default chunky block) + the app theme so the
       // terminal matches the rest of the app (round-10 #5).

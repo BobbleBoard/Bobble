@@ -14,8 +14,10 @@
  * `resize` is a no-op. The active backend is reported back from `pty:spawn`.
  */
 import { type ChildProcessWithoutNullStreams, spawn as spawnChild } from 'node:child_process';
+import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import os from 'node:os';
+import path from 'node:path';
 import { createIpcEventSender, createLogger } from '@pi-desktop/shared';
 import { type IpcMainInvokeEvent, ipcMain, type WebContents } from 'electron';
 import type { AppEventMap } from '../ipc-contract';
@@ -93,6 +95,97 @@ interface SpawnOpts {
   rows: number;
 }
 
+/**
+ * THE PROMPT SAYS BOBBLE AND WHERE IT IS.
+ *
+ * the user: "would be appreciated if you can show in the terminal something like
+ * the user being 'bobble' and the directory." Left alone, the pane inherits the
+ * login shell's own prompt — `user@My-MacBook-Pro ~ %` — which names the
+ * machine (never in question) and hides the only thing that matters here, which
+ * directory the agent's commands are landing in.
+ *
+ * `PS1` covers bash/sh directly (`\w` renders the cwd with `$HOME` as `~`). zsh
+ * needs more than an env var — see {@link zshShimDir}.
+ */
+function promptEnv(): Record<string, string> {
+  const env: Record<string, string> = {
+    PS1: '\\[\\033[38;5;39m\\]bobble\\[\\033[0m\\] \\w % ',
+    // Marks the pane for anything that wants to know it is not a login terminal.
+    BOBBLE_TERMINAL: '1',
+  };
+  const shim = zshShimDir();
+  if (shim !== null) {
+    /* Remember the real one so the shim can source the user's own files. */
+    const real = process.env.ZDOTDIR;
+    if (real !== undefined) env.BOBBLE_REAL_ZDOTDIR = real;
+    env.ZDOTDIR = shim;
+  }
+  return env;
+}
+
+/**
+ * MEASURED: exporting `PROMPT` does nothing for zsh — the default macOS shell.
+ * An interactive zsh runs `.zshrc` AFTER the environment is applied, and that
+ * file sets the prompt, so the pane kept showing `user@My-MacBook-Pro ~ %`
+ * with the env var set. (Verified on screen before and after; the env-only
+ * version was silently a no-op, which is the failure mode I keep meeting.)
+ *
+ * So: a shim ZDOTDIR whose `.zshrc` sources the user's real startup files FIRST
+ * and only then overrides the prompt — their PATH, aliases and options all load
+ * exactly as usual, and the last word on the prompt is ours. This is the same
+ * approach VS Code's shell integration uses.
+ *
+ * Returns null if the shim cannot be written; the pane then just keeps the
+ * system prompt, which is cosmetically wrong but entirely functional.
+ */
+let shimCache: string | null | undefined;
+function zshShimDir(): string | null {
+  if (shimCache !== undefined) return shimCache;
+  try {
+    const dir = path.join(os.tmpdir(), 'bobble-zdotdir');
+    fs.mkdirSync(dir, { recursive: true });
+    /* Falls back to $HOME the long way round rather than with `${VAR:-default}`,
+     * which reads as a botched JS template literal to both a linter and a human
+     * skimming it. Same behaviour, no ambiguity. */
+    const rcHome = [
+      'BOBBLE_RC_HOME="$BOBBLE_REAL_ZDOTDIR"',
+      '[ -z "$BOBBLE_RC_HOME" ] && BOBBLE_RC_HOME="$HOME"',
+    ];
+    fs.writeFileSync(
+      path.join(dir, '.zshrc'),
+      [
+        '# Written by Bobble. Sources your real zsh setup, then names the prompt.',
+        ...rcHome,
+        '[ -f "$BOBBLE_RC_HOME/.zshrc" ] && source "$BOBBLE_RC_HOME/.zshrc"',
+        "PROMPT='%F{39}bobble%f %~ %# '",
+        'unset BOBBLE_RC_HOME',
+      ].join('\n'),
+      'utf8',
+    );
+    /* zsh looks for these in ZDOTDIR too, so a missing shim copy would skip the
+     * user's own — PATH most importantly. */
+    for (const name of ['.zshenv', '.zprofile']) {
+      fs.writeFileSync(
+        path.join(dir, name),
+        [
+          ...rcHome,
+          `[ -f "$BOBBLE_RC_HOME/${name}" ] && source "$BOBBLE_RC_HOME/${name}"`,
+          'unset BOBBLE_RC_HOME',
+          '',
+        ].join('\n'),
+        'utf8',
+      );
+    }
+    shimCache = dir;
+  } catch (error) {
+    log.warn('zsh prompt shim unavailable — keeping the system prompt', {
+      error: String(error),
+    });
+    shimCache = null;
+  }
+  return shimCache;
+}
+
 function spawnNodePty(
   mod: NodePtyModule,
   tabId: string,
@@ -105,7 +198,7 @@ function spawnNodePty(
       cols: opts.cols,
       rows: opts.rows,
       cwd: opts.cwd,
-      env: { ...process.env },
+      env: { ...process.env, ...promptEnv() },
     });
     proc.onData((data) => emitData(owner, tabId, data));
     proc.onExit(({ exitCode }) => {
@@ -129,7 +222,7 @@ function spawnNodePty(
 function spawnPipe(tabId: string, owner: WebContents, opts: SpawnOpts): Session {
   const child: ChildProcessWithoutNullStreams = spawnChild(opts.shell, [], {
     cwd: opts.cwd,
-    env: { ...process.env, TERM: 'xterm-256color' },
+    env: { ...process.env, TERM: 'xterm-256color', ...promptEnv() },
   });
   child.stdout.on('data', (chunk: Buffer) => emitData(owner, tabId, chunk.toString('utf8')));
   child.stderr.on('data', (chunk: Buffer) => emitData(owner, tabId, chunk.toString('utf8')));

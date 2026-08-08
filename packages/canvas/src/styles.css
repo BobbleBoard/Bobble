@@ -946,15 +946,28 @@
 
 /* ── Terminal surface ────────────────────────────────────────────────── */
 
-/* The terminal chrome uses the app theme (round-10 #5): the container bg matches
- * the xterm theme background the app derives from `--pd-code-block-bg`, so the
- * padding around the grid blends in instead of framing a raw black box. */
+/*
+ * THE AWKWARD BORDER. the user, from a screenshot: "the terminal styling there's
+ * that akward border".
+ *
+ * MEASURED in the running app before changing anything: `.pd-terminal` computed
+ * to `rgba(255, 255, 255, 0.04)` — `--pd-code-block-bg` is a translucent wash,
+ * not a solid — sitting inside `.pd-canvas-tabs` at `rgb(30,30,33)` with an
+ * 18px radius. So the terminal painted a SQUARE-cornered lighter rectangle
+ * inside a rounded panel, and xterm then painted the same token again on its own
+ * canvas, doubling the wash over the grid. Two hard edges and a shade step: the
+ * frame he is looking at.
+ *
+ * The surface is transparent now and the panel behind it shows through, so there
+ * is no rectangle to have edges. xterm is transparent to match (allowTransparency
+ * in native-surfaces.ts) — the two must change together or the seam comes back.
+ */
 .pd-terminal {
   display: flex;
   flex-direction: column;
   height: 100%;
   min-height: 0;
-  background: var(--pd-code-block-bg);
+  background: transparent;
 }
 
 .pd-terminal-header {
