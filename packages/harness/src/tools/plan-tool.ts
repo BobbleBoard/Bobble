@@ -86,7 +86,24 @@ export function planSummary(plan: readonly PlanItem[]): string {
     const mark = p.status === 'done' ? '[x]' : p.status === 'in_progress' ? '[~]' : '[ ]';
     return `${mark} ${p.text}`;
   });
-  return `Plan updated (${done}/${plan.length} done${inProgress > 0 ? `, ${inProgress} in progress` : ''}):\n${lines.join('\n')}`;
+  const summary = `Plan updated (${done}/${plan.length} done${inProgress > 0 ? `, ${inProgress} in progress` : ''}):\n${lines.join('\n')}`;
+  /*
+   * THE PLAN IS A PROGRESS INDICATOR, AND A STALE ONE IS WORSE THAN NONE.
+   *
+   * MEASURED in a real run: the model called `update_plan` ONCE — five items,
+   * one in_progress, four pending — then did every piece of the work and never
+   * touched it again. It finished with a written summary saying the app was
+   * fully compliant while the pinned checklist still read 0/5. the user reported
+   * that as a UI bug; the UI was reporting exactly what it had been told.
+   *
+   * The reminder rides the tool's OWN result, which costs nothing and arrives at
+   * the one moment the model is already thinking about the plan — rather than
+   * spending the turn-end steer budget, which belongs to correctness checks.
+   * Only when something is actually outstanding.
+   */
+  const open = plan.length - done;
+  if (open === 0) return summary;
+  return `${summary}\n\nCall update_plan again as you finish each item — this list is what the person watching sees, and right now it says ${done} of ${plan.length}. ${open} still open.`;
 }
 
 export interface PlanToolOptions {

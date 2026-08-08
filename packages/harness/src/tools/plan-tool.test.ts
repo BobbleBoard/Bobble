@@ -88,3 +88,41 @@ describe('registerPlanTool', () => {
     expect(onUpdate).toHaveBeenCalledWith([], undefined);
   });
 });
+
+describe('the plan reminds the model to keep it current', () => {
+  /*
+   * MEASURED in a real run: `update_plan` called ONCE — five items, one
+   * in_progress, four pending — then every piece of the work done and the plan
+   * never touched again. It closed with a written summary saying the app was
+   * fully compliant while the pinned checklist still read 0/5. That was
+   * reported as a UI bug; the UI was showing exactly what it had been told.
+   *
+   * The nudge rides the tool's own result: no turn-end steer budget spent (that
+   * belongs to correctness), and it lands at the one moment the model is already
+   * thinking about the plan.
+   */
+  const plan = (statuses: string[]) =>
+    statuses.map((status, i) => ({ text: `step ${i}`, status }) as never);
+
+  it('asks for an update while anything is still open', () => {
+    const out = planSummary(plan(['in_progress', 'pending', 'pending']));
+    expect(out).toContain('Call update_plan again');
+    expect(out).toContain('0 of 3');
+    expect(out).toContain('3 still open');
+  });
+
+  it('counts only what is actually done', () => {
+    expect(planSummary(plan(['done', 'done', 'pending']))).toContain('1 still open');
+  });
+
+  /* Nothing outstanding — say nothing. A reminder on a finished plan is noise. */
+  it('is silent once every item is done', () => {
+    const out = planSummary(plan(['done', 'done']));
+    expect(out).not.toContain('Call update_plan again');
+    expect(out).toContain('2/2 done');
+  });
+
+  it('still reports an empty plan plainly', () => {
+    expect(planSummary([])).toBe('Plan cleared.');
+  });
+});
