@@ -104,6 +104,7 @@ import { registerSandboxFileTools, resolveWorkspaceRoot } from './tools/sandbox-
 import { truncateToolOutput } from './tools/tool-output-truncate.js';
 import { captureRegisteredTools } from './tools/tool-registry.js';
 import { registerUseTool } from './tools/use-tool.js';
+import { readmeIn, undemonstrated } from './verify/documented.js';
 import {
   detectProjectCheck,
   emptyOutputs,
@@ -795,6 +796,19 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
        * converter that generated sample.md at ZERO bytes, which was itself one
        * of the bugs it had been asked to fix.
        */
+      /*
+       * The THIRD way, and the one that has survived every bench: the code runs,
+       * produces real output, and quietly disagrees with its own README.
+       *
+       * Run H fixed 3 of 4 planted defects. The survivor was "Searching is
+       * case-insensitive" — and the model had written itself a FOURTEEN step test
+       * plan, run it, and passed, because every search it tried used the exact
+       * capitalisation already present in the note. It tested that the code does
+       * what the code does.
+       *
+       * Ordered last: a turn that ran nothing at all has a more basic problem
+       * than an undemonstrated promise, and only one steer is spent per turn.
+       */
       const unexercised =
         neverExercised(runtime.touchedFiles, runtime.ranCommands) ??
         emptyOutputs(runtime.touchedFiles, (fp) => {
@@ -803,7 +817,8 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
           } catch {
             return null;
           }
-        });
+        }) ??
+        undemonstrated(readmeIn(runtime.workspaceRoot), runtime.ranCommands, runtime.touchedFiles);
       if (unexercised !== null && runtime.verifyFixesRemaining > 0) {
         runtime.verifyFixesRemaining -= 1;
         runtime.verifyActive = true;
