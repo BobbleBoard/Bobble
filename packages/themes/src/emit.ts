@@ -344,6 +344,21 @@ const TERMINAL_CURSOR: Record<string, string> = {
   codex: '#4a9eff',
 };
 
+/*
+ * The CURRENT row of a menu — the active project, the selected model.
+ *
+ * the user: "let's go with a blue hover effect + checkmark instead of the green on
+ * the selected one". Green was `--pd-status-success-fg`, which says SUCCEEDED
+ * rather than SELECTED — the wrong idea in a picker, and loud enough that it
+ * pulled the eye past the row you were actually hovering.
+ *
+ * Same shape as the caret above: two flavors already say it with their own
+ * accent, and codex's is a near-black that would read as "not marked at all".
+ */
+const MENU_CURRENT: Record<string, string> = {
+  codex: '#4a9eff',
+};
+
 const SYNTAX: Record<'light' | 'dark', Record<string, string>> = {
   light: {
     keyword: '#8b2fa8',
@@ -394,9 +409,8 @@ export function emitThemesCss(): string {
     for (const [name, value] of Object.entries(SYNTAX[mode])) {
       lines.push(`  --pd-syntax-${name}: ${value};`);
     }
-    lines.push(
-      `  --pd-terminal-cursor: ${TERMINAL_CURSOR[flavor] ?? 'var(--pd-accent-primary)'};`,
-    );
+    lines.push(`  --pd-terminal-cursor: ${TERMINAL_CURSOR[flavor] ?? 'var(--pd-accent-primary)'};`);
+    lines.push(`  --pd-menu-current: ${MENU_CURRENT[flavor] ?? 'var(--pd-accent-primary)'};`);
     lines.push('}');
     lines.push('');
   }

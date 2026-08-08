@@ -168,6 +168,7 @@
   --pd-syntax-punctuation: #4a5160;
   --pd-syntax-invalid: #c0392b;
   --pd-terminal-cursor: var(--pd-accent-primary);
+  --pd-menu-current: var(--pd-accent-primary);
 }
 
 :root[data-flavor='claude'][data-mode='dark'] {
@@ -328,6 +329,7 @@
   --pd-syntax-punctuation: #b8c0d0;
   --pd-syntax-invalid: #ff8a80;
   --pd-terminal-cursor: var(--pd-accent-primary);
+  --pd-menu-current: var(--pd-accent-primary);
 }
 
 :root[data-flavor='codex'][data-mode='light'] {
@@ -488,6 +490,7 @@
   --pd-syntax-punctuation: #4a5160;
   --pd-syntax-invalid: #c0392b;
   --pd-terminal-cursor: #4a9eff;
+  --pd-menu-current: #4a9eff;
 }
 
 :root[data-flavor='codex'][data-mode='dark'] {
@@ -648,6 +651,7 @@
   --pd-syntax-punctuation: #b8c0d0;
   --pd-syntax-invalid: #ff8a80;
   --pd-terminal-cursor: #4a9eff;
+  --pd-menu-current: #4a9eff;
 }
 
 :root[data-flavor='bobble'][data-mode='light'] {
@@ -808,6 +812,7 @@
   --pd-syntax-punctuation: #4a5160;
   --pd-syntax-invalid: #c0392b;
   --pd-terminal-cursor: var(--pd-accent-primary);
+  --pd-menu-current: var(--pd-accent-primary);
 }
 
 :root[data-flavor='bobble'][data-mode='dark'] {
@@ -968,6 +973,7 @@
   --pd-syntax-punctuation: #b8c0d0;
   --pd-syntax-invalid: #ff8a80;
   --pd-terminal-cursor: var(--pd-accent-primary);
+  --pd-menu-current: var(--pd-accent-primary);
 }
 
 @supports (corner-shape: superellipse(1.5)) {
