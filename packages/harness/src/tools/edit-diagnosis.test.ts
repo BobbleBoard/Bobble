@@ -178,3 +178,51 @@ describe('diagnoseEditFailure', () => {
     expect(diagnoseEditFailure({ edits: [] }, undefined, () => APP)).toBe('');
   });
 });
+
+describe('the note ends with the text worth copying', () => {
+  /*
+   * RUN H: the diagnosis named every bad character correctly — and the model
+   * still failed five edits in a row. `sys::argv[2]` came back a SECOND time,
+   * byte-identical, several calls later: it was copying its own corrupted
+   * string forward out of context, not re-deriving the mistake. A note that
+   * only echoes `yours: sys::argv[2]` hands it that string again.
+   */
+  it('hands over the exact correct oldText, not only the difference', () => {
+    const note = diagnoseEdit(
+      APP,
+      [{ oldText: '        root.title("TinyConvert v0.9_BETA")\n', newText: 'q' }],
+      'app.py',
+    );
+    expect(note).toContain('Send edits[0].oldText as exactly this:');
+    expect(note).toContain('root.title("TinyConvert v0.9 BETA")');
+    // The correct string is the LAST thing in the entry, after the caret.
+    expect(note.lastIndexOf('v0.9 BETA')).toBeGreaterThan(note.lastIndexOf('v0.9_BETA'));
+  });
+
+  it('quotes every line of a multi-line span, not just the anchor', () => {
+    const note = diagnoseEdit(
+      APP,
+      [
+        {
+          oldText: '    def handle_drop(self, path):\n        self.listbox.insert("end", path)\n',
+          newText: 'z',
+        },
+      ],
+      'app.py',
+    );
+    expect(note).toContain('def handle_drop(self, path):');
+    expect(note).toContain('os.path.basename(path)');
+  });
+
+  /* The reproduced text must be byte-exact or copying it fails again. */
+  it('reproduces the span verbatim, indentation included', () => {
+    const miss = nearestMiss(APP, '        root.title("TinyConvert v0.9_BETA")\n');
+    expect(miss?.correctText).toBe('        root.title("TinyConvert v0.9 BETA")\n');
+    expect(APP).toContain(miss?.correctText ?? ' ');
+  });
+
+  it('keeps a span with no trailing newline free of one', () => {
+    const miss = nearestMiss(APP, '        root.title("TinyConvert v0.9_BETA")');
+    expect(miss?.correctText).toBe('        root.title("TinyConvert v0.9 BETA")');
+  });
+});

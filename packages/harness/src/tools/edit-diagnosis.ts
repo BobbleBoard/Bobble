@@ -97,6 +97,18 @@ export interface EditMiss {
   /** Human phrasing of the two characters that differ. */
   expected: string;
   actual: string;
+  /**
+   * The file's REAL text for the span the model was aiming at — the string it
+   * should have sent, ready to copy verbatim.
+   *
+   * Run H showed why naming the bad character is not enough: `sys::argv[2]`
+   * came back a second time, byte-identical, several calls later. The model was
+   * not re-deriving the mistake, it was copying its own corrupted string
+   * forward out of context — and a note that only echoes `yours: sys::argv[2]`
+   * puts that string in front of it one more time. So the note ends with the
+   * correct text, which is the version worth copying.
+   */
+  correctText: string;
   /** How close the anchor line was (1 = the line is identical, so the mismatch
    *  is further down the block rather than on the anchor itself). */
   confidence: number;
@@ -149,6 +161,14 @@ export function nearestMiss(fileText: string, oldText: string, index = 0): EditM
   ) {
     column += 1;
   }
+  /* Reproduce the file's real text for the span, trailing newline included: a
+   * `wanted` ending in '' means oldText ended with \n, so that blank is a line
+   * terminator and not an extra line to quote. */
+  const endsWithNewline = wanted[wanted.length - 1] === '';
+  const spanLines = endsWithNewline ? wanted.length - 1 : wanted.length;
+  const correctText =
+    lines.slice(bestLine, bestLine + spanLines).join('\n') + (endsWithNewline ? '\n' : '');
+
   return {
     index,
     line: bestLine + offsetInBlock + 1,
@@ -157,6 +177,7 @@ export function nearestMiss(fileText: string, oldText: string, index = 0): EditM
     modelLine,
     expected: visible(fileLine[column]),
     actual: visible(modelLine[column]),
+    correctText,
     confidence: bestScore,
   };
 }
@@ -208,6 +229,10 @@ export function diagnoseEdit(fileText: string, edits: EditEntry[], fileName: str
         `  yours: ${showWhitespace(miss.modelLine)}`,
         `         ${caret}`,
         `  Column ${miss.column}: the file has ${miss.expected}, you wrote ${miss.actual}.`,
+        /* The LAST thing this entry puts in context is the correct string, not
+         * the corrupted one — see EditMiss.correctText. */
+        `  Send edits[${i}].oldText as exactly this:`,
+        miss.correctText.replace(/\n$/, '').replace(/^/gm, '    '),
       ].join('\n'),
     );
   }
