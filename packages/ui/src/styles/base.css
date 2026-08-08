@@ -105,3 +105,50 @@
     corner-shape: superellipse(1.5);
   }
 }
+
+/*
+ * A HAIRLINE THAT FADES OUT AT ITS ENDS.
+ *
+ * the user: "always and this goes for all borders generally where it would be
+ * applicable, eg. chat scroll and this tab scroll, probably not terminal
+ * commands: border must have fade out".
+ *
+ * A divider that runs the full width and stops dead draws attention to its own
+ * ends — you see the line terminate rather than the boundary it marks. Fading
+ * both ends into the background lets it read as an edge instead of a rule.
+ *
+ * Used as a pseudo-element rather than `border`, because a border cannot carry a
+ * gradient. `--pd-edge-line-inset` controls how far in the solid part starts;
+ * `--pd-edge-line-color` the colour. One place to change, everywhere follows —
+ * which is the point of it being here rather than per-component.
+ *
+ * Deliberately NOT applied to terminal output or code, where a rule that trails
+ * off would read as a rendering fault rather than a design.
+ */
+.pd-edge-line {
+  position: relative;
+}
+
+.pd-edge-line::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 1px;
+  pointer-events: none;
+  background: linear-gradient(
+    to right,
+    transparent,
+    var(--pd-edge-line-color, var(--pd-border-subtle)) var(--pd-edge-line-inset, 12%),
+    var(--pd-edge-line-color, var(--pd-border-subtle))
+      calc(100% - var(--pd-edge-line-inset, 12%)),
+    transparent
+  );
+}
+
+/* Same line along the TOP edge, for a boundary above scrolling content. */
+.pd-edge-line--top::after {
+  top: 0;
+  bottom: auto;
+}

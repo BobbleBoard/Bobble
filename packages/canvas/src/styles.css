@@ -90,6 +90,29 @@
   padding: 0 var(--pd-space-xs);
   background: var(--pd-bg-inset);
   flex: 0 0 auto;
+  /* The seam under the strip: see `.pd-edge-line` in ui/styles/base.css. It
+   * fades out at both ends rather than stopping dead against the panel edges,
+   * so it reads as the boundary of the strip instead of a drawn rule. The
+   * ACTIVE tab sits on top of it and breaks it, which is what makes that tab
+   * read as continuous with the content below. */
+  position: relative;
+}
+
+.pd-canvas-tabbar::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 1px;
+  pointer-events: none;
+  background: linear-gradient(
+    to right,
+    transparent,
+    var(--pd-border-subtle) 12%,
+    var(--pd-border-subtle) 88%,
+    transparent
+  );
 }
 
 /* Non-scrolling wrapper that hosts the edge-fade overlays. It must NOT establish
