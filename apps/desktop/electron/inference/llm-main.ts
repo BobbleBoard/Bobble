@@ -5,8 +5,10 @@
  * app window as `llm:*` events. The supervisor owns llama-server; main only
  * relays, so a crash there never takes the UI down.
  */
+import { execFileSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 import path from 'node:path';
+import { cacheRoot } from '@pi-desktop/inference';
 import {
   createIpcEventSender,
   createLogger,
@@ -23,6 +25,7 @@ import type {
   LlmOutbound,
   LlmRequestBody,
 } from './protocol';
+import { reapOrphanedServers } from './reap-orphans';
 
 const log = createLogger('desktop:llm');
 const events = createIpcEventSender<AppEventMap>();
@@ -357,6 +360,23 @@ const hfHandlers: IpcHandlers<HfInvokeMap> = {
 export function registerLlmIpc(ipcMain: IpcMain, allowSender: (event: unknown) => boolean): void {
   registerIpcHandlers<LlmInvokeMap>(ipcMain, handlers, { allowSender });
   registerIpcHandlers<HfInvokeMap>(ipcMain, hfHandlers, { allowSender });
+  /*
+   * Clear out any model server a PREVIOUS run left behind before standing up
+   * ours. The ordered quit kills its own server correctly; a crash, a
+   * force-quit or an automated close never gets to run it, and what survives is
+   * a llama-server reparented to init still holding the whole model resident.
+   *
+   * MEASURED: six accumulated in one session, three of them 6.5GB. Free memory
+   * fell to 41% and a benchmark run produced no tokens at all for four minutes
+   * — the app was competing with ghosts of itself, and nothing on screen said
+   * so. A server belonging to a LIVE app always has a live parent, so a second
+   * window or a concurrent run is never touched.
+   */
+  reapOrphanedServers(path.join(cacheRoot(), 'llamacpp'), {
+    ps: () => execFileSync('ps', ['-axo', 'pid=,ppid=,command='], { encoding: 'utf8' }),
+    kill: (pid) => process.kill(pid),
+    log: (message, meta) => log.info(message, meta),
+  });
   // Stand the supervisor up now so its initial idle status broadcasts to the
   // window as soon as the renderer subscribes.
   ensureChild();
