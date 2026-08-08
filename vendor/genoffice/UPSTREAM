@@ -1,0 +1,16 @@
+repository  https://github.com/genspark-ai/genoffice.git
+commit      d8305ff2dc152593a1ec5639d77e6860c6a512bd
+committed   2026-08-08T11:38:54+08:00
+subject     docs: catch the contributor docs up with the tree (#53)
+vendored-by scripts/vendor-genoffice.sh
+license     Apache-2.0 (see LICENSE and NOTICE in this directory)
+
+Removed from the upstream tree by the vendoring script:
+  ee/         proprietary GenOffice Enterprise License — must never ship
+  apps/shell  upstream's own window shell; Bobble's canvas hosts the views
+  e2e/        upstream end-to-end suite
+  .github/    upstream CI
+
+Modified:
+  their 'project:*' and 'app:get-language'/'app:language-changed' IPC channels
+  are prefixed 'go:' to avoid a hard collision with Bobble's own channels.
