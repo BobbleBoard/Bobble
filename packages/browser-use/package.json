@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "license": "MIT",
+  "license": "GPL-3.0-or-later",
   "description": "pi extension: browser_* tools that let the model drive the canvas browser (efficient indexed DOM perception + index/coordinate acting) over a local RPC bridge to the app.",
   "exports": {
     ".": "./src/index.ts",

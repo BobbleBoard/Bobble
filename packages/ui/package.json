@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "license": "MIT",
+  "license": "GPL-3.0-or-later",
   "description": "Shared design system: components built from the Claude/Codex component spec book, styled on --pd-* tokens.",
   "exports": {
     ".": "./src/index.ts",

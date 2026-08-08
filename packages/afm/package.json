@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "license": "MIT",
+  "license": "GPL-3.0-or-later",
   "description": "Apple Foundation Models on-device bridge: Swift pi-afm CLI helper + Node wrapper (checkAvailability, streamAfm) speaking NDJSON over stdio.",
   "exports": {
     ".": "./src/index.ts"

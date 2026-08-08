@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "license": "MIT",
+  "license": "GPL-3.0-or-later",
   "description": "The swappable CoordinationEngine boundary (harness-architecture spec section 1): the stable typed interface + plain DTOs the UI depends on, plus the SoloEngine adapter skeleton over the current pi flow.",
   "exports": {
     ".": "./src/index.ts",

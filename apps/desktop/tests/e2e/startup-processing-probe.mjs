@@ -31,7 +31,16 @@ const OUT = process.env.OUT ?? path.join(appRoot, '.corp-runs', 'startup-process
 const REAL = process.env.REAL === '1';
 if (!existsSync(OUT)) mkdirSync(OUT, { recursive: true });
 
-const udd = mkdtempSync(path.join(tmpdir(), 'pd-startup-'));
+/*
+ * A COPY of the real profile, not a fresh one.
+ *
+ * The first version of this probe used an empty `--user-data-dir` and could
+ * never reproduce: users=0 at every step, ring never shown. the user's app has 80+
+ * restored chats, and the ring appears there — so the trigger is in RESTORE, and
+ * a cold profile is the one condition guaranteed to hide it. `UDD=<path>` points
+ * at a copied profile; the original is never opened.
+ */
+const udd = process.env.UDD ?? mkdtempSync(path.join(tmpdir(), 'pd-startup-'));
 const env = { ...process.env, PI_E2E_BACKGROUND: '1' };
 if (!REAL) {
   env.PI_E2E = '1';

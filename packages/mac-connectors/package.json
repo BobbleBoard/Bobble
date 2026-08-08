@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "license": "MIT",
+  "license": "GPL-3.0-or-later",
   "description": "pi extension: macOS app connectors (Calendar, Reminders, Contacts, Mail, Messages) via osascript + chat.db.",
   "exports": {
     ".": "./src/index.ts",

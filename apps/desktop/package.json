@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "Pi Desktop Electron app. dist-electron artifacts are CJS (sandboxed preloads must be CommonJS); all source is ESM TypeScript.",
-  "license": "MIT",
+  "license": "GPL-3.0-or-later",
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "vite",

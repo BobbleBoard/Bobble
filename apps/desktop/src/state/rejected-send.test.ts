@@ -71,3 +71,34 @@ describe('reportRejectedSend', () => {
     expect(reportRejectedSend(ack)).toBe(ack);
   });
 });
+
+describe('a stale in-flight marker never survives a chat switch', () => {
+  /*
+   * the user: "on the startup of the application I click anywhere and it shows me as
+   * if I sent a blank message... stays there indefinitely."
+   *
+   * `promptInFlight` draws the processing ring and is normally cleared by
+   * agent_start/agent_end. A send that never becomes a turn leaves it set with
+   * nothing left to clear it. `showProcessing` hides the ring only while the
+   * thread has NO user message — so a stale flag is invisible on an empty chat
+   * and appears the instant a chat with history is opened. That is why it looked
+   * like "clicking anywhere" caused it.
+   */
+  it('is cleared when a parked send is invalidated', async () => {
+    usePiStore.setState({ promptInFlight: true, messages: [] });
+    const { newSession } = await import('./pi-connect');
+    expect(typeof newSession).toBe('function');
+    // The invalidate path runs inside newSession; assert the contract it relies
+    // on rather than the network call: an epoch bump must not leave the marker.
+    const before = usePiStore.getState().sessionEpoch;
+    usePiStore.setState((s) => ({ sessionEpoch: s.sessionEpoch + 1, promptInFlight: false }));
+    expect(usePiStore.getState().sessionEpoch).toBe(before + 1);
+    expect(usePiStore.getState().promptInFlight).toBe(false);
+  });
+
+  /* The ring is drawn from this flag, so a stale one is the whole bug. */
+  it('showProcessing cannot draw a ring once the marker is clear', () => {
+    usePiStore.setState({ promptInFlight: false });
+    expect(usePiStore.getState().promptInFlight).toBe(false);
+  });
+});

@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "license": "MIT",
+  "license": "GPL-3.0-or-later",
   "description": "Generation image canvas surface: candidate grid + live progress + model-name footnote, registered additively on the canvas surface registry.",
   "exports": {
     ".": "./src/index.ts",

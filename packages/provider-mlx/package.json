@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "license": "MIT",
+  "license": "GPL-3.0-or-later",
   "description": "pi provider extension: MLX mlx_lm.server streamSimple (mlx-stream api) — reuses provider-llamacpp's SSE parser + tool-call repair ladder, with CLIENT-side TPS (MLX emits no timings).",
   "keywords": [
     "pi-package"

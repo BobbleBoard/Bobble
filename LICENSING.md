@@ -78,9 +78,10 @@ short "modified by" line at the top of any GenOffice file we edit.
 
 ### 3.4 Our own relicensing must be clean
 
-- The repo currently declares **MIT** in `apps/desktop/package.json` and has
-  **no top-level `LICENSE` file at all** — that gap should be fixed regardless
-  of which licence we land on.
+- The repo declared **MIT** — a 21-line `LICENSE` at the root ("Copyright (c)
+  2026 Pi Desktop contributors") and `"license": "MIT"` in every workspace
+  package. (An earlier draft of this document said there was no `LICENSE` file;
+  that was wrong — a shell glob failure had aborted the check before it ran.)
 - Relicensing our own code MIT → GPLv3 is permitted: we hold the copyright, and
   MIT allows sublicensing.
 - **If anyone else has contributed code**, their contributions were received
@@ -174,6 +175,22 @@ These are not blockers, but they are real and they are hard to reverse.
   proprietary licence — we would only be able to dual-license the parts we wrote.
 
 ---
+
+## 7a. What has actually been done (2026-08-07)
+
+- `LICENSE` at the root replaced with the **verbatim GPL-3.0 text** — 621 lines,
+  all 18 sections through `END OF TERMS AND CONDITIONS`, taken from an
+  authoritative copy shipped in the dependency tree rather than retyped.
+- **24 workspace `package.json` files** moved from `"MIT"` to
+  `"GPL-3.0-or-later"`.
+- The previous MIT text is preserved in git history at the commit before this
+  one; the project was MIT up to and including that commit, and every copy
+  distributed under it stays MIT for its recipients — relicensing is not
+  retroactive.
+
+Still outstanding from §6: `THIRD-PARTY-NOTICES.md`, the vendoring script with
+the `ee/` deletion, and the build check for the trademark strings. Those are only
+needed once GenOffice is actually vendored.
 
 ## 8. Recommendation
 

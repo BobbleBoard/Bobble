@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "license": "MIT",
+  "license": "GPL-3.0-or-later",
   "description": "pi extension: a generate_image tool that generates on-device (Apple-Silicon MLX/mflux) by enqueuing jobs over a token-authed socket bridge to the app's JobQueue; progress streams to the canvas.",
   "exports": {
     ".": "./src/index.ts",

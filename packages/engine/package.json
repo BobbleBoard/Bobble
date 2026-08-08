@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "license": "MIT",
+  "license": "GPL-3.0-or-later",
   "description": "pi RPC bridge: child-process spawn, typed RPC unions, event router, session rehydration.",
   "exports": {
     ".": "./src/index.ts",

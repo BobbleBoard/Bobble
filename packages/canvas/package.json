@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "license": "MIT",
+  "license": "GPL-3.0-or-later",
   "description": "Artifact surface registry and code/md/html/svg renderers.",
   "exports": {
     ".": "./src/index.ts",

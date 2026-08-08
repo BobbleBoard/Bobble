@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "license": "MIT",
+  "license": "GPL-3.0-or-later",
   "description": "pi extension: task classifier, toolset presets, tool search, repair rungs 3-5, permission modes, effort mapping, small-model warnings, and the /harness command protocol.",
   "keywords": [
     "pi-package"

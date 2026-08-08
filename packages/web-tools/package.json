@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "license": "MIT",
+  "license": "GPL-3.0-or-later",
   "description": "pi extension: web_search (pluggable backends), web_fetch with readability, python_run.",
   "exports": {
     ".": "./src/index.ts"

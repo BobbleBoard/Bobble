@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "license": "MIT",
+  "license": "GPL-3.0-or-later",
   "description": "Mac computer-use bridge helper: Swift pi-mac CLI (indexed AX-tree snapshot + CGEvent click/type/key/scroll + TCC check) + Node wrapper (checkTcc, MacHelperClient) speaking NDJSON over stdio.",
   "exports": {
     ".": "./src/index.ts"

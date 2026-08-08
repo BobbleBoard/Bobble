@@ -72,7 +72,24 @@ export function agentInFlight(): boolean {
  * double-bump here is a no-op beyond dropping the stale send.
  */
 function invalidateInFlightSend(): void {
-  usePiStore.setState((s) => ({ sessionEpoch: s.sessionEpoch + 1 }));
+  /*
+   * Clear the in-flight MARKER too, not just the epoch.
+   *
+   * the user: "on the startup of the application I click anywhere and it shows me as
+   * if I sent a blank message ... stays there indefinitely." `promptInFlight` is
+   * what draws the processing ring, and it is normally cleared by
+   * agent_start/agent_end. A send that never becomes a turn — refused by pi,
+   * dropped on a session switch — leaves it set with nothing left to clear it.
+   * `showProcessing` then HIDES the ring only while the thread has no user
+   * message, so the moment any chat with history is opened, a stale flag from a
+   * different chat surfaces as an endless "processing · 287.0s".
+   *
+   * Bumping the epoch already says "no parked send may land"; the marker for
+   * that send has to go with it. Belt and braces alongside the refusal path,
+   * which now reports and clears (see reportRejectedSend) — this catches the
+   * flag whatever left it set.
+   */
+  usePiStore.setState((s) => ({ sessionEpoch: s.sessionEpoch + 1, promptInFlight: false }));
 }
 
 let disconnect: (() => void) | null = null;

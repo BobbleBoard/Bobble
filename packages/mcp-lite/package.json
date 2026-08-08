@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "license": "MIT",
+  "license": "GPL-3.0-or-later",
   "description": "MCP stdio client, lite proxy mode, and native-mode registrar.",
   "exports": {
     ".": "./src/index.ts",

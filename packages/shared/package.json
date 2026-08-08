@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "license": "MIT",
+  "license": "GPL-3.0-or-later",
   "description": "tsconfig base, typed IPC helpers, Result type, and logger shared by all Pi Desktop packages. Imports nothing.",
   "exports": {
     ".": "./src/index.ts",

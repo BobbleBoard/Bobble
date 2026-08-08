@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "license": "MIT",
+  "license": "GPL-3.0-or-later",
   "description": "llama.cpp binary manager, GGUF catalog, hardware detection, llama-server supervisor.",
   "exports": {
     ".": "./src/index.ts"

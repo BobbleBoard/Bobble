@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "license": "MIT",
+  "license": "GPL-3.0-or-later",
   "description": "Generation backend: remote-capable job protocol, modality catalog, uv-managed mflux/MLX worker, NDJSON-streaming client, and a memory-budget-aware JobQueue.",
   "exports": {
     ".": "./src/index.ts",

@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "license": "MIT",
+  "license": "GPL-3.0-or-later",
   "description": "The Bobble 3D generation engine: model catalog + uv/Python sidecar supervisor (TRELLIS.2 on MPS, Mage-Flow, CubePart, Hunyuan Paint, AutoRemesher).",
   "exports": {
     ".": "./src/index.ts"
