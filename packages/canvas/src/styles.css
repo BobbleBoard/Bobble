@@ -436,14 +436,44 @@
 
 /* ── Per-tab operation bar (SECOND bar under the tab strip) ───────────── */
 
+/*
+ * The rule the canvas content scrolls beneath — the same treatment as the tab
+ * seam above it, for the same reason: a divider that runs the full width and
+ * stops dead draws the eye to its own ends.
+ *
+ * FOUND BY MEASUREMENT, not by reading the stylesheet. A probe enumerated every
+ * pane-width horizontal edge actually painted in a loaded, scrolled chat; this
+ * was one of only four, and the only one that is a genuine scroll boundary. The
+ * same measurement settled the other half of the request: the CHAT thread has NO
+ * pane-width border at all, which is why no amount of reading thread.css turned
+ * one up — its only hairlines are the rings around message cards, and fading an
+ * enclosing ring would read as a rendering fault.
+ */
 .pd-canvas-opbar {
+  position: relative;
   display: flex;
   align-items: center;
   gap: var(--pd-space-xs);
   min-height: 36px;
   padding: var(--pd-space-xs) var(--pd-space-sm);
-  border-bottom: 1px solid var(--pd-border-subtle);
   flex: 0 0 auto;
+}
+
+.pd-canvas-opbar::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 1px;
+  pointer-events: none;
+  background: linear-gradient(
+    to right,
+    transparent,
+    var(--pd-border-subtle) 12%,
+    var(--pd-border-subtle) 88%,
+    transparent
+  );
 }
 
 .pd-canvas-opbar-spacer {
