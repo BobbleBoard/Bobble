@@ -499,6 +499,12 @@ export function ChatThread() {
                   key={item.path}
                   item={item}
                   onOpen={() => void openPresented(canvasController, item)}
+                  onOpenWith={(_it, appId) => {
+                    void window.piDesktop.invoke('canvas:open-with', {
+                      path: item.path,
+                      appId,
+                    });
+                  }}
                   onReveal={() => {
                     void window.piDesktop.invoke('canvas:reveal', { path: item.path });
                   }}

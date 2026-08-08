@@ -596,54 +596,12 @@
   object-fit: contain;
 }
 
-/* ── File "Open" split button (primary + divided caret, one unit) ─────── */
-
-.pd-canvas-split {
-  display: inline-flex;
-  align-items: stretch;
-  height: 28px;
-  border: 1px solid var(--pd-border-default);
-  border-radius: var(--pd-radius-md);
-  background: var(--pd-bg-raised);
-  overflow: hidden;
-  flex: 0 0 auto;
-}
-
-.pd-canvas-split-main,
-.pd-canvas-split-caret {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--pd-space-xs);
-  border: none;
-  background: none;
-  color: var(--pd-text-primary);
-  font: inherit;
-  font-size: var(--pd-font-size-caption);
-  cursor: pointer;
-  transition: background var(--pd-duration-fast) var(--pd-easing-standard);
-}
-
-.pd-canvas-split-main {
-  padding: 0 var(--pd-space-sm);
-}
-
-.pd-canvas-split-caret {
-  padding: 0 4px;
-  color: var(--pd-text-muted);
-}
-
-.pd-canvas-split-main:hover,
-.pd-canvas-split-caret:hover {
-  background: var(--pd-bg-hover);
-}
-
-/* The thin divider that keeps the two segments visually connected. */
-.pd-canvas-split-divider {
-  width: 1px;
-  align-self: stretch;
-  flex: 0 0 auto;
-  background: var(--pd-border-default);
-}
+/*
+ * The "Open" split button moved to the design system (ui/styles/split-button.css)
+ * when the presentation card had to render the SAME control — the user: "the same
+ * thing as the 'open' button inside the canvas ... with the little dropdown
+ * also". A copy here would be the dropdown-divergence problem all over again.
+ */
 
 /* Raw↔rendered segmented toggle sizing (surface styling comes from ui). */
 .pd-canvas-view-toggle {

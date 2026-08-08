@@ -57,7 +57,10 @@ describe('the canvas dropdown surface is the shared one', () => {
       '',
     );
     const forked: string[] = [];
-    for (const [, selector, body] of css.matchAll(/([^{}]*menu[^{}]*)\{([^}]*)\}/gi)) {
+    for (const m of css.matchAll(/([^{}]*menu[^{}]*)\{([^}]*)\}/gi)) {
+      const selector = m[1];
+      const body = m[2];
+      if (selector === undefined || body === undefined) continue;
       if (/(^|\s)(border|background)\s*:/m.test(body)) forked.push(selector.trim());
     }
     expect(forked).toEqual([]);

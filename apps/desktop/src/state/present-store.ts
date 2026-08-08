@@ -1,3 +1,4 @@
+import type { OpenWithChoice } from '@pi-desktop/ui';
 /**
  * What the model has presented this conversation, and how it reaches the canvas.
  *
@@ -21,6 +22,9 @@ export interface PresentedRecord {
   kind: PresentKind;
   /** Monotonic, so a re-present of the same path moves it to the end. */
   at: number;
+  /** Apps that can open it — hydrated after the record appears. */
+  openApps?: readonly OpenWithChoice[];
+  defaultApp?: OpenWithChoice;
 }
 
 /** Extension → how we label it and which canvas surface opens it. */
@@ -70,6 +74,8 @@ export function classifyPresented(p: string): { kind: PresentKind; tab: CanvasTa
 interface PresentState {
   items: PresentedRecord[];
   add: (item: { path: string; note?: string }) => PresentedRecord;
+  /** Attach the apps that can open a presented artefact (async, best-effort). */
+  setApps: (path: string, apps: OpenWithChoice[], defaultAppId: string | null) => void;
   clear: () => void;
 }
 
@@ -86,8 +92,44 @@ export const usePresentStore = create<PresentState>((set, get) => ({
     // Re-presenting the same artefact REPLACES its row rather than stacking a
     // duplicate — the model iterating on one file is the normal case.
     set((s) => ({ items: [...s.items.filter((i) => i.path !== path), record] }));
+    /*
+     * Ask the OS which applications can open this, the same way the canvas
+     * operation bar does — so the card's Open control offers the same choices
+     * rather than a lookalike with an empty menu (the user: "the same thing as the
+     * 'open' button inside the canvas... with the little dropdown also").
+     * Best-effort and async: the button works from the moment it renders,
+     * opening with the OS default, and the caret appears if alternatives exist.
+     */
+    /* `?.` on the bridge alone is not enough: it yields undefined, and calling
+     * `.then` on that throws. Unit tests run without a preload bridge. */
+    const bridge = typeof window === 'undefined' ? undefined : window.piDesktop;
+    if (bridge !== undefined) {
+      void bridge
+        .invoke('canvas:list-open-apps', { path })
+        .then((res) => {
+          const r = res as { apps?: OpenWithChoice[]; defaultAppId?: string | null };
+          get().setApps(path, r.apps ?? [], r.defaultAppId ?? null);
+        })
+        .catch(() => {
+          // No app list — Open still works via the OS default.
+        });
+    }
     return record;
   },
+  setApps: (path, apps, defaultAppId) =>
+    set((s) => ({
+      items: s.items.map((i) =>
+        i.path === path
+          ? {
+              ...i,
+              openApps: apps,
+              ...(defaultAppId !== null
+                ? { defaultApp: apps.find((a) => a.id === defaultAppId) }
+                : {}),
+            }
+          : i,
+      ),
+    })),
   clear: () => set({ items: [] }),
 }));
 

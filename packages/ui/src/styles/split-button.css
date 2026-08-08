@@ -1,0 +1,84 @@
+/*
+ * The "Open" split button — a primary segment and a divided caret as ONE
+ * rounded control. Moved here from packages/canvas so the canvas operation bar
+ * and the presentation card render the same component rather than two copies
+ * that drift (the user: "the same thing as the 'open' button inside the canvas...
+ * with the little dropdown also").
+ */
+
+.pd-split-root {
+  position: relative;
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+
+.pd-split {
+  display: inline-flex;
+  align-items: stretch;
+  height: 28px;
+  border: 1px solid var(--pd-border-default);
+  border-radius: var(--pd-radius-md);
+  background: var(--pd-bg-raised);
+  overflow: hidden;
+  flex: 0 0 auto;
+}
+
+.pd-split-main,
+.pd-split-caret {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--pd-space-xs);
+  border: none;
+  background: none;
+  color: var(--pd-text-primary);
+  font: inherit;
+  font-size: var(--pd-font-size-caption);
+  cursor: pointer;
+  transition: background var(--pd-duration-fast) var(--pd-easing-standard);
+}
+
+.pd-split-main {
+  padding: 0 var(--pd-space-sm);
+}
+
+.pd-split-caret {
+  padding: 0 4px;
+  color: var(--pd-text-muted);
+}
+
+.pd-split-main:hover,
+.pd-split-caret:hover {
+  background: var(--pd-bg-hover);
+}
+
+/* The thin divider that keeps the two segments reading as one control. */
+.pd-split-divider {
+  width: 1px;
+  align-self: stretch;
+  flex: 0 0 auto;
+  background: var(--pd-border-default);
+}
+
+/* App icon (OS icon or the generic glyph) on the button and in the menu. */
+.pd-split-app-icon {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  color: var(--pd-text-muted);
+}
+
+.pd-split-app-icon img {
+  width: 16px;
+  height: 16px;
+  border-radius: var(--pd-radius-sm);
+  object-fit: contain;
+}
+
+/* Anchored under the control; the surface itself is the shared .pd-menu. */
+.pd-split-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 30;
+  min-width: 160px;
+}

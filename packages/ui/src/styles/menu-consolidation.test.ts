@@ -31,7 +31,10 @@ const css = readFileSync(
 /** Every declaration block whose selector mentions the project menu. */
 function projectMenuBlocks(): Array<[string, string]> {
   const out: Array<[string, string]> = [];
-  for (const [, selector, body] of css.matchAll(/([^{}]*)\{([^}]*)\}/g)) {
+  for (const m of css.matchAll(/([^{}]*)\{([^}]*)\}/g)) {
+    const selector = m[1];
+    const body = m[2];
+    if (selector === undefined || body === undefined) continue;
     if (selector.includes('pd-project-menu')) out.push([selector.trim(), body]);
   }
   return out;

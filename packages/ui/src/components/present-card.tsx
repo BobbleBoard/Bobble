@@ -1,3 +1,4 @@
+import { OpenSplitButton, type OpenWithChoice } from './open-split-button.tsx';
 /**
  * The card `present` puts in the thread: here is the finished thing.
  *
@@ -29,6 +30,11 @@ export interface PresentedItem {
   note?: string;
   /** A thumbnail (data URI) when we have one — an image, a rendered page. */
   thumbnailUrl?: string;
+  /* The applications that can open this artefact — the same data the canvas
+   * operation bar uses, so the card's Open control offers the same choices.
+   * Absent → the button still opens with the OS default and shows no caret. */
+  defaultApp?: OpenWithChoice;
+  openApps?: readonly OpenWithChoice[];
 }
 
 const KIND_LABEL: Record<PresentKind, string> = {
@@ -120,6 +126,8 @@ export interface PresentCardProps extends Omit<HTMLAttributes<HTMLElement>, 'onS
   onOpen?: (item: PresentedItem) => void;
   /** Show it in Finder. Secondary. */
   onReveal?: (item: PresentedItem) => void;
+  /** A specific app chosen from the Open dropdown. */
+  onOpenWith?: (item: PresentedItem, appId: string) => void;
 }
 
 /**
@@ -130,7 +138,7 @@ export interface PresentCardProps extends Omit<HTMLAttributes<HTMLElement>, 'onS
  * because the name alone is not enough to know WHICH file this is.
  */
 export const PresentCard = forwardRef<HTMLDivElement, PresentCardProps>(function PresentCard(
-  { item, onOpen, onReveal, className, ...rest },
+  { item, onOpen, onOpenWith, onReveal, className, ...rest },
   ref,
 ) {
   const name = item.name ?? baseName(item.path);
@@ -175,14 +183,21 @@ export const PresentCard = forwardRef<HTMLDivElement, PresentCardProps>(function
             Reveal
           </button>
         ) : null}
+        {/*
+         * the user: "I want it to just be a rounded corner open button that has the
+         * same thing as the 'open' button inside the canvas when you have a file
+         * open. with the little dropdown also." Literally the same component the
+         * canvas operation bar renders — not a lookalike.
+         */}
         {onOpen !== undefined ? (
-          <button
-            type="button"
-            className="pd-present-action pd-present-action--primary pd-focusable"
-            onClick={() => onOpen(item)}
-          >
-            Open
-          </button>
+          <OpenSplitButton
+            {...(item.defaultApp !== undefined ? { defaultApp: item.defaultApp } : {})}
+            {...(item.openApps !== undefined ? { apps: item.openApps } : {})}
+            onOpen={() => onOpen(item)}
+            {...(onOpenWith !== undefined
+              ? { onOpenWith: (appId: string) => onOpenWith(item, appId) }
+              : {})}
+          />
         ) : null}
       </div>
     </div>

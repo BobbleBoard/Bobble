@@ -7,6 +7,7 @@ import {
   IconExternal,
   IconMore,
   IconRefresh,
+  OpenSplitButton,
   SegmentedControl,
 } from '@pi-desktop/ui';
 import {
@@ -254,73 +255,22 @@ function OpenSplit({
   onOpenWith,
   onReveal,
 }: Pick<CanvasOperationBarProps, 'tab' | 'onOpen' | 'onOpenWith' | 'onReveal'>) {
-  const [openMenu, setOpenMenu] = useState(false);
-  const openRef = useRef<HTMLDivElement>(null);
-  useOutsideClose(openRef, openMenu, () => setOpenMenu(false));
   const defaultApp = tab.defaultApp;
   // The dropdown lists every app EXCEPT the default (it lives on the primary
   // segment) — belt-and-braces even if the app already omitted it.
   const apps = (tab.openApps ?? []).filter((app) => app.id !== defaultApp?.id);
   return (
-    <div ref={openRef} className="pd-canvas-opbar-pop">
-      {/* Split button: primary "Open" (default app) + a divided ▾ that lists
-          the other apps — one connected control (round-8 #14). */}
-      <div className="pd-canvas-split">
-        <button
-          type="button"
-          className="pd-canvas-split-main"
-          aria-label={defaultApp ? `Open with ${defaultApp.name}` : 'Open'}
-          onClick={() => onOpen?.()}
-        >
-          <AppIcon app={defaultApp} />
-          Open
-        </button>
-        <span className="pd-canvas-split-divider" aria-hidden="true" />
-        <button
-          type="button"
-          className="pd-canvas-split-caret"
-          aria-label="Open with…"
-          aria-expanded={openMenu}
-          onClick={() => setOpenMenu((open) => !open)}
-        >
-          <IconChevronDown size={14} />
-        </button>
-      </div>
-      {openMenu ? (
-        <div className="pd-menu pd-canvas-popmenu" role="menu">
-          {apps.map((app) => (
-            <button
-              key={app.id}
-              type="button"
-              role="menuitem"
-              className="pd-menu-item"
-              onClick={() => {
-                setOpenMenu(false);
-                onOpenWith?.(app.id);
-              }}
-            >
-              <AppIcon app={app} slot="menu" />
-              {app.name}
-            </button>
-          ))}
-          {apps.length > 0 ? <div className="pd-menu-separator" aria-hidden="true" /> : null}
-          <button
-            type="button"
-            role="menuitem"
-            className="pd-menu-item"
-            onClick={() => {
-              setOpenMenu(false);
-              onReveal?.();
-            }}
-          >
-            <span className="pd-menu-icon" aria-hidden="true">
-              <IconFolder size={16} />
-            </span>
-            Open in folder
-          </button>
-        </div>
-      ) : null}
-    </div>
+    /* The control itself is the design-system component now — the canvas and the
+     * presentation card render ONE implementation, not two copies. */
+    <OpenSplitButton
+      {...(defaultApp !== undefined ? { defaultApp } : {})}
+      apps={apps}
+      onOpen={() => onOpen?.()}
+      onOpenWith={(appId) => onOpenWith?.(appId)}
+      {...(onReveal !== undefined
+        ? { extraItem: { label: 'Open in folder', onSelect: () => onReveal() } }
+        : {})}
+    />
   );
 }
 

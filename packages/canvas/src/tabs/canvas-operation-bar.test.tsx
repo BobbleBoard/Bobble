@@ -161,10 +161,10 @@ describe('CanvasOperationBar — file', () => {
         onOpen={onOpen}
       />,
     );
-    const primary = container.querySelector('.pd-canvas-split-main');
+    const primary = container.querySelector('.pd-split-main');
     // The default app's icon (a data: URL <img>) sits on the primary segment.
     expect(primary?.getAttribute('aria-label')).toBe('Open with VS Code');
-    expect(primary?.querySelector('.pd-canvas-app-icon img')).toBeTruthy();
+    expect(primary?.querySelector('.pd-split-app-icon img')).toBeTruthy();
     await click(primary);
     expect(onOpen).toHaveBeenCalledTimes(1);
   });
@@ -205,11 +205,11 @@ describe('CanvasOperationBar — file', () => {
     const { container } = await render(
       <CanvasOperationBar tab={tab({ kind: 'file', filePath: 'a.txt' })} />,
     );
-    const primary = container.querySelector('.pd-canvas-split-main');
+    const primary = container.querySelector('.pd-split-main');
     expect(primary?.getAttribute('aria-label')).toBe('Open');
     // Generic glyph (an svg), not a system-icon <img>.
-    expect(primary?.querySelector('.pd-canvas-app-icon svg')).toBeTruthy();
-    expect(primary?.querySelector('.pd-canvas-app-icon img')).toBeNull();
+    expect(primary?.querySelector('.pd-split-app-icon svg')).toBeTruthy();
+    expect(primary?.querySelector('.pd-split-app-icon img')).toBeNull();
   });
 });
 

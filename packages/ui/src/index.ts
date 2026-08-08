@@ -270,3 +270,4 @@ export {
 } from './components/web-search.tsx';
 export type { VariantProps, VariantSelection, VariantsConfig } from './define-variants.ts';
 export { defineVariants } from './define-variants.ts';
+export * from './components/open-split-button.tsx';
