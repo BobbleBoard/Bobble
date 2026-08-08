@@ -51,7 +51,7 @@ import {
 } from './permissions/modes.js';
 import { capabilityForTool } from './presets/capabilities.js';
 import { BROWSER_NAVIGATE_ALWAYS, resolvePresetTools } from './presets/presets.js';
-import { augmentSystemPrompt, TEAM_PROMPT_MARKER } from './prompt/capability-prompt.js';
+import { augmentSystemPrompt } from './prompt/capability-prompt.js';
 import { connectRepairBridge, type LiveRepairDeps } from './repair/bridge.js';
 import { createToolCallFixer, withRepairAttempts } from './repair/fixer.js';
 import {
@@ -92,6 +92,7 @@ import {
 } from './subagent/types.js';
 import { registerAskUser } from './tools/ask-user.js';
 import { registerCapabilityTool } from './tools/capability-tool.js';
+import { diagnoseEditFailure } from './tools/edit-diagnosis.js';
 import { wouldHang } from './tools/hang-guard.js';
 import { registerImageTools } from './tools/image-tools.js';
 import { applyBias, lastAssistantThought, planBias } from './tools/intent-bias.js';
@@ -1682,6 +1683,32 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
       const content =
         withNote.length > 0 ? withNote : [{ type: 'text' as const, text: note.trimStart() }];
       return { content };
+    }
+    /*
+     * A FAILED EDIT MUST COME BACK WITH THE DIFF ALREADY DONE.
+     *
+     * Run G: six `edit` calls, all rejected, the file never written, ten minutes
+     * gone — and the last one missed by a single character (`v0.9_BETA` for
+     * `v0.9 BETA`) inside a 1165-character file. All pi says is "Could not find
+     * edits[1] ... must match exactly", so the model re-read the file four times
+     * hunting for a difference it cannot see, then hit the loop breaker.
+     *
+     * The harness holds both strings. It runs the comparison and hands over the
+     * line, the column, the two characters and — because the batch is atomic —
+     * which entries were ALREADY correct, so the good ones aren't re-derived and
+     * re-broken next round. Same shape as every other steer that has actually
+     * moved this model: perform the check, don't request it.
+     */
+    if (event.toolName === 'edit' && event.isError) {
+      const note = diagnoseEditFailure(event.input, runtime.workspaceRoot ?? undefined);
+      if (note.length > 0) {
+        return {
+          content: event.content.map((part, i) =>
+            i === 0 && part.type === 'text' ? { ...part, text: `${part.text}\n${note}` } : part,
+          ),
+        };
+      }
+      return;
     }
     if (!TRUNCATE_TOOLS.has(event.toolName)) return;
     let changed = false;

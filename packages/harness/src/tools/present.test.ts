@@ -138,10 +138,14 @@ describe('present resolves ~ before touching the filesystem', () => {
    */
   it('stats, shows and previews the expanded path — never the tilde', async () => {
     const seen: string[] = [];
-    let tool: { execute: (id: string, params: unknown) => Promise<unknown> } | null = null;
+    type Registered = { execute: (id: string, params: unknown) => Promise<unknown> };
+    /* Held in a one-slot box: assigning through a closure narrows `tool` to
+     * `never` at the use site, which typechecks as an error even though the
+     * value is there at runtime. */
+    const box: { tool: Registered | null } = { tool: null };
     const pi = {
-      registerTool: (def: typeof tool) => {
-        tool = def;
+      registerTool: (def: Registered) => {
+        box.tool = def;
       },
     };
     registerPresentTool(
@@ -163,8 +167,8 @@ describe('present resolves ~ before touching the filesystem', () => {
         },
       } as never,
     );
-    expect(tool).not.toBeNull();
-    await tool?.execute('id', { path: '~/proj/app.py' });
+    expect(box.tool).not.toBeNull();
+    await box.tool?.execute('id', { path: '~/proj/app.py' });
 
     expect(seen.length).toBeGreaterThan(0);
     for (const p of seen) expect(p.startsWith('~')).toBe(false);

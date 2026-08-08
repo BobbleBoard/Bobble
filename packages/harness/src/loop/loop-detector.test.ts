@@ -293,7 +293,7 @@ describe('a loop made entirely of prose', () => {
    * watched TOOL CALLS, and that loop made none — so the harness was blind to
    * the most visible failure a user can see.
    */
-  const det = () => createLoopDetector({ steerAfter: 3, abortAfter: 6 });
+  const det = () => createLoopDetector({ steerAfter: 3, abortAfter: 6, maxSteps: 200 });
   const LINE = "Actually, I'll just present the app.py.";
 
   it('steers once the same sentence keeps coming back', () => {
