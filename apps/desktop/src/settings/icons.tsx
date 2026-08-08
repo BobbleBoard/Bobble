@@ -11,7 +11,12 @@ import type { SVGProps } from 'react';
 
 export type LocalIconProps = SVGProps<SVGSVGElement> & { size?: number };
 
-function Svg({ size = 16, children, ...props }: LocalIconProps & { children: React.ReactNode }) {
+function Svg({
+  size = 16,
+  className,
+  children,
+  ...props
+}: LocalIconProps & { children: React.ReactNode }) {
   return (
     <svg
       width={size}
@@ -22,6 +27,15 @@ function Svg({ size = 16, children, ...props }: LocalIconProps & { children: Rea
       strokeWidth={1.5}
       strokeLinecap="round"
       strokeLinejoin="round"
+      /*
+       * `.pd-icon` — the class the docstring above PROMISED ("so they compose
+       * identically") and this wrapper did not carry. Without it these glyphs
+       * missed `--pd-icon-stroke` and never matched a `.pd-icon` sizing rule, so
+       * in the collapsed rail the Model-management icon sat at 16px among 18px
+       * neighbours and drew its outline at a different weight. Visible only when
+       * one of them stands beside the shared set, which is exactly where it was.
+       */
+      className={className === undefined ? 'pd-icon' : `pd-icon ${className}`}
       aria-hidden="true"
       {...props}
     >

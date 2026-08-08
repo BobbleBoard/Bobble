@@ -299,8 +299,27 @@
  * attributes, so this rule is what actually enlarges the glyph in step with its
  * (already-scaled) icon box. Fallback ,1 keeps the default a byte-identical 16px.
  */
-.pd-sidebar-row-icon .pd-icon,
-.pd-rail-btn-icon .pd-icon {
+.pd-sidebar-row-icon .pd-icon {
   width: calc(16px * var(--pd-sidebar-scale, 1));
   height: calc(16px * var(--pd-sidebar-scale, 1));
+}
+
+/*
+ * THE RAIL GLYPH IS SIZED HERE, NOT BY THE `size` PROP.
+ *
+ * This rule used to cover the rail too, pinning it to 16px — and because CSS
+ * beats an SVG's width/height presentation attributes, passing `size={18}` in
+ * SessionSidebar.tsx changed nothing at all. Silently. (Measured: five of six
+ * rail icons stayed 16x16 while the one that does not carry `.pd-icon` moved.)
+ * Anyone reaching for the prop again should find this comment first.
+ *
+ * The rail runs WITHOUT labels, so its glyphs carry the whole meaning of each
+ * control; at 16px in a 40px wash they read as small marks floating in space.
+ * 18px fills the --pd-icon-size box they are already centred in, so nothing
+ * moves — the glyph just gains the presence the expanded rows get from their
+ * text. Expanded rows stay 16px: there the label does that work.
+ */
+.pd-rail-btn-icon .pd-icon {
+  width: calc(18px * var(--pd-sidebar-scale, 1));
+  height: calc(18px * var(--pd-sidebar-scale, 1));
 }

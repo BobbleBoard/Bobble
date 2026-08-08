@@ -356,8 +356,33 @@ body {
   align-self: center;
   width: 24px;
   height: 1px;
-  margin: 4px 0;
+  /* The ONLY grouping signal in a rail with no labels, so it needs more room
+   * than the 4px that separates two buttons — at 4px it read as just another
+   * gap. 10px above/below makes "navigate" and "act" two visible clusters. */
+  margin: 10px 0;
   background: var(--pd-border-subtle, var(--pd-sidebar-border));
+}
+
+/*
+ * The profile avatar is the rail's odd one out: 28px of solid filled circle
+ * against 18px line glyphs, so it pulled the eye straight to the bottom of the
+ * rail and read as the loudest control there. Sized down to sit in the same
+ * visual weight class as the icons it queues with. The expanded footer keeps
+ * its 28px — there it sits beside a name and a chevron and carries that row.
+ */
+.pd-rail-btn .pd-sidebar-avatar {
+  width: calc(24px * var(--pd-sidebar-scale, 1));
+  height: calc(24px * var(--pd-sidebar-scale, 1));
+}
+
+/*
+ * A rail button has no label, so hover is the only thing that confirms the
+ * pointer is on the target — and a background-only wash on a 40px box is easy
+ * to miss at the edge of vision. The glyph lifts to full-strength text at the
+ * same time, which reads as a response rather than a shade.
+ */
+.pd-rail-btn:active {
+  background: var(--pd-bg-active);
 }
 
 @media (prefers-reduced-motion: reduce) {
