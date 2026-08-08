@@ -13,6 +13,7 @@
 import { type CanvasTab, useCanvasTabs } from '@pi-desktop/canvas';
 import type { ChatMsg, ContentBlock } from '@pi-desktop/engine';
 import { useEffect, useRef } from 'react';
+import { useCanvasStore } from '../../state/canvas-store';
 import { usePiStore } from '../../state/pi-slice';
 import { toolStepKind } from '../activity-mapping';
 import { isInteractiveCommand, mirrorCommandText, shortCommandTitle } from './agent-surfaces';
@@ -101,6 +102,20 @@ export function useBashTerminalCanvasRouting(): void {
           title: shortCommandTitle(ev.command),
           data,
         });
+        /*
+         * ...AND REVEAL THE PANEL. the user: "the canvas sidebar should just be
+         * opened itself on any of these tool calls, and it hasn't been for this
+         * terminal command."
+         *
+         * `upsertTab` already FOCUSES the new tab, so the intent was always that
+         * the user sees it — it was just being focused behind a closed drawer.
+         * file-tabs.ts records the identical fix for the media path: every other
+         * route that puts something in the canvas on the user's behalf opens it
+         * too, and this was the remaining exception. Only on CREATE, never on a
+         * text update, so a running command does not keep prising the panel back
+         * open while the user is reading something else.
+         */
+        useCanvasStore.getState().setCanvasOpen(true);
       } else if ((existing.data?.mirrorText as string | undefined) !== data.mirrorText) {
         controller.updateTab(existing.id, { data });
       }
