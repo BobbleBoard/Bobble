@@ -362,8 +362,14 @@ button.pd-chain-step-row:hover .pd-chain-step-chevron {
   line-height: var(--pd-leading-footnote);
 }
 
+/* NO pre-wrap here either. This wrapper sits AROUND the Markdown component,
+ * which renders its own paragraphs, lists and code — so forcing pre-wrap on the
+ * container turned every newline the model typed mid-sentence into a visible
+ * break, on top of the markdown structure. It is the rule responsible for the
+ * ragged thought traces the user flagged; the clamp/fade below is what this wrapper
+ * is actually for. */
 .pd-chain-thought-text {
-  white-space: pre-wrap;
+  min-width: 0;
 }
 
 /* the user UI#5: an in-chain thought renders through the shared Markdown component
@@ -471,7 +477,6 @@ button.pd-chain-step-row:hover .pd-chain-step-chevron {
   color: var(--pd-text-primary);
   font-weight: 600;
 }
-
 
 /* Elapsed time on a step that is still running — see RunningFor. Sits after the
  * command so the row reads "Running a command  python3 app.py  12s". Tabular

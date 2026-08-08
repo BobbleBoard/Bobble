@@ -32,9 +32,27 @@
   margin-bottom: 0;
 }
 
+/*
+ * SOFT NEWLINES COLLAPSE, the way markdown says they should.
+ *
+ * This carried `white-space: pre-wrap`, so every newline the model happened to
+ * type inside a paragraph became a visible line break. the user: "are you sure
+ * there's not any forced double spacing on any newline ... this doesn't look
+ * natural or like regular model output here, I've used all these quite a bit,
+ * they don't do this." He is right, and that rule is why: models wrap their
+ * prose at arbitrary points, and pre-wrap turned every one of those into a
+ * break — tight ragged lines inside a paragraph, then a 12px gap between
+ * paragraphs, a rhythm no other client produces.
+ *
+ * Markdown already has both real ways to break a line: two trailing spaces (or
+ * a backslash) for a hard break, and a blank line for a new paragraph. Both
+ * still work. Only the accidental breaks go away.
+ *
+ * Code keeps its own whitespace — `pre`/`code` set it themselves, and a fence is
+ * how deliberate line structure is expressed.
+ */
 .pd-prose p {
   margin: 0 0 12px;
-  white-space: pre-wrap;
 }
 
 .pd-prose :is(h1, h2, h3, h4, h5, h6) {
