@@ -328,6 +328,41 @@ export function neverExercised(
   );
 }
 
+/**
+ * OUTPUTS THAT ARE EMPTY.
+ *
+ * MEASURED, and it is the sharpest evidence in the whole cycle: a turn asked to
+ * fix a converter RAN the conversions, produced sample.md, sample.txt and
+ * sample.json — 0, 0 and 2 bytes — and reported success. One of the planted
+ * bugs was literally "csv→md writes an empty file". It generated the proof and
+ * never opened it.
+ *
+ * `neverExercised` cannot catch this: something DID run. The stronger property
+ * is whether anything looked at what came back, and an empty artifact is
+ * checkable without knowing the domain — a conversion, a render, a build or an
+ * export that yields nothing is wrong in every one of them.
+ *
+ * Only files this turn actually WROTE, so a repo full of legitimately empty
+ * placeholders is not dragged in, and only ones that are truly zero-length,
+ * which is never a deliberate result of producing something.
+ */
+export function emptyOutputs(
+  writtenFiles: readonly string[],
+  sizeOf: (p: string) => number | null,
+): string | null {
+  const empty = writtenFiles.filter((f) => sizeOf(f) === 0);
+  if (empty.length === 0) return null;
+  const names = empty.slice(0, 4).map((f) => f.split(/[\\/]/).pop() ?? f);
+  return (
+    `${names.join(', ')}${empty.length > 4 ? ` and ${empty.length - 4} more` : ''} ` +
+    `${empty.length === 1 ? 'is' : 'are'} EMPTY — zero bytes. Something produced ` +
+    `${empty.length === 1 ? 'it' : 'them'} and nothing opened ` +
+    `${empty.length === 1 ? 'it' : 'them'} afterwards. A file of the right name with no ` +
+    'content is the cheapest way for work to look finished. Open each one, confirm what is ' +
+    'actually inside, and fix whatever produced an empty result.'
+  );
+}
+
 export async function runVerifyPass(deps: VerifyPassDeps): Promise<VerifyPassResult> {
   const check = deps.detectCheck(deps.cwd) ?? syntaxCheckCommand(deps.touchedFiles ?? []);
   if (check === null) return { check: null, outcome: null };

@@ -4,6 +4,7 @@ import {
   type CheckOutcome,
   detectPackageManager,
   detectProjectCheck,
+  emptyOutputs,
   neverExercised,
   type ProjectProbe,
   runCheck,
@@ -273,5 +274,43 @@ describe('neverExercised — wrote code, never ran it', () => {
 
   it('says nothing when no files were written at all', () => {
     expect(neverExercised([], ['python3 whatever.py'])).toBeNull();
+  });
+});
+
+describe('emptyOutputs — the artifact nobody opened', () => {
+  /*
+   * MEASURED, and the sharpest evidence of the cycle: a turn asked to fix a
+   * converter RAN the conversions, produced sample.md / sample.txt / sample.json
+   * at 0, 0 and 2 bytes, and reported success. One of the planted bugs was
+   * literally "csv→md writes an empty file". It generated the proof and never
+   * opened it. `neverExercised` cannot catch this — something DID run.
+   */
+  const sizes: Record<string, number> = {
+    '/w/sample.md': 0,
+    '/w/sample.json': 2,
+    '/w/app.py': 800,
+  };
+  const sizeOf = (p: string) => sizes[p] ?? null;
+
+  it('names an output that came back empty', () => {
+    const out = emptyOutputs(['/w/sample.md', '/w/app.py'], sizeOf);
+    expect(out).not.toBeNull();
+    expect(out).toContain('sample.md');
+    expect(out).toContain('EMPTY');
+    // Must say what to do, not merely report.
+    expect(out).toContain('Open each one');
+  });
+
+  it('says nothing when every written file has content', () => {
+    expect(emptyOutputs(['/w/app.py', '/w/sample.json'], sizeOf)).toBeNull();
+  });
+
+  it('ignores files this turn did not write', () => {
+    // A repo full of legitimately empty placeholders must not be dragged in.
+    expect(emptyOutputs([], sizeOf)).toBeNull();
+  });
+
+  it('ignores a file it cannot stat', () => {
+    expect(emptyOutputs(['/w/gone.txt'], sizeOf)).toBeNull();
   });
 });

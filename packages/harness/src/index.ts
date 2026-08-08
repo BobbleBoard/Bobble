@@ -17,6 +17,7 @@
  * CLI pi users can consume the pieces directly.
  */
 
+import { statSync } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import type {
@@ -104,6 +105,7 @@ import { captureRegisteredTools } from './tools/tool-registry.js';
 import { registerUseTool } from './tools/use-tool.js';
 import {
   detectProjectCheck,
+  emptyOutputs,
   makeExecBashRunner,
   makeFsProbe,
   neverExercised,
@@ -785,7 +787,22 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
        * the turn genuinely wrote executable code and issued no command naming
        * any of it.
        */
-      const unexercised = neverExercised(runtime.touchedFiles, runtime.ranCommands);
+      /*
+       * Two ways a turn can look finished without being checked: nothing was
+       * run at all, or something ran and produced an artifact nobody opened.
+       * The second is the one that survives running the code — measured on a
+       * converter that generated sample.md at ZERO bytes, which was itself one
+       * of the bugs it had been asked to fix.
+       */
+      const unexercised =
+        neverExercised(runtime.touchedFiles, runtime.ranCommands) ??
+        emptyOutputs(runtime.touchedFiles, (fp) => {
+          try {
+            return statSync(fp).size;
+          } catch {
+            return null;
+          }
+        });
       if (unexercised !== null && runtime.verifyFixesRemaining > 0) {
         runtime.verifyFixesRemaining -= 1;
         runtime.verifyActive = true;
