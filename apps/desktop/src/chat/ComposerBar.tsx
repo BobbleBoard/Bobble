@@ -166,6 +166,16 @@ function ProjectRegion() {
   };
 
   const sandbox = usesSandbox(activePath, sessionCwd, sandboxFlag ?? projectMissing);
+  /** The working folder's own name, for when it has no row of its own yet. Not
+   * used in a sandbox: there is genuinely no project then, and "No project" is
+   * the honest answer. */
+  const workingFolderName = useMemo(() => {
+    if (sandbox) return null;
+    const dir = (activePath ?? '').replace(/\/+$/, '');
+    if (dir.length === 0) return null;
+    const base = dir.slice(dir.lastIndexOf('/') + 1);
+    return base.length > 0 ? base : null;
+  }, [activePath, sandbox]);
   const className = [
     'pd-project-picker--bar',
     sandbox && orgProjectName === null ? 'pd-project-picker--sandbox' : '',
@@ -204,7 +214,22 @@ function ProjectRegion() {
       /* "Sandbox" and "No project" were two labels for one state — a chat with
          no working folder, whose files go to its own private folder. the user: call
          it "No project". The distinction only ever mattered internally. */
-      placeholder={orgProjectName ?? 'No project'}
+      /* The chip must never name a different place from where the work lands.
+       *
+       * MEASURED: with pi rooted at ~/bobble-testbed/corp-godot — project:set
+       * returning that project, the store's activePath holding it — the chip
+       * read "No project". The LIST is derived from the chats that exist, so a
+       * folder with no chats in it yet has no row, nothing matches, and the
+       * label falls through to the placeholder. corp-headed-run refused to
+       * start over it, correctly: the guard is there because a run once went to
+       * the previous session's folder while the log claimed otherwise.
+       *
+       * The dropdown keeps the user's rule ("nothing should be in this dropdown if
+       * it isn't in the left sidebar") — this changes only the LABEL, which is
+       * a status readout of the working folder, not a list entry. A folder with
+       * no chats yet is exactly the case where a user most needs to be told
+       * where their first message is about to write. */
+      placeholder={orgProjectName ?? workingFolderName ?? 'No project'}
     />
   );
 }
