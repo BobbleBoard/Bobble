@@ -86,6 +86,11 @@ try {
   // correctly bounded, and blank.
   await page.waitForTimeout(4000);
 
+  // Dark FIRST, so every per-format capture below is dark-mode evidence rather
+  // than a light screenshot with a separate theme check bolted on the end.
+  await page.evaluate(() => window.__pi_theme?.()?.setMode?.('dark'));
+  await page.waitForTimeout(1500);
+
   const available = await page.evaluate(() => window.piDesktop.invoke('office:available', {}));
   check(available?.available === true, 'office seam reports available');
   if (available?.available !== true) throw new Error('seam unavailable — nothing else can pass');
@@ -146,12 +151,16 @@ try {
   }
 
   // ── theming: the editor must look like part of the app, not an embed ─────
+  const themeShots = {};
   for (const themeMode of ['dark', 'light']) {
-    await page.evaluate((m) => {
+    const applied = await page.evaluate((m) => {
       const st = window.__pi_theme?.();
-      if (st?.setMode) st.setMode(m);
+      if (!st?.setMode) return null;
+      st.setMode(m);
+      return window.__pi_theme().mode;
     }, themeMode);
-    await page.waitForTimeout(2500);
+    check(applied === themeMode, `theme ${themeMode}: app switched (got ${applied})`);
+    await page.waitForTimeout(3000);
     const tabId = await page.evaluate(() => window.__pi_canvas().getState().activeTabId);
     const shot = await page.evaluate(
       ({ tabId }) => window.piDesktop.invoke('office:capture', { tabId }),
@@ -160,7 +169,14 @@ try {
     const stats = imageStats(shot?.dataUrl);
     if (check(stats !== null, `theme ${themeMode}: captured`)) {
       writeFileSync(path.join(SHOTS, `theme-${themeMode}.png`), stats.buf);
+      themeShots[themeMode] = stats.buf;
     }
+  }
+  // The whole point. Capturing twice proves nothing if the editor ignored the
+  // theme both times — which is exactly how this passed before insertCSS was
+  // found to be losing the cascade to their author styles.
+  if (themeShots.dark && themeShots.light) {
+    check(!themeShots.dark.equals(themeShots.light), 'theme: the editor re-themed with the app');
   }
 
   // ── click around inside the editor (native view, so DOM tooling cannot) ──

@@ -93,6 +93,14 @@ const HIDE_AI_DOCK_CSS = `
      ribbon without leaving an empty ribbon group behind. */
   .ai-entry { display: none !important; }
   .ribbon-group:has(.ai-entry), .ribbon-tool-group:has(.ai-entry) { display: none !important; }
+
+  /* The COLLAPSED form of that group. At narrow widths the ribbon folds a group
+     into one dropdown button, and that button carries the "Genspark AI" label
+     but none of the .ai-entry classes — so the selectors above stop matching at
+     exactly the widths a canvas sidebar uses, and the wordmark floats back over
+     the document when opened. scripts/vendor-genoffice.sh stamps the marker,
+     because CSS cannot match text content. */
+  [data-rbgroup="pd-ai-suppressed"] { display: none !important; }
 `;
 
 let seam: OfficeSeam | null = null;

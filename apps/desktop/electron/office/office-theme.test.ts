@@ -15,10 +15,10 @@ const DARK = {
 describe('officeThemeCss', () => {
   it('remaps GenOffice chrome variables onto Bobble tokens', () => {
     const css = officeThemeCss(DARK, true);
-    expect(css).toContain('--chrome-bg: #262624');
-    expect(css).toContain('--surface: #30302e');
-    expect(css).toContain('--text: #faf9f5');
-    expect(css).toContain('--border: #4a4844');
+    expect(css).toContain('--chrome-bg: #262624 !important');
+    expect(css).toContain('--surface: #30302e !important');
+    expect(css).toContain('--text: #faf9f5 !important');
+    expect(css).toContain('--border: #4a4844 !important');
   });
 
   it('keeps the document PAGE white even in dark mode', () => {
@@ -27,11 +27,15 @@ describe('officeThemeCss', () => {
     // around it changes. If this ever flips, the editors will look wrong in a
     // way that is easy to mistake for a rendering bug.
     const css = officeThemeCss(DARK, true);
-    expect(css).toContain('--color-bg-page: #ffffff');
+    // BOTH names: docs uses --page-bg (falling back to --surface, which we
+    // darken), the others use --color-bg-page. Missing either turns a document
+    // page dark grey with near-black text.
+    expect(css).toContain('--page-bg: #ffffff !important');
+    expect(css).toContain('--color-bg-page: #ffffff !important');
   });
 
   it('themes the area AROUND the page, which is chrome', () => {
-    expect(officeThemeCss(DARK, true)).toContain('--canvas: #1f1e1d');
+    expect(officeThemeCss(DARK, true)).toContain('--canvas: #1f1e1d !important');
   });
 
   it('styles scrollbars in dark mode', () => {
@@ -43,6 +47,18 @@ describe('officeThemeCss', () => {
   it('adds no dark-only rules in light mode', () => {
     const css = officeThemeCss({ bgBase: '#faf9f5' }, false);
     expect(css).not.toContain('::-webkit-scrollbar');
+  });
+
+  it('marks every declaration !important', () => {
+    // insertCSS lands at the USER-stylesheet origin, which author styles beat.
+    // Without !important the whole file is inert: insertCSS returns a valid key
+    // and GenOffice's own :root wins. Measured, not theorised.
+    const css = officeThemeCss(DARK, true);
+    for (const line of css.split('\n')) {
+      if (line.trim().startsWith('--')) {
+        expect(line, `not !important: ${line}`).toContain('!important');
+      }
+    }
   });
 
   it('never emits an empty custom property when a token is missing', () => {
@@ -59,8 +75,44 @@ describe('officeThemeCss', () => {
     }
   });
 
+  it('maps every colour-bearing variable the renderers consume', () => {
+    // Derived by enumerating `var(--x)` across the five vendored renderers.
+    // Missing one does not error — that surface just keeps GenOffice's light
+    // default, which is how the formula-bar strip stayed white under a dark
+    // ribbon (--surface-subtle) and how hover states stayed pale (--accent,
+    // ~100 uses). A list is cheap; noticing a pale strip in a screenshot is not.
+    const REQUIRED = [
+      '--surface',
+      '--surface-subtle',
+      '--surface-hover',
+      '--chrome-bg',
+      '--canvas',
+      '--border',
+      '--border-strong',
+      '--text',
+      '--text-dim',
+      '--text-muted',
+      '--text-caption',
+      '--accent',
+      '--hover',
+      '--ribbon-hover',
+      '--active-bg',
+      '--color-text-primary',
+      '--color-text-secondary',
+      '--color-text-tertiary',
+      '--color-bg-subtle',
+      '--color-bg-page',
+      '--color-border-default',
+      '--page-bg',
+    ];
+    const css = officeThemeCss(DARK, true);
+    for (const v of REQUIRED) {
+      expect(css, `unmapped: ${v}`).toContain(`${v}:`);
+    }
+  });
+
   it('falls back to the light palette when nothing is supplied', () => {
     const css = officeThemeCss({}, false);
-    expect(css).toContain('--chrome-bg: #faf9f5');
+    expect(css).toContain('--chrome-bg: #faf9f5 !important');
   });
 });

@@ -56,6 +56,17 @@ find apps packages -type f \( -name '*.ts' -o -name '*.tsx' \) -print0 \
       -e "s/'app:get-language'/'${NS}:app:get-language'/g" \
       -e "s/'app:language-changed'/'${NS}:app:language-changed'/g"
 
+# Mark the Genspark-branded ribbon group so CSS can hide it in BOTH forms.
+# Necessary because the group COLLAPSES at narrow widths into a single button
+# whose label is "Genspark AI" but which carries none of the .ai-entry classes
+# the buttons have — so a selector-based rule silently stops matching exactly
+# when the canvas is narrow, and the wordmark floats back over the document.
+# CSS cannot match text content, hence a marker attribute rather than a
+# cleverer selector.
+echo "vendor-genoffice: marking the Genspark ribbon group for suppression"
+find apps -type f -name '*.tsx' -print0 \
+  | xargs -0 sed -i '' -e 's/<Group label="Genspark AI">/<Group label="Genspark AI" groupId="pd-ai-suppressed">/g'
+
 echo "vendor-genoffice: staging into vendor/genoffice"
 rm -rf "$DEST"
 mkdir -p "$DEST"
@@ -89,6 +100,10 @@ if [ -e "$DEST/ee" ]; then
 fi
 if grep -rq "ipcMain.handle('project:list'" "$DEST" 2>/dev/null; then
   echo "vendor-genoffice: FAIL — unprefixed project:list survived the rename" >&2
+  exit 1
+fi
+if grep -rq '<Group label="Genspark AI">' "$DEST" 2>/dev/null; then
+  echo "vendor-genoffice: FAIL — an unmarked Genspark ribbon group survived" >&2
   exit 1
 fi
 
