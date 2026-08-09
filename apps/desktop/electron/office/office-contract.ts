@@ -53,7 +53,10 @@ export type OfficeInvokeMap = {
   /** Whether the document has unsaved changes (close confirmation). */
   'office:dirty': { request: { tabId: string }; response: { dirty: boolean } };
   /** Screenshot the live editor — used by the automated acceptance checks. */
-  'office:capture': { request: { tabId: string }; response: { dataUrl: string | null } };
+  'office:capture': {
+    request: { tabId: string };
+    response: { dataUrl: string | null; error?: string | null };
+  };
   /** Is the vendored seam actually present in this build? */
   'office:available': { request: Record<string, never>; response: { available: boolean } };
 };

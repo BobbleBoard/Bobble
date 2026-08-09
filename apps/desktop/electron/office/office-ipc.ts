@@ -9,6 +9,7 @@ import { isTrustedIpcEvent } from '../trusted-senders';
 import type { OfficeBounds, OfficeKind } from './office-contract';
 import {
   captureView,
+  lastCaptureError,
   createOfficeView,
   destroyView,
   isDirty,
@@ -50,7 +51,8 @@ export function registerOfficeIpc(): void {
 
   handle('office:dirty', async (_owner, req) => ({ dirty: await isDirty(req.tabId as string) }));
 
-  handle('office:capture', async (_owner, req) => ({
-    dataUrl: await captureView(req.tabId as string),
-  }));
+  handle('office:capture', async (_owner, req) => {
+    const dataUrl = await captureView(req.tabId as string);
+    return { dataUrl, error: dataUrl === null ? lastCaptureError : null };
+  });
 }

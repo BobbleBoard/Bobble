@@ -58,9 +58,41 @@ interface OfficeSeam {
   createPdfView(openPath?: string | null): WebContentsView;
   createMarkdownView(openPath?: string | null): WebContentsView;
   setForcedWorkbookPath(path: string | undefined): void;
+  setUiLang(lang: string): void;
   teardownDocsRenderer(contents: WebContents): void;
   docsQueryDirty(view: WebContentsView): Promise<boolean>;
 }
+
+/**
+ * Chrome we hide inside every editor view.
+ *
+ * Their AI dock is Genspark-account-bound and Bobble's own chat is the chat, so
+ * the dock is dead weight that was taking roughly half the canvas width. Not
+ * registering its IPC (see vendor/genoffice/embed/index.ts) stops it FUNCTIONING
+ * but not DRAWING — the renderer still lays it out, which is why hiding it here
+ * is a second, separate step rather than a belt-and-braces duplicate.
+ *
+ * Done as injected CSS rather than a patch to their components so the vendored
+ * tree stays as close to upstream as possible — this is a fork we have to
+ * cherry-pick into, and every edited file is a future merge conflict.
+ *
+ * The trademark rule (Apache-2.0 §6 grants no trademark rights) is also served
+ * here: `.ai-panel` / `.copilot` carry the Genspark wordmark and logo.
+ */
+const HIDE_AI_DOCK_CSS = `
+  /* Hide the DOCK, not the panel inside it. .ai-dock is a flex item with
+     flex-shrink:0 and width:var(--ai-panel-width, 360px); hiding only its child
+     .ai-panel left 360px of dead space reserved and squeezed the document into
+     the remainder — which looked like a broken layout rather than a hidden
+     dock. Same for sheets' .copilot, which is its own flex item. */
+  .ai-dock, .copilot, .ai-panel, .ai-panel-resizer, .ai-rail { display: none !important; }
+
+  /* The ribbon's AI slot. Every editor marks these buttons .ai-entry, so hiding
+     the GROUP that contains one removes the Genspark wordmark and logo from the
+     ribbon without leaving an empty ribbon group behind. */
+  .ai-entry { display: none !important; }
+  .ribbon-group:has(.ai-entry), .ribbon-tool-group:has(.ai-entry) { display: none !important; }
+`;
 
 let seam: OfficeSeam | null = null;
 let seamTried = false;
@@ -96,6 +128,13 @@ function loadSeam(): OfficeSeam | null {
     // separately from us (scripts/build-genoffice.mjs) and must stay outside
     // our main bundle, or a fork rebuild would force a Bobble rebuild.
     const mod = requireCjs(bundle) as OfficeSeam;
+
+    // Before anything renders: upstream's i18n defaults to 'zh'.
+    try {
+      mod.setUiLang('en');
+    } catch {
+      /* older vendor build without the export — ribbons stay zh, nothing breaks */
+    }
 
     const docs = moduleOut(root, 'docs');
     const sheets = moduleOut(root, 'sheets');
@@ -221,6 +260,42 @@ export function createOfficeView(
     return { ok: false, error: String(err) };
   }
 
+  // Inject on EVERY load, not once: their editors navigate internally (new
+  // document, reload after save) and a one-shot injection silently stops
+  // applying the first time that happens.
+  const applyChrome = (): void => {
+    void view.webContents?.insertCSS(HIDE_AI_DOCK_CSS).catch(() => undefined);
+  };
+  view.webContents.on('dom-ready', applyChrome);
+  applyChrome();
+
+  /**
+   * Force the compositor to hand this view a display surface once it has
+   * loaded.
+   *
+   * MEASURED: the FIRST office view of a session never paints — capturePage()
+   * returns an empty image forever while the view reports visible:true with
+   * correct bounds. It is not format-specific; reordering the acceptance probe
+   * moved the failure from docx to xlsx, which is what proved it positional.
+   * The cause is that opening the first office tab is also what opens the canvas
+   * panel, so the view is attached and shown while the window has not yet
+   * allocated that region, and nothing later re-asserts it.
+   *
+   * A bare invalidate() is not enough — there is no surface to invalidate. The
+   * visibility toggle is what makes Electron allocate one.
+   */
+  view.webContents.once('did-finish-load', () => {
+    setTimeout(() => {
+      const entry = entries.get(tabId);
+      if (entry === undefined || !entry.visible) return;
+      const wc = entry.view.webContents;
+      if (!wc || wc.isDestroyed()) return;
+      entry.view.setVisible(false);
+      entry.view.setVisible(true);
+      wc.invalidate();
+    }, 120);
+  });
+
   view.setVisible(false);
   win.contentView.addChildView(view);
   entries.set(tabId, { view, owner, visible: false, kind, filePath });
@@ -270,17 +345,33 @@ export function destroyView(tabId: string): void {
   log.info('office view destroyed', { tabId });
 }
 
+/** Last capture failure reason, surfaced to probes — silence is not a diagnosis. */
+export let lastCaptureError: string | null = null;
+
 export async function captureView(tabId: string): Promise<string | null> {
   const entry = entries.get(tabId);
-  if (entry === undefined) return null;
+  if (entry === undefined) {
+    lastCaptureError = `no view for tab ${tabId}`;
+    return null;
+  }
   const wc = entry.view.webContents;
-  if (!wc || wc.isDestroyed()) return null;
+  if (!wc || wc.isDestroyed()) {
+    lastCaptureError = 'webContents gone';
+    return null;
+  }
+  lastCaptureError = `visible=${entry.visible} bounds=${JSON.stringify(entry.view.getBounds())}`;
   try {
     // capturePage forces a renderer frame even when occluded or on another
     // Space, unlike screencapture(1) — which this host denies anyway.
     const img = await wc.capturePage();
-    return img.isEmpty() ? null : img.toDataURL();
+    if (img.isEmpty()) {
+      lastCaptureError = `empty image; ${lastCaptureError}`;
+      return null;
+    }
+    lastCaptureError = null;
+    return img.toDataURL();
   } catch (err) {
+    lastCaptureError = `${String(err)}; ${lastCaptureError}`;
     log.warn('office capture failed', { tabId, err: String(err) });
     return null;
   }

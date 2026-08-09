@@ -287,6 +287,20 @@ export class NativeSurfaces {
             }
           })
           .catch(() => undefined);
+        // Re-measure across the panel's open animation.
+        //
+        // MEASURED: the FIRST office view of a session was landing at x=1440 in
+        // a 1440-wide window — entirely off-screen, so it never got a display
+        // surface and capturePage() returned an empty image forever. The slot's
+        // SIZE was already correct (440x825); only its position was stale.
+        //
+        // That is the ResizeObserver in useContentSlot doing exactly what it
+        // says: it fires on size changes, and the canvas panel sliding in from
+        // the right changes position only. Nothing ever corrected the rect.
+        // Opening the first office tab is what opens the panel, which is why
+        // only the first one was affected — and why the bug followed tab
+        // ORDER, not file format.
+        this.#renudgeOffice(tabId, el);
       } else this.#hideOffice(tabId);
       return;
     }
@@ -330,6 +344,30 @@ export class NativeSurfaces {
     if (kind === 'terminal' && rect !== null) this.#fitTerminal(tabId);
   }
 
+  /**
+   * Push fresh bounds a few times while the canvas panel finishes animating.
+   * Cheap, self-correcting, and it does not care how long the transition is —
+   * as opposed to listening for `transitionend`, which never fires if the panel
+   * was already open and would leave the view stranded in exactly the case this
+   * exists to fix.
+   */
+  #renudgeOffice(tabId: string, el: HTMLElement): void {
+    for (const delay of [80, 220, 420, 700]) {
+      setTimeout(() => {
+        if (!this.#offices.has(tabId) && delay > 80) return;
+        const rect = el.getBoundingClientRect();
+        if (rect.width === 0 || rect.height === 0) return;
+        const bounds = rectToBounds(rect);
+        this.#offices.set(tabId, { lastBounds: bounds });
+        void window.piDesktop.invoke('office:set-bounds', {
+          tabId,
+          bounds,
+          visible: this.#panelOpen,
+        });
+      }, delay);
+    }
+  }
+
   #hideOffice(tabId: string): void {
     const bounds = this.#offices.get(tabId)?.lastBounds ?? { x: 0, y: 0, width: 0, height: 0 };
     void window.piDesktop.invoke('office:set-bounds', { tabId, bounds, visible: false });
@@ -352,10 +390,19 @@ export class NativeSurfaces {
     const activeId = this.#controller.getState().activeTabId;
     if (activeId === null) return;
     const tab = this.#tab(activeId);
-    if (tab?.kind !== 'browser') return;
-    const entry = this.#browsers.get(tab.id);
+    // Office editors paint above the DOM exactly like browser views do, so a
+    // canvas menu opened over one is occluded unless it is lowered too.
+    const channel =
+      tab?.kind === 'browser'
+        ? 'browser:set-bounds'
+        : tab?.kind === 'office'
+          ? 'office:set-bounds'
+          : null;
+    if (channel === null) return;
+    if (tab === undefined) return;
+    const entry = (tab.kind === 'browser' ? this.#browsers : this.#offices).get(tab.id);
     if (entry === undefined) return;
-    void window.piDesktop.invoke('browser:set-bounds', {
+    void window.piDesktop.invoke(channel, {
       tabId: tab.id,
       bounds: entry.lastBounds,
       // Never raise the view while the whole panel is closed.
@@ -377,6 +424,14 @@ export class NativeSurfaces {
     const activeId = this.#controller.getState().activeTabId;
     for (const intent of browserBoundsForPanel(open, activeId, this.#browsers)) {
       void window.piDesktop.invoke('browser:set-bounds', intent);
+    }
+    // Office views need the SAME re-assert. Without it, an editor created while
+    // the panel was still closed — the very first office tab in a session, since
+    // opening it is what opens the panel — stays setVisible(false) forever. It
+    // loads, lays out and finishes painting; it is simply never shown, which
+    // looks identical to an editor that failed to render.
+    for (const intent of browserBoundsForPanel(open, activeId, this.#offices)) {
+      void window.piDesktop.invoke('office:set-bounds', intent);
     }
   }
 

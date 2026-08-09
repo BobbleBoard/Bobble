@@ -55,3 +55,11 @@ export {
   configureMarkdownRuntime,
   createMarkdownView,
 } from '../apps/markdown/src/main/markdown-main';
+
+/**
+ * Upstream defaults the UI language to Chinese (`let uiLang: Lang = 'zh'` in
+ * packages/i18n). Their shell overrides it from a persisted setting we do not
+ * ship, so without this every ribbon, menu and status bar renders in zh.
+ * Exported so the host can set it explicitly at load.
+ */
+export { setUiLang, getUiLang } from '../packages/i18n/src';
