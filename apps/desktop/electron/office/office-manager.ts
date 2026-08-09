@@ -109,6 +109,16 @@ const HIDE_AI_DOCK_CSS = `
      named it. The lesson is in the commit message: query the DOM before
      theorising about which container something lives in. */
   .stage-ai-bar, [class*="ai-bar"], .stage-ai-btn { display: none !important; }
+
+  /* The slide navigator eats roughly half of a narrow canvas, which is why a
+     deck opened in the sidebar was fitting to 20% — the stage had almost no
+     room left. the user: "this is absolutely tiny by the way in the UI by default,
+     that can't be acceptable." Below a tablet-ish width the rail is the first
+     thing to go; the tab bar and the status bar still say which slide you are
+     on, and it comes back the moment the canvas is widened. */
+  @media (max-width: 900px) {
+    .slide-list, .thumb-resizer { display: none !important; }
+  }
 `;
 
 let seam: OfficeSeam | null = null;
