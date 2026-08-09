@@ -32,10 +32,19 @@ export {
   docsQueryDirty,
 } from '../apps/docs/src/main/docs-main';
 
+/**
+ * Sheets is the odd one out: createSheetsView() takes options, NOT a path,
+ * because Univer mounts asynchronously and a path passed at construction time
+ * would race the renderer. setForcedWorkbookPath() queues the file and the
+ * renderer pulls it once it is ready — so both must be exported together or
+ * an xlsx tab opens as a blank workbook.
+ */
 export {
   configureSheetsRuntime,
   registerSheetsIpc,
   createSheetsView,
+  setForcedWorkbookPath,
+  setSheetsNewBlank,
 } from '../apps/sheets/src/main/sheets-main';
 
 export { configureSlidesRuntime, createSlidesView } from '../apps/slides/src/main/slides-main';

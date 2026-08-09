@@ -75,3 +75,39 @@ await build({
 });
 
 console.log('build-genoffice: seam bundled ->', join(OUT, 'index.cjs'));
+
+// ── the other half: each module's renderer + preload ─────────────────────────
+// Built with THEIR toolchain, unmodified. We only consume out/renderer and
+// out/preload — out/main is dead weight here, since our seam bundle replaces it.
+//
+// sheets is built with electron-vite directly rather than `npm run build`,
+// because its build script front-runs cargo and we build the sidecar separately
+// (it is the one module that needs Rust, and only for xlsx).
+const { execFileSync } = await import('node:child_process');
+const EVITE = join(VENDOR, 'node_modules/.bin/electron-vite');
+
+for (const mod of ['docs', 'sheets', 'slides', 'pdf', 'markdown']) {
+  const cwd = join(VENDOR, 'apps', mod);
+  process.stdout.write(`build-genoffice: renderer ${mod} ... `);
+  try {
+    execFileSync(EVITE, ['build'], { cwd, stdio: 'pipe' });
+    console.log('ok');
+  } catch (err) {
+    console.log('FAILED');
+    console.error(String(err.stdout ?? err));
+    process.exitCode = 1;
+  }
+}
+
+// A missing renderer is the failure mode that looks like success: the view is
+// created, the window is there, and it paints nothing. Assert it instead.
+const missing = ['docs', 'sheets', 'slides', 'pdf', 'markdown'].filter(
+  (m) =>
+    !existsSync(join(VENDOR, 'apps', m, 'out/renderer/index.html')) ||
+    !existsSync(join(VENDOR, 'apps', m, 'out/preload/index.js')),
+);
+if (missing.length) {
+  console.error(`build-genoffice: FAIL — no renderer/preload for: ${missing.join(', ')}`);
+  process.exit(1);
+}
+console.log('build-genoffice: all five renderers + preloads present');

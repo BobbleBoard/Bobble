@@ -17,6 +17,7 @@ import {
   type BrowserEventMap,
   type BrowserInvokeMap,
 } from './canvas/browser-contract';
+import { OFFICE_INVOKE_CHANNELS, type OfficeInvokeMap } from './office/office-contract';
 import {
   CONNECTORS_INVOKE_CHANNELS,
   type ConnectorsInvokeMap,
@@ -518,6 +519,7 @@ export type AppInvokeMap = CoreInvokeMap &
   DictationInvokeMap &
   BrowserInvokeMap &
   BrowserAgentInvokeMap &
+  OfficeInvokeMap &
   PtyInvokeMap &
   CorpInvokeMap &
   MacInvokeMap &
@@ -545,6 +547,7 @@ export const APP_INVOKE_CHANNELS = [
   ...DICTATION_INVOKE_CHANNELS,
   ...BROWSER_INVOKE_CHANNELS,
   ...BROWSER_AGENT_INVOKE_CHANNELS,
+  ...OFFICE_INVOKE_CHANNELS,
   ...PTY_INVOKE_CHANNELS,
   ...CORP_INVOKE_CHANNELS,
   ...MAC_INVOKE_CHANNELS,

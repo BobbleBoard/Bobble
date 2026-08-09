@@ -21,6 +21,7 @@ import { registerAfmIpc } from './afm/afm-main';
 import { resolveBundledPackageAsset } from './app-paths';
 import { registerBrowserAgentIpc } from './canvas/browser-agent';
 import { registerBrowserIpc } from './canvas/browser-manager';
+import { registerOfficeIpc } from './office/office-ipc';
 import {
   harnessAssetsPresent,
   registerCanvasIpc,
@@ -659,6 +660,7 @@ if (!hasSingleInstanceLock) {
     });
     // Native canvas surfaces (Phase 2b): per-tab WebContentsView + PTY managers.
     registerBrowserIpc();
+    registerOfficeIpc();
     registerPtyIpc();
     // Canvas: serve the pd-preview harness + wire the artifact pop-out window.
     if (!harnessAssetsPresent(HARNESS_DIR)) {
