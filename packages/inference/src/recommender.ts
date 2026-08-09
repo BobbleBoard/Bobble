@@ -370,24 +370,25 @@ function tierTable(tier: BudgetTier): Record<ModelTier, { modelId: string; quant
       return {
         fast: { modelId: 'qwen3.5-4b-mtp', quant: S },
         balanced: { modelId: 'gemma-4-e4b-it', quant: S },
+        // 8GB cannot hold the 9B balanced pick, so the step UP stays the 12B.
         intelligent: { modelId: 'gemma-4-12b-it', quant: 'Q4_K_M' },
       };
     case '16GB':
       return {
         fast: { modelId: 'qwen3.5-4b-mtp', quant: S },
-        balanced: { modelId: 'gemma-4-12b-it', quant: 'Q4_K_M' },
+        balanced: { modelId: 'qwen3.5-9b-mtp', quant: S },
         intelligent: { modelId: 'gemma-4-12b-it', quant: 'Q4_K_M' },
       };
     case '24GB':
       return {
         fast: { modelId: 'qwen3.5-4b-mtp', quant: S },
-        balanced: { modelId: 'gemma-4-12b-it', quant: 'Q4_K_M' },
+        balanced: { modelId: 'qwen3.5-9b-mtp', quant: S },
         intelligent: { modelId: 'qwen3.6-27b-mtp', quant: 'Q4_K_M' },
       };
     case '32GB':
       return {
         fast: { modelId: 'qwen3.5-4b-mtp', quant: S },
-        balanced: { modelId: 'gemma-4-12b-it', quant: 'Q4_K_M' },
+        balanced: { modelId: 'qwen3.5-9b-mtp', quant: S },
         intelligent: { modelId: 'qwen3.6-35b-a3b-mtp', quant: 'UD-Q4_K_M' },
       };
     default:

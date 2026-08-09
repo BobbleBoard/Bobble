@@ -556,7 +556,21 @@ const QWEN35_9B_MTP: CatalogModel = {
       sha256: 'a6d6c0ace780ea91d59a3ef5050a96b6ebbf416d94e6b23c191d1f492a6276f0',
     },
   ],
-  mmproj: { name: 'mmproj-F16.gguf', bytes: 0, quant: 'F16' },
+  /*
+   * REAL bytes + hash. This was `bytes: 0` with no sha256 — a placeholder that
+   * named a file nobody had checked existed. `bytes: 0` also means "unverified"
+   * elsewhere in this catalog, so the download had no size to report and no
+   * integrity check to run, and the model came up vision-blind while the app
+   * reported it as image-capable. Taken from the repo's paths-info, not guessed.
+   */
+  mmproj: {
+    name: 'mmproj-F16.gguf',
+    bytes: 918_165_984,
+    quant: 'F16',
+    sha256: '5a40d1f771686432172a4981018a0d30d03a5aaf5793a5badd5416573362a232',
+  },
+  // The MTP head ships INSIDE the weights here (hence the -MTP- repo), so there
+  // is no sibling draft file to fetch and `--model-draft` must not be passed.
   mtpEmbedded: true,
   spec: 'mtp',
   variants: [

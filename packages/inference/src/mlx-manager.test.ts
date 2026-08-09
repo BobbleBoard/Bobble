@@ -73,12 +73,25 @@ describe('createMlxSupervisor', () => {
     let spawnedArgs: string[] = [];
     const fetched: string[] = [];
 
+    /*
+     * A child that can actually EXIT. This used to be `on: () => {}` /
+     * `kill: () => {}` — a stub that could never fire 'exit', so dispose() only
+     * ever returned because it gave up waiting. That was invisible until
+     * dispose started waiting for the real exit (the model-switch fix), at
+     * which point this test timed out against a supervisor that was behaving
+     * correctly. A fake process that cannot die is not a useful fake.
+     */
+    const listeners = new Map<string, (...a: unknown[]) => void>();
     const fakeChild = {
       pid: 4242,
       stdout: { on: () => {} },
       stderr: { on: () => {} },
-      on: () => {},
-      kill: () => {},
+      on: (event: string, cb: (...a: unknown[]) => void) => {
+        listeners.set(event, cb);
+      },
+      kill: () => {
+        queueMicrotask(() => listeners.get('exit')?.(0, 'SIGTERM'));
+      },
     } as unknown as LlamaChildProcess;
 
     const sup = createMlxSupervisor({

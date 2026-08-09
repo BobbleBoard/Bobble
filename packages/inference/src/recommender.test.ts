@@ -165,13 +165,20 @@ describe('resolveTierModels (per-hardware 3-tier resolution)', () => {
     }
   });
 
-  it('the dev M5 Pro 24GB resolves fast=qwen3.5-4b, balanced=gemma-12b (vision), intelligent=qwen3.6-27b', () => {
+  it('the dev M5 Pro 24GB resolves fast=qwen3.5-4b, balanced=qwen3.5-9b (vision+MTP), intelligent=qwen3.6-27b', () => {
     const p = resolveTierModels({ totalRamGB: 24 });
     expect(p.fast.model.id).toBe('qwen3.5-4b-mtp');
     // Sub-12B fast pick: Q8_0 default (fits 24GB easily); >=12B tiers keep Q4_K_M.
     expect(p.fast.file.quant).toBe('Q8_0');
-    expect(p.balanced.model.id).toBe('gemma-4-12b-it');
+    expect(p.balanced.model.id).toBe('qwen3.5-9b-mtp');
+    // The two properties the swap had to PRESERVE, not just the id:
+    //   vision — the 9B ships an mmproj (a real one now; the catalog entry was a
+    //            bytes:0 placeholder, so this asserted nothing before);
+    //   MTP    — embedded in the weights, so a fast-text launch still gets
+    //            speculative decoding without a sibling draft file.
     expect(p.balanced.vision).toBe(true);
+    expect(p.balanced.spec).toBe('mtp');
+    expect(p.balanced.file.quant).toBe('Q8_0');
     expect(p.intelligent.model.id).toBe('qwen3.6-27b-mtp');
     expect(p.intelligent.file.quant).toBe('Q4_K_M');
     expect(p.intelligent.spec).toBe('mtp');
@@ -196,14 +203,22 @@ describe('resolveTierModels (per-hardware 3-tier resolution)', () => {
       balanced: 'gemma-4-e4b-it',
       intel: 'gemma-4-12b-it',
     });
+    // the user, 2026-08-09: Qwen3.5-9B replaces Gemma-4-12B as the standard
+    // balanced pick. 16GB keeps the 12B as its step UP; 8GB cannot hold the 9B
+    // at all, so its balanced stays the e4b.
     expect(id(16)).toEqual({
       fast: 'qwen3.5-4b-mtp',
-      balanced: 'gemma-4-12b-it',
+      balanced: 'qwen3.5-9b-mtp',
       intel: 'gemma-4-12b-it',
+    });
+    expect(id(24)).toEqual({
+      fast: 'qwen3.5-4b-mtp',
+      balanced: 'qwen3.5-9b-mtp',
+      intel: 'qwen3.6-27b-mtp',
     });
     expect(id(32)).toEqual({
       fast: 'qwen3.5-4b-mtp',
-      balanced: 'gemma-4-12b-it',
+      balanced: 'qwen3.5-9b-mtp',
       intel: 'qwen3.6-35b-a3b-mtp',
     });
     expect(id(64)).toEqual({
