@@ -1,5 +1,5 @@
 import { EventEmitter } from 'node:events';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   assembleServerArgs,
   findFreePort,
@@ -286,6 +286,101 @@ describe('LlamaServerSupervisor lifecycle', () => {
     const restart = events.find((e) => e.type === 'restart');
     expect(restart).toBeDefined();
     await sup.dispose();
+  });
+
+  /**
+   * A child that ignores BOTH signals. Real llama-server does not, but a process
+   * stuck in uninterruptible I/O while unmapping tens of gigabytes behaves
+   * exactly like this for a while, and that is the window the model-switch bug
+   * lived in.
+   */
+  class StubbornChild extends EventEmitter {
+    readonly stdout = new EventEmitter();
+    readonly stderr = new EventEmitter();
+    readonly killed: string[] = [];
+    constructor(readonly pid = 5150) {
+      super();
+    }
+    kill(signal: 'SIGTERM' | 'SIGKILL' = 'SIGTERM'): void {
+      this.killed.push(signal);
+      // Deliberately never emits 'exit'.
+    }
+  }
+
+  it('dispose does NOT resolve while the process is still alive after SIGKILL', async () => {
+    // THE MODEL-SWITCH BUG. dispose() used to resolve on the same tick as
+    // kill('SIGKILL'), so the switch path spawned the next (larger) model while
+    // the previous one still held its weights — both resident at once on a
+    // 24GB machine.
+    vi.useFakeTimers();
+    try {
+      let child: StubbornChild | undefined;
+      const sup = new LlamaServerSupervisor({
+        serverPath: '/bin/llama-server',
+        modelPath: '/m.gguf',
+        launchMode: 'fast-text',
+        port: 9107,
+        healthIntervalMs: 1,
+        killGraceMs: 3_000,
+        spawnFn: () => {
+          child = new StubbornChild();
+          return asChild(child as unknown as FakeChild);
+        },
+        fetchImpl: okFetch(() => true),
+      });
+      await sup.start();
+
+      let resolved = false;
+      const disposing = sup.dispose().then(() => {
+        resolved = true;
+      });
+
+      // SIGTERM ignored → escalate.
+      await vi.advanceTimersByTimeAsync(3_100);
+      expect(child?.killed).toEqual(['SIGTERM', 'SIGKILL']);
+
+      // THE ASSERTION. Old behaviour resolved here, with the process still up.
+      await Promise.resolve();
+      expect(resolved).toBe(false);
+
+      // Bounded, so a wedged process can never hang a switch forever.
+      await vi.advanceTimersByTimeAsync(5_100);
+      await disposing;
+      expect(resolved).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('dispose resolves as soon as a SIGKILLed child actually exits', async () => {
+    vi.useFakeTimers();
+    try {
+      let child: FakeChild | undefined;
+      const sup = new LlamaServerSupervisor({
+        serverPath: '/bin/llama-server',
+        modelPath: '/m.gguf',
+        launchMode: 'fast-text',
+        port: 9108,
+        healthIntervalMs: 1,
+        killGraceMs: 3_000,
+        // Lingers through SIGTERM, exits on SIGKILL — the normal stubborn case.
+        spawnFn: () => {
+          child = new FakeChild(4242, true);
+          return asChild(child);
+        },
+        fetchImpl: okFetch(() => true),
+      });
+      await sup.start();
+      const disposing = sup.dispose();
+      // Escalation fires, the child exits, and dispose returns without waiting
+      // out the confirmation backstop.
+      await vi.advanceTimersByTimeAsync(3_100);
+      await disposing;
+      expect(child?.killed).toEqual(['SIGTERM', 'SIGKILL']);
+      expect(sup.running).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('killImmediately synchronously SIGKILLs the child and is idempotent', async () => {

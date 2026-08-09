@@ -352,6 +352,14 @@ const sleep = (ms: number): Promise<void> =>
     t.unref?.();
   });
 
+/**
+ * How long to wait for a process to actually die after SIGKILL before giving up
+ * and saying so. SIGKILL is uncatchable, so this only ever elapses for a process
+ * stuck in uninterruptible I/O — but a model switch must not hang forever on
+ * one, so the wait is bounded rather than open-ended.
+ */
+const KILL_CONFIRM_MS = 5_000;
+
 export class LlamaServerSupervisor {
   private readonly listeners = new Set<SupervisorListener>();
   private readonly host: string;
@@ -594,7 +602,27 @@ export class LlamaServerSupervisor {
     throw new Error(`llama-server never became healthy on port ${this.port}`);
   }
 
-  /** Graceful shutdown: SIGTERM, then SIGKILL after killGraceMs. */
+  /**
+   * Graceful shutdown: SIGTERM, then SIGKILL after killGraceMs — and in EVERY
+   * case, resolve only once the process is actually gone.
+   *
+   * THE MODEL-SWITCH BUG. This used to call `resolve()` on the same tick as
+   * `kill('SIGKILL')`. A signal is a request, not a completion: the process is
+   * still alive, still holding its weights, at the moment dispose() returns.
+   * The switch path (supervisor-entry.ts startServerExclusive) does
+   *
+   *     await current.supervisor.dispose();   // ← returned early
+   *     …spawn the new server…
+   *
+   * so a switch from a small model to a large one could have BOTH resident at
+   * once. On a 24GB Mac that is the difference between a swap-free load and
+   * memory pressure that takes the machine — and the thing the OS reaps under
+   * pressure is not necessarily llama-server, which is how this showed up as
+   * "switching models kills pi".
+   *
+   * Awaiting the real exit costs nothing in the normal case (llama-server exits
+   * on SIGTERM in well under the grace) and removes the overlap entirely.
+   */
   async dispose(): Promise<void> {
     if (this.disposed) return;
     this.disposed = true;
@@ -611,7 +639,7 @@ export class LlamaServerSupervisor {
     }
     await new Promise<void>((resolve) => {
       let settled = false;
-      const done = (): void => {
+      const finish = (): void => {
         if (settled) return;
         settled = true;
         if (this.killTimer !== null) {
@@ -620,14 +648,35 @@ export class LlamaServerSupervisor {
         }
         resolve();
       };
-      child.on('exit', done);
+      // The ONLY thing that proves the memory is back.
+      child.on('exit', finish);
       this.killTimer = setTimeout(() => {
         try {
           child.kill('SIGKILL');
         } catch {
-          // already gone
+          // already gone — 'exit' has fired or is about to
+          finish();
+          return;
         }
-        done();
+        /*
+         * SIGKILL cannot be caught, so exit is imminent — but "imminent" is
+         * still not "now", and a large model's address space takes a moment to
+         * tear down. Wait for the real exit, with a bounded backstop so a
+         * process wedged in uninterruptible I/O can never hang a model switch
+         * forever. Reaching the backstop is worth saying out loud: it means the
+         * next server may start against memory that is not fully back.
+         */
+        const hardTimer = setTimeout(() => {
+          this.emit({
+            type: 'exit',
+            reason: 'failed',
+            detail:
+              'llama-server did not exit after SIGKILL; starting the next server ' +
+              'may overlap with memory it still holds',
+          });
+          finish();
+        }, KILL_CONFIRM_MS);
+        hardTimer.unref?.();
       }, this.killGraceMs);
       this.killTimer.unref?.();
     });
