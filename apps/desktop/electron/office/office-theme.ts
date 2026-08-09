@@ -138,6 +138,13 @@ input, select, textarea {
    a user sees as a light seam around dark chrome. Listed explicitly, and
    covered by rebrand-guard.test.ts so a rename fails loudly instead of
    quietly restoring a white strip. */
+/* The slide navigator RAIL is chrome; the thumbnails inside it are slide
+   content and stay white, exactly like the page. */
+.slide-list, .nav-rail, .thumbnails, .sidebar-thumbs {
+  background: ${t.bgInset} !important;
+  border-color: ${t.borderDefault} !important;
+}
+
 .status-bar, .statusbar, .sheet-tabs, .tab-strip, .bottom-bar, .toolbar, .ribbon {
   background: ${t.bgBase} !important;
   color: ${t.textSecondary} !important;

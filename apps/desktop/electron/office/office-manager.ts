@@ -20,6 +20,7 @@ import { join } from 'node:path';
 import { createLogger } from '@pi-desktop/shared';
 import { app, BrowserWindow, type WebContents, type WebContentsView } from 'electron';
 import type { OfficeBounds, OfficeKind } from './office-contract';
+import { officeChromeCss, officeChromeScript } from './office-chrome';
 import { officeThemeCss, type OfficeThemeTokens } from './office-theme';
 
 const log = createLogger('desktop:office');
@@ -101,6 +102,13 @@ const HIDE_AI_DOCK_CSS = `
      the document when opened. scripts/vendor-genoffice.sh stamps the marker,
      because CSS cannot match text content. */
   [data-rbgroup="pd-ai-suppressed"] { display: none !important; }
+
+  /* Slides renders the AI commands a SECOND time, in a floating bar over the
+     slide canvas that shares nothing with the ribbon — .stage-ai-bar inside
+     .stage-zoom-box. Three container guesses failed to hide it; one DOM query
+     named it. The lesson is in the commit message: query the DOM before
+     theorising about which container something lives in. */
+  .stage-ai-bar, [class*="ai-bar"], .stage-ai-btn { display: none !important; }
 `;
 
 let seam: OfficeSeam | null = null;
@@ -112,13 +120,36 @@ let seamTried = false;
  * light chrome — a flash of white inside a dark app, and only on some tabs.
  */
 let themeCss = officeThemeCss({}, false);
+let themeDark = false;
+
+/**
+ * Everything a freshly loaded view needs, in one place.
+ *
+ * The dark stamp has to land as an ATTRIBUTE, not just CSS: the spreadsheet grid
+ * is drawn by Univer rather than the DOM, so CSS cannot reach it, and the
+ * vendored sheets app reads `data-pd-dark` when it constructs Univer. The
+ * runtime call after that corrects an editor that was built before we stamped —
+ * creation-time alone leaves an already-open document stale the moment the app
+ * theme changes.
+ */
+function applyToView(wc: WebContents | undefined): void {
+  if (!wc || wc.isDestroyed()) return;
+  void wc.insertCSS(themeCss).catch(() => undefined);
+  void wc.insertCSS(officeChromeCss(themeDark)).catch(() => undefined);
+  void wc
+    .executeJavaScript(
+      `document.documentElement.dataset.pdDark = ${JSON.stringify(themeDark ? '1' : '0')};` +
+        `window.__pdSetUniverDark?.(${themeDark});` +
+        officeChromeScript(),
+      true,
+    )
+    .catch(() => undefined);
+}
 
 export function setOfficeTheme(tokens: OfficeThemeTokens, dark: boolean): void {
   themeCss = officeThemeCss(tokens, dark);
-  for (const entry of entries.values()) {
-    const wc = entry.view.webContents;
-    if (wc && !wc.isDestroyed()) void wc.insertCSS(themeCss).catch(() => undefined);
-  }
+  themeDark = dark;
+  for (const entry of entries.values()) applyToView(entry.view.webContents);
 }
 
 /** Root of the vendored build output — repo tree in dev, resources when packaged. */
@@ -289,9 +320,12 @@ export function createOfficeView(
   // applying the first time that happens.
   const applyChrome = (): void => {
     void view.webContents?.insertCSS(HIDE_AI_DOCK_CSS).catch(() => undefined);
-    void view.webContents?.insertCSS(themeCss).catch(() => undefined);
+    applyToView(view.webContents);
   };
   view.webContents.on('dom-ready', applyChrome);
+  // Again after load: Univer is constructed during the app's mount, which is
+  // after dom-ready, so the runtime setDarkMode hook does not exist yet then.
+  view.webContents.on('did-finish-load', applyChrome);
   applyChrome();
 
   /**

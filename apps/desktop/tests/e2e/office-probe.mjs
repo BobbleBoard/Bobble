@@ -179,6 +179,34 @@ try {
     check(!themeShots.dark.equals(themeShots.light), 'theme: the editor re-themed with the app');
   }
 
+  // ── toolbar starts collapsed, and the button reveals it ──────────────────
+  {
+    const tabId = await page.evaluate(() => window.__pi_canvas().getState().activeTabId);
+    const collapsed = await page.evaluate(
+      ({ tabId }) => window.piDesktop.invoke('office:capture', { tabId }),
+      { tabId },
+    );
+    const a = imageStats(collapsed?.dataUrl);
+    if (check(a !== null, 'toolbar: captured collapsed')) {
+      writeFileSync(path.join(SHOTS, 'toolbar-collapsed.png'), a.buf);
+    }
+    // The button is at top-left, roughly 8,6 + half its size in CSS px.
+    await page.evaluate(
+      ({ tabId }) => window.piDesktop.invoke('office:click', { tabId, x: 45, y: 16 }),
+      { tabId },
+    );
+    await page.waitForTimeout(1500);
+    const shown = await page.evaluate(
+      ({ tabId }) => window.piDesktop.invoke('office:capture', { tabId }),
+      { tabId },
+    );
+    const b = imageStats(shown?.dataUrl);
+    if (check(b !== null, 'toolbar: captured after clicking Show toolbar')) {
+      writeFileSync(path.join(SHOTS, 'toolbar-shown.png'), b.buf);
+      check(!a.buf.equals(b.buf), 'toolbar: the button revealed the ribbon');
+    }
+  }
+
   // ── click around inside the editor (native view, so DOM tooling cannot) ──
   const activeId = await page.evaluate(() => window.__pi_canvas().getState().activeTabId);
   const before = await page.evaluate(

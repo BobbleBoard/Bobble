@@ -96,6 +96,7 @@ import { UniverSheetsTablePreset } from '@univerjs/preset-sheets-table'
 import UniverPresetSheetsTableEnUS from '@univerjs/preset-sheets-table/locales/en-US'
 import '@univerjs/preset-sheets-table/lib/index.css'
 import { greenTheme } from '@univerjs/themes'
+import { ThemeService } from '@univerjs/core'
 import { createUniver } from './create-univer'
 
 import {
@@ -1089,6 +1090,11 @@ export function App(): React.JSX.Element {
     const runtime = createUniver({
       // green selection/highlight instead of Univer's default blue
       theme: greenTheme,
+      // BOBBLE PATCH: the grid is rendered by Univer, not the DOM, so the host's
+      // injected CSS cannot reach it — without this the spreadsheet stayed a
+      // white rectangle inside dark chrome. The host stamps data-pd-dark on
+      // <html> before this runs; see office-manager.ts.
+      darkMode: document.documentElement.dataset.pdDark === '1',
       locale: LocaleType.EN_US,
       locales: {
         [LocaleType.EN_US]: mergeLocales(
@@ -1172,6 +1178,21 @@ export function App(): React.JSX.Element {
     // should remain text, so clear the view type before the built-in marker
     // interceptor (priority 10). Short numeric text ("007", "20%") keeps its
     // warning.
+    // BOBBLE PATCH: let the host re-theme the grid without reopening the
+    // document. Creation-time darkMode alone would leave an already-open
+    // spreadsheet stale the moment the user flips the app theme.
+    ;(window as unknown as { __pdSetUniverDark?: (v: boolean) => void }).__pdSetUniverDark = (
+      v: boolean,
+    ) => {
+      try {
+        const injector = (runtime.univer as unknown as { __getInjector(): { get(t: unknown): unknown } }).__getInjector()
+        const svc = injector.get(ThemeService) as { setDarkMode(v: boolean): void }
+        svc.setDarkMode(v)
+      } catch {
+        /* Univer internals moved — the CSS-themed chrome still follows the app */
+      }
+    }
+
     const dateTextDisposable = runtime.univer
       .__getInjector()
       .get(SheetInterceptorService)
