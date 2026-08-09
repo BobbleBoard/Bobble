@@ -24,6 +24,8 @@ import { FitAddon } from '@xterm/addon-fit';
 import { type ITheme, Terminal } from '@xterm/xterm';
 import { useCallback, useEffect, useRef } from 'react';
 import type { BrowserBounds } from '../../../electron/canvas/browser-contract';
+import { officeKindForExt } from '../../../electron/office/office-contract';
+import { setOfficeEditorsAvailable } from './file-preview';
 import { usePiStore } from '../../state/pi-slice';
 import { browserBoundsForPanel, rectToBounds } from './browser-bounds';
 import { fileArtifactFromText, openFileInCanvas } from './file-tabs';
@@ -118,6 +120,12 @@ export class NativeSurfaces {
   readonly handlers: CanvasTabsHandlers;
   readonly #controller: CanvasController;
   readonly #browsers = new Map<string, BrowserEntry>();
+  /**
+   * Office editor views, keyed like browsers. Same overlay lifecycle: created on
+   * mount, positioned from the reported rect, HIDDEN on tab switch, destroyed
+   * only when the tab leaves the controller.
+   */
+  readonly #offices = new Map<string, BrowserEntry>();
   readonly #terminals = new Map<string, TerminalEntry>();
   /** Session cwd (project dir), kept fresh by the hook, for the file-tree
    * breadcrumb when the user opens a file from the tree panel. */
@@ -262,6 +270,26 @@ export class NativeSurfaces {
       } else this.#hideBrowser(tabId);
       return;
     }
+    if (kind === 'office') {
+      if (el !== null) {
+        const tab = this.#tab(tabId);
+        const filePath = tab?.filePath;
+        if (filePath === undefined || filePath.length === 0) return;
+        const officeKind = officeKindForExt(filePath.split('.').pop() ?? '');
+        if (officeKind === null) return;
+        void window.piDesktop
+          .invoke('office:create', { tabId, kind: officeKind, filePath })
+          .then((res) => {
+            if (!res.ok) {
+              // Surfacing beats silence: an editor that fails to open otherwise
+              // shows an empty rectangle indistinguishable from a slow load.
+              this.#controller.updateTab(tabId, { title: `${tab?.title ?? 'Document'} (failed)` });
+            }
+          })
+          .catch(() => undefined);
+      } else this.#hideOffice(tabId);
+      return;
+    }
     if (kind === 'terminal') {
       if (el !== null) this.#mountTerminal(tabId, el);
       else this.#detachTerminal(tabId);
@@ -285,7 +313,26 @@ export class NativeSurfaces {
       });
       return;
     }
+    if (kind === 'office') {
+      if (rect === null) {
+        this.#hideOffice(tabId);
+        return;
+      }
+      const bounds = rectToBounds(rect);
+      this.#offices.set(tabId, { lastBounds: bounds });
+      void window.piDesktop.invoke('office:set-bounds', {
+        tabId,
+        bounds,
+        visible: this.#panelOpen,
+      });
+      return;
+    }
     if (kind === 'terminal' && rect !== null) this.#fitTerminal(tabId);
+  }
+
+  #hideOffice(tabId: string): void {
+    const bounds = this.#offices.get(tabId)?.lastBounds ?? { x: 0, y: 0, width: 0, height: 0 };
+    void window.piDesktop.invoke('office:set-bounds', { tabId, bounds, visible: false });
   }
 
   // ── browser ──────────────────────────────────────────────────────────────
@@ -517,6 +564,12 @@ export class NativeSurfaces {
         void window.piDesktop.invoke('browser:destroy', { tabId });
       }
     }
+    for (const tabId of [...this.#offices.keys()]) {
+      if (!live.has(tabId)) {
+        this.#offices.delete(tabId);
+        void window.piDesktop.invoke('office:destroy', { tabId });
+      }
+    }
     for (const [tabId, entry] of [...this.#terminals]) {
       if (!live.has(tabId)) {
         this.#terminals.delete(tabId);
@@ -534,6 +587,8 @@ export class NativeSurfaces {
     for (const [tabId] of this.#browsers)
       void window.piDesktop.invoke('browser:destroy', { tabId });
     this.#browsers.clear();
+    for (const [tabId] of this.#offices) void window.piDesktop.invoke('office:destroy', { tabId });
+    this.#offices.clear();
     for (const [tabId, entry] of this.#terminals) {
       entry.onDataDispose?.();
       entry.term.dispose();
@@ -569,6 +624,23 @@ export function useNativeSurfaces(controller: CanvasController): NativeSurfacesA
   // Keep the session cwd fresh (the file-tree "Open from tree" breadcrumb).
   const cwd = usePiStore((s) => s.session?.cwd ?? undefined);
   manager.setCwd(cwd);
+
+  // Ask ONCE whether this build shipped the vendored office editors, and let
+  // the extension routing know. Until this resolves, docx/pptx/pdf keep opening
+  // as the read-only previews — the honest default, since a build without the
+  // fork genuinely has no editor.
+  useEffect(() => {
+    let cancelled = false;
+    void window.piDesktop
+      .invoke('office:available', {})
+      .then((res) => {
+        if (!cancelled) setOfficeEditorsAvailable(res.available === true);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     const unsubController = controller.subscribe(() => manager.syncTabs());

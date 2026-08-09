@@ -25,6 +25,7 @@ import type { ArtifactContent } from '../model.ts';
 import { defaultSurfaceRegistry, type SurfaceRegistry } from '../registry.ts';
 import { SituationRoomHost } from '../situation/situation-surface.tsx';
 import { BrowserSurface } from '../surfaces/browser-surface.tsx';
+import { OfficeSurface } from '../surfaces/office-surface.tsx';
 import { CodeSurface, rawSourceContent } from '../surfaces/code-surface.tsx';
 import { FileSurface } from '../surfaces/file-surface.tsx';
 import { MediaPreviewSurface } from '../surfaces/media-preview-surface.tsx';
@@ -651,6 +652,15 @@ function DefaultSurface({
           driving={tab.driving}
           onMount={(el) => handlers?.onSurfaceMount?.(id, 'browser', el)}
           onRectChange={(rect) => handlers?.onSurfaceRectChange?.(id, 'browser', rect)}
+        />
+      );
+    case 'office':
+      return (
+        <OfficeSurface
+          filePath={tab.filePath}
+          label={tab.title}
+          onMount={(el) => handlers?.onSurfaceMount?.(id, 'office', el)}
+          onRectChange={(rect) => handlers?.onSurfaceRectChange?.(id, 'office', rect)}
         />
       );
     case 'terminal':

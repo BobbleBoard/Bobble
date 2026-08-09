@@ -31,6 +31,31 @@ const VIDEO_EXT = new Set(['mp4', 'webm', 'mov', 'm4v', 'ogv', 'mkv']);
 const AUDIO_EXT = new Set(['mp3', 'wav', 'm4a', 'aac', 'flac', 'ogg', 'oga', 'opus']);
 const MODEL_EXT = new Set(['glb', 'gltf', 'obj', 'stl', 'ply']);
 
+/**
+ * Extensions the LIVE office editors handle. When the vendored GenOffice tree
+ * is built these open as an editable `office` tab; otherwise they fall back to
+ * the read-only previews below (mammoth for docx/pptx, the pdf surface for
+ * pdf) and xlsx falls through to the text/code surface as it always did.
+ */
+const OFFICE_EXT = new Set(['docx', 'pptx', 'xlsx', 'xlsm', 'pdf']);
+
+/**
+ * Whether the vendored office editors are available in this build. Set once at
+ * startup from `office:available`. It is a module flag rather than a parameter
+ * so the routing stays a pure function of the extension for every existing
+ * caller and test — the only thing that varies is whether one build shipped the
+ * fork.
+ */
+let officeEditorsAvailable = false;
+
+export function setOfficeEditorsAvailable(available: boolean): void {
+  officeEditorsAvailable = available;
+}
+
+export function officeEditorsReady(): boolean {
+  return officeEditorsAvailable;
+}
+
 /** A binary file's preview tab kind + media-type hint, or null when the file is
  * not a previewable modality (→ falls back to the text/code file surface). The
  * `ext` is the lower-cased extension with no leading dot. */
@@ -38,8 +63,12 @@ export function previewKindForExt(ext: string): { kind: CanvasTabKind; mediaType
   if (IMAGE_EXT.has(ext)) return { kind: 'image', mediaType: ext.toUpperCase() };
   if (VIDEO_EXT.has(ext)) return { kind: 'video', mediaType: ext.toUpperCase() };
   if (AUDIO_EXT.has(ext)) return { kind: 'audio', mediaType: ext.toUpperCase() };
-  if (ext === 'pdf') return { kind: 'pdf', mediaType: 'PDF' };
   if (MODEL_EXT.has(ext)) return { kind: 'model', mediaType: ext.toUpperCase() };
+  // Live editors win over the read-only previews when the fork is built.
+  if (officeEditorsAvailable && OFFICE_EXT.has(ext)) {
+    return { kind: 'office', mediaType: ext.toUpperCase() };
+  }
+  if (ext === 'pdf') return { kind: 'pdf', mediaType: 'PDF' };
   if (ext === 'docx') return { kind: 'doc', mediaType: 'DOCX' };
   if (ext === 'pptx') return { kind: 'doc', mediaType: 'PPTX' };
   return null;

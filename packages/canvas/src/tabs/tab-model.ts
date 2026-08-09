@@ -13,6 +13,12 @@ import type { NodeTiming } from '../situation/situation-model.ts';
  */
 export type CanvasTabKind =
   | 'browser'
+  // A LIVE office editor (docx / xlsx / pptx / pdf) — a native WebContentsView
+  // overlay backed by the vendored GenOffice editors, hosted exactly like a
+  // `browser` tab. Distinct from `doc`/`pdf`, which are the read-only
+  // artifact-backed previews that remain the fallback when the vendored tree
+  // has not been built.
+  | 'office'
   | 'file'
   | 'filetree'
   | 'terminal'

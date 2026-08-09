@@ -43,6 +43,9 @@ export interface CanvasTabKindMeta {
 
 export const CANVAS_TAB_KINDS: Record<CanvasTabKind, CanvasTabKindMeta> = {
   browser: { kind: 'browser', label: 'New tab', icon: IconGlobe, live: true, opensInCanvas: true },
+  // Live office editor (WebContentsView overlay). `live` because the app mounts
+  // native content into the slot rather than rendering an artifact's text.
+  office: { kind: 'office', label: 'Document', icon: IconDoc, live: true, opensInCanvas: true },
   file: { kind: 'file', label: 'File', icon: IconFile, live: false, opensInCanvas: true },
   // Full-canvas project file tree (the `+ › Files` surface). App-fed like a live
   // surface (the tree comes from the app), rendered directly (no artifact).
