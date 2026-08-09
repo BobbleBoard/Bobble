@@ -95,6 +95,66 @@ describe('detectProjectCheck', () => {
   });
 });
 
+describe('godot project check', () => {
+  it('a project.godot with no other check infra resolves to the engine load check', () => {
+    const c = detectProjectCheck(probe({ 'project.godot': '[application]\nconfig/name="x"' }));
+    expect(c?.kind).toBe('build');
+    expect(c?.command).toContain('godot --headless --quit');
+    // stderr must be folded in: Godot reports parse errors there and exits 0.
+    expect(c?.command).toContain('2>&1');
+  });
+
+  it('a real project check still wins over it', () => {
+    const c = detectProjectCheck(
+      probe({ 'project.godot': '', 'package.json': '{"scripts":{"test":"vitest"}}' }),
+    );
+    expect(c?.command).toBe('npm run test');
+  });
+
+  it('THE RUN THAT MOTIVATED THIS: exit 0 with a parse error on stderr is a FAIL', async () => {
+    // Verbatim from the corp run's own .scratch/godot_output.log. Godot exits 0
+    // here, so an exit-code-only verdict called an unloadable project fine and
+    // the contract was discharged while project.godot was still corrupt.
+    const godotOutput = [
+      "ERROR: Error parsing '/w/project.godot' at line 0: Unterminated string File might be corrupted.",
+      '   at: _load_settings_text (core/config/project_settings.cpp:978)',
+      "ERROR: Couldn't load file '/w/project.godot', error code 43.",
+      'Godot Engine v4.7.1.stable.official.a13da4feb - https://godotengine.org',
+    ].join('\n');
+    const c = detectProjectCheck(probe({ 'project.godot': 'broken' }));
+    const run: VerifyBashRunner = vi.fn(async () => ({
+      exitCode: 0,
+      stdout: godotOutput,
+      stderr: '',
+    }));
+    const r = await runCheck(run, c!, { cwd: '/w' });
+    expect(r.status).toBe('fail');
+    expect(r.exitCode).toBe(0);
+  });
+
+  it('a clean load still passes', async () => {
+    const c = detectProjectCheck(probe({ 'project.godot': 'ok' }));
+    const run: VerifyBashRunner = vi.fn(async () => ({
+      exitCode: 0,
+      stdout: 'Godot Engine v4.7.1.stable.official - https://godotengine.org',
+      stderr: '',
+    }));
+    expect((await runCheck(run, c!, { cwd: '/w' })).status).toBe('pass');
+  });
+
+  it('a hang is inconclusive, never a pass', async () => {
+    // Measured: a corrupt project.godot wedged `--quit` past 180s.
+    const c = detectProjectCheck(probe({ 'project.godot': 'broken' }));
+    const run: VerifyBashRunner = vi.fn(async () => ({
+      exitCode: null,
+      stdout: '',
+      stderr: '',
+      timedOut: true,
+    }));
+    expect((await runCheck(run, c!, { cwd: '/w' })).status).toBe('inconclusive');
+  });
+});
+
 describe('syntaxCheckCommand', () => {
   it('py_compiles touched Python files (quoted)', () => {
     const c = syntaxCheckCommand(['a.py', "weird name's.py", 'notes.txt']);

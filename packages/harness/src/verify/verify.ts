@@ -27,6 +27,16 @@ export interface ProjectCheck {
   readonly kind: 'test' | 'typecheck' | 'lint' | 'build' | 'syntax';
   /** Short human label for telemetry / notifications. */
   readonly label: string;
+  /**
+   * Treat a ZERO exit as a failure when the output matches this.
+   *
+   * Exit codes are the right default and are not universal: Godot prints
+   * `ERROR: Error parsing 'project.godot' … File might be corrupted` and still
+   * exits 0, so an exit-code-only verdict calls an unloadable project fine —
+   * the precise trap this whole verify pass exists to close. A check that knows
+   * its tool lies about its exit status says so here.
+   */
+  readonly failIfOutputMatches?: RegExp;
 }
 
 /** Outcome of running one check. */
@@ -162,8 +172,48 @@ export function detectProjectCheck(probe: ProjectProbe): ProjectCheck | null {
       : null) ??
     (pythonPytestConfigured(probe)
       ? { command: 'python3 -m pytest -q', kind: 'test', label: 'pytest' }
-      : null)
+      : null) ??
+    godotCheck(probe)
   );
+}
+
+/**
+ * A Godot project's own check: does the engine load it?
+ *
+ * MEASURED, from a corp run that built a Godot sample: no package.json, no
+ * Makefile, no Cargo.toml — so nothing here matched, no check ran, and the only
+ * "verification" in the record was the engineer's own shell line:
+ *
+ *   godot --headless --quit --path . > out.txt 2>&1 && grep -i error out.txt \
+ *     || echo "No errors found in log."
+ *
+ * That parses as `(A && B) || C`, so it prints "No errors found in log." when
+ * the check passes, when grep matches nothing, AND when godot itself fails or is
+ * killed. Success and failure are the same string. The contract was discharged
+ * on it while project.godot was still unparseable.
+ *
+ * Running it here instead means the OUTCOME is an exit code the harness read,
+ * not a sentence an agent wrote about a command it chose.
+ *
+ * `2>&1` matters and is not decoration: Godot writes parse errors to stderr and
+ * can still exit 0, so an exit code alone would call a broken project fine.
+ */
+function godotCheck(probe: ProjectProbe): ProjectCheck | null {
+  if (!probe.exists('project.godot')) return null;
+  return {
+    // --quit exits after the first frame. It can still WEDGE on a malformed
+    // project rather than erroring out — measured: a corrupt project.godot hung
+    // past 180s — which is exactly why runCheck's timeout reports `inconclusive`
+    // rather than letting a hang read as a pass.
+    command: 'godot --headless --quit --path . 2>&1',
+    kind: 'build',
+    label: 'godot --headless --quit',
+    // The two Godot emits for an unloadable project, both on stderr, both with
+    // exit 0. Taken verbatim from the run's own log:
+    //   ERROR: Error parsing '…/project.godot' at line 0: Unterminated string
+    //   ERROR: Couldn't load file '…/project.godot', error code 43.
+    failIfOutputMatches: /^\s*(ERROR|SCRIPT ERROR):/m,
+  };
 }
 
 /** Single-quote a path for `sh -c` (escapes embedded quotes). */
@@ -249,10 +299,17 @@ export async function runCheck(
   }
   const timedOut = res.timedOut === true;
   const output = truncateTail(`${res.stdout ?? ''}\n${res.stderr ?? ''}`.trim(), maxOutputChars);
+  // A zero exit is not proof for every tool. When a check declares the shape of
+  // its own lie, an otherwise-passing run that matches it is a FAIL — checked
+  // against the combined stdout+stderr, because the tools that do this are
+  // exactly the ones that report on stderr while exiting 0.
+  const lies = check.failIfOutputMatches !== undefined && check.failIfOutputMatches.test(output);
   const status: CheckOutcome['status'] = timedOut
     ? 'inconclusive'
     : res.exitCode === 0
-      ? 'pass'
+      ? lies
+        ? 'fail'
+        : 'pass'
       : 'fail';
   return {
     status,
