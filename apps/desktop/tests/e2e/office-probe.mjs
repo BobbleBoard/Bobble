@@ -145,21 +145,82 @@ try {
     }
   }
 
-  // ── canvas resize: the editor must track the slot at every width ──────────
-  for (const width of [1500, 1100, 820]) {
-    await page.setViewportSize({ width, height: 900 });
-    await page.waitForTimeout(1500);
-    const tabId = await page.evaluate(() => window.__pi_canvas().getState().activeTabId);
-    const shot = await page.evaluate(
-      ({ tabId }) => window.piDesktop.invoke('office:capture', { tabId }),
-      { tabId },
+  // ── click around inside the editor (native view, so DOM tooling cannot) ──
+  const activeId = await page.evaluate(() => window.__pi_canvas().getState().activeTabId);
+  const before = await page.evaluate(
+    ({ tabId }) => window.piDesktop.invoke('office:capture', { tabId }),
+    { tabId: activeId },
+  );
+  // Ribbon tabs sit along the top strip; these land on different ones.
+  for (const [x, y] of [
+    [200, 60],
+    [120, 300],
+    [260, 300],
+  ]) {
+    await page.evaluate(
+      ({ tabId, x, y }) => window.piDesktop.invoke('office:click', { tabId, x, y }),
+      { tabId: activeId, x, y },
     );
-    const stats = imageStats(shot?.dataUrl);
-    if (check(stats !== null, `resize ${width}: captured`)) {
-      writeFileSync(path.join(SHOTS, `resize-${width}.png`), stats.buf);
-      check(stats.bytes > 6000, `resize ${width}: still painting (${stats.width}x${stats.height})`);
-    }
+    await page.waitForTimeout(700);
   }
+  const after = await page.evaluate(
+    ({ tabId }) => window.piDesktop.invoke('office:capture', { tabId }),
+    { tabId: activeId },
+  );
+  const a = imageStats(before?.dataUrl);
+  const b = imageStats(after?.dataUrl);
+  if (check(a !== null && b !== null, 'click: captured before and after')) {
+    writeFileSync(path.join(SHOTS, 'click-before.png'), a.buf);
+    writeFileSync(path.join(SHOTS, 'click-after.png'), b.buf);
+    // If clicking the ribbon changed nothing, the view is not receiving input —
+    // which a screenshot alone would never reveal.
+    check(!a.buf.equals(b.buf), 'click: the editor reacted to the clicks');
+  }
+
+  // ── canvas resize: DRAG THE RAIL HANDLE, not the window ──────────────────
+  // The first version of this resized the window and passed while measuring
+  // nothing: all three captures came back byte-identical because the canvas
+  // panel has its own width and does not track the window. Asserting the
+  // captures DIFFER is what makes this a test.
+  const handle = page.locator('[data-testid="canvas-rail-handle"]');
+  check((await handle.count()) > 0, 'resize: rail handle present');
+  const sizes = [];
+  {
+    for (const [label, dx] of [
+      ['wider', -260],
+      ['widest', -300],
+      ['narrow', 380],
+    ]) {
+      // Re-read the handle every time: it MOVES with the panel edge, so a box
+      // captured once sends every drag after the first to empty space — which
+      // is exactly how this passed while resizing nothing.
+      const box = await handle.boundingBox();
+      if (!box) break;
+      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(box.x + box.width / 2 + dx, box.y + box.height / 2, { steps: 12 });
+      await page.mouse.up();
+      await page.waitForTimeout(1200);
+
+      const panelWidth = await page.evaluate(
+        () => document.querySelector('[data-testid="canvas-tabs-panel"]')?.getBoundingClientRect().width ?? 0,
+      );
+      const tabId = await page.evaluate(() => window.__pi_canvas().getState().activeTabId);
+      const shot = await page.evaluate(
+        ({ tabId }) => window.piDesktop.invoke('office:capture', { tabId }),
+        { tabId },
+      );
+      const stats = imageStats(shot?.dataUrl);
+      if (check(stats !== null, `resize ${label}: captured`)) {
+        writeFileSync(path.join(SHOTS, `resize-${label}.png`), stats.buf);
+        sizes.push({ label, panelWidth: Math.round(panelWidth), capture: stats.width });
+        console.log(`      resize ${label}: panel=${Math.round(panelWidth)}px capture=${stats.width}x${stats.height}`);
+      }
+    }
+    const widths = new Set(sizes.map((s) => s.capture));
+    check(widths.size > 1, `resize: the editor followed the canvas (${[...widths].join(', ')})`);
+  }
+
 } catch (err) {
   failures.push(`threw: ${err?.message ?? err}`);
   console.error(err);

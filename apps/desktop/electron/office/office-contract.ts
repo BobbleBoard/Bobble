@@ -57,6 +57,12 @@ export type OfficeInvokeMap = {
     request: { tabId: string };
     response: { dataUrl: string | null; error?: string | null };
   };
+  /** Synthesize a left click at view-relative coords — drives the acceptance
+   * checks, which must click INSIDE the native view where Playwright cannot. */
+  'office:click': {
+    request: { tabId: string; x: number; y: number };
+    response: { ok: boolean };
+  };
   /** Is the vendored seam actually present in this build? */
   'office:available': { request: Record<string, never>; response: { available: boolean } };
 };
@@ -67,5 +73,6 @@ export const OFFICE_INVOKE_CHANNELS = [
   'office:set-bounds',
   'office:dirty',
   'office:capture',
+  'office:click',
   'office:available',
 ] as const satisfies readonly (keyof OfficeInvokeMap)[];

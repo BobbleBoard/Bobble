@@ -387,6 +387,28 @@ export async function isDirty(tabId: string): Promise<boolean> {
   }
 }
 
+/**
+ * Synthesize a left click inside the editor. Playwright drives the DOM, and the
+ * editor is a native view above it — without this there is no way to exercise
+ * the ribbon from a probe, so "clicking around" would be a claim rather than a
+ * check.
+ */
+export function clickView(tabId: string, x: number, y: number): boolean {
+  const entry = entries.get(tabId);
+  const wc = entry?.view.webContents;
+  if (!wc || wc.isDestroyed()) return false;
+  const at = { x: Math.round(x), y: Math.round(y), button: 'left', clickCount: 1 } as const;
+  // Focus first and move before pressing. A WebContentsView that has never been
+  // focused drops synthetic input on the floor, and a down/up with no preceding
+  // move lands without the hover state many ribbon controls key off — both look
+  // identical to "the click did nothing".
+  wc.focus();
+  wc.sendInputEvent({ type: 'mouseMove', x: at.x, y: at.y });
+  wc.sendInputEvent({ ...at, type: 'mouseDown' });
+  wc.sendInputEvent({ ...at, type: 'mouseUp' });
+  return true;
+}
+
 /** Test seam: how many views are live right now. */
 export function liveViewCount(): number {
   return entries.size;
