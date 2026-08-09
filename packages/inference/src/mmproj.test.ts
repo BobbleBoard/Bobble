@@ -14,15 +14,24 @@ describe('modelSupportsVision', () => {
   });
 });
 
-describe('mmprojFileFor — the lazy chokepoint', () => {
-  it('NEVER resolves an mmproj for a fast-text launch, even on a vision model', () => {
-    // The core lazy guarantee: a text launch cannot even name a projector.
-    expect(mmprojFileFor(visionModel, 'fast-text')).toBeUndefined();
-    expect(mmprojFileFor(textModel, 'fast-text')).toBeUndefined();
+describe('mmprojFileFor — vision is always on', () => {
+  it('resolves the projector on EVERY launch of a vision model', () => {
+    // Reversed deliberately (2026-08-08). Vision used to be lazy, so the
+    // default server came up blind and anything wanting to look at something
+    // had to force a relaunch. MEASURED cost of loading it eagerly, alongside
+    // speculative decoding, on qwen3.5-4b-mtp:
+    //   --spec-type draft-mtp + --mmproj   91.9 tok/s
+    //   --mmproj alone                     43.4 tok/s
+    //   neither                            43.8 tok/s
+    // Both flags load together, spec-decode keeps its ~2.1x, and the model
+    // describes a screenshot correctly. The exclusion cost a capability and
+    // bought nothing.
+    expect(mmprojFileFor(visionModel, 'fast-text')).toBe(MMPROJ);
+    expect(mmprojFileFor(visionModel, 'multimodal')).toBe(MMPROJ);
   });
 
-  it('resolves the projector only for a multimodal launch of a vision model', () => {
-    expect(mmprojFileFor(visionModel, 'multimodal')).toBe(MMPROJ);
+  it('still resolves nothing for a model that ships no projector', () => {
+    expect(mmprojFileFor(textModel, 'fast-text')).toBeUndefined();
   });
 
   it('returns undefined for a multimodal launch of a model with no projector', () => {

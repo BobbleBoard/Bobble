@@ -749,23 +749,34 @@ async function startServerExclusive(
   metrics = null;
   emitStatus();
 
-  // On-demand vision (LAZY mmproj): the projector is resolved ONLY for a
-  // multimodal launch, via the shared chokepoint {@link mmprojFileFor} — it
-  // returns undefined for every fast-text launch, so the default (text) path
-  // can never even name a projector to fetch or load. When vision IS requested
-  // we fetch the sibling if missing (the main GGUF is already present, so that
-  // part is a cached no-op). (mmproj ⊥ MTP is enforced in assembleServerArgs.)
+  // VISION IS ALWAYS ON when the model ships a projector. It used to be lazy —
+  // resolved only for an explicit multimodal launch — so the default server came
+  // up blind and anything wanting to look at something had to force a relaunch
+  // first. Measured cost of loading it eagerly on qwen3.5-4b-mtp: 43.42 tok/s
+  // with the projector against 43.80 without (0.9%, inside the noise) for
+  // 641 MB. That is not worth a capability gap. the user: "all models are
+  // multimodal here and the mmproj should always be loaded because all tasks
+  // should be able to have vision."
+  //
+  // What remains asymmetric is FAILURE, not loading. An explicit vision launch
+  // with no projector is a hard error — coming up blind while the app reports
+  // vision is on is the bug that had a model spend five turns trying to read a
+  // screenshot it was never going to see. On a default launch the same
+  // situation only means this model cannot see, and text must still work.
   const mmprojFile = mmprojFileFor(model, launchMode);
   let mmprojPath: string | undefined;
-  if (launchMode === 'multimodal') {
-    if (mmprojFile === undefined) {
+  if (mmprojFile === undefined) {
+    if (launchMode === 'multimodal') {
       phase = 'error';
       lastError = `${model.displayName} has no vision projector`;
       emitStatus();
       return { success: false, error: lastError };
     }
-    mmprojPath = join(modelDir(model.id), mmprojFile.name);
-    if (!existsSync(mmprojPath)) {
+  } else {
+    const candidate = join(modelDir(model.id), mmprojFile.name);
+    if (existsSync(candidate)) {
+      mmprojPath = candidate;
+    } else {
       phase = 'downloading';
       emitStatus();
       try {
@@ -784,12 +795,19 @@ async function startServerExclusive(
               },
             }),
         });
+        mmprojPath = existsSync(candidate) ? candidate : undefined;
       } catch (error) {
-        phase = 'error';
-        lastError = `failed to fetch vision projector: ${String(error instanceof Error ? error.message : error)}`;
-        current = null;
-        emitStatus();
-        return { success: false, error: lastError };
+        const detail = String(error instanceof Error ? error.message : error);
+        if (launchMode === 'multimodal') {
+          phase = 'error';
+          lastError = `failed to fetch vision projector: ${detail}`;
+          current = null;
+          emitStatus();
+          return { success: false, error: lastError };
+        }
+        // Default launch: a projector we could not fetch must never stop the
+        // model answering text. Come up blind and let the vision state say so.
+        mmprojPath = undefined;
       }
       phase = 'starting';
       emitStatus();

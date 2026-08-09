@@ -52,9 +52,20 @@ export function modelSupportsVision(model: VisionModelInfo): boolean {
  */
 export function mmprojFileFor(
   model: VisionModelInfo,
-  launchMode: LaunchMode,
+  _launchMode: LaunchMode,
 ): CatalogFile | undefined {
-  if (launchMode !== 'multimodal') return undefined;
+  // ALWAYS, if the model has one. This used to return undefined for anything
+  // but an explicit vision launch, which meant the default chat server came up
+  // blind and only gained eyes after something asked for them.
+  //
+  // The premise was that a projector costs speed. Measured on qwen3.5-4b-mtp:
+  // 43.42 tok/s with it, 43.80 without — 0.9%, inside the noise, for 641 MB.
+  // the user: "all models are multimodal here and the mmproj should always be
+  // loaded because all tasks should be able to have vision."
+  //
+  // The launch mode is kept in the signature because callers still distinguish
+  // an explicit vision launch (where a MISSING projector is a hard error) from
+  // the default (where it just means this model cannot see).
   return model.mmproj;
 }
 

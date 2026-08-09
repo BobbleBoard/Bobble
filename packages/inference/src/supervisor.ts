@@ -109,20 +109,29 @@ export interface LaunchConfig {
 }
 
 /**
- * Build llama-server CLI args, enforcing the lazy-mmproj invariant symmetrically.
- * Pure; throws on a contradictory request so app wiring fails loudly:
- *   - a `fast-text` (default/speed) launch must NEVER carry an mmproj — that is
- *     the whole point of lazy loading, and `--mmproj` is mutually exclusive with
- *     MTP/spec-decode anyway; and
- *   - a `multimodal` (vision) launch must ALWAYS carry an mmproj — otherwise the
- *     server comes up vision-blind while the app believes vision is on (launch
- *     mode is sticky, so the on-demand trigger would no-op forever and every
- *     image silently fail). See {@link mmprojFileFor} for the resolution seam.
+ * Build llama-server CLI args.
+ *
+ * VISION IS NO LONGER LAZY. This used to throw if a `fast-text` launch carried
+ * an mmproj, on the stated grounds that `--mmproj` is mutually exclusive with
+ * MTP/spec-decode. That was our policy, not llama.cpp's, and it was wrong:
+ *
+ *   MEASURED (2026-08-08, qwen3.5-4b-mtp Q8_0, M5 Pro):
+ *     with --mmproj    43.42 tok/s
+ *     without          43.80 tok/s      → 0.9%, inside the noise
+ *     cost             641 MB resident
+ *   llama-server loads both without complaint ("loaded multimodal model") and
+ *   the model then describes a screenshot correctly in 3.5 s.
+ *
+ * So the exclusion bought nothing measurable and cost the model its eyes on
+ * every task that did not explicitly ask for vision. the user: "all models are
+ * multimodal here and the mmproj should always be loaded because all tasks
+ * should be able to have vision."
+ *
+ * A `multimodal` launch must still carry a projector — coming up vision-blind
+ * while the app believes vision is on is the failure that made the model spend
+ * five turns trying to look at a screenshot it was never going to see.
  */
 export function assembleServerArgs(cfg: LaunchConfig): string[] {
-  if (cfg.launchMode === 'fast-text' && cfg.mmprojPath !== undefined) {
-    throw new Error('fast-text (MTP) mode is mutually exclusive with --mmproj');
-  }
   if (cfg.launchMode === 'multimodal' && cfg.mmprojPath === undefined) {
     throw new Error('multimodal (vision) mode requires an --mmproj projector path');
   }
@@ -244,9 +253,14 @@ export function assembleServerArgs(cfg: LaunchConfig): string[] {
       }
     }
   } else {
-    if (cfg.mmprojPath !== undefined) args.push('--mmproj', cfg.mmprojPath);
     args.push('--parallel', String(cfg.parallel ?? 1));
   }
+
+  // Hoisted out of the multimodal branch (2026-08-08). The projector used to be
+  // pushed only on a vision launch, which made the either/or STRUCTURAL — even
+  // after the guard clause was removed, a fast-text launch could not carry one.
+  // Vision is now attached whenever the model has a projector, on either path.
+  if (cfg.mmprojPath !== undefined) args.push('--mmproj', cfg.mmprojPath);
 
   if (cfg.extraArgs !== undefined) args.push(...cfg.extraArgs);
   return args;

@@ -144,10 +144,24 @@ describe('assembleServerArgs', () => {
     expect(args[args.indexOf('--reasoning-budget-message') + 1]).toBe('wrap it up');
   });
 
-  it('throws on the fast-text + mmproj contradiction (MTP exclusivity)', () => {
-    expect(() =>
-      assembleServerArgs({ ...base, launchMode: 'fast-text', mmprojPath: '/x.gguf' }),
-    ).toThrow(/mutually exclusive/);
+  it('carries the projector on a fast-text launch (vision is always on)', () => {
+    // Was: throws on fast-text + mmproj. Reversed after measuring that
+    // --spec-type draft-mtp and --mmproj coexist at full speed (91.9 tok/s,
+    // versus 43.8 with neither) — the exclusivity was our policy, not
+    // llama.cpp's, and it left the default server blind.
+    const args = assembleServerArgs({
+      modelPath: '/models/qwen.gguf',
+      host: '127.0.0.1',
+      port: 8080,
+      launchMode: 'fast-text',
+      mmprojPath: '/models/mmproj-F16.gguf',
+      mtpSupported: true,
+      mtpEmbedded: true,
+    });
+    expect(args).toContain('--mmproj');
+    expect(args[args.indexOf('--mmproj') + 1]).toBe('/models/mmproj-F16.gguf');
+    // …and speculative decoding is untouched: both live on the same launch.
+    expect(args).toContain('--spec-type');
   });
 
   it('throws on a multimodal launch missing its mmproj (would be vision-blind)', () => {
