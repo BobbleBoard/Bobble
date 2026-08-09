@@ -20,6 +20,7 @@ import { join } from 'node:path';
 import { createLogger } from '@pi-desktop/shared';
 import { app, BrowserWindow, type WebContents, type WebContentsView } from 'electron';
 import type { OfficeBounds, OfficeKind } from './office-contract';
+import { officeThemeCss, type OfficeThemeTokens } from './office-theme';
 
 const log = createLogger('desktop:office');
 const requireCjs = createRequire(import.meta.url);
@@ -96,6 +97,21 @@ const HIDE_AI_DOCK_CSS = `
 
 let seam: OfficeSeam | null = null;
 let seamTried = false;
+
+/**
+ * The live theme, remembered so a view created LATER is themed at birth. Without
+ * this, opening a second document after a theme change gives it the default
+ * light chrome — a flash of white inside a dark app, and only on some tabs.
+ */
+let themeCss = officeThemeCss({}, false);
+
+export function setOfficeTheme(tokens: OfficeThemeTokens, dark: boolean): void {
+  themeCss = officeThemeCss(tokens, dark);
+  for (const entry of entries.values()) {
+    const wc = entry.view.webContents;
+    if (wc && !wc.isDestroyed()) void wc.insertCSS(themeCss).catch(() => undefined);
+  }
+}
 
 /** Root of the vendored build output — repo tree in dev, resources when packaged. */
 function vendorRoot(): string {
@@ -265,6 +281,7 @@ export function createOfficeView(
   // applying the first time that happens.
   const applyChrome = (): void => {
     void view.webContents?.insertCSS(HIDE_AI_DOCK_CSS).catch(() => undefined);
+    void view.webContents?.insertCSS(themeCss).catch(() => undefined);
   };
   view.webContents.on('dom-ready', applyChrome);
   applyChrome();

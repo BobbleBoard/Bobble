@@ -78,6 +78,16 @@ export function App() {
     applyThemeAttributes(document.documentElement, { flavor, mode });
   }, [flavor, mode]);
 
+  /* E2E theme hook, on the same `?piE2E=1` opt-in as `__pi_canvas`. Probes need
+   * to flip the theme to check that the native office views re-theme with the
+   * app — the one thing a DOM screenshot cannot show, since those views paint
+   * above the DOM and have to be captured through their own webContents. */
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).has('piE2E')) {
+      window.__pi_theme = () => useThemeStore.getState();
+    }
+  }, []);
+
   /*
    * WARM THE MODEL WHILE THE USER IS STILL READING THE SCREEN.
    *

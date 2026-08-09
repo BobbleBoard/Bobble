@@ -18,6 +18,9 @@ declare global {
     /** E2E hook: accessor for the canvas controller (open browser/terminal
      * tabs). Present only when loaded with ?piE2E=1 (see CanvasTabsPanel.tsx). */
     __pi_canvas?: () => CanvasController;
+    /** E2E only: the theme store, so probes can flip dark/light. */
+    // biome-ignore lint/suspicious/noExplicitAny: probe-only escape hatch
+    __pi_theme?: () => any;
     /** E2E hook: recorded canvas shell-out invokes (open-with / reveal /
      * open-external). Populated (and the real shell-out suppressed) only under
      * ?piE2E=1 so probes can assert the wiring without launching Finder/Terminal

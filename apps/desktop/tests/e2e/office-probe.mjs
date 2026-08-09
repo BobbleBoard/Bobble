@@ -145,6 +145,24 @@ try {
     }
   }
 
+  // ── theming: the editor must look like part of the app, not an embed ─────
+  for (const themeMode of ['dark', 'light']) {
+    await page.evaluate((m) => {
+      const st = window.__pi_theme?.();
+      if (st?.setMode) st.setMode(m);
+    }, themeMode);
+    await page.waitForTimeout(2500);
+    const tabId = await page.evaluate(() => window.__pi_canvas().getState().activeTabId);
+    const shot = await page.evaluate(
+      ({ tabId }) => window.piDesktop.invoke('office:capture', { tabId }),
+      { tabId },
+    );
+    const stats = imageStats(shot?.dataUrl);
+    if (check(stats !== null, `theme ${themeMode}: captured`)) {
+      writeFileSync(path.join(SHOTS, `theme-${themeMode}.png`), stats.buf);
+    }
+  }
+
   // ── click around inside the editor (native view, so DOM tooling cannot) ──
   const activeId = await page.evaluate(() => window.__pi_canvas().getState().activeTabId);
   const before = await page.evaluate(

@@ -27,6 +27,7 @@ import type { BrowserBounds } from '../../../electron/canvas/browser-contract';
 import { officeKindForExt } from '../../../electron/office/office-contract';
 import { setOfficeEditorsAvailable } from './file-preview';
 import { usePiStore } from '../../state/pi-slice';
+import { useThemeStore } from '../../store/theme';
 import { browserBoundsForPanel, rectToBounds } from './browser-bounds';
 import { fileArtifactFromText, openFileInCanvas } from './file-tabs';
 
@@ -679,6 +680,42 @@ export function useNativeSurfaces(controller: CanvasController): NativeSurfacesA
   // Keep the session cwd fresh (the file-tree "Open from tree" breadcrumb).
   const cwd = usePiStore((s) => s.session?.cwd ?? undefined);
   manager.setCwd(cwd);
+
+  // Push Bobble's resolved theme into the editor views, and re-push whenever the
+  // theme attributes change. Reading the COMPUTED values rather than mirroring
+  // the palette in TypeScript means a theme edit lands in the editors for free —
+  // a hardcoded copy would drift silently and only show up in a screenshot.
+  const flavor = useThemeStore((s) => s.flavor);
+  const mode = useThemeStore((s) => s.mode);
+  useEffect(() => {
+    const push = (): void => {
+      const cs = getComputedStyle(document.documentElement);
+      const read = (name: string): string => cs.getPropertyValue(name).trim();
+      const tokens = {
+        bgBase: read('--pd-bg-base'),
+        bgRaised: read('--pd-bg-raised'),
+        bgInset: read('--pd-bg-inset'),
+        textPrimary: read('--pd-text-primary'),
+        textSecondary: read('--pd-text-secondary'),
+        textMuted: read('--pd-text-muted'),
+        borderDefault: read('--pd-border-default'),
+        accentPrimary: read('--pd-accent-primary'),
+        fontSans: read('--pd-font-sans'),
+      };
+      // Decide dark from the RESOLVED background rather than the mode name:
+      // 'system' resolves either way, and a flavor may be dark-only.
+      const rgb = tokens.bgBase.match(/\d+/g);
+      const dark =
+        rgb !== null && rgb.length >= 3
+          ? (Number(rgb[0]) * 299 + Number(rgb[1]) * 587 + Number(rgb[2]) * 114) / 1000 < 128
+          : /^#[0-3]/.test(tokens.bgBase);
+      void window.piDesktop.invoke('office:set-theme', { tokens, dark }).catch(() => undefined);
+    };
+    // Next frame: the theme attributes are applied in a sibling effect, and
+    // reading computed styles in the same tick can catch the previous palette.
+    const id = requestAnimationFrame(push);
+    return () => cancelAnimationFrame(id);
+  }, [flavor, mode]);
 
   // Ask ONCE whether this build shipped the vendored office editors, and let
   // the extension routing know. Until this resolves, docx/pptx/pdf keep opening

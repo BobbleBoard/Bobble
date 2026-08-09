@@ -63,6 +63,11 @@ export type OfficeInvokeMap = {
     request: { tabId: string; x: number; y: number };
     response: { ok: boolean };
   };
+  /** Push Bobble's resolved theme tokens into every editor view. */
+  'office:set-theme': {
+    request: { tokens: Record<string, string>; dark: boolean };
+    response: { ok: boolean };
+  };
   /** Is the vendored seam actually present in this build? */
   'office:available': { request: Record<string, never>; response: { available: boolean } };
 };
@@ -74,5 +79,6 @@ export const OFFICE_INVOKE_CHANNELS = [
   'office:dirty',
   'office:capture',
   'office:click',
+  'office:set-theme',
   'office:available',
 ] as const satisfies readonly (keyof OfficeInvokeMap)[];

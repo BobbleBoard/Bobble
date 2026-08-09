@@ -16,6 +16,7 @@ import {
   isDirty,
   officeAvailable,
   setBoundsFor,
+  setOfficeTheme,
 } from './office-manager';
 
 const log = createLogger('desktop:office');
@@ -35,6 +36,14 @@ export function registerOfficeIpc(): void {
   };
 
   handle('office:available', () => ({ available: officeAvailable() }));
+
+  handle('office:set-theme', (_owner, req) => {
+    setOfficeTheme(
+      (req.tokens ?? {}) as Record<string, string>,
+      req.dark === true,
+    );
+    return { ok: true };
+  });
 
   handle('office:create', (owner, req) =>
     createOfficeView(req.tabId as string, req.kind as OfficeKind, req.filePath as string, owner),
