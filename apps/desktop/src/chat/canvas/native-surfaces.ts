@@ -97,6 +97,10 @@ function canvasShellInvoke(channel: string, req: unknown): void {
 
 interface BrowserEntry {
   lastBounds: BrowserBounds;
+  /** The mounted slot element, kept so bounds can be RE-MEASURED rather than
+   * replayed. `lastBounds` is only ever as fresh as the last callback, which is
+   * the whole problem when a resize produces no callback. */
+  el?: HTMLElement;
 }
 
 interface TerminalEntry {
@@ -139,9 +143,27 @@ export class NativeSurfaces {
    * hides/re-shows on the open→closed / closed→open edge.
    */
   #panelOpen = true;
+  /** Detach for the window-resize re-assert; see {@link #onWindowResize}. */
+  #offResize: (() => void) | undefined;
 
   constructor(controller: CanvasController) {
     this.#controller = controller;
+    // MEASURED, from the user's screenshot of the running app: widening the window
+    // from 1440 to 1900 left the office view's viewport at 440x825 — it never
+    // moved, so the canvas panel grew and the editor did not, leaving a band of
+    // dead space down the right-hand side.
+    //
+    // The slot's ResizeObserver is not a reliable signal here for the same
+    // reason it missed the very first office view: the panel is laid out from
+    // the window, and the observed element's own box can settle a frame later
+    // than the window event, so the callback either never fires or fires with a
+    // stale rect. Re-measuring from the live element on window resize is the
+    // signal that always exists, and it is self-correcting.
+    if (typeof window !== 'undefined') {
+      const onResize = (): void => this.#onWindowResize();
+      window.addEventListener('resize', onResize);
+      this.#offResize = () => window.removeEventListener('resize', onResize);
+    }
     this.handlers = {
       onSurfaceMount: (tabId, kind, el) => this.#onMount(tabId, kind, el),
       onSurfaceRectChange: (tabId, kind, rect) => this.#onRect(tabId, kind, rect),
@@ -301,6 +323,10 @@ export class NativeSurfaces {
         // Opening the first office tab is what opens the panel, which is why
         // only the first one was affected — and why the bug followed tab
         // ORDER, not file format.
+        this.#offices.set(tabId, {
+          ...(this.#offices.get(tabId) ?? { lastBounds: rectToBounds(el.getBoundingClientRect()) }),
+          el,
+        });
         this.#renudgeOffice(tabId, el);
       } else this.#hideOffice(tabId);
       return;
@@ -365,6 +391,42 @@ export class NativeSurfaces {
           bounds,
           visible: this.#panelOpen,
         });
+      }, delay);
+    }
+  }
+
+  /**
+   * Re-measure every native view from its live slot element and push bounds.
+   *
+   * Runs a few times across the resize: macOS live-resize emits continuously
+   * and the flex layout settles after the event, so the last measurement taken
+   * during the drag can still be one frame behind where the panel ends up.
+   */
+  #onWindowResize(): void {
+    for (const delay of [0, 120, 320]) {
+      setTimeout(() => {
+        for (const [tabId, entry] of this.#offices) {
+          const rect = entry.el?.getBoundingClientRect();
+          if (!rect || rect.width === 0 || rect.height === 0) continue;
+          const bounds = rectToBounds(rect);
+          this.#offices.set(tabId, { ...entry, lastBounds: bounds });
+          void window.piDesktop.invoke('office:set-bounds', {
+            tabId,
+            bounds,
+            visible: this.#panelOpen && this.#controller.getState().activeTabId === tabId,
+          });
+        }
+        for (const [tabId, entry] of this.#browsers) {
+          const rect = entry.el?.getBoundingClientRect();
+          if (!rect || rect.width === 0 || rect.height === 0) continue;
+          const bounds = rectToBounds(rect);
+          this.#browsers.set(tabId, { ...entry, lastBounds: bounds });
+          void window.piDesktop.invoke('browser:set-bounds', {
+            tabId,
+            bounds,
+            visible: this.#panelOpen && this.#controller.getState().activeTabId === tabId,
+          });
+        }
       }, delay);
     }
   }
@@ -640,6 +702,8 @@ export class NativeSurfaces {
   }
 
   disposeAll(): void {
+    this.#offResize?.();
+    this.#offResize = undefined;
     for (const [tabId] of this.#browsers)
       void window.piDesktop.invoke('browser:destroy', { tabId });
     this.#browsers.clear();

@@ -97,6 +97,7 @@ import UniverPresetSheetsTableEnUS from '@univerjs/preset-sheets-table/locales/e
 import '@univerjs/preset-sheets-table/lib/index.css'
 import { greenTheme } from '@univerjs/themes'
 import { ThemeService } from '@univerjs/core'
+import { IRenderManagerService } from '@univerjs/engine-render'
 import { createUniver } from './create-univer'
 
 import {
@@ -1190,6 +1191,26 @@ export function App(): React.JSX.Element {
         svc.setDarkMode(v)
       } catch {
         /* Univer internals moved — the CSS-themed chrome still follows the app */
+      }
+    }
+    // BOBBLE PATCH: re-measure the grid against its container.
+    //
+    // MEASURED: hosted in the canvas panel, dragging the divider took the
+    // editor's shell from 459px to 750px and the grid canvas stayed at its
+    // load-time 458.5px — a band of dead space down the right-hand side. A
+    // `resize` event does not fix it (we tried; nothing moved), because Univer
+    // sizes its canvas from the render unit's engine, not from the window.
+    // Nothing reachable is exposed on `window`, so the hook has to live here,
+    // where the injector is in scope.
+    ;(window as unknown as { __pdUniverResize?: () => void }).__pdUniverResize = () => {
+      try {
+        const injector = (runtime.univer as unknown as { __getInjector(): { get(t: unknown): unknown } }).__getInjector()
+        const rms = injector.get(IRenderManagerService) as {
+          getRenderAll(): Map<string, { engine?: { resize(): void } }>
+        }
+        for (const [, unit] of rms.getRenderAll()) unit?.engine?.resize()
+      } catch {
+        /* ditto — the shell is fluid regardless, this only re-fits the canvas */
       }
     }
 

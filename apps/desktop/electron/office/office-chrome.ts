@@ -20,9 +20,15 @@
 export const TOOLBAR_ATTR = 'data-pd-toolbar';
 
 export function officeChromeCss(dark: boolean): string {
-  const bg = dark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.07)';
-  const bgHover = dark ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.12)';
+  // Translucent over an unknown strip is a coin flip: the chip is painted from
+  // the theme we last pushed, the strip behind it from whatever the editor's own
+  // sheet says, and when those disagree the label vanishes — near-white text on
+  // near-white chrome, which is how it read in the capture. Opaque both ways, so
+  // legibility never depends on the two agreeing.
+  const bg = dark ? '#3a3a38' : '#e8e6df';
+  const bgHover = dark ? '#4a4a47' : '#dcd9d0';
   const fg = dark ? '#faf9f5' : '#141413';
+  const edge = dark ? 'rgba(255,255,255,0.14)' : 'rgba(0,0,0,0.12)';
   return `
 /* Collapsed is the DEFAULT: the attribute is only added to reveal. Keying off
    [${TOOLBAR_ATTR}="shown"] rather than a "hidden" flag means the ribbon stays
@@ -55,7 +61,7 @@ html:not([${TOOLBAR_ATTR}="shown"]) #root {
   left: 8px;
   z-index: 2147483000;
   appearance: none;
-  border: 0;
+  border: 1px solid ${edge};
   border-radius: 7px;
   padding: 4px 10px;
   font: 500 12px/1.4 var(--gs-font-sans, -apple-system, BlinkMacSystemFont, system-ui, sans-serif);

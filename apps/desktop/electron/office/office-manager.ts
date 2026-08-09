@@ -32,6 +32,10 @@ interface Entry {
   visible: boolean;
   kind: OfficeKind;
   filePath: string;
+  /** Last size pushed, so a reflow is forced only on a real size change and not
+   * on the scroll/focus churn that also re-emits bounds. */
+  lastW: number;
+  lastH: number;
 }
 
 const entries = new Map<string, Entry>();
@@ -367,21 +371,63 @@ export function createOfficeView(
 
   view.setVisible(false);
   win.contentView.addChildView(view);
-  entries.set(tabId, { view, owner, visible: false, kind, filePath });
+  entries.set(tabId, { view, owner, visible: false, kind, filePath, lastW: 0, lastH: 0 });
   wireOwner(owner, win);
   log.info('office view created', { tabId, kind, wcId: view.webContents.id });
   return { ok: true, created: true };
 }
 
+/**
+ * Make the editor re-measure itself against the view it now occupies.
+ *
+ * A `resize` event is the documented way in, but Univer debounces it and reads
+ * the size from its own container observer, which does not always run for a
+ * host-driven resize. So we do both: fire the event, and — for the sheets and
+ * slides renderers — ask Univer's render units to re-size explicitly. Belt and
+ * braces is right here because the failure is silent and looks like a layout
+ * bug rather than a missed notification.
+ */
+function reflow(entry: Entry): void {
+  const wc = entry.view.webContents;
+  if (!wc || wc.isDestroyed()) return;
+  const js = `(() => {
+    window.dispatchEvent(new Event('resize'));
+    try {
+      // The editors keep their instance in module scope, so the only way in is
+      // the hook the vendored App.tsx installs for exactly this.
+      window.__pdUniverResize?.();
+    } catch { /* the editors differ; the event above is the floor */ }
+    // Two frames later: the flex layout settles first, and a canvas resized
+    // against a stale container is the bug we are fixing, not a fix for it.
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      window.dispatchEvent(new Event('resize'));
+      window.__pdUniverResize?.();
+    }));
+  })()`;
+  wc.executeJavaScript(js, true).catch(() => undefined);
+}
+
 export function setBoundsFor(tabId: string, bounds: OfficeBounds, visible: boolean): void {
   const entry = entries.get(tabId);
   if (entry === undefined) return;
-  entry.view.setBounds({
+  const next = {
     x: Math.round(bounds.x),
     y: Math.round(bounds.y),
     width: Math.max(0, Math.round(bounds.width)),
     height: Math.max(0, Math.round(bounds.height)),
-  });
+  };
+  const grew = next.width !== entry.lastW || next.height !== entry.lastH;
+  entry.lastW = next.width;
+  entry.lastH = next.height;
+  entry.view.setBounds(next);
+  // MEASURED: dragging the canvas divider took the view from 440px to 760px
+  // wide and Univer's grid canvas stayed at 458.5px — 300px of dead background
+  // on the right, which is exactly what the user saw. The editors size their canvas
+  // once and only reflow on a `resize` event; a WebContentsView resized from
+  // the main process does not reliably deliver one to the guest. We already
+  // knew this — the toolbar toggle dispatches the same event for the same
+  // reason — it just was never wired to the view's own geometry.
+  if (grew) reflow(entry);
   if (entry.visible !== visible) {
     entry.view.setVisible(visible);
     entry.visible = visible;

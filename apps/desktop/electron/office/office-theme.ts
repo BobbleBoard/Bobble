@@ -64,6 +64,54 @@ export function officeThemeCss(tokens: OfficeThemeTokens, dark: boolean): string
   const pressed = dark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.075)';
 
   return `
+/* ── fluid shell ───────────────────────────────────────────────────────────
+ * MEASURED, walking the guest DOM: #root, main.app-shell, header.excel-header
+ * and div.sheet-body all compute to a flat 900px, and div.sheet-main to 360px,
+ * in a viewport of 440. GenOffice is built as a standalone desktop web app with
+ * a minimum shell width; hosted in a canvas panel that is routinely narrower —
+ * or WIDER — that fixed width is what the user saw as "blank space on the right".
+ *
+ * It was never a missed resize notification, which is why dispatching resize
+ * events changed nothing: no event can make a 900px box fill 1000px. The shell
+ * has to be told it is fluid, and because insertCSS lands at USER-stylesheet
+ * origin, every declaration needs !important to beat the author sheet.
+ */
+html, body, #root, main.app-shell,
+.sheet-body, .sheet-main, .doc-body, .doc-main, .slide-body, .slide-main,
+.excel-header, .word-header, .ppt-header, .workbook-area, #univer-container {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+}
+html, body { overflow-x: hidden !important; }
+/* The editor area sits in a fixed track of its parent's grid/flex, which is why
+ * width:100% on it resolved to 360px while its own parent measured 750: a
+ * percentage width resolves against the GRID AREA, not the parent box. Hiding
+ * the AI dock with display:none removes the item but leaves the TRACK, so the
+ * layout keeps reserving the column it used to fill. Collapse the container to
+ * a single fluid track and let the editor take it. */
+.sheet-body, .doc-body, .slide-body {
+  display: flex !important;
+  flex-direction: row !important;
+  grid-template-columns: 1fr !important;
+}
+/* The shell stacks a header ABOVE the body, so it is a COLUMN. Forcing it to
+ * row alongside the bodies collapsed .sheet-body to its content width (750 →
+ * 375) — a tidier-looking rule that made the bug worse. */
+main.app-shell {
+  display: flex !important;
+  flex-direction: column !important;
+}
+.sheet-body, .doc-body, .slide-body { flex: 1 1 auto !important; }
+.sheet-main, .doc-main, .slide-main {
+  flex: 1 1 auto !important;
+  width: auto !important;
+  min-width: 0 !important;
+}
+/* The shell is a column: let the editor area take every leftover pixel instead
+ * of sitting at its intrinsic size. */
+main.app-shell, .sheet-body, .doc-body, .slide-body { box-sizing: border-box !important; }
+
 :root {
   --surface: ${t.bgRaised} !important;
   --chrome-bg: ${t.bgBase} !important;
