@@ -132,6 +132,26 @@ describe('godot project check', () => {
     expect(r.exitCode).toBe(0);
   });
 
+  it('THE VACUOUS PASS: an empty workspace must not satisfy the check', async () => {
+    /*
+     * MEASURED: `godot --headless --quit --path .` in an empty directory prints
+     * the banner and exits 0. In the second corp run the manager ran
+     * `rm -rf scenes scripts assets project.godot` and every later check came
+     * back clean — seven contracts closed green over a project that no longer
+     * existed. The guard is the `test -f` in front of the command, so assert it
+     * is actually there, and that a shell reporting its failure is a FAIL.
+     */
+    const c = detectProjectCheck(probe({ 'project.godot': 'ok' }));
+    expect(c?.command.startsWith('test -f project.godot &&')).toBe(true);
+
+    // What that command does when the file has since been deleted: non-zero,
+    // no output — indistinguishable from a clean run on exit code ALONE, which
+    // is why the file test has to come first rather than be inferred later.
+    const run: VerifyBashRunner = vi.fn(async () => ({ exitCode: 1, stdout: '', stderr: '' }));
+    const r = await runCheck(run, c!, { cwd: '/w' });
+    expect(r.status).toBe('fail');
+  });
+
   it('a clean load still passes', async () => {
     const c = detectProjectCheck(probe({ 'project.godot': 'ok' }));
     const run: VerifyBashRunner = vi.fn(async () => ({

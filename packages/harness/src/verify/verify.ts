@@ -201,11 +201,28 @@ export function detectProjectCheck(probe: ProjectProbe): ProjectCheck | null {
 function godotCheck(probe: ProjectProbe): ProjectCheck | null {
   if (!probe.exists('project.godot')) return null;
   return {
-    // --quit exits after the first frame. It can still WEDGE on a malformed
-    // project rather than erroring out — measured: a corrupt project.godot hung
-    // past 180s — which is exactly why runCheck's timeout reports `inconclusive`
-    // rather than letting a hang read as a pass.
-    command: 'godot --headless --quit --path . 2>&1',
+    /*
+     * `test -f project.godot` FIRST, and it is the whole point of this line.
+     *
+     * MEASURED: `godot --headless --quit --path .` in an EMPTY directory prints
+     * the version banner and exits 0. It passes when there is nothing to check.
+     * That is not hypothetical — in the second corp run the manager ran
+     * `rm -rf scenes scripts assets project.godot` and every check after it came
+     * back clean, which is what let seven more contracts close green over a
+     * project that no longer existed. A check you can satisfy by deleting the
+     * work is worse than no check.
+     *
+     * A project.godot that EXISTS but declares no main scene already fails on
+     * its own (Godot: "Can't run project: no main scene defined", exit 1) or
+     * hangs — so the missing file is the only vacuous case, and this closes it
+     * exactly, without inventing rules about what a valid project must contain.
+     *
+     * --quit exits after the first frame. It can still WEDGE rather than
+     * erroring — measured twice: a corrupt project.godot past 180s, and a
+     * main-scene-less one past 120s — which is why runCheck's timeout reports
+     * `inconclusive` rather than letting a hang read as a pass.
+     */
+    command: 'test -f project.godot && godot --headless --quit --path . 2>&1',
     kind: 'build',
     label: 'godot --headless --quit',
     // The two Godot emits for an unloadable project, both on stderr, both with
