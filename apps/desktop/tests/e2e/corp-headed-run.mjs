@@ -81,6 +81,8 @@ const STOPWORDS = new Set([
 const EFFORT = process.env.EFFORT ?? arg('effort', 'max');
 const MINUTES = Number(process.env.MINUTES ?? arg('minutes', '45'));
 const SHOT_MS = Number(process.env.SHOT_MS ?? 60_000);
+/** Pin a catalog model id for the run (empty = whatever the profile has). */
+const MODEL = process.env.MODEL ?? arg('model', '');
 const OUT = process.env.OUT ?? path.join(repoRoot, '.corp-runs', 'corp-headed');
 /*
  * A REAL, NAMED FOLDER — never a temp path with a random suffix.
@@ -258,6 +260,28 @@ try {
   log('project confirmed on screen:', chip.trim());
 
   /*
+   * PIN THE MODEL when asked.
+   *
+   * the user: "rerun the corp harness with the 4b qwen model, NOT the 9b model."
+   * With Qwen3.5-9B now the `balanced` tier pick, a run that inherits whatever
+   * the profile last used could silently be a 9B run — and a trace attributing
+   * 4B behaviour to a 9B is worse than no trace. `mode: 'model'` also disables
+   * the auto-router, so the tier cannot drift mid-run.
+   */
+  if (MODEL !== '') {
+    // settings:set takes a PATCH and merges it — passing a whole document (my
+    // first attempt) threw "Cannot read properties of undefined (reading
+    // 'theme')" from inside the merge.
+    await page.evaluate(async (modelId) => {
+      await window.piDesktop.invoke('settings:set', {
+        patch: { modelSelection: { mode: 'model', modelId } },
+      });
+    }, MODEL);
+    await page.waitForTimeout(3000);
+    log('model pinned:', MODEL);
+  }
+
+  /*
    * WAIT FOR THE MODEL. Every headed run I did answered "fetch failed", and the
    * reason was mine: the probe typed the moment the window appeared, while a 4B
    * Q8 model was still loading. the user: "this never happens on the real app
@@ -280,7 +304,21 @@ try {
     await app.close().catch(() => {});
     process.exit(5);
   }
-  log('model ready');
+  /* Say WHICH model came up. The pin above is an instruction; this is the
+     observation, and a trace is only attributable if they agree. */
+  const loaded = await page
+    .evaluate(() => {
+      const st = window.__llm_store?.().getState?.().status;
+      return st?.model ? `${st.model.id} ${st.model.quant}` : null;
+    })
+    .catch(() => null);
+  log('model ready:', loaded ?? '(unreported)');
+  if (MODEL !== '' && loaded !== null && !String(loaded).includes(MODEL)) {
+    console.error(`corp-headed-run: asked for "${MODEL}" but "${loaded}" is loaded. Refusing:`);
+    console.error('a run traced against the wrong model is worse than no run.');
+    await app.close().catch(() => {});
+    process.exit(6);
+  }
 
   await page.click('[data-testid="composer-input"]');
   await page.keyboard.insertText(TASK);
