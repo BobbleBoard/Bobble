@@ -121,7 +121,17 @@ export const CREATE_PRODUCTION_HIERARCHY_TOOL: OpenAiFunctionTool = {
       "this product and iterating with the manager until you have fufilled the user's large " +
       'request. anything *genuinely* quick you are still free to do without this tool though. ' +
       "start by asking yourself at each turn, 'genuinely quick or should I call in the " +
-      "manager?'.",
+      "manager?'. " +
+      // the user, 2026-08-09 — what the manager actually takes, in his words. The
+      // run-2 manager received a one-line brief ("a Godot game") and spent 36
+      // minutes inventing the requirement itself; the vision is the CEO's job.
+      'WHAT THE MANAGER TAKES: a planned, fully thought out vision that you lay out ' +
+      'conceptually and designed, but with no need for technical instruction. You provide in ' +
+      'detail exactly the deliverable you want, and the manager will have it built, so long as ' +
+      'you articulate exactly what you want. Be specific about all details. No technical or ' +
+      'implementation details are needed however — simply describe what you want done. Decide ' +
+      'what the thing IS, what it contains, how it should look and feel, and what would make ' +
+      'it good; leave how to build it to the team.',
     parameters: {
       type: 'object',
       properties: {

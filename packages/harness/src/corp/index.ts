@@ -21,6 +21,7 @@ export * from './budget.js';
 export * from './ceo.js';
 export * from './contracts.js';
 export * from './corp-mesh.js';
+export * from './manager-gates.js';
 export * from './dag.js';
 export * from './delivery.js';
 export * from './dispatch.js';

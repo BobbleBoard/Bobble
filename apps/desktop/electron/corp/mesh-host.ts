@@ -34,9 +34,17 @@ import {
   buildCorpRoster,
   classifyVerification,
   COMMISSION_SPECIALIST_TOOL,
+  DELEGATION_ACTIVATED,
   extractClaims,
   finalCheck,
   MESH_SPECIALIST_KINDS,
+  NOT_READY_TO_DELEGATE,
+  READY_TO_DELEGATE_DEFINITION,
+  READY_TO_DELEGATE_TOOL,
+  REQUEST_TEST_TOOLS_DEFINITION,
+  REQUEST_TEST_TOOLS_TOOL,
+  TEST_TOOL_KIT_NAMES,
+  toolsForKits,
   type MeshAgent,
   type MeshHop,
   type RoleAgentActivity,
@@ -752,9 +760,32 @@ function textResult(text: string): {
  * `talk`: `talk_to` (its non-specialist peers) + `commission_specialist` (all
  * specialties — everyone gets it). Each tool's async execute calls `talk` and returns
  * the peer's reply, exactly like the consult tool awaits an advisor. */
-function communicationTools(agent: MeshAgent, talk: TalkFn): ToolDefinition[] {
+/** The manager's gate state for one run. Mutated by the gate tools. */
+interface ManagerGateState {
+  /** False until `ready_to_delegate` is called; the contract tools refuse. */
+  delegationOpen: boolean;
+  /** Tools granted by `request_test_tools`, added from the NEXT turn onward. */
+  grantedTools: Set<string>;
+  /** What the manager said it was about to hand out. */
+  planSummary: string;
+}
+
+function communicationTools(
+  agent: MeshAgent,
+  talk: TalkFn,
+  gates?: ManagerGateState,
+): ToolDefinition[] {
   const colleagues = agent.peers.filter((p) => !p.startsWith('specialist:'));
   const tools: Array<Record<string, unknown>> = [];
+  /*
+   * THE DELEGATION GATE. Only the manager has one, and only until it says its
+   * plan is concrete. The tools stay ADVERTISED throughout — an unadvertised
+   * tool a model wants gets approximated by the nearest advertised name rather
+   * than abandoned — so the gate lives in execute(), where the refusal text can
+   * say what to do instead at the moment it is relevant.
+   */
+  const gated = (): string | null =>
+    gates !== undefined && !gates.delegationOpen ? NOT_READY_TO_DELEGATE : null;
 
   if (colleagues.length > 0) {
     tools.push({
@@ -774,6 +805,8 @@ function communicationTools(agent: MeshAgent, talk: TalkFn): ToolDefinition[] {
         required: ['recipient', 'message'],
       },
       execute: async (_id: unknown, params: unknown) => {
+        const refusal = gated();
+        if (refusal !== null) return textResult(refusal);
         const p = (params ?? {}) as Record<string, unknown>;
         const recipient = typeof p.recipient === 'string' ? p.recipient : '';
         const message = typeof p.message === 'string' ? p.message : '';
@@ -803,12 +836,61 @@ function communicationTools(agent: MeshAgent, talk: TalkFn): ToolDefinition[] {
       required: ['specialty', 'request'],
     },
     execute: async (_id: unknown, params: unknown) => {
+      const refusal = gated();
+      if (refusal !== null) return textResult(refusal);
       const p = (params ?? {}) as Record<string, unknown>;
       const specialty = typeof p.specialty === 'string' ? p.specialty : MESH_SPECIALIST_KINDS[0];
       const request = typeof p.request === 'string' ? p.request : '';
       return textResult(await talk(agent.id, specialistId(specialty), request));
     },
   });
+
+  /* THE TWO MANAGER GATES, as real tools. Present only for the role that has
+   * them, so no other agent learns a verb it cannot use. */
+  if (gates !== undefined) {
+    tools.push({
+      name: READY_TO_DELEGATE_TOOL,
+      label: READY_TO_DELEGATE_TOOL,
+      description: READY_TO_DELEGATE_DEFINITION.function.description,
+      promptSnippet: 'Open delegation once the plan is concrete.',
+      parameters: READY_TO_DELEGATE_DEFINITION.function.parameters,
+      execute: async (_id: unknown, params: unknown) => {
+        const p = (params ?? {}) as Record<string, unknown>;
+        gates.delegationOpen = true;
+        gates.planSummary = typeof p.plan_summary === 'string' ? p.plan_summary : '';
+        return textResult(DELEGATION_ACTIVATED);
+      },
+    });
+    tools.push({
+      name: REQUEST_TEST_TOOLS_TOOL,
+      label: REQUEST_TEST_TOOLS_TOOL,
+      description: REQUEST_TEST_TOOLS_DEFINITION.function.description,
+      promptSnippet: 'Request the kit to test the settled project.',
+      parameters: REQUEST_TEST_TOOLS_DEFINITION.function.parameters,
+      execute: async (_id: unknown, params: unknown) => {
+        const p = (params ?? {}) as Record<string, unknown>;
+        const asked = Array.isArray(p.kits) ? p.kits.filter((k) => typeof k === 'string') : [];
+        const granted = toolsForKits(asked as string[]);
+        if (granted.length === 0) {
+          return textResult(
+            `No kit named. Ask for one or more of: ${TEST_TOOL_KIT_NAMES.join(', ')}.`,
+          );
+        }
+        for (const t of granted) gates.grantedTools.add(t);
+        /*
+         * The grant takes effect on the manager's NEXT turn, because the tool
+         * list for this one was already sent. Saying so is the difference
+         * between a manager that waits a beat and one that concludes the tools
+         * are broken and starts working around them.
+         */
+        return textResult(
+          `Granted: ${granted.join(', ')}. These are available from your next message ` +
+            'onward — finish this turn and they will be in your hands. Use them to TEST ' +
+            'what the team built, as an end user would.',
+        );
+      },
+    });
+  }
 
   return tools as unknown as ToolDefinition[];
 }
@@ -1052,6 +1134,14 @@ export function createMeshAgentHost(config: MeshAgentHostConfig): MeshAgentHost 
   const contractProfile = new Map<string, VerificationProfile>();
   /** Roles that have already had their one final claim check. */
   const finalChecked = new Set<string>();
+  /* THE MANAGER'S GATES, for this run. `delegationOpen` starts false so the
+   * contract tools refuse until the plan is settled; `grantedTools` starts
+   * empty so the manager plans without a shell. */
+  const managerGates: ManagerGateState = {
+    delegationOpen: false,
+    grantedTools: new Set<string>(),
+    planSummary: '',
+  };
   /** The run-level profile, as a ref so the host can be built before it is known. */
   const taskProfileRef: { value: VerificationProfile } = {
     value: classifyVerification(config.task ?? ''),
@@ -1097,8 +1187,14 @@ export function createMeshAgentHost(config: MeshAgentHostConfig): MeshAgentHost 
           // The comm-tool NAMES must be in the allowlist or the SDK never offers them.
           tools: [
             ...agent.tools,
+            /* Kits the manager asked for via `request_test_tools`. Merged HERE,
+             * at turn construction, which is why the grant message says they
+             * arrive from the next message onward — this turn's list was already
+             * sent when the tool ran. */
+            ...(agent.role === 'manager' ? [...managerGates.grantedTools] : []),
             TALK_TO_TOOL,
             COMMISSION_SPECIALIST_TOOL,
+            ...(agent.role === 'manager' ? [READY_TO_DELEGATE_TOOL, REQUEST_TEST_TOOLS_TOOL] : []),
             ...(agent.role === 'engineer' ? [SUBMIT_WORK_TOOL] : []),
           ],
           /*
@@ -1126,7 +1222,11 @@ export function createMeshAgentHost(config: MeshAgentHostConfig): MeshAgentHost 
            */
           enableToolSearch: agent.role !== 'ceo' && agent.role !== 'manager',
           customTools: [
-            ...communicationTools(agent, talkThrough(agentId)),
+            ...communicationTools(
+              agent,
+              talkThrough(agentId),
+              agent.role === 'manager' ? managerGates : undefined,
+            ),
             // ENGINEERS ONLY. This is how a piece comes back: what was built, how
             // they checked it, and — when a command makes sense for this kind of
             // work — the output of the harness running it, so the manager reads
@@ -1206,6 +1306,9 @@ export function createMeshAgentHost(config: MeshAgentHostConfig): MeshAgentHost 
           freeTools: [
             TALK_TO_TOOL,
             COMMISSION_SPECIALIST_TOOL,
+            /* The gates are not WORK — opening delegation and asking for a test
+             * kit should never cost a step the manager needs for the job. */
+            ...(agent.role === 'manager' ? [READY_TO_DELEGATE_TOOL, REQUEST_TEST_TOOLS_TOOL] : []),
             ...(agent.role === 'engineer' ? [SUBMIT_WORK_TOOL] : []),
           ],
           ...(config.maxTokens !== undefined ? { maxTokens: config.maxTokens } : {}),
