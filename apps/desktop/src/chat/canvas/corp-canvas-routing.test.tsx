@@ -33,6 +33,8 @@ import type { ReactNode } from 'react';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { useChildAgentStore } from '../../state/child-agent-store';
+import { corpChildId } from '../../state/corp-child-bridge';
 import { useCorpStore } from '../../state/corp-store';
 import { corpChatView } from '../corp/corp-thread-view';
 import {
@@ -386,3 +388,23 @@ describe('useCorpCanvasRouting — a corp run drives the canvas like a chat', ()
     await unmount();
   });
 });
+
+describe('one UI for an agent conversation', () => {
+  it('clicking a situation-room agent opens the SAME child view the sidebar opens', () => {
+    /*
+     * the user: "there shouldn't be two seperate UI's dpeneding on whether we click
+     * into the situation room's buttons or the subchats in the left sidebar."
+     */
+    const controller = createCanvasController();
+    const node = { id: 'engineer:1', name: 'Engineer 1', role: 'engineer', state: 'working', parentId: 'manager' } as never;
+    selectCorpNodeAndFocus(controller, 't1', node);
+    expect(useChildAgentStore.getState().viewedChildId).toBe(corpChildId('engineer:1'));
+  });
+
+  it('the ROOT stays in the main thread — its conversation IS the chat', () => {
+    const controller = createCanvasController();
+    const root = { id: 'ceo', name: 'CEO', role: 'ceo', state: 'working' } as never;
+    selectCorpNodeAndFocus(controller, 't1', root);
+    expect(useChildAgentStore.getState().viewedChildId).toBeNull();
+  });
+})

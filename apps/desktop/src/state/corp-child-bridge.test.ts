@@ -15,6 +15,11 @@ const PARENT = '/Users/user/.pi/sessions/chat-1.jsonl';
 
 function seedChart(nodes: Array<{ id: string; name: string; state: string }>): void {
   useCorpStore.setState({
+    /* A chart with a `working` node only exists while the RUN is live, and a
+     * role's spinner now depends on that: `corpRunning` overrules a node left
+     * mid-`working` when the run ended, which is what made a finished engineer
+     * spin forever. Seeding it here matches the state being described. */
+    corpRunning: true,
     situation: {
       status: 'running',
       chart: {
@@ -54,6 +59,15 @@ describe('corp roles become sidebar children', () => {
     // Nested under the CHAT that hosts the run — that is what the sidebar keys on.
     expect(kids[corpChildId('manager')]?.parentId).toBe(PARENT);
     expect(kids[corpChildId('manager')]?.title).toBe('Manager');
+  });
+
+  it('a finished RUN stops every spinner, whatever the chart still says', () => {
+    // The chart settles from state pulses that stop arriving when a run ends, so
+    // a node can be left mid-`working` forever. The run's own terminal signal wins.
+    seedChart([{ id: 'manager', name: 'Manager', state: 'working' }]);
+    useCorpStore.setState({ corpRunning: false });
+    syncCorpChildren(PARENT);
+    expect(useChildAgentStore.getState().children[corpChildId('manager')]?.running).toBe(false);
   });
 
   it('only the working role spins', () => {

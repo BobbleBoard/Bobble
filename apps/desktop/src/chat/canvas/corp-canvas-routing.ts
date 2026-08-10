@@ -28,7 +28,7 @@ import type { OrgNodeView } from '@pi-desktop/coordination';
 import { useEffect, useRef } from 'react';
 import { useCanvasStore } from '../../state/canvas-store';
 import { useChildAgentStore } from '../../state/child-agent-store';
-import { CORP_CHILD_PREFIX } from '../../state/corp-child-bridge';
+import { CORP_CHILD_PREFIX, corpChildId } from '../../state/corp-child-bridge';
 import { type CorpBlock, useCorpStore } from '../../state/corp-store';
 import { corpFileBaseName, corpHtmlArtifact } from '../corp/corp-file-canvas';
 import { corpBashSteps, currentCorpFile, isHtmlPath } from '../corp/corp-file-content';
@@ -178,6 +178,26 @@ export function selectCorpNodeAndFocus(
   node: OrgNodeView,
 ): void {
   useCorpStore.getState().selectNode(node);
+  /*
+   * ONE UI FOR AN AGENT'S CONVERSATION.
+   *
+   * the user: "there shouldn't be two seperate UI's dpeneding on whether we click
+   * into the situation room's buttons or the subchats in the left sidebar. the
+   * UI that I want to see is exactly as the left sidebar shows, with the back
+   * button." Clicking a row here used to pin the node and stream it INLINE
+   * beneath the CEO's thread — a second renderer of the same thing.
+   *
+   * This is the USER-CLICK path, which is why it belongs here and not in
+   * `selectNode`. I tried it there first and it broke the canvas: the routing
+   * logic calls selectNode internally, so hijacking it swallowed the activity
+   * tab (corp-canvas-routing's live-write test caught it). A click is a
+   * different event from a selection, and only the click opens a view.
+   *
+   * The ROOT stays null: the CEO's conversation is the main chat itself, and
+   * pushing it into a child view would hide the thread it lives in.
+   */
+  const isRoot = node.parentId === undefined;
+  useChildAgentStore.getState().setViewedChild(isRoot ? null : corpChildId(node.id));
   focusSituationTab(controller, taskId);
 }
 
