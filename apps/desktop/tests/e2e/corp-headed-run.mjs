@@ -228,6 +228,19 @@ try {
     process.exit(3);
   }
   log('effort:', effortNow, '· chip:', (effortChip ?? '').trim());
+  /*
+   * AND SET IT IN SETTINGS. The chip is the UI's view; `settings.effort` is what
+   * reaches the harness and what `corpToolEnabled` reads when it decides whether
+   * `talk_to_manager` enters the active tool set. Reading the chip and calling
+   * that "effort: max" is the same mistake as reading the folder chip and
+   * calling that the working directory.
+   */
+  await page
+    .evaluate(async (level) => {
+      await window.piDesktop.invoke('settings:set', { patch: { effort: level } });
+    }, EFFORT)
+    .catch(() => undefined);
+  await page.waitForTimeout(1500);
 
   /*
    * THE PROJECT — set it, then CONFIRM IT ON SCREEN.
@@ -276,8 +289,17 @@ try {
       await window.piDesktop.invoke('settings:set', {
         patch: { modelSelection: { mode: 'model', modelId } },
       });
+      /*
+       * AND SWITCH THE RUNNING SERVER. modelSelection is the user's DEFAULT,
+       * "re-applied on each fresh pi session" — it does not retarget a server
+       * that is already up. MEASURED: the pin was accepted and the previous
+       * model stayed loaded, which the assertion below caught. Setting the
+       * preference and starting the server are two different things and the
+       * probe has to do both.
+       */
+      await window.piDesktop.invoke('llm:start-server', { modelId, launchMode: 'fast-text' });
     }, MODEL);
-    await page.waitForTimeout(3000);
+    await page.waitForTimeout(5000);
     log('model pinned:', MODEL);
   }
 
@@ -304,6 +326,25 @@ try {
     await app.close().catch(() => {});
     process.exit(5);
   }
+  /*
+   * RE-PUSH THE EFFORT, NOW THAT PI IS THE ONE THAT WILL ANSWER.
+   *
+   * MEASURED: the harness held `effort=medium` while the renderer, the store and
+   * the chip all said max — so `corpToolEnabled` was false and `talk_to_manager`
+   * never entered the advertised set. The push at the top of this run goes out
+   * before the model is ready; selecting/loading a model respawns pi, and the
+   * fresh child does not carry it. The effort that matters is the one the child
+   * answering the prompt holds.
+   */
+  await page
+    .evaluate(async (level) => {
+      const store = window.__settings_store?.();
+      if (store === undefined) return;
+      await store.getState().update({ effort: level, effortMode: 'level' });
+    }, EFFORT)
+    .catch(() => undefined);
+  await page.waitForTimeout(2000);
+
   /* Say WHICH model came up. The pin above is an instruction; this is the
      observation, and a trace is only attributable if they agree. */
   const loaded = await page
@@ -313,6 +354,14 @@ try {
     })
     .catch(() => null);
   log('model ready:', loaded ?? '(unreported)');
+  /*
+   * AND ASSERT THE HARNESS ACTUALLY HAS THE EFFORT. The chip is the UI's view;
+   * `corpToolEnabled` reads the effort the pi CHILD holds, and those came apart:
+   * a run reported "effort: max · chip: Effort · Max" while the harness held
+   * medium, so `talk_to_manager` was never advertised and the CEO built a whole
+   * product alone because it had no other option. Set PI_ADV_DEBUG_TOOLS to see
+   * the gate's own verdict per request.
+   */
   if (MODEL !== '' && loaded !== null && !String(loaded).includes(MODEL)) {
     console.error(`corp-headed-run: asked for "${MODEL}" but "${loaded}" is loaded. Refusing:`);
     console.error('a run traced against the wrong model is worse than no run.');

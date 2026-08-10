@@ -17,7 +17,7 @@
  * CLI pi users can consume the pieces directly.
  */
 
-import { statSync } from 'node:fs';
+import { appendFileSync, statSync } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import type {
@@ -1336,8 +1336,34 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     // at those efforts, strip it below — so lowering effort mid-session hides it
     // again. Kept at the END of the list so its presence/absence never disturbs
     // the cached prefix ahead of it.
-    const wantCorp =
-      corpToolEnabled(runtime.config.effort) && available.includes(CREATE_PRODUCTION_HIERARCHY);
+    const corpRegistered = available.includes(CREATE_PRODUCTION_HIERARCHY);
+    const wantCorp = corpToolEnabled(runtime.config.effort) && corpRegistered;
+    /*
+     * WHY THE TEAM TOOL IS OR IS NOT THERE — the two conditions, separately.
+     *
+     * A run where the CEO built a whole product alone turned out to have no
+     * `talk_to_manager` in its advertised set at max effort, and the existing
+     * dump could not say WHICH condition failed: the effort the harness holds,
+     * or whether the tool was ever registered. Reading the gate's source and
+     * concluding "it must have been available" is exactly how that run got
+     * mis-attributed to the model choosing not to delegate.
+     *
+     * Opt-in on the same env as the tool dump, appended to the same file, so one
+     * switch gives the whole picture.
+     */
+    const dbgPath = process.env.PI_ADV_DEBUG_TOOLS;
+    if (dbgPath !== undefined && dbgPath.length > 0) {
+      try {
+        appendFileSync(
+          dbgPath,
+          `applyPreset: effort=${runtime.config.effort} corpEnabled=${corpToolEnabled(
+            runtime.config.effort,
+          )} corpRegistered=${corpRegistered} wantCorp=${wantCorp}\n`,
+        );
+      } catch {
+        /* a diagnostic must never break a turn */
+      }
+    }
     if (wantCorp && !target.includes(CREATE_PRODUCTION_HIERARCHY)) {
       target.push(CREATE_PRODUCTION_HIERARCHY);
     } else if (!wantCorp && target.includes(CREATE_PRODUCTION_HIERARCHY)) {
