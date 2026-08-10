@@ -115,12 +115,16 @@ export function CorpWorkerFeed({
     lastLine.streaming !== true;
   const currentAction = transcript?.currentAction;
 
-  // A5: the CEO/solo LEAD is the model the user is already talking to — there is no
-  // "briefing card" for it (the synthesized "Pi · Lead" bubble that echoed the
-  // prompt back with canned deliverables). Only a real briefed subagent
-  // (manager/engineer/…) shows its contract briefing.
-  const showBriefing =
-    transcript !== null && transcript.role !== 'ceo' && transcript.role !== 'solo';
+  /*
+   * NO BRIEFING CARD, FOR ANYONE.
+   *
+   * It was a synthesized header — "Manager · Team" over "Live work by Manager." —
+   * standing in for a briefing that had not loaded, which is to say a card that
+   * restated the role's name and said nothing. Now that a role's REAL brief
+   * arrives as a blue bubble in its transcript, the card is a placeholder in
+   * front of the actual thing. the user: "the card should not exist at all."
+   */
+  const showBriefing = false;
 
   return (
     <Thread>

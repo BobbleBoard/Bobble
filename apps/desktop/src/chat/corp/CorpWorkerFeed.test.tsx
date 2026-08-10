@@ -296,7 +296,20 @@ describe('CorpWorkerFeed — A5: no lead briefing card, real subagent briefing k
     await unmount();
   });
 
-  it('keeps a real subagent (engineer) contract briefing', async () => {
+  /*
+   * THE CARD IS GONE, FOR EVERYONE. the user: "the card should not exist at all."
+   *
+   * It was a synthesized header — "Manager · Team" over "Live work by Manager." —
+   * standing in front of the real thing. A role's actual brief now arrives in its
+   * transcript as the blue left-aligned bubble, which is the message it was
+   * genuinely handed rather than a restatement of its own name.
+   *
+   * KNOWN TRADE-OFF, stated rather than discovered later: a node that has not
+   * been prompted yet has no brief to show, so its chat reads "Not yet queued"
+   * instead of previewing its contract (see the sibling flow test). The contract
+   * appears the moment the role is actually briefed.
+   */
+  it('shows NO briefing card, for a real subagent either', async () => {
     const { container, unmount } = await render(
       feedFor('engineer', {
         workerName: 'HUD',
@@ -306,8 +319,7 @@ describe('CorpWorkerFeed — A5: no lead briefing card, real subagent briefing k
         deliverables: ['src/ui/hud.ts'],
       }),
     );
-    expect(container.querySelector('[data-testid="task-briefing"]')).not.toBeNull();
-    expect(container.textContent).toContain('Build the HUD overlay');
+    expect(container.querySelector('[data-testid="task-briefing"]')).toBeNull();
     await unmount();
   });
 });

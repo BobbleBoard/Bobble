@@ -41,9 +41,39 @@ export const corpChildId = (nodeId: string): string => `${CORP_CHILD_PREFIX}${no
 function blocksToMessages(childId: string, blocks: readonly CorpBlock[]): ChatMsg[] {
   const content: ContentBlock[] = [];
   const results: ChatMsg[] = [];
+  /*
+   * THE SECOND RENDERER. A role's chat is drawn two ways — the inline corp view
+   * (CorpChatStream) and THIS, the sidebar chat you get by clicking the role —
+   * and only the first learned to show briefings. So the manager's own chat still
+   * opened straight into "Thought, edited a file" with the instruction that
+   * caused it nowhere on screen. the user: "the top of this chat should show the blue
+   * bubble on the left. RIGHT THERE… WHERES THE MESSAGE BUBBLE."
+   *
+   * Same shape as transcriptToAssistantView: a brief closes the current assistant
+   * turn and becomes a user message, so the transcript reads as a conversation.
+   */
+  const out: ChatMsg[] = [];
   const assistantId = `${childId}:turn`;
+  let turn = 0;
+  const flush = (streaming: boolean): void => {
+    if (content.length === 0) return;
+    out.push({
+      kind: 'assistant',
+      id: turn === 0 ? assistantId : `${assistantId}:${turn}`,
+      blocks: [...content],
+      isStreaming: streaming,
+      timestamp: 0,
+    });
+    content.length = 0;
+    turn += 1;
+  };
   let call = 0;
   for (const b of blocks) {
+    if (b.kind === 'briefing') {
+      flush(false); // an earlier run is, by definition, finished
+      out.push({ kind: 'user', id: `${childId}:brief:${out.length}`, text: b.text, timestamp: 0 });
+      continue;
+    }
     switch (b.kind) {
       case 'text':
         content.push({ type: 'text', text: b.text });
@@ -106,16 +136,8 @@ function blocksToMessages(childId: string, blocks: readonly CorpBlock[]): ChatMs
     }
   }
   const streaming = blocks.some((b) => (b.kind === 'text' || b.kind === 'thinking') && b.streaming);
-  return [
-    {
-      kind: 'assistant',
-      id: assistantId,
-      blocks: content,
-      isStreaming: streaming,
-      timestamp: 0,
-    },
-    ...results,
-  ];
+  flush(streaming);
+  return [...out, ...results];
 }
 
 /**
@@ -167,8 +189,29 @@ export function syncCorpChildren(parentId: string): void {
      * left it, not as live.
      */
     child.setStatusLabel(id, nodeStatusWord(node.state, corp.corpRunning));
+
+    /*
+     * WALK THE USER INTO THE MANAGER'S CHAT when the hand-off happens.
+     *
+     * The CEO calling talk_to_manager is the moment the run becomes a team, and
+     * the user was left in the main conversation looking at a card ABOUT the
+     * manager instead of at the manager. the user: "act as if the user clicked onto
+     * the newly created manager chat instead, route away from the main
+     * conversation automatically."
+     *
+     * Once per run, and only if the user has not already chosen a chat to look
+     * at — an automatic navigation that overrides a deliberate one is a worse
+     * bug than the card ever was.
+     */
+    if (node.role === 'manager' && !routedToManager) {
+      routedToManager = true;
+      if (useChildAgentStore.getState().viewedChildId === null) child.setViewedChild(id);
+    }
   }
 }
+
+/** Whether this run has already walked the user into the manager's chat. */
+let routedToManager = false;
 
 /** One word per org-chart state — the sidebar's mirror of the situation room. */
 export function nodeStatusWord(state: OrgNodeView['state'], runLive: boolean): string {
@@ -195,4 +238,7 @@ const lastBlocks = new Map<string, readonly CorpBlock[]>();
 /** Forget the mirror between runs so a new production starts clean. */
 export function resetCorpChildren(): void {
   lastBlocks.clear();
+  // A new production gets its own walk-in; otherwise the second run of a session
+  // would leave the user wherever the first one put them.
+  routedToManager = false;
 }

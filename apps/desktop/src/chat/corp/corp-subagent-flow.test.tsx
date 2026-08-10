@@ -279,9 +279,14 @@ describe('corp/subagent-run UX flow', () => {
         />
       </CanvasProvider>,
     );
-    // The contract briefing is still shown …
-    expect(container.textContent).toContain('Build the HUD overlay');
-    // … and the honest not-yet-picked-up tail.
+    /*
+     * The briefing CARD is gone (the user: "the card should not exist at all"), and a
+     * node that has never been prompted has no real brief to show in its place —
+     * so a queued role reads as queued and nothing more. That is the honest state:
+     * the contract it will be given has not been given yet. It appears as the blue
+     * briefing bubble the moment the role is actually briefed.
+     */
+    expect(container.textContent).not.toContain('Build the HUD overlay');
     expect(container.textContent).toContain('Not yet queued');
     await unmount();
   });

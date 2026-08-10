@@ -19,6 +19,7 @@ import {
   WAIT_TOOL,
 } from '@pi-desktop/harness/corp';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { roleActiveTools } from './role-agent';
 import {
   communicationTools,
   DEFAULT_STEPS_PER_MESSAGE,
@@ -685,5 +686,42 @@ describe('dispatchesTo — which hand-offs run in parallel', () => {
 
   it('an engineer never dispatches — it does the work itself', () => {
     expect(dispatchesTo(a('engineer:1', 'engineer'), 'engineer:2')).toBe(false);
+  });
+});
+
+describe('the custom communication tools survive the active-set narrowing', () => {
+  /*
+   * THE RUN-KILLER, 2026-08-09. A role's active set was narrowed to
+   * `config.tools` — the manager's is ['read','ls','write'] — while everything
+   * that makes it a team member arrives as customTools. So talk_to,
+   * commission_specialist, ready_to_delegate and request_test_tools were
+   * registered and then deactivated, and the manager, fenced from writing the
+   * product AND holding no way to hand it off, wrote it itself. In its own
+   * words: "no talk_to or commission_specialist active… there are no engineers
+   * available on this machine".
+   */
+  const names = ['talk_to', 'commission_specialist', 'ready_to_delegate', 'request_test_tools'];
+
+  it('unions the custom tool names into the active set', () => {
+    const active = roleActiveTools(['read', 'ls', 'write', ...names]);
+    for (const n of names) expect(active).toContain(n);
+    // The file kit and tool_search are still there.
+    expect(active).toContain('write');
+    expect(active).toContain('tool_search');
+  });
+
+  it('a planning kit ALONE leaves a manager unable to delegate — the bug', () => {
+    // Kept as the counter-example: this is precisely what shipped, and what the
+    // union above exists to prevent.
+    const active = roleActiveTools(['read', 'ls', 'write']);
+    for (const n of names) expect(active).not.toContain(n);
+  });
+
+  it('does not duplicate a name that is in both lists', () => {
+    const active = roleActiveTools(['read', 'talk_to', 'talk_to']);
+    expect(active.filter((n) => n === 'talk_to')).toHaveLength(2); // caller dedupes; pass-through is honest
+    expect(roleActiveTools(['read', 'tool_search']).filter((n) => n === 'tool_search')).toHaveLength(
+      1,
+    );
   });
 });

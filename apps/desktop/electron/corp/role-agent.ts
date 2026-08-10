@@ -1575,10 +1575,31 @@ export async function openRoleSession(
     sessionManager,
     settingsManager: settings,
   });
-  // Narrow the active set to the role's curated tools (+ tool_search). The full
-  // registered corpus stays discoverable via tool_search; this is just the
-  // STARTING active set the model sees, keeping its prompt focused.
-  if (useToolSearch) session.setActiveToolsByName(roleActiveTools(config.tools));
+  /*
+   * Narrow the active set to the role's curated tools (+ tool_search). The full
+   * registered corpus stays discoverable via tool_search; this is just the
+   * STARTING active set the model sees, keeping its prompt focused.
+   *
+   * THE CUSTOM TOOLS MUST SURVIVE THAT NARROWING. `config.tools` is the role's
+   * FILE/SHELL kit — the manager's is ['read','ls','write'] — while everything
+   * that makes it a team member (talk_to, commission_specialist,
+   * ready_to_delegate, request_test_tools, wait, raise_hand) arrives as
+   * customTools. Narrowing to `config.tools` alone registered those and then
+   * deactivated them, so the manager was fenced out of building AND had nobody
+   * to hand to. Measured from the manager's own reasoning, mid-run: "the
+   * available tools show only python3, node, pytest, git — no talk_to or
+   * commission_specialist active", followed by it deciding "there are no
+   * engineers available on this machine" and writing the product itself.
+   *
+   * That is the third time today a tool was registered but not advertised. The
+   * union is taken HERE, at the one place the active set is decided.
+   */
+  if (useToolSearch) {
+    const customNames = (config.customTools ?? []).map(
+      (t) => (t as { name?: unknown }).name as string,
+    );
+    session.setActiveToolsByName(roleActiveTools([...config.tools, ...customNames]));
+  }
 
   // --- run: fully autonomous, guarded ONLY by the per-CALL network abort ---
   sessionRef = session; // arm the watchdog's abort target
