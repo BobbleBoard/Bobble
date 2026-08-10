@@ -246,3 +246,23 @@ describe('a rejected call is not work done', () => {
     expect(summarizeActivity([step('edit'), step('edit')])).toBe('Edited 2 files');
   });
 });
+
+describe('a prefilling turn is not a settled one', () => {
+  /*
+   * the user, watching a run sit silent: "we can't see what the model is doing right
+   * now at this moment… we need to have an idea of what's going on at all times."
+   *
+   * The chain's "Done" is inferred from quiet, and a long prompt ingest is quiet:
+   * no step running, no tokens. So the marker appeared over a working model. The
+   * prefill row both explains the gap AND blocks the false completion — these are
+   * the same bug seen from two sides, which is why one prop does both.
+   */
+  it('keeps the collapse summary honest while nothing has run yet', () => {
+    // No steps + no work done: the summary must not claim any.
+    expect(summarizeActivity([])).toBe('');
+  });
+
+  it('still reports real work once steps exist', () => {
+    expect(summarizeActivity([{ kind: 'bash', label: 'x' }])).toBe('Ran a command');
+  });
+});

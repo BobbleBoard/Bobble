@@ -4,6 +4,7 @@ import { forwardRef, useEffect, useRef, useState } from 'react';
 import { DiffStat } from './activity.tsx';
 import { type DiffFileData, DiffView } from './diff-view.tsx';
 import { IconCheck, IconChevronRight, IconExternal } from './icons.tsx';
+import { ContextGauge } from './indicators.tsx';
 import { Markdown } from './markdown.tsx';
 import { ShimmerText } from './shimmer.tsx';
 import { Spinner } from './spinner.tsx';
@@ -923,6 +924,22 @@ export interface ActivityChainProps extends Omit<HTMLAttributes<HTMLDivElement>,
   onOpenCanvas?: (step: ActivityStepData, index: number) => void;
   /** Activated for a file-op step (read/edit/skill) to open its file in the canvas. */
   onOpenFile?: (step: ActivityStepData, index: number) => void;
+  /**
+   * The turn is PREFILLING — the model is ingesting the prompt and has produced
+   * nothing yet. Renders a trailing processing step carrying the real percent,
+   * and suppresses the terminal "Done".
+   *
+   * A long prefill is silence: no row is running, nothing is streaming, and the
+   * chain looks exactly like a finished one. the user: "we can't see what the model
+   * is doing right now at this moment… that bottom item should say processing…
+   * then completely replace it with the actual tool call / thinking once that's
+   * done and generation resumes. we need to have an idea of what's going on at
+   * all times."
+   *
+   * `percent: null` = ingesting but no frame yet (indeterminate). Clear the whole
+   * prop the instant tokens resume — the real row takes its place.
+   */
+  prefill?: { percent: number | null };
 }
 
 /**
@@ -968,6 +985,7 @@ export const ActivityChain = forwardRef<HTMLDivElement, ActivityChainProps>(func
     summary,
     onOpenCanvas,
     onOpenFile,
+    prefill,
     className,
     ...rest
   },
@@ -997,7 +1015,11 @@ export const ActivityChain = forwardRef<HTMLDivElement, ActivityChainProps>(func
   const [openStep, setOpenStep] = useState<number | null>(defaultOpenStep ?? null);
 
   const running = steps.some((s) => s.status === 'running');
-  const settled = useSettled(!running && !active);
+  /* A PREFILLING turn is not a settled one. Without this the chain has no
+   * running step, goes quiet, and prints "Done" over a model that is still
+   * ingesting the prompt — the premature-completion family again, one layer
+   * down. */
+  const settled = useSettled(!running && !active && prefill === undefined);
   const toggleChain = () => {
     const next = !isExpanded;
     if (expanded === undefined) {
@@ -1057,6 +1079,29 @@ export const ActivityChain = forwardRef<HTMLDivElement, ActivityChainProps>(func
                 {...(onOpenFile !== undefined ? { onOpenFile: () => onOpenFile(step, index) } : {})}
               />
             ))}
+            {/* PREFILL, as the chain's last step. Same ring the thread indicator
+                uses, so one visual language means one thing; replaced by the real
+                tool call or thought the moment tokens resume, because the prop is
+                cleared then. */}
+            {prefill !== undefined ? (
+              <div className="pd-chain-step pd-chain-step--prefill">
+                <div className="pd-chain-step-row">
+                  <span className="pd-chain-step-icon">
+                    <ContextGauge
+                      value={prefill.percent === null ? 0 : Math.min(1, prefill.percent / 100)}
+                      size={14}
+                      className={`pd-processing-ring${prefill.percent === null ? ' pd-processing-ring--indeterminate' : ''}`}
+                      label="processing"
+                    />
+                  </span>
+                  <ShimmerText className="pd-chain-step-label">
+                    {prefill.percent === null
+                      ? 'Processing the prompt…'
+                      : `${Math.round(prefill.percent)}% processing the prompt`}
+                  </ShimmerText>
+                </div>
+              </div>
+            ) : null}
             {/* Terminal "Done" — shown only once the run has been finished for a
              * BEAT, never on the momentary inter-tool gap.
              *

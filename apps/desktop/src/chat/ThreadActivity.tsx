@@ -31,6 +31,7 @@ import {
 // Local module (NOT a package barrel) — keep the open-in-canvas action off the
 // renderer-forbidden barrels (the gotcha); `openFileInCanvas` reads via IPC.
 import { openFileInCanvas } from './canvas/file-tabs';
+import { PREFILL_STATUS_KEY, parsePrefillPercent } from './harness-status';
 
 export { segmentBlocks } from './activity-mapping';
 
@@ -146,6 +147,15 @@ export function ThreadActivityChain({
       : (estimated ?? 0);
   const firstThinkingIdx = blocks.findIndex((b) => b.type === 'thinking');
 
+  /*
+   * The REAL prompt-ingest percent, off the same channel the thread indicator
+   * reads (provider-llamacpp's `prompt_progress` frames). Not a second source
+   * and not an easing curve — the chain shows exactly what llama reports, or an
+   * indeterminate ring when it has not reported yet.
+   */
+  const prefillRaw = usePiStore((st) => st.extensionStatus[PREFILL_STATUS_KEY]);
+  const prefillPct = parsePrefillPercent(prefillRaw);
+
   // E1: only the LAST block of a live chain is present-tense; every settled prior
   // step stays past-tense (a new action must not re-present the ones before it).
   const runningFlags = chainRunningFlags(blocks, {
@@ -185,6 +195,25 @@ export function ThreadActivityChain({
       defaultExpanded={false}
       // Expanded + live while this run streams; collapses the moment it's done.
       active={streaming}
+      /*
+       * PREFILL, as the chain's last row. A turn that is ingesting a long prompt
+       * produces nothing — no running step, no tokens — so the chain looked
+       * exactly like a finished one and printed "Done" over a working model.
+       * the user: "we need to have an idea of what's going on at all times."
+       *
+       * Conditions, deliberately strict: this run is streaming, NO step is
+       * running, and llama is reporting a percent BELOW 100. A finished ingest
+       * reports 100 and generation begins, so `< 100` is what separates "still
+       * reading the prompt" from "producing" — without it the row would sit
+       * there through ordinary text generation, which is the opposite of
+       * telling you what is going on.
+       *
+       * The moment a real tool call or thought starts, that row IS the answer
+       * and this one clears — the replacement the user asked for.
+       */
+      {...(streaming && !runningFlags.some(Boolean) && prefillPct !== null && prefillPct < 100
+        ? { prefill: { percent: prefillPct } }
+        : {})}
       onOpenCanvas={(_step, index) => {
         const spec = steps[index]?.tabSpec;
         if (spec?.key === undefined) return;
