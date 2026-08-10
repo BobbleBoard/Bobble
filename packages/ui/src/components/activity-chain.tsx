@@ -106,7 +106,11 @@ export type ActivityStepData =
   // (`argsText`/`output`); a connector also carries its brand mark (`iconSvg`)
   // so the row reads "Used <connector icon> <connector name>".
   | (ActivityStepCommon & {
-      kind: 'tool-search' | 'tool';
+      /* The corp coordination rows belong to this shape, not the file-read one:
+       * their ARGS are the content — who was asked, and what for — so they
+       * reveal argsText + output exactly like any other tool row. Reaching the
+       * read shape is what relabelled them "Read a file". */
+      kind: 'tool-search' | 'tool' | 'talk' | 'commission' | 'delegate' | 'toolkit' | 'submit';
       argsText?: string;
       output?: string;
     })

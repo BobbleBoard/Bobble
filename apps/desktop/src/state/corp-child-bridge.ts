@@ -141,8 +141,22 @@ export function syncCorpChildren(parentId: string): void {
       lastBlocks.set(node.id, blocks);
       useChildAgentStore.getState().replaceMessages(id, blocksToMessages(id, blocks));
     }
-    // `working` is the only live state; everything else is a finished role.
-    child.setRunning(id, node.state === 'working');
+    /*
+     * A ROLE CANNOT BE RUNNING AFTER THE RUN HAS ENDED.
+     *
+     * `working` is the only live node state, but it is the CHART's opinion, and
+     * the chart settles from state pulses that stop arriving when a run
+     * finishes. A node left mid-`working` at that moment kept its spinner
+     * forever — the user, on an engineer that had already posted "Deliverables
+     * Complete": "the model seems to have submitted for a final time, or
+     * otherwise be finished, but it still shows a loading spinner."
+     *
+     * `corpRunning` is the run's own terminal signal (set false on the
+     * `done`/`status` event), so it is the authority over a stale node state.
+     * Same rule as everywhere else here: when two sources disagree, prefer the
+     * one that observed the end.
+     */
+    child.setRunning(id, corp.corpRunning && node.state === 'working');
   }
 }
 

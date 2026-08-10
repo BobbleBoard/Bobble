@@ -808,7 +808,7 @@ describe('the corp coordination rows are specific, not generic', () => {
       call('c1', 'talk_to', { recipient: 'engineer:1', message: 'Build the deck.\nUse office-gen.' }),
       result('c1', 'on it'),
       false,
-    ).data;
+    ).data as { kind: string; label: string; detail?: string; argsText?: string };
     expect(step.kind).toBe('talk');
     expect(step.label).toBe('Messaged');
     expect(step.detail).toBe('engineer:1');
@@ -822,7 +822,7 @@ describe('the corp coordination rows are specific, not generic', () => {
       call('c1', 'commission_specialist', { specialty: 'document', request: 'Make the pptx.' }),
       undefined,
       false,
-    ).data;
+    ).data as { kind: string; label: string; detail?: string; argsText?: string };
     expect(step.kind).toBe('commission');
     expect(step.detail).toBe('document');
     expect(step.argsText).toContain('Specialist: document');
@@ -838,7 +838,7 @@ describe('the corp coordination rows are specific, not generic', () => {
       }),
       undefined,
       false,
-    ).data;
+    ).data as { kind: string; label: string; detail?: string; argsText?: string };
     expect(step.kind).toBe('toolkit');
     expect(step.argsText).toContain('Kit: shell — run the deck renderer');
     expect(step.argsText).toContain('Kit: browser');
@@ -850,7 +850,7 @@ describe('the corp coordination rows are specific, not generic', () => {
       call('c1', 'ready_to_delegate', { plan_summary: '1. deck → engineer 1' }),
       undefined,
       false,
-    ).data;
+    ).data as { kind: string; label: string; detail?: string; argsText?: string };
     expect(step.kind).toBe('delegate');
     expect(step.label).toBe('Ready to delegate');
     expect(step.argsText).toContain('1. deck → engineer 1');
