@@ -156,7 +156,35 @@ export function syncCorpChildren(parentId: string): void {
      * Same rule as everywhere else here: when two sources disagree, prefer the
      * one that observed the end.
      */
-    child.setRunning(id, corp.corpRunning && node.state === 'working');
+    const running = corp.corpRunning && node.state === 'working';
+    child.setRunning(id, running);
+    /*
+     * The SAME lifecycle word the situation room shows, on the sidebar row.
+     * the user had a run where the sidebar showed a blue dot and the situation room
+     * showed "queued" for the same agent — two panes describing one thing in two
+     * vocabularies, so neither could be trusted. Once the run is over the chart's
+     * `working` is stale (see above), so a still-`working` node reads as the run
+     * left it, not as live.
+     */
+    child.setStatusLabel(id, nodeStatusWord(node.state, corp.corpRunning));
+  }
+}
+
+/** One word per org-chart state — the sidebar's mirror of the situation room. */
+export function nodeStatusWord(state: OrgNodeView['state'], runLive: boolean): string {
+  switch (state) {
+    case 'working':
+      return runLive ? 'working' : 'stopped';
+    case 'waiting':
+      return 'waiting';
+    case 'done':
+      return 'done';
+    case 'blocked':
+      return 'blocked';
+    case 'retired':
+      return 'stopped';
+    default:
+      return 'queued';
   }
 }
 

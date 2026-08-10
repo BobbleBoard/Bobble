@@ -797,6 +797,13 @@ export function SessionSidebar({
                   <IconChat size={13} />
                 </span>
                 <span className="pd-child-row-label">{c.title}</span>
+                {/* The situation room's own lifecycle word, on the row. Without
+                    it the sidebar could only say "spinning" or "not spinning",
+                    which is why a finished agent and a never-started one looked
+                    identical here. */}
+                {c.statusLabel !== undefined && !c.running ? (
+                  <span className="pd-child-row-status">{c.statusLabel}</span>
+                ) : null}
                 {c.running ? (
                   <Spinner size={12} />
                 ) : childUnread[c.childId] !== undefined ? (

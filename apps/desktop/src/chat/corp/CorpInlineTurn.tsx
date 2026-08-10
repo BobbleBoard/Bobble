@@ -85,6 +85,10 @@ function rowStatusLine(node: OrgNodeView, anyoneElseWorking: boolean): string {
       return 'blocked';
     case 'retired':
       return 'stopped';
+    // Has RUN and is between turns. Reading this as "queued" is what made a
+    // finished engineer look like one that never started.
+    case 'waiting':
+      return 'waiting';
     default:
       return 'queued';
   }
@@ -97,13 +101,16 @@ function isRoot(n: OrgNodeView): boolean {
   return n.parentId === undefined && (n.role === 'ceo' || n.role === 'solo');
 }
 
-/** Active rows on top: working → blocked → queued → done → stopped. */
+/** Active rows on top: working → blocked → waiting → queued → done → stopped. */
 const STATE_RANK: Record<OrgNodeView['state'], number> = {
   working: 0,
   blocked: 1,
-  idle: 2,
-  done: 3,
-  retired: 4,
+  // Above `idle`: an agent that has run and can be talked to again is closer to
+  // the action than one that has never started.
+  waiting: 2,
+  idle: 3,
+  done: 4,
+  retired: 5,
 };
 
 /** Stable ordering: rank by state, keep the chart's order within a rank. */

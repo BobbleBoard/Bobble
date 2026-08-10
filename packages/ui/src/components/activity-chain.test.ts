@@ -133,9 +133,33 @@ describe('formatDuration', () => {
   it('drops to seconds under a minute', () => {
     expect(formatDuration(45_000)).toBe('45s');
   });
-  it('keeps a zero minute/second component', () => {
-    expect(formatDuration(3_600_000)).toBe('1h 0m');
-    expect(formatDuration(0)).toBe('0s');
+
+  /* the user: "'worked for ah nm rs' please. no 0s." */
+  it('keeps the seconds on a long duration instead of truncating them', () => {
+    expect(formatDuration(3600_000 + 20 * 60_000 + 5_000)).toBe('1h 20m 5s');
+  });
+
+  it('OMITS any zero component rather than printing it', () => {
+    expect(formatDuration(3_600_000)).toBe('1h');
+    expect(formatDuration(3_600_000 + 5_000)).toBe('1h 5s');
+    expect(formatDuration(120_000)).toBe('2m');
+  });
+
+  it('returns an empty string for zero — there is no useful "0s"', () => {
+    expect(formatDuration(0)).toBe('');
+    expect(formatDuration(400)).toBe('');
+  });
+
+  it('never leaves a caller with a dangling phrase', () => {
+    // The reason the empty string is safe: callers test the FORMATTED value.
+    expect(summarizeActivity([{ kind: 'thinking', label: 't', durationMs: 400 }])).toBe('Thought');
+    expect(
+      summarizeActivity([
+        { kind: 'read', label: 'a' },
+        { kind: 'thinking', label: 'b' },
+        { kind: 'bash', label: 'c' },
+      ]),
+    ).toBe('Worked');
   });
 });
 

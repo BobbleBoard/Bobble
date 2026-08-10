@@ -170,7 +170,11 @@ export function CorpWorkerFeed({
         // Only a real SUBAGENT (manager/engineer) is a "subagent". The CEO/lead is
         // not — its run summary ("Delivered N tasks with a team of M") owns that.
         <div className="pd-workerpane-finished" data-testid="corp-finished-line">
-          Subagent finished in {formatDuration(finishedInMs)}
+          {/* A sub-second run formats to nothing ("no 0s"), so say it finished
+              rather than "finished in " with a hole where the time should be. */}
+          {formatDuration(finishedInMs) !== ''
+            ? `Subagent finished in ${formatDuration(finishedInMs)}`
+            : 'Subagent finished'}
         </div>
       ) : null}
       {loading && transcript === null ? (

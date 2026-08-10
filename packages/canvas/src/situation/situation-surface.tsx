@@ -391,6 +391,16 @@ function actionText(action: string): string {
   return action === 'thinking' ? 'thinking…' : action;
 }
 
+/**
+ * `<prefix> <duration>`, or the bare fallback when there is no duration worth
+ * printing. `formatDuration` returns an empty string for zero (the user: "no 0s"),
+ * so testing the FORMATTED value is what stops a row reading "finished in ".
+ */
+function durationOr(ms: number | undefined, prefix: string, fallback: string): string {
+  const d = ms !== undefined ? formatDuration(ms) : '';
+  return d !== '' ? `${prefix} ${d}` : fallback;
+}
+
 /** The one-line status a subagent row shows for its node's live state —
  * exactly the chat's wording (CorpInlineTurn's rowStatusLine). A finished node
  * with known timing reads "finished in Nm Ns" (Point 4c) instead of a bare "done". */
@@ -409,23 +419,28 @@ function agentStatusLine(node: OrgNodeView, elapsedMs?: number): string {
       }
       return node.currentAction !== undefined ? actionText(node.currentAction) : 'working…';
     case 'done':
-      return elapsedMs !== undefined ? `finished in ${formatDuration(elapsedMs)}` : 'done';
+      return durationOr(elapsedMs, 'finished in', 'done');
     case 'blocked':
       return 'blocked';
     case 'retired':
-      return elapsedMs !== undefined ? `finished in ${formatDuration(elapsedMs)}` : 'stopped';
+      return durationOr(elapsedMs, 'finished in', 'stopped');
+    /* Ran, and can be talked to again. Says how long it worked, because the
+     * whole complaint was a row that hid the fact it had worked at all. */
+    case 'waiting':
+      return durationOr(elapsedMs, 'waiting · worked', 'waiting');
     default:
       return 'queued';
   }
 }
 
-/** Active rows on top (the chat's order): working → blocked → queued → done → stopped. */
+/** Active rows on top (the chat's order): working → blocked → waiting → queued → done → stopped. */
 const STATE_RANK: Record<OrgNodeView['state'], number> = {
   working: 0,
   blocked: 1,
-  idle: 2,
-  done: 3,
-  retired: 4,
+  waiting: 2,
+  idle: 3,
+  done: 4,
+  retired: 5,
 };
 
 /** Stable ordering: the root always first, then rank by state, keeping the

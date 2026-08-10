@@ -222,21 +222,37 @@ const KIND_ORDER: ActivityStepKind[] = [
   'canvas-open',
 ];
 
-/** Format a millisecond duration as "Xh Ym" / "Ym Zs" / "Zs". */
+/**
+ * Format a millisecond duration as "1h 20m 5s", dropping any ZERO component.
+ *
+ * the user: "'worked for ah nm rs' please. no 0s." So all three units appear when
+ * they carry information and none of them appear when they don't — "1h" rather
+ * than "1h 0m", "2m 5s" rather than "0h 2m 5s". An hour-long turn also keeps its
+ * seconds now; truncating them was hiding real precision on the long turns where
+ * it is most interesting.
+ *
+ * Returns an EMPTY STRING for zero: there is no useful reading of "0s", and a
+ * caller with nothing to report should say nothing rather than print a zero.
+ */
 export function formatDuration(ms: number): string {
   const totalSec = Math.max(0, Math.round(ms / 1000));
   const h = Math.floor(totalSec / 3600);
   const m = Math.floor((totalSec % 3600) / 60);
   const s = totalSec % 60;
-  if (h > 0) return `${h}h ${m}m`;
-  if (m > 0) return `${m}m ${s}s`;
-  return `${s}s`;
+  const parts: string[] = [];
+  if (h > 0) parts.push(`${h}h`);
+  if (m > 0) parts.push(`${m}m`);
+  if (s > 0) parts.push(`${s}s`);
+  return parts.join(' ');
 }
 
 function phrase(kind: ActivityStepKind, count: number, durationMs: number, failed = 0): string {
   // Thinking is duration-first when we have one ("thought for 1h 20m").
   if (kind === 'thinking') {
-    return durationMs > 0 ? `Thought for ${formatDuration(durationMs)}` : 'Thought';
+    // Test the FORMATTED value, not the raw ms: a sub-second duration is a real
+    // number that formats to nothing, and "Thought for " is worse than "Thought".
+    const d = formatDuration(durationMs);
+    return d !== '' ? `Thought for ${d}` : 'Thought';
   }
   const spec = VERBS[kind];
   /*
@@ -309,7 +325,8 @@ export function summarizeActivity(steps: ActivityStepData[]): string {
     const anyDone = steps.some((s) => s.failed !== true);
     if (anyDone) {
       const total = steps.reduce((sum, s) => sum + (s.durationMs ?? 0), 0);
-      return total > 0 ? `Worked for ${formatDuration(total)}` : 'Worked';
+      const d = formatDuration(total);
+      return d !== '' ? `Worked for ${d}` : 'Worked';
     }
   }
   return phrases.map((p, i) => (i === 0 ? p : lowerFirst(p))).join(', ');

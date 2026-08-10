@@ -255,8 +255,9 @@ export function startMeshTask(opts: {
     if (terminated) return;
     terminated = true;
     controller.abort();
+    // Stopped mid-turn: it RAN, so it is waiting, not back to never-started.
     for (const agent of roster)
-      if (states.get(agent.id) === 'working') states.set(agent.id, 'idle');
+      if (states.get(agent.id) === 'working') states.set(agent.id, 'waiting');
     emitChart();
     stream.push({ type: 'status', status: 'done' });
     stream.push({
@@ -294,8 +295,14 @@ export function startMeshTask(opts: {
         return;
       }
       if (record.kind === 'turn-end') {
-        // Not "done" — a persistent agent may be talked to again; idle between turns.
-        states.set(agentId, 'idle');
+        /*
+         * Not "done" — a persistent agent may be talked to again. But not `idle`
+         * either: idle means never started, and the situation room labels it
+         * "queued". An agent that has finished a turn and can be talked to again
+         * is WAITING, and saying so is the difference between a roster that
+         * reflects the run and one that claims a working engineer never began.
+         */
+        states.set(agentId, 'waiting');
         emitChart();
         emitPlan();
         return;

@@ -63,7 +63,12 @@ function stateWord(state: OrgNodeView['state']): string {
   switch (state) {
     case 'working':
       return 'building';
+    /* This panel already called `idle` "waiting" while the situation room called
+     * the SAME state "queued" — the two surfaces disagreed because one state was
+     * carrying both meanings. Now they are distinct, so both can be true. */
     case 'idle':
+      return 'queued';
+    case 'waiting':
       return 'waiting';
     case 'blocked':
       return 'blocked';

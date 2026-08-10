@@ -124,7 +124,16 @@ export type OrgNodeRole =
   | 'specialist';
 
 /** Live state of a node (the situation room pulses `working` nodes). */
-export type OrgNodeState = 'idle' | 'working' | 'blocked' | 'done' | 'retired';
+/**
+ * `idle` and `waiting` are NOT the same thing, and collapsing them is what made
+ * a finished agent read as "queued" in the situation room while its full
+ * transcript sat one click away — the user: "engineer 1 WAS run, because I can click
+ * on it… see it's 'queued' but it's already run."
+ *
+ *  - `idle`    — has never run. Genuinely queued.
+ *  - `waiting`— has run, is between turns, and can be talked to again.
+ */
+export type OrgNodeState = 'idle' | 'waiting' | 'working' | 'blocked' | 'done' | 'retired';
 
 /** One node in the neutral org-chart view. */
 export interface OrgNodeView {

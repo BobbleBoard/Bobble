@@ -1665,19 +1665,23 @@ body {
    open that chat. Replaces the old rectangular popout. ─────────────────────────── */
 .pd-chat-dot {
   display: inline-block;
-  width: 10px;
-  height: 10px;
+  /* 5px, not 10 — the user: "blue dot needs to be 2x smaller". At 10px with a 3px
+     halo it read as a status light competing with the row's own text; the point
+     of the dot is to be noticed in peripheral vision, not to be the loudest
+     thing in the sidebar. The halo scales with it. */
+  width: 5px;
+  height: 5px;
   border-radius: 999px;
   /* fill both ends so a paused/interrupted animation can never leave it invisible */
   animation: pd-chat-dot-pop 0.28s var(--pd-easing-standard) both;
 }
 .pd-chat-dot--finished {
   background: var(--pd-status-info-fg);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--pd-status-info-fg) 22%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--pd-status-info-fg) 22%, transparent);
 }
 .pd-chat-dot--needs-input {
   background: var(--pd-status-warning-fg);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--pd-status-warning-fg) 22%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--pd-status-warning-fg) 22%, transparent);
 }
 @keyframes pd-chat-dot-pop {
   from {
@@ -1756,6 +1760,18 @@ body {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The agent's lifecycle word ("queued" / "waiting" / "done"), mirroring the
+   situation room onto the sidebar row. Quiet by construction: it is context for
+   the name beside it, not a second label competing with it. Never shrinks — the
+   NAME truncates first, because the status is the shorter and more perishable
+   fact, and a half-word status ("wait…") is worse than a truncated title. */
+.pd-child-row-status {
+  flex: none;
+  font-size: 11px;
+  color: var(--pd-text-tertiary, var(--pd-text-secondary));
   white-space: nowrap;
 }
 

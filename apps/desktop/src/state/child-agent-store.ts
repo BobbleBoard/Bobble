@@ -31,6 +31,18 @@ export interface ChildAgentEntry {
   messages: ChatMsg[];
   /** True between the child's agent_start and agent_end (drives the spinner). */
   running: boolean;
+  /**
+   * The one-word lifecycle the situation room shows for this agent — "queued",
+   * "working", "waiting", "done", "blocked", "stopped".
+   *
+   * the user: "that small text that shows 'queued' 'working', 'waiting' or 'error'
+   * should show as such in the left sidebar aswell." The sidebar and the
+   * situation room were describing the same agents with different vocabularies
+   * (one had a dot, the other had a word), so the two panes could disagree about
+   * whether anything was happening. Absent for a plain subagent, which has no
+   * org-chart state of its own — the spinner still speaks for it.
+   */
+  statusLabel?: string;
 }
 
 interface ChildAgentState {
@@ -50,6 +62,9 @@ interface ChildAgentState {
   updateMessages(childId: string, mutate: (m: ChatMsg[]) => ChatMsg[]): void;
   replaceMessages(childId: string, messages: ChatMsg[]): void;
   setRunning(childId: string, running: boolean): void;
+  /** Mirror the org-chart lifecycle word onto the sidebar row. No-ops when
+   * unchanged, so the corp bridge can call it on every store tick. */
+  setStatusLabel(childId: string, statusLabel: string | undefined): void;
 }
 
 export const useChildAgentStore = create<ChildAgentState>()((set) => ({
@@ -118,6 +133,12 @@ export const useChildAgentStore = create<ChildAgentState>()((set) => ({
         return { children, unread: { ...s.unread, [childId]: true } };
       }
       return { children };
+    }),
+  setStatusLabel: (childId, statusLabel) =>
+    set((s) => {
+      const c = s.children[childId];
+      if (c === undefined || c.statusLabel === statusLabel) return {};
+      return { children: { ...s.children, [childId]: { ...c, statusLabel } } };
     }),
 }));
 
