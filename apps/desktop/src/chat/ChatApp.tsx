@@ -264,7 +264,13 @@ export function ChatApp({
   // tab-reset with the session lifecycle so a new/switched conversation starts
   // with a clean canvas (session isolation, backlog #2).
   const canvasController = useRef<CanvasController | null>(null);
-  if (canvasController.current === null) canvasController.current = createCanvasController();
+  if (canvasController.current === null)
+    canvasController.current = createCanvasController({
+      // Closing the LAST tab collapses the rail, whichever affordance did it —
+      // the tab's own X used to leave the chat beside an empty canvas while ⌘W
+      // closed it properly (the user).
+      onEmpty: () => useCanvasStore.getState().setCanvasOpen(false),
+    });
   // Drives the situation room's user/power labelling when a run promotes.
   const userMode = useUserMode();
   useEffect(() => {

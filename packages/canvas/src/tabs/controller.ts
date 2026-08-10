@@ -16,6 +16,13 @@ export interface CanvasControllerOptions {
   idFactory?: () => string;
   /** Seed state (the app can restore tabs on launch). */
   initialState?: Partial<CanvasState>;
+  /**
+   * Called when {@link CanvasController.closeTab} removes the LAST tab. The app
+   * collapses its rail here, so "close the last tab" means the same thing
+   * whichever affordance did it (the tab's X, ⌘W). Optional — a headless or test
+   * controller simply has no rail to collapse.
+   */
+  onEmpty?: () => void;
 }
 
 /**
@@ -38,10 +45,12 @@ export interface CanvasControllerOptions {
 export class CanvasController {
   #state: CanvasState;
   readonly #idFactory: () => string;
+  readonly #onEmpty: (() => void) | undefined;
   readonly #listeners = new Set<() => void>();
 
   constructor(options: CanvasControllerOptions = {}) {
     this.#idFactory = options.idFactory ?? defaultIdFactory;
+    this.#onEmpty = options.onEmpty;
     this.#state = { ...emptyCanvasState, ...options.initialState };
   }
 
@@ -126,6 +135,17 @@ export class CanvasController {
       activeTabId = neighbour?.id ?? null;
     }
     this.#commit({ ...this.#state, tabs, activeTabId });
+    /*
+     * CLOSING THE LAST TAB CLOSES THE RAIL. the user: "clicking the X on the last tab
+     * in the canvas should close the canvas sidebar."
+     *
+     * Fired from HERE rather than at the call sites, because there are several
+     * and they had already drifted: the ⌘W accelerator collapsed the rail, the
+     * tab's own X did not, so the same action left the chat sitting beside an
+     * empty canvas depending on how you did it. The controller is the one place
+     * that knows the tab list just became empty.
+     */
+    if (tabs.length === 0) this.#onEmpty?.();
   }
 
   /** Merge live state into a tab (browser url/title, media status, subagents…). */

@@ -98,3 +98,45 @@ describe('CanvasController', () => {
     expect(listener).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('closing the LAST tab closes the rail', () => {
+  /*
+   * the user: "clicking the X on the last tab in the canvas should close the canvas
+   * sidebar." Lives on the controller because the affordances had drifted — ⌘W
+   * collapsed the rail and the tab's own X did not, so the same action behaved
+   * differently depending on how you performed it.
+   */
+  it('fires onEmpty when the final tab goes', () => {
+    let closed = 0;
+    const c = createCanvasController({ onEmpty: () => { closed += 1; } });
+    const a = c.openTab({ kind: 'file', title: 'a.ts' });
+    const b = c.openTab({ kind: 'file', title: 'b.ts' });
+    c.closeTab(a);
+    expect(closed).toBe(0); // one tab left — the rail stays
+    c.closeTab(b);
+    expect(closed).toBe(1);
+  });
+
+  it('does NOT fire for a close that leaves tabs behind', () => {
+    let closed = 0;
+    const c = createCanvasController({ onEmpty: () => { closed += 1; } });
+    c.openTab({ kind: 'file', title: 'a.ts' });
+    const b = c.openTab({ kind: 'file', title: 'b.ts' });
+    c.closeTab(b);
+    expect(closed).toBe(0);
+  });
+
+  it('does NOT fire for an unknown id, which removes nothing', () => {
+    let closed = 0;
+    const c = createCanvasController({ onEmpty: () => { closed += 1; } });
+    c.closeTab('nope');
+    expect(closed).toBe(0);
+  });
+
+  it('works without the callback — a headless controller has no rail', () => {
+    const c = createCanvasController();
+    const a = c.openTab({ kind: 'file', title: 'a.ts' });
+    expect(() => c.closeTab(a)).not.toThrow();
+    expect(c.getState().tabs).toHaveLength(0);
+  });
+});
