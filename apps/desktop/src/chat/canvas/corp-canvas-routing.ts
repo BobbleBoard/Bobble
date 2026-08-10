@@ -104,7 +104,30 @@ export function activitySpec(blocks: readonly CorpBlock[]): CanvasTabSpec | unde
     filePath: file.path,
     breadcrumb: file.path.split(/[/\\]/).filter(Boolean),
     streaming: file.streaming,
-    ...(file.content.length > 0 ? { artifact: fileArtifactFromText(file.path, file.content) } : {}),
+    /*
+     * NO BODY IS NOT THE SAME AS AN EMPTY FILE, and rendering both as a blank
+     * pane is what made the user click a file the agent had just written and see
+     * nothing — "being shown blanks in the canvas renderer with no failed to
+     * edit file or whatnot".
+     *
+     * With a body, show it. WITHOUT one, say why: the tab still names the file
+     * and its +N/−N, and the pane says the content was not captured rather than
+     * implying the agent wrote an empty file. The common cause was a shell
+     * heredoc carrying no text; that now carries its body (shell-writes.ts), so
+     * this is the honest fallback for what is left — a redirect from a pipeline,
+     * whose output we cannot know without running it.
+     */
+    ...(file.content.length > 0
+      ? { artifact: fileArtifactFromText(file.path, file.content) }
+      : {
+          artifact: fileArtifactFromText(
+            file.path,
+            file.streaming
+              ? '(writing…)'
+              : '(the agent wrote this file, but the command did not carry its ' +
+                  'contents — open it from the file tree to read it)',
+          ),
+        }),
     ...(file.addedLines !== undefined
       ? { addedLines: file.addedLines, removedLines: file.removedLines ?? 0 }
       : {}),

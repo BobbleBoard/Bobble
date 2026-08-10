@@ -32,6 +32,36 @@ export interface ShellWrite {
   readonly path: string;
   /** `>>` and python `'a'` mode — the file is extended, not replaced. */
   readonly append: boolean;
+  /**
+   * The body, when the command CARRIES it — a heredoc's text.
+   *
+   * Without this the live canvas got a path and an empty string, and the tab
+   * renders no artifact for empty content, so a file the agent had just written
+   * opened BLANK. the user: "when we clicked on a file it just wrote to it looked
+   * blank". Tool `write`/`edit` already carried their body; a heredoc is how
+   * these agents actually write, and it carried nothing.
+   */
+  readonly body?: string;
+}
+
+/**
+ * The text of a `<< 'EOF' ... EOF` heredoc feeding a redirect.
+ *
+ * Quoted (`<< 'EOF'`) and bare (`<< EOF`) both count; the terminator is matched
+ * at the start of a line, which is what the shell itself requires. Returns
+ * undefined when the command has no heredoc — a redirect from a pipeline has no
+ * body we can know without running it.
+ */
+export function heredocBody(command: string): string | undefined {
+  const start = /<<-?\s*(['"]?)([A-Za-z_][A-Za-z0-9_]*)\1/.exec(command);
+  const tag = start?.[2];
+  if (tag === undefined) return undefined;
+  const after = command.slice((start?.index ?? 0) + (start?.[0].length ?? 0));
+  const nl = after.indexOf('\n');
+  if (nl < 0) return undefined;
+  const rest = after.slice(nl + 1);
+  const end = new RegExp(`^\\s*${tag}\\s*$`, 'm').exec(rest);
+  return end === null ? rest : rest.slice(0, end.index);
 }
 
 /** Strip one layer of quoting from a shell word. */
@@ -59,7 +89,10 @@ function redirectWrites(command: string): ShellWrite[] {
   for (const m of command.matchAll(redirect)) {
     const op = m[2] ?? '';
     const path = unquote(m[3] ?? '');
-    if (isLiteralPath(path)) out.push({ path, append: op.includes('>>') });
+    if (isLiteralPath(path)) {
+      const body = heredocBody(command);
+      out.push({ path, append: op.includes('>>'), ...(body !== undefined ? { body } : {}) });
+    }
   }
   const tee = /\btee\s+(-a\s+)?("[^"]+"|'[^']+'|[^\s;|&<>]+)/g;
   for (const m of command.matchAll(tee)) {

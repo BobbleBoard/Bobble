@@ -4,7 +4,7 @@
  * of owning a file, which is worse than missing one.
  */
 import { describe, expect, it } from 'vitest';
-import { shellWrites } from './shell-writes';
+import { heredocBody, shellWrites } from './shell-writes';
 
 const paths = (cmd: string): string[] => shellWrites(cmd).map((w) => w.path);
 
@@ -26,7 +26,9 @@ describe('heredocs — how run 19’s manager built the whole product', () => {
   });
 
   it('distinguishes append from replace', () => {
-    expect(shellWrites('cat >> notes.md << EOF\nhi\nEOF')[0]).toEqual({
+    // `body` is now carried too (the heredoc's text, for the live canvas), so
+    // this asserts the append/replace decision rather than the whole shape.
+    expect(shellWrites('cat >> notes.md << EOF\nhi\nEOF')[0]).toMatchObject({
       path: 'notes.md',
       append: true,
     });
@@ -103,3 +105,26 @@ describe('a command that writes more than one file', () => {
     expect(shellWrites(cmd).find((w) => w.path === 'a.py')?.append).toBe(false);
   });
 });
+
+describe('heredocBody — the live-write body for a shell write', () => {
+  it('captures a quoted heredoc, which is how agents actually write files', () => {
+    // Verbatim shape from the corp run: the manager wrote project.godot this
+    // way, and the canvas showed a blank file because nothing carried the text.
+    const cmd = "cat << 'PROJECTGODOT' > project.godot\n[config]\nname = \"x\"\nPROJECTGODOT";
+    expect(heredocBody(cmd)).toBe('[config]\nname = "x"\n');
+    const w = shellWrites(cmd);
+    expect(w[0]?.path).toBe('project.godot');
+    expect(w[0]?.body).toContain('[config]');
+  });
+
+  it('captures a bare heredoc too', () => {
+    expect(heredocBody('cat << EOF > a.txt\nhello\nEOF')).toBe('hello\n');
+  });
+
+  it('is undefined when the command has no heredoc', () => {
+    // A redirect from a pipeline has a body we cannot know without running it —
+    // undefined, never an empty string, so the canvas can tell the two apart.
+    expect(heredocBody('echo hi > a.txt')).toBeUndefined();
+    expect(shellWrites('echo hi > a.txt')[0]?.body).toBeUndefined();
+  });
+})

@@ -723,6 +723,11 @@ export function shellWriteActivities(
       toolName: w.append ? 'bash(append)' : 'bash',
       path: w.path,
       ...(bytes !== undefined ? { bytes } : {}),
+      // A heredoc's body, on the same field the tool writes use, so a file
+      // written by shell streams into the live canvas exactly like one written
+      // by `write`. Previously this carried no text at all and the tab opened
+      // blank on the most common write path in a corp run.
+      ...(w.body !== undefined ? { text: w.body, linesAdded: w.body.split('\n').length } : {}),
     };
   });
 }
