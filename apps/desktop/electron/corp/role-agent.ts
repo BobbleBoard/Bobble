@@ -737,6 +737,7 @@ export function fileWriteActivity(
   args: unknown,
   cwd: string,
   statBytes: (absPath: string) => number | undefined,
+  readText?: (absPath: string) => string | undefined,
 ): RoleAgentActivity | undefined {
   if (toolName !== 'write' && toolName !== 'edit') return undefined;
   const rec = argsRecord(args as RoleAgentToolCall['arguments']);
@@ -756,6 +757,16 @@ export function fileWriteActivity(
             ? rec.text
             : undefined
       : undefined;
+  /*
+   * AN EDIT IS NOT ITS REPLACEMENT TEXT. `write` carries the whole file, so its
+   * body is the file; `edit` carries only the fragment it swapped in, and
+   * threading that to the live canvas rendered a snippet where the document
+   * should be. Read the file back so "live edit" shows the file the edit
+   * produced. Falls back to the fragment when the read is unavailable — a
+   * fragment beats nothing, and nothing is what a blank pane says.
+   */
+  const settled = toolName === 'edit' ? readText?.(abs) : undefined;
+  const liveBody = settled ?? body;
   const linesAdded = body !== undefined ? body.split('\n').length : undefined;
   return {
     kind: 'file-write',
@@ -767,7 +778,7 @@ export function fileWriteActivity(
     // structured-write completion has the full file) so coordination can thread it
     // to the live file canvas — the tab renders the ACTUAL content, not a blank
     // peek. Reuses the existing field; no new activity shape.
-    ...(body !== undefined ? { text: body } : {}),
+    ...(liveBody !== undefined ? { text: liveBody } : {}),
   };
 }
 
@@ -1358,7 +1369,13 @@ export async function openRoleSession(
         });
       }
       if (e.isError) return undefined;
-      const fileWrite = fileWriteActivity(e.toolName, e.input, config.cwd, safeStatBytes);
+      const fileWrite = fileWriteActivity(
+        e.toolName,
+        e.input,
+        config.cwd,
+        safeStatBytes,
+        safeReadText,
+      );
       if (fileWrite !== undefined) emit(fileWrite);
       // A heredoc IS a file write. Emitted after the bash record above, so the
       // transcript shows the command and then what it produced.
@@ -1619,6 +1636,29 @@ export async function runRoleAgent(
 function safeStatBytes(absPath: string): number | undefined {
   try {
     return statSync(absPath).size;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * The file AS IT NOW STANDS, read back after a write.
+ *
+ * An `edit` carries only its REPLACEMENT text, so threading that to the canvas
+ * showed a fragment where the file should be — live edit that renders three
+ * changed lines and calls itself the document. Reading the file back is the only
+ * way to show what the edit actually produced.
+ *
+ * Bounded: a large artifact is not something to stream into a chat pane, and the
+ * agent's own writes are the only files this ever touches.
+ */
+const LIVE_BODY_MAX_BYTES = 256 * 1024;
+
+function safeReadText(absPath: string): string | undefined {
+  try {
+    const size = statSync(absPath).size;
+    if (size > LIVE_BODY_MAX_BYTES) return undefined;
+    return readFileSync(absPath, 'utf8');
   } catch {
     return undefined;
   }

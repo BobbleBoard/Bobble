@@ -717,3 +717,44 @@ describe('wouldHang — a GUI app run in the foreground', () => {
     expect(wouldHang('python3 nope-not-here.py', dir)).toBeNull();
   });
 });
+
+describe('live EDIT carries the file, not the fragment', () => {
+  it('reads the file back after an edit', () => {
+    /*
+     * An `edit` tool call carries only `new_text` — the replacement. Threading
+     * that to the live canvas rendered three changed lines where the document
+     * should be, which is why "live edit" looked broken even when it worked.
+     */
+    const act = fileWriteActivity(
+      'edit',
+      { path: 'a.py', new_text: 'return 2' },
+      '/w',
+      () => 120,
+      (abs) => (abs === '/w/a.py' ? 'def f():\n    return 2\n' : undefined),
+    );
+    expect(act?.text).toBe('def f():\n    return 2\n');
+  });
+
+  it('falls back to the fragment when the file cannot be read', () => {
+    // A fragment beats nothing, and nothing is what a blank pane says.
+    const act = fileWriteActivity(
+      'edit',
+      { path: 'a.py', new_text: 'return 2' },
+      '/w',
+      () => 120,
+      () => undefined,
+    );
+    expect(act?.text).toBe('return 2');
+  });
+
+  it('a write still uses its OWN body — it already has the whole file', () => {
+    const act = fileWriteActivity(
+      'write',
+      { path: 'a.py', content: 'whole file' },
+      '/w',
+      () => 10,
+      () => 'SHOULD NOT BE USED',
+    );
+    expect(act?.text).toBe('whole file');
+  });
+});
