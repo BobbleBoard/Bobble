@@ -581,6 +581,53 @@ function toolCallPath(args: RoleAgentToolCall['arguments']): string | undefined 
   return typeof raw === 'string' && raw.length > 0 ? raw : undefined;
 }
 
+/**
+ * A write whose target CANNOT BE OPENED LATER is refused now, with the reason.
+ *
+ * the user, on a report a subagent wrote and handed back: "it just shows up blank in
+ * the canvas sidebar… it was unable to be read or clicked on or viewed by me…
+ * ensure even if paths are malformed or something it gets written somewhere /
+ * reprompted to specify the path if there's error."
+ *
+ * The write PARSED and the +N counter climbed, so nothing looked wrong until the
+ * file was wanted. Refusing at the moment of writing turns a mystery discovered
+ * an hour later into a sentence the model can act on immediately — and unlike a
+ * silent relocation (the bug this project already fixed once), the agent is told
+ * where its file did NOT go.
+ *
+ * Deliberately NARROW. It rejects only paths that cannot name a real file — not
+ * paths it merely dislikes — because a fence that second-guesses a legitimate
+ * target is worse than no fence.
+ */
+export function unusableWritePath(target: string): string | undefined {
+  const t = target.trim();
+  if (t.length === 0) return 'the path is empty';
+  // A trailing separator names a directory, not a file — this project has already
+  // shipped a run whose "file" was a directory path with a dot on the end.
+  if (/[/\\]$/.test(t)) return `"${target}" ends in a separator, so it names a folder, not a file`;
+  if (/\n|\r/.test(target)) return 'the path contains a line break';
+  // A path the model wrote as prose ("the file at src/x.ts") is not a path.
+  if (/\s{2,}/.test(t) || /^[A-Za-z ]+ (at|in|to) /.test(t)) {
+    return `"${target}" reads as a sentence rather than a path`;
+  }
+  if (t.endsWith('.')) return `"${target}" ends in a dot, which will not open`;
+  return undefined;
+}
+
+/**
+ * The refusal text for {@link unusableWritePath} — names the problem AND asks for
+ * the one thing that fixes it, because a refusal the model cannot act on just
+ * becomes a retry loop.
+ */
+export function unusablePathRefusal(toolName: string, target: string, why: string): string {
+  return (
+    `The ${toolName} did NOT happen: ${why}. Nothing was written, and nothing was ` +
+    `moved somewhere else — the file does not exist. Call ${toolName} again with an ` +
+    `absolute path inside your workspace, naming the file you actually want ` +
+    `(for example /path/to/workspace/report.md).`
+  );
+}
+
 /** Collapse a shell command to a compact one-line summary for a live readout:
  * first non-blank line, whitespace squeezed, clipped to `max` chars. Pure. */
 export function summarizeCommand(command: string, max = 60): string {
@@ -1411,6 +1458,18 @@ export async function openRoleSession(
         const startPath = toolCallPath(e.input as RoleAgentToolCall['arguments']);
         if (startPath !== undefined) {
           emit({ kind: 'file-write', toolName: e.toolName, path: startPath, phase: 'start' });
+        }
+      }
+      /*
+       * REFUSE AN UNOPENABLE TARGET BEFORE it becomes a file nobody can find.
+       * Runs ahead of the other gates because it is about the ARGUMENTS being
+       * usable at all, not about whether this agent is allowed to write.
+       */
+      if (e.toolName === 'write' || e.toolName === 'edit') {
+        const target = toolCallPath(e.input as RoleAgentToolCall['arguments']);
+        const why = target === undefined ? 'no path was given' : unusableWritePath(target);
+        if (why !== undefined) {
+          return { block: true, reason: unusablePathRefusal(e.toolName, target ?? '', why) };
         }
       }
       const denied = bashDenylistGate(e.toolName, e.input, config.cwd);

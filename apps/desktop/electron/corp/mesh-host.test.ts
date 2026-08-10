@@ -19,7 +19,7 @@ import {
   WAIT_TOOL,
 } from '@pi-desktop/harness/corp';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { roleActiveTools } from './role-agent';
+import { roleActiveTools, unusablePathRefusal, unusableWritePath } from './role-agent';
 import {
   communicationTools,
   DEFAULT_STEPS_PER_MESSAGE,
@@ -723,5 +723,45 @@ describe('the custom communication tools survive the active-set narrowing', () =
     expect(roleActiveTools(['read', 'tool_search']).filter((n) => n === 'tool_search')).toHaveLength(
       1,
     );
+  });
+});
+
+describe('a write whose path cannot be opened is refused, not relocated', () => {
+  /*
+   * the user: "it just shows up blank in the canvas sidebar… ensure even if paths are
+   * malformed or something it gets written somewhere / reprompted to specify the
+   * path if there's error." The write PARSED and the +N counter climbed, so
+   * nothing looked wrong until the file was wanted an hour later.
+   *
+   * Refusing beats relocating: this project already shipped a silent-relocation
+   * bug, where the agent was never told its file had gone somewhere else.
+   */
+  it('rejects the shapes that cannot name a file', () => {
+    expect(unusableWritePath('')).toBeTruthy();
+    expect(unusableWritePath('   ')).toBeTruthy();
+    expect(unusableWritePath('/tmp/out/')).toContain('folder');
+    expect(unusableWritePath('/tmp/report.md.')).toContain('dot');
+    expect(unusableWritePath('the file at src/x.ts')).toContain('sentence');
+    expect(unusableWritePath('/tmp/a\nb.md')).toContain('line break');
+  });
+
+  it('leaves ORDINARY paths alone — a fence that second-guesses is worse than none', () => {
+    for (const ok of [
+      '/Users/user/bobble-testbed/run/report.md',
+      'src/index.ts',
+      './notes.md',
+      '../sibling/file.json',
+      '/tmp/a b.md', // a single space is a legal filename
+      'C:\\Users\\x\\file.txt',
+    ]) {
+      expect(unusableWritePath(ok)).toBeUndefined();
+    }
+  });
+
+  it('tells the model nothing was written AND what to do next', () => {
+    const msg = unusablePathRefusal('write', '/tmp/out/', 'it names a folder');
+    expect(msg).toContain('did NOT happen');
+    expect(msg).toContain('nothing was moved somewhere else');
+    expect(msg).toContain('absolute path');
   });
 });
