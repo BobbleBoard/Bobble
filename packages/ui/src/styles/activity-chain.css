@@ -489,3 +489,68 @@ button.pd-chain-step-row:hover .pd-chain-step-chevron {
   line-height: var(--pd-leading-caption);
   font-variant-numeric: tabular-nums;
 }
+
+
+/*
+ * A FAILED STEP, in the one place it can be acted on.
+ *
+ * the user: "no (failed). expanded tool calls show fails as red and clicking it
+ * shows the actual error and 'copy raw' button if it's an actual failed to
+ * parse error (this will be useful for debugging). terminal stuff should show
+ * the failed part (the error message) when expanded in red."
+ *
+ * The summary line no longer carries a "(N failed)" parenthetical — it was
+ * noise you could not click. The signal moved here instead: the row is red, and
+ * opening it shows the real error text rather than a count of them.
+ */
+.pd-chain-step[data-failed='true'] .pd-chain-step-label,
+.pd-chain-step[data-failed='true'] .pd-chain-step-icon {
+  color: var(--pd-status-danger-fg);
+}
+
+.pd-chain-step[data-failed='true'] .pd-chain-step-detail,
+.pd-chain-step[data-failed='true'] .pd-chain-step-subline {
+  color: color-mix(in srgb, var(--pd-status-danger-fg) 72%, var(--pd-text-secondary));
+}
+
+/* The error body inside an opened failed row — and the same treatment for a
+   command's stderr, which is the "failed part" of a terminal row. */
+.pd-chain-error {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: var(--pd-radius-sm, 6px);
+  border: 1px solid color-mix(in srgb, var(--pd-status-danger-fg) 35%, transparent);
+  background: color-mix(in srgb, var(--pd-status-danger-fg) 8%, transparent);
+}
+
+.pd-chain-error-text {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: var(--pd-font-mono);
+  font-size: var(--pd-font-size-code);
+  color: var(--pd-status-danger-fg);
+  user-select: text;
+}
+
+.pd-chain-error-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.pd-chain-error-copy {
+  padding: 3px 8px;
+  border-radius: var(--pd-radius-sm, 6px);
+  border: 1px solid color-mix(in srgb, var(--pd-status-danger-fg) 40%, transparent);
+  background: transparent;
+  color: var(--pd-status-danger-fg);
+  font-family: var(--pd-font-sans);
+  font-size: var(--pd-font-size-caption, 12px);
+  cursor: pointer;
+}
+
+.pd-chain-error-copy:hover {
+  background: color-mix(in srgb, var(--pd-status-danger-fg) 12%, transparent);
+}

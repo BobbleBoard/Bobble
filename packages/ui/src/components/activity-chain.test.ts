@@ -39,12 +39,41 @@ describe('summarizeActivity', () => {
   });
 
   it('emits kinds in a fixed canonical order regardless of input order', () => {
+    // TWO kinds, because three or more now collapse (below) and the ordering
+    // this test exists to pin would no longer be observable.
     const steps: ActivityStepData[] = [
+      { kind: 'read', label: 'a' },
+      { kind: 'bash', label: 'c' },
+    ];
+    expect(summarizeActivity(steps)).toBe('Ran a command, read a file');
+  });
+
+  it('collapses past TWO distinct actions rather than listing them', () => {
+    /*
+     * the user: "if the message shown on tool call blocks exceeds 2 distinct
+     * actions simply collapse it to say 'worked' for <time> rather than list
+     * everything out." Two still reads as a sentence; three is a list.
+     */
+    const three: ActivityStepData[] = [
       { kind: 'read', label: 'a' },
       { kind: 'thinking', label: 'b' },
       { kind: 'bash', label: 'c' },
     ];
-    expect(summarizeActivity(steps)).toBe('Ran a command, thought, read a file');
+    expect(summarizeActivity(three)).toBe('Worked');
+    expect(summarizeActivity([...three, { kind: 'bash', label: 'd', durationMs: 90_000 }])).toBe(
+      'Worked for 1m 30s',
+    );
+  });
+
+  it('never says "Worked" when nothing did', () => {
+    // A collapse that swallows a wholly failed turn would be the same false
+    // completion this project keeps fixing one layer up.
+    const allFailed: ActivityStepData[] = [
+      { kind: 'read', label: 'a', failed: true },
+      { kind: 'thinking', label: 'b', failed: true },
+      { kind: 'bash', label: 'c', failed: true },
+    ];
+    expect(summarizeActivity(allFailed).startsWith('Worked')).toBe(false);
   });
 
   it('keeps non-countable verbs singular even when repeated', () => {
@@ -86,7 +115,7 @@ describe('summarizeActivity', () => {
       { kind: 'thinking', label: 't', durationMs: 80 * 60_000 },
       ...Array.from({ length: 3 }, (_, i): ActivityStepData => ({ kind: 'read', label: `r${i}` })),
     ];
-    expect(summarizeActivity(steps)).toBe('Ran 10 commands, thought for 1h 20m, read 3 files');
+    expect(summarizeActivity(steps)).toBe('Worked for 1h 20m');
   });
 
   it('returns an empty string for no steps', () => {
@@ -160,15 +189,23 @@ describe('a rejected call is not work done', () => {
       ...Array.from({ length: 6 }, () => step('edit', true)),
       ...Array.from({ length: 9 }, () => step('read')),
     ]);
-    expect(summary).toContain('6 edits failed');
+    /*
+     * Three distinct kinds now collapse to "Worked for <time>" (the user), so the
+     * itemisation is gone — but the property this test exists for holds, and is
+     * what is asserted: the summary must never CLAIM the rejected edits. The
+     * failures are not hidden, they are red on their own rows with the real
+     * error, which is where you can act on one.
+     */
     expect(summary).not.toContain('edited 6 files');
-    // The reads DID work and still read normally.
-    expect(summary).toContain('read 9 files');
+    expect(summary).not.toContain('6 files');
+    expect(summary.startsWith('Worked')).toBe(true);
   });
 
   it('reports a partial failure as both, never rounded up', () => {
+    // NO "(N failed)" TAIL any more (the user) — but the count still excludes the
+    // rejected call, so the line remains true rather than rounded up.
     const summary = summarizeActivity([step('edit'), step('edit'), step('edit', true)]);
-    expect(summary).toBe('Edited 2 files (1 failed)');
+    expect(summary).toBe('Edited 2 files');
   });
 
   it('says "1 edit failed" for a single rejected call', () => {

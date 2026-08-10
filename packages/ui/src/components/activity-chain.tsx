@@ -237,8 +237,13 @@ function phrase(kind: ActivityStepKind, count: number, durationMs: number, faile
   }
   const done = count - failed;
   const noun = done > 1 ? `${done} ${spec.plural}` : spec.singular;
-  // Some worked and some did not — report both rather than rounding up.
-  return failed > 0 ? `${spec.verb} ${noun} (${failed} failed)` : `${spec.verb} ${noun}`;
+  /*
+   * NO "(N failed)" TAIL. the user: "additionally, no (failed)." The count of what
+   * WORKED is the honest headline; the failures are not hidden, they are red in
+   * the expanded rows with their real error, which is where you can act on one.
+   * A parenthetical in the summary was noise you could not click.
+   */
+  return `${spec.verb} ${noun}`;
 }
 
 function lowerFirst(text: string): string {
@@ -264,6 +269,32 @@ export function summarizeActivity(steps: ActivityStepData[]): string {
   for (const kind of KIND_ORDER) {
     const entry = agg.get(kind);
     if (entry) phrases.push(phrase(kind, entry.count, entry.durationMs, entry.failed));
+  }
+  /*
+   * PAST TWO DISTINCT ACTIONS, SAY "WORKED FOR <time>".
+   *
+   * the user: "if the message shown on tool call blocks exceeds 2 distinct actions
+   * simply collapse it to say 'worked' for <time> rather than list everything
+   * out." A forty-step turn summarised as "Ran 12 commands, thought for 4m,
+   * read 9 files, edited 5 files, listed 3 folders" is a paragraph where a
+   * glance should do — and the detail is one click away in the chain itself.
+   *
+   * Two is the line because two still READS ("Ran 3 commands, thought for 2m");
+   * three is where it becomes a list.
+   */
+  if (phrases.length > 2) {
+    /*
+     * ...unless nothing worked. "Worked for 2m" over a turn whose every call
+     * was rejected is the false-completion this project keeps having to fix,
+     * one layer up. When there is nothing that succeeded, the collapse would be
+     * a claim rather than a summary, so keep the itemised line — it is the
+     * honest one, and a failing turn is exactly when you want the detail.
+     */
+    const anyDone = steps.some((s) => s.failed !== true);
+    if (anyDone) {
+      const total = steps.reduce((sum, s) => sum + (s.durationMs ?? 0), 0);
+      return total > 0 ? `Worked for ${formatDuration(total)}` : 'Worked';
+    }
   }
   return phrases.map((p, i) => (i === 0 ? p : lowerFirst(p))).join(', ');
 }
@@ -437,7 +468,65 @@ function TerminalBlock({
   );
 }
 
+/**
+ * The error body of a FAILED step: the real message, in red, with a copy button.
+ *
+ * the user: "clicking it shows the actual error and 'copy raw' button if it's an
+ * actual failed to parse error (this will be useful for debugging)."
+ *
+ * `copyRaw` appears only for the errors worth pasting somewhere — a parse /
+ * schema failure, where the exact bytes are the diagnosis. A "file not found"
+ * needs no clipboard, and a button on every error trains you to ignore it.
+ */
+function looksLikeParseError(text: string): boolean {
+  return /pars|json|schema|unexpected token|malformed|invalid|syntax|decode/i.test(text);
+}
+
+function StepError({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <div className="pd-chain-error">
+      <pre className="pd-chain-error-text">{text}</pre>
+      {looksLikeParseError(text) ? (
+        <div className="pd-chain-error-actions">
+          <button
+            type="button"
+            className="pd-chain-error-copy pd-focusable"
+            onClick={() => {
+              void navigator.clipboard?.writeText(text);
+              setCopied(true);
+              setTimeout(() => setCopied(false), 1200);
+            }}
+          >
+            {copied ? 'Copied' : 'Copy raw'}
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function StepContent({ step, live = false }: { step: ActivityStepData; live?: boolean }) {
+  /*
+   * A FAILURE OUTRANKS THE NORMAL BODY. Whatever this kind usually shows, the
+   * thing you opened it for is what went wrong — so the error leads, and the
+   * usual content follows it (a bash row still shows its command and stdout
+   * under the red stderr).
+   */
+  const errText =
+    step.failed === true
+      ? ((step as { output?: string }).output ?? (step as { error?: string }).error ?? '')
+      : '';
+  if (errText.trim().length > 0) {
+    return (
+      <>
+        <StepError text={errText} />
+        {step.kind === 'bash' || step.kind === 'python' ? (
+          <TerminalBlock command={(step as { command?: string }).command} />
+        ) : null}
+      </>
+    );
+  }
   switch (step.kind) {
     case 'thinking':
       return step.thought ? <ChainThought text={step.thought} live={live} /> : null;
@@ -667,6 +756,11 @@ export const ActivityStep = forwardRef<HTMLDivElement, ActivityStepProps>(functi
       className="pd-chain-step"
       data-expanded={disclosable ? expanded : undefined}
       data-kind={data.kind}
+      /* A FAILED STEP IS RED, and only here. the user: "expanded tool calls show
+       * fails as red and clicking it shows the actual error". The summary above
+       * no longer carries a "(N failed)" tail, so this is where a failure is
+       * visible — on the row you can open to see what actually went wrong. */
+      data-failed={data.failed === true ? 'true' : undefined}
     >
       {canvas ? (
         <button type="button" className="pd-chain-step-row pd-focusable" onClick={onOpenCanvas}>
