@@ -29,10 +29,15 @@ const OUT = process.env.OUT ?? '/tmp/real-send';
  * has no models in it.
  */
 const packaged = process.env.APP;
+/* OBSERVE=1 threads PI_E2E purely to expose `window.__pi_store`, so the warm
+ * status can be READ. Audited: PI_E2E only affects window bounds, that store
+ * opt-in, onboarding seeding and a mac debug channel — nothing that touches a
+ * response — so the timing stays comparable. */
+const observe = process.env.OBSERVE === '1' ? { PI_E2E: '1' } : {};
 const app = await electron.launch(
   packaged !== undefined
-    ? { executablePath: `${packaged}/Contents/MacOS/Bobble` }
-    : { executablePath: require('electron'), args: [appRoot] },
+    ? { executablePath: `${packaged}/Contents/MacOS/Bobble`, env: { ...process.env, ...observe } }
+    : { executablePath: require('electron'), args: [appRoot], env: { ...process.env, ...observe } },
 );
 
 const assistantText = (win) =>
@@ -46,12 +51,44 @@ try {
   await win.waitForSelector('[data-testid="composer-input"]', { timeout: 60_000 });
   console.log('app up');
 
-  // The server does not auto-wire under Playwright, so start it — but nothing
-  // else. No pi:restart, no pi:set-model: that sequence is what send-diag did.
+  /*
+   * THE REAL USER PATH. The server does not auto-wire under Playwright, so start
+   * it and SELECT the model — selecting is what a user does in the picker, and
+   * it is what fires the system-prompt warm-up. Crucially NO `pi:restart`: that
+   * is the one step send-diag added, and it is the step that produces empty
+   * replies (#47).
+   *
+   * Then WAIT FOR WARM rather than sleeping a guessed number of seconds, so the
+   * measurement below starts from the moment the app claims it is ready — which
+   * is exactly the promise "Loading model" makes.
+   */
   await win.evaluate(async (modelId) => {
     await window.piDesktop.invoke('llm:start-server', { modelId });
   }, MODEL);
-  await win.waitForTimeout(20_000);
+  if (process.env.SELECT_MODEL === '1') {
+    await win.evaluate(async (modelId) => {
+      await window.piDesktop.invoke('pi:set-model', { provider: 'llamacpp', modelId });
+    }, MODEL);
+  }
+  const warmStart = Date.now();
+  await win
+    .waitForFunction(
+      () => document.querySelector('[data-testid="composer-model-loading"]') === null,
+      undefined,
+      { timeout: 180_000 },
+    )
+    .catch(() => {});
+  console.log(`  "Loading model" gone after ${((Date.now() - warmStart) / 1000).toFixed(1)}s`);
+  const warmState = await win
+    .evaluate(() => {
+      const st = window.__pi_store?.().getState?.();
+      return st === undefined
+        ? 'store not exposed (set OBSERVE=1)'
+        : (st.extensionStatus?.['harness-prefix-warm'] ?? 'NEVER PUBLISHED');
+    })
+    .catch(() => 'unreadable');
+  console.log(`  prefix warm: ${warmState}`);
+  await win.waitForTimeout(1500);
   await win.screenshot({ path: `${OUT}-01-loaded.png` }).catch(() => {});
   console.log('server started, model settling');
 
@@ -60,17 +97,30 @@ try {
   const sentAt = Date.now();
   await win.keyboard.press('Enter');
 
+  /*
+   * SPLIT THE NUMBER. "7 seconds to an answer" is three different bugs wearing
+   * one coat: the send not dispatching, a long prompt prefill, or the model
+   * thinking. Timing the ROW appearing separately from its first CHARACTER
+   * separates dispatch+prefill from generation, which is the only way to know
+   * what to fix.
+   */
+  let rowAt = null;
   let firstAt = null;
   let text = [];
   const deadline = Date.now() + 180_000;
   while (Date.now() < deadline) {
+    if (rowAt === null) {
+      const rows = await win.evaluate(() => document.querySelectorAll('.pd-msg--assistant').length);
+      if (rows > 0) rowAt = Date.now() - sentAt;
+    }
     text = await assistantText(win);
     if (text.length > 0) {
       firstAt = Date.now() - sentAt;
       break;
     }
-    await new Promise((r) => setTimeout(r, 200));
+    await new Promise((r) => setTimeout(r, 50));
   }
+  console.log(`assistant row appeared: ${rowAt === null ? 'NEVER' : `${rowAt}ms`}`);
   // Let it finish so the screenshot shows a real answer, not one word.
   await win.waitForTimeout(8000);
   text = await assistantText(win);

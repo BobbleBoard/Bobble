@@ -19,11 +19,11 @@ import { runImageJob } from '../gen3d/gen3d-main';
 import {
   getInferenceLaunchMode,
   getInferenceUtility,
+  utilityStateFilePath,
   visionStateFilePath,
 } from '../inference/llm-main';
 import type { AppEventMap } from '../ipc-contract';
-import { activeProjectPath } from '../project/project-main';
-import { currentWorkspaceDir } from '../project/project-main';
+import { activeProjectPath, currentWorkspaceDir } from '../project/project-main';
 import { resolveSessionCwd } from '../sandbox';
 import { advancedSamplingFilePath, generationExperimentEnabled } from '../settings/settings-main';
 import { isTrustedIpcEvent } from '../trusted-senders';
@@ -136,6 +136,11 @@ function buildPiEnv(cwd: string | undefined): Record<string, string | undefined>
     ...(utility !== null
       ? { PI_DESKTOP_UTILITY_BASE_URL: utility.baseUrl, PI_DESKTOP_UTILITY_MODEL: utility.model }
       : {}),
+    // …and the LIVE file, always. The env pair above is a spawn-time snapshot and
+    // on app open pi starts BEFORE the server, so without this the harness never
+    // learns there is an endpoint at all — which is what kept the system-prompt
+    // warm-up from ever running outside a probe.
+    PI_DESKTOP_UTILITY_FILE: utilityStateFilePath(),
   };
 }
 

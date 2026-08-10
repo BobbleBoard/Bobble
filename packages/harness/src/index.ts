@@ -444,7 +444,23 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
   // The utility model powering fixer + reviewer + classifier escalation. Absent
   // (no PI_DESKTOP_UTILITY_BASE_URL and no injected callModel) → those features
   // degrade to heuristic/skip; the rest of the harness is unaffected.
-  const callModel: CallModel | undefined = options.callModel ?? callModelFromEnv();
+  /*
+   * RE-RESOLVED, not captured once.
+   *
+   * On a normal app open pi starts BEFORE the model server, so the endpoint env
+   * is absent at this line and every consumer below — the fixer, the reviewer,
+   * and above all the prefix warm-up — was permanently dead for that process.
+   * It only ever worked in the probe, which restarts pi after the server is up.
+   * `callModelFromEnv` now also reads the app's live endpoint file, so asking
+   * again later is what turns a late server into a working one.
+   */
+  let resolvedCallModel: CallModel | undefined = options.callModel ?? callModelFromEnv();
+  const currentCallModel = (): CallModel | undefined => {
+    if (resolvedCallModel !== undefined) return resolvedCallModel;
+    resolvedCallModel = callModelFromEnv();
+    return resolvedCallModel;
+  };
+  const callModel: CallModel | undefined = resolvedCallModel;
   // Debounce the preemptive warm-up by the CANONICAL prompt content: warm each
   // unique system+tools prefix once. Keyed on content (not model id) because it
   // fires on BOTH session_start and model_select — a new chat on the same model
@@ -519,21 +535,75 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
   }
 
   function maybeWarmPrefix(ctx: ExtensionContext): void {
-    if (callModel === undefined || typeof ctx.getSystemPrompt !== 'function') return;
+    const warmCall = currentCallModel();
+    /* Opt-in diagnostic: WHY a warm-up did not happen. Four different silent
+     * returns look identical from outside, and the difference decides the fix. */
+    const dbg = process.env.PI_ADV_DEBUG_WARM;
+    const note = (why: string): void => {
+      if (dbg === undefined || dbg.length === 0) return;
+      try {
+        appendFileSync(dbg, `warm: ${why}\n`);
+      } catch {
+        /* a diagnostic must never break a turn */
+      }
+    };
+    if (warmCall === undefined) {
+      note('no callModel (no endpoint env and no live file)');
+      return;
+    }
+    if (typeof ctx.getSystemPrompt !== 'function') {
+      note('ctx.getSystemPrompt missing');
+      return;
+    }
     const canonical = augmentSystemPrompt(ctx.getSystemPrompt());
-    if (canonical.trim().length === 0 || canonical === warmedCanonical) return;
-    warmedCanonical = canonical;
+    if (canonical.trim().length === 0) {
+      note('empty system prompt');
+      return;
+    }
+    // NOTE: the debounce key is completed BELOW, once the tool set is known — the
+    // prefix is [system][tools], so warming is only redundant when BOTH match.
+
     runtime.canonicalSystemPrompt = canonical;
     const warmClass: TaskClass =
       runtime.config.preset === 'auto' ? 'coding' : runtime.config.preset;
     // Build the tool list in the SAME ORDER a real turn does (applyPreset unions
     // resolvePresetTools' order), NOT pi.getAllTools() registry order.
-    const warmTools = orderedToolDefs(
-      resolvePresetTools(
-        warmClass,
-        pi.getAllTools().map((t) => t.name),
-      ),
-    );
+    /*
+     * THE WARM SET MUST BE THE TURN'S SET, EXACTLY.
+     *
+     * Chat templates render tools at the START of the prompt, so one extra or
+     * missing tool changes the very first tokens and the cached prefix is worth
+     * nothing. The corp seam is gated on EFFORT and added by applyPreset, so a
+     * warm-up that ignored it warmed 16 tools while a max-effort turn asked for
+     * 17 — a prefix that could never be reused, which is why a measured 20× win
+     * never once showed up in a real session.
+     */
+    const available = pi.getAllTools().map((t) => t.name);
+    const warmNames = resolvePresetTools(warmClass, available);
+    if (
+      corpToolEnabled(runtime.config.effort) &&
+      available.includes(CREATE_PRODUCTION_HIERARCHY) &&
+      !warmNames.includes(CREATE_PRODUCTION_HIERARCHY)
+    ) {
+      warmNames.push(CREATE_PRODUCTION_HIERARCHY);
+    }
+    const warmTools = orderedToolDefs(warmNames);
+    /*
+     * DEBOUNCE ON THE WHOLE PREFIX, not just the system prompt.
+     *
+     * Keyed on the prompt alone, the first warm-up (default effort, 16 tools)
+     * blocked every later one — so when effort rose to max and the turn began
+     * advertising a 17th tool (talk_to_manager), the cached prefix no longer
+     * matched the turn's first tokens and reused nothing. The retry ticks dutifully
+     * reported "already warmed" 19 times while the thing they were meant to warm
+     * had changed underneath them.
+     */
+    const warmKey = `${canonical}\u0000${warmNames.join(',')}`;
+    if (warmKey === warmedCanonical) {
+      note('already warmed (same prompt + tools)');
+      return;
+    }
+    warmedCanonical = warmKey;
     /*
      * SAY WHEN THE PREFIX IS ACTUALLY RESIDENT.
      *
@@ -549,8 +619,12 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
      * still release the label, or a transient error strands the UI on "Loading
      * model" forever with a perfectly usable server behind it.
      */
+    note(
+      `WARMING ${canonical.length} chars, ${warmTools.length} tools ` +
+        `[${warmTools.map((t) => t.name).join(',')}], hasUI=${ctx.hasUI}`,
+    );
     if (ctx.hasUI === true) ctx.ui.setStatus(PREFIX_WARM_STATUS, 'warming');
-    void warmSystemPrompt(callModel, canonical, { tools: warmTools }).finally(() => {
+    void warmSystemPrompt(warmCall, canonical, { tools: warmTools }).finally(() => {
       if (ctx.hasUI === true) ctx.ui.setStatus(PREFIX_WARM_STATUS, 'ready');
     });
     // Seed the renderer's predictive-prefill context with exactly what the warm-up
@@ -1467,7 +1541,17 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     // Push repair deps now that the effort level is known (abortThreshold etc.).
     bridge.push();
     if (runtime.statusTimer !== null) clearInterval(runtime.statusTimer);
-    runtime.statusTimer = setInterval(() => publishStatus(ctx), 1000);
+    /*
+     * The tick also RETRIES THE WARM-UP until it takes. session_start fires
+     * before the model server exists on a normal app open, so the one-shot
+     * attempt below always lost that race; `maybeWarmPrefix` self-guards on the
+     * canonical prompt, so re-asking is free once it has succeeded and is the
+     * difference between a warm first message and a 12-second one.
+     */
+    runtime.statusTimer = setInterval(() => {
+      publishStatus(ctx);
+      maybeWarmPrefix(ctx);
+    }, 1000);
     publishStatus(ctx);
     publishSubagents(ctx);
     // Warm the deterministic prefix now that the session (and its model + utility

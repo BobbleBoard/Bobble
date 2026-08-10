@@ -83,12 +83,20 @@ export interface MeshBudget {
    * the manager's wait behaves identically either way, it just resumes sooner
    * or later.
    */
-  readonly maxConcurrent: number;
+  readonly maxConcurrent?: number;
 }
 
 /** The default bounds — generous enough for a real multi-agent build, tight enough to
  * guarantee termination. */
-export const DEFAULT_MESH_BUDGET: MeshBudget = { maxTurns: 200, maxDepth: 12, maxConcurrent: 3 };
+/** Three at once: enough for a real round on this machine, few enough that a
+ * single llama-server's slots are not thrashed. */
+export const DEFAULT_MAX_CONCURRENT = 3;
+
+export const DEFAULT_MESH_BUDGET: MeshBudget = {
+  maxTurns: 200,
+  maxDepth: 12,
+  maxConcurrent: DEFAULT_MAX_CONCURRENT,
+};
 
 /** One piece of work handed out and not yet finished. */
 export interface DispatchedJob {
@@ -227,7 +235,9 @@ export class AgentMesh {
     onHop?: (hop: MeshHop) => void,
   ) {
     this.runTurn = runTurn;
-    this.budget = budget;
+    // OPTIONAL on the way in, concrete in here: an existing caller that predates
+    // parallel dispatch must not have to know about a cap to keep working.
+    this.budget = { ...budget, maxConcurrent: budget.maxConcurrent ?? DEFAULT_MAX_CONCURRENT };
     this.onHop = onHop;
     for (const a of agents) this.agents.set(a.id, a);
   }
@@ -387,7 +397,7 @@ export class AgentMesh {
    * new call path.
    */
   private async acquireSlot(): Promise<void> {
-    if (this.running < this.budget.maxConcurrent) {
+    if (this.running < (this.budget.maxConcurrent ?? DEFAULT_MAX_CONCURRENT)) {
       this.running += 1;
       return;
     }

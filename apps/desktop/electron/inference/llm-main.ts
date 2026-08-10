@@ -76,6 +76,34 @@ export function visionStateFilePath(): string {
  * relaunched multimodal. A one-byte file both parent and children re-read is the
  * cheapest thing that cannot go stale.
  */
+/**
+ * The LIVE utility endpoint, for a pi child that started before the server did.
+ *
+ * `PI_DESKTOP_UTILITY_BASE_URL` is fixed at spawn, and on a normal app open pi
+ * starts FIRST — so the harness saw no endpoint, and everything that needs one
+ * was dead for that process: the fixer, the reviewer, and above all the
+ * system-prompt WARM-UP. Measured consequence: a first message paid a full cold
+ * prefill, ~12s of "processing" on a question worth milliseconds, because the
+ * warm-up had never once run in a real session. It only worked in the probe,
+ * which restarts pi after the server is up.
+ *
+ * Same one-file cure as vision above, for the same reason.
+ */
+export function utilityStateFilePath(): string {
+  return path.join(app.getPath('userData'), 'utility-endpoint.json');
+}
+
+/** Keep that file current — written on every status change, cleared when the
+ * server goes away so a stale URL is never handed to a child. */
+function writeUtilityState(): void {
+  try {
+    const utility = getInferenceUtility();
+    writeFileSync(utilityStateFilePath(), utility === null ? '{}' : JSON.stringify(utility));
+  } catch {
+    // Best effort — the env snapshot remains the fallback.
+  }
+}
+
 function writeVisionState(mode: 'fast-text' | 'multimodal' | null): void {
   try {
     writeFileSync(visionStateFilePath(), mode === 'multimodal' ? '1' : '0');
@@ -225,6 +253,10 @@ function ensureChild(): UtilityProcess {
       const before = lastStatus?.launchMode;
       lastStatus = message.status;
       if (message.status.launchMode !== before) writeVisionState(message.status.launchMode ?? null);
+      // The endpoint file tracks EVERY status change, not just a launch-mode
+      // flip: "the server just came up" is exactly the transition a pi child
+      // that started first needs to hear about.
+      writeUtilityState();
       broadcast('llm:status', message.status);
       return;
     }

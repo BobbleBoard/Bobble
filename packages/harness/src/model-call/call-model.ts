@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 /**
  * The "call a model" seam.
  *
@@ -166,17 +167,74 @@ export const UTILITY_MODEL_ENV = 'PI_DESKTOP_UTILITY_MODEL';
 export const UTILITY_API_KEY_ENV = 'PI_DESKTOP_UTILITY_API_KEY';
 
 /**
+ * A stable path the app REWRITES whenever the local server comes up or changes.
+ *
+ * The env vars above are a SPAWN-TIME SNAPSHOT, and on a normal app open pi
+ * starts BEFORE the model server does — so they are simply absent, this returns
+ * undefined, and every consumer (the prefix warm-up above all) is dead for the
+ * life of that pi process. The app's own comment already named it: "a server that
+ * starts WITHOUT a subsequent pi respawn won't re-point the already-running
+ * child until the next spawn."
+ *
+ * MEASURED, which is why this exists: the system-prompt warm-up never ran in a
+ * real session, so a first message paid a full cold prefill — ~12s of
+ * "processing" on a question worth a hundred milliseconds. It only ever worked
+ * in the probe, which restarts pi AFTER the server is up.
+ *
+ * Same fix the codebase already uses for vision (`PI_DESKTOP_VISION_FILE`): a
+ * live file the child re-reads, rather than a value captured once.
+ */
+export const UTILITY_FILE_ENV = 'PI_DESKTOP_UTILITY_FILE';
+
+/** The endpoint as the app writes it. */
+interface UtilityEndpoint {
+  readonly baseUrl?: unknown;
+  readonly model?: unknown;
+  readonly apiKey?: unknown;
+}
+
+/** Read the live endpoint file, or undefined when absent/unreadable/empty. */
+function readUtilityFile(file: string): { baseUrl: string; model: string; apiKey?: string } | undefined {
+  try {
+    // Required lazily so this module stays importable where `node:fs` is not
+    // (the renderer never imports it today, and this keeps that true).
+    const raw = readFileSync(file, 'utf8');
+    const json = JSON.parse(raw) as UtilityEndpoint;
+    const baseUrl = typeof json.baseUrl === 'string' ? json.baseUrl : '';
+    if (baseUrl.length === 0) return undefined;
+    const model = typeof json.model === 'string' && json.model.length > 0 ? json.model : 'utility';
+    const apiKey = typeof json.apiKey === 'string' && json.apiKey.length > 0 ? json.apiKey : undefined;
+    return { baseUrl, model, ...(apiKey !== undefined ? { apiKey } : {}) };
+  } catch {
+    // No server yet, or a half-written file — indistinguishable from "not ready",
+    // and both mean the same thing to a caller: try again later.
+    return undefined;
+  }
+}
+
+/**
  * Build the default {@link CallModel} from env config, or `undefined` when no
- * base URL is set (so callers degrade to heuristic-only behavior). Never
+ * base URL is known (so callers degrade to heuristic-only behavior). Never
  * hardcodes a URL.
+ *
+ * The env vars win when set (a spawn that already knew the server); otherwise
+ * the LIVE FILE is consulted, which is what makes a server that came up after pi
+ * usable without respawning the child. Callers that ran before the server
+ * existed should call this again rather than caching `undefined` forever.
  */
 export function callModelFromEnv(
   env: Record<string, string | undefined> = process.env,
   fetchImpl?: typeof fetch,
 ): CallModel | undefined {
-  const baseUrl = env[UTILITY_BASE_URL_ENV];
-  if (baseUrl === undefined || baseUrl.length === 0) return undefined;
-  const model = env[UTILITY_MODEL_ENV] ?? 'utility';
-  const apiKey = env[UTILITY_API_KEY_ENV];
-  return createOpenAiCompatCallModel({ baseUrl, model, apiKey, fetchImpl });
+  const envUrl = env[UTILITY_BASE_URL_ENV];
+  if (envUrl !== undefined && envUrl.length > 0) {
+    const model = env[UTILITY_MODEL_ENV] ?? 'utility';
+    const apiKey = env[UTILITY_API_KEY_ENV];
+    return createOpenAiCompatCallModel({ baseUrl: envUrl, model, apiKey, fetchImpl });
+  }
+  const file = env[UTILITY_FILE_ENV];
+  if (file === undefined || file.length === 0) return undefined;
+  const live = readUtilityFile(file);
+  if (live === undefined) return undefined;
+  return createOpenAiCompatCallModel({ ...live, fetchImpl });
 }
