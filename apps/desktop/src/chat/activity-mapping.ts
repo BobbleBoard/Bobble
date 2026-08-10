@@ -461,9 +461,21 @@ function labelFor(kind: ActivityStepKind, resolution: ToolResolution, running: b
   return stepLabel(kind, running);
 }
 
-/** Pretty-print a tool call's arguments for the generic reveal (Input block). */
+/**
+ * Pretty-print a tool call's arguments for the reveal (Input block).
+ *
+ * THE COORDINATION TOOLS GET PROSE, NOT JSON. the user: "the talk to, ready to
+ * delegate additionally need to be clickable to show case specific not generic
+ * expansions of details of the tool call." A hand-off's content is one
+ * recipient and one paragraph; rendering that as `{"recipient": "engineer:1",
+ * "message": "…\n…"}` buries the only two facts that matter behind escaped
+ * newlines. These are the rows that carry what a corp run actually decided, so
+ * they read as what they are.
+ */
 function formatArgs(args: Record<string, unknown>): string | undefined {
   if (Object.keys(args).length === 0) return undefined;
+  const comm = formatCommArgs(args);
+  if (comm !== undefined) return comm;
   try {
     return JSON.stringify(args, null, 2);
   } catch {
@@ -471,11 +483,45 @@ function formatArgs(args: Record<string, unknown>): string | undefined {
   }
 }
 
+/** The corp comm tools, rendered as "Field: value" + the body on its own lines. */
+function formatCommArgs(args: Record<string, unknown>): string | undefined {
+  const lines: string[] = [];
+  const push = (label: string, v: unknown): void => {
+    const t = str(v);
+    if (t !== undefined && t.length > 0) lines.push(`${label}: ${t}`);
+  };
+  push('To', args.recipient);
+  push('Specialist', args.specialty);
+  push('Testing', args.what_you_will_test);
+  // request_test_tools: each kit with the reason it was asked for.
+  if (Array.isArray(args.kits)) {
+    for (const k of args.kits) {
+      if (typeof k === 'string') lines.push(`Kit: ${k}`);
+      else if (k !== null && typeof k === 'object') {
+        const rec = k as Record<string, unknown>;
+        const why = str(rec.why);
+        lines.push(`Kit: ${str(rec.kit) ?? '?'}${why !== undefined ? ` — ${why}` : ''}`);
+      }
+    }
+  }
+  const body = str(args.message) ?? str(args.request) ?? str(args.plan_summary);
+  if (lines.length === 0 && body === undefined) return undefined;
+  if (body !== undefined) {
+    if (lines.length > 0) lines.push('');
+    lines.push(body);
+  }
+  return lines.join('\n');
+}
+
 /** The most meaningful single arg to surface inline for a connector/tool row. */
 function primaryArg(args: Record<string, unknown>): string | undefined {
   return (
     str(args.query) ??
     str(args.q) ??
+    // WHO a hand-off went to, so the row itself reads "Messaged engineer:1"
+    // rather than making you open it to learn the one fact you wanted.
+    str(args.recipient) ??
+    str(args.specialty) ??
     str(args.title) ??
     str(args.name) ??
     str(args.subject) ??
@@ -829,6 +875,21 @@ function mapToolStepData(
       };
     case 'tool-search':
     case 'tool':
+    /*
+     * THE COORDINATION KINDS BELONG HERE, not in the default arm.
+     *
+     * `default:` hardcodes `kind: 'read'`, so a kind that reaches it is
+     * RELABELLED a file read with a file icon and a `preview` — which is
+     * exactly the mislabelling the comment below warns about, applied to the
+     * rows that carry a run's whole coordination story. Their args ARE the
+     * content (who, and what was asked), so they take the same arm as any
+     * tool whose reveal is its input and output.
+     */
+    case 'talk':
+    case 'commission':
+    case 'delegate':
+    case 'toolkit':
+    case 'submit':
       // tool_search + the NEUTRAL generic fallback: a distinct glyph + humanized
       // name, args + result revealed on click. NEVER a mislabeled "Read a file".
       return {

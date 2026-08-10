@@ -795,3 +795,64 @@ describe('chat-template markers are not thoughts', () => {
     expect((step.data as { thought?: string }).thought).toBe('Reading the file.');
   });
 });
+
+describe('the corp coordination rows are specific, not generic', () => {
+  it('talk_to says WHO on the row and reads as prose when opened', () => {
+    /*
+     * the user: "the talk to, ready to delegate additionally need to be clickable
+     * to show case specific not generic expansions of details of the tool
+     * call." A hand-off is one recipient and one paragraph; JSON.stringify
+     * buried both behind escaped newlines.
+     */
+    const step = mapToolStep(
+      call('c1', 'talk_to', { recipient: 'engineer:1', message: 'Build the deck.\nUse office-gen.' }),
+      result('c1', 'on it'),
+      false,
+    ).data;
+    expect(step.kind).toBe('talk');
+    expect(step.label).toBe('Messaged');
+    expect(step.detail).toBe('engineer:1');
+    expect(step.argsText).toContain('To: engineer:1');
+    expect(step.argsText).toContain('Build the deck.');
+    expect(step.argsText).not.toContain('{');
+  });
+
+  it('commission_specialist names the specialist and the request', () => {
+    const step = mapToolStep(
+      call('c1', 'commission_specialist', { specialty: 'document', request: 'Make the pptx.' }),
+      undefined,
+      false,
+    ).data;
+    expect(step.kind).toBe('commission');
+    expect(step.detail).toBe('document');
+    expect(step.argsText).toContain('Specialist: document');
+    expect(step.argsText).toContain('Make the pptx.');
+  });
+
+  it('request_test_tools lists each kit WITH the reason it was asked for', () => {
+    // The reason is never checked by the harness — but it is worth reading.
+    const step = mapToolStep(
+      call('c1', 'request_test_tools', {
+        kits: [{ kit: 'shell', why: 'run the deck renderer' }, 'browser'],
+        what_you_will_test: 'the exported pptx',
+      }),
+      undefined,
+      false,
+    ).data;
+    expect(step.kind).toBe('toolkit');
+    expect(step.argsText).toContain('Kit: shell — run the deck renderer');
+    expect(step.argsText).toContain('Kit: browser');
+    expect(step.argsText).toContain('Testing: the exported pptx');
+  });
+
+  it('ready_to_delegate shows the plan it claims to have', () => {
+    const step = mapToolStep(
+      call('c1', 'ready_to_delegate', { plan_summary: '1. deck → engineer 1' }),
+      undefined,
+      false,
+    ).data;
+    expect(step.kind).toBe('delegate');
+    expect(step.label).toBe('Ready to delegate');
+    expect(step.argsText).toContain('1. deck → engineer 1');
+  });
+})
