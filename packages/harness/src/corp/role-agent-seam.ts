@@ -136,6 +136,9 @@ export interface RoleAgentActivity {
    * paired settle every row reads as complete on arrival and a blocking call
    * looks like an idle agent. */
   readonly settled?: boolean;
+  /** How long a `tool` step took, ms — paired by tool-call id, so a repeated
+   * tool cannot borrow another call's clock. Carried on the settle. */
+  readonly durationMs?: number;
   /** Context fullness of the run's session (0..100) at a turn boundary, when the
    * app impl can read it (`session.getContextUsage().percent`). Carried on
    * `turn-start`/`turn-end` records so the engine can surface a live context

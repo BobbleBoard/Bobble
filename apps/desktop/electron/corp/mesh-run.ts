@@ -174,6 +174,7 @@ function activityToEvent(nodeId: string, r: RoleAgentActivity): CoordinationEven
         ...(r.argsText !== undefined ? { argsText: r.argsText } : {}),
         ...(r.recipient !== undefined ? { recipient: r.recipient } : {}),
         ...(r.settled === true ? { settled: true } : {}),
+        ...(r.durationMs !== undefined ? { durationMs: r.durationMs } : {}),
       };
     case 'file-write':
       return {

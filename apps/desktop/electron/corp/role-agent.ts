@@ -1372,7 +1372,15 @@ export async function openRoleSession(
     // SAME `tool_call` handler the live-activity forwarding and submit gates
     // compose around — the denylist gate slots in without clobbering the capture
     // sink or the step-cap.
+    /*
+     * WHEN each call started, keyed by its OWN id — not its name. A role that
+     * runs `bash` three times has three calls in flight by name and only the id
+     * pairs each result with the right start. Feeds the row's duration, which is
+     * what turns a bare "Worked" into "Worked for 2m 5s".
+     */
+    const startedAt = new Map<string, number>();
     pi.on('tool_call', (e: ToolCallEvent) => {
+      startedAt.set(e.toolCallId, Date.now());
       turn.toolCalls.push({ name: e.toolName, arguments: e.input });
       // LIVE: name the tool the MOMENT it starts — the NAMED call + a short arg
       // summary (web_search → the query, read → the file, bash → the command) so
@@ -1442,7 +1450,14 @@ export async function openRoleSession(
        * Emitted first, and for every tool, so it happens even on an error result
        * (the isError early-out below returns before the file handling).
        */
-      emit({ kind: 'tool', toolName: e.toolName, settled: true });
+      const began = startedAt.get(e.toolCallId);
+      startedAt.delete(e.toolCallId);
+      emit({
+        kind: 'tool',
+        toolName: e.toolName,
+        settled: true,
+        ...(began !== undefined ? { durationMs: Date.now() - began } : {}),
+      });
       // A bash command's RESULT text → mirror it into the live terminal tab. This
       // is a SECOND `tool` record paired with the command's own step (same
       // toolName + detail), so coordination folds the output onto that row instead

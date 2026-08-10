@@ -57,6 +57,9 @@ export type CorpBlock =
       recipient?: string;
       /** Still executing. A blocking talk_to sits here for minutes. */
       running?: boolean;
+      /** Wall-clock the call took, ms — set by its settle. The collapsed chain
+       * sums these, which is the difference between "Worked" and "Worked for 2m". */
+      durationMs?: number;
     }
   | {
       kind: 'file';
@@ -146,7 +149,11 @@ export function appendWorkerActivity(
         for (let i = blocks.length - 1; i >= 0; i--) {
           const b = blocks[i];
           if (b?.kind === 'tool' && b.toolName === (event.toolName ?? b.toolName) && b.running) {
-            blocks[i] = { ...b, running: false };
+            blocks[i] = {
+              ...b,
+              running: false,
+              ...(event.durationMs !== undefined ? { durationMs: event.durationMs } : {}),
+            };
             return blocks;
           }
         }

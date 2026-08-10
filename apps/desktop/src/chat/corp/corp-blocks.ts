@@ -40,7 +40,7 @@ import {
   reconstructToolCallFromContent,
   stripToolCallScaffolding,
 } from '@pi-desktop/provider-llamacpp/repair';
-import { PROSE_ARGS_KEY, toolStepKind } from '../activity-mapping';
+import { DURATION_ARG_KEY, PROSE_ARGS_KEY, toolStepKind } from '../activity-mapping';
 import { type DetectedArtifact, detectArtifacts } from '../canvas/artifacts';
 
 /** The corp role-agent built-in tools the text-form salvage resolves written
@@ -423,6 +423,8 @@ function lineToBlocks(line: WorkerTranscriptLine, index: number): ContentBlock[]
           // The real input, formatted at the engine boundary. Without it a
           // coordination row opens onto nothing.
           ...(line.argsText !== undefined ? { [PROSE_ARGS_KEY]: line.argsText } : {}),
+          // The measured wall-clock, so the collapsed chain can say how long.
+          ...(line.durationMs !== undefined ? { [DURATION_ARG_KEY]: line.durationMs } : {}),
         }),
       ];
     case 'consult':

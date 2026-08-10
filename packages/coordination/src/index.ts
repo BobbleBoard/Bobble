@@ -491,6 +491,8 @@ export interface WorkerTranscriptLine {
   readonly recipient?: string;
   /** The step is still executing (a blocking hand-off sits here for minutes). */
   readonly running?: boolean;
+  /** Wall-clock the step took, ms — feeds the collapsed chain's "Worked for …". */
+  readonly durationMs?: number;
 }
 
 /**
@@ -649,6 +651,9 @@ export interface WorkerActivityEvent {
    * premature "Done" underneath a role that was still working.
    */
   readonly settled?: boolean;
+  /** Wall-clock a `tool` step took, ms. Without it the collapsed chain can only
+   * say "Worked" — the roll-up sums per-step durations and corp steps had none. */
+  readonly durationMs?: number;
   /** The written file's BODY for a `file` step, when the engine captured it (a
    * `write`/`edit` carries the whole new file; a structured tool write lands it at
    * completion). Lets the live file canvas render the ACTUAL content the worker

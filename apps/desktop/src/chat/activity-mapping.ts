@@ -483,6 +483,17 @@ function labelFor(kind: ActivityStepKind, resolution: ToolResolution, running: b
 export const PROSE_ARGS_KEY = '__prose';
 
 /**
+ * Arg key carrying a step's measured wall-clock, ms. Set only by the corp bridge,
+ * which times each call by its tool-call id at the process boundary.
+ *
+ * The collapsed chain sums per-step durations, and corp steps carried none — so a
+ * forty-step corp turn read "Worked" with no time while the identical chain in the
+ * ordinary chat read "Worked for 2m 5s". the user: "which doesn't have the time next
+ * to it for some reason? 'worked for ah nm rs' please."
+ */
+export const DURATION_ARG_KEY = '__durationMs';
+
+/**
  * Pretty-print a tool call's arguments for the reveal (Input block).
  *
  * THE COORDINATION TOOLS GET PROSE, NOT JSON. the user: "the talk to, ready to
@@ -762,8 +773,19 @@ export function mapToolStep(
   running: boolean,
 ): MappedStep {
   const step = mapToolStepData(block, result, running);
-  if (result?.isError !== true) return step;
-  return { ...step, data: { ...step.data, failed: true } };
+  /*
+   * A MEASURED duration, when the corp bridge attached one. The chain sums these
+   * for its collapsed line, and corp steps had none — so a forty-step corp turn
+   * read a bare "Worked" while the identical chain in the ordinary chat read
+   * "Worked for 2m 5s".
+   */
+  const measured = (block.arguments as Record<string, unknown> | undefined)?.[DURATION_ARG_KEY];
+  const withDuration =
+    typeof measured === 'number' && measured > 0
+      ? { ...step, data: { ...step.data, durationMs: measured } }
+      : step;
+  if (result?.isError !== true) return withDuration;
+  return { ...withDuration, data: { ...withDuration.data, failed: true } };
 }
 
 /** Map one tool-call block (+ its result) to a chain step and optional canvas tab. */

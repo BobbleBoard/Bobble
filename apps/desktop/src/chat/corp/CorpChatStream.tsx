@@ -128,6 +128,7 @@ function blockToLine(block: CorpBlock, working: boolean): WorkerTranscriptLine {
         // Only live while the NODE is live — a settled node must never show a
         // spinning row, the same gate the streaming tail uses above.
         ...(block.running === true && working ? { running: true } : {}),
+        ...(block.durationMs !== undefined ? { durationMs: block.durationMs } : {}),
       };
     case 'file':
       return {

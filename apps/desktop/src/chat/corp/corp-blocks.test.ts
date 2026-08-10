@@ -9,6 +9,7 @@
 import type { WorkerTranscriptLine, WorkerTranscriptView } from '@pi-desktop/coordination';
 import type { AssistantMsg, ChatMsg, ContentBlock, UserMsg } from '@pi-desktop/engine';
 import { describe, expect, it } from 'vitest';
+import { mapToolStep } from '../activity-mapping';
 import { corpArtifacts, transcriptToAssistantView, transcriptToBlocks } from './corp-blocks';
 
 function line(
@@ -333,7 +334,9 @@ describe('transcriptToAssistantView — streaming + running control', () => {
       line({ kind: 'file-touch', path: 'b.ts', addedLines: 2 }),
     ];
     const working = transcriptToAssistantView(view(lines), true);
-    const toolIds = assistantAt(working).blocks.filter(isTool).map((b) => b.id);
+    const toolIds = assistantAt(working)
+      .blocks.filter(isTool)
+      .map((b) => b.id);
     expect(toolIds).toHaveLength(3);
     // The first two are settled (have a result); the last (current action) is not.
     expect(working.resultByCallId.has(toolIds[0] as string)).toBe(true);
@@ -341,5 +344,37 @@ describe('transcriptToAssistantView — streaming + running control', () => {
     expect(working.resultByCallId.has(toolIds[2] as string)).toBe(false);
     // A settled node runs nothing — no synthetic results at all.
     expect(transcriptToAssistantView(view(lines), false).resultByCallId.size).toBe(0);
+  });
+});
+
+describe('a corp step carries its measured duration', () => {
+  /*
+   * the user: "'worked' block… doesn't have the time next to it for some reason?"
+   * The collapsed chain SUMS per-step durations, and corp steps had none — so a
+   * forty-step corp turn read a bare "Worked" while the identical chain in the
+   * ordinary chat read "Worked for 2m 5s". The number is measured at the process
+   * boundary (tool_call -> tool_result, paired by CALL ID so a repeated tool
+   * cannot borrow another call's clock) and rides the line to the step.
+   */
+  it('lifts the line duration onto the step', () => {
+    const step = mapToolStep(
+      transcriptToBlocks([
+        line({ kind: 'tool-call', text: 'bash', detail: 'ls', durationMs: 4200 }),
+      ]).filter(isTool)[0] as never,
+      undefined,
+      false,
+    ).data as { durationMs?: number };
+    expect(step.durationMs).toBe(4200);
+  });
+
+  it('omits it when nothing was measured, rather than inventing a zero', () => {
+    const step = mapToolStep(
+      transcriptToBlocks([line({ kind: 'tool-call', text: 'bash', detail: 'ls' })]).filter(
+        isTool,
+      )[0] as never,
+      undefined,
+      false,
+    ).data as { durationMs?: number };
+    expect(step.durationMs).toBeUndefined();
   });
 });
