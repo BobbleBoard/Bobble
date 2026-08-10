@@ -374,6 +374,49 @@ try {
   await page.keyboard.press('Enter');
   log('task sent — watch the situation room');
 
+  /*
+   * A TOUR, not a fixed camera. the user: "periodically take and review a screenshot
+   * and do some automation to click around, maybe on a tool call, screenshot
+   * again, then click a different subagent/engineer chat, screenshot again… that'll
+   * give you ability to build a good UI/UX checklist issue list as well as read
+   * thoughts and such and see what's actually failing in more real time and
+   * concretely than your logs provide."
+   *
+   * One camera pointed at the situation room shows a tidy list of rows. The
+   * failures live one click in — inside a collapsed tool call, or in an
+   * engineer's own chat — which is exactly where a log never looks. Each round
+   * walks a DIFFERENT subagent so the set covers the team rather than the first
+   * name in the list.
+   */
+  const tour = async (round) => {
+    const tag = String(round).padStart(2, '0');
+    const shoot = async (name) =>
+      page.screenshot({ path: path.join(OUT, `r${tag}-${name}.png`) }).catch(() => {});
+    await shoot('a-overview');
+
+    // Expand a collapsed tool call — the row whose contents the logs cannot show.
+    const chains = await page.$$('.pd-chain-summary, .pd-chain-header, [data-testid="chain-summary"]');
+    const chain = chains[Math.min(round, chains.length - 1)] ?? chains[0];
+    if (chain !== undefined) {
+      await chain.click({ timeout: 3000 }).catch(() => {});
+      await page.waitForTimeout(900);
+      await shoot('b-toolcall');
+    }
+
+    // A DIFFERENT role each round, so the set spans the team.
+    const rows = await page.$$('[data-testid^="child-row-"]');
+    if (rows.length > 0) {
+      const row = rows[round % rows.length];
+      await row?.click({ timeout: 3000 }).catch(() => {});
+      await page.waitForTimeout(1600);
+      await shoot('c-role-chat');
+      // Scroll its transcript so the shot is the LIVE tail, not the opening brief.
+      await page.mouse.wheel(0, 4000).catch(() => {});
+      await page.waitForTimeout(600);
+      await shoot('d-role-tail');
+    }
+  };
+
   const deadline = Date.now() + MINUTES * 60_000;
   let n = 0;
   while (Date.now() < deadline) {
@@ -382,6 +425,7 @@ try {
     const shot = path.join(OUT, `t${String(n).padStart(3, '0')}.png`);
     try {
       await page.screenshot({ path: shot });
+      await tour(n);
     } catch {
       log('window went away — stopping');
       break;

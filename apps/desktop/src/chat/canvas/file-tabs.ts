@@ -126,6 +126,35 @@ type ReadFileResult = {
 
 /** Build the file surface's Artifact from a bounded read result. Too-large /
  * binary files show a short note instead of the (missing) content. */
+/**
+ * What a tab shows when the file CANNOT be read.
+ *
+ * There was no such artifact, so an unreadable file opened a tab with nothing in
+ * it — the user, on a report a subagent wrote and handed back: "it just shows up
+ * blank in the canvas sidebar… it was unable to be read or clicked on or viewed
+ * by me." A blank pane is the worst possible answer: it looks like an empty file,
+ * so you go looking for a bug in whatever wrote it rather than at the path.
+ *
+ * Binary and too-large already explained themselves; this is the third case, and
+ * it names the path it actually tried, because "not found" is only useful with
+ * the string that was looked up.
+ */
+export function unreadableFileArtifact(absPath: string): Artifact {
+  const filename = basename(absPath);
+  return {
+    id: fileTabKey(absPath),
+    title: filename,
+    filename,
+    content: {
+      kind: 'text',
+      text:
+        `Could not read this file.\n\n${absPath}\n\n` +
+        'It may have been written somewhere else, moved, or removed since it was ' +
+        'named. Nothing has been lost from the tab — there was nothing to show.',
+    },
+  };
+}
+
 export function fileArtifact(absPath: string, read: ReadFileResult): Artifact {
   const filename = basename(absPath);
   const ext = extname(filename);
@@ -380,9 +409,20 @@ export async function openFileInCanvas(
     // Opening a file explicitly shows its CONTENT — drop any live edit-diff a
     // mid-stream edit left on this tab so the user sees the file, not the hunk.
     diff: undefined,
-    // Only replace content with a read that actually loaded — a missing/raced
-    // read must never blank the surface (round-blindtest #10).
-    ...(readHasContent(read) ? { artifact: fileArtifact(absPath, read) } : {}),
+    /*
+     * Only replace content with a read that actually loaded — a missing/raced
+     * read must never blank the surface (round-blindtest #10).
+     *
+     * …but a tab that has NOTHING yet and a read that failed is the blank pane:
+     * the guard was protecting already-shown content and, in the empty case,
+     * protecting nothing while showing nothing. Say why instead. A tab that
+     * already has content keeps it, exactly as before.
+     */
+    ...(readHasContent(read)
+      ? { artifact: fileArtifact(absPath, read) }
+      : tab.artifact === undefined
+        ? { artifact: unreadableFileArtifact(absPath) }
+        : {}),
   });
   void hydrateOpenApps(controller, key, absPath);
 }
