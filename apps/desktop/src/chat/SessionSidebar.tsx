@@ -800,8 +800,12 @@ export function SessionSidebar({
                 {/* The situation room's own lifecycle word, on the row. Without
                     it the sidebar could only say "spinning" or "not spinning",
                     which is why a finished agent and a never-started one looked
-                    identical here. */}
-                {c.statusLabel !== undefined && !c.running ? (
+                    identical here.
+                    Shown while RUNNING too: "working" is one of the words the user
+                    asked for, and a spinner alone says something is happening
+                    without saying what. The spinner keeps its own job (liveness);
+                    the word carries the state. */}
+                {c.statusLabel !== undefined ? (
                   <span className="pd-child-row-status">{c.statusLabel}</span>
                 ) : null}
                 {c.running ? (
