@@ -49,6 +49,38 @@ export function classLabel(cls: string | null | undefined): string | null {
 export const PREFILL_STATUS_KEY = 'harness-prefill';
 
 /**
+ * Whether the system-prompt prefix is RESIDENT yet: `'warming'` while the
+ * warm-up runs, `'ready'` once it has finished (or failed — a failed warm-up
+ * must still release the UI).
+ *
+ * "Loading model" waits for this, because the label's real promise is "the next
+ * message is instant", and llama-server answering is only half of that. Declared
+ * here rather than imported from the harness barrel, which drags node-only deps
+ * into the renderer bundle (see auto-router.ts); a test pins the two strings
+ * together so they cannot drift apart silently.
+ */
+export const PREFIX_WARM_STATUS = 'harness-prefix-warm';
+
+/**
+ * Should the "Loading model" label still be showing?
+ *
+ * True while the server is coming up, AND while it is up but the system-prompt
+ * prefix is not yet resident — because the label's real promise is "the next
+ * message is instant", and llama-server answering is only half of that. the user:
+ * "when that finishes, I want any prompt I send in to be instantaneous… the
+ * instant 'loading model' disappears."
+ *
+ * Only extends the label when we have actually SEEN `'warming'`. A build with no
+ * harness warm-up never publishes the key, and must behave exactly as before
+ * rather than wait forever on a signal that is never coming — the same reason
+ * the harness releases the label in `finally` rather than `then`.
+ */
+export function showLoadingModel(phase: string, prefixWarm: string | undefined): boolean {
+  if (phase === 'starting') return true;
+  return phase === 'ready' && prefixWarm === 'warming';
+}
+
+/**
  * The pi status key the harness publishes a corp-promotion intent on when the
  * model calls `create_production_hierarchy` in normal chat (offered only at
  * high/max effort). The value is a JSON {@link PromoteSignal}; ChatApp watches it

@@ -118,6 +118,17 @@ import {
 
 export const packageName = '@pi-desktop/harness';
 
+/**
+ * Extension-status key carrying whether the system-prompt prefix is RESIDENT:
+ * `'warming'` while the warm-up runs, `'ready'` once it has (or has failed).
+ *
+ * A named export because both ends must agree on the exact string and they live
+ * in different processes — a renderer watching `harness-prefix-warm` while the
+ * harness publishes `harness-warm-prefix` would simply never fire, and would
+ * look exactly like a warm-up that never finished.
+ */
+export const PREFIX_WARM_STATUS = 'harness-prefix-warm';
+
 interface HarnessRuntime {
   config: HarnessConfig;
   /**
@@ -523,7 +534,25 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
         pi.getAllTools().map((t) => t.name),
       ),
     );
-    void warmSystemPrompt(callModel, canonical, { tools: warmTools });
+    /*
+     * SAY WHEN THE PREFIX IS ACTUALLY RESIDENT.
+     *
+     * The warm-up is fire-and-forget, and the app's "Loading model" indicator
+     * clears on `phase = 'ready'` — which fires when llama-server answers, some
+     * seconds before this finishes. So the moment the label disappeared, a first
+     * message still paid the full prefill. the user: "when that finishes, I want any
+     * prompt I send in to be instantaneous… the instant 'loading model'
+     * disappears."
+     *
+     * Publishing 'warming' → 'ready' lets the indicator wait for the thing it
+     * was implicitly claiming. `finally`, not `then`: a warm-up that FAILS must
+     * still release the label, or a transient error strands the UI on "Loading
+     * model" forever with a perfectly usable server behind it.
+     */
+    if (ctx.hasUI === true) ctx.ui.setStatus(PREFIX_WARM_STATUS, 'warming');
+    void warmSystemPrompt(callModel, canonical, { tools: warmTools }).finally(() => {
+      if (ctx.hasUI === true) ctx.ui.setStatus(PREFIX_WARM_STATUS, 'ready');
+    });
     // Seed the renderer's predictive-prefill context with exactly what the warm-up
     // just made resident ([system][warm preset tools]) — so a first message typed
     // BEFORE any turn (activeTools still empty) prefills against the real prefix.

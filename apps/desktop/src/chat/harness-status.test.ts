@@ -1,5 +1,12 @@
+import { PREFIX_WARM_STATUS as HARNESS_PREFIX_WARM_STATUS } from '@pi-desktop/harness';
 import { describe, expect, it } from 'vitest';
-import { PROMOTE_STATUS_KEY, parsePromoteSignal, showProcessing } from './harness-status';
+import {
+  PREFIX_WARM_STATUS,
+  PROMOTE_STATUS_KEY,
+  parsePromoteSignal,
+  showLoadingModel,
+  showProcessing,
+} from './harness-status';
 
 describe('parsePromoteSignal (corp-promote intent from normal chat)', () => {
   it('parses a valid promote signal', () => {
@@ -67,5 +74,58 @@ describe('showProcessing — the ring on an empty thread', () => {
 
   it('is off when nothing at all is happening', () => {
     expect(showProcessing(base)).toBe(false);
+  });
+});
+
+describe('the prefix-warm status key', () => {
+  /*
+   * THE TWO SIDES MUST AGREE ON THE STRING. The harness publishes this from
+   * another process and the renderer watches for it; a typo on either side does
+   * not fail — it just never fires, which looks precisely like a warm-up that
+   * never finished, i.e. "Loading model" forever over a perfectly good server.
+   * Cheap to pin, expensive to debug.
+   */
+  it('is byte-identical to the constant the harness publishes', () => {
+    expect(PREFIX_WARM_STATUS).toBe(HARNESS_PREFIX_WARM_STATUS);
+  });
+
+  it('is namespaced `harness-` so a session switch drops it with the rest', () => {
+    // pi-slice's setMessagesExternal clears harness-prefixed keys; a key outside
+    // that namespace would survive a chat switch and gate the label on a stale
+    // warm-up from a different session.
+    expect(PREFIX_WARM_STATUS.startsWith('harness-')).toBe(true);
+  });
+});
+
+describe('showLoadingModel — the label waits for the prefix, not just the server', () => {
+  it('shows while the server is still coming up', () => {
+    expect(showLoadingModel('starting', undefined)).toBe(true);
+    expect(showLoadingModel('starting', 'warming')).toBe(true);
+  });
+
+  /*
+   * THE BUG. `phase = 'ready'` fires when llama-server answers — seconds before
+   * the system prompt is resident — so the label cleared while a first message
+   * still paid the full ~2s prefill.
+   */
+  it('KEEPS showing when the server is up but the prefix is not yet warm', () => {
+    expect(showLoadingModel('ready', 'warming')).toBe(true);
+  });
+
+  it('clears the instant the prefix is resident — the promise the label makes', () => {
+    expect(showLoadingModel('ready', 'ready')).toBe(false);
+  });
+
+  it('does NOT wait on a signal that is never coming', () => {
+    // No harness warm-up in this build → key never published → behave as before,
+    // rather than sitting on "Loading model" over a perfectly usable server.
+    expect(showLoadingModel('ready', undefined)).toBe(false);
+  });
+
+  it('never shows for a phase that is neither starting nor ready', () => {
+    for (const phase of ['idle', 'downloading', 'error']) {
+      expect(showLoadingModel(phase, 'warming')).toBe(false);
+      expect(showLoadingModel(phase, undefined)).toBe(false);
+    }
   });
 });

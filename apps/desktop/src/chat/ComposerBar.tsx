@@ -51,7 +51,7 @@ import {
   stickyContextGauge,
   usesSandbox,
 } from './composer-bar-logic';
-import { useHarnessStatus } from './harness-status';
+import { PREFIX_WARM_STATUS, showLoadingModel, useHarnessStatus } from './harness-status';
 
 /** LEFT: the relocated project (working-folder) chip, slimmed for the bar. When
  * the selected project folder is MISSING and pi fell back to the conversation
@@ -249,7 +249,11 @@ function ContextRegion() {
   // right here (left of Effort, by the selector) so the input bar reflects that
   // the model is warming up (the user) — it takes over from the context ring, which
   // has nothing to show pre-first-turn anyway.
-  const serverLoading = useLlmStore((s) => s.status.phase === 'starting');
+  // Same rule as the thread indicator: the label holds until the system prompt is
+  // RESIDENT, not merely until llama-server answers — those are seconds apart and
+  // the gap is exactly where a "loaded" model still made you wait.
+  const prefixWarm = usePiStore((s) => s.extensionStatus[PREFIX_WARM_STATUS]);
+  const serverLoading = useLlmStore((s) => showLoadingModel(s.status.phase, prefixWarm));
   const harnessPercent = useHarnessStatus()?.contextPercent;
   // During a corp run, pi's own harness sits idle — the ring fills from the
   // RUN's real context usage instead (threaded off the live worker transcript).

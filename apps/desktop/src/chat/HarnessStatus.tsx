@@ -24,7 +24,9 @@ import { usePiStore } from '../state/pi-slice';
 import {
   type PlanItem,
   PREFILL_STATUS_KEY,
+  PREFIX_WARM_STATUS,
   parsePrefillPercent,
+  showLoadingModel,
   showProcessing,
   useHarnessStatus,
 } from './harness-status';
@@ -99,7 +101,19 @@ export function ThreadStatusIndicator(): ReactElement | null {
   // processed/total the server reports via provider-llamacpp's `prompt_progress`
   // frames) — no fabricated easing; the ring shows exactly what llama reports.
   const prefillRaw = usePiStore((s) => s.extensionStatus[PREFILL_STATUS_KEY]);
-  const serverStarting = useLlmStore((s) => s.status.phase === 'starting');
+  /*
+   * "Loading model" covers the server coming up AND the system prompt becoming
+   * resident, because those together are what the label implicitly promises: the
+   * moment it goes, a message is instant. `phase = 'ready'` fires when
+   * llama-server answers, seconds before the prefix is warm, so on its own it
+   * cleared the label while a first message still paid the full prefill.
+   *
+   * Gated on having SEEN 'warming': a build with no harness warm-up never
+   * publishes this key, and must behave exactly as it did rather than sit on
+   * "Loading model" waiting for a signal that is never coming.
+   */
+  const prefixWarm = usePiStore((s) => s.extensionStatus[PREFIX_WARM_STATUS]);
+  const serverStarting = useLlmStore((s) => showLoadingModel(s.status.phase, prefixWarm));
   const prefillPct = parsePrefillPercent(prefillRaw);
   const messages = usePiStore((s) => s.messages);
 
