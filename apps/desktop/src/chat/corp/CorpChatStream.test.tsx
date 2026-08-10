@@ -409,9 +409,18 @@ describe('CorpChatStream — J4: the lead streams through the vision→promotion
     expect(container.querySelector('.pd-markdown')?.textContent).toContain(
       'Core Game Implementation',
     );
-    // …AND the post-vision tool call renders as a LIVE chain row (expanded/active),
-    // not a dead settled title — the lead's stream is continuous through the gap.
-    expect(container.querySelector('.pd-chain-step[data-kind="tool"]')).not.toBeNull();
+    /*
+     * …AND the post-vision tool call renders as a LIVE chain row (expanded/active),
+     * not a dead settled title — the lead's stream is continuous through the gap.
+     *
+     * `manager`, not the generic `tool`: this row IS the hand-off to the team, and
+     * it read as "Running a tool" for three runs because the merged
+     * create_production_hierarchy/speak_to_manager channel was never registered
+     * under the name it ships as. Asserting the specific kind here keeps the corp
+     * render path honest, not just the chat's.
+     */
+    expect(container.querySelector('.pd-chain-step[data-kind="manager"]')).not.toBeNull();
+    expect(container.querySelector('.pd-chain-step[data-kind="tool"]')).toBeNull();
     expect(container.querySelector('.pd-chain')?.getAttribute('data-expanded')).toBe('true');
     // But NO idle "Working…"/waiting tail of its own (A3 preserved — the
     // "Waiting for N…" indicator carries the coordinating signal).

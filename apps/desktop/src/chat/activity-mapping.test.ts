@@ -4,6 +4,9 @@
  * (bash command+output, edit diff, read preview, media opensInCanvas + tabSpec).
  */
 import type { AssistantMsg, ContentBlock, ToolResultMsg } from '@pi-desktop/engine';
+// The harness SOURCE module, not the barrel — promotion.ts → org-chart.ts has
+// no imports at all, so this stays node/browser-safe (see auto-router.ts).
+import { TALK_TO_MANAGER } from '../../../../packages/harness/src/corp/promotion';
 import { describe, expect, it } from 'vitest';
 import {
   chainRunningFlags,
@@ -797,6 +800,57 @@ describe('chat-template markers are not thoughts', () => {
 });
 
 describe('the corp coordination rows are specific, not generic', () => {
+  /*
+   * THE RENAME REGRESSION. The merge of create_production_hierarchy +
+   * speak_to_manager into one bidirectional `talk_to_manager` channel renamed
+   * the tool; the registry kept only the pre-merge names, so for three runs the
+   * row that PROVES a run delegated rendered as the neutral "Running a tool".
+   * the user, mid-run: "I thought we fixed this UI thing."
+   *
+   * The name is imported from the harness rather than typed here on purpose —
+   * the next rename fails this test instead of silently degrading the UI.
+   */
+  it('resolves the manager channel under the name the harness actually ships', () => {
+    expect(TALK_TO_MANAGER).toBe('talk_to_manager');
+    expect(toolStepKind(TALK_TO_MANAGER)).toBe('manager');
+    // The pre-merge name still resolves — old session JSONLs replay through here.
+    expect(toolStepKind('create_production_hierarchy')).toBe('manager');
+  });
+
+  it('never lets a coordination tool fall back to the generic kind', () => {
+    for (const name of [
+      TALK_TO_MANAGER,
+      'talk_to',
+      'commission_specialist',
+      'ready_to_delegate',
+      'request_test_tools',
+      'submit_work',
+    ])
+      expect(toolStepKind(name)).not.toBe('tool');
+  });
+
+  it('opens the manager brief as prose — the vision, the why, and the shape', () => {
+    const step = mapToolStep(
+      call('m1', TALK_TO_MANAGER, {
+        message: 'Build a 3D pocket watch.\nIt must run offline.',
+        reason: 'Three separate disciplines.',
+        divisions: [
+          { name: '3D Assets', purpose: 'model the movement' },
+          { name: 'Report', purpose: 'the deck' },
+        ],
+      }),
+      result('m1', 'planning'),
+      false,
+    ).data as { kind: string; label: string; argsText?: string };
+    expect(step.kind).toBe('manager');
+    expect(step.label).toBe('Briefed the manager');
+    expect(step.argsText).toContain('Why a team: Three separate disciplines.');
+    expect(step.argsText).toContain('Division: 3D Assets — model the movement');
+    expect(step.argsText).toContain('Division: Report — the deck');
+    expect(step.argsText).toContain('It must run offline.');
+    expect(step.argsText).not.toContain('{');
+  });
+
   it('talk_to says WHO on the row and reads as prose when opened', () => {
     /*
      * the user: "the talk to, ready to delegate additionally need to be clickable

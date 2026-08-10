@@ -54,7 +54,7 @@ const NO_ARTIFACTS: DetectedArtifact[] = [];
 function blocksSignature(blocks: readonly CorpBlock[]): number {
   let n = blocks.length;
   for (const b of blocks) {
-    if (b.kind === 'text' || b.kind === 'thinking') n += b.text.length;
+    if (b.kind === 'text' || b.kind === 'thinking' || b.kind === 'briefing') n += b.text.length;
     else if (b.kind === 'tool') n += (b.detail?.length ?? 0) + (b.output?.length ?? 0);
     else n += b.addedLines + b.removedLines;
   }
@@ -107,6 +107,8 @@ function blockToLine(block: CorpBlock, working: boolean): WorkerTranscriptLine {
         text: block.text,
         ...(block.streaming && working ? { streaming: true } : {}),
       };
+    case 'briefing':
+      return { at: 0, kind: 'briefing', text: block.text };
     case 'tool':
       return {
         at: 0,
@@ -119,6 +121,13 @@ function blockToLine(block: CorpBlock, working: boolean): WorkerTranscriptLine {
         // was a header with nothing under it — no command output, and no search
         // results card — while the same call in the chat rendered in full.
         ...(block.output !== undefined ? { output: block.output } : {}),
+        // The INPUT, and where a message went. Same reason as the output above:
+        // dropped here, the row opens onto nothing.
+        ...(block.argsText !== undefined ? { argsText: block.argsText } : {}),
+        ...(block.recipient !== undefined ? { recipient: block.recipient } : {}),
+        // Only live while the NODE is live — a settled node must never show a
+        // spinning row, the same gate the streaming tail uses above.
+        ...(block.running === true && working ? { running: true } : {}),
       };
     case 'file':
       return {

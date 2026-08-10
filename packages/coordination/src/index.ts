@@ -439,7 +439,8 @@ export interface WorkerBriefingView {
  */
 export interface WorkerTranscriptLine {
   readonly at: number;
-  readonly kind: Activity['kind'] | 'thinking';
+  /** `briefing` = what this role was ASKED to do (see {@link WorkerActivityEvent}). */
+  readonly kind: Activity['kind'] | 'thinking' | 'briefing';
   /** The line's text. For a streaming line it GROWS across reads (the live
    * assistant text / reasoning so far); for a tool step it is the raw tool name. */
   readonly text: string;
@@ -471,6 +472,16 @@ export interface WorkerTranscriptLine {
    * regularly it shows actual results").
    */
   readonly output?: string;
+  /**
+   * The call's INPUT as prose — what a coordination row OPENS into. A "Messaged"
+   * or "Requested test tools" row whose args stop upstream can only ever be an
+   * inert header, which is what a role chat showed.
+   */
+  readonly argsText?: string;
+  /** The node a message went TO — makes the row navigate to that role's chat. */
+  readonly recipient?: string;
+  /** The step is still executing (a blocking hand-off sits here for minutes). */
+  readonly running?: boolean;
 }
 
 /**
@@ -579,7 +590,15 @@ export interface WorkerActivityEvent {
   readonly type: 'worker-activity';
   /** The node this delta belongs to — its accumulated block grows. */
   readonly nodeId: string;
-  readonly kind: 'text' | 'thinking' | 'tool' | 'file';
+  /**
+   * `briefing` is what this role was ASKED to do — the incoming brief and every
+   * follow-up. It was missing entirely, so a role chat could only ever show a
+   * monologue: its own output, with the instruction that caused it invisible.
+   * the user, watching a live run: "I still don't see the blue left aligned bubble I
+   * asked for showing the actual task/follow up messages the subagents were
+   * given… this applies to all manager/corp roles etc."
+   */
+  readonly kind: 'text' | 'thinking' | 'tool' | 'file' | 'briefing';
   /** Streamed increment for a `text`/`thinking` block (a token or few). On
    * `start` it seeds the block; on `end` it may carry the authoritative full text. */
   readonly delta?: string;
@@ -598,6 +617,29 @@ export interface WorkerActivityEvent {
   readonly output?: string;
   /** File path a `file`/`tool` step touched. */
   readonly path?: string;
+  /**
+   * A `tool` step's INPUT, already prose-formatted (the corp comm tools read as
+   * "To: engineer:1" + the message body, never escaped JSON).
+   *
+   * Without this a corp role's tool row had no arguments at all, so it could not
+   * open into anything — the user: "I can't click on it to go to the chat or at
+   * least preview the message", and on the toolkit row, "I can't click on to
+   * expand the tool and see what that tool is doing". The row's registry entry
+   * was never the problem; the args simply never crossed this boundary.
+   */
+  readonly argsText?: string;
+  /**
+   * The node a `message` step was sent TO, so the row can open that role's chat.
+   */
+  readonly recipient?: string;
+  /**
+   * A `tool` step has FINISHED. Rows arrive at `tool_call` (the moment the call
+   * starts) and carried no lifecycle at all, so every corp tool row rendered as
+   * already-complete — and during a BLOCKING talk_to, which waits minutes on the
+   * engineer, the chain looked quiet enough for the settle heuristic to print a
+   * premature "Done" underneath a role that was still working.
+   */
+  readonly settled?: boolean;
   /** The written file's BODY for a `file` step, when the engine captured it (a
    * `write`/`edit` carries the whole new file; a structured tool write lands it at
    * completion). Lets the live file canvas render the ACTUAL content the worker

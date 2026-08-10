@@ -110,7 +110,15 @@ export type ActivityStepData =
        * their ARGS are the content — who was asked, and what for — so they
        * reveal argsText + output exactly like any other tool row. Reaching the
        * read shape is what relabelled them "Read a file". */
-      kind: 'tool-search' | 'tool' | 'talk' | 'commission' | 'delegate' | 'toolkit' | 'submit';
+      kind:
+        | 'tool-search'
+        | 'tool'
+        | 'talk'
+        | 'manager'
+        | 'commission'
+        | 'delegate'
+        | 'toolkit'
+        | 'submit';
       argsText?: string;
       output?: string;
     })
@@ -150,6 +158,14 @@ const VERBS: Record<ActivityStepKind, VerbSpec> = {
   // The coordination steps. A collapsed chain that says "messaged 3 colleagues"
   // tells you a corp run actually delegated; "used 3 tools" tells you nothing.
   talk: { verb: 'Messaged', singular: 'a colleague', plural: 'colleagues', attempt: 'message' },
+  /*
+   * The CEO→manager hand-off is its own kind, not a `talk`. It is the single
+   * moment a run stops being one model and becomes a team, and it is the row
+   * you look for to answer "did it delegate at all?" — "Messaged a colleague"
+   * buries that, and the generic `tool` fallback ("Running a tool") erased it
+   * entirely for three runs after the tool was renamed to `talk_to_manager`.
+   */
+  manager: { verb: 'Briefed', singular: 'the manager', plural: '', attempt: 'brief' },
   commission: {
     verb: 'Commissioned',
     singular: 'a specialist',
@@ -308,6 +324,7 @@ const RUNNING_PHRASE: Record<ActivityStepKind, string> = {
   read: 'Reading a file',
   folder: 'Listing a folder',
   talk: 'Messaging a colleague',
+  manager: 'Briefing the manager',
   commission: 'Commissioning a specialist',
   delegate: 'Opening delegation',
   toolkit: 'Requesting test tools',

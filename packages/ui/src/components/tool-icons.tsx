@@ -15,6 +15,7 @@ import {
   IconGateOpen,
   IconGears,
   IconHandoff,
+  IconOrg,
   IconSubmit,
   IconGlobe,
   IconKeyboard,
@@ -52,6 +53,9 @@ export type ToolIconKind =
    * recognisable at a glance in a chain of forty rows.
    */
   | 'talk'
+  // The CEO→manager hand-off. Distinct from `talk` (peer to peer): this one
+  // starts the team, so it reads as an org branching rather than a message.
+  | 'manager'
   | 'commission'
   | 'delegate'
   | 'toolkit'
@@ -196,6 +200,8 @@ export function toolIcon(
       return <IconFolderOpen size={size} />;
     case 'talk':
       return <IconHandoff size={size} />;
+    case 'manager':
+      return <IconOrg size={size} />;
     case 'commission':
       return <IconSparkles size={size} />;
     case 'delegate':

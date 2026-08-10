@@ -94,6 +94,7 @@ function deriveActivity(blocks: readonly CorpBlock[], nodeState: string | undefi
     }
     return { label: `TOOL ${last.toolName ?? '?'}`, canvas: last.path ? `file ${last.path}` : '—' };
   }
+  if (last.kind === 'briefing') return { label: 'BRIEFED', canvas: '—' };
   return { label: `WROTE ${last.path} (+${last.addedLines})`, canvas: `file ${last.path}` };
 }
 
@@ -102,7 +103,7 @@ function deriveActivity(blocks: readonly CorpBlock[], nodeState: string | undefi
 function blocksSig(blocks: readonly CorpBlock[]): number {
   let n = blocks.length;
   for (const b of blocks) {
-    if (b.kind === 'text' || b.kind === 'thinking') n += b.text.length;
+    if (b.kind === 'text' || b.kind === 'thinking' || b.kind === 'briefing') n += b.text.length;
     else if (b.kind === 'tool') n += (b.detail?.length ?? 0) + (b.output?.length ?? 0);
     else n += b.addedLines + b.removedLines;
   }

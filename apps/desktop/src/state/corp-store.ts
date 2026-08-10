@@ -39,6 +39,9 @@ import { create } from 'zustand';
 export type CorpBlock =
   | { kind: 'text'; text: string; streaming: boolean }
   | { kind: 'thinking'; text: string; streaming: boolean }
+  /** What this role was ASKED to do — rendered as the blue left-aligned briefing
+   * bubble, the same one AgentTranscript gives a subagent. */
+  | { kind: 'briefing'; text: string }
   | {
       kind: 'tool';
       toolName: string;
@@ -48,6 +51,12 @@ export type CorpBlock =
       /** Captured RESULT text (a bash command's output) — replaced in place as it
        * grows, so a terminal tab can mirror the command + its live output. */
       output?: string;
+      /** The call's INPUT as prose — what the row opens into. */
+      argsText?: string;
+      /** The node a message went to, so the row can navigate there. */
+      recipient?: string;
+      /** Still executing. A blocking talk_to sits here for minutes. */
+      running?: boolean;
     }
   | {
       kind: 'file';
@@ -121,7 +130,28 @@ export function appendWorkerActivity(
       }
       return blocks;
     }
+    case 'briefing': {
+      closeTrailingStream(blocks);
+      blocks.push({ kind: 'briefing', text: event.delta ?? '' });
+      return blocks;
+    }
     case 'tool': {
+      /*
+       * A SETTLE for a row already on screen. Rows land at `tool_call` (running)
+       * and this marks the matching one finished, newest-first so a repeated tool
+       * settles its own most recent call. Without it every row looked complete on
+       * arrival and a blocking talk_to read as an idle chain.
+       */
+      if (event.settled === true) {
+        for (let i = blocks.length - 1; i >= 0; i--) {
+          const b = blocks[i];
+          if (b?.kind === 'tool' && b.toolName === (event.toolName ?? b.toolName) && b.running) {
+            blocks[i] = { ...b, running: false };
+            return blocks;
+          }
+        }
+        return blocks;
+      }
       // An OUTPUT update for an already-open tool row (a bash command streaming its
       // result): fold it onto the most recent row of the same tool — replacing its
       // captured output in place — rather than pushing a duplicate row. A partial
@@ -155,6 +185,12 @@ export function appendWorkerActivity(
         ...(event.label !== undefined ? { label: event.label } : {}),
         ...(event.detail !== undefined ? { detail: event.detail } : {}),
         ...(event.path !== undefined ? { path: event.path } : {}),
+        ...(event.argsText !== undefined ? { argsText: event.argsText } : {}),
+        ...(event.recipient !== undefined ? { recipient: event.recipient } : {}),
+        // Arrives from `tool_call`, i.e. the call has STARTED — running until a
+        // settle says otherwise. An event that already knows it finished
+        // (`settled: false` is never sent) keeps the flag off.
+        running: true,
       });
       return blocks;
     }

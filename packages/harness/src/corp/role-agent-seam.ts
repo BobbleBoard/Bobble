@@ -86,7 +86,17 @@ export interface RoleAgentActivity {
    *    `start`/`delta`/`end` phases; `delta` carries streamed reasoning when the
    *    provider exposes it).
    */
-  readonly kind: 'file-write' | 'tool' | 'turn-start' | 'turn-end' | 'assistant-text' | 'thinking';
+  readonly kind:
+    | 'file-write'
+    | 'tool'
+    | 'turn-start'
+    | 'turn-end'
+    | 'assistant-text'
+    | 'thinking'
+    /** What this role was ASKED to do — the brief, and each follow-up. Carried in
+     * {@link text}. Without it a role's chat is a monologue with the instruction
+     * that caused it nowhere on screen. */
+    | 'briefing';
   /** The tool that ran (`tool` / `file-write`). */
   readonly toolName?: string;
   /** The file a `file-write` touched — as the model addressed it (relative to the
@@ -116,6 +126,16 @@ export interface RoleAgentActivity {
    * it to a recent tail so a noisy build can't bloat the event. Absent on a tool
    * START and on tools whose result is not mirrored. */
   readonly output?: string;
+  /** A `tool` step's INPUT, prose-formatted at the boundary — what the row opens
+   * into. The corp comm tools carry their whole content here (who was asked, and
+   * what for); without it a coordination row can only ever be a bare header. */
+  readonly argsText?: string;
+  /** The node a message was sent TO, so the row can open that role's chat. */
+  readonly recipient?: string;
+  /** A `tool` step FINISHED. Steps forward the moment they START, so without a
+   * paired settle every row reads as complete on arrival and a blocking call
+   * looks like an idle agent. */
+  readonly settled?: boolean;
   /** Context fullness of the run's session (0..100) at a turn boundary, when the
    * app impl can read it (`session.getContextUsage().percent`). Carried on
    * `turn-start`/`turn-end` records so the engine can surface a live context

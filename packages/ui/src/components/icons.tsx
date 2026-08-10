@@ -460,6 +460,22 @@ export function IconHandoff(props: IconProps) {
   );
 }
 
+/**
+ * One node branching into a team — the CEO→manager `talk_to_manager` row.
+ * Deliberately NOT IconHandoff: this is the row that answers "did it delegate
+ * at all", so it reads as an org appearing rather than a message being passed.
+ */
+export function IconOrg(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect x="6.2" y="2.2" width="3.6" height="3" rx="0.6" />
+      <path d="M8 5.2v2.6M4 10.4V8.6h8v1.8" />
+      <rect x="2.2" y="10.4" width="3.6" height="3" rx="0.6" />
+      <rect x="10.2" y="10.4" width="3.6" height="3" rx="0.6" />
+    </Icon>
+  );
+}
+
 /** Work handed back up — the `submit_work` row. */
 export function IconSubmit(props: IconProps) {
   return (

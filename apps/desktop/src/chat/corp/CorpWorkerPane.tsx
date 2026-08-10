@@ -135,6 +135,10 @@ export function CorpWorkerFeed({
         <AgentTranscript
           messages={[...view.group, ...view.resultByCallId.values()]}
           suppressInlineArtifacts
+          /* A corp role's incoming turns are BRIEFINGS, not things the person
+             typed — left-aligned and blue-tinted, the same voice a subagent
+             transcript already uses. */
+          voice="agent"
           {...(onOpenFile !== undefined ? { onOpenFile } : {})}
         />
       ) : null}

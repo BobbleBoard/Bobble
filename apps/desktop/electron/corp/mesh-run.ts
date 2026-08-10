@@ -155,6 +155,13 @@ function activityToEvent(nodeId: string, r: RoleAgentActivity): CoordinationEven
         ...(delta !== undefined && delta !== '' ? { delta } : {}),
       };
     }
+    case 'briefing':
+      return {
+        type: 'worker-activity',
+        nodeId,
+        kind: 'briefing',
+        ...(r.text !== undefined ? { delta: r.text } : {}),
+      };
     case 'tool':
       return {
         type: 'worker-activity',
@@ -164,6 +171,9 @@ function activityToEvent(nodeId: string, r: RoleAgentActivity): CoordinationEven
         ...(r.detail !== undefined ? { detail: r.detail } : {}),
         ...(r.output !== undefined ? { output: r.output } : {}),
         ...(r.path !== undefined ? { path: r.path } : {}),
+        ...(r.argsText !== undefined ? { argsText: r.argsText } : {}),
+        ...(r.recipient !== undefined ? { recipient: r.recipient } : {}),
+        ...(r.settled === true ? { settled: true } : {}),
       };
     case 'file-write':
       return {

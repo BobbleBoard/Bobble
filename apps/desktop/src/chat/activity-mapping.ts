@@ -181,6 +181,7 @@ const STEP_LABELS: Record<ActivityStepKind, [running: string, done: string]> = {
   read: ['Reading a file', 'Read a file'],
   folder: ['Listing a folder', 'Listed a folder'],
   talk: ['Messaging', 'Messaged'],
+  manager: ['Briefing the manager', 'Briefed the manager'],
   commission: ['Commissioning a specialist', 'Commissioned a specialist'],
   delegate: ['Opening delegation', 'Ready to delegate'],
   toolkit: ['Requesting test tools', 'Requested test tools'],
@@ -263,6 +264,19 @@ const TOOL_REGISTRY: Record<string, ToolResolution> = {
    * asked, and what for.
    */
   talk_to: { kind: 'talk' },
+  /*
+   * THE CEO→MANAGER CHANNEL. This entry was missing for three runs: the merge
+   * of create_production_hierarchy + speak_to_manager into ONE bidirectional
+   * `talk_to_manager` renamed the tool, and the registry still listed only the
+   * pre-merge names — so the row that PROVES a run delegated rendered as the
+   * neutral "Running a tool" puzzle glyph. the user, looking at a live run: "I
+   * thought we fixed this UI thing."
+   *
+   * The legacy name is kept because old session JSONLs replay through here and
+   * would otherwise degrade to the same generic row.
+   */
+  talk_to_manager: { kind: 'manager' },
+  create_production_hierarchy: { kind: 'manager' },
   commission_specialist: { kind: 'commission' },
   ready_to_delegate: { kind: 'delegate' },
   request_test_tools: { kind: 'toolkit' },
@@ -462,6 +476,13 @@ function labelFor(kind: ActivityStepKind, resolution: ToolResolution, running: b
 }
 
 /**
+ * Arg key carrying an ALREADY-FORMATTED reveal body. Set only by the corp
+ * bridge, which formats at the engine boundary rather than shipping raw tool
+ * arguments over IPC; underscored so it can never collide with a real parameter.
+ */
+export const PROSE_ARGS_KEY = '__prose';
+
+/**
  * Pretty-print a tool call's arguments for the reveal (Input block).
  *
  * THE COORDINATION TOOLS GET PROSE, NOT JSON. the user: "the talk to, ready to
@@ -474,6 +495,14 @@ function labelFor(kind: ActivityStepKind, resolution: ToolResolution, running: b
  */
 function formatArgs(args: Record<string, unknown>): string | undefined {
   if (Object.keys(args).length === 0) return undefined;
+  /*
+   * A corp role's call arrives already prose-formatted (the engine formats it at
+   * the process boundary — see corpArgsText — rather than shipping raw tool
+   * arguments across IPC). Honour it verbatim so a role chat's reveal is
+   * identical to the same call's reveal in the ordinary chat.
+   */
+  const prose = args[PROSE_ARGS_KEY];
+  if (typeof prose === 'string' && prose.length > 0) return prose;
   const comm = formatCommArgs(args);
   if (comm !== undefined) return comm;
   try {
@@ -493,6 +522,17 @@ function formatCommArgs(args: Record<string, unknown>): string | undefined {
   push('To', args.recipient);
   push('Specialist', args.specialty);
   push('Testing', args.what_you_will_test);
+  // talk_to_manager: why a team, and the shape the CEO had in mind (optional —
+  // leaving divisions out and letting the manager split the work is the norm).
+  push('Why a team', args.reason);
+  if (Array.isArray(args.divisions)) {
+    for (const d of args.divisions) {
+      if (d === null || typeof d !== 'object') continue;
+      const rec = d as Record<string, unknown>;
+      const purpose = str(rec.purpose);
+      lines.push(`Division: ${str(rec.name) ?? '?'}${purpose !== undefined ? ` — ${purpose}` : ''}`);
+    }
+  }
   // request_test_tools: each kit with the reason it was asked for.
   if (Array.isArray(args.kits)) {
     for (const k of args.kits) {
@@ -886,6 +926,7 @@ function mapToolStepData(
      * tool whose reveal is its input and output.
      */
     case 'talk':
+    case 'manager':
     case 'commission':
     case 'delegate':
     case 'toolkit':

@@ -110,7 +110,7 @@ describe('appendWorkerActivity (the PUSH block accumulator)', () => {
     blocks = appendWorkerActivity(blocks, wa({ kind: 'tool', toolName: 'read', detail: 'x.ts' }));
     expect(blocks).toEqual([
       { kind: 'thinking', text: 'hmm', streaming: false },
-      { kind: 'tool', toolName: 'read', detail: 'x.ts' },
+      { kind: 'tool', toolName: 'read', detail: 'x.ts', running: true },
     ]);
   });
 
@@ -176,8 +176,60 @@ describe('appendWorkerActivity (the PUSH block accumulator)', () => {
       }),
     );
     expect(blocks).toEqual([
-      { kind: 'tool', toolName: 'bash', detail: 'npm run build', output: 'compiling…\nBuild OK' },
+      {
+        kind: 'tool',
+        toolName: 'bash',
+        detail: 'npm run build',
+        output: 'compiling…\nBuild OK',
+        // Rows arrive from `tool_call`, i.e. STARTED. An output update is not a
+        // settle — only an explicit settle clears this — so the row stays live
+        // until its result actually lands.
+        running: true,
+      },
     ]);
+  });
+
+  it('settles the matching row, so a blocking call stops reading as finished', () => {
+    /*
+     * The premature "Done". Every corp tool row used to arrive with no lifecycle
+     * at all, so a BLOCKING talk_to — minutes waiting on a downstream agent —
+     * left the chain looking completely idle underneath a completion marker.
+     */
+    let blocks = appendWorkerActivity([], wa({ kind: 'tool', toolName: 'talk_to' }));
+    expect((blocks[0] as Extract<CorpBlock, { kind: 'tool' }>).running).toBe(true);
+    blocks = appendWorkerActivity(blocks, wa({ kind: 'tool', toolName: 'talk_to', settled: true }));
+    expect((blocks[0] as Extract<CorpBlock, { kind: 'tool' }>).running).toBe(false);
+    expect(blocks).toHaveLength(1); // settles in place, never a second row
+  });
+
+  it('settles the NEWEST running call when a tool is used more than once', () => {
+    let blocks = appendWorkerActivity([], wa({ kind: 'tool', toolName: 'bash', detail: 'a' }));
+    blocks = appendWorkerActivity(blocks, wa({ kind: 'tool', toolName: 'bash', detail: 'b' }));
+    blocks = appendWorkerActivity(blocks, wa({ kind: 'tool', toolName: 'bash', settled: true }));
+    const running = blocks.map((b) => (b as Extract<CorpBlock, { kind: 'tool' }>).running);
+    expect(running).toEqual([true, false]);
+  });
+
+  it('carries the call INPUT and recipient onto the row', () => {
+    // Without these a coordination row opens onto nothing — the user: "I can't click
+    // on it to go to the chat or at least preview the message."
+    const blocks = appendWorkerActivity(
+      [],
+      wa({
+        kind: 'tool',
+        toolName: 'talk_to',
+        argsText: 'To: engineer:1\n\nBuild the deck.',
+        recipient: 'engineer:1',
+      }),
+    );
+    const row = blocks[0] as Extract<CorpBlock, { kind: 'tool' }>;
+    expect(row.argsText).toContain('Build the deck.');
+    expect(row.recipient).toBe('engineer:1');
+  });
+
+  it('records a briefing as its own block — what the role was ASKED', () => {
+    const blocks = appendWorkerActivity([], wa({ kind: 'briefing', delta: 'Build the watch.' }));
+    expect(blocks).toEqual([{ kind: 'briefing', text: 'Build the watch.' }]);
   });
 
   it('seeds a tool row from an output update that outran its start', () => {

@@ -615,6 +615,86 @@ export function toolResultText(content: ToolResultEvent['content']): string {
  * web") is left to the coordination layer; this only surfaces the raw detail the
  * args carry. Never throws.
  */
+/**
+ * A coordination call's INPUT as prose — the same shape the main chat's reveal
+ * uses ("To: engineer:1", "Kit: browser — to check the page renders", then the
+ * body on its own lines), so a role chat and the CEO chat read identically.
+ *
+ * Only the corp comm tools produce anything here. A `bash` or `read` row is
+ * already fully described by its `detail`, and dumping its raw args into an
+ * expansion would be noise.
+ */
+export function corpArgsText(input: unknown): string | undefined {
+  const rec = argsRecord(input as RoleAgentToolCall['arguments']);
+  if (rec === undefined) return undefined;
+  const s = (v: unknown): string | undefined =>
+    typeof v === 'string' && v.trim().length > 0 ? v.trim() : undefined;
+  const lines: string[] = [];
+  const push = (label: string, v: unknown): void => {
+    const t = s(v);
+    if (t !== undefined) lines.push(`${label}: ${t}`);
+  };
+  push('To', rec.recipient);
+  push('Specialist', rec.specialty);
+  push('Testing', rec.what_you_will_test);
+  push('Why a team', rec.reason);
+  // request_test_tools — the user: "in that case what the tools it accessed were
+  // for testting are". Each kit WITH the reason it was asked for.
+  if (Array.isArray(rec.kits)) {
+    for (const k of rec.kits) {
+      if (typeof k === 'string') lines.push(`Kit: ${k}`);
+      else if (k !== null && typeof k === 'object') {
+        const kr = k as Record<string, unknown>;
+        const why = s(kr.why);
+        lines.push(`Kit: ${s(kr.kit) ?? '?'}${why !== undefined ? ` — ${why}` : ''}`);
+      }
+    }
+  }
+  if (Array.isArray(rec.divisions)) {
+    for (const d of rec.divisions) {
+      if (d === null || typeof d !== 'object') continue;
+      const dr = d as Record<string, unknown>;
+      const purpose = s(dr.purpose);
+      lines.push(`Division: ${s(dr.name) ?? '?'}${purpose !== undefined ? ` — ${purpose}` : ''}`);
+    }
+  }
+  const body = s(rec.message) ?? s(rec.request) ?? s(rec.plan_summary);
+  if (lines.length === 0 && body === undefined) return undefined;
+  if (body !== undefined) {
+    if (lines.length > 0) lines.push('');
+    lines.push(body);
+  }
+  return lines.join('\n');
+}
+
+/**
+ * Push one activity record at a sink, best-effort. A misbehaving or absent sink
+ * can never break the agent loop — this is a diagnostic channel, not a
+ * dependency. Shared so every emit site has the same guarantee.
+ */
+export function safeEmit(
+  sink: ((record: RoleAgentActivity) => void) | undefined,
+  record: RoleAgentActivity,
+): void {
+  if (sink === undefined) return;
+  try {
+    sink(record);
+  } catch {
+    // a misbehaving sink can never break the agent loop
+  }
+}
+
+/** The node a message went to, so its row can open that role's chat. */
+export function corpRecipient(toolName: string, input: unknown): string | undefined {
+  const rec = argsRecord(input as RoleAgentToolCall['arguments']);
+  const to = rec?.recipient;
+  if (typeof to === 'string' && to.trim().length > 0) return to.trim();
+  // The merged CEO→manager channel names no recipient — it has exactly one.
+  return toolName === 'talk_to_manager' || toolName === 'create_production_hierarchy'
+    ? 'manager'
+    : undefined;
+}
+
 export function toolCallDetail(
   toolName: string,
   input: unknown,
@@ -1248,15 +1328,7 @@ export async function openRoleSession(
     // Best-effort + a no-op when no sink is wired: a throwing/absent sink can never
     // break the agent loop. Hoisted here so the `tool_call` gate (below) can name the
     // tool as it STARTS without a second handler racing the denylist return.
-    const emit = (record: RoleAgentActivity): void => {
-      const sink = turn.onActivity;
-      if (sink === undefined) return;
-      try {
-        sink(record);
-      } catch {
-        // a misbehaving sink can never break the agent loop
-      }
-    };
+    const emit = (record: RoleAgentActivity): void => safeEmit(turn.onActivity, record);
 
     // Owner-tuned sampling, merged onto every outgoing request body. This also arms
     // the per-CALL watchdog: THIS request must return a response within perCallMs or
@@ -1308,11 +1380,19 @@ export async function openRoleSession(
       // CURRENT action, not a generic "Used a tool".
       if (e.toolName !== 'write' && e.toolName !== 'edit') {
         const { detail, path } = toolCallDetail(e.toolName, e.input);
+        // The call's INPUT travels with it. A coordination row's args ARE its
+        // content, and they used to stop at this boundary — so "Messaged" and
+        // "Requested test tools" reached the UI as headers that opened onto
+        // nothing.
+        const argsText = corpArgsText(e.input);
+        const recipient = corpRecipient(e.toolName, e.input);
         emit({
           kind: 'tool',
           toolName: e.toolName,
           ...(detail !== undefined ? { detail } : {}),
           ...(path !== undefined ? { path } : {}),
+          ...(argsText !== undefined ? { argsText } : {}),
+          ...(recipient !== undefined ? { recipient } : {}),
         });
       } else {
         // write/edit: the file is still being PRODUCED, but name it the moment the
@@ -1354,6 +1434,15 @@ export async function openRoleSession(
     // `tool_call` (start), so they are NOT re-emitted here. `tool_result` fires
     // after execution and carries the tool args (`input`) + `isError`.
     pi.on('tool_result', (e: ToolResultEvent) => {
+      /*
+       * SETTLE the row this result answers. Steps forward at `tool_call`, so
+       * without this pairing every corp tool row rendered as finished the instant
+       * it appeared — and a BLOCKING talk_to, which waits on the whole downstream
+       * agent, left the chain looking idle for minutes under a premature "Done".
+       * Emitted first, and for every tool, so it happens even on an error result
+       * (the isError early-out below returns before the file handling).
+       */
+      emit({ kind: 'tool', toolName: e.toolName, settled: true });
       // A bash command's RESULT text → mirror it into the live terminal tab. This
       // is a SECOND `tool` record paired with the command's own step (same
       // toolName + detail), so coordination folds the output onto that row instead
@@ -1523,6 +1612,15 @@ export async function openRoleSession(
     const before = (session.state.messages as unknown as readonly UsageMessage[]).length;
     let promptError = false;
     let bumps = 0;
+    /*
+     * THE BRIEF, on the record. Every turn a role is given — the opening
+     * contract and each follow-up — lands here first, so its chat opens with
+     * what it was ASKED to do instead of starting mid-monologue. This is the
+     * only place that sees all of them, which is why it goes here rather than at
+     * a call site. the user: "I still don't see the blue left aligned bubble I asked
+     * for showing the actual task/follow up messages the subagents were given."
+     */
+    safeEmit(turn.onActivity, { kind: 'briefing', text: userPrompt });
     try {
       await session.prompt(userPrompt);
       // BUMP-TO-CONTINUE: if the loop ended without the deliverable, re-prompt the SAME
@@ -1533,6 +1631,10 @@ export async function openRoleSession(
         const next = await options.bump.nextPrompt({ finalText: lastText() });
         if (next === undefined) break; // deliverable present or unfulfillable declared
         bumps += 1;
+        // A bump is an ordinary user turn on the live session, so it is a
+        // briefing like any other — it must not be the one message that stays
+        // invisible.
+        safeEmit(turn.onActivity, { kind: 'briefing', text: next });
         await session.prompt(next);
       }
     } catch {

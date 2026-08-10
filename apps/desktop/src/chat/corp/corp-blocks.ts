@@ -33,14 +33,14 @@
  */
 
 import type { WorkerTranscriptLine, WorkerTranscriptView } from '@pi-desktop/coordination';
-import type { AssistantMsg, ContentBlock, ToolResultMsg } from '@pi-desktop/engine';
+import type { ChatMsg, ContentBlock, ToolResultMsg } from '@pi-desktop/engine';
 import {
   findToolCallOpener,
   findWrittenToolCallRegion,
   reconstructToolCallFromContent,
   stripToolCallScaffolding,
 } from '@pi-desktop/provider-llamacpp/repair';
-import { toolStepKind } from '../activity-mapping';
+import { PROSE_ARGS_KEY, toolStepKind } from '../activity-mapping';
 import { type DetectedArtifact, detectArtifacts } from '../canvas/artifacts';
 
 /** The corp role-agent built-in tools the text-form salvage resolves written
@@ -396,6 +396,13 @@ function lineToBlocks(line: WorkerTranscriptLine, index: number): ContentBlock[]
   const idBase = `${CORP_MSG_ID}-${index}`;
   const streaming = line.streaming === true;
   switch (line.kind) {
+    /* A briefing is a MESSAGE in the conversation, not a block inside a run —
+     * `transcriptToAssistantView` lifts it out as a user turn. Returning nothing
+     * here keeps it from also falling through to `default` and rendering as the
+     * agent's own prose, which would put the instruction on screen twice, in the
+     * wrong voice. */
+    case 'briefing':
+      return [];
     case 'file-touch': {
       // A file write: a `write` toolCall (→ the `edit` chain row) carrying the
       // live +N/−N as explicit line counts, plus the path for the filename subline
@@ -411,7 +418,12 @@ function lineToBlocks(line: WorkerTranscriptLine, index: number): ContentBlock[]
     }
     case 'tool-call':
       return [
-        toolCallBlock(`${idBase}-tool`, line.text, toolLineArgs(line.text, line.detail, line.path)),
+        toolCallBlock(`${idBase}-tool`, line.text, {
+          ...toolLineArgs(line.text, line.detail, line.path),
+          // The real input, formatted at the engine boundary. Without it a
+          // coordination row opens onto nothing.
+          ...(line.argsText !== undefined ? { [PROSE_ARGS_KEY]: line.argsText } : {}),
+        }),
       ];
     case 'consult':
       // A consult reads as a generic tool row (resolveTool → neutral `tool`).
@@ -458,8 +470,16 @@ function lineToBlocks(line: WorkerTranscriptLine, index: number): ContentBlock[]
 
 /** A watched corp node's live view, ready for {@link AssistantGroup}. */
 export interface CorpAssistantView {
-  /** One synthetic assistant message carrying every block (positional keys). */
-  group: AssistantMsg[];
+  /**
+   * The node's conversation: assistant runs, split by the BRIEFINGS it was given.
+   *
+   * This was a single assistant message holding every block, which is why a role
+   * chat could only ever be a monologue — there was nowhere for an incoming
+   * instruction to go. Splitting here means the shared `AgentTranscript` sees a
+   * real conversation and renders each brief through the SAME blue left-aligned
+   * bubble a subagent already gets.
+   */
+  group: ChatMsg[];
   /** Synthetic done-results for every settled tool call, so ONLY the current
    * action shimmers while working (the chain derives running from a missing
    * result + the live turn). Empty when the node isn't working. */
@@ -467,10 +487,16 @@ export interface CorpAssistantView {
 }
 
 /** The corp node's transcript lines → ordered content blocks (stable by index). */
-export function transcriptToBlocks(lines: readonly WorkerTranscriptLine[]): ContentBlock[] {
+export function transcriptToBlocks(
+  lines: readonly WorkerTranscriptLine[],
+  /** Index of `lines[0]` in the FULL transcript. Block ids derive from the line
+   * index, so a slice must keep the global numbering or two runs would mint the
+   * same tool-call id and their results would cross. */
+  offset = 0,
+): ContentBlock[] {
   const out: ContentBlock[] = [];
   lines.forEach((line, i) => {
-    for (const block of lineToBlocks(line, i)) out.push(block);
+    for (const block of lineToBlocks(line, offset + i)) out.push(block);
   });
   return out;
 }
@@ -504,9 +530,42 @@ export function transcriptToAssistantView(
   working: boolean,
 ): CorpAssistantView {
   const blocks = transcriptToBlocks(transcript.lines);
-  const group: AssistantMsg[] = [
-    { kind: 'assistant', id: CORP_MSG_ID, blocks, isStreaming: working, timestamp: 0 },
-  ];
+  /*
+   * Split the run at each BRIEFING. Everything before a brief is one assistant
+   * run; the brief itself becomes a user turn (which the agent voice draws as
+   * the blue bubble); the work it triggers is the next run. Only the LAST run
+   * can be streaming — earlier ones are, by definition, finished.
+   */
+  const briefs = transcript.lines
+    .map((l, i) => ({ l, i }))
+    .filter(({ l }) => l.kind === 'briefing');
+  const group: ChatMsg[] = [];
+  if (briefs.length === 0) {
+    group.push({ kind: 'assistant', id: CORP_MSG_ID, blocks, isStreaming: working, timestamp: 0 });
+  } else {
+    let cursor = 0;
+    const pushRun = (upto: number, last: boolean): void => {
+      const slice = transcript.lines.slice(cursor, upto);
+      cursor = upto;
+      if (slice.length === 0) return;
+      const runBlocks = transcriptToBlocks(slice, upto - slice.length);
+      if (runBlocks.length === 0) return;
+      group.push({
+        kind: 'assistant',
+        // Positional and STABLE across re-renders — the ids key the render list.
+        id: `${CORP_MSG_ID}-${group.length}`,
+        blocks: runBlocks,
+        isStreaming: last && working,
+        timestamp: 0,
+      });
+    };
+    for (const { l, i } of briefs) {
+      pushRun(i, false);
+      cursor = i + 1; // the briefing line itself is the user turn, not a block
+      group.push({ kind: 'user', id: `${CORP_MSG_ID}-brief-${i}`, text: l.text, timestamp: 0 });
+    }
+    pushRun(transcript.lines.length, true);
+  }
 
   /*
    * THE REAL RESULTS, WHERE THERE ARE ANY.

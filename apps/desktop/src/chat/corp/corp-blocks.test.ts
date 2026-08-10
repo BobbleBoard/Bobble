@@ -7,7 +7,7 @@
  */
 
 import type { WorkerTranscriptLine, WorkerTranscriptView } from '@pi-desktop/coordination';
-import type { ContentBlock } from '@pi-desktop/engine';
+import type { AssistantMsg, ChatMsg, ContentBlock, UserMsg } from '@pi-desktop/engine';
 import { describe, expect, it } from 'vitest';
 import { corpArtifacts, transcriptToAssistantView, transcriptToBlocks } from './corp-blocks';
 
@@ -266,10 +266,64 @@ describe('transcriptToAssistantView — streaming + running control', () => {
     lines,
   });
 
+  /* `group` is a CONVERSATION now (briefings split it into runs), so a test that
+   * wants the assistant run has to say so rather than assume index 0 is one. */
+  const assistantAt = (v: { group: ChatMsg[] }, i = 0): AssistantMsg => {
+    const m = v.group.filter((x): x is AssistantMsg => x.kind === 'assistant')[i];
+    if (m === undefined) throw new Error(`no assistant message at ${i}`);
+    return m;
+  };
+
   it('marks the group streaming while working and settles it otherwise', () => {
     const lines = [line({ kind: 'message', text: 'hi' })];
-    expect(transcriptToAssistantView(view(lines), true).group[0]?.isStreaming).toBe(true);
-    expect(transcriptToAssistantView(view(lines), false).group[0]?.isStreaming).toBe(false);
+    expect(assistantAt(transcriptToAssistantView(view(lines), true)).isStreaming).toBe(true);
+    expect(assistantAt(transcriptToAssistantView(view(lines), false)).isStreaming).toBe(false);
+  });
+
+  it('lifts each briefing out as a USER turn, splitting the runs around it', () => {
+    /*
+     * The whole point of #37: a role chat must show what it was ASKED, not just
+     * what it said. The brief becomes a user turn (drawn as the blue left-aligned
+     * bubble by the agent voice) and must NOT also appear as the agent's own
+     * prose inside a run.
+     */
+    const v = transcriptToAssistantView(
+      view([
+        line({ kind: 'briefing', text: 'Build the watch.' }),
+        line({ kind: 'message', text: 'On it.' }),
+        line({ kind: 'briefing', text: 'Also make the deck.' }),
+        line({ kind: 'message', text: 'Done.' }),
+      ]),
+      false,
+    );
+    expect(v.group.map((m) => m.kind)).toEqual(['user', 'assistant', 'user', 'assistant']);
+    expect(v.group.filter((m): m is UserMsg => m.kind === 'user').map((m) => m.text)).toEqual([
+      'Build the watch.',
+      'Also make the deck.',
+    ]);
+    // The brief is NOT echoed inside the agent's own blocks.
+    const prose = JSON.stringify(v.group.filter((m) => m.kind === 'assistant'));
+    expect(prose).not.toContain('Build the watch.');
+    // Only the LAST run may stream; here nothing is working, so none do.
+    expect(assistantAt(v, 0).isStreaming).toBe(false);
+  });
+
+  it('keeps tool-call ids unique across runs split by a briefing', () => {
+    // Block ids derive from the line INDEX; slicing per run would restart the
+    // numbering and two runs would mint the same id, crossing their results.
+    const v = transcriptToAssistantView(
+      view([
+        line({ kind: 'tool-call', text: 'bash', detail: 'ls' }),
+        line({ kind: 'briefing', text: 'carry on' }),
+        line({ kind: 'tool-call', text: 'bash', detail: 'pwd' }),
+      ]),
+      false,
+    );
+    const ids = v.group
+      .filter((m): m is AssistantMsg => m.kind === 'assistant')
+      .flatMap((m) => m.blocks.filter(isTool).map((b) => b.id));
+    expect(ids).toHaveLength(2);
+    expect(new Set(ids).size).toBe(2);
   });
 
   it('gives every tool call but the LAST a settled result while working (only the current action shimmers)', () => {
@@ -279,7 +333,7 @@ describe('transcriptToAssistantView — streaming + running control', () => {
       line({ kind: 'file-touch', path: 'b.ts', addedLines: 2 }),
     ];
     const working = transcriptToAssistantView(view(lines), true);
-    const toolIds = working.group[0]?.blocks.filter(isTool).map((b) => b.id) ?? [];
+    const toolIds = assistantAt(working).blocks.filter(isTool).map((b) => b.id);
     expect(toolIds).toHaveLength(3);
     // The first two are settled (have a result); the last (current action) is not.
     expect(working.resultByCallId.has(toolIds[0] as string)).toBe(true);
