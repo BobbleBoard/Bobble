@@ -27,6 +27,13 @@ type Item =
   | { kind: 'assistant'; group: AssistantMsg[] };
 
 /**
+ * Whose transcript this is. An AGENT's incoming user turns are briefings — the
+ * contract it was handed — and render left-aligned in blue; the main chat's are
+ * the person talking and stay as they were.
+ */
+export type TranscriptVoice = 'person' | 'agent';
+
+/**
  * Group consecutive assistant messages into one run, so a turn that spanned
  * several messages reads as a single reply rather than a stack of fragments —
  * the same shape the main thread builds.
@@ -70,6 +77,9 @@ export interface AgentTranscriptProps {
   readonly onOpenFile?: (path: string) => void;
   /** Shown when there is nothing yet — say WHY, never leave a blank pane. */
   readonly empty?: ReactNode;
+  /** 'agent' renders incoming turns as BRIEFINGS (left-aligned, blue) — see
+   * {@link TranscriptVoice}. Defaults to the person's own chat. */
+  readonly voice?: TranscriptVoice;
 }
 
 /** An agent's conversation, rendered exactly as the main chat renders one. */
@@ -79,6 +89,7 @@ export function AgentTranscript({
   suppressInlineArtifacts,
   onOpenFile,
   empty,
+  voice = 'person',
 }: AgentTranscriptProps): ReactNode {
   const items = groupAgentMessages(messages);
   const resultByCallId = resultsByCallId(messages);
@@ -88,7 +99,7 @@ export function AgentTranscript({
       {items.map((item, i) =>
         item.kind === 'user' ? (
           // biome-ignore lint/suspicious/noArrayIndexKey: positional, read-only list
-          <MessageRow key={`u${i}`} kind="user">
+          <MessageRow key={`u${i}`} kind={voice === 'agent' ? 'briefing' : 'user'}>
             <div className="flex flex-col gap-2">
               {item.images.length > 0 ? (
                 <div className="flex flex-wrap gap-2">

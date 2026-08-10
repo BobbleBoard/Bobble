@@ -40,6 +40,7 @@ export function ChildChatView({ childId }: { childId: string }): ReactNode {
       <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-6">
         <div className="mx-auto flex max-w-3xl flex-col gap-4">
           <AgentTranscript
+        voice="agent"
             messages={entry.messages}
             empty={
               <div className="py-8 text-center text-body text-text-muted">

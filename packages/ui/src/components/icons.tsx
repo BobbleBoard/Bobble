@@ -432,6 +432,55 @@ export function IconFolder(props: IconProps) {
   );
 }
 
+/**
+ * Folder being LOOKED INTO — the lid tilted open.
+ *
+ * the user: "it among the specialists should have specific icons, eg. an open
+ * folder as an icon when it 'lists files from a folder' rather than a file
+ * icon." A closed folder is a place; an open one is the act of reading it, and
+ * that is what an `ls` row actually reports.
+ */
+export function IconFolderOpen(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M2.5 12.5V4.5a1 1 0 0 1 1-1h2.4l1.2 1.4h5.4a1 1 0 0 1 1 1v1.1" />
+      <path d="M2.5 12.5 4.4 7.4a1 1 0 0 1 .95-.7h8.3a1 1 0 0 1 .95 1.3l-1.5 4.5z" />
+    </Icon>
+  );
+}
+
+/** A message handed to somebody — the corp `talk_to` row. Distinct from
+ * IconChat (a conversation) because this is one directed hand-off. */
+export function IconHandoff(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M2.5 4.5h11v6.2h-6l-2.6 2.3v-2.3H2.5z" />
+      <path d="M5.5 7.6h5" />
+    </Icon>
+  );
+}
+
+/** Work handed back up — the `submit_work` row. */
+export function IconSubmit(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M8 12.5V3.6" />
+      <path d="M4.6 7 8 3.6 11.4 7" />
+      <path d="M3 13.2h10" />
+    </Icon>
+  );
+}
+
+/** A gate that has opened — `ready_to_delegate`. */
+export function IconGateOpen(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <circle cx="8" cy="8" r="5.5" />
+      <path d="M5.6 8.2 7.2 9.8l3.2-3.6" />
+    </Icon>
+  );
+}
+
 export function IconFolderPlus(props: IconProps) {
   return (
     <Icon {...props}>

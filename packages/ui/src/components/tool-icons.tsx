@@ -11,6 +11,11 @@ import {
   IconEye,
   IconFile,
   IconFolder,
+  IconFolderOpen,
+  IconGateOpen,
+  IconGears,
+  IconHandoff,
+  IconSubmit,
   IconGlobe,
   IconKeyboard,
   IconPencil,
@@ -37,8 +42,20 @@ export type ToolIconKind =
   | 'python'
   | 'edit'
   | 'read'
-  // A directory LISTING — a folder glyph, never the file sheet.
+  // A directory LISTING — an OPEN folder glyph, never the file sheet, and never
+  // the closed folder either: listing is the act of looking inside one.
   | 'folder'
+  /*
+   * THE COORDINATION STEPS. A corp run's most important rows are who was asked
+   * and what for, and they were rendering as the neutral puzzle glyph because
+   * they had no kind of their own. Each gets a distinct mark so a hand-off is
+   * recognisable at a glance in a chain of forty rows.
+   */
+  | 'talk'
+  | 'commission'
+  | 'delegate'
+  | 'toolkit'
+  | 'submit'
   | 'search'
   // The `tool_search` builtin: a magnifier over the TOOL registry (not the web),
   // so it reads "Searched tools" with the search-glass glyph, never the web globe.
@@ -176,7 +193,17 @@ export function toolIcon(
         <IconPencil size={size} />
       );
     case 'folder':
-      return <IconFolder size={size} />;
+      return <IconFolderOpen size={size} />;
+    case 'talk':
+      return <IconHandoff size={size} />;
+    case 'commission':
+      return <IconSparkles size={size} />;
+    case 'delegate':
+      return <IconGateOpen size={size} />;
+    case 'toolkit':
+      return <IconGears size={size} />;
+    case 'submit':
+      return <IconSubmit size={size} />;
     case 'read':
     case 'file':
       return filename ? (

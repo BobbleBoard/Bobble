@@ -52,7 +52,7 @@ function roleLabel(node: OrgNodeView): string {
     case 'division-head':
       return 'Area lead';
     case 'engineer':
-      return 'Builder';
+      return 'Engineer';
     case 'specialist':
       return 'Specialist';
   }

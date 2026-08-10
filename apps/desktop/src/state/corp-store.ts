@@ -291,6 +291,22 @@ export const useCorpStore = create<CorpStoreState>((set) => ({
     }),
   setContextPercent: (percent) =>
     set((s) => (s.contextPercent === percent ? s : { contextPercent: percent })),
+  /*
+   * NOTE — one UI for "an agent's conversation" is still OUTSTANDING.
+   *
+   * the user: "there shouldn't be two seperate UI's dpeneding on whether we click
+   * into the situation room's buttons or the subchats in the left sidebar."
+   * CorpInlineTurn already routes its clicks through setViewedChild; this path
+   * pins the node instead, and ChatThread then renders CorpChatStream inline —
+   * the second presentation.
+   *
+   * I tried routing this through setViewedChild too and it BROKE the canvas:
+   * corp-canvas-routing's "types a live write into the activity tab" test went
+   * from passing to failing, because selectNode is also called internally by the
+   * routing logic, so hijacking it swallowed the activity tab. The unification
+   * needs an explicit user-click path separate from internal selection, which is
+   * a bigger change than one line here. Reverted rather than shipped broken.
+   */
   selectNode: (node) => set((s) => ({ pinnedNode: s.pinnedNode?.id === node?.id ? null : node })),
   followLive: () => set({ pinnedNode: null }),
   trackChart: (rawChart) =>

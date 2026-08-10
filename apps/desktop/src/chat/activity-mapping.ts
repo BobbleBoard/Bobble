@@ -180,6 +180,11 @@ const STEP_LABELS: Record<ActivityStepKind, [running: string, done: string]> = {
   edit: ['Editing a file', 'Edited a file'],
   read: ['Reading a file', 'Read a file'],
   folder: ['Listing a folder', 'Listed a folder'],
+  talk: ['Messaging', 'Messaged'],
+  commission: ['Commissioning a specialist', 'Commissioned a specialist'],
+  delegate: ['Opening delegation', 'Ready to delegate'],
+  toolkit: ['Requesting test tools', 'Requested test tools'],
+  submit: ['Submitting the work', 'Submitted the work'],
   file: ['Presenting a file', 'Presented a file'],
   skill: ['Reading a skill', 'Read a skill'],
   search: ['Searching the web', 'Searched the web'],
@@ -247,6 +252,21 @@ const TOOL_REGISTRY: Record<string, ToolResolution> = {
   open_file: { kind: 'read' },
   read_file: { kind: 'read' },
   cat: { kind: 'read' },
+  /*
+   * THE CORP COMM TOOLS. They had no entries, so every hand-off rendered as the
+   * neutral "Used a tool" puzzle glyph with a generic reveal — the user, looking at
+   * a run: "it 'commisions specialist' but I can't click on that to see what the
+   * commision was, what specialist it was or anything specific."
+   *
+   * A registry entry is what gives a row its own verb AND its own openable
+   * detail, so these are the rows that carry the actual coordination: who was
+   * asked, and what for.
+   */
+  talk_to: { kind: 'talk' },
+  commission_specialist: { kind: 'commission' },
+  ready_to_delegate: { kind: 'delegate' },
+  request_test_tools: { kind: 'toolkit' },
+  submit_work: { kind: 'submit' },
   // shell
   bash: { kind: 'bash' },
   shell: { kind: 'bash' },

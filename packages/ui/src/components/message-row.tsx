@@ -13,7 +13,21 @@ export const Thread = forwardRef<HTMLDivElement, ThreadProps>(function Thread(
 });
 
 export interface MessageRowProps extends HTMLAttributes<HTMLDivElement> {
-  kind: 'user' | 'assistant';
+  /**
+   * `briefing` is a message an AGENT was given — the manager's contract to an
+   * engineer, the CEO's vision to the manager.
+   *
+   * It is a user-shaped bubble because that is what it IS from the receiving
+   * agent's point of view: the thing it was asked to do. But it is LEFT aligned
+   * with a blue border rather than right aligned, so a transcript never implies
+   * the user typed it. the user: "the manager/CEO provided messages need to be shown as
+   * if they are a user message, however their message bubble should be left
+   * aligned instead of right aligned and should have a blue tint/border."
+   *
+   * Without it a subagent's view opened mid-thought — "right now it just starts
+   * working without us being able to scroll up and see 'what hapened'".
+   */
+  kind: 'user' | 'assistant' | 'briefing';
   /** Hover-revealed action cluster (copy/edit/retry — codex extras, adopted
    * unconditionally per spec-message-row ADAPTATION). */
   actions?: ReactNode;
@@ -32,10 +46,24 @@ export const MessageRow = forwardRef<HTMLDivElement, MessageRowProps>(function M
   return (
     <div
       ref={ref}
-      className={clsx('pd-msg', kind === 'user' ? 'pd-msg--user' : 'pd-msg--assistant', className)}
+      className={clsx(
+        'pd-msg',
+        kind === 'user'
+          ? 'pd-msg--user'
+          : kind === 'briefing'
+            ? 'pd-msg--briefing'
+            : 'pd-msg--assistant',
+        className,
+      )}
       {...rest}
     >
-      {kind === 'user' ? <div className="pd-msg-bubble">{children}</div> : children}
+      {kind === 'user' || kind === 'briefing' ? (
+        <div className={clsx('pd-msg-bubble', kind === 'briefing' && 'pd-msg-bubble--briefing')}>
+          {children}
+        </div>
+      ) : (
+        children
+      )}
       {actions !== undefined ? <div className="pd-msg-actions">{actions}</div> : null}
     </div>
   );

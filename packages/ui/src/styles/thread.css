@@ -40,6 +40,29 @@
   align-items: flex-end;
 }
 
+/*
+ * A BRIEFING — what an agent was ASKED to do, in its own transcript.
+ *
+ * Same bubble as a user message, because that is its role from the receiving
+ * agent's side, but LEFT aligned and blue-bordered so it can never be misread
+ * as something the person typed. the user: "left aligned instead of right aligned
+ * and should have a blue tint/border."
+ *
+ * Wider cap than a user bubble: a contract is a paragraph of requirements, not
+ * a sentence, and wrapping it into a narrow column made the one message that
+ * explains the whole run the hardest thing on screen to read.
+ */
+.pd-msg--briefing {
+  align-items: flex-start;
+}
+
+.pd-msg-bubble--briefing {
+  max-width: min(92%, var(--pd-thread-prose-width));
+  background: color-mix(in srgb, var(--pd-accent-primary) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--pd-accent-primary) 45%, transparent);
+  color: var(--pd-text-primary);
+}
+
 .pd-msg-bubble {
   max-width: min(80%, 40rem);
   padding: 10px 16px;

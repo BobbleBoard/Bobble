@@ -1707,7 +1707,7 @@ export class CorpEngine implements CoordinationEngine {
         const c = rt.contracts.find((x) => x.nodeId === node.id);
         return {
           workerName: node.name,
-          roleLine: c ? `Builder · ${c.divisionName}` : 'Builder',
+          roleLine: c ? `Engineer · ${c.divisionName}` : 'Engineer',
           title: c ? `Build ${c.title}` : node.name,
           ...(c?.slot ? { area: c.slot } : {}),
           goal: c
