@@ -213,3 +213,157 @@ describe('AgentMesh — bounds (an emergent loop must never run away)', () => {
     expect(out).toContain('kaboom');
   });
 });
+
+describe('dispatch + wait — a manager delegates a ROUND, then stands by', () => {
+  const agent = (id: string, peers: string[]): MeshAgent => ({
+    id,
+    role: id.split(':')[0] ?? id,
+    systemPrompt: '',
+    peers,
+    tools: [],
+  });
+  const roster = [
+    agent('manager', ['engineer:1', 'engineer:2', 'engineer:3']),
+    agent('engineer:1', ['manager']),
+    agent('engineer:2', ['manager']),
+    agent('engineer:3', ['manager']),
+  ];
+  /** A runner whose turns finish only when the test says so. */
+  const gated = () => {
+    const release = new Map<string, () => void>();
+    const started: string[] = [];
+    const runTurn: RunAgentTurn = async ({ agentId }) => {
+      started.push(agentId);
+      await new Promise<void>((r) => release.set(agentId, r));
+      return { reply: `${agentId} done` };
+    };
+    return { runTurn, release, started };
+  };
+
+  it('returns IMMEDIATELY, so a whole round can go out before anyone waits', async () => {
+    const g = gated();
+    const mesh = new AgentMesh(g.runTurn, roster);
+    const ack = mesh.dispatch('manager', 'engineer:1', 'build the movement');
+    // The engineer has not replied and cannot have — that is the point.
+    expect(ack).toContain('engineer:1');
+    expect(ack).not.toContain('done');
+    expect(mesh.outstanding('manager')).toEqual(['engineer:1']);
+    g.release.get('engineer:1')?.();
+  });
+
+  it('runs the round in PARALLEL — all three start before any finishes', async () => {
+    const g = gated();
+    const mesh = new AgentMesh(g.runTurn, roster, { maxTurns: 200, maxDepth: 12, maxConcurrent: 3 });
+    for (const n of [1, 2, 3]) mesh.dispatch('manager', `engineer:${n}`, 'go');
+    await new Promise((r) => setTimeout(r, 0));
+    expect(g.started.sort()).toEqual(['engineer:1', 'engineer:2', 'engineer:3']);
+    for (const n of [1, 2, 3]) g.release.get(`engineer:${n}`)?.();
+  });
+
+  it('honours maxConcurrent, and UNQUEUES the next as a slot frees', async () => {
+    /* the user: "even if there isn't enough compute to handle concurrency, when an
+     * engineer running pauses, then run then unqueue". */
+    const g = gated();
+    const mesh = new AgentMesh(g.runTurn, roster, { maxTurns: 200, maxDepth: 12, maxConcurrent: 2 });
+    for (const n of [1, 2, 3]) mesh.dispatch('manager', `engineer:${n}`, 'go');
+    await new Promise((r) => setTimeout(r, 0));
+    expect(g.started).toHaveLength(2); // the third is queued behind the cap
+    g.release.get('engineer:1')?.();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(g.started).toHaveLength(3); // …and starts the moment a slot frees
+    for (const n of [2, 3]) g.release.get(`engineer:${n}`)?.();
+  });
+
+  it('parks the manager until a job comes back, then names who finished', async () => {
+    const g = gated();
+    const mesh = new AgentMesh(g.runTurn, roster);
+    mesh.dispatch('manager', 'engineer:1', 'go');
+    let done = false;
+    const waiting = mesh.waitOn('manager').then((o) => {
+      done = true;
+      return o;
+    });
+    await new Promise((r) => setTimeout(r, 0));
+    expect(done).toBe(false); // genuinely parked, not returning early
+    g.release.get('engineer:1')?.();
+    const out = await waiting;
+    expect(out.kind).toBe('finished');
+    expect(out.finished.map((f) => f.to)).toEqual(['engineer:1']);
+    expect(out.finished[0]?.reply).toBe('engineer:1 done');
+  });
+
+  it('wakes on a NUDGE — a raised hand beats waiting out the slowest contract', async () => {
+    const g = gated();
+    const mesh = new AgentMesh(g.runTurn, roster);
+    mesh.dispatch('manager', 'engineer:1', 'go');
+    const waiting = mesh.waitOn('manager');
+    await new Promise((r) => setTimeout(r, 0));
+    mesh.nudge('manager');
+    const out = await waiting;
+    expect(out.kind).toBe('nudged');
+    expect(out.stillRunning).toEqual(['engineer:1']);
+    g.release.get('engineer:1')?.();
+  });
+
+  it('is IDLE with nothing outstanding — never hangs on an empty team', async () => {
+    const mesh = new AgentMesh(async () => ({ reply: 'x' }), roster);
+    expect((await mesh.waitOn('manager')).kind).toBe('idle');
+  });
+
+  it('reports BOTH when two land together, losing neither', async () => {
+    const g = gated();
+    const mesh = new AgentMesh(g.runTurn, roster);
+    mesh.dispatch('manager', 'engineer:1', 'go');
+    mesh.dispatch('manager', 'engineer:2', 'go');
+    const waiting = mesh.waitOn('manager');
+    await new Promise((r) => setTimeout(r, 0));
+    g.release.get('engineer:1')?.();
+    g.release.get('engineer:2')?.();
+    const out = await waiting;
+    expect(out.finished.map((f) => f.to).sort()).toEqual(['engineer:1', 'engineer:2']);
+  });
+
+  it('consumes what it reported, so the next wait is about what is still out', async () => {
+    const g = gated();
+    const mesh = new AgentMesh(g.runTurn, roster);
+    mesh.dispatch('manager', 'engineer:1', 'go');
+    mesh.dispatch('manager', 'engineer:2', 'go');
+    const w1 = mesh.waitOn('manager');
+    await new Promise((r) => setTimeout(r, 0));
+    g.release.get('engineer:1')?.();
+    expect((await w1).finished.map((f) => f.to)).toEqual(['engineer:1']);
+    const w2 = mesh.waitOn('manager');
+    await new Promise((r) => setTimeout(r, 0));
+    g.release.get('engineer:2')?.();
+    const out2 = await w2;
+    // engineer:1 is NOT re-reported — it was already handed over.
+    expect(out2.finished.map((f) => f.to)).toEqual(['engineer:2']);
+  });
+
+  it('refuses a bad dispatch SYNCHRONOUSLY, so the sender can act on it', () => {
+    const mesh = new AgentMesh(async () => ({ reply: 'x' }), roster);
+    expect(mesh.dispatch('manager', 'engineer:9', 'go')).toMatch(/engineer:9/);
+    expect(mesh.outstanding('manager')).toEqual([]);
+  });
+
+  it('does NOT deadlock when dispatched work talks onward past the cap', async () => {
+    /*
+     * The gate is per JOB, not per turn. Per turn, a nested talk_to waits for a
+     * slot its own parent is holding and the run stops forever — with
+     * maxConcurrent 1 this test would never resolve.
+     */
+    const deep: MeshAgent[] = [
+      agent('manager', ['engineer:1']),
+      agent('engineer:1', ['manager', 'specialist:tester']),
+      agent('specialist:tester', ['engineer:1']),
+    ];
+    const runTurn: RunAgentTurn = async ({ agentId, talk }) => {
+      if (agentId === 'engineer:1') return { reply: await talk('engineer:1', 'specialist:tester', 'check') };
+      return { reply: 'measured' };
+    };
+    const mesh = new AgentMesh(runTurn, deep, { maxTurns: 200, maxDepth: 12, maxConcurrent: 1 });
+    mesh.dispatch('manager', 'engineer:1', 'go');
+    const out = await mesh.waitOn('manager');
+    expect(out.finished[0]?.reply).toBe('measured');
+  });
+});

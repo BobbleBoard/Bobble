@@ -29,43 +29,46 @@ import { mkdirSync, readdirSync, readFileSync, statSync, unlinkSync } from 'node
 import { tmpdir } from 'node:os';
 import nodePath from 'node:path';
 import type { ExtensionFactory, ToolDefinition } from '@mariozechner/pi-coding-agent';
-import { app } from 'electron';
-import { getInferenceUtility } from '../inference/llm-main';
 import {
   AgentMesh,
   buildCorpRoster,
-  classifyVerification,
   COMMISSION_SPECIALIST_TOOL,
+  classifyVerification,
   DELEGATION_ACTIVATED,
   extractClaims,
   finalCheck,
-  MESH_SPECIALIST_KINDS,
-  NOT_READY_TO_DELEGATE,
-  READY_TO_DELEGATE_DEFINITION,
-  READY_TO_DELEGATE_TOOL,
-  REQUEST_TEST_TOOLS_DEFINITION,
-  RAISE_HAND_TOOL,
-  RAISE_HAND_TOOL_DEF,
   HAND_REASONS,
   HandLedger,
   type HandReason,
-  type RaisedHand,
-  raisedHandReply,
-  withHandAlerts,
-  REQUEST_TEST_TOOLS_TOOL,
-  TEST_TOOL_KIT_NAMES,
-  toolsForKits,
+  MESH_SPECIALIST_KINDS,
   type MeshAgent,
   type MeshHop,
+  NOT_READY_TO_DELEGATE,
+  RAISE_HAND_TOOL,
+  RAISE_HAND_TOOL_DEF,
+  type RaisedHand,
+  READY_TO_DELEGATE_DEFINITION,
+  READY_TO_DELEGATE_TOOL,
+  REQUEST_TEST_TOOLS_DEFINITION,
+  REQUEST_TEST_TOOLS_TOOL,
   type RoleAgentActivity,
   type RunAgentTurn,
+  raisedHandReply,
   specialistId,
   TALK_TO_TOOL,
   type TalkFn,
+  TEST_TOOL_KIT_NAMES,
+  toolsForKits,
   type VerificationProfile,
   verificationBriefing,
+  WAIT_TOOL,
+  WAIT_TOOL_DEF,
+  type WaitOutcome,
+  withHandAlerts,
 } from '@pi-desktop/harness/corp';
 import { createLogger } from '@pi-desktop/shared';
+import { app } from 'electron';
+import { getInferenceUtility } from '../inference/llm-main';
 import { AgentPool } from './agent-pool';
 import { blindCriticEnabled, blindCriticReport } from './blind-critic';
 import {
@@ -148,7 +151,6 @@ function crashComplaint(cwd: string): string | null {
   );
 }
 
-
 /**
  * "No errors" from an empty project is not success — see the note in
  * {@link runtimeCheck}. A game needs a scene, and project.godot has to name it.
@@ -204,9 +206,6 @@ export function emptyProjectComplaint(cwd: string): string | null {
   return null;
 }
 
-
-
-
 /*
  * THE GODOT CHEAT-SHEET LIVED HERE, AND HAS BEEN REMOVED.
  *
@@ -225,8 +224,6 @@ export function emptyProjectComplaint(cwd: string): string | null {
  * how we learned that every failure was one unfamiliar API call rather than a
  * reasoning failure.
  */
-
-
 
 /**
  * Pull the actual lines an error points at. Godot names `file:line` (and
@@ -271,7 +268,6 @@ export function excerptFailures(state: string, cwd: string): string {
   return out.length === 0 ? '' : `The lines those errors point at:\n${out.join('\n')}`;
 }
 
-
 /** The workspace's files, relative and sorted — context for a missing-file error. */
 export function listProject(cwd: string): string {
   const walk = (dir: string, prefix: string, out: string[]): void => {
@@ -293,7 +289,6 @@ export function listProject(cwd: string): string {
     return '  (could not be listed)';
   }
 }
-
 
 /**
  * Run the one command that proves whether a runtime-typed project actually loads,
@@ -748,15 +743,16 @@ function buildScriptReport(cwd: string): string {
   const out = `${r.stdout ?? ''}\n${r.stderr ?? ''}`;
   const errs = out.split('\n').filter((l) => /ERROR|SCRIPT ERROR/.test(l));
   if (errs.length === 0) {
-    return `\nI ALSO RAN YOUR ${name} — it reported no errors. If the scene it should ` +
-      'produce is still missing, it is not actually saving one.';
+    return (
+      `\nI ALSO RAN YOUR ${name} — it reported no errors. If the scene it should ` +
+      'produce is still missing, it is not actually saving one.'
+    );
   }
   return (
     `\nI ALSO RAN YOUR ${name}, AND IT IS BROKEN:\n${errs.slice(0, 10).join('\n')}\n` +
     'Fix the build script first — nothing it should have produced exists until it runs clean.'
   );
 }
-
 
 /** A pi tool result carrying a single text block (the reply the calling agent reads). */
 function textResult(text: string): {
@@ -827,6 +823,30 @@ interface ManagerGateState {
 }
 
 /**
+ * The slice of the mesh the communication tools need. Narrow on purpose: these
+ * tools should be able to hand work out and stand by, and nothing else.
+ */
+export interface MeshDispatcher {
+  dispatch(from: string, to: string, message: string): string;
+  waitOn(from: string): Promise<WaitOutcome>;
+  outstanding(from: string): string[];
+}
+
+/**
+ * Work this agent hands DOWN runs in parallel; everything else is a question
+ * whose answer is the point.
+ *
+ * A manager briefing engineer:1 must not block, or engineer:2 could never start
+ * and there would be no round to wait on. But a commissioned specialist's
+ * measurement, and a report UP the chain, are both things the sender needs in
+ * hand before it can carry on — those stay synchronous.
+ */
+export function dispatchesTo(agent: MeshAgent, recipient: string): boolean {
+  if (agent.role !== 'manager' && agent.role !== 'ceo') return false;
+  return recipient.startsWith('engineer:');
+}
+
+/**
  * Who this agent reports to — derived from its ACTUAL peer list, never assumed.
  * A raised hand routed to an agent that is not a peer would vanish silently,
  * which is the failure mode the whole tool exists to remove. The lead reports to
@@ -846,6 +866,8 @@ export function communicationTools(
   talk: TalkFn,
   gates?: ManagerGateState,
   hands?: HandLedger,
+  /** The mesh, for handing work out without waiting and for standing by. */
+  waiter?: MeshDispatcher,
 ): ToolDefinition[] {
   const colleagues = agent.peers.filter((p) => !p.startsWith('specialist:'));
   const tools: Array<Record<string, unknown>> = [];
@@ -891,6 +913,11 @@ export function communicationTools(
         const p = (params ?? {}) as Record<string, unknown>;
         const recipient = typeof p.recipient === 'string' ? p.recipient : '';
         const message = typeof p.message === 'string' ? p.message : '';
+        // Downward delegation HANDS OFF and returns; everything else waits for
+        // the answer, because the answer is why it was asked.
+        if (waiter !== undefined && dispatchesTo(agent, recipient)) {
+          return textResult(withAlerts(waiter.dispatch(agent.id, recipient, message)));
+        }
         return textResult(withAlerts(await talk(agent.id, recipient, message)));
       },
     });
@@ -908,6 +935,38 @@ export function communicationTools(
    * engineer became "the engineer keeps replying with nothing… the tool isn't
    * functioning properly for this engineer" in a live run.
    */
+  /*
+   * STAND BY. Delegation hands work out without waiting for it, so this is how a
+   * manager finds out how it went — and the user's standing order makes waiting a
+   * legitimate action rather than the absence of one, which is what stops a
+   * manager with idle hands from building the product itself.
+   */
+  if (waiter !== undefined && agent.role !== 'engineer') {
+    tools.push({
+      ...WAIT_TOOL_DEF,
+      label: WAIT_TOOL,
+      promptSnippet: 'Stand by until somebody finishes or needs you.',
+      execute: async () => {
+        const out = await waiter.waitOn(agent.id);
+        const alerts = hands === undefined ? [] : hands.drain(agent.id);
+        if (out.kind === 'idle' && alerts.length === 0) {
+          return textResult(
+            'Nobody is working for you right now, so there is nothing to wait for. ' +
+              'Delegate the next round, or if the work is in, test it.',
+          );
+        }
+        const lines: string[] = [];
+        for (const f of out.finished) lines.push(`${f.to} came back:\n${f.reply}`);
+        if (out.stillRunning.length > 0) {
+          lines.push(`Still working: ${out.stillRunning.join(', ')}.`);
+        } else if (out.finished.length > 0) {
+          lines.push('That was everyone — nobody is still working for you.');
+        }
+        return textResult(withHandAlerts(lines.join('\n\n'), alerts));
+      },
+    });
+  }
+
   const reportsTo = managerOf(agent);
   if (reportsTo !== undefined && hands !== undefined) {
     tools.push({
@@ -1109,6 +1168,12 @@ export function hostPassthrough<T extends Record<string, unknown>>(
 export interface MeshAgentHostConfig {
   /** The resolved corp model (registry/auth/model) every agent runs on. */
   readonly handle: CorpModelHandle;
+  /**
+   * The mesh, as a REF, because the host is built before the mesh that owns it
+   * and each agent's tools are assembled later — by which time it is set. Gives
+   * downward delegation its hand-off and the manager its standby.
+   */
+  readonly meshRef?: { value?: MeshDispatcher };
   /** The SHARED product workspace every agent works in (engineers write here; everyone
    * reads the same tree — one product, one truth). */
   readonly cwd: string;
@@ -1356,6 +1421,7 @@ export function createMeshAgentHost(config: MeshAgentHostConfig): MeshAgentHost 
               // ONE ledger for the whole run: a hand is raised in one agent's
               // turn and read in another's, so it cannot live on either.
               raisedHands,
+              config.meshRef?.value,
             ),
             // ENGINEERS ONLY. This is how a piece comes back: what was built, how
             // they checked it, and — when a command makes sense for this kind of
@@ -1849,6 +1915,9 @@ export async function runCorpMeshTask(opts: {
   const team = new TeamBook(teamDir, opts.task);
   const roleOf = new Map(roster.map((a) => [a.id, a.role]));
 
+  /* The mesh does not exist yet — the host it runs on is built first — so the
+   * tools take it by reference and read it when an agent actually calls one. */
+  const meshRef: { value?: MeshDispatcher } = {};
   const host = createMeshAgentHost({
     handle: opts.handle,
     cwd: opts.cwd,
@@ -1862,10 +1931,13 @@ export async function runCorpMeshTask(opts: {
       : {}),
     ...(teamDir !== undefined ? { projectDir: teamDir } : {}),
     ...hostPassthrough(opts),
+    meshRef,
     sessionFileFor: (id) => team.sessionFileFor(id),
     onSessionFile: (id, file) => team.remember(id, roleOf.get(id) ?? 'engineer', file),
   });
   const mesh = new AgentMesh(host, roster, undefined, opts.onHop);
+  // Close the loop: the tools were built holding this ref, empty until now.
+  meshRef.value = mesh;
   // A stop must reach BOTH layers: the mesh refuses new talks, and the host cuts
   // whatever is already running. Only one of those existed before, so a spent
   // budget left the in-flight agent churning.

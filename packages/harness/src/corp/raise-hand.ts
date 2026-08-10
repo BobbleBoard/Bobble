@@ -31,6 +31,40 @@
 /** Stop, and tell your manager why. Available to every non-lead agent. */
 export const RAISE_HAND_TOOL = 'raise_hand';
 
+/** Stand by until the team comes back. The manager's side of the same channel. */
+export const WAIT_TOOL = 'wait';
+
+export const WAIT_TOOL_DEF = {
+  name: WAIT_TOOL,
+  description:
+    'Stand by until somebody you delegated to finishes, or needs you. Handing work ' +
+    'out does NOT wait for it — the people you brief start immediately and keep ' +
+    'working while you carry on — so this is how you find out how it went.\n\n' +
+    'Use it once you have delegated everything you mean to delegate this round. ' +
+    'It returns as soon as the FIRST person comes back or raises a hand, not when ' +
+    'everyone is done, so you hear about trouble early. Call it again to keep ' +
+    'waiting for the rest.\n\n' +
+    'Do NOT build the work yourself while your team is building it.',
+  parameters: { type: 'object', properties: {}, required: [] },
+} as const;
+
+/**
+ * THE MANAGER'S STANDING ORDER, the user verbatim.
+ *
+ * A manager with idle hands starts building, which is the failure the delegation
+ * gates exist to stop — in the run that prompted this it spent 32 minutes
+ * "waiting", decided its team was broken, and began writing the product itself.
+ * Saying what standing by IS makes waiting a legitimate action rather than the
+ * absence of one.
+ */
+export const MANAGER_STANDBY_INSTRUCTION =
+  'Wait once you do the initial delegation round until there is substantial work in ' +
+  "and it's ready to test. You shouldn't be doing anything but waiting or " +
+  'advising/helping out when asked until everyone is done — that\'s when you test, or ' +
+  'do another round. When you\'ve delegated everyone you want for the round, you\'re ' +
+  'either delegating more, sending messages to already delegated workers, or being on ' +
+  `standby (\`${WAIT_TOOL}\`).`;
+
 /** What a raised hand is FOR — the shape of the trouble, not its severity. */
 export const HAND_REASONS = ['needs_help', 'not_working', 'please_advise', 'blocked'] as const;
 export type HandReason = (typeof HAND_REASONS)[number];

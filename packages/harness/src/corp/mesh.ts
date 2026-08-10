@@ -74,11 +74,44 @@ export interface MeshBudget {
   readonly maxTurns: number;
   /** Max `talk_to` nesting depth (a → b → c → … ). */
   readonly maxDepth: number;
+  /**
+   * How many agent turns may be IN FLIGHT at once. Dispatched work runs in
+   * parallel up to this, and the rest queues FIFO for the next free slot —
+   * the user: "even if there isn't enough compute to handle concurrency, when an
+   * engineer running pauses, then run then unqueue the manager". The cap is
+   * about the machine (one llama-server, a few slots), never about the design:
+   * the manager's wait behaves identically either way, it just resumes sooner
+   * or later.
+   */
+  readonly maxConcurrent: number;
 }
 
 /** The default bounds — generous enough for a real multi-agent build, tight enough to
  * guarantee termination. */
-export const DEFAULT_MESH_BUDGET: MeshBudget = { maxTurns: 200, maxDepth: 12 };
+export const DEFAULT_MESH_BUDGET: MeshBudget = { maxTurns: 200, maxDepth: 12, maxConcurrent: 3 };
+
+/** One piece of work handed out and not yet finished. */
+export interface DispatchedJob {
+  /** Who is doing it. */
+  readonly to: string;
+  /** What they were asked, so a wait can say which job came back. */
+  readonly message: string;
+  /** Resolves with their reply when their turn ends. Never rejects. */
+  readonly done: Promise<string>;
+  settled: boolean;
+  reply?: string;
+}
+
+/** What a {@link AgentMesh.waitOn} came back with. */
+export interface WaitOutcome {
+  /** `finished` = at least one job came back; `nudged` = somebody needs you;
+   * `idle` = there was nothing outstanding to wait for. */
+  readonly kind: 'finished' | 'nudged' | 'idle';
+  /** Jobs that completed while waiting (empty for `nudged`/`idle`). */
+  readonly finished: readonly { readonly to: string; readonly reply: string }[];
+  /** Jobs still running when the wait returned. */
+  readonly stillRunning: readonly string[];
+}
 
 /** The synthetic sender id for the ROOT prompt (the user/task kicking off the mesh) —
  * it may talk to any agent (it has no peer allowlist of its own). */
@@ -157,6 +190,23 @@ export class AgentMesh {
   /** The ordered transcript of every talk (including refusals). */
   readonly hops: MeshHop[] = [];
 
+  /**
+   * WORK HANDED OUT AND STILL RUNNING, by whoever handed it out.
+   *
+   * A manager delegates a ROUND — several engineers — and only then waits. That
+   * is impossible if delegation blocks: the first hand-off would hold the stack
+   * and the second engineer could never start. the user: "when you've delegated
+   * everyone you want for the round, you're either delegating more, sending
+   * messages to already delegated workers, or being on standby."
+   */
+  private readonly jobs = new Map<string, DispatchedJob[]>();
+  /** Anyone parked in {@link waitOn}, so a raised hand can wake them early. */
+  private readonly waiters = new Map<string, () => void>();
+  /** Turns actually in flight, for the concurrency cap. */
+  private running = 0;
+  /** Agents whose turn is queued behind the cap, released FIFO as slots free. */
+  private readonly startQueue: Array<() => void> = [];
+
   // PLAIN FIELDS, not constructor parameter properties. The real-server drivers
   // load these modules directly under Node's strip-only TypeScript, which cannot
   // transform a parameter property — it throws ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX
@@ -217,6 +267,138 @@ export class AgentMesh {
    */
   async run(rootId: string, message: string): Promise<string> {
     return this.deliver(ROOT_SENDER, rootId, message, 0);
+  }
+
+  /**
+   * HAND WORK OUT WITHOUT WAITING FOR IT.
+   *
+   * The recipient's turn starts now and runs alongside the sender's, so a manager
+   * can brief its whole round and only then park in {@link waitOn}. Returns
+   * immediately with an acknowledgement — never the reply, which by definition
+   * does not exist yet.
+   *
+   * A refusal (not a peer, out of turns, aborted) still comes back synchronously,
+   * because those are answers the sender can act on straight away.
+   */
+  dispatch(from: string, to: string, message: string, depth = 0): string {
+    const refusal = this.refuse(from, to, depth);
+    if (refusal !== undefined) {
+      const reply = refusalNote(refusal, to);
+      this.record({ from, to, message, reply, depth, refused: refusal });
+      return reply;
+    }
+    const job: DispatchedJob = {
+      to,
+      message,
+      settled: false,
+      // `deliver` never throws, so this promise never rejects — but the catch
+      // stays because an unhandled rejection here would take down the run for a
+      // reason that has nothing to do with the work.
+      /*
+       * THE CONCURRENCY GATE, held for the whole JOB rather than per turn.
+       *
+       * Per turn it deadlocks: a nested `talk_to` inside a running turn would
+       * wait for a slot its own parent is holding, and at maxConcurrent=3 a
+       * chain four deep stops forever. Per job is also the honest unit — a
+       * dispatched thread only ever has ONE agent generating at a time (the
+       * leaf), whoever called it is parked awaiting a reply. So "3 at once"
+       * means three models really generating.
+       */
+      done: this.acquireSlot()
+        .then(() => this.deliver(from, to, message, depth + 1))
+        .catch(
+          (err: unknown) =>
+            `(${to} hit a problem: ${err instanceof Error ? err.message : String(err)})`,
+        )
+        .finally(() => this.releaseSlot()),
+    };
+    void job.done.then((reply) => {
+      job.settled = true;
+      job.reply = reply;
+      // Whoever handed this out may be parked waiting for exactly this.
+      this.nudge(from);
+    });
+    const list = this.jobs.get(from) ?? [];
+    list.push(job);
+    this.jobs.set(from, list);
+    return (
+      `Handed to ${to}, who is working on it now. You do NOT have their answer yet — ` +
+      `carry on delegating, or wait to be told when they finish or need you.`
+    );
+  }
+
+  /** Who this agent has work out with right now. */
+  outstanding(from: string): string[] {
+    return (this.jobs.get(from) ?? []).filter((j) => !j.settled).map((j) => j.to);
+  }
+
+  /**
+   * Wake anyone parked in {@link waitOn} for `agentId` — a job came back, or
+   * somebody raised a hand at them. Safe to call when nobody is waiting.
+   */
+  nudge(agentId: string): void {
+    const wake = this.waiters.get(agentId);
+    if (wake === undefined) return;
+    this.waiters.delete(agentId);
+    wake();
+  }
+
+  /**
+   * STAND BY until something happens: a job comes back, or somebody needs you.
+   *
+   * Returns as soon as the FIRST thing lands rather than draining everything, so
+   * a manager hears about a stuck engineer immediately instead of after the
+   * slowest contract in the round. With nothing outstanding it returns `idle` at
+   * once — waiting on an empty team is a mistake to report, not to hang on.
+   */
+  async waitOn(from: string): Promise<WaitOutcome> {
+    const jobs = this.jobs.get(from) ?? [];
+    const outstanding = jobs.filter((j) => !j.settled);
+    if (outstanding.length === 0) {
+      return { kind: 'idle', finished: [], stillRunning: [] };
+    }
+    let nudged = false;
+    const woken = new Promise<void>((resolve) => {
+      this.waiters.set(from, () => {
+        nudged = true;
+        resolve();
+      });
+    });
+    await Promise.race([...outstanding.map((j) => j.done), woken]);
+    this.waiters.delete(from);
+    // Report every job that settled, not only the one that won the race — two
+    // finishing together must not leave one silently unreported.
+    const finished = jobs
+      .filter((j) => j.settled && j.reply !== undefined)
+      .map((j) => ({ to: j.to, reply: j.reply as string }));
+    // Settled jobs are consumed: the next wait is about what is still out.
+    this.jobs.set(
+      from,
+      jobs.filter((j) => !j.settled),
+    );
+    const stillRunning = this.outstanding(from);
+    if (finished.length > 0) return { kind: 'finished', finished, stillRunning };
+    return { kind: nudged ? 'nudged' : 'idle', finished: [], stillRunning };
+  }
+
+  /**
+   * Take a concurrency slot, queueing FIFO when every slot is busy. This is the
+   * only place a turn is allowed to begin, so the cap cannot be bypassed by a
+   * new call path.
+   */
+  private async acquireSlot(): Promise<void> {
+    if (this.running < this.budget.maxConcurrent) {
+      this.running += 1;
+      return;
+    }
+    await new Promise<void>((resolve) => this.startQueue.push(resolve));
+    this.running += 1;
+  }
+
+  private releaseSlot(): void {
+    this.running -= 1;
+    const next = this.startQueue.shift();
+    if (next !== undefined) next();
   }
 
   /** Route one message from `from` to `to`, enforcing the peer allowlist, the

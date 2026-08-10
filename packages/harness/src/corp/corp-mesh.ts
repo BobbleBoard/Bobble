@@ -23,6 +23,7 @@ import {
   CHECK_FIX_CHECK,
   RIGOROUS_VERIFICATION_INSTRUCTION,
 } from '../verification-language.js';
+import { MANAGER_STANDBY_INSTRUCTION, WAIT_TOOL } from './raise-hand.js';
 import {
   MANAGER_PLANNING_TOOLS,
   READY_TO_DELEGATE_TOOL,
@@ -145,6 +146,12 @@ PLAN ON PAPER FIRST, THEN OPEN DELEGATION. Read the vision and brainstorm the co
 When the plan is CONCRETE, call ${READY_TO_DELEGATE_TOOL}. That activates the delegation tools. ${TALK_TO_TOOL} and ${COMMISSION_SPECIALIST_TOOL} exist before then and will refuse, telling you to settle the plan first — that refusal is the gate, not a fault.
 
 Then hand the work out. The reason you exist is that one person cannot build this alone.
+
+HANDING WORK OUT DOES NOT WAIT FOR IT. The moment you ${TALK_TO_TOOL} an engineer they start, and you get control straight back — so brief everybody you want working this round, one after another, before you do anything else. You will NOT have their answers yet; that is correct, not a failure.
+
+${MANAGER_STANDBY_INSTRUCTION}
+
+\`${WAIT_TOOL}\` returns the moment the FIRST person comes back or needs you, not when everyone is finished — so you hear about trouble early. Call it again to keep waiting. If somebody stops and asks for help, answer them and let them carry on. An idle manager who starts building is the single most expensive failure this team has.
 
 YOU START WITHOUT A SHELL OR A BROWSER, ON PURPOSE. Planning and coordinating need neither, and a manager holding a shell is a manager about to do somebody else's job. When the engineers are finished and the project has SETTLED, call ${REQUEST_TEST_TOOLS_TOOL} and ask for what you will actually use:
 ${testToolMenu()}

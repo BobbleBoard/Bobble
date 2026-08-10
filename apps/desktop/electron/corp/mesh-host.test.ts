@@ -16,6 +16,7 @@ import {
   HandLedger,
   type MeshAgent,
   RAISE_HAND_TOOL,
+  WAIT_TOOL,
 } from '@pi-desktop/harness/corp';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
@@ -29,6 +30,8 @@ import {
   listProject,
   MESH_ENTRY,
   managerOf,
+  dispatchesTo,
+  type MeshDispatcher,
   orphanReport,
   PASSTHROUGH_KEYS,
   runtimeCheck,
@@ -561,5 +564,126 @@ describe('managerOf — where a raised hand goes', () => {
     // unreachable target is exactly the disappearance this tool exists to stop.
     expect(managerOf(a('engineer:9', 'engineer', []))).toBeUndefined();
     expect(managerOf(a('manager', 'manager', ['engineer:1']))).toBeUndefined();
+  });
+});
+
+describe('wait — the manager delegates a round, then stands by', () => {
+  const agent = (id: string, role: string, peers: string[]) =>
+    ({ id, role, systemPrompt: '', peers, tools: [] }) as MeshAgent;
+  const mgr = agent('manager', 'manager', ['ceo', 'engineer:1', 'engineer:2']);
+  const text = (r: { content: Array<{ text: string }> }) => r.content[0]?.text ?? '';
+  const call = (tools: ReturnType<typeof communicationTools>, name: string) =>
+    (
+      tools.find((t) => t.name === name) as unknown as {
+        execute: (id: unknown, p: unknown) => Promise<{ content: Array<{ text: string }> }>;
+      }
+    ).execute;
+
+  /** A dispatcher stub — the mesh's contract, without a mesh. */
+  const stub = (over: Partial<MeshDispatcher> = {}): MeshDispatcher => ({
+    dispatch: () => 'handed off',
+    waitOn: async () => ({ kind: 'idle', finished: [], stillRunning: [] }),
+    outstanding: () => [],
+    ...over,
+  });
+
+  it('is advertised to the manager and NOT to an engineer', () => {
+    const names = (a: MeshAgent) =>
+      communicationTools(a, async () => '', undefined, new HandLedger(), stub()).map((t) => t.name);
+    expect(names(mgr)).toContain(WAIT_TOOL);
+    // An engineer does the work; it has nobody to stand by for.
+    expect(names(agent('engineer:1', 'engineer', ['manager']))).not.toContain(WAIT_TOOL);
+  });
+
+  it('DELEGATION HANDS OFF — talk_to downward returns without the reply', async () => {
+    /* The whole point: a blocking hand-off means engineer:2 can never start, so
+     * there is no round to wait on. */
+    let dispatched = '';
+    const tools = communicationTools(mgr, async () => 'SHOULD NOT BE USED', undefined, undefined, stub({
+      dispatch: (_f, to) => {
+        dispatched = to;
+        return `Handed to ${to}, who is working on it now.`;
+      },
+    }));
+    const out = text(await call(tools, 'talk_to')('c1', { recipient: 'engineer:1', message: 'build' }));
+    expect(dispatched).toBe('engineer:1');
+    expect(out).toContain('working on it now');
+    expect(out).not.toContain('SHOULD NOT BE USED');
+  });
+
+  it('a report UPWARD still waits — the answer is why it was asked', async () => {
+    const tools = communicationTools(mgr, async () => 'the CEO says go ahead', undefined, undefined, stub({
+      dispatch: () => 'WRONG — should not dispatch upward',
+    }));
+    const out = text(await call(tools, 'talk_to')('c1', { recipient: 'ceo', message: 'done?' }));
+    expect(out).toBe('the CEO says go ahead');
+  });
+
+  it('reports who came back, and who is still going', async () => {
+    const tools = communicationTools(mgr, async () => '', undefined, new HandLedger(), stub({
+      waitOn: async () => ({
+        kind: 'finished',
+        finished: [{ to: 'engineer:1', reply: 'movement built' }],
+        stillRunning: ['engineer:2'],
+      }),
+    }));
+    const out = text(await call(tools, WAIT_TOOL)('c1', {}));
+    expect(out).toContain('engineer:1 came back');
+    expect(out).toContain('movement built');
+    expect(out).toContain('Still working: engineer:2');
+  });
+
+  it('says plainly when the round is over, so the manager moves on to testing', async () => {
+    const tools = communicationTools(mgr, async () => '', undefined, new HandLedger(), stub({
+      waitOn: async () => ({
+        kind: 'finished',
+        finished: [{ to: 'engineer:1', reply: 'done' }],
+        stillRunning: [],
+      }),
+    }));
+    expect(text(await call(tools, WAIT_TOOL)('c1', {}))).toContain('That was everyone');
+  });
+
+  it('waiting on an empty team is a MISTAKE TO REPORT, never a hang', async () => {
+    const tools = communicationTools(mgr, async () => '', undefined, new HandLedger(), stub());
+    const out = text(await call(tools, WAIT_TOOL)('c1', {}));
+    expect(out).toContain('nothing to wait for');
+    expect(out).toContain('Delegate the next round');
+  });
+
+  it('carries a raised hand out of the wait, so standing by is how you hear it', async () => {
+    const hands = new HandLedger();
+    hands.raise('manager', {
+      from: 'engineer:2',
+      reason: 'not_working',
+      message: 'three.js will not load offline',
+    });
+    const tools = communicationTools(mgr, async () => '', undefined, hands, stub({
+      waitOn: async () => ({ kind: 'nudged', finished: [], stillRunning: ['engineer:2'] }),
+    }));
+    const out = text(await call(tools, WAIT_TOOL)('c1', {}));
+    expect(out).toContain('additional info, engineer:2 is stopped');
+    expect(out).toContain('three.js will not load offline');
+  });
+});
+
+describe('dispatchesTo — which hand-offs run in parallel', () => {
+  const a = (id: string, role: string) => ({ id, role, systemPrompt: '', peers: [], tools: [] }) as MeshAgent;
+
+  it('parallelises work handed DOWN to engineers', () => {
+    expect(dispatchesTo(a('manager', 'manager'), 'engineer:1')).toBe(true);
+    expect(dispatchesTo(a('ceo', 'ceo'), 'engineer:2')).toBe(true);
+  });
+
+  it('keeps a specialist SYNCHRONOUS — its measurement is the answer you asked for', () => {
+    expect(dispatchesTo(a('manager', 'manager'), 'specialist:tester')).toBe(false);
+  });
+
+  it('keeps a report UPWARD synchronous', () => {
+    expect(dispatchesTo(a('manager', 'manager'), 'ceo')).toBe(false);
+  });
+
+  it('an engineer never dispatches — it does the work itself', () => {
+    expect(dispatchesTo(a('engineer:1', 'engineer'), 'engineer:2')).toBe(false);
   });
 });
