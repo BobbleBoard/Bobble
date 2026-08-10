@@ -29,6 +29,7 @@ import { mkdirSync, readdirSync, readFileSync, statSync, unlinkSync } from 'node
 import { tmpdir } from 'node:os';
 import nodePath from 'node:path';
 import type { ExtensionFactory, ToolDefinition } from '@mariozechner/pi-coding-agent';
+import { app } from 'electron';
 import {
   AgentMesh,
   buildCorpRoster,
@@ -760,6 +761,22 @@ function textResult(text: string): {
  * `talk`: `talk_to` (its non-specialist peers) + `commission_specialist` (all
  * specialties — everyone gets it). Each tool's async execute calls `talk` and returns
  * the peer's reply, exactly like the consult tool awaits an advisor. */
+
+/**
+ * Where the office renderers live, as an ABSOLUTE path.
+ *
+ * The document specialist's prompt names `tools/office-gen/...`, but a corp run
+ * has cwd set to the user's WORKSPACE, not the repo — so a relative path there
+ * resolves to nothing and the specialist would conclude the scripts do not
+ * exist and start hand-writing OOXML, which is the exact failure it was added
+ * to prevent. Tell it the real location instead.
+ */
+function officeGenDir(): string {
+  return app.isPackaged
+    ? nodePath.join(process.resourcesPath, 'office-gen')
+    : nodePath.join(app.getAppPath(), '..', '..', 'tools', 'office-gen');
+}
+
 /** The manager's gate state for one run. Mutated by the gate tools. */
 interface ManagerGateState {
   /** False until `ready_to_delegate` is called; the contract tools refuse. */
@@ -869,8 +886,11 @@ function communicationTools(
       parameters: REQUEST_TEST_TOOLS_DEFINITION.function.parameters,
       execute: async (_id: unknown, params: unknown) => {
         const p = (params ?? {}) as Record<string, unknown>;
-        const asked = Array.isArray(p.kits) ? p.kits.filter((k) => typeof k === 'string') : [];
-        const granted = toolsForKits(asked as string[]);
+        /* `{kit, why}` objects now, with bare strings still accepted — the
+         * REASON is never inspected, by design: it exists to make asking for
+         * every kit cost a sentence. */
+        const asked = Array.isArray(p.kits) ? p.kits : [];
+        const granted = toolsForKits(asked as (string | { kit: string })[]);
         if (granted.length === 0) {
           return textResult(
             `No kit named. Ask for one or more of: ${TEST_TOOL_KIT_NAMES.join(', ')}.`,
@@ -1183,7 +1203,10 @@ export function createMeshAgentHost(config: MeshAgentHostConfig): MeshAgentHost 
         agentId,
         {
           purpose: ROLE_PURPOSE[agent.role] ?? 'engineer',
-          systemPrompt: `${agent.systemPrompt}\n${workspaceNote}`,
+          systemPrompt:
+            agent.id === specialistId('document')
+              ? `${agent.systemPrompt}\n${workspaceNote}\n\nTHE RENDERERS ARE AT ${officeGenDir()} — use that absolute path. Read its README.md before your first run.`
+              : `${agent.systemPrompt}\n${workspaceNote}`,
           // The comm-tool NAMES must be in the allowlist or the SDK never offers them.
           tools: [
             ...agent.tools,

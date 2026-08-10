@@ -70,20 +70,36 @@ export const TEST_TOOL_KITS = {
   files: {
     label: 'file manipulation',
     summary:
-      'Make and inspect test INPUTS, and read what the product produced. This ' +
-      'does not let you edit the product — that belongs to the engineers.',
-    tools: ['read', 'ls', 'grep', 'find'],
+      'Read, write and edit files — make test INPUTS, fix a fixture, inspect ' +
+      'what the product produced.',
+    tools: ['read', 'ls', 'grep', 'find', 'write', 'edit'],
   },
 } as const;
 
 export type TestToolKit = keyof typeof TEST_TOOL_KITS;
 export const TEST_TOOL_KIT_NAMES = Object.keys(TEST_TOOL_KITS) as TestToolKit[];
 
-/** Resolve requested kit names to a flat, de-duplicated tool list. */
-export function toolsForKits(kits: readonly string[]): string[] {
+/** One requested kit: which, and why it is needed. */
+export interface KitRequest {
+  readonly kit: string;
+  readonly why?: string;
+}
+
+/**
+ * Resolve requested kits to a flat, de-duplicated tool list.
+ *
+ * Accepts a bare name or a `{kit, why}` object. The REASON is deliberately not
+ * validated and nothing is ever done with it — the user: "this is never checked by
+ * the harness, nothing is ever done with it, but keeping it as an input
+ * implicitly combats the model asking for everything every time for no reason."
+ * Having to write a justification per kit is the whole mechanism; enforcing it
+ * would only teach the model to write a better-looking one.
+ */
+export function toolsForKits(kits: readonly (string | KitRequest)[]): string[] {
   const out = new Set<string>();
-  for (const k of kits) {
-    const kit = TEST_TOOL_KITS[k as TestToolKit];
+  for (const entry of kits) {
+    const name = typeof entry === 'string' ? entry : entry?.kit;
+    const kit = TEST_TOOL_KITS[name as TestToolKit];
     if (kit === undefined) continue;
     for (const t of kit.tools) out.add(t);
   }
@@ -152,8 +168,22 @@ export const REQUEST_TEST_TOOLS_DEFINITION = {
       properties: {
         kits: {
           type: 'array',
-          items: { type: 'string', enum: TEST_TOOL_KIT_NAMES },
-          description: 'Which kits you want. Ask for everything you will actually use.',
+          description:
+            'The kits you want, each with the reason you need it. Ask for what you ' +
+            'will actually use.',
+          items: {
+            type: 'object',
+            properties: {
+              kit: { type: 'string', enum: TEST_TOOL_KIT_NAMES },
+              why: {
+                type: 'string',
+                description:
+                  'One short line: why THIS toolset is necessary for what you are ' +
+                  'about to test.',
+              },
+            },
+            required: ['kit', 'why'],
+          },
         },
         what_you_will_test: {
           type: 'string',

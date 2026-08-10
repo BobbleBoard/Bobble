@@ -70,6 +70,12 @@ export const MESH_SPECIALIST_KINDS = [
   'motion',
   'ui-critic',
   'research',
+  // Owns every office format. It exists because a small model cannot hand-write
+  // OOXML and does not stop trying — the same failure that killed two Godot runs
+  // was waiting for every .pptx/.docx/.xlsx/.pdf. tools/office-gen already turns
+  // a small JSON spec into a designed file, so the specialist is that pipeline
+  // with someone driving it.
+  'document',
 ] as const;
 /** Named to avoid colliding with prompts.ts's review-lens `SpecialistKind`. */
 export type MeshSpecialistKind = (typeof MESH_SPECIALIST_KINDS)[number];
@@ -417,6 +423,23 @@ HOW YOU WORK. Search, then GO AND LOOK — a search result is a claim about a pa
 GO WIDE BEFORE DEEP. Whatever you find first is not the whole picture; look for what the obvious sources leave out, and for the thing that disagrees. Prefer the primary source over somebody's summary of it.
 
 CITE EVERYTHING AND MARK YOUR CONFIDENCE. Every claim gets its source. Where sources disagree, say so rather than picking one silently. Where you could not confirm something, label it — a report where the unknowns are marked is far more useful than one where they are smoothed over, because the person acting on it can tell which parts they may lean on.`,
+
+    document: `You are the DOCUMENT SPECIALIST. Somebody needs a real .pptx, .docx, .xlsx or .pdf — a deck, a report, a workbook, a brief — and you produce it.
+
+NEVER HAND-WRITE THE FILE FORMAT. Not the XML, not the zip, not a .tscn-style guess at what the inside of an Office file looks like. Every attempt at that in this project has produced a file that will not open, and the model that wrote it could not repair it. The renderers already exist and they own every byte:
+
+  \`tools/office-gen/make_doc.py <docx|xlsx|pdf> "<what you want>"\`   generate + render
+  \`tools/office-gen/make_deck.py "<what you want>"\`                  a slide deck
+  \`tools/office-gen/make_edit.py <file> "<instruction>"\`             edit an EXISTING file
+  \`tools/office-gen/office_edit.py inspect <file>\`                   see what is in one
+
+Read \`tools/office-gen/README.md\` first — it says what each script takes. You write a small JSON spec and prose; the renderer writes the file. If a format needs something the renderer cannot yet do, SAY SO rather than working around it by hand: a gap fixed in the renderer is fixed for everyone, forever.
+
+REAL CONTENT, NOT LOREM IPSUM. Numbers come from the actual thing — read the files, run the command, take the figure off what exists. A deck of invented statistics about a real product is worse than no deck.
+
+A DOCUMENT ABOUT SOMETHING VISIBLE MUST CONTAIN THE VISIBLE THING. If you are presenting an app, a page or a game, go and CAPTURE it — open it in the browser, screenshot the real screens — and put those images in. A deck about a working product that contains no picture of the product has not been finished, however good the words are.
+
+THEN OPEN WHAT YOU MADE AND LOOK AT IT. Render it, view it, and say what you saw: how many slides or pages, what is on them, whether anything is clipped, empty or overlapping. A file of the right size with the right extension is not evidence that it is any good.`,
   };
 
   const body =
@@ -611,7 +634,7 @@ const DEFAULT_SPECIALIST_TOOLS = [
 
 /** The specialists that PRODUCE an artifact rather than answer a question — they
  * get `write`, and {@link producerSpine} instead of {@link specialistSpine}. */
-const PRODUCING_KINDS = new Set(['image', 'motion', 'ui-critic', 'research']);
+const PRODUCING_KINDS = new Set(['image', 'motion', 'ui-critic', 'research', 'document']);
 
 /**
  * The tools a given specialist starts with.
@@ -640,6 +663,13 @@ export function specialistToolsFor(kind: string): readonly string[] {
     // a written report — so it needs the browser, the web, and somewhere to write.
     case 'research':
       return ['write', 'read', 'ls', 'bash', ...RESEARCH_TOOLS, ...BROWSER_TOOLS];
+    // Makes documents. `bash` is the load-bearing one: the renderers in
+    // tools/office-gen are what actually write the file, and `write` is for the
+    // JSON spec it hands them. The browser is for CAPTURING the real screens a
+    // deck about a product has to contain — an unillustrated deck about a
+    // working app is the failure this specialist exists to avoid.
+    case 'document':
+      return ['write', 'read', 'ls', 'bash', ...BROWSER_TOOLS, ...RESEARCH_TOOLS];
     default:
       return DEFAULT_SPECIALIST_TOOLS;
   }
