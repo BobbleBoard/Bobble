@@ -467,6 +467,12 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
   // (no model_select) still needs the prefix resident, and a cwd change (new
   // canonical) must re-warm.
   let warmedCanonical: string | null = null;
+  /** When the warm-up first claimed the "Loading model" label (null = not yet). */
+  let warmClaimedAt: number | null = null;
+  /** The prefix seen on the PREVIOUS attempt — warm only once it repeats. */
+  let pendingWarmKey: string | null = null;
+  /** How long to keep claiming it with no endpoint in sight before giving up. */
+  const WARM_CLAIM_GRACE_MS = 20_000;
   // Last-published predictive-prefill context (deduped so a per-turn applyPreset
   // that changed nothing doesn't re-push the ~7k-char system + tool schemas).
   let publishedPrefillSystem: string | null = null;
@@ -547,8 +553,33 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
         /* a diagnostic must never break a turn */
       }
     };
+    /*
+     * CLAIM THE LABEL BEFORE WE CAN WARM, not after.
+     *
+     * "Loading model" is gated on this status, and the server reaches `ready`
+     * seconds before the harness has an endpoint to warm through — so the label
+     * cleared, the user sent, and the turn QUEUED BEHIND the warm-up it was meant
+     * to benefit from. Measured: first token at 12.6s, matching the warm-up's own
+     * 12.5s completion almost exactly. Saying "warming" from the first attempt
+     * closes that window.
+     *
+     * With a deadline, because a promise this makes must be one it can keep: if
+     * no endpoint ever appears (no local server at all), release the label rather
+     * than holding the composer hostage to a warm-up that is never coming.
+     */
+    if (ctx.hasUI === true && warmClaimedAt === null) {
+      warmClaimedAt = Date.now();
+      ctx.ui.setStatus(PREFIX_WARM_STATUS, 'warming');
+    }
     if (warmCall === undefined) {
       note('no callModel (no endpoint env and no live file)');
+      if (
+        ctx.hasUI === true &&
+        warmClaimedAt !== null &&
+        Date.now() - warmClaimedAt > WARM_CLAIM_GRACE_MS
+      ) {
+        ctx.ui.setStatus(PREFIX_WARM_STATUS, 'ready');
+      }
       return;
     }
     if (typeof ctx.getSystemPrompt !== 'function') {
@@ -599,6 +630,23 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
      * had changed underneath them.
      */
     const warmKey = `${canonical}\u0000${warmNames.join(',')}`;
+    /*
+     * WAIT FOR THE SET TO SETTLE before spending a cold prefill on it.
+     *
+     * The app pushes effort AFTER the session comes up, and effort decides
+     * whether the corp seam is advertised — so the first tick sees 16 tools and
+     * the turn will want 17. Warming immediately meant priming a prefix the turn
+     * could not use, releasing the "Loading model" label on it, and leaving the
+     * real 17-tool warm still running when the user sent. Measured: 12.6s.
+     *
+     * One tick of stability (~1s) is enough for effort to land and costs nothing,
+     * because nothing can be sent while the label is still claimed.
+     */
+    if (warmKey !== pendingWarmKey) {
+      pendingWarmKey = warmKey;
+      note(`tool set changed (${warmNames.length}) — waiting a tick for it to settle`);
+      return;
+    }
     if (warmKey === warmedCanonical) {
       note('already warmed (same prompt + tools)');
       return;
@@ -623,10 +671,12 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
       `WARMING ${canonical.length} chars, ${warmTools.length} tools ` +
         `[${warmTools.map((t) => t.name).join(',')}], hasUI=${ctx.hasUI}`,
     );
-    if (ctx.hasUI === true) ctx.ui.setStatus(PREFIX_WARM_STATUS, 'warming');
-    void warmSystemPrompt(warmCall, canonical, { tools: warmTools }).finally(() => {
-      if (ctx.hasUI === true) ctx.ui.setStatus(PREFIX_WARM_STATUS, 'ready');
-    });
+    const warmStartedAt = Date.now();
+    void warmSystemPrompt(warmCall, canonical, { tools: warmTools })
+      .then((ok) => note(`warm result ok=${ok} in ${Date.now() - warmStartedAt}ms`))
+      .finally(() => {
+        if (ctx.hasUI === true) ctx.ui.setStatus(PREFIX_WARM_STATUS, 'ready');
+      });
     // Seed the renderer's predictive-prefill context with exactly what the warm-up
     // just made resident ([system][warm preset tools]) — so a first message typed
     // BEFORE any turn (activeTools still empty) prefills against the real prefix.

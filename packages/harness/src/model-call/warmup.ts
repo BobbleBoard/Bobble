@@ -31,7 +31,28 @@ export interface WarmupOptions {
    * resident, so the first message only prefills its own few tokens.
    */
   readonly tools?: CallModelRequest['tools'];
+  /**
+   * How long to allow. Defaults to {@link WARMUP_TIMEOUT_MS}, NOT the utility
+   * endpoint's ordinary timeout — see there for why.
+   */
+  readonly timeoutMs?: number;
 }
+
+/**
+ * A warm-up may take as long as ONE COLD PREFILL, because that is exactly what
+ * it is: the ~5k-token system+tools prefix this exists to make resident.
+ *
+ * MEASURED, and the reason this constant exists: the utility endpoint's default
+ * timeout is 5s — sized for the short helper calls it was built for — and a cold
+ * prefill of this prompt takes ~4s plus request overhead. So every warm-up was
+ * ABORTED at 5003ms and primed nothing, silently, because the result is
+ * deliberately swallowed. Two separate earlier fixes (making it run at all, and
+ * matching the tool set) were both correct and both invisible behind this.
+ *
+ * Nothing waits on it, so a generous budget costs nothing: it is fire-and-forget
+ * on a background endpoint, and finishing late is still finishing.
+ */
+export const WARMUP_TIMEOUT_MS = 120_000;
 
 /**
  * Warm the local model with a 1-token completion of `systemPrompt` (+ `tools`).
@@ -55,6 +76,7 @@ export async function warmSystemPrompt(
       ...(opts.tools !== undefined && opts.tools.length > 0 ? { tools: opts.tools } : {}),
       maxTokens: 1,
       temperature: 0,
+      timeoutMs: opts.timeoutMs ?? WARMUP_TIMEOUT_MS,
       // Never let a reasoning model "think" during a warm-up — we only want the
       // prefill, not a token budget burned on hidden reasoning.
       extraBody: { chat_template_kwargs: { enable_thinking: false } },
