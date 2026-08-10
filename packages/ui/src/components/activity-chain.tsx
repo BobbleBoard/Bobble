@@ -793,6 +793,37 @@ export interface ActivityChainProps extends Omit<HTMLAttributes<HTMLDivElement>,
   onOpenFile?: (step: ActivityStepData, index: number) => void;
 }
 
+/**
+ * True once `quiet` has held for {@link SETTLE_MS} — a completion that has to
+ * stay true for a moment before it is believed.
+ *
+ * Deliberately asymmetric: it drops to false the INSTANT work resumes (so a new
+ * step never renders under a "Done"), and only rises after the pause. A marker
+ * that flickers on every gap between tool calls is not information, and the gap
+ * is normal — the model is deciding what to do next.
+ */
+const SETTLE_MS = 600;
+
+function useSettled(quiet: boolean): boolean {
+  /*
+   * SEEDED FROM THE FIRST RENDER. A chain that mounts already finished — a
+   * scrolled-back turn, a rehydrated transcript, a static render — is settled
+   * NOW and should say so; only a chain that goes quiet while you are watching
+   * has to prove it. Starting at false made every historical turn wait 600ms to
+   * admit it was over, and made the marker vanish entirely without an effect.
+   */
+  const [settled, setSettled] = useState(quiet);
+  useEffect(() => {
+    if (!quiet) {
+      setSettled(false);
+      return;
+    }
+    const t = setTimeout(() => setSettled(true), SETTLE_MS);
+    return () => clearTimeout(t);
+  }, [quiet]);
+  return settled;
+}
+
 /** Collapsed/expandable run of tool + thinking steps. */
 export const ActivityChain = forwardRef<HTMLDivElement, ActivityChainProps>(function ActivityChain(
   {
@@ -834,6 +865,7 @@ export const ActivityChain = forwardRef<HTMLDivElement, ActivityChainProps>(func
   const [openStep, setOpenStep] = useState<number | null>(defaultOpenStep ?? null);
 
   const running = steps.some((s) => s.status === 'running');
+  const settled = useSettled(!running && !active);
   const toggleChain = () => {
     const next = !isExpanded;
     if (expanded === undefined) {
@@ -893,10 +925,17 @@ export const ActivityChain = forwardRef<HTMLDivElement, ActivityChainProps>(func
                 {...(onOpenFile !== undefined ? { onOpenFile: () => onOpenFile(step, index) } : {})}
               />
             ))}
-            {/* Terminal "Done" — shown ONLY once the run is fully finished
-             * (`!active`), never on the momentary inter-tool gap while streaming
-             * where every step is briefly done → running=false (A3 flash fix). */}
-            {!running && !active ? (
+            {/* Terminal "Done" — shown only once the run has been finished for a
+             * BEAT, never on the momentary inter-tool gap.
+             *
+             * `!running && !active` was not enough. Between two tool calls every
+             * step is briefly settled AND `active` dips, so Done appeared, then
+             * the next tool started and erased it — the user: "the bottom of the tool
+             * chain will show 'done' prematurely but then it will get erased and
+             * replaced constantly". Flapping a completion marker is worse than
+             * showing nothing, because it is the one row that claims the run is
+             * over. See {@link useSettled}. */}
+            {settled ? (
               <div className="pd-chain-step pd-chain-done">
                 <div className="pd-chain-step-row">
                   <span className="pd-chain-step-icon pd-chain-done-icon">

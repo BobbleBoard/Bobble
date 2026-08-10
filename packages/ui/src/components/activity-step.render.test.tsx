@@ -279,3 +279,23 @@ describe('ActivityStep — elapsed counter on a running row', () => {
     expect(render(running({ startedAt: Date.now() }))).not.toContain('pd-chain-step-elapsed');
   });
 });
+
+describe('"Done" does not flap on the gap between tool calls', () => {
+  const steps: ActivityStepData[] = [{ kind: 'bash', label: 'Ran a command', status: 'done' }];
+
+  it('a chain that mounts already finished says Done immediately', () => {
+    // Historical turns must not wait for a timer to admit they are over.
+    const html = renderToStaticMarkup(<ActivityChain steps={steps} expanded />);
+    expect(html).toContain('pd-chain-done');
+  });
+
+  it('an ACTIVE chain never shows Done, even with every step settled', () => {
+    /*
+     * The flash the user reported: between two tool calls every step is briefly
+     * settled, so `!running` alone was true and Done appeared, then the next
+     * tool erased it. `active` marks the turn as still in flight.
+     */
+    const html = renderToStaticMarkup(<ActivityChain steps={steps} expanded active />);
+    expect(html).not.toContain('pd-chain-done');
+  });
+})
