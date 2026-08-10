@@ -44,6 +44,14 @@ import {
   READY_TO_DELEGATE_DEFINITION,
   READY_TO_DELEGATE_TOOL,
   REQUEST_TEST_TOOLS_DEFINITION,
+  RAISE_HAND_TOOL,
+  RAISE_HAND_TOOL_DEF,
+  HAND_REASONS,
+  HandLedger,
+  type HandReason,
+  type RaisedHand,
+  raisedHandReply,
+  withHandAlerts,
   REQUEST_TEST_TOOLS_TOOL,
   TEST_TOOL_KIT_NAMES,
   toolsForKits,
@@ -818,13 +826,38 @@ interface ManagerGateState {
   planSummary: string;
 }
 
-function communicationTools(
+/**
+ * Who this agent reports to — derived from its ACTUAL peer list, never assumed.
+ * A raised hand routed to an agent that is not a peer would vanish silently,
+ * which is the failure mode the whole tool exists to remove. The lead reports to
+ * nobody and so has no hand to raise.
+ */
+export function managerOf(agent: MeshAgent): string | undefined {
+  if (agent.role === 'ceo' || agent.role === 'solo') return undefined;
+  const up = agent.role === 'manager' ? 'ceo' : 'manager';
+  return agent.peers.includes(up) ? up : undefined;
+}
+
+/* Exported for tests. What matters about a tool is not that it exists but that
+ * it is ADVERTISED to the right agent — registered-but-unadvertised has been the
+ * root cause of two separate "the model refuses to use it" investigations. */
+export function communicationTools(
   agent: MeshAgent,
   talk: TalkFn,
   gates?: ManagerGateState,
+  hands?: HandLedger,
 ): ToolDefinition[] {
   const colleagues = agent.peers.filter((p) => !p.startsWith('specialist:'));
   const tools: Array<Record<string, unknown>> = [];
+  /*
+   * Anything this agent returns may carry an alert about somebody who STOPPED —
+   * the user's "<tool result> + additional info, <subagent> is stopped: <message>".
+   * Wrapping at the return point rather than at each call site means a new tool
+   * cannot forget to check; draining here is what stops the same alert repeating
+   * on every result until it is ignored.
+   */
+  const withAlerts = (text: string): string =>
+    hands === undefined ? text : withHandAlerts(text, hands.drain(agent.id));
   /*
    * THE DELEGATION GATE. Only the manager has one, and only until it says its
    * plan is concrete. The tools stay ADVERTISED throughout — an unadvertised
@@ -858,7 +891,44 @@ function communicationTools(
         const p = (params ?? {}) as Record<string, unknown>;
         const recipient = typeof p.recipient === 'string' ? p.recipient : '';
         const message = typeof p.message === 'string' ? p.message : '';
-        return textResult(await talk(agent.id, recipient, message));
+        return textResult(withAlerts(await talk(agent.id, recipient, message)));
+      },
+    });
+  }
+
+  /*
+   * RAISE A HAND. Every agent that reports to somebody gets a second exit, so
+   * being stuck stops looking like being finished.
+   *
+   * The mesh is SYNCHRONOUS — `talk_to` already blocks until the recipient's
+   * turn returns, so "wait for a subagent to complete" is what every hand-off
+   * does, and a manager-side blocking wait would deadlock on its own stack. The
+   * half that was missing is this one: an agent that cannot proceed had only
+   * `reply` available, and a reply reads as delivered work. That is how a stuck
+   * engineer became "the engineer keeps replying with nothing… the tool isn't
+   * functioning properly for this engineer" in a live run.
+   */
+  const reportsTo = managerOf(agent);
+  if (reportsTo !== undefined && hands !== undefined) {
+    tools.push({
+      ...RAISE_HAND_TOOL_DEF,
+      label: RAISE_HAND_TOOL,
+      promptSnippet: 'Stop and tell your manager you are stuck, instead of replying as if done.',
+      execute: async (_id: unknown, params: unknown) => {
+        const p = (params ?? {}) as Record<string, unknown>;
+        const reason = (HAND_REASONS as readonly string[]).includes(String(p.reason))
+          ? (p.reason as HandReason)
+          : 'needs_help';
+        const message = typeof p.message === 'string' ? p.message : '';
+        const tried = typeof p.tried === 'string' ? p.tried : undefined;
+        const hand: RaisedHand = {
+          from: agent.id,
+          reason,
+          message,
+          ...(tried !== undefined && tried.length > 0 ? { tried } : {}),
+        };
+        hands.raise(reportsTo, hand);
+        return textResult(raisedHandReply(hand));
       },
     });
   }
@@ -1193,6 +1263,9 @@ export function createMeshAgentHost(config: MeshAgentHostConfig): MeshAgentHost 
     grantedTools: new Set<string>(),
     planSummary: '',
   };
+  /* Raised hands for this run. One ledger, because a hand goes up during one
+   * agent's turn and is read during another's. */
+  const raisedHands = new HandLedger();
   /** The run-level profile, as a ref so the host can be built before it is known. */
   const taskProfileRef: { value: VerificationProfile } = {
     value: classifyVerification(config.task ?? ''),
@@ -1280,6 +1353,9 @@ export function createMeshAgentHost(config: MeshAgentHostConfig): MeshAgentHost 
               agent,
               talkThrough(agentId),
               agent.role === 'manager' ? managerGates : undefined,
+              // ONE ledger for the whole run: a hand is raised in one agent's
+              // turn and read in another's, so it cannot live on either.
+              raisedHands,
             ),
             // ENGINEERS ONLY. This is how a piece comes back: what was built, how
             // they checked it, and — when a command makes sense for this kind of

@@ -1,4 +1,3 @@
-import { buildCorpRoster } from '@pi-desktop/harness/corp';
 /**
  * The parts of the mesh host that can be checked without a model.
  *
@@ -12,15 +11,30 @@ import { buildCorpRoster } from '@pi-desktop/harness/corp';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import {
+  buildCorpRoster,
+  HandLedger,
+  type MeshAgent,
+  RAISE_HAND_TOOL,
+} from '@pi-desktop/harness/corp';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
+  communicationTools,
   DEFAULT_STEPS_PER_MESSAGE,
-  hostPassthrough,
-  PASSTHROUGH_KEYS,
-  taskNote,
+  emptyProjectComplaint,
   excerptFailures,
+  hasProduct,
+  hostPassthrough,
+  isUncheckable,
   listProject,
-  emptyProjectComplaint, hasProduct, MESH_ENTRY, isUncheckable, orphanReport, runtimeCheck, testSuiteReport } from './mesh-host';
+  MESH_ENTRY,
+  managerOf,
+  orphanReport,
+  PASSTHROUGH_KEYS,
+  runtimeCheck,
+  taskNote,
+  testSuiteReport,
+} from './mesh-host';
 
 describe('what a run hands through to its host', () => {
   it('carries every passthrough setting that was supplied', () => {
@@ -120,14 +134,6 @@ describe('the per-message work budget', () => {
   });
 });
 
-
-
-
-
-
-
-
-
 describe('an empty project is not a clean load', () => {
   const tmp = (): string => mkdtempSync(path.join(os.tmpdir(), 'empty-'));
 
@@ -137,7 +143,10 @@ describe('an empty project is not a clean load', () => {
    * have ended the convergence loop on an empty directory. */
   it('says so when there is no scene to open', () => {
     const dir = tmp();
-    writeFileSync(path.join(dir, 'project.godot'), 'config_version=5\nrun/main_scene="res://x.tscn"\n');
+    writeFileSync(
+      path.join(dir, 'project.godot'),
+      'config_version=5\nrun/main_scene="res://x.tscn"\n',
+    );
     expect(emptyProjectComplaint(dir)).toContain('NOTHING TO LOAD');
   });
 
@@ -178,7 +187,6 @@ describe('only one sentence means success', () => {
     expect(isBroken(`${clean}\nNOTE: I removed your [input] section.`)).toBe(false);
   });
 });
-
 
 describe('the mesh entry point exists', () => {
   /*
@@ -438,5 +446,120 @@ describe('nothing built yet is a continue, not a stop', () => {
     expect(body).toContain('NOTHING HAS BEEN BUILT YET');
     // The regression in one line: this branch must never end the loop.
     expect(body).not.toContain('return undefined');
+  });
+});
+
+describe('raise_hand — a stuck agent is not a finished agent', () => {
+  const agent = (id: string, role: string, peers: string[]): MeshAgent => ({
+    id,
+    role,
+    systemPrompt: '',
+    peers,
+    tools: [],
+  });
+  const noTalk = async (): Promise<string> => '';
+  const names = (a: MeshAgent, hands?: HandLedger): string[] =>
+    communicationTools(a, noTalk, undefined, hands).map((t) => t.name as string);
+
+  /*
+   * ADVERTISEMENT IS THE PROPERTY. A tool that exists but is not offered to the
+   * agent that needs it is the same as no tool — twice this project has chased a
+   * "the model won't use it" bug that was really "it was never in the list".
+   */
+  it('is advertised to an engineer, who reports to the manager', () => {
+    expect(names(agent('engineer:1', 'engineer', ['manager']), new HandLedger())).toContain(
+      RAISE_HAND_TOOL,
+    );
+  });
+
+  it('is advertised to the manager, who reports to the CEO', () => {
+    expect(names(agent('manager', 'manager', ['ceo', 'engineer:1']), new HandLedger())).toContain(
+      RAISE_HAND_TOOL,
+    );
+  });
+
+  it('is NOT advertised to the lead — it reports to nobody', () => {
+    expect(names(agent('ceo', 'ceo', ['manager']), new HandLedger())).not.toContain(
+      RAISE_HAND_TOOL,
+    );
+  });
+
+  it('is NOT advertised when the agent cannot actually reach its manager', () => {
+    // Routing a hand at a non-peer would drop it silently, which is precisely the
+    // failure the tool exists to remove.
+    expect(names(agent('engineer:9', 'engineer', []), new HandLedger())).not.toContain(
+      RAISE_HAND_TOOL,
+    );
+  });
+
+  it('records the hand against the manager, and reports it as NOT delivered', async () => {
+    const hands = new HandLedger();
+    const tools = communicationTools(
+      agent('engineer:1', 'engineer', ['manager']),
+      noTalk,
+      undefined,
+      hands,
+    );
+    const tool = tools.find((t) => t.name === RAISE_HAND_TOOL);
+    const res = await (
+      tool as unknown as {
+        execute: (id: unknown, p: unknown) => Promise<{ content: Array<{ text: string }> }>;
+      }
+    ).execute('c1', { reason: 'not_working', message: 'browser tool returns no elements' });
+    expect(res.content[0]?.text).toContain('STOPPED');
+    expect(res.content[0]?.text).toContain('Nothing was delivered');
+    expect(hands.peek('manager')).toHaveLength(1);
+    expect(hands.peek('manager')[0]?.from).toBe('engineer:1');
+  });
+
+  it('rides the manager’s NEXT tool result, then does not repeat', async () => {
+    const hands = new HandLedger();
+    hands.raise('manager', {
+      from: 'engineer:1',
+      reason: 'not_working',
+      message: 'browser tool returns no elements',
+    });
+    const mgr = communicationTools(
+      agent('manager', 'manager', ['ceo', 'engineer:1']),
+      async () => 'engineer replied: done',
+      undefined,
+      hands,
+    );
+    const talkTool = mgr.find((t) => t.name === 'talk_to');
+    const exec = (
+      talkTool as unknown as {
+        execute: (id: unknown, p: unknown) => Promise<{ content: Array<{ text: string }> }>;
+      }
+    ).execute;
+    const first = await exec('c1', { recipient: 'engineer:1', message: 'status?' });
+    expect(first.content[0]?.text).toContain('engineer replied: done');
+    expect(first.content[0]?.text).toContain('additional info, engineer:1 is stopped');
+    // Drained: a second call carries the reply alone.
+    const second = await exec('c2', { recipient: 'engineer:1', message: 'and now?' });
+    expect(second.content[0]?.text).toContain('engineer replied: done');
+    expect(second.content[0]?.text).not.toContain('additional info');
+  });
+});
+
+describe('managerOf — where a raised hand goes', () => {
+  const a = (id: string, role: string, peers: string[]) =>
+    ({ id, role, systemPrompt: '', peers, tools: [] }) as MeshAgent;
+
+  it('sends an engineer’s hand to the manager, and the manager’s to the CEO', () => {
+    expect(managerOf(a('engineer:1', 'engineer', ['manager']))).toBe('manager');
+    expect(managerOf(a('manager', 'manager', ['ceo', 'engineer:1']))).toBe('ceo');
+    expect(managerOf(a('specialist:tester', 'specialist', ['manager']))).toBe('manager');
+  });
+
+  it('gives the lead nobody to raise to', () => {
+    expect(managerOf(a('ceo', 'ceo', ['manager']))).toBeUndefined();
+    expect(managerOf(a('solo', 'solo', []))).toBeUndefined();
+  });
+
+  it('refuses to route at a NON-PEER, which would drop the hand silently', () => {
+    // Derived from the real peer list rather than assumed from the role — an
+    // unreachable target is exactly the disappearance this tool exists to stop.
+    expect(managerOf(a('engineer:9', 'engineer', []))).toBeUndefined();
+    expect(managerOf(a('manager', 'manager', ['engineer:1']))).toBeUndefined();
   });
 });
