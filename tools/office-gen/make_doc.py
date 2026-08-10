@@ -8,10 +8,23 @@ the renderers own every pixel.
 
     python3 make_doc.py docx "the prompt"
 """
+import os
 import json, re, sys, time, urllib.request
 from pathlib import Path
 HERE = Path(__file__).parent
-SERVER = "http://127.0.0.1:8099"
+# The server is NOT a fixed port. The app's supervisor picks a free one per
+# launch, so a hardcoded 8099 is connection-refused inside a real run — which is
+# exactly how a specialist concludes the renderers are broken and goes back to
+# hand-writing the file format. Read it from the environment, accept a base URL
+# with or without a trailing /v1, and keep 8099 as the bare-testbed default.
+def _server() -> str:
+    raw = (os.environ.get("PI_OFFICE_GEN_SERVER")
+           or os.environ.get("OPENAI_BASE_URL")
+           or "http://127.0.0.1:8099")
+    return raw.rstrip("/").removesuffix("/v1")
+
+
+SERVER = _server()
 
 MENUS = {
  "docx": """

@@ -30,6 +30,7 @@ import { tmpdir } from 'node:os';
 import nodePath from 'node:path';
 import type { ExtensionFactory, ToolDefinition } from '@mariozechner/pi-coding-agent';
 import { app } from 'electron';
+import { getInferenceUtility } from '../inference/llm-main';
 import {
   AgentMesh,
   buildCorpRoster,
@@ -771,6 +772,36 @@ function textResult(text: string): {
  * exist and start hand-writing OOXML, which is the exact failure it was added
  * to prevent. Tell it the real location instead.
  */
+/**
+ * What the document specialist needs to actually RUN the renderers: where they
+ * are, and which server they should talk to.
+ *
+ * The scripts default to :8099, which is the bare testbed. Inside the app the
+ * supervisor picks a FREE port per launch, so that default is
+ * connection-refused — and a specialist whose renderer "does not work" goes
+ * straight back to hand-writing the file format, which is the one thing this
+ * specialist exists to prevent. Give it the live URL and a command that works
+ * as written.
+ */
+function officeGenNote(): string {
+  const dir = officeGenDir();
+  const base = getInferenceUtility()?.baseUrl ?? '';
+  const env = base.length > 0 ? `PI_OFFICE_GEN_SERVER=${base} ` : '';
+  return [
+    ``,
+    `THE RENDERERS ARE AT ${dir} — use that absolute path, and read its README.md`,
+    `before your first run. They talk to the local model server, which is NOT on a`,
+    `fixed port, so run them exactly like this:`,
+    ``,
+    `  ${env}python3 ${dir}/make_deck.py "<what you want>"`,
+    `  ${env}python3 ${dir}/make_doc.py <docx|xlsx|pdf> "<what you want>"`,
+    ``,
+    `If a run of one of these fails, report what it printed. Do NOT fall back to`,
+    `writing the file format yourself — that has never once produced a file that`,
+    `opens.`,
+  ].join('\n');
+}
+
 function officeGenDir(): string {
   return app.isPackaged
     ? nodePath.join(process.resourcesPath, 'office-gen')
@@ -1205,7 +1236,7 @@ export function createMeshAgentHost(config: MeshAgentHostConfig): MeshAgentHost 
           purpose: ROLE_PURPOSE[agent.role] ?? 'engineer',
           systemPrompt:
             agent.id === specialistId('document')
-              ? `${agent.systemPrompt}\n${workspaceNote}\n\nTHE RENDERERS ARE AT ${officeGenDir()} — use that absolute path. Read its README.md before your first run.`
+              ? `${agent.systemPrompt}\n${workspaceNote}\n${officeGenNote()}`
               : `${agent.systemPrompt}\n${workspaceNote}`,
           // The comm-tool NAMES must be in the allowlist or the SDK never offers them.
           tools: [
