@@ -102,13 +102,15 @@ export async function blindCriticReport(input: BlindCriticInput): Promise<string
   let open: Awaited<ReturnType<typeof openRoleSession>> | null = null;
   try {
     open = await openRoleSession(input.handle, {
+      // Charged to the budget as a review turn, and labelled as one in the log.
+      purpose: 'review',
       systemPrompt: BLIND_CRITIC_PROMPT,
       /*
        * READ AND RUN, NEVER WRITE. `bash` is here on purpose — "go and look"
        * means executing the thing, which is the only way to tell a program that
-       * works from one that merely parses. `canWrite: false` on the turn makes
-       * every write refused, bash included, so the critic cannot quietly repair
-       * the defect it is supposed to be reporting.
+       * works from one that merely parses. `mayWriteFiles: false` on the turn
+       * makes every write refused, bash included, so the critic cannot quietly
+       * repair the defect it is supposed to be reporting.
        */
       tools: ['read', 'ls', 'grep', 'find', 'bash'],
       cwd: input.cwd,
@@ -131,7 +133,15 @@ export async function blindCriticReport(input: BlindCriticInput): Promise<string
         '',
         'Go and look, run it, and report.',
       ].join('\n'),
-      { canWrite: false },
+      /*
+       * The option is `mayWriteFiles`, and it was written here as `canWrite` —
+       * a name RoleTurnOptions has never had. TypeScript said so and nobody was
+       * listening: `apps/desktop` had two standing typecheck errors, both from
+       * this file, so the critic shipped with writes ENABLED (the default) while
+       * its own comment claimed they were refused. The read-only auditor could
+       * repair the defect it was sent to report.
+       */
+      { mayWriteFiles: false },
     );
     const text = res.finalText.trim();
     if (text === '') return '';
