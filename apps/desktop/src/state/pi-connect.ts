@@ -399,8 +399,8 @@ export async function sendPrompt(
   if (messageNeedsVision({ imageDataUris })) {
     // Round-12 on-demand VISION (ask #3): an image needs a multimodal model. Relaunch
     // the current model (or a vision-capable pick) BEFORE dispatch — sticky, restart-
-    // based. Gated by the in-flight lock (a vision relaunch is a hard restart; the
-    // composer routes an in-flight send to steerPrompt instead). The result is now
+    // based. Gated by the in-flight lock (a vision relaunch is a hard restart, so
+    // an in-flight send is steered into the running turn instead). The result is now
     // CHECKED (previously ignored, which is why images 'fetch failed' on a text model):
     // ok:false covers both "no vision model" and "the mmproj download/relaunch failed".
     if (!agentInFlight()) {
@@ -451,21 +451,66 @@ export async function sendPrompt(
   // server), so a turn may have started since this send was accepted. Dispatching
   // a bare prompt into a busy pi is REJECTED ("Agent is already processing…"),
   // which stranded the echo as a user bubble with no reply and raised a red toast
-  // (the user's blank-gap repro). `followUp` is pi's own supported way to queue it,
-  // and it preserves the ordering we want: [msg1, reply1, msg2, reply2].
-  const ack = await window.piDesktop.invoke('pi:prompt', {
-    ...body,
-    ...(agentInFlight() ? { streamingBehavior: 'followUp' as const } : {}),
-  });
+  // (the user's blank-gap repro). See {@link deliveryForSend} for which queue it lands
+  // in and why.
+  const delivery = deliveryForSend(agentInFlight());
+  const ack = await window.piDesktop.invoke('pi:prompt', { ...body, ...delivery.body });
+  // The dispatch, not a turn, has to lower the in-flight bridge for a steer: it
+  // joins a run that ALREADY started, so `agent_start` will not fire again.
+  if (delivery.clearsInFlight) usePiStore.setState({ promptInFlight: false });
   // Belt and braces for any race the check above still loses (pi's view of busy
-  // is authoritative, ours is a mirror): retry once as a follow-up instead of
-  // surfacing the rejection.
+  // is authoritative, ours is a mirror): retry once into the steering queue
+  // instead of surfacing the rejection.
   if (ack?.success === false && /already processing/i.test(ack.error ?? '')) {
-    return reportRejectedSend(
-      await window.piDesktop.invoke('pi:prompt', { ...body, streamingBehavior: 'followUp' }),
-    );
+    const retry = await window.piDesktop.invoke('pi:prompt', {
+      ...body,
+      streamingBehavior: 'steer',
+    });
+    usePiStore.setState({ promptInFlight: false });
+    return reportRejectedSend(retry);
   }
   return reportRejectedSend(ack);
+}
+
+/**
+ * WHICH QUEUE A MID-RUN MESSAGE LANDS IN — and who lowers the in-flight bridge.
+ *
+ * the user, after a mid-run message disappeared: "I attempted to ask a follow up /
+ * steering prompt in the middle of the action which I assumed would be properly
+ * queued greyed out sent, and then at the next tool result, my prompt would be
+ * passed along and the following thinking block would address my prompt as it
+ * would be in context then. however that was wrong."
+ *
+ * What he described is pi's STEERING queue, precisely. In pi-agent-core's
+ * `agent-loop.js` the loop re-reads it immediately after every turn:
+ *
+ *     await emit({ type: "turn_end", message, toolResults });
+ *     pendingMessages = (await config.getSteeringMessages?.()) || [];
+ *
+ * and the inner loop re-enters while `pendingMessages.length > 0`, injecting them
+ * as real user messages BEFORE the next assistant response. A steer therefore
+ * arrives at the next tool round even if the model had stopped calling tools.
+ *
+ * A FOLLOW-UP is read only after that inner loop exits — after the whole run.
+ * That is not just slower, it is the difference between arriving and never
+ * arriving: the run this was reported from was ABORTED by the loop detector after
+ * five failing tool calls, and an aborted run drops its follow-up queue unread.
+ * Audited against the session transcript: the user's text appears nowhere in it — the
+ * only second user message in the whole file is the loop detector's own steer.
+ *
+ * The second half of the bug is the spinner. `promptInFlight` bridges the
+ * dispatch→`agent_start` gap of a NEW run; a steer joins a run that has already
+ * started, so `agent_start` never fires again and only `agent_end` — ten minutes
+ * later, or never — would have cleared it. That is the "processing spinner that
+ * never clears". The dispatch clears it itself.
+ */
+export function deliveryForSend(inFlight: boolean): {
+  body: { streamingBehavior?: 'steer' };
+  clearsInFlight: boolean;
+} {
+  return inFlight
+    ? { body: { streamingBehavior: 'steer' }, clearsInFlight: true }
+    : { body: {}, clearsInFlight: false };
 }
 
 /**
@@ -500,14 +545,6 @@ export function reportRejectedSend<T extends { success?: boolean; error?: string
       `That message wasn't sent — the agent refused it (${reason}). Nothing has been lost; send it again. If this keeps happening, check Settings → Models that a model is loaded and there is memory free for it.`,
     );
   return ack;
-}
-
-export async function steerPrompt(message: string, agentMessage?: string) {
-  usePiStore.getState().appendUser(message);
-  return window.piDesktop.invoke('pi:prompt', {
-    message: agentMessage ?? message,
-    streamingBehavior: 'steer',
-  });
 }
 
 export async function abortPi() {
