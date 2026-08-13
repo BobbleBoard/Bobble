@@ -65,6 +65,33 @@ describe('what the model is told', () => {
     expect(text).toContain('PRIMARY web control');
   });
 
+  /*
+   * IT MUST NOT SAY THE TOOLS ARE HERE NOW — because they are not.
+   *
+   * pi snapshots a run's tool array when the run starts (pi-agent-core
+   * agent.js:273), so `setActiveTools` lands on the NEXT run: "Changes take
+   * effect on the next agent turn." MEASURED against the running server — this
+   * function answered "browser is on. You now have: … browser_click …", and the
+   * model's very next `browser_click` came back "Tool browser_click not found",
+   * twice, while the advertised array never moved off tools[17] in 20 requests.
+   *
+   * The old wording was the whole lie. A model that believes it retries; a model
+   * told the truth spends the rest of the turn on what it can actually do.
+   */
+  it('says the tools arrive NEXT reply, never that they are callable now', () => {
+    const cap = findCapability('browser');
+    if (cap === undefined) throw new Error('browser capability missing');
+    const text = capabilityActivated(cap, [...cap.tools]);
+    expect(text).toMatch(/NEXT reply/);
+    expect(text).toMatch(/NOT callable in this reply/i);
+    expect(text).not.toMatch(/You now have/);
+  });
+
+  it('the menu does not promise immediate availability either', () => {
+    expect(capabilityMenu()).not.toMatch(/immediately/i);
+    expect(capabilityMenu()).toMatch(/NEXT reply/);
+  });
+
   it('says so honestly when a capability is not in this build', () => {
     const cap = findCapability('generation');
     if (cap === undefined) throw new Error('generation capability missing');

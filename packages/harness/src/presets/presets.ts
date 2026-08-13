@@ -36,26 +36,42 @@ export const TOOL_SEARCH_TOOL_NAME = 'capability';
 export const USE_TOOL_NAME = 'use';
 
 /**
- * The browser tools that are ALWAYS advertised — navigate AND snapshot.
+ * The browser tools that are ALWAYS advertised — the WHOLE suite.
  *
  * the user asked for navigate by default so "open example.com" never falls to the
  * shell. Shipping navigate ALONE caused the loop he then hit: "it's constantly in
  * a loop of calling browser navigate … it really seems like the models are trying
  * to call browser snapshot or something and then they're getting forced to call
- * browser navigate."
+ * browser navigate." So navigate and snapshot shipped together, and the rest of
+ * the suite was left to arrive on demand via `capability`.
  *
- * That is exactly right, and it is the coercion measured earlier on this server:
- * llama-server's tool-call grammar pins the function name to the ADVERTISED list,
- * so a bid for `browser_snapshot` cannot be emitted — it collapses onto the only
- * browser name available, `browser_navigate`. The model navigates, is shown the
- * page, wants to look again, is forced to navigate again. Forever.
+ * IT COULD NOT ARRIVE. Measured with tests/e2e/browser-click-reach-probe.mjs —
+ * one page, one button, 20 requests, reading the tools array llama-server was
+ * actually sent. It never changed: tools[17], every time. The transcript:
+ *
+ *     browser_click {index:1}      → "Tool browser_click not found"
+ *     capability {name:"browser"}  → "browser is on. You now have: … browser_click …"
+ *     browser_click {index:1}      → "Tool browser_click not found"
+ *     use {tool:"browser_click"}   → "There is no tool called browser_click"
+ *
+ * pi's Agent SNAPSHOTS the tool array when a run starts (pi-agent-core
+ * agent.js:273, `tools: this._state.tools.slice()`); both the provider request
+ * and the tool executor read that snapshot, and `setActiveToolsByName` only
+ * mutates state for the NEXT run — pi's own words: "Changes take effect on the
+ * next agent turn." An agentic run is one turn, so nothing turned on inside a run
+ * can be called during it. That is what produced the nine-snapshot loop in the
+ * hive-logbook run, and it means half a browser was never a temporary state.
  *
  * A tool that takes you somewhere and no tool that lets you look is not half a
- * browser, it is a trap. They ship together.
+ * browser, it is a trap; a browser you can look at but never touch is the same
+ * trap one rung along. The suite ships together, up front, where it works.
+ *
+ * the user, on the fix: "let's fix this so it has the manager tool and everything
+ * configured correctly from the start … just advertise the right tools."
  */
 export const BROWSER_NAVIGATE_ALWAYS = 'browser_navigate';
 export const BROWSER_SNAPSHOT_ALWAYS = 'browser_snapshot';
-export const ALWAYS_BROWSER_TOOLS = [BROWSER_NAVIGATE_ALWAYS, BROWSER_SNAPSHOT_ALWAYS] as const;
+export const ALWAYS_BROWSER_TOOLS = BROWSER_TOOL_NAMES;
 
 /**
  * Harness tools kept active in EVERY preset (when registered), independent of

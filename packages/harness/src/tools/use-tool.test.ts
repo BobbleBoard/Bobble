@@ -84,8 +84,22 @@ describe('dispatching', () => {
     // A bare "unknown tool" just invites another guess.
     const { use } = setup();
     const out = (await use.execute('id-1', { tool: 'nope' })) as { content: { text: string }[] };
-    expect(out.content[0]?.text).toContain('no tool called "nope"');
+    expect(out.content[0]?.text).toContain('"nope" cannot be called this way');
     expect(out.content[0]?.text).toContain('mac_snapshot');
+  });
+
+  /*
+   * IT MUST NOT SEND THE MODEL TO `capability`. That advice cannot work inside
+   * the reply that follows it — a run's tool array is snapshotted when the run
+   * starts — so a model that takes it calls `capability`, is told the tool is on,
+   * tries the same name again and fails again. Measured: four rounds of exactly
+   * that, then a fallback to a selenium script that was not installed.
+   */
+  it('does not tell the model to turn on a capability it cannot use this turn', async () => {
+    const { use } = setup();
+    const out = (await use.execute('id-1', { tool: 'nope' })) as { content: { text: string }[] };
+    expect(out.content[0]?.text).not.toMatch(/turn on the capability/i);
+    expect(out.content[0]?.text).toMatch(/nothing you do in this reply/i);
   });
 
   it('asks for a name when given none', async () => {

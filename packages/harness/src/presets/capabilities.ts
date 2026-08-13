@@ -161,8 +161,8 @@ export function capabilityMenu(): string {
     '',
     ...lines,
     '',
-    `Call ${CAPABILITY_TOOL_NAME} with one of these names and its tools become available ` +
-      'immediately. Turn on only what the task needs.',
+    `Call ${CAPABILITY_TOOL_NAME} with one of these names and its tools join your list from ` +
+      'your NEXT reply onward — not this one. Turn on only what the task needs.',
   ].join('\n');
 }
 
@@ -181,5 +181,13 @@ export function capabilityActivated(cap: Capability, available: readonly string[
       'installed. Say so plainly rather than pretending to use it.'
     );
   }
-  return [`"${cap.name}" is on. You now have: ${present.join(', ')}.`, '', cap.guidance].join('\n');
+  return [
+    `"${cap.name}" is on, and takes effect on your NEXT reply: ${present.join(', ')}.`,
+    '',
+    'They are NOT callable in this reply — calling one now returns "tool not found". Finish ' +
+      'this reply with what you can already do, or stop and say what you are about to do with ' +
+      'them; they will be in your tool list from your next reply onward, and stay there.',
+    '',
+    cap.guidance,
+  ].join('\n');
 }

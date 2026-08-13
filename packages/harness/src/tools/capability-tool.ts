@@ -2,8 +2,19 @@
  * The `capability` tool — the replacement for `tool_search`.
  *
  * Called bare it lists what is on offer; called with a name it turns that group
- * on and says, in the result, exactly which tools the model now has and how to
+ * on and says, in the result, exactly which tools the model will have and how to
  * use them well. One call, a fixed set, no scoring, nothing to loop on.
+ *
+ * WHAT "ON" MEANS, EXACTLY. pi snapshots the tool array when a run begins
+ * (pi-agent-core agent.js:273) and both the provider request and the tool
+ * executor read that snapshot, so `setActiveTools` lands on the NEXT run — pi's
+ * own words: "Changes take effect on the next agent turn." Measured live: after
+ * this tool answered "browser is on. You now have: … browser_click …", the very
+ * next `browser_click` came back "Tool browser_click not found", twice, and the
+ * advertised array never moved off tools[17] across 20 requests. The result text
+ * says so now. Anything a turn genuinely cannot proceed without belongs in the
+ * preset instead (see ALWAYS_BROWSER_TOOLS, which is why the browser suite is no
+ * longer behind this tool).
  *
  * See ./presets/capabilities.ts for why a named group beats a search.
  */
@@ -33,8 +44,8 @@ export function registerCapabilityTool(pi: ExtensionAPI, opts: CapabilityToolOpt
     description:
       'Turn on a group of tools you need but do not currently have. Call it with no argument ' +
       `to see what is available, or with a name to switch that group on: ${names}. The tools ` +
-      'arrive immediately and you can use them in your very next action. Turn on only what the ' +
-      'task actually needs.',
+      'join your list from your NEXT reply onward — they are not callable in the same reply ' +
+      'that turns them on. Turn on only what the task actually needs.',
     promptSnippet: 'Turn on a group of tools (browser, computer-use, personal, …)',
     parameters: Type.Object({
       name: Type.Optional(

@@ -50,7 +50,7 @@ import {
   registerPermissions,
 } from './permissions/modes.js';
 import { capabilityForTool } from './presets/capabilities.js';
-import { BROWSER_NAVIGATE_ALWAYS, resolvePresetTools } from './presets/presets.js';
+import { resolvePresetTools } from './presets/presets.js';
 import { augmentSystemPrompt } from './prompt/capability-prompt.js';
 import { connectRepairBridge, type LiveRepairDeps } from './repair/bridge.js';
 import { createToolCallFixer, withRepairAttempts } from './repair/fixer.js';
@@ -1260,15 +1260,32 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
       if (plan.match === null) return body;
       if (plan.inject.length > 0) {
         // The whole group, not the single tool — same one re-prefill, and it
-        // spares the next two turns theirs.
+        // spares the next two turns theirs. This lands on the NEXT run, which is
+        // the earliest pi can honour it.
         const wanted = plan.inject[0] ?? '';
         const cap = capabilityForTool(wanted);
         const names = all.map((t) => t.name);
         const group = cap !== undefined ? cap.tools.filter((t) => names.includes(t)) : plan.inject;
         activateCapability(group.length > 0 ? group : plan.inject);
-        // Also add them to THIS request, so the intent is served on the very next
-        // action instead of a turn later.
-        applyBias(body, { ...plan, inject: [...group] }, all);
+        /*
+         * AND IT IS NOT ADDED TO *THIS* REQUEST ANY MORE.
+         *
+         * It used to be, "so the intent is served on the very next action instead
+         * of a turn later" — putting the schema in the outgoing body made the
+         * model able to EMIT the name. It was never able to RUN it: pi's executor
+         * resolves a call against the tool array snapshotted when the run began
+         * (pi-agent-core agent-loop.js:309), which this injection does not touch.
+         *
+         * MEASURED, and it is the whole bug — the model said it wanted to click,
+         * this code handed it `browser_click`, and:
+         *     browser_click {index:1} → "Tool browser_click not found"
+         * twice, before it fell back to snapshots and then to a selenium script.
+         * Injecting a tool the turn cannot execute does not serve the intent, it
+         * manufactures the phantom-tool failure this file exists to prevent.
+         *
+         * Anything a turn genuinely needs belongs in the preset — which is why the
+         * browser suite is advertised up front now (ALWAYS_BROWSER_TOOLS).
+         */
       } else {
         applyBias(body, plan, all);
       }
@@ -1855,19 +1872,14 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
      * default and load the capability suite of browser tools when it's called
      * immediately."
      *
-     * navigate and snapshot ship advertised; the rest arrive the moment the model
-     * actually goes somewhere. That is the point where wanting to click becomes
-     * certain, and getting the suite here means the click turn never has to be
-     * spent discovering it is not allowed to click — which is the loop the user kept
-     * screenshotting. One re-prefill, at the only moment it is obviously earned.
+     * This used to activate the rest of the suite here, on the first navigate —
+     * the moment wanting to click becomes certain. IT NEVER WORKED. A run's tool
+     * array is snapshotted when the run starts (see ALWAYS_BROWSER_TOOLS), so
+     * activating mid-run changed nothing at all, and the click turn was spent
+     * discovering it could not click — the loop the user kept screenshotting, with
+     * this code in place the whole time. The suite is in the preset now, which is
+     * the only place that can deliver on what he asked for.
      */
-    if (event.toolName === BROWSER_NAVIGATE_ALWAYS) {
-      const cap = capabilityForTool(BROWSER_NAVIGATE_ALWAYS);
-      if (cap !== undefined) {
-        const names = new Set(pi.getAllTools().map((t) => t.name));
-        activateCapability(cap.tools.filter((t) => names.has(t)));
-      }
-    }
     const detector = runtime.loopDetector;
     if (detector === null) return;
     const signal = detector.onToolCall(event.toolName, event.input);

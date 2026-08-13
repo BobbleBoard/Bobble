@@ -2,15 +2,23 @@
  * `use` — call a tool the model has been TOLD about but which is not in its
  * advertised tool list.
  *
- * This is what makes a capability cost nothing. The advertised set stays fixed,
- * so the prompt prefix is never rewritten and no turn pays a re-prefill; a
- * capability just appends a result naming the tools it may now use, and `use`
- * carries the call. Measured against the running server: told about
+ * This was meant to make a capability cost nothing: the advertised set stays
+ * fixed, no turn pays a re-prefill, a capability just names the tools it may now
+ * use and `use` carries the call. Measured against the running server: told about
  * `mac_snapshot` in prose, the model emitted
  * `use({tool:"mac_snapshot",args:{app:"Safari"}})` correctly on the first try.
  *
- * It dispatches through the registry in ./tool-registry.ts, which captures each
- * tool's real `execute` as it registers — pi's own `getAllTools()` omits it.
+ * IT ONLY REACHES OUR OWN TOOLS. It dispatches through the registry in
+ * ./tool-registry.ts, which captures each tool's real `execute` as it registers —
+ * and every extension gets its OWN api object, so the registry holds the harness's
+ * tools and nothing else. pi's ExtensionAPI exposes `getAllTools()` (name,
+ * description, parameters — no `execute`) and no `getToolDefinition`, so there is
+ * no seam to dispatch another extension's tool. Measured: `use({tool:
+ * "browser_click"})` and `use({tool:"mac_click"})` both answered "There is no tool
+ * called …" while both tools were plainly loaded.
+ *
+ * So this is a fallback for HARNESS tools only. Anything a turn cannot proceed
+ * without belongs in the preset (see ALWAYS_BROWSER_TOOLS).
  */
 
 import type { ExtensionAPI } from '@mariozechner/pi-coding-agent';
@@ -56,14 +64,19 @@ export function registerUseTool(pi: ExtensionAPI, opts: UseToolOptions): void {
       const target = opts.registry.get(name);
       if (target === undefined) {
         // Say what IS reachable — a bare "unknown tool" invites another guess.
+        // And do NOT say "turn on the capability that provides it": that advice
+        // cannot work inside this reply (see the header), so a model that follows
+        // it calls `capability` and then loops on the same unreachable name. It
+        // did exactly that, four times, before falling back to a selenium script.
         const known = opts.registry.names().slice(0, 40).join(', ');
         return {
           content: [
             {
               type: 'text',
               text:
-                `There is no tool called "${name}". Turn on the capability that provides it, ` +
-                `or use one of these: ${known}`,
+                `"${name}" cannot be called this way. This tool only reaches: ${known}. ` +
+                'Do not retry it or try to turn it on — nothing you do in this reply will make ' +
+                'it callable. Use what you already have, or finish and say what you need.',
             },
           ],
           details: undefined,

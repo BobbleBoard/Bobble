@@ -1,3 +1,4 @@
+import { BROWSER_TOOL_NAMES } from '@pi-desktop/browser-use/tool-names';
 import { describe, expect, it } from 'vitest';
 import { TASK_CLASSES, type TaskClass } from '../classify/classify.js';
 import { SPAWN_SUBAGENT_TOOL_NAME } from '../subagent/types.js';
@@ -8,6 +9,16 @@ import {
   SUBAGENT_PRESET_CLASSES,
   TOOL_SEARCH_TOOL_NAME,
 } from './presets.js';
+
+/**
+ * The WHOLE browser suite is advertised in every class, not just navigate +
+ * snapshot. Measured cause: a run's tool array is snapshotted when the run
+ * begins, so the other eight could never arrive mid-run — `capability` said
+ * "browser is on … browser_click", the very next browser_click answered "Tool
+ * browser_click not found", and the model looped on snapshot instead. Imported
+ * from browser-use rather than spelled out, so a rename fails to compile here.
+ */
+const BROWSER_SUITE = BROWSER_TOOL_NAMES;
 
 // The full v0.1+ tool universe, as it would appear once every workstream lands.
 // The browser_* names are the REAL ones registered by @pi-desktop/browser-use.
@@ -82,8 +93,7 @@ describe('resolvePresetTools — full tool universe', () => {
       'bash',
       'python_run',
       'capability',
-      'browser_navigate',
-      'browser_snapshot',
+      ...BROWSER_SUITE,
     ]);
   });
 
@@ -95,8 +105,7 @@ describe('resolvePresetTools — full tool universe', () => {
       'web_search',
       'web_fetch',
       'capability',
-      'browser_navigate',
-      'browser_snapshot',
+      ...BROWSER_SUITE,
       'read',
       'write',
       'edit',
@@ -106,16 +115,7 @@ describe('resolvePresetTools — full tool universe', () => {
 
   it('browser-use → the REAL browser tools (snapshot present + early) + web_fetch + capability + file tools', () => {
     expect(resolvePresetTools('browser-use', ALL_TOOLS)).toEqual([
-      'browser_navigate',
-      'browser_snapshot',
-      'browser_click',
-      'browser_type',
-      'browser_scroll',
-      'browser_read',
-      'browser_wait',
-      'browser_back',
-      'browser_forward',
-      'browser_key',
+      ...BROWSER_SUITE,
       'web_fetch',
       'capability',
       // browser_navigate is always appended, but this preset already leads with
@@ -158,8 +158,7 @@ describe('resolvePresetTools — full tool universe', () => {
       'grep',
       'video_locate',
       'capability',
-      'browser_navigate',
-      'browser_snapshot',
+      ...BROWSER_SUITE,
       'bash',
     ]);
   });
@@ -172,8 +171,7 @@ describe('resolvePresetTools — full tool universe', () => {
       'image_ocr',
       'video_edit',
       'capability',
-      'browser_navigate',
-      'browser_snapshot',
+      ...BROWSER_SUITE,
       'read',
       'write',
       'edit',
@@ -190,8 +188,7 @@ describe('resolvePresetTools — full tool universe', () => {
       'image_generate',
       'image_edit',
       'capability',
-      'browser_navigate',
-      'browser_snapshot',
+      ...BROWSER_SUITE,
       'read',
       'write',
       'edit',
@@ -217,15 +214,7 @@ describe('resolvePresetTools — full tool universe', () => {
     // Was tool-search-only; the user made read/write/edit/bash globally active so a
     // simple-QA turn that suddenly needs a file can act instead of disclaiming.
     const tools = resolvePresetTools('simple-QA', ALL_TOOLS);
-    expect(tools).toEqual([
-      'capability',
-      'browser_navigate',
-      'browser_snapshot',
-      'read',
-      'write',
-      'edit',
-      'bash',
-    ]);
+    expect(tools).toEqual(['capability', ...BROWSER_SUITE, 'read', 'write', 'edit', 'bash']);
     expect(isToolSearchOnly(tools)).toBe(false);
   });
 
@@ -252,15 +241,7 @@ describe('resolvePresetTools — full tool universe', () => {
     expect(tools).not.toContain('calendar_list_events');
     expect(tools).not.toContain('mail_recent');
     expect(tools).not.toContain('messages_send');
-    expect(tools).toEqual([
-      'capability',
-      'browser_navigate',
-      'browser_snapshot',
-      'read',
-      'write',
-      'edit',
-      'bash',
-    ]);
+    expect(tools).toEqual(['capability', ...BROWSER_SUITE, 'read', 'write', 'edit', 'bash']);
   });
 
   it("'other' with no connectors falls back to the global file tools + capability", () => {
