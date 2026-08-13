@@ -3,8 +3,8 @@ import {
   augmentSystemPrompt,
   CAPABILITY_PROMPT,
   CAPABILITY_PROMPT_MARKER,
+  MANAGER_PROMPT_MARKER,
   stripToolCatalog,
-  TEAM_PROMPT_MARKER,
   VERIFY_PROMPT,
 } from './capability-prompt.js';
 
@@ -121,7 +121,32 @@ describe('augmentSystemPrompt', () => {
 
   it('asks the agent not to reflexively spawn a subagent / open the browser for trivial tasks (item 6)', () => {
     const p = CAPABILITY_PROMPT.toLowerCase();
-    expect(p).toMatch(/don't spawn a subagent or open the browser for a simple/);
+    expect(p).toMatch(/don't spawn a subagent, call the manager, or open the browser for a simple/);
+  });
+
+  /*
+   * THE CEO IS TOLD IT HAS A MANAGER. It was not, for three measured runs: the
+   * old team section was removed in f4c3f02 (rightly — it was said three times
+   * and swapped in mid-run), the guidance moved to the tool description, and
+   * `stripToolCatalog` then strips pi's prose catalog, so one JSON description
+   * among seventeen was the only framing that reached the model. Result: the word
+   * "manager" appears ZERO times in a 1.4MB max-effort transcript.
+   *
+   * the user: "?? why wouldn't it be" / "yes if the talk to tool isn't loaded, load
+   * it." Said once, unconditionally, next to the line that tells it to work alone
+   * — so the two rules are read together rather than one of them alone.
+   */
+  it('names the manager, and says it at every effort', () => {
+    expect(CAPABILITY_PROMPT).toContain(MANAGER_PROMPT_MARKER);
+    expect(CAPABILITY_PROMPT).toContain('talk_to_manager');
+    // Identical prompt at every effort is the property f4c3f02 was protecting.
+    expect(augmentSystemPrompt('Base.', { team: true })).toBe(augmentSystemPrompt('Base.'));
+    expect(augmentSystemPrompt('Base.')).toContain(MANAGER_PROMPT_MARKER);
+  });
+
+  /* A model that is busy alone for an hour does not feel like it made a mistake. */
+  it('says why building it alone is the expensive mistake', () => {
+    expect(CAPABILITY_PROMPT).toMatch(/more expensive mistake/);
   });
 });
 

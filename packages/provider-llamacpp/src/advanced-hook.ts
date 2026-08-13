@@ -164,7 +164,11 @@ export function registerAdvancedParamsHook(
          * Literal rather than an import: this is a diagnostic in the provider
          * package, and it must not create a dependency on the harness.
          */
-        const team = gt.systemPrompt.includes('You lead a TEAM');
+        // Kept in sync with MANAGER_PROMPT_MARKER (harness capability-prompt.ts).
+        // It read 'You lead a TEAM' long after that section was deleted, so it
+        // reported team=false on every run and nobody read it as the finding it
+        // was — the CEO was never told it had a manager, for three runs.
+        const team = gt.systemPrompt.includes('YOU HAVE A MANAGER AND A TEAM');
         appendFileSync(
           dbg,
           `cwd=${cwdLine} team=${team} tools[${names.length}] sysPromptChars=${gt.systemPrompt.length}: ${names.join(', ')}\n`,

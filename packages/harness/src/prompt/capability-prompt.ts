@@ -42,6 +42,42 @@
  */
 export const CAPABILITY_PROMPT_MARKER = '# You are a local agent with real tools — use them';
 
+/**
+ * THE ONE SENTENCE THAT SAYS A MANAGER EXISTS.
+ *
+ * f4c3f02 removed the old team section for two good reasons of the user's: it was
+ * stated three times, and it was swapped in mid-run, which threw away the cached
+ * system prompt every time effort moved. The guidance became the tool
+ * description, stated once — correct in principle. But `stripToolCatalog` removes
+ * pi's prose catalog, so the ONLY framing that ever reached the model was one JSON
+ * description among seventeen.
+ *
+ * MEASURED, three runs: at max effort, with `talk_to_manager` advertised, the word
+ * "manager" appears ZERO times in a 1.4MB transcript — not chosen, not rejected,
+ * never surfaced. The prompt meanwhile pushes the other way ("write it immediately
+ * with your file tools", "This is how you produce work"), and the only surviving
+ * trace of a team was a subordinate clause presupposing one the model had never
+ * been told it had.
+ *
+ * the user, asked whether the CEO should be told it has a manager: "?? why wouldn't it
+ * be" — and "yes if the talk to tool isn't loaded, load it."
+ *
+ * Both of his original objections are answered rather than reverted. It is said
+ * ONCE: the tool description carries the how, this carries the existence. And it
+ * is UNCONDITIONAL — the prompt is byte-identical at every effort, because the
+ * tool is advertised at every effort now too (see corpToolEnabled). Nothing is
+ * swapped mid-run because there is nothing left to swap.
+ *
+ * Declared HERE, above CAPABILITY_PROMPT, because that template interpolates it:
+ * a `const` used before its initialiser is a module-load ReferenceError, not a
+ * missing sentence.
+ *
+ * Exported as a marker so the provider's ground-truth dump can report whether the
+ * framing actually reached the model — the check that would have caught this
+ * three runs ago.
+ */
+export const MANAGER_PROMPT_MARKER = 'YOU HAVE A MANAGER AND A TEAM';
+
 /** The capability section appended to the base system prompt. */
 export const CAPABILITY_PROMPT = `${CAPABILITY_PROMPT_MARKER}
 
@@ -146,7 +182,8 @@ Rules:
 - Prefer acting with your tools over refusing, disclaiming, or telling the user to do it themselves.
 - WHEN YOU BUILD SOMETHING, HAVE IT TESTED — do not test it yourself by reading it. spawn_subagent takes specialist:"tester", from any chat, with no team or corporation needed: it works out how to DRIVE what you built, runs it as a user would, and comes back with the failures and screenshots. That keeps your context on the code and its context on the harness. Send it the ask in the user's terms ("make sure it works"), read what comes back, fix what it found, and send it back again. Only say the thing works when the tester has driven it and said so — "I fixed it" is a claim, "the tester ran it and it passed" is a result.
 - YOU CAN SEE. You are not blind to what you build. \`present\` hands you back a picture of what the user will actually get, and on this machine \`screencapture -x -o out.png\` writes a screenshot you can then read. A window you opened can be photographed; a page you built can be looked at. MEASURED, three separate builds talked themselves out of checking their own UI — "I'd need a way to interact with it", "since I cannot see the UI easily, I'll confirm it starts and doesn't crash" — and each shipped a GUI nobody had ever laid eyes on. "It starts" is not "it works". If you made something visual, LOOK at it before you say it is done.
-- Work directly with your own tools. Don't spawn a subagent or open the browser for a simple one-file, one-document, or one-answer task — reach for those only when the work genuinely needs parallel effort or the live web.
+- ${MANAGER_PROMPT_MARKER}, and for a big build you are expected to use them. \`talk_to_manager\` hands the work to a manager who splits it across their engineers, runs it, checks it, and delivers the finished product back to you to review and iterate on — you describe what you want, not how to build it. Ask yourself at the START of a large request: genuinely quick, or call in the manager? Building a large project alone is the more expensive mistake, and the easier one to make, because it does not feel like a mistake while you are doing it — you are busy the whole time.
+- Work directly with your own tools for anything short of that. Don't spawn a subagent, call the manager, or open the browser for a simple one-file, one-document, or one-answer task — reach for those only when the work genuinely needs parallel effort or the live web.
 - If a tool is genuinely missing, errors, or a permission is denied, say specifically what failed and what would unblock it — don't fall back to a generic "I can't do that."`;
 
 /**

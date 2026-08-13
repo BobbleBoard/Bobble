@@ -44,11 +44,17 @@ function text(res: { content: Array<{ type: string; text?: string }> }): string 
 }
 
 describe('corpToolEnabled', () => {
-  it('is true ONLY at high/max (the user)', () => {
-    expect(corpToolEnabled('low')).toBe(false);
-    expect(corpToolEnabled('medium')).toBe(false);
-    expect(corpToolEnabled('high')).toBe(true);
-    expect(corpToolEnabled('max')).toBe(true);
+  /*
+   * WAS high/max only. Effort is decided per MESSAGE, so the manager appeared and
+   * vanished between turns of one conversation — and since chat templates render
+   * the tool list at the START of the prompt, every flip threw away the KV prefix.
+   * The gate existed to avoid mid-run changes and was itself the mid-run change.
+   * the user: "yes if the talk to tool isn't loaded, load it."
+   */
+  it('is true at EVERY effort — one prompt, one tool list', () => {
+    for (const effort of ['low', 'medium', 'high', 'max'] as const) {
+      expect(corpToolEnabled(effort), effort).toBe(true);
+    }
   });
 });
 
@@ -74,18 +80,23 @@ describe('create_production_hierarchy — normal-chat tool', () => {
     expect(signal.divisions).toHaveLength(1);
   });
 
-  it('at low/medium: rejects and publishes NOTHING (not offered below high)', async () => {
+  /*
+   * A tool that is ADVERTISED and then refuses on a condition the model cannot
+   * see is the phantom-tool failure wearing a different hat. It is offered at
+   * every effort now, so it must WORK at every effort.
+   */
+  it('at low effort: works exactly as it does at max — no hidden refusal', async () => {
     const tool = register('low');
     const { ctx, statuses } = fakeCtx();
     const res = await tool.execute(
       'c',
-      { reason: 'x', divisions: [{ name: 'A', purpose: 'b' }] },
+      { message: 'build me a thing', reason: 'x', divisions: [{ name: 'A', purpose: 'b' }] },
       undefined,
       undefined,
       ctx,
     );
-    expect(res.isError).toBe(true);
-    expect(statuses[PROMOTE_STATUS_KEY]).toBeUndefined();
+    expect(res.isError).toBeFalsy();
+    expect(statuses[PROMOTE_STATUS_KEY]).toBeDefined();
   });
 
   it('rejects unusable args (no valid division) without publishing', async () => {

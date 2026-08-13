@@ -33,9 +33,29 @@ import { classifyVerification, extractClaims, finalCheck } from './verification.
  */
 export const PROMOTE_STATUS_KEY = 'harness-promote';
 
-/** The efforts at which the corp system is offered as a tool (the user: high/max). */
-export function corpToolEnabled(effort: EffortLevel): boolean {
-  return effort === 'high' || effort === 'max';
+/**
+ * The efforts at which the corp system is offered as a tool: ALL of them.
+ *
+ * It used to be high/max only (the user: "max effort just adds this talk to manager
+ * tool"). Two things killed that gate.
+ *
+ * EFFORT MOVES PER MESSAGE. Adaptive effort is decided per turn, so the manager
+ * appeared and disappeared between turns of the same conversation — and because
+ * chat templates render the tool list at the START of the prompt, every flip threw
+ * away the KV prefix. The gate was bought to avoid mid-run changes and was itself
+ * the mid-run change.
+ *
+ * AND A TOOL THAT COMES AND GOES CANNOT BE PLANNED AROUND. the user, after asking why
+ * the CEO is not told it has a manager: "yes if the talk to tool isn't loaded,
+ * load it." One prompt, one tool list, every effort — which is the property
+ * f4c3f02 was after in the first place ("a prompt that never changes is the
+ * point"); it just gated the wrong half.
+ *
+ * The `effort` argument is kept so the seam still reads as a policy decision
+ * rather than a deleted line, and so a future gate has somewhere to live.
+ */
+export function corpToolEnabled(_effort: EffortLevel): boolean {
+  return true;
 }
 
 const DivisionSpec = Type.Object({
@@ -151,7 +171,15 @@ function briefForManager(args: {
  */
 export function registerCreateHierarchyTool(pi: ExtensionAPI, deps: PromoteToolDeps): void {
   let seq = 0;
-  const nextId = deps.nextId ?? (() => `promote-${Date.now()}-${(seq += 1)}`);
+  // Not `${(seq += 1)}` inline: an assignment buried in a template literal is the
+  // one standing lint error this package had, and a known error is how a real one
+  // hides (the same way two typecheck errors hid a read-only auditor that could write).
+  const nextId =
+    deps.nextId ??
+    (() => {
+      seq += 1;
+      return `promote-${Date.now()}-${seq}`;
+    });
 
   pi.registerTool({
     name: CREATE_PRODUCTION_HIERARCHY,
@@ -165,19 +193,9 @@ export function registerCreateHierarchyTool(pi: ExtensionAPI, deps: PromoteToolD
     ],
     parameters: PromoteParams,
     async execute(_toolCallId, params: PromoteInput, _signal, _onUpdate, ctx) {
-      // Effort gate (belt-and-braces; visibility is already gated in applyPreset).
-      if (!corpToolEnabled(deps.getEffort())) {
-        return {
-          content: [
-            {
-              type: 'text',
-              text: 'The production hierarchy is only available at high or max effort. Do the task directly with your own tools instead.',
-            },
-          ],
-          isError: true,
-          details: { rejected: 'effort' },
-        };
-      }
+      // No effort gate any more — see corpToolEnabled. A tool that is advertised
+      // and then refuses on a condition the model cannot see is the phantom-tool
+      // failure wearing a different hat.
       const args = parseCreateHierarchyArgs(params);
       if (args === undefined) {
         return {

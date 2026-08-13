@@ -11,7 +11,6 @@ import {
   HARNESS_CONFIG_ENTRY,
   hasAttachedFileBlock,
   type StoredEntryLike,
-  TEAM_PROMPT_MARKER,
   type ToolSchemaLike,
   wireHarness,
 } from './index.js';
@@ -303,27 +302,26 @@ describe('wireHarness', () => {
     expect(warned).toBe(true);
   });
 
-  it('offers talk_to_manager as a tool ONLY at high/max effort (the user)', async () => {
+  /*
+   * WAS "only at high/max". Effort is decided per MESSAGE, so this test was
+   * pinning a tool that appeared and vanished between turns of one conversation
+   * — and the tool list is rendered at the START of the prompt, so each flip
+   * threw away the KV prefix. the user: "yes if the talk to tool isn't loaded, load
+   * it." The assertion is now the opposite, and it is the point: the advertised
+   * set does not move when effort does.
+   */
+  it('offers talk_to_manager at EVERY effort, and never takes it away', async () => {
     const f = makeFakePi(['read', 'write', 'edit', 'bash', 'talk_to_manager']);
     const handle = wireHarness(f.pi);
     const { ctx } = makeCtx(f.entries);
     await f.fire('session_start', { type: 'session_start', reason: 'startup' }, ctx);
     const run = (args: string) => f.getCommand()?.handler(args, ctx) ?? Promise.resolve();
 
-    // Below high → the corp system is NOT offered in the active set.
-    await run('effort medium');
-    handle.applyPreset('coding', ctx);
-    expect(f.getActiveTools()).not.toContain('talk_to_manager');
-
-    // At high → it enters the active set (as an OPTION the model can call).
-    await run('effort high');
-    handle.applyPreset('coding', ctx);
-    expect(f.getActiveTools()).toContain('talk_to_manager');
-
-    // Dropping back below high → it is stripped again.
-    await run('effort low');
-    handle.applyPreset('coding', ctx);
-    expect(f.getActiveTools()).not.toContain('talk_to_manager');
+    for (const effort of ['medium', 'high', 'low', 'max'] as const) {
+      await run(`effort ${effort}`);
+      handle.applyPreset('coding', ctx);
+      expect(f.getActiveTools(), effort).toContain('talk_to_manager');
+    }
   });
 });
 
