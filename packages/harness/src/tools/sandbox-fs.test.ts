@@ -591,7 +591,20 @@ describe('syntaxComplaint', () => {
 
   it('covers the languages whose parsers are already on the machine', () => {
     expect(syntaxCheckFor('/w/a.py')).toEqual(['python3', '-m', 'py_compile']);
-    expect(syntaxCheckFor('/w/a.js')).toEqual(['node', '--check']);
-    expect(syntaxCheckFor('/w/a.mjs')).toEqual(['node', '--check']);
+  });
+
+  /*
+   * NOT THE BARE NAME `node`. A pi child inherits the GUI app's PATH
+   * (/usr/bin:/bin:/usr/sbin:/sbin on a launchd-started macOS app), where python3
+   * lives and node does not — so `spawnSync('node', …)` returned status null, the
+   * parser-not-installed skip fired, and JavaScript went unchecked for a whole
+   * run while a truncated main.js sailed through. This process is already a node,
+   * so process.execPath is a runtime that exists by definition. Measured: with a
+   * GUI PATH, `node --check` → null (never ran); `process.execPath --check` → 1.
+   */
+  it('reaches a node that exists rather than one it hopes is on PATH', () => {
+    expect(syntaxCheckFor('/w/a.js')).toEqual([process.execPath, '--check']);
+    expect(syntaxCheckFor('/w/a.mjs')).toEqual([process.execPath, '--check']);
+    expect(syntaxCheckFor('/w/a.js')?.[0]).not.toBe('node');
   });
 });

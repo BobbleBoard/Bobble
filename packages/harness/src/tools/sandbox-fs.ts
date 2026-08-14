@@ -177,8 +177,33 @@ export function repairDroppedRootSlash(relative: string): string | undefined {
  */
 const SYNTAX_CHECKS: ReadonlyArray<{ ext: readonly string[]; cmd: readonly string[] }> = [
   { ext: ['.py'], cmd: ['python3', '-m', 'py_compile'] },
-  { ext: ['.js', '.cjs', '.mjs'], cmd: ['node', '--check'] },
+  { ext: ['.js', '.cjs', '.mjs'], cmd: [nodeBinary(), '--check'] },
 ];
+
+/**
+ * A node we can actually reach, rather than one we hope is on PATH.
+ *
+ * THE GAP THIS CLOSES, found in run 4 the hour after the check shipped. A pi
+ * child inherits the GUI app's PATH, and a launchd-started macOS app gets
+ * `/usr/bin:/bin:/usr/sbin:/sbin`. `python3` lives there. `node` does not — it is
+ * in /usr/local/bin or a version manager. So `spawnSync('node', …)` failed to
+ * launch, `status` came back null, the "parser not installed" skip fired, and
+ * JavaScript was never checked at all. Run 3 was Python and would have been
+ * caught; run 4 was JavaScript and a `main.js` truncated mid-string sailed
+ * through.
+ *
+ * The skip itself is right — our missing parser must never fail the model's
+ * write. It was the reach that was wrong. This process is ALREADY a node (pi runs
+ * on Electron-as-node), so `process.execPath` is a runtime that exists by
+ * definition, which is the same trick resolve-pi.ts uses to run the bundled CLI
+ * without a separate Node.
+ */
+function nodeBinary(): string {
+  return process.execPath;
+}
+
+/** Parsers we have already reported as unavailable — one line each, not one per write. */
+const skipReported = new Set<string>();
 
 /** The parser command for this path, or undefined when none covers it. */
 export function syntaxCheckFor(file: string): readonly string[] | undefined {
@@ -204,6 +229,18 @@ export function syntaxComplaint(file: string, content: string, run: RunSyntaxChe
   try {
     fs.writeFileSync(tmp, content);
     const res = run(cmd, tmp);
+    /*
+     * A SKIP MUST NOT BE INVISIBLE. `status === null` is the parser failing to
+     * launch, which correctly does not fail the write — but silence made a
+     * half-working guard look like a working one for a whole run. Say it once, so
+     * "no check ran" is never indistinguishable from "the check passed".
+     */
+    if (res.status === null && !skipReported.has(cmd[0] ?? '')) {
+      skipReported.add(cmd[0] ?? '');
+      process.stderr.write(
+        `[harness] syntax check unavailable (${cmd.join(' ')}) — writes of this kind are NOT parsed\n`,
+      );
+    }
     // `status === null` is the parser failing to launch — not the file's fault.
     if (res.status === null || res.status === 0) return null;
     const detail = res.stderr.split(tmp).join(file).trim();
@@ -588,7 +625,19 @@ function fenceTool<S extends TSchema, D>(
         if (destructive !== null) throw new Error(destructive);
         // ...and never let a file that does not parse reach disk (see syntaxComplaint).
         const unparseable = syntaxComplaint(abs, cleaned, (cmd, target) => {
-          const res = spawnSync(cmd[0] ?? '', [...cmd.slice(1), target], { encoding: 'utf8' });
+          const res = spawnSync(cmd[0] ?? '', [...cmd.slice(1), target], {
+            encoding: 'utf8',
+            /*
+             * ELECTRON_RUN_AS_NODE=1 here is the deliberate INVERSE of
+             * cleanChildEnv, and for the opposite reason. The model's own
+             * commands must not inherit it (it breaks any Electron they launch);
+             * this one must have it, because the binary being spawned is
+             * `process.execPath` — our own runtime — and we want it to behave as
+             * node rather than start an app. Harmless under a plain node, which
+             * ignores it.
+             */
+            env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
+          });
           return { status: res.status, stderr: `${res.stderr ?? ''}${res.stdout ?? ''}` };
         });
         if (unparseable !== null) throw new Error(unparseable);

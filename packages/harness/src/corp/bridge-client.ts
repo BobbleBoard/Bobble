@@ -105,6 +105,7 @@ function runViaBridge(
           product?: string;
           summary?: string;
           error?: string;
+          workspace?: string;
         };
         done({
           ok: res.ok === true,
@@ -112,6 +113,20 @@ function runViaBridge(
           // subagent responder's shape without a second field name.
           product: res.product ?? res.summary ?? '',
           ...(res.error !== undefined ? { error: res.error } : {}),
+          /*
+           * CARRY THE WORKSPACE. It is what stops a failed hand-off being
+           * reported as an empty one — see CorpRunResult.workspace and the
+           * promote-tool message it feeds.
+           *
+           * This line is the whole reason that fix did not work the first time.
+           * The field was added to the type, set by the host, and read by the
+           * consumer; this parse in the middle picks fields explicitly and
+           * silently dropped it, so run 4's CEO was told "Nothing was delivered"
+           * over a real tree for the second run running. A response parser that
+           * enumerates fields needs updating with every field, and nothing warns
+           * you — the type is on the RESULT, not on the wire.
+           */
+          ...(res.workspace !== undefined ? { workspace: res.workspace } : {}),
         });
       } catch {
         done({ ok: false, product: '', error: 'bad corp bridge response' });
