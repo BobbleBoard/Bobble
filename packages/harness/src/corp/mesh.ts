@@ -276,7 +276,44 @@ export class AgentMesh {
    * conversation. A missing root or a spent budget yields a plain note, never throws.
    */
   async run(rootId: string, message: string): Promise<string> {
-    return this.deliver(ROOT_SENDER, rootId, message, 0);
+    let reply = await this.deliver(ROOT_SENDER, rootId, message, 0);
+    /*
+     * ENDING A TURN IS NOT FINISHING THE JOB.
+     *
+     * `deliver` runs ONE turn. So the production used to end the moment the root's
+     * turn ended — and a manager that has just delegated has, by design, nothing
+     * left to say. MEASURED, run 4: the manager briefed three engineers, wrote a
+     * note to itself reading "Waiting for engineers to submit completed work", and
+     * its turn ended. deliver returned an empty reply, mesh-host invented a cause
+     * for it ("ran out of steps after 100 tool calls"), promote-tool turned that
+     * into "Nothing was delivered", and the CEO relayed a failure to the user
+     * while a packaged .app sat on disk.
+     *
+     * the user: "unless the manager returned a message to the ceo like 'we failed'
+     * how would the ceo break out of waiting for a tool result for the 'talk to'
+     * tool, it should just be waiting for a tool result".
+     *
+     * So while the root still has work out, waiting is the default rather than a
+     * thing it must remember to ask for. Each pass parks until somebody comes back
+     * and hands the root what came back, exactly as the `wait` tool would have. It
+     * ends when there is genuinely nothing outstanding — which is the real
+     * definition of done, and the only one that cannot be produced by silence.
+     */
+    for (;;) {
+      if (this.aborted) break;
+      const outstanding = this.outstanding(rootId);
+      if (outstanding.length === 0) break;
+      const out = await this.waitOn(rootId);
+      // `idle` with nothing outstanding is the loop's own exit; anything else is
+      // news the root has to act on, so give it a turn with that news.
+      const news = [
+        ...out.finished.map((f) => `${f.to} came back:\n${f.reply}`),
+        ...(out.stillRunning.length > 0 ? [`Still working: ${out.stillRunning.join(', ')}.`] : []),
+      ].join('\n\n');
+      if (news === '') break;
+      reply = await this.deliver(ROOT_SENDER, rootId, news, 0);
+    }
+    return reply;
   }
 
   /**

@@ -45,6 +45,10 @@ import {
   type MeshAgent,
   type MeshHop,
   NOT_READY_TO_DELEGATE,
+  PAUSE_TOOL,
+  PAUSE_TOOL_DEF,
+  PauseLedger,
+  pausedNote,
   RAISE_HAND_TOOL,
   RAISE_HAND_TOOL_DEF,
   type RaisedHand,
@@ -870,6 +874,8 @@ export function communicationTools(
   hands?: HandLedger,
   /** The mesh, for handing work out without waiting and for standing by. */
   waiter?: MeshDispatcher,
+  /** Who has been stood down — the manager's side of waiting (PAUSE_TOOL_DEF). */
+  paused?: PauseLedger,
 ): ToolDefinition[] {
   const colleagues = agent.peers.filter((p) => !p.startsWith('specialist:'));
   const tools: Array<Record<string, unknown>> = [];
@@ -943,6 +949,29 @@ export function communicationTools(
    * legitimate action rather than the absence of one, which is what stops a
    * manager with idle hands from building the product itself.
    */
+  /*
+   * STAND SOMEBODY DOWN. The other half of waiting: a manager could wait for work
+   * but never stop it, so an engineer heading the wrong way either finished anyway
+   * or was told nothing. It also frees the machine — one model, so four "working"
+   * engineers are four turns queued on one slot.
+   */
+  if (paused !== undefined && (agent.role === 'manager' || agent.role === 'ceo')) {
+    tools.push({
+      ...PAUSE_TOOL_DEF,
+      label: PAUSE_TOOL,
+      promptSnippet: 'Stand a subagent down until you message it again.',
+      execute: async (_id: unknown, params: unknown) => {
+        const p = (params ?? {}) as { agent?: unknown; why?: unknown };
+        const who = typeof p.agent === 'string' ? p.agent.trim() : '';
+        const why = typeof p.why === 'string' ? p.why : undefined;
+        if (who === '') return textResult('Name who to stand down, e.g. engineer:2.');
+        if (who === agent.id) return textResult('You cannot stand yourself down.');
+        paused.pause(who);
+        return textResult(withAlerts(pausedNote(who, why)));
+      },
+    });
+  }
+
   if (waiter !== undefined && agent.role !== 'engineer') {
     tools.push({
       ...WAIT_TOOL_DEF,
@@ -1321,6 +1350,8 @@ export function createMeshAgentHost(config: MeshAgentHostConfig): MeshAgentHost 
   /** The run-level profile, as a ref so the host can be built before it is known. */
   /** Agents that have already had the orientation block — first contact only. */
   const briefed = new Set<string>();
+  /** Who the manager has stood down — see PAUSE_TOOL_DEF. */
+  const paused = new PauseLedger();
   /** The tree each agent was last shown, so a later message can carry the delta. */
   const seenTree = new Map<string, string>();
   const taskProfileRef: { value: VerificationProfile } = {
@@ -1377,6 +1408,22 @@ export function createMeshAgentHost(config: MeshAgentHostConfig): MeshAgentHost 
      * them rather than hoping they go looking. No prose: an engineer that sees a
      * path next to the one it was about to create does not need it explained.
      */
+    /*
+     * BEING MESSAGED IS WHAT PICKS A STOOD-DOWN AGENT BACK UP. There is no separate
+     * resume, because a manager with something to say to somebody has by
+     * definition stopped standing them down.
+     *
+     * WHAT PAUSE DOES AND DOES NOT DO, plainly: an agent only ever takes a turn
+     * when somebody messages it, so marking it paused is already most of the
+     * enforcement. What this does NOT do is cancel a turn already in flight —
+     * `dispatch` starts the work immediately, and stopping a running turn is a
+     * different mechanism (abort) with different consequences. So pausing somebody
+     * mid-turn lets that turn finish and stops the NEXT one. Said out loud because
+     * a manager told "stopped" about something still running would be the same
+     * class of lie this harness keeps having to dig out.
+     */
+    paused.resume(agentId);
+
     const firstContact = !briefed.has(agentId);
     if (firstContact) briefed.add(agentId);
     const treeNow = listProject(config.cwd);
@@ -1454,6 +1501,9 @@ export function createMeshAgentHost(config: MeshAgentHostConfig): MeshAgentHost 
               // turn and read in another's, so it cannot live on either.
               raisedHands,
               config.meshRef?.value,
+              // Same reason as the hand ledger: pausing is a fact about the run's
+              // scheduling, read in a different turn from the one that set it.
+              paused,
             ),
             // ENGINEERS ONLY. This is how a piece comes back: what was built, how
             // they checked it, and — when a command makes sense for this kind of

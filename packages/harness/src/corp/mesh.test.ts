@@ -253,7 +253,11 @@ describe('dispatch + wait — a manager delegates a ROUND, then stands by', () =
 
   it('runs the round in PARALLEL — all three start before any finishes', async () => {
     const g = gated();
-    const mesh = new AgentMesh(g.runTurn, roster, { maxTurns: 200, maxDepth: 12, maxConcurrent: 3 });
+    const mesh = new AgentMesh(g.runTurn, roster, {
+      maxTurns: 200,
+      maxDepth: 12,
+      maxConcurrent: 3,
+    });
     for (const n of [1, 2, 3]) mesh.dispatch('manager', `engineer:${n}`, 'go');
     await new Promise((r) => setTimeout(r, 0));
     expect(g.started.sort()).toEqual(['engineer:1', 'engineer:2', 'engineer:3']);
@@ -264,7 +268,11 @@ describe('dispatch + wait — a manager delegates a ROUND, then stands by', () =
     /* the user: "even if there isn't enough compute to handle concurrency, when an
      * engineer running pauses, then run then unqueue". */
     const g = gated();
-    const mesh = new AgentMesh(g.runTurn, roster, { maxTurns: 200, maxDepth: 12, maxConcurrent: 2 });
+    const mesh = new AgentMesh(g.runTurn, roster, {
+      maxTurns: 200,
+      maxDepth: 12,
+      maxConcurrent: 2,
+    });
     for (const n of [1, 2, 3]) mesh.dispatch('manager', `engineer:${n}`, 'go');
     await new Promise((r) => setTimeout(r, 0));
     expect(g.started).toHaveLength(2); // the third is queued behind the cap
@@ -358,12 +366,55 @@ describe('dispatch + wait — a manager delegates a ROUND, then stands by', () =
       agent('specialist:tester', ['engineer:1']),
     ];
     const runTurn: RunAgentTurn = async ({ agentId, talk }) => {
-      if (agentId === 'engineer:1') return { reply: await talk('engineer:1', 'specialist:tester', 'check') };
+      if (agentId === 'engineer:1')
+        return { reply: await talk('engineer:1', 'specialist:tester', 'check') };
       return { reply: 'measured' };
     };
     const mesh = new AgentMesh(runTurn, deep, { maxTurns: 200, maxDepth: 12, maxConcurrent: 1 });
     mesh.dispatch('manager', 'engineer:1', 'go');
     const out = await mesh.waitOn('manager');
     expect(out.finished[0]?.reply).toBe('measured');
+  });
+});
+
+/**
+ * A RUN DOES NOT END BECAUSE THE ROOT STOPPED TALKING.
+ *
+ * MEASURED, run 4: the manager briefed three engineers, wrote itself a note
+ * reading "Waiting for engineers to submit completed work", and its turn ended.
+ * `deliver` runs ONE turn, so the production ended there — mesh-host invented a
+ * cause for the empty reply, promote-tool turned that into "Nothing was
+ * delivered", and the CEO reported failure while a packaged .app sat on disk.
+ *
+ * the user: "it should just be waiting for a tool result not running until the
+ * manager calls its submit."
+ */
+describe('run() keeps going while the root has work out', () => {
+  it('gives the root another turn with what came back, instead of returning empty', async () => {
+    const turns: string[] = [];
+    let mesh!: AgentMesh;
+    const run: RunAgentTurn = async ({ agentId }) => {
+      turns.push(agentId);
+      if (agentId === 'manager') {
+        // First turn: hand work out and say NOTHING — the exact run-4 shape.
+        if (turns.filter((t) => t === 'manager').length === 1) {
+          mesh.dispatch('manager', 'engineer:1', 'build it');
+          return { reply: '' };
+        }
+        return { reply: 'done, the piece is in' };
+      }
+      return { reply: 'engineer:1 finished the piece' };
+    };
+    mesh = new AgentMesh(run, [agent('manager', ['engineer:1']), agent('engineer:1', ['manager'])]);
+    const out = await mesh.run('manager', 'build the product');
+    expect(turns).toContain('engineer:1');
+    expect(turns.filter((t) => t === 'manager').length).toBeGreaterThan(1);
+    expect(out).not.toBe('');
+  });
+
+  /* The exit is genuinely nothing outstanding — not silence. */
+  it('returns once no work is out', async () => {
+    const mesh = scriptedMesh([agent('manager')], { manager: () => 'here is the answer' });
+    expect(await mesh.run('manager', 'x')).toBe('here is the answer');
   });
 });

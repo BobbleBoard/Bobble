@@ -60,8 +60,8 @@ export const WAIT_TOOL_DEF = {
 export const MANAGER_STANDBY_INSTRUCTION =
   'Wait once you do the initial delegation round until there is substantial work in ' +
   "and it's ready to test. You shouldn't be doing anything but waiting or " +
-  'advising/helping out when asked until everyone is done — that\'s when you test, or ' +
-  'do another round. When you\'ve delegated everyone you want for the round, you\'re ' +
+  "advising/helping out when asked until everyone is done — that's when you test, or " +
+  "do another round. When you've delegated everyone you want for the round, you're " +
   'either delegating more, sending messages to already delegated workers, or being on ' +
   `standby (\`${WAIT_TOOL}\`).`;
 
@@ -210,5 +210,88 @@ export class HandLedger {
   /** Every agent with a hand still up (the run's own "who is stuck" view). */
   pendingManagers(): string[] {
     return [...this.byManager.entries()].filter(([, v]) => v.length > 0).map(([k]) => k);
+  }
+}
+
+/** Park a subagent until the manager messages it again. */
+export const PAUSE_TOOL = 'pause_subagent';
+
+/**
+ * STAND SOMEBODY DOWN — the manager's side of waiting.
+ *
+ * the user: "maybe have the manager get a stop subagent tool call, that will pause it
+ * until the manager decides to message it again."
+ *
+ * The gap it fills: a manager could hand work out and wait for it, but had no way
+ * to tell somebody to STOP. Its only options for an engineer heading the wrong way
+ * were to let it finish anyway or to say nothing — and a 4B that is told nothing
+ * keeps going. Pausing is also how a manager frees the machine: this box runs one
+ * model, so four engineers "working" are four turns queued on one slot, and
+ * standing down the two that are not on the critical path makes the other two
+ * finish sooner.
+ *
+ * Deliberately NOT a kill. The session stays open and the agent keeps everything
+ * it knows; it simply takes no further turn until the manager talks to it, at
+ * which point it carries on with its context intact. That is what makes this safe
+ * to use liberally — the cost of pausing somebody wrongly is one message.
+ */
+export const PAUSE_TOOL_DEF = {
+  name: PAUSE_TOOL,
+  description:
+    'Tell somebody working for you to STOP for now. They stay exactly as they are — ' +
+    'nothing is lost, they keep everything they have done and everything they know — ' +
+    'and they simply take no further turn until you message them again, which picks ' +
+    'them straight back up where they left off.\n\n' +
+    'Use it when their work is no longer the thing that matters: they are heading the ' +
+    'wrong way, what they are building is not needed yet, or you want the machine free ' +
+    'for somebody closer to finished. Pausing two people so the other two finish ' +
+    'sooner is a normal thing to do here.\n\n' +
+    'This is not firing anybody and not throwing work away. If you are unsure, pause ' +
+    'them — the cost of being wrong is one message to start them again.',
+  parameters: {
+    type: 'object',
+    properties: {
+      agent: { type: 'string', description: 'Who to stand down, e.g. engineer:2.' },
+      why: {
+        type: 'string',
+        description:
+          'One line they will read when you restart them, so they know why they stopped.',
+      },
+    },
+    required: ['agent'],
+  },
+} as const;
+
+/** What a paused agent is told, and what the manager gets back. */
+export function pausedNote(agent: string, why?: string): string {
+  const reason = (why ?? '').trim();
+  return reason === ''
+    ? `${agent} is standing by. It keeps everything it has done; message it to pick back up.`
+    : `${agent} is standing by (${reason}). It keeps everything it has done; message it to pick back up.`;
+}
+
+/**
+ * Who is currently stood down. A plain set rather than agent state: pausing is a
+ * fact about the MESH's scheduling, not about the agent, and it has to survive the
+ * agent being mid-anything.
+ */
+export class PauseLedger {
+  private readonly paused = new Set<string>();
+
+  pause(agent: string): void {
+    this.paused.add(agent);
+  }
+
+  /** Messaging somebody is what un-pauses them — there is no separate resume. */
+  resume(agent: string): void {
+    this.paused.delete(agent);
+  }
+
+  isPaused(agent: string): boolean {
+    return this.paused.has(agent);
+  }
+
+  list(): string[] {
+    return [...this.paused].sort();
   }
 }
