@@ -20,12 +20,14 @@ import {
   guardDestructiveRewrite,
   isInsideRoots,
   isNamedDestination,
+  outsideWorkspaceRefusal,
   registerSandboxFileTools,
   resolveWorkspacePath,
   resolveWorkspaceRoot,
   sandboxBaseDir,
   stripCodeFence,
   stripMarkdownEscapes,
+  suggestWorkspaceRelative,
 } from './sandbox-fs.js';
 
 const norm = (p: string) => path.resolve(p);
@@ -454,5 +456,80 @@ describe('stripMarkdownEscapes — prose escaping that reached a code file', () 
   it('leaves other backslash escapes untouched', () => {
     const src = 'print("a\\nb")\npath = "C:\\\\tmp"';
     expect(stripMarkdownEscapes(src, '/w/app.py')).toBe(src);
+  });
+});
+
+/**
+ * A REFUSAL HAS TO CARRY THE CORRECT CALL.
+ *
+ * The CloudConvert/localconvert run: the model wrote `/localconvert/index.html`,
+ * was refused with a message that named the working folder, and "corrected" it to
+ * `localconvert/index.html` — so every file of that run landed in
+ * `<workspace>/localconvert/`, one level too deep. The old text was accurate and
+ * still steered it wrong, because "write inside the working folder (X)" reads as
+ * "put it under X's name".
+ */
+describe('outsideWorkspaceRefusal', () => {
+  const ROOT = '/Users/user/bobble-testbed/localconvert';
+
+  it('hands back the exact relative path to pass', () => {
+    const msg = outsideWorkspaceRefusal(
+      'write',
+      '/localconvert/index.html',
+      '/localconvert/index.html',
+      ROOT,
+    );
+    expect(msg).toContain('pass path: "index.html"');
+  });
+
+  /* The whole point: name the wrong answer so it cannot be re-derived. */
+  it('names the duplicate-basename trap and what it would create', () => {
+    const msg = outsideWorkspaceRefusal(
+      'write',
+      '/localconvert/index.html',
+      '/localconvert/index.html',
+      ROOT,
+    );
+    expect(msg).toContain('Do NOT pass "localconvert/index.html"');
+    expect(msg).toContain('/Users/user/bobble-testbed/localconvert/localconvert/index.html');
+  });
+
+  it('still says which tool refused and where the path resolved', () => {
+    const msg = outsideWorkspaceRefusal('edit', '~/evil.txt', '/Users/user/evil.txt', ROOT);
+    expect(msg).toMatch(/^Refusing to edit outside the workspace/);
+    expect(msg).toContain('/Users/user/evil.txt');
+  });
+
+  /* Kept from the original: a deliberate write elsewhere must be DECLARED. */
+  it('keeps the never-lie-about-the-path instruction', () => {
+    const msg = outsideWorkspaceRefusal('write', '/x/y.txt', '/x/y.txt', ROOT);
+    expect(msg).toMatch(/SAY SO in your reply/);
+  });
+});
+
+describe('suggestWorkspaceRelative', () => {
+  const ROOT = '/Users/user/bobble-testbed/localconvert';
+
+  it('drops a leading segment that duplicates the workspace basename', () => {
+    expect(suggestWorkspaceRelative('/localconvert/index.html', ROOT)).toBe('index.html');
+  });
+
+  it('drops the whole root when it is echoed back absolutely', () => {
+    expect(suggestWorkspaceRelative(`${ROOT}/src/app.js`, ROOT)).toBe('src/app.js');
+  });
+
+  /* A path with nothing in common with the root says nothing about where it
+   * belongs here — suggest the filename, not someone else's directory tree. */
+  it('suggests the bare filename for an unrelated absolute path', () => {
+    expect(suggestWorkspaceRelative('/tmp/a/b/c.txt', ROOT)).toBe('c.txt');
+    expect(suggestWorkspaceRelative('~/evil.txt', ROOT)).toBe('evil.txt');
+  });
+
+  it('never strips everything — something has to be written', () => {
+    expect(suggestWorkspaceRelative('/localconvert', ROOT)).toBe('localconvert');
+  });
+
+  it('leaves a genuine relative path alone', () => {
+    expect(suggestWorkspaceRelative('src/core/x.js', ROOT)).toBe('src/core/x.js');
   });
 });

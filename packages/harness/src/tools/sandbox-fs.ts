@@ -177,6 +177,69 @@ const HOME_DIRS_OFF_LIMITS = new Set(['Library']);
  * user's own instruction reaches the disk. A bare relative name is still fenced
  * to the workspace, which is what the containment was actually for.
  */
+/**
+ * The workspace-relative path a refused write almost certainly MEANT.
+ *
+ * Drops leading segments the root already accounts for, because duplicating them
+ * is the mistake being corrected. Never drops the last segment — something has to
+ * be written — and for a path that shares nothing with the root (`~/evil.txt`,
+ * `/tmp/a/b/c.txt`) suggests the bare filename rather than replanting a stranger's
+ * directory tree inside the workspace.
+ */
+export function suggestWorkspaceRelative(raw: string, root: string): string {
+  const expanded = expandUserPath(raw);
+  const segs = expanded.split(/[/\\]+/).filter((s) => s !== '' && s !== '.');
+  if (segs.length === 0) return 'file';
+  const rootSegs = new Set(
+    normalizeRoot(root)
+      .split(/[/\\]+/)
+      .filter((s) => s !== ''),
+  );
+  let i = 0;
+  while (i < segs.length - 1 && rootSegs.has(segs[i] ?? '')) i += 1;
+  if (i === 0 && path.isAbsolute(expanded)) return segs.at(-1) ?? 'file';
+  return segs.slice(i).join('/');
+}
+
+/**
+ * WHAT A REFUSED PATH IS TOLD — the exact call to make instead, not a folder to
+ * guess against.
+ *
+ * MEASURED, the localconvert run. The old text already named the root:
+ *
+ *   Refusing to write outside the workspace: "/localconvert/index.html" resolves
+ *   to /localconvert/index.html. Write inside the working folder
+ *   (/Users/user/bobble-testbed/localconvert). …
+ *
+ * The model's very next call was `write "localconvert/index.html"` — it read
+ * "write inside the working folder (X)" as "put it under X's name" — and every
+ * artifact of that run landed in `localconvert/localconvert/`. Naming the root
+ * was not enough; the phrasing invited the duplicate. So say the answer: the
+ * literal relative path to pass, and the trap not to fall into, with the wrong
+ * result spelled out so there is nothing left to infer.
+ *
+ * This is the same lesson as the `use` tool's dead-end message and the
+ * capability's "you now have" — a refusal the model cannot act on correctly is a
+ * refusal that sends it somewhere worse.
+ */
+export function outsideWorkspaceRefusal(
+  toolName: string,
+  raw: string,
+  abs: string,
+  root: string,
+): string {
+  const suggestion = suggestWorkspaceRelative(raw, root);
+  const trap = `${path.basename(normalizeRoot(root))}/${suggestion}`;
+  return (
+    `Refusing to ${toolName} outside the workspace: "${raw}" resolves to ${abs}. ` +
+    `The working folder IS ${root}, and a relative path resolves against it — so pass ` +
+    `path: "${suggestion}". Do NOT pass "${trap}": that would create ` +
+    `${path.join(root, trap)}, one level too deep. If you genuinely mean to write ` +
+    `somewhere else, SAY SO in your reply and give the real path — never let the user ` +
+    `believe their files are at a location you did not use.`
+  );
+}
+
 export function isNamedDestination(raw: string, abs: string, home: string): boolean {
   const expanded = expandUserPath(raw);
   if (!path.isAbsolute(expanded)) return false;
@@ -429,12 +492,7 @@ function fenceTool<S extends TSchema, D>(
         !isInsideRoots(abs, allowedWriteRoots(root, home)) &&
         !isNamedDestination(raw, abs, home)
       ) {
-        throw new Error(
-          `Refusing to ${base.name} outside the workspace: "${raw}" resolves to ${abs}. ` +
-            `Write inside the working folder (${root}). If you write somewhere else, ` +
-            `SAY SO in your reply and give the real path — never let the user believe ` +
-            `their files are at a location you did not use.`,
-        );
+        throw new Error(outsideWorkspaceRefusal(base.name, raw, abs, root));
       }
       // Hand pi an already-absolute path so its own resolveToCwd is a passthrough
       // and it writes/reads EXACTLY where we fenced.
