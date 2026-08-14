@@ -21,9 +21,7 @@ import {
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   CLEAN_LOAD,
-  COORDINATOR_STEP_MULTIPLE,
   communicationTools,
-  DEFAULT_STEPS_PER_MESSAGE,
   dispatchesTo,
   emptyProjectComplaint,
   excerptFailures,
@@ -37,7 +35,6 @@ import {
   orphanReport,
   PASSTHROUGH_KEYS,
   runtimeCheck,
-  stepsForRole,
   taskNote,
   testSuiteReport,
 } from './mesh-host';
@@ -121,23 +118,26 @@ describe('what the manager is told, every time', () => {
   });
 });
 
-describe('the per-message work budget', () => {
-  it('is generous enough for real work and finite enough to end', () => {
-    /*
-     * Real work is a dozen reads, a few writes and several test runs. Run 7's
-     * engineer passed forty-eight calls in ONE message and had not stopped —
-     * which is what the upper bound was originally written against.
-     *
-     * RAISED to allow 60. Runs 9 and 10 both ended "(ceo ran out of steps after
-     * 31 / 33 tool calls without ever replying)": seventeen files of a Godot
-     * project is more than 24 calls of work, so the cap was landing mid-build
-     * and a role cut off mid-build never reaches the part where it RUNS what it
-     * wrote. The cap is a runaway guard, not a work budget — it must not be the
-     * thing that decides the outcome of ordinary work — but it stays finite,
-     * because a role that never stops never reports.
-     */
-    expect(DEFAULT_STEPS_PER_MESSAGE).toBeGreaterThanOrEqual(12);
-    expect(DEFAULT_STEPS_PER_MESSAGE).toBeLessThanOrEqual(60);
+describe('the per-message work budget is gone', () => {
+  /*
+   * ITS WHOLE HISTORY IS THE ARGUMENT AGAINST IT. 24 was "generous"; runs 9 and
+   * 10 then ended "(ceo ran out of steps after 31 / 33 tool calls without ever
+   * replying)" because seventeen Godot files is more than 24 calls of work. 60
+   * replaced it; run 2's manager burned 100+ coordinating eleven contracts. A 3x
+   * coordinator multiple went on top; run 4 still reported a step-out — from a
+   * message that only *assumed* one (see #74).
+   *
+   * the user: "let's not have a tool call cap". A guard that has to be raised every
+   * time it fires is not measuring what it claims to. What it was protecting
+   * against — a role that works forever and never reports — belongs where the
+   * work actually is: a turn that ends with work outstanding waits rather than
+   * ending the production.
+   */
+  it('is not reinstated by any default the host can reach', async () => {
+    const mod = (await import('./mesh-host')) as Record<string, unknown>;
+    for (const gone of ['DEFAULT_STEPS_PER_MESSAGE', 'stepsForRole', 'COORDINATOR_STEP_MULTIPLE']) {
+      expect(mod[gone], gone).toBeUndefined();
+    }
   });
 });
 
@@ -195,35 +195,36 @@ describe('only one sentence means success', () => {
   });
 });
 
-describe('a coordinator gets a coordinator-sized budget', () => {
+describe('a run has no tool-call cap at all', () => {
   /*
-   * 60 was set for a role BUILDING one thing. A manager builds nothing — it
-   * dispatches, reads handbacks and looks at the tree, once per engineer, before
-   * it can say anything at all.
+   * the user: "let's not have a tool call cap".
    *
-   * MEASURED, run 2: eleven contracts, 117 tool calls, and the manager never
-   * replied. The cap meant to catch "a role that never stops" cut off a role
-   * coordinating exactly as asked, and a role cut off mid-work never reaches the
-   * part where it reports.
+   * The cap existed to stop a role that never stops. It could never tell that
+   * apart from a role doing a big job well, so it kept deciding the outcome of
+   * ordinary work — 24 was raised to 60 when seventeen Godot files did not fit,
+   * 60 then cut off a manager coordinating eleven contracts, and a 3x coordinator
+   * multiple was added on top. A limit that has to be raised every time it fires
+   * is measuring the wrong thing.
+   *
+   * `hostPassthrough` still carries maxStepsPerMessage so a TEST can make a cap
+   * observable; what matters is that a real run passes none, and that omitting it
+   * is a genuine absence rather than a very large number — newTurnState only
+   * builds a counter when maxSteps is defined.
    */
-  it('gives the manager several times a builder budget', () => {
-    expect(stepsForRole('manager')).toBeGreaterThan(stepsForRole('engineer'));
-    expect(stepsForRole('manager')).toBe(DEFAULT_STEPS_PER_MESSAGE * COORDINATOR_STEP_MULTIPLE);
+  it('keeps maxStepsPerMessage as an explicit opt-in, not a default', () => {
+    expect(hostPassthrough({} as never)).not.toHaveProperty('maxStepsPerMessage');
+    expect(hostPassthrough({ maxStepsPerMessage: 12 } as never)).toEqual(
+      expect.objectContaining({ maxStepsPerMessage: 12 }),
+    );
   });
 
-  it('leaves builders and specialists exactly where they were', () => {
-    expect(stepsForRole('engineer')).toBe(DEFAULT_STEPS_PER_MESSAGE);
-    expect(stepsForRole('specialist')).toBe(DEFAULT_STEPS_PER_MESSAGE);
-  });
-
-  /* run 2 burned 117 coordinating eleven contracts; the new ceiling clears it. */
-  it('clears the run that exposed this', () => {
-    expect(stepsForRole('manager')).toBeGreaterThan(117);
-  });
-
-  it('scales an explicit override rather than ignoring it', () => {
-    expect(stepsForRole('manager', 20)).toBe(20 * COORDINATOR_STEP_MULTIPLE);
-    expect(stepsForRole('engineer', 20)).toBe(20);
+  /* The constants are gone, not merely unused — a future edit cannot quietly
+   * reinstate a default by referencing one. */
+  it('exports no step-cap default for anything to fall back to', async () => {
+    const mod = (await import('./mesh-host')) as Record<string, unknown>;
+    expect(mod.DEFAULT_STEPS_PER_MESSAGE).toBeUndefined();
+    expect(mod.stepsForRole).toBeUndefined();
+    expect(mod.COORDINATOR_STEP_MULTIPLE).toBeUndefined();
   });
 });
 

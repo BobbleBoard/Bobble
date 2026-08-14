@@ -70,7 +70,7 @@ import {
 } from '@pi-desktop/harness/corp';
 import { createLogger } from '@pi-desktop/shared';
 import { app } from 'electron';
-import { getInferenceUtility } from '../inference/llm-main';
+import { getInferenceContextWindow, getInferenceUtility } from '../inference/llm-main';
 import { AgentPool } from './agent-pool';
 import { blindCriticEnabled, blindCriticReport } from './blind-critic';
 import {
@@ -1119,46 +1119,6 @@ const ROLE_PURPOSE: Record<string, string> = {
 };
 
 /**
- * Work tool calls one message may spend. Generous — a real piece of work is a
- * dozen reads, a few writes and several test runs — but finite, because the
- * failure it guards against is not slowness, it is a role that never stops and
- * therefore never reports. Measured against run 7, where an engineer passed
- * thirty calls inside one message and was still going.
- *
- * RAISED FROM 24 after runs 9 and 10 both ended "(ceo ran out of steps after 31
- * / 33 tool calls without ever replying)". Seventeen files of a Godot project is
- * simply more than 24 calls of work, so the cap was landing mid-build every time
- * — and a role cut off mid-build never reaches the part where it RUNS what it
- * wrote. The guard is against a role that never stops; 60 still guarantees that
- * and stops deciding the outcome of ordinary work.
- */
-export const DEFAULT_STEPS_PER_MESSAGE = 60;
-
-/**
- * The COORDINATOR's budget, which is a different job and needs a different number.
- *
- * 60 was chosen for a role BUILDING one thing — "seventeen files of a Godot
- * project is simply more than 24 calls of work". A manager builds nothing. It
- * spends its calls dispatching contracts, reading handbacks, and looking at the
- * tree, and it needs one round of that PER ENGINEER before it can say anything.
- *
- * MEASURED, run 2: eleven contracts, and the manager burned 117 tool calls
- * without ever replying. The cap that was meant to catch "a role that never
- * stops" instead cut off a role that was coordinating exactly as asked — and a
- * role cut off mid-work never reaches the part where it reports, which is the
- * same failure the 24→60 raise was already trying to fix, one level up.
- *
- * Deliberately a multiple rather than a new constant: whatever a builder is
- * allowed, coordinating a team of them is several times that work.
- */
-export const COORDINATOR_STEP_MULTIPLE = 3;
-
-/** Work-tool budget for one message to `agentId`, by what that role actually does. */
-export function stepsForRole(role: string, base = DEFAULT_STEPS_PER_MESSAGE): number {
-  return role === 'manager' || role === 'ceo' ? base * COORDINATOR_STEP_MULTIPLE : base;
-}
-
-/**
  * The settings a run passes STRAIGHT THROUGH to its agent host.
  *
  * Extracted and named because forgetting one is silent: `onSubmitted` was
@@ -1219,7 +1179,8 @@ export interface MeshAgentHostConfig {
   readonly maxTokens?: number;
   /** How many WORK tool calls one message may spend before the role is pushed to
    * conclude. The finishing tools are exempt — see the `freeTools` wiring below.
-   * Default {@link DEFAULT_STEPS_PER_MESSAGE}. */
+   * OPT-IN ONLY — there is no default. Tests set it to make a cap observable;
+   * a real run has none (see the call site). */
   readonly maxStepsPerMessage?: number;
   /** Live activity sink for the situation room, tagged with the emitting agent. */
   readonly onActivity?: (agentId: string, record: RoleAgentActivity) => void;
@@ -1367,6 +1328,8 @@ export function createMeshAgentHost(config: MeshAgentHostConfig): MeshAgentHost 
   };
 
   const run: RunAgentTurn = async ({ agentId, from, message, talk }) => {
+    // Live, not captured: the server restarts and a stale window would stick.
+    const liveContextWindow = getInferenceContextWindow();
     const agent = roster.get(agentId);
     if (agent === undefined) return { reply: `(there is no ${agentId} on this team.)` };
     talkRef.set(agentId, talk);
@@ -1523,10 +1486,46 @@ export function createMeshAgentHost(config: MeshAgentHostConfig): MeshAgentHost 
           // inside a single message rewriting one file, never finished its turn,
           // and so never submitted anything. Running out of budget now reads as
           // "conclude", which is the one thing a 4B model needs said out loud.
-          maxSteps: stepsForRole(
-            agent.role,
-            config.maxStepsPerMessage ?? DEFAULT_STEPS_PER_MESSAGE,
-          ),
+          /*
+           * NO STEP CAP. the user: "let's not have a tool call cap".
+           *
+           * It was built to stop a role that never stops — run 7's engineer spent
+           * thirty-odd bash calls rewriting one file and never submitted. But a
+           * cap cannot tell that apart from a role doing a big job well, and it
+           * kept deciding the outcome of ordinary work: 24 was raised to 60 for
+           * exactly that reason, then 60 cut off a manager coordinating eleven
+           * contracts, then a 3x coordinator multiple was needed on top. A limit
+           * that has to be raised every time it fires is measuring the wrong
+           * thing.
+           *
+           * `newTurnState` only builds a counter when maxSteps is defined, so
+           * omitting it is a real absence rather than a large number. What the cap
+           * was actually protecting against — a role that works forever and never
+           * reports — is now handled where it belongs: a turn that ends with work
+           * outstanding waits instead of ending the production.
+           */
+          ...(config.maxStepsPerMessage !== undefined
+            ? { maxSteps: config.maxStepsPerMessage }
+            : {}),
+          /*
+           * THE MODEL'S REAL GEOMETRY, not role-agent's defaults.
+           *
+           * Roles ran on DEFAULT_CONTEXT_WINDOW=16384 / DEFAULT_MAX_TOKENS=8192
+           * while qwen3.5-4b declares 32768 / 28672 — half the context and 29% of
+           * the output, from constants nobody picked for this model. mesh-host
+           * never passed contextWindow at all, so the default was unreachable
+           * even in principle.
+           *
+           * MEASURED: an engineer's turn spent its output on thinking and was cut
+           * mid-tool-call; the write landed 359 bytes into main.js at
+           * `preload: path.join(__`, and the run then spent an auditor round
+           * finding it. Output budget is what a file write is made of.
+           *
+           * `maxTokens` is left to the model's own declared value by passing only
+           * the window — role-agent already reads maxTokens from config when set,
+           * and the provider clamps to what the server will accept.
+           */
+          ...(liveContextWindow !== null ? { contextWindow: liveContextWindow } : {}),
           // RUN, DO NOT WRITE — for everyone whose job is not building. The
           // manager needs a shell to see a failure with its own eyes; it does not
           // need one to write `gui_app.py`, which is what it did the moment it had
@@ -1965,7 +1964,7 @@ export async function runCorpMeshTask(opts: {
   /** Observe files rescued out of a mangled nested path (see workspace-paths). */
   readonly onRepaired?: (agentId: string, count: number) => void;
   /** How many WORK tool calls one message may spend before the role is pushed to
-   * conclude ({@link DEFAULT_STEPS_PER_MESSAGE}). */
+   * conclude. Opt-in only; a real run sets no cap. */
   readonly maxStepsPerMessage?: number;
   /** Skip the capability probe (tests — it shells out). */
   readonly skipCapabilityProbe?: boolean;

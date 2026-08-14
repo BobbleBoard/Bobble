@@ -58,6 +58,24 @@ let lastStatus: LlmStatus | null = null;
  * and the model concludes its tools are broken. Measured exactly that — five
  * turns of a 4B trying to look at a screenshot it was never going to see.
  */
+/**
+ * The RUNNING server's context window, or null when nothing is up.
+ *
+ * Corp roles were built on `DEFAULT_CONTEXT_WINDOW = 16384` and
+ * `DEFAULT_MAX_TOKENS = 8192` while the model in front of them declares 32768 and
+ * 28672 — nobody chose those constants for this model, and mesh-host never passed
+ * a contextWindow at all. MEASURED consequence: an engineer's turn spent its
+ * output budget on thinking and was cut mid-tool-call, so a `write` landed 359
+ * bytes into main.js at `preload: path.join(__` and the harness ran it anyway.
+ *
+ * Read live rather than captured at spawn — the server restarts (a vision
+ * relaunch, an Auto tier switch) and a role opened before that would otherwise
+ * hold a stale number.
+ */
+export function getInferenceContextWindow(): number | null {
+  return lastStatus?.model?.contextWindow ?? null;
+}
+
 export function getInferenceLaunchMode(): 'fast-text' | 'multimodal' | null {
   return lastStatus?.launchMode ?? null;
 }

@@ -62,13 +62,13 @@ import type { CorpTurnPurpose, RoleAgentActivity } from '@pi-desktop/harness/cor
 // the permissions default is a static denylist flagged BY RULE — no LLM reviewer
 // in the loop.
 import { checkScaryBash } from '@pi-desktop/harness/permissions';
-import { wouldHang } from '@pi-desktop/harness/tools/hang-guard';
 // The SAME `tool_search` a solo agent gets — full-harness parity for corp roles.
 // Value-imported from the zero-dependency `./tool-search` subpath (only a pi type
 // + typebox), so it stays loadable under Node TS type-stripping and drags in none
 // of the harness/pi barrel. A role starts with its curated tools ACTIVE, then can
 // search the full registered corpus and activate what it needs mid-run.
 import { registerToolSearch } from '@pi-desktop/harness/tool-search';
+import { wouldHang } from '@pi-desktop/harness/tools/hang-guard';
 import { shellWrites } from './shell-writes';
 
 // ---------------------------------------------------------------------------
@@ -1426,7 +1426,43 @@ export async function openRoleSession(
      * what turns a bare "Worked" into "Worked for 2m 5s".
      */
     const startedAt = new Map<string, number>();
+    /*
+     * DID THE TURN THAT PRODUCED THIS CALL FINISH GENERATING IT?
+     *
+     * `message_end` carries the assistant message and fires BEFORE the loop
+     * executes its tool calls (pi-agent-core agent-loop.js: streamAssistantResponse
+     * emits message_end, then executeToolCalls runs), so the stop reason is known
+     * in time to refuse.
+     */
+    let lastStopReason: string | undefined;
+    pi.on('message_end', (e: { message?: { role?: string; stopReason?: string } }) => {
+      if (e.message?.role === 'assistant') lastStopReason = e.message.stopReason;
+    });
     pi.on('tool_call', (e: ToolCallEvent) => {
+      /*
+       * A TRUNCATED CALL IS NOT A CALL.
+       *
+       * MEASURED, run 4: an engineer's turn spent its output budget and was cut
+       * mid-tool-call. The harness ran it anyway, so `write` landed 359 bytes into
+       * main.js, ending at `preload: path.join(__`. The team then spent an auditor
+       * round discovering it, and the CEO later reported the file as built.
+       *
+       * `stopReason === 'length'` means the final content block is incomplete by
+       * definition — the arguments are a prefix of what the model meant to send.
+       * Executing a prefix of a file write is how a half-file reaches disk looking
+       * like a whole one. Refuse, and say why, so the model rewrites rather than
+       * wondering what happened.
+       */
+      if (lastStopReason === 'length') {
+        return {
+          block: true,
+          reason:
+            `This ${e.toolName} call was CUT OFF — the turn ran out of output budget ` +
+            'part-way through generating it, so its arguments are incomplete and it ' +
+            'was not run. Nothing was changed. Send it again, smaller: split a long ' +
+            'file into more than one write, or shorten your reasoning before the call.',
+        };
+      }
       startedAt.set(e.toolCallId, Date.now());
       turn.toolCalls.push({ name: e.toolName, arguments: e.input });
       // LIVE: name the tool the MOMENT it starts — the NAMED call + a short arg

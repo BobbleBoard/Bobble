@@ -758,3 +758,35 @@ describe('live EDIT carries the file, not the fragment', () => {
     expect(act?.text).toBe('whole file');
   });
 });
+
+/**
+ * A TOOL CALL FROM A TRUNCATED TURN MUST NOT RUN.
+ *
+ * MEASURED, run 4: an engineer's turn spent its output budget mid-tool-call and
+ * the harness executed the partial call, so `write` put 359 bytes into main.js
+ * ending at `preload: path.join(__`. An auditor round was spent finding it, and
+ * the CEO later listed the file as built.
+ *
+ * The rule is decidable, not a heuristic: stopReason 'length' means the final
+ * content block is a PREFIX of what the model meant to send.
+ */
+describe('a truncated turn does not get its tool call executed', () => {
+  /* The decision, as the hook makes it. */
+  const blocked = (stopReason: string | undefined): boolean => stopReason === 'length';
+
+  it('blocks when the turn stopped for length', () => {
+    expect(blocked('length')).toBe(true);
+  });
+
+  it('allows every normal ending', () => {
+    expect(blocked('toolUse')).toBe(false);
+    expect(blocked('stop')).toBe(false);
+    expect(blocked(undefined)).toBe(false);
+  });
+
+  /* An aborted turn is a different event with its own handling — this guard must
+   * not quietly widen into "any unusual stop reason". */
+  it('does not block an aborted turn', () => {
+    expect(blocked('aborted')).toBe(false);
+  });
+});
