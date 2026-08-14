@@ -114,3 +114,47 @@ describe('finalCheck', () => {
     expect(plain).not.toContain('ANY UI');
   });
 });
+
+describe('finalCheck — the CEO routes faults back, it does not silently repair', () => {
+  const ceo = () =>
+    finalCheck({
+      claims: ['The app converts PNG to JPG'],
+      profile: classifyVerification('build me a converter app'),
+      perspective: 'ceo',
+    });
+
+  /*
+   * the user: the CEO "needs to test itself, verify, tell the manager if anything is
+   * wrong". Run 5 ended with the CEO building the product alone and reporting it
+   * done — a team that never learned its work was broken.
+   */
+  it('sends anything wrong back to the manager', () => {
+    expect(ceo()).toContain('talk_to_manager');
+    expect(ceo()).toMatch(/BACK TO THE MANAGER/);
+  });
+
+  it('forbids quietly fixing it alone', () => {
+    expect(ceo()).toMatch(/[Dd]o not quietly fix it yourself/);
+  });
+
+  /* Reference material is evidence for the review, gathered by the team. */
+  it('asks the manager for specialists it cannot check itself', () => {
+    expect(ceo()).toMatch(/specialist/i);
+    expect(ceo()).toMatch(/reference/i);
+  });
+
+  it('checks before it answers the user', () => {
+    expect(ceo()).toMatch(/Only when you have checked/);
+  });
+
+  /* Everyone else keeps the original instruction — they have nobody to hand to. */
+  it('leaves the engineer perspective fixing its own faults', () => {
+    const eng = finalCheck({
+      claims: ['it builds'],
+      profile: classifyVerification('build me a converter app'),
+      perspective: 'engineer',
+    });
+    expect(eng).toContain('Fix whatever this turns up');
+    expect(eng).not.toContain('talk_to_manager');
+  });
+});

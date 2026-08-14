@@ -277,7 +277,9 @@ export function finalCheck(opts: {
       'would show it false, not by re-reading what you wrote:',
       '',
     );
-    claims.forEach((c, i) => lines.push(`  ${i + 1}. ${c}`));
+    claims.forEach((c, i) => {
+      lines.push(`  ${i + 1}. ${c}`);
+    });
     lines.push(
       '',
       'A claim you cannot demonstrate right now is not a finding to mention later —',
@@ -317,6 +319,36 @@ export function finalCheck(opts: {
 
   if (opts.vision !== undefined && opts.vision.trim() !== '') {
     lines.push(`WHAT THEY ASKED FOR, verbatim: ${opts.vision.trim()}`, '');
+  }
+
+  /*
+   * WHAT THE CEO DOES WITH A FAULT IS NOT WHAT ANYONE ELSE DOES.
+   *
+   * Everyone else fixes what their check turns up. The CEO has a team that just
+   * built this, and the team is who should repair it — the user: "it needs to test
+   * itself, verify, tell the manager if anything is wrong". Left with the
+   * generic "fix whatever this turns up", the CEO quietly repairs the product
+   * alone, which is how a run ends with a manager that never learned its work
+   * was broken and a CEO that did the job twice.
+   */
+  if (perspective === 'ceo') {
+    lines.push(
+      'WHAT YOU DO WITH WHAT YOU FIND:',
+      '',
+      '  - Anything wrong goes BACK TO THE MANAGER — call `talk_to_manager` again',
+      '    and say exactly what you did, what you saw, and which file it is in. The',
+      '    team that built it repairs it. Do not quietly fix it yourself: then',
+      '    nobody who built this ever learns it was broken.',
+      '  - Ask the manager to put a specialist on anything you could not check',
+      '    yourself — a reference build, screenshots of the real thing it is meant',
+      '    to resemble, a tester driving it — and use what comes back as the',
+      '    evidence for this review.',
+      '  - Only when you have checked it yourself and it holds up do you answer',
+      '    the user.',
+      '',
+      'Then say what you actually did to check, and what you actually saw.',
+    );
+    return lines.join('\n');
   }
 
   lines.push(
