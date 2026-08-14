@@ -5,7 +5,7 @@
  * one fold per event — so `CorpInlineTurn` renders the identical state the
  * situation room would have. `setTask` starts every run clean.
  */
-import { initialSituation, reduceSituation } from '@pi-desktop/canvas';
+import { initialSituation, nodeElapsedMs, reduceSituation } from '@pi-desktop/canvas';
 import type {
   ChecklistItem,
   CoordinationEvent,
@@ -317,16 +317,60 @@ describe('trackChart per-node timing (STEP 1)', () => {
     timing = useCorpStore.getState().nodeTiming;
     expect(timing.a).toEqual({ startedAt: 1000 });
 
-    // A leaves working → done at t=9000 → finishedAt lands once.
+    // A leaves working → done at t=9000. The stint is BANKED (8s of real work)
+    // and the live start is cleared, so nothing keeps reading from the clock.
     now.mockReturnValue(9000);
     useCorpStore.getState().trackChart(timingChart('done', 'idle'));
     timing = useCorpStore.getState().nodeTiming;
-    expect(timing.a).toEqual({ startedAt: 1000, finishedAt: 9000 });
+    expect(timing.a).toEqual({ workedMs: 8000, startedAt: undefined, finishedAt: 9000 });
 
-    // A stays done at t=12000 → finishedAt is NOT re-stamped.
+    // A stays done at t=12000 → nothing moves.
     now.mockReturnValue(12000);
     useCorpStore.getState().trackChart(timingChart('done', 'idle'));
-    expect(useCorpStore.getState().nodeTiming.a).toEqual({ startedAt: 1000, finishedAt: 9000 });
+    expect(useCorpStore.getState().nodeTiming.a).toEqual({
+      workedMs: 8000,
+      startedAt: undefined,
+      finishedAt: 9000,
+    });
+  });
+
+  /*
+   * THE COUNTING-UP "worked" ROW.
+   *
+   * the user, on the situation room: "even more silly it shows 'waiting', and then
+   * 'worked' in the situation room, (past tense) but the timer next to it is
+   * still counting up."
+   *
+   * `waiting` is not terminal, so it never stamped anything — the node kept a
+   * live `startedAt` and `nodeElapsedMs` kept subtracting it from `now`. A corp
+   * role works in BURSTS, so the fix is to bank each stint on the way out and
+   * resume the clock only when it genuinely works again.
+   */
+  it('banks the stint when a node stops to WAIT, and resumes on the next stint', () => {
+    const now = vi.spyOn(Date, 'now');
+    useCorpStore.getState().setTask('t1');
+
+    now.mockReturnValue(1000);
+    useCorpStore.getState().trackChart(timingChart('working', 'idle'));
+
+    // Worked 4s, then went to `waiting` — banked, and the live start is gone.
+    now.mockReturnValue(5000);
+    useCorpStore.getState().trackChart(timingChart('waiting', 'idle'));
+    expect(useCorpStore.getState().nodeTiming.a).toEqual({
+      workedMs: 4000,
+      startedAt: undefined,
+      finishedAt: undefined,
+    });
+
+    // Ten minutes of waiting later, the number has NOT moved. This is the bug.
+    now.mockReturnValue(605_000);
+    useCorpStore.getState().trackChart(timingChart('waiting', 'idle'));
+    expect(nodeElapsedMs(useCorpStore.getState().nodeTiming.a, 605_000)).toBe(4000);
+
+    // Talked to again: a second stint accrues ON TOP of the first, never resets.
+    now.mockReturnValue(605_000);
+    useCorpStore.getState().trackChart(timingChart('working', 'idle'));
+    expect(nodeElapsedMs(useCorpStore.getState().nodeTiming.a, 608_000)).toBe(7000);
   });
 
   it('never stamps finishedAt for a node that reaches done without ever working', () => {

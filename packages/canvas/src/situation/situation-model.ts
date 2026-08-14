@@ -518,20 +518,36 @@ export function formatEta(eta: EtaRange | undefined): string {
  * the run, never from {@link reduceSituation}.
  */
 export interface NodeTiming {
-  /** Epoch millis a node first entered `working`. */
+  /** Epoch millis the CURRENT working stint began; absent while not working. */
   readonly startedAt?: number;
-  /** Epoch millis a `working` node left for `done`/`retired`. */
+  /** Epoch millis a node reached a terminal state (`done`/`retired`). */
   readonly finishedAt?: number;
+  /** Millis accumulated from stints that have already ENDED. */
+  readonly workedMs?: number;
 }
 
 /**
- * A node's elapsed working time in millis: LIVE (`now − startedAt`) while it is
- * still running, FROZEN (`finishedAt − startedAt`) once it finished. `undefined`
- * for a node that never started working (nothing honest to show).
+ * A node's WORKING time in millis — accumulated across stints, live only while
+ * it is actually working.
+ *
+ * A corp role does not work once and stop; it works, waits for the manager, and
+ * works again. This used to be `(finishedAt ?? now) − startedAt`, with
+ * `finishedAt` stamped ONLY on done/retired — so a role sitting in `waiting`
+ * had no finish mark and kept reading from the clock.
+ *
+ * the user, on a row that said "Engineer 1 · waiting · worked 12m 12s": "even more
+ * silly it shows 'waiting', and then 'worked' in the situation room, (past
+ * tense) but the timer next to it is still counting up." Exactly — the label was
+ * past tense because the node had stopped, and the number was live because
+ * nothing had recorded WHEN it stopped. A number that grows while an agent does
+ * nothing is not a measurement of anything.
+ *
+ * `undefined` when a node has never worked, so there is nothing to claim.
  */
 export function nodeElapsedMs(timing: NodeTiming | undefined, now: number): number | undefined {
-  if (timing?.startedAt === undefined) return undefined;
-  return Math.max(0, (timing.finishedAt ?? now) - timing.startedAt);
+  const banked = timing?.workedMs ?? 0;
+  if (timing?.startedAt === undefined) return banked > 0 ? banked : undefined;
+  return banked + Math.max(0, (timing.finishedAt ?? now) - timing.startedAt);
 }
 
 /** Compact live clock — `m:ss` (the per-subagent running timer). */

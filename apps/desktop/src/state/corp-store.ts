@@ -465,18 +465,34 @@ function stampTiming(
   let next: Record<string, NodeTiming> | null = null;
   for (const node of chart.nodes) {
     const cur = prev[node.id];
-    if (node.state === 'working' && cur?.startedAt === undefined) {
+    const working = node.state === 'working';
+    if (working && cur?.startedAt === undefined) {
+      // A new stint. `finishedAt` is cleared: a node that works again has not
+      // finished, whatever it did earlier.
       next ??= { ...prev };
-      next[node.id] = { ...cur, startedAt: Date.now() };
+      next[node.id] = { ...cur, startedAt: Date.now(), finishedAt: undefined };
       continue;
     }
-    if (
-      (node.state === 'done' || node.state === 'retired') &&
-      cur?.startedAt !== undefined &&
-      cur.finishedAt === undefined
-    ) {
+    /*
+     * LEAVING `working` BANKS THE STINT — for ANY next state, not just the
+     * terminal ones.
+     *
+     * This used to stamp `finishedAt` only on done/retired, so a role that
+     * stopped to WAIT kept no record of when it stopped and its readout carried
+     * on counting from the clock: "waiting · worked 12m 12s", growing, while the
+     * agent did nothing at all. Banking on every exit makes the number mean the
+     * one thing it should — time actually spent working.
+     */
+    if (!working && cur?.startedAt !== undefined) {
+      const banked = (cur.workedMs ?? 0) + Math.max(0, Date.now() - cur.startedAt);
       next ??= { ...prev };
-      next[node.id] = { ...cur, finishedAt: Date.now() };
+      next[node.id] = {
+        workedMs: banked,
+        startedAt: undefined,
+        ...(node.state === 'done' || node.state === 'retired'
+          ? { finishedAt: Date.now() }
+          : { finishedAt: cur.finishedAt }),
+      };
     }
   }
   return next ?? prev;
