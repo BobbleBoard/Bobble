@@ -39,6 +39,7 @@ import { modelTierForClass } from './classify/tier.js';
 import { corpToolEnabled, registerCreateHierarchyTool } from './corp/promote-tool.js';
 import { CREATE_PRODUCTION_HIERARCHY } from './corp/promotion.js';
 import { effortKnobs, isEffortLevel } from './effort/effort.js';
+import { HANDBACK_NUDGE, isChoiceHandback } from './loop/handback.js';
 import { createLoopDetector, type LoopDetector, loopDetectorConfig } from './loop/loop-detector.js';
 import { parseModelParams, smallModelWarning } from './model/model-size.js';
 import { type CallModel, callModelFromEnv } from './model-call/call-model.js';
@@ -191,6 +192,8 @@ interface HarnessRuntime {
   /** This turn handed work to a subagent, whose commands never reach
    *  `ranCommands` — so "nothing was run" cannot be concluded. */
   delegatedThisTurn: boolean;
+  /** One handback nudge per session — see the agent_end hook. */
+  nudgedHandback: boolean;
   /** Remaining REAL-verify fix steers allowed in the active verify sequence. */
   verifyFixesRemaining: number;
   /** True while inside a self-triggered verify fix sequence (so the budget isn't reset). */
@@ -397,6 +400,25 @@ const HELP = [
  * Wire the full harness onto a pi session. Returns a handle used by tests and
  * (in the app) by the code that also needs the permission controller.
  */
+/** The text of the LAST assistant message in a finished run (its final reply). */
+function lastAssistantText(messages: readonly unknown[]): string {
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    const m = messages[i] as { role?: unknown; content?: unknown };
+    if (m?.role !== 'assistant') continue;
+    const content = m.content;
+    if (typeof content === 'string') return content;
+    if (!Array.isArray(content)) return '';
+    return content
+      .filter((c): c is { type: string; text: string } => {
+        const b = c as { type?: unknown; text?: unknown };
+        return b?.type === 'text' && typeof b.text === 'string';
+      })
+      .map((c) => c.text)
+      .join('\n');
+  }
+  return '';
+}
+
 export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}): HarnessHandle {
   /*
    * FIRST, before anything registers: wrap `pi.registerTool` so every tool that
@@ -429,6 +451,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     touchedFiles: [],
     ranCommands: [],
     delegatedThisTurn: false,
+    nudgedHandback: false,
     verifyFixesRemaining: 0,
     verifyActive: false,
   };
@@ -1722,6 +1745,30 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     runtime.currentCtx = ctx;
     runtime.taskStart = null;
     publishStatus(ctx);
+    /*
+     * A TURN THAT ENDED BY ASKING WHICH OPTION TO TAKE IS A TURN THAT STOPPED.
+     *
+     * MEASURED, run 3: sixty minutes in with two hours left, the lead wrote a
+     * status summary and finished with "A) … B) … C) … Which would you prefer?"
+     * and went idle. Nobody was going to answer. The corp bumps could not help —
+     * they fire on a MESH role's turn end and the lead is the chat model, outside
+     * the mesh — so the run held a question until the clock ran out.
+     *
+     * `sendUserMessage` is documented "Always triggers a turn", and the loop
+     * detector already uses this path, so one nudge restarts it. ONCE per session:
+     * a model that asks again after being told to choose is telling us something
+     * real, and a guard that keeps overriding the same answer is worse than the
+     * stall. See handback.ts for why this is narrow — `ask_user` exists for a
+     * genuine blocker, and using the tool is exactly what separates the two.
+     */
+    if (!runtime.nudgedHandback) {
+      const finalText = lastAssistantText(event.messages);
+      if (isChoiceHandback(finalText)) {
+        runtime.nudgedHandback = true;
+        pi.appendEntry(HARNESS_LOOP_ENTRY, { action: 'steer', cause: 'handback' });
+        pi.sendUserMessage?.(HANDBACK_NUDGE);
+      }
+    }
     // THE USER OUTRANKS EVERYTHING BEHIND THEM. Naming and the reviewer both run
     // on the single llama-server slot, so while either is in flight the user's
     // next message queues behind it — MEASURED, a follow-up typed the instant a
