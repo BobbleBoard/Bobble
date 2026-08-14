@@ -419,6 +419,41 @@ function lastAssistantText(messages: readonly unknown[]): string {
   return '';
 }
 
+/**
+ * The environment a MODEL's command should run in — ours, minus the parts that
+ * only make sense for us.
+ *
+ * A pi child is launched through the Electron helper with
+ * `ELECTRON_RUN_AS_NODE=1` (see resolve-pi.ts: it is how the bundled CLI runs
+ * without a separate Node, and how the child avoids taking a dock tile). Every
+ * bash command that child runs inherits it — including commands that launch
+ * ANOTHER Electron.
+ *
+ * That is poison for exactly the thing a team is most often asked to build. An
+ * agent that runs `npm start` on the desktop app it just wrote gets an Electron
+ * whose renderer dies on startup:
+ *
+ *     Electron sandboxed_renderer.bundle.js script failed to run
+ *     TypeError: Cannot destructure property 'preloadScripts' of
+ *     'binding.startupData' as it is null.
+ *
+ * Measured twice in run 4 — both attempts died around the sixteen-minute mark
+ * while the team was building an Electron app. Whether or not that is what
+ * crashed OUR window (the role transcripts do not persist, so it is not provable
+ * from what survives), handing an agent a variable that breaks the kind of app it
+ * was asked to build is a defect on its own.
+ *
+ * Only OUR variables are stripped. The model's own environment is otherwise
+ * untouched: it needs PATH, HOME and everything else to work.
+ */
+const HOST_ONLY_ENV = ['ELECTRON_RUN_AS_NODE'] as const;
+
+export function cleanChildEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const out = { ...env };
+  for (const key of HOST_ONLY_ENV) delete out[key];
+  return out;
+}
+
 export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}): HarnessHandle {
   /*
    * FIRST, before anything registers: wrap `pi.registerTool` so every tool that
@@ -1156,7 +1191,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
    */
   pi.registerTool(
     createBashToolDefinition(process.cwd(), {
-      spawnHook: (c) => ({ ...c, cwd: liveRoot() }),
+      spawnHook: (c) => ({ ...c, cwd: liveRoot(), env: cleanChildEnv(c.env) }),
     }) as never,
   );
 

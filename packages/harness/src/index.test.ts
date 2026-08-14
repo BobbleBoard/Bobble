@@ -8,6 +8,7 @@ import type {
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   CAPABILITY_PROMPT_MARKER,
+  cleanChildEnv,
   HARNESS_CONFIG_ENTRY,
   hasAttachedFileBlock,
   type StoredEntryLike,
@@ -471,5 +472,33 @@ describe('the system prompt no longer changes mid-session', () => {
 
   it('never carries the old team section', () => {
     expect(augmentSystemPrompt('Base.', { team: true })).not.toMatch(/You lead a TEAM/);
+  });
+});
+
+/**
+ * A MODEL'S COMMAND MUST NOT INHERIT THE FLAG THAT MAKES ELECTRON RUN AS NODE.
+ *
+ * pi is launched through the Electron helper with ELECTRON_RUN_AS_NODE=1, and
+ * every bash command it runs inherits that. An agent asked to build a desktop
+ * app — the single most common shape of this benchmark — then runs `npm start`
+ * and gets a renderer that dies on startup with "Cannot destructure property
+ * 'preloadScripts' of 'binding.startupData' as it is null."
+ */
+describe('cleanChildEnv', () => {
+  it('removes the flag that only makes sense for our own child', () => {
+    const out = cleanChildEnv({ PATH: '/usr/bin', ELECTRON_RUN_AS_NODE: '1' });
+    expect(out.ELECTRON_RUN_AS_NODE).toBeUndefined();
+  });
+
+  /* The model needs a working environment — this is a scalpel, not a scrub. */
+  it('leaves everything the command actually needs', () => {
+    const out = cleanChildEnv({ PATH: '/usr/bin', HOME: '/Users/x', LANG: 'en_US.UTF-8' });
+    expect(out).toEqual({ PATH: '/usr/bin', HOME: '/Users/x', LANG: 'en_US.UTF-8' });
+  });
+
+  it('does not mutate the environment it was handed', () => {
+    const env = { ELECTRON_RUN_AS_NODE: '1' };
+    cleanChildEnv(env);
+    expect(env.ELECTRON_RUN_AS_NODE).toBe('1');
   });
 });
