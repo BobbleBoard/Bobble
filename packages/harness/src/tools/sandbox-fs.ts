@@ -40,6 +40,7 @@
  * package.
  */
 
+import { spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -147,6 +148,81 @@ export function repairDroppedRootSlash(relative: string): string | undefined {
   const first = relative.split(path.sep)[0] ?? '';
   if (!ROOT_LEVEL_DIRS.has(first)) return undefined;
   return path.resolve(path.sep + relative);
+}
+
+/**
+ * PARSE IT BEFORE IT LANDS.
+ *
+ * MEASURED, run 3. Two central files were written corrupted and nothing noticed
+ * for the rest of the run:
+ *
+ *   src/core/converter.py:456   `</parameter> </function> [END OF EDITS] {  try:`
+ *   src/ui/main_window.py:327   `self._drag_zone QVBoxLayout = QVBoxLayout(...)`
+ *
+ * The first is the model's own tool-call markup written INTO the file — its
+ * output format bleeding into content on a long generation. Both sat on disk,
+ * settled, while five agents built around them. Every structural check passed
+ * (all imports resolved, one tree, no duplicates) and the product was broken. The
+ * CEO then listed the unparseable file under "Built Components", because nothing
+ * between the write and the report had ever tried to parse it.
+ *
+ * The writer is the only agent with the context to fix it, and it is standing
+ * right there. So the check happens AT the write and the complaint goes back in
+ * the tool result — the same shape as the path refusal.
+ *
+ * GENERAL, NOT TASK-SPECIFIC: whatever parser the language already ships, and no
+ * parser is a SKIP rather than a failure — the clean/broken/could-not-check
+ * discipline learned in the project checker. A machine without python3 simply
+ * does not get the Python check.
+ */
+const SYNTAX_CHECKS: ReadonlyArray<{ ext: readonly string[]; cmd: readonly string[] }> = [
+  { ext: ['.py'], cmd: ['python3', '-m', 'py_compile'] },
+  { ext: ['.js', '.cjs', '.mjs'], cmd: ['node', '--check'] },
+];
+
+/** The parser command for this path, or undefined when none covers it. */
+export function syntaxCheckFor(file: string): readonly string[] | undefined {
+  const ext = path.extname(file).toLowerCase();
+  return SYNTAX_CHECKS.find((c) => c.ext.includes(ext))?.cmd;
+}
+
+/** How a syntax check is actually run (injected so this stays unit-testable). */
+export type RunSyntaxCheck = (
+  cmd: readonly string[],
+  target: string,
+) => { status: number | null; stderr: string };
+
+/**
+ * Parse `content` the way `file` would be parsed. Returns the refusal text, or
+ * null when it parses, when no parser covers this kind of file, or when the
+ * parser is not installed — never a false alarm from our own environment.
+ */
+export function syntaxComplaint(file: string, content: string, run: RunSyntaxCheck): string | null {
+  const cmd = syntaxCheckFor(file);
+  if (cmd === undefined) return null;
+  const tmp = path.join(os.tmpdir(), `pi-syntax-${process.pid}-${Date.now()}${path.extname(file)}`);
+  try {
+    fs.writeFileSync(tmp, content);
+    const res = run(cmd, tmp);
+    // `status === null` is the parser failing to launch — not the file's fault.
+    if (res.status === null || res.status === 0) return null;
+    const detail = res.stderr.split(tmp).join(file).trim();
+    return (
+      `Refusing this write: ${path.basename(file)} does not parse.\n\n${detail}\n\n` +
+      'Nothing was written. Fix the text and send it again — you are the only one who ' +
+      'knows what this file was meant to say. Check the END of what you sent: a long ' +
+      'file usually breaks where the generation ran out, and tool-call markup landing ' +
+      'inside the content is the usual culprit.'
+    );
+  } catch {
+    return null;
+  } finally {
+    try {
+      fs.unlinkSync(tmp);
+    } catch {
+      /* a temp file we could not remove must never fail a write */
+    }
+  }
 }
 
 /**
@@ -510,6 +586,12 @@ function fenceTool<S extends TSchema, D>(
           }
         });
         if (destructive !== null) throw new Error(destructive);
+        // ...and never let a file that does not parse reach disk (see syntaxComplaint).
+        const unparseable = syntaxComplaint(abs, cleaned, (cmd, target) => {
+          const res = spawnSync(cmd[0] ?? '', [...cmd.slice(1), target], { encoding: 'utf8' });
+          return { status: res.status, stderr: `${res.stderr ?? ''}${res.stdout ?? ''}` };
+        });
+        if (unparseable !== null) throw new Error(unparseable);
         (next as Record<string, unknown>).content = cleaned;
       }
       return base.execute(toolCallId, next, signal, onUpdate as never, ctx);

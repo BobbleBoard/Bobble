@@ -28,6 +28,8 @@ import {
   stripCodeFence,
   stripMarkdownEscapes,
   suggestWorkspaceRelative,
+  syntaxCheckFor,
+  syntaxComplaint,
 } from './sandbox-fs.js';
 
 const norm = (p: string) => path.resolve(p);
@@ -531,5 +533,65 @@ describe('suggestWorkspaceRelative', () => {
 
   it('leaves a genuine relative path alone', () => {
     expect(suggestWorkspaceRelative('src/core/x.js', ROOT)).toBe('src/core/x.js');
+  });
+});
+
+/**
+ * A FILE THAT DOES NOT PARSE MUST NOT LAND.
+ *
+ * Run 3 wrote `</parameter> </function> [END OF EDITS]` into the middle of a
+ * Python file — the model's own tool-call markup bleeding into content on a long
+ * generation — and nothing noticed for the rest of the run. Every structural
+ * check passed; the product was broken.
+ */
+describe('syntaxComplaint', () => {
+  const ok = () => ({ status: 0, stderr: '' });
+  const bad = (msg: string) => () => ({ status: 1, stderr: msg });
+
+  it('says nothing when the file parses', () => {
+    expect(syntaxComplaint('/w/a.py', 'x = 1\n', ok)).toBeNull();
+  });
+
+  /* No parser is a SKIP, not a verdict — the clean/broken/could-not-check
+   * discipline. A .md or a .toml must never be refused for being unparseable. */
+  it('says nothing for a kind of file no parser covers', () => {
+    expect(syntaxComplaint('/w/notes.md', 'not code', bad('boom'))).toBeNull();
+    expect(syntaxCheckFor('/w/notes.md')).toBeUndefined();
+  });
+
+  /* status null = the parser could not launch. Our missing python3 is not the
+   * model's fault and must never block its write. */
+  it('says nothing when the parser itself is not installed', () => {
+    expect(syntaxComplaint('/w/a.py', 'garbage(', () => ({ status: null, stderr: '' }))).toBeNull();
+  });
+
+  it('refuses a file that does not parse, and quotes the parser', () => {
+    const out = syntaxComplaint('/w/converter.py', 'def f(:\n', bad('SyntaxError: invalid syntax'));
+    expect(out).toContain('converter.py does not parse');
+    expect(out).toContain('SyntaxError: invalid syntax');
+    expect(out).toContain('Nothing was written');
+  });
+
+  /* The measured cause deserves naming: a 4B breaks where the generation ran out. */
+  it('points at the end of the file, where a long generation breaks', () => {
+    const out = syntaxComplaint('/w/a.py', 'x', bad('bad'));
+    expect(out).toMatch(/Check the END of what you sent/);
+    expect(out).toMatch(/tool-call markup/);
+  });
+
+  it('rewrites the temp path back to the real filename', () => {
+    let target = '';
+    const out = syntaxComplaint('/w/real.py', 'x', (_c, t) => {
+      target = t;
+      return { status: 1, stderr: `File "${t}", line 3` };
+    });
+    expect(out).toContain('File "/w/real.py", line 3');
+    expect(out).not.toContain(target);
+  });
+
+  it('covers the languages whose parsers are already on the machine', () => {
+    expect(syntaxCheckFor('/w/a.py')).toEqual(['python3', '-m', 'py_compile']);
+    expect(syntaxCheckFor('/w/a.js')).toEqual(['node', '--check']);
+    expect(syntaxCheckFor('/w/a.mjs')).toEqual(['node', '--check']);
   });
 });
