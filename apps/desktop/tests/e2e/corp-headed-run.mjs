@@ -395,7 +395,9 @@ try {
     await shoot('a-overview');
 
     // Expand a collapsed tool call — the row whose contents the logs cannot show.
-    const chains = await page.$$('.pd-chain-summary, .pd-chain-header, [data-testid="chain-summary"]');
+    const chains = await page.$$(
+      '.pd-chain-summary, .pd-chain-header, [data-testid="chain-summary"]',
+    );
     const chain = chains[Math.min(round, chains.length - 1)] ?? chains[0];
     if (chain !== undefined) {
       await chain.click({ timeout: 3000 }).catch(() => {});
@@ -417,10 +419,46 @@ try {
     }
   };
 
+  /*
+   * WHY THE RENDERER DIED, captured at the moment it dies.
+   *
+   * Run 4 ended at t+2 with Playwright's bare `Page crashed` and nothing else —
+   * no .ips report, no stack, no numbers. A repeat would have been just as
+   * opaque, so take the two measurements that are only available while the page
+   * is alive: how much the renderer was holding, and how much was on screen. A
+   * corp run's DOM grows with every worker-activity block, so the block count is
+   * the first number worth having.
+   */
+  let crashNote = null;
+  page.on('crash', () => {
+    crashNote = 'renderer crashed (no further detail available after the fact)';
+    log('RENDERER CRASHED');
+  });
+  page.on('console', (m) => {
+    if (m.type() === 'error') log(`console.error: ${m.text().slice(0, 300)}`);
+  });
+  const vitals = async () => {
+    try {
+      return await page.evaluate(() => ({
+        nodes: document.getElementsByTagName('*').length,
+        msgs: document.querySelectorAll('.pd-msg').length,
+        heap: Math.round((performance.memory?.usedJSHeapSize ?? 0) / 1e6),
+      }));
+    } catch {
+      return null;
+    }
+  };
+
   const deadline = Date.now() + MINUTES * 60_000;
   let n = 0;
   while (Date.now() < deadline) {
     await page.waitForTimeout(SHOT_MS);
+    const v = await vitals();
+    if (v !== null) log(`vitals · dom ${v.nodes} nodes · ${v.msgs} msgs · heap ${v.heap}MB`);
+    if (crashNote !== null) {
+      log(crashNote);
+      break;
+    }
     n += 1;
     const shot = path.join(OUT, `t${String(n).padStart(3, '0')}.png`);
     try {
