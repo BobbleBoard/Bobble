@@ -92,7 +92,7 @@ const log = createLogger('desktop:corp');
 
 /** The ONLY string that means the project is fine. Everything else is a failure,
  * however it is worded — see the note in the bump. */
-const CLEAN_LOAD = 'It loaded with NO errors.';
+export const CLEAN_LOAD = 'It loaded with NO errors.';
 /**
  * There is no runtime we know how to check for this project.
  *
@@ -1676,9 +1676,40 @@ export function createMeshAgentHost(config: MeshAgentHostConfig): MeshAgentHost 
                     finalChecked.add(agentId);
                     const claims = extractClaims(finalText);
                     if (claims.length === 0 && finalText.trim() === '') {
-                      log.info('corp bump: loads clean but nothing was said', { agentId });
+                      /*
+                       * DO NOT CLAIM A CHECK THAT DID NOT RUN.
+                       *
+                       * `broken` is `!CLEAN_LOAD && !uncheckable`, so control
+                       * reaches here in TWO states, and this message asserted the
+                       * happier one for both. runtimeCheck is Godot-only (`if
+                       * (runtime !== 'godot') return NO_CHECK`), so for every
+                       * other kind of project it returns "no automatic check
+                       * exists" — and the manager was then told, verbatim, "The
+                       * project LOADS CLEANLY — I checked."
+                       *
+                       * MEASURED, the CloudConvert run: an Electron app whose
+                       * `main.js` destructures a non-existent `dnd` export from
+                       * `electron` and calls it at module scope. It throws before
+                       * a window opens. Nothing had checked anything, and the
+                       * harness said it had.
+                       *
+                       * The file already argues this exact point one branch up —
+                       * "THREE STATES, NOT TWO. 'Could not check' is not a
+                       * verdict" — and then the success path collapsed it back to
+                       * two. A harness that laundered an unknown into a pass is
+                       * worse than one that never checked: it is the false
+                       * completion this project keeps having to dig out, coming
+                       * from the one component that is supposed to be immune.
+                       */
+                      const verified = state.startsWith(CLEAN_LOAD);
+                      log.info('corp bump: nothing was said', { agentId, verified });
                       return (
-                        'The project LOADS CLEANLY — I checked. You never replied, though. ' +
+                        (verified
+                          ? 'The project LOADS CLEANLY — I checked. '
+                          : 'I could NOT check this project automatically — there is no runtime ' +
+                            'check for this kind of project, so nobody has verified it loads. ' +
+                            'Run it yourself the way a user would before you say it works. ') +
+                        'You never replied, though. ' +
                         'Do not build anything more. `present` it so the user actually gets it ' +
                         'in front of them, look at the preview that comes back, and then say ' +
                         'what exists and what it does.'

@@ -19,10 +19,11 @@ import {
   WAIT_TOOL,
 } from '@pi-desktop/harness/corp';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { roleActiveTools, unusablePathRefusal, unusableWritePath } from './role-agent';
 import {
+  CLEAN_LOAD,
   communicationTools,
   DEFAULT_STEPS_PER_MESSAGE,
+  dispatchesTo,
   emptyProjectComplaint,
   excerptFailures,
   hasProduct,
@@ -30,15 +31,15 @@ import {
   isUncheckable,
   listProject,
   MESH_ENTRY,
-  managerOf,
-  dispatchesTo,
   type MeshDispatcher,
+  managerOf,
   orphanReport,
   PASSTHROUGH_KEYS,
   runtimeCheck,
   taskNote,
   testSuiteReport,
 } from './mesh-host';
+import { roleActiveTools, unusablePathRefusal, unusableWritePath } from './role-agent';
 
 describe('what a run hands through to its host', () => {
   it('carries every passthrough setting that was supplied', () => {
@@ -189,6 +190,37 @@ describe('only one sentence means success', () => {
     expect(isBroken('It reported no errors — because there is NOTHING TO LOAD.')).toBe(true);
     expect(isBroken(clean)).toBe(false);
     expect(isBroken(`${clean}\nNOTE: I removed your [input] section.`)).toBe(false);
+  });
+});
+
+describe('an unchecked project is never reported as checked', () => {
+  /*
+   * THE INVERSE OF THE BUG ABOVE, and it shipped for longer.
+   *
+   * `broken` is `!CLEAN_LOAD && !isUncheckable(state)`, so the success path is
+   * reached in TWO states — genuinely clean, and never checked at all. It
+   * asserted the first for both: "The project LOADS CLEANLY — I checked."
+   *
+   * runtimeCheck is Godot-only, so EVERY other kind of project lands in the
+   * second state. Measured on the CloudConvert run: an Electron app whose
+   * main.js throws at module scope on a non-existent import, and the harness
+   * told the manager it had checked that it loads.
+   */
+  const verifiedWording = (state: string): boolean => state.startsWith(CLEAN_LOAD);
+
+  it('separates "it loaded" from "there was no way to check"', () => {
+    expect(verifiedWording(CLEAN_LOAD)).toBe(true);
+    expect(verifiedWording('(no automatic check exists for this kind of project.)')).toBe(false);
+  });
+
+  /* Both are `!broken`, which is exactly why the wording had to stop keying off
+   * `broken` and start keying off the state itself. */
+  it('agrees with the broken gate that neither state is a failure', () => {
+    const isBroken = (state: string): boolean =>
+      !state.startsWith(CLEAN_LOAD) && !isUncheckable(state);
+    expect(isBroken(CLEAN_LOAD)).toBe(false);
+    expect(isBroken('(no automatic check exists for this kind of project.)')).toBe(false);
+    expect(isBroken('3 problem(s):\nERROR: x')).toBe(true);
   });
 });
 
@@ -600,34 +632,54 @@ describe('wait — the manager delegates a round, then stands by', () => {
     /* The whole point: a blocking hand-off means engineer:2 can never start, so
      * there is no round to wait on. */
     let dispatched = '';
-    const tools = communicationTools(mgr, async () => 'SHOULD NOT BE USED', undefined, undefined, stub({
-      dispatch: (_f, to) => {
-        dispatched = to;
-        return `Handed to ${to}, who is working on it now.`;
-      },
-    }));
-    const out = text(await call(tools, 'talk_to')('c1', { recipient: 'engineer:1', message: 'build' }));
+    const tools = communicationTools(
+      mgr,
+      async () => 'SHOULD NOT BE USED',
+      undefined,
+      undefined,
+      stub({
+        dispatch: (_f, to) => {
+          dispatched = to;
+          return `Handed to ${to}, who is working on it now.`;
+        },
+      }),
+    );
+    const out = text(
+      await call(tools, 'talk_to')('c1', { recipient: 'engineer:1', message: 'build' }),
+    );
     expect(dispatched).toBe('engineer:1');
     expect(out).toContain('working on it now');
     expect(out).not.toContain('SHOULD NOT BE USED');
   });
 
   it('a report UPWARD still waits — the answer is why it was asked', async () => {
-    const tools = communicationTools(mgr, async () => 'the CEO says go ahead', undefined, undefined, stub({
-      dispatch: () => 'WRONG — should not dispatch upward',
-    }));
+    const tools = communicationTools(
+      mgr,
+      async () => 'the CEO says go ahead',
+      undefined,
+      undefined,
+      stub({
+        dispatch: () => 'WRONG — should not dispatch upward',
+      }),
+    );
     const out = text(await call(tools, 'talk_to')('c1', { recipient: 'ceo', message: 'done?' }));
     expect(out).toBe('the CEO says go ahead');
   });
 
   it('reports who came back, and who is still going', async () => {
-    const tools = communicationTools(mgr, async () => '', undefined, new HandLedger(), stub({
-      waitOn: async () => ({
-        kind: 'finished',
-        finished: [{ to: 'engineer:1', reply: 'movement built' }],
-        stillRunning: ['engineer:2'],
+    const tools = communicationTools(
+      mgr,
+      async () => '',
+      undefined,
+      new HandLedger(),
+      stub({
+        waitOn: async () => ({
+          kind: 'finished',
+          finished: [{ to: 'engineer:1', reply: 'movement built' }],
+          stillRunning: ['engineer:2'],
+        }),
       }),
-    }));
+    );
     const out = text(await call(tools, WAIT_TOOL)('c1', {}));
     expect(out).toContain('engineer:1 came back');
     expect(out).toContain('movement built');
@@ -635,13 +687,19 @@ describe('wait — the manager delegates a round, then stands by', () => {
   });
 
   it('says plainly when the round is over, so the manager moves on to testing', async () => {
-    const tools = communicationTools(mgr, async () => '', undefined, new HandLedger(), stub({
-      waitOn: async () => ({
-        kind: 'finished',
-        finished: [{ to: 'engineer:1', reply: 'done' }],
-        stillRunning: [],
+    const tools = communicationTools(
+      mgr,
+      async () => '',
+      undefined,
+      new HandLedger(),
+      stub({
+        waitOn: async () => ({
+          kind: 'finished',
+          finished: [{ to: 'engineer:1', reply: 'done' }],
+          stillRunning: [],
+        }),
       }),
-    }));
+    );
     expect(text(await call(tools, WAIT_TOOL)('c1', {}))).toContain('That was everyone');
   });
 
@@ -659,9 +717,15 @@ describe('wait — the manager delegates a round, then stands by', () => {
       reason: 'not_working',
       message: 'three.js will not load offline',
     });
-    const tools = communicationTools(mgr, async () => '', undefined, hands, stub({
-      waitOn: async () => ({ kind: 'nudged', finished: [], stillRunning: ['engineer:2'] }),
-    }));
+    const tools = communicationTools(
+      mgr,
+      async () => '',
+      undefined,
+      hands,
+      stub({
+        waitOn: async () => ({ kind: 'nudged', finished: [], stillRunning: ['engineer:2'] }),
+      }),
+    );
     const out = text(await call(tools, WAIT_TOOL)('c1', {}));
     expect(out).toContain('additional info, engineer:2 is stopped');
     expect(out).toContain('three.js will not load offline');
@@ -669,7 +733,8 @@ describe('wait — the manager delegates a round, then stands by', () => {
 });
 
 describe('dispatchesTo — which hand-offs run in parallel', () => {
-  const a = (id: string, role: string) => ({ id, role, systemPrompt: '', peers: [], tools: [] }) as MeshAgent;
+  const a = (id: string, role: string) =>
+    ({ id, role, systemPrompt: '', peers: [], tools: [] }) as MeshAgent;
 
   it('parallelises work handed DOWN to engineers', () => {
     expect(dispatchesTo(a('manager', 'manager'), 'engineer:1')).toBe(true);
@@ -720,9 +785,9 @@ describe('the custom communication tools survive the active-set narrowing', () =
   it('does not duplicate a name that is in both lists', () => {
     const active = roleActiveTools(['read', 'talk_to', 'talk_to']);
     expect(active.filter((n) => n === 'talk_to')).toHaveLength(2); // caller dedupes; pass-through is honest
-    expect(roleActiveTools(['read', 'tool_search']).filter((n) => n === 'tool_search')).toHaveLength(
-      1,
-    );
+    expect(
+      roleActiveTools(['read', 'tool_search']).filter((n) => n === 'tool_search'),
+    ).toHaveLength(1);
   });
 });
 
