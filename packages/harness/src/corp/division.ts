@@ -119,3 +119,31 @@ export function divisionBriefing(division: Division, contract: string): string {
     section('YOUR CONTRACT', contract)
   );
 }
+
+/**
+ * WHAT APPEARED SINCE THIS AGENT LAST LOOKED.
+ *
+ * The orientation block fires once, on first contact, because that message is the
+ * KV prefix and a whole listing re-sent every turn would churn the cache. Run 2
+ * showed, while it was running, that once is not enough: everyone commissioned in
+ * the opening minutes is briefed against a nearly-empty tree and never shown it
+ * again. Run 1's duplicate came from an engineer commissioned an HOUR in.
+ *
+ * So later messages carry only the difference, appended — the prefix survives, and
+ * the one fact that prevents a duplicate arrives on the turn it is needed rather
+ * than an hour before it exists.
+ *
+ * NO PROSE. An engineer that sees `src/utils/format/image-formats.ts` listed while
+ * it is about to write `src/renderer/utils/format/formats.ts` does not need the
+ * situation explained to it. Capped, because a delta longer than the contract is
+ * a delta nobody reads.
+ */
+export function treeDelta(before: string | undefined, now: string, cap = 20): string {
+  if (before === undefined) return '';
+  const had = new Set(before.split('\n').filter((l) => l.trim() !== ''));
+  const fresh = now.split('\n').filter((l) => l.trim() !== '' && !had.has(l));
+  if (fresh.length === 0) return '';
+  const shown = fresh.slice(0, cap);
+  const more = fresh.length > cap ? ` (+${fresh.length - cap} more)` : '';
+  return `\n\nAPPEARED SINCE YOU LAST WORKED — other people wrote these${more}:\n${shown.join('\n')}`;
+}

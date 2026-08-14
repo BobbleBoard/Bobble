@@ -60,6 +60,7 @@ import {
   type TalkFn,
   TEST_TOOL_KIT_NAMES,
   toolsForKits,
+  treeDelta,
   type VerificationProfile,
   verificationBriefing,
   WAIT_TOOL,
@@ -1335,6 +1336,8 @@ export function createMeshAgentHost(config: MeshAgentHostConfig): MeshAgentHost 
   /** The run-level profile, as a ref so the host can be built before it is known. */
   /** Agents that have already had the orientation block — first contact only. */
   const briefed = new Set<string>();
+  /** The tree each agent was last shown, so a later message can carry the delta. */
+  const seenTree = new Map<string, string>();
   const taskProfileRef: { value: VerificationProfile } = {
     value: classifyVerification(config.task ?? ''),
   };
@@ -1373,16 +1376,28 @@ export function createMeshAgentHost(config: MeshAgentHostConfig): MeshAgentHost 
      * manager, and the manager is the 4B that wrote a build log contradicting
      * itself in a single line. A file listing cannot be wrong.
      *
-     * FIRST MESSAGE ONLY. It is the KV prefix; re-sending it every turn would
-     * churn the cache for a listing that is mostly unchanged, and the practice
-     * block is a habit, not a reminder. Later messages stay bare.
+     * THE FULL BLOCK ONCE, THEN ONLY WHAT CHANGED. The first message is the KV
+     * prefix, so re-sending a whole listing every turn would churn the cache; but
+     * first-contact-only was not enough either, and run 2 showed why while it was
+     * running. Everyone commissioned in the opening minutes is briefed against a
+     * nearly-empty tree — a listing that tells them nothing — and never sees the
+     * tree again. Run 1's duplicate came from an engineer commissioned an HOUR in;
+     * a first-contact briefing would still have missed it.
+     *
+     * So later messages carry a DELTA: the paths that appeared since this agent
+     * last heard from us. Append-only, so the cached prefix survives, and it is
+     * the trick `taskNote` already uses on the manager — put the fact in front of
+     * them rather than hoping they go looking. No prose: an engineer that sees a
+     * path next to the one it was about to create does not need it explained.
      */
     const firstContact = !briefed.has(agentId);
     if (firstContact) briefed.add(agentId);
+    const treeNow = listProject(config.cwd);
     const body =
       firstContact && agent.role !== 'manager'
-        ? divisionBriefing({ overview: listProject(config.cwd) || 'Nothing yet.' }, message)
-        : message;
+        ? divisionBriefing({ overview: treeNow || 'Nothing yet.' }, message)
+        : `${message}${treeDelta(seenTree.get(agentId), treeNow)}`;
+    seenTree.set(agentId, treeNow);
     const incoming =
       agent.role === 'manager'
         ? `Message from ${from}:\n${body}\n\n${taskNote(config.task)}`

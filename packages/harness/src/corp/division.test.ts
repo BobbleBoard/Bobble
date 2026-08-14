@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DIVISION_PRACTICE, type Division, divisionBriefing } from './division.js';
+import { DIVISION_PRACTICE, type Division, divisionBriefing, treeDelta } from './division.js';
 
 const UI: Division = {
   name: 'UI',
@@ -199,5 +199,40 @@ describe('the shape mesh-host relies on', () => {
   it('renders an empty workspace as "Nothing yet." rather than a gap', () => {
     const out = divisionBriefing({ overview: 'Nothing yet.' }, contract);
     expect(out).toContain('WHAT ALREADY EXISTS HERE\nNothing yet.');
+  });
+});
+
+describe('treeDelta', () => {
+  const before = 'src/main.ts\nsrc/utils/format/image-formats.ts';
+
+  it('says nothing on first contact, where the full briefing already ran', () => {
+    expect(treeDelta(undefined, `${before}\nsrc/new.ts`)).toBe('');
+  });
+
+  it('says nothing when the tree has not moved — silence is the common case', () => {
+    expect(treeDelta(before, before)).toBe('');
+  });
+
+  /* The whole mechanism: the path that would have prevented the duplicate,
+   * arriving on the turn it is needed. */
+  it('names exactly what appeared, and attributes it to other people', () => {
+    const out = treeDelta(before, `${before}\nsrc/renderer/utils/format/formats.ts`);
+    expect(out).toContain('APPEARED SINCE YOU LAST WORKED');
+    expect(out).toContain('other people wrote these');
+    expect(out).toContain('src/renderer/utils/format/formats.ts');
+    /* Only the new one — repeating what it already saw is what the cap exists for. */
+    expect(out).not.toContain('src/main.ts');
+  });
+
+  it('ignores files that disappeared — this answers "what is new", not "what changed"', () => {
+    expect(treeDelta(before, 'src/main.ts')).toBe('');
+  });
+
+  /* A delta longer than the contract is a delta nobody reads. */
+  it('caps the list and says how many it held back', () => {
+    const many = Array.from({ length: 30 }, (_, i) => `src/f${i}.ts`).join('\n');
+    const out = treeDelta('src/main.ts', `src/main.ts\n${many}`, 5);
+    expect(out.split('\n').filter((l) => l.startsWith('src/f'))).toHaveLength(5);
+    expect(out).toContain('(+25 more)');
   });
 });
