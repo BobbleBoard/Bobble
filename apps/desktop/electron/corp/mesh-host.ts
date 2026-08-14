@@ -35,6 +35,7 @@ import {
   COMMISSION_SPECIALIST_TOOL,
   classifyVerification,
   DELEGATION_ACTIVATED,
+  divisionBriefing,
   extractClaims,
   finalCheck,
   HAND_REASONS,
@@ -1332,6 +1333,8 @@ export function createMeshAgentHost(config: MeshAgentHostConfig): MeshAgentHost 
    * agent's turn and is read during another's. */
   const raisedHands = new HandLedger();
   /** The run-level profile, as a ref so the host can be built before it is known. */
+  /** Agents that have already had the orientation block — first contact only. */
+  const briefed = new Set<string>();
   const taskProfileRef: { value: VerificationProfile } = {
     value: classifyVerification(config.task ?? ''),
   };
@@ -1353,10 +1356,37 @@ export function createMeshAgentHost(config: MeshAgentHostConfig): MeshAgentHost 
     // gets the CURRENT verdict stapled to every message it receives. It is the
     // same lesson as L17 one level up: a check the model must decide to run is a
     // check that does not get run, so put the answer in front of it instead.
+    /*
+     * ORIENTATION, ONCE, ON THE WAY IN.
+     *
+     * A role's first message is its contract, and until now that was ALL it was.
+     * Measured consequence: an engineer commissioned an hour into a run had no
+     * idea what the other four had built, so it wrote `src/core/conversers/` beside
+     * the `src/core/converters/` somebody else had finished 45 minutes earlier —
+     * a different implementation, not a copy. 37 of 53 files ended up on paths
+     * nothing referenced. Each agent was coherent; none of them was oriented.
+     *
+     * So the first thing a new colleague reads is the same thing a new colleague
+     * would be told: a team is already here, this is what is in the tree, this is
+     * how not to trample it — and then the contract. The overview is `listProject`
+     * rather than prose because the only agent that could narrate it is the
+     * manager, and the manager is the 4B that wrote a build log contradicting
+     * itself in a single line. A file listing cannot be wrong.
+     *
+     * FIRST MESSAGE ONLY. It is the KV prefix; re-sending it every turn would
+     * churn the cache for a listing that is mostly unchanged, and the practice
+     * block is a habit, not a reminder. Later messages stay bare.
+     */
+    const firstContact = !briefed.has(agentId);
+    if (firstContact) briefed.add(agentId);
+    const body =
+      firstContact && agent.role !== 'manager'
+        ? divisionBriefing({ overview: listProject(config.cwd) || 'Nothing yet.' }, message)
+        : message;
     const incoming =
       agent.role === 'manager'
-        ? `Message from ${from}:\n${message}\n\n${taskNote(config.task)}`
-        : `Message from ${from}:\n${message}`;
+        ? `Message from ${from}:\n${body}\n\n${taskNote(config.task)}`
+        : `Message from ${from}:\n${body}`;
     let reply = '';
     /** Tool calls this turn — what tells a spent step budget apart from silence. */
     let toolCallCount = 0;

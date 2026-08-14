@@ -24,6 +24,7 @@ export * from './corp-mesh.js';
 export * from './dag.js';
 export * from './delivery.js';
 export * from './dispatch.js';
+export * from './division.js';
 export * from './engineer.js';
 export * from './escalate.js';
 export * from './integrate.js';

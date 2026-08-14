@@ -34,12 +34,21 @@
  *    line. A clause a 4B has to unpick is a clause it will skip.
  */
 
-/** A named area of the work. The manager creates these and assigns people to them. */
+/**
+ * A named area of the work. The manager creates these and assigns people to them.
+ *
+ * `name`/`responsibility` are OPTIONAL together, and that is deliberate: the
+ * manager already names the area in the first line of its contract ("CONTRACT:
+ * React + Tailwind CSS UI Framework"), so requiring a structured field would mean
+ * threading one through the whole mesh to restate what the prose says. When they
+ * are absent the block still does its real job — you are not alone, here is what
+ * exists, here is how not to trample it.
+ */
 export interface Division {
   /** Short name, as the team refers to it — "UI", "conversion engine". */
-  readonly name: string;
-  /** One line: what this division is responsible for. */
-  readonly responsibility: string;
+  readonly name?: string;
+  /** One line: what this division is responsible for. Pairs with `name`. */
+  readonly responsibility?: string;
   /**
    * What already exists here, WITH PATHS. Required, and required for a reason:
    * this is the field that prevents the duplicate, so an assignment must not be
@@ -97,9 +106,12 @@ function section(heading: string, body: string | undefined): string {
  * the tree, which is the single fact whose absence produced the duplicates.
  */
 export function divisionBriefing(division: Division, contract: string): string {
+  const assigned =
+    division.name !== undefined && division.responsibility !== undefined
+      ? ` You are assigned to the ${division.name} division, which is responsible for ${division.responsibility}.`
+      : ' Other people are working in this tree at the same time as you.';
   return (
-    `A team is working in this project. You are assigned to the ${division.name} division, ` +
-    `which is responsible for ${division.responsibility}.` +
+    `A team is working in this project.${assigned}` +
     section('WHAT ALREADY EXISTS HERE', division.overview) +
     section('STILL TO DO IN THIS DIVISION', division.todo) +
     checklistBlock(division.checklist) +

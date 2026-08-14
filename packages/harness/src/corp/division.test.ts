@@ -143,3 +143,61 @@ describe('DIVISION_PRACTICE', () => {
     for (const line of lines) expect(line.split(/\s+/).length, line).toBeLessThan(45);
   });
 });
+
+/*
+ * NO DIVISION NAMED — the common case at first, because the manager names the
+ * area in its contract prose rather than in a structured field. The block must
+ * still deliver its real payload: you are not alone, here is what exists, here is
+ * how not to trample it.
+ */
+describe('divisionBriefing without a named division', () => {
+  const anon = { overview: 'main.js and a renderer folder exist at the top level.' };
+
+  it('still warns that other people are in the tree', () => {
+    const out = divisionBriefing(anon, 'Wire the entry point.');
+    expect(out).toMatch(/A team is working in this project/);
+    expect(out).toMatch(/Other people are working in this tree at the same time as you/);
+    expect(out).not.toContain('undefined');
+  });
+
+  it('still carries the tree, the practice and the contract, in that order', () => {
+    const out = divisionBriefing(anon, 'Wire the entry point.');
+    expect(out).toContain('main.js and a renderer folder exist');
+    expect(out.indexOf('WHAT ALREADY EXISTS HERE')).toBeLessThan(out.indexOf(DIVISION_PRACTICE));
+    expect(out.indexOf(DIVISION_PRACTICE)).toBeLessThan(out.indexOf('YOUR CONTRACT'));
+  });
+});
+
+/*
+ * THE WIRING CONTRACT, asserted here because the host that does it is Electron
+ * code the unit suite cannot import.
+ *
+ * mesh-host.ts builds every role's incoming message. On FIRST contact with a
+ * non-manager it wraps the contract in divisionBriefing with `listProject(cwd)`
+ * as the overview; every later message stays bare, because the first message is
+ * the KV prefix and a listing that barely changes is not worth re-prefilling.
+ *
+ * What matters and is easy to lose in a refactor: the contract must survive the
+ * wrapping intact, and the tree must arrive with it.
+ */
+describe('the shape mesh-host relies on', () => {
+  const contract = 'CONTRACT: React + Tailwind UI Framework\n\nFILES YOU OWN:\n- ui/framework/';
+
+  it('wraps a real contract without altering a character of it', () => {
+    const out = divisionBriefing({ overview: 'main.js\nrenderer/index.html' }, contract);
+    expect(out).toContain(contract);
+  });
+
+  it('carries the tree listing the host passes in', () => {
+    const out = divisionBriefing({ overview: 'main.js\nrenderer/index.html' }, contract);
+    expect(out).toContain('main.js');
+    expect(out).toContain('renderer/index.html');
+  });
+
+  /* An empty workspace is the first engineer's normal case — it must read as a
+   * fact, not as a missing section. */
+  it('renders an empty workspace as "Nothing yet." rather than a gap', () => {
+    const out = divisionBriefing({ overview: 'Nothing yet.' }, contract);
+    expect(out).toContain('WHAT ALREADY EXISTS HERE\nNothing yet.');
+  });
+});
