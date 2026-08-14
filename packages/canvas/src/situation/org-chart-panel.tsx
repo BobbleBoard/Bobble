@@ -274,7 +274,7 @@ export function SituationOrgChart({
     const liveIds = new Set(chart.nodes.map((n) => n.id));
     const next = new Map<string, { x: number; y: number }>();
     for (const [id, el] of cardRefs.current) {
-      if (!el || !el.isConnected || !liveIds.has(id)) continue;
+      if (!el?.isConnected || !liveIds.has(id)) continue;
       next.set(id, offsetWithin(el, container));
     }
     const reduced =

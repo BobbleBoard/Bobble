@@ -69,6 +69,7 @@ import { checkScaryBash } from '@pi-desktop/harness/permissions';
 // search the full registered corpus and activate what it needs mid-run.
 import { registerToolSearch } from '@pi-desktop/harness/tool-search';
 import { wouldHang } from '@pi-desktop/harness/tools/hang-guard';
+import { compactionSettingsFor } from './compaction-settings';
 import { shellWrites } from './shell-writes';
 
 // ---------------------------------------------------------------------------
@@ -1625,7 +1626,19 @@ export async function openRoleSession(
   const { createAgentSession, DefaultResourceLoader, SessionManager, SettingsManager } =
     await loadPi();
 
-  const settings = SettingsManager.inMemory();
+  /*
+   * COMPACTION SIZED TO THIS ROLE'S ACTUAL WINDOW.
+   *
+   * This was a bare `SettingsManager.inMemory()`, which means every role has
+   * always run pi's DEFAULTS — reserve 16384 / keepRecent 20000. Those are fine
+   * on the 200k cloud window they were written for and actively harmful on ours;
+   * see compaction-settings.ts for the measured dead band and why it costs a
+   * full re-prefill every time it fires. Seed the settings instead of accepting
+   * whatever pi ships.
+   */
+  const settings = SettingsManager.inMemory({
+    compaction: compactionSettingsFor(handle.model.contextWindow),
+  });
   const loader = new DefaultResourceLoader({
     cwd: config.cwd,
     agentDir,

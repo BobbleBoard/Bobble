@@ -516,9 +516,10 @@ export function guardDestructiveRewrite(
       `Refusing this write: ${path.basename(absPath)} currently defines ` +
       `${lost.map((d) => `\`${d}\``).join(', ')}, and the version you are writing does not. ` +
       'Dropping a definition you were not asked to remove is almost always a rewrite that ran ' +
-      'out partway — and the file on disk is the only copy. Use `edit` to change the parts you ' +
-      'mean to change; if you really are replacing the file, include every definition you intend ' +
-      'to keep.'
+      `out partway. NOTHING WAS WRITTEN — ${path.basename(absPath)} on disk is UNCHANGED and ` +
+      'intact, exactly as it was before this call. Read it if you want to see it. Use `edit` to ' +
+      'change the parts you mean to change; if you really are replacing the file, include every ' +
+      'definition you intend to keep.'
     );
   }
 
@@ -526,8 +527,9 @@ export function guardDestructiveRewrite(
   return (
     `Refusing this write: it would cut ${path.basename(absPath)} from ${beforeLines} lines to ` +
     `${afterLines}, deleting most of what is there. That is almost always a rewrite that ran ` +
-    'out partway rather than a deliberate deletion — and the file on disk is the only copy. ' +
-    'If you meant to change part of it, use `edit`, which touches only the lines you name. ' +
+    `out partway rather than a deliberate deletion. NOTHING WAS WRITTEN — ${path.basename(absPath)} ` +
+    'on disk is UNCHANGED and intact, exactly as it was before this call. Read it if you want to ' +
+    'see it. If you meant to change part of it, use `edit`, which touches only the lines you name. ' +
     'If you really do mean to replace the whole file, write the COMPLETE new contents in one ' +
     'go, including every function you intend to keep.'
   );
@@ -643,10 +645,37 @@ function fenceTool<S extends TSchema, D>(
         if (unparseable !== null) throw new Error(unparseable);
         (next as Record<string, unknown>).content = cleaned;
       }
-      return base.execute(toolCallId, next, signal, onUpdate as never, ctx);
+      const result = await base.execute(toolCallId, next, signal, onUpdate as never, ctx);
+      if (base.name !== 'read') return result;
+      const r = result as unknown as Record<string, unknown>;
+      return { ...r, content: withReadPathHeader(abs, r.content) } as typeof result;
     },
   };
   return wrapped;
+}
+
+/**
+ * Stamp a `read` result with the absolute path it came from.
+ *
+ * `write` and `edit` already name their target — "Successfully wrote N bytes to
+ * <abs>", "Successfully replaced N block(s) in <abs>" — and those paths are
+ * absolute precisely because we hand pi an already-resolved one (see the
+ * `next` construction in the wrapper). `read` alone returns the file body and
+ * nothing else, so a role that reads five files accumulates five unlabelled
+ * blobs and has to infer which is which from the content. That inference is the
+ * same class of bug as every other "the harness left it implicit" failure in
+ * this file — and it is one line to remove.
+ *
+ * Also load-bearing for compaction: a stamped blob is provably recoverable from
+ * disk, which is what makes it safe to evict first.
+ */
+export function withReadPathHeader(abs: string, content: unknown): unknown {
+  if (!Array.isArray(content)) return content;
+  const parts = content as Array<Record<string, unknown>>;
+  const i = parts.findIndex((p) => p?.type === 'text' && typeof p.text === 'string');
+  // An image read has no text part to prefix — give it its own.
+  if (i === -1) return [{ type: 'text', text: abs }, ...parts];
+  return parts.map((p, n) => (n === i ? { ...p, text: `${abs}\n${String(p.text)}` } : p));
 }
 
 export interface SandboxFsOptions {

@@ -20,7 +20,7 @@
  * OPT-IN — spawns a real server and loads ~10GB:
  *   PI_INFERENCE_INTEGRATION=1 npx vitest run src/qwen9b.integration.test.ts
  */
-import { readFileSync, existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';

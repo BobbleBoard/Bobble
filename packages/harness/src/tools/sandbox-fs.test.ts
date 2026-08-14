@@ -30,6 +30,7 @@ import {
   suggestWorkspaceRelative,
   syntaxCheckFor,
   syntaxComplaint,
+  withReadPathHeader,
 } from './sandbox-fs.js';
 
 const norm = (p: string) => path.resolve(p);
@@ -359,6 +360,24 @@ describe('guardDestructiveRewrite — a rewrite that ran out partway', () => {
     expect(out).toContain('`edit`');
   });
 
+  /*
+   * IT MUST SAY THE FILE IS UNTOUCHED — measured live, run 5.
+   *
+   * The refusal used to warn that "the file on disk is the only copy" and never
+   * state that nothing had been written. The CEO read a run of these refusals and
+   * concluded: "The file is corrupted - it has multiple issues from the failed
+   * writes. I need to completely rewrite it from scratch." The file on disk
+   * compiled cleanly the whole time. A guard that protects a file while
+   * convincing the model it destroyed it has done net harm — `syntaxComplaint`
+   * already said "Nothing was written", and this had to as well.
+   */
+  it('states outright that the file on disk is unchanged', () => {
+    const out = guardDestructiveRewrite('/w/app.py', 'line 0\nline 1\nline 2', read(big)) ?? '';
+    expect(out).toContain('NOTHING WAS WRITTEN');
+    expect(out).toMatch(/UNCHANGED/);
+    expect(out).not.toContain('the only copy');
+  });
+
   it('allows a new file — there is nothing to lose', () => {
     expect(guardDestructiveRewrite('/w/new.py', 'a\nb', read(null))).toBeNull();
   });
@@ -412,6 +431,18 @@ describe('guardDestructiveRewrite — losing definitions, not just lines', () =>
     expect(out).not.toBeNull();
     expect(out).toContain('main');
     expect(out).toContain('`edit`');
+  });
+
+  /* Both refusal paths must say it, not just the line-count one. */
+  it('also states outright that the file on disk is unchanged', () => {
+    const truncated = before
+      .split('\n')
+      .filter((l) => !l.startsWith('def main'))
+      .join('\n');
+    const out = guardDestructiveRewrite('/w/app.py', truncated, read) ?? '';
+    expect(out).toContain('NOTHING WAS WRITTEN');
+    expect(out).toMatch(/UNCHANGED/);
+    expect(out).not.toContain('the only copy');
   });
 
   it('allows a rewrite that keeps every definition', () => {
@@ -606,5 +637,48 @@ describe('syntaxComplaint', () => {
     expect(syntaxCheckFor('/w/a.js')).toEqual([process.execPath, '--check']);
     expect(syntaxCheckFor('/w/a.mjs')).toEqual([process.execPath, '--check']);
     expect(syntaxCheckFor('/w/a.js')?.[0]).not.toBe('node');
+  });
+});
+
+describe('withReadPathHeader', () => {
+  const ABS = '/Users/user/bobble-testbed/lc/src/main.js';
+
+  it('names the file above its own body', () => {
+    const out = withReadPathHeader(ABS, [{ type: 'text', text: 'const x = 1;' }]) as Array<{
+      text: string;
+    }>;
+    expect(out[0]?.text).toBe(`${ABS}\nconst x = 1;`);
+  });
+
+  it('always stamps an absolute path, never the relative one the model asked for', () => {
+    const out = withReadPathHeader(ABS, [{ type: 'text', text: 'body' }]) as Array<{
+      text: string;
+    }>;
+    expect(out[0]?.text.startsWith('/')).toBe(true);
+  });
+
+  /* An image read has no text part; the label still has to land somewhere. */
+  it('gives an image result a text part of its own', () => {
+    const out = withReadPathHeader(ABS, [{ type: 'image', data: 'AAAA' }]) as Array<{
+      type: string;
+      text?: string;
+    }>;
+    expect(out[0]).toEqual({ type: 'text', text: ABS });
+    expect(out[1]?.type).toBe('image');
+  });
+
+  it('leaves the other parts untouched', () => {
+    const parts = [
+      { type: 'text', text: 'a' },
+      { type: 'image', data: 'B' },
+    ];
+    const out = withReadPathHeader(ABS, parts) as Array<Record<string, unknown>>;
+    expect(out[1]).toEqual({ type: 'image', data: 'B' });
+    expect(out).toHaveLength(2);
+  });
+
+  it('does not throw on a result shape it does not recognise', () => {
+    expect(withReadPathHeader(ABS, undefined)).toBeUndefined();
+    expect(withReadPathHeader(ABS, 'plain')).toBe('plain');
   });
 });

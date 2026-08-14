@@ -14,20 +14,18 @@ import { PresentCard } from './present-card.tsx';
  * only ever have had a COPY — and a copy is exactly what produced the dropdown
  * divergence he spent the evening pointing at. Both render this component now.
  */
-const APPS = [
-  { id: 'code', name: 'VS Code' },
-  { id: 'zed', name: 'Zed' },
-];
+const VSCODE = { id: 'code', name: 'VS Code' };
+const APPS = [VSCODE, { id: 'zed', name: 'Zed' }];
 
 describe('OpenSplitButton', () => {
   it('names the default app on the primary segment', () => {
-    const html = renderToStaticMarkup(<OpenSplitButton defaultApp={APPS[0]} apps={APPS} />);
+    const html = renderToStaticMarkup(<OpenSplitButton defaultApp={VSCODE} apps={APPS} />);
     expect(html).toContain('Open with VS Code');
     expect(html).toContain('pd-split-main');
   });
 
   it('offers the caret when there is another app to choose', () => {
-    expect(renderToStaticMarkup(<OpenSplitButton defaultApp={APPS[0]} apps={APPS} />)).toContain(
+    expect(renderToStaticMarkup(<OpenSplitButton defaultApp={VSCODE} apps={APPS} />)).toContain(
       'pd-split-caret',
     );
   });
@@ -35,7 +33,7 @@ describe('OpenSplitButton', () => {
   /* An empty menu is worse than no menu — nothing to pick and nothing to say. */
   it('omits the caret when the default is the only app', () => {
     expect(
-      renderToStaticMarkup(<OpenSplitButton defaultApp={APPS[0]} apps={[APPS[0]]} />),
+      renderToStaticMarkup(<OpenSplitButton defaultApp={VSCODE} apps={[VSCODE]} />),
     ).not.toContain('pd-split-caret');
   });
 
@@ -65,7 +63,7 @@ describe('PresentCard uses that same control', () => {
   it('shows the dropdown caret once the apps are known', () => {
     const html = renderToStaticMarkup(
       <PresentCard
-        item={{ ...item, defaultApp: APPS[0], openApps: APPS }}
+        item={{ ...item, defaultApp: VSCODE, openApps: APPS }}
         onOpen={() => {}}
         onOpenWith={() => {}}
       />,
