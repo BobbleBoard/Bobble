@@ -1135,6 +1135,30 @@ const ROLE_PURPOSE: Record<string, string> = {
 export const DEFAULT_STEPS_PER_MESSAGE = 60;
 
 /**
+ * The COORDINATOR's budget, which is a different job and needs a different number.
+ *
+ * 60 was chosen for a role BUILDING one thing — "seventeen files of a Godot
+ * project is simply more than 24 calls of work". A manager builds nothing. It
+ * spends its calls dispatching contracts, reading handbacks, and looking at the
+ * tree, and it needs one round of that PER ENGINEER before it can say anything.
+ *
+ * MEASURED, run 2: eleven contracts, and the manager burned 117 tool calls
+ * without ever replying. The cap that was meant to catch "a role that never
+ * stops" instead cut off a role that was coordinating exactly as asked — and a
+ * role cut off mid-work never reaches the part where it reports, which is the
+ * same failure the 24→60 raise was already trying to fix, one level up.
+ *
+ * Deliberately a multiple rather than a new constant: whatever a builder is
+ * allowed, coordinating a team of them is several times that work.
+ */
+export const COORDINATOR_STEP_MULTIPLE = 3;
+
+/** Work-tool budget for one message to `agentId`, by what that role actually does. */
+export function stepsForRole(role: string, base = DEFAULT_STEPS_PER_MESSAGE): number {
+  return role === 'manager' || role === 'ceo' ? base * COORDINATOR_STEP_MULTIPLE : base;
+}
+
+/**
  * The settings a run passes STRAIGHT THROUGH to its agent host.
  *
  * Extracted and named because forgetting one is silent: `onSubmitted` was
@@ -1499,7 +1523,10 @@ export function createMeshAgentHost(config: MeshAgentHostConfig): MeshAgentHost 
           // inside a single message rewriting one file, never finished its turn,
           // and so never submitted anything. Running out of budget now reads as
           // "conclude", which is the one thing a 4B model needs said out loud.
-          maxSteps: config.maxStepsPerMessage ?? DEFAULT_STEPS_PER_MESSAGE,
+          maxSteps: stepsForRole(
+            agent.role,
+            config.maxStepsPerMessage ?? DEFAULT_STEPS_PER_MESSAGE,
+          ),
           // RUN, DO NOT WRITE — for everyone whose job is not building. The
           // manager needs a shell to see a failure with its own eyes; it does not
           // need one to write `gui_app.py`, which is what it did the moment it had

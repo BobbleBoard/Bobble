@@ -21,6 +21,7 @@ import {
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   CLEAN_LOAD,
+  COORDINATOR_STEP_MULTIPLE,
   communicationTools,
   DEFAULT_STEPS_PER_MESSAGE,
   dispatchesTo,
@@ -36,6 +37,7 @@ import {
   orphanReport,
   PASSTHROUGH_KEYS,
   runtimeCheck,
+  stepsForRole,
   taskNote,
   testSuiteReport,
 } from './mesh-host';
@@ -190,6 +192,38 @@ describe('only one sentence means success', () => {
     expect(isBroken('It reported no errors — because there is NOTHING TO LOAD.')).toBe(true);
     expect(isBroken(clean)).toBe(false);
     expect(isBroken(`${clean}\nNOTE: I removed your [input] section.`)).toBe(false);
+  });
+});
+
+describe('a coordinator gets a coordinator-sized budget', () => {
+  /*
+   * 60 was set for a role BUILDING one thing. A manager builds nothing — it
+   * dispatches, reads handbacks and looks at the tree, once per engineer, before
+   * it can say anything at all.
+   *
+   * MEASURED, run 2: eleven contracts, 117 tool calls, and the manager never
+   * replied. The cap meant to catch "a role that never stops" cut off a role
+   * coordinating exactly as asked, and a role cut off mid-work never reaches the
+   * part where it reports.
+   */
+  it('gives the manager several times a builder budget', () => {
+    expect(stepsForRole('manager')).toBeGreaterThan(stepsForRole('engineer'));
+    expect(stepsForRole('manager')).toBe(DEFAULT_STEPS_PER_MESSAGE * COORDINATOR_STEP_MULTIPLE);
+  });
+
+  it('leaves builders and specialists exactly where they were', () => {
+    expect(stepsForRole('engineer')).toBe(DEFAULT_STEPS_PER_MESSAGE);
+    expect(stepsForRole('specialist')).toBe(DEFAULT_STEPS_PER_MESSAGE);
+  });
+
+  /* run 2 burned 117 coordinating eleven contracts; the new ceiling clears it. */
+  it('clears the run that exposed this', () => {
+    expect(stepsForRole('manager')).toBeGreaterThan(117);
+  });
+
+  it('scales an explicit override rather than ignoring it', () => {
+    expect(stepsForRole('manager', 20)).toBe(20 * COORDINATOR_STEP_MULTIPLE);
+    expect(stepsForRole('engineer', 20)).toBe(20);
   });
 });
 

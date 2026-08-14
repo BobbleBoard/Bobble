@@ -256,3 +256,61 @@ describe('a refusal is not a product', () => {
     expect(text(res)).toContain('THIS IS THE FINAL CHECK');
   });
 });
+
+/*
+ * A FAILED HAND-OFF IS NOT AN EMPTY WORKSPACE.
+ *
+ * MEASURED, run 2: the manager exhausted its step budget mid-coordination and
+ * never replied, so this tool told the CEO "Nothing was delivered" — over 18
+ * source files, 2,452 lines and a clean TypeScript build on disk. The claim was
+ * derived from the team's REPLY being empty, which says only that the manager
+ * never spoke. The false-completion failure, running backwards; and a false
+ * negative costs the same, because it invites the CEO to discard real work.
+ */
+describe('a failed production reports what is actually on disk', () => {
+  const failed = (workspace?: string) => ({
+    ok: true,
+    product: '(manager ran out of steps after 117 tool calls without ever replying.)',
+    ...(workspace !== undefined ? { workspace } : {}),
+  });
+
+  /** Run the tool against a corp that comes back with no usable product. */
+  const runPromoted = async (result: ReturnType<typeof failed>): Promise<string> => {
+    const tool = register('max', async () => result);
+    const { ctx } = fakeCtx();
+    const res = await tool.execute(
+      'c',
+      { message: 'Build it', divisions: [] },
+      undefined,
+      undefined,
+      ctx,
+    );
+    return String(res.content?.[0]?.text ?? '');
+  };
+
+  it('still says nothing was delivered when the workspace really is empty', async () => {
+    const text = await runPromoted(failed());
+    expect(text).toContain('Nothing was delivered');
+    expect(text).toContain('the hand-off failed');
+  });
+
+  it('never says "Nothing was delivered" when there are files', async () => {
+    const text = await runPromoted(failed('src/main.ts\nsrc/converters/image-converter.ts'));
+    expect(text).not.toContain('Nothing was delivered');
+  });
+
+  it('shows the tree and says to carry on from it rather than restart', async () => {
+    const text = await runPromoted(failed('src/main.ts\nsrc/converters/image-converter.ts'));
+    expect(text).toContain('THE WORK IS STILL THERE');
+    expect(text).toContain('src/converters/image-converter.ts');
+    expect(text).toMatch(/do NOT start again/);
+    expect(text).toMatch(/ask the manager for a short summary/i);
+  });
+
+  /* It must still not read as success — that is the other way to get this wrong. */
+  it('does not describe the product as finished', async () => {
+    const text = await runPromoted(failed('src/main.ts'));
+    expect(text).toContain('did not complete');
+    expect(text).not.toMatch(/\bfinished\b(?!,)/);
+  });
+});

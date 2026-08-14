@@ -282,15 +282,40 @@ export function registerCreateHierarchyTool(pi: ExtensionAPI, deps: PromoteToolD
         const why = result.ok
           ? `the team returned nothing usable: ${result.product.trim()}`
           : (result.error ?? 'unknown error');
+        /*
+         * "NOTHING WAS DELIVERED" HAS TO BE CHECKED, NOT ASSUMED.
+         *
+         * This message was composed from the team's REPLY being empty — which
+         * means the manager never spoke, and says nothing whatsoever about the
+         * workspace. MEASURED, run 2: the manager exhausted its step budget
+         * mid-coordination and never replied, so the CEO was told "Nothing was
+         * delivered" over 18 source files, 2,452 lines and a clean TypeScript
+         * build sitting on disk. The inner message even said "Its work may be on
+         * disk but none of it was reported" — and this sentence contradicted it
+         * two lines later.
+         *
+         * That is the false-completion failure this project keeps digging out,
+         * running backwards, and a false NEGATIVE costs the same: it invites the
+         * CEO to throw away real work or start again. So when the host reports a
+         * non-empty workspace, say the true thing and show it.
+         */
+        const tree = (result.workspace ?? '').trim();
         return {
           content: [
             {
               type: 'text',
               text:
-                `The production did not complete: ${why}. ` +
-                'Nothing was delivered. Tell the user plainly what happened — do not ' +
-                'describe the product as finished, and do not quietly build it yourself ' +
-                'instead: say that the hand-off failed.',
+                tree === ''
+                  ? `The production did not complete: ${why}. ` +
+                    'Nothing was delivered. Tell the user plainly what happened — do not ' +
+                    'describe the product as finished, and do not quietly build it yourself ' +
+                    'instead: say that the hand-off failed.'
+                  : `The hand-off did not complete: ${why}.\n\n` +
+                    `THE WORK IS STILL THERE. The workspace contains:\n${tree}\n\n` +
+                    'So do NOT start again and do NOT throw this away. Ask the manager for a ' +
+                    'short summary of what works and what is left, then carry on from it. ' +
+                    'Tell the user what actually exists — not that it is finished, and not ' +
+                    'that nothing happened.',
             },
           ],
           isError: true,

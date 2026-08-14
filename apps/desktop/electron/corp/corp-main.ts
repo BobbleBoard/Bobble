@@ -16,10 +16,6 @@
 
 import fs from 'node:fs';
 import os from 'node:os';
-import { ensureTimeoutShim } from './timeout-shim';
-import { currentWorkspaceDir } from '../project/project-main';
-import { resolveProjectDir } from '../workspace/project-dir';
-import { deliveryFromTask } from './workspace-paths';
 import path from 'node:path';
 import { BrowserAgentClient, registerBrowserUseTools } from '@pi-desktop/browser-use';
 import type { CoordinationEvent, TaskHandle, TaskResult } from '@pi-desktop/coordination';
@@ -31,17 +27,22 @@ import { app, type IpcMainInvokeEvent, ipcMain, type WebContents } from 'electro
 import { ensureCorpInferenceServer } from '../inference/llm-main';
 import type { AppEventMap } from '../ipc-contract';
 import { piToolExtensionPaths } from '../pi/pi-main';
+import { currentWorkspaceDir } from '../project/project-main';
 import type { EffortLevel } from '../settings/settings-contract';
 import { isTrustedIpcEvent } from '../trusted-senders';
+import { resolveProjectDir } from '../workspace/project-dir';
 import { corpConcurrencyForHost } from './concurrency';
 import { createLlamaCorpChat } from './corp-chat';
 import type { CorpInvokeMap } from './corp-contract';
 import { CORP_INVOKE_CHANNELS } from './corp-contract';
 import { createBrowserSearch } from './corp-search';
 import { openHierarchy } from './hierarchy-store';
+import { listProject } from './mesh-host';
 import { startMeshTask } from './mesh-run';
 import { createCorpModelProvider } from './role-agent';
 import { createRunRoleAgent } from './role-agent-seam-impl';
+import { ensureTimeoutShim } from './timeout-shim';
+import { deliveryFromTask } from './workspace-paths';
 
 const log = createLogger('desktop:corp');
 const events = createIpcEventSender<AppEventMap>();
@@ -473,7 +474,8 @@ const handlers: CorpHandlers = {
         answer: "That production isn't loaded any more — start a new chat to begin a fresh one.",
       };
     }
-    if (task.engine !== undefined) return { answer: await task.engine.ask(task.handle, req.question) };
+    if (task.engine !== undefined)
+      return { answer: await task.engine.ask(task.handle, req.question) };
     /*
      * A MESH RUN CAN BE TALKED TO. It could not before: this branch required
      * `task.engine`, a mesh run has none, and the mesh is the implementation —
@@ -482,7 +484,9 @@ const handlers: CorpHandlers = {
      */
     const ask = (task.handle as { ask?: (q: string) => Promise<string> }).ask;
     if (typeof ask !== 'function') {
-      return { answer: "That production isn't loaded any more — start a new chat to begin a fresh one." };
+      return {
+        answer: "That production isn't loaded any more — start a new chat to begin a fresh one.",
+      };
     }
     return { answer: await ask(req.question) };
   },
@@ -543,11 +547,12 @@ const handlers: CorpHandlers = {
 export async function runCorpForBridge(
   wc: WebContents | null,
   task: string,
-): Promise<{ ok: boolean; product: string; error?: string }> {
+): Promise<{ ok: boolean; product: string; error?: string; workspace?: string }> {
   if (wc === null || wc.isDestroyed()) {
     return { ok: false, product: '', error: 'no window to run the production in' };
   }
   let started: { taskId: string };
+  const workspace = currentWorkspaceDir();
   try {
     /*
      * THE CHAT'S WORKSPACE, not a fresh resolution.
@@ -559,7 +564,6 @@ export async function runCorpForBridge(
      * for one conversation, the work split. Fixing the renderer's startCorpTask
      * was not enough, because the renderer is not the caller here.
      */
-    const workspace = currentWorkspaceDir();
     started = await handleStart(wc, {
       prompt: task,
       effort: 'max',
@@ -578,14 +582,30 @@ export async function runCorpForBridge(
   const result = await new Promise<TaskResult | null>((resolve) => {
     deliveries.set(taskId, resolve);
   });
+  /*
+   * WHAT IS ON DISK, reported alongside the outcome.
+   *
+   * A failed hand-off is not an empty workspace, and the CEO was being told it
+   * was: run 2's manager exhausted its step budget without replying and the tool
+   * result said "Nothing was delivered" over a compiling 2,452-line codebase.
+   * Only this side knows the cwd, so only this side can answer the question —
+   * see CorpRunResult.workspace.
+   */
+  const built = workspace !== null ? listProject(workspace) : '';
   if (result === null) {
-    return { ok: false, product: '', error: 'the production ended without delivering' };
+    return {
+      ok: false,
+      product: '',
+      error: 'the production ended without delivering',
+      ...(built !== '' ? { workspace: built } : {}),
+    };
   }
   if (result.outcome !== 'completed') {
     return {
       ok: false,
       product: result.summary ?? '',
       error: result.error ?? `production ${result.outcome}`,
+      ...(built !== '' ? { workspace: built } : {}),
     };
   }
   return { ok: true, product: result.summary ?? '' };

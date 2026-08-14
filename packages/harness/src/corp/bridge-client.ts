@@ -36,6 +36,18 @@ export interface CorpRunResult {
   /** What the team delivered, as the CEO should read it. */
   readonly product: string;
   readonly error?: string;
+  /**
+   * WHAT IS ACTUALLY IN THE WORKSPACE, filled in by the host that ran the team
+   * (only it knows the cwd; this package stays electron-free).
+   *
+   * Exists because "the team returned nothing usable" was being turned into
+   * "Nothing was delivered", and those are different facts. MEASURED, run 2: the
+   * manager exhausted its step budget mid-coordination and never replied, so the
+   * CEO was told nothing was delivered — over 18 source files, 2,452 lines and a
+   * clean TypeScript build sitting on disk. An empty REPLY says the manager never
+   * spoke. It says nothing whatsoever about the tree.
+   */
+  readonly workspace?: string;
 }
 
 function runViaBridge(
