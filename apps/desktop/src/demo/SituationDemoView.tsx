@@ -100,7 +100,7 @@ export function SituationDemoView() {
     })();
     controller.upsertTab(tabKey, {
       kind: 'situation',
-      title: 'Situation room',
+      title: 'Subagents',
       situationEvents: events,
       situationTaskId: handle.taskId,
       situationUserMode: userMode,

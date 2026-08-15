@@ -195,6 +195,9 @@ export function ThreadActivityChain({
       defaultExpanded={false}
       // Expanded + live while this run streams; collapses the moment it's done.
       active={streaming}
+      /* The turn's own answer to "is this over", so Done is never inferred from
+         rows going quiet between two tool calls (the user: "done is a final thing"). */
+      complete={!streaming}
       /*
        * PREFILL, as the chain's last row. A turn that is ingesting a long prompt
        * produces nothing — no running step, no tokens — so the chain looked

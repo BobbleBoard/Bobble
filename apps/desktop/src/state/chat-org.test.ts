@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { SessionSummary } from '../../electron/ipc-contract';
 import type { ChatOrganization } from '../../electron/settings/settings-contract';
-import { AUTO_PROJECT_PREFIX, displayTitle, groupChats } from './chat-org';
+import { displayTitle, groupChats, PROJECT_PROMPT_AT, shouldOfferProject } from './chat-org';
 
 const EMPTY: ChatOrganization = { projects: [], assignments: {}, pinned: [], titles: {} };
 const SANDBOX = '/home/u/.pi/desktop/sandbox/conv1';
@@ -20,74 +20,85 @@ function chat(file: string, cwd: string, modifiedAt = 't', title = file): Sessio
   };
 }
 
-describe('groupChats — auto folders by working directory', () => {
-  it('keeps sandbox + unknown-cwd chats ungrouped, with no auto folders', () => {
-    const g = groupChats([chat('a', SANDBOX), chat('b', '')], EMPTY);
+describe('a working folder is NOT a project', () => {
+  /*
+   * the user: "not every working directory folder becomes a project, delete all
+   * projects now, and projects can now only be created when explicitly done
+   * so." Every cwd used to sprout its own folder, so the sidebar filled with
+   * run5/run6/run7/corp-probe2 — one per experiment, none of them asked for.
+   */
+  it('leaves chats with a real cwd ungrouped', () => {
+    const g = groupChats([chat('a', '/home/u/proj'), chat('b', '/home/u/proj')], EMPTY);
     expect(g.projects).toEqual([]);
-    expect(g.ungrouped.map((s) => s.file)).toEqual(['a', 'b']);
+    expect(g.ungrouped.map((c) => c.file)).toEqual(['a', 'b']);
   });
 
-  it('auto-groups a real-cwd chat into a folder named by the dir basename', () => {
-    const g = groupChats([chat('a', '/home/u/work/GeometryDash')], EMPTY);
-    expect(g.projects).toHaveLength(1);
-    expect(g.projects[0]?.auto).toBe(true);
-    expect(g.projects[0]?.project.name).toBe('GeometryDash');
-    expect(g.projects[0]?.project.id).toBe(`${AUTO_PROJECT_PREFIX}/home/u/work/GeometryDash`);
-    expect(g.ungrouped).toEqual([]);
+  it('invents no folder even for many chats in one directory', () => {
+    const many = ['a', 'b', 'c', 'd'].map((f) => chat(f, '/home/u/proj'));
+    expect(groupChats(many, EMPTY).projects).toEqual([]);
   });
 
-  it('collects chats sharing a cwd + sorts folders by most-recent activity', () => {
-    const g = groupChats(
-      [
-        chat('a', '/home/u/work/alpha', '2026-01-01'),
-        chat('b', '/home/u/work/alpha', '2026-01-03'),
-        chat('c', '/home/u/work/beta', '2026-01-05'),
-      ],
-      EMPTY,
-    );
-    // beta (Jan 5) is more recent than alpha (Jan 3) → sorts first.
-    expect(g.projects.map((p) => p.project.name)).toEqual(['beta', 'alpha']);
-    expect(g.projects[1]?.chats.map((s) => s.file)).toEqual(['a', 'b']);
-  });
-
-  it('a manual assignment overrides the cwd folder (and manual projects come first)', () => {
+  /* A project the user MADE still groups its chats — that is the whole point. */
+  it('groups a chat the user assigned to a project they created', () => {
     const org: ChatOrganization = {
-      projects: [{ id: 'p1', name: 'My Project' }],
+      projects: [{ id: 'p1', name: 'Converter' }],
       assignments: { a: 'p1' },
       pinned: [],
       titles: {},
     };
-    const g = groupChats([chat('a', '/home/u/work/foo'), chat('b', '/home/u/work/foo')], org);
-    expect(g.projects[0]?.auto).toBe(false);
-    expect(g.projects[0]?.project.name).toBe('My Project');
-    expect(g.projects[0]?.chats.map((s) => s.file)).toEqual(['a']);
-    // b still auto-folders under its cwd.
-    expect(g.projects[1]?.auto).toBe(true);
-    expect(g.projects[1]?.chats.map((s) => s.file)).toEqual(['b']);
-    expect(g.ungrouped).toEqual([]);
+    const g = groupChats([chat('a', '/home/u/proj'), chat('b', '/home/u/proj')], org);
+    expect(g.projects).toHaveLength(1);
+    expect(g.projects[0]?.project.name).toBe('Converter');
+    expect(g.projects[0]?.chats.map((c) => c.file)).toEqual(['a']);
+    expect(g.ungrouped.map((c) => c.file)).toEqual(['b']);
   });
 
-  it('floats pinned chats to the top within a folder', () => {
+  it('floats pinned chats to the top of the ungrouped list', () => {
     const org: ChatOrganization = { ...EMPTY, pinned: ['b'] };
-    const g = groupChats([chat('a', '/home/u/work/foo'), chat('b', '/home/u/work/foo')], org);
-    expect(g.projects[0]?.chats.map((s) => s.file)).toEqual(['b', 'a']);
+    const g = groupChats([chat('a', '/home/u/proj'), chat('b', '/home/u/proj')], org);
+    expect(g.ungrouped.map((c) => c.file)).toEqual(['b', 'a']);
+  });
+});
+
+describe('shouldOfferProject — exactly the third chat', () => {
+  /*
+   * the user: "the user gets a popup to 'create project' when they make their third
+   * chat in the same working directory (excluding no project). not after or
+   * before the third time." Asking at one is noise; asking at four and five is
+   * nagging.
+   */
+  const inDir = (n: number) =>
+    Array.from({ length: n }, (_, i) => chat(`f${i}`, '/home/u/proj'));
+
+  it('does not offer before the third', () => {
+    expect(shouldOfferProject(inDir(1), '/home/u/proj', EMPTY)).toBe(false);
+    expect(shouldOfferProject(inDir(2), '/home/u/proj', EMPTY)).toBe(false);
   });
 
-  it('keeps a projectless project`s shared-sandbox chat grouped (assignment beats isSandboxCwd)', () => {
-    // A chat rooted at a project`s shared sandbox is still SANDBOX-like, so without
-    // the manual assignment it would fall to `ungrouped`. The assignment must win
-    // so the projectless project`s chats stay under its folder.
+  it('offers on exactly the third', () => {
+    expect(PROJECT_PROMPT_AT).toBe(3);
+    expect(shouldOfferProject(inDir(3), '/home/u/proj', EMPTY)).toBe(true);
+  });
+
+  it('does not keep asking after the third', () => {
+    expect(shouldOfferProject(inDir(4), '/home/u/proj', EMPTY)).toBe(false);
+    expect(shouldOfferProject(inDir(9), '/home/u/proj', EMPTY)).toBe(false);
+  });
+
+  /* No folder was chosen, so there is nothing to make a project of. */
+  it('never offers for the sandbox', () => {
+    const s = Array.from({ length: 3 }, (_, i) => chat(`f${i}`, SANDBOX));
+    expect(shouldOfferProject(s, SANDBOX, EMPTY)).toBe(false);
+  });
+
+  it('does not offer when the folder already has a project', () => {
     const org: ChatOrganization = {
-      projects: [{ id: 'p1', name: 'Scratchpad' }],
-      assignments: { a: 'p1' },
+      projects: [{ id: 'p1', name: 'Converter' }],
+      assignments: { f0: 'p1' },
       pinned: [],
       titles: {},
     };
-    const g = groupChats([chat('a', '/home/u/.pi/desktop/sandbox/project-p1')], org);
-    expect(g.projects).toHaveLength(1);
-    expect(g.projects[0]?.project.name).toBe('Scratchpad');
-    expect(g.projects[0]?.chats.map((s) => s.file)).toEqual(['a']);
-    expect(g.ungrouped).toEqual([]);
+    expect(shouldOfferProject(inDir(3), '/home/u/proj', org)).toBe(false);
   });
 });
 
@@ -107,35 +118,3 @@ describe('displayTitle', () => {
  * literally called `~` and every one of them joined it. the user asked for that to
  * stop, and for those chats to be treated as "no project".
  */
-describe('a HOME-rooted chat is not a project', () => {
-  const at = (file: string, cwd: string): SessionSummary =>
-    ({
-      file,
-      id: file,
-      cwd,
-      cwdLabel: cwd.replace('/Users/user', '~'),
-      startedAt: '2026-07-27T00:00:00Z',
-      modifiedAt: '2026-07-27T00:00:00Z',
-      messageCount: 2,
-      firstUserText: 'hi',
-      title: 'hi',
-    }) as SessionSummary;
-
-  it('leaves HOME chats ungrouped and invents no `~` folder', () => {
-    const org = { projects: [], assignments: {}, pinned: [], titles: {}, hidden: [] };
-    const grouped = groupChats(
-      [at('a.jsonl', '/Users/user'), at('b.jsonl', '/Users/user/work')],
-      org as never,
-    );
-    expect(grouped.ungrouped.map((s) => s.file)).toEqual(['a.jsonl']);
-    expect(grouped.projects.map((p) => p.project.name)).toEqual(['work']);
-    expect(grouped.projects.some((p) => p.project.name === '~')).toBe(false);
-  });
-
-  it('still groups a real folder that merely lives inside HOME', () => {
-    const org = { projects: [], assignments: {}, pinned: [], titles: {}, hidden: [] };
-    const grouped = groupChats([at('c.jsonl', '/Users/user/Desktop/OSS-harness')], org as never);
-    expect(grouped.ungrouped).toEqual([]);
-    expect(grouped.projects[0]?.project.name).toBe('OSS-harness');
-  });
-});

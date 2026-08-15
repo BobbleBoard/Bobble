@@ -197,9 +197,18 @@ export function groupChats(sessions: SessionSummary[], org: ChatOrganization): G
       const arr = byManual.get(pid);
       if (arr === undefined) byManual.set(pid, [s]);
       else arr.push(s);
-    } else if (isSandboxCwd(s.cwd)) {
-      ungrouped.push(s);
     } else {
+      /*
+       * A WORKING FOLDER IS NOT A PROJECT. the user: "not every working directory
+       * folder becomes a project… projects can now only be created when
+       * explicitly done so."
+       *
+       * Every cwd used to sprout its own folder, so the sidebar filled with
+       * run5/run6/run7/corp-probe2… — one folder per experiment, none of them
+       * asked for. A project is a thing the user decides to make; unassigned
+       * chats simply sit in the list. `byCwd` survives only to COUNT chats per
+       * folder, which is what offers the prompt at the third one.
+       */
       const key = s.cwd;
       const g = byCwd.get(key);
       if (g === undefined) {
@@ -208,6 +217,7 @@ export function groupChats(sessions: SessionSummary[], org: ChatOrganization): G
         g.chats.push(s);
         if (s.modifiedAt > g.recent) g.recent = s.modifiedAt;
       }
+      ungrouped.push(s);
     }
   }
 
@@ -216,13 +226,34 @@ export function groupChats(sessions: SessionSummary[], org: ChatOrganization): G
     chats: pinnedFirst(byManual.get(project.id) ?? [], pinned),
     auto: false,
   }));
-  const auto: ProjectGroup[] = [...byCwd.entries()]
-    .sort((a, b) => b[1].recent.localeCompare(a[1].recent))
-    .map(([cwd, g]) => ({
-      project: { id: `${AUTO_PROJECT_PREFIX}${cwd}`, name: g.name },
-      chats: pinnedFirst(g.chats, pinned),
-      auto: true,
-    }));
+  return { projects: manual, ungrouped: pinnedFirst(ungrouped, pinned) };
+}
 
-  return { projects: [...manual, ...auto], ungrouped: pinnedFirst(ungrouped, pinned) };
+/** Chats in one working folder before we OFFER to make it a project. */
+export const PROJECT_PROMPT_AT = 3;
+
+/**
+ * Should we offer to make this working folder a project, right now?
+ *
+ * the user: "the user gets a popup to 'create project' when they make their third
+ * chat in the same working directory (excluding no project). not after or
+ * before the third time." So this is true on EXACTLY the third — asking at one
+ * is noise, and asking at every one after three is nagging.
+ *
+ * Never for the sandbox (no folder was chosen), and never once the folder
+ * already has a project the chats are assigned to.
+ */
+export function shouldOfferProject(
+  sessions: readonly SessionSummary[],
+  cwd: string,
+  org: ChatOrganization,
+): boolean {
+  if (isSandboxCwd(cwd)) return false;
+  const inFolder = sessions.filter((s) => s.cwd === cwd);
+  if (inFolder.length !== PROJECT_PROMPT_AT) return false;
+  const known = new Set(org.projects.map((p) => p.id));
+  return !inFolder.some((s) => {
+    const pid = org.assignments[s.file];
+    return pid !== undefined && known.has(pid);
+  });
 }

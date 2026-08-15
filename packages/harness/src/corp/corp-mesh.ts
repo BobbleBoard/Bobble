@@ -169,6 +169,7 @@ A CONTRACT IS A MESSAGE YOU SEND, NEVER A FILE YOU WRITE. You hand a piece of wo
 
 Put each piece in this shape, in the message:
 
+  NAME: two or three words for this piece of work — "Conversion engine", "App shell", "Format icons". This is what the piece gets CALLED everywhere afterwards, so make it say what the work is; "Task 1" and "Engineer 2" name nothing.
   WHAT TO BUILD: one paragraph, what it must DO.
   FILES YOU OWN: the exact paths. Nobody else will touch them.
   DONE WHEN: what this piece must be able to DO before it comes back to you.

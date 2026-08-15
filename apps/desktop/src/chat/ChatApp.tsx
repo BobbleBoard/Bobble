@@ -353,7 +353,7 @@ export function ChatApp({
             situationOpened = true;
             canvasController.current?.upsertTab(`situation:${handle.taskId}`, {
               kind: 'situation',
-              title: 'Situation room',
+              title: 'Subagents',
               situationEvents: events,
               situationTaskId: handle.taskId,
               situationUserMode: userMode,
@@ -422,6 +422,11 @@ export function ChatApp({
   // When a child agent (subagent / role) is selected in the nested dropdown, its
   // read-only chat view replaces the main thread + composer.
   const viewedChildId = useChildAgentStore((s) => s.viewedChildId);
+  /* The subagent's own name for the top-bar route (the user: "eg. 'engineer 1'"). */
+  const viewedChildTitle = useChildAgentStore((s) =>
+    s.viewedChildId === null ? undefined : s.children[s.viewedChildId]?.title,
+  );
+  const setViewedChild = useChildAgentStore((s) => s.setViewedChild);
 
   // ONE composer instance ACROSS the empty→thread transition (same session → stable
   // key → focus survives the first send), but a FRESH instance per session: keying on
@@ -491,9 +496,36 @@ export function ChatApp({
                 trafficLightInset={false}
                 className={sidebarOpen ? undefined : 'pd-topbar--sidebar-collapsed'}
                 left={
-                  // The chat title sits just RIGHT of the sidebar/rail (#13). The
-                  // rail carries its own expand toggle, so no top-bar sidebar button.
-                  <ChatTitle title={title} onRename={(name) => void setSessionName(name)} />
+                  /*
+                   * THE TOP BAR SAYS WHERE YOU ARE. the user: "let's utilize the top
+                   * bar where it says 'chat' currently as a placeholder name to
+                   * show the back button and the centered dot and the subagent
+                   * name eg. 'engineer 1'."
+                   *
+                   * Viewing a subagent, it becomes a route: ‹ Back · <name>. The
+                   * "Back" that used to live inside the thread body was the only
+                   * way out and it sat in the scroll, so it moved off screen the
+                   * moment the agent produced anything.
+                   */
+                  viewedChildId !== null ? (
+                    <div className="pd-topbar-route">
+                      <button
+                        type="button"
+                        className="pd-topbar-back pd-focusable"
+                        onClick={() => setViewedChild(null)}
+                      >
+                        ‹ Back
+                      </button>
+                      <span className="pd-topbar-dot" aria-hidden>
+                        ·
+                      </span>
+                      <span className="pd-topbar-where">{viewedChildTitle ?? 'Subagent'}</span>
+                    </div>
+                  ) : (
+                    // The chat title sits just RIGHT of the sidebar/rail (#13). The
+                    // rail carries its own expand toggle, so no top-bar sidebar button.
+                    <ChatTitle title={title} onRename={(name) => void setSessionName(name)} />
+                  )
                 }
                 right={
                   // The canvas toggle (round-8 #11/#16) plus, for power users only,

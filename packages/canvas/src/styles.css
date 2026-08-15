@@ -4101,3 +4101,34 @@
 .pd-sitroom-agent-why[data-why='paused'] .pd-sitroom-agent-why-dot {
   box-shadow: 0 0 5px currentColor;
 }
+
+/* Back to the user's own chat, above the roster. Reads as a peer of the agent
+   rows because that is what it is — the conversation this team belongs to. */
+.pd-sitroom-main-btn {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 7px 12px;
+  border: 0;
+  border-radius: var(--pd-radius-sm, 6px);
+  background: transparent;
+  color: var(--pd-text-secondary);
+  font-size: var(--pd-font-size-body);
+  font-weight: 500;
+  cursor: pointer;
+}
+.pd-sitroom-main-btn:hover {
+  background: var(--pd-bg-hover, rgba(127, 127, 127, 0.1));
+  color: var(--pd-text-primary);
+}
+.pd-sitroom-main-btn[data-selected] {
+  color: var(--pd-text-primary);
+  background: var(--pd-bg-hover, rgba(127, 127, 127, 0.12));
+}
+
+/* The label this replaced is gone — the user: "that text is silly". */
+.pd-sitroom-owner,
+.pd-sitroom-owner-name,
+.pd-sitroom-owner-note {
+  display: none;
+}

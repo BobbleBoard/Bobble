@@ -147,6 +147,62 @@ export const DEFAULT_BASH_TIMEOUT_S = 300;
  * The model can still pass its own `timeout` for a genuinely long build; this
  * only supplies one when it did not.
  */
+/**
+ * BACKGROUND, AS A THING THE TOOL OFFERS.
+ *
+ * the user: "do all bash commands have background parameter set in the tool call
+ * inputs by the way? that could be helpful. background true if this runs in the
+ * background and doesn't block."
+ *
+ * pi's bash takes only `command` and `timeout`, so the ONLY way to background
+ * something was to type `&` yourself — nothing in the tool's shape suggested
+ * it, and a model that did not think of it discovered the problem by hanging.
+ * A declared parameter is a prompt: it tells the model, at the point of use,
+ * that "this one does not return" is an option it can choose deliberately.
+ *
+ * It rewrites rather than re-implements: `nohup <cmd> &` detaches the process,
+ * output goes to a log the model is told about, and the call returns at once.
+ */
+export function withBackgroundOption<T extends { parameters?: unknown; execute: (...a: never[]) => unknown }>(
+  base: T,
+): T {
+  const params = base.parameters as
+    | { properties?: Record<string, unknown>; type?: string }
+    | undefined;
+  const parameters =
+    params?.properties === undefined
+      ? base.parameters
+      : {
+          ...params,
+          properties: {
+            ...params.properties,
+            background: {
+              type: 'boolean',
+              description:
+                'Run this in the background and return immediately. Use it for anything that ' +
+                'does not finish on its own — a server, a watcher, a GUI. Output goes to a log ' +
+                'file whose path comes back in the result.',
+            },
+          },
+        };
+  return {
+    ...base,
+    parameters,
+    async execute(...args: never[]) {
+      const p = args[1] as Record<string, unknown> | undefined;
+      if (p?.background === true && typeof p.command === 'string') {
+        const log = `/tmp/pi-bg-${Date.now()}.log`;
+        const { background: _drop, ...rest } = p;
+        (args as unknown[])[1] = {
+          ...rest,
+          command: `nohup sh -c ${JSON.stringify(p.command)} > ${log} 2>&1 & echo "started in background (pid $!), output: ${log}"`,
+        };
+      }
+      return (base.execute as (...a: never[]) => Promise<unknown>)(...args);
+    },
+  } as T;
+}
+
 export function withDefaultTimeout<T extends { execute: (...a: never[]) => unknown }>(
   base: T,
   seconds: number = DEFAULT_BASH_TIMEOUT_S,
@@ -1249,9 +1305,11 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
    */
   pi.registerTool(
     withDefaultTimeout(
-      createBashToolDefinition(process.cwd(), {
-        spawnHook: (c) => ({ ...c, cwd: liveRoot(), env: cleanChildEnv(c.env) }),
-      }),
+      withBackgroundOption(
+        createBashToolDefinition(process.cwd(), {
+          spawnHook: (c) => ({ ...c, cwd: liveRoot(), env: cleanChildEnv(c.env) }),
+        }),
+      ),
     ) as never,
   );
 

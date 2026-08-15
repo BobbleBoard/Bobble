@@ -78,6 +78,81 @@ function normalizeContent(raw: string): string {
   return deLed;
 }
 
+
+/**
+ * Read one string field out of JSON that is STILL ARRIVING.
+ *
+ * A tool call's arguments stream in a character at a time, so `JSON.parse`
+ * fails on every frame until the last one — which is exactly why a file being
+ * written showed "(writing…)" and no content: the text-markup parser below only
+ * sees calls a model emits as raw text, and a STRUCTURED call carries its body
+ * in `argsText` instead. the user: "instead of live showing the edit streamed in
+ * canvas it showed the file… without any content just: '(writing)…'. that's
+ * unacceptable."
+ *
+ * So this reads the value as far as it has arrived, honouring escapes, and
+ * reports whether the closing quote has landed yet. Partial is the point: the
+ * half-written value IS the live view.
+ */
+export function partialJsonString(
+  args: string,
+  key: string,
+): { value: string; closed: boolean } | undefined {
+  const needle = new RegExp(`"${key}"\\s*:\\s*"`);
+  const m = needle.exec(args);
+  if (m === null) return undefined;
+  let i = m.index + m[0].length;
+  let out = '';
+  while (i < args.length) {
+    const ch = args[i] ?? '';
+    if (ch === '\\') {
+      const next = args[i + 1];
+      if (next === undefined) return { value: out, closed: false };
+      out +=
+        next === 'n'
+          ? '\n'
+          : next === 't'
+            ? '\t'
+            : next === 'r'
+              ? '\r'
+              : next === 'u'
+                ? String.fromCharCode(Number.parseInt(args.slice(i + 2, i + 6), 16) || 0)
+                : next;
+      i += next === 'u' ? 6 : 2;
+      continue;
+    }
+    if (ch === '"') return { value: out, closed: true };
+    out += ch;
+    i += 1;
+  }
+  return { value: out, closed: false };
+}
+
+/**
+ * A live write read from a STRUCTURED tool call's streaming arguments — the
+ * other half of {@link parseWritesFromText}, which only ever saw raw markup.
+ */
+export function writeFromArgs(
+  argsText: string,
+  blockStreaming: boolean,
+): LiveFileWrite | undefined {
+  const pathArg =
+    partialJsonString(argsText, 'path') ??
+    partialJsonString(argsText, 'file_path') ??
+    partialJsonString(argsText, 'filename');
+  if (pathArg === undefined || !pathArg.closed) return undefined;
+  const path = pathArg.value.trim();
+  if (path.length === 0) return undefined;
+  const contentArg =
+    partialJsonString(argsText, 'content') ?? partialJsonString(argsText, 'new_str');
+  if (contentArg === undefined) return undefined;
+  return {
+    path,
+    content: normalizeContent(contentArg.value),
+    streaming: blockStreaming || !contentArg.closed,
+  };
+}
+
 /**
  * Parse every write in ONE block of streamed text into its {@link LiveFileWrite}.
  * Handles the in-flight case (an opener with no `</function>`/`</parameter>` yet)
@@ -133,6 +208,17 @@ function parseWritesFromText(text: string, blockStreaming: boolean): LiveFileWri
 export function liveFileWrites(blocks: readonly CorpBlock[]): LiveFileWrite[] {
   const byPath = new Map<string, LiveFileWrite>();
   for (const block of blocks) {
+    /*
+     * BOTH WAYS A WRITE CAN ARRIVE. Raw markup in the model's text (below), and
+     * a STRUCTURED tool call whose arguments stream into `argsText` — which is
+     * the path a proper tool call takes, and the one that was producing
+     * "(writing…)" with no body because nothing read it.
+     */
+    if (block.kind === 'tool' && block.argsText !== undefined) {
+      const write = writeFromArgs(block.argsText, block.running === true);
+      if (write !== undefined) byPath.set(write.path, write);
+      continue;
+    }
     if (block.kind !== 'text' && block.kind !== 'thinking') continue;
     for (const write of parseWritesFromText(block.text, block.streaming)) {
       byPath.set(write.path, write);

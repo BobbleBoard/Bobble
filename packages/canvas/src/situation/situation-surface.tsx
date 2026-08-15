@@ -56,6 +56,8 @@ export interface SituationRoomSurfaceProps {
   userMode?: SituationUserMode;
   /** Clicking a worker routes its live stream to the app (left chat area). */
   onSelectNode?: (node: OrgNodeView) => void;
+  /** Back to the user's own chat — renders the `Main` button above the roster. */
+  onSelectMain?: () => void;
   selectedNodeId?: string;
   /**
    * Per-node working timing (from the app's corp store) — each subagent row
@@ -150,6 +152,7 @@ function useNow(active: boolean): number {
 export function SituationRoomSurface({
   state,
   onSelectNode,
+  onSelectMain,
   selectedNodeId,
   nodeTiming,
   className,
@@ -191,7 +194,14 @@ export function SituationRoomSurface({
   const team = teamNodes(state.chart.nodes);
   // The root answers in the chat, so it is listed but never COUNTED as a subagent.
   const subagents = team.filter((n) => !isRootNode(n));
-  const busy = subagents.filter((n) => n.state === 'working').length;
+  /*
+   * PARKED IS NOT WORKING. the user: "how come there's '4 at work' with 4 timers
+   * ticking up in the situation room". A lead blocked in talk_to is marked
+   * `working` by the model — it has an open turn — but it is generating
+   * nothing, and a clock beside it claims otherwise. `generating` is the honest
+   * subset, and it drives BOTH the count and the timers.
+   */
+  const busy = subagents.filter(isGenerating).length;
   // A shared 1s clock drives every row's live timer. It ticks for the WHOLE time
   // the run is live (`live`) — not merely when THIS snapshot happens to show a
   // working node — so a subagent's `m:ss` keeps advancing across the gaps between
@@ -306,19 +316,24 @@ export function SituationRoomSurface({
       <div className="pd-sitroom-body">
         <div className="pd-sitroom-main pd-scroll">
           {/*
-           * WHOSE RUN THIS IS. the user: "above 'the team' it needs to say 'bobble'
-           * or 'user' or something for the original chat."
-           *
-           * The list starts at the manager and reads as though the manager were
-           * the top of the hierarchy. It is not — it is the top of the TEAM. The
-           * chart has no node for the conversation that commissioned the work
-           * (there is no CEO in the mesh; the chat model is the CEO), so nothing
-           * on this panel represented the user's own thread at all.
+           * A BUTTON BACK TO THE USER'S OWN CHAT, not a caption about it. This
+           * was the line "Bobble — your chat, this is its team"; the user: "that
+           * text is silly and just isn't what I asked for. just remove that."
+           * What he wanted was a way BACK: "pressing the manager chat in the
+           * situation room bring me to the top level chat and there isn't a
+           * 'main' button as I want above the 'the team'."
            */}
-          <div className="pd-sitroom-owner">
-            <span className="pd-sitroom-owner-name">Bobble</span>
-            <span className="pd-sitroom-owner-note">your chat — this is its team</span>
-          </div>
+          {onSelectMain !== undefined ? (
+            <button
+              type="button"
+              className="pd-sitroom-main-btn pd-focusable"
+              data-testid="sitroom-main"
+              data-selected={selectedNodeId === undefined || undefined}
+              onClick={onSelectMain}
+            >
+              Main
+            </button>
+          ) : null}
           <RoomSection
             id="agents"
             title="The team"
@@ -330,6 +345,7 @@ export function SituationRoomSurface({
             <SubagentList
               nodes={team}
               onSelectNode={onSelectNode}
+      {...(onSelectMain !== undefined ? { onSelectMain } : {})}
               selectedNodeId={selectedNodeId}
               nodeTiming={nodeTiming}
               now={now}
@@ -418,6 +434,21 @@ function durationOr(ms: number | undefined, prefix: string, fallback: string): s
 /** The one-line status a subagent row shows for its node's live state —
  * exactly the chat's wording (CorpInlineTurn's rowStatusLine). A finished node
  * with known timing reads "finished in Nm Ns" (Point 4c) instead of a bare "done". */
+
+/**
+ * Is this agent actually producing right now?
+ *
+ * `state === 'working'` only means it has an open turn. A lead parked in
+ * talk_to waiting on its team has an open turn and produces nothing, so it gets
+ * no clock and is not counted at work — see agentStatusLine's own wording,
+ * "waiting for other subagents to finish", which is the case this excludes.
+ */
+export function isGenerating(node: OrgNodeView): boolean {
+  if (node.state !== 'working') return false;
+  const parked = (node.role === 'ceo' || node.role === 'manager') && node.currentAction === undefined;
+  return !parked;
+}
+
 function agentStatusLine(node: OrgNodeView, elapsedMs?: number): string {
   switch (node.state) {
     case 'working':
@@ -536,6 +567,7 @@ function SubagentList({ nodes, onSelectNode, selectedNodeId, nodeTiming, now }: 
     <div className="pd-sitroom-agents" data-testid="subagent-list">
       {ordered.map((node) => {
         const working = node.state === 'working';
+        const generating = isGenerating(node);
         const elapsed = nodeElapsedMs(nodeTiming?.[node.id], now);
         const line = agentStatusLine(node, elapsed);
         return (
@@ -560,7 +592,7 @@ function SubagentList({ nodes, onSelectNode, selectedNodeId, nodeTiming, now }: 
                 {/* The per-subagent timer: a live `m:ss` while working, frozen at
                     its final duration once done. Present only when the node has
                     actually started (honest — nothing invented for a queued row). */}
-                {working && elapsed !== undefined ? (
+                {generating && elapsed !== undefined ? (
                   <span className="pd-sitroom-agent-timer" data-testid="subagent-timer">
                     {formatClock(elapsed)}
                   </span>
@@ -578,14 +610,14 @@ function SubagentList({ nodes, onSelectNode, selectedNodeId, nodeTiming, now }: 
                  * screen. Nothing is shown while it IS working — that already has
                  * the shimmer and the clock, and a badge there would be noise.
                  */}
-                {agentStopped(node.state) !== null ? (
+                {(working && !generating ? { word: 'waiting', tone: 'waiting' as const } : agentStopped(node.state)) !== null ? (
                   <span
                     className="pd-sitroom-agent-why"
-                    data-why={agentStopped(node.state)?.tone}
+                    data-why={(working && !generating ? { word: 'waiting', tone: 'waiting' as const } : agentStopped(node.state))?.tone}
                     data-testid="subagent-why"
                   >
                     <span className="pd-sitroom-agent-why-dot" aria-hidden />
-                    {agentStopped(node.state)?.word}
+                    {(working && !generating ? { word: 'waiting', tone: 'waiting' as const } : agentStopped(node.state))?.word}
                   </span>
                 ) : null}
               </>
@@ -611,6 +643,8 @@ export interface SituationRoomHostProps {
   taskId?: string;
   userMode?: SituationUserMode;
   onSelectNode?: (node: OrgNodeView) => void;
+  /** Back to the user's own chat — renders the `Main` button above the roster. */
+  onSelectMain?: () => void;
   selectedNodeId?: string;
   /** Per-node working timing (from the app's corp store) — drives the row timers. */
   nodeTiming?: Record<string, NodeTiming>;
@@ -625,6 +659,7 @@ export function SituationRoomHost({
   taskId,
   userMode,
   onSelectNode,
+  onSelectMain,
   selectedNodeId,
   nodeTiming,
 }: SituationRoomHostProps) {

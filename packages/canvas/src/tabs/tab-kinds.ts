@@ -95,7 +95,7 @@ export const CANVAS_TAB_KINDS: Record<CanvasTabKind, CanvasTabKindMeta> = {
   // like a live surface — the tab carries the run's event stream.
   situation: {
     kind: 'situation',
-    label: 'Situation room',
+    label: 'Subagents',
     icon: IconSituation,
     live: true,
     opensInCanvas: true,

@@ -641,9 +641,63 @@ function StepContent({ step, live = false }: { step: ActivityStepData; live?: bo
     case 'tool':
     case 'connector':
       return <TerminalBlock output={step.output} />;
+    case 'talk':
+    case 'manager':
+    case 'commission':
+    case 'delegate':
+    case 'toolkit':
+    case 'submit':
+      return <CoordinationReveal argsText={step.argsText} output={step.output} />;
     default:
       return null;
   }
+}
+
+
+/**
+ * What a coordination row opens to: the MESSAGE that was sent, the files that
+ * went with it, and the reply.
+ *
+ * the user: "just show the brief and some indented/smaller inline file presentation
+ * cards showing what files/folders got passed along." The brief is prose a
+ * person reads, so it is rendered as text rather than the raw JSON these args
+ * arrive as — the schema noise was the reason args stopped being shown at all.
+ */
+function CoordinationReveal({ argsText, output }: { argsText?: string; output?: string }) {
+  const parsed = (() => {
+    if (argsText === undefined) return undefined;
+    try {
+      return JSON.parse(argsText) as Record<string, unknown>;
+    } catch {
+      return undefined;
+    }
+  })();
+  const message =
+    typeof parsed?.message === 'string'
+      ? parsed.message
+      : typeof parsed?.request === 'string'
+        ? parsed.request
+        : argsText;
+  const files = Array.isArray(parsed?.files)
+    ? parsed.files.filter((f): f is string => typeof f === 'string')
+    : [];
+  return (
+    <div className="pd-chain-coord">
+      {message !== undefined && message.length > 0 ? (
+        <div className="pd-chain-coord-brief">{message}</div>
+      ) : null}
+      {files.length > 0 ? (
+        <div className="pd-chain-coord-files">
+          {files.map((f) => (
+            <span key={f} className="pd-chain-coord-file" title={f}>
+              {f.split(/[/\\]/).filter(Boolean).at(-1) ?? f}
+            </span>
+          ))}
+        </div>
+      ) : null}
+      {output !== undefined && output.length > 0 ? <TerminalBlock output={output} /> : null}
+    </div>
+  );
 }
 
 /** Whether a step has inline content worth a reveal (pill) or inline render. */
@@ -670,6 +724,26 @@ function hasInlineContent(step: ActivityStepData): boolean {
       // Only the result opens a reveal now — the raw args JSON is no longer shown,
       // so args alone must not produce an empty reveal.
       return step.output !== undefined && step.output.length > 0;
+    /*
+     * COORDINATION ROWS OPEN TOO. the user: "find out all tool calls that are not
+     * able to be clicked on for an expansion eg. briefing manager, that's easy,
+     * just show the brief and some indented/smaller inline file presentation
+     * cards showing what files/folders got passed along."
+     *
+     * These fell to `default: false`, so the single most consequential message
+     * in a run — the brief the whole build is made from — was a row you could
+     * not open.
+     */
+    case 'talk':
+    case 'manager':
+    case 'commission':
+    case 'delegate':
+    case 'toolkit':
+    case 'submit':
+      return (
+        (step.argsText !== undefined && step.argsText.length > 0) ||
+        (step.output !== undefined && step.output.length > 0)
+      );
     default:
       return false;
   }
@@ -722,8 +796,27 @@ export function elapsedLabel(ms: number): string | null {
  * then survives a remount instead of restarting at zero. Without it the clock
  * starts at mount, which is still the question being asked.
  */
-function RunningFor({ since }: { since?: number }) {
-  const [mounted] = useState(() => Date.now());
+/**
+ * FIRST TIME WE EVER SAW THIS STEP RUNNING, keyed by its stable id.
+ *
+ * the user: "the timer for tool calls… just resets every time I go to a new chat
+ * and come back or check on anything else." The clock fell back to MOUNT time
+ * whenever the caller had no `startedAt`, so every remount — switching chats,
+ * opening a panel, a re-render that drops the subtree — restarted it at zero.
+ * A step's start is a fact about the step, not about when a component happened
+ * to mount, so it lives outside React.
+ */
+const STEP_FIRST_SEEN = new Map<string, number>();
+
+function RunningFor({ since, stepId }: { since?: number; stepId?: string }) {
+  const [mounted] = useState(() => {
+    if (stepId === undefined) return Date.now();
+    const prior = STEP_FIRST_SEEN.get(stepId);
+    if (prior !== undefined) return prior;
+    const t = Date.now();
+    STEP_FIRST_SEEN.set(stepId, t);
+    return t;
+  });
   const start = since ?? mounted;
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -788,7 +881,12 @@ export const ActivityStep = forwardRef<HTMLDivElement, ActivityStepProps>(functi
    * row, plain row. Built once and rendered from one branch, it would have shown
    * on some rows and not others.
    */
-  const elapsedEl = running ? <RunningFor since={data.startedAt} /> : null;
+  const elapsedEl = running ? (
+    <RunningFor
+      {...(data.startedAt !== undefined ? { since: data.startedAt } : {})}
+      {...(data.id !== undefined ? { stepId: data.id } : {})}
+    />
+  ) : null;
   /*
    * A STILL AGENT SAYS WHY IT IS STILL. Without this, "waiting" and "stopped"
    * are indistinguishable from "done" — the row just sits there — which is the
@@ -973,6 +1071,13 @@ export interface ActivityChainProps extends Omit<HTMLAttributes<HTMLDivElement>,
    * animates via the existing height roll (reduced-motion safe).
    */
   active?: boolean;
+  /**
+   * Whether the TURN this chain belongs to is over, from whoever owns it.
+   * Supplied → the only thing that can show the terminal "Done". Omitted → the
+   * chain falls back to inferring it from quiet rows, which is correct for a
+   * historical transcript and wrong for a live one.
+   */
+  complete?: boolean;
   onExpandedChange?: (expanded: boolean) => void;
   /** Seed which pill-gated step's content is open on mount (index into `steps`). */
   defaultOpenStep?: number;
@@ -1038,6 +1143,7 @@ export const ActivityChain = forwardRef<HTMLDivElement, ActivityChainProps>(func
     expanded,
     defaultExpanded = false,
     active = false,
+    complete,
     onExpandedChange,
     defaultOpenStep,
     summary,
@@ -1069,15 +1175,51 @@ export const ActivityChain = forwardRef<HTMLDivElement, ActivityChainProps>(func
     if (active && !wasActive.current) setUserChose(false);
     wasActive.current = active;
   }, [active]);
-  const isExpanded = expanded ?? (userChose || !active ? internalExpanded : true);
   const [openStep, setOpenStep] = useState<number | null>(defaultOpenStep ?? null);
 
   const running = steps.some((s) => s.status === 'running');
+  /*
+   * IT STAYS OPEN UNTIL IT IS DONE. the user: "no expanding/closing tool / think
+   * blocks it stays open until it says done". `active` dips between tool calls,
+   * so keying the auto-open on it alone made the chain snap shut and reopen on
+   * every gap. A live turn — `active`, or anything running, or a prefill in
+   * flight, or a caller that says the turn is not over — holds it open unless
+   * the user has chosen otherwise.
+   */
+  const live = active || running || prefill !== undefined || complete === false;
+  const isExpanded = expanded ?? (userChose || !live ? internalExpanded : true);
   /* A PREFILLING turn is not a settled one. Without this the chain has no
    * running step, goes quiet, and prints "Done" over a model that is still
    * ingesting the prompt — the premature-completion family again, one layer
    * down. */
-  const settled = useSettled(!running && !active && prefill === undefined);
+  /*
+   * DONE IS FINAL, AND IT IS THE TURN THAT DECIDES IT — NOT QUIET ROWS.
+   *
+   * the user, three rounds of this: "the premature done just needs to be fixed now
+   * though… it doesn't say done until it's truly totally done." Then: "done is
+   * a final thing. This tool chain is DONE."
+   *
+   * `!running && !active` goes true in every gap between two tool calls and
+   * across a long prefill, so Done printed, the next block erased it, and the
+   * chain flapped. A 600ms debounce only delayed a decision whose inputs were
+   * wrong.
+   *
+   * `complete` is the authoritative answer from whoever owns the turn. When it
+   * is supplied, it is the ONLY thing that can show Done. When it is not (a
+   * static render, a historical transcript), fall back to the old quiet test —
+   * those are already over.
+   *
+   * And once shown, Done never retracts: latching is what makes it final rather
+   * than a status that blinks.
+   */
+  const quiet = !running && !active && prefill === undefined;
+  const settledGuess = useSettled(quiet);
+  const [everDone, setEverDone] = useState(false);
+  const doneNow = complete !== undefined ? complete && quiet : settledGuess;
+  useEffect(() => {
+    if (doneNow) setEverDone(true);
+  }, [doneNow]);
+  const settled = everDone || doneNow;
   const toggleChain = () => {
     const next = !isExpanded;
     if (expanded === undefined) {

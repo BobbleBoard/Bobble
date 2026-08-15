@@ -13,6 +13,8 @@ import {
   isHtmlPath,
   liveFileContentForPath,
   liveFileWrites,
+  partialJsonString,
+  writeFromArgs,
 } from './corp-file-content';
 
 const text = (t: string, streaming = false): CorpBlock => ({ kind: 'text', text: t, streaming });
@@ -167,5 +169,48 @@ describe('isHtmlPath', () => {
     expect(isHtmlPath('a/b/mockup.HTM')).toBe(true);
     expect(isHtmlPath('style.css')).toBe(false);
     expect(isHtmlPath('app.tsx')).toBe(false);
+  });
+});
+
+describe('a structured tool call streams its file into the canvas', () => {
+  /*
+   * the user: "instead of live showing the edit streamed in canvas it showed the
+   * file in the right sidebar, but without any content just: '(writing)...'
+   * that's unacceptable."
+   *
+   * The capture only read raw `<function=write>` markup out of the model's
+   * TEXT. A structured tool call carries its body in `argsText` instead, so
+   * nothing read it, content came back empty, and the canvas fell through to
+   * the "(writing…)" placeholder.
+   */
+  it('reads a path and content that are still arriving', () => {
+    const partial = '{"path":"src/main.js","content":"const a = 1;\\nconst b';
+    const w = writeFromArgs(partial, true);
+    expect(w?.path).toBe('src/main.js');
+    expect(w?.content).toContain('const a = 1;');
+    expect(w?.content).toContain('const b');
+    expect(w?.streaming).toBe(true);
+  });
+
+  it('knows when the content has finished arriving', () => {
+    const done = '{"path":"a.js","content":"x = 1;"}';
+    expect(writeFromArgs(done, false)?.streaming).toBe(false);
+  });
+
+  it('waits for a settled path rather than keying a tab on half a name', () => {
+    expect(writeFromArgs('{"path":"src/ma', true)).toBeUndefined();
+  });
+
+  it('honours escapes so the live view is not full of \\n', () => {
+    const r = partialJsonString('{"content":"line1\\nline2\\ttab"}', 'content');
+    expect(r?.value).toBe('line1\nline2\ttab');
+    expect(r?.closed).toBe(true);
+  });
+
+  it('reports an unterminated string as still open', () => {
+    expect(partialJsonString('{"content":"half', 'content')).toEqual({
+      value: 'half',
+      closed: false,
+    });
   });
 });

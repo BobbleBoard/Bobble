@@ -15,6 +15,7 @@ import {
   type StoredEntryLike,
   type ToolSchemaLike,
   wireHarness,
+  withBackgroundOption,
   withDefaultTimeout,
 } from './index.js';
 import { augmentSystemPrompt } from './prompt/capability-prompt.js';
@@ -565,5 +566,50 @@ describe('withDefaultTimeout — every command comes back', () => {
     await expect(
       (t as { execute: (...a: unknown[]) => Promise<unknown> }).execute('c', { command: 'x' }),
     ).rejects.toThrow(/ENOENT/);
+  });
+});
+
+describe('withBackgroundOption — "this one does not return" is a choice', () => {
+  /*
+   * the user: "do all bash commands have background parameter set in the tool call
+   * inputs by the way? that could be helpful."
+   *
+   * pi's bash takes only `command` and `timeout`, so backgrounding meant typing
+   * `&` yourself — nothing in the tool's SHAPE suggested it, and a model that
+   * did not think of it found out by hanging (run 7 died to `electron .`).
+   */
+  const spy = () => {
+    const seen: Record<string, unknown>[] = [];
+    const tool = withBackgroundOption({
+      parameters: { type: 'object', properties: { command: { type: 'string' } } },
+      execute: (_id: unknown, p: unknown) => {
+        seen.push(p as Record<string, unknown>);
+        return Promise.resolve('ok');
+      },
+    } as never) as unknown as {
+      parameters: { properties: Record<string, unknown> };
+      execute: (...a: unknown[]) => Promise<unknown>;
+    };
+    return { tool, seen };
+  };
+
+  it('advertises the option on the tool itself', () => {
+    expect(spy().tool.parameters.properties.background).toBeDefined();
+  });
+
+  it('detaches the command and reports where the output went', async () => {
+    const { tool, seen } = spy();
+    await tool.execute('c', { command: 'electron .', background: true });
+    const cmd = String(seen[0]?.command ?? '');
+    expect(cmd).toContain('nohup');
+    expect(cmd).toMatch(/&\s*echo/);
+    expect(cmd).toContain('/tmp/pi-bg-');
+    expect(seen[0]?.background).toBeUndefined();
+  });
+
+  it('leaves an ordinary command completely alone', async () => {
+    const { tool, seen } = spy();
+    await tool.execute('c', { command: 'npm run build' });
+    expect(seen[0]?.command).toBe('npm run build');
   });
 });

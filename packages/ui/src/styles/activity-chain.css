@@ -618,3 +618,36 @@ button.pd-chain-step-row:hover .pd-chain-step-chevron {
   background: none;
   -webkit-text-fill-color: currentColor;
 }
+
+/* A coordination row opened: the brief, the files that went with it, the reply. */
+.pd-chain-coord {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pd-chain-coord-brief {
+  white-space: pre-wrap;
+  font-size: var(--pd-font-size-caption);
+  line-height: 1.55;
+  color: var(--pd-text-secondary);
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+/* Indented and smaller than the brief — they are attachments to it, not peers. */
+.pd-chain-coord-files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-left: 10px;
+}
+
+.pd-chain-coord-file {
+  padding: 2px 8px;
+  border: 1px solid var(--pd-border-subtle);
+  border-radius: 999px;
+  font-size: var(--pd-font-size-caption);
+  color: var(--pd-text-muted);
+  background: color-mix(in srgb, var(--pd-text-muted) 8%, transparent);
+}

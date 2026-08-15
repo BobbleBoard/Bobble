@@ -87,6 +87,47 @@ function toRenderItems(messages: ChatMsg[], claimed: Set<string>): RenderItem[] 
   return items;
 }
 
+
+/** Lines of a user message shown before it is folded behind "Show more". */
+const USER_CLAMP_LINES = 12;
+
+/**
+ * A long user message, folded.
+ *
+ * the user: "some of these messages are really really long, keep user message
+ * bubbles short with a 'show more'." A pasted spec can be hundreds of lines,
+ * and it pushes the reply — the thing being looked for — off the screen.
+ * Short ones are untouched: a fold on three lines is worse than no fold.
+ */
+function ClampedText({ text }: { text: string }) {
+  const [open, setOpen] = useState(false);
+  const lines = text.split('\n');
+  const long = lines.length > USER_CLAMP_LINES || text.length > 1200;
+  if (!long || open) {
+    return (
+      <span className="whitespace-pre-wrap">
+        {text}
+        {long ? (
+          <button type="button" className="pd-usermsg-more pd-focusable" onClick={() => setOpen(false)}>
+            Show less
+          </button>
+        ) : null}
+      </span>
+    );
+  }
+  const shown = lines.slice(0, USER_CLAMP_LINES).join('\n').slice(0, 1200);
+  return (
+    <span className="whitespace-pre-wrap">
+      {shown}
+      {'…'}
+      <button type="button" className="pd-usermsg-more pd-focusable" onClick={() => setOpen(true)}>
+        Show more
+      </button>
+    </span>
+  );
+}
+
+
 /**
  * A generation rate we are willing to print.
  *
@@ -323,9 +364,7 @@ export function ChatThread() {
                           ))}
                         </div>
                       ) : null}
-                      {message.text.length > 0 ? (
-                        <span className="whitespace-pre-wrap">{message.text}</span>
-                      ) : null}
+                      {message.text.length > 0 ? <ClampedText text={message.text} /> : null}
                     </div>
                   </MessageRow>
                   {switcher}

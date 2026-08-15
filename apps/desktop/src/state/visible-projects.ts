@@ -22,6 +22,7 @@
 import { useEffect } from 'react';
 import { create } from 'zustand';
 import type { SessionSummary } from '../../electron/ipc-contract';
+import { isSandboxCwd } from '../chat/composer-bar-logic';
 import { AUTO_PROJECT_PREFIX, groupChats, useChatOrg } from './chat-org';
 import { listSessions } from './pi-connect';
 
@@ -71,11 +72,34 @@ export function visibleProjectsOf(
   sessions: readonly SessionSummary[],
   org: ReturnType<typeof useChatOrg>,
 ): VisibleProject[] {
-  return groupChats([...sessions], org).projects.map((g) => ({
+  /*
+   * THE PICKER STILL LISTS FOLDERS; THE SIDEBAR NO LONGER MAKES THEM PROJECTS.
+   *
+   * These used to come from groupChats' auto groups. the user removed those —
+   * "not every working directory folder becomes a project" — but the composer
+   * still has to offer the folders chats actually live in, or there is no way
+   * to point a new chat at one. So the folder entries are derived HERE, from
+   * the sessions, and exist only inside this picker.
+   */
+  const manual = groupChats([...sessions], org).projects.map((g) => ({
     id: g.project.id,
     name: g.project.name,
-    auto: g.auto,
+    auto: false,
   }));
+  const byCwd = new Map<string, { name: string; recent: string }>();
+  for (const s of sessions) {
+    const dir = normalizeDir(s.cwd);
+    if (dir === null || isSandboxCwd(s.cwd)) continue;
+    const name = dir.split('/').filter(Boolean).at(-1) ?? dir;
+    const prior = byCwd.get(dir);
+    if (prior === undefined || s.modifiedAt > prior.recent) {
+      byCwd.set(dir, { name, recent: s.modifiedAt });
+    }
+  }
+  const folders = [...byCwd.entries()]
+    .sort((a, b) => b[1].recent.localeCompare(a[1].recent))
+    .map(([dir, g]) => ({ id: `${AUTO_PROJECT_PREFIX}${dir}`, name: g.name, auto: true }));
+  return [...manual, ...folders];
 }
 
 /** One directory, one spelling: trailing slashes off (a lone `/` stays `/`), so
