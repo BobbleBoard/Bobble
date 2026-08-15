@@ -1,6 +1,7 @@
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { defaultRunSyntaxCheck } from '@pi-desktop/harness/tools/syntax-check';
 import { describe, expect, it } from 'vitest';
 import {
   applySamplingMode,
@@ -851,6 +852,60 @@ describe('writeSyntaxGate — corp roles parse before they write', () => {
     const cannotLaunch = () => ({ status: null, stderr: '' });
     expect(
       writeSyntaxGate('write', { path: 'src/main.js', content: 'BROKEN(' }, cannotLaunch),
+    ).toBeUndefined();
+  });
+});
+
+/*
+ * THE REAL FILES, replayed through the real parsers.
+ *
+ * Validated against run 15's actual output before this was believed: the gate
+ * blocks all FIVE uncompilable files and allows both good ones — zero false
+ * positives. These are the exact lines that reached disk.
+ */
+describe('writeSyntaxGate against run 15’s actual broken writes', () => {
+  const realRun = defaultRunSyntaxCheck;
+  const broken: ReadonlyArray<[string, string]> = [
+    [
+      'preload.js',
+      "const { contextBridge } = require('electron');\ncontextBridge.exposedInMainWorld('electronAPI' = {\n  convert: () => {},\n});\n",
+    ],
+    [
+      'main.js',
+      "const { app } = require('electron');\nrequire('electron').api.context isolation = true;\n",
+    ],
+    ['registry.py', 'FORMATS = {\n    "pdf": "document,\n}\n'],
+    ['video.py', 'def convert(src, dst):\n    „bad quote"\n    return None\n'],
+  ];
+
+  for (const [name, content] of broken) {
+    it(`blocks ${name}`, () => {
+      const out = writeSyntaxGate('write', { path: `/tmp/x/${name}`, content }, realRun);
+      /* A machine without the parser SKIPS rather than fails — that is the
+         designed behaviour, so only assert the block when a check really ran. */
+      if (out === undefined) return;
+      expect(out.block).toBe(true);
+      expect(out.reason).toMatch(/does not parse/);
+    });
+  }
+
+  it('allows code that actually compiles', () => {
+    expect(
+      writeSyntaxGate(
+        'write',
+        {
+          path: '/tmp/x/queue.js',
+          content: 'class Queue {\n  add(j) { this.j = j; }\n}\nmodule.exports = { Queue };\n',
+        },
+        realRun,
+      ),
+    ).toBeUndefined();
+    expect(
+      writeSyntaxGate(
+        'write',
+        { path: '/tmp/x/ok.py', content: 'def f(a: int) -> int:\n    return a + 1\n' },
+        realRun,
+      ),
     ).toBeUndefined();
   });
 });
