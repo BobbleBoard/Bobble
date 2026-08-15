@@ -87,9 +87,9 @@ describe('finalCheck', () => {
     /* Wording sharpened after run 6 — it now puts the CEO IN the user's chair
        ("You are now THE USER") rather than beside it ("read this as the user
        will"), because reading-as was satisfied by an `ls`. */
-    expect(ceo).toContain('You are now THE USER');
+    expect(ceo).toContain('standing in for them');
     /* The CEO path is now a flat list; its verbs live in the bullets. */
-    expect(ceo).toContain('Stop reading about the product and USE it');
+    expect(ceo).toContain('Go through the ENTIRE project');
     expect(ceo).toContain('build me a platformer');
   });
 
@@ -143,21 +143,26 @@ describe('the CEO check is a flat list, in the order that matters', () => {
   });
 
   it('tells it to open the product and do the real thing', () => {
-    expect(ceo()).toMatch(/Open the product the way the user would open it/);
-    expect(ceo()).toMatch(/a real file, a real input, the real action/);
+    expect(ceo()).toMatch(/Start where the user starts/);
+    expect(ceo()).toMatch(/every main thing it was built to do, with real inputs/);
   });
 
   it('tells it to open what came out and look at it', () => {
-    expect(ceo()).toMatch(/Open what it produced and look at it/);
+    expect(ceo()).toMatch(/Anything visual, look at it/);
+    expect(ceo()).toMatch(/open the file it/);
   });
 
   it('makes "I could not open it" a reportable finding, not a silence', () => {
-    expect(ceo()).toMatch(/cannot open it at all, say that plainly/);
+    expect(ceo()).toMatch(/cannot open or run it at all, that goes in the file first/);
   });
 
   it('casts the CEO as the user about to try it', () => {
-    expect(ceo()).toMatch(/You are now THE USER/);
-    expect(ceo()).toMatch(/Stop reading about the product and USE it/);
+    /* the user: "the ceo is not the user, but they should test in the shoes of the
+       end user via automation and visually if applicable". Roleplay invited a
+       claim of having looked; standing in for them is a job with a method. */
+    expect(ceo()).toMatch(/You are not the user, but you are standing in for them/);
+    expect(ceo()).toMatch(/by automation where you can/);
+    expect(ceo()).toMatch(/ENTIRE project, not a sample/);
   });
 
   it('routes anything wrong back to the manager instead of fixing it', () => {
@@ -167,11 +172,11 @@ describe('the CEO check is a flat list, in the order that matters', () => {
   });
 
   it('asks the manager for a specialist it cannot check itself', () => {
-    expect(ceo()).toMatch(/ask the manager to put a specialist on it/);
+    expect(ceo()).toMatch(/ask the manager to put a specialist on/);
   });
 
   it('answers the user only after using it', () => {
-    expect(ceo()).toMatch(/only after you have used it yourself/);
+    expect(ceo()).toMatch(/Answer the user only once the list is empty/);
   });
 
   /*
@@ -193,14 +198,29 @@ describe('the CEO check is a flat list, in the order that matters', () => {
 
   it('does not tell it to go make an undemonstrable claim true', () => {
     expect(ceo()).not.toMatch(/make it true/);
-    expect(ceo()).toMatch(/Say you could\s+not check it/);
+    expect(ceo()).toMatch(/say plainly what is still wrong/);
   });
 
   /* the user: "your guidelines should essentially be able to be put into a clean
      bulleted list." Sections are where instructions go to be skimmed at 4B. */
+  /* Findings go to a FILE as they are found, not held in context — a 4B that
+     keeps a list in its head reports the first item and forgets the rest. */
+  it('accumulates findings in a scratchpad instead of its head', () => {
+    const t = ceo();
+    expect(t).toContain('.scratch/verification.md');
+    expect(t).toMatch(/AS YOU FIND IT/);
+    expect(t).toMatch(/do not stop at the first one/);
+  });
+
+  it('sends the whole list back to the manager, not a fix of its own', () => {
+    const t = ceo();
+    expect(t).toMatch(/send the whole list to the manager/);
+    expect(t).toMatch(/Do not fix it yourself/);
+  });
+
   it('stays a short flat list', () => {
     const t = ceo();
-    expect(t.split('\n').length).toBeLessThan(32);
+    expect(t.split('\n').length).toBeLessThan(36);
     expect(t).not.toContain('WHAT CHECKING MEANS HERE');
     expect(t).not.toContain('WHAT YOU DO WITH WHAT YOU FIND');
   });

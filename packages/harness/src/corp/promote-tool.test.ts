@@ -318,7 +318,7 @@ describe('a failed production reports what is actually on disk', () => {
   it('carries the end-user test, like every other return with work on disk', async () => {
     const text = await runPromoted(failed('src/main.ts'));
     expect(text).toMatch(/Building is not testing/);
-    expect(text).toMatch(/Open what it produced and look at it/);
+    expect(text).toMatch(/Anything visual, look at it/);
     /* Numbered, so the CEO knows whether it reports before or after asking
        again — and told to STOP if the second ask also comes back empty, since
        this branch is reached because the manager already failed once. */
