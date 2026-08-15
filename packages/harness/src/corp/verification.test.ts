@@ -68,7 +68,9 @@ describe('finalCheck', () => {
     });
     expect(text).toContain('1. Created four sprite files');
     expect(text).toContain('2. The scene opens in Godot');
-    expect(text).toContain('comes OUT of your report, or you go and make it true');
+    /* Reworded: the old line told the model to "go and make it true", which is
+       the same instruction as "fix it yourself" that the CEO path forbids. */
+    expect(text).toContain('not one you may pass on');
   });
 
   it('asks the manager to read it as the CEO, and the CEO as the user', () => {
@@ -86,7 +88,8 @@ describe('finalCheck', () => {
        ("You are now THE USER") rather than beside it ("read this as the user
        will"), because reading-as was satisfied by an `ls`. */
     expect(ceo).toContain('You are now THE USER');
-    expect(ceo).toContain('did it WORK');
+    /* The CEO path is now a flat list; its verbs live in the bullets. */
+    expect(ceo).toContain('Stop reading about the product and USE it');
     expect(ceo).toContain('build me a platformer');
   });
 
@@ -118,54 +121,10 @@ describe('finalCheck', () => {
   });
 });
 
-describe('finalCheck — the CEO routes faults back, it does not silently repair', () => {
-  const ceo = () =>
+describe('the CEO check is a flat list, in the order that matters', () => {
+  const ceo = (claims: string[] = ['The app converts PNG to JPG']) =>
     finalCheck({
-      claims: ['The app converts PNG to JPG'],
-      profile: classifyVerification('build me a converter app'),
-      perspective: 'ceo',
-    });
-
-  /*
-   * the user: the CEO "needs to test itself, verify, tell the manager if anything is
-   * wrong". Run 5 ended with the CEO building the product alone and reporting it
-   * done — a team that never learned its work was broken.
-   */
-  it('sends anything wrong back to the manager', () => {
-    expect(ceo()).toContain('talk_to_manager');
-    expect(ceo()).toMatch(/BACK TO THE MANAGER/);
-  });
-
-  it('forbids quietly fixing it alone', () => {
-    expect(ceo()).toMatch(/[Dd]o not quietly fix it yourself/);
-  });
-
-  /* Reference material is evidence for the review, gathered by the team. */
-  it('asks the manager for specialists it cannot check itself', () => {
-    expect(ceo()).toMatch(/specialist/i);
-    expect(ceo()).toMatch(/reference/i);
-  });
-
-  it('checks before it answers the user', () => {
-    expect(ceo()).toMatch(/Only when you have checked/);
-  });
-
-  /* Everyone else keeps the original instruction — they have nobody to hand to. */
-  it('leaves the engineer perspective fixing its own faults', () => {
-    const eng = finalCheck({
-      claims: ['it builds'],
-      profile: classifyVerification('build me a converter app'),
-      perspective: 'engineer',
-    });
-    expect(eng).toContain('Fix whatever this turns up');
-    expect(eng).not.toContain('talk_to_manager');
-  });
-});
-
-describe('finalCheck — the CEO tests it visually, as the end user', () => {
-  const ceo = () =>
-    finalCheck({
-      claims: ['The app converts PNG to JPG'],
+      claims,
       profile: classifyVerification('build me a desktop converter app'),
       perspective: 'ceo',
     });
@@ -174,43 +133,88 @@ describe('finalCheck — the CEO tests it visually, as the end user', () => {
    * MEASURED, run 6: the CEO's whole verification was edit package.json,
    * `npm run build`, `cp` the DMG to /Applications, `ls`. It then told the user
    * "the application is now ready to use" over an app whose conversion core
-   * could not be require()d. Each of those commands ran clean, which is exactly
-   * why the check has to name them and rule them out.
+   * could not be require()d. Each command ran clean — which is why they are
+   * named and ruled out by name.
    */
   it('rules out the four things run 6 mistook for testing', () => {
     const t = ceo();
-    expect(t).toMatch(/BUILDING IS NOT TESTING/);
-    expect(t).toMatch(/Packaging is not testing/);
-    expect(t).toMatch(/Copying it into a[\s\S]{0,20}folder is not testing/);
-    expect(t).toMatch(/`ls` is not testing/);
+    expect(t).toMatch(/Building is not testing/);
+    expect(t).toMatch(/Packaging, copying it into a folder and `ls` are not/);
   });
 
   it('tells it to open the product and do the real thing', () => {
-    expect(ceo()).toMatch(/OPEN THE PRODUCT/);
-    expect(ceo()).toMatch(/real file, a real input, the real action/);
+    expect(ceo()).toMatch(/Open the product the way the user would open it/);
+    expect(ceo()).toMatch(/a real file, a real input, the real action/);
   });
 
-  it('tells it to LOOK — with its eyes, at an image', () => {
-    const t = ceo();
-    expect(t).toMatch(/LOOK AT THE RESULT WITH YOUR EYES/);
-    expect(t).toMatch(/[Ss]creenshot/);
-  });
-
-  /* Order matters for a 4B: this must lead, not trail the routing rules. */
-  it('puts the user-test FIRST, ahead of the routing rules', () => {
-    const t = ceo();
-    expect(t.indexOf('TEST IT AS THE END USER')).toBeLessThan(
-      t.indexOf('WHAT YOU DO WITH WHAT YOU FIND'),
-    );
+  it('tells it to open what came out and look at it', () => {
+    expect(ceo()).toMatch(/Open what it produced and look at it/);
   });
 
   it('makes "I could not open it" a reportable finding, not a silence', () => {
-    expect(ceo()).toMatch(/cannot open it, say so plainly/);
+    expect(ceo()).toMatch(/cannot open it at all, say that plainly/);
   });
 
-  /* The perspective framing has to put it IN the user's chair, not beside it. */
   it('casts the CEO as the user about to try it', () => {
     expect(ceo()).toMatch(/You are now THE USER/);
-    expect(ceo()).toMatch(/did it WORK/);
+    expect(ceo()).toMatch(/Stop reading about the product and USE it/);
+  });
+
+  it('routes anything wrong back to the manager instead of fixing it', () => {
+    const t = ceo();
+    expect(t).toContain('talk_to_manager');
+    expect(t).toMatch(/Do not fix it yourself/);
+  });
+
+  it('asks the manager for a specialist it cannot check itself', () => {
+    expect(ceo()).toMatch(/ask the manager to put a specialist on it/);
+  });
+
+  it('answers the user only after using it', () => {
+    expect(ceo()).toMatch(/only after you have used it yourself/);
+  });
+
+  /*
+   * ORDER IS THE FIX. The claims are machine-extracted from the MANAGER's
+   * sign-off, so a manager that wrote "All tests pass" had that promoted into a
+   * numbered, mandatory verification target. With the list first, the model
+   * reads "a build is not testing" BEFORE it reads "All tests pass" as claim 2.
+   */
+  it('puts the actions above the claims, not below them', () => {
+    const t = ceo(['The app converts PNG to JPG', 'All tests pass']);
+    expect(t.indexOf('Building is not testing')).toBeLessThan(t.indexOf('THE TEAM CLAIMED THESE'));
+  });
+
+  it('attributes the claims to the TEAM, which is who made them', () => {
+    const t = ceo();
+    expect(t).toContain('THE TEAM CLAIMED THESE');
+    expect(t).not.toContain('EVERY CLAIM YOU JUST MADE');
+  });
+
+  it('does not tell it to go make an undemonstrable claim true', () => {
+    expect(ceo()).not.toMatch(/make it true/);
+    expect(ceo()).toMatch(/Say you could\s+not check it/);
+  });
+
+  /* the user: "your guidelines should essentially be able to be put into a clean
+     bulleted list." Sections are where instructions go to be skimmed at 4B. */
+  it('stays a short flat list', () => {
+    const t = ceo();
+    expect(t.split('\n').length).toBeLessThan(32);
+    expect(t).not.toContain('WHAT CHECKING MEANS HERE');
+    expect(t).not.toContain('WHAT YOU DO WITH WHAT YOU FIND');
+  });
+
+  /* `vision` is the CEO's own brief, not the user's words — do not certify it
+     as verbatim, or CEO drift gets rubber-stamped instead of caught. */
+  it('labels the brief as the CEO own brief, never as the user verbatim', () => {
+    const t = finalCheck({
+      claims: [],
+      profile: classifyVerification('build a converter'),
+      perspective: 'ceo',
+      vision: 'build a converter, split into Backend and UI',
+    });
+    expect(t).toContain('WHAT YOU BRIEFED THE TEAM WITH');
+    expect(t).not.toContain('verbatim');
   });
 });

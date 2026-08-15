@@ -320,10 +320,15 @@ export function registerCreateHierarchyTool(pi: ExtensionAPI, deps: PromoteToolD
                      */
                     `The hand-off did not complete: ${why}.\n\n` +
                     `THE WORK IS STILL THERE. The workspace contains:\n${tree}\n\n` +
-                    'So do NOT start again and do NOT throw this away. Find out what ' +
-                    'actually works by USING it, then ask the manager to finish the rest. ' +
-                    'Tell the user what actually exists — not that it is finished, and not ' +
-                    `that nothing happened.\n\n${END_USER_TEST}`,
+                    'Do NOT start again and do NOT throw this away. In this order:\n\n' +
+                    '1. Open it and use it yourself — find out what actually works.\n' +
+                    `${END_USER_TEST}\n` +
+                    '2. If something is missing or broken, call `talk_to_manager` once more\n' +
+                    '   with exactly what you did and what you saw. If that comes back empty\n' +
+                    '   too, stop asking and go to 3.\n' +
+                    '3. Tell the user what you saw with your own eyes — not that it is\n' +
+                    '   finished, and not that nothing happened.\n\n' +
+                    `WHAT YOU BRIEFED THE TEAM WITH: ${brief}`,
             },
           ],
           isError: true,

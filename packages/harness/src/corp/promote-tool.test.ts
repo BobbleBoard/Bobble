@@ -253,7 +253,7 @@ describe('a refusal is not a product', () => {
     );
     expect(res.isError).toBeUndefined();
     expect(text(res)).toContain('three platforms');
-    expect(text(res)).toContain('THIS IS THE FINAL CHECK');
+    expect(text(res)).toContain('THIS CHECK DECIDES WHETHER YOU CAN ANSWER THE USER');
   });
 });
 
@@ -303,11 +303,11 @@ describe('a failed production reports what is actually on disk', () => {
     const text = await runPromoted(failed('src/main.ts\nsrc/converters/image-converter.ts'));
     expect(text).toContain('THE WORK IS STILL THERE');
     expect(text).toContain('src/converters/image-converter.ts');
-    expect(text).toMatch(/do NOT start again/);
+    expect(text).toMatch(/Do NOT start again/);
     /* Was "ask the manager for a short summary" — which is reading ABOUT the
        product again. A partial hand-off has something on disk to open, so the
        CEO finds out what works by USING it, and the end-user test rides along. */
-    expect(text).toMatch(/what actually works by USING it/);
+    expect(text).toMatch(/Open it and use it yourself/);
   });
 
   /*
@@ -317,15 +317,24 @@ describe('a failed production reports what is actually on disk', () => {
    */
   it('carries the end-user test, like every other return with work on disk', async () => {
     const text = await runPromoted(failed('src/main.ts'));
-    expect(text).toContain('TEST IT AS THE END USER');
-    expect(text).toMatch(/BUILDING IS NOT TESTING/);
-    expect(text).toMatch(/LOOK AT THE RESULT WITH YOUR EYES/);
+    expect(text).toMatch(/Building is not testing/);
+    expect(text).toMatch(/Open what it produced and look at it/);
+    /* Numbered, so the CEO knows whether it reports before or after asking
+       again — and told to STOP if the second ask also comes back empty, since
+       this branch is reached because the manager already failed once. */
+    expect(text).toMatch(/1\. Open it and use it yourself/);
+    expect(text).toMatch(/2\. If something is missing or broken/);
+    expect(text).toMatch(/stop asking and go to 3/);
+    expect(text).toMatch(/3\. Tell the user what you saw with your own eyes/);
+    /* RETURN B used to lack the brief entirely — "do the thing they asked" with
+       no statement of what that was. */
+    expect(text).toContain('WHAT YOU BRIEFED THE TEAM WITH');
   });
 
   /* Nothing on disk means nothing to open — do not send it hunting. */
   it('omits the end-user test when the workspace is empty', async () => {
     const text = await runPromoted(failed(''));
-    expect(text).not.toContain('TEST IT AS THE END USER');
+    expect(text).not.toMatch(/Open it and use it yourself/);
   });
 
   /* It must still not read as success — that is the other way to get this wrong. */

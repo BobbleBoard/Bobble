@@ -147,8 +147,15 @@ const RUNTIMES: ReadonlyArray<{ readonly words: readonly string[]; readonly cmd:
   { words: ['ffmpeg'], cmd: 'ffmpeg' },
 ];
 
+/*
+ * WHOLE WORDS ONLY. This was `text.includes(w)`, and MEASURED consequences:
+ * 'ui' matches inside "build" and "requirements", so `profile.ui` fired on
+ * nearly every brief ever written; 'rust' matches inside "trusted", so "a
+ * trusted local converter" resolved its runtime to `cargo`. A classifier that
+ * says yes to everything is not a classifier.
+ */
 const hasAny = (text: string, words: readonly string[]): boolean =>
-  words.some((w) => text.includes(w));
+  words.some((w) => new RegExp(`\\b${w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(text));
 
 /**
  * Decide what verification this text implies — run on the TASK at the start of a
@@ -271,20 +278,14 @@ const PERSPECTIVE: Record<VerificationPerspective, { readonly who: string; reado
  * "really test it" does not dislodge a habit that already feels like testing.
  */
 export const END_USER_TEST = [
-  'TEST IT AS THE END USER, AND LOOK AT IT. This comes before anything else.',
-  '',
-  '  - OPEN THE PRODUCT the way the user would open it, and DO THE THING they',
-  '    asked it to do — with a real file, a real input, the real action. Not a',
-  '    test script beside it: the product itself.',
-  '  - LOOK AT THE RESULT WITH YOUR EYES. Screenshot the window and view the',
-  '    image. Open the file it produced. A converted file that never opens is',
-  '    not a converted file.',
-  '  - BUILDING IS NOT TESTING. Packaging is not testing. Copying it into a',
-  '    folder is not testing. `ls` is not testing. A build that succeeds tells',
-  '    you the compiler was happy, and nothing whatsoever about whether the',
-  '    thing works.',
-  '  - If you cannot open it, say so plainly — that IS the finding, and it is',
-  '    the most important one you can report.',
+  '- Open the product the way the user would open it, and do the real thing they',
+  '  asked for — a real file, a real input, the real action. Not a test script',
+  '  beside it: the product itself.',
+  '- Open what it produced and look at it. A file that never opens is not a result.',
+  '- Building is not testing. Packaging, copying it into a folder and `ls` are not',
+  '  testing. They tell you the compiler was happy and nothing about whether it works.',
+  '- If you cannot open it at all, say that plainly. It is the most important thing',
+  '  you can report.',
 ].join('\n');
 
 /**
@@ -303,6 +304,71 @@ export function finalCheck(opts: {
   readonly vision?: string;
 }): string {
   const { claims, profile, perspective } = opts;
+
+  /*
+   * THE CEO'S CHECK IS A FLAT LIST, AND NOTHING ELSE.
+   *
+   * the user: "your guidelines should essentially be able to be put into a clean
+   * bulleted list." The previous version was ~45 lines in five titled sections
+   * whose own ordering contradicted itself — it announced "This comes before
+   * anything else" from the MIDDLE of the block. At 4B, sections are where
+   * instructions go to be skimmed.
+   *
+   * Order is load-bearing and was wrong. The claims list used to come FIRST, and
+   * it is machine-extracted from the manager's own sign-off — so a manager that
+   * wrote "All tests pass" and "The build completes with no errors" had those
+   * promoted into numbered, mandatory verification targets, twenty lines above
+   * the line saying a build is not verification. The harness was mandating the
+   * exact commands that shipped run 6. Actions first; claims after, as things to
+   * discharge BY using the product.
+   */
+  if (perspective === 'ceo') {
+    const out: string[] = [
+      'THIS CHECK DECIDES WHETHER YOU CAN ANSWER THE USER.',
+      '',
+      'You are now THE USER: the person who asked for this, who has not seen the',
+      'work and will not read the source. Stop reading about the product and USE it.',
+      '',
+      '- Open the product the way the user would open it, and do the real thing they',
+      '  asked for — a real file, a real input, the real action. Not a test script',
+      '  beside it: the product itself.',
+      '- Open what it produced and look at it. A file that never opens is not a result.',
+      '- Building is not testing. Packaging, copying it into a folder and `ls` are not',
+      '  testing. They tell you the compiler was happy and nothing about whether it works.',
+      '- If you cannot open it at all, say that plainly. It is the most important thing',
+      '  you can report.',
+      '- Anything wrong goes back to the manager: call `talk_to_manager` with what you',
+      '  did, what you saw, and which file. Do not fix it yourself — then nobody who',
+      '  built this ever learns it was broken.',
+      '- Anything you cannot check yourself, ask the manager to put a specialist on it.',
+      '- A claim you could not demonstrate does not go in your report. Say you could',
+      '  not check it.',
+      '- Answer the user only after you have used it yourself, and say what you saw.',
+    ];
+    if (profile.runtime !== null) {
+      out.push(
+        `- It is written for \`${profile.runtime}\`. Load it THERE, in a way that exits by`,
+        '  itself — a normal GUI window never returns and your turn hangs with it.',
+      );
+    }
+    if (claims.length > 0) {
+      out.push('', 'THE TEAM CLAIMED THESE. Check each one by using the product:', '');
+      claims.forEach((c, i) => {
+        out.push(`  ${i + 1}. ${c}`);
+      });
+    }
+    /*
+     * `vision` is the CEO's OWN brief to the manager (message + any divisions),
+     * not the user's words — labelling it "what they asked for, verbatim" made
+     * the harness certify the CEO's paraphrase as the user's request, so drift
+     * was rubber-stamped rather than caught. Label it for what it is.
+     */
+    if (opts.vision !== undefined && opts.vision.trim() !== '') {
+      out.push('', `WHAT YOU BRIEFED THE TEAM WITH: ${opts.vision.trim()}`);
+    }
+    return out.join('\n');
+  }
+
   const p = PERSPECTIVE[perspective];
   const lines: string[] = ['THIS IS THE FINAL CHECK. Do it now, in this turn.', ''];
 
@@ -318,8 +384,8 @@ export function finalCheck(opts: {
     });
     lines.push(
       '',
-      'A claim you cannot demonstrate right now is not a finding to mention later —',
-      'it comes OUT of your report, or you go and make it true.',
+      'A claim you cannot demonstrate right now is not one you may pass on — say',
+      'plainly that you could not check it.',
       '',
     );
   }
@@ -337,12 +403,16 @@ export function finalCheck(opts: {
   }
   if (profile.ui) {
     musts.push(
-      'ANY UI — DRIVE IT. Move through it as the user would, and WRITE NEW TESTS for it now and make them green. Tests that already passed prove nothing about what you just changed.',
+      'ANY UI — DRIVE IT. Move through it as the user would and watch what happens. Tests that already passed prove nothing about what you just changed.',
     );
   }
   if (profile.runtime !== null) {
     musts.push(
-      `THE RUNTIME — this is written for \`${profile.runtime}\`. Confirm it is installed and LOAD THE WORK IN IT. Saying it "will open" in a program you never launched is the single failure this check exists to catch. RUN IT IN A WAY THAT EXITS BY ITSELF — a validate/headless/\`--quit\` mode. Launching the editor or a normal GUI window NEVER RETURNS: the command hangs, your turn hangs with it, and the whole run stops. There is no \`timeout\` command on this machine, so the flags ARE your protection. For Godot the exact command is \`godot --headless --quit --path .\` — it loads every script and scene, PRINTS EVERY PARSE ERROR, and exits. Read that output: it is the difference between a project that opens and a folder of files. \`-e\` and a bare \`--path\` open the editor and hang forever.`,
+      `THE RUNTIME — this is written for \`${profile.runtime}\`. Confirm it is installed and LOAD THE WORK IN IT. Saying it "will open" in a program you never launched is the single failure this check exists to catch. RUN IT IN A WAY THAT EXITS BY ITSELF — a validate/headless/\`--quit\` mode: a normal GUI window NEVER RETURNS, and your turn hangs with it.${
+        profile.runtime === 'godot'
+          ? ' For Godot the exact command is `godot --headless --quit --path .` — it loads every script and scene, PRINTS EVERY PARSE ERROR, and exits. `-e` and a bare `--path` open the editor and hang forever.'
+          : ''
+      }`,
     );
   }
   musts.push(
@@ -355,56 +425,6 @@ export function finalCheck(opts: {
 
   if (opts.vision !== undefined && opts.vision.trim() !== '') {
     lines.push(`WHAT THEY ASKED FOR, verbatim: ${opts.vision.trim()}`, '');
-  }
-
-  /*
-   * WHAT THE CEO DOES WITH A FAULT IS NOT WHAT ANYONE ELSE DOES.
-   *
-   * Everyone else fixes what their check turns up. The CEO has a team that just
-   * built this, and the team is who should repair it — the user: "it needs to test
-   * itself, verify, tell the manager if anything is wrong". Left with the
-   * generic "fix whatever this turns up", the CEO quietly repairs the product
-   * alone, which is how a run ends with a manager that never learned its work
-   * was broken and a CEO that did the job twice.
-   */
-  if (perspective === 'ceo') {
-    lines.push(END_USER_TEST, '');
-    /*
-     * BE THE END USER, AND LOOK.
-     *
-     * MEASURED, run 6. The CEO's entire verification was: edit package.json,
-     * `npm run build`, `cp` the DMG to /Applications, `ls` that folder. Four
-     * commands, none of which is the product doing anything. It then told the
-     * user "the application is now ready to use". The app's conversion core
-     * could not even be require()d — `SyntaxError: Identifier 'imageProcessor'
-     * has already been declared` — and its drop zone was wired to a renderer
-     * function that fakes success with a setTimeout.
-     *
-     * Every one of those four commands felt like verification: they all ran,
-     * they all exited 0, they all produced output. That is exactly why this has
-     * to name them and rule them out. the user: the CEO "needs to always visually
-     * and AS THE END USER" test the project.
-     *
-     * This goes FIRST, before the routing rules — a 4B reads the top of a block
-     * and acts on it.
-     */
-    lines.push(
-      'WHAT YOU DO WITH WHAT YOU FIND:',
-      '',
-      '  - Anything wrong goes BACK TO THE MANAGER — call `talk_to_manager` again',
-      '    and say exactly what you did, what you saw, and which file it is in. The',
-      '    team that built it repairs it. Do not quietly fix it yourself: then',
-      '    nobody who built this ever learns it was broken.',
-      '  - Ask the manager to put a specialist on anything you could not check',
-      '    yourself — a reference build, screenshots of the real thing it is meant',
-      '    to resemble, a tester driving it — and use what comes back as the',
-      '    evidence for this review.',
-      '  - Only when you have checked it yourself and it holds up do you answer',
-      '    the user.',
-      '',
-      'Then say what you actually did to check, and what you actually saw.',
-    );
-    return lines.join('\n');
   }
 
   lines.push(
