@@ -305,6 +305,20 @@ export function SituationRoomSurface({
 
       <div className="pd-sitroom-body">
         <div className="pd-sitroom-main pd-scroll">
+          {/*
+           * WHOSE RUN THIS IS. the user: "above 'the team' it needs to say 'bobble'
+           * or 'user' or something for the original chat."
+           *
+           * The list starts at the manager and reads as though the manager were
+           * the top of the hierarchy. It is not — it is the top of the TEAM. The
+           * chart has no node for the conversation that commissioned the work
+           * (there is no CEO in the mesh; the chat model is the CEO), so nothing
+           * on this panel represented the user's own thread at all.
+           */}
+          <div className="pd-sitroom-owner">
+            <span className="pd-sitroom-owner-name">Bobble</span>
+            <span className="pd-sitroom-owner-note">your chat — this is its team</span>
+          </div>
           <RoomSection
             id="agents"
             title="The team"

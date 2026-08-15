@@ -4039,3 +4039,25 @@
   margin: 0;
   font-size: var(--pd-font-size-caption);
 }
+
+/* Whose run this is — see the comment in situation-surface.tsx. The panel's
+   list starts at the manager, which reads as the top of the hierarchy; this
+   says what it is actually the top OF. Deliberately quiet: it is a label, not
+   a row, and must not compete with the agents that are doing the work. */
+.pd-sitroom-owner {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 10px 12px 6px;
+}
+
+.pd-sitroom-owner-name {
+  font-size: var(--pd-font-size-body);
+  font-weight: 600;
+  color: var(--pd-text-primary);
+}
+
+.pd-sitroom-owner-note {
+  font-size: var(--pd-font-size-caption);
+  color: var(--pd-text-muted);
+}
