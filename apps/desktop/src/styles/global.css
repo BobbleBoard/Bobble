@@ -2038,19 +2038,19 @@ body {
   opacity: 0.75;
 }
 
-.pd-child-row-status[data-why='done'] {
+.pd-child-row-status[data-why="done"] {
   color: var(--pd-status-success-fg);
 }
-.pd-child-row-status[data-why='error'] {
+.pd-child-row-status[data-why="error"] {
   color: var(--pd-status-danger-fg);
 }
-.pd-child-row-status[data-why='paused'] {
+.pd-child-row-status[data-why="paused"] {
   color: var(--pd-status-warning-fg);
 }
 /* waiting/queued keeps the inherited muted colour — it is the normal state. */
 
-.pd-child-row-status[data-why='error'] .pd-child-row-dot,
-.pd-child-row-status[data-why='paused'] .pd-child-row-dot {
+.pd-child-row-status[data-why="error"] .pd-child-row-dot,
+.pd-child-row-status[data-why="paused"] .pd-child-row-dot {
   box-shadow: 0 0 5px currentColor;
 }
 
@@ -2069,33 +2069,4 @@ body {
 }
 .pd-usermsg-more:hover {
   color: var(--pd-text-primary);
-}
-
-/* The top bar as a route when viewing a subagent: ‹ Back · <name>. */
-.pd-topbar-route {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-.pd-topbar-back {
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--pd-text-muted);
-  font-size: var(--pd-font-size-body);
-  cursor: pointer;
-}
-.pd-topbar-back:hover {
-  color: var(--pd-text-primary);
-}
-.pd-topbar-dot {
-  color: var(--pd-text-muted);
-}
-.pd-topbar-where {
-  color: var(--pd-text-primary);
-  font-weight: 600;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }

@@ -78,7 +78,6 @@ function normalizeContent(raw: string): string {
   return deLed;
 }
 
-
 /**
  * Read one string field out of JSON that is STILL ARRIVING.
  *

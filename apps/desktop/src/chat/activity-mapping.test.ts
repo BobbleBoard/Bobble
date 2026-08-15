@@ -4,10 +4,10 @@
  * (bash command+output, edit diff, read preview, media opensInCanvas + tabSpec).
  */
 import type { AssistantMsg, ContentBlock, ToolResultMsg } from '@pi-desktop/engine';
+import { describe, expect, it } from 'vitest';
 // The harness SOURCE module, not the barrel — promotion.ts → org-chart.ts has
 // no imports at all, so this stays node/browser-safe (see auto-router.ts).
 import { TALK_TO_MANAGER } from '../../../../packages/harness/src/corp/promotion';
-import { describe, expect, it } from 'vitest';
 import {
   chainRunningFlags,
   cleanThought,
@@ -859,7 +859,10 @@ describe('the corp coordination rows are specific, not generic', () => {
      * buried both behind escaped newlines.
      */
     const step = mapToolStep(
-      call('c1', 'talk_to', { recipient: 'engineer:1', message: 'Build the deck.\nUse office-gen.' }),
+      call('c1', 'talk_to', {
+        recipient: 'engineer:1',
+        message: 'Build the deck.\nUse office-gen.',
+      }),
       result('c1', 'on it'),
       false,
     ).data as { kind: string; label: string; detail?: string; argsText?: string };
@@ -909,4 +912,4 @@ describe('the corp coordination rows are specific, not generic', () => {
     expect(step.label).toBe('Ready to delegate');
     expect(step.argsText).toContain('1. deck → engineer 1');
   });
-})
+});

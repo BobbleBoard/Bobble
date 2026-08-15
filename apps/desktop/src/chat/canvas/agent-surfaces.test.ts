@@ -95,4 +95,4 @@ describe('the terminal mirror shows where the command ran', () => {
   it('still marks a finished command with no output', () => {
     expect(mirrorCommandText('true', '', false, '/w/proj')).toContain('(no output)');
   });
-})
+});

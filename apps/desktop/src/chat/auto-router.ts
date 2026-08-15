@@ -36,10 +36,10 @@
 // export — that's W5's package to touch.)
 import { classify, type TaskClass } from '../../../../packages/harness/src/classify/classify.ts';
 import {
-  MODEL_TIERS,
-  type ModelTier,
   asksForTheTeam,
   effortForClass,
+  MODEL_TIERS,
+  type ModelTier,
   modelTierForClass,
   TIER_LABEL,
 } from '../../../../packages/harness/src/classify/tier.ts';

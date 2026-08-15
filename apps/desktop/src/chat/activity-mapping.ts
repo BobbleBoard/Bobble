@@ -541,7 +541,9 @@ function formatCommArgs(args: Record<string, unknown>): string | undefined {
       if (d === null || typeof d !== 'object') continue;
       const rec = d as Record<string, unknown>;
       const purpose = str(rec.purpose);
-      lines.push(`Division: ${str(rec.name) ?? '?'}${purpose !== undefined ? ` — ${purpose}` : ''}`);
+      lines.push(
+        `Division: ${str(rec.name) ?? '?'}${purpose !== undefined ? ` — ${purpose}` : ''}`,
+      );
     }
   }
   // request_test_tools: each kit with the reason it was asked for.
@@ -562,6 +564,47 @@ function formatCommArgs(args: Record<string, unknown>): string | undefined {
     lines.push(body);
   }
   return lines.join('\n');
+}
+
+/**
+ * WHICH ELEMENT a browser click/type acted on.
+ *
+ * There is no agreement between browser tools on what to call it — Playwright
+ * takes a `selector`, the computer-use tools take a `ref` or an `element`
+ * description, and several accept a plain accessible `label`. Any of them
+ * answers "what did it click", so any of them will do; a coordinate pair is the
+ * last resort, because "(412, 380)" is at least a place.
+ */
+function browserTarget(args: Record<string, unknown>): string | undefined {
+  const named =
+    str(args.selector) ??
+    str(args.ref) ??
+    str(args.element) ??
+    str(args.element_description) ??
+    str(args.label) ??
+    str(args.aria_label) ??
+    str(args.name);
+  if (named !== undefined) return named;
+  const coord = args.coordinate;
+  if (Array.isArray(coord) && coord.length >= 2 && coord.every((n) => typeof n === 'number')) {
+    return `(${coord[0]}, ${coord[1]})`;
+  }
+  const x = args.x;
+  const y = args.y;
+  return typeof x === 'number' && typeof y === 'number' ? `(${x}, ${y})` : undefined;
+}
+
+/**
+ * The text a `browser-type` step entered. Deliberately NOT `str()`-guarded on
+ * emptiness: clearing a field is a real action with an empty string as its
+ * argument, and reporting nothing there would make a clear look like a no-op.
+ */
+function browserTyped(args: Record<string, unknown>): string | undefined {
+  for (const key of ['text', 'value', 'input', 'keys', 'key'] as const) {
+    const v = args[key];
+    if (typeof v === 'string') return v;
+  }
+  return undefined;
 }
 
 /** The most meaningful single arg to surface inline for a connector/tool row. */
@@ -889,6 +932,17 @@ function mapToolStepData(
           status,
           detail: url,
           url,
+          /*
+           * WHAT WAS CLICKED, AND WHAT WAS TYPED. These were dropped on the
+           * floor: the step carried only a URL, so a click row could name the
+           * action and never its object, and the text a `type` step put into a
+           * form existed nowhere in the UI at all. Now that the browser rows
+           * expand, the reveal has somewhere to put them.
+           */
+          target: browserTarget(args),
+          typed: kind === 'browser-type' ? browserTyped(args) : undefined,
+          title: str(args.title),
+          pageStatus: str(args.status) ?? str(args.statusText),
           // Only the read/snapshot step expands the page text it returned.
           preview: kind === 'browser-read' ? str(result?.text) : undefined,
         },
@@ -898,7 +952,11 @@ function mapToolStepData(
       const src = pickMediaSrc(args, result);
       const mediaType = kind === 'pdf' ? 'PDF' : 'PNG';
       return {
-        data: { kind, label, status, filename, opensInCanvas: true },
+        // `src` rides along even though `opensInCanvas` is set: it is what the
+        // step can still name about itself if it ever reaches the chain without
+        // a canvas destination (B1 deliberately keeps the tab even for a missing
+        // src, so today that is a fallback rather than a live path).
+        data: { kind, label, status, filename, src, opensInCanvas: true },
         tabSpec: {
           kind,
           key: block.id,
@@ -964,6 +1022,18 @@ function mapToolStepData(
           argsText: formatArgs(args),
           output: str(result?.text),
         },
+      };
+    /*
+     * A LISTING IS NOT A FILE READ. `ls`/`list_dir`/`listdir` resolve to
+     * `folder`, but the arm below hardcodes `kind: 'read'` — so every directory
+     * listing reached the chain relabelled as a read, wearing the file-sheet
+     * glyph, while the open-folder icon drawn for exactly this case was never
+     * reachable. Same body as a read (a path plus the text it returned); the
+     * kind is the whole point.
+     */
+    case 'folder':
+      return {
+        data: { kind: 'folder', label, status, detail: path, filename, preview: str(result?.text) },
       };
     default:
       // read / file-preview: show the tool output inline.

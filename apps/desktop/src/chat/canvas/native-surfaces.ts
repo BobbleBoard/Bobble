@@ -25,10 +25,10 @@ import { type ITheme, Terminal } from '@xterm/xterm';
 import { useCallback, useEffect, useRef } from 'react';
 import type { BrowserBounds } from '../../../electron/canvas/browser-contract';
 import { officeKindForExt } from '../../../electron/office/office-contract';
-import { setOfficeEditorsAvailable } from './file-preview';
 import { usePiStore } from '../../state/pi-slice';
 import { useThemeStore } from '../../store/theme';
 import { browserBoundsForPanel, rectToBounds } from './browser-bounds';
+import { setOfficeEditorsAvailable } from './file-preview';
 import { fileArtifactFromText, openFileInCanvas } from './file-tabs';
 
 const MONO_STACK =

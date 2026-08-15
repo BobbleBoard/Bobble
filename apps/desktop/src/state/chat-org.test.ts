@@ -67,8 +67,7 @@ describe('shouldOfferProject — exactly the third chat', () => {
    * before the third time." Asking at one is noise; asking at four and five is
    * nagging.
    */
-  const inDir = (n: number) =>
-    Array.from({ length: n }, (_, i) => chat(`f${i}`, '/home/u/proj'));
+  const inDir = (n: number) => Array.from({ length: n }, (_, i) => chat(`f${i}`, '/home/u/proj'));
 
   it('does not offer before the third', () => {
     expect(shouldOfferProject(inDir(1), '/home/u/proj', EMPTY)).toBe(false);

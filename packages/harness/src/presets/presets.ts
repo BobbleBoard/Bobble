@@ -114,6 +114,30 @@ export const ALWAYS_ACTIVE_TOOLS: readonly string[] = [
    * bridge simply never lists it.
    */
   'present',
+  /*
+   * A CEO COMMISSIONS. the user: "it should always have the commission tools…
+   * that's what we wanted right, clean context ceo, until really needed for
+   * testing, no clutter with browser tools or anything (it can have the basic
+   * tools + search though always) and then it calls subagents to do browser use
+   * screenshots extraction of [a site's] ui, or research otherwise or image
+   * generation or motion graphics… it commissions, it's a CEO. have it act like
+   * one!"
+   *
+   * MEASURED, runs 10-12: told to close its unknowns before briefing its
+   * manager, the CEO delegated immediately every time. It had no way to look
+   * anything up — a `coding` turn front-loaded fs+bash+python and nothing else,
+   * and `capability` only lands from the NEXT reply, so research cost a turn
+   * while delegating cost none.
+   *
+   * Search and a way to hand work out are therefore not a task class, they are
+   * the baseline. Everything HEAVY still stays out — browser, image, video,
+   * motion, 3D, perception, connectors — because a subagent does that work in
+   * its own context and returns the answer. That is what keeps the CEO's own
+   * context clean while making "go and find out" something it can actually do.
+   */
+  'web_search',
+  'web_fetch',
+  'spawn_subagent',
 ];
 
 /**
@@ -176,26 +200,8 @@ export const PRESET_TOOLS: Record<TaskClass, readonly string[]> = {
   'simple-QA': [],
   'basic-tools': [...PYTHON, ...WEB],
   // Categories.
-  /*
-   * BUILDING USUALLY MEANS LOOKING SOMETHING UP, so WEB is in hand from the
-   * first turn.
-   *
-   * MEASURED, runs 10 and 11. The CEO was told to close its unknowns before
-   * briefing the manager — "don't ask the user, research it, commission
-   * specialists, get informed" — and both times made exactly ONE tool call,
-   * talk_to_manager, off one thought about the task being large. Not laziness:
-   * a `coding` turn front-loaded fs+bash+python and NO web tools, and a
-   * capability turned on mid-turn only lands "from your NEXT reply onward". So
-   * researching cost a whole turn round-trip, while delegating cost nothing —
-   * and the brief that went out was the model's own priors about the product,
-   * stated confidently.
-   *
-   * An instruction the tools cannot carry out is not a prompt problem, and
-   * rewording it does nothing. This is the general fix: a build task can read
-   * the docs, look at the thing it is cloning, check an API — the same way the
-   * mesh's engineers already can (corp-mesh's RESEARCH_TOOLS).
-   */
-  coding: [...CORE_FS, 'bash', ...PYTHON, ...WEB],
+  // WEB lives in ALWAYS_ACTIVE_TOOLS now — every turn can look something up.
+  coding: [...CORE_FS, 'bash', ...PYTHON],
   'file-ops': [...CORE_FS, 'bash'],
   // NOTE: the bare file `read` tool is deliberately NOT here — it was an
   // attractive nuisance that a small model grabbed ("Read a file") instead of
@@ -262,24 +268,29 @@ export function resolvePresetTools(
   // `capability` and `use` are a PAIR — one names tools, the other calls them.
   // Either alone is broken, so they are added together or not at all.
   if (includeToolSearch) {
-    for (const name of [TOOL_SEARCH_TOOL_NAME, USE_TOOL_NAME, ...ALWAYS_BROWSER_TOOLS]) {
+    /*
+     * BROWSER IS NO LONGER GLUED TO EVERY TURN. It used to ride along with
+     * `capability`/`use` on every class, which is precisely the clutter the user
+     * called out: "no clutter with browser tools or anything… it calls
+     * subagents to do browser use screenshots extraction… it commissions, it's
+     * a CEO." A subagent drives a browser in its OWN context and returns the
+     * answer; the browser-use class still front-loads the suite for a turn
+     * whose whole job IS driving a page.
+     */
+    for (const name of [TOOL_SEARCH_TOOL_NAME, USE_TOOL_NAME]) {
       if (available.has(name) && !seen.has(name)) {
         out.push(name);
         seen.add(name);
       }
     }
   }
-  // Front-load the subagent tool ONLY for genuinely-agentic classes (blind-test
-  // item 6). Trivial doc/file/answer tasks omit it here and reach it via the
-  // capability tool instead, so the model stops spawning a child for simple work.
-  if (
-    SUBAGENT_PRESET_CLASSES.has(cls) &&
-    available.has(SPAWN_SUBAGENT_TOOL_NAME) &&
-    !seen.has(SPAWN_SUBAGENT_TOOL_NAME)
-  ) {
-    out.push(SPAWN_SUBAGENT_TOOL_NAME);
-    seen.add(SPAWN_SUBAGENT_TOOL_NAME);
-  }
+  /*
+   * HANDING WORK OUT IS BASELINE, not a privilege of certain task classes.
+   * It used to be gated to SUBAGENT_PRESET_CLASSES, so whether the model could
+   * commission anything depended on how a keyword classifier read the prompt —
+   * and that is how a CEO told to "research it, commission specialists" ended
+   * up with no way to do either (runs 10-12). It is in ALWAYS_ACTIVE_TOOLS now.
+   */
   // Plan + ask-user stay active across every class (when registered) so the
   // model can always surface progress and ask questions.
   for (const name of ALWAYS_ACTIVE_TOOLS) {

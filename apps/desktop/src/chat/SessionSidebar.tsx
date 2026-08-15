@@ -249,7 +249,6 @@ interface WorkspaceNavItem {
   testid: string;
 }
 
-
 /**
  * The colour that goes with a child row's state word. Derived from the WORD so
  * this and the situation room cannot drift apart — one vocabulary, two surfaces.

@@ -87,7 +87,6 @@ function toRenderItems(messages: ChatMsg[], claimed: Set<string>): RenderItem[] 
   return items;
 }
 
-
 /** Lines of a user message shown before it is folded behind "Show more". */
 const USER_CLAMP_LINES = 12;
 
@@ -108,7 +107,11 @@ function ClampedText({ text }: { text: string }) {
       <span className="whitespace-pre-wrap">
         {text}
         {long ? (
-          <button type="button" className="pd-usermsg-more pd-focusable" onClick={() => setOpen(false)}>
+          <button
+            type="button"
+            className="pd-usermsg-more pd-focusable"
+            onClick={() => setOpen(false)}
+          >
             Show less
           </button>
         ) : null}
@@ -126,7 +129,6 @@ function ClampedText({ text }: { text: string }) {
     </span>
   );
 }
-
 
 /**
  * A generation rate we are willing to print.

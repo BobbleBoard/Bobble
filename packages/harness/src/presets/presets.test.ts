@@ -23,6 +23,12 @@ const BROWSER_SUITE = BROWSER_TOOL_NAMES;
 // The full v0.1+ tool universe, as it would appear once every workstream lands.
 // The browser_* names are the REAL ones registered by @pi-desktop/browser-use.
 const ALL_TOOLS = [
+  /* The always-active baseline has to be IN the universe or the contract test
+     below cannot see it (a tool is only listed when it is registered). */
+  'update_plan',
+  'ask_user',
+  'present',
+  'spawn_subagent',
   'read',
   'write',
   'edit',
@@ -80,253 +86,74 @@ describe('PRESET_TOOLS', () => {
   });
 });
 
-describe('resolvePresetTools — full tool universe', () => {
+describe('resolvePresetTools — what every turn can reach', () => {
   /*
-   * WEB IS IN THE CODING PRESET, and that is the point of it.
+   * THE BASELINE IS A CEO'S BASELINE. the user: "it should always have the
+   * commission tools… clean context ceo… no clutter with browser tools or
+   * anything (it can have the basic tools + search though always) and then it
+   * calls subagents to do browser use screenshots extraction… it commissions,
+   * it's a CEO."
    *
-   * MEASURED, runs 10/11: the CEO was told to research before briefing its
-   * manager and could not — a coding turn front-loaded fs+bash+python with no
-   * web tools, and a capability turned on mid-turn only lands from the NEXT
-   * reply. Researching cost a turn; delegating cost nothing. Building usually
-   * means looking something up, so it is in hand from the first turn.
+   * MEASURED, runs 10-12: told to close its unknowns before briefing its
+   * manager, the CEO delegated immediately every time — it had no web tool and
+   * no subagent tool, because a keyword classifier decided both. These assert
+   * the CONTRACT (what is reachable) rather than an exact array, so adding a
+   * tool to a class stops being a test edit.
    */
-  it('coding → filesystem + bash + python + WEB + capability', () => {
-    const tools = resolvePresetTools('coding', ALL_TOOLS);
-    expect(tools).toEqual([
-      'read',
-      'write',
-      'edit',
-      'ls',
-      'find',
-      'grep',
-      'bash',
-      'python_run',
-      'web_search',
-      'web_fetch',
-      'capability',
-      ...BROWSER_SUITE,
-    ]);
-  });
-
-  it('basic-tools → python + web + capability + the always-active file tools', () => {
-    // read/write/edit/bash are appended to EVERY class now (the user: never refuse a
-    // file op), after the class preset + capability.
-    expect(resolvePresetTools('basic-tools', ALL_TOOLS)).toEqual([
-      'python_run',
-      'web_search',
-      'web_fetch',
-      'capability',
-      ...BROWSER_SUITE,
-      'read',
-      'write',
-      'edit',
-      'bash',
-    ]);
-  });
-
-  it('browser-use → the REAL browser tools (snapshot present + early) + web_fetch + capability + file tools', () => {
-    expect(resolvePresetTools('browser-use', ALL_TOOLS)).toEqual([
-      ...BROWSER_SUITE,
-      'web_fetch',
-      'capability',
-      // browser_navigate is always appended, but this preset already leads with
-      // it — the dedupe keeps the first position rather than adding a second.
-      // Globally-active file tools, appended LAST so the browser tools still lead.
-      'read',
-      'write',
-      'edit',
-      'bash',
-    ]);
-  });
-
-  it('browser-use regression guard (round-10 #9): snapshot active + early; no fake tools', () => {
-    const tools = resolvePresetTools('browser-use', ALL_TOOLS);
-    // The perception tool MUST be present so the model can SEE the page, and
-    // near the front (right after navigate) so it reaches for it early.
-    expect(tools).toContain('browser_snapshot');
-    expect(tools.indexOf('browser_snapshot')).toBeLessThanOrEqual(1);
-    // The bug names must be gone.
-    expect(tools).not.toContain('browser_eval');
-    expect(tools).not.toContain('browser_screenshot');
-    // The page-text reader is present + still leads the file `read` (the user made
-    // read globally available, but it is appended LAST so browsing stays primary).
-    expect(tools).toContain('browser_read');
-    expect(tools.indexOf('browser_read')).toBeLessThan(tools.indexOf('read'));
-  });
-
-  it('video-edit → ffmpeg façade + fs + video_locate + capability (generation stays in advanced-video)', () => {
-    // read/write/edit are already in the preset's CORE_FS; only `bash` is added
-    // by the always-active set (appended at the very end).
-    expect(resolvePresetTools('video-edit', ALL_TOOLS)).toEqual([
-      'video_edit',
-      'extract_frames',
-      'probe',
-      'read',
-      'write',
-      'edit',
-      'ls',
-      'find',
-      'grep',
-      'video_locate',
-      'capability',
-      ...BROWSER_SUITE,
-      'bash',
-    ]);
-  });
-
-  it('perception → segment/detect/locate/ocr + video_edit + capability + file tools', () => {
-    expect(resolvePresetTools('perception', ALL_TOOLS)).toEqual([
-      'image_segment',
-      'image_detect',
-      'video_locate',
-      'image_ocr',
-      'video_edit',
-      'capability',
-      ...BROWSER_SUITE,
-      'read',
-      'write',
-      'edit',
-      'bash',
-    ]);
-  });
-
-  it('advanced-video preset is unchanged by the video split (still generation-shaped) + file tools', () => {
-    expect(resolvePresetTools('advanced-video', ALL_TOOLS)).toEqual([
-      'video_generate',
-      'video_edit',
-      'generate_image',
-      'edit_image',
-      'image_generate',
-      'image_edit',
-      'capability',
-      ...BROWSER_SUITE,
-      'read',
-      'write',
-      'edit',
-      'bash',
-    ]);
-  });
-
-  it('2d-art front-loads the REAL on-device image tools, not just placeholder names', () => {
-    // Regression: IMAGE_GEN listed only `image_generate`/`image_edit`, which no
-    // tool has ever registered — so resolvePresetTools filtered them out and a
-    // "draw me a …" turn front-loaded NO image tool at all.
-    const tools = resolvePresetTools('2d-art', ALL_TOOLS);
-    expect(tools).toContain('generate_image');
-    expect(tools).toContain('edit_image');
-    // …and the same for the classes that reach for an image on the way to something
-    // else (3D starts from a generated image; motion graphics composites them).
-    for (const cls of ['3d', 'motion-graphics'] as const) {
-      expect(resolvePresetTools(cls, ALL_TOOLS)).toContain('generate_image');
-    }
-  });
-
-  it('simple-QA → capability + the always-active file tools (never a bare refusal)', () => {
-    // Was tool-search-only; the user made read/write/edit/bash globally active so a
-    // simple-QA turn that suddenly needs a file can act instead of disclaiming.
-    const tools = resolvePresetTools('simple-QA', ALL_TOOLS);
-    expect(tools).toEqual(['capability', ...BROWSER_SUITE, 'read', 'write', 'edit', 'bash']);
-    expect(isToolSearchOnly(tools)).toBe(false);
-  });
-
-  it("'connectors' surfaces the macOS connectors + capability when registered", () => {
-    const tools = resolvePresetTools('connectors', ALL_TOOLS);
-    // A GENUINE calendar/mail/messages request (the `connectors` class) must hand
-    // the model the connector tools directly, not force a capability hop — the
-    // fix for "I can't access your calendar" refusals.
-    expect(tools).toContain('calendar_list_events');
-    expect(tools).toContain('mail_recent');
-    expect(tools).toContain('messages_send');
-    expect(tools).toContain('reminders_list');
-    expect(tools).toContain('contacts_search');
-    expect(tools).toContain('capability');
-    expect(isToolSearchOnly(tools)).toBe(false);
-  });
-
-  it("'other' (the generic fallback) does NOT drag in the connectors — minimal set", () => {
-    // The bloat fix (the user): a no-signal query used to route to 'other' and pick
-    // up all 10 personal-info connectors. 'other' is now tool-search-only, so
-    // even with EVERY tool registered it hands back only the always-active file
-    // tools + capability — the connectors stay out unless actually asked for.
-    const tools = resolvePresetTools('other', ALL_TOOLS);
-    expect(tools).not.toContain('calendar_list_events');
-    expect(tools).not.toContain('mail_recent');
-    expect(tools).not.toContain('messages_send');
-    expect(tools).toEqual(['capability', ...BROWSER_SUITE, 'read', 'write', 'edit', 'bash']);
-  });
-
-  it("'other' with no connectors falls back to the global file tools + capability", () => {
-    // With no connector tools registered, 'other' keeps only the always-active
-    // file tools + capability — no longer a bare tool-search-only refusal (the user).
-    const tools = resolvePresetTools('other', [
-      'read',
-      'write',
-      'edit',
-      'bash',
-      TOOL_SEARCH_TOOL_NAME,
-    ]);
-    expect(tools).toEqual(['capability', 'read', 'write', 'edit', 'bash']);
-    expect(isToolSearchOnly(tools)).toBe(false);
-  });
-
-  it('always keeps capability available across every class', () => {
-    for (const cls of TASK_CLASSES) {
-      expect(resolvePresetTools(cls, ALL_TOOLS)).toContain('capability');
-    }
-  });
-});
-
-describe('spawn_subagent is front-loaded only for agentic classes (blind-test item 6)', () => {
-  // The harness registers these three cross-cutting tools globally; add them to
-  // the available set so the gating is exercised (they were absent from ALL_TOOLS,
-  // which is why the exact-array preset tests above never surfaced them).
-  const WITH_HARNESS_TOOLS = [...ALL_TOOLS, SPAWN_SUBAGENT_TOOL_NAME, 'update_plan', 'ask_user'];
-
-  // Trivial tiers + single-artifact create tasks must NOT front-load the subagent
-  // — this is exactly the "write a doc" (other) / "create 3 files" (basic-tools)
-  // regression from the blind test.
-  const NON_SUBAGENT_CLASSES: readonly TaskClass[] = [
-    'simple-QA',
-    'basic-tools',
-    'file-ops',
-    '2d-art',
-    'other',
+  const BASELINE = [
+    'read',
+    'write',
+    'edit',
+    'bash',
+    'update_plan',
+    'ask_user',
+    'present',
+    'web_search',
+    'web_fetch',
+    'spawn_subagent',
+    'capability',
   ];
 
-  it('omits spawn_subagent for trivial doc/file/answer classes', () => {
-    for (const cls of NON_SUBAGENT_CLASSES) {
-      expect(resolvePresetTools(cls, WITH_HARNESS_TOOLS)).not.toContain(SPAWN_SUBAGENT_TOOL_NAME);
+  it('gives EVERY class the baseline — search and a way to hand work out', () => {
+    for (const cls of Object.keys(PRESET_TOOLS) as TaskClass[]) {
+      const tools = resolvePresetTools(cls, ALL_TOOLS);
+      for (const t of BASELINE) {
+        expect(tools, `${cls} is missing ${t}`).toContain(t);
+      }
     }
   });
 
-  it('front-loads spawn_subagent for genuinely-agentic classes', () => {
-    for (const cls of SUBAGENT_PRESET_CLASSES) {
-      expect(resolvePresetTools(cls, WITH_HARNESS_TOOLS)).toContain(SPAWN_SUBAGENT_TOOL_NAME);
+  it('keeps the heavy suites OUT unless the class is about them', () => {
+    /* A CEO commissions this work; it does not carry the tools around. */
+    for (const cls of ['coding', 'simple-QA', 'other', 'file-ops'] as TaskClass[]) {
+      const tools = resolvePresetTools(cls, ALL_TOOLS);
+      expect(tools, `${cls} dragged in the browser suite`).not.toContain('browser_snapshot');
+      expect(tools, `${cls} dragged in image generation`).not.toContain('generate_image');
     }
   });
 
-  it("'other' (the generic fallback) gets capability + file tools, no connectors, no subagent", () => {
-    const tools = resolvePresetTools('other', WITH_HARNESS_TOOLS);
-    expect(tools).not.toContain('calendar_list_events');
-    expect(tools).toContain('capability');
-    expect(tools).not.toContain(SPAWN_SUBAGENT_TOOL_NAME);
+  it('still front-loads the browser suite for a turn whose job IS a page', () => {
+    const tools = resolvePresetTools('browser-use', ALL_TOOLS);
+    expect(tools).toContain('browser_navigate');
+    expect(tools).toContain('browser_snapshot');
+    /* Round-10 #9: snapshot must be present and early — the model has to SEE
+       the page before it can click it. */
+    expect(tools.indexOf('browser_snapshot')).toBeLessThan(tools.indexOf('browser_click'));
   });
 
-  it('the two sets partition every class (each class is agentic XOR trivial for subagents)', () => {
-    for (const cls of TASK_CLASSES) {
-      const frontLoaded = resolvePresetTools(cls, WITH_HARNESS_TOOLS).includes(
-        SPAWN_SUBAGENT_TOOL_NAME,
-      );
-      expect(frontLoaded).toBe(SUBAGENT_PRESET_CLASSES.has(cls));
-    }
+  it('front-loads each class its own domain tools', () => {
+    expect(resolvePresetTools('coding', ALL_TOOLS)).toContain('python_run');
+    expect(resolvePresetTools('2d-art', ALL_TOOLS)).toContain('generate_image');
+    expect(resolvePresetTools('perception', ALL_TOOLS)).toContain('image_segment');
+    expect(resolvePresetTools('video-edit', ALL_TOOLS)).toContain('extract_frames');
+    expect(resolvePresetTools('connectors', ALL_TOOLS).length).toBeGreaterThan(BASELINE.length);
   });
 
-  it('plan + ask_user stay active across every class regardless of the subagent gate', () => {
-    for (const cls of TASK_CLASSES) {
-      const tools = resolvePresetTools(cls, WITH_HARNESS_TOOLS);
-      expect(tools).toContain('update_plan');
-      expect(tools).toContain('ask_user');
-    }
+  it('never lists a tool that is not registered', () => {
+    const tools = resolvePresetTools('coding', ['read', 'bash']);
+    expect(tools).toEqual(expect.arrayContaining(['read', 'bash']));
+    expect(tools).not.toContain('web_search');
+    expect(tools).not.toContain('spawn_subagent');
   });
 });
 

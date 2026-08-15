@@ -396,7 +396,13 @@ describe('one UI for an agent conversation', () => {
      * into the situation room's buttons or the subchats in the left sidebar."
      */
     const controller = createCanvasController();
-    const node = { id: 'engineer:1', name: 'Engineer 1', role: 'engineer', state: 'working', parentId: 'manager' } as never;
+    const node = {
+      id: 'engineer:1',
+      name: 'Engineer 1',
+      role: 'engineer',
+      state: 'working',
+      parentId: 'manager',
+    } as never;
     selectCorpNodeAndFocus(controller, 't1', node);
     expect(useChildAgentStore.getState().viewedChildId).toBe(corpChildId('engineer:1'));
   });
@@ -407,4 +413,4 @@ describe('one UI for an agent conversation', () => {
     selectCorpNodeAndFocus(controller, 't1', root);
     expect(useChildAgentStore.getState().viewedChildId).toBeNull();
   });
-})
+});
