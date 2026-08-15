@@ -17,6 +17,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   allowedWriteRoots,
   createSandboxFileTools,
+  FS_FENCE_ENV,
   guardDestructiveRewrite,
   isInsideRoots,
   isNamedDestination,
@@ -680,5 +681,110 @@ describe('withReadPathHeader', () => {
   it('does not throw on a result shape it does not recognise', () => {
     expect(withReadPathHeader(ABS, undefined)).toBeUndefined();
     expect(withReadPathHeader(ABS, 'plain')).toBe('plain');
+  });
+});
+
+describe('an edit that breaks a file is refused and rolled back', () => {
+  /*
+   * MEASURED, run 6 — the failure that sank the whole product.
+   *
+   * engineer-2 wrote src/core/converter.js (6,747 chars; syntax-checked, fine),
+   * then `edit`ed it with an oldText of the file's OWN FIRST LINE, prepending a
+   * second copy of the module ahead of the original. Every declaration ended up
+   * defined twice:
+   *
+   *   SyntaxError: Identifier 'imageProcessor' has already been declared
+   *
+   * The conversion core could not be require()d at all. The team then built the
+   * UI on it, packaged it with electron-builder, and shipped a 120MB DMG.
+   *
+   * The fence checked `params.content` — which only `write` has. `edit` carries
+   * `edits: [{oldText,newText}]`, so it was never parsed. `node --check` exits 1
+   * on that file; the check simply never ran on that path.
+   */
+  let ws: string;
+  const ctx = (cwd: string) => ({ cwd }) as unknown as ExtensionContext;
+  const tool = (name: string) => {
+    const t = createSandboxFileTools({ getRoot: () => ws }).find((x) => x.name === name);
+    if (t === undefined) throw new Error(`${name} tool missing`);
+    return t;
+  };
+
+  beforeEach(() => {
+    ws = fs.mkdtempSync(path.join(os.tmpdir(), 'editfence-'));
+    process.env[FS_FENCE_ENV] = '1';
+  });
+  afterEach(() => {
+    fs.rmSync(ws, { recursive: true, force: true });
+    delete process.env[FS_FENCE_ENV];
+  });
+
+  const GOOD =
+    "const formats = require('./formats.js');\nlet imageProcessor = null;\nmodule.exports = { formats };\n";
+
+  it('refuses the duplicating edit that run 6 shipped', async () => {
+    const file = path.join(ws, 'converter.js');
+    fs.writeFileSync(file, GOOD);
+    await expect(
+      tool('edit').execute(
+        'c1',
+        {
+          path: 'converter.js',
+          // Exactly run 6's shape: match the first line, put a whole copy in front.
+          edits: [{ oldText: "const formats = require('./formats.js');", newText: GOOD }],
+        },
+        undefined,
+        undefined,
+        ctx(ws),
+      ),
+    ).rejects.toThrow(/does not parse/);
+  });
+
+  it('leaves the file EXACTLY as it was — the refusal must be true', async () => {
+    const file = path.join(ws, 'converter.js');
+    fs.writeFileSync(file, GOOD);
+    await tool('edit')
+      .execute(
+        'c2',
+        {
+          path: 'converter.js',
+          edits: [{ oldText: "const formats = require('./formats.js');", newText: GOOD }],
+        },
+        undefined,
+        undefined,
+        ctx(ws),
+      )
+      .catch(() => {});
+    expect(fs.readFileSync(file, 'utf8')).toBe(GOOD);
+  });
+
+  it('still allows an edit that keeps the file parseable', async () => {
+    const file = path.join(ws, 'converter.js');
+    fs.writeFileSync(file, GOOD);
+    await tool('edit').execute(
+      'c3',
+      {
+        path: 'converter.js',
+        edits: [{ oldText: 'let imageProcessor = null;', newText: 'let imageProcessor = 1;' }],
+      },
+      undefined,
+      undefined,
+      ctx(ws),
+    );
+    expect(fs.readFileSync(file, 'utf8')).toContain('imageProcessor = 1');
+  });
+
+  /* A file with no checker must not be blocked by a check that cannot run. */
+  it('does not interfere with a file kind it cannot parse', async () => {
+    const file = path.join(ws, 'notes.md');
+    fs.writeFileSync(file, '# title\nbody\n');
+    await tool('edit').execute(
+      'c4',
+      { path: 'notes.md', edits: [{ oldText: 'body', newText: 'body {{{ unbalanced' }] },
+      undefined,
+      undefined,
+      ctx(ws),
+    );
+    expect(fs.readFileSync(file, 'utf8')).toContain('unbalanced');
   });
 });

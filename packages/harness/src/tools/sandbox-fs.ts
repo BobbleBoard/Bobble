@@ -617,35 +617,53 @@ function fenceTool<S extends TSchema, D>(
       if (typeof body === 'string') {
         const cleaned = stripMarkdownEscapes(stripCodeFence(body, abs), abs);
         // ...and never let a rewrite silently gut an existing file.
-        const destructive = guardDestructiveRewrite(abs, cleaned, (fp) => {
-          try {
-            return fs.readFileSync(fp, 'utf8');
-          } catch {
-            return null;
-          }
-        });
+        const destructive = guardDestructiveRewrite(abs, cleaned, readIfPresent);
         if (destructive !== null) throw new Error(destructive);
         // ...and never let a file that does not parse reach disk (see syntaxComplaint).
-        const unparseable = syntaxComplaint(abs, cleaned, (cmd, target) => {
-          const res = spawnSync(cmd[0] ?? '', [...cmd.slice(1), target], {
-            encoding: 'utf8',
-            /*
-             * ELECTRON_RUN_AS_NODE=1 here is the deliberate INVERSE of
-             * cleanChildEnv, and for the opposite reason. The model's own
-             * commands must not inherit it (it breaks any Electron they launch);
-             * this one must have it, because the binary being spawned is
-             * `process.execPath` — our own runtime — and we want it to behave as
-             * node rather than start an app. Harmless under a plain node, which
-             * ignores it.
-             */
-            env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
-          });
-          return { status: res.status, stderr: `${res.stderr ?? ''}${res.stdout ?? ''}` };
-        });
+        const unparseable = syntaxComplaint(abs, cleaned, runSyntaxCheck);
         if (unparseable !== null) throw new Error(unparseable);
         (next as Record<string, unknown>).content = cleaned;
       }
+      /*
+       * AN `edit` CAN BREAK A FILE JUST AS THOROUGHLY AS A `write`.
+       *
+       * Everything above inspects `params.content` — which only `write` has.
+       * `edit` carries `edits: [{oldText,newText}]`, so for its entire life the
+       * syntax fence has not applied to it. A guard on one door is not a guard;
+       * this file already learned that once, in hang-guard.ts.
+       *
+       * MEASURED, run 6. engineer-2 wrote src/core/converter.js (6,747 chars,
+       * syntax-checked, fine), then `edit`ed it with an oldText of the file's
+       * OWN FIRST LINE — `const formats = require('./formats.js');` — which
+       * prepended a fresh copy of the module ahead of the original. Every
+       * declaration ended up defined twice:
+       *
+       *   SyntaxError: Identifier 'imageProcessor' has already been declared
+       *
+       * The conversion core of the product could not be `require`d at all, and
+       * the team built the rest of the app, packaged it, and shipped a DMG on
+       * top of it. `node --check` exits 1 on that file — the check simply never
+       * ran.
+       *
+       * The edits are pi's to apply, so this verifies the RESULT rather than
+       * re-implementing them: snapshot, let it apply, re-read, parse. A file
+       * that does not parse is put back exactly as it was and the writer is told
+       * why — the same contract `write` has, and the same promise the refusal
+       * makes ("NOTHING WAS WRITTEN").
+       */
+      const checkable = fence && base.name === 'edit' && syntaxCheckFor(abs) !== undefined;
+      const before = checkable ? readIfPresent(abs) : null;
       const result = await base.execute(toolCallId, next, signal, onUpdate as never, ctx);
+      if (checkable) {
+        const after = readIfPresent(abs);
+        if (after !== null && after !== before) {
+          const broke = syntaxComplaint(abs, after, runSyntaxCheck);
+          if (broke !== null) {
+            if (before !== null) fs.writeFileSync(abs, before);
+            throw new Error(broke);
+          }
+        }
+      }
       if (base.name !== 'read') return result;
       const r = result as unknown as Record<string, unknown>;
       return { ...r, content: withReadPathHeader(abs, r.content) } as typeof result;
@@ -677,6 +695,35 @@ export function withReadPathHeader(abs: string, content: unknown): unknown {
   if (i === -1) return [{ type: 'text', text: abs }, ...parts];
   return parts.map((p, n) => (n === i ? { ...p, text: `${abs}\n${String(p.text)}` } : p));
 }
+
+/** Read a file, or null if it is not there — the shape both guards want. */
+function readIfPresent(p: string): string | null {
+  try {
+    return fs.readFileSync(p, 'utf8');
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Spawn a syntax checker. ONE definition, used by both the `write` path and the
+ * post-`edit` verification — the bug this exists to prevent was exactly two
+ * mutation paths disagreeing about whether files get parsed.
+ *
+ * ELECTRON_RUN_AS_NODE=1 here is the deliberate INVERSE of cleanChildEnv, and
+ * for the opposite reason. The model's own commands must not inherit it (it
+ * breaks any Electron they launch); this one must have it, because the binary
+ * being spawned is `process.execPath` — our own runtime — and we want it to
+ * behave as node rather than start an app. Harmless under a plain node, which
+ * ignores it.
+ */
+const runSyntaxCheck: RunSyntaxCheck = (cmd, target) => {
+  const res = spawnSync(cmd[0] ?? '', [...cmd.slice(1), target], {
+    encoding: 'utf8',
+    env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
+  });
+  return { status: res.status, stderr: `${res.stderr ?? ''}${res.stdout ?? ''}` };
+};
 
 export interface SandboxFsOptions {
   /** Override the workspace-root resolver (tests). Default: {@link resolveWorkspaceRoot}. */
