@@ -131,7 +131,25 @@ export const CREATE_PRODUCTION_HIERARCHY_TOOL: OpenAiFunctionTool = {
       'you articulate exactly what you want. Be specific about all details. No technical or ' +
       'implementation details are needed however — simply describe what you want done. Decide ' +
       'what the thing IS, what it contains, how it should look and feel, and what would make ' +
-      'it good; leave how to build it to the team.',
+      'it good; leave how to build it to the team. ' +
+      /*
+       * FIND OUT BEFORE YOU BRIEF. the user: "I want to incentivize some sort of
+       * research and ideally get it to commission something that goes and grabs
+       * [a reference]… but of course not overfitting to the task."
+       *
+       * So this names no domain and no artifact type — not UI, not cloning, not
+       * "if you are copying something". The general property is that a brief
+       * written from guesses produces a build made of guesses, and the CEO is
+       * the only one who can close its own unknowns: the manager has not spoken
+       * to the user and knows only what it is told. Anything concrete the CEO
+       * can attach — a page it read, a file it found, a picture of the real
+       * thing — is worth more to a 4B engineer than a paragraph of adjectives.
+       */
+      'BEFORE YOU SEND IT: anything you would otherwise be guessing at, find out first. ' +
+      'Look it up, look at whatever already exists that does this, and put what you find ' +
+      'INTO the brief — a link, a page you read, a file, a picture. If finding out is a job ' +
+      'in itself, say so in the brief and ask the manager to put someone on it before the ' +
+      'build starts. A vision written from guesses gets built from guesses.',
     parameters: {
       type: 'object',
       properties: {
