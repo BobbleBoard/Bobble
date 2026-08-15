@@ -87,7 +87,7 @@ try {
     `verdict is a fit verdict ("${label}")`,
   );
   check(
-    /GB of \d+ GB with a \d+k context/.test(detail),
+    /GB of \d+ GB, at a \d+k window/.test(detail),
     `verdict shows its arithmetic ("${detail}")`,
   );
   await card.screenshot({ path: path.join(OUT, '2-card.png') });

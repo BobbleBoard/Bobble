@@ -114,8 +114,25 @@ export function quantFit(input: QuantFitInput): RamVerdict {
    */
   const needGB = estimateLaunchRamGB(modelBytes, ctx);
   const withVisionGB = mmprojBytes > 0 ? estimateLaunchRamGB(modelBytes + mmprojBytes, ctx) : null;
+  /*
+   * SHOW THE WHOLE SUM, IN ONE UNIT.
+   *
+   * The card quotes file sizes base-1000 ("13 GB", matching HuggingFace and
+   * every download UI) while every memory figure here is base-1024 — so a bare
+   * "13 GB model needs ≈18.5 GB" looks like 5.5 GB of unexplained overhead, and
+   * the two numbers labelled GB are not even the same GB. (Unsloth Desktop has
+   * exactly this split too; theirs is unexplained.) Breaking the estimate into
+   * its terms makes the arithmetic add up on screen, all in GiB.
+   *
+   * The parts are DERIVED from the total rather than recomputed, so they cannot
+   * drift from `estimateLaunchRamGB` if its formula changes.
+   */
+  const weightsGB = modelBytes / 1024 ** 3;
+  const runtimeGB = 1;
+  const contextGB = Math.max(0, needGB - weightsGB - runtimeGB);
   const detail =
-    `≈${needGB.toFixed(1)} GB of ${totalRamGB} GB with a ${Math.round(ctx / 1024)}k context` +
+    `${weightsGB.toFixed(1)} weights + ${contextGB.toFixed(1)} context + ${runtimeGB.toFixed(1)} ` +
+    `runtime ≈ ${needGB.toFixed(1)} GB of ${totalRamGB} GB, at a ${Math.round(ctx / 1024)}k window` +
     (withVisionGB !== null ? ` (≈${withVisionGB.toFixed(1)} GB with vision on)` : '');
   if (needGB <= budgetGB) return { tone: 'success', label: 'Fits', fits: true, detail };
   if (needGB <= totalRamGB) {

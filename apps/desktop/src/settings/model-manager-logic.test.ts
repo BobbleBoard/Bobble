@@ -338,10 +338,19 @@ describe('quantFit — the verdict weighs the quant on screen', () => {
     expect(tight.fits).toBe(true);
   });
 
-  it('shows its working so the number can be argued with', () => {
+  it('shows the whole sum, in one unit, so the arithmetic adds up on screen', () => {
     const v = quantFit({ modelBytes: 13.44 * GB, ...M5_PRO_24GB });
     expect(v.detail).toMatch(/GB of 24 GB/);
-    expect(v.detail).toMatch(/64k context/);
+    expect(v.detail).toMatch(/64k window/);
+    // weights + context + runtime must actually equal the total shown.
+    const m = /([\d.]+) weights \+ ([\d.]+) context \+ ([\d.]+) runtime ≈ ([\d.]+) GB/.exec(
+      v.detail ?? '',
+    );
+    expect(m).not.toBeNull();
+    const [w, c, r, total] = (m ?? ['0', '0', '0', '0', '0']).slice(1).map(Number) as number[];
+    expect((w ?? 0) + (c ?? 0) + (r ?? 0)).toBeCloseTo(total ?? 0, 1);
+    // And the weights term is the file in GiB, not the base-1000 GB on the card.
+    expect(w ?? 0).toBeCloseTo((13.44 * GB) / 1024 ** 3, 1);
   });
 
   it('stays neutral when the machine is unknown rather than guessing', () => {
