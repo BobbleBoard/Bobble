@@ -26,7 +26,7 @@
  * Exit code 0 means the run was DRIVEN, never that the product is good — the
  * verification is the hierarchy, and ultimately a human looking at the artifacts.
  */
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -368,6 +368,54 @@ try {
     await app.close().catch(() => {});
     process.exit(6);
   }
+
+  /*
+   * "READY" IS NOT "ANSWERING", AND ON A BIG MODEL THE GAP IS WHOLE SECONDS.
+   *
+   * MEASURED, run 16 (Qwen3.8-27B, 13.4 GB): the supervisor reported `model
+   * ready` at t+25s, this typed the prompt immediately, and pi's first four
+   * requests all came back `fetch failed`. The CEO gave up and sat idle for the
+   * rest of the run — five messages, zero tool calls, zero files. The server was
+   * fine; by the time anyone looked, `/health` answered `{"status":"ok"}` on the
+   * port models.json named. The race is between the health flip and pi actually
+   * holding a usable connection, and it never showed on a 641 MB 4B because the
+   * window is too small to hit.
+   *
+   * So: ask the server the question the run is about to ask it — one token
+   * through the real endpoint, at the URL pi was given — and only type when that
+   * comes back. Reading models.json is the point: it verifies the address pi
+   * will use, not one this script picked.
+   */
+  const served = await (async () => {
+    const modelsJson = path.join(process.env.HOME ?? '', '.pi/agent/models.json');
+    const deadline = Date.now() + 180_000;
+    let lastErr = 'never resolved a baseUrl';
+    while (Date.now() < deadline) {
+      try {
+        const doc = JSON.parse(readFileSync(modelsJson, 'utf8'));
+        const base = doc?.providers?.llamacpp?.baseUrl;
+        if (typeof base === 'string' && base !== '') {
+          const res = await fetch(`${base}/chat/completions`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+              messages: [{ role: 'user', content: 'hi' }],
+              max_tokens: 1,
+              stream: false,
+            }),
+          });
+          if (res.ok) return base;
+          lastErr = `HTTP ${res.status}`;
+        }
+      } catch (e) {
+        lastErr = e instanceof Error ? e.message : String(e);
+      }
+      await page.waitForTimeout(2000);
+    }
+    log(`WARNING: the server never answered a test completion (${lastErr}) — sending anyway`);
+    return null;
+  })();
+  if (served !== null) log('server answered a real completion:', served);
 
   await page.click('[data-testid="composer-input"]');
   await page.keyboard.insertText(TASK);
