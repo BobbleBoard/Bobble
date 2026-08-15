@@ -12,7 +12,6 @@ import { createHash } from 'node:crypto';
 import { createReadStream, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { rm, unlink } from 'node:fs/promises';
 import { homedir, totalmem } from 'node:os';
-import { modelFitsInRam } from './model-fit';
 import { dirname, join } from 'node:path';
 import {
   buildMlxProviderBlock,
@@ -60,6 +59,7 @@ import type {
   LlmTierPick,
 } from '../ipc-contract';
 import { DownloadCancellation, discardPartials, partialPaths } from './download-cancellation';
+import { modelFitsInRam } from './model-fit';
 import { fastTextSlotLaunch } from './parallel-launch';
 import type {
   HfListFilesReply,
@@ -474,7 +474,14 @@ async function downloadOne(
   try {
     await downloadModel(model, {
       quant,
-      launchMode: 'fast-text',
+      /*
+       * A DOWNLOAD FETCHES WHAT THE MODEL NEEDS, not what the next launch
+       * happens to want. This was `launchMode: 'fast-text'`, which skips the
+       * vision projector — so a vision model read as fully downloaded and then
+       * stalled for ~1 GB the first time it was shown an image. Unsloth Desktop
+       * folds the projector into every variant's download for the same reason.
+       */
+      allCompanions: true,
       signal,
       hfToken,
       onProgress: (file, p) =>
@@ -676,7 +683,6 @@ async function startMlxServer(
  * resident, so it is a no-op).
  */
 let startInFlight: Promise<{ success: boolean; baseUrl?: string; error?: string }> | null = null;
-
 
 function startServer(
   modelId: string,

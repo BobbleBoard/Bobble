@@ -16,6 +16,17 @@ export interface ModelDownloadOptions {
   readonly quant?: string;
   /** Launch mode decides whether the mmproj / MTP sibling is fetched too. */
   readonly launchMode?: LaunchMode;
+  /**
+   * Fetch EVERY sibling the model can use, ignoring `launchMode`.
+   *
+   * The download question ("what might this model need?") is not the launch
+   * question ("what am I loading right now?"), and conflating them is why a
+   * vision model could be fully "downloaded" with no projector on disk: the
+   * Model Manager downloads as `fast-text`, so the mmproj was left to be
+   * fetched on demand — i.e. the first time you send it an image, mid-chat,
+   * as a surprise ~1 GB stall.
+   */
+  readonly allCompanions?: boolean;
   /** Directory override (defaults to `~/.cache/pi-desktop/models/<id>`). */
   readonly dir?: string;
   /** Per-file progress; `file` names which sibling is downloading. */
@@ -88,22 +99,23 @@ export async function downloadModel(
 ): Promise<DownloadedModel> {
   const dir = opts.dir ?? modelDir(model.id);
   const mode = opts.launchMode ?? 'fast-text';
+  const all = opts.allCompanions === true;
 
   const mainFile = pickFile(model, opts.quant);
   const modelPath = await fetchOne(model.hfRepo, mainFile, dir, opts);
 
   let mmprojPath: string | undefined;
-  if (mode === 'multimodal' && model.mmproj !== undefined) {
+  if ((all || mode === 'multimodal') && model.mmproj !== undefined) {
     mmprojPath = await fetchOne(model.hfRepo, model.mmproj, dir, opts);
   }
 
   let mtpPath: string | undefined;
-  if (mode === 'fast-text' && model.mtpFile !== undefined && model.mtpEmbedded !== true) {
+  if ((all || mode === 'fast-text') && model.mtpFile !== undefined && model.mtpEmbedded !== true) {
     mtpPath = await fetchOne(model.hfRepo, model.mtpFile, dir, opts);
   }
 
   let draftPath: string | undefined;
-  if (mode === 'fast-text' && model.spec === 'eagle3' && model.draftModel !== undefined) {
+  if ((all || mode === 'fast-text') && model.spec === 'eagle3' && model.draftModel !== undefined) {
     // The EAGLE-3 draft usually lives in a separate repo (draftRepo).
     draftPath = await fetchOne(model.draftRepo ?? model.hfRepo, model.draftModel, dir, opts);
   }
