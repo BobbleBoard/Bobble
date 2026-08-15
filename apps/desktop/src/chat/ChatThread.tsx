@@ -41,7 +41,6 @@ import { usePiStore } from '../state/pi-slice';
 import { openPresented, usePresentStore } from '../state/present-store';
 import { AssistantGroup } from './AssistantGroup';
 import { focusSituationTab } from './canvas/corp-canvas-routing';
-import { CorpChatStream } from './corp/CorpChatStream';
 import { CorpInlineTurn } from './corp/CorpInlineTurn';
 import { corpChatView, corpPeekAvailable } from './corp/corp-thread-view';
 import { HarnessChecklistPanel, ThreadStatusIndicator } from './HarnessStatus';
@@ -420,9 +419,26 @@ export function ChatThread() {
               indicator (clickable → the situation-room canvas); pre-promotion streams
               the solo CEO/root. The subagent NAVIGATOR + checklist live in the
               situation-room canvas tab, which opens when the model builds a team. */}
-          {corpTaskId !== null && corpView.kind === 'stream' ? (
-            <CorpChatStream taskId={corpTaskId} node={corpView.node} />
-          ) : corpTaskId !== null && corpView.kind === 'waiting' && corpSituation !== null ? /*
+          {/*
+           * NO ROLE'S CHAT RENDERS HERE. EVER. the user, after three attempts at
+           * this: "the embedded ceo-manager chat (not just the message bubble
+           * the entire ceo-manager chat is shown there) just needs to be
+           * removed. just remove that, not a complicated idea."
+           *
+           * A pinned role used to STREAM INTO THIS THREAD, which is how the
+           * CEO-manager conversation ended up beneath the user's own messages —
+           * they scroll to the bottom of their chat and find the manager saying
+           * it is done. Every previous fix trimmed one route in and left this
+           * one, because it only fires while something is pinned.
+           *
+           * A role is read in ITS OWN chat, opened from the sidebar or the
+           * situation room — which is exactly what the user asked for the first
+           * time: "ceo-manager is shown when clicked on the manager subchat
+           * just as manager-subagent chat is shown when any subagent is
+           * clicked on." This thread stays the user's conversation with Bobble
+           * and nothing else.
+           */}
+          {corpTaskId !== null && corpView.kind === 'waiting' && corpSituation !== null ? /*
            * NOTHING. the user: "this forming a plan bar just needs to go in it's
            * entirety aswell."
            *

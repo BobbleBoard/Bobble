@@ -11,6 +11,7 @@
  *  5. a not-started node B reads "Not yet queued" with its contract still shown;
  *  6. when the pinned node A finishes, the pin auto-drops (return to overview).
  */
+import { readFileSync } from 'node:fs';
 import {
   CanvasProvider,
   createCanvasController,
@@ -374,5 +375,28 @@ describe('the user thread never shows somebody else another agent is talking to'
     expect(
       corpChatView({ taskId: 't1', situation: withNodes([]), liveNode: null, pinnedNode: null }),
     ).toEqual({ kind: 'starting' });
+  });
+});
+
+describe('no role chat is ever embedded in the user thread', () => {
+  /*
+   * the user asked for this three times. First: "no ceo-manager chat embedded into
+   * the ceo-user chat?" Then: "it's still embedded and shown right below the
+   * user chat." Then, with a screenshot: "the embedded ceo-manager chat (not
+   * just the message bubble the entire ceo-manager chat is shown there) just
+   * needs to be removed. just remove that, not a complicated idea."
+   *
+   * Two earlier fixes each closed ONE route in — corpChatView returning a node
+   * to stream, then the waiting branch's own lead-node transcript — and each
+   * time the remaining route kept rendering it. ChatThread no longer mounts
+   * CorpChatStream at all: a role is read in its own chat, opened from the
+   * sidebar or the situation room.
+   */
+  it('ChatThread does not import or mount the role stream', () => {
+    /* jsdom gives import.meta.url an http scheme, so resolve from the vitest
+       root (apps/desktop) instead. */
+    const src = readFileSync('src/chat/ChatThread.tsx', 'utf8');
+    expect(src).not.toContain('<CorpChatStream');
+    expect(src).not.toContain("from './corp/CorpChatStream'");
   });
 });
