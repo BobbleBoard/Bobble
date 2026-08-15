@@ -947,7 +947,9 @@ async function startServerExclusive(
       // Undefined for every fast-text launch (mmprojFileFor is the chokepoint),
       // set only when vision was explicitly requested — the lazy guarantee.
       mmprojPath,
-      mtpSupported: features.mtp,
+      /* `specDisabled` models keep their declared head and simply do not launch
+         with it — measured slower on this hardware. See CatalogModel. */
+      mtpSupported: features.mtp && model.specDisabled !== true,
       mtpEmbedded: launchMode === 'fast-text' ? model.mtpEmbedded : undefined,
       mtpPath:
         mtpSiblingPath !== undefined && existsSync(mtpSiblingPath) ? mtpSiblingPath : undefined,

@@ -120,7 +120,12 @@ async function runOnce({ server, files, spec, template }) {
   ];
   if (template !== undefined) args.push('--chat-template-file', template);
   if (spec) args.push('--spec-type', 'draft-mtp', '--spec-draft-n-max', '2');
-  if (files.mmproj !== undefined) args.push('--mmproj', files.mmproj);
+  /* NO_MMPROJ=1 isolates the projector, because MTP and `--mmproj` are
+     documented as mutually exclusive per launch and a compute error on
+     generation is exactly what that would look like. */
+  if (files.mmproj !== undefined && process.env.NO_MMPROJ !== '1') {
+    args.push('--mmproj', files.mmproj);
+  }
 
   console.log(
     `\n$ llama-server ${args.map((a) => (a.includes('/') ? path.basename(a) : a)).join(' ')}`,
@@ -143,7 +148,25 @@ async function runOnce({ server, files, spec, template }) {
     console.log(`  loaded in ${loadS.toFixed(1)}s`);
 
     const runs = [];
-    for (const p of PROMPTS) runs.push(await measure(PORT, p));
+    for (const p of PROMPTS) {
+      try {
+        runs.push(await measure(PORT, p));
+      } catch (err) {
+        /* The server's own words. A bare "HTTP 500 Compute error." from the
+           client says nothing about WHY; llama-server prints the reason. */
+        console.log(`  request failed: ${err instanceof Error ? err.message : String(err)}`);
+        console.log('  --- llama-server stderr (tail) ---');
+        console.log(
+          stderr
+            .split('\n')
+            .filter((l) => l.trim() !== '')
+            .slice(-30)
+            .map((l) => `  | ${l}`)
+            .join('\n'),
+        );
+        throw err;
+      }
+    }
     const totalTokens = runs.reduce((s, r) => s + r.predicted, 0);
     const avgTps = runs.reduce((s, r) => s + r.tps, 0) / runs.length;
     for (const r of runs) {
@@ -174,12 +197,19 @@ console.log(`model:    ${path.basename(files.model)}`);
 console.log(`mmproj:   ${files.mmproj === undefined ? '(none)' : path.basename(files.mmproj)}`);
 console.log(`context:  ${CTX}`);
 
-// The fixed chat template, if it was cached by a download or launch.
+/*
+ * The template THIS MODEL declares, not the first Qwen-ish file in the cache.
+ * The loose `/qwen|froggeric/` match picked `Qwen--Qwen3.5-4B.jinja` for a 27B
+ * — a different model's template, chosen by readdir order.
+ * `TEMPLATE_REPO` mirrors the catalog entry's `baseRepo`; the app caches it as
+ * `<owner>--<repo>.jinja` (see chat-template.ts `repoSlug`).
+ */
+const TEMPLATE_REPO = process.env.TEMPLATE_REPO ?? 'froggeric/Qwen-Fixed-Chat-Templates';
 const templates = path.join(homedir(), '.cache/pi-desktop/chat-templates');
 let template;
-if (existsSync(templates)) {
-  const hit = readdirSync(templates).find((f) => /qwen|froggeric/i.test(f) && f.endsWith('.jinja'));
-  if (hit !== undefined) template = path.join(templates, hit);
+if (process.env.NO_TEMPLATE !== '1') {
+  const want = path.join(templates, `${TEMPLATE_REPO.replace(/[/\\]/g, '--')}.jinja`);
+  if (existsSync(want)) template = want;
 }
 console.log(`template: ${template === undefined ? '(GGUF built-in)' : path.basename(template)}`);
 

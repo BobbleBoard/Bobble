@@ -138,6 +138,16 @@ export interface CatalogModel {
   /** True when the MTP head is embedded in the main GGUF (Qwen3.6 style). */
   readonly mtpEmbedded?: boolean;
   /**
+   * Launch WITHOUT speculative decoding even though this model has a head.
+   *
+   * A speed head is an optimisation, not a fact about the model, and it does not
+   * always pay: on Qwen3.8-27B it MEASURED 17–32% SLOWER than plain decoding
+   * (see that entry). The head stays declared — `mtpEmbedded` is a true
+   * statement about the file — and this says only that we choose not to use it,
+   * which keeps the data honest and the reason in one place.
+   */
+  readonly specDisabled?: boolean;
+  /**
    * The DEFAULT speed method used by the current launch path for a fast-text
    * launch (`--spec-type draft-<spec>`). See {@link variants} for the full set of
    * speed options a model supports (what the manager's variant dropdown offers).
@@ -716,6 +726,28 @@ const QWEN38_27B_MTP: CatalogModel = {
   },
   mtpEmbedded: true,
   spec: 'mtp',
+  /*
+   * THE SPEED HEAD IS REAL AND IT MAKES THIS MODEL SLOWER. Measured on this M5
+   * Pro, UD-Q3_K_XL, froggeric v22 template, three prompts each:
+   *
+   *              64k ctx     16k ctx
+   *   MTP on     11.2 tok/s  14.0 tok/s
+   *   MTP off    16.4 tok/s  16.8 tok/s
+   *              −32%        −17%
+   *
+   * Speculative decoding only pays when the draft is accepted often enough to
+   * cover its cost; on this hybrid attention/SSM architecture it clearly is not.
+   * The head is still declared — that is a true statement about the file — and
+   * `specDisabled` records that we choose not to launch with it.
+   *
+   * A SECOND REASON, worth knowing before re-enabling: with `--spec-type
+   * draft-mtp` AND `--mmproj` together this model loads in 7.1s and then returns
+   * HTTP 500 "Compute error." on EVERY completion. It fails at generation, not
+   * at load, so nothing in the startup path notices. That combination is fine on
+   * qwen3.5-4b (measured 2026-08-08, see assembleServerArgs) — it is specific to
+   * this architecture, which is why the fix is here and not a blanket rule.
+   */
+  specDisabled: true,
   /* MTP only. The DSpark / DFlash / EAGLE-3 repos that exist for this model are
      community re-uploads in non-GGUF formats today; naming one here would
      advertise a launch that cannot resolve. */
