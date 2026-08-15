@@ -9,7 +9,15 @@
  * crash-looping llama-server never takes the UI process down.
  */
 import { createHash } from 'node:crypto';
-import { createReadStream, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  createReadStream,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { rm, unlink } from 'node:fs/promises';
 import { homedir, totalmem } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -239,6 +247,38 @@ function isDownloaded(model: CatalogModel, file: CatalogFile): boolean {
   return existsSync(modelPathFor(model, file));
 }
 
+/**
+ * Bytes this model actually occupies on disk, right now.
+ *
+ * Not derivable in the renderer: `LlmCatalogEntry.downloaded` is a boolean, and
+ * the per-quant sizes describe what COULD be fetched, not what is here. The
+ * delete confirmation was doing the arithmetic from the SELECTED quant and got
+ * "Frees 56 GB" for a directory holding 14.4 GB — the number described a
+ * different thing than the button did.
+ *
+ * Reads the directory rather than the catalog, so a partially-fetched or
+ * hand-copied model is counted as it lies. `.part` files are included: they are
+ * on the disk and deleting the model reclaims them too.
+ */
+function downloadedBytesFor(model: CatalogModel): number {
+  const dir = modelDir(model.id);
+  if (!existsSync(dir)) return 0;
+  let total = 0;
+  try {
+    for (const name of readdirSync(dir)) {
+      try {
+        const s = statSync(join(dir, name));
+        if (s.isFile()) total += s.size;
+      } catch {
+        /* raced with a delete — skip it */
+      }
+    }
+  } catch {
+    return 0;
+  }
+  return total;
+}
+
 function pickFile(model: CatalogModel, quant?: string): CatalogFile | undefined {
   return quant !== undefined ? getCatalogFile(model, quant) : model.files[0];
 }
@@ -287,6 +327,8 @@ function catalogEntry(model: CatalogModel, recommendedId: string | null): LlmCat
     })),
     vision: model.input.includes('image'),
     downloaded: model.files.some((f) => isDownloaded(model, f)),
+    downloadedBytes: downloadedBytesFor(model),
+    downloadedQuants: model.files.filter((f) => isDownloaded(model, f)).map((f) => f.quant),
     recommended: model.id === recommendedId,
     hfRepo: model.hfRepo,
     engine: modelEngine(model),

@@ -196,6 +196,24 @@ export interface LlmCatalogEntry {
   variants?: LlmSpecVariant[];
   vision: boolean;
   downloaded: boolean;
+  /**
+   * Bytes this model occupies on disk RIGHT NOW — read from the directory, not
+   * derived from `quants`, which describes what could be fetched rather than
+   * what is here. The delete confirmation needs the number for the action it is
+   * about to take; computing it from the selected quant said "Frees 56 GB" for
+   * a directory holding 14.4 GB. 0 when nothing is downloaded.
+   */
+  downloadedBytes?: number;
+  /**
+   * WHICH quants are on disk. `downloaded` is per-ENTRY, so a model with one
+   * quant fetched reported every quant as downloaded — the card offered
+   * "Verify / Delete / Set active" for a 55 GB BF16 nobody has, and Set active
+   * would have tried to load a file that is not there.
+   *
+   * Also what lets the quant list float an already-downloaded quant to the top:
+   * re-using what you have beats fetching something marginally better.
+   */
+  downloadedQuants?: string[];
   recommended: boolean;
   /** HF repo id (e.g. "unsloth/gemma-4-E2B-it-GGUF") — for the Advanced view. */
   hfRepo?: string;

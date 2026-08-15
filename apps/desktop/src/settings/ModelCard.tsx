@@ -11,6 +11,12 @@
 import {
   Badge,
   Button,
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
   ProgressBar,
   Select,
   SelectContent,
@@ -119,6 +125,7 @@ export function ModelCard({
   // catalog quants). Lazy: only when a quant dropdown is first opened.
   const [ladders, setLadders] = useState<Record<string, HfGgufFileDTO[]>>({});
   const [busy, setBusy] = useState<null | 'activate' | 'delete' | 'verify' | 'stop'>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [verify, setVerify] = useState<null | 'ok' | 'bad'>(null);
 
   const primary = group.primary;
@@ -148,12 +155,14 @@ export function ModelCard({
     modelMaxContext: entry.contextWindow,
     totalRamGB: hardware?.totalRamGB ?? 0,
   };
-  /* No downloaded-first key here: `LlmCatalogEntry.downloaded` is per-ENTRY, not
-     per-quant, so there is nothing on the contract that says WHICH quant is on
-     disk. Passing a predicate that guesses would sort the list by a fiction. */
+  /* Downloaded-first: re-using a quant already on disk beats fetching a
+     marginally better one. `downloadedQuants` is the per-QUANT truth — the
+     older `downloaded` flag is per-entry and cannot answer this. */
+  const onDisk = new Set(entry.downloadedQuants ?? []);
   const quantOptions = orderQuantsForDisplay(
     mergeQuantLadder(entry.quants, ladders[entry.hfRepo ?? entry.id]),
     fitInput,
+    (q) => onDisk.has(q),
   );
   const effectiveQuant =
     quantOptions.find((q) => q.quant === quant)?.quant ?? quantOptions[0]?.quant ?? '';
@@ -177,9 +186,27 @@ export function ModelCard({
 
   const recommended = group.entries.some((e) => e.recommended);
   const reliable = primary.publisher?.reliable === true;
+  /* What the delete button will actually reclaim: every file in this model's
+     directory, summed by the supervisor. Sums across the group's entries so a
+     model with several repo variants reports the whole footprint. */
+  const onDiskBytes = group.entries.reduce((sum, e) => sum + (e.downloadedBytes ?? 0), 0);
   const engine = entry.engine ?? 'llamacpp';
   const showEngineBadge = advanced || engine === 'mlx' || enginePref === 'mlx';
-  const downloaded = entry.downloaded;
+  /*
+   * THE ACTION ROW IS ABOUT THE SELECTED QUANT, not the model.
+   *
+   * This was `entry.downloaded`, which is true if ANY quant is on disk — so
+   * with UD-Q3_K_XL fetched, selecting the 55 GB BF16 still showed
+   * "Verify / Delete / Set active", and Set active would have tried to load a
+   * file that does not exist. Seen on screen while checking the delete dialog.
+   *
+   * Falls back to the entry flag when the per-quant list is absent (an older
+   * supervisor), which is the previous behaviour rather than a regression.
+   */
+  const downloaded =
+    entry.downloadedQuants === undefined
+      ? entry.downloaded
+      : effectiveQuant !== '' && onDisk.has(effectiveQuant);
 
   const loadLadder = (repo: string) => {
     if (ladders[repo] !== undefined) return;
@@ -216,7 +243,24 @@ export function ModelCard({
       await applyModelEffortDefault(entry.id);
       return activateLocalModel(entry.id, effectiveQuant);
     });
-  const onDelete = () => run('delete', () => store.getState().deleteModel(entry.id));
+  /*
+   * DELETING 13 GB WAS ONE CLICK ON A GHOST BUTTON.
+   *
+   * No confirmation, no size, no undo — and the cost of a misclick is a
+   * multi-gigabyte re-download over whatever connection the user has. (Measured
+   * on this machine: the 27B takes 3m30s on a fast link. On a slow one it is an
+   * evening.) The chat list has confirmed deletes for a JSONL file; the model
+   * list did not for the largest thing the app owns.
+   *
+   * The dialog says the number, because "delete this model?" and "delete 14.4 GB
+   * you will have to fetch again?" are different questions.
+   */
+  const onDelete = () => setConfirmDelete(true);
+  const doDelete = () =>
+    run('delete', async () => {
+      setConfirmDelete(false);
+      await store.getState().deleteModel(entry.id);
+    });
   const onStop = () => run('stop', () => store.getState().stopServer());
   const onVerify = () =>
     run('verify', async () => {
@@ -571,6 +615,52 @@ export function ModelCard({
           </dl>
         </div>
       ) : null}
+
+      {/* Delete confirmation, with the number that makes it a real decision. */}
+      <Dialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+        <DialogContent data-testid={`delete-dialog-${entry.id}`} className="max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle>Delete {group.displayName}?</DialogTitle>
+          </DialogHeader>
+          <DialogBody>
+            <p className="text-body text-text-secondary">
+              {/*
+               * THE NUMBER IS WHAT IS ON DISK, not what is selected in the
+               * dropdown. Delete removes the model's whole directory, so
+               * quoting the selected quant described a different action than
+               * the button performs — it read "Frees 56 GB" (BF16, never
+               * downloaded) for a directory holding 14.4 GB. When the size is
+               * genuinely unknown it says nothing rather than guessing.
+               */}
+              {onDiskBytes > 0 ? (
+                <>
+                  Frees <strong>{formatBytes(onDiskBytes)}</strong> of disk. You can download it
+                  again later.
+                </>
+              ) : (
+                <>This removes the model&apos;s files from disk. You can download it again later.</>
+              )}
+            </p>
+          </DialogBody>
+          <DialogFooter>
+            <button
+              type="button"
+              className="pd-btn-ghost pd-focusable"
+              onClick={() => setConfirmDelete(false)}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="pd-btn-danger pd-focusable"
+              data-testid={`delete-confirm-${entry.id}`}
+              onClick={() => void doDelete()}
+            >
+              Delete
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

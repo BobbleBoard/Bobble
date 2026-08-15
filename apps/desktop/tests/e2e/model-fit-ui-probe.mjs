@@ -7,9 +7,13 @@
  * the dropdown really is ordered the way `orderQuantsForDisplay` says, and that
  * the verdict CHANGES when the quant does.
  *
- * Isolated empty HOME on purpose: no model is cached there, so nothing can
+ * Isolated empty HOME by default: no model is cached there, so nothing can
  * auto-start and this is safe to run beside a live corp run on the one GPU.
  * The catalog, the hardware detect and every fit computation are real.
+ *
+ *   REAL_HOME=1  use the actual model cache, so the downloaded-card and the
+ *                delete confirmation can be checked too. Reads only — the
+ *                delete dialog is opened, read, screenshotted and CANCELLED.
  *
  * Run `pnpm build` first. Screenshots land in .corp-runs/model-fit-ui/.
  */
@@ -41,12 +45,13 @@ if (!existsSync(path.join(appRoot, 'dist/index.html'))) {
 }
 mkdirSync(OUT, { recursive: true });
 
-const home = mkdtempSync(path.join(tmpdir(), 'pi-e2e-home-'));
 const userDataDir = mkdtempSync(path.join(tmpdir(), 'pi-e2e-udd-'));
+const env = { ...process.env, PI_BIN: mockPi, MOCK_PI_FIXTURE: fixture, PI_E2E: '1' };
+if (process.env.REAL_HOME !== '1') env.HOME = mkdtempSync(path.join(tmpdir(), 'pi-e2e-home-'));
 const app = await electron.launch({
   executablePath: electronBinary,
   args: [appRoot, `--user-data-dir=${userDataDir}`],
-  env: { ...process.env, HOME: home, PI_BIN: mockPi, MOCK_PI_FIXTURE: fixture, PI_E2E: '1' },
+  env,
 });
 
 try {
@@ -160,6 +165,63 @@ try {
     await fitsToggle.click();
   } else {
     console.log('  --   fit filter absent (every model fits this machine)');
+  }
+
+  /*
+   * ── The delete confirmation (REAL_HOME only) ─────────────────────────────
+   * Deleting the 27B was one click on a ghost button: 14.4 GB and a 3m30s
+   * re-download, with no dialog and no undo. This opens it, reads it, and
+   * presses CANCEL — a probe must never destroy what it is inspecting.
+   */
+  /*
+   * The action row must describe the SELECTED quant. With one quant on disk,
+   * selecting a different one used to keep offering Verify/Delete/Set active —
+   * and Set active would have tried to load a file that is not there.
+   */
+  const onDiskQuants = await page.evaluate((id) => {
+    const e = window
+      .__llm_store?.()
+      .getState()
+      .catalog.find((c) => c.id === id);
+    return e?.downloadedQuants ?? [];
+  }, MODEL_ID);
+  console.log('on disk:', JSON.stringify(onDiskQuants));
+  if (onDiskQuants.length > 0) {
+    // Currently a NON-downloaded quant is selected (the probe picked the last row).
+    const selectedNow =
+      (await page.locator(`[data-testid="quant-${MODEL_ID}"]`).textContent()) ?? '';
+    const isOnDisk = onDiskQuants.some((q) => selectedNow.includes(q));
+    const showsDownload =
+      (await page.locator(`[data-testid="download-${MODEL_ID}-btn"]`).count()) > 0;
+    check(
+      isOnDisk !== showsDownload,
+      `the action row follows the selected quant (selected="${selectedNow.trim()}", onDisk=${isOnDisk}, showsDownload=${showsDownload})`,
+    );
+    // Now pick the downloaded one and confirm the row flips.
+    await page.click(`[data-testid="quant-${MODEL_ID}"]`);
+    await page.waitForTimeout(400);
+    await page.locator('[role="option"]', { hasText: onDiskQuants[0] }).first().click();
+    await page.waitForTimeout(500);
+    check(
+      (await page.locator(`[data-testid="delete-${MODEL_ID}"]`).count()) > 0,
+      `selecting the downloaded quant (${onDiskQuants[0]}) offers Delete / Set active`,
+    );
+  }
+
+  const del = page.locator(`[data-testid="delete-${MODEL_ID}"]`);
+  if ((await del.count()) > 0) {
+    await del.click();
+    const dialog = page.locator(`[data-testid="delete-dialog-${MODEL_ID}"]`);
+    await dialog.waitFor({ timeout: 5000 });
+    const text = (await dialog.textContent())?.replace(/\s+/g, ' ').trim() ?? '';
+    console.log(`delete dialog: "${text}"`);
+    check(/Frees [\d.]+ GB/.test(text), `the delete dialog says what it frees ("${text}")`);
+    await page.screenshot({ path: path.join(OUT, '7-delete-confirm.png') });
+    await dialog.locator('text=Cancel').click();
+    await page.waitForTimeout(400);
+    check((await dialog.count()) === 0, 'Cancel closes the dialog without deleting');
+  } else {
+    console.log('  --   delete dialog not checked (model not downloaded in this HOME)');
   }
 } finally {
   await app.close().catch(() => {});
