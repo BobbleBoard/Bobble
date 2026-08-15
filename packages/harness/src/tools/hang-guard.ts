@@ -59,35 +59,23 @@ export function wouldHang(command: string, cwd?: string): string | null {
     }
   }
   /*
-   * A GUI LAUNCHER WITH NO SCRIPT TO READ. The check above only fires when the
-   * command names a .py/.js file it can open and inspect. `electron .`,
-   * `npm start`, `npm run dev` name no file at all — nothing to read, so nothing
-   * refused.
+   * NO LIST OF LAUNCHER NAMES HERE, ON PURPOSE.
    *
-   * MEASURED, run 7. At 20:38 an engineer ran a globally-installed `electron .`
-   * in the project. That opens a window and never returns. Bobble's own window
-   * went away 4 minutes later, the runner logged "window went away — stopping",
-   * and the run died at 66 minutes having never reached the CEO's verification
-   * turn. The engineer's process was STILL running afterwards.
+   * `electron .` killed run 7, and the first fix was a blocklist — electron,
+   * npm start, yarn dev, open -a. the user removed it: "the deterministic guard
+   * here is again something we need to let go of, how can you make this general
+   * and reliable."
    *
-   * One engineer's foreground window can end the whole run, so this is refused
-   * on the command shape alone.
+   * A blocklist catches only what somebody already thought of, and refuses
+   * commands that might have been fine. The general answer is a default TIMEOUT
+   * on every bash command (`withDefaultTimeout`, ../index.ts): a clock does not
+   * care whether it is a GUI, a server, an infinite loop or something nobody
+   * has seen — control comes back either way.
+   *
+   * What stays here is a refusal EARNED by evidence: the check above opens the
+   * file the command names and finds the blocking loop in it. That is a fact
+   * about this program, not a guess from its name.
    */
-  const launcher =
-    /(^|[\s;&|(])electron(\s|$)/.test(c) ||
-    /(^|[\s;&|(])npm\s+(start|run\s+(dev|start|serve|electron))(\s|$)/.test(c) ||
-    /(^|[\s;&|(])(pnpm|yarn)\s+(dev|start|serve)(\s|$)/.test(c) ||
-    /(^|[\s;&|(])open\s+-a(\s|$)/.test(c);
-  if (launcher && !/(^|[\s;&|(])timeout\s+\d+/.test(c) && !/&\s*$/.test(c)) {
-    return (
-      'that command opens a window and never returns — it would hang this entire ' +
-      'run, so it was not executed. A GUI you launch in the foreground blocks your ' +
-      'turn until a human closes it, and nothing here can. To CHECK the app works, ' +
-      'drive it headlessly instead: run the code that does the work directly, or ' +
-      'launch it with a `timeout N` in front so a block is a failed test rather ' +
-      'than a dead run. To leave something running, background it with `&`.'
-    );
-  }
 
   if (!/(^|[\s;&|(])godot(\s|$)/.test(c)) return null;
   // These all terminate on their own.

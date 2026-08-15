@@ -1,39 +1,39 @@
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { wouldHang } from './hang-guard.js';
 
-describe('a GUI launcher that names no script', () => {
+describe('the launcher blocklist is deliberately NOT here', () => {
   /*
-   * MEASURED, run 7. At 20:38 an engineer ran a globally-installed `electron .`
-   * in the project. Bobble's own window went away four minutes later, the runner
-   * logged "window went away — stopping", and the run died at 66 minutes having
-   * never reached the CEO's verification turn. The engineer's process was still
-   * running afterwards.
+   * A list of names — electron, npm start, yarn dev — lived here for one commit
+   * (82082d1) after `electron .` killed run 7. the user removed it: "the
+   * deterministic guard here is again something we need to let go of, how can
+   * you make this general and reliable."
    *
-   * The existing check only fires when the command names a .py/.js file it can
-   * open and read for a blocking loop. `electron .` and `npm start` name no file
-   * at all, so there was nothing to inspect and nothing was refused. One
-   * engineer's foreground window can end the whole run.
+   * He is right. A blocklist catches only what somebody already thought of, and
+   * refuses commands that might have been fine. The general answer is a default
+   * TIMEOUT on every bash command (withDefaultTimeout in ../index.ts): a clock
+   * does not care what the command is, and control comes back either way.
+   *
+   * This test exists so the list does not grow back by reflex.
    */
-  it('refuses the exact command that killed run 7', () => {
-    expect(wouldHang('electron .')).toMatch(/never returns/);
+  it('does not refuse a launcher on its name — the timeout handles it', () => {
+    expect(wouldHang('electron .')).toBeNull();
+    expect(wouldHang('npm start')).toBeNull();
+    expect(wouldHang('yarn dev')).toBeNull();
   });
 
-  it('refuses the usual dev-server launchers', () => {
-    for (const c of ['npm start', 'npm run dev', 'yarn dev', 'pnpm serve', 'open -a Foo.app']) {
-      expect(wouldHang(c), c).not.toBeNull();
-    }
-  });
-
-  /* The two escapes that genuinely come back, both named in the refusal. */
-  it('allows it under a timeout, or backgrounded', () => {
-    expect(wouldHang('timeout 20 electron .')).toBeNull();
-    expect(wouldHang('electron . &')).toBeNull();
-  });
-
-  /* A build EXITS. Refusing it would block the one thing that must work. */
-  it('does not touch commands that terminate on their own', () => {
-    for (const c of ['npm run build', 'npm test', 'node build.js', 'npm ci']) {
-      expect(wouldHang(c), c).toBeNull();
+  /* What DOES stay: a refusal earned by reading the file and finding the loop.
+     That is evidence, not a name. */
+  it('still refuses a script it has read and found a blocking loop in', () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), 'hang-'));
+    try {
+      const f = path.join(dir, 'app.py');
+      writeFileSync(f, 'import tkinter\nroot = tkinter.Tk()\nroot.mainloop()\n');
+      expect(wouldHang(`python3 ${f}`)).toMatch(/never returns/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
     }
   });
 });

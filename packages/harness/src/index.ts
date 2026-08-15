@@ -117,6 +117,64 @@ import {
   type VerifyBashRunner,
 } from './verify/verify.js';
 
+/** Seconds a command gets before the harness takes control back. */
+export const DEFAULT_BASH_TIMEOUT_S = 300;
+
+/**
+ * EVERY COMMAND COMES BACK.
+ *
+ * pi's bash says so itself: "Timeout in seconds (optional, no default
+ * timeout)". A command the model runs without one can block forever, and a
+ * blocked command blocks the turn, and a blocked turn blocks the run.
+ *
+ * MEASURED, run 7: an engineer ran `electron .`, which opens a window and waits
+ * for a human to close it. The run died at 66 minutes having never reached the
+ * CEO's verification turn — five roles and nine contracts ended by one
+ * foreground window.
+ *
+ * The first fix was a list of launcher names to refuse — electron, npm start,
+ * yarn dev. the user killed it, correctly: "the deterministic guard here is again
+ * something we need to let go of, how can you make this general and reliable."
+ * A blocklist only ever catches the ones somebody already thought of, and it
+ * refuses commands that might have been fine.
+ *
+ * A CLOCK CATCHES ALL OF THEM. It does not care what the command is, whether it
+ * is a GUI, a server, an infinite loop, a wedged mount or something nobody has
+ * seen yet — if it has not returned, control comes back anyway, pi kills the
+ * process tree, and the model is told what happened and how to ask for longer.
+ * That is general by construction, and it assumes nothing about the task.
+ *
+ * The model can still pass its own `timeout` for a genuinely long build; this
+ * only supplies one when it did not.
+ */
+export function withDefaultTimeout<T extends { execute: (...a: never[]) => unknown }>(
+  base: T,
+  seconds: number = DEFAULT_BASH_TIMEOUT_S,
+): T {
+  return {
+    ...base,
+    async execute(...args: never[]) {
+      const params = args[1] as Record<string, unknown> | undefined;
+      if (params !== undefined && params.timeout === undefined) {
+        (args as unknown[])[1] = { ...params, timeout: seconds };
+      }
+      try {
+        return await (base.execute as (...a: never[]) => Promise<unknown>)(...args);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        if (!/^timeout:/.test(msg)) throw e;
+        throw new Error(
+          `That command did not finish within ${seconds}s, so it was stopped and control ` +
+            'came back to you. Commands that open a window or start a server never return ' +
+            'on their own — run those in the background with `&`, or drive the thing ' +
+            'headlessly instead. If this is a genuinely long build, run it again and pass ' +
+            'a bigger `timeout`.',
+        );
+      }
+    },
+  } as T;
+}
+
 export const packageName = '@pi-desktop/harness';
 
 /**
@@ -1190,9 +1248,11 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
    * command, and by the time one runs the workspace has been set.
    */
   pi.registerTool(
-    createBashToolDefinition(process.cwd(), {
-      spawnHook: (c) => ({ ...c, cwd: liveRoot(), env: cleanChildEnv(c.env) }),
-    }) as never,
+    withDefaultTimeout(
+      createBashToolDefinition(process.cwd(), {
+        spawnHook: (c) => ({ ...c, cwd: liveRoot(), env: cleanChildEnv(c.env) }),
+      }),
+    ) as never,
   );
 
   /*

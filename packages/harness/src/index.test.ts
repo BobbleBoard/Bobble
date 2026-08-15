@@ -9,11 +9,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   CAPABILITY_PROMPT_MARKER,
   cleanChildEnv,
+  DEFAULT_BASH_TIMEOUT_S,
   HARNESS_CONFIG_ENTRY,
   hasAttachedFileBlock,
   type StoredEntryLike,
   type ToolSchemaLike,
   wireHarness,
+  withDefaultTimeout,
 } from './index.js';
 import { augmentSystemPrompt } from './prompt/capability-prompt.js';
 
@@ -500,5 +502,68 @@ describe('cleanChildEnv', () => {
     const env = { ELECTRON_RUN_AS_NODE: '1' };
     cleanChildEnv(env);
     expect(env.ELECTRON_RUN_AS_NODE).toBe('1');
+  });
+});
+
+describe('withDefaultTimeout — every command comes back', () => {
+  /*
+   * MEASURED, run 7: an engineer ran `electron .`, which opens a window and
+   * waits for a human. The run died at 66 minutes without ever reaching the
+   * CEO's verification turn. pi's bash says it itself — "no default timeout".
+   *
+   * The first fix was a list of launcher names. the user: "the deterministic guard
+   * here is again something we need to let go of, how can you make this general
+   * and reliable." A clock is general: it does not care what the command is.
+   */
+  const fake = (impl: (p: unknown) => unknown) => ({
+    execute: (_id: unknown, params: unknown) => Promise.resolve(impl(params)),
+  });
+
+  it('supplies a timeout when the model gave none', async () => {
+    let seen: Record<string, unknown> | undefined;
+    const t = withDefaultTimeout(
+      fake((p) => {
+        seen = p as Record<string, unknown>;
+        return 'ok';
+      }) as never,
+    );
+    await (t as { execute: (...a: unknown[]) => Promise<unknown> }).execute('c', {
+      command: 'electron .',
+    });
+    expect(seen?.timeout).toBe(DEFAULT_BASH_TIMEOUT_S);
+  });
+
+  it("never overrides the model's own timeout", async () => {
+    let seen: Record<string, unknown> | undefined;
+    const t = withDefaultTimeout(
+      fake((p) => {
+        seen = p as Record<string, unknown>;
+        return 'ok';
+      }) as never,
+    );
+    await (t as { execute: (...a: unknown[]) => Promise<unknown> }).execute('c', {
+      command: 'npm run build',
+      timeout: 1800,
+    });
+    expect(seen?.timeout).toBe(1800);
+  });
+
+  /* The bare `timeout:300` pi throws says nothing a 4B can act on. */
+  it('turns the raw timeout error into something actionable', async () => {
+    const t = withDefaultTimeout({
+      execute: () => Promise.reject(new Error('timeout:300')),
+    } as never);
+    await expect(
+      (t as { execute: (...a: unknown[]) => Promise<unknown> }).execute('c', { command: 'x' }),
+    ).rejects.toThrow(/background it with `&`|did not finish within/);
+  });
+
+  it('passes any other error straight through', async () => {
+    const t = withDefaultTimeout({
+      execute: () => Promise.reject(new Error('ENOENT: no such file')),
+    } as never);
+    await expect(
+      (t as { execute: (...a: unknown[]) => Promise<unknown> }).execute('c', { command: 'x' }),
+    ).rejects.toThrow(/ENOENT/);
   });
 });
