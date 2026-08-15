@@ -740,12 +740,16 @@ const QWEN38_27B_MTP: CatalogModel = {
    * The head is still declared — that is a true statement about the file — and
    * `specDisabled` records that we choose not to launch with it.
    *
-   * A SECOND REASON, worth knowing before re-enabling: with `--spec-type
-   * draft-mtp` AND `--mmproj` together this model loads in 7.1s and then returns
-   * HTTP 500 "Compute error." on EVERY completion. It fails at generation, not
-   * at load, so nothing in the startup path notices. That combination is fine on
-   * qwen3.5-4b (measured 2026-08-08, see assembleServerArgs) — it is specific to
-   * this architecture, which is why the fix is here and not a blanket rule.
+   * A NOTE ON A FAILURE I FIRST BLAMED ON MTP AND SHOULD NOT HAVE: this model
+   * also returns HTTP 500 "Compute error." on every completion when launched
+   * with `--mmproj` at a 64k window. The first failing launch happened to carry
+   * both flags, so I wrote it up as an MTP/projector incompatibility. It is
+   * neither — it is the MEMORY BUDGET: weights + projector + 64k KV comes to
+   * ≈19.7 GB against ≈19.2 GB usable, and llama-server loads anyway and fails at
+   * generation. Fixed where it belongs, by feeding the projector's bytes into
+   * `chooseContextCap` so the window steps down to 48k and vision survives.
+   * The tok/s numbers above were measured without a projector on both sides, so
+   * they are unaffected.
    */
   specDisabled: true,
   /* MTP only. The DSpark / DFlash / EAGLE-3 repos that exist for this model are
