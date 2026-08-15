@@ -82,8 +82,11 @@ describe('finalCheck', () => {
       perspective: 'ceo',
       vision: 'build me a platformer',
     });
-    expect(ceo).toContain('as THE USER will');
-    expect(ceo).toContain('Did this work out, in the end, as they asked?');
+    /* Wording sharpened after run 6 — it now puts the CEO IN the user's chair
+       ("You are now THE USER") rather than beside it ("read this as the user
+       will"), because reading-as was satisfied by an `ls`. */
+    expect(ceo).toContain('You are now THE USER');
+    expect(ceo).toContain('did it WORK');
     expect(ceo).toContain('build me a platformer');
   });
 
@@ -156,5 +159,58 @@ describe('finalCheck — the CEO routes faults back, it does not silently repair
     });
     expect(eng).toContain('Fix whatever this turns up');
     expect(eng).not.toContain('talk_to_manager');
+  });
+});
+
+describe('finalCheck — the CEO tests it visually, as the end user', () => {
+  const ceo = () =>
+    finalCheck({
+      claims: ['The app converts PNG to JPG'],
+      profile: classifyVerification('build me a desktop converter app'),
+      perspective: 'ceo',
+    });
+
+  /*
+   * MEASURED, run 6: the CEO's whole verification was edit package.json,
+   * `npm run build`, `cp` the DMG to /Applications, `ls`. It then told the user
+   * "the application is now ready to use" over an app whose conversion core
+   * could not be require()d. Each of those commands ran clean, which is exactly
+   * why the check has to name them and rule them out.
+   */
+  it('rules out the four things run 6 mistook for testing', () => {
+    const t = ceo();
+    expect(t).toMatch(/BUILDING IS NOT TESTING/);
+    expect(t).toMatch(/Packaging is not testing/);
+    expect(t).toMatch(/Copying it into a[\s\S]{0,20}folder is not testing/);
+    expect(t).toMatch(/`ls` is not testing/);
+  });
+
+  it('tells it to open the product and do the real thing', () => {
+    expect(ceo()).toMatch(/OPEN THE PRODUCT/);
+    expect(ceo()).toMatch(/real file, a real input, the real action/);
+  });
+
+  it('tells it to LOOK — with its eyes, at an image', () => {
+    const t = ceo();
+    expect(t).toMatch(/LOOK AT THE RESULT WITH YOUR EYES/);
+    expect(t).toMatch(/[Ss]creenshot/);
+  });
+
+  /* Order matters for a 4B: this must lead, not trail the routing rules. */
+  it('puts the user-test FIRST, ahead of the routing rules', () => {
+    const t = ceo();
+    expect(t.indexOf('TEST IT AS THE END USER')).toBeLessThan(
+      t.indexOf('WHAT YOU DO WITH WHAT YOU FIND'),
+    );
+  });
+
+  it('makes "I could not open it" a reportable finding, not a silence', () => {
+    expect(ceo()).toMatch(/cannot open it, say so plainly/);
+  });
+
+  /* The perspective framing has to put it IN the user's chair, not beside it. */
+  it('casts the CEO as the user about to try it', () => {
+    expect(ceo()).toMatch(/You are now THE USER/);
+    expect(ceo()).toMatch(/did it WORK/);
   });
 });

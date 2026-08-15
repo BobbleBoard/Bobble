@@ -246,8 +246,8 @@ const PERSPECTIVE: Record<VerificationPerspective, { readonly who: string; reado
       ask: 'Is this the thing the CEO described to you, or is it the thing that was easy to finish?',
     },
     ceo: {
-      who: 'Read this back as THE USER will — the person who asked you for this, who has not seen any of the work, and who will judge it in ten seconds by whether it does what they wanted.',
-      ask: 'Did this work out, in the end, as they asked? Not "is there a deliverable" — did it work out.',
+      who: 'You are now THE USER — the person who asked for this, who has not seen any of the work, who will not read the source, and who is about to open it and try it. Stop reading about the product and USE it.',
+      ask: 'Open it and do what they asked it to do. Did it actually do it — in front of you, just now? Not "is there a deliverable", not "did it build" — did it WORK.',
     },
   };
 
@@ -332,7 +332,41 @@ export function finalCheck(opts: {
    * was broken and a CEO that did the job twice.
    */
   if (perspective === 'ceo') {
+    /*
+     * BE THE END USER, AND LOOK.
+     *
+     * MEASURED, run 6. The CEO's entire verification was: edit package.json,
+     * `npm run build`, `cp` the DMG to /Applications, `ls` that folder. Four
+     * commands, none of which is the product doing anything. It then told the
+     * user "the application is now ready to use". The app's conversion core
+     * could not even be require()d — `SyntaxError: Identifier 'imageProcessor'
+     * has already been declared` — and its drop zone was wired to a renderer
+     * function that fakes success with a setTimeout.
+     *
+     * Every one of those four commands felt like verification: they all ran,
+     * they all exited 0, they all produced output. That is exactly why this has
+     * to name them and rule them out. the user: the CEO "needs to always visually
+     * and AS THE END USER" test the project.
+     *
+     * This goes FIRST, before the routing rules — a 4B reads the top of a block
+     * and acts on it.
+     */
     lines.push(
+      'TEST IT AS THE END USER, AND LOOK AT IT. This comes before anything else.',
+      '',
+      '  - OPEN THE PRODUCT the way the user would open it, and DO THE THING they',
+      '    asked it to do — with a real file, a real input, the real action. Not a',
+      '    test script beside it: the product itself.',
+      '  - LOOK AT THE RESULT WITH YOUR EYES. Screenshot the window and view the',
+      '    image. Open the file it produced. A converted file that never opens is',
+      '    not a converted file.',
+      '  - BUILDING IS NOT TESTING. Packaging is not testing. Copying it into a',
+      '    folder is not testing. `ls` is not testing. A build that succeeds tells',
+      '    you the compiler was happy, and nothing whatsoever about whether the',
+      '    thing works.',
+      '  - If you cannot open it, say so plainly — that IS the finding, and it is',
+      '    the most important one you can report.',
+      '',
       'WHAT YOU DO WITH WHAT YOU FIND:',
       '',
       '  - Anything wrong goes BACK TO THE MANAGER — call `talk_to_manager` again',
