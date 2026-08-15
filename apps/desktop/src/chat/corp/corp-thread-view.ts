@@ -23,6 +23,12 @@ export type CorpChatView =
 export interface CorpChatViewInput {
   readonly taskId: string | null;
   readonly situation: SituationState | null;
+  /**
+   * The node currently mid-turn. DELIBERATELY NOT CONSULTED by `corpChatView`
+   * any more — following the live agent is what put somebody else's
+   * conversation under the user's own. Kept on the input because the store
+   * supplies it and other surfaces (the canvas tab panel) still route by it.
+   */
   readonly liveNode: OrgNodeView | null;
   readonly pinnedNode: OrgNodeView | null;
 }
@@ -35,13 +41,30 @@ export interface CorpChatViewInput {
  * original model is on screen from the first event.
  */
 export function corpChatView(input: CorpChatViewInput): CorpChatView {
-  const { taskId, situation, liveNode, pinnedNode } = input;
+  const { taskId, situation, pinnedNode } = input;
   if (taskId === null) return { kind: 'none' };
   if (pinnedNode !== null) return { kind: 'stream', node: pinnedNode };
-  const promoted = (situation?.chart.nodes.length ?? 0) > 1;
-  if (promoted) return { kind: 'waiting' };
-  const shown = liveNode ?? situation?.chart.nodes[0] ?? null;
-  if (shown !== null) return { kind: 'stream', node: shown };
+  /*
+   * AN UNPINNED ROLE IS NEVER STREAMED INTO THE USER'S OWN THREAD.
+   *
+   * This used to stream `chart.nodes[0]` whenever the run had only one node,
+   * on the reasoning that the single node was the solo CEO and the user should
+   * see their own model working. That reasoning expired when the mesh moved its
+   * entry point to the MANAGER: there is no CEO in the mesh at all, so node[0]
+   * is the manager, and the branch quietly rendered the CEO↔manager
+   * conversation directly beneath the user's messages.
+   *
+   * the user, twice: "no ceo-manager chat embedded into the ceo-user chat?
+   * ceo-manager is shown when clicked on the manager subchat just as
+   * manager-subagent chat is shown when any subagent is clicked on" — and again
+   * after run 6: "The ceo-manager chat is still embedded and shown right below
+   * the user chat that's not supposed to be there."
+   *
+   * A pin is the ONLY way a role's feed reaches this thread. Unpinned, the user
+   * gets the waiting indicator, which is a summary of their own turn rather than
+   * somebody else's conversation.
+   */
+  if ((situation?.chart.nodes.length ?? 0) > 0) return { kind: 'waiting' };
   return { kind: 'starting' };
 }
 

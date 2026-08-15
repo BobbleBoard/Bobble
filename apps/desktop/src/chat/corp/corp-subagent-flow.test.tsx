@@ -315,3 +315,64 @@ describe('corp/subagent-run UX flow', () => {
     expect(view.kind).toBe('waiting');
   });
 });
+
+describe('the user thread never shows somebody else another agent is talking to', () => {
+  /*
+   * the user, twice — and the second time is the one that counts:
+   *
+   *   "no ceo-manager chat embedded into the ceo-user chat? ceo-manager is shown
+   *    when clicked on the manager subchat just as manager-subagent chat is
+   *    shown when any subagent is clicked on"
+   *   "The ceo-manager chat is still embedded and shown right below the user
+   *    chat that's not supposed to be there."
+   *
+   * corpChatView streamed chart.nodes[0] whenever the run had a single node, on
+   * the reasoning that it was the solo CEO. That expired when the mesh entry
+   * moved to the MANAGER — there is no CEO in the mesh, so node[0] IS the
+   * manager, and the CEO↔manager conversation rendered under the user's
+   * messages. A pin is now the only route into this thread.
+   */
+  const node = (id: string, state: OrgNodeView['state']): OrgNodeView =>
+    ({ id, label: id, role: 'manager', state, parentId: undefined }) as unknown as OrgNodeView;
+
+  const withNodes = (n: OrgNodeView[]) =>
+    ({ chart: { nodes: n, edges: [] }, artifacts: [], checklist: [] }) as unknown as SituationState;
+
+  it('does not stream the manager into the user thread just because it is the only node', () => {
+    const view = corpChatView({
+      taskId: 't1',
+      situation: withNodes([node('manager', 'working')]),
+      liveNode: node('manager', 'working'),
+      pinnedNode: null,
+    });
+    expect(view).toEqual({ kind: 'waiting' });
+  });
+
+  it('does not follow the live agent either', () => {
+    const view = corpChatView({
+      taskId: 't1',
+      situation: withNodes([node('manager', 'working'), node('engineer-1', 'working')]),
+      liveNode: node('engineer-1', 'working'),
+      pinnedNode: null,
+    });
+    expect(view).toEqual({ kind: 'waiting' });
+  });
+
+  /* Drilling in is still the way to see a role — that half must keep working. */
+  it('streams a role the user explicitly pinned', () => {
+    const pinned = node('manager', 'working');
+    const view = corpChatView({
+      taskId: 't1',
+      situation: withNodes([pinned]),
+      liveNode: null,
+      pinnedNode: pinned,
+    });
+    expect(view).toEqual({ kind: 'stream', node: pinned });
+  });
+
+  it('says "starting" before any node exists, never blank', () => {
+    expect(
+      corpChatView({ taskId: 't1', situation: withNodes([]), liveNode: null, pinnedNode: null }),
+    ).toEqual({ kind: 'starting' });
+  });
+});

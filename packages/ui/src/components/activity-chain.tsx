@@ -31,7 +31,50 @@ import { type WebSearchResultData, WebSearchResults } from './web-search.tsx';
  */
 
 export type ActivityStepKind = ToolIconKind;
-export type ActivityStatus = 'running' | 'done';
+
+/**
+ * WHAT AN AGENT IS ACTUALLY DOING — five states, not two.
+ *
+ * This was `'running' | 'done'`, so everything that had not finished read as
+ * running: it shimmered, it spun, and its elapsed clock ticked. the user, watching a
+ * corp run: "timers can't keep ticking for waiting agents, it needs to be more
+ * clear who is waiting, working, and waiting because stopped."
+ *
+ * An agent parked in `talk_to` is not working, and a clock counting up next to
+ * it is a claim that it is. The distinctions people actually need at a glance:
+ *
+ *   running  the model is generating right now  — shimmer + live clock
+ *   waiting  parked on someone else's reply     — still, no clock
+ *   stopped  stood down, resumable (orange)     — still, no clock
+ *   error    the turn failed (red)              — still, no clock
+ *   done     finished (green)
+ *
+ * Only `running` gets the ticking timer. The rest hold a frozen elapsed time if
+ * they have one, which is a fact, rather than a counter, which is a claim.
+ */
+export type ActivityStatus = 'running' | 'waiting' | 'stopped' | 'error' | 'done';
+
+/** States where the agent is NOT generating — no shimmer, no ticking clock. */
+export const STILL_STATUSES: ReadonlySet<ActivityStatus> = new Set<ActivityStatus>([
+  'waiting',
+  'stopped',
+  'error',
+  'done',
+]);
+
+/** The word shown beside a still agent, so "why is nothing happening" has an answer. */
+export function statusWord(status: ActivityStatus): string | null {
+  switch (status) {
+    case 'waiting':
+      return 'Waiting';
+    case 'stopped':
+      return 'Stopped';
+    case 'error':
+      return 'Failed';
+    default:
+      return null;
+  }
+}
 
 interface ActivityStepCommon {
   /** Stable key for lists; derived from kind+label when omitted. */
@@ -746,6 +789,15 @@ export const ActivityStep = forwardRef<HTMLDivElement, ActivityStepProps>(functi
    * on some rows and not others.
    */
   const elapsedEl = running ? <RunningFor since={data.startedAt} /> : null;
+  /*
+   * A STILL AGENT SAYS WHY IT IS STILL. Without this, "waiting" and "stopped"
+   * are indistinguishable from "done" — the row just sits there — which is the
+   * ambiguity the extra states exist to remove.
+   */
+  const stateWordEl = (() => {
+    const w = statusWord(data.status ?? 'done');
+    return w === null ? null : <span className="pd-chain-step-state">{w}</span>;
+  })();
   // File-op rows read as a two-line stack (verb + filename subline); other rows
   // keep the verb + inline arg on one line.
   const contentEls =
@@ -754,6 +806,7 @@ export const ActivityStep = forwardRef<HTMLDivElement, ActivityStepProps>(functi
         <span className="pd-chain-step-label">
           {labelText}
           {elapsedEl}
+          {stateWordEl}
         </span>
         <span className="pd-chain-step-subline" title={detail}>
           {subline}
@@ -768,6 +821,7 @@ export const ActivityStep = forwardRef<HTMLDivElement, ActivityStepProps>(functi
           </span>
         ) : null}
         {elapsedEl}
+        {stateWordEl}
       </>
     );
 
@@ -796,6 +850,10 @@ export const ActivityStep = forwardRef<HTMLDivElement, ActivityStepProps>(functi
        * no longer carries a "(N failed)" tail, so this is where a failure is
        * visible — on the row you can open to see what actually went wrong. */
       data-failed={data.failed === true ? 'true' : undefined}
+      /* The five-state colour hook: waiting / stopped (orange) / error (red) /
+       * done (green). Carried on the row so the icon, label and state chip all
+       * tint from ONE source rather than three components each deciding. */
+      data-status={data.status ?? 'done'}
     >
       {canvas ? (
         <button type="button" className="pd-chain-step-row pd-focusable" onClick={onOpenCanvas}>

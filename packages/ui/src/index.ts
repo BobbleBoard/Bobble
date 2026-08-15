@@ -30,6 +30,8 @@ export {
   ActivityStep,
   activitySummary,
   formatDuration,
+  STILL_STATUSES,
+  statusWord,
   summarizeActivity,
 } from './components/activity-chain.tsx';
 export type {
@@ -187,6 +189,7 @@ export type { MessageRowProps, ThreadProps } from './components/message-row.tsx'
 export { MessageRow, Thread } from './components/message-row.tsx';
 export type { EffortOption, ModelOption, ModelPickerProps } from './components/model-picker.tsx';
 export { ModelPicker } from './components/model-picker.tsx';
+export * from './components/open-split-button.tsx';
 export type { PopoverContentProps } from './components/popover.tsx';
 export {
   Popover,
@@ -270,4 +273,3 @@ export {
 } from './components/web-search.tsx';
 export type { VariantProps, VariantSelection, VariantsConfig } from './define-variants.ts';
 export { defineVariants } from './define-variants.ts';
-export * from './components/open-split-button.tsx';
