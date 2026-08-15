@@ -28,7 +28,12 @@ import { IconCpu, IconStar } from './icons';
 import { ModalityCategoryView } from './ModalityCategoryView';
 import { ModelCard } from './ModelCard';
 import { MODALITY_CATEGORIES } from './modality-catalog-logic';
-import { categorizeByFamily, groupCatalog, type ModelGroup } from './model-manager-logic';
+import {
+  categorizeByFamily,
+  groupCatalog,
+  groupFits,
+  type ModelGroup,
+} from './model-manager-logic';
 import { ModelTag, SpecPill } from './model-tags';
 
 /** True when this entry is starred (by its id or, for an HF add, its repo id). */
@@ -70,6 +75,7 @@ export function ModelManagerPanel() {
   const [pickBusy, setPickBusy] = useState<string | null>(null);
   const [advanced, setAdvanced] = useState(false);
   const [favoritesOnly, setFavoritesOnly] = useState(false);
+  const [fitsOnly, setFitsOnly] = useState(false);
 
   useEffect(() => {
     void refreshCatalog();
@@ -85,8 +91,21 @@ export function ModelManagerPanel() {
   // De-duplicate the catalog into ONE group per model, then categorize by family
   // (sorted by size) for the power-user Recommended view.
   const groups = groupCatalog(catalog);
-  const shownGroups = favoritesOnly ? groups.filter((g) => isGroupFavorite(g, favorites)) : groups;
+  /*
+   * "ONLY SHOW MODELS THAT FIT" — on a 24 GB machine most of a catalog built for
+   * every tier is unusable, and scrolling past six models that cannot load to
+   * reach the two that can is the actual daily experience. A DOWNLOADED model
+   * stays visible whatever the verdict: it is already yours, hiding it would
+   * read as having lost it. Off by default — the catalog is still the catalog.
+   */
+  const fitting = fitsOnly
+    ? groups.filter((g) => g.entries.some((e) => e.downloaded) || groupFits(g, hardware))
+    : groups;
+  const shownGroups = favoritesOnly
+    ? fitting.filter((g) => isGroupFavorite(g, favorites))
+    : fitting;
   const sections = categorizeByFamily(shownGroups);
+  const hiddenByFit = groups.length - fitting.length;
 
   const afmVisible = afmAvailable(afmAvailability) && afmAvailability !== null;
   const afmFavorite = favorites.includes(AFM_MODEL_ID);
@@ -269,23 +288,42 @@ export function ModelManagerPanel() {
                 </div>
               ) : null}
 
-              {/* Favorites filter (only when the user has starred something). */}
-              {hasFavorites ? (
-                <button
-                  type="button"
-                  data-testid="mm-favorites-toggle"
-                  aria-pressed={favoritesOnly}
-                  onClick={() => setFavoritesOnly((v) => !v)}
-                  className={
-                    favoritesOnly
-                      ? 'pd-focusable flex w-fit items-center gap-2 rounded-lg border border-border-strong bg-bg-active px-3 py-1.5 text-footnote text-text-primary'
-                      : 'pd-focusable flex w-fit items-center gap-2 rounded-lg border border-border-default px-3 py-1.5 text-footnote text-text-secondary hover:bg-bg-hover'
-                  }
-                >
-                  <IconStar size={14} filled={favoritesOnly} />
-                  {favoritesOnly ? 'Showing favorites' : 'Favorites only'}
-                </button>
-              ) : null}
+              {/* Filters: favorites (only when something is starred) + fit. */}
+              <div className="flex flex-wrap items-center gap-2">
+                {hasFavorites ? (
+                  <button
+                    type="button"
+                    data-testid="mm-favorites-toggle"
+                    aria-pressed={favoritesOnly}
+                    onClick={() => setFavoritesOnly((v) => !v)}
+                    className={
+                      favoritesOnly
+                        ? 'pd-focusable flex w-fit items-center gap-2 rounded-lg border border-border-strong bg-bg-active px-3 py-1.5 text-footnote text-text-primary'
+                        : 'pd-focusable flex w-fit items-center gap-2 rounded-lg border border-border-default px-3 py-1.5 text-footnote text-text-secondary hover:bg-bg-hover'
+                    }
+                  >
+                    <IconStar size={14} filled={favoritesOnly} />
+                    {favoritesOnly ? 'Showing favorites' : 'Favorites only'}
+                  </button>
+                ) : null}
+                {/* Offered only when it would actually hide something. */}
+                {hiddenByFit > 0 || fitsOnly ? (
+                  <button
+                    type="button"
+                    data-testid="mm-fits-toggle"
+                    aria-pressed={fitsOnly}
+                    title="Hides models this Mac cannot load. Downloaded models stay visible."
+                    onClick={() => setFitsOnly((v) => !v)}
+                    className={
+                      fitsOnly
+                        ? 'pd-focusable flex w-fit items-center gap-2 rounded-lg border border-border-strong bg-bg-active px-3 py-1.5 text-footnote text-text-primary'
+                        : 'pd-focusable flex w-fit items-center gap-2 rounded-lg border border-border-default px-3 py-1.5 text-footnote text-text-secondary hover:bg-bg-hover'
+                    }
+                  >
+                    {fitsOnly ? `Fits this Mac · ${hiddenByFit} hidden` : 'Only what fits'}
+                  </button>
+                ) : null}
+              </div>
 
               {/* Advanced: the "Prefer MLX (experimental)" engine preference. The
               MLX backend itself is a later wave — this persists the preference +

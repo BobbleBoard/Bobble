@@ -8,6 +8,7 @@ import {
   formatBytes,
   formatSpeed,
   groupCatalog,
+  groupFits,
   isReliablePublisher,
   mergeQuantLadder,
   modelFamily,
@@ -383,5 +384,32 @@ describe('mergeQuantLadder — size order, and a projector is not a quant', () =
       ],
     );
     expect(out.map((q) => q.quant)).toEqual(['UD-Q3_K_XL']);
+  });
+});
+
+describe('groupFits — can this model run here at all', () => {
+  const g = (quants: Array<{ quant: string; bytes: number }>) =>
+    ({ entries: [{ quants, contextWindow: 65_536 }] }) as never;
+
+  it('is true when the SMALLEST quant fits, even if the largest does not', () => {
+    expect(
+      groupFits(
+        g([
+          { quant: 'UD-Q2_K_XL', bytes: 10.68 * GB },
+          { quant: 'UD-Q8_K_XL', bytes: 31.46 * GB },
+        ]),
+        { totalRamGB: 24 },
+      ),
+    ).toBe(true);
+  });
+
+  it('is false only when nothing on offer can load', () => {
+    expect(groupFits(g([{ quant: 'Q8_0', bytes: 29 * GB }]), { totalRamGB: 16 })).toBe(false);
+  });
+
+  it('never hides on a guess — unknown hardware or unknown size passes', () => {
+    expect(groupFits(g([{ quant: 'Q8_0', bytes: 29 * GB }]), null)).toBe(true);
+    expect(groupFits(g([{ quant: 'Q8_0', bytes: 29 * GB }]), { totalRamGB: 0 })).toBe(true);
+    expect(groupFits(g([{ quant: 'Q8_0', bytes: 0 }]), { totalRamGB: 8 })).toBe(true);
   });
 });

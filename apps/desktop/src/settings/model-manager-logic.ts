@@ -96,6 +96,34 @@ export function quantFit(input: QuantFitInput): RamVerdict {
   return { tone: 'danger', label: "Won't fit", fits: false, detail };
 }
 
+/**
+ * Can this MODEL run here at all — i.e. is ANY of its quants green?
+ *
+ * The card-level question, as opposed to {@link quantFit}'s row-level one. A
+ * model is only genuinely out of reach when even its smallest quant will not
+ * load, so this asks about the smallest rather than the default. Unknown
+ * hardware (`totalRamGB` 0) passes everything: a machine we could not measure is
+ * not grounds for hiding the catalog.
+ */
+export function groupFits(
+  group: Pick<ModelGroup, 'entries'>,
+  hardware: { totalRamGB: number } | null,
+): boolean {
+  if (hardware === null || hardware.totalRamGB <= 0) return true;
+  for (const entry of group.entries) {
+    for (const q of entry.quants) {
+      if (q.bytes <= 0) return true; // unknown size — do not hide on a guess
+      const verdict = quantFit({
+        modelBytes: q.bytes,
+        modelMaxContext: entry.contextWindow,
+        totalRamGB: hardware.totalRamGB,
+      });
+      if (verdict.fits) return true;
+    }
+  }
+  return false;
+}
+
 /** Rank for the display sort: already yours, then usable, then not. */
 function fitRank(tone: RamTone): number {
   if (tone === 'success') return 0;
