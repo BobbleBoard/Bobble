@@ -19,11 +19,7 @@
  * Pure roster + orchestration; the model work is behind the injected seam.
  */
 
-import {
-  CHECK_FIX_CHECK,
-  RIGOROUS_VERIFICATION_INSTRUCTION,
-} from '../verification-language.js';
-import { MANAGER_STANDBY_INSTRUCTION, WAIT_TOOL } from './raise-hand.js';
+import { CHECK_FIX_CHECK, RIGOROUS_VERIFICATION_INSTRUCTION } from '../verification-language.js';
 import {
   MANAGER_PLANNING_TOOLS,
   READY_TO_DELEGATE_TOOL,
@@ -38,6 +34,7 @@ import {
   type MeshHop,
   type RunAgentTurn,
 } from './mesh.js';
+import { MANAGER_STANDBY_INSTRUCTION, WAIT_TOOL } from './raise-hand.js';
 
 /** The universal peer-to-peer conversation tool every agent carries (recipient is one
  * of its colleagues). The desktop host builds the concrete tool from the agent's

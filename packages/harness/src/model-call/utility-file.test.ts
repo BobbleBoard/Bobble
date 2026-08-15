@@ -2,7 +2,7 @@ import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { UTILITY_BASE_URL_ENV, UTILITY_FILE_ENV, callModelFromEnv } from './call-model.js';
+import { callModelFromEnv, UTILITY_BASE_URL_ENV, UTILITY_FILE_ENV } from './call-model.js';
 
 /**
  * THE 12-SECOND BUG. On a normal app open pi starts BEFORE the model server, so

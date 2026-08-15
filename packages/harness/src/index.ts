@@ -163,9 +163,9 @@ export const DEFAULT_BASH_TIMEOUT_S = 300;
  * It rewrites rather than re-implements: `nohup <cmd> &` detaches the process,
  * output goes to a log the model is told about, and the call returns at once.
  */
-export function withBackgroundOption<T extends { parameters?: unknown; execute: (...a: never[]) => unknown }>(
-  base: T,
-): T {
+export function withBackgroundOption<
+  T extends { parameters?: unknown; execute: (...a: never[]) => unknown },
+>(base: T): T {
   const params = base.parameters as
     | { properties?: Record<string, unknown>; type?: string }
     | undefined;
@@ -1539,7 +1539,21 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
   // globally but only ENTERS the active set at high/max (see applyPreset); calling
   // it publishes a promote intent (PROMOTE_STATUS_KEY) the desktop catches to
   // launch the existing corp run.
-  registerCreateHierarchyTool(pi, { getEffort: () => runtime.config.effort });
+  /*
+   * HOW MANY TOOLS THE MODEL HAS ACTUALLY USED, so `talk_to_manager` can refuse
+   * a delegation from a standing start (see STANDING_START_REFUSAL). Counted
+   * here because the tool itself cannot see anything but its own call, and
+   * asking the model how much work it has done invites it to say "enough".
+   * The delegation tool is excluded so it never counts itself.
+   */
+  let otherToolCalls = 0;
+  pi.on('tool_execution_start', (event) => {
+    if (event.toolName !== CREATE_PRODUCTION_HIERARCHY) otherToolCalls += 1;
+  });
+  registerCreateHierarchyTool(pi, {
+    getEffort: () => runtime.config.effort,
+    otherToolCalls: () => otherToolCalls,
+  });
 
   // Permission gate. In reviewer mode a scary-bash command is flagged first by
   // the regex rules, then — when a utility model is configured — double-checked

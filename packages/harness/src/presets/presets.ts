@@ -176,7 +176,26 @@ export const PRESET_TOOLS: Record<TaskClass, readonly string[]> = {
   'simple-QA': [],
   'basic-tools': [...PYTHON, ...WEB],
   // Categories.
-  coding: [...CORE_FS, 'bash', ...PYTHON],
+  /*
+   * BUILDING USUALLY MEANS LOOKING SOMETHING UP, so WEB is in hand from the
+   * first turn.
+   *
+   * MEASURED, runs 10 and 11. The CEO was told to close its unknowns before
+   * briefing the manager — "don't ask the user, research it, commission
+   * specialists, get informed" — and both times made exactly ONE tool call,
+   * talk_to_manager, off one thought about the task being large. Not laziness:
+   * a `coding` turn front-loaded fs+bash+python and NO web tools, and a
+   * capability turned on mid-turn only lands "from your NEXT reply onward". So
+   * researching cost a whole turn round-trip, while delegating cost nothing —
+   * and the brief that went out was the model's own priors about the product,
+   * stated confidently.
+   *
+   * An instruction the tools cannot carry out is not a prompt problem, and
+   * rewording it does nothing. This is the general fix: a build task can read
+   * the docs, look at the thing it is cloning, check an API — the same way the
+   * mesh's engineers already can (corp-mesh's RESEARCH_TOOLS).
+   */
+  coding: [...CORE_FS, 'bash', ...PYTHON, ...WEB],
   'file-ops': [...CORE_FS, 'bash'],
   // NOTE: the bare file `read` tool is deliberately NOT here — it was an
   // attractive nuisance that a small model grabbed ("Read a file") instead of

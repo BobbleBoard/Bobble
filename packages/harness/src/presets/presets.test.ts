@@ -81,7 +81,16 @@ describe('PRESET_TOOLS', () => {
 });
 
 describe('resolvePresetTools — full tool universe', () => {
-  it('coding → filesystem + bash + python + capability', () => {
+  /*
+   * WEB IS IN THE CODING PRESET, and that is the point of it.
+   *
+   * MEASURED, runs 10/11: the CEO was told to research before briefing its
+   * manager and could not — a coding turn front-loaded fs+bash+python with no
+   * web tools, and a capability turned on mid-turn only lands from the NEXT
+   * reply. Researching cost a turn; delegating cost nothing. Building usually
+   * means looking something up, so it is in hand from the first turn.
+   */
+  it('coding → filesystem + bash + python + WEB + capability', () => {
     const tools = resolvePresetTools('coding', ALL_TOOLS);
     expect(tools).toEqual([
       'read',
@@ -92,6 +101,8 @@ describe('resolvePresetTools — full tool universe', () => {
       'grep',
       'bash',
       'python_run',
+      'web_search',
+      'web_fetch',
       'capability',
       ...BROWSER_SUITE,
     ]);

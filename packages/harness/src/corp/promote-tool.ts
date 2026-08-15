@@ -34,6 +34,30 @@ import { classifyVerification, END_USER_TEST, extractClaims, finalCheck } from '
 export const PROMOTE_STATUS_KEY = 'harness-promote';
 
 /**
+ * What comes back when the CEO delegates without having done anything.
+ *
+ * Deliberately the WORKFLOW and nothing else — no scolding, no restatement of
+ * what the tool is. It arrives as the answer to a call the model is waiting on,
+ * which is the only place a 4B reliably reads.
+ */
+export const STANDING_START_REFUSAL = [
+  'Not yet — you have not looked at anything.',
+  '',
+  'Before you hand this over:',
+  '',
+  "- Break the request down and write down what you DON'T know. Anything about how it",
+  '  should look, behave, or what it is meant to resemble.',
+  '- Close those unknowns one at a time. Search for it, fetch the page, read the docs,',
+  '  look at the thing itself. Use specialists where they save you time.',
+  '- THEN call this again with what you found in the brief, and the files you gathered',
+  '  in `files`.',
+  '',
+  'The manager has never spoken to the user and knows only what you write. A brief',
+  'written before the unknowns are closed is a list of your assumptions, and it gets',
+  'built exactly as written.',
+].join('\n');
+
+/**
  * The efforts at which the corp system is offered as a tool: ALL of them.
  *
  * It used to be high/max only (the user: "max effort just adds this talk to manager
@@ -109,6 +133,11 @@ export interface PromoteToolDeps {
    * Pi Desktop, where there is no team to wait for.
    */
   readonly runCorp?: ((req: CorpRunRequest) => Promise<CorpRunResult>) | null;
+  /**
+   * How many OTHER tools the model has called this session. Drives the
+   * standing-start veto below; omitted → no veto (tests, headless callers).
+   */
+  readonly otherToolCalls?: () => number;
 }
 
 /**
@@ -250,6 +279,37 @@ export function registerCreateHierarchyTool(pi: ExtensionAPI, deps: PromoteToolD
        * model asked to remember how many rounds it has had will guess. Bumped
        * before the run so the first delivery reads as round 1.
        */
+      /*
+       * A DELEGATION FROM A STANDING START IS REFUSED, ONCE.
+       *
+       * MEASURED across runs 10, 11 and 12: the CEO made exactly ONE tool call
+       * — this one — off one thought about the task being large, and briefed
+       * the manager entirely from its own priors about the product. The
+       * instruction to close its unknowns first was in the description the
+       * whole time; moving it to the very top (run 11) changed nothing, and
+       * giving the turn real web tools (run 12) changed nothing either. A model
+       * that has decided at the top of the description does not read the rest,
+       * whatever it says.
+       *
+       * the user: "veto the first talk to tool call outright no matter what and
+       * just paste these instructions in there as the tool result… maybe only
+       * do that if 0 tools have been called prior to the talk to."
+       *
+       * That last clause is what makes this general rather than a nag: the
+       * refusal fires on a fact about the RUN — nothing has been done yet — and
+       * never on what the task is. A CEO that has already looked at anything is
+       * not stopped. And a tool RESULT is the one surface a model cannot skim
+       * past, because it is the answer it was blocked waiting for.
+       */
+      const nothingDoneYet = handbacks === 0 && (deps.otherToolCalls?.() ?? 1) === 0;
+      if (nothingDoneYet) {
+        handbacks += 1;
+        return {
+          content: [{ type: 'text', text: STANDING_START_REFUSAL }],
+          isError: true,
+          details: { promoted: false, vetoed: true },
+        };
+      }
       handbacks += 1;
       const runCorp = deps.runCorp ?? corpBridgeRunFromEnv();
       if (runCorp !== null) {

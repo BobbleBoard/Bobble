@@ -111,6 +111,28 @@ export const CREATE_PRODUCTION_HIERARCHY_TOOL: OpenAiFunctionTool = {
      * separate prompt telling it who to be.
      */
     description:
+      /*
+       * THE WORKFLOW GOES FIRST, ABOVE THE DECISION TO DELEGATE.
+       *
+       * MEASURED, run 10. The CEO made exactly ONE tool call — talk_to_manager —
+       * after exactly one thought: "This is a complex, multi-step project… I
+       * should call in the manager to handle this large build task properly."
+       * No research, no specialists, no files. The brief it wrote was its own
+       * priors about the product, spelled out confidently.
+       *
+       * The research instruction WAS in this description, and it was never
+       * reached: it sat ~1,100 characters down, below the "genuinely quick or
+       * should I call in the manager?" framing. The model answers that question
+       * at the top and fires the tool, so everything after the decision point is
+       * read only by a model that has already decided. Same lesson as the final
+       * check — at 4B, position is the instruction.
+       */
+      'BEFORE YOU USE THIS: we strongly recommend a workflow of decomposing the ' +
+      "user's request, identifying any unknowns, then one by one addressing those " +
+      'unknowns — leveraging the available tools and specialists to make your life ' +
+      'easier wherever possible. Look things up. Get the real thing in front of you. ' +
+      'THEN write the brief, with what you found attached. A brief written before ' +
+      'the unknowns are closed is a list of your own assumptions. ' +
       "now that you're in max effort mode you are now connected to a manager, the manager is a " +
       'powerful coordinator that has a team of workers at their disposal to help you achieve ' +
       'large projects/goals, if you have something large, that could benefit from handing off ' +
@@ -138,12 +160,12 @@ export const CREATE_PRODUCTION_HIERARCHY_TOOL: OpenAiFunctionTool = {
        * his — an unknown you did not close is a decision handed to a 4B engineer
        * with less context than you have.
        */
-      'From the user prompt, think of all the unknowns you have, and don\'t guess, get ' +
+      "From the user prompt, think of all the unknowns you have, and don't guess, get " +
       'concrete. The user asks for something to look a certain way, function a certain way, ' +
       'maybe even feel a certain way, or maybe like something else. Do you know what they ' +
       'mean? Do you have a visual? They ask for something to perform or function like ' +
-      'something else — do you know what they\'re referencing? All the unknowns: they say a ' +
-      'name you don\'t recognize, something you don\'t quite understand — don\'t ask the user, ' +
+      "something else — do you know what they're referencing? All the unknowns: they say a " +
+      "name you don't recognize, something you don't quite understand — don't ask the user, " +
       'research it, commission specialists, get informed, and then brief the manager so they ' +
       'can focus on building exactly what you asked for, concretely. Attach any relevant ' +
       'files to the brief that will be useful: assets, references, pieces, rough drafts, ' +

@@ -194,7 +194,9 @@ interface UtilityEndpoint {
 }
 
 /** Read the live endpoint file, or undefined when absent/unreadable/empty. */
-function readUtilityFile(file: string): { baseUrl: string; model: string; apiKey?: string } | undefined {
+function readUtilityFile(
+  file: string,
+): { baseUrl: string; model: string; apiKey?: string } | undefined {
   try {
     // Required lazily so this module stays importable where `node:fs` is not
     // (the renderer never imports it today, and this keeps that true).
@@ -203,7 +205,8 @@ function readUtilityFile(file: string): { baseUrl: string; model: string; apiKey
     const baseUrl = typeof json.baseUrl === 'string' ? json.baseUrl : '';
     if (baseUrl.length === 0) return undefined;
     const model = typeof json.model === 'string' && json.model.length > 0 ? json.model : 'utility';
-    const apiKey = typeof json.apiKey === 'string' && json.apiKey.length > 0 ? json.apiKey : undefined;
+    const apiKey =
+      typeof json.apiKey === 'string' && json.apiKey.length > 0 ? json.apiKey : undefined;
     return { baseUrl, model, ...(apiKey !== undefined ? { apiKey } : {}) };
   } catch {
     // No server yet, or a half-written file — indistinguishable from "not ready",

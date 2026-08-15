@@ -14,13 +14,21 @@ type CapturedTool = any;
 
 /** Register the tool at a given effort and return the captured tool spec.
  * `runCorp` defaults to null — no bridge, i.e. a headless harness. */
-function register(effort: EffortLevel, runCorp: PromoteToolDeps['runCorp'] = null): CapturedTool {
+function register(
+  effort: EffortLevel,
+  runCorp: PromoteToolDeps['runCorp'] = null,
+  extra: Partial<PromoteToolDeps> = {},
+): CapturedTool {
   const tools: CapturedTool[] = [];
   const pi = { registerTool: (t: CapturedTool) => tools.push(t) } as unknown as ExtensionAPI;
   registerCreateHierarchyTool(pi, {
     getEffort: () => effort,
     nextId: () => 'fixed-id',
     runCorp,
+    /* Default: plenty done already, so existing cases are not vetoed. The
+       standing-start block overrides it to 0 deliberately. */
+    otherToolCalls: () => 5,
+    ...extra,
   });
   return tools[0];
 }
@@ -381,5 +389,83 @@ describe('the harness counts the hand-backs, because the CEO cannot', () => {
     const second = await deliver(tool);
     expect(second).not.toMatch(/THIS IS THE FIRST ROUND/);
     expect(second).toMatch(/Choose 2 only when your list is empty/);
+  });
+});
+
+describe('a delegation from a standing start is refused, once', () => {
+  /*
+   * MEASURED across runs 10, 11 and 12. The CEO made exactly ONE tool call —
+   * talk_to_manager — off one thought about the task being large, and briefed
+   * the manager entirely from its own priors about the product.
+   *
+   * The instruction to close its unknowns first was in the description the
+   * whole time. Moving it to the very top (run 11) changed nothing. Giving the
+   * turn real web tools, which it had lacked entirely (run 12), changed nothing
+   * either. A model that has decided at the top of a description does not read
+   * the rest of it, whatever it says.
+   *
+   * the user: "veto the first talk to tool call outright… maybe only do that if 0
+   * tools have been called prior to the talk to." The `0 tools` clause is what
+   * keeps it general: it fires on a fact about the RUN, never on the task.
+   */
+  const run = async (otherToolCalls: number, calls: { n: number }) => {
+    const tool = register(
+      'max',
+      async () => {
+        calls.n += 1;
+        return { ok: true, product: 'Built it.' };
+      },
+      { otherToolCalls: () => otherToolCalls },
+    );
+    const { ctx } = fakeCtx();
+    const res = await tool.execute(
+      'c',
+      { message: 'Build it', divisions: [] },
+      undefined,
+      undefined,
+      ctx,
+    );
+    return String(res.content?.[0]?.text ?? '');
+  };
+
+  it('refuses when nothing at all has been done', async () => {
+    const calls = { n: 0 };
+    const text = await run(0, calls);
+    expect(text).toContain('you have not looked at anything');
+    expect(calls.n).toBe(0);
+  });
+
+  it('hands back the workflow, not a scolding', async () => {
+    const text = await run(0, { n: 0 });
+    expect(text).toMatch(/what you DON'T know/);
+    expect(text).toMatch(/Close those unknowns one at a time/);
+    expect(text).toMatch(/`files`/);
+  });
+
+  /* Anyone who has already looked at something is not stopped. */
+  it('lets a CEO through that has actually done something', async () => {
+    const calls = { n: 0 };
+    const text = await run(3, calls);
+    expect(text).not.toContain('you have not looked at anything');
+    expect(calls.n).toBe(1);
+  });
+
+  /* One refusal, not a wall: the second call runs even from a standing start. */
+  it('never refuses twice', async () => {
+    const calls = { n: 0 };
+    const tool = register(
+      'max',
+      async () => {
+        calls.n += 1;
+        return { ok: true, product: 'Built it.' };
+      },
+      { otherToolCalls: () => 0 },
+    );
+    const { ctx } = fakeCtx();
+    const call = () =>
+      tool.execute('c', { message: 'Build it', divisions: [] }, undefined, undefined, ctx);
+    await call();
+    await call();
+    expect(calls.n).toBe(1);
   });
 });
