@@ -880,8 +880,41 @@ async function startServerExclusive(
     // hold their own KV, so the per-slot window shrinks as K grows (never above the
     // model's own max). Replaces the old flat 16k CONTEXT_CAP.
     const slots = launchMode === 'fast-text' ? Math.max(1, Math.floor(parallel ?? 1)) : 1;
+    /*
+     * THE PROJECTOR IS PART OF THE FOOTPRINT, so it has to be part of the sum
+     * the context is sized against.
+     *
+     * MEASURED, run 16 (Qwen3.8-27B UD-Q3_K_XL, 13.44 GB + a 0.93 GB F16
+     * projector, 24 GB machine): this sized a 64k window from the WEIGHTS
+     * alone, the projector then landed on top, and llama-server came up
+     * healthy — `/health` answering `{"status":"ok"}` — and returned HTTP 500
+     * "Compute error." to every single completion. It fails at generation, so
+     * nothing in the startup path notices; the CEO's first four requests came
+     * back `fetch failed` and the run was dead on arrival.
+     *
+     * The same launch WITHOUT the projector runs at 16.4 tok/s. And the Model
+     * Manager's own badge had already predicted it — "≈18.5 GB … (≈19.7 GB with
+     * vision on)" against a 19.2 GB budget — because `quantFit` counts the
+     * projector and this did not. Same estimator, two callers, one of them
+     * missing a term.
+     *
+     * Feeding the real total in makes `chooseContextCap` do its job: it steps
+     * the window down (64k → 48k here) and KEEPS vision, which is the trade it
+     * exists to make. Dropping the projector instead would have been the
+     * cheaper fix and the wrong one.
+     */
+    const mmprojBytes =
+      mmprojPath !== undefined
+        ? (() => {
+            try {
+              return statSync(mmprojPath).size;
+            } catch {
+              return 0;
+            }
+          })()
+        : 0;
     const contextWindow = chooseContextCap({
-      modelBytes: file.bytes,
+      modelBytes: file.bytes + mmprojBytes,
       modelMaxContext: model.contextWindow,
       totalRamGB: hw.totalRamGB,
       slots,
