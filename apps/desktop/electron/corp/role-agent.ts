@@ -69,6 +69,12 @@ import { checkScaryBash } from '@pi-desktop/harness/permissions';
 // search the full registered corpus and activate what it needs mid-run.
 import { registerToolSearch } from '@pi-desktop/harness/tool-search';
 import { wouldHang } from '@pi-desktop/harness/tools/hang-guard';
+// Zero-dependency subpath (no pi barrel) — see the note on writeSyntaxGate.
+import {
+  defaultRunSyntaxCheck,
+  type RunSyntaxCheck,
+  syntaxComplaint,
+} from '@pi-desktop/harness/tools/syntax-check';
 import { compactionSettingsFor } from './compaction-settings';
 import { shellWrites } from './shell-writes';
 
@@ -403,6 +409,47 @@ export function createStepCapCounter(
  * so EVERY corp role-agent that has `bash` (engineers, reviewers, CEO, consults)
  * is gated the same way, and the flagged command NEVER executes.
  */
+/**
+ * Refuse a `write` whose content does not parse — for CORP ROLES.
+ *
+ * THE GAP: the syntax fence has existed since run 3, in
+ * `packages/harness/src/tools/sandbox-fs.ts`, and has never protected a single
+ * corp role. It is registered by the harness EXTENSION that the main chat's pi
+ * child loads; role agents are built with `createAgentSession` directly and get
+ * pi's unfenced built-in `write`/`edit`. So the guard covered the one agent that
+ * writes least and none of the four that write everything — "a guard on one door
+ * is not a guard", again.
+ *
+ * MEASURED, run 15. The team produced 53 files and 4,709 lines that read
+ * plausibly and do not compile:
+ *   preload.js  `contextBridge.exposedInMainWorld('electronAPI' = {`
+ *   main.js     `require('electron').api.context isolation = true;`
+ *   images.py   invalid syntax at line 377
+ *   video.py    an invisible `„` (U+201E) at line 447
+ *   format_registry.py  unterminated string at line 224
+ * Three of five Python files and two of the main JS files. `node --check` and
+ * `python3 -m py_compile` both catch every one of them in milliseconds, and both
+ * were installed and working on this machine the whole time.
+ *
+ * Blocking at `tool_call` means nothing reaches disk, which is the same contract
+ * sandbox-fs offers ("Nothing was written"). `edit` is not covered here — its
+ * result cannot be known before it runs — so it keeps the post-write rollback
+ * path in sandbox-fs; this closes the larger hole, not every hole.
+ */
+export function writeSyntaxGate(
+  toolName: string,
+  input: unknown,
+  run: RunSyntaxCheck,
+): StepCapBlock | undefined {
+  if (toolName !== 'write') return undefined;
+  const arg = input as { path?: unknown; content?: unknown } | null;
+  const file = typeof arg?.path === 'string' ? arg.path : '';
+  const content = typeof arg?.content === 'string' ? arg.content : null;
+  if (file === '' || content === null) return undefined;
+  const complaint = syntaxComplaint(file, content, run);
+  return complaint === null ? undefined : { block: true, reason: complaint };
+}
+
 export function bashDenylistGate(
   toolName: string,
   input: unknown,
@@ -1117,6 +1164,8 @@ export interface RoleAgentConfig {
   /** May this role create or change files? Default true. `false` makes a role
    * run-only: bash still works, but a command that writes is refused. */
   readonly mayWriteFiles?: boolean;
+  /** Injected syntax runner (tests). Default: the real spawnSync parser. */
+  readonly runSyntaxCheck?: RunSyntaxCheck;
   /** Per-individual-CALL network-abort (spec §197): the max time ONE provider HTTP
    * request may take to return a response before it is treated as a hung socket and
    * aborted (degraded to empty). This is a network-hang guard on a SINGLE request —
@@ -1264,6 +1313,8 @@ export interface RoleTurnOptions {
   /** May this role create or change files? Default true. `false` makes a role
    * run-only: bash still works, but a command that writes is refused. */
   readonly mayWriteFiles?: boolean;
+  /** Injected syntax runner (tests). Default: the real spawnSync parser. */
+  readonly runSyntaxCheck?: RunSyntaxCheck;
 }
 
 /** A role session that stays OPEN between turns. */
@@ -1513,6 +1564,13 @@ export async function openRoleSession(
       if (denied !== undefined) return denied;
       const cannotWrite = bashWriteGate(e.toolName, e.input, config.mayWriteFiles !== false);
       if (cannotWrite !== undefined) return cannotWrite;
+      /* Parse it before it lands — the guard the corp roles never had. */
+      const unparseable = writeSyntaxGate(
+        e.toolName,
+        e.input,
+        config.runSyntaxCheck ?? defaultRunSyntaxCheck,
+      );
+      if (unparseable !== undefined) return unparseable;
       return turn.stepCap?.charge(e.toolName);
     });
     // Turn boundaries carry the session's live context fullness (when readable)

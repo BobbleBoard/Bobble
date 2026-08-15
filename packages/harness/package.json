@@ -13,7 +13,8 @@
     "./corp": "./src/corp/index.ts",
     "./permissions": "./src/permissions/rules.ts",
     "./tool-search": "./src/tools/tool-search.ts",
-    "./tools/hang-guard": "./src/tools/hang-guard.ts"
+    "./tools/hang-guard": "./src/tools/hang-guard.ts",
+    "./tools/syntax-check": "./src/tools/syntax-check.ts"
   },
   "pi": {
     "extensions": [

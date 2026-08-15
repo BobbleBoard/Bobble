@@ -1,4 +1,4 @@
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -17,7 +17,6 @@ import {
   type RoleAgentToolCall,
   roleActiveTools,
   SAMPLING_MODES,
-  SAVE_GRACE,
   type SamplingMode,
   type StripMessage,
   settleActivitiesOnEnd,
@@ -26,6 +25,7 @@ import {
   TOOL_SEARCH_NAME,
   toolResultText,
   wouldHang,
+  writeSyntaxGate,
 } from './role-agent';
 
 describe('roleActiveTools — full-harness parity starting active set', () => {
@@ -788,5 +788,69 @@ describe('a truncated turn does not get its tool call executed', () => {
    * not quietly widen into "any unusual stop reason". */
   it('does not block an aborted turn', () => {
     expect(blocked('aborted')).toBe(false);
+  });
+});
+
+/*
+ * THE GUARD THE CORP ROLES NEVER HAD.
+ *
+ * The syntax fence has existed since run 3, in sandbox-fs — registered by the
+ * harness EXTENSION that only the main chat's pi child loads. Role agents are
+ * built with `createAgentSession` and got pi's unfenced built-in `write`, so the
+ * four agents that write nearly all of the code were never parsed.
+ *
+ * MEASURED, run 15: 53 files, 4,709 lines, five of them uncompilable —
+ *   preload.js  `contextBridge.exposedInMainWorld('electronAPI' = {`
+ *   main.js     `require('electron').api.context isolation = true;`
+ *   plus three Python files (invalid syntax, an unterminated string, and a
+ *   stray `„` U+201E).
+ * `node --check` and `python3 -m py_compile` catch every one in milliseconds,
+ * and both were installed and working the whole time.
+ */
+describe('writeSyntaxGate — corp roles parse before they write', () => {
+  /** A runner standing in for node/python: non-zero when the text says BROKEN. */
+  const fakeRun = (_cmd: readonly string[], target: string) => {
+    const text = readFileSync(target, 'utf8');
+    return text.includes('BROKEN')
+      ? { status: 1, stderr: `SyntaxError: unexpected token in ${target}` }
+      : { status: 0, stderr: '' };
+  };
+
+  it('blocks a write whose content does not parse, and says nothing was written', () => {
+    const out = writeSyntaxGate('write', { path: 'src/main.js', content: 'BROKEN(' }, fakeRun);
+    expect(out?.block).toBe(true);
+    expect(out?.reason).toMatch(/does not parse/);
+    expect(out?.reason).toMatch(/Nothing was written/);
+  });
+
+  it('lets a parseable write through', () => {
+    expect(
+      writeSyntaxGate('write', { path: 'src/main.js', content: 'const a = 1;' }, fakeRun),
+    ).toBeUndefined();
+  });
+
+  it('ignores files no parser covers', () => {
+    expect(
+      writeSyntaxGate('write', { path: 'notes.md', content: 'BROKEN(' }, fakeRun),
+    ).toBeUndefined();
+  });
+
+  it('ignores tools that are not `write`', () => {
+    expect(writeSyntaxGate('bash', { command: 'BROKEN(' }, fakeRun)).toBeUndefined();
+    expect(writeSyntaxGate('read', { path: 'src/main.js' }, fakeRun)).toBeUndefined();
+  });
+
+  it('does not fire on a malformed call rather than inventing a complaint', () => {
+    expect(writeSyntaxGate('write', { path: 'src/main.js' }, fakeRun)).toBeUndefined();
+    expect(writeSyntaxGate('write', null, fakeRun)).toBeUndefined();
+  });
+
+  /* A parser we cannot launch must never fail the model's write — the
+     clean/broken/could-not-check discipline. */
+  it('lets the write through when the parser will not start', () => {
+    const cannotLaunch = () => ({ status: null, stderr: '' });
+    expect(
+      writeSyntaxGate('write', { path: 'src/main.js', content: 'BROKEN(' }, cannotLaunch),
+    ).toBeUndefined();
   });
 });
