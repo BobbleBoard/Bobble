@@ -274,14 +274,53 @@ export function excerptFailures(state: string, cwd: string): string {
   return out.length === 0 ? '' : `The lines those errors point at:\n${out.join('\n')}`;
 }
 
-/** The workspace's files, relative and sorted — context for a missing-file error. */
+/**
+ * Directories that are never the product: installed dependencies and build
+ * output. Kept as one set so every tree walk in this file agrees on it — the bug
+ * below was one walker disagreeing with its three siblings.
+ */
+const IGNORED_TREE_DIRS: ReadonlySet<string> = new Set([
+  'node_modules',
+  'dist',
+  'build',
+  'out',
+  'venv',
+  '.venv',
+  '__pycache__',
+  'target',
+  'Pods',
+]);
+
+/**
+ * The workspace's files, relative and sorted — context for a missing-file error,
+ * and the "WHAT ALREADY EXISTS HERE" block every role is briefed with.
+ *
+ * DEPENDENCIES ARE NOT THE PROJECT. This skipped dotfiles and nothing else,
+ * while the three other walkers in this file all skip `node_modules` too. The
+ * moment a team runs `npm install`, ~7,000 files appear, `node_modules` sorts
+ * ahead of `src`, and the 60-entry cap is spent before the walk ever reaches the
+ * product.
+ *
+ * MEASURED, run 6: the manager commissioned a visual specialist to inspect the
+ * app's UI, and its entire orientation read
+ *
+ *   WHAT ALREADY EXISTS HERE
+ *     node_modules/@develar/schema-utils/CHANGELOG.md
+ *     node_modules/@electron/asar/lib/asar.js          … 20 lines of this
+ *
+ * It never saw src/main/main.js or src/renderer/index.html. It spent 33 bash
+ * calls hunting for paths it had invented — `apps/desktop/src`, `*.tsx` — and
+ * finished with "No localconvert directory found". A briefing that describes
+ * somebody else's package internals is worse than no briefing: it is confidently
+ * wrong about the one fact the role most needs.
+ */
 export function listProject(cwd: string): string {
   const walk = (dir: string, prefix: string, out: string[]): void => {
     if (out.length > 60) return;
     for (const e of readdirSync(dir, { withFileTypes: true }).sort((a, b) =>
       a.name.localeCompare(b.name),
     )) {
-      if (e.name.startsWith('.')) continue;
+      if (e.name.startsWith('.') || IGNORED_TREE_DIRS.has(e.name)) continue;
       const rel = prefix === '' ? e.name : `${prefix}/${e.name}`;
       if (e.isDirectory()) walk(nodePath.join(dir, e.name), rel, out);
       else out.push(rel);

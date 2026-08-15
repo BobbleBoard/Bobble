@@ -865,3 +865,72 @@ describe('a write whose path cannot be opened is refused, not relocated', () => 
     expect(msg).toContain('absolute path');
   });
 });
+
+describe('listProject — the briefing must describe the PRODUCT, not its dependencies', () => {
+  /*
+   * MEASURED, run 6. The manager commissioned a visual specialist to inspect the
+   * app's UI. Its whole "WHAT ALREADY EXISTS HERE" block was
+   * node_modules/@develar/schema-utils/..., node_modules/@electron/asar/... — it
+   * never saw src/main/main.js. It then spent 33 bash calls hunting for paths it
+   * had invented and reported "No localconvert directory found".
+   *
+   * listProject skipped dotfiles only, while the three other walkers in
+   * mesh-host.ts all skip node_modules. `npm install` drops ~7,000 files in,
+   * node_modules sorts ahead of src, and the 60-entry cap is gone before the walk
+   * reaches the product.
+   */
+  const build = (): string => {
+    const root = mkdtempSync(path.join(os.tmpdir(), 'listproj-'));
+    mkdirSync(path.join(root, 'src', 'main'), { recursive: true });
+    writeFileSync(path.join(root, 'src', 'main', 'main.js'), 'x');
+    writeFileSync(path.join(root, 'package.json'), '{}');
+    // The flood: sorts before "package.json"/"src" and would eat the whole cap.
+    for (const pkg of ['@develar', '@electron', 'acorn', 'builder-util']) {
+      mkdirSync(path.join(root, 'node_modules', pkg, 'lib'), { recursive: true });
+      for (let i = 0; i < 30; i++) {
+        writeFileSync(path.join(root, 'node_modules', pkg, 'lib', `f${i}.js`), 'x');
+      }
+    }
+    mkdirSync(path.join(root, 'dist'), { recursive: true });
+    writeFileSync(path.join(root, 'dist', 'bundle.js'), 'x');
+    return root;
+  };
+
+  it('never mentions node_modules, however much of it there is', () => {
+    const root = build();
+    try {
+      expect(listProject(root)).not.toContain('node_modules');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('still shows the source the role actually needs to find', () => {
+    const root = build();
+    try {
+      const out = listProject(root);
+      expect(out).toContain('src/main/main.js');
+      expect(out).toContain('package.json');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('skips build output too — also not the product', () => {
+    const root = build();
+    try {
+      expect(listProject(root)).not.toContain('dist/bundle.js');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('says something honest about a genuinely empty project', () => {
+    const root = mkdtempSync(path.join(os.tmpdir(), 'listproj-empty-'));
+    try {
+      expect(listProject(root)).toContain('nothing at all');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
