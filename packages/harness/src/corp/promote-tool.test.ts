@@ -304,7 +304,28 @@ describe('a failed production reports what is actually on disk', () => {
     expect(text).toContain('THE WORK IS STILL THERE');
     expect(text).toContain('src/converters/image-converter.ts');
     expect(text).toMatch(/do NOT start again/);
-    expect(text).toMatch(/ask the manager for a short summary/i);
+    /* Was "ask the manager for a short summary" — which is reading ABOUT the
+       product again. A partial hand-off has something on disk to open, so the
+       CEO finds out what works by USING it, and the end-user test rides along. */
+    expect(text).toMatch(/what actually works by USING it/);
+  });
+
+  /*
+   * the user: "the most pragmatic thing to do is after the manager returns any talk
+   * to tool call, we put a lot of testing instructions." This branch carried
+   * none — it was the one path back to the CEO with no testing pressure at all.
+   */
+  it('carries the end-user test, like every other return with work on disk', async () => {
+    const text = await runPromoted(failed('src/main.ts'));
+    expect(text).toContain('TEST IT AS THE END USER');
+    expect(text).toMatch(/BUILDING IS NOT TESTING/);
+    expect(text).toMatch(/LOOK AT THE RESULT WITH YOUR EYES/);
+  });
+
+  /* Nothing on disk means nothing to open — do not send it hunting. */
+  it('omits the end-user test when the workspace is empty', async () => {
+    const text = await runPromoted(failed(''));
+    expect(text).not.toContain('TEST IT AS THE END USER');
   });
 
   /* It must still not read as success — that is the other way to get this wrong. */

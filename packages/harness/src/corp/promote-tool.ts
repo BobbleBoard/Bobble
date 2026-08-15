@@ -24,7 +24,7 @@ import {
   HIERARCHY_CREATED_ACK,
   parseCreateHierarchyArgs,
 } from './promotion.js';
-import { classifyVerification, extractClaims, finalCheck } from './verification.js';
+import { classifyVerification, END_USER_TEST, extractClaims, finalCheck } from './verification.js';
 
 /**
  * The `ctx.ui.setStatus` key the tool publishes the promote intent on. The desktop
@@ -310,12 +310,20 @@ export function registerCreateHierarchyTool(pi: ExtensionAPI, deps: PromoteToolD
                     'Nothing was delivered. Tell the user plainly what happened — do not ' +
                     'describe the product as finished, and do not quietly build it yourself ' +
                     'instead: say that the hand-off failed.'
-                  : `The hand-off did not complete: ${why}.\n\n` +
+                  : /*
+                     * A PARTIAL HAND-OFF STILL HAS SOMETHING TO OPEN, so it still
+                     * gets the end-user test. This branch used to carry no testing
+                     * instruction at all — the CEO was told the work exists and to
+                     * ask for a summary, which is reading ABOUT the product again.
+                     * Finding out what actually runs is the fastest way to know
+                     * what is left, and it is the same question either way.
+                     */
+                    `The hand-off did not complete: ${why}.\n\n` +
                     `THE WORK IS STILL THERE. The workspace contains:\n${tree}\n\n` +
-                    'So do NOT start again and do NOT throw this away. Ask the manager for a ' +
-                    'short summary of what works and what is left, then carry on from it. ' +
+                    'So do NOT start again and do NOT throw this away. Find out what ' +
+                    'actually works by USING it, then ask the manager to finish the rest. ' +
                     'Tell the user what actually exists — not that it is finished, and not ' +
-                    'that nothing happened.',
+                    `that nothing happened.\n\n${END_USER_TEST}`,
             },
           ],
           isError: true,

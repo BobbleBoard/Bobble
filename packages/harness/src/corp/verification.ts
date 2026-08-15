@@ -252,6 +252,42 @@ const PERSPECTIVE: Record<VerificationPerspective, { readonly who: string; reado
   };
 
 /**
+ * WHAT THE CEO IS TOLD EVERY TIME THE TEAM HANDS SOMETHING BACK.
+ *
+ * the user: "the most pragmatic thing to do is after the manager returns any talk to
+ * tool call, we put a lot of testing instructions." The tool result is the one
+ * place the CEO cannot skim past — it is the answer it was blocked waiting for —
+ * so that is where the pressure goes, on EVERY return that has something on disk
+ * to open, not only the clean one.
+ *
+ * MEASURED, run 6. The CEO's entire verification was four commands: edit
+ * package.json, `npm run build`, `cp` the DMG into /Applications, `ls` that
+ * folder. It then told the user "the application is now ready to use". The app's
+ * conversion core could not be require()d — duplicate declarations — and its drop
+ * zone was wired to a renderer function faking success with a setTimeout.
+ *
+ * Every one of those four commands ran clean, exited 0 and printed something.
+ * That is precisely why they are named and ruled out here by name: a general
+ * "really test it" does not dislodge a habit that already feels like testing.
+ */
+export const END_USER_TEST = [
+  'TEST IT AS THE END USER, AND LOOK AT IT. This comes before anything else.',
+  '',
+  '  - OPEN THE PRODUCT the way the user would open it, and DO THE THING they',
+  '    asked it to do — with a real file, a real input, the real action. Not a',
+  '    test script beside it: the product itself.',
+  '  - LOOK AT THE RESULT WITH YOUR EYES. Screenshot the window and view the',
+  '    image. Open the file it produced. A converted file that never opens is',
+  '    not a converted file.',
+  '  - BUILDING IS NOT TESTING. Packaging is not testing. Copying it into a',
+  '    folder is not testing. `ls` is not testing. A build that succeeds tells',
+  '    you the compiler was happy, and nothing whatsoever about whether the',
+  '    thing works.',
+  '  - If you cannot open it, say so plainly — that IS the finding, and it is',
+  '    the most important one you can report.',
+].join('\n');
+
+/**
  * The final check itself: the agent's own claims, back at it, one per line, plus
  * exactly the kinds of proof this job admits.
  *
@@ -332,6 +368,7 @@ export function finalCheck(opts: {
    * was broken and a CEO that did the job twice.
    */
   if (perspective === 'ceo') {
+    lines.push(END_USER_TEST, '');
     /*
      * BE THE END USER, AND LOOK.
      *
@@ -352,21 +389,6 @@ export function finalCheck(opts: {
      * and acts on it.
      */
     lines.push(
-      'TEST IT AS THE END USER, AND LOOK AT IT. This comes before anything else.',
-      '',
-      '  - OPEN THE PRODUCT the way the user would open it, and DO THE THING they',
-      '    asked it to do — with a real file, a real input, the real action. Not a',
-      '    test script beside it: the product itself.',
-      '  - LOOK AT THE RESULT WITH YOUR EYES. Screenshot the window and view the',
-      '    image. Open the file it produced. A converted file that never opens is',
-      '    not a converted file.',
-      '  - BUILDING IS NOT TESTING. Packaging is not testing. Copying it into a',
-      '    folder is not testing. `ls` is not testing. A build that succeeds tells',
-      '    you the compiler was happy, and nothing whatsoever about whether the',
-      '    thing works.',
-      '  - If you cannot open it, say so plainly — that IS the finding, and it is',
-      '    the most important one you can report.',
-      '',
       'WHAT YOU DO WITH WHAT YOU FIND:',
       '',
       '  - Anything wrong goes BACK TO THE MANAGER — call `talk_to_manager` again',
