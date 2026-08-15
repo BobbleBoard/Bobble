@@ -368,6 +368,33 @@ function lowerFirst(text: string): string {
  * summed duration ("Ran 10 commands, thought for 1h 20m, read 3 files"). The
  * first phrase is capitalized, the rest lower-cased. Pure + deterministic.
  */
+/**
+ * Should this chain print "Done" RIGHT NOW? (The latch lives in the component;
+ * this is the per-render decision it latches on.)
+ *
+ * Extracted because it was wrong three times and the user reported it three times —
+ * "the premature done just needs to be fixed now though… it doesn't say done
+ * until it's truly totally done", then "done is a final thing". Each fix was a
+ * one-line change to an expression buried in a 200-line component, with nothing
+ * asserting the rule afterwards. Now there is.
+ *
+ * The rule, in one place:
+ *  · When the turn's owner supplies `complete`, that is the ONLY thing that can
+ *    show Done. Quiet rows cannot — `!running && !active` goes true in every gap
+ *    between two tool calls, which is what made Done flap on and off mid-turn.
+ *  · A `complete` turn that is not yet quiet is still not done: the caller can
+ *    know the turn is over before the last row stops rendering.
+ *  · With no `complete` (a static render, a historical transcript) fall back to
+ *    the debounced quiet guess — those turns are already over.
+ */
+export function chainIsDone(input: {
+  readonly complete?: boolean;
+  readonly quiet: boolean;
+  readonly settledGuess: boolean;
+}): boolean {
+  return input.complete !== undefined ? input.complete && input.quiet : input.settledGuess;
+}
+
 export function summarizeActivity(steps: ActivityStepData[]): string {
   const agg = new Map<ActivityStepKind, { count: number; durationMs: number; failed: number }>();
   for (const step of steps) {
@@ -1539,7 +1566,7 @@ export const ActivityChain = forwardRef<HTMLDivElement, ActivityChainProps>(func
   const quiet = !running && !active && prefill === undefined;
   const settledGuess = useSettled(quiet);
   const [everDone, setEverDone] = useState(false);
-  const doneNow = complete !== undefined ? complete && quiet : settledGuess;
+  const doneNow = chainIsDone({ complete, quiet, settledGuess });
   useEffect(() => {
     if (doneNow) setEverDone(true);
   }, [doneNow]);

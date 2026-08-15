@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   type ActivityStepData,
   activitySummary,
+  chainIsDone,
   formatDuration,
   hasInlineContent,
   summarizeActivity,
@@ -454,5 +455,45 @@ describe('hasInlineContent — no tool row is a dead end', () => {
         expect(hasInlineContent({ kind, label: 'x' })).toBe(false);
       });
     }
+  });
+});
+
+/*
+ * THE PREMATURE-DONE RULE, finally locked down.
+ *
+ * the user reported this three times — "why is there green here… premature done",
+ * "the premature done just needs to be fixed now though… it doesn't say done
+ * until it's truly totally done", "done is a final thing. This tool chain is
+ * DONE." Each fix was a one-line change to an expression inside a 200-line
+ * component, with nothing asserting the rule afterwards, so the next change to
+ * the surrounding code could quietly undo it. This is the debt paid.
+ */
+describe('chainIsDone — when a tool chain may say Done', () => {
+  it('does NOT print Done in the gap between two tool calls', () => {
+    // The failing case: nothing running this instant, but the TURN is not over.
+    // `!running && !active` goes true in every gap, which is what made Done flap.
+    expect(chainIsDone({ complete: false, quiet: true, settledGuess: true })).toBe(false);
+  });
+
+  it('prints Done only when the turn OWNER says the turn is complete', () => {
+    expect(chainIsDone({ complete: true, quiet: true, settledGuess: false })).toBe(true);
+  });
+
+  it('does not print Done while rows are still rendering, even once complete', () => {
+    expect(chainIsDone({ complete: true, quiet: false, settledGuess: true })).toBe(false);
+  });
+
+  it('falls back to the quiet guess for a historical chain with no owner', () => {
+    // Static renders and replayed transcripts are already over; there is nobody
+    // left to answer `complete`, so quiet is the best available signal.
+    expect(chainIsDone({ quiet: true, settledGuess: true })).toBe(true);
+    expect(chainIsDone({ quiet: true, settledGuess: false })).toBe(false);
+  });
+
+  it('lets `complete` OVERRIDE the guess in both directions', () => {
+    // The guess must never be able to promote a live turn to Done…
+    expect(chainIsDone({ complete: false, quiet: true, settledGuess: true })).toBe(false);
+    // …nor hold back a turn its owner has declared finished.
+    expect(chainIsDone({ complete: true, quiet: true, settledGuess: false })).toBe(true);
   });
 });
