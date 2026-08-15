@@ -58,6 +58,37 @@ export function wouldHang(command: string, cwd?: string): string | null {
       // thing that stops an ordinary command.
     }
   }
+  /*
+   * A GUI LAUNCHER WITH NO SCRIPT TO READ. The check above only fires when the
+   * command names a .py/.js file it can open and inspect. `electron .`,
+   * `npm start`, `npm run dev` name no file at all — nothing to read, so nothing
+   * refused.
+   *
+   * MEASURED, run 7. At 20:38 an engineer ran a globally-installed `electron .`
+   * in the project. That opens a window and never returns. Bobble's own window
+   * went away 4 minutes later, the runner logged "window went away — stopping",
+   * and the run died at 66 minutes having never reached the CEO's verification
+   * turn. The engineer's process was STILL running afterwards.
+   *
+   * One engineer's foreground window can end the whole run, so this is refused
+   * on the command shape alone.
+   */
+  const launcher =
+    /(^|[\s;&|(])electron(\s|$)/.test(c) ||
+    /(^|[\s;&|(])npm\s+(start|run\s+(dev|start|serve|electron))(\s|$)/.test(c) ||
+    /(^|[\s;&|(])(pnpm|yarn)\s+(dev|start|serve)(\s|$)/.test(c) ||
+    /(^|[\s;&|(])open\s+-a(\s|$)/.test(c);
+  if (launcher && !/(^|[\s;&|(])timeout\s+\d+/.test(c) && !/&\s*$/.test(c)) {
+    return (
+      'that command opens a window and never returns — it would hang this entire ' +
+      'run, so it was not executed. A GUI you launch in the foreground blocks your ' +
+      'turn until a human closes it, and nothing here can. To CHECK the app works, ' +
+      'drive it headlessly instead: run the code that does the work directly, or ' +
+      'launch it with a `timeout N` in front so a block is a failed test rather ' +
+      'than a dead run. To leave something running, background it with `&`.'
+    );
+  }
+
   if (!/(^|[\s;&|(])godot(\s|$)/.test(c)) return null;
   // These all terminate on their own.
   if (/--quit(\b|-after)/.test(c) || /--script\b/.test(c) || /--write-movie\b/.test(c)) return null;
