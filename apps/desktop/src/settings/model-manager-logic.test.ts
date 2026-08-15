@@ -34,16 +34,33 @@ describe('ramVerdict', () => {
   });
 
   it('insufficient RAM is danger + does not fit', () => {
-    expect(ramVerdict(32, 16)).toEqual({ tone: 'danger', label: 'Needs more RAM', fits: false });
+    expect(ramVerdict(32, 16)).toMatchObject({ tone: 'danger', label: "Won't fit", fits: false });
   });
 
   it('a tight-but-adequate fit is a warning', () => {
     // 18 total, needs 16 → 2 GB headroom (< 4) → tight.
-    expect(ramVerdict(16, 18)).toEqual({ tone: 'warning', label: 'Tight fit', fits: true });
+    expect(ramVerdict(16, 18)).toMatchObject({
+      tone: 'warning',
+      label: 'Tight — will swap',
+      fits: true,
+    });
   });
 
   it('comfortable headroom is success', () => {
-    expect(ramVerdict(16, 32)).toEqual({ tone: 'success', label: 'Fits comfortably', fits: true });
+    expect(ramVerdict(16, 32)).toMatchObject({ tone: 'success', label: 'Fits', fits: true });
+  });
+
+  /* One vocabulary on screen; the DETAIL is what says this is the coarse one. */
+  it('uses the same three words as quantFit, and says why it is different', () => {
+    const words = new Set([
+      ramVerdict(16, 32).label,
+      ramVerdict(16, 18).label,
+      ramVerdict(32, 16).label,
+      quantFit({ modelBytes: 5 * GB, ...M5_PRO_24GB }).label,
+      quantFit({ modelBytes: 40 * GB, ...M5_PRO_24GB }).label,
+    ]);
+    expect(words).toEqual(new Set(['Fits', 'Tight — will swap', "Won't fit"]));
+    expect(ramVerdict(16, 32).detail).toMatch(/no file size known yet/);
   });
 
   it('exact minimum counts as a (tight) fit, not insufficient', () => {
@@ -294,10 +311,24 @@ describe('quantFit — the verdict weighs the quant on screen', () => {
     expect(q4.tone).not.toBe('success');
   });
 
-  it('counts the vision projector when it will be loaded too', () => {
+  /*
+   * The projector is downloaded with the weights but only LOADED on an opt-in
+   * multimodal restart, so it must not decide the default verdict — charging
+   * every model for it handed the 27B's recommendation to a worse quant of the
+   * same size. It is named in the detail instead, because switching vision on
+   * later is a real cliff.
+   */
+  it('does not charge the default (text-only) launch for the projector', () => {
     const bare = quantFit({ modelBytes: 15 * GB, ...M5_PRO_24GB });
     const withVision = quantFit({ modelBytes: 15 * GB, mmprojBytes: 0.93 * GB, ...M5_PRO_24GB });
-    expect(withVision.detail).not.toBe(bare.detail);
+    expect(withVision.tone).toBe(bare.tone);
+    expect(withVision.label).toBe(bare.label);
+  });
+
+  it('still names the vision cost, so the cliff is visible before you walk off it', () => {
+    const v = quantFit({ modelBytes: 13.44 * GB, mmprojBytes: 0.93 * GB, ...M5_PRO_24GB });
+    expect(v.detail).toMatch(/with vision on/);
+    expect(quantFit({ modelBytes: 13.44 * GB, ...M5_PRO_24GB }).detail).not.toMatch(/vision/);
   });
 
   it('has a distinct verdict for "loads, then swaps"', () => {
@@ -327,10 +358,37 @@ describe('orderQuantsForDisplay — row 0 is the recommendation', () => {
     { quant: 'UD-Q6_K_XL', bytes: 25.92 * GB },
   ];
 
-  it('puts the LARGEST fitting quant first, not the smallest', () => {
+  it('puts the best fitting quant first, not the smallest', () => {
     const out = orderQuantsForDisplay(ladder, M5_PRO_24GB);
+    expect(out[0]?.quant).toBe('UD-Q3_K_XL');
+    expect(recommendedQuant(ladder, M5_PRO_24GB)?.quant).toBe('UD-Q3_K_XL');
+  });
+
+  /*
+   * MEASURED on the real card: strict size-descending picked Q3_K_M (13.82 GB)
+   * over UD-Q3_K_XL (13.44 GB) — 0.4 GB of extra file bought at the cost of the
+   * better quantisation, which is the whole reason UD quants exist.
+   */
+  it('prefers a dynamic quant over a marginally larger plain one', () => {
+    const out = orderQuantsForDisplay(
+      [
+        { quant: 'Q3_K_M', bytes: 13.82 * GB },
+        { quant: 'UD-Q3_K_XL', bytes: 13.44 * GB },
+      ],
+      M5_PRO_24GB,
+    );
+    expect(out[0]?.quant).toBe('UD-Q3_K_XL');
+  });
+
+  it('but not over a decisively larger one', () => {
+    const out = orderQuantsForDisplay(
+      [
+        { quant: 'Q3_K_M', bytes: 13.82 * GB },
+        { quant: 'UD-IQ2_M', bytes: 10.32 * GB },
+      ],
+      M5_PRO_24GB,
+    );
     expect(out[0]?.quant).toBe('Q3_K_M');
-    expect(recommendedQuant(ladder, M5_PRO_24GB)?.quant).toBe('Q3_K_M');
   });
 
   it('sinks what will not fit below what will', () => {
@@ -411,5 +469,58 @@ describe('groupFits — can this model run here at all', () => {
     expect(groupFits(g([{ quant: 'Q8_0', bytes: 29 * GB }]), null)).toBe(true);
     expect(groupFits(g([{ quant: 'Q8_0', bytes: 29 * GB }]), { totalRamGB: 0 })).toBe(true);
     expect(groupFits(g([{ quant: 'Q8_0', bytes: 0 }]), { totalRamGB: 8 })).toBe(true);
+  });
+});
+
+describe('mergeQuantLadder — shards are one model', () => {
+  /*
+   * CAUGHT BY DRIVING THE REAL CARD. unsloth/Qwen3.8-27B-GGUF ships BF16 as two
+   * shards (49.99 GB + 4.67 GB). parseQuant strips the -00001-of-00002 suffix,
+   * so both reduced to "BF16" and the LATER one won — the dropdown offered
+   * "BF16 · 4.7 GB · Fits" for a 54.7 GB model on a 24 GB Mac.
+   */
+  it('sums the shards of one quant instead of keeping the last', () => {
+    const out = mergeQuantLadder(
+      [],
+      [
+        { quant: 'BF16', sizeBytes: 49.99 * GB },
+        { quant: 'BF16', sizeBytes: 4.67 * GB },
+      ],
+    );
+    expect(out).toHaveLength(1);
+    expect(out[0]?.bytes).toBeCloseTo(54.66 * GB, -8);
+  });
+
+  it('does not double-count a single-file quant that is also in the catalog', () => {
+    const out = mergeQuantLadder(
+      [{ quant: 'UD-Q3_K_XL', bytes: 13.44 * GB }],
+      [{ quant: 'UD-Q3_K_XL', sizeBytes: 13.44 * GB }],
+    );
+    expect(out[0]?.bytes).toBeCloseTo(13.44 * GB, -6);
+  });
+
+  it('keeps the catalog size when the live listing has no size for it', () => {
+    const out = mergeQuantLadder(
+      [{ quant: 'Q4_K_M', bytes: 17.11 * GB }],
+      [{ quant: 'Q4_K_M', sizeBytes: 0 }],
+    );
+    expect(out[0]?.bytes).toBeCloseTo(17.11 * GB, -6);
+  });
+
+  it('a summed shard family sorts and judges by its REAL size', () => {
+    const ladder = mergeQuantLadder(
+      [],
+      [
+        { quant: 'BF16', sizeBytes: 49.99 * GB },
+        { quant: 'BF16', sizeBytes: 4.67 * GB },
+        { quant: 'UD-Q3_K_XL', sizeBytes: 13.44 * GB },
+      ],
+    );
+    const ordered = orderQuantsForDisplay(ladder, M5_PRO_24GB);
+    expect(ordered[0]?.quant).toBe('UD-Q3_K_XL');
+    expect(
+      quantFit({ modelBytes: ladder.find((q) => q.quant === 'BF16')?.bytes ?? 0, ...M5_PRO_24GB })
+        .fits,
+    ).toBe(false);
   });
 });

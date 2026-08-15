@@ -130,12 +130,30 @@ export function ModelCard({
    * without opening it gets the best quant this machine can actually run —
    * which `quants[0]`, the SMALLEST, never was.
    */
+  const vision = group.entries.some((e) => e.vision);
+  /* The projector is loaded alongside the weights on a vision launch, so it is
+     part of the footprint — real bytes from the ladder, never a guess. */
+  const mmprojBytes = vision
+    ? (ladders[entry.hfRepo ?? entry.id]?.find((f) => f.mmproj === true)?.sizeBytes ?? 0)
+    : 0;
+  /*
+   * ONE fit input for the sort, the badge and every row. They were computed
+   * separately and disagreed: the ORDER ranked without the projector while the
+   * ROW LABELS included it, so the 27B's list opened with two rows marked
+   * "Tight — will swap" above rows marked "Fits". Caught by reading the real
+   * dropdown; no unit test could see it, because each function was right.
+   */
+  const fitInput = {
+    mmprojBytes,
+    modelMaxContext: entry.contextWindow,
+    totalRamGB: hardware?.totalRamGB ?? 0,
+  };
   /* No downloaded-first key here: `LlmCatalogEntry.downloaded` is per-ENTRY, not
      per-quant, so there is nothing on the contract that says WHICH quant is on
      disk. Passing a predicate that guesses would sort the list by a fiction. */
   const quantOptions = orderQuantsForDisplay(
     mergeQuantLadder(entry.quants, ladders[entry.hfRepo ?? entry.id]),
-    { totalRamGB: hardware?.totalRamGB ?? 0, modelMaxContext: entry.contextWindow },
+    fitInput,
   );
   const effectiveQuant =
     quantOptions.find((q) => q.quant === quant)?.quant ?? quantOptions[0]?.quant ?? '';
@@ -144,12 +162,6 @@ export function ModelCard({
   const isLoading = isActive && status.phase === 'starting';
   const dl = download !== null && download.modelId === entry.id ? download : null;
   const sizeBytes = quantOptions.find((q) => q.quant === effectiveQuant)?.bytes ?? 0;
-  const vision = group.entries.some((e) => e.vision);
-  /* The projector is loaded alongside the weights on a vision launch, so it is
-     part of the footprint — real bytes from the ladder, never a guess. */
-  const mmprojBytes = vision
-    ? (ladders[entry.hfRepo ?? entry.id]?.find((f) => f.mmproj === true)?.sizeBytes ?? 0)
-    : 0;
   /*
    * The verdict now weighs THE QUANT ON SCREEN, not the group's catalog minimum,
    * so it moves with the dropdown the way the size beside it always did. Falls
@@ -158,12 +170,7 @@ export function ModelCard({
    */
   const ram =
     sizeBytes > 0
-      ? quantFit({
-          modelBytes: sizeBytes,
-          mmprojBytes,
-          modelMaxContext: entry.contextWindow,
-          totalRamGB: hardware?.totalRamGB ?? 0,
-        })
+      ? quantFit({ ...fitInput, modelBytes: sizeBytes })
       : ramVerdict(primary.minRamGB, hardware?.totalRamGB ?? 0);
   const tps = status.metrics?.avgTps ?? status.metrics?.lastTps;
   const port = isActive ? portOf(status.baseUrl) : null;
@@ -427,12 +434,7 @@ export function ModelCard({
                  * and made the list hard to scan").
                  */}
                 {quantOptions.map((q) => {
-                  const rowFit = quantFit({
-                    modelBytes: q.bytes,
-                    mmprojBytes,
-                    modelMaxContext: entry.contextWindow,
-                    totalRamGB: hardware?.totalRamGB ?? 0,
-                  });
+                  const rowFit = quantFit({ ...fitInput, modelBytes: q.bytes });
                   return (
                     <SelectItem key={q.quant} value={q.quant}>
                       <span className="flex items-center gap-1.5">

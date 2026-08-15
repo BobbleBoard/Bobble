@@ -23,18 +23,28 @@ export interface RamVerdict {
 }
 
 /**
- * Green/ok/insufficient verdict comparing a model's minimum RAM against
- * detected RAM. Unknown RAM (0, e.g. non-macOS detect) yields a neutral badge
- * that just states the requirement rather than guessing a fit.
+ * The fallback verdict for a card whose file sizes are not known yet — several
+ * catalog entries carry `bytes: 0` until their live ladder is fetched.
  *
- * Prefer {@link quantFit} wherever the SELECTED quant is known — this compares a
- * whole model group's hand-set catalog minimum and cannot tell Q2 from Q8.
+ * SAME THREE WORDS as {@link quantFit} on purpose. They used to be "Fits
+ * comfortably" / "Tight fit" / "Needs more RAM", and with the measured verdict
+ * shipping beside them the manager showed two vocabularies at once — a card
+ * reading "Tight fit" next to one reading "Tight — will swap" looks like two
+ * different states rather than one state known two ways. Seen on screen, not in
+ * a test.
+ *
+ * The DETAIL is where they differ, and it says so plainly: this one is the
+ * model's hand-set minimum, not an estimate of the file you picked. Prefer
+ * {@link quantFit} wherever a size is known — this cannot tell Q2 from Q8.
  */
 export function ramVerdict(minRamGB: number, totalRamGB: number): RamVerdict {
   if (totalRamGB <= 0) return { tone: 'default', label: `${minRamGB} GB RAM`, fits: true };
-  if (totalRamGB < minRamGB) return { tone: 'danger', label: 'Needs more RAM', fits: false };
-  if (totalRamGB - minRamGB < 4) return { tone: 'warning', label: 'Tight fit', fits: true };
-  return { tone: 'success', label: 'Fits comfortably', fits: true };
+  const detail = `this model states ${minRamGB} GB minimum; no file size known yet`;
+  if (totalRamGB < minRamGB) return { tone: 'danger', label: "Won't fit", fits: false, detail };
+  if (totalRamGB - minRamGB < 4) {
+    return { tone: 'warning', label: 'Tight — will swap', fits: true, detail };
+  }
+  return { tone: 'success', label: 'Fits', fits: true, detail };
 }
 
 export interface QuantFitInput {
@@ -78,7 +88,7 @@ export interface QuantFitInput {
 export function quantFit(input: QuantFitInput): RamVerdict {
   const { modelBytes, mmprojBytes = 0, modelMaxContext = CONTEXT_CEILING, totalRamGB } = input;
   if (totalRamGB <= 0 || modelBytes <= 0) {
-    return { tone: 'default', label: formatBytes(modelBytes + mmprojBytes), fits: true };
+    return { tone: 'default', label: formatBytes(modelBytes), fits: true };
   }
   /*
    * The context the app would really launch with — not the model's advertised
@@ -87,8 +97,26 @@ export function quantFit(input: QuantFitInput): RamVerdict {
    */
   const budgetGB = totalRamGB * DEFAULT_MEMORY_FRACTION;
   const ctx = Math.min(CONTEXT_CEILING, modelMaxContext > 0 ? modelMaxContext : CONTEXT_CEILING);
-  const needGB = estimateLaunchRamGB(modelBytes + mmprojBytes, ctx);
-  const detail = `≈${needGB.toFixed(1)} GB of ${totalRamGB} GB with a ${Math.round(ctx / 1024)}k context`;
+  /*
+   * THE VERDICT IS ABOUT THE DEFAULT LAUNCH, WHICH IS TEXT-ONLY.
+   *
+   * The projector is downloaded with the weights but only LOADED on a
+   * multimodal launch, which is an explicit opt-in restart. Charging every
+   * model for it judges a cost most sessions never pay — and it changed the
+   * answer, not just the number: on a 24 GB Mac it pushed the 27B's
+   * UD-Q3_K_XL out of green and handed the recommendation to a plain Q3_K_S
+   * that is a worse model at the same size. Caught by reading the real
+   * dropdown, where two "Tight" rows sat above five "Fits" rows.
+   *
+   * So the projector is not in the verdict. It IS in the detail, because
+   * turning vision on later is a real cliff and the number should be visible
+   * before someone walks off it.
+   */
+  const needGB = estimateLaunchRamGB(modelBytes, ctx);
+  const withVisionGB = mmprojBytes > 0 ? estimateLaunchRamGB(modelBytes + mmprojBytes, ctx) : null;
+  const detail =
+    `≈${needGB.toFixed(1)} GB of ${totalRamGB} GB with a ${Math.round(ctx / 1024)}k context` +
+    (withVisionGB !== null ? ` (≈${withVisionGB.toFixed(1)} GB with vision on)` : '');
   if (needGB <= budgetGB) return { tone: 'success', label: 'Fits', fits: true, detail };
   if (needGB <= totalRamGB) {
     return { tone: 'warning', label: 'Tight — will swap', fits: true, detail };
@@ -133,6 +161,26 @@ function fitRank(tone: RamTone): number {
 }
 
 /**
+ * How much quality a quant carries per byte, relative to a plain one.
+ *
+ * Unsloth Dynamic (`UD-`) quants keep the layers that matter at higher
+ * precision, so they beat a same-sized plain quant — that is the entire reason
+ * they exist, and Unsloth's own `GGUF_QUANT_PREFERENCE` puts all sixteen UD
+ * entries above every plain quant unconditionally.
+ *
+ * MEASURED on the real 27B card: strict size-descending picked `Q3_K_M`
+ * (13.82 GB) over `UD-Q3_K_XL` (13.44 GB) — 0.4 GB of extra file bought at the
+ * cost of the better quantisation. Weighting UD by 1.05 makes the ordering
+ * express "bigger is better, and dynamic is worth a little size", which is what
+ * a person choosing here actually believes. It is a modelling assumption, so it
+ * is written down as one rather than buried in a comparator.
+ */
+const UD_QUALITY_BONUS = 1.05;
+function qualityWeightedBytes(option: QuantOption): number {
+  return /(^|[^A-Z])UD-/i.test(option.quant) ? option.bytes * UD_QUALITY_BONUS : option.bytes;
+}
+
+/**
  * Order the quant list so ROW 0 IS THE RECOMMENDATION.
  *
  * the user, describing what he liked in Unsloth Desktop: "they have a default
@@ -170,7 +218,10 @@ export function orderQuantsForDisplay(
     const fa = rank.get(a.quant) ?? 3;
     const fb = rank.get(b.quant) ?? 3;
     if (fa !== fb) return fa - fb;
-    return fa === 3 ? a.bytes - b.bytes : b.bytes - a.bytes;
+    /* Inside the won't-fit group the question is "how close was it", which is
+       about real bytes, not quality. Everywhere else, best-first. */
+    if (fa === 3) return a.bytes - b.bytes;
+    return qualityWeightedBytes(b) - qualityWeightedBytes(a);
   });
 }
 
@@ -482,6 +533,22 @@ export function mergeQuantLadder(
 ): QuantOption[] {
   const map = new Map<string, QuantOption>();
   for (const q of base) map.set(q.quant, { quant: q.quant, bytes: q.bytes });
+  /*
+   * SHARDS ARE ONE MODEL, SO THEIR BYTES ADD UP.
+   *
+   * CAUGHT BY DRIVING THE REAL CARD, not by any unit test: the 27B's dropdown
+   * offered "BF16 · 4.7 GB · Fits" on a 24 GB Mac. `unsloth/Qwen3.8-27B-GGUF`
+   * ships BF16 as two shards — 49.99 GB and 4.67 GB — and `parseQuant` strips
+   * the `-00001-of-00002` suffix, so both landed on the label "BF16" and the
+   * later one WON. A 54.7 GB model was advertised as 4.7 GB and green.
+   *
+   * Two files in one repo that reduce to the same quant label are shards of one
+   * model; there is no other way for that to happen. Summing them is both the
+   * correct size and the correct verdict, and it is what Unsloth Desktop does
+   * (`gguf.py` sums per shard family). Fetched sizes replace a catalog entry the
+   * FIRST time and accumulate after, so a single-file quant is unaffected.
+   */
+  const fromFetch = new Set<string>();
   for (const f of fetched ?? []) {
     if (f.quant === undefined || f.quant.length === 0) continue;
     /*
@@ -492,8 +559,13 @@ export function mergeQuantLadder(
      * every caller remembering to.
      */
     if (f.mmproj === true) continue;
-    const existing = map.get(f.quant);
-    map.set(f.quant, { quant: f.quant, bytes: f.sizeBytes ?? existing?.bytes ?? 0 });
+    const bytes = f.sizeBytes ?? 0;
+    const prior = fromFetch.has(f.quant) ? (map.get(f.quant)?.bytes ?? 0) : 0;
+    fromFetch.add(f.quant);
+    map.set(f.quant, {
+      quant: f.quant,
+      bytes: bytes > 0 || prior > 0 ? prior + bytes : (map.get(f.quant)?.bytes ?? 0),
+    });
   }
   return [...map.values()].sort(
     (a, b) =>
