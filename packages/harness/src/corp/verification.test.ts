@@ -150,8 +150,11 @@ describe('the CEO check is a flat list, in the order that matters', () => {
     expect(ceo()).toMatch(/visually where it applies/);
   });
 
-  it('makes "I could not open it" a reportable finding, not a silence', () => {
-    expect(ceo()).toMatch(/say plainly what is wrong/);
+  it('offers exactly two ways to end the turn, numbered', () => {
+    const t = ceo();
+    expect(t).toMatch(/TWO WAYS TO END THIS TURN/);
+    expect(t).toMatch(/1\. Send the manager your list/);
+    expect(t).toMatch(/2\. Tell the user the product is finished/);
   });
 
   it('casts the CEO as the user about to try it', () => {
@@ -178,12 +181,34 @@ describe('the CEO check is a flat list, in the order that matters', () => {
     expect(t).toMatch(/Do not fix it\s+yourself/);
   });
 
-  it('asks the manager for a specialist it cannot check itself', () => {
-    expect(ceo()).toMatch(/Send the whole list to the manager/);
+  /*
+   * the user: "there will always be bias in the prompt, you want to ensure that the
+   * bias is toward the safer option especially at the start… we especially at
+   * the 4b class bias the attention mechanism an incredible degree away from
+   * submitting that turn." A wrong "send feedback" costs a round; a wrong "it
+   * is finished" ships a broken product.
+   */
+  it('leans the FIRST round toward another round of feedback', () => {
+    const t = ceo();
+    expect(t).toMatch(/THIS IS THE FIRST ROUND/);
+    expect(t).toMatch(/rarely right the first/);
+    expect(t).toMatch(/be really sure before you choose 2/);
   });
 
-  it('answers the user only after using it', () => {
-    expect(ceo()).toMatch(/Answer the user only once the list is empty/);
+  it('drops the first-round lean once the CEO has had a round', () => {
+    const t = finalCheck({
+      claims: [],
+      profile: classifyVerification('desktop converter app'),
+      perspective: 'ceo',
+      round: 2,
+    });
+    expect(t).not.toMatch(/THIS IS THE FIRST ROUND/);
+    expect(t).toMatch(/Choose 2 only when your list is empty/);
+  });
+
+  it('frames the feedback route as improving the app, not as escalation', () => {
+    expect(ceo()).toMatch(/a round of feedback/);
+    expect(ceo()).toMatch(/so the team improves the app/);
   });
 
   /*
@@ -205,7 +230,6 @@ describe('the CEO check is a flat list, in the order that matters', () => {
 
   it('does not tell it to go make an undemonstrable claim true', () => {
     expect(ceo()).not.toMatch(/make it true/);
-    expect(ceo()).toMatch(/say plainly what is wrong/);
   });
 
   /* the user: "your guidelines should essentially be able to be put into a clean
@@ -219,15 +243,17 @@ describe('the CEO check is a flat list, in the order that matters', () => {
     expect(t).toMatch(/what you expected, what happened, which file/);
   });
 
-  it('sends the whole list back to the manager, not a fix of its own', () => {
+  it('sends the list back to the manager, not a fix of its own', () => {
     const t = ceo();
-    expect(t).toMatch(/Send the whole list to the manager/);
-    expect(t).toMatch(/Do not fix it\s+yourself/);
+    expect(t).toContain('talk_to_manager');
+    expect(t).toMatch(/Do not fix it yourself/);
   });
 
+  /* 45 lines in five titled sections at the start of the day; 23 now, and the
+     7 the two-course fork costs are the ones the user asked for by name. */
   it('stays a short flat list', () => {
     const t = ceo();
-    expect(t.split('\n').length).toBeLessThan(20);
+    expect(t.split('\n').length).toBeLessThan(26);
     expect(t).not.toContain('WHAT CHECKING MEANS HERE');
     expect(t).not.toContain('WHAT YOU DO WITH WHAT YOU FIND');
   });

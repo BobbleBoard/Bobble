@@ -301,6 +301,11 @@ export function finalCheck(opts: {
   readonly perspective: VerificationPerspective;
   /** The CEO's anchor: what the user actually asked for. */
   readonly vision?: string;
+  /**
+   * Which hand-back this is, 1-based. Only the CEO uses it, and only to bias
+   * the FIRST one toward another round of feedback — see the ending it builds.
+   */
+  readonly round?: number;
 }): string {
   const { claims, profile, perspective } = opts;
 
@@ -322,6 +327,24 @@ export function finalCheck(opts: {
    * discharge BY using the product.
    */
   if (perspective === 'ceo') {
+    /*
+     * THE BIAS POINTS AT THE RECOVERABLE OPTION, AND HARDEST ON ROUND ONE.
+     *
+     * the user: "there will always be bias in the prompt, you want to ensure that
+     * the bias is toward the safer option especially at the start… we
+     * especially at the 4b class bias the attention mechanism an incredible
+     * degree away from submitting that turn."
+     *
+     * The two outcomes used to sit in separate bullets as separate rules, which
+     * is not a decision the model ever has to make consciously. Naming them as
+     * a numbered fork forces the choice, and naming WHICH ROUND THIS IS is what
+     * moves the weight — far harder for a 4B to skip than an abstract "be sure".
+     *
+     * The asymmetry justifies it: a wrong "send feedback" costs one round; a
+     * wrong "it is finished" ships a broken product to the user, which is the
+     * failure this whole file exists to stop.
+     */
+    const round = opts.round ?? 1;
     const out: string[] = [
       'THIS CHECK DECIDES WHETHER YOU CAN ANSWER THE USER.',
       '',
@@ -332,9 +355,20 @@ export function finalCheck(opts: {
       '- Building, packaging, copying it somewhere and `ls` are not testing.',
       '- Write every problem to `.scratch/verification.md` as you find it: what you',
       '  did, what you expected, what happened, which file.',
-      '- Send the whole list to the manager with `talk_to_manager`. Do not fix it',
-      '  yourself.',
-      '- Answer the user only once the list is empty, or say plainly what is wrong.',
+      '',
+      'THEN THERE ARE TWO WAYS TO END THIS TURN:',
+      '',
+      '  1. Send the manager your list with `talk_to_manager` — a round of feedback,',
+      '     so the team improves the app. Do not fix it yourself.',
+      '  2. Tell the user the product is finished.',
+      '',
+      ...(round <= 1
+        ? [
+            'THIS IS THE FIRST ROUND. A build like this is rarely right the first',
+            'time. Take 1 unless you drove all of it and genuinely found nothing',
+            'wrong — be really sure before you choose 2.',
+          ]
+        : ['Choose 2 only when your list is empty. Otherwise send it back.']),
     ];
     if (profile.runtime !== null) {
       out.push(

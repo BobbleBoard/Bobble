@@ -344,3 +344,42 @@ describe('a failed production reports what is actually on disk', () => {
     expect(text).not.toMatch(/\bfinished\b(?!,)/);
   });
 });
+
+describe('the harness counts the hand-backs, because the CEO cannot', () => {
+  /*
+   * The first-round lean only means anything if something knows which round it
+   * is. The CEO's own history may have been compacted by then, and a model
+   * asked to remember how many rounds it has had will guess — so the harness
+   * counts its own calls.
+   */
+  const deliver = async (tool: ReturnType<typeof register>): Promise<string> => {
+    const { ctx } = fakeCtx();
+    const res = await tool.execute(
+      'c',
+      { message: 'Build it', divisions: [] },
+      undefined,
+      undefined,
+      ctx,
+    );
+    return String(res.content?.[0]?.text ?? '');
+  };
+
+  it('leans toward feedback on the first delivery', async () => {
+    const tool = register('max', async () => ({
+      ok: true,
+      product: 'Built it: it converts files.',
+    }));
+    expect(await deliver(tool)).toMatch(/THIS IS THE FIRST ROUND/);
+  });
+
+  it('drops the lean on the second, without the CEO having to remember', async () => {
+    const tool = register('max', async () => ({
+      ok: true,
+      product: 'Built it: it converts files.',
+    }));
+    await deliver(tool);
+    const second = await deliver(tool);
+    expect(second).not.toMatch(/THIS IS THE FIRST ROUND/);
+    expect(second).toMatch(/Choose 2 only when your list is empty/);
+  });
+});

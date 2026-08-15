@@ -170,6 +170,8 @@ function briefForManager(args: {
  * sees exactly the framing it does inside a corp run.
  */
 export function registerCreateHierarchyTool(pi: ExtensionAPI, deps: PromoteToolDeps): void {
+  /** Hand-backs to the CEO so far — see `round` in the final check. */
+  let handbacks = 0;
   let seq = 0;
   // Not `${(seq += 1)}` inline: an assignment buried in a template literal is the
   // one standing lint error this package had, and a known error is how a real one
@@ -242,6 +244,13 @@ export function registerCreateHierarchyTool(pi: ExtensionAPI, deps: PromoteToolD
        * it from the raw prompt — two CEOs, one of them working from notes it
        * never wrote.
        */
+      /*
+       * WHICH HAND-BACK IS THIS? Counted here because the harness is the only
+       * thing that knows — the CEO's own history may have been compacted, and a
+       * model asked to remember how many rounds it has had will guess. Bumped
+       * before the run so the first delivery reads as round 1.
+       */
+      handbacks += 1;
       const runCorp = deps.runCorp ?? corpBridgeRunFromEnv();
       if (runCorp !== null) {
         const brief = briefForManager(args);
@@ -273,6 +282,7 @@ export function registerCreateHierarchyTool(pi: ExtensionAPI, deps: PromoteToolD
                   profile: classifyVerification(brief),
                   perspective: 'ceo',
                   vision: brief,
+                  round: handbacks,
                 })}`,
               },
             ],
