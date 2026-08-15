@@ -3,6 +3,7 @@ import {
   type ActivityStepData,
   activitySummary,
   formatDuration,
+  hasInlineContent,
   summarizeActivity,
 } from './activity-chain.tsx';
 
@@ -264,5 +265,194 @@ describe('a prefilling turn is not a settled one', () => {
 
   it('still reports real work once steps exist', () => {
     expect(summarizeActivity([{ kind: 'bash', label: 'x' }])).toBe('Ran a command');
+  });
+});
+
+/**
+ * EVERY TOOL ROW OPENS TO SOMETHING.
+ *
+ * the user: "find out all tool calls that are not able to be clicked on for an
+ * expansion." Two separate ways a row went dead, and both are pinned here:
+ *
+ *   1. kinds that fell through to `default: return false` — browser
+ *      navigate/click/type, and the media kinds with no canvas destination;
+ *   2. kinds that COULD expand but only when an optional field happened to be
+ *      present, so they were silently unexpandable in practice: a read whose
+ *      tool returned nothing, an edit reporting counts before any diff exists,
+ *      a search that came back empty carrying the note explaining why.
+ *
+ * The negative cases matter as much: a row with NOTHING to say must stay
+ * unclickable rather than open onto an empty box.
+ */
+describe('hasInlineContent — no tool row is a dead end', () => {
+  describe('kinds that used to fall through to default: false', () => {
+    it('opens a navigate row on its URL', () => {
+      expect(
+        hasInlineContent({ kind: 'browser-navigate', label: 'Visited', url: 'https://a.dev' }),
+      ).toBe(true);
+      // The mapping fills `detail` from the same value; either alone suffices.
+      expect(
+        hasInlineContent({ kind: 'browser-navigate', label: 'Visited', detail: 'https://a.dev' }),
+      ).toBe(true);
+    });
+
+    it('opens a click row on its target', () => {
+      expect(hasInlineContent({ kind: 'browser-click', label: 'Clicked', target: '#submit' })).toBe(
+        true,
+      );
+    });
+
+    it('opens a type row on the text that was typed', () => {
+      expect(hasInlineContent({ kind: 'browser-type', label: 'Typed', typed: 'hello' })).toBe(true);
+    });
+
+    it('opens a title/status-only navigate row', () => {
+      expect(hasInlineContent({ kind: 'browser-navigate', label: 'Visited', title: 'Home' })).toBe(
+        true,
+      );
+      expect(
+        hasInlineContent({ kind: 'browser-navigate', label: 'Visited', pageStatus: '404' }),
+      ).toBe(true);
+    });
+
+    it('leaves a browser row with nothing at all unclickable', () => {
+      expect(hasInlineContent({ kind: 'browser-click', label: 'Clicked' })).toBe(false);
+    });
+
+    for (const kind of ['image', 'pdf', 'canvas-open'] as const) {
+      it(`names a ${kind} that has no canvas destination`, () => {
+        expect(hasInlineContent({ kind, label: 'x', src: '/out/a.png' })).toBe(true);
+        expect(hasInlineContent({ kind, label: 'x', filename: 'a.png' })).toBe(true);
+        expect(hasInlineContent({ kind, label: 'x', detail: '/out/a.png' })).toBe(true);
+        expect(hasInlineContent({ kind, label: 'x' })).toBe(false);
+      });
+
+      it(`still routes a ${kind} to the canvas when it has one`, () => {
+        // opensInCanvas outranks everything: that row is a canvas button, not a
+        // disclosure, and giving it both would be two answers to one click.
+        expect(hasInlineContent({ kind, label: 'x', src: '/out/a.png', opensInCanvas: true })).toBe(
+          false,
+        );
+      });
+    }
+  });
+
+  describe('kinds that expanded only when an optional field turned up', () => {
+    for (const kind of ['read', 'file', 'skill', 'folder'] as const) {
+      it(`opens a ${kind} with a path but no preview`, () => {
+        expect(hasInlineContent({ kind, label: 'x', detail: '/w/app.ts' })).toBe(true);
+      });
+
+      it(`leaves a ${kind} with neither path nor preview unclickable`, () => {
+        expect(hasInlineContent({ kind, label: 'x' })).toBe(false);
+      });
+    }
+
+    it('opens a read on its preview alone, as it always did', () => {
+      expect(hasInlineContent({ kind: 'read', label: 'x', preview: 'body' })).toBe(true);
+    });
+
+    it('opens an edit that has counts but no diff yet', () => {
+      // The streaming case: `added` is derived from partial JSON long before any
+      // diff exists, so the row showed a ±stat it could not explain.
+      expect(hasInlineContent({ kind: 'edit', label: 'x', added: 12, deleted: 0 })).toBe(true);
+      expect(hasInlineContent({ kind: 'edit', label: 'x', detail: '/w/app.ts' })).toBe(true);
+      // An EMPTY diff array is not content — that was the old bug's other half.
+      expect(hasInlineContent({ kind: 'edit', label: 'x', diff: [] })).toBe(false);
+      expect(hasInlineContent({ kind: 'edit', label: 'x' })).toBe(false);
+    });
+
+    it('opens a search that returned nothing but explained why', () => {
+      expect(hasInlineContent({ kind: 'search', label: 'x', note: 'rate limited' })).toBe(true);
+      expect(hasInlineContent({ kind: 'search', label: 'x', query: 'tokyo' })).toBe(true);
+      expect(hasInlineContent({ kind: 'search', label: 'x', results: [] })).toBe(true);
+      expect(hasInlineContent({ kind: 'search', label: 'x' })).toBe(false);
+    });
+
+    it('opens a browser-read on its URL when the page text is missing', () => {
+      expect(hasInlineContent({ kind: 'browser-read', label: 'x', detail: 'https://a.dev' })).toBe(
+        true,
+      );
+    });
+  });
+
+  /*
+   * The fallbacks all assert an ABSENCE ("returned no content", "no diff was
+   * captured", "no canvas target"). Every one of those is false while the call
+   * is still in flight, so they wait for the step to settle — real content still
+   * opens a running row, and so do the browser rows, whose values are arguments
+   * rather than results.
+   */
+  describe('an in-flight step has not returned nothing — it has not returned yet', () => {
+    it('withholds the empty-read reveal until the read finishes', () => {
+      const running: ActivityStepData = {
+        kind: 'read',
+        label: 'Reading a file',
+        detail: '/w/app.ts',
+        status: 'running',
+      };
+      expect(hasInlineContent(running)).toBe(false);
+      expect(hasInlineContent({ ...running, status: 'done' })).toBe(true);
+      // Real content still opens a running row — only the absence-note waits.
+      expect(hasInlineContent({ ...running, preview: 'body' })).toBe(true);
+    });
+
+    it('withholds the diffless-edit reveal while the write is still streaming', () => {
+      expect(hasInlineContent({ kind: 'edit', label: 'x', added: 4, status: 'running' })).toBe(
+        false,
+      );
+      expect(hasInlineContent({ kind: 'edit', label: 'x', added: 4, status: 'done' })).toBe(true);
+    });
+
+    it('withholds the no-canvas-target reveal while the media is still generating', () => {
+      expect(
+        hasInlineContent({ kind: 'image', label: 'x', src: '/a.png', status: 'running' }),
+      ).toBe(false);
+    });
+
+    it('still opens a running browser row — its args are known at call time', () => {
+      expect(
+        hasInlineContent({ kind: 'browser-type', label: 'x', typed: 'hi', status: 'running' }),
+      ).toBe(true);
+    });
+  });
+
+  describe('kinds that already behaved — unchanged', () => {
+    it('thinking opens on its thought', () => {
+      expect(hasInlineContent({ kind: 'thinking', label: 'x', thought: 'hm' })).toBe(true);
+      expect(hasInlineContent({ kind: 'thinking', label: 'x' })).toBe(false);
+    });
+
+    for (const kind of ['bash', 'python'] as const) {
+      it(`${kind} opens on its command or output`, () => {
+        expect(hasInlineContent({ kind, label: 'x', command: 'ls' })).toBe(true);
+        expect(hasInlineContent({ kind, label: 'x', output: 'ok' })).toBe(true);
+        expect(hasInlineContent({ kind, label: 'x' })).toBe(false);
+      });
+    }
+
+    for (const kind of ['tool', 'tool-search', 'connector'] as const) {
+      it(`${kind} still opens on its RESULT only, never raw args`, () => {
+        // the user's earlier call: no schema-noise reveal for generic tool rows.
+        // Left deliberately untouched — args alone must not open an empty box.
+        expect(hasInlineContent({ kind, label: 'x', output: 'done' })).toBe(true);
+        expect(hasInlineContent({ kind, label: 'x', argsText: '{"a":1}' })).toBe(false);
+      });
+    }
+
+    for (const kind of [
+      'talk',
+      'manager',
+      'commission',
+      'delegate',
+      'toolkit',
+      'submit',
+    ] as const) {
+      it(`${kind} opens on the brief or the reply`, () => {
+        expect(hasInlineContent({ kind, label: 'x', argsText: '{"message":"go"}' })).toBe(true);
+        expect(hasInlineContent({ kind, label: 'x', output: 'ok' })).toBe(true);
+        expect(hasInlineContent({ kind, label: 'x' })).toBe(false);
+      });
+    }
   });
 });

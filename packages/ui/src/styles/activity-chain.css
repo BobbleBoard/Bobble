@@ -490,7 +490,6 @@ button.pd-chain-step-row:hover .pd-chain-step-chevron {
   font-variant-numeric: tabular-nums;
 }
 
-
 /*
  * A FAILED STEP, in the one place it can be acted on.
  *
@@ -503,13 +502,13 @@ button.pd-chain-step-row:hover .pd-chain-step-chevron {
  * noise you could not click. The signal moved here instead: the row is red, and
  * opening it shows the real error text rather than a count of them.
  */
-.pd-chain-step[data-failed='true'] .pd-chain-step-label,
-.pd-chain-step[data-failed='true'] .pd-chain-step-icon {
+.pd-chain-step[data-failed="true"] .pd-chain-step-label,
+.pd-chain-step[data-failed="true"] .pd-chain-step-icon {
   color: var(--pd-status-danger-fg);
 }
 
-.pd-chain-step[data-failed='true'] .pd-chain-step-detail,
-.pd-chain-step[data-failed='true'] .pd-chain-step-subline {
+.pd-chain-step[data-failed="true"] .pd-chain-step-detail,
+.pd-chain-step[data-failed="true"] .pd-chain-step-subline {
   color: color-mix(in srgb, var(--pd-status-danger-fg) 72%, var(--pd-text-secondary));
 }
 
@@ -582,24 +581,24 @@ button.pd-chain-step-row:hover .pd-chain-step-chevron {
 
 /* WAITING — parked on someone else's reply. Deliberately quiet: it is the
    normal state of half a corporation at any moment, not a problem. */
-.pd-chain-step[data-status='waiting'] .pd-chain-step-state {
+.pd-chain-step[data-status="waiting"] .pd-chain-step-state {
   color: var(--pd-text-secondary);
   background: color-mix(in srgb, var(--pd-text-secondary) 12%, transparent);
 }
 
 /* STOPPED (orange) — stood down by a manager, resumable. Not a failure. */
-.pd-chain-step[data-status='stopped'] .pd-chain-step-state {
+.pd-chain-step[data-status="stopped"] .pd-chain-step-state {
   color: var(--pd-status-warning-fg);
   background: color-mix(in srgb, var(--pd-status-warning-fg) 14%, transparent);
 }
 /* ERROR (red) — the turn failed. Matches the existing data-failed treatment so
    a failed step and a failed agent look like the same thing, because they are. */
-.pd-chain-step[data-status='error'] .pd-chain-step-state {
+.pd-chain-step[data-status="error"] .pd-chain-step-state {
   color: var(--pd-status-danger-fg);
   background: color-mix(in srgb, var(--pd-status-danger-fg) 14%, transparent);
 }
-.pd-chain-step[data-status='error'] .pd-chain-step-label,
-.pd-chain-step[data-status='error'] .pd-chain-step-icon {
+.pd-chain-step[data-status="error"] .pd-chain-step-label,
+.pd-chain-step[data-status="error"] .pd-chain-step-icon {
   color: var(--pd-status-danger-fg);
 }
 
@@ -611,9 +610,9 @@ button.pd-chain-step-row:hover .pd-chain-step-chevron {
 
 /* A STILL ROW MUST NOT LOOK BUSY. Whatever else is going on, an agent that is
    not generating gets no shimmer — the animation is what reads as "working". */
-.pd-chain-step[data-status='waiting'] .pd-shimmer-text,
-.pd-chain-step[data-status='stopped'] .pd-shimmer-text,
-.pd-chain-step[data-status='error'] .pd-shimmer-text {
+.pd-chain-step[data-status="waiting"] .pd-shimmer-text,
+.pd-chain-step[data-status="stopped"] .pd-shimmer-text,
+.pd-chain-step[data-status="error"] .pd-shimmer-text {
   animation: none;
   background: none;
   -webkit-text-fill-color: currentColor;
@@ -650,4 +649,66 @@ button.pd-chain-step-row:hover .pd-chain-step-chevron {
   font-size: var(--pd-font-size-caption);
   color: var(--pd-text-muted);
   background: color-mix(in srgb, var(--pd-text-muted) 8%, transparent);
+}
+
+/* ------------------------------------------------------------------ */
+/* Fact-list reveals (browser / media / edit-without-a-diff)           */
+/* ------------------------------------------------------------------ */
+
+/* The rows whose expansion is a handful of NAMED VALUES rather than a document.
+   One layout for all of them, so six kinds that used to be unclickable do not
+   arrive as six different-looking panels. */
+.pd-chain-facts {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+}
+
+/* Label column fixed rather than auto: the labels are short and few, and a
+   ragged left edge on a four-row list reads as a table that failed to align. */
+.pd-chain-fact {
+  display: grid;
+  grid-template-columns: 62px minmax(0, 1fr);
+  gap: 8px;
+  align-items: baseline;
+}
+
+.pd-chain-fact-label {
+  color: var(--pd-text-muted);
+  font-family: var(--pd-font-sans);
+  font-size: var(--pd-font-size-caption);
+  line-height: var(--pd-leading-caption);
+  font-weight: var(--pd-font-weight-medium);
+}
+
+.pd-chain-fact-value {
+  margin: 0;
+  min-width: 0;
+  color: var(--pd-text-secondary);
+  font-family: var(--pd-font-sans);
+  font-size: var(--pd-font-size-caption);
+  line-height: var(--pd-leading-caption);
+  /* URLs and selectors have no spaces to break at, so an unbroken one would
+     push the whole reveal sideways inside its scroll frame. */
+  overflow-wrap: anywhere;
+}
+
+.pd-chain-fact-value[data-mono="true"] {
+  font-family: var(--pd-font-mono);
+  font-size: var(--pd-font-size-code);
+  line-height: var(--pd-leading-code);
+  word-break: break-all;
+}
+
+/* Why there is nothing else here. Quieter than a value, because it is a
+   statement about the absence rather than a fact about the call — but present,
+   because an empty reveal reads as a bug. */
+.pd-chain-note {
+  margin-top: 6px;
+  color: var(--pd-text-muted);
+  font-family: var(--pd-font-sans);
+  font-size: var(--pd-font-size-caption);
+  line-height: var(--pd-leading-caption);
+  font-style: italic;
 }

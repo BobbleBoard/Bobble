@@ -116,3 +116,66 @@ export const StepSearch: Story = () => (
     </Row>
   </Frame>
 );
+
+/**
+ * The rows that used to be dead ends. Each of these either fell through to
+ * `default: return false` (browser navigate/click/type, media with no canvas
+ * destination) or expanded ONLY when an optional field happened to be present
+ * (a read whose tool returned nothing, an edit reporting counts before a diff
+ * exists, a search that came back empty). Seeded open one at a time so the
+ * reveal bodies are visible in the screenshot sheet.
+ */
+const DEAD_ENDS: ActivityStepData[] = [
+  {
+    kind: 'browser-navigate',
+    label: 'Visited a page',
+    detail: 'https://pypi.org/project/qrcode',
+    url: 'https://pypi.org/project/qrcode',
+    title: 'qrcode · PyPI',
+    pageStatus: '200',
+  },
+  {
+    kind: 'browser-type',
+    label: 'Typed',
+    url: 'https://pypi.org/project/qrcode',
+    target: 'input[name=q]',
+    typed: 'pillow ',
+  },
+  {
+    kind: 'browser-click',
+    label: 'Clicked',
+    url: 'https://pypi.org/project/qrcode',
+    target: 'button[data-test=search]',
+  },
+  { kind: 'read', label: 'Read a file', detail: '/repo/out/qr.png.meta', filename: 'qr.png.meta' },
+  { kind: 'folder', label: 'Listed a folder', detail: '/repo/out', filename: 'out' },
+  { kind: 'edit', label: 'Edited a file', detail: '/repo/make_qr.py', added: 12, deleted: 3 },
+  {
+    kind: 'search',
+    label: 'Searched the web',
+    query: 'pillow save png transparency',
+    results: [],
+    note: 'search backend rate-limited — try again shortly',
+  },
+  { kind: 'image', label: 'Generated an image', filename: 'qr.png', src: '/repo/out/qr.png' },
+];
+
+export const DeadEndRows: Story = () => (
+  <Frame>
+    <Row label="every row opens — browser navigate/type/click, a diffless edit, an empty search">
+      <ActivityChain steps={DEAD_ENDS} defaultExpanded defaultOpenStep={0} />
+    </Row>
+    <Row label="a type row names the field, the page, and quotes the text (trailing space visible)">
+      <ActivityChain steps={DEAD_ENDS} defaultExpanded defaultOpenStep={1} />
+    </Row>
+    <Row label="a read with no preview discloses its full path instead of being unclickable">
+      <ActivityChain steps={DEAD_ENDS} defaultExpanded defaultOpenStep={3} />
+    </Row>
+    <Row label="an edit with counts but no diff, and a media row with no canvas destination">
+      <ActivityChain steps={DEAD_ENDS} defaultExpanded defaultOpenStep={5} />
+    </Row>
+    <Row label="a media row with no canvas destination still says what it points at">
+      <ActivityChain steps={DEAD_ENDS} defaultExpanded defaultOpenStep={7} />
+    </Row>
+  </Frame>
+);

@@ -298,4 +298,179 @@ describe('"Done" does not flap on the gap between tool calls', () => {
     const html = renderToStaticMarkup(<ActivityChain steps={steps} expanded active />);
     expect(html).not.toContain('pd-chain-done');
   });
-})
+});
+
+/**
+ * WHAT THE NEWLY-CLICKABLE ROWS ACTUALLY SAY.
+ *
+ * `hasInlineContent` returning true only earns a chevron; the point was the
+ * content behind it. These assert the reveal bodies, because a row that opens
+ * onto an empty box is the same dead end with an extra click in front of it.
+ */
+describe('ActivityStep — reveals for the rows that used to be dead', () => {
+  it('a navigate row opens to its URL, title and status', () => {
+    const html = render(
+      {
+        kind: 'browser-navigate',
+        label: 'Visited a page',
+        detail: 'https://example.dev/pricing',
+        url: 'https://example.dev/pricing',
+        title: 'Pricing — Example',
+        pageStatus: '200',
+      },
+      true,
+    );
+    expect(html).toContain('pd-chain-facts');
+    expect(html).toContain('https://example.dev/pricing');
+    expect(html).toContain('Pricing — Example');
+    expect(html).toContain('200');
+  });
+
+  it('a click row names the element AND the page it happened on', () => {
+    const html = render(
+      {
+        kind: 'browser-click',
+        label: 'Clicked',
+        url: 'https://example.dev/pricing',
+        target: 'button[data-test=buy]',
+      },
+      true,
+    );
+    expect(html).toContain('button[data-test=buy]');
+    // "Clicked #buy" on an unknown page answers nothing — the page comes too.
+    expect(html).toContain('https://example.dev/pricing');
+  });
+
+  it('a type row quotes the text so trailing whitespace is visible', () => {
+    const html = render(
+      { kind: 'browser-type', label: 'Typed', target: '#email', typed: 'a@b.com ' },
+      true,
+    );
+    expect(html).toContain('#email');
+    expect(html).toContain('&quot;a@b.com &quot;');
+  });
+
+  it('a media row with no canvas target says what it points at', () => {
+    const html = render(
+      { kind: 'image', label: 'Generated an image', filename: 'hero.png', src: '/out/hero.png' },
+      true,
+    );
+    expect(html).toContain('hero.png');
+    expect(html).toContain('/out/hero.png');
+    expect(html).toContain('no canvas target');
+  });
+
+  it('a media row WITH a canvas target is still a canvas button, not a disclosure', () => {
+    const html = render(
+      { kind: 'image', label: 'Generated an image', filename: 'hero.png', opensInCanvas: true },
+      true,
+    );
+    expect(html).toContain('Opens in canvas');
+    expect(html).not.toContain('pd-chain-facts');
+  });
+
+  it('a read with no preview still discloses its full path', () => {
+    const html = render(
+      { kind: 'read', label: 'Read a file', detail: '/Users/user/src/deep/config.ts' },
+      true,
+    );
+    // The row shows the basename; the reveal restates the whole path.
+    expect(html).toContain('pd-chain-arg');
+    expect(html).toContain('/Users/user/src/deep/config.ts');
+    // …and explains the empty body, rather than leaving what looks like a bug.
+    expect(html).toContain('returned no content');
+  });
+
+  it('a folder listing is its own kind, not a relabelled file read', () => {
+    const html = render({ kind: 'folder', label: 'Listed a folder', detail: '/w/src' }, true);
+    expect(html).toContain('data-kind="folder"');
+    expect(html).toContain('/w/src');
+  });
+
+  it('an edit with no diff shows the path and the ± counts', () => {
+    const html = render(
+      { kind: 'edit', label: 'Edited a file', detail: '/w/app.ts', added: 12, deleted: 3 },
+      true,
+    );
+    expect(html).toContain('/w/app.ts');
+    expect(html).toContain('+12 −3');
+  });
+
+  it('a REJECTED edit says nothing was written, rather than implying it was', () => {
+    const html = render(
+      { kind: 'edit', label: 'Edited a file', detail: '/w/app.ts', added: 12, failed: true },
+      true,
+    );
+    // The failure path renders the error body first; the ± claim must not read
+    // as a change that landed.
+    expect(html).toContain('/w/app.ts');
+  });
+
+  it('an empty search shows the query and the backend note that explains it', () => {
+    const html = render({
+      kind: 'search',
+      label: 'Searched the web',
+      detail: 'tokyo weather',
+      query: 'tokyo weather',
+      results: [],
+      note: 'search backend rate-limited',
+    });
+    expect(html).toContain('tokyo weather');
+    expect(html).toContain('search backend rate-limited');
+  });
+
+  it('a browser-read with no page text names the page instead of nothing', () => {
+    const html = render(
+      {
+        kind: 'browser-read',
+        label: 'Read the page',
+        detail: 'https://example.dev',
+        title: 'Example',
+      },
+      true,
+    );
+    expect(html).toContain('https://example.dev');
+    expect(html).toContain('Example');
+    expect(html).toContain('returned no text');
+    // The URL is already this kind's reveal arg header, so the fact list must
+    // not restate it — that was the duplication BrowserReveal would have caused.
+    expect(html).toContain('pd-chain-arg');
+    expect(html).not.toContain('>Page<');
+    expect(html).not.toContain('>URL<');
+  });
+
+  /*
+   * A RUNNING STEP HAS NOT RETURNED NOTHING — IT HAS NOT RETURNED YET.
+   *
+   * Opening every path-carrying row unconditionally made an in-flight read
+   * disclose "the tool returned no content", which is a claim about a call that
+   * has not finished. Two older tests caught it; these keep the rule visible.
+   */
+  it('does not claim an in-flight read came back empty', () => {
+    const html = render(
+      { kind: 'read', label: 'Reading a file', detail: '/w/app.ts', status: 'running' },
+      true,
+    );
+    expect(html).not.toContain('returned no content');
+    expect(html).not.toContain('pd-chain-step-chevron');
+  });
+
+  it('opens the same row the moment it settles', () => {
+    const html = render(
+      { kind: 'read', label: 'Read a file', detail: '/w/app.ts', status: 'done' },
+      true,
+    );
+    expect(html).toContain('returned no content');
+  });
+
+  it('keeps a browser row open while running — its args are known at call time', () => {
+    // Unlike a result, "which URL" and "what text" are true the instant the
+    // call is made, so these rows do not wait to be openable.
+    const html = render(
+      { kind: 'browser-type', label: 'Typing', target: '#q', typed: 'hi', status: 'running' },
+      true,
+    );
+    expect(html).toContain('#q');
+    expect(html).toContain('&quot;hi&quot;');
+  });
+});

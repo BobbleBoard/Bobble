@@ -130,7 +130,16 @@ export type ActivityStepData =
       added?: number;
       deleted?: number;
     })
-  | (ActivityStepCommon & { kind: 'read' | 'file' | 'skill'; preview?: ReactNode })
+  /*
+   * `folder` belongs here, and did not exist at all.
+   *
+   * `ls`/`list_dir`/`listdir` resolve to `folder` in the app's tool mapping and
+   * VERBS/RUNNING_PHRASE both carry an entry for it — but the union had no
+   * member, so the mapping could only emit the step as a `read`. A directory
+   * listing therefore arrived labelled "Listed a folder" wearing the file-sheet
+   * glyph, and the open-folder icon this project drew for it was unreachable.
+   */
+  | (ActivityStepCommon & { kind: 'read' | 'file' | 'skill' | 'folder'; preview?: ReactNode })
   | (ActivityStepCommon & {
       kind: 'search';
       query?: string;
@@ -143,6 +152,22 @@ export type ActivityStepData =
       // and browser-read expands the page text it returned as an inline preview.
       kind: 'browser-navigate' | 'browser-click' | 'browser-type' | 'browser-read';
       url?: string;
+      /**
+       * What the page called itself once it loaded, when the tool reported it.
+       * A URL alone does not tell you whether you landed on the thing you meant
+       * or on a login wall, and that is the usual reason to open a visit row.
+       */
+      title?: string;
+      /** Load outcome as the tool phrased it ("200", "404 Not Found", "timeout"). */
+      pageStatus?: string;
+      /**
+       * The element that was acted on — a CSS selector, an element ref, or its
+       * accessible name. "Clicked" with no target is the least informative row
+       * in the whole chain: it names an action and withholds its object.
+       */
+      target?: string;
+      /** The text a `browser-type` step put into that element. */
+      typed?: string;
       preview?: ReactNode;
     })
   // Generic tool rows (tool-search + the NEUTRAL unknown-tool fallback) and
@@ -173,7 +198,18 @@ export type ActivityStepData =
       argsText?: string;
       output?: string;
     })
-  | (ActivityStepCommon & { kind: 'image' | 'pdf' | 'canvas-open' });
+  | (ActivityStepCommon & {
+      kind: 'image' | 'pdf' | 'canvas-open';
+      /**
+       * Where the artifact actually lives (file path, data URI, canvas tab
+       * title). These rows normally route to the canvas via `opensInCanvas`, but
+       * when no canvas target resolves — the media URL could not be picked out
+       * of the tool result — the row kept the flag off and became inert: a
+       * "Generated an image" you could neither open nor interrogate. This is
+       * what such a row can still say for itself.
+       */
+      src?: string;
+    });
 
 /* ------------------------------------------------------------------ */
 /* Summary derivation (pure — unit-tested)                             */
@@ -437,7 +473,7 @@ function basename(path: string): string {
  * (the meaningful tail — "Read a file: config.ts") while the expanded reveal
  * restates the full path. Command/query/url kinds show `detail` verbatim.
  */
-const PATH_DETAIL_KINDS = new Set<ActivityStepKind>(['read', 'edit', 'file', 'skill']);
+const PATH_DETAIL_KINDS = new Set<ActivityStepKind>(['read', 'edit', 'file', 'skill', 'folder']);
 
 /**
  * File-op kinds that surface their filename as a SUBLINE directly under the verb
@@ -452,7 +488,13 @@ const SUBLINE_KINDS = new Set<ActivityStepKind>(['read', 'edit', 'skill']);
  * content (a file/page preview) doesn't otherwise restate it. bash/edit skip
  * this: their reveal already shows the command / the diff's own path header.
  */
-const ARG_HEADER_KINDS = new Set<ActivityStepKind>(['read', 'file', 'skill', 'browser-read']);
+const ARG_HEADER_KINDS = new Set<ActivityStepKind>([
+  'read',
+  'file',
+  'skill',
+  'folder',
+  'browser-read',
+]);
 
 /** Char count past which an in-chain thought fades + offers "Show more". */
 const CHAIN_THOUGHT_LONG = 240;
@@ -618,22 +660,74 @@ function StepContent({ step, live = false }: { step: ActivityStepData; live?: bo
         />
       );
     case 'edit':
-      return step.diff ? <DiffView files={step.diff} /> : null;
+      return step.diff !== undefined && step.diff.length > 0 ? (
+        <DiffView files={step.diff} />
+      ) : (
+        <EditReveal path={step.detail} {...editTotals(step)} failed={step.failed} />
+      );
     case 'search':
-      return step.results ? (
+      // `results ?? []` rather than a null branch: the empty state names the
+      // query and prints the backend `note`, which is the whole answer to "why
+      // did that search show me nothing".
+      return (
         <WebSearchResults
-          query={step.query ?? step.label}
-          results={step.results}
+          query={step.query ?? step.detail ?? step.label}
+          results={step.results ?? []}
           emptyHint={step.note}
         />
-      ) : null;
+      );
     case 'read':
     case 'file':
     case 'skill':
+    case 'folder':
+      return step.preview !== undefined ? (
+        <div className="pd-chain-preview">{step.preview}</div>
+      ) : (
+        <EmptyPreviewNote kind={step.kind} />
+      );
     case 'browser-read':
       return step.preview !== undefined ? (
         <div className="pd-chain-preview">{step.preview}</div>
-      ) : null;
+      ) : (
+        <>
+          {/* No BrowserReveal here: this kind is in ARG_HEADER_KINDS, so the
+              reveal already leads with the URL and a second copy of it is the
+              only thing this branch could add wrongly. */}
+          <ChainFacts
+            rows={[
+              { label: 'Title', value: step.title },
+              { label: 'Status', value: step.pageStatus },
+            ]}
+          />
+          <div className="pd-chain-note">The page returned no text.</div>
+        </>
+      );
+    case 'browser-navigate':
+    case 'browser-click':
+    case 'browser-type':
+      return (
+        <BrowserReveal
+          kind={step.kind}
+          // `detail` is the fallback, not a second source: the mapping fills both
+          // from one value, but a hand-built step may set only the row arg.
+          url={step.url ?? step.detail}
+          title={step.title}
+          pageStatus={step.pageStatus}
+          target={step.target}
+          typed={step.typed}
+        />
+      );
+    case 'image':
+    case 'pdf':
+    case 'canvas-open':
+      return (
+        <MediaReveal
+          kind={step.kind}
+          src={step.src}
+          filename={step.filename}
+          detail={step.detail}
+        />
+      );
     // Generic tool / connector / tool_search: show ONLY the tool's result, as one
     // clean block — never the raw args JSON (that's the schema noise the user called
     // out). The row header already surfaces the tool name + its primary arg.
@@ -652,7 +746,6 @@ function StepContent({ step, live = false }: { step: ActivityStepData; live?: bo
       return null;
   }
 }
-
 
 /**
  * What a coordination row opens to: the MESSAGE that was sent, the files that
@@ -700,9 +793,193 @@ function CoordinationReveal({ argsText, output }: { argsText?: string; output?: 
   );
 }
 
+/** A string that is actually there — the `?? ''`-and-check the reveals all repeat. */
+function nonEmpty(value: string | undefined): boolean {
+  return value !== undefined && value.trim().length > 0;
+}
+
+/**
+ * The reveal shape for rows whose content is a HANDFUL OF FACTS rather than a
+ * document: a URL, a selector, a path, a pair of ± counts.
+ *
+ * Every one of the rows fixed here has the same problem — one to four short
+ * values that a person wants named, which is too little for a terminal frame and
+ * too much for the row itself. Rendering them all through one labelled list is
+ * what stops six new expansions from becoming six new layouts; a `<dl>` because
+ * the labels really are labels, including to a screen reader.
+ */
+function ChainFacts({ rows }: { rows: { label: string; value?: string; mono?: boolean }[] }) {
+  const shown = rows.filter((r) => nonEmpty(r.value));
+  if (shown.length === 0) return null;
+  return (
+    <dl className="pd-chain-facts">
+      {shown.map((r) => (
+        <div className="pd-chain-fact" key={r.label}>
+          <dt className="pd-chain-fact-label">{r.label}</dt>
+          <dd
+            className="pd-chain-fact-value"
+            data-mono={r.mono === true ? 'true' : undefined}
+            title={r.value}
+          >
+            {r.value}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+/**
+ * What a browser action row opens to.
+ *
+ * navigate/click/type all fell through to `default: return false`, so the three
+ * commonest browser rows could not be opened at all — the only thing you could
+ * learn from a click was the word "Clicked". The URL had to be read from the
+ * truncated row `detail`, and the element and the typed text had nowhere to go.
+ *
+ * A click/type restates the page it happened on rather than assuming the visit
+ * row above it is still on screen: in a forty-row chain it is usually not, and
+ * "Clicked #submit" on an unknown page answers nothing.
+ */
+function BrowserReveal({
+  kind,
+  url,
+  title,
+  pageStatus,
+  target,
+  typed,
+}: {
+  kind: 'browser-navigate' | 'browser-click' | 'browser-type';
+  url?: string;
+  title?: string;
+  pageStatus?: string;
+  target?: string;
+  typed?: string;
+}) {
+  return (
+    <ChainFacts
+      rows={[
+        { label: kind === 'browser-navigate' ? 'URL' : 'Page', value: url, mono: true },
+        { label: 'Title', value: title },
+        { label: 'Status', value: pageStatus },
+        { label: kind === 'browser-type' ? 'Field' : 'Target', value: target, mono: true },
+        /*
+         * Quoted, and never trimmed. Whether the field got "hello " or "hello"
+         * is frequently the entire question when a form submit misbehaves, and
+         * a bare value renders those two identically.
+         */
+        { label: 'Typed', value: typed === undefined ? undefined : `"${typed}"` },
+      ]}
+    />
+  );
+}
+
+/**
+ * A media row that never reached the canvas.
+ *
+ * image/pdf/canvas-open are `opensInCanvas` rows, and the canvas is the right
+ * destination — but the flag is only set when a media URL could be picked out of
+ * the tool result. When it could not, the row lost its click AND had no reveal
+ * to fall back on, so a generated image became a line of text with nothing
+ * behind it. Naming the artifact is the least it can do.
+ */
+function MediaReveal({
+  kind,
+  src,
+  filename,
+  detail,
+}: {
+  kind: 'image' | 'pdf' | 'canvas-open';
+  src?: string;
+  filename?: string;
+  detail?: string;
+}) {
+  const noun = kind === 'pdf' ? 'PDF' : kind === 'image' ? 'image' : 'canvas tab';
+  const where = nonEmpty(src) ? src : nonEmpty(detail) ? detail : undefined;
+  return (
+    <>
+      <ChainFacts
+        rows={[
+          { label: 'File', value: filename },
+          { label: 'Source', value: where, mono: true },
+        ]}
+      />
+      <div className="pd-chain-note">
+        This {noun} has no canvas target, so it cannot be opened in a preview tab.
+      </div>
+    </>
+  );
+}
+
+/**
+ * A file/skill/listing row whose tool returned nothing.
+ *
+ * These kinds were gated on `preview` alone, so a read that came back empty — or
+ * one still in flight, or one whose result was dropped — was a row displaying a
+ * path that you could not click to read that path. The reveal's arg header
+ * supplies the full path (see {@link ARG_HEADER_KINDS}); this explains the empty
+ * space under it, which otherwise reads as a rendering fault rather than a fact
+ * about the call.
+ */
+function EmptyPreviewNote({ kind }: { kind: 'read' | 'file' | 'skill' | 'folder' }) {
+  const noun =
+    kind === 'folder' ? 'listing' : kind === 'skill' ? 'skill' : kind === 'file' ? 'file' : 'read';
+  return <div className="pd-chain-note">The tool returned no content for this {noun}.</div>;
+}
+
+/**
+ * An edit with counts but no hunks.
+ *
+ * `hasInlineContent` required a non-empty `diff`, and the mapping produces edits
+ * that have none: while a write streams it derives `added` from the partial JSON
+ * long before any diff exists, and a rejected edit has counts and no hunks at
+ * all. So the row carried a ±stat, and the two questions that stat provokes —
+ * which file, and did it land — had no answer behind the click.
+ */
+function EditReveal({
+  path,
+  added,
+  deleted,
+  failed,
+}: {
+  path?: string;
+  added: number;
+  deleted: number;
+  failed?: boolean;
+}) {
+  return (
+    <>
+      <ChainFacts
+        rows={[
+          { label: 'File', value: path, mono: true },
+          { label: 'Changes', value: `+${added} −${deleted}` },
+        ]}
+      />
+      <div className="pd-chain-note">
+        {failed === true
+          ? 'This edit was rejected — nothing was written.'
+          : 'No line-by-line diff was captured for this edit.'}
+      </div>
+    </>
+  );
+}
+
 /** Whether a step has inline content worth a reveal (pill) or inline render. */
-function hasInlineContent(step: ActivityStepData): boolean {
+export function hasInlineContent(step: ActivityStepData): boolean {
   if (step.opensInCanvas) return false;
+  /*
+   * A RUNNING STEP HAS NOT RETURNED NOTHING — IT HAS NOT RETURNED YET.
+   *
+   * The fallbacks below open a row on what it can still say when its RESULT is
+   * missing, and each of them asserts an absence ("the tool returned no
+   * content", "no diff was captured", "no canvas target"). Every one of those
+   * sentences is false while the call is in flight, and the row already has a
+   * spinner saying so. So the absence-reveals wait for the step to settle;
+   * real content (a preview, a diff, a command) still opens a running row, and
+   * the browser rows below key on their ARGUMENTS, which are known at call time
+   * and true immediately.
+   */
+  const settled = step.status !== 'running';
   switch (step.kind) {
     case 'thinking':
       return step.thought !== undefined;
@@ -710,14 +987,61 @@ function hasInlineContent(step: ActivityStepData): boolean {
     case 'python':
       return step.command !== undefined || step.output !== undefined;
     case 'edit':
-      return step.diff !== undefined && step.diff.length > 0;
+      /*
+       * A ±STAT ON THE ROW IS A PROMISE THAT THE ROW OPENS. Keyed on `diff`
+       * alone this was false for every streaming write (counts are derived from
+       * partial JSON before any diff exists) and every rejected edit, so the
+       * rows most worth interrogating were the inert ones. See {@link EditReveal}.
+       */
+      return (
+        (step.diff !== undefined && step.diff.length > 0) ||
+        (settled &&
+          (nonEmpty(step.detail) || step.added !== undefined || step.deleted !== undefined))
+      );
     case 'search':
-      return step.results !== undefined;
+      /*
+       * ZERO RESULTS IS A RESULT. `results !== undefined` meant a search that
+       * came back empty — carrying a `note` that says WHY, a rate limit or a
+       * dead backend — rendered nothing at all, which looks like the search
+       * never happened. WebSearchResults has an empty state built for exactly
+       * this; it just was never reached.
+       */
+      return step.results !== undefined || nonEmpty(step.query) || nonEmpty(step.note);
     case 'read':
     case 'file':
     case 'skill':
+    case 'folder':
     case 'browser-read':
-      return step.preview !== undefined;
+      // A path with no content is still worth opening — the row shows a basename,
+      // the reveal shows the full path. See {@link EmptyPreviewNote}.
+      return step.preview !== undefined || (settled && nonEmpty(step.detail));
+    /*
+     * THE THREE DEAD BROWSER ROWS. Only `browser-read` was ever listed, so
+     * navigate/click/type fell to `default: false` — the URL that was visited,
+     * the element that was clicked and the text that was typed were all carried
+     * on the step and none of them could be opened.
+     */
+    case 'browser-navigate':
+    case 'browser-click':
+    case 'browser-type':
+      return (
+        nonEmpty(step.url) ||
+        nonEmpty(step.detail) ||
+        nonEmpty(step.target) ||
+        nonEmpty(step.typed) ||
+        nonEmpty(step.title) ||
+        nonEmpty(step.pageStatus)
+      );
+    /*
+     * Media rows whose canvas target never resolved. The `opensInCanvas` guard
+     * above already returns false for the healthy case (those rows route to the
+     * canvas instead of expanding); this catches the ones left with no
+     * destination at all. See {@link MediaReveal}.
+     */
+    case 'image':
+    case 'pdf':
+    case 'canvas-open':
+      return settled && (nonEmpty(step.src) || nonEmpty(step.detail) || nonEmpty(step.filename));
     case 'tool-search':
     case 'tool':
     case 'connector':
