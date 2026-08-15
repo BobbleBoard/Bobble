@@ -98,6 +98,12 @@ export interface LlmDownloadProgress {
   received: number;
   total: number | null;
   fraction: number | null;
+  /** 0-based index of this file within the download, and how many there are. */
+  fileIndex?: number;
+  fileCount?: number;
+  /** Whole-job position, so the bar never snaps backwards between files. */
+  jobReceived?: number;
+  jobTotal?: number | null;
 }
 
 export type LlmOutbound =

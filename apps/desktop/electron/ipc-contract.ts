@@ -17,7 +17,6 @@ import {
   type BrowserEventMap,
   type BrowserInvokeMap,
 } from './canvas/browser-contract';
-import { OFFICE_INVOKE_CHANNELS, type OfficeInvokeMap } from './office/office-contract';
 import {
   CONNECTORS_INVOKE_CHANNELS,
   type ConnectorsInvokeMap,
@@ -38,6 +37,7 @@ import {
   type Gen3dInvokeMap,
 } from './gen3d/gen3d-contract';
 import { IMPORT_INVOKE_CHANNELS, type ImportInvokeMap } from './import/import-contract';
+import { OFFICE_INVOKE_CHANNELS, type OfficeInvokeMap } from './office/office-contract';
 import { PI_INVOKE_CHANNELS, type PiEventMap, type PiInvokeMap } from './pi/contract';
 import { PROJECT_INVOKE_CHANNELS, type ProjectInvokeMap } from './project/project-contract';
 import { SETTINGS_INVOKE_CHANNELS, type SettingsInvokeMap } from './settings/settings-contract';
@@ -590,12 +590,23 @@ export type AppEventMap = {
    * thread and the thing itself open (or running) in the canvas.
    */
   'present:show': { path: string; note?: string };
+  /**
+   * Download progress. `received`/`total`/`fraction` are THIS FILE's; the
+   * `job*` fields are the whole download's and are what the bar should follow —
+   * a model plus its projector is two files, and a per-file bar hits 100% and
+   * then restarts at 0%, which reads as the download having failed and retried.
+   * Optional because a caller that fetches exactly one file need not compute them.
+   */
   'llm:download-progress': {
     modelId: string;
     file: string;
     received: number;
     total: number | null;
     fraction: number | null;
+    fileIndex?: number;
+    fileCount?: number;
+    jobReceived?: number;
+    jobTotal?: number | null;
   };
   /** Pushed to the pop-out window when a fresh artifact is popped out while it
    * is already open, so the standalone canvas re-renders without a reload. */

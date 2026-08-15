@@ -20,7 +20,8 @@ import {
   ProgressBar,
   Tooltip,
 } from '@pi-desktop/ui';
-import { useLlmStore } from '../state/llm-store';
+import { formatSpeed, percent } from '../settings/model-manager-logic';
+import { downloadEtaSeconds, downloadFraction, formatEta, useLlmStore } from '../state/llm-store';
 import { usePiStore } from '../state/pi-slice';
 import { useModelSelection, useUserMode } from '../state/settings-store';
 import { AutoDownloadPrompt } from './AutoDownloadPrompt';
@@ -158,10 +159,50 @@ export function ComposerFooter({
           needs a visible bar. All RUN status — the "switching…" pill, the harness
           stage/timer/repair cluster — moved OUT of the footer into the ONE thread
           indicator (the user blind-test #1), so the input bar never shows run state. */}
+      {/*
+       * THE DOWNLOAD IS VISIBLE FROM OUTSIDE SETTINGS, which is where the user
+       * actually is while a 13 GB pull runs. A bare bar was not enough to act
+       * on, though: it had no number, no ETA, and no name, so "is this stuck?"
+       * had no answer without navigating back to the manager. It also read
+       * `fraction` (this FILE's), so it snapped backwards when the projector
+       * started. Percent + ETA inline, the rest on hover.
+       */}
       {download !== null ? (
-        <div className="flex w-28 items-center gap-1">
-          <ProgressBar value={download.fraction} />
-        </div>
+        <Tooltip
+          side="top"
+          align="start"
+          delayDuration={100}
+          label={
+            <span>
+              {download.modelId}
+              {(download.fileCount ?? 1) > 1
+                ? ` · file ${(download.fileIndex ?? 0) + 1} of ${download.fileCount}`
+                : ''}
+              {formatSpeed(download.bytesPerSec) ? ` · ${formatSpeed(download.bytesPerSec)}` : ''}
+            </span>
+          }
+        >
+          <div
+            className="flex items-center gap-1.5 text-caption text-text-muted"
+            data-testid="footer-download"
+          >
+            <div className="w-16">
+              <ProgressBar value={downloadFraction(download)} />
+            </div>
+            <span className="tabular-nums">
+              {download.paused
+                ? 'Paused'
+                : percent(downloadFraction(download)) !== null
+                  ? `${percent(downloadFraction(download))}%`
+                  : '…'}
+            </span>
+            {!download.paused && formatEta(downloadEtaSeconds(download)) ? (
+              <span className="hidden tabular-nums sm:inline">
+                {formatEta(downloadEtaSeconds(download))}
+              </span>
+            ) : null}
+          </div>
+        </Tooltip>
       ) : null}
 
       {/* Info popover: current/last-turn stats. Tokens are real (engine usage);

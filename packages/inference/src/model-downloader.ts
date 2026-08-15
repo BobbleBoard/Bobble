@@ -11,6 +11,23 @@ import { type CatalogFile, type CatalogModel, hfResolveUrl, type LaunchMode } fr
 import { type DownloadProgress, downloadFile } from './download.js';
 import { modelDir } from './paths.js';
 
+/**
+ * A file's own progress PLUS where that file sits in the whole download.
+ *
+ * The per-file numbers are still here (a resumed 12-of-13 GB file wants its own
+ * bar), but the UI leads with the job so the bar only ever moves forwards.
+ */
+export interface JobProgress extends DownloadProgress {
+  /** 0-based position of the file being fetched. */
+  readonly fileIndex: number;
+  /** How many files this download will fetch in total. */
+  readonly fileCount: number;
+  /** Bytes received across the whole job so far. */
+  readonly jobReceived: number;
+  /** Total bytes across every planned file; null when any size is unknown. */
+  readonly jobTotal: number | null;
+}
+
 export interface ModelDownloadOptions {
   /** Which quant to fetch (defaults to the first file listed). */
   readonly quant?: string;
@@ -29,8 +46,9 @@ export interface ModelDownloadOptions {
   readonly allCompanions?: boolean;
   /** Directory override (defaults to `~/.cache/pi-desktop/models/<id>`). */
   readonly dir?: string;
-  /** Per-file progress; `file` names which sibling is downloading. */
-  readonly onProgress?: (file: string, p: DownloadProgress) => void;
+  /** Per-file progress; `file` names which sibling is downloading, and `p`
+   * carries the WHOLE-JOB position alongside this file's own (see JobProgress). */
+  readonly onProgress?: (file: string, p: JobProgress) => void;
   readonly signal?: AbortSignal;
   readonly fetchImpl?: typeof fetch;
   /** HF auth header for gated repos (public repos need none). */
@@ -65,7 +83,9 @@ async function fetchOne(
   repo: string,
   file: CatalogFile,
   dir: string,
-  opts: ModelDownloadOptions,
+  opts: Omit<ModelDownloadOptions, 'onProgress'>,
+  /** This file's raw progress; the caller decorates it with the job position. */
+  onProgress?: (p: DownloadProgress) => void,
 ): Promise<string> {
   const dest = join(dir, file.name);
   const headers: Record<string, string> = { 'user-agent': 'pi-desktop' };
@@ -76,12 +96,19 @@ async function fetchOne(
     expectedSha256: file.sha256,
     // 0 = unverified/unknown → no size assertion (see catalog note).
     expectedBytes: file.bytes > 0 ? file.bytes : undefined,
-    onProgress: opts.onProgress !== undefined ? (p) => opts.onProgress?.(file.name, p) : undefined,
+    ...(onProgress !== undefined ? { onProgress } : {}),
     signal: opts.signal,
     fetchImpl: opts.fetchImpl,
     headers,
   });
   return dest;
+}
+
+/** One file in the download plan, in the order it will be fetched. */
+interface PlannedFile {
+  readonly kind: 'model' | 'mmproj' | 'mtp' | 'draft';
+  readonly repo: string;
+  readonly file: CatalogFile;
 }
 
 /**
@@ -92,6 +119,14 @@ async function fetchOne(
  *   (Gemma4); Qwen3.6 embeds the MTP head so nothing extra is fetched. For an
  *   EAGLE-3 entry it pulls the `draftModel` from its (usually separate)
  *   `draftRepo` so the launch can pass `--model-draft`.
+ * - `allCompanions` takes everything, whatever the mode.
+ *
+ * THE PLAN IS BUILT BEFORE THE FIRST BYTE, so progress can be reported against
+ * the WHOLE job rather than the current file. That is not a nicety: the moment
+ * companions started downloading with the weights, a per-file bar reached 100%
+ * and then snapped back to 0% for the projector, which reads as the download
+ * having restarted. A 13 GB model with a 1 GB projector does that in front of
+ * someone who has been watching for seven minutes.
  */
 export async function downloadModel(
   model: CatalogModel,
@@ -101,24 +136,58 @@ export async function downloadModel(
   const mode = opts.launchMode ?? 'fast-text';
   const all = opts.allCompanions === true;
 
-  const mainFile = pickFile(model, opts.quant);
-  const modelPath = await fetchOne(model.hfRepo, mainFile, dir, opts);
-
-  let mmprojPath: string | undefined;
+  const plan: PlannedFile[] = [
+    { kind: 'model', repo: model.hfRepo, file: pickFile(model, opts.quant) },
+  ];
   if ((all || mode === 'multimodal') && model.mmproj !== undefined) {
-    mmprojPath = await fetchOne(model.hfRepo, model.mmproj, dir, opts);
+    plan.push({ kind: 'mmproj', repo: model.hfRepo, file: model.mmproj });
   }
-
-  let mtpPath: string | undefined;
   if ((all || mode === 'fast-text') && model.mtpFile !== undefined && model.mtpEmbedded !== true) {
-    mtpPath = await fetchOne(model.hfRepo, model.mtpFile, dir, opts);
+    plan.push({ kind: 'mtp', repo: model.hfRepo, file: model.mtpFile });
   }
-
-  let draftPath: string | undefined;
   if ((all || mode === 'fast-text') && model.spec === 'eagle3' && model.draftModel !== undefined) {
     // The EAGLE-3 draft usually lives in a separate repo (draftRepo).
-    draftPath = await fetchOne(model.draftRepo ?? model.hfRepo, model.draftModel, dir, opts);
+    plan.push({ kind: 'draft', repo: model.draftRepo ?? model.hfRepo, file: model.draftModel });
   }
 
-  return { model, dir, modelPath, mmprojPath, mtpPath, draftPath };
+  /* Catalog bytes may be 0 (unverified entries), so the job total is only
+     trustworthy when EVERY planned file declares a size. Reporting a partial
+     denominator would be worse than reporting none. */
+  const jobTotal = plan.every((p) => p.file.bytes > 0)
+    ? plan.reduce((sum, p) => sum + p.file.bytes, 0)
+    : null;
+
+  const paths: Partial<Record<PlannedFile['kind'], string>> = {};
+  let doneBytes = 0;
+  for (const [index, planned] of plan.entries()) {
+    const report = opts.onProgress;
+    paths[planned.kind] = await fetchOne(
+      planned.repo,
+      planned.file,
+      dir,
+      opts,
+      report === undefined
+        ? undefined
+        : (p) =>
+            report(planned.file.name, {
+              ...p,
+              fileIndex: index,
+              fileCount: plan.length,
+              jobReceived: doneBytes + p.received,
+              jobTotal,
+            }),
+    );
+    doneBytes += planned.file.bytes;
+  }
+
+  const modelPath = paths.model;
+  if (modelPath === undefined) throw new Error(`model ${model.id} produced no main file`);
+  return {
+    model,
+    dir,
+    modelPath,
+    ...(paths.mmproj !== undefined ? { mmprojPath: paths.mmproj } : {}),
+    ...(paths.mtp !== undefined ? { mtpPath: paths.mtp } : {}),
+    ...(paths.draft !== undefined ? { draftPath: paths.draft } : {}),
+  };
 }

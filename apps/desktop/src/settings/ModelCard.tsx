@@ -20,7 +20,13 @@ import {
 } from '@pi-desktop/ui';
 import { useState } from 'react';
 import type { HfGgufFileDTO } from '../../electron/ipc-contract';
-import { useLlmStore } from '../state/llm-store';
+import {
+  downloadEtaSeconds,
+  downloadFraction,
+  formatEta,
+  type LlmDownloadState,
+  useLlmStore,
+} from '../state/llm-store';
 import { activateLocalModel } from '../state/local-model';
 import { applyModelEffortDefault, useEnginePreference } from '../state/settings-store';
 import {
@@ -61,6 +67,26 @@ function portOf(baseUrl: string | null): string | null {
 /** Human label for the inference engine badge. */
 function engineLabel(engine: string | undefined): string {
   return engine === 'mlx' ? 'MLX' : 'llama.cpp';
+}
+
+/** Job bytes received (falls back to this file's when there is only one). */
+function jobReceivedBytes(dl: LlmDownloadState): number {
+  return dl.jobTotal !== null && dl.jobTotal !== undefined ? (dl.jobReceived ?? 0) : dl.received;
+}
+
+/** Job bytes total, or this file's, or null when nothing is known. */
+function jobTotalBytes(dl: LlmDownloadState): number | null {
+  return dl.jobTotal ?? dl.total;
+}
+
+/** A companion file's role in plain words — "mmproj-F16.gguf" says nothing to
+ * someone who did not ask for a vision projector and does not know it exists. */
+function companionLabel(file: string): string {
+  const f = file.toLowerCase();
+  if (f.includes('mmproj')) return 'Vision projector';
+  if (f.includes('mtp')) return 'Speed head';
+  if (f.includes('draft')) return 'Draft model';
+  return 'Model weights';
 }
 
 /** Fit tone → dot colour for the per-row indicator in the quant dropdown. */
@@ -293,16 +319,22 @@ export function ModelCard({
       {/* Download progress with pause/resume/cancel. */}
       {dl !== null ? (
         <div className="flex flex-col gap-2" data-testid={`download-${entry.id}`}>
-          <ProgressBar value={dl.fraction} />
+          {/* The JOB fraction, not the file's — see downloadFraction. */}
+          <ProgressBar value={downloadFraction(dl)} />
           <div className="flex items-center justify-between text-caption text-text-muted">
-            <span>
+            <span data-testid={`download-line-${entry.id}`}>
               {dl.paused
                 ? 'Paused'
-                : percent(dl.fraction) !== null
-                  ? `${percent(dl.fraction)}%`
+                : percent(downloadFraction(dl)) !== null
+                  ? `${percent(downloadFraction(dl))}%`
                   : 'Starting…'}
-              {dl.total !== null ? ` · ${formatBytes(dl.received)} / ${formatBytes(dl.total)}` : ''}
+              {jobTotalBytes(dl) !== null
+                ? ` · ${formatBytes(jobReceivedBytes(dl))} / ${formatBytes(jobTotalBytes(dl) ?? 0)}`
+                : ''}
               {!dl.paused && formatSpeed(dl.bytesPerSec) ? ` · ${formatSpeed(dl.bytesPerSec)}` : ''}
+              {!dl.paused && formatEta(downloadEtaSeconds(dl))
+                ? ` · ${formatEta(downloadEtaSeconds(dl))}`
+                : ''}
             </span>
             <span className="flex items-center gap-1">
               {dl.paused ? (
@@ -332,6 +364,18 @@ export function ModelCard({
               </Button>
             </span>
           </div>
+          {/*
+           * WHICH FILE, when there is more than one. Without this, the second
+           * file's bytes look like the first file's having gone wrong — the
+           * numerator is smaller than it was a moment ago even though the job
+           * bar keeps climbing. Naming it ("Vision projector · 2 of 2") makes
+           * the two numbers agree with each other.
+           */}
+          {(dl.fileCount ?? 1) > 1 ? (
+            <div className="text-caption text-text-muted" data-testid={`download-file-${entry.id}`}>
+              {companionLabel(dl.file)} · file {(dl.fileIndex ?? 0) + 1} of {dl.fileCount}
+            </div>
+          ) : null}
         </div>
       ) : null}
 

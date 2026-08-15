@@ -493,6 +493,10 @@ async function downloadOne(
             received: p.received,
             total: p.total ?? null,
             fraction: p.fraction ?? null,
+            fileIndex: p.fileIndex,
+            fileCount: p.fileCount,
+            jobReceived: p.jobReceived,
+            jobTotal: p.jobTotal,
           },
         }),
     });
