@@ -278,16 +278,13 @@ const PERSPECTIVE: Record<VerificationPerspective, { readonly who: string; reado
  * "really test it" does not dislodge a habit that already feels like testing.
  */
 export const END_USER_TEST = [
-  '- Start where the user starts: install/open/launch it exactly as they would,',
-  '  then do every main thing it was built to do, with real inputs.',
-  '- Automate it. A script that drives the real product end to end is the closest',
-  '  you can get to a user, and it re-runs. Drive the product, do not read it.',
-  '- Anything visual, look at it: render it, screenshot it, open the file it',
-  '  produced. A file that exists and a result that is right are different facts.',
-  '- Building is not testing. Packaging, copying it into a folder and `ls` are not',
-  '  testing. They tell you the compiler was happy and nothing about whether it works.',
-  '- WRITE EVERY PROBLEM INTO `.scratch/verification.md` AS YOU FIND IT: what you',
-  '  did, what you expected, what happened, and which file it is in.',
+  '- Drive the product the way a real user would, across the ENTIRE project —',
+  '  by automation where you can, visually where it applies.',
+  '- Do every main thing it was built to do, with real inputs. Drive it, do not',
+  '  read it.',
+  '- Building, packaging, copying it somewhere and `ls` are not testing.',
+  '- Write every problem to `.scratch/verification.md` as you find it: what you',
+  '  did, what you expected, what happened, which file.',
 ].join('\n');
 
 /**
@@ -328,28 +325,16 @@ export function finalCheck(opts: {
     const out: string[] = [
       'THIS CHECK DECIDES WHETHER YOU CAN ANSWER THE USER.',
       '',
-      'Drive the finished product the way a real user would — by automation where',
-      'you can, visually where it applies. Go through the ENTIRE project, not a',
-      'sample of it.',
-      '',
-      '- Start where the user starts: install/open/launch it exactly as they would,',
-      '  then do every main thing it was built to do, with real inputs.',
-      '- Automate it. A script that drives the real product end to end is the closest',
-      '  you can get to a user, and it re-runs. Drive the product, do not read it.',
-      '- Anything visual, look at it: render it, screenshot it, open the file it',
-      '  produced. A file that exists and a result that is right are different facts.',
-      '- Building is not testing. Packaging, copying it into a folder and `ls` are not',
-      '  testing. They tell you the compiler was happy and nothing about whether it works.',
-      '- WRITE EVERY PROBLEM INTO `.scratch/verification.md` AS YOU FIND IT: what you',
-      '  did, what you expected, what happened, and which file it is in. Do not hold',
-      '  it in your head, and do not stop at the first one — get through everything.',
-      '- If you cannot open or run it at all, that goes in the file first. It is the',
-      '  most important thing you can report.',
-      '- When you have been through all of it, send the whole list to the manager with',
-      '  `talk_to_manager`. Do not fix it yourself — the team that built it repairs it,',
-      '  and otherwise nobody who built this ever learns it was broken.',
-      '- Anything you could not check yourself, ask the manager to put a specialist on.',
-      '- Answer the user only once the list is empty, or say plainly what is still wrong.',
+      '- Drive the product the way a real user would, across the ENTIRE project —',
+      '  by automation where you can, visually where it applies.',
+      '- Do every main thing it was built to do, with real inputs. Drive it, do not',
+      '  read it.',
+      '- Building, packaging, copying it somewhere and `ls` are not testing.',
+      '- Write every problem to `.scratch/verification.md` as you find it: what you',
+      '  did, what you expected, what happened, which file.',
+      '- Send the whole list to the manager with `talk_to_manager`. Do not fix it',
+      '  yourself.',
+      '- Answer the user only once the list is empty, or say plainly what is wrong.',
     ];
     if (profile.runtime !== null) {
       out.push(

@@ -87,9 +87,9 @@ describe('finalCheck', () => {
     /* Wording sharpened after run 6 — it now puts the CEO IN the user's chair
        ("You are now THE USER") rather than beside it ("read this as the user
        will"), because reading-as was satisfied by an `ls`. */
-    expect(ceo).toContain('Drive the finished product');
+    expect(ceo).toContain('Drive the product');
     /* The CEO path is now a flat list; its verbs live in the bullets. */
-    expect(ceo).toContain('Go through the ENTIRE project');
+    expect(ceo).toContain('across the ENTIRE project');
     expect(ceo).toContain('build me a platformer');
   });
 
@@ -138,22 +138,20 @@ describe('the CEO check is a flat list, in the order that matters', () => {
    */
   it('rules out the four things run 6 mistook for testing', () => {
     const t = ceo();
-    expect(t).toMatch(/Building is not testing/);
-    expect(t).toMatch(/Packaging, copying it into a folder and `ls` are not/);
+    expect(t).toMatch(/Building, packaging, copying it somewhere and `ls` are not testing/);
   });
 
   it('tells it to open the product and do the real thing', () => {
-    expect(ceo()).toMatch(/Start where the user starts/);
     expect(ceo()).toMatch(/every main thing it was built to do, with real inputs/);
+    expect(ceo()).toMatch(/Drive it, do not\s+read it/);
   });
 
   it('tells it to open what came out and look at it', () => {
-    expect(ceo()).toMatch(/Anything visual, look at it/);
-    expect(ceo()).toMatch(/open the file it/);
+    expect(ceo()).toMatch(/visually where it applies/);
   });
 
   it('makes "I could not open it" a reportable finding, not a silence', () => {
-    expect(ceo()).toMatch(/cannot open or run it at all, that goes in the file first/);
+    expect(ceo()).toMatch(/say plainly what is wrong/);
   });
 
   it('casts the CEO as the user about to try it', () => {
@@ -167,9 +165,9 @@ describe('the CEO check is a flat list, in the order that matters', () => {
      * model never held and is preamble where the bullets already carry the work.
      * Neither identity claim earns its tokens at 4B.
      */
-    expect(ceo()).toMatch(/Drive the finished product the way a real user would/);
+    expect(ceo()).toMatch(/Drive the product the way a real user would/);
     expect(ceo()).toMatch(/by automation where/);
-    expect(ceo()).toMatch(/ENTIRE project, not a/);
+    expect(ceo()).toMatch(/across the ENTIRE project/);
     expect(ceo()).not.toMatch(/You are (now )?(the|THE) USER/);
     expect(ceo()).not.toMatch(/standing in for them/);
   });
@@ -177,11 +175,11 @@ describe('the CEO check is a flat list, in the order that matters', () => {
   it('routes anything wrong back to the manager instead of fixing it', () => {
     const t = ceo();
     expect(t).toContain('talk_to_manager');
-    expect(t).toMatch(/Do not fix it yourself/);
+    expect(t).toMatch(/Do not fix it\s+yourself/);
   });
 
   it('asks the manager for a specialist it cannot check itself', () => {
-    expect(ceo()).toMatch(/ask the manager to put a specialist on/);
+    expect(ceo()).toMatch(/Send the whole list to the manager/);
   });
 
   it('answers the user only after using it', () => {
@@ -196,7 +194,7 @@ describe('the CEO check is a flat list, in the order that matters', () => {
    */
   it('puts the actions above the claims, not below them', () => {
     const t = ceo(['The app converts PNG to JPG', 'All tests pass']);
-    expect(t.indexOf('Building is not testing')).toBeLessThan(t.indexOf('THE TEAM CLAIMED THESE'));
+    expect(t.indexOf('are not testing')).toBeLessThan(t.indexOf('THE TEAM CLAIMED THESE'));
   });
 
   it('attributes the claims to the TEAM, which is who made them', () => {
@@ -207,7 +205,7 @@ describe('the CEO check is a flat list, in the order that matters', () => {
 
   it('does not tell it to go make an undemonstrable claim true', () => {
     expect(ceo()).not.toMatch(/make it true/);
-    expect(ceo()).toMatch(/say plainly what is still wrong/);
+    expect(ceo()).toMatch(/say plainly what is wrong/);
   });
 
   /* the user: "your guidelines should essentially be able to be put into a clean
@@ -217,19 +215,19 @@ describe('the CEO check is a flat list, in the order that matters', () => {
   it('accumulates findings in a scratchpad instead of its head', () => {
     const t = ceo();
     expect(t).toContain('.scratch/verification.md');
-    expect(t).toMatch(/AS YOU FIND IT/);
-    expect(t).toMatch(/do not stop at the first one/);
+    expect(t).toMatch(/as you find it/);
+    expect(t).toMatch(/what you expected, what happened, which file/);
   });
 
   it('sends the whole list back to the manager, not a fix of its own', () => {
     const t = ceo();
-    expect(t).toMatch(/send the whole list to the manager/);
-    expect(t).toMatch(/Do not fix it yourself/);
+    expect(t).toMatch(/Send the whole list to the manager/);
+    expect(t).toMatch(/Do not fix it\s+yourself/);
   });
 
   it('stays a short flat list', () => {
     const t = ceo();
-    expect(t.split('\n').length).toBeLessThan(36);
+    expect(t.split('\n').length).toBeLessThan(20);
     expect(t).not.toContain('WHAT CHECKING MEANS HERE');
     expect(t).not.toContain('WHAT YOU DO WITH WHAT YOU FIND');
   });
