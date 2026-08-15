@@ -6,6 +6,7 @@ import {
   PROMOTE_STATUS_KEY,
   type PromoteToolDeps,
   registerCreateHierarchyTool,
+  STANDING_START_REFUSAL,
 } from './promote-tool.js';
 import { CREATE_PRODUCTION_HIERARCHY, HIERARCHY_CREATED_ACK } from './promotion.js';
 
@@ -467,5 +468,24 @@ describe('a delegation from a standing start is refused, once', () => {
     await call();
     await call();
     expect(calls.n).toBe(1);
+  });
+});
+
+describe('the refusal has a stop condition, not just a start', () => {
+  /*
+   * MEASURED, run 14: the veto fired, the CEO went to research, and then spent
+   * FIVE HOURS re-checking whether `ls` exists — 48 bash calls ending
+   * `ls /opt/homebrew/bin/ls`, `which ls find`, `ls /opt/homebrew/bin/unzip`,
+   * repeatedly. Zero delegations, zero files. "Close those unknowns one at a
+   * time" is a loop unless something says when to stop.
+   */
+  it('says a handful of checks is enough and to come back', () => {
+    expect(STANDING_START_REFUSAL).toMatch(/A HANDFUL OF CHECKS IS ENOUGH/);
+    expect(STANDING_START_REFUSAL).toMatch(/come straight back here/);
+    expect(STANDING_START_REFUSAL).toMatch(/Do not keep checking/);
+  });
+
+  it('says the team finds out the rest, so partial knowledge is allowed', () => {
+    expect(STANDING_START_REFUSAL).toMatch(/the team finds out the rest/);
   });
 });

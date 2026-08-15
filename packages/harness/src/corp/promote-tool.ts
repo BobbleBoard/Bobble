@@ -55,6 +55,23 @@ export const STANDING_START_REFUSAL = [
   'The manager has never spoken to the user and knows only what you write. A brief',
   'written before the unknowns are closed is a list of your assumptions, and it gets',
   'built exactly as written.',
+  '',
+  /*
+   * A START CONDITION NEEDS A STOP CONDITION.
+   *
+   * MEASURED, run 14. This refusal fired, the CEO went to research — and then
+   * spent FIVE HOURS re-checking whether `ls` exists: 48 bash calls ending
+   * `ls /opt/homebrew/bin/ls`, `which ls find`, `ls /opt/homebrew/bin/unzip`,
+   * over and over. Zero delegations, zero files. "Close those unknowns one at a
+   * time" was read as a loop with no exit, because nothing here said when to
+   * stop or that partial knowledge was allowed.
+   *
+   * The team can find out the rest — that is what it is for.
+   */
+  'A HANDFUL OF CHECKS IS ENOUGH. You are not writing a complete picture, you are',
+  'writing a brief good enough to build from — the team finds out the rest. Once you',
+  'know what the thing is meant to be, come straight back here. Do not keep checking',
+  'the same things.',
 ].join('\n');
 
 /**
