@@ -134,17 +134,6 @@ export function ChatThread() {
     liveNode: corpLiveNode,
     pinnedNode: corpPinnedNode,
   });
-  // A3/B1: once the team forms (the promoted "waiting" view), keep the CEO/root's
-  // vision-forming turn visible as history ABOVE the live "Waiting for N…"
-  // indicator — otherwise it vanishes on promotion and it looks like nothing
-  // happened. The lead is the chart's ceo/solo (else the root / first node).
-  const corpLeadNode =
-    corpSituation !== null
-      ? (corpSituation.chart.nodes.find((n) => n.role === 'ceo' || n.role === 'solo') ??
-        corpSituation.chart.nodes.find((n) => n.parentId === undefined) ??
-        corpSituation.chart.nodes[0] ??
-        null)
-      : null;
   const { controller: canvasController } = useCanvasTabs();
   const presented = usePresentStore((st) => st.items);
 
@@ -435,11 +424,24 @@ export function ChatThread() {
             <CorpChatStream taskId={corpTaskId} node={corpView.node} />
           ) : corpTaskId !== null && corpView.kind === 'waiting' && corpSituation !== null ? (
             <>
-              {/* A3: the CEO's vision, kept as history so it never disappears when
-                  the team forms — settled, no live tail of its own. */}
-              {corpLeadNode !== null ? (
-                <CorpChatStream taskId={corpTaskId} node={corpLeadNode} historyMode />
-              ) : null}
+              {/*
+               * THE LEAD NODE'S TRANSCRIPT USED TO RENDER HERE, and it is what
+               * the user kept seeing: "the ceo-manager chat is right embedded down
+               * below the user-ceo chat… the user scrolls to the bottom of their
+               * original chat and sees the manager saying it's done, and then
+               * gets confused."
+               *
+               * It was added when the chart's lead WAS the CEO — "the CEO's
+               * vision, kept as history so it never disappears when the team
+               * forms". That expired when the mesh entry moved to the MANAGER:
+               * `corpLeadNode` falls through ceo/solo to the root node, which is
+               * now the manager, so this rendered somebody else's conversation
+               * (briefing bubble included) directly under the user's own message.
+               *
+               * Nothing is lost by removing it. The user's own message is still
+               * above, the CEO's briefing turn is still in the activity chain,
+               * and the manager is one click away in the sidebar.
+               */}
               {/* B1: the live "Waiting for N of M tasks · K in progress" indicator —
                   mounted the whole promoted-unpinned phase; never a bare "Done". */}
               <CorpInlineTurn
