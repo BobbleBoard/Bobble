@@ -3,6 +3,11 @@
  * RAM-fit verdict, size/speed formatting, and quant selection are unit-testable
  * and can't drift silently.
  */
+import {
+  CONTEXT_CEILING,
+  DEFAULT_MEMORY_FRACTION,
+  estimateLaunchRamGB,
+} from '@pi-desktop/inference/context-cap';
 import type { LlmCatalogEntry } from '../../electron/ipc-contract';
 
 export type RamTone = 'success' | 'warning' | 'danger' | 'default';
@@ -12,18 +17,146 @@ export interface RamVerdict {
   label: string;
   /** Whether the machine meets the model's minimum RAM. */
   fits: boolean;
+  /** What the verdict actually weighed, for the tooltip/subtitle. Absent on the
+   * legacy catalog-minimum path, which has nothing to show its working from. */
+  detail?: string;
 }
 
 /**
  * Green/ok/insufficient verdict comparing a model's minimum RAM against
  * detected RAM. Unknown RAM (0, e.g. non-macOS detect) yields a neutral badge
  * that just states the requirement rather than guessing a fit.
+ *
+ * Prefer {@link quantFit} wherever the SELECTED quant is known — this compares a
+ * whole model group's hand-set catalog minimum and cannot tell Q2 from Q8.
  */
 export function ramVerdict(minRamGB: number, totalRamGB: number): RamVerdict {
   if (totalRamGB <= 0) return { tone: 'default', label: `${minRamGB} GB RAM`, fits: true };
   if (totalRamGB < minRamGB) return { tone: 'danger', label: 'Needs more RAM', fits: false };
   if (totalRamGB - minRamGB < 4) return { tone: 'warning', label: 'Tight fit', fits: true };
   return { tone: 'success', label: 'Fits comfortably', fits: true };
+}
+
+export interface QuantFitInput {
+  /** Bytes of the GGUF actually selected in the dropdown. */
+  readonly modelBytes: number;
+  /** Bytes of the vision projector, when it is loaded alongside the weights. */
+  readonly mmprojBytes?: number;
+  /** The model's own maximum context; the launch cap is derived from it. */
+  readonly modelMaxContext?: number;
+  /** Detected unified/system RAM. 0 = unknown. */
+  readonly totalRamGB: number;
+}
+
+/**
+ * Will THIS quant actually run on THIS machine?
+ *
+ * the user: "it says things will fit I think without taking into account OS overhead
+ * or unified memory or anything".
+ *
+ * He is right, and in a worse way than the wording suggests: the badge was
+ * {@link ramVerdict}(group.primary.minRamGB, totalRam) — a hand-set constant for
+ * the whole MODEL, compared against the machine's TOTAL RAM. Two consequences:
+ *
+ *  1. It did not move when you changed the quant. The size next to it did. So a
+ *     card could read "31 GB · Fits comfortably" on a 24 GB Mac, because 31 GB is
+ *     the file you picked and "fits comfortably" is about a different number.
+ *  2. Weights are not the footprint. The KV cache alone is ~20% of the weights
+ *     per 32k of context, and on unified memory it comes out of the same pool as
+ *     the OS, the compositor and this Electron app.
+ *
+ * So this asks the question the launcher will actually face, using the estimator
+ * the launcher itself uses — {@link estimateLaunchRamGB}, already calibrated
+ * against the catalog's hand-set minimums — at the context the app would really
+ * pick, plus the projector when vision is on. `DEFAULT_MEMORY_FRACTION` (0.8) is
+ * the OS/other-apps headroom; between that and total RAM is the band where it
+ * loads and then swaps, which is a real state and deserves its own colour.
+ *
+ * The label shows its working. "Fits comfortably" is a claim; "16 GB of 24 GB"
+ * is a number the user can disagree with.
+ */
+export function quantFit(input: QuantFitInput): RamVerdict {
+  const { modelBytes, mmprojBytes = 0, modelMaxContext = CONTEXT_CEILING, totalRamGB } = input;
+  if (totalRamGB <= 0 || modelBytes <= 0) {
+    return { tone: 'default', label: formatBytes(modelBytes + mmprojBytes), fits: true };
+  }
+  /*
+   * The context the app would really launch with — not the model's advertised
+   * maximum. Asking "does 27B at its full context fit" answers a question the
+   * app never asks; `chooseContextCap` steps the window down until it does.
+   */
+  const budgetGB = totalRamGB * DEFAULT_MEMORY_FRACTION;
+  const ctx = Math.min(CONTEXT_CEILING, modelMaxContext > 0 ? modelMaxContext : CONTEXT_CEILING);
+  const needGB = estimateLaunchRamGB(modelBytes + mmprojBytes, ctx);
+  const detail = `≈${needGB.toFixed(1)} GB of ${totalRamGB} GB with a ${Math.round(ctx / 1024)}k context`;
+  if (needGB <= budgetGB) return { tone: 'success', label: 'Fits', fits: true, detail };
+  if (needGB <= totalRamGB) {
+    return { tone: 'warning', label: 'Tight — will swap', fits: true, detail };
+  }
+  return { tone: 'danger', label: "Won't fit", fits: false, detail };
+}
+
+/** Rank for the display sort: already yours, then usable, then not. */
+function fitRank(tone: RamTone): number {
+  if (tone === 'success') return 0;
+  if (tone === 'warning') return 1;
+  if (tone === 'default') return 2;
+  return 3;
+}
+
+/**
+ * Order the quant list so ROW 0 IS THE RECOMMENDATION.
+ *
+ * the user, describing what he liked in Unsloth Desktop: "they have a default
+ * selection, the dropdown is clickable and then the download button, if you
+ * press it immediately will do the recommended (which was already initially
+ * selected)".
+ *
+ * The neat part of that design, which their source confirms
+ * (`hub/lib/gguf-variant-sort.ts`), is that there is no separate "recommend"
+ * step to keep in sync with the list — the preselection is just the first row.
+ * So the ordering has to carry the whole opinion, in three keys:
+ *
+ *  1. What you already have — a downloaded quant beats re-downloading a better one.
+ *  2. Whether it fits — green, then tight, then unknown, then won't.
+ *  3. Size DESCENDING inside the fitting groups, because quality rises with
+ *     quant size and the best usable option is the biggest one that still fits.
+ *     Inside the won't-fit group it flips to ascending: if you are going to
+ *     scroll into the red, the near-misses are the interesting end.
+ *
+ * (Note the direction. "Order by file size" read literally means ascending, which
+ * would put the WORST quant first and make Download-without-thinking pick Q2.)
+ */
+export function orderQuantsForDisplay(
+  options: readonly QuantOption[],
+  fit: Omit<QuantFitInput, 'modelBytes'>,
+  isDownloaded: (quant: string) => boolean = () => false,
+): QuantOption[] {
+  const rank = new Map<string, number>();
+  for (const option of options) {
+    rank.set(option.quant, fitRank(quantFit({ ...fit, modelBytes: option.bytes }).tone));
+  }
+  return [...options].sort((a, b) => {
+    const own = Number(isDownloaded(b.quant)) - Number(isDownloaded(a.quant));
+    if (own !== 0) return own;
+    const fa = rank.get(a.quant) ?? 3;
+    const fb = rank.get(b.quant) ?? 3;
+    if (fa !== fb) return fa - fb;
+    return fa === 3 ? a.bytes - b.bytes : b.bytes - a.bytes;
+  });
+}
+
+/**
+ * The quant to preselect — by construction, the first row of
+ * {@link orderQuantsForDisplay}, so the dropdown's default and the list's top
+ * can never disagree.
+ */
+export function recommendedQuant(
+  options: readonly QuantOption[],
+  fit: Omit<QuantFitInput, 'modelBytes'>,
+  isDownloaded?: (quant: string) => boolean,
+): QuantOption | undefined {
+  return orderQuantsForDisplay(options, fit, isDownloaded)[0];
 }
 
 /** Human byte size (binary-ish, matches how model files are quoted). */
@@ -290,7 +423,8 @@ export interface QuantOption {
   bytes: number;
 }
 
-/** Rough Q2…Q8 ordering key (UD-/IQ- prefixes keep their base digit). */
+/** Rough Q2…Q8 ordering key (UD-/IQ- prefixes keep their base digit). Only a
+ * tie-break now, for ladders whose sizes we never learned. */
 function quantRank(quant: string): number {
   const m = quant.match(/Q(\d)/i);
   return m !== null ? Number(m[1]) : 5;
@@ -299,21 +433,44 @@ function quantRank(quant: string): number {
 /**
  * Merge a catalog entry's known quants (always present, offline) with a live
  * `hf:list-files` quant ladder (real Q2…Q8), deduped by quant label (live size
- * wins when known) and sorted low→high. Returns the base list unchanged when no
- * ladder was fetched, so the dropdown is deterministic without the network.
+ * wins when known) and sorted SMALLEST FILE FIRST. Returns the base list
+ * unchanged when no ladder was fetched, so the dropdown is deterministic without
+ * the network.
+ *
+ * the user: "sort ggufs instead of alphabetically which as you can see might put all
+ * the unsloth dynamics (labeled UD) below all the others, instead if we order by
+ * file size".
+ *
+ * The old key was `quantRank` then `localeCompare`, which is alphabetical inside
+ * a digit — so within Q4 you got IQ4_NL, Q4_0, Q4_1, Q4_K_M, Q4_K_S and then
+ * UD-Q4_K_XL dead last, purely because "U" sorts after "Q". The one property a
+ * user actually scans a quant list for — how big is it — was the one thing the
+ * order did not encode. Bytes is also the only key that stays meaningful across
+ * naming schemes nobody has invented yet.
  */
 export function mergeQuantLadder(
   base: readonly QuantOption[],
-  fetched?: ReadonlyArray<{ quant?: string; sizeBytes?: number }>,
+  fetched?: ReadonlyArray<{ quant?: string; sizeBytes?: number; mmproj?: boolean }>,
 ): QuantOption[] {
   const map = new Map<string, QuantOption>();
   for (const q of base) map.set(q.quant, { quant: q.quant, bytes: q.bytes });
   for (const f of fetched ?? []) {
     if (f.quant === undefined || f.quant.length === 0) continue;
+    /*
+     * A PROJECTOR IS NOT A QUANT. the user: "lists mmproj's separately I think, as if
+     * it's its own standalone model". `mmproj-F16.gguf` parses to the quant label
+     * "F16", so a vision repo grew a phantom 0.9 GB option that loads nothing on
+     * its own. Callers filter it today; the shared helper should not depend on
+     * every caller remembering to.
+     */
+    if (f.mmproj === true) continue;
     const existing = map.get(f.quant);
     map.set(f.quant, { quant: f.quant, bytes: f.sizeBytes ?? existing?.bytes ?? 0 });
   }
   return [...map.values()].sort(
-    (a, b) => quantRank(a.quant) - quantRank(b.quant) || a.quant.localeCompare(b.quant),
+    (a, b) =>
+      a.bytes - b.bytes ||
+      quantRank(a.quant) - quantRank(b.quant) ||
+      a.quant.localeCompare(b.quant),
   );
 }

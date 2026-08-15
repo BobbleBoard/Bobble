@@ -11,11 +11,18 @@ import {
   isReliablePublisher,
   mergeQuantLadder,
   modelFamily,
+  orderQuantsForDisplay,
   percent,
+  quantFit,
   ramVerdict,
+  recommendedQuant,
   selectedQuant,
   variantEntry,
 } from './model-manager-logic';
+
+/** the user's machine, and the one every "does it fit" claim has to survive. */
+const M5_PRO_24GB = { totalRamGB: 24, modelMaxContext: 65_536 };
+const GB = 1e9;
 
 describe('ramVerdict', () => {
   it('unknown RAM (0) is neutral and states the requirement', () => {
@@ -260,5 +267,121 @@ describe('mergeQuantLadder', () => {
   it('ignores fetched files without a quant label', () => {
     const merged = mergeQuantLadder(base, [{ sizeBytes: 1e9 }]);
     expect(merged).toHaveLength(2);
+  });
+});
+
+describe('quantFit — the verdict weighs the quant on screen', () => {
+  /*
+   * THE BUG THIS REPLACES. `ramVerdict(group.primary.minRamGB, totalRam)` was a
+   * per-MODEL constant, so the badge could not move when the quant did. the user:
+   * "it says things will fit I think without taking into account OS overhead or
+   * unified memory or anything."
+   */
+  it('gives different answers for different quants of the same model', () => {
+    // Real Qwen3.8-27B sizes from unsloth/Qwen3.8-27B-GGUF.
+    const q3 = quantFit({ modelBytes: 13.44 * GB, ...M5_PRO_24GB });
+    const q6 = quantFit({ modelBytes: 25.92 * GB, ...M5_PRO_24GB });
+    expect(q3.fits).toBe(true);
+    expect(q6.fits).toBe(false);
+    expect(q6.label).toBe("Won't fit");
+  });
+
+  it('counts the KV cache, not just the weights on disk', () => {
+    // 17.9 GB of weights is under 24 GB of RAM and still cannot be launched:
+    // the context cache and runtime overhead push it past the budget.
+    const q4 = quantFit({ modelBytes: 17.92 * GB, ...M5_PRO_24GB });
+    expect(q4.tone).not.toBe('success');
+  });
+
+  it('counts the vision projector when it will be loaded too', () => {
+    const bare = quantFit({ modelBytes: 15 * GB, ...M5_PRO_24GB });
+    const withVision = quantFit({ modelBytes: 15 * GB, mmprojBytes: 0.93 * GB, ...M5_PRO_24GB });
+    expect(withVision.detail).not.toBe(bare.detail);
+  });
+
+  it('has a distinct verdict for "loads, then swaps"', () => {
+    // Between the 80% budget and the full 24 GB: it will start and then thrash.
+    const tight = quantFit({ modelBytes: 16.5 * GB, ...M5_PRO_24GB });
+    expect(tight.tone).toBe('warning');
+    expect(tight.fits).toBe(true);
+  });
+
+  it('shows its working so the number can be argued with', () => {
+    const v = quantFit({ modelBytes: 13.44 * GB, ...M5_PRO_24GB });
+    expect(v.detail).toMatch(/GB of 24 GB/);
+    expect(v.detail).toMatch(/64k context/);
+  });
+
+  it('stays neutral when the machine is unknown rather than guessing', () => {
+    expect(quantFit({ modelBytes: 13 * GB, totalRamGB: 0 }).tone).toBe('default');
+  });
+});
+
+describe('orderQuantsForDisplay — row 0 is the recommendation', () => {
+  const ladder = [
+    { quant: 'UD-Q2_K_XL', bytes: 10.68 * GB },
+    { quant: 'UD-Q3_K_XL', bytes: 13.44 * GB },
+    { quant: 'Q3_K_M', bytes: 13.82 * GB },
+    { quant: 'UD-Q4_K_XL', bytes: 17.92 * GB },
+    { quant: 'UD-Q6_K_XL', bytes: 25.92 * GB },
+  ];
+
+  it('puts the LARGEST fitting quant first, not the smallest', () => {
+    const out = orderQuantsForDisplay(ladder, M5_PRO_24GB);
+    expect(out[0]?.quant).toBe('Q3_K_M');
+    expect(recommendedQuant(ladder, M5_PRO_24GB)?.quant).toBe('Q3_K_M');
+  });
+
+  it('sinks what will not fit below what will', () => {
+    const out = orderQuantsForDisplay(ladder, M5_PRO_24GB).map((q) => q.quant);
+    expect(out.indexOf('UD-Q6_K_XL')).toBeGreaterThan(out.indexOf('UD-Q2_K_XL'));
+  });
+
+  it('orders the wont-fit tail smallest-first — the near-misses are the useful end', () => {
+    const tiny = { totalRamGB: 8, modelMaxContext: 65_536 };
+    const out = orderQuantsForDisplay(ladder, tiny).map((q) => q.quant);
+    expect(out[0]).toBe('UD-Q2_K_XL');
+    expect(out.at(-1)).toBe('UD-Q6_K_XL');
+  });
+
+  it('floats a quant already on disk above a better one that is not', () => {
+    const out = orderQuantsForDisplay(ladder, M5_PRO_24GB, (q) => q === 'UD-Q2_K_XL');
+    expect(out[0]?.quant).toBe('UD-Q2_K_XL');
+  });
+
+  it('never drops or duplicates an option', () => {
+    const out = orderQuantsForDisplay(ladder, M5_PRO_24GB);
+    expect(out).toHaveLength(ladder.length);
+    expect(new Set(out.map((q) => q.quant)).size).toBe(ladder.length);
+  });
+});
+
+describe('mergeQuantLadder — size order, and a projector is not a quant', () => {
+  /*
+   * the user: "sort ggufs instead of alphabetically which as you can see might put
+   * all the unsloth dynamics (labeled UD) below all the others".
+   */
+  it('does not strand UD- quants under plain ones of the same digit', () => {
+    const out = mergeQuantLadder(
+      [],
+      [
+        { quant: 'Q4_K_S', sizeBytes: 16.12 * GB },
+        { quant: 'UD-Q4_K_XL', sizeBytes: 17.92 * GB },
+        { quant: 'IQ4_XS', sizeBytes: 15.71 * GB },
+      ],
+    ).map((q) => q.quant);
+    // Old key was quantRank then localeCompare, which put UD- dead last.
+    expect(out).toEqual(['IQ4_XS', 'Q4_K_S', 'UD-Q4_K_XL']);
+  });
+
+  it('drops the mmproj row instead of offering it as a 0.9 GB "F16" model', () => {
+    const out = mergeQuantLadder(
+      [],
+      [
+        { quant: 'UD-Q3_K_XL', sizeBytes: 13.44 * GB },
+        { quant: 'F16', sizeBytes: 0.93 * GB, mmproj: true },
+      ],
+    );
+    expect(out.map((q) => q.quant)).toEqual(['UD-Q3_K_XL']);
   });
 });

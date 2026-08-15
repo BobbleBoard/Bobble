@@ -6,7 +6,8 @@
   "license": "GPL-3.0-or-later",
   "description": "llama.cpp binary manager, GGUF catalog, hardware detection, llama-server supervisor.",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./context-cap": "./src/context-cap.ts"
   },
   "scripts": {
     "lint": "biome check .",

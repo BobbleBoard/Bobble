@@ -39,7 +39,9 @@ import {
   formatSpeed,
   type ModelGroup,
   mergeQuantLadder,
+  orderQuantsForDisplay,
   percent,
+  quantFit,
   ramVerdict,
   type SpecMethod,
   variantEntry,
@@ -86,21 +88,53 @@ export function ModelCard({
 
   const primary = group.primary;
   const entry = variantEntry(group, variant);
-  const quantOptions = mergeQuantLadder(entry.quants, ladders[entry.hfRepo ?? entry.id]);
+  /*
+   * THE TOP OF THE LIST IS THE DEFAULT IS THE RECOMMENDATION.
+   *
+   * One ordering drives the dropdown AND the preselection, so pressing Download
+   * without opening it gets the best quant this machine can actually run —
+   * which `quants[0]`, the SMALLEST, never was.
+   */
+  /* No downloaded-first key here: `LlmCatalogEntry.downloaded` is per-ENTRY, not
+     per-quant, so there is nothing on the contract that says WHICH quant is on
+     disk. Passing a predicate that guesses would sort the list by a fiction. */
+  const quantOptions = orderQuantsForDisplay(
+    mergeQuantLadder(entry.quants, ladders[entry.hfRepo ?? entry.id]),
+    { totalRamGB: hardware?.totalRamGB ?? 0, modelMaxContext: entry.contextWindow },
+  );
   const effectiveQuant =
     quantOptions.find((q) => q.quant === quant)?.quant ?? quantOptions[0]?.quant ?? '';
 
   const isActive = status.serverRunning && status.model?.id === entry.id;
   const isLoading = isActive && status.phase === 'starting';
   const dl = download !== null && download.modelId === entry.id ? download : null;
-  const ram = ramVerdict(primary.minRamGB, hardware?.totalRamGB ?? 0);
   const sizeBytes = quantOptions.find((q) => q.quant === effectiveQuant)?.bytes ?? 0;
+  const vision = group.entries.some((e) => e.vision);
+  /* The projector is loaded alongside the weights on a vision launch, so it is
+     part of the footprint — real bytes from the ladder, never a guess. */
+  const mmprojBytes = vision
+    ? (ladders[entry.hfRepo ?? entry.id]?.find((f) => f.mmproj === true)?.sizeBytes ?? 0)
+    : 0;
+  /*
+   * The verdict now weighs THE QUANT ON SCREEN, not the group's catalog minimum,
+   * so it moves with the dropdown the way the size beside it always did. Falls
+   * back to the old constant only while a card has no size to weigh (a ladder
+   * that never loaded), where a stale badge still beats a blank one.
+   */
+  const ram =
+    sizeBytes > 0
+      ? quantFit({
+          modelBytes: sizeBytes,
+          mmprojBytes,
+          modelMaxContext: entry.contextWindow,
+          totalRamGB: hardware?.totalRamGB ?? 0,
+        })
+      : ramVerdict(primary.minRamGB, hardware?.totalRamGB ?? 0);
   const tps = status.metrics?.avgTps ?? status.metrics?.lastTps;
   const port = isActive ? portOf(status.baseUrl) : null;
 
   const recommended = group.entries.some((e) => e.recommended);
   const reliable = primary.publisher?.reliable === true;
-  const vision = group.entries.some((e) => e.vision);
   const engine = entry.engine ?? 'llamacpp';
   const showEngineBadge = advanced || engine === 'mlx' || enginePref === 'mlx';
   const downloaded = entry.downloaded;
@@ -112,7 +146,10 @@ export function ModelCard({
     void window.piDesktop
       .invoke('hf:list-files', { repoId: repo, contextWindow: entry.contextWindow })
       .then((res) => {
-        const files = (res.files ?? []).filter((f) => f.mmproj !== true && f.mtp !== true);
+        /* KEEP the mmproj row. `mergeQuantLadder` drops it from the quant list
+           itself, and its size is needed to weigh a vision launch honestly —
+           filtering here threw away the only place that number exists. */
+        const files = (res.files ?? []).filter((f) => f.mtp !== true);
         if (files.length > 0) setLadders((prev) => ({ ...prev, [repo]: files }));
       })
       .catch(() => {
@@ -206,7 +243,14 @@ export function ModelCard({
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-1">
-          <Badge tone={ram.tone} size="sm" data-testid={`ram-badge-${primary.id}`}>
+          {/* `title` carries the arithmetic — "≈16.0 GB of 24 GB with a 64k
+              context" — so the verdict is checkable rather than trusted. */}
+          <Badge
+            tone={ram.tone}
+            size="sm"
+            data-testid={`ram-badge-${primary.id}`}
+            {...(ram.detail !== undefined ? { title: ram.detail } : {})}
+          >
             {ram.label}
           </Badge>
           <FavoriteStar modelId={primary.id} />
