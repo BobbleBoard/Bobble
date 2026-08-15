@@ -175,7 +175,7 @@ const app = await electron.launch({
 });
 
 try {
-  const page = await app.firstWindow();
+  let page = await app.firstWindow();
   await page.waitForFunction(
     () => typeof window.__pi_store === 'function' && typeof window.__pi_project === 'function',
     { timeout: 30_000 },
@@ -452,7 +452,52 @@ try {
   const deadline = Date.now() + MINUTES * 60_000;
   let n = 0;
   while (Date.now() < deadline) {
-    await page.waitForTimeout(SHOT_MS);
+    /*
+     * A CRASH MUST NOT KILL THE WATCHER BEFORE THE REASON IS PRINTED.
+     *
+     * The main process DOES log why a renderer died — `render-process-gone`
+     * carries a reason and an exit code, and renderer-recovery logs both. It
+     * has never appeared in a run log because `page.waitForTimeout` REJECTS the
+     * instant the page goes, this script threw, and node exited before
+     * Electron's own line was flushed to stdout. So every crash for months has
+     * read "RENDERER CRASHED" and nothing else — the report existed and the
+     * harness killed itself before reading it.
+     *
+     * Swallow the rejection, give the main process a moment to say why, and let
+     * the loop's own crash check end the run in order.
+     */
+    try {
+      await page.waitForTimeout(SHOT_MS);
+    } catch (err) {
+      log('watch interrupted:', err instanceof Error ? err.message : String(err));
+      // Give the main process a beat to print WHY, then say it.
+      await new Promise((r) => setTimeout(r, 3000));
+      if (crashNote !== null) log(crashNote);
+      /*
+       * THE APP SURVIVES A RENDERER CRASH; THE WATCHER SHOULD TOO.
+       *
+       * renderer-recovery reloads the window (up to MAX_CONSECUTIVE_RECOVERIES),
+       * so the corp run in the MAIN process is untouched — engineers keep
+       * working. Only this script's `page` handle is dead. It used to exit
+       * anyway, which is how a crash at 30 minutes ended a 5-hour run and threw
+       * away everything the team was still doing.
+       */
+      const recovered = await app.firstWindow({ timeout: 30_000 }).catch(() => null);
+      if (recovered === null) {
+        log('renderer did not come back — stopping');
+        break;
+      }
+      page = recovered;
+      crashNote = null;
+      /* The listeners were bound to the DEAD page; rebind or the next crash is
+         silent and the console stops being mirrored. */
+      page.on('crash', () => {
+        crashNote = 'renderer crashed (no further detail available after the fact)';
+        log('RENDERER CRASHED');
+      });
+      log('renderer recovered — re-attached, still watching');
+      continue;
+    }
     const v = await vitals();
     if (v !== null) log(`vitals · dom ${v.nodes} nodes · ${v.msgs} msgs · heap ${v.heap}MB`);
     if (crashNote !== null) {
