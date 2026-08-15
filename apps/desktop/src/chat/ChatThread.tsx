@@ -422,37 +422,20 @@ export function ChatThread() {
               situation-room canvas tab, which opens when the model builds a team. */}
           {corpTaskId !== null && corpView.kind === 'stream' ? (
             <CorpChatStream taskId={corpTaskId} node={corpView.node} />
-          ) : corpTaskId !== null && corpView.kind === 'waiting' && corpSituation !== null ? (
-            <>
-              {/*
-               * THE LEAD NODE'S TRANSCRIPT USED TO RENDER HERE, and it is what
-               * the user kept seeing: "the ceo-manager chat is right embedded down
-               * below the user-ceo chat… the user scrolls to the bottom of their
-               * original chat and sees the manager saying it's done, and then
-               * gets confused."
-               *
-               * It was added when the chart's lead WAS the CEO — "the CEO's
-               * vision, kept as history so it never disappears when the team
-               * forms". That expired when the mesh entry moved to the MANAGER:
-               * `corpLeadNode` falls through ceo/solo to the root node, which is
-               * now the manager, so this rendered somebody else's conversation
-               * (briefing bubble included) directly under the user's own message.
-               *
-               * Nothing is lost by removing it. The user's own message is still
-               * above, the CEO's briefing turn is still in the activity chain,
-               * and the manager is one click away in the sidebar.
-               */}
-              {/* B1: the live "Waiting for N of M tasks · K in progress" indicator —
-                  mounted the whole promoted-unpinned phase; never a bare "Done". */}
-              <CorpInlineTurn
-                taskId={corpTaskId}
-                state={corpSituation}
-                fetchTranscript={(nodeId) => fetchWorkerTranscript(corpTaskId, nodeId)}
-                peekAvailable={corpPeekAvailable(corpSituation)}
-                onFocusSituation={() => focusSituationTab(canvasController, corpTaskId)}
-              />
-            </>
-          ) : corpTaskId !== null && corpView.kind === 'starting' ? (
+          ) : corpTaskId !== null && corpView.kind === 'waiting' && corpSituation !== null ? /*
+           * NOTHING. the user: "this forming a plan bar just needs to go in it's
+           * entirety aswell."
+           *
+           * The inline corp turn lived here — a status bar reading "Forming a
+           * plan" / "Waiting for N of M tasks", with the team listed under it.
+           * It is a third place to read the same state: the sidebar already
+           * shows every role with its own status, and the situation room shows
+           * the team and the plan. Three views of one thing is what made this
+           * confusing, and this was the one nobody asked for — it sat at the
+           * bottom of the user's OWN conversation, which is where they look
+           * for their answer, not for machinery.
+           */
+          null : corpTaskId !== null && corpView.kind === 'starting' ? (
             // Bridge the moment between submit and the first agent appearing so the
             // chat is never blank — the model is spinning up, not gone.
             <div className="pd-corpchat-starting" data-testid="corp-chat-starting">
