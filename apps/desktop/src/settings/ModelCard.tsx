@@ -42,6 +42,7 @@ import {
   orderQuantsForDisplay,
   percent,
   quantFit,
+  type RamTone,
   ramVerdict,
   type SpecMethod,
   variantEntry,
@@ -61,6 +62,14 @@ function portOf(baseUrl: string | null): string | null {
 function engineLabel(engine: string | undefined): string {
   return engine === 'mlx' ? 'MLX' : 'llama.cpp';
 }
+
+/** Fit tone → dot colour for the per-row indicator in the quant dropdown. */
+const FIT_DOT: Record<RamTone, string> = {
+  success: 'bg-status-success-fg',
+  warning: 'bg-status-warning-fg',
+  danger: 'bg-status-danger-fg',
+  default: 'bg-text-muted',
+};
 
 export function ModelCard({
   group,
@@ -364,12 +373,40 @@ export function ModelCard({
                 data-testid={`quant-${entry.id}`}
               />
               <SelectContent>
-                {quantOptions.map((q) => (
-                  <SelectItem key={q.quant} value={q.quant}>
-                    {q.quant}
-                    {q.bytes > 0 ? ` · ${formatBytes(q.bytes)}` : ''}
-                  </SelectItem>
-                ))}
+                {/*
+                 * FIT IS VISIBLE WHILE CHOOSING, not only after choosing. The
+                 * badge on the card describes the SELECTED quant, so picking a
+                 * different one used to mean select-then-look-then-reselect.
+                 * A tinted dot per row, sized to fit on ONE line — Unsloth
+                 * removed their per-row tags for exactly this reason ("the
+                 * recommended/downloaded tags wrapped every row onto two lines
+                 * and made the list hard to scan").
+                 */}
+                {quantOptions.map((q) => {
+                  const rowFit = quantFit({
+                    modelBytes: q.bytes,
+                    mmprojBytes,
+                    modelMaxContext: entry.contextWindow,
+                    totalRamGB: hardware?.totalRamGB ?? 0,
+                  });
+                  return (
+                    <SelectItem key={q.quant} value={q.quant}>
+                      <span className="flex items-center gap-1.5">
+                        <span
+                          aria-hidden="true"
+                          title={rowFit.detail ?? rowFit.label}
+                          className={`size-1.5 shrink-0 rounded-full ${FIT_DOT[rowFit.tone]}`}
+                        />
+                        <span>
+                          {q.quant}
+                          {q.bytes > 0 ? ` · ${formatBytes(q.bytes)}` : ''}
+                        </span>
+                        {/* Screen readers get the word; sighted users get the dot. */}
+                        <span className="sr-only">{rowFit.label}</span>
+                      </span>
+                    </SelectItem>
+                  );
+                })}
               </SelectContent>
             </Select>
           ) : (
