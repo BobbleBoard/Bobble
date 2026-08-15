@@ -569,3 +569,88 @@ describe('unknowns the CEO left open travel with the brief', () => {
     expect(seen).toBe('Build it');
   });
 });
+
+describe('the CEO is told WHERE the work is', () => {
+  /*
+   * MEASURED, run 15. The manager exhausted its step budget without replying,
+   * so the hand-back said "Nothing was delivered" — over 53 files written by
+   * four engineers across 77 minutes. The CEO then went looking in ~/Bobble and
+   * /Applications, found nothing, and told the user no code had been produced.
+   *
+   * Two separate failures: the workspace was not reported at all (the host read
+   * module state that was null), and even when it IS reported it is a list of
+   * RELATIVE filenames — which is not an address.
+   */
+  it('names the directory on a partial hand-off, not just the filenames', async () => {
+    const tool = register('max', async () => ({
+      ok: false,
+      product: '',
+      error: 'manager ran out of steps after 43 tool calls without ever replying',
+      workspace: '/Users/user/bobble-testbed/run15\n  src/core/format_registry.py\n  src/main.js',
+    }));
+    const { ctx } = fakeCtx();
+    const res = await tool.execute(
+      'c',
+      { message: 'Build LocalConvert', divisions: [] },
+      undefined,
+      undefined,
+      ctx,
+    );
+    const text = String(res.content?.[0]?.text ?? '');
+    expect(text).toContain('/Users/user/bobble-testbed/run15');
+    expect(text).toMatch(/look HERE and nowhere else/);
+    expect(text).toMatch(/THE WORK IS STILL THERE/);
+    // And it must NOT tell the CEO nothing was delivered.
+    expect(text).not.toMatch(/Nothing was delivered/);
+  });
+
+  it('still says nothing was delivered when the workspace really is empty', async () => {
+    const tool = register('max', async () => ({
+      ok: false,
+      product: '',
+      error: 'the production ended without delivering',
+    }));
+    const { ctx } = fakeCtx();
+    const res = await tool.execute(
+      'c',
+      { message: 'Build it', divisions: [] },
+      undefined,
+      undefined,
+      ctx,
+    );
+    expect(String(res.content?.[0]?.text ?? '')).toMatch(/Nothing was delivered/);
+  });
+
+  it('gives the address on a SUCCESSFUL hand-off too — verification needs somewhere to look', async () => {
+    const tool = register('max', async () => ({
+      ok: true,
+      product: 'Built LocalConvert. All tests pass.',
+      workspace: '/Users/user/bobble-testbed/run16\n  src/main.js',
+    }));
+    const { ctx } = fakeCtx();
+    const res = await tool.execute(
+      'c',
+      { message: 'Build it', divisions: [] },
+      undefined,
+      undefined,
+      ctx,
+    );
+    const text = String(res.content?.[0]?.text ?? '');
+    expect(text).toContain('Built LocalConvert');
+    expect(text).toContain('/Users/user/bobble-testbed/run16');
+    expect(text).toMatch(/Open it here, not anywhere you think it might be/);
+  });
+
+  it('omits the address block entirely when the host could not report one', async () => {
+    const tool = register('max', async () => ({ ok: true, product: 'Done.' }));
+    const { ctx } = fakeCtx();
+    const res = await tool.execute(
+      'c',
+      { message: 'Build it', divisions: [] },
+      undefined,
+      undefined,
+      ctx,
+    );
+    expect(String(res.content?.[0]?.text ?? '')).not.toMatch(/THE WORK IS HERE/);
+  });
+});

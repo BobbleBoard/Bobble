@@ -396,11 +396,27 @@ export function registerCreateHierarchyTool(pi: ExtensionAPI, deps: PromoteToolD
            * The real CEO is the only CEO, so it does this review itself, here,
            * before it answers.
            */
+          /*
+           * WHERE IT IS, before what to do about it.
+           *
+           * The next instruction is "open it and use it as the user would",
+           * which needs an address. Without one the CEO guesses, and run 15
+           * shows how: told a hand-off had failed, it searched `~/Bobble/…` and
+           * `/Applications`, found neither, and reported to the user that no
+           * code existed — while 53 files sat in the chat's own directory. The
+           * successful path had the same blind spot; it just had a summary to
+           * paper over it.
+           */
+          const delivered = (result.workspace ?? '').trim();
+          const where =
+            delivered === ''
+              ? ''
+              : `\n\nTHE WORK IS HERE. Open it here, not anywhere you think it might be:\n${delivered}`;
           return {
             content: [
               {
                 type: 'text',
-                text: `${result.product}\n\n${'—'.repeat(20)}\n\n${finalCheck({
+                text: `${result.product}${where}\n\n${'—'.repeat(20)}\n\n${finalCheck({
                   claims: extractClaims(result.product),
                   profile: classifyVerification(brief),
                   perspective: 'ceo',
@@ -452,7 +468,17 @@ export function registerCreateHierarchyTool(pi: ExtensionAPI, deps: PromoteToolD
                      * what is left, and it is the same question either way.
                      */
                     `The hand-off did not complete: ${why}.\n\n` +
-                    `THE WORK IS STILL THERE. The workspace contains:\n${tree}\n\n` +
+                    /*
+                     * The first line of `tree` is the ABSOLUTE directory; the
+                     * rest are paths relative to it. Run 15's CEO was told a
+                     * hand-off had failed, went looking in `~/Bobble/…` and
+                     * `/Applications`, found nothing, and reported to the user
+                     * that no code had been produced — over 53 files sitting in
+                     * the chat's own folder. A list of filenames is not an
+                     * address, so the address goes first and is named as one.
+                     */
+                    `THE WORK IS STILL THERE. This is where it is, and what is in it —\n` +
+                    `look HERE and nowhere else:\n${tree}\n\n` +
                     'Do NOT start again and do NOT throw this away. In this order:\n\n' +
                     '1. Open it and use it yourself — find out what actually works.\n' +
                     `${END_USER_TEST}\n` +

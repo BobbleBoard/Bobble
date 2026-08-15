@@ -56,6 +56,15 @@ interface RunningTask {
   /** Mesh runs have no CorpEngine — their cooperative stop lives here instead, so
    * `corp:abort` can halt a hierarchy the same way it aborts an engine task. */
   readonly abortMesh?: () => void;
+  /**
+   * The directory this run ACTUALLY resolved and wrote into.
+   *
+   * Recorded because the caller cannot re-derive it. `runCorpForBridge` used
+   * `currentWorkspaceDir()`, module state that is only set once a workspace has
+   * been resolved — and when it was null the failure report said "Nothing was
+   * delivered" over 53 files. See the tree note in `runCorpForBridge`.
+   */
+  readonly cwd?: string;
 }
 
 const tasks = new Map<string, RunningTask>();
@@ -401,6 +410,10 @@ async function handleStart(
     ...(abortMesh !== undefined ? { abortMesh } : {}),
     handle,
     wc,
+    /* `projectPath` is what `cwd` is set from in both branches — the directory
+       the team actually writes into. Recorded so the hand-back can report what
+       is on disk without re-deriving it from module state that may be unset. */
+    cwd: projectPath,
   });
 
   // Forward the task's events to the requesting window until the terminal `done`.
@@ -590,8 +603,26 @@ export async function runCorpForBridge(
    * result said "Nothing was delivered" over a compiling 2,452-line codebase.
    * Only this side knows the cwd, so only this side can answer the question —
    * see CorpRunResult.workspace.
+   *
+   * IT HAPPENED AGAIN IN RUN 15, for a different reason, and that is the point:
+   * this read `currentWorkspaceDir()` — module state set only once a workspace
+   * has been RESOLVED — which was null, so `built` was '' and the CEO was told
+   * "Nothing was delivered" over 53 files and 77 minutes of work by four
+   * engineers. It then told the user the hand-off had failed and nothing was
+   * produced. A false negative costs exactly what a false completion does.
+   *
+   * So the source of truth is now the directory THIS RUN recorded when it
+   * started, not a guess made before it and re-read after. The old lookup stays
+   * as a fallback for a task that somehow left no record.
    */
-  const built = workspace !== null ? listProject(workspace) : '';
+  const ranIn = tasks.get(taskId)?.cwd ?? workspace;
+  /*
+   * THE ABSOLUTE PATH LEADS THE TREE. `listProject` returns paths relative to
+   * the workspace, and the CEO does not know what they are relative TO — run
+   * 15's went looking in `~/Bobble/…` and `/Applications` and concluded nothing
+   * had been built. A list of filenames is not an address.
+   */
+  const built = ranIn != null ? `${ranIn}\n${listProject(ranIn)}` : '';
   if (result === null) {
     return {
       ok: false,
@@ -608,7 +639,15 @@ export async function runCorpForBridge(
       ...(built !== '' ? { workspace: built } : {}),
     };
   }
-  return { ok: true, product: result.summary ?? '' };
+  /*
+   * The SUCCESS path carries the tree too. The CEO's next instruction is to open
+   * the thing and use it as the user — which needs somewhere to open. Without
+   * this it was told a product exists and left to guess where, and run 15 shows
+   * exactly how that guessing goes: it searched `~/Bobble/…` and `/Applications`
+   * and concluded nothing had been built, while the work sat in the chat's own
+   * directory.
+   */
+  return { ok: true, product: result.summary ?? '', ...(built !== '' ? { workspace: built } : {}) };
 }
 
 export function registerCorpIpc(): void {
