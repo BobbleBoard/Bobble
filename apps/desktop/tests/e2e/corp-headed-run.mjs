@@ -449,7 +449,32 @@ try {
     }
   };
 
+  /*
+   * IS ANY SEAT ACTUALLY WORKING? Read from the corp store rather than the chat
+   * transcript, because the two disagree exactly when it matters: a blocking
+   * `talk_to_manager` pins the main thread at two messages for the whole run
+   * while the team builds. `working` (and `waiting`, which is a seat queued
+   * behind the single llama-server slot) both count as alive.
+   */
+  const corpBusy = async () => {
+    try {
+      return await page.evaluate(() => {
+        const nodes = window.__corpStore?.getState().situation?.chart.nodes ?? [];
+        return nodes.some((node) => node.state === 'working' || node.state === 'waiting');
+      });
+    } catch {
+      /* Can't tell → assume alive. A stall report has to be earned. */
+      return true;
+    }
+  };
+
   const deadline = Date.now() + MINUTES * 60_000;
+  /** Consecutive ticks with a frozen transcript, nothing streaming, no seat busy. */
+  const STALL_MIN = Number(process.env.STALL_MIN ?? 10);
+  const STALL_TICKS = Math.max(3, Math.ceil((STALL_MIN * 60_000) / SHOT_MS));
+  let idleTicks = 0;
+  let lastCount = -1;
+  let stalled = false;
   let n = 0;
   while (Date.now() < deadline) {
     /*
@@ -533,6 +558,35 @@ try {
       `t+${n} · ${state.messages} msgs · ${state.streaming ? 'working' : 'idle'} · ${state.tail}`,
     );
     writeFileSync(path.join(OUT, 'last-state.json'), JSON.stringify(state, null, 2));
+
+    /*
+     * A DEAD RUN IS NOT A QUIET RUN.
+     *
+     * MEASURED, run 14: the CEO's turn was aborted externally at 4m06s with a
+     * healthy 20k context, and this loop went on logging `118 msgs · idle`
+     * every 60 seconds for FOUR HOURS FIFTY-SIX MINUTES. Nothing was wrong with
+     * the watcher — it reported exactly what it saw, once a minute, 290 times,
+     * and never drew the obvious conclusion. I then read the five hours of
+     * screenshots as five hours of work and wrote that into a commit message.
+     *
+     * A corp run is legitimately silent for long stretches — a blocking
+     * `talk_to_manager` freezes the main thread at two messages while five
+     * roles work, which is the signature of healthy delegation, not a stall.
+     * So this cannot key on the main thread alone: it stalls only when the
+     * transcript is FROZEN, nothing is streaming, and no corp node is running.
+     */
+    const quiet = state.messages === lastCount && !state.streaming && !(await corpBusy());
+    lastCount = state.messages;
+    idleTicks = quiet ? idleTicks + 1 : 0;
+    if (idleTicks >= STALL_TICKS) {
+      log(
+        `STALLED — ${state.messages} messages, nothing streaming and no corp seat working ` +
+          `for ${Math.round((STALL_TICKS * SHOT_MS) / 60_000)} minutes. The run is over; ` +
+          `watching longer only produces identical screenshots. Stopping.`,
+      );
+      stalled = true;
+      break;
+    }
   }
 
   /*
@@ -566,7 +620,15 @@ try {
   for (const r of plan.rows) log('  ·', r);
 
   await page.screenshot({ path: path.join(OUT, 'final.png') }).catch(() => {});
-  log('done watching · screenshots:', OUT);
+  /* Say WHY it ended. "done watching" reads the same whether the run finished
+     or died in the first five minutes — which is how run 14 got written up as
+     five hours of work. */
+  log(
+    stalled
+      ? `done watching (STALLED — the run stopped producing anything and was not going to resume) · screenshots:`
+      : 'done watching (watch window elapsed) · screenshots:',
+    OUT,
+  );
   console.log(`\nProject (go and look): ${PROJECT}`);
   console.log(`Screenshots:           ${OUT}`);
 } finally {
