@@ -17,6 +17,7 @@
 import type { ExtensionAPI } from '@mariozechner/pi-coding-agent';
 import { type Static, Type } from '@sinclair/typebox';
 import type { EffortLevel } from '../effort/effort.js';
+import type { PlanItem } from '../state.js';
 import { type CorpRunRequest, type CorpRunResult, corpBridgeRunFromEnv } from './bridge-client.js';
 import {
   CREATE_PRODUCTION_HIERARCHY,
@@ -43,35 +44,43 @@ export const PROMOTE_STATUS_KEY = 'harness-promote';
 export const STANDING_START_REFUSAL = [
   'Not yet — you have not looked at anything.',
   '',
-  'Before you hand this over:',
+  'Before you hand this over, work a checklist:',
   '',
-  "- Break the request down and write down what you DON'T know. Anything about how it",
-  '  should look, behave, or what it is meant to resemble.',
-  '- Close those unknowns one at a time. Search for it, fetch the page, read the docs,',
-  '  look at the thing itself. Use specialists where they save you time.',
-  '- THEN call this again with what you found in the brief, and the files you gathered',
-  '  in `files`.',
+  '1. Call `update_plan` with one item per QUESTION you cannot answer about what this',
+  '   should look like, behave like, or resemble. Questions, not build steps — "what',
+  '   formats does it convert, and how does the page lay them out?", not "implement the',
+  '   converter". THREE TO SIX of them. More than six and they are not all worth asking.',
+  '2. Answer them one at a time — search, fetch the page, read the docs, look at the',
+  '   thing itself; a specialist can go and look for you. Mark each one `done` in',
+  '   `update_plan` as you answer it. A done item is CLOSED. Do not check it again.',
+  '3. When the list is done, call this again with what you found in the brief and the',
+  '   files you gathered in `files`.',
+  '',
+  /*
+   * A START CONDITION NEEDS A STOP CONDITION, AND THE LIST IS BOTH.
+   *
+   * MEASURED, run 14 (aborted at 4m06s, 58 tool calls, 0 files, 0 delegations).
+   * This refusal fired and the CEO did go and research — 3 searches, a fetch of
+   * cloudconvert.com, then a real environment sweep that narrowed properly and
+   * found `7zz` in the Cellar. Then it slid: `which ls find`, answered at call
+   * 28 (`/bin/ls`), re-asked at call 47, and `ls /opt/homebrew/bin/ls` twice
+   * byte-identical, `ls /opt/homebrew/bin/unzip` twice byte-identical.
+   *
+   * It was not that it checked too much. It never wrote down WHAT it was trying
+   * to learn, so nothing could be finished — every answer was disposable and
+   * re-askable. "Close those unknowns one at a time" named no unknowns.
+   *
+   * A written list is the scope (bounded at six), the consistency (an answered
+   * question is struck off, not re-opened) and the accountability (what is still
+   * open travels to the manager in the brief — see openQuestionsFor).
+   */
+  'The list is the scope. Nothing left on it means nothing left to find out — come',
+  'straight back here even if you still feel underinformed; the team finds out the',
+  'rest, and whatever is still open on your list goes to them with the brief.',
   '',
   'The manager has never spoken to the user and knows only what you write. A brief',
   'written before the unknowns are closed is a list of your assumptions, and it gets',
   'built exactly as written.',
-  '',
-  /*
-   * A START CONDITION NEEDS A STOP CONDITION.
-   *
-   * MEASURED, run 14. This refusal fired, the CEO went to research — and then
-   * spent FIVE HOURS re-checking whether `ls` exists: 48 bash calls ending
-   * `ls /opt/homebrew/bin/ls`, `which ls find`, `ls /opt/homebrew/bin/unzip`,
-   * over and over. Zero delegations, zero files. "Close those unknowns one at a
-   * time" was read as a loop with no exit, because nothing here said when to
-   * stop or that partial knowledge was allowed.
-   *
-   * The team can find out the rest — that is what it is for.
-   */
-  'A HANDFUL OF CHECKS IS ENOUGH. You are not writing a complete picture, you are',
-  'writing a brief good enough to build from — the team finds out the rest. Once you',
-  'know what the thing is meant to be, come straight back here. Do not keep checking',
-  'the same things.',
 ].join('\n');
 
 /**
@@ -155,6 +164,29 @@ export interface PromoteToolDeps {
    * standing-start veto below; omitted → no veto (tests, headless callers).
    */
   readonly otherToolCalls?: () => number;
+  /**
+   * The CEO's live `update_plan` checklist, if it kept one. Read at hand-back
+   * so the questions it never closed travel WITH the brief instead of being
+   * silently dropped — see {@link openQuestionsFor}.
+   */
+  readonly getPlan?: () => readonly PlanItem[] | null;
+}
+
+/**
+ * The CEO's own unclosed questions, in its own words.
+ *
+ * The standing-start refusal asks for a checklist of unknowns and says the team
+ * finds out the rest. This is the half that makes that true: whatever is still
+ * `pending` or `in_progress` when the CEO hands over is named in the brief, so
+ * the manager starts knowing which parts of it are assumption.
+ *
+ * Reading the model's OWN list assumes nothing about the task — it does not
+ * check that the questions were good, or that they were about the right thing,
+ * only that the CEO said they were open and then stopped.
+ */
+export function openQuestionsFor(plan: readonly PlanItem[] | null | undefined): string[] {
+  if (plan === null || plan === undefined) return [];
+  return plan.filter((item) => item.status !== 'done').map((item) => item.text);
 }
 
 /**
@@ -182,11 +214,14 @@ function looksUndelivered(product: string): boolean {
  * call without one is turned into a brief from whatever the CEO did give rather
  * than handing the manager an empty string to start a production from.
  */
-function briefForManager(args: {
-  readonly message?: string;
-  readonly reason: string;
-  readonly divisions: readonly { readonly name: string; readonly purpose: string }[];
-}): string {
+function briefForManager(
+  args: {
+    readonly message?: string;
+    readonly reason: string;
+    readonly divisions: readonly { readonly name: string; readonly purpose: string }[];
+  },
+  openQuestions: readonly string[] = [],
+): string {
   const parts: string[] = [];
   if (args.message !== undefined && args.message !== '') parts.push(args.message);
   if (parts.length === 0 && args.reason !== '') parts.push(args.reason);
@@ -205,6 +240,17 @@ function briefForManager(args: {
       `Divisions the CEO already has in mind:\n${named
         .map((d) => `- ${d.name}: ${d.purpose}`)
         .join('\n')}`,
+    );
+  }
+  /*
+   * Last, because it is the part the manager acts on rather than reads: these
+   * are the things the CEO could not answer, so they are the first things to
+   * find out — and naming them stops the brief's silence being read as settled.
+   */
+  if (openQuestions.length > 0) {
+    parts.push(
+      `The CEO left these questions open — treat the brief as an assumption wherever it ` +
+        `touches them, and find out first:\n${openQuestions.map((q) => `- ${q}`).join('\n')}`,
     );
   }
   return parts.join('\n\n');
@@ -330,7 +376,7 @@ export function registerCreateHierarchyTool(pi: ExtensionAPI, deps: PromoteToolD
       handbacks += 1;
       const runCorp = deps.runCorp ?? corpBridgeRunFromEnv();
       if (runCorp !== null) {
-        const brief = briefForManager(args);
+        const brief = briefForManager(args, openQuestionsFor(deps.getPlan?.()));
         const result = await runCorp({ message: brief });
         if (result.ok && !looksUndelivered(result.product)) {
           /*

@@ -1,8 +1,10 @@
 import type { ExtensionAPI } from '@mariozechner/pi-coding-agent';
 import { describe, expect, it } from 'vitest';
 import type { EffortLevel } from '../effort/effort.js';
+import type { PlanItem } from '../state.js';
 import {
   corpToolEnabled,
+  openQuestionsFor,
   PROMOTE_STATUS_KEY,
   type PromoteToolDeps,
   registerCreateHierarchyTool,
@@ -438,8 +440,8 @@ describe('a delegation from a standing start is refused, once', () => {
 
   it('hands back the workflow, not a scolding', async () => {
     const text = await run(0, { n: 0 });
-    expect(text).toMatch(/what you DON'T know/);
-    expect(text).toMatch(/Close those unknowns one at a time/);
+    expect(text).toMatch(/one item per QUESTION you cannot answer/);
+    expect(text).toMatch(/Answer them one at a time/);
     expect(text).toMatch(/`files`/);
   });
 
@@ -473,19 +475,97 @@ describe('a delegation from a standing start is refused, once', () => {
 
 describe('the refusal has a stop condition, not just a start', () => {
   /*
-   * MEASURED, run 14: the veto fired, the CEO went to research, and then spent
-   * FIVE HOURS re-checking whether `ls` exists — 48 bash calls ending
-   * `ls /opt/homebrew/bin/ls`, `which ls find`, `ls /opt/homebrew/bin/unzip`,
-   * repeatedly. Zero delegations, zero files. "Close those unknowns one at a
-   * time" is a loop unless something says when to stop.
+   * MEASURED, run 14 (aborted at 4m06s; 58 tool calls, 0 files, 0 delegations).
+   * The veto fired and the research DID happen — 3 searches, a fetch of
+   * cloudconvert.com, an environment sweep that narrowed properly and found
+   * `7zz`. Then it slid: `which ls find` answered at call 28, re-asked at 47;
+   * `ls /opt/homebrew/bin/ls` and `ls /opt/homebrew/bin/unzip` each run twice
+   * byte-identical. It never wrote down what it was trying to learn, so no
+   * answer ever finished anything.
    */
-  it('says a handful of checks is enough and to come back', () => {
-    expect(STANDING_START_REFUSAL).toMatch(/A HANDFUL OF CHECKS IS ENOUGH/);
-    expect(STANDING_START_REFUSAL).toMatch(/come straight back here/);
-    expect(STANDING_START_REFUSAL).toMatch(/Do not keep checking/);
+  it('names the checklist, the tool that carries it, and a ceiling on it', () => {
+    expect(STANDING_START_REFUSAL).toMatch(/update_plan/);
+    expect(STANDING_START_REFUSAL).toMatch(/THREE TO SIX/);
+    expect(STANDING_START_REFUSAL).toMatch(/Questions, not build steps/);
   });
 
-  it('says the team finds out the rest, so partial knowledge is allowed', () => {
-    expect(STANDING_START_REFUSAL).toMatch(/the team finds out the rest/);
+  it('closes an answered question so it cannot be re-opened', () => {
+    expect(STANDING_START_REFUSAL).toMatch(/A done item is CLOSED/);
+    expect(STANDING_START_REFUSAL).toMatch(/Do not check it again/);
+  });
+
+  it('says an empty list means come back, and the team finds out the rest', () => {
+    expect(STANDING_START_REFUSAL).toMatch(/come\s+straight back here/);
+    expect(STANDING_START_REFUSAL).toMatch(/the team finds out the/);
+  });
+});
+
+describe('unknowns the CEO left open travel with the brief', () => {
+  const plan = (rows: readonly [string, PlanItem['status']][]): PlanItem[] =>
+    rows.map(([text, status], i) => ({ id: `s${i}`, text, status }));
+
+  it('reports only what is still open, in the CEO’s own words', () => {
+    expect(
+      openQuestionsFor(
+        plan([
+          ['What formats does it accept?', 'done'],
+          ['How does the queue page look?', 'pending'],
+          ['What happens on a failed convert?', 'in_progress'],
+        ]),
+      ),
+    ).toEqual(['How does the queue page look?', 'What happens on a failed convert?']);
+  });
+
+  it('is empty when there is no plan at all, so a CEO that kept none is not punished', () => {
+    expect(openQuestionsFor(null)).toEqual([]);
+    expect(openQuestionsFor(undefined)).toEqual([]);
+    expect(openQuestionsFor(plan([['Closed it', 'done']]))).toEqual([]);
+  });
+
+  it('puts them in the brief the manager receives, marked as assumption', async () => {
+    let seen = '';
+    const tool = register(
+      'max',
+      async (req) => {
+        seen = req.message;
+        return { ok: true, product: 'Built it.' };
+      },
+      {
+        otherToolCalls: () => 3,
+        getPlan: () =>
+          plan([
+            ['What formats does it accept?', 'done'],
+            ['How does the queue page look?', 'pending'],
+          ]),
+      },
+    );
+    const { ctx } = fakeCtx();
+    await tool.execute(
+      'c',
+      { message: 'Build LocalConvert', divisions: [] },
+      undefined,
+      undefined,
+      ctx,
+    );
+    expect(seen).toContain('Build LocalConvert');
+    expect(seen).toContain('How does the queue page look?');
+    expect(seen).toContain('treat the brief as an assumption');
+    // The closed one is not repeated back as an open question.
+    expect(seen).not.toContain('What formats does it accept?');
+  });
+
+  it('leaves the brief untouched when every question was closed', async () => {
+    let seen = '';
+    const tool = register(
+      'max',
+      async (req) => {
+        seen = req.message;
+        return { ok: true, product: 'Built it.' };
+      },
+      { otherToolCalls: () => 3, getPlan: () => plan([['Closed it', 'done']]) },
+    );
+    const { ctx } = fakeCtx();
+    await tool.execute('c', { message: 'Build it', divisions: [] }, undefined, undefined, ctx);
+    expect(seen).toBe('Build it');
   });
 });

@@ -1553,6 +1553,8 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
   registerCreateHierarchyTool(pi, {
     getEffort: () => runtime.config.effort,
     otherToolCalls: () => otherToolCalls,
+    // The CEO's unknowns checklist, so whatever it left open rides to the manager.
+    getPlan: () => runtime.plan,
   });
 
   // Permission gate. In reviewer mode a scary-bash command is flagged first by
