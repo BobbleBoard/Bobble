@@ -499,6 +499,34 @@ interface SubagentListProps {
  * clicking routes that worker's live stream to the app's left pane (the
  * row does not expand in place, so the expander chevron is suppressed in CSS).
  */
+
+/**
+ * WHY A ROW IS STILL — the word and the colour that go beside a stopped agent.
+ *
+ * the user: "they are stopped for a reason, so the reason could be red error, green
+ * completed and waiting, and yellow paused." Working returns null: that state
+ * already has a shimmer and a running clock, and a badge on top of them would
+ * be noise on the only row that needs no explanation.
+ */
+export function agentStopped(
+  state: OrgNodeView['state'],
+): { readonly word: string; readonly tone: 'done' | 'error' | 'paused' | 'waiting' } | null {
+  switch (state) {
+    case 'done':
+      return { word: 'done', tone: 'done' };
+    case 'blocked':
+      return { word: 'error', tone: 'error' };
+    case 'retired':
+      return { word: 'paused', tone: 'paused' };
+    case 'waiting':
+      return { word: 'waiting', tone: 'waiting' };
+    case 'idle':
+      return { word: 'queued', tone: 'waiting' };
+    default:
+      return null;
+  }
+}
+
 function SubagentList({ nodes, onSelectNode, selectedNodeId, nodeTiming, now }: SubagentListProps) {
   const ordered = orderSubagents(nodes);
   if (ordered.length === 0) {
@@ -535,6 +563,29 @@ function SubagentList({ nodes, onSelectNode, selectedNodeId, nodeTiming, now }: 
                 {working && elapsed !== undefined ? (
                   <span className="pd-sitroom-agent-timer" data-testid="subagent-timer">
                     {formatClock(elapsed)}
+                  </span>
+                ) : null}
+                {/*
+                 * WHY THIS ONE IS STOPPED. the user: "for each subagent, they are
+                 * stopped for a reason, so the reason could be red error, green
+                 * completed and waiting, and yellow paused… simple circles faint
+                 * tint or glow maybe, very faint, nothing complicated, to the
+                 * right of them and a 'waiting, done, error' whatever's
+                 * applicable."
+                 *
+                 * A row that is not working looks identical to every other row
+                 * that is not working, so "nothing is happening" has no answer on
+                 * screen. Nothing is shown while it IS working — that already has
+                 * the shimmer and the clock, and a badge there would be noise.
+                 */}
+                {agentStopped(node.state) !== null ? (
+                  <span
+                    className="pd-sitroom-agent-why"
+                    data-why={agentStopped(node.state)?.tone}
+                    data-testid="subagent-why"
+                  >
+                    <span className="pd-sitroom-agent-why-dot" aria-hidden />
+                    {agentStopped(node.state)?.word}
                   </span>
                 ) : null}
               </>

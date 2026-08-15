@@ -1473,8 +1473,13 @@ export function createMeshAgentHost(config: MeshAgentHostConfig): MeshAgentHost 
     seenTree.set(agentId, treeNow);
     const incoming =
       agent.role === 'manager'
-        ? `Message from ${from}:\n${body}\n\n${taskNote(config.task)}`
-        : `Message from ${from}:\n${body}`;
+        /* NO "Message from <x>:" HEADER. the user: "you can just totally remove that
+           header from the top of each message bubble it serves no purpose."
+           The sender is already on the row the message arrives in, and the line
+           was also what surfaced "Message from user:" inside a CEO-manager
+           bubble, where it read as the user having said it. */
+        ? `${body}\n\n${taskNote(config.task)}`
+        : body;
     let reply = '';
     /** Tool calls this turn — what tells a spent step budget apart from silence. */
     let toolCallCount = 0;

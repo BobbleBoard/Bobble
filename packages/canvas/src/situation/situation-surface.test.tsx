@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { render } from '../test-utils.tsx';
 import { buildMockCorpRunScript, MOCK_TASK_ID } from './mock-run.ts';
 import { initialSituation, reduceSituation, type SituationState } from './situation-model.ts';
-import { SituationRoomHost, SituationRoomSurface } from './situation-surface.tsx';
+import { agentStopped, SituationRoomHost, SituationRoomSurface } from './situation-surface.tsx';
 
 function foldTo(atMs: number): SituationState {
   let state = initialSituation(MOCK_TASK_ID);
@@ -241,5 +241,28 @@ describe('SituationRoomSurface — live per-subagent timer (D4)', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe('why a subagent row is still', () => {
+  /*
+   * the user: "for each subagent, they are stopped for a reason, so the reason could
+   * be red error, green completed and waiting, and yellow paused… to the right
+   * of them and a 'waiting, done, error' whatever's applicable."
+   *
+   * Every not-working row looked identical, so "nothing is happening" had no
+   * answer on screen.
+   */
+  it('names the reason, with a tone, for each stopped state', () => {
+    expect(agentStopped('done')).toEqual({ word: 'done', tone: 'done' });
+    expect(agentStopped('blocked')).toEqual({ word: 'error', tone: 'error' });
+    expect(agentStopped('retired')).toEqual({ word: 'paused', tone: 'paused' });
+    expect(agentStopped('waiting')).toEqual({ word: 'waiting', tone: 'waiting' });
+    expect(agentStopped('idle')).toEqual({ word: 'queued', tone: 'waiting' });
+  });
+
+  /* Working already has a shimmer and a clock; a badge there is noise. */
+  it('says nothing about a row that is working', () => {
+    expect(agentStopped('working')).toBeNull();
   });
 });

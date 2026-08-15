@@ -249,6 +249,22 @@ interface WorkspaceNavItem {
   testid: string;
 }
 
+
+/**
+ * The colour that goes with a child row's state word. Derived from the WORD so
+ * this and the situation room cannot drift apart — one vocabulary, two surfaces.
+ * `undefined` means no dot: working and anything unrecognised stay plain, since
+ * a running row already has a spinner.
+ */
+function statusTone(label: string): 'done' | 'error' | 'paused' | 'waiting' | undefined {
+  const w = label.trim().toLowerCase();
+  if (w.startsWith('done') || w.startsWith('finish')) return 'done';
+  if (w.startsWith('error') || w.startsWith('fail') || w.startsWith('block')) return 'error';
+  if (w.startsWith('paus') || w.startsWith('stopp') || w.startsWith('stepped')) return 'paused';
+  if (w.startsWith('wait') || w.startsWith('queue') || w.startsWith('idle')) return 'waiting';
+  return undefined;
+}
+
 /** Stylized isometric cube — the 3D Studio modality glyph. */
 function ModalityCube({ size = 16 }: { size?: number }): ReactNode {
   return (
@@ -806,7 +822,17 @@ export function SessionSidebar({
                     without saying what. The spinner keeps its own job (liveness);
                     the word carries the state. */}
                 {c.statusLabel !== undefined ? (
-                  <span className="pd-child-row-status">{c.statusLabel}</span>
+                  /* The word was already here; the DOT is what the user asked for —
+                     "red error, green completed and waiting, and yellow paused…
+                     simple circles faint tint or glow maybe, very faint". Tone
+                     comes off the word itself so the sidebar and the situation
+                     room cannot disagree about what colour a state is. */
+                  <span className="pd-child-row-status" data-why={statusTone(c.statusLabel)}>
+                    {statusTone(c.statusLabel) !== undefined ? (
+                      <span className="pd-child-row-dot" aria-hidden />
+                    ) : null}
+                    {c.statusLabel}
+                  </span>
                 ) : null}
                 {c.running ? (
                   <Spinner size={12} />

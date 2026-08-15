@@ -133,23 +133,22 @@ export const CREATE_PRODUCTION_HIERARCHY_TOOL: OpenAiFunctionTool = {
       'what the thing IS, what it contains, how it should look and feel, and what would make ' +
       'it good; leave how to build it to the team. ' +
       /*
-       * FIND OUT BEFORE YOU BRIEF. the user: "I want to incentivize some sort of
-       * research and ideally get it to commission something that goes and grabs
-       * [a reference]… but of course not overfitting to the task."
-       *
-       * So this names no domain and no artifact type — not UI, not cloning, not
-       * "if you are copying something". The general property is that a brief
-       * written from guesses produces a build made of guesses, and the CEO is
-       * the only one who can close its own unknowns: the manager has not spoken
-       * to the user and knows only what it is told. Anything concrete the CEO
-       * can attach — a page it read, a file it found, a picture of the real
-       * thing — is worth more to a 4B engineer than a paragraph of adjectives.
+       * the user's wording, VERBATIM. He wrote it after watching a CEO brief a
+       * manager from adjectives alone; the phrasing is his because the point is
+       * his — an unknown you did not close is a decision handed to a 4B engineer
+       * with less context than you have.
        */
-      'BEFORE YOU SEND IT: anything you would otherwise be guessing at, find out first. ' +
-      'Look it up, look at whatever already exists that does this, and put what you find ' +
-      'INTO the brief — a link, a page you read, a file, a picture. If finding out is a job ' +
-      'in itself, say so in the brief and ask the manager to put someone on it before the ' +
-      'build starts. A vision written from guesses gets built from guesses.',
+      'From the user prompt, think of all the unknowns you have, and don\'t guess, get ' +
+      'concrete. The user asks for something to look a certain way, function a certain way, ' +
+      'maybe even feel a certain way, or maybe like something else. Do you know what they ' +
+      'mean? Do you have a visual? They ask for something to perform or function like ' +
+      'something else — do you know what they\'re referencing? All the unknowns: they say a ' +
+      'name you don\'t recognize, something you don\'t quite understand — don\'t ask the user, ' +
+      'research it, commission specialists, get informed, and then brief the manager so they ' +
+      'can focus on building exactly what you asked for, concretely. Attach any relevant ' +
+      'files to the brief that will be useful: assets, references, pieces, rough drafts, ' +
+      'block-outs, concepts. The more comprehensive and better you make your brief, the ' +
+      'better the result you get will be.',
     parameters: {
       type: 'object',
       properties: {
@@ -162,6 +161,14 @@ export const CREATE_PRODUCTION_HIERARCHY_TOOL: OpenAiFunctionTool = {
         reason: {
           type: 'string',
           description: 'Optional: why this needs a team rather than a single pass.',
+        },
+        files: {
+          type: 'array',
+          items: { type: 'string' },
+          description:
+            'Paths to files or folders that belong WITH this brief — references, assets, ' +
+            'drafts, concepts, anything you gathered while getting informed. The team can ' +
+            'open these; a real file is worth more to them than a description of one.',
         },
         divisions: {
           type: 'array',

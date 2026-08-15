@@ -2020,3 +2020,36 @@ body {
   font-size: var(--pd-font-size-caption);
   color: var(--pd-status-danger-fg);
 }
+
+/* The state dot on a nested subagent row — same vocabulary and same colours as
+   the situation room's, so the two surfaces cannot disagree. the user: "very faint,
+   nothing complicated". Working keeps no dot: it has the spinner already. */
+.pd-child-row-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.pd-child-row-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.75;
+}
+
+.pd-child-row-status[data-why='done'] {
+  color: var(--pd-status-success-fg);
+}
+.pd-child-row-status[data-why='error'] {
+  color: var(--pd-status-danger-fg);
+}
+.pd-child-row-status[data-why='paused'] {
+  color: var(--pd-status-warning-fg);
+}
+/* waiting/queued keeps the inherited muted colour — it is the normal state. */
+
+.pd-child-row-status[data-why='error'] .pd-child-row-dot,
+.pd-child-row-status[data-why='paused'] .pd-child-row-dot {
+  box-shadow: 0 0 5px currentColor;
+}
