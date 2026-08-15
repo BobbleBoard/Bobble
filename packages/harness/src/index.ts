@@ -101,6 +101,7 @@ import { detectOpenedApp, openedAppNote } from './tools/opened-app.js';
 import { registerPlanTool } from './tools/plan-tool.js';
 import { registerPresentTool } from './tools/present.js';
 import { presentBridgeFromEnv } from './tools/present-bridge.js';
+import { withRepeatNotice } from './tools/repeat-notice.js';
 import { registerSandboxFileTools, resolveWorkspaceRoot } from './tools/sandbox-fs.js';
 import { truncateToolOutput } from './tools/tool-output-truncate.js';
 import { captureRegisteredTools } from './tools/tool-registry.js';
@@ -1303,13 +1304,21 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
    * The static value is irrelevant anyway: the spawnHook rewrites cwd on every
    * command, and by the time one runs the workspace has been set.
    */
+  /*
+   * `withRepeatNotice` is outermost so it sees the FINAL arguments (after the
+   * background rewrite and the timeout default) and the final result — the two
+   * things whose identity it is asserting.
+   */
   pi.registerTool(
-    withDefaultTimeout(
-      withBackgroundOption(
-        createBashToolDefinition(process.cwd(), {
-          spawnHook: (c) => ({ ...c, cwd: liveRoot(), env: cleanChildEnv(c.env) }),
-        }),
+    withRepeatNotice(
+      withDefaultTimeout(
+        withBackgroundOption(
+          createBashToolDefinition(process.cwd(), {
+            spawnHook: (c) => ({ ...c, cwd: liveRoot(), env: cleanChildEnv(c.env) }),
+          }),
+        ),
       ),
+      'bash',
     ) as never,
   );
 
