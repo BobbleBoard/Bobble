@@ -32,6 +32,7 @@ export function AssistantGroup({
   tps,
   onOpenFile,
   suppressInlineArtifacts = false,
+  live,
 }: {
   group: AssistantMsg[];
   resultByCallId: Map<string, ToolResultMsg>;
@@ -49,8 +50,28 @@ export function AssistantGroup({
    * chat leaves this false and renders widgets inline (THEME 2), unchanged.
    */
   suppressInlineArtifacts?: boolean;
+  /**
+   * This agent is mid-turn RIGHT NOW, per whoever owns its state. Overrides the
+   * per-message `isStreaming` derivation, which a reconstructed transcript
+   * cannot supply. Omit in the ordinary chat, where the live slice sets it.
+   */
+  live?: boolean;
 }): ReactNode {
-  const streaming = group.some((m) => m.isStreaming === true);
+  /*
+   * A RECONSTRUCTED TRANSCRIPT HAS NO isStreaming, AND THAT READ AS FINISHED.
+   *
+   * `isStreaming` is set by the live pi slice. A corp role's chat is built from
+   * a fetched SNAPSHOT of its session (`transcriptToAssistantView`), so no
+   * message carries it — `streaming` came out false, `active` reached the chain
+   * as false, and the terminal "Done" row printed the moment the rows went
+   * quiet. the user, with the situation room saying "Engineer 1 working… 1:36"
+   * beside a chat reading Done: "premature 'done' in the UI while still
+   * working… done is a final thing. This tool chain is DONE."
+   *
+   * `live` lets a caller that KNOWS the agent is mid-turn say so — driving Done
+   * from the node's state rather than from rows happening to be still.
+   */
+  const streaming = live ?? group.some((m) => m.isStreaming === true);
   // Owner-scoped result per tool-call id (avoids a bare-id collision with a
   // provider-reused toolCallId in a later user turn).
   const resultForBlock = new Map<string, ToolResultMsg>();

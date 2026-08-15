@@ -137,6 +137,10 @@ export function CorpWorkerFeed({
            came to show tool rows with no output while the chat showed them in
            full. One component now, so a fix lands on every agent's view. */
         <AgentTranscript
+          /* Done is driven by the NODE's state, not by rows going quiet: a
+             fetched transcript has no isStreaming, so a working engineer's chat
+             used to print "Done" between tool calls. */
+          live={nodeState === 'working'}
           messages={[...view.group, ...view.resultByCallId.values()]}
           suppressInlineArtifacts
           /* A corp role's incoming turns are BRIEFINGS, not things the person

@@ -72,6 +72,12 @@ export interface AgentTranscriptProps {
   readonly messages: readonly ChatMsg[];
   /** Tool calls still running — drives the shimmering live row. */
   readonly runningToolCalls?: readonly string[];
+  /**
+   * This agent is mid-turn RIGHT NOW, per its node state. A fetched transcript
+   * carries no `isStreaming`, so without this the chain reads as finished and
+   * prints "Done" over a working agent (see AssistantGroup).
+   */
+  readonly live?: boolean;
   /** Keep html/svg fences out of the thread (the corp routes them to the canvas). */
   readonly suppressInlineArtifacts?: boolean;
   readonly onOpenFile?: (path: string) => void;
@@ -86,6 +92,7 @@ export interface AgentTranscriptProps {
 export function AgentTranscript({
   messages,
   runningToolCalls,
+  live,
   suppressInlineArtifacts,
   onOpenFile,
   empty,
@@ -122,6 +129,9 @@ export function AgentTranscript({
               resultByCallId={resultByCallId}
               runningToolCalls={[...(runningToolCalls ?? [])]}
               tps={undefined}
+              /* Only the LAST group can be the one in flight; earlier groups are
+                 settled history and must keep their own Done. */
+              {...(live === true && i === items.length - 1 ? { live: true } : {})}
               {...(suppressInlineArtifacts === true ? { suppressInlineArtifacts: true } : {})}
               {...(onOpenFile !== undefined ? { onOpenFile } : {})}
             />
