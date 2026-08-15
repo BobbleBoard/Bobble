@@ -657,6 +657,82 @@ const QWEN36_27B_MTP: CatalogModel = {
   quantRange: 'Q3–Q8 + UD + IQ',
 };
 
+/**
+ * Qwen3.8 27B — the 24GB-tier intelligence pick, released 2026-08-14.
+ *
+ * MEASURED from the GGUF's own metadata (`gguf-dump` of UD-Q3_K_XL), because
+ * this generation is not shaped like the last one:
+ *
+ *   general.architecture      = qwen35   (llama.cpp's arch id for the family)
+ *   qwen35.block_count        = 65
+ *   qwen35.nextn_predict_layers = 1      → the MTP head is EMBEDDED (blk.64.nextn.*)
+ *   qwen35.attention.head_count_kv = 4
+ *   qwen35.full_attention_interval = 4   ┐ hybrid: full attention every 4th layer,
+ *   qwen35.ssm.{state_size,inner_size…}  ┘ SSM state in between
+ *   qwen35.context_length     = 262144
+ *
+ * The hybrid SSM layers matter for sizing: only every fourth block holds a
+ * growing KV cache, so the real footprint is well under what `estimateRamGB`'s
+ * dense-attention heuristic predicts. The heuristic errs toward "too big",
+ * which is the safe direction, so it is left alone rather than special-cased.
+ *
+ * QUANTS. UD-Q3_K_XL (13.4 GB) is the entry a 24 GB Mac actually wants — with a
+ * 64k window it lands ≈18.5 GB of a 19.2 GB budget. UD-Q4_K_XL (17.9 GB) does
+ * NOT fit here despite being the family's usual default, which is exactly the
+ * case the Model Manager's per-quant fit badge exists to show.
+ *
+ * CHAT TEMPLATE. the user: "use this chat template", froggeric's Qwen-Fixed set (v22,
+ * 2026-08-13, covers 3.5/3.6/3.8). It ships `chat_template.jinja` at the repo
+ * root, which is precisely what `baseRepo` fetches — the field is documented as
+ * "the repo that carries the authoritative chat_template.jinja", not necessarily
+ * the base MODEL repo. It fixes KV-cache invalidation, empty-think poisoning and
+ * a tool-argument parse crash; the first of those is the recurring TTFT killer
+ * here, so it is not a cosmetic choice.
+ */
+const QWEN38_27B_MTP: CatalogModel = {
+  id: 'qwen3.8-27b-mtp',
+  displayName: 'Qwen3.8 27B (MTP)',
+  hfRepo: 'unsloth/Qwen3.8-27B-GGUF',
+  baseRepo: 'froggeric/Qwen-Fixed-Chat-Templates',
+  files: [
+    {
+      name: 'Qwen3.8-27B-UD-Q3_K_XL.gguf',
+      bytes: 13_441_059_904,
+      quant: 'UD-Q3_K_XL',
+      sha256: '00cf92e666c6af6566996c38c89a44ccdb6449ea25ef0f112a452c853b2a71e2',
+    },
+    {
+      name: 'Qwen3.8-27B-UD-Q2_K_XL.gguf',
+      bytes: 10_676_423_744,
+      quant: 'UD-Q2_K_XL',
+      sha256: '46151b52a5cad673d90a00222103254864326c251130b8fc4381d6f34386b3c8',
+    },
+  ],
+  mmproj: {
+    name: 'mmproj-F16.gguf',
+    bytes: 927_607_488,
+    quant: 'F16',
+    sha256: 'cbb841a9ee0636b2ec172f5bb8df2ea8dfeb01e90fe7c6126581d662a0b4e43e',
+  },
+  mtpEmbedded: true,
+  spec: 'mtp',
+  /* MTP only. The DSpark / DFlash / EAGLE-3 repos that exist for this model are
+     community re-uploads in non-GGUF formats today; naming one here would
+     advertise a launch that cannot resolve. */
+  variants: [{ method: 'mtp', embedded: true }],
+  license: 'Apache-2.0',
+  minRamGB: 24,
+  /* The model allows 256k. This is what a 24 GB machine can actually hold, and
+     `chooseContextCap` steps down from here anyway. */
+  contextWindow: 65_536,
+  input: ['text', 'image'],
+  verified: true,
+  engine: 'llamacpp',
+  publisher: UNSLOTH,
+  tier: 'intelligent',
+  quantRange: 'Q2–Q8 + UD + IQ',
+};
+
 const QWEN36_35B_A3B_MTP: CatalogModel = {
   id: 'qwen3.6-35b-a3b-mtp',
   displayName: 'Qwen3.6 35B-A3B (MTP)',
@@ -857,6 +933,7 @@ export const CATALOG: readonly CatalogModel[] = [
   QWEN36_27B_MTP,
   QWEN36_35B_A3B_MTP,
   QWEN36_27B_EAGLE3,
+  QWEN38_27B_MTP,
   NEMOTRON3_NANO_30B_A3B,
   MLX_QWEN35_4B,
   MLX_QWEN35_9B,
