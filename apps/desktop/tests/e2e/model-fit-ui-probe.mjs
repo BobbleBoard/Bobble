@@ -223,6 +223,57 @@ try {
   } else {
     console.log('  --   delete dialog not checked (model not downloaded in this HOME)');
   }
+  /*
+   * ── The chat-screen download indicator, LOOKED AT ────────────────────────
+   * The real 13 GB download proved the TEXT was right ("43%1m 48s left") but I
+   * never saw it rendered. Injected through the store hook so the pixels can be
+   * checked without another multi-gigabyte transfer — the numbers below are the
+   * real ones observed mid-download.
+   */
+  await page.click('[data-testid="settings-back"]').catch(() => {});
+  await page.waitForSelector('[data-testid="composer-input"]', { timeout: 10000 });
+  await page.evaluate(() => {
+    window.__llm_store?.().getState().applyDownloadProgress({
+      modelId: 'qwen3.8-27b-mtp',
+      file: 'Qwen3.8-27B-UD-Q3_K_XL.gguf',
+      received: 5_800_000_000,
+      total: 13_441_059_904,
+      fraction: 0.43,
+      fileIndex: 0,
+      fileCount: 2,
+      jobReceived: 5_800_000_000,
+      jobTotal: 14_368_667_392,
+    });
+  });
+  await page.waitForTimeout(400);
+  // A second sample so a rate (and therefore an ETA) can be derived.
+  await page.evaluate(() => {
+    window.__llm_store?.().getState().applyDownloadProgress({
+      modelId: 'qwen3.8-27b-mtp',
+      file: 'Qwen3.8-27B-UD-Q3_K_XL.gguf',
+      received: 6_200_000_000,
+      total: 13_441_059_904,
+      fraction: 0.46,
+      fileIndex: 0,
+      fileCount: 2,
+      jobReceived: 6_200_000_000,
+      jobTotal: 14_368_667_392,
+    });
+  });
+  await page.waitForTimeout(600);
+  const footer = page.locator('[data-testid="footer-download"]');
+  check((await footer.count()) > 0, 'the chat screen shows a download indicator');
+  if ((await footer.count()) > 0) {
+    const text = (await footer.textContent())?.trim() ?? '';
+    console.log(`footer indicator: "${text}"`);
+    check(/\d+%/.test(text), `the indicator carries a percentage ("${text}")`);
+    await page.screenshot({ path: path.join(OUT, '8-footer-download.png') });
+    const box = await footer.boundingBox();
+    check(
+      box !== null && box.width > 60 && box.height > 8,
+      `the indicator has real size on screen (${JSON.stringify(box)})`,
+    );
+  }
 } finally {
   await app.close().catch(() => {});
 }
