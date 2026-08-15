@@ -87,7 +87,7 @@ describe('finalCheck', () => {
     /* Wording sharpened after run 6 — it now puts the CEO IN the user's chair
        ("You are now THE USER") rather than beside it ("read this as the user
        will"), because reading-as was satisfied by an `ls`. */
-    expect(ceo).toContain('standing in for them');
+    expect(ceo).toContain('Drive the finished product');
     /* The CEO path is now a flat list; its verbs live in the bullets. */
     expect(ceo).toContain('Go through the ENTIRE project');
     expect(ceo).toContain('build me a platformer');
@@ -157,12 +157,21 @@ describe('the CEO check is a flat list, in the order that matters', () => {
   });
 
   it('casts the CEO as the user about to try it', () => {
-    /* the user: "the ceo is not the user, but they should test in the shoes of the
-       end user via automation and visually if applicable". Roleplay invited a
-       claim of having looked; standing in for them is a job with a method. */
-    expect(ceo()).toMatch(/You are not the user, but you are standing in for them/);
-    expect(ceo()).toMatch(/by automation where you can/);
-    expect(ceo()).toMatch(/ENTIRE project, not a sample/);
+    /*
+     * the user: "the ceo is not the user, but they should test in the shoes of the
+     * end user via automation and visually if applicable."
+     *
+     * The METHOD is what survives. This said "You are now THE USER" (roleplay —
+     * cheap to assert, impossible to check), then briefly "You are not the user,
+     * but you are standing in for them", which the user cut: it negates a belief the
+     * model never held and is preamble where the bullets already carry the work.
+     * Neither identity claim earns its tokens at 4B.
+     */
+    expect(ceo()).toMatch(/Drive the finished product the way a real user would/);
+    expect(ceo()).toMatch(/by automation where/);
+    expect(ceo()).toMatch(/ENTIRE project, not a/);
+    expect(ceo()).not.toMatch(/You are (now )?(the|THE) USER/);
+    expect(ceo()).not.toMatch(/standing in for them/);
   });
 
   it('routes anything wrong back to the manager instead of fixing it', () => {

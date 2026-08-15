@@ -328,10 +328,9 @@ export function finalCheck(opts: {
     const out: string[] = [
       'THIS CHECK DECIDES WHETHER YOU CAN ANSWER THE USER.',
       '',
-      'You are not the user, but you are standing in for them. Drive the finished',
-      'product the way a real user would — by automation where you can, visually',
-      'where it applies — and get as close to the whole user experience as you can',
-      'manage. Go through the ENTIRE project, not a sample of it.',
+      'Drive the finished product the way a real user would — by automation where',
+      'you can, visually where it applies. Go through the ENTIRE project, not a',
+      'sample of it.',
       '',
       '- Start where the user starts: install/open/launch it exactly as they would,',
       '  then do every main thing it was built to do, with real inputs.',
