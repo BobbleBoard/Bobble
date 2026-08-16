@@ -1029,7 +1029,13 @@ async function startServerExclusive(
     await writeModelsJson(
       MODELS_JSON,
       PROVIDER_NAME,
-      buildProviderBlock(model, { baseUrl, servedModelId: model.id }),
+      /* Tell pi the window the SERVER has, not the one the catalog wishes for —
+         `chooseContextCap` may have stepped it down. See launchedContextWindow. */
+      buildProviderBlock(model, {
+        baseUrl,
+        servedModelId: model.id,
+        launchedContextWindow: contextWindow,
+      }),
     );
 
     emitStatus();

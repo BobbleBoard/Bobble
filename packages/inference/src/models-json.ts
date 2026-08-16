@@ -54,6 +54,25 @@ export interface BuildProviderBlockOptions {
   readonly servedModelId?: string;
   /** Cap on output tokens (defaults to contextWindow - 4096, min 1024). */
   readonly maxTokens?: number;
+  /**
+   * The context the server ACTUALLY launched with (`-c`), when it differs from
+   * the catalog's declared maximum.
+   *
+   * THIS KILLED BOTH 27B RUNS. `chooseContextCap` steps the window down to fit
+   * the machine — 64k → 48k for Qwen3.8-27B once the projector is counted — but
+   * this block kept declaring the CATALOG number. So models.json told pi
+   * `contextWindow: 65536` while llama-server was running `-c 49152`.
+   *
+   * pi then grows the prompt toward 64k and, with its default 16,384-token
+   * reserve, would first consider compacting at 65536 − 16384 = 49152 — which is
+   * EXACTLY where the server runs out. The server truncates the generation
+   * before pi ever reaches its own threshold, so compaction never fires at all:
+   * run 17 logged zero compaction events and died at `tot=49152` with a
+   * 1,984-token reply. Run 16 died the same way.
+   *
+   * A model told it has more room than it has cannot manage the room it has.
+   */
+  readonly launchedContextWindow?: number;
 }
 
 /**
@@ -65,7 +84,12 @@ export function buildProviderBlock(
   model: CatalogModel,
   opts: BuildProviderBlockOptions,
 ): ProviderBlock {
-  const maxTokens = opts.maxTokens ?? Math.max(1024, model.contextWindow - 4096);
+  /* The real ceiling, never the aspirational one — see launchedContextWindow. */
+  const contextWindow =
+    opts.launchedContextWindow !== undefined && opts.launchedContextWindow > 0
+      ? Math.min(opts.launchedContextWindow, model.contextWindow)
+      : model.contextWindow;
+  const maxTokens = opts.maxTokens ?? Math.max(1024, contextWindow - 4096);
   return {
     baseUrl: opts.baseUrl,
     api: 'llamacpp-stream',
@@ -82,7 +106,7 @@ export function buildProviderBlock(
         id: opts.servedModelId ?? model.id,
         name: model.displayName,
         input: [...model.input],
-        contextWindow: model.contextWindow,
+        contextWindow,
         maxTokens,
       },
     ],

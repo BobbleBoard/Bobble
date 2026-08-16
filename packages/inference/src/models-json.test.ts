@@ -77,3 +77,55 @@ describe('models-json', () => {
     expect(parsed.providers.llamacpp?.models[0]?.id).toBe('served-id');
   });
 });
+
+describe('the declared context window is the one the SERVER has', () => {
+  /*
+   * THIS KILLED BOTH 27B RUNS. `chooseContextCap` steps the window down to fit
+   * the machine (64k → 48k for Qwen3.8-27B once the projector is counted), but
+   * this block kept declaring the CATALOG number — so models.json said 65536
+   * while llama-server ran `-c 49152`.
+   *
+   * pi grows the prompt toward 64k and, with its 16,384-token reserve, first
+   * considers compacting at 65536 − 16384 = 49152 — EXACTLY the server's
+   * ceiling. The server truncates first, so compaction never fires: run 17
+   * logged zero compaction events and died at tot=49152 with a 1,984-token
+   * reply. Run 16 died identically.
+   */
+  const model = {
+    id: 'qwen3.8-27b-mtp',
+    displayName: 'Qwen3.8 27B (MTP)',
+    hfRepo: 'unsloth/Qwen3.8-27B-GGUF',
+    contextWindow: 65_536,
+    input: ['text', 'image'],
+  } as never;
+
+  it('declares the LAUNCHED window when the cap stepped it down', () => {
+    const block = buildProviderBlock(model, {
+      baseUrl: 'http://127.0.0.1:8080/v1',
+      launchedContextWindow: 49_152,
+    });
+    expect(block.models[0]?.contextWindow).toBe(49_152);
+  });
+
+  it('derives maxTokens from the REAL window, not the catalog one', () => {
+    const block = buildProviderBlock(model, {
+      baseUrl: 'http://127.0.0.1:8080/v1',
+      launchedContextWindow: 49_152,
+    });
+    // 61440 (the old value) would let pi ask for more output than the server has.
+    expect(block.models[0]?.maxTokens).toBe(49_152 - 4096);
+  });
+
+  it('falls back to the catalog window when nothing was launched', () => {
+    const block = buildProviderBlock(model, { baseUrl: 'http://127.0.0.1:8080/v1' });
+    expect(block.models[0]?.contextWindow).toBe(65_536);
+  });
+
+  it('never declares MORE than the model actually supports', () => {
+    const block = buildProviderBlock(model, {
+      baseUrl: 'http://127.0.0.1:8080/v1',
+      launchedContextWindow: 131_072,
+    });
+    expect(block.models[0]?.contextWindow).toBe(65_536);
+  });
+});
