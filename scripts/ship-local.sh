@@ -56,4 +56,31 @@ ditto "$APP_SRC" "$DEST"
 (cd apps/desktop && node tests/e2e/packaged-probe.mjs "$DEST")
 (cd apps/desktop && node tests/e2e/packaged-smoke.mjs "$DEST")
 
+# CLEAN UP THE ORPHAN THIS SCRIPT JUST MADE.
+#
+# Booting the app auto-starts the last-selected model, and packaged-smoke ends
+# with `child.kill('SIGKILL')` — no handler runs, so the llama-server grandchild
+# is reparented to init and keeps the whole model resident. MEASURED after a ship
+# on 2026-08-16: one orphaned 27B server, free memory 10%, and the next thing to
+# want the GPU died with "Compute error". It looked like a model bug. It was this.
+#
+# The app reaps orphans on LAUNCH (electron/inference/reap-orphans.ts, which owns
+# the real selection rule and is unit-tested). That covers a user opening Bobble;
+# it does nothing for the window between this script exiting and the next launch,
+# which is exactly when someone runs a benchmark and measures a ghost. So the
+# script that creates the orphan disposes of it, rather than leaving it for the
+# next process to trip over.
+#
+# Deliberately narrow: only llama-server, only from our own cache root, only
+# reparented to init (ppid 1). A server owned by a LIVE app always has a live
+# parent, so a running Bobble is never touched.
+LLAMA_ROOT="$HOME/.cache/pi-desktop/llamacpp"
+orphans=$(ps -axo pid=,ppid=,command= \
+  | awk -v root="$LLAMA_ROOT" '$2 == 1 && index($0, "llama-server") && index($0, root) { print $1 }')
+if [ -n "$orphans" ]; then
+  # shellcheck disable=SC2086
+  kill -9 $orphans 2>/dev/null || true
+  echo "ship-local: reaped orphaned llama-server(s) left by the smoke test: $(echo $orphans | tr '\n' ' ')"
+fi
+
 echo "ship-local: installed $(defaults read "$DEST/Contents/Info" CFBundleShortVersionString 2>/dev/null || echo '?') → $DEST"
