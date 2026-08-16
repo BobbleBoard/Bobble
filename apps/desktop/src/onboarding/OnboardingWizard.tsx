@@ -6,6 +6,7 @@
 import { Button, Spinner } from '@pi-desktop/ui';
 import { useEffect } from 'react';
 import { cx } from './cx';
+import { SetupStep } from './SetupStep';
 import { CapabilitiesStep } from './steps/CapabilitiesStep';
 import { ExperienceStep } from './steps/ExperienceStep';
 import { ImportStep } from './steps/ImportStep';
@@ -27,6 +28,10 @@ const STEP_META: Record<(typeof ONBOARDING_STEPS)[number], { title: string; subt
     title: 'How much guidance?',
     subtitle: 'This sets the tutorial and your default permissions.',
   },
+  setup: {
+    title: 'Getting you running',
+    subtitle: 'We picked the fastest setup for this machine. Change any of it later.',
+  },
   capabilities: {
     title: 'What do you want to create?',
     subtitle: 'Switch on generation features. Installs happen later.',
@@ -45,6 +50,8 @@ function StepBody({ index }: { index: number }) {
       return <ExperienceStep />;
     case 'capabilities':
       return <CapabilitiesStep />;
+    case 'setup':
+      return <SetupStep />;
     default:
       return null;
   }

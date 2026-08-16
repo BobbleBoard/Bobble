@@ -29,6 +29,7 @@ export const ONBOARDING_STEPS = [
   'theme',
   'experience',
   'capabilities',
+  'setup',
 ] as const;
 export type OnboardingStepId = (typeof ONBOARDING_STEPS)[number];
 

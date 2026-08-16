@@ -45,22 +45,103 @@ const userDataDir = mkdtempSync(path.join(tmpdir(), 'pi-settings-udd-'));
 const app = await electron.launch({
   executablePath: electronBinary,
   args: [appRoot, `--user-data-dir=${userDataDir}`],
-  env: { ...process.env, PI_E2E: '1', PI_E2E_BACKGROUND: '1' },
+  /* PI_ONBOARDING=1 is the intended escape from the E2E onboarding skip
+     (import-main.ts returns firstRunComplete:true under PI_E2E without it), so
+     the probe can look at the first-run setup step it is here to check. */
+  env: { ...process.env, PI_E2E: '1', PI_E2E_BACKGROUND: '1', PI_ONBOARDING: '1' },
 });
 
 try {
   const page = await app.firstWindow();
   await page.waitForSelector('[data-testid="boot-state"]', { timeout: 20_000 });
+  /* Onboarding state does NOT live in userData, so a fresh --user-data-dir is
+     not enough: once any run finishes the wizard, later runs boot to chat and
+     the setup-step assertions silently never fire. Reset it explicitly so this
+     probe is repeatable. */
+  await page
+    .evaluate(() => window.piDesktop.invoke('onboarding:reset', undefined))
+    .catch(() => undefined);
+  await page.reload();
+  await page.waitForSelector('[data-testid="boot-state"]', { timeout: 20_000 });
+
+  /* The first-run tips overlay spans the window and eats clicks once onboarding
+     finishes. Hidden for the whole run — a probe concern; the tips have their
+     own probe. Added at load so it applies whenever they mount. */
+  await page.addStyleTag({
+    content: '[data-testid="first-run-tips"]{display:none !important}',
+  });
 
   // A fresh userData means onboarding; skip straight past it so the probe is
   // about the settings surface rather than the wizard.
+  // The first-run gate starts as 'loading' and resolves async; checking for the
+  // wizard immediately after boot-state races it and always finds nothing.
+  await page
+    .waitForSelector('[data-testid="onboarding-wizard"], [data-testid="composer-input"]', {
+      timeout: 20_000,
+    })
+    .catch(() => null);
   const onboarding = await page.$('[data-testid="onboarding-wizard"]');
   if (onboarding !== null) {
-    await page.evaluate(() =>
-      window.piDesktop.invoke('onboarding:set-state', { firstRunComplete: true }),
-    );
-    await page.reload();
-    await page.waitForSelector('[data-testid="boot-state"]', { timeout: 20_000 });
+    /*
+     * WALK TO THE SETUP STEP FIRST. It is the step that decides what a fresh
+     * install actually ends up running — the engine picked for this hardware,
+     * the 4B checkpoint, the agents found on the machine — so it is worth
+     * looking at before skipping onboarding away.
+     */
+    for (let i = 0; i < 10; i++) {
+      if ((await page.$('[data-testid="onboarding-setup"]')) !== null) break;
+      const next = await page.$('[data-testid="onboarding-next"]');
+      if (next === null) break;
+      // Steps gate Continue until a choice is made, so make one: click the first
+      // enabled option in the step body, then advance.
+      if (!(await next.isEnabled())) {
+        const picked = await page.evaluate(() => {
+          const body = document.querySelector('.pd-onboard-step');
+          if (body === null) return false;
+          const opt = [
+            ...body.querySelectorAll('button, [role="radio"], input[type="radio"]'),
+          ].find((el) => !el.hasAttribute('disabled'));
+          if (opt === undefined) return false;
+          opt.click();
+          return true;
+        });
+        if (!picked) break;
+        await page.waitForTimeout(200);
+      }
+      if (!(await next.isEnabled())) break;
+      await next.click();
+      await page.waitForTimeout(300);
+    }
+    const setup = await page.$('[data-testid="onboarding-setup"]');
+    if (setup === null) {
+      console.log('settings-float-probe: never reached the onboarding setup step');
+    } else {
+      await page.waitForTimeout(700);
+      await page.screenshot({ path: path.join(OUT, '00-onboarding-setup.png') });
+      const rows = await page.evaluate(() =>
+        ['setup-engine', 'setup-model', 'setup-harness'].map((id) => {
+          const el = document.querySelector(`[data-testid="${id}"]`);
+          return el === null
+            ? { id, missing: true }
+            : { id, phase: el.getAttribute('data-phase'), text: el.textContent.slice(0, 70) };
+        }),
+      );
+      for (const r of rows) {
+        assert(r.missing !== true, `onboarding setup step is missing ${r.id}`);
+        console.log(`  ${r.id} [${r.phase}] ${r.text}`);
+      }
+    }
+
+    // Finish through the wizard's own button rather than an IPC shortcut — the
+    // preload blocks unregistered channels, and this is the path a user takes.
+    const finish = await page.$('[data-testid="onboarding-finish"]');
+    if (finish !== null) await finish.click();
+    await page.waitForTimeout(1200);
+    /* The first-run tips overlay sits above the whole window after onboarding
+       and eats clicks. It is a multi-step card, so the probe hides it outright
+       rather than trying to click it away — this is a probe concern, and the
+       tips themselves are covered by their own probe. */
+    await page.waitForTimeout(300);
   }
   await page.waitForSelector('[data-testid="composer-input"]', { timeout: 20_000 });
   await page.screenshot({ path: path.join(OUT, '01-chat.png') });

@@ -94,7 +94,7 @@ export const ENGINES: readonly EngineSpec[] = [
   {
     id: 'dflash-mlx',
     name: 'MLX DFlash',
-    blurb: 'Fastest for a single chat — around 1.4-1.6x. Adds a 1.2 GB draft model.',
+    blurb: 'Fastest for a single chat — around 1.4-1.6x. Needs a draft model.',
     role: 'single-user',
     platforms: ['darwin'],
     requiresAppleSilicon: true,
