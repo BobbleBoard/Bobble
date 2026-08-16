@@ -33,6 +33,8 @@ const base: DesktopSettings = {
   advanced: DEFAULT_ADVANCED,
   chatOrg: { projects: [], assignments: {}, pinned: [], titles: {} },
   hideDeleteChatConfirm: false,
+  harnessId: 'pi-bundled',
+  harnessConfigPath: '',
 };
 
 describe('sliderToLevel / levelToSlider', () => {

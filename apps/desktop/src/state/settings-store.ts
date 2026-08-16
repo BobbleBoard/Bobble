@@ -50,6 +50,8 @@ const DEFAULTS: DesktopSettings = {
   advanced: DEFAULT_ADVANCED,
   chatOrg: { projects: [], assignments: {}, pinned: [], titles: {} },
   hideDeleteChatConfirm: false,
+  harnessId: 'pi-bundled',
+  harnessConfigPath: '',
 };
 
 function prefersDark(): boolean {
@@ -227,6 +229,30 @@ export function useEnginePreference(): EnginePreference {
 /** Persist the engine preference (no-op re-write is harmless). */
 export async function setEnginePreference(enginePreference: EnginePreference): Promise<void> {
   await useSettingsStore.getState().update({ enginePreference });
+}
+
+/**
+ * Which pi drives the chat, and the custom config path when the choice is
+ * `pi-custom`. Main resolves the actual binary at bridge construction
+ * (pi/pi-main.ts harnessBinPath), so persisting IS applying — for the next
+ * chat. An in-flight conversation keeps the pi it started with on purpose:
+ * swapping the binary underneath a live session would strand its state.
+ */
+export function useHarnessChoice(): { id: string; configPath: string } {
+  return useSettingsStore((s) => ({
+    id: s.settings.harnessId,
+    configPath: s.settings.harnessConfigPath,
+  }));
+}
+
+export async function setHarnessChoice(id: string, configPath?: string): Promise<void> {
+  await useSettingsStore
+    .getState()
+    .update(
+      configPath === undefined
+        ? { harnessId: id }
+        : { harnessId: id, harnessConfigPath: configPath },
+    );
 }
 
 /**

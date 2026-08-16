@@ -18,6 +18,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { HarnessDetected } from '../../../electron/ipc-contract';
 import { cx } from '../../onboarding/cx';
 import { useLlmStore } from '../../state/llm-store';
+import { setHarnessChoice, useHarnessChoice } from '../../state/settings-store';
 import {
   canDriveChat,
   connectScript,
@@ -55,8 +56,12 @@ function CopyBox({ text, testid }: { text: string; testid: string }) {
 export function HarnessPanel() {
   const [found, setFound] = useState<Record<string, HarnessDetected>>({});
   const [loading, setLoading] = useState(true);
-  const [selected, setSelected] = useState('pi-bundled');
-  const [customPath, setCustomPath] = useState('');
+  /* The choice is PERSISTED, not component state: main reads it when it builds
+     the next pi bridge, so a selection that lived only in React would look
+     applied and do nothing. */
+  const choice = useHarnessChoice();
+  const selected = choice.id;
+  const [customPath, setCustomPath] = useState(choice.configPath);
   const [expanded, setExpanded] = useState<string | null>(null);
 
   const status = useLlmStore((s) => s.status);
@@ -130,7 +135,9 @@ export function HarnessPanel() {
               type="button"
               data-testid={`harness-select-${spec.id}`}
               disabled={!selectable}
-              onClick={() => setSelected(spec.id)}
+              onClick={() =>
+                void setHarnessChoice(spec.id, spec.id === 'pi-custom' ? customPath : undefined)
+              }
               className={cx(
                 'shrink-0 rounded-lg border px-3 py-1.5 text-footnote transition-colors pd-focusable',
                 isSelected
@@ -159,7 +166,10 @@ export function HarnessPanel() {
           <input
             data-testid="harness-custom-path"
             value={customPath}
-            onChange={(e) => setCustomPath(e.target.value)}
+            onChange={(e) => {
+              setCustomPath(e.target.value);
+              if (selected === 'pi-custom') void setHarnessChoice('pi-custom', e.target.value);
+            }}
             placeholder="/path/to/your/pi/config.json"
             className="mt-2 w-full rounded-lg border border-border-default bg-bg-base px-2.5 py-1.5 text-footnote text-text-primary placeholder:text-text-muted pd-focusable"
           />
@@ -206,6 +216,9 @@ export function HarnessPanel() {
           </p>
         </div>
         {embedded.map(renderRow)}
+        <p className="text-footnote text-text-muted">
+          A change applies to your next chat — an open conversation keeps the pi it started with.
+        </p>
       </section>
 
       <section className="flex flex-col gap-2">

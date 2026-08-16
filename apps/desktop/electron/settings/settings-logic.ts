@@ -81,6 +81,8 @@ export const DEFAULT_SETTINGS: DesktopSettings = {
   advanced: DEFAULT_ADVANCED,
   chatOrg: { projects: [], assignments: {}, pinned: [], titles: {} },
   hideDeleteChatConfirm: false,
+  harnessId: 'pi-bundled',
+  harnessConfigPath: '',
 };
 
 function oneOf<T extends string>(value: unknown, allowed: readonly T[], fallback: T): T {
@@ -232,6 +234,8 @@ export function clampSettings(raw: unknown): DesktopSettings {
     favoriteModels: strArray(o.favoriteModels),
     modelEffortDefaults: effortMap(o.modelEffortDefaults),
     hfToken: str(o.hfToken, d.hfToken),
+    harnessId: str(o.harnessId, d.harnessId),
+    harnessConfigPath: str(o.harnessConfigPath, d.harnessConfigPath),
     experimentalProductionHarness: bool(
       o.experimentalProductionHarness,
       d.experimentalProductionHarness,

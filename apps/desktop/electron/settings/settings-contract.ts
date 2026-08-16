@@ -229,6 +229,16 @@ export interface DesktopSettings {
   chatOrg: ChatOrganization;
   /** Skip the delete-chat confirmation dialog (set via its "don't ask again"). */
   hideDeleteChatConfirm: boolean;
+  /**
+   * Which pi drives the chat (Settings -> Harness). `pi-bundled` is the default
+   * and means "whatever ships in the app"; `pi-system` resolves the one on PATH;
+   * `pi-custom` uses {@link harnessConfigPath}. External agents (Claude Code,
+   * Codex, ...) are never stored here — they are not something the app runs, so
+   * they cannot be a value for "the harness the app runs".
+   */
+  harnessId: string;
+  /** Absolute path to a custom pi config, used only when harnessId is pi-custom. */
+  harnessConfigPath: string;
 }
 
 /** A partial patch merged over the current document (one level deep on the
@@ -263,6 +273,8 @@ export interface DesktopSettingsPatch {
   advanced?: Partial<AdvancedSettings>;
   /** Full replacement of chat organization (renderer read-modify-writes it whole). */
   chatOrg?: ChatOrganization;
+  harnessId?: string;
+  harnessConfigPath?: string;
   /** Skip the delete-chat confirmation dialog. */
   hideDeleteChatConfirm?: boolean;
 }

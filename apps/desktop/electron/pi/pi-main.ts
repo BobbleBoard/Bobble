@@ -11,6 +11,8 @@ import { readFileSync } from 'node:fs';
 import type { PiBridgeEvent } from '@pi-desktop/engine';
 import { PiBridge } from '@pi-desktop/engine/main';
 import { createIpcEventSender, createLogger } from '@pi-desktop/shared';
+import { detectHarnesses } from '../inference/harness-main';
+import { readSettings } from '../settings/settings-main';
 import { app, type IpcMainInvokeEvent, ipcMain, type WebContents } from 'electron';
 import { resolveBundledPackageAsset } from '../app-paths';
 import { openStillWindow } from '../gen/hyperframes-window';
@@ -36,6 +38,28 @@ import { registerPresentBridge } from './present-bridge';
 import { installPiQuitHold } from './quit-hold';
 import { registerResumeIpc } from './resume-main';
 import { registerSubagentBridge } from './subagent-bridge';
+
+/**
+ * The pi binary the user chose, or undefined for the bundled one.
+ *
+ * `pi-system` deliberately resolves through the SAME search as harness
+ * detection rather than bare `pi`: a GUI app inherits launchd's PATH, so a bare
+ * name fails for exactly the user who has pi installed and working.
+ */
+function harnessBinPath(): string | undefined {
+  try {
+    const s = readSettings();
+    if (s.harnessId === 'pi-system') {
+      const found = detectHarnesses([{ id: 'pi-system', bin: 'pi' }])[0];
+      return found?.installed === true ? found.path : undefined;
+    }
+    // pi-custom points at a CONFIG, not a binary: the bundled pi still runs, it
+    // just reads the user's config. Handled via args, not binPath.
+    return undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 const log = createLogger('desktop:pi');
 const events = createIpcEventSender<AppEventMap>();
@@ -188,6 +212,17 @@ const sessions = createPiSessions<WebContents>({
         // subagent grandchildren too, not just the direct child (task #55): a
         // hard-kill otherwise strands orphaned subagent pi processes.
         detached: true,
+        /*
+         * WHICH pi (Settings -> Harness). `binPath` wins over PI_BIN and over
+         * the bundled CLI inside resolvePiSpawn, so setting it is the whole of
+         * "use a different pi" — no separate spawn path, no second code route
+         * that could drift from the bundled one.
+         *
+         * Resolved fresh on every bridge construction rather than captured at
+         * module load, so switching harness and starting a new chat picks the
+         * new binary up without a relaunch.
+         */
+        binPath: harnessBinPath(),
         // Bundled resolution root; PI_BIN (E2E/mock) and explicit binPath
         // still take precedence inside the engine.
         appRoot: app.getAppPath(),
