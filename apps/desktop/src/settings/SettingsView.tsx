@@ -1,33 +1,40 @@
 /**
- * The Settings + Model Manager surface: a full-window panel (replaces the chat
- * surface; the chat store persists underneath) with a left nav and a scrollable
- * content area. Reachable from the sidebar gear (opens a settings section) and
- * from the composer model chip (opens the Models section). Opening the surface
- * slides + fades it in (`.pd-settings-enter`), consistent with the app's panel
- * motion; reduced-motion drops the animation.
+ * Settings: a FLOATING, CENTERED panel over whatever view is behind it.
+ *
+ * It used to be a full-window surface that replaced the chat entirely. the user,
+ * with a screenshot of Unsloth's settings dialog: "I want the settings to be a
+ * not full window taking over thing, but instead floating panel center." So the
+ * chat (or the models view) stays visible behind a dimmed backdrop, and closing
+ * returns you exactly where you were rather than to a re-mounted chat.
+ *
+ * Model management is NOT in here any more — it is its own view that replaces
+ * the chat area (see ModelsView). The `models` section id survives in the union
+ * because the composer's model chip and the sidebar both address it; App routes
+ * that id to the standalone view instead of opening this panel.
  */
 import {
-  IconChevronLeft,
+  IconClose,
   IconConnector,
   IconPuzzle,
   IconSearch,
   IconSparkles,
   ScrollArea,
 } from '@pi-desktop/ui';
-import type { ReactNode } from 'react';
+import { type ReactNode, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { cx } from '../onboarding/cx';
 import { IconCpu, IconShield, IconSlider, IconSun } from './icons';
-import { ModelManagerPanel } from './ModelManagerPanel';
 import { AgentPanel } from './panels/AgentPanel';
 import { AppearancePanel } from './panels/AppearancePanel';
 import { CapabilitiesPanel } from './panels/CapabilitiesPanel';
 import { ConnectorsPanel } from './panels/ConnectorsPanel';
+import { EnginePanel } from './panels/EnginePanel';
 import { InterfacePanel } from './panels/InterfacePanel';
 import { PersonalizationPanel } from './panels/PersonalizationPanel';
 import { SearchPanel } from './panels/SearchPanel';
 
 export type SettingsSection =
   | 'models'
+  | 'engines'
   | 'personalization'
   | 'appearance'
   | 'interface'
@@ -36,9 +43,10 @@ export type SettingsSection =
   | 'connectors'
   | 'capabilities';
 
+/** Sections this panel renders. `models` is deliberately absent — it is a view. */
 const NAV: Array<{ id: SettingsSection; label: string; icon: ReactNode }> = [
   { id: 'personalization', label: 'Custom instructions', icon: <IconSparkles /> },
-  { id: 'models', label: 'Models', icon: <IconCpu /> },
+  { id: 'engines', label: 'Engines', icon: <IconCpu /> },
   { id: 'appearance', label: 'Appearance', icon: <IconSun /> },
   { id: 'interface', label: 'Interface', icon: <IconSlider /> },
   { id: 'agent', label: 'Agent', icon: <IconShield /> },
@@ -46,6 +54,18 @@ const NAV: Array<{ id: SettingsSection; label: string; icon: ReactNode }> = [
   { id: 'connectors', label: 'Connectors', icon: <IconConnector /> },
   { id: 'capabilities', label: 'Capabilities', icon: <IconPuzzle /> },
 ];
+
+const TITLES: Record<SettingsSection, string> = {
+  models: 'Models',
+  engines: 'Engines',
+  personalization: 'Custom instructions',
+  appearance: 'Appearance',
+  interface: 'Interface',
+  agent: 'Agent',
+  search: 'Web search',
+  connectors: 'Connectors',
+  capabilities: 'Capabilities',
+};
 
 function SectionBody({
   section,
@@ -60,7 +80,8 @@ function SectionBody({
 }) {
   switch (section) {
     case 'models':
-      return <ModelManagerPanel />;
+    case 'engines':
+      return <EnginePanel />;
     case 'personalization':
       return <PersonalizationPanel />;
     case 'appearance':
@@ -96,28 +117,77 @@ export function SettingsView({
   /** Clear the first-run flag + re-open the onboarding wizard (Interface panel). */
   onRedoOnboarding?: () => void;
 }) {
-  return (
-    <div className="pd-settings-enter flex h-full flex-col bg-bg-base" data-testid="settings-view">
-      {/* Empty draggable strip clearing the macOS traffic lights (the "Back to
-          chat" control moved to the bottom-left of the nav, round-6 img54). */}
-      <div className="h-10 shrink-0 [-webkit-app-region:drag]" />
+  const [query, setQuery] = useState('');
+  const titleId = useId();
+  const panelRef = useRef<HTMLDivElement>(null);
 
-      <div className="flex min-h-0 flex-1">
-        <nav className="flex w-52 shrink-0 flex-col border-r border-border-default px-2 pt-3 pb-2">
-          {/* Account/profile identity — mirrors the sidebar footer that opens
-              this surface. */}
-          <div
-            className="mb-2 flex items-center gap-2.5 rounded-lg px-3 py-2"
-            data-testid="settings-account"
-          >
-            <span className="pd-sidebar-avatar">B</span>
-            <span className="min-w-0">
-              <span className="block truncate text-body text-text-primary">Bobble</span>
-              <span className="block text-footnote text-text-muted">Local · signed out</span>
-            </span>
+  /* Escape closes, from anywhere in the panel — a floating dialog that can only
+     be dismissed by hitting a small X is the kind of thing that reads as broken. */
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        onClose();
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  // Move focus into the dialog on open so Escape and tabbing work without a click.
+  useEffect(() => {
+    panelRef.current?.focus();
+  }, []);
+
+  const nav = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return q.length === 0 ? NAV : NAV.filter((i) => i.label.toLowerCase().includes(q));
+  }, [query]);
+
+  return (
+    <div className="pd-settings-enter fixed inset-0 z-50 flex items-center justify-center p-6">
+      {/*
+       * The backdrop is a real BUTTON sitting behind the panel, not a div with a
+       * click handler. Same dismissal, but it is reachable and announced, and it
+       * cannot swallow a click that merely bubbled out of the panel — which the
+       * "is this my own event target" check was only approximating.
+       */}
+      {/* `--pd-bg-backdrop` / `--pd-blur-backdrop` are the same tokens the app's
+          dialogs dim with (packages/ui/styles/dialog.css), so this scrim tracks
+          the theme. A literal `bg-black/40` silently resolved to transparent in
+          this Tailwind config — MEASURED as rgba(0,0,0,0) on the real screen. */}
+      <button
+        type="button"
+        aria-label="Close settings"
+        data-testid="settings-backdrop"
+        onClick={onClose}
+        className="absolute inset-0 cursor-default bg-[var(--pd-bg-backdrop)] backdrop-blur-[var(--pd-blur-backdrop)]"
+      />
+      <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
+        data-testid="settings-view"
+        className="relative flex h-[min(640px,100%)] w-[min(920px,100%)] overflow-hidden rounded-2xl border border-border-default bg-bg-base shadow-2xl outline-none"
+      >
+        <nav className="flex w-56 shrink-0 flex-col border-r border-border-default bg-bg-sunken px-2 py-3">
+          <div className="px-1 pb-2">
+            <label className="sr-only" htmlFor={`${titleId}-search`}>
+              Search settings
+            </label>
+            <input
+              id={`${titleId}-search`}
+              data-testid="settings-search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search settings…"
+              className="w-full rounded-lg border border-border-default bg-bg-base px-2.5 py-1.5 text-body text-text-primary placeholder:text-text-muted pd-focusable"
+            />
           </div>
 
-          {NAV.map((item) => (
+          {nav.map((item) => (
             <button
               key={item.id}
               type="button"
@@ -135,30 +205,49 @@ export function SettingsView({
               {item.label}
             </button>
           ))}
+          {nav.length === 0 ? (
+            <p className="px-3 py-2 text-footnote text-text-muted">No matching settings.</p>
+          ) : null}
 
-          {/* Back to chat: a proper button pinned to the BOTTOM-left of the nav
-              (round-6 img54) — a bordered secondary action, not raw blue link. */}
-          <button
-            type="button"
-            data-testid="settings-back"
-            onClick={onClose}
-            className="mt-auto flex w-full items-center gap-2 rounded-lg border border-border-default px-3 py-2 text-left text-body text-text-secondary transition-colors hover:bg-bg-hover hover:text-text-primary pd-focusable"
+          <div
+            className="mt-auto flex items-center gap-2.5 rounded-lg px-3 py-2"
+            data-testid="settings-account"
           >
-            <IconChevronLeft size={16} className="shrink-0 text-text-muted" />
-            Back to chat
-          </button>
+            <span className="pd-sidebar-avatar">B</span>
+            <span className="min-w-0">
+              <span className="block truncate text-body text-text-primary">Bobble</span>
+              <span className="block text-footnote text-text-muted">Local · signed out</span>
+            </span>
+          </div>
         </nav>
 
-        <ScrollArea className="min-w-0 flex-1">
-          <div className="mx-auto max-w-[760px] px-8 py-8">
-            <SectionBody
-              section={section}
-              onOpenGallery={onOpenGallery}
-              onOpenConnectors={onOpenConnectors}
-              onRedoOnboarding={onRedoOnboarding}
-            />
+        <div className="flex min-w-0 flex-1 flex-col">
+          <div className="flex shrink-0 items-start justify-between gap-4 px-7 pt-6 pb-2">
+            <h2 id={titleId} className="text-title text-text-primary">
+              {TITLES[section]}
+            </h2>
+            <button
+              type="button"
+              data-testid="settings-back"
+              aria-label="Close settings"
+              onClick={onClose}
+              className="-mr-1 rounded-lg p-1.5 text-text-muted transition-colors hover:bg-bg-hover hover:text-text-primary pd-focusable"
+            >
+              <IconClose size={18} />
+            </button>
           </div>
-        </ScrollArea>
+
+          <ScrollArea className="min-w-0 flex-1">
+            <div className="px-7 pt-2 pb-7">
+              <SectionBody
+                section={section}
+                onOpenGallery={onOpenGallery}
+                onOpenConnectors={onOpenConnectors}
+                onRedoOnboarding={onRedoOnboarding}
+              />
+            </div>
+          </ScrollArea>
+        </div>
       </div>
     </div>
   );

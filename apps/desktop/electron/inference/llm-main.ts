@@ -16,7 +16,14 @@ import {
   registerIpcHandlers,
 } from '@pi-desktop/shared';
 import { app, BrowserWindow, type IpcMain, type UtilityProcess, utilityProcess } from 'electron';
-import type { AppEventMap, HfInvokeMap, LlmInvokeMap, LlmStatus } from '../ipc-contract';
+import type {
+  AppEventMap,
+  EngineInvokeMap,
+  HfInvokeMap,
+  LlmInvokeMap,
+  LlmStatus,
+} from '../ipc-contract';
+import { installEngine, listEngines, uninstallEngine } from './engines-main';
 import type {
   HfListFilesReply,
   HfRegisterReply,
@@ -407,8 +414,26 @@ const hfHandlers: IpcHandlers<HfInvokeMap> = {
     }),
 };
 
+/*
+ * Engine install/remove (Settings -> Engines). The renderer owns the CATALOG
+ * (which engines exist, what they are for, which platforms can run them — see
+ * settings/engine-catalog.ts) and passes the ids it wants state for; main owns
+ * only the disk truth. Keeping the catalog renderer-side means adding an engine
+ * is a data edit that the panel and onboarding pick up together, rather than a
+ * change that has to land on both sides of the IPC boundary at once.
+ */
+const engineHandlers: IpcHandlers<EngineInvokeMap> = {
+  'engines:list': () => ({ engines: listEngines(KNOWN_ENGINE_IDS) }),
+  'engines:install': (req) => installEngine(req.id),
+  'engines:uninstall': (req) => uninstallEngine(req.id),
+};
+
+/** Ids main can report on. Mirrors settings/engine-catalog.ts. */
+const KNOWN_ENGINE_IDS = ['llamacpp', 'rapid-mlx', 'dflash-mlx', 'lemonade', 'vllm'] as const;
+
 export function registerLlmIpc(ipcMain: IpcMain, allowSender: (event: unknown) => boolean): void {
   registerIpcHandlers<LlmInvokeMap>(ipcMain, handlers, { allowSender });
+  registerIpcHandlers<EngineInvokeMap>(ipcMain, engineHandlers, { allowSender });
   registerIpcHandlers<HfInvokeMap>(ipcMain, hfHandlers, { allowSender });
   /*
    * Clear out any model server a PREVIOUS run left behind before standing up

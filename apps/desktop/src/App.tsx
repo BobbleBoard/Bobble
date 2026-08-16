@@ -7,6 +7,7 @@ import { CanvasPopoutView } from './chat/canvas/CanvasPopoutView';
 import { ConnectorsScreen } from './connectors/ConnectorsScreen';
 import { SituationDemoView } from './demo/SituationDemoView';
 import { GalleryView } from './gallery/GalleryView';
+import { ModelsView } from './models/ModelsView';
 import { FirstRunTips, resetFirstRunTips } from './onboarding/FirstRunTips';
 import { OnboardingWizard } from './onboarding/OnboardingWizard';
 import { type SettingsSection, SettingsView } from './settings/SettingsView';
@@ -64,13 +65,19 @@ function ProbeHooks() {
   );
 }
 
-type MainView = 'chat' | 'gallery' | 'settings' | 'connectors';
+/**
+ * `settings` is NOT a view any more — it floats over whichever of these is
+ * showing (see `settingsOpen`). `models` became one, because model management
+ * is now a full surface of its own rather than a settings page.
+ */
+type MainView = 'chat' | 'gallery' | 'models' | 'connectors';
 
 export function App() {
   const flavor = useThemeStore((s) => s.flavor);
   const mode = useThemeStore((s) => s.mode);
   const modalityView = useModalityStore((s) => s.view);
   const [view, setView] = useState<MainView>('chat');
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsSection, setSettingsSection] = useState<SettingsSection>('models');
   const [gate, setGate] = useState<GateStatus>('loading');
 
@@ -110,6 +117,22 @@ export function App() {
       .then(({ ensureChatServerReady }) => ensureChatServerReady())
       .catch(() => undefined);
   }, []);
+
+  /**
+   * One entry point for "open settings at section X", because `models` is no
+   * longer a settings section — it is its own view. Every existing caller (the
+   * sidebar gear, the composer's model chip) keeps passing the same ids and
+   * lands in the right place, which is why the id stayed in `SettingsSection`.
+   */
+  const openSettings = (section: SettingsSection) => {
+    if (section === 'models') {
+      setSettingsOpen(false);
+      setView('models');
+      return;
+    }
+    setSettingsSection(section);
+    setSettingsOpen(true);
+  };
 
   // "Redo onboarding" (Settings → Interface): clear the persisted first-run flag,
   // re-arm the first-run tips, and re-open the wizard. Settings persist; the
@@ -198,15 +221,8 @@ export function App() {
             </div>
           ) : gate === 'onboarding' ? (
             <OnboardingWizard onComplete={() => setGate('ready')} />
-          ) : view === 'settings' ? (
-            <SettingsView
-              section={settingsSection}
-              onSection={setSettingsSection}
-              onClose={() => setView('chat')}
-              onOpenGallery={() => setView('gallery')}
-              onOpenConnectors={() => setView('connectors')}
-              onRedoOnboarding={redoOnboarding}
-            />
+          ) : view === 'models' ? (
+            <ModelsView onClose={() => setView('chat')} />
           ) : view === 'connectors' ? (
             <ConnectorsScreen onClose={() => setView('chat')} />
           ) : view === 'gallery' ? (
@@ -217,7 +233,7 @@ export function App() {
                 <button
                   type="button"
                   className="[-webkit-app-region:no-drag] text-footnote text-text-link"
-                  onClick={() => setView('settings')}
+                  onClick={() => setSettingsOpen(true)}
                 >
                   ← Back to settings
                 </button>
@@ -229,16 +245,40 @@ export function App() {
           ) : (
             <div className="relative h-full">
               <ChatApp
-                onOpenSettings={(section) => {
-                  setSettingsSection(section);
-                  setView('settings');
-                }}
+                onOpenSettings={openSettings}
                 onOpenConnectors={() => setView('connectors')}
               />
               {/* Onboarding `tutorial` flag consumer: dismissible first-run tips. */}
               <FirstRunTips />
             </div>
           )}
+
+          {/*
+           * Settings FLOATS over whatever is behind it rather than replacing it
+           * (the user: "not full window taking over thing, but instead floating
+           * panel center"), so it is rendered as a sibling of the view switch,
+           * not a branch of it. The view underneath stays mounted, which is why
+           * closing settings returns you to the same chat scroll position.
+           */}
+          {gate === 'ready' && settingsOpen ? (
+            <SettingsView
+              section={settingsSection}
+              onSection={openSettings}
+              onClose={() => setSettingsOpen(false)}
+              onOpenGallery={() => {
+                setSettingsOpen(false);
+                setView('gallery');
+              }}
+              onOpenConnectors={() => {
+                setSettingsOpen(false);
+                setView('connectors');
+              }}
+              onRedoOnboarding={() => {
+                setSettingsOpen(false);
+                redoOnboarding();
+              }}
+            />
+          ) : null}
         </div>
         <ProbeHooks />
       </ToastProvider>

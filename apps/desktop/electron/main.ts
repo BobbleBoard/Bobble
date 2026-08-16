@@ -21,7 +21,6 @@ import { registerAfmIpc } from './afm/afm-main';
 import { resolveBundledPackageAsset } from './app-paths';
 import { registerBrowserAgentIpc } from './canvas/browser-agent';
 import { registerBrowserIpc } from './canvas/browser-manager';
-import { registerOfficeIpc } from './office/office-ipc';
 import {
   harnessAssetsPresent,
   registerCanvasIpc,
@@ -39,6 +38,7 @@ import { registerImportIpc } from './import/import-main';
 import { registerLlmIpc, shutdownInference } from './inference/llm-main';
 import type { AppEventMap, CoreInvokeMap, FsInvokeMap } from './ipc-contract';
 import { disposeMacAgent, registerMacAgentIpc } from './mac/mac-agent';
+import { registerOfficeIpc } from './office/office-ipc';
 import { registerPiIpc } from './pi/pi-main';
 import { registerProjectIpc } from './project/project-main';
 import { createRendererRecovery } from './renderer-recovery';
@@ -491,6 +491,7 @@ function registerAppIpc(): void {
         chromeVersion: process.versions.chrome ?? 'unknown',
         nodeVersion: process.versions.node ?? 'unknown',
         platform: process.platform,
+        arch: process.arch,
       }),
     },
     { allowSender },

@@ -51,6 +51,9 @@ export interface AppInfo {
   nodeVersion: string;
   /** `process.platform` value, e.g. `darwin`. */
   platform: string;
+  /** `process.arch`, e.g. `arm64`. Distinguishes Apple Silicon from an Intel
+   * Mac, which decides whether the MLX engines can run at all. */
+  arch: string;
 }
 
 /** Core app channels, registered exhaustively via registerIpcHandlers in
@@ -324,6 +327,36 @@ export type LlmInvokeMap = {
   'llm:stop-server': { request: undefined; response: { success: boolean } };
 };
 
+// ---------------------------------------------------------------------------
+// Inference-engine management (Settings → Engines). Separate from `llm:` on
+// purpose: those channels drive the RUNNING server, these install and remove the
+// engines it can run. The renderer never learns install paths — it asks for
+// state and gets back what it needs to draw a row.
+// ---------------------------------------------------------------------------
+
+export interface EngineState {
+  readonly id: string;
+  readonly installed: boolean;
+  /** Bytes actually on disk once installed; undefined when not installed. */
+  readonly bytes?: number;
+  /** Set while an install/uninstall is running, so the row can show progress. */
+  readonly busy?: 'installing' | 'removing';
+  /** Populated when the last install/uninstall failed, for the row to surface. */
+  readonly error?: string;
+}
+
+export type EngineInvokeMap = {
+  'engines:list': { request: undefined; response: { engines: EngineState[] } };
+  'engines:install': { request: { id: string }; response: { success: boolean; error?: string } };
+  'engines:uninstall': { request: { id: string }; response: { success: boolean; error?: string } };
+};
+
+export const ENGINE_INVOKE_CHANNELS = [
+  'engines:list',
+  'engines:install',
+  'engines:uninstall',
+] as const satisfies readonly (keyof EngineInvokeMap)[];
+
 export const LLM_INVOKE_CHANNELS = [
   'llm:get-status',
   'llm:list-catalog',
@@ -523,6 +556,7 @@ export const MAC_INVOKE_CHANNELS = ['mac:debug'] as const satisfies readonly (ke
 export type AppInvokeMap = CoreInvokeMap &
   FsInvokeMap &
   LlmInvokeMap &
+  EngineInvokeMap &
   HfInvokeMap &
   AfmInvokeMap &
   SettingsInvokeMap &
@@ -570,6 +604,7 @@ export const APP_INVOKE_CHANNELS = [
   ...CORP_INVOKE_CHANNELS,
   ...MAC_INVOKE_CHANNELS,
   ...PI_INVOKE_CHANNELS,
+  ...ENGINE_INVOKE_CHANNELS,
 ] as const satisfies readonly (keyof AppInvokeMap)[];
 
 type MissingChannels = Exclude<keyof AppInvokeMap, (typeof APP_INVOKE_CHANNELS)[number]>;
