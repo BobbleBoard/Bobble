@@ -138,6 +138,46 @@ export function assembleServerArgs(cfg: LaunchConfig): string[] {
   const args = ['-m', cfg.modelPath, '--host', cfg.host, '--port', String(cfg.port)];
   if (cfg.contextSize !== undefined) args.push('-c', String(cfg.contextSize));
 
+  /*
+   * NO PROMPT-CACHE FLAGS ARE SET HERE, and that absence is load-bearing.
+   *
+   * the user, on the corp harness: "if currently you can only hold one prefix at once,
+   * the build needs to be able to store KV for many instances… so if anything is
+   * ever sent as a follow up that has been activated in the last hour already, it
+   * just gets to use cached kv and doesn't have to reprefill."
+   *
+   * llama-server already does precisely that, on by default, and this launch gets
+   * it by NOT passing:
+   *   -cram, --cache-ram N   host-RAM prompt cache, default 8192 MiB (0 disables)
+   *   --cache-idle-slots     "save idle slots to the prompt cache on new task",
+   *                          default enabled, requires cache-ram
+   * Those two are save-on-yield / restore-on-return keyed by prompt prefix, with a
+   * byte budget and LRU eviction. So `--parallel 1` does NOT mean one conversation:
+   * it means one conversation DECODING, while the rest keep their KV.
+   *
+   * MEASURED (2026-08-16, b9934, Qwen3.5-4B-Q8_0, M5 Pro, `-c 65536 --parallel 1`,
+   * six unrelated agents round-robined twice — the CEO/manager/engineer shape. See
+   * apps/desktop/tests/e2e/multi-conversation-kv-probe.mjs):
+   *     6 × ~1.9k tok    --cache-ram 0    11247/11247 tokens re-prefilled,  9.9 s
+   *                      default 8192       882/11247                    ,  1.2 s
+   *     6 × ~11.9k tok   default 8192       882/71439                    ,  1.6 s
+   * Coming back to an agent costs a flat ~120-175 tokens whatever the thread
+   * length — the "instant follow-up" the latency work is after, for free.
+   *
+   * SO DO NOT set `--cache-ram 0`, `--no-cache-idle-slots`, or a small `-cram`.
+   * The failure mode is a CLIFF, not a slope: same six agents at `-c 32768`,
+   * 1536 MiB gave 92% reuse and 1024 MiB gave 0.0% — every agent evicted before
+   * its next turn came round. Nothing surfaces it except follow-ups going slow,
+   * which is the report the user keeps filing.
+   *
+   * AND DO NOT REACH FOR `--slot-save-path` + POST /slots/{id}?action=restore to
+   * make this disk-backed. They look like the tool for the job and are not: the
+   * restore reports success (n_restored = every token, ~8 ms) and the very next
+   * request re-prefills the conversation anyway — 1994 of 2020 tokens with the
+   * prompt cache off, and 17519 tok / 19.8 s on a 19.4k-token thread that costs
+   * 17 tok / 126 ms when simply left alone. Arm 3 of the probe re-measures it.
+   */
+
   // Server-wide sampling defaults, tuned to BREAK the repetition/looping the user
   // observed in regular chat (2026-07-20). The old set (temp 0.6 / top-p 0.95 /
   // top-k 20) was too greedy — low temp + tight top-k collapse onto a repeating
