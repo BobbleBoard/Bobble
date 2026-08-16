@@ -24,6 +24,7 @@ import {
   communicationTools,
   dispatchesTo,
   emptyProjectComplaint,
+  emptyReplyCause,
   excerptFailures,
   hasProduct,
   hostPassthrough,
@@ -931,6 +932,52 @@ describe('listProject — the briefing must describe the PRODUCT, not its depend
       expect(listProject(root)).toContain('nothing at all');
     } finally {
       rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
+/*
+ * AN EMPTY REPLY MUST NOT INVENT A CAUSE.
+ *
+ * mesh-host answered every empty reply with "ran out of steps after N tool
+ * calls. Its work may be on disk but none of it was reported." Neither clause
+ * was ever observed: there is no step cap in a mesh run (`maxStepsPerMessage` is
+ * a passthrough nothing sets, so no counter is built), and the harness had no
+ * idea what was on disk.
+ *
+ * MEASURED COST, run 15: the manager's turn was cut off at the OUTPUT cap
+ * (`stopReason: 'length'`). The CEO was handed a cause that had not happened,
+ * went looking for a summary that did not exist, and told the user no code had
+ * been produced — over 53 files. the user: "is that an automated harness line?
+ * again remove it if so."
+ */
+describe('emptyReplyCause — say what was observed, or say nothing', () => {
+  it('names the output cutoff, which is the cause that actually occurs', () => {
+    const out = emptyReplyCause('length');
+    expect(out).toMatch(/cut off at the output limit/);
+    expect(out).toMatch(/never arrived/);
+  });
+
+  it('names an error or abort plainly', () => {
+    expect(emptyReplyCause('error')).toMatch(/ended with a error/);
+    expect(emptyReplyCause('aborted')).toMatch(/ended with a aborted/);
+  });
+
+  it('says NOTHING when the reason is unknown or ordinary', () => {
+    expect(emptyReplyCause(undefined)).toBe('');
+    expect(emptyReplyCause('stop')).toBe('');
+    expect(emptyReplyCause('toolUse')).toBe('');
+  });
+
+  it('never claims a step budget, which cannot happen here', () => {
+    for (const r of ['length', 'error', 'aborted', 'stop', undefined]) {
+      expect(emptyReplyCause(r)).not.toMatch(/step/i);
+    }
+  });
+
+  it('never speculates about the disk — the workspace tree answers that', () => {
+    for (const r of ['length', 'error', 'aborted', 'stop', undefined]) {
+      expect(emptyReplyCause(r)).not.toMatch(/may be on disk/i);
     }
   });
 });

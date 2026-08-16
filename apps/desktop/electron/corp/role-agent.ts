@@ -1270,6 +1270,16 @@ export interface RoleAgentResult {
   readonly maxTurnOutputTokens: number;
   /** Why the run ended. */
   readonly terminatedReason: RoleTerminatedReason;
+  /**
+   * Stop reason of the role's LAST assistant turn (`'length'` when it was cut
+   * off at the output cap, `'stop'`/`'toolUse'` otherwise).
+   *
+   * Exposed because the caller was GUESSING. mesh-host answered every empty
+   * reply with "ran out of steps after N tool calls" — a cause it had never
+   * observed, and one that cannot happen in a mesh run at all (nothing
+   * configures a step cap). The real cause, measured repeatedly, is `length`.
+   */
+  readonly lastStopReason: string | undefined;
   /** How many provider requests the sampling hook stamped (proof it fired). */
   readonly samplingCalls: number;
   /** The sampling params the hook last sent (proof of what the server saw). */
@@ -1924,6 +1934,7 @@ export async function openRoleSession(
         stepCapHit: turn.stepCap?.hit ?? false,
         promptError,
       }),
+      lastStopReason: turn.lastStopReason,
       samplingCalls: turn.samplingCalls,
       sentSampling: turn.sentSampling,
     };

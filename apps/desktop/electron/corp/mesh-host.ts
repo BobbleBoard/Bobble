@@ -314,6 +314,23 @@ const IGNORED_TREE_DIRS: ReadonlySet<string> = new Set([
  * somebody else's package internals is worse than no briefing: it is confidently
  * wrong about the one fact the role most needs.
  */
+/**
+ * Name the reason an agent's turn ended, when we actually know it.
+ *
+ * Only ever states what the provider reported. `length` is the one that matters
+ * in practice — a turn cut off at the output cap looks identical to a turn with
+ * nothing to say, and telling them apart is what lets the caller respond
+ * usefully instead of concluding the work does not exist.
+ */
+export function emptyReplyCause(stopReason: string | undefined): string {
+  if (stopReason === 'length') {
+    return ' — its turn was cut off at the output limit, mid-sentence, so whatever it was composing never arrived';
+  }
+  if (stopReason === 'error' || stopReason === 'aborted')
+    return ` — its turn ended with a ${stopReason}`;
+  return '';
+}
+
 export function listProject(cwd: string): string {
   const walk = (dir: string, prefix: string, out: string[]): void => {
     if (out.length > 60) return;
@@ -1473,16 +1490,18 @@ export function createMeshAgentHost(config: MeshAgentHostConfig): MeshAgentHost 
     seenTree.set(agentId, treeNow);
     const incoming =
       agent.role === 'manager'
-        /* NO "Message from <x>:" HEADER. the user: "you can just totally remove that
+        ? /* NO "Message from <x>:" HEADER. the user: "you can just totally remove that
            header from the top of each message bubble it serves no purpose."
            The sender is already on the row the message arrives in, and the line
            was also what surfaced "Message from user:" inside a CEO-manager
            bubble, where it read as the user having said it. */
-        ? `${body}\n\n${taskNote(config.task)}`
+          `${body}\n\n${taskNote(config.task)}`
         : body;
     let reply = '';
     /** Tool calls this turn — what tells a spent step budget apart from silence. */
     let toolCallCount = 0;
+    /** The role's real last stop reason — reported, never guessed at. */
+    let lastStopReason: string | undefined;
     /*
      * PER-CONTRACT CLASSIFIER. A contract to draw a sprite sheet and a contract
      * to write a save-file parser need different proof even inside one project,
@@ -1951,6 +1970,7 @@ export function createMeshAgentHost(config: MeshAgentHostConfig): MeshAgentHost 
       );
       reply = result.finalText.trim();
       toolCallCount = result.toolCalls?.length ?? 0;
+      lastStopReason = result.lastStopReason;
       const work = submitted.get(agentId);
       if (work !== undefined) {
         submitted.delete(agentId);
@@ -1974,26 +1994,38 @@ export function createMeshAgentHost(config: MeshAgentHostConfig): MeshAgentHost 
       reply = `(${agentId} hit a problem: ${err instanceof Error ? err.message : String(err)})`;
     }
     /*
-     * AN EMPTY REPLY MUST SAY WHY.
+     * AN EMPTY REPLY MUST SAY WHY — AND MUST NOT INVENT ONE.
      *
      * `(no reply)` was the whole verdict of the first corp run that completed:
-     * the CEO worked for five minutes, wrote seven files, and the user got a
-     * blank. Its own status update said what had happened — "I've now made ~30
-     * tool calls without reporting back, which has blocked progress" — but the
-     * only thing that reached the caller was two words that read like the agent
-     * had nothing to say.
+     * seven files written, and the caller got a blank. So this says what
+     * happened. But what it SAID was a fabrication:
      *
-     * An agent that burned its whole step budget and one that genuinely answered
-     * with nothing are different events and need different responses, so say
-     * which it was and what to do about it. The caller here is usually another
-     * agent, and "ask it for a summary" is an instruction it can actually act on.
+     *   "ran out of steps after N tool calls … Its work may be on disk but none
+     *    of it was reported."
+     *
+     * Neither clause was observed. There is no step cap in a mesh run at all —
+     * `maxStepsPerMessage` is a passthrough nothing sets, so no counter is ever
+     * built — and the harness had no idea whether anything was on disk; it
+     * guessed, hedged, and then the promote-tool's own sentence two lines later
+     * said "Nothing was delivered". the user, reading it: "is that an automated
+     * harness line? remove it."
+     *
+     * MEASURED COST, run 15: the manager's turn was cut off at the OUTPUT cap
+     * (`stopReason: 'length'`), not a step budget. The CEO was told a cause that
+     * had not happened, went looking for a summary that did not exist, and
+     * reported to the user that no code had been produced — over 53 files.
+     *
+     * Now it reports the reason the run actually ended with, and nothing else.
+     * WHERE the work is is answered separately and factually, by listing the
+     * workspace (see runCorpForBridge) — a hedge is not needed when the tree is
+     * right there.
      */
     if (reply === '') {
       reply =
         toolCallCount > 0
-          ? `(${agentId} ran out of steps after ${toolCallCount} tool calls without ever replying. ` +
-            `Its work may be on disk but none of it was reported. Ask it directly for a short ` +
-            `summary of what it did, what works, and what is left.)`
+          ? `(${agentId} made ${toolCallCount} tool call${toolCallCount === 1 ? '' : 's'} and ` +
+            `then ended its turn without writing a reply${emptyReplyCause(lastStopReason)}. ` +
+            `Ask it directly for a short summary of what it did, what works, and what is left.)`
           : `(${agentId} replied with nothing at all.)`;
     }
     return { reply };

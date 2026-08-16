@@ -48,6 +48,7 @@ function fakeOpener() {
           stats: undefined,
           turns: 1,
           bumps: 0,
+          lastStopReason: undefined,
           maxTurnOutputTokens: 0,
           terminatedReason: 'stop' as const,
           samplingCalls: 1,
