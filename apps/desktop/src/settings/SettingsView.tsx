@@ -18,6 +18,7 @@ import {
   IconPuzzle,
   IconSearch,
   IconSparkles,
+  IconTerminal,
   ScrollArea,
 } from '@pi-desktop/ui';
 import { type ReactNode, useEffect, useId, useMemo, useRef, useState } from 'react';
@@ -28,6 +29,7 @@ import { AppearancePanel } from './panels/AppearancePanel';
 import { CapabilitiesPanel } from './panels/CapabilitiesPanel';
 import { ConnectorsPanel } from './panels/ConnectorsPanel';
 import { EnginePanel } from './panels/EnginePanel';
+import { HarnessPanel } from './panels/HarnessPanel';
 import { InterfacePanel } from './panels/InterfacePanel';
 import { PersonalizationPanel } from './panels/PersonalizationPanel';
 import { SearchPanel } from './panels/SearchPanel';
@@ -35,6 +37,7 @@ import { SearchPanel } from './panels/SearchPanel';
 export type SettingsSection =
   | 'models'
   | 'engines'
+  | 'harness'
   | 'personalization'
   | 'appearance'
   | 'interface'
@@ -47,6 +50,7 @@ export type SettingsSection =
 const NAV: Array<{ id: SettingsSection; label: string; icon: ReactNode }> = [
   { id: 'personalization', label: 'Custom instructions', icon: <IconSparkles /> },
   { id: 'engines', label: 'Engines', icon: <IconCpu /> },
+  { id: 'harness', label: 'Harness', icon: <IconTerminal /> },
   { id: 'appearance', label: 'Appearance', icon: <IconSun /> },
   { id: 'interface', label: 'Interface', icon: <IconSlider /> },
   { id: 'agent', label: 'Agent', icon: <IconShield /> },
@@ -58,6 +62,7 @@ const NAV: Array<{ id: SettingsSection; label: string; icon: ReactNode }> = [
 const TITLES: Record<SettingsSection, string> = {
   models: 'Models',
   engines: 'Engines',
+  harness: 'Harness',
   personalization: 'Custom instructions',
   appearance: 'Appearance',
   interface: 'Interface',
@@ -82,6 +87,8 @@ function SectionBody({
     case 'models':
     case 'engines':
       return <EnginePanel />;
+    case 'harness':
+      return <HarnessPanel />;
     case 'personalization':
       return <PersonalizationPanel />;
     case 'appearance':

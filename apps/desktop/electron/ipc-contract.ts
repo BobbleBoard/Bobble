@@ -357,6 +357,29 @@ export const ENGINE_INVOKE_CHANNELS = [
   'engines:uninstall',
 ] as const satisfies readonly (keyof EngineInvokeMap)[];
 
+/** What we found on this machine for one coding harness. */
+export interface HarnessDetected {
+  readonly id: string;
+  readonly installed: boolean;
+  readonly path?: string;
+  readonly version?: string;
+}
+
+export type HarnessInvokeMap = {
+  /**
+   * Probe PATH for each harness binary. The renderer sends the ids and the bin
+   * names from its catalog, so adding a harness stays a one-file data edit.
+   */
+  'harness:detect': {
+    request: { probes: Array<{ id: string; bin: string }> };
+    response: { found: HarnessDetected[] };
+  };
+};
+
+export const HARNESS_INVOKE_CHANNELS = [
+  'harness:detect',
+] as const satisfies readonly (keyof HarnessInvokeMap)[];
+
 export const LLM_INVOKE_CHANNELS = [
   'llm:get-status',
   'llm:list-catalog',
@@ -557,6 +580,7 @@ export type AppInvokeMap = CoreInvokeMap &
   FsInvokeMap &
   LlmInvokeMap &
   EngineInvokeMap &
+  HarnessInvokeMap &
   HfInvokeMap &
   AfmInvokeMap &
   SettingsInvokeMap &
@@ -605,6 +629,7 @@ export const APP_INVOKE_CHANNELS = [
   ...MAC_INVOKE_CHANNELS,
   ...PI_INVOKE_CHANNELS,
   ...ENGINE_INVOKE_CHANNELS,
+  ...HARNESS_INVOKE_CHANNELS,
 ] as const satisfies readonly (keyof AppInvokeMap)[];
 
 type MissingChannels = Exclude<keyof AppInvokeMap, (typeof APP_INVOKE_CHANNELS)[number]>;

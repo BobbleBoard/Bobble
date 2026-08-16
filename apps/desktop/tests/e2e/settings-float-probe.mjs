@@ -178,6 +178,46 @@ try {
       );
     }
 
+    /* ------------------------------------------------------------- harness */
+    const harnessNav = await page.$('[data-testid="settings-nav-harness"]');
+    assert(harnessNav !== null, 'no Harness section in the settings nav');
+    await harnessNav.click();
+    await page.waitForSelector('[data-testid="harness-panel"]', { timeout: 15_000 });
+    await page.waitForTimeout(500);
+    await page.screenshot({ path: path.join(OUT, '05-harness.png') });
+
+    const harnesses = await page.evaluate(() =>
+      [...document.querySelectorAll('[data-testid^="harness-row-"]')].map((el) => ({
+        id: el.getAttribute('data-testid').replace('harness-row-', ''),
+        installed: el.getAttribute('data-installed'),
+        selectable: el.getAttribute('data-selectable'),
+      })),
+    );
+    assert(harnesses.length >= 7, `expected 7 harnesses, saw ${harnesses.length}`);
+    // The bundled harness must always be usable — it ships with the app.
+    const bundled = harnesses.find((h) => h.id === 'pi-bundled');
+    assert(bundled?.selectable === 'yes', 'the bundled pi is not selectable');
+    // A custom config with no path yet must NOT be selectable.
+    const custom = harnesses.find((h) => h.id === 'pi-custom');
+    assert(custom?.selectable === 'no', 'custom pi config is selectable with no path set');
+    for (const h of harnesses) {
+      console.log(`  ${h.installed === 'yes' ? '✓' : '·'} ${h.id}`);
+    }
+
+    // Connect instructions for an external agent must render real shell lines.
+    const connect = await page.$('[data-testid="harness-connect-claude-code"]');
+    if (connect !== null) {
+      await connect.click();
+      await page.waitForTimeout(300);
+      const script = await page.textContent('[data-testid="harness-script-claude-code"]');
+      assert(
+        script !== null && script.includes('ANTHROPIC_BASE_URL'),
+        'Claude Code connect block does not set ANTHROPIC_BASE_URL',
+      );
+      await page.screenshot({ path: path.join(OUT, '06-harness-connect.png') });
+      console.log(`  connect block: ${script.split('\n')[0]}`);
+    }
+
     // Escape must dismiss it.
     await page.keyboard.press('Escape');
     await page.waitForTimeout(300);
