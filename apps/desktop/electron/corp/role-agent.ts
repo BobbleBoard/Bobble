@@ -1348,6 +1348,9 @@ interface TurnState {
   samplingCalls: number;
   sentSampling: SamplingParams | undefined;
   callTimedOut: boolean;
+  /** Stop reason of the most recent assistant message, so the prompt loop can
+   * tell a turn that ran out of OUTPUT budget from one that finished. */
+  lastStopReason: string | undefined;
 }
 
 function newTurnState(
@@ -1364,6 +1367,7 @@ function newTurnState(
     samplingCalls: 0,
     sentSampling: undefined,
     callTimedOut: false,
+    lastStopReason: undefined,
   };
 }
 
@@ -1488,7 +1492,11 @@ export async function openRoleSession(
      */
     let lastStopReason: string | undefined;
     pi.on('message_end', (e: { message?: { role?: string; stopReason?: string } }) => {
-      if (e.message?.role === 'assistant') lastStopReason = e.message.stopReason;
+      if (e.message?.role !== 'assistant') return;
+      lastStopReason = e.message.stopReason;
+      /* Also on the TURN, so the prompt loop (a different closure) can see that
+         a turn died at the output ceiling — see the steer after session.prompt. */
+      turn.lastStopReason = lastStopReason;
     });
     pi.on('tool_call', (e: ToolCallEvent) => {
       /*
@@ -1814,6 +1822,8 @@ export async function openRoleSession(
     const before = (session.state.messages as unknown as readonly UsageMessage[]).length;
     let promptError = false;
     let bumps = 0;
+    /** One output-limit steer per role run — see the note below. */
+    let nudgedLength = false;
     /*
      * THE BRIEF, on the record. Every turn a role is given — the opening
      * contract and each follow-up — lands here first, so its chat opens with
@@ -1825,6 +1835,35 @@ export async function openRoleSession(
     safeEmit(turn.onActivity, { kind: 'briefing', text: userPrompt });
     try {
       await session.prompt(userPrompt);
+      /*
+       * A TURN THAT SPENT ITS WHOLE OUTPUT BUDGET AND CALLED NOTHING.
+       *
+       * MEASURED, run 16 (Qwen3.8-27B). The manager did this FOUR times in a
+       * row — `stop=length` at exactly 8,192 output tokens, no tool call, ~15
+       * minutes of wall clock each at 16 tok/s. Forty-five minutes and three
+       * dead turns before it finally wrote a file. The CEO had done the same
+       * thing in the previous attempt (20,541 tokens, no call, run over).
+       *
+       * The neighbouring guard (`lastStopReason === 'length'` in `tool_call`)
+       * only refuses a call that was CUT OFF — it has nothing to say about a
+       * turn that made no call at all, which is this. Raising the cap would be
+       * the obvious fix and the wrong one: it buys a longer monologue, not a
+       * file.
+       *
+       * ONE re-prompt, and only when the turn produced nothing, so a role that
+       * is legitimately mid-stride is never interrupted.
+       */
+      if (turn.lastStopReason === 'length' && turn.toolCalls.length === 0 && !nudgedLength) {
+        nudgedLength = true;
+        const steer =
+          'That turn hit the output limit and was cut off mid-sentence, so none of it ' +
+          'counted and nothing was saved. You were writing content into the reply — a ' +
+          'reply is not a file, and printing one spends the whole budget without ' +
+          'producing anything. Use `write` to put it where it belongs, ONE call per ' +
+          'file, and keep the reply itself to a sentence.';
+        safeEmit(turn.onActivity, { kind: 'briefing', text: steer });
+        await session.prompt(steer);
+      }
       // BUMP-TO-CONTINUE: if the loop ended without the deliverable, re-prompt the SAME
       // session to reach a terminal decision — bounded to `bump.maxBumps`. Each bump is
       // an ordinary user turn on the live session (its context preserved), NOT a fresh
