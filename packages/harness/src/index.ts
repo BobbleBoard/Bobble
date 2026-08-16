@@ -527,9 +527,36 @@ const HELP = [
  */
 export function endedAtOutputLimit(messages: readonly unknown[]): boolean {
   for (let i = messages.length - 1; i >= 0; i -= 1) {
-    const m = messages[i] as { role?: unknown; stopReason?: unknown };
+    const m = messages[i] as {
+      role?: unknown;
+      stopReason?: unknown;
+      usage?: { input?: number; output?: number; totalTokens?: number };
+    };
     if (m?.role !== 'assistant') continue;
-    return m.stopReason === 'length';
+    if (m.stopReason !== 'length') return false;
+    /*
+     * `length` MEANS TWO DIFFERENT THINGS, and only one of them is this steer's.
+     *
+     * MEASURED, run 16, both in the same session:
+     *   manager  out=8192  tot=23040  → hit the OUTPUT cap with context to spare.
+     *                                   Narration. The steer is right.
+     *   CEO      out=3309  tot=49152  → hit the CONTEXT ceiling (-c 49152) with a
+     *                                   small reply. Not verbosity at all.
+     *
+     * Sending "you wrote too much, use `write`" into a FULL context is worse than
+     * silence: the advice is wrong, and the message itself consumes room the
+     * model does not have — it lands and is immediately truncated again. That is
+     * what happened at 04:41:28, the last entry before the run stalled out.
+     *
+     * A reply that is small relative to its own turn is a context problem, not an
+     * output problem. Compaction owns that; this does not.
+     */
+    const usage = m.usage;
+    if (usage === undefined) return true;
+    const output = usage.output ?? 0;
+    const total = usage.totalTokens ?? 0;
+    // Output tokens a trivial share of the turn ⇒ the ceiling was the context.
+    return !(total > 0 && output > 0 && output / total < 0.25);
   }
   return false;
 }
