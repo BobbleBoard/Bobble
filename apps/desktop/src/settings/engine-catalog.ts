@@ -21,8 +21,17 @@
  *
  * The measurements behind the blurbs are ours, taken 2026-08-16 on an M5 Pro
  * with Qwen3.5-4B at 8-bit, 2048-token prompts (see the inference-bench notes):
- * rapid-mlx 2003 tok/s prefill and 259.7 aggregate TG at 16 streams; dflash-mlx
- * 117.7 tok/s single-stream at 84.5% acceptance; llama.cpp 1616 / 48.4.
+ * rapid-mlx 2003 tok/s prefill and 259.7 aggregate TG at 16 streams; llama.cpp
+ * 1616 / 48.4.
+ *
+ * DFlash's number is quoted CAREFULLY, because the first one we took was not
+ * representative. `dflash benchmark` defaults to a short MATH prompt, where
+ * acceptance is 84.5% and the speedup 2.10x (117.7 tok/s). On the workload this
+ * app actually serves — 2048-token prose — acceptance falls to 68.9% and the
+ * measured result is 56.1 -> 77.0 tok/s, about 1.37x. Both numbers are real;
+ * only the second one describes a user's chat. Speculative decoding pays in
+ * proportion to how predictable the text is, so any blurb quoting a single
+ * multiplier has to quote the pessimistic one.
  */
 
 export type EnginePlatform = 'darwin' | 'win32' | 'linux';
@@ -85,7 +94,7 @@ export const ENGINES: readonly EngineSpec[] = [
   {
     id: 'dflash-mlx',
     name: 'MLX DFlash',
-    blurb: 'Fastest for a single chat — about 2.4x llama.cpp. Adds a 1.2 GB draft model.',
+    blurb: 'Fastest for a single chat — around 1.4-1.6x. Adds a 1.2 GB draft model.',
     role: 'single-user',
     platforms: ['darwin'],
     requiresAppleSilicon: true,
