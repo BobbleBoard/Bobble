@@ -1568,8 +1568,32 @@ export const ActivityChain = forwardRef<HTMLDivElement, ActivityChainProps>(func
   const [everDone, setEverDone] = useState(false);
   const doneNow = chainIsDone({ complete, quiet, settledGuess });
   useEffect(() => {
-    if (doneNow) setEverDone(true);
-  }, [doneNow]);
+    if (doneNow) {
+      setEverDone(true);
+      return;
+    }
+    /*
+     * THE LATCH MUST NOT OUTLIVE THE TURN IT LATCHED ON.
+     *
+     * the user, reporting this for the FOURTH time with a screenshot: "premature
+     * done is showing while thoughts/tools are still being written." A chain
+     * that had legitimately settled — Done latched — then received more
+     * thinking and another tool call, and went on showing Done underneath them
+     * because latching was one-way.
+     *
+     * "Done is a final thing" was about not FLICKERING between two tool calls,
+     * and `complete` already handles that: the turn's owner holds it false for
+     * the whole turn, so quiet rows can never trip it. An owner that says
+     * `complete === false` is making a positive statement that the turn is
+     * live, and that has to be able to clear a stale latch — otherwise the one
+     * signal we trust is outranked by a cached boolean.
+     *
+     * Only an explicit `false` clears it. `undefined` (a static render, a
+     * replayed transcript) leaves the latch alone, because there is nobody
+     * there to say otherwise.
+     */
+    if (complete === false) setEverDone(false);
+  }, [doneNow, complete]);
   const settled = everDone || doneNow;
   const toggleChain = () => {
     const next = !isExpanded;
