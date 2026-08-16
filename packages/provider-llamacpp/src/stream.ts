@@ -888,6 +888,41 @@ export function createLlamaCppStream(deps: LlamaCppStreamDeps = {}): LlamaCppStr
         calculateCost(model, output.usage);
         if (lastTimings !== undefined) deps.onTimings?.(lastTimings);
 
+        /*
+         * KV REUSE, MEASURED FROM DATA THE SERVER ALWAYS SENDS.
+         *
+         * THIS IS WHY THE PREFIX-CACHE REGRESSION KEEPS COMING BACK — five times
+         * now, each time found by the user noticing the app is slow. There WAS a
+         * `[pi-kv]` line for exactly this, and it is inert: it hangs off
+         * `chunk.prompt_progress`, which llama-server only emits when asked, so
+         * it never printed. Zero occurrences across every run log on this
+         * machine. A detector that cannot fire is indistinguishable from a
+         * detector that keeps passing, which is how four fixes in a row were
+         * aimed at whichever caller happened to be blamed that month.
+         *
+         * `timings.prompt_n` (tokens actually PROCESSED) and `usage.prompt_tokens`
+         * (tokens SENT) both arrive on every completion — MEASURED with
+         * kv-eviction-probe: a cache hit reports prompt_n 17 against a 1,121-token
+         * conversation, a cold send reports 1,121. So reuse is
+         * `1 - processed/sent`, and it needs nothing optional turned on.
+         *
+         * Logged every turn with the prefix fingerprint, so a follow-up that
+         * re-prefills the world is visible in the line itself rather than
+         * inferred from a stopwatch.
+         */
+        const sent = output.usage.input;
+        const processed = lastTimings?.prompt_n;
+        if (typeof processed === 'number' && sent > 0) {
+          const reused = Math.max(0, sent - processed);
+          const pct = Math.round((reused / sent) * 100);
+          const nTools = context.tools?.length ?? 0;
+          const sysLen = context.systemPrompt?.length ?? 0;
+          // eslint-disable-next-line no-console
+          console.log(
+            `[pi-kv] sent=${sent} tok · reused=${reused} (${pct}%) · prefilled=${processed} · prefix{tools=${nTools} sys=${sysLen}ch}`,
+          );
+        }
+
         output.stopReason = finishReason;
         stream.push({ type: 'done', reason: finishReason, message: output });
         stream.end();
