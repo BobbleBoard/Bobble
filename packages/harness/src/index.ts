@@ -309,6 +309,8 @@ interface HarnessRuntime {
   delegatedThisTurn: boolean;
   /** One handback nudge per session — see the agent_end hook. */
   nudgedHandback: boolean;
+  /** One-shot: the output-limit steer has already been sent this session. */
+  nudgedOutputLimit: boolean;
   /** Remaining REAL-verify fix steers allowed in the active verify sequence. */
   verifyFixesRemaining: number;
   /** True while inside a self-triggered verify fix sequence (so the budget isn't reset). */
@@ -516,6 +518,51 @@ const HELP = [
  * (in the app) by the code that also needs the permission controller.
  */
 /** The text of the LAST assistant message in a finished run (its final reply). */
+/**
+ * Did the last assistant turn stop because it ran out of OUTPUT budget?
+ *
+ * `stopReason: 'length'` means the reply is a prefix of what the model meant to
+ * say — cut mid-token, not finished. Read off the last assistant message so it
+ * works whatever produced it.
+ */
+export function endedAtOutputLimit(messages: readonly unknown[]): boolean {
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    const m = messages[i] as { role?: unknown; stopReason?: unknown };
+    if (m?.role !== 'assistant') continue;
+    return m.stopReason === 'length';
+  }
+  return false;
+}
+
+/**
+ * What to say to a turn that spent its whole budget PRINTING code.
+ *
+ * MEASURED, run 16 (Qwen3.8-27B). After twelve sensible environment probes the
+ * CEO wrote "Alright, let's write all the application files. I'll write them one
+ * by one." and then began emitting the entire application as prose — 20,541
+ * output tokens, 28 minutes at 16 tok/s, straight into the 49,152-token ceiling.
+ * `stopReason: 'length'`. Not one `write` call, not one file, and the run was
+ * over: nothing in the main-chat path notices a turn that dies this way.
+ *
+ * The truncated-call guard for exactly this (`lastStopReason === 'length'`)
+ * exists in `corp/role-agent.ts` and covers the corp ROLES only — the fourth
+ * "guard on one door" found today. This is the chat side of it, and it has to
+ * be a different message because the CEO made no call at all: the failure is
+ * not a cut-off tool call, it is having narrated instead of acted.
+ *
+ * ONE nudge per session, like the handback nudge beside it: a model that does
+ * it twice is telling us something a third message will not fix.
+ */
+export const OUTPUT_LIMIT_NUDGE =
+  'Your last turn hit the output limit and was cut off mid-sentence, so none of ' +
+  'it took effect and nothing was saved.\n\n' +
+  'Looking at it: you were writing file contents into the reply. That is what ran ' +
+  'out of room — a reply is not a file, and printing one costs the whole budget ' +
+  'without putting anything on disk.\n\n' +
+  'Use `write` to put each file where it belongs, ONE call per file, and say ' +
+  'nothing about the contents in the reply itself. Start with the single most ' +
+  'important file rather than restating the plan.';
+
 function lastAssistantText(messages: readonly unknown[]): string {
   for (let i = messages.length - 1; i >= 0; i -= 1) {
     const m = messages[i] as { role?: unknown; content?: unknown };
@@ -602,6 +649,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     ranCommands: [],
     delegatedThisTurn: false,
     nudgedHandback: false,
+    nudgedOutputLimit: false,
     verifyFixesRemaining: 0,
     verifyActive: false,
   };
@@ -1945,6 +1993,24 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
         runtime.nudgedHandback = true;
         pi.appendEntry(HARNESS_LOOP_ENTRY, { action: 'steer', cause: 'handback' });
         pi.sendUserMessage?.(HANDBACK_NUDGE);
+      }
+    }
+    /*
+     * A TURN CUT OFF AT THE OUTPUT CEILING IS A TURN THAT DID NOTHING.
+     *
+     * See OUTPUT_LIMIT_NUDGE: run 16's CEO spent 20,541 tokens and 28 minutes
+     * printing an application into the chat, hit `stopReason: 'length'`, wrote
+     * no files, and the run ended there — silently, because only the corp roles
+     * had any handling for this.
+     *
+     * Checked AFTER the handback nudge and gated on it not having fired, so a
+     * single turn can never send two steers.
+     */
+    if (!runtime.nudgedHandback && !runtime.nudgedOutputLimit) {
+      if (endedAtOutputLimit(event.messages)) {
+        runtime.nudgedOutputLimit = true;
+        pi.appendEntry(HARNESS_LOOP_ENTRY, { action: 'steer', cause: 'output-limit' });
+        pi.sendUserMessage?.(OUTPUT_LIMIT_NUDGE);
       }
     }
     // THE USER OUTRANKS EVERYTHING BEHIND THEM. Naming and the reviewer both run
