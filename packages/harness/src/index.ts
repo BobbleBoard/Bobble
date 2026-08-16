@@ -580,15 +580,30 @@ export function endedAtOutputLimit(messages: readonly unknown[]): boolean {
  * ONE nudge per session, like the handback nudge beside it: a model that does
  * it twice is telling us something a third message will not fix.
  */
+/*
+ * Say only what the harness actually KNOWS.
+ *
+ * This used to open its second paragraph with "Looking at it: you were writing
+ * file contents into the reply." That was true of the run it was written from
+ * (run 16's CEO printed an application into the chat), and it is asserted here
+ * unconditionally — the firing condition is only "hit the output limit and made
+ * no tool calls", which a long analysis satisfies just as well. So on any other
+ * cause the harness states a confident falsehood about what the model just did,
+ * and the model then "corrects" behaviour it never exhibited.
+ *
+ * What is genuinely known at this point: the turn ended at the output cap, it
+ * saved nothing, and it made no tool calls. The remedy is offered against the
+ * likely cause rather than asserted as fact — same pressure, no invention.
+ */
 export const OUTPUT_LIMIT_NUDGE =
   'Your last turn hit the output limit and was cut off mid-sentence, so none of ' +
-  'it took effect and nothing was saved.\n\n' +
-  'Looking at it: you were writing file contents into the reply. That is what ran ' +
-  'out of room — a reply is not a file, and printing one costs the whole budget ' +
-  'without putting anything on disk.\n\n' +
-  'Use `write` to put each file where it belongs, ONE call per file, and say ' +
-  'nothing about the contents in the reply itself. Start with the single most ' +
-  'important file rather than restating the plan.';
+  'it took effect and nothing was saved. It made no tool calls.\n\n' +
+  'If you were writing file contents into the reply: a reply is not a file, and ' +
+  'printing one costs the whole budget without putting anything on disk. Use ' +
+  '`write` to put each file where it belongs, ONE call per file, and say nothing ' +
+  'about the contents in the reply itself.\n\n' +
+  'Either way, start with the single most important next action rather than ' +
+  'restating the plan.';
 
 function lastAssistantText(messages: readonly unknown[]): string {
   for (let i = messages.length - 1; i >= 0; i -= 1) {
