@@ -1865,12 +1865,23 @@ export async function openRoleSession(
        */
       if (turn.lastStopReason === 'length' && turn.toolCalls.length === 0 && !nudgedLength) {
         nudgedLength = true;
+        /*
+         * Say only what is KNOWN. This used to assert "You were writing content
+         * into the reply" outright, matching the harness-side OUTPUT_LIMIT_NUDGE
+         * it was modelled on. Both were written from run 16, where it happened to
+         * be true, and both stated it unconditionally — while the firing condition
+         * here is just "hit the cap and called nothing", which a long piece of
+         * reasoning satisfies equally. Telling a role it did something it did not
+         * do makes it correct behaviour it never had.
+         */
         const steer =
           'That turn hit the output limit and was cut off mid-sentence, so none of it ' +
-          'counted and nothing was saved. You were writing content into the reply — a ' +
-          'reply is not a file, and printing one spends the whole budget without ' +
-          'producing anything. Use `write` to put it where it belongs, ONE call per ' +
-          'file, and keep the reply itself to a sentence.';
+          'counted and nothing was saved. It made no tool call.\n\n' +
+          'If you were writing content into the reply: a reply is not a file, and ' +
+          'printing one spends the whole budget without producing anything. Use ' +
+          '`write` to put it where it belongs, ONE call per file, and keep the reply ' +
+          'itself to a sentence.\n\n' +
+          'Either way, make the next concrete action your first move.';
         safeEmit(turn.onActivity, { kind: 'briefing', text: steer });
         await session.prompt(steer);
       }
