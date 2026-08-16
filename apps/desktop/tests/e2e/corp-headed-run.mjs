@@ -26,14 +26,58 @@
  * Exit code 0 means the run was DRIVEN, never that the product is good — the
  * verification is the hierarchy, and ultimately a human looking at the artifacts.
  */
+import { execSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { _electron as electron } from 'playwright-core';
 
 const require = createRequire(import.meta.url);
 const electronBinary = require('electron');
+
+/*
+ * DO NOT LEAVE A LOADED MODEL BEHIND.
+ *
+ * Closing the app from Playwright does not reliably reap the llama-server
+ * grandchild — MEASURED 2026-08-16, a bail-out here left a 4B server reparented
+ * to init holding 6.6GB. The app reaps orphans when it LAUNCHES
+ * (electron/inference/reap-orphans.ts, which owns the real rule and is
+ * unit-tested); nothing covers the gap between this script exiting and the next
+ * launch, and that gap is exactly when the next benchmark runs and silently
+ * measures a machine with a ghost on it. That is not hypothetical: an orphaned
+ * 27B took this machine to 10% free and the next probe died with "Compute
+ * error", which reads as a model bug and is not one.
+ *
+ * Narrow on purpose — llama-server only, our cache root only, ppid 1 only. A
+ * server owned by a LIVE app always has a live parent, so a running Bobble is
+ * never touched. Registered on `exit` so every path (success, bail, throw) is
+ * covered rather than just the one someone remembered.
+ */
+function reapOrphanedServers() {
+  const root = path.join(os.homedir(), '.cache/pi-desktop/llamacpp');
+  try {
+    const rows = execSync('ps -axo pid=,ppid=,command=', { encoding: 'utf8' });
+    const pids = rows
+      .split('\n')
+      .map((line) => /^\s*(\d+)\s+(\d+)\s+(.*)$/.exec(line))
+      .filter((m) => m !== null && m[2] === '1')
+      .filter((m) => m[3].includes('llama-server') && m[3].includes(root))
+      .map((m) => Number(m[1]));
+    for (const pid of pids) {
+      try {
+        process.kill(pid, 'SIGKILL');
+        console.error(`corp-headed-run: reaped orphaned llama-server ${pid}`);
+      } catch {
+        /* already gone */
+      }
+    }
+  } catch {
+    /* tidying up must never be the reason a run fails */
+  }
+}
+process.on('exit', reapOrphanedServers);
 
 const appRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const repoRoot = path.resolve(appRoot, '../..');
@@ -310,22 +354,48 @@ try {
    * seemingly" — because a human waits for it. A test that races the model is
    * testing the race.
    */
-  const modelReady = await page
-    .waitForFunction(
-      () => {
-        const st = window.__llm_store?.().getState?.().status;
-        return st?.phase === 'ready';
-      },
-      { timeout: 180_000 },
-    )
-    .then(() => true)
-    .catch(() => false);
+  /*
+   * ASK THE APP, NOT A TEST-ONLY HOOK.
+   *
+   * This used to read `window.__llm_store?.().getState?.().status`, and it could
+   * never once have returned true. `__llm_store` is installed ONLY when the app
+   * is loaded with `?piE2E=1` (state/llm-store.ts), and this launcher
+   * deliberately does not use that flag — the whole point is to drive the app as
+   * a user does. So `window.__llm_store?.()` was always undefined, `.getState?.()`
+   * on undefined THREW, the throw landed in `.catch(() => false)`, and every run
+   * bailed with "the model never reached ready" in a couple of seconds — the
+   * 180s budget never even started. MEASURED 2026-08-16: the 4B was in fact fine,
+   * loaded and resident at 6.6GB, while the launcher declared it never ready.
+   *
+   * A gate that reads a hook the app does not install is not a gate, it is an
+   * unconditional refusal. `llm:get-status` is the real IPC the UI itself renders
+   * from, it is on the always-present preload bridge, and it needs no test flag.
+   */
+  const readyDeadline = Date.now() + 180_000;
+  let modelReady = false;
+  let lastPhase = 'unknown';
+  while (Date.now() < readyDeadline) {
+    const st = await page
+      .evaluate(() => window.piDesktop.invoke('llm:get-status', undefined))
+      .catch(() => null);
+    if (st !== null && st !== undefined) {
+      lastPhase = String(st.phase);
+      if (st.phase === 'ready') {
+        modelReady = true;
+        break;
+      }
+      if (st.phase === 'error') break;
+    }
+    await page.waitForTimeout(2000);
+  }
   if (!modelReady) {
-    console.error('corp-headed-run: the model never reached "ready" — refusing to send, because');
-    console.error('a prompt into a loading model just yields "fetch failed" and proves nothing.');
+    console.error(`corp-headed-run: the model never reached "ready" (phase: ${lastPhase}) —`);
+    console.error('refusing to send, because a prompt into a loading model just yields');
+    console.error('"fetch failed" and proves nothing.');
     await app.close().catch(() => {});
     process.exit(5);
   }
+  log('model ready');
   /*
    * RE-PUSH THE EFFORT, NOW THAT PI IS THE ONE THAT WILL ANSWER.
    *
