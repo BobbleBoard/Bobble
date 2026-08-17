@@ -266,10 +266,7 @@ function RowMenu({
         setOpen(false);
         run();
       }}
-      className={cx(
-        'w-full rounded-lg px-2.5 py-1.5 text-left text-footnote',
-        disabled ? 'text-text-muted' : 'text-text-primary hover:bg-bg-hover',
-      )}
+      className={cx('pd-menu-item text-footnote', disabled ? 'text-text-muted' : undefined)}
     >
       {label}
     </button>
@@ -307,9 +304,16 @@ function RowMenu({
               setOpen(false);
             }}
           />
+          {/*
+           * SHARED SURFACE, not a local one. Every dropdown in the app draws
+           * from `.pd-menu` in packages/ui/styles/menu.css — the user wants "the
+           * same master switch so that you change the style and they all
+           * change". Only POSITION is local here; the ring, radius, surface and
+           * the (now instant) open behaviour all come from there.
+           */}
           <div
             data-testid="row-menu-panel"
-            className="absolute top-full right-0 z-30 mt-1 min-w-[180px] rounded-xl border border-border-subtle bg-bg-raised p-1 shadow-[0_8px_28px_rgba(0,0,0,0.14)]"
+            className="pd-menu absolute top-full right-0 z-30 mt-1 min-w-[180px]"
           >
             {kind === 'models' ? item('Download', onDownload, model.downloaded === true) : null}
             {item(kind === 'datasets' ? 'Copy dataset id' : 'Copy model id', onCopyId)}
@@ -390,14 +394,14 @@ function CapabilityFilter({
           />
           <div
             data-testid="filter-capability-menu"
-            className="absolute top-full left-0 z-20 mt-1 min-w-[240px] rounded-xl border border-border-subtle bg-bg-raised p-1 shadow-[0_8px_28px_rgba(0,0,0,0.14)]"
+            className="pd-menu absolute top-full left-0 z-20 mt-1 min-w-[240px]"
           >
             {groups.map((g) => {
               const inGroup = options.filter((o) => o.group === g.key);
               if (inGroup.length === 0) return null;
               return (
                 <div key={g.key}>
-                  <p className="px-2.5 pt-1.5 pb-1 text-caption text-text-muted">{g.title}</p>
+                  <p className="pd-menu-label">{g.title}</p>
                   {inGroup.map((o) => {
                     const on = selected.includes(o.id);
                     return (
@@ -408,7 +412,7 @@ function CapabilityFilter({
                         aria-pressed={on}
                         // Deliberately does NOT close: multi-select.
                         onClick={() => toggle(o.id)}
-                        className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-body text-text-primary hover:bg-bg-hover"
+                        className="pd-menu-item"
                       >
                         <span
                           className={cx(
@@ -533,7 +537,7 @@ function Dropdown<T extends string>({
           />
           <div
             data-testid={`${testid}-menu`}
-            className="absolute top-full left-0 z-20 mt-1 min-w-[260px] rounded-xl border border-border-subtle bg-bg-raised p-1 shadow-[0_8px_28px_rgba(0,0,0,0.14)]"
+            className="pd-menu absolute top-full left-0 z-20 mt-1 min-w-[260px]"
           >
             {options.map((o) => (
               <button
@@ -544,7 +548,7 @@ function Dropdown<T extends string>({
                   onChange(o.id);
                   setOpen(false);
                 }}
-                className="flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-left text-body text-text-primary hover:bg-bg-hover"
+                className="pd-menu-item"
               >
                 {o.dot !== undefined ? (
                   <span
@@ -557,7 +561,10 @@ function Dropdown<T extends string>({
               </button>
             ))}
             {footer !== undefined ? (
-              <div className="mt-1 border-t border-border-default pt-1">{footer}</div>
+              <>
+                <div className="pd-menu-separator" />
+                {footer}
+              </>
             ) : null}
           </div>
         </>

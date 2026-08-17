@@ -58,12 +58,17 @@ export function TierPickerMenu({
 }: TierPickerMenuProps) {
   const recommendation = useLlmStore((s) => s.recommendation);
   const refreshCatalog = useLlmStore((s) => s.refreshCatalog);
-  const userMode = useUserMode();
   const selection = useModelSelection();
   const isAuto = selection.mode === 'auto';
   const activeTier = selectionTier(selection);
-  const tierRows = buildTierRows(recommendation?.tierModels, userMode);
-  const showManager = userMode === 'power' && onOpenManager !== undefined;
+  /*
+   * NO MODE GATE. The User / Power-user toggle is gone (the user), and the honest
+   * consequence is that everyone gets what Power showed: leaving the persisted
+   * 'user' default in charge with no way to change it would have hidden the
+   * Model hub, which is reached from this very menu.
+   */
+  const tierRows = buildTierRows(recommendation?.tierModels, 'power');
+  const showManager = onOpenManager !== undefined;
 
   return (
     <DropdownMenu

@@ -32,7 +32,6 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
   IconChat,
-  IconCheck,
   IconChevronDown,
   IconClock,
   IconConnector,
@@ -85,11 +84,11 @@ import { useModalityStore } from '../state/modality-store';
 import { listSessions, newSession, restartPi, switchSession } from '../state/pi-connect';
 import { usePiStore } from '../state/pi-slice';
 import { useProjectStore } from '../state/project-store';
-import { setUserMode, useSettingsStore, useUserMode } from '../state/settings-store';
+import { useSettingsStore } from '../state/settings-store';
 import { publishSessionList } from '../state/visible-projects';
 import { useThemeStore } from '../store/theme';
 import { BobbleMark } from './BobbleMark';
-import { PROFILE_MENU_ACTIONS, USER_MODE_OPTIONS } from './profile-menu';
+import { PROFILE_MENU_ACTIONS } from './profile-menu';
 
 /** Nav destinations that don't have a real page yet — open a "coming soon" stub. */
 export type SidebarStub = 'projects' | 'scheduled' | 'skills';
@@ -97,9 +96,14 @@ export type SidebarStub = 'projects' | 'scheduled' | 'skills';
 /**
  * Bottom-left profile control (round-12 #4). ONE compact button — the avatar
  * (rail) or the full "Bobble · Local" row (expanded) — that opens a DROPUP
- * (side="top") holding, top→bottom: Settings, Toggle theme, a divider, and — at
- * the bottom — the User / Power-user segmented toggle. Replaces the old separate
- * settings-gear + theme-toggle controls. Rendered in both sidebar shapes so both
+ * (side="top") holding Settings and Toggle theme.
+ *
+ * It used to end in a User / Power-user toggle. the user: "the power user/user toggle
+ * has been completely broken, however I think it's a good idea for us to remove
+ * that now that I think about it, so let's remove that toggle anyways." Removing
+ * the control meant choosing a mode rather than leaving everyone on the 'user'
+ * default, which gates the Model hub out of the composer entirely — see
+ * footer-models.ts / TierPickerMenu. Everything now behaves as power did. Rendered in both sidebar shapes so both
  * share one menu; the `open-settings` / `toggle-mode` testids move onto the menu
  * rows (probes open the menu first, then click them).
  */
@@ -112,7 +116,6 @@ function SidebarProfileMenu({
 }) {
   const mode = useThemeStore((s) => s.mode);
   const setTheme = useSettingsStore((s) => s.setTheme);
-  const userMode = useUserMode();
 
   const trigger =
     variant === 'rail' ? (
@@ -193,42 +196,6 @@ function SidebarProfileMenu({
             </DropdownMenuItem>
           ),
         )}
-
-        <DropdownMenuSeparator />
-
-        {/*
-         * MODE AS MENU ITEMS, not an embedded control.
-         *
-         * the user: the dropup "needs to be restyled to be the same as all other
-         * dropdowns/ups in the app that are uniformly styled". It held a
-         * SegmentedControl and a paragraph of blurb — a bespoke block no other
-         * menu in the app has, which is exactly what made it look foreign. Two
-         * checkable rows say the same thing in the shared vocabulary, and the
-         * description moves onto each row as its hint rather than sitting under
-         * the control as prose.
-         */}
-        <div className="pd-menu-label">Mode</div>
-        {USER_MODE_OPTIONS.map((o) => (
-          <DropdownMenuItem
-            key={o.value}
-            data-testid={`usermode-${o.value}`}
-            icon={
-              userMode === o.value ? (
-                <IconCheck size={16} />
-              ) : (
-                <span style={{ width: 16, display: 'inline-block' }} />
-              )
-            }
-            // Stays open so switching and reading the effect happens in place.
-            onSelect={(e) => {
-              e.preventDefault();
-              void setUserMode(o.value as UserMode);
-            }}
-            hint={o.blurb}
-          >
-            {o.label}
-          </DropdownMenuItem>
-        ))}
       </DropdownMenuContent>
     </DropdownMenu>
   );

@@ -194,7 +194,9 @@ export function QuantPicker({
           />
           <div
             data-testid="quant-menu"
-            className="absolute top-full right-0 left-0 z-20 mt-1 max-h-[280px] overflow-y-auto rounded-xl border border-border-subtle bg-bg-raised p-1 shadow-[0_8px_28px_rgba(0,0,0,0.14)]"
+            /* Shared `.pd-menu` surface — see the note in ModelsView's RowMenu.
+               Position and the height cap are the only local parts. */
+            className="pd-menu absolute top-full right-0 left-0 z-20 mt-1 max-h-[280px]"
           >
             {ordered.map((o) => {
               const fit = quantFit({ ...fitInput, modelBytes: o.bytes });
@@ -208,7 +210,7 @@ export function QuantPicker({
                     setChosen(o.quant);
                     setOpen(false);
                   }}
-                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left hover:bg-bg-hover"
+                  className="pd-menu-item"
                 >
                   <Tooltip label={fit.detail ?? fit.label} side="left">
                     <span className={cx('h-2 w-2 shrink-0 rounded-full', TONE_CLASS[fit.tone])} />

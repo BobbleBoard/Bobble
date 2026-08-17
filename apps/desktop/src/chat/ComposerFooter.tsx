@@ -207,49 +207,50 @@ export function ComposerFooter({
 
       {/* Info popover: current/last-turn stats. Tokens are real (engine usage);
           the tool-call count is exact; elapsed is derived from message
-          timestamps (labelled estimated). Hover to reveal (round-5 #25). HIDDEN
-          for power users (round-A #1) — they read the raw numbers elsewhere. */}
-      {userMode !== 'power' ? (
-        <Tooltip
-          side="top"
-          align="end"
-          delayDuration={100}
-          className="pd-context-tooltip"
-          label={
-            <span
-              className="flex min-w-[220px] flex-col gap-1.5 text-footnote"
-              data-testid="turn-stats"
-            >
-              <span className="font-medium text-text-primary">Last turn</span>
-              {modelName !== null ? <StatRow label="Model" value={modelName} /> : null}
-              {usage !== undefined ? (
-                <>
-                  <StatRow
-                    label="Input ↓"
-                    value={`${fmtInt(usage.input)}${inputPct !== null ? ` · ${inputPct}` : ''}`}
-                  />
-                  <StatRow
-                    label="Output ↑"
-                    value={`${fmtInt(usage.output)}${outputPct !== null ? ` · ${outputPct}` : ''}`}
-                  />
-                  <StatRow label="Total" value={fmtInt(usage.totalTokens)} />
-                </>
-              ) : (
-                <StatRow label="Tokens" value="—" />
-              )}
-              <StatRow label="Tool calls" value={String(stats.toolCalls)} />
-              {stats.elapsedMs !== undefined ? (
-                <StatRow label="Elapsed*" value={fmtElapsed(stats.elapsedMs)} />
-              ) : null}
-              <span className="text-text-muted">* estimated from message timestamps</span>
-            </span>
-          }
-        >
-          <IconButton size="sm" aria-label="Turn stats" data-testid="footer-info">
-            <IconInfo size={16} />
-          </IconButton>
-        </Tooltip>
-      ) : null}
+          timestamps (labelled estimated). Hover to reveal (round-5 #25).
+          It used to be hidden for power users, who "read the raw numbers
+          elsewhere". With the mode toggle removed there is no such distinction,
+          and hiding the only inline stats readout from everyone is the worse of
+          the two options — so it stays. */}
+      <Tooltip
+        side="top"
+        align="end"
+        delayDuration={100}
+        className="pd-context-tooltip"
+        label={
+          <span
+            className="flex min-w-[220px] flex-col gap-1.5 text-footnote"
+            data-testid="turn-stats"
+          >
+            <span className="font-medium text-text-primary">Last turn</span>
+            {modelName !== null ? <StatRow label="Model" value={modelName} /> : null}
+            {usage !== undefined ? (
+              <>
+                <StatRow
+                  label="Input ↓"
+                  value={`${fmtInt(usage.input)}${inputPct !== null ? ` · ${inputPct}` : ''}`}
+                />
+                <StatRow
+                  label="Output ↑"
+                  value={`${fmtInt(usage.output)}${outputPct !== null ? ` · ${outputPct}` : ''}`}
+                />
+                <StatRow label="Total" value={fmtInt(usage.totalTokens)} />
+              </>
+            ) : (
+              <StatRow label="Tokens" value="—" />
+            )}
+            <StatRow label="Tool calls" value={String(stats.toolCalls)} />
+            {stats.elapsedMs !== undefined ? (
+              <StatRow label="Elapsed*" value={fmtElapsed(stats.elapsedMs)} />
+            ) : null}
+            <span className="text-text-muted">* estimated from message timestamps</span>
+          </span>
+        }
+      >
+        <IconButton size="sm" aria-label="Turn stats" data-testid="footer-info">
+          <IconInfo size={16} />
+        </IconButton>
+      </Tooltip>
     </>
   );
 }

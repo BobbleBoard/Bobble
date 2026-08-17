@@ -476,27 +476,6 @@ export function ChatApp({
       <SiteIconProvider value={useSiteIcon}>
         <OpenUrlProvider value={openResultUrl}>
           <div className="relative flex h-full">
-            {/*
-             * THE SIDEBAR TOGGLE LIVES HERE, not in the sidebar.
-             *
-             * the user: "move the left sidebar button right to the right of the
-             * traffic light buttons… button stays fixed up right next to the
-             * traffic light buttons." A collapsed sidebar now unmounts entirely,
-             * so a toggle rendered by it would vanish with it and leave no way
-             * back. Absolutely positioned clear of the macOS lights (~78px) and
-             * opted out of the drag region so it stays clickable.
-             */}
-            <button
-              type="button"
-              aria-label={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
-              aria-expanded={sidebarOpen}
-              data-testid={sidebarOpen ? 'collapse-sidebar' : 'expand-sidebar'}
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="[-webkit-app-region:no-drag] pd-focusable absolute top-2 left-[84px] z-30 flex h-8 w-8 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-bg-hover hover:text-text-primary"
-            >
-              <IconSidebar size={16} />
-            </button>
-
             {/* The sidebar stays mounted; when collapsed the slot narrows to a
             ~64px ICON RAIL (round-8 #1) rather than hiding — global.css owns the
             rail width + the panel's stay-put override. */}
@@ -606,6 +585,48 @@ export function ChatApp({
 
               {stub !== null ? <StubPanel stub={stub} onClose={() => setStub(null)} /> : null}
             </MainSurface>
+
+            {/*
+             * THE SIDEBAR TOGGLE LIVES HERE, not in the sidebar.
+             *
+             * the user: "move the left sidebar button right to the right of the
+             * traffic light buttons… button stays fixed up right next to the
+             * traffic light buttons." A collapsed sidebar now unmounts entirely,
+             * so a toggle rendered by it would vanish with it and leave no way
+             * back.
+             *
+             * WHY IT IS RENDERED LAST AND WRAPPED. the user: "the left sidebar
+             * button is NOT CLICKABLE doesn't have any hover or click."
+             *
+             * `no-drag` on the button was not enough. macOS takes mouse events
+             * inside a `-webkit-app-region: drag` rect BEFORE the renderer sees
+             * them, so a covered control loses its clicks AND its hover — the
+             * missing hover is what proves the events never arrived, and it is
+             * why a Playwright click "passed": CDP injects at the renderer,
+             * below the layer that was eating real input.
+             *
+             * `.pd-sidebar-tl` is a full-width drag strip across the sidebar's
+             * top, and it overlapped this button exactly. Chromium unions and
+             * subtracts these rects in paint order, so the fix is both halves:
+             * the strips no longer extend over this corner (global.css), and the
+             * toggle sits in its own `no-drag` zone painted after everything so
+             * nothing can re-add drag on top of it.
+             */}
+            <div
+              className="[-webkit-app-region:no-drag] absolute top-0 left-[78px] z-40 flex h-12 w-11 items-start pt-2"
+              data-testid="sidebar-toggle-zone"
+            >
+              <button
+                type="button"
+                aria-label={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
+                aria-expanded={sidebarOpen}
+                data-testid={sidebarOpen ? 'collapse-sidebar' : 'expand-sidebar'}
+                onClick={() => setSidebarOpen(!sidebarOpen)}
+                className="[-webkit-app-region:no-drag] pd-focusable flex h-8 w-8 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-bg-hover hover:text-text-primary"
+              >
+                <IconSidebar size={16} />
+              </button>
+            </div>
 
             <CanvasTabsPanel />
 

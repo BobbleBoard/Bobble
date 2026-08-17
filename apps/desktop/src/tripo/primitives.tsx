@@ -125,7 +125,11 @@ export function MenuAnchor({
         ? createPortal(
             <div
               ref={popRef}
-              className="tp-popover tp-popover-portal"
+              /* `pd-menu` FIRST: the surface, ring, radius and open behaviour
+                 come from the app's one menu recipe (packages/ui/styles/menu.css)
+                 rather than a second copy here. `.tp-popover` keeps only what is
+                 genuinely local — fixed positioning and z-index. */
+              className="pd-menu tp-popover tp-popover-portal"
               data-testid={`tp-menu-${id}`}
               data-tp-menu-root
               role="menu"

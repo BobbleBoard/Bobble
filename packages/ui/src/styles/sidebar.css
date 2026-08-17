@@ -202,10 +202,24 @@
  * two children each own their own hover — the profile area and the gear light up
  * separately, which is what tells you they do different things.
  */
+/*
+ * THE GEAR SITS ON TOP OF THE PROFILE BUTTON, NOT BESIDE IT.
+ *
+ * the user: "the 'bobble local' button to the left of it should have a clickable
+ * area that stretches to the right more, through the settings button, so the
+ * settings button is sitting on TOP of the bobble button."
+ *
+ * Side by side, the profile button stopped short of the gear and the row's right
+ * end was dead space. So the row is a positioning context, the profile button
+ * spans all of it, and the gear is layered over the right end — it still owns
+ * its own hover and its own click, because it is a real button above, not a
+ * region of the one below. The profile button keeps padding-right so its label
+ * never runs under the gear.
+ */
 .pd-sidebar-footer-row {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 2px;
   flex: none;
   margin: 0 8px 8px;
 }
@@ -221,7 +235,8 @@
   min-width: 0;
   flex: 1;
   height: calc(44px * var(--pd-sidebar-scale, 1));
-  padding: 0 8px;
+  /* Right padding = the gear's width + its inset, so the label stops before it. */
+  padding: 0 calc(40px * var(--pd-sidebar-scale, 1)) 0 8px;
   border: 0;
   border-radius: var(--pd-radius-md, 8px);
   background: transparent;
@@ -234,6 +249,11 @@
   background: var(--pd-bg-hover);
 }
 .pd-sidebar-footer-gear {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;

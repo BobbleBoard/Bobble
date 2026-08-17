@@ -678,6 +678,16 @@ body {
  */
 .pd-topbar--sidebar-collapsed .pd-topbar-section:first-child {
   padding-left: 124px;
+  /*
+   * AND NOT DRAGGABLE. `.pd-topbar` is a drag region; collapsed, it starts at
+   * window-x 0 and so covers the sidebar toggle — the same theft `.pd-sidebar-tl`
+   * was committing when the sidebar is open. The 124px of padding above is
+   * exactly the toggle's corner, so making this section `no-drag` removes the
+   * overlap at its source rather than relying on which rect Chromium subtracts
+   * last. The window is still dragged by the rest of the bar, and the title
+   * inside was already no-drag so it could be clicked to rename.
+   */
+  -webkit-app-region: no-drag;
 }
 /*
  * THE WORDMARK. the user: "the bobble in the top left should be some nice font and
@@ -1289,6 +1299,24 @@ body {
  * (→ 72px padding = the same 80px window-x). Vertical centering is handled by the
  * strip sharing the top-bar height with `items-center`.
  */
+/*
+ * THE DRAG STRIP STOPS SHORT OF THE TOGGLE.
+ *
+ * `.pd-sidebar-tl` is a full-width draggable strip across the sidebar's top, and
+ * it covered the sidebar toggle at x=84..116 — so macOS claimed those mouse
+ * events and the button had no hover and no click. The toggle's own `no-drag`
+ * did not save it: Chromium collects these rects in DOM order, and the strip
+ * comes later in the tree. Belt AND braces, because this cost a round trip: the
+ * toggle now renders last (ChatApp) so its `no-drag` is applied last, and the
+ * strip below no longer reaches over it in the first place.
+ *
+ * 124px = 78 (traffic lights) + 32 (the toggle) + 14 (gap), the same clearance
+ * the collapsed top bar's title uses. The window is still draggable by the whole
+ * strip to the right of it.
+ */
+.pd-sidebar-tl {
+  margin-left: 124px;
+}
 .pd-sidebar-tl {
   padding-left: 80px;
   /* Round-7 (img56): a little top padding so the collapse toggle drops onto the

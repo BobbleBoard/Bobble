@@ -104,6 +104,37 @@ try {
     `the title starts after the toggle (x=${corner.titleX} vs button right ${corner.btnRight})`,
   );
   check(corner.hitIsButton === true, 'a click at the toggle reaches the toggle, not the title');
+  /*
+   * AND NOTHING DRAGGABLE MAY COVER IT. the user, after the first fix: "the left
+   * sidebar button is NOT CLICKABLE doesn't have any hover or click." macOS
+   * claims mouse events inside a `-webkit-app-region: drag` rect BEFORE the
+   * renderer sees them, so a covered button loses hover as well as clicks — and
+   * a Playwright click still "passes", because CDP injects below that layer.
+   * This is the invariant that governs real input; the hit test above cannot
+   * see it.
+   */
+  const region = await page.evaluate(() => {
+    const btn = document.querySelector('[data-testid="expand-sidebar"]');
+    if (btn === null) return { governing: 'no toggle', stack: [] };
+    const r = btn.getBoundingClientRect();
+    /*
+     * Which region GOVERNS this point. Chromium unions the `drag` rects and
+     * subtracts the `no-drag` ones, so an ancestor bar being draggable is fine
+     * as long as something nearer the top of the stack opts out — what is fatal
+     * is the topmost opt-in winning, which is what `.pd-sidebar-tl` did.
+     */
+    const stack = document.elementsFromPoint(r.x + r.width / 2, r.y + r.height / 2).map((el) => ({
+      el: `${el.tagName.toLowerCase()}.${String(el.className).split(' ')[0]}`,
+      region: getComputedStyle(el).webkitAppRegion,
+    }));
+    const governing = stack.find((e) => e.region === 'drag' || e.region === 'no-drag');
+    return { governing: governing?.region ?? 'none', stack: stack.slice(0, 5) };
+  });
+  check(
+    region.governing === 'no-drag',
+    `the toggle sits in a no-drag region (governing: ${region.governing})`,
+  );
+  console.log(`     region stack: ${region.stack.map((e) => `${e.el}:${e.region}`).join(' > ')}`);
   await page.screenshot({ path: path.join(OUT, 'r20-00-collapsed.png') });
   await page.evaluate(() => document.querySelector('[data-testid="expand-sidebar"]')?.click());
   await page.waitForTimeout(900);
@@ -127,11 +158,11 @@ try {
       // The bespoke block: a segmented control no other menu in the app has.
       segmented: menu.querySelectorAll('[role="radiogroup"], .pd-segmented').length,
       items: menu.querySelectorAll('[role="menuitem"]').length,
-      modeRowsAreMenuItems: ['user', 'power'].every(
-        (m) =>
-          document.querySelector(`[data-testid="usermode-${m}"]`)?.getAttribute('role') ===
-          'menuitem',
-      ),
+      // The User / Power-user toggle was removed outright (the user).
+      modeRows: document.querySelectorAll('[data-testid^="usermode-"]').length,
+      // Every menu draws from the one recipe: shared class, no open animation.
+      isPdMenu: menu.classList.contains('pd-menu'),
+      animation: cs.animationName,
       settingsRow: document.querySelector('[data-testid="open-settings"]') !== null,
       radius: cs.borderRadius,
       bg: cs.backgroundColor,
@@ -142,19 +173,12 @@ try {
     dropup?.segmented === 0,
     `no segmented control left inside the menu (${dropup?.segmented})`,
   );
-  check(dropup?.modeRowsAreMenuItems === true, 'both mode rows are ordinary menu items');
-  check(dropup?.items >= 4, `menu has the expected rows (${dropup?.items})`);
+  check(dropup?.modeRows === 0, `the User/Power-user toggle is gone (${dropup?.modeRows} rows)`);
+  check(dropup?.items >= 2, `menu has its rows (${dropup?.items})`);
+  check(dropup?.isPdMenu === true, 'the dropup uses the shared .pd-menu surface');
+  check(dropup?.animation === 'none', `the dropup opens instantly (${dropup?.animation})`);
   check(dropup?.settingsRow === true, 'the open-settings row still exists (11 probes click it)');
 
-  /* Flip to Power user through the NEW menu row. Two things at once: it proves
-     the restyled row is a working control and not just markup, and Power mode is
-     what surfaces the hub entry ("More models") the slider checks need. */
-  await page.click('[data-testid="usermode-power"]');
-  await page.waitForTimeout(500);
-  const powerOn = await page.evaluate(
-    () => document.querySelector('[data-testid="usermode-power"]')?.textContent ?? '',
-  );
-  check(powerOn.includes('Power'), 'the Power-user row is still there after selecting it');
   await page.keyboard.press('Escape');
   await page.waitForTimeout(300);
 

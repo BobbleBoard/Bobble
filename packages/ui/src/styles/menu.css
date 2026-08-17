@@ -55,7 +55,32 @@
    * keyframes below; default is the dropdown direction.
    */
   transform-origin: var(--radix-popper-transform-origin, center top);
-  animation: pd-menu-reveal-down var(--pd-duration-menu) var(--pd-easing-enter);
+  /*
+   * ===================== THE MENU MOTION SWITCH =====================
+   *
+   * the user: every dropdown should share "the same master switch so that you change
+   * the style and they all change… this includes instant open, bordering and
+   * such." Currently: INSTANT.
+   *
+   * The two custom properties below are the entire control surface. To bring the
+   * directional reveal back for EVERY menu in the app, set:
+   *
+   *   --pd-menu-open-animation: var(--pd-menu-keyframes) var(--pd-duration-menu)
+   *                             var(--pd-easing-enter);
+   *   --pd-menu-close-animation: pd-fade-out var(--pd-duration-fast)
+   *                              var(--pd-easing-exit) forwards;
+   *
+   * The per-side rules below no longer set `animation-name` — that is what made
+   * this not a switch at all: a shorthand here was silently re-armed by a
+   * longhand there, so turning motion off in one place left dropups animating.
+   * They now only pick which keyframes the switch WOULD use, so the decision
+   * lives in exactly one place.
+   * ==================================================================
+   */
+  --pd-menu-keyframes: pd-menu-reveal-down;
+  --pd-menu-open-animation: none;
+  --pd-menu-close-animation: none;
+  animation: var(--pd-menu-open-animation);
   scrollbar-width: none;
 }
 
@@ -64,35 +89,35 @@
 }
 
 /* Each side reveals from the edge nearest its trigger, anchored by origin so the
- * subtle directional slide + clip growth read as "rolling out" that direction. */
+ * subtle directional slide + clip growth read as "rolling out" that direction.
+ * These choose WHICH keyframes; whether they run at all is the switch above. */
 .pd-menu[data-side="bottom"] {
   transform-origin: center top;
-  animation-name: pd-menu-reveal-down;
+  --pd-menu-keyframes: pd-menu-reveal-down;
 }
 .pd-menu[data-side="top"] {
   transform-origin: center bottom;
-  animation-name: pd-menu-reveal-up;
+  --pd-menu-keyframes: pd-menu-reveal-up;
 }
 .pd-menu[data-side="right"] {
   transform-origin: left center;
-  animation-name: pd-menu-reveal-right;
+  --pd-menu-keyframes: pd-menu-reveal-right;
 }
 .pd-menu[data-side="left"] {
   transform-origin: right center;
-  animation-name: pd-menu-reveal-left;
+  --pd-menu-keyframes: pd-menu-reveal-left;
 }
 
 .pd-menu[data-state="closed"] {
-  animation: pd-fade-out var(--pd-duration-fast) var(--pd-easing-exit) forwards;
+  animation: var(--pd-menu-close-animation);
 }
 
 /*
- * Round-10 (#11): opt a menu OUT of the open/close motion entirely — it appears
- * and disappears instantly (no clip-reveal, slide, scale or fade). Used by the
- * footer model dropdown and the composer "+" menu. The `[data-side]` / `[data-state]`
- * variants outrank the directional reveal + closed fade-out rules above (equal
- * specificity, declared later), and `animation: none` on the closed state makes
- * Radix unmount immediately instead of waiting out an exit animation.
+ * Kept as a no-op alias. It used to be the way a MENU opted out of motion, back
+ * when some menus animated and others did not — the inconsistency the user asked to
+ * end. Motion is now decided once, above, so this class adds nothing; it stays
+ * because several call sites pass it and removing it would be churn with no
+ * behaviour change either way.
  */
 .pd-menu--instant,
 .pd-menu--instant[data-side],
@@ -178,6 +203,11 @@
   display: flex;
   width: 100%;
   align-items: center;
+  /* A row is left-aligned. Obvious until the row is a <button>, whose UA default
+     is text-align:center — which centred every label the moment the hub's menus
+     started using this recipe instead of carrying their own `text-left`. It
+     belongs here so no consumer has to remember it. */
+  text-align: left;
   gap: calc(8px * var(--pd-menu-scale, 1));
   min-height: calc((var(--pd-row-height) - 2px) * var(--pd-menu-scale, 1));
   padding: calc(4px * var(--pd-menu-scale, 1)) calc(10px * var(--pd-menu-scale, 1));

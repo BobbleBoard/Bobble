@@ -394,31 +394,26 @@
 .tp-anchor-block {
   display: block;
 }
+/*
+ * POSITION ONLY. The surface came from here — its own background stack, a 1px
+ * BORDER where the app's recipe draws a hairline ring as a box-shadow, and its
+ * own `tp-menu-in` animation. That is precisely the divergence the user asked to
+ * end: "ensure all dropdowns across the entire app use the universal styling
+ * (the same master switch so that you change the style and they all change…
+ * instant open, bordering and such)."
+ *
+ * The element now also carries `.pd-menu` (see tripo/primitives.tsx), so
+ * everything visual arrives from packages/ui/src/styles/menu.css. What is left
+ * below is what that recipe cannot know: this popover is positioned by hand into
+ * a portal, and it sits above the studio's own layers.
+ */
 .tp-popover {
   position: absolute;
   z-index: 80;
   min-width: 190px;
-  padding: var(--pd-menu-padding, 6px);
-  /* The overlay token carries alpha (it pairs with the app's overlay blur).
-   * Layer it over the solid raised surface so menus are opaque even when
-   * nested inside another blurred surface (e.g. the export dialog). */
-  background: linear-gradient(var(--pd-bg-overlay), var(--pd-bg-overlay)), var(--pd-bg-raised);
-  backdrop-filter: blur(var(--pd-blur-overlay, 14px));
-  border: 1px solid var(--pd-border-subtle);
-  border-radius: var(--pd-radius-popover);
-  box-shadow: var(--pd-shadow-popover);
-  animation: tp-menu-in var(--pd-duration-menu, 140ms) var(--pd-easing-enter, ease-out);
 }
-@keyframes tp-menu-in {
-  from {
-    opacity: 0;
-    transform: translateY(-4px) scale(0.98);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
+/* `tp-menu-in` deleted with the surface above — opening is instant now, and the
+ * one place that decides that is `.pd-menu` in packages/ui/src/styles/menu.css. */
 .tp-place-bottom-start {
   top: calc(100% + 6px);
   left: 0;
