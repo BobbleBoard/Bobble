@@ -208,16 +208,18 @@ body {
   width: calc(var(--pd-sidebar-width) + 16px);
 }
 /*
- * Round-8 #1: a COLLAPSED sidebar is a NARROW ICON RAIL (~64px), not hidden —
- * the SVG icons stay visible. The slot keeps the rail's footprint; the panel
- * override below cancels the ui package's off-screen slide so it parks in place.
+ * A COLLAPSED SIDEBAR IS GONE, not a rail. the user: "when we close the left sidebar
+ * now it just completely closes… like a curtain and the whole thing dissapears".
+ * The width animates to 0 so the right border slides left rather than the panel
+ * popping out, and the slot clips so nothing bleeds over the chat mid-transition.
+ * The toggle lives in the shell (ChatApp) precisely so it outlives this.
  */
 .pd-sidebar-slot[data-open="false"] {
-  width: var(--pd-sidebar-rail, 64px);
-  overflow: visible;
+  width: 0;
+  overflow: hidden;
 }
 :root[data-flavor="claude"] .pd-sidebar-slot[data-open="false"] {
-  width: calc(var(--pd-sidebar-rail, 64px) + 16px);
+  width: 0;
 }
 .pd-sidebar[data-open="false"] {
   transform: none;

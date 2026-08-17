@@ -19,13 +19,21 @@
  */
 
 export type ModelFormat = 'all' | 'gguf' | 'safetensors' | 'mlx' | 'finetune';
+/**
+ * Capabilities AND generation types in one axis. the user: "how about a filter by
+ * generation type, generation: we have 3d video image text etc. maybe merge in
+ * capabilities". They are the same question from the user's side — "what can
+ * this thing do" — so two dropdowns asking it would be two places to look.
+ */
 export type ModelCapability =
-  | 'all'
   | 'reasoning'
   | 'vision'
   | 'audio'
   | 'embeddings'
-  | 'image-generation';
+  | 'text-generation'
+  | 'image-generation'
+  | 'video-generation'
+  | '3d-generation';
 export type ModelSort = 'newest' | 'trending' | 'downloads' | 'updated' | 'likes';
 export type ViewMode = 'split' | 'detail' | 'compact';
 
@@ -37,13 +45,20 @@ export const FORMAT_OPTIONS: Array<{ id: ModelFormat; label: string; dot?: strin
   { id: 'finetune', label: 'Fine-tune ready' },
 ];
 
-export const CAPABILITY_OPTIONS: Array<{ id: ModelCapability; label: string }> = [
-  { id: 'all', label: 'All capabilities' },
-  { id: 'reasoning', label: 'Reasoning' },
-  { id: 'vision', label: 'Vision' },
-  { id: 'audio', label: 'Audio' },
-  { id: 'embeddings', label: 'Embeddings' },
-  { id: 'image-generation', label: 'Image generation' },
+/** Grouped so the menu reads as "what it understands" then "what it makes". */
+export const CAPABILITY_OPTIONS: Array<{
+  id: ModelCapability;
+  label: string;
+  group: 'understands' | 'generates';
+}> = [
+  { id: 'reasoning', label: 'Reasoning', group: 'understands' },
+  { id: 'vision', label: 'Vision', group: 'understands' },
+  { id: 'audio', label: 'Audio', group: 'understands' },
+  { id: 'embeddings', label: 'Embeddings', group: 'understands' },
+  { id: 'text-generation', label: 'Text', group: 'generates' },
+  { id: 'image-generation', label: 'Image', group: 'generates' },
+  { id: 'video-generation', label: 'Video', group: 'generates' },
+  { id: '3d-generation', label: '3D', group: 'generates' },
 ];
 
 export const SORT_OPTIONS: Array<{ id: ModelSort; label: string }> = [
@@ -69,7 +84,7 @@ export interface HubModel {
   /** Repo creation time — what "Newest" actually means. */
   readonly createdAt?: number;
   readonly formats: readonly Exclude<ModelFormat, 'all' | 'finetune'>[];
-  readonly capabilities: readonly Exclude<ModelCapability, 'all'>[];
+  readonly capabilities: readonly ModelCapability[];
   readonly downloaded?: boolean;
   /** From model-manager-logic's fit verdict — this module never recomputes it. */
   readonly fits?: boolean;
@@ -78,7 +93,13 @@ export interface HubModel {
 
 export interface HubFilters {
   readonly format: ModelFormat;
-  readonly capability: ModelCapability;
+  /**
+   * MULTI-SELECT. the user: "have that capabilities dropdown be a checkbox that
+   * doesn't immediately close dropdown so you can select multiple." Empty means
+   * no capability filter — which is different from a magic 'all' member, because
+   * a set with an 'all' in it has two ways to say the same thing.
+   */
+  readonly capabilities: readonly ModelCapability[];
   readonly sort: ModelSort;
   readonly onlyFits: boolean;
   readonly query: string;
@@ -86,8 +107,24 @@ export interface HubFilters {
 
 export const DEFAULT_FILTERS: HubFilters = {
   format: 'gguf',
-  capability: 'all',
+  capabilities: [],
   sort: 'newest',
+  onlyFits: false,
+  query: '',
+};
+
+/**
+ * Datasets have no quant format and no inference capabilities, so they start
+ * from a different baseline. Keeping the two sets SEPARATE is the fix for
+ * the user's report: "searching for datasets seeming to not work because filters for
+ * gguf vision etc persist and obviously those files don't exist in datasets,
+ * save those for when the user swaps back to the models tab, don't reset their
+ * filters".
+ */
+export const DEFAULT_DATASET_FILTERS: HubFilters = {
+  format: 'all',
+  capabilities: [],
+  sort: 'downloads',
   onlyFits: false,
   query: '',
 };
@@ -110,7 +147,10 @@ export function filterModels(models: readonly HubModel[], f: HubFilters): HubMod
     } else if (f.format !== 'all' && !m.formats.includes(f.format)) {
       return false;
     }
-    if (f.capability !== 'all' && !m.capabilities.includes(f.capability)) return false;
+    /* OR, not AND: ticking Vision and Audio means "show me either", which is
+       how a browse filter reads. AND would return almost nothing. */
+    if (f.capabilities.length > 0 && !f.capabilities.some((c) => m.capabilities.includes(c)))
+      return false;
     if (f.onlyFits && m.fits !== true) return false;
     if (q.length > 0 && !`${m.name} ${m.org}`.toLowerCase().includes(q)) return false;
     return true;

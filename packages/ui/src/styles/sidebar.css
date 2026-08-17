@@ -193,6 +193,64 @@
   flex: none;
 }
 
+/*
+ * FOOTER: a full-width row, not a floating pill.
+ *
+ * the user: "the hover highlight needs to be full width, same margin on the right as
+ * left… add an embedded settings button… this highlights individually, just a
+ * gear on the right side". So the row owns the inset (equal both sides) and the
+ * two children each own their own hover — the profile area and the gear light up
+ * separately, which is what tells you they do different things.
+ */
+.pd-sidebar-footer-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: none;
+  margin: 0 8px 8px;
+}
+.pd-sidebar-footer-slot {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+}
+.pd-sidebar-footer-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+  height: calc(44px * var(--pd-sidebar-scale, 1));
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--pd-radius-md, 8px);
+  background: transparent;
+  color: var(--pd-text-primary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.pd-sidebar-footer-main:hover {
+  background: var(--pd-bg-hover);
+}
+.pd-sidebar-footer-gear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: calc(32px * var(--pd-sidebar-scale, 1));
+  height: calc(32px * var(--pd-sidebar-scale, 1));
+  border: 0;
+  border-radius: var(--pd-radius-md, 8px);
+  background: transparent;
+  color: var(--pd-text-muted);
+  cursor: pointer;
+}
+.pd-sidebar-footer-gear:hover {
+  background: var(--pd-bg-hover);
+  color: var(--pd-text-primary);
+}
+
 .pd-sidebar-avatar {
   display: inline-flex;
   align-items: center;

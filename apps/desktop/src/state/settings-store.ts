@@ -244,6 +244,22 @@ export async function setEnginePreference(enginePreference: EnginePreference): P
  * same thrash that has bitten this store before. Each of these returns a
  * primitive, which is stable by value.
  */
+/**
+ * The Hugging Face token. Gated and private repos answer 401 without one, and
+ * the hub had nowhere to put it — the user: "no quick place to put a token."
+ *
+ * Returned as a primitive so the selector stays stable, and never logged: the
+ * value is a credential, so it travels between this store and the IPC call and
+ * nowhere else.
+ */
+export function useHfToken(): string {
+  return useSettingsStore((s) => s.settings.hfToken);
+}
+
+export async function setHfToken(hfToken: string): Promise<void> {
+  await useSettingsStore.getState().update({ hfToken });
+}
+
 export function useHarnessId(): string {
   return useSettingsStore((s) => s.settings.harnessId);
 }

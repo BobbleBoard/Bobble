@@ -76,8 +76,25 @@ describe('search + capability', () => {
       m({ id: 'sees', capabilities: ['vision'] }),
       m({ id: 'thinks', capabilities: ['reasoning'] }),
     ];
-    const out = filterModels(models, { ...DEFAULT_FILTERS, capability: 'vision' });
+    const out = filterModels(models, { ...DEFAULT_FILTERS, capabilities: ['vision'] });
     expect(out.map((x) => x.id)).toEqual(['sees']);
+  });
+
+  it('several capabilities are OR, not AND', () => {
+    // Ticking Vision and Audio means "either" — AND would return almost nothing,
+    // since few models claim both.
+    const models = [
+      m({ id: 'sees', capabilities: ['vision'] }),
+      m({ id: 'hears', capabilities: ['audio'] }),
+      m({ id: 'neither', capabilities: ['reasoning'] }),
+    ];
+    const out = filterModels(models, { ...DEFAULT_FILTERS, capabilities: ['vision', 'audio'] });
+    expect(out.map((x) => x.id)).toEqual(['sees', 'hears']);
+  });
+
+  it('an empty capability set filters nothing', () => {
+    const models = [m({ id: 'a' }), m({ id: 'b', capabilities: ['vision'] })];
+    expect(filterModels(models, { ...DEFAULT_FILTERS, capabilities: [] })).toHaveLength(2);
   });
 });
 

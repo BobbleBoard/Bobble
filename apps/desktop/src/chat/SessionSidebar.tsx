@@ -88,6 +88,7 @@ import { useProjectStore } from '../state/project-store';
 import { setUserMode, useSettingsStore, useUserMode } from '../state/settings-store';
 import { publishSessionList } from '../state/visible-projects';
 import { useThemeStore } from '../store/theme';
+import { BobbleMark } from './BobbleMark';
 import { PROFILE_MENU_ACTIONS, USER_MODE_OPTIONS, userModeBlurb } from './profile-menu';
 
 /** Nav destinations that don't have a real page yet — open a "coming soon" stub. */
@@ -129,18 +130,31 @@ function SidebarProfileMenu({
         </span>
       </button>
     ) : (
-      <button
-        type="button"
-        data-testid="profile-button"
-        aria-label="Account, settings and theme"
-        className="pd-sidebar-footer pd-focusable min-w-0 flex-1 cursor-pointer rounded-lg border-0 bg-transparent text-left font-[inherit] text-text-primary hover:bg-bg-hover"
-      >
-        <span className="pd-sidebar-avatar">B</span>
-        <span className="pd-sidebar-footer-name">
-          Bobble<span className="pd-sidebar-footer-plan"> · Local</span>
-        </span>
-        <IconChevronDown size={16} className="shrink-0 text-text-muted" />
-      </button>
+      /*
+       * the user: "the hover highlight needs to be full width, same margin on the
+       * right as left, remove the down arrow, add an embedded settings button
+       * that takes you straight to settings one click, this highlights
+       * individually, just a gear on the right side of the button, clicking the
+       * rest still does the dropup".
+       *
+       * So the hover target is the ROW (inset equally on both sides), the gear is
+       * a sibling with its own hover rather than a nested button — a button
+       * inside a button is invalid HTML and the inner click would bubble into
+       * the dropup, which is exactly the bug that shape produces.
+       */
+      <span className="pd-sidebar-footer-slot">
+        <button
+          type="button"
+          data-testid="profile-button"
+          aria-label="Account and theme"
+          className="pd-sidebar-footer-main pd-focusable"
+        >
+          <span className="pd-sidebar-avatar">B</span>
+          <span className="pd-sidebar-footer-name">
+            Bobble<span className="pd-sidebar-footer-plan"> · Local</span>
+          </span>
+        </button>
+      </span>
     );
 
   return (
@@ -881,69 +895,33 @@ export function SessionSidebar({
     },
   ];
 
-  // ── COLLAPSED: the narrow icon rail (round-8 #1/#3) ────────────────────────
-  if (!open) {
-    return (
-      <Sidebar open={open} className="pd-sidebar--rail">
-        {/* Traffic-light clearance strip (draggable); no button — the rail's own
-            expand toggle sits just below it, clear of the macOS lights. */}
-        <div className="pd-sidebar-tl h-[var(--pd-height-topbar)] shrink-0 [-webkit-app-region:drag]" />
-        <div className="pd-rail">
-          <RailButton
-            label="Expand sidebar"
-            testid="expand-sidebar"
-            onClick={onExpand}
-            icon={<IconSidebar size={16} />}
-          />
-          <RailButton label="Search chats" onClick={onExpand} icon={<IconSearch size={16} />} />
-          <div className="pd-rail-sep" aria-hidden="true" />
-          <RailButton
-            label="New chat"
-            testid="new-chat"
-            onClick={() => void onNewChat()}
-            icon={<IconPencil size={16} />}
-          />
-          <RailButton label="Chats" onClick={onExpand} icon={<IconChat size={16} />} />
-          <RailButton
-            label="Model management"
-            testid="nav-model-management"
-            onClick={() => onOpenSettings('models')}
-            icon={<IconCpu size={16} />}
-          />
-          <RailButton
-            label="Connectors"
-            testid="nav-connectors"
-            onClick={onOpenConnectors}
-            icon={<IconConnector size={16} />}
-          />
-          {/* The rail runs the FULL sidebar height; this spacer pushes the
-              profile button down to the foot, matching the expanded sidebar. */}
-          <div className="pd-rail-spacer" aria-hidden="true" />
-          <SidebarProfileMenu variant="rail" onOpenSettings={onOpenSettings} />
-        </div>
-      </Sidebar>
-    );
-  }
+  /*
+   * COLLAPSED: NOTHING. the user: "when we close the left sidebar now it just
+   * completely closes, right border of the left sidebar just slides to the left
+   * like a curtain and the whole thing dissapears, button stays fixed up right
+   * next to the traffic light buttons."
+   *
+   * The icon rail is gone with it. The toggle that brings the sidebar back lives
+   * in the shell (ChatApp), not in here — a control that has to survive this
+   * component unmounting cannot be rendered by it.
+   */
+  if (!open) return null;
 
   // ── EXPANDED: the full sidebar ─────────────────────────────────────────────
   return (
     <Sidebar open={open}>
-      {/* Traffic-light clearance strip (draggable). The collapse toggle now lives
-          in the search row below (to the LEFT of the search), round-8 #1. */}
+      {/* Traffic-light clearance strip (draggable). The collapse toggle moved OUT
+          of the sidebar entirely — it now sits beside the macOS lights in the
+          shell, so it survives the sidebar unmounting. */}
       <div className="pd-sidebar-tl h-[var(--pd-height-topbar)] shrink-0 [-webkit-app-region:drag]" />
 
-      {/* Collapse toggle + click-to-expand search share one row; both align on
-          the same 8px left inset as the rows below (img33). */}
-      <div className="flex items-center gap-1 px-2 pb-2">
-        <button
-          type="button"
-          aria-label="Collapse sidebar"
-          data-testid="collapse-sidebar"
-          onClick={onCollapse}
-          className="pd-focusable flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-text-muted hover:bg-bg-hover"
-        >
-          <IconSidebar size={16} />
-        </button>
+      {/* Identity: the app mark + wordmark, above the search. */}
+      <div className="flex items-center gap-2 px-3 pb-2" data-testid="sidebar-identity" aria-hidden>
+        <BobbleMark size={20} />
+        <span className="text-body font-medium text-text-primary">Bobble</span>
+      </div>
+
+      <div className="px-2 pb-2">
         <div className="min-w-0 flex-1" data-testid="sidebar-search">
           <CollapsibleSearch placeholder="Search chats" value={query} onChange={setQuery} />
         </div>
@@ -1204,11 +1182,21 @@ export function SessionSidebar({
         </DialogContent>
       </Dialog>
 
-      {/* Bottom-left footer: ONE profile button that opens the dropup holding
-          Settings, Toggle theme, and the User / Power-user toggle (round-12 #4).
-          The `open-settings` / `toggle-mode` testids now live on the menu rows. */}
-      <div className="m-1 mt-0 flex">
+      {/* Bottom-left footer: the profile dropup plus a one-click gear. Equal
+          inset both sides so the hover wash is a full-width row rather than a
+          pill floating off-centre. */}
+      <div className="pd-sidebar-footer-row">
         <SidebarProfileMenu variant="full" onOpenSettings={onOpenSettings} />
+        <button
+          type="button"
+          data-testid="footer-settings"
+          aria-label="Settings"
+          title="Settings"
+          onClick={() => onOpenSettings('personalization')}
+          className="pd-sidebar-footer-gear pd-focusable"
+        >
+          <IconSettings size={16} />
+        </button>
       </div>
     </Sidebar>
   );

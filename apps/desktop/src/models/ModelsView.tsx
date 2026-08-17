@@ -51,12 +51,14 @@ import { OrgAvatar } from '../settings/brand-icons';
 import { type QuantOption, ramVerdict } from '../settings/model-manager-logic';
 import { useHfStore } from '../state/hf-store';
 import { useLlmStore } from '../state/llm-store';
+import { setHfToken, useHfToken } from '../state/settings-store';
 import { ModelCard } from './ModelCard';
 import { CapabilityPills } from './model-pills';
 import {
   CAPABILITY_OPTIONS,
   compactBytes,
   compactCount,
+  DEFAULT_DATASET_FILTERS,
   DEFAULT_FILTERS,
   FORMAT_OPTIONS,
   filterModels,
@@ -88,6 +90,8 @@ function toHubModel(e: LlmCatalogEntry, totalRamGB: number): HubModel {
   const caps: Array<Exclude<ModelCapability, 'all'>> = [];
   if (e.vision) caps.push('vision');
   if (e.spec !== undefined || e.mtp) caps.push('reasoning');
+  // Every catalog entry is a text model; that is what makes it launchable here.
+  caps.push('text-generation');
   const sizes = e.quants.map((q) => q.bytes).filter((b) => typeof b === 'number' && b > 0);
   const org = e.hfRepo?.includes('/') === true ? e.hfRepo.split('/')[0] : undefined;
   return {
@@ -135,6 +139,10 @@ function hfToHubModel(h: HfModelHitDTO): HubModel {
   if (has('audio', 'speech', 'asr', 'tts')) caps.push('audio');
   if (has('embedding', 'sentence-similarity', 'feature-extraction')) caps.push('embeddings');
   if (has('text-to-image', 'diffusion', 'image-generation')) caps.push('image-generation');
+  // Generation types, now part of the same axis as capabilities.
+  if (has('text-to-video', 'video-generation', 'image-to-video')) caps.push('video-generation');
+  if (has('text-to-3d', 'image-to-3d', '3d')) caps.push('3d-generation');
+  if (has('text-generation', 'conversational')) caps.push('text-generation');
 
   const formats: Array<Exclude<ModelFormat, 'all' | 'finetune'>> = [];
   if (tags.some((t) => t.includes('gguf'))) formats.push('gguf');
@@ -287,6 +295,131 @@ function RowMenu({
   );
 }
 
+/**
+ * MULTI-SELECT CAPABILITIES.
+ *
+ * the user: "have that capabilities dropdown be a checkbox that doesn't immediately
+ * close dropdown so you can select multiple." So a tick does NOT dismiss the
+ * menu — the whole point is picking several — and the trigger summarises the
+ * selection rather than showing one value.
+ *
+ * Grouped into "understands" and "generates", which is where the generation
+ * types (text/image/video/3D) live now that they are folded in here.
+ */
+function CapabilityFilter({
+  selected,
+  options,
+  onChange,
+}: {
+  selected: readonly ModelCapability[];
+  options: ReadonlyArray<{ id: ModelCapability; label: string; group: string }>;
+  onChange: (next: ModelCapability[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        setOpen(false);
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [open]);
+
+  const label =
+    selected.length === 0
+      ? 'All capabilities'
+      : selected.length === 1
+        ? (options.find((o) => o.id === selected[0])?.label ?? '1 selected')
+        : `${selected.length} selected`;
+
+  const toggle = (id: ModelCapability) =>
+    onChange(selected.includes(id) ? selected.filter((c) => c !== id) : [...selected, id]);
+
+  const groups: Array<{ key: string; title: string }> = [
+    { key: 'understands', title: 'Understands' },
+    { key: 'generates', title: 'Generates' },
+  ];
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        data-testid="filter-capability"
+        onClick={() => setOpen((v) => !v)}
+        className="flex items-center gap-2 rounded-full border border-border-subtle bg-bg-raised px-3.5 py-1.5 text-footnote text-text-secondary shadow-[0_1px_2px_rgba(0,0,0,0.03)] transition-colors hover:bg-bg-hover hover:text-text-primary pd-focusable"
+      >
+        {label}
+        <IconChevronDown size={14} className="text-text-muted" />
+      </button>
+      {open ? (
+        <>
+          <button
+            type="button"
+            aria-label="Close menu"
+            className="fixed inset-0 z-10 cursor-default"
+            onClick={() => setOpen(false)}
+          />
+          <div
+            data-testid="filter-capability-menu"
+            className="absolute top-full left-0 z-20 mt-1 min-w-[240px] rounded-xl border border-border-subtle bg-bg-raised p-1 shadow-[0_8px_28px_rgba(0,0,0,0.14)]"
+          >
+            {groups.map((g) => {
+              const inGroup = options.filter((o) => o.group === g.key);
+              if (inGroup.length === 0) return null;
+              return (
+                <div key={g.key}>
+                  <p className="px-2.5 pt-1.5 pb-1 text-caption text-text-muted">{g.title}</p>
+                  {inGroup.map((o) => {
+                    const on = selected.includes(o.id);
+                    return (
+                      <button
+                        key={o.id}
+                        type="button"
+                        data-testid={`filter-capability-opt-${o.id}`}
+                        aria-pressed={on}
+                        // Deliberately does NOT close: multi-select.
+                        onClick={() => toggle(o.id)}
+                        className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-body text-text-primary hover:bg-bg-hover"
+                      >
+                        <span
+                          className={cx(
+                            'flex h-4 w-4 shrink-0 items-center justify-center rounded border',
+                            on
+                              ? 'border-transparent bg-accent-primary text-text-on-accent'
+                              : 'border-border-strong',
+                          )}
+                        >
+                          {on ? <IconCheck size={11} /> : null}
+                        </span>
+                        <span className="flex-1">{o.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              );
+            })}
+            {selected.length > 0 ? (
+              <div className="mt-1 border-t border-border-subtle pt-1">
+                <button
+                  type="button"
+                  data-testid="filter-capability-clear"
+                  onClick={() => onChange([])}
+                  className="w-full rounded-lg px-2.5 py-1.5 text-left text-footnote text-text-secondary hover:bg-bg-hover"
+                >
+                  Clear all
+                </button>
+              </div>
+            ) : null}
+          </div>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
 function Chip({ label, value, icon }: { label?: string; value: string; icon?: React.ReactNode }) {
   return (
     <span className="inline-flex items-center gap-1.5 rounded-full border border-border-subtle bg-bg-raised px-2.5 py-1 text-footnote">
@@ -414,7 +547,17 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
      decoration pretending to be information, and every download decision on
      this page is made against these numbers. */
   const [hw, setHw] = useState<{ ramGiB: number; cpus: number } | null>(null);
-  const [filters, setFilters] = useState<HubFilters>(DEFAULT_FILTERS);
+  /*
+   * ONE FILTER SET PER KIND, both remembered.
+   *
+   * the user: "searching for datasets seeming to not work because filters for gguf
+   * vision etc persist and obviously those files don't exist in datasets, save
+   * those for when the user swaps back to the models tab, don't reset their
+   * filters". So the two live side by side and the switch swaps which one is
+   * active — nothing is reset behind the user's back, and nothing leaks across.
+   */
+  const [modelFilters, setModelFilters] = useState<HubFilters>(DEFAULT_FILTERS);
+  const [datasetFilters, setDatasetFilters] = useState<HubFilters>(DEFAULT_DATASET_FILTERS);
   const [view, setView] = useState<ViewMode>('compact');
   const [tab, setTab] = useState<'discover' | 'device'>('discover');
   const [selected, setSelected] = useState<string | null>(null);
@@ -427,6 +570,24 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
   const [kind, setKind] = useState<'models' | 'datasets'>('models');
   const [datasets, setDatasets] = useState<DatasetHitDTO[]>([]);
   const [dsLoading, setDsLoading] = useState(false);
+  const filters = kind === 'datasets' ? datasetFilters : modelFilters;
+  const setFilters = (next: HubFilters | ((f: HubFilters) => HubFilters)) => {
+    const apply = (f: HubFilters) => (typeof next === 'function' ? next(f) : next);
+    if (kind === 'datasets') setDatasetFilters(apply);
+    else setModelFilters(apply);
+  };
+  const resetFilters = () =>
+    kind === 'datasets'
+      ? setDatasetFilters(DEFAULT_DATASET_FILTERS)
+      : setModelFilters(DEFAULT_FILTERS);
+  const isFiltered =
+    filters.capabilities.length > 0 ||
+    filters.onlyFits ||
+    filters.format !== (kind === 'datasets' ? DEFAULT_DATASET_FILTERS : DEFAULT_FILTERS).format;
+
+  const hfToken = useHfToken();
+  const [tokenDraft, setTokenDraft] = useState('');
+  const [needsToken, setNeedsToken] = useState(false);
   const [hfLoading, setHfLoading] = useState(false);
   const [hfError, setHfError] = useState<string | null>(null);
   const [card, setCard] = useState<{ repo: string; markdown?: string; error?: string } | null>(
@@ -473,6 +634,8 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
           query: filters.query.trim(),
           sort: sortMap[filters.sort] ?? 'trending',
           limit: 40,
+          // Gated repos and higher rate limits both need the token.
+          ...(hfToken.length > 0 ? { hfToken } : {}),
         })
         .then((res) => {
           if (cancelled) return;
@@ -494,7 +657,7 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
       cancelled = true;
       clearTimeout(t);
     };
-  }, [tab, filters.query, filters.sort]);
+  }, [tab, filters.query, filters.sort, hfToken]);
 
   useEffect(() => {
     if (kind !== 'datasets') return;
@@ -591,6 +754,19 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
    * README; ours was mostly empty space. Keyed on the repo so switching rows
    * swaps the card, and main caches so going back and forth is instant.
    */
+  /*
+   * ERRORS MUST EXPIRE. the user: "there's also this hanging unknown model text that
+   * I don't know what prompted it but it isn't going away no matter what
+   * either." A download failure set `error` and nothing ever unset it, so a
+   * stale message about one model followed you across tabs, kinds and searches.
+   * It clears whenever the thing it referred to stops being what you are
+   * looking at.
+   */
+  useEffect(() => {
+    setError(null);
+    setNeedsToken(false);
+  }, [kind, tab, filters.query]);
+
   const detailRepo = detail?.id;
 
   /*
@@ -622,9 +798,20 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
     let cancelled = false;
     setQuants({ repo: detailRepo, options: [], files: [], loading: true });
     void window.piDesktop
-      .invoke('hf:list-files', { repoId: detailRepo })
+      .invoke('hf:list-files', {
+        repoId: detailRepo,
+        ...(hfToken.length > 0 ? { hfToken } : {}),
+      })
       .then((res) => {
         if (cancelled) return;
+        /*
+         * A 401 here is not a failure to explain away — it means the repo is
+         * gated or private and we have no token. Say that, and offer the fix
+         * inline, rather than printing "HTTP 401" and leaving the user to guess.
+         */
+        if (res.error !== undefined && /401|403|gated/i.test(res.error)) {
+          setNeedsToken(true);
+        }
         const files = res.files ?? [];
         const mmproj = files.find((f) => f.mmproj === true);
         setQuants({
@@ -647,7 +834,7 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
     return () => {
       cancelled = true;
     };
-  }, [detailRepo, catalog]);
+  }, [detailRepo, catalog, hfToken]);
   useEffect(() => {
     if (detailRepo === undefined || !detailRepo.includes('/')) {
       setCard(null);
@@ -742,7 +929,7 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
   }, [all]);
   const capabilityOptions = useMemo(() => {
     const present = new Set(all.flatMap((m) => m.capabilities));
-    return CAPABILITY_OPTIONS.filter((o) => o.id === 'all' || present.has(o.id));
+    return CAPABILITY_OPTIONS.filter((o) => present.has(o.id));
   }, [all]);
 
   return (
@@ -753,15 +940,9 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
       {/* Header + hardware strip */}
       <div className="flex shrink-0 items-start justify-between gap-6 px-6 pt-3 pb-3">
         <div>
-          <button
-            type="button"
-            data-testid="models-back"
-            onClick={onClose}
-            className="-ml-2 mb-1 flex items-center gap-1 rounded-lg px-2 py-1 text-footnote text-text-secondary transition-colors hover:bg-bg-hover hover:text-text-primary pd-focusable"
-          >
-            <IconChevronDown size={13} className="rotate-90" />
-            Back to chat
-          </button>
+          {/* No "Back to chat": the sidebar is always present now and its New
+              chat row sits inches away — the user: "don't put a back to chat button
+              it's right next to the 'new chat' button anyways." */}
           <h1 className="text-title text-text-primary">
             {kind === 'datasets' ? 'Datasets' : 'Model hub'}
           </h1>
@@ -824,25 +1005,30 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
           data-testid="models-search"
           value={filters.query}
           onChange={(e) => setFilters((f) => ({ ...f, query: e.target.value }))}
-          placeholder="Search all models"
+          placeholder={kind === 'datasets' ? 'Search datasets' : 'Search all models'}
           className="min-w-0 flex-1 rounded-full border border-border-subtle bg-bg-raised px-4 py-2 text-body text-text-primary shadow-[0_1px_2px_rgba(0,0,0,0.03)] placeholder:text-text-muted pd-focusable"
         />
       </div>
 
       {/* Filter row */}
       <div className="flex shrink-0 items-center gap-2 px-6 pb-4">
-        <Dropdown
-          testid="filter-format"
-          value={filters.format}
-          options={formatOptions}
-          onChange={(format) => setFilters((f) => ({ ...f, format }))}
-        />
-        <Dropdown
-          testid="filter-capability"
-          value={filters.capability}
-          options={capabilityOptions}
-          onChange={(capability) => setFilters((f) => ({ ...f, capability }))}
-        />
+        {/* A quant format is a model property; datasets have none, so offering
+            the control there is offering a dead end. */}
+        {kind === 'models' ? (
+          <Dropdown
+            testid="filter-format"
+            value={filters.format}
+            options={formatOptions}
+            onChange={(format) => setFilters((f) => ({ ...f, format }))}
+          />
+        ) : null}
+        {kind === 'models' ? (
+          <CapabilityFilter
+            selected={filters.capabilities}
+            options={capabilityOptions}
+            onChange={(capabilities) => setFilters((f) => ({ ...f, capabilities }))}
+          />
+        ) : null}
         <Dropdown
           testid="filter-sort"
           value={filters.sort}
@@ -869,6 +1055,16 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
             </button>
           }
         />
+        {isFiltered ? (
+          <button
+            type="button"
+            data-testid="filters-reset"
+            onClick={resetFilters}
+            className="rounded-full border border-border-subtle bg-bg-raised px-3 py-1.5 text-footnote text-text-secondary transition-colors hover:bg-bg-hover hover:text-text-primary pd-focusable"
+          >
+            Reset
+          </button>
+        ) : null}
         <div className="ml-auto flex rounded-lg border border-border-subtle bg-bg-raised p-0.5">
           {(['split', 'detail', 'compact'] as const).map((v) => (
             <button
@@ -932,6 +1128,45 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
         >
           {hfError}
         </p>
+      ) : null}
+
+      {needsToken ? (
+        <div
+          className="mx-6 mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-border-default bg-bg-inset px-3 py-2"
+          data-testid="hf-token-row"
+        >
+          <span className="text-footnote text-text-secondary">
+            This repo is gated or private. Paste a Hugging Face token to see its files.
+          </span>
+          <input
+            type="password"
+            value={tokenDraft}
+            onChange={(e) => setTokenDraft(e.target.value)}
+            placeholder="hf_…"
+            autoComplete="off"
+            spellCheck={false}
+            data-testid="hf-token-input"
+            className="min-w-[180px] flex-1 rounded-md border border-border-default bg-bg-base px-2 py-1 text-footnote text-text-primary placeholder:text-text-muted pd-focusable"
+          />
+          <button
+            type="button"
+            data-testid="hf-token-save"
+            disabled={tokenDraft.trim().length === 0}
+            onClick={() => {
+              void setHfToken(tokenDraft.trim());
+              setTokenDraft('');
+              setNeedsToken(false);
+            }}
+            className={cx(
+              'rounded-md px-2.5 py-1 text-footnote',
+              tokenDraft.trim().length === 0
+                ? 'bg-bg-active text-text-muted'
+                : 'bg-accent-primary text-text-on-accent hover:opacity-90',
+            )}
+          >
+            Save
+          </button>
+        </div>
       ) : null}
 
       {error !== null ? (
@@ -1053,7 +1288,8 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
                       <IconRefresh size={14} />
                     </button>
                     <span className="ml-auto text-footnote text-text-muted">
-                      {rows.length} model{rows.length === 1 ? '' : 's'}
+                      {rows.length} {kind === 'datasets' ? 'dataset' : 'model'}
+                      {rows.length === 1 ? '' : 's'}
                     </span>
                   </div>
 

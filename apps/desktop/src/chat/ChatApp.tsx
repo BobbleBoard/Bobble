@@ -20,6 +20,7 @@ import {
   IconButton,
   IconClose,
   IconGears,
+  IconSidebar,
   MainSurface,
   OpenUrlProvider,
   SiteIconProvider,
@@ -474,7 +475,28 @@ export function ChatApp({
           forbids remote images) and open in the canvas browser when clicked. */}
       <SiteIconProvider value={useSiteIcon}>
         <OpenUrlProvider value={openResultUrl}>
-          <div className="flex h-full">
+          <div className="relative flex h-full">
+            {/*
+             * THE SIDEBAR TOGGLE LIVES HERE, not in the sidebar.
+             *
+             * the user: "move the left sidebar button right to the right of the
+             * traffic light buttons… button stays fixed up right next to the
+             * traffic light buttons." A collapsed sidebar now unmounts entirely,
+             * so a toggle rendered by it would vanish with it and leave no way
+             * back. Absolutely positioned clear of the macOS lights (~78px) and
+             * opted out of the drag region so it stays clickable.
+             */}
+            <button
+              type="button"
+              aria-label={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
+              aria-expanded={sidebarOpen}
+              data-testid={sidebarOpen ? 'collapse-sidebar' : 'expand-sidebar'}
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              className="[-webkit-app-region:no-drag] pd-focusable absolute top-2 left-[84px] z-30 flex h-8 w-8 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-bg-hover hover:text-text-primary"
+            >
+              <IconSidebar size={16} />
+            </button>
+
             {/* The sidebar stays mounted; when collapsed the slot narrows to a
             ~64px ICON RAIL (round-8 #1) rather than hiding — global.css owns the
             rail width + the panel's stay-put override. */}
