@@ -5,14 +5,13 @@
  * `/harness preset <x>` directly (pi-connect) and reflects the harness's live
  * active task class. The descriptions mirror what each level actually changes.
  */
-import { SegmentedControl, Select, SelectContent, SelectItem, SelectTrigger } from '@pi-desktop/ui';
+import { SegmentedControl } from '@pi-desktop/ui';
 import { useEffect, useState } from 'react';
 import type { EffortLevel, PermissionMode } from '../../../electron/settings/settings-contract';
 import { classLabel, useHarnessStatus } from '../../chat/harness-status';
 import { applyHarnessPreset } from '../../state/pi-connect';
 import { useSettingsStore } from '../../state/settings-store';
 import { SettingRow, SettingSection } from '../parts';
-import { PRESET_OPTIONS } from './agent-presets';
 
 const PERMISSION_HINT: Record<PermissionMode, string> = {
   bypass: 'Run every tool call without review — fastest, least safe.',
@@ -41,14 +40,14 @@ export function AgentPanel() {
   }, [harness?.preset]);
 
   const activeClass = classLabel(harness?.activeClass ?? null);
-  const presetHint =
+  const _presetHint =
     preset === 'auto'
       ? activeClass !== null
         ? `The classifier picks a toolset per task. Currently active: ${activeClass}.`
         : 'The classifier picks the toolset per task automatically.'
       : 'Pin a fixed toolset for every task instead of auto-classifying.';
 
-  const onPreset = (value: string) => {
+  const _onPreset = (value: string) => {
     setPreset(value);
     void applyHarnessPreset(value);
   };
@@ -87,22 +86,13 @@ export function AgentPanel() {
         />
       </SettingRow>
 
-      <SettingRow label="Task preset" hint={presetHint}>
-        <Select value={preset} onValueChange={onPreset}>
-          <SelectTrigger
-            className="h-8 min-w-[170px]"
-            aria-label="Task preset"
-            data-testid="settings-preset"
-          />
-          <SelectContent>
-            {PRESET_OPTIONS.map((o) => (
-              <SelectItem key={o.value} value={o.value}>
-                {o.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </SettingRow>
+      {/*
+       * "Task preset" REMOVED. the user: "task classification set hard? not needed".
+       * The classifier picks a toolset per task and does it well; a pin was a way
+       * to make it worse by hand, and it duplicated a decision the harness
+       * already owns. The underlying `/harness preset` route is untouched for
+       * anything that drives it directly.
+       */}
     </SettingSection>
   );
 }

@@ -377,10 +377,14 @@ export function corpForceEnabled(): boolean {
   );
 }
 
+/**
+ * The coordination harness is no longer a user setting — it is reached through
+ * the top effort levels, and its old toggle only mattered when `?corpForce` was
+ * also set. Kept as a function because the dev/env override still uses it; it
+ * simply no longer consults a switch nobody can see.
+ */
 export function productionHarnessEnabled(): boolean {
-  return (
-    corpEnvOverrideEnabled() || useSettingsStore.getState().settings.experimentalProductionHarness
-  );
+  return corpEnvOverrideEnabled();
 }
 
 /**

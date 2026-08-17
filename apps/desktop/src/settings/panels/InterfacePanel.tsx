@@ -21,7 +21,7 @@ export function InterfacePanel({
   const sidebarScale = useSettingsStore((s) => s.settings.sidebarScale);
   const menuScale = useSettingsStore((s) => s.settings.menuScale);
   const flavor = useSettingsStore((s) => s.settings.theme.flavor);
-  const productionHarness = useSettingsStore((s) => s.settings.experimentalProductionHarness);
+  const _productionHarness = useSettingsStore((s) => s.settings.experimentalProductionHarness);
   const generation = useSettingsStore((s) => s.settings.experimentalGeneration);
   const update = useSettingsStore((s) => s.update);
 
@@ -165,21 +165,13 @@ export function InterfacePanel({
         title="Experimental"
         description="Early features that are still being built. May be rough — off by default."
       >
-        <SettingRow
-          label="Coordination harness"
-          hint="Route a prompt through the multi-agent coordination harness and watch it work in the situation room, instead of a normal single-agent chat. Experimental."
-        >
-          <SegmentedControl
-            aria-label="Coordination harness"
-            data-testid="settings-production-harness"
-            value={productionHarness ? 'on' : 'off'}
-            onValueChange={(v) => void update({ experimentalProductionHarness: v === 'on' })}
-            options={[
-              { value: 'off', label: 'Off' },
-              { value: 'on', label: 'On' },
-            ]}
-          />
-        </SettingRow>
+        {/*
+         * "Coordination harness" REMOVED. the user: deprecated. It only ever took
+         * effect alongside the `?corpForce` dev URL param
+         * (productionHarnessEnabled && corpForceEnabled in ChatComposer), so as a
+         * user-facing switch it did nothing — the corporation is reached through
+         * the top effort levels now. The dev override is untouched.
+         */}
         <SettingRow
           label="On-device generation"
           hint="Give the assistant on-device image/video generation tools (Apple-Silicon MLX/mflux; ComfyUI for video) that stream results onto the canvas. Downloads models on first use. Restart to apply. Experimental."
