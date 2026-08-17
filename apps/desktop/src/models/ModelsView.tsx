@@ -25,7 +25,7 @@
  */
 import { ScrollArea, Spinner, Tooltip } from '@pi-desktop/ui';
 import { useEffect, useMemo, useState } from 'react';
-import type { LlmCatalogEntry } from '../../electron/ipc-contract';
+import type { HfModelHitDTO, HfSortOption, LlmCatalogEntry } from '../../electron/ipc-contract';
 import { cx } from '../onboarding/cx';
 import { OrgAvatar } from '../settings/brand-icons';
 import { ramVerdict } from '../settings/model-manager-logic';
@@ -40,6 +40,7 @@ import {
   type HubFilters,
   type HubModel,
   type ModelCapability,
+  type ModelFormat,
   relativeAge,
   SORT_OPTIONS,
   sortModels,
@@ -89,6 +90,51 @@ function toHubModel(e: LlmCatalogEntry, totalRamGB: number): HubModel {
           return { fits: v.fits, fitReason: v.detail ?? v.label };
         })()
       : {}),
+  };
+}
+
+/**
+ * An HF search hit → a hub row.
+ *
+ * This is what makes Discover actually discover. Everything the reference shows
+ * and the bundled catalog cannot supply — downloads, likes, the update stamp,
+ * the real author org, the parameter count — comes from here, which is why the
+ * Downloads/Likes columns and a meaningful "Trending" only exist on this tab.
+ */
+function hfToHubModel(h: HfModelHitDTO): HubModel {
+  const tags = h.tags.map((t) => t.toLowerCase());
+  const caps: Array<Exclude<ModelCapability, 'all'>> = [];
+  const has = (...needles: string[]) =>
+    needles.some((n) => tags.some((t) => t.includes(n)) || h.pipelineTag?.includes(n) === true);
+  if (has('vision', 'image-text', 'multimodal', 'vlm')) caps.push('vision');
+  if (has('reason', 'thinking')) caps.push('reasoning');
+  if (has('audio', 'speech', 'asr', 'tts')) caps.push('audio');
+  if (has('embedding', 'sentence-similarity', 'feature-extraction')) caps.push('embeddings');
+  if (has('text-to-image', 'diffusion', 'image-generation')) caps.push('image-generation');
+
+  const formats: Array<Exclude<ModelFormat, 'all' | 'finetune'>> = [];
+  if (tags.some((t) => t.includes('gguf'))) formats.push('gguf');
+  if (tags.some((t) => t.includes('mlx'))) formats.push('mlx');
+  if (tags.some((t) => t.includes('safetensors'))) formats.push('safetensors');
+  if (formats.length === 0) formats.push('gguf');
+
+  // The reference's Size column is a PARAMETER COUNT (27B, 95B, 1573B), read
+  // off the repo name — HF search does not return a param field.
+  const params = /(\d+(?:\.\d+)?)\s*[bB](?![a-z])/.exec(h.name)?.[1];
+
+  return {
+    id: h.id,
+    name: h.name,
+    org: h.author,
+    /* NO verified badge. HF's search does not return one, and most of these
+       authors are individuals rather than verified orgs — stamping a blue check
+       on every row invents a credential HF actually grants selectively. */
+    params: params === undefined ? undefined : `${params}B`,
+    downloads: h.downloads,
+    likes: h.likes,
+    updatedAt: h.updatedAt === undefined ? undefined : Date.parse(h.updatedAt),
+    formats,
+    capabilities: caps,
   };
 }
 
@@ -216,6 +262,56 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
   const [selected, setSelected] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [hits, setHits] = useState<HfModelHitDTO[]>([]);
+  const [hfLoading, setHfLoading] = useState(false);
+  const [hfError, setHfError] = useState<string | null>(null);
+
+  /*
+   * DISCOVER SEARCHES HUGGING FACE. It used to filter the same 19 bundled
+   * entries as On Device, which is why the reference's Downloads/Likes columns
+   * never had data and "Trending" collapsed to alphabetical. Debounced, because
+   * a request per keystroke is both rude to HF and rate-limited.
+   */
+  useEffect(() => {
+    if (tab !== 'discover') return;
+    const sortMap: Record<string, HfSortOption> = {
+      newest: 'recent',
+      updated: 'recent',
+      trending: 'trending',
+      downloads: 'downloads',
+      likes: 'likes',
+    };
+    let cancelled = false;
+    setHfError(null);
+    setHfLoading(true);
+    const t = setTimeout(() => {
+      void window.piDesktop
+        .invoke('hf:search', {
+          query: filters.query.trim(),
+          sort: sortMap[filters.sort] ?? 'trending',
+          limit: 40,
+        })
+        .then((res) => {
+          if (cancelled) return;
+          setHits(res.hits);
+          setHfError(
+            res.rateLimited === true
+              ? 'Hugging Face is rate-limiting us — showing what we have.'
+              : (res.error ?? null),
+          );
+        })
+        .catch(() => {
+          if (!cancelled) setHfError('Could not reach Hugging Face. On Device still works.');
+        })
+        .finally(() => {
+          if (!cancelled) setHfLoading(false);
+        });
+    }, 300);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [tab, filters.query, filters.sort]);
 
   useEffect(() => {
     void refreshCatalog();
@@ -226,9 +322,15 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
   }, [refreshCatalog]);
 
   const all = useMemo(() => catalog.map((e) => toHubModel(e, hw?.ramGiB ?? 0)), [catalog, hw]);
+  /* Discover = Hugging Face; On Device = what is actually on this disk. They
+     are different SOURCES, not two filters over one list. */
+  const discovered = useMemo(() => {
+    const local = new Set(all.filter((m) => m.downloaded === true).map((m) => m.id));
+    return hits.map((h) => ({ ...hfToHubModel(h), downloaded: local.has(h.id) }));
+  }, [hits, all]);
   const scoped = useMemo(
-    () => (tab === 'device' ? all.filter((m) => m.downloaded === true) : all),
-    [all, tab],
+    () => (tab === 'device' ? all.filter((m) => m.downloaded === true) : discovered),
+    [all, discovered, tab],
   );
   const rows = useMemo(
     () => sortModels(filterModels(scoped, filters), filters.sort),
@@ -255,7 +357,9 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
   };
   /* Does THIS source carry popularity data? The bundled catalog does not; the
      HF browse path does. Drives whether those columns exist at all. */
-  const hasCounts = all.some((m) => m.downloads !== undefined || m.likes !== undefined);
+  /* Describes the SOURCE ON SCREEN. Reading `all` (the local catalog) meant the
+     columns stayed hidden even on Discover, where every row has real counts. */
+  const hasCounts = scoped.some((m) => m.downloads !== undefined || m.likes !== undefined);
 
   /*
    * Only offer filters this source can satisfy. The menus advertised
@@ -398,6 +502,15 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
         </div>
       </div>
 
+      {hfError !== null ? (
+        <p
+          className="mx-8 mb-3 rounded-lg border border-border-default bg-bg-inset px-3 py-2 text-footnote text-text-secondary"
+          data-testid="models-hf-error"
+        >
+          {hfError}
+        </p>
+      ) : null}
+
       {error !== null ? (
         <p
           className="mx-8 mb-3 rounded-lg border border-border-default bg-bg-inset px-3 py-2 text-footnote text-text-primary"
@@ -409,9 +522,10 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
 
       <ScrollArea className="min-h-0 flex-1">
         <div className="px-8 pb-10">
-          {catalog.length === 0 ? (
+          {(tab === 'discover' ? hfLoading && hits.length === 0 : catalog.length === 0) ? (
             <div className="flex items-center gap-2 py-10 text-body text-text-muted">
-              <Spinner size={16} /> Loading models…
+              <Spinner size={16} />{' '}
+              {tab === 'discover' ? 'Searching Hugging Face…' : 'Loading models…'}
             </div>
           ) : (
             <>
@@ -515,8 +629,11 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
                             </span>
                           </span>
                           <CapabilityPills caps={mdl.capabilities} />
+                          {/* The reference's Size column is a PARAMETER COUNT
+                              (27B, 95B); bytes belong to a specific quant and
+                              only exist once a file is chosen. */}
                           <span className="text-footnote text-text-secondary">
-                            {compactBytes(mdl.bytes)}
+                            {mdl.params ?? compactBytes(mdl.bytes)}
                           </span>
                           {hasCounts ? (
                             <span className="text-footnote text-text-secondary">

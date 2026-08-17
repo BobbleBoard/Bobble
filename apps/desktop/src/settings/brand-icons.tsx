@@ -2,115 +2,72 @@
  * BRAND MARKS FOR THE THINGS WE LIST BUT DO NOT OWN.
  *
  * the user: "ensure you include actual official logos/icons eg. in harness picker
- * and hf orgs and such in model manager".
+ * and hf orgs and such in model manager", then "use official svgs".
  *
- * Two rules shape this file:
+ * The marks are the vendors' OWN artwork, extracted from simple-icons (CC0-1.0)
+ * into the generated brand-svg.ts. Three rules:
  *
- *   1. INLINE, NOT FETCHED. Bobble is offline-first. A logo pulled from a CDN
- *      is a blank square on a plane, and a blank square where a brand should be
- *      reads as a broken app rather than a missing network.
- *   2. `currentColor` WHERE THE MARK IS MONOCHROME. These sit in a themed list
- *      that flips between light and dark; a hard-coded black mark disappears on
- *      one of them. Marks whose identity IS the colour (the model orgs) keep it.
+ *   1. INLINE, NOT FETCHED. The app's CSP is `img-src 'self' data: blob:
+ *      pd-file:`, and it is offline-first — a logo behind a URL is a blank
+ *      square, which reads as a broken app rather than a missing network. An
+ *      earlier version of this file fetched avatars and every one was blocked.
+ *   2. A WRONG MARK IS WORSE THAN NONE. Two brands we list have no correct mark
+ *      available: OpenAI/Codex (not in simple-icons — trademark enforcement) and
+ *      Nous Research's Hermes (simple-icons' `siHermes` is the parcel company).
+ *      Neither gets an invented approximation; both fall back to a monogram.
+ *      The previous hand-drawn Claude mark read as the letters "AI", which is
+ *      exactly the failure this rule exists to prevent.
+ *   3. BRAND COLOUR ON A NEUTRAL TILE. Each mark renders in its own hex on a
+ *      tinted tile, so the row is scannable in both themes without a black
+ *      glyph vanishing into a dark background.
  *
- * These are identifying marks, drawn as simple monochrome glyphs, used to label
- * each product in a picker — the same nominative use as an app listing the
- * browsers it can open. None of them implies endorsement, and none is presented
- * as the vendor's own asset pack.
+ * Using a vendor's mark to identify their product in a picker is nominative
+ * use; none of it implies endorsement.
  */
+import { BRAND_SVGS } from './brand-svg';
 
 export interface BrandIconProps {
   size?: number;
   className?: string;
 }
 
-const box = (size: number) => ({ width: size, height: size });
-
-/** Anthropic / Claude Code — the burst mark. */
-export function BrandClaude({ size = 20, className }: BrandIconProps) {
+/**
+ * One official mark, in its own brand colour on a soft tile of that colour.
+ * `title` is on the <svg> so the mark is announced rather than silent.
+ */
+export function BrandMark({
+  id,
+  size = 20,
+  className,
+}: {
+  id: string;
+  size?: number;
+  className?: string;
+}) {
+  const brand = BRAND_SVGS[id];
+  if (brand === undefined) return null;
   return (
     <svg
-      {...box(size)}
+      width={size}
+      height={size}
       viewBox="0 0 24 24"
-      fill="currentColor"
+      fill={brand.hex}
       className={className}
       role="img"
-      aria-label="Claude"
+      aria-label={brand.title}
     >
-      <path d="M6.2 16.4 9.5 7.6h1.9l3.3 8.8h-1.9l-.7-2h-3.3l-.7 2H6.2Zm2.6-3.5h2.3l-1.15-3.3L8.8 12.9Z" />
-      <path d="M15.6 16.4V7.6h1.8v8.8h-1.8Z" opacity=".55" />
-      <path d="M3.4 12a8.6 8.6 0 0 1 8.6-8.6v1.7A6.9 6.9 0 0 0 5.1 12H3.4Z" opacity=".35" />
+      <title>{brand.title}</title>
+      <path d={brand.path} />
     </svg>
   );
 }
 
-/** OpenAI / Codex — the knot mark, simplified to a single stroke path. */
-export function BrandOpenAI({ size = 20, className }: BrandIconProps) {
+/** The π glyph for pi itself — a letter, not a logo, so drawing it is honest. */
+export function BrandPi({ size = 20, className }: { size?: number; className?: string }) {
   return (
     <svg
-      {...box(size)}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinejoin="round"
-      className={className}
-      role="img"
-      aria-label="OpenAI"
-    >
-      <path d="M12 3.6a3.3 3.3 0 0 1 3.1 2.2 3.3 3.3 0 0 1 2.9 4.9 3.3 3.3 0 0 1-1.1 4.6 3.3 3.3 0 0 1-3.9 3 3.3 3.3 0 0 1-5.1-1 3.3 3.3 0 0 1-2.9-4.9 3.3 3.3 0 0 1 1.1-4.6 3.3 3.3 0 0 1 3.9-3A3.3 3.3 0 0 1 12 3.6Z" />
-      <path d="M12 8.4v7.2M8.9 10.2l6.2 3.6M15.1 10.2l-6.2 3.6" opacity=".5" />
-    </svg>
-  );
-}
-
-/** OpenCode — a bracketed caret, its terminal identity. */
-export function BrandOpenCode({ size = 20, className }: BrandIconProps) {
-  return (
-    <svg
-      {...box(size)}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.7"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-      role="img"
-      aria-label="OpenCode"
-    >
-      <path d="M8.5 4.5h-3a1 1 0 0 0-1 1v13a1 1 0 0 0 1 1h3M15.5 4.5h3a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-3" />
-      <path d="m10.2 9.4 2.6 2.6-2.6 2.6" />
-    </svg>
-  );
-}
-
-/** Nous Research / Hermes — the winged-caduceus reduced to a wing + staff. */
-export function BrandHermes({ size = 20, className }: BrandIconProps) {
-  return (
-    <svg
-      {...box(size)}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinecap="round"
-      className={className}
-      role="img"
-      aria-label="Hermes"
-    >
-      <path d="M12 4.5v15" />
-      <path d="M12 7.5c-2.4 0-4.2 1.3-5.4 2.4C7.8 11 9.6 12.3 12 12.3s4.2-1.3 5.4-2.4C16.2 8.8 14.4 7.5 12 7.5Z" />
-      <path d="M9.4 15.6c.9.7 1.7 1.1 2.6 1.1s1.7-.4 2.6-1.1" opacity=".6" />
-    </svg>
-  );
-}
-
-/** pi — the letter, which is the whole identity. */
-export function BrandPi({ size = 20, className }: BrandIconProps) {
-  return (
-    <svg
-      {...box(size)}
+      width={size}
+      height={size}
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
@@ -120,6 +77,7 @@ export function BrandPi({ size = 20, className }: BrandIconProps) {
       role="img"
       aria-label="pi"
     >
+      <title>pi</title>
       <path d="M5.5 8h13" />
       <path d="M9.5 8v9" />
       <path d="M15 8v7.2c0 1 .6 1.8 1.6 1.8h.9" />
@@ -130,40 +88,56 @@ export function BrandPi({ size = 20, className }: BrandIconProps) {
 /** Which mark belongs to which harness id. Unknown ids get no icon rather than
  * a wrong one — a generic placeholder next to real marks looks like a bug. */
 export function harnessIcon(id: string, size = 20): React.ReactNode {
-  switch (id) {
-    case 'claude-code':
-      return <BrandClaude size={size} />;
-    case 'codex':
-      return <BrandOpenAI size={size} />;
-    case 'opencode':
-      return <BrandOpenCode size={size} />;
-    case 'hermes':
-      return <BrandHermes size={size} />;
-    case 'pi-bundled':
-    case 'pi-system':
-    case 'pi-custom':
-      return <BrandPi size={size} />;
-    default:
-      return null;
-  }
+  if (id.startsWith('pi-')) return <BrandPi size={size} />;
+  // codex + hermes have no correct mark available (see rule 2) and deliberately
+  // return null, so the caller shows a monogram instead of an invented logo.
+  return <BrandMark id={id} size={size} />;
+}
+
+/** Brand colour for a harness tile, when we have the official mark. */
+export function harnessTint(id: string): string | undefined {
+  return BRAND_SVGS[id]?.hex;
 }
 
 /**
- * A model org's badge.
+ * ORG NAME → OFFICIAL MARK.
  *
- * IT DOES NOT FETCH. The first version pulled `huggingface.co/...` and asserted
- * in this very docstring that "a browsing user sees the real Qwen / NVIDIA /
- * DeepSeek marks". They never did: the app's CSP is `img-src 'self' data: blob:
- * pd-file:` (vite.config.ts), so every request was blocked and all 23 avatars
- * rendered as the grey fallback — measured. The comment described an intention,
- * not the build, which is the worse kind of wrong because it stops anyone
- * looking.
+ * Hugging Face orgs do not match brand ids one-for-one: `mlx-community` and
+ * `unsloth` are re-publishers with no mark in the set, while a model's actual
+ * author shows through the org for the big labs. Matching on a substring is
+ * deliberate — `Qwen`, `qwen-ai` and `Qwen2` should all get Qwen's mark.
+ */
+const ORG_MARKS: ReadonlyArray<readonly [RegExp, string]> = [
+  [/qwen/i, 'qwen'],
+  [/nvidia/i, 'nvidia'],
+  [/deepseek/i, 'deepseek'],
+  [/^meta|facebook/i, 'meta'],
+  [/google|gemma/i, 'google'],
+  [/mistral/i, 'mistralai'],
+  [/minimax/i, 'minimax'],
+  [/moonshot/i, 'moonshotai'],
+  [/kimi/i, 'kimi'],
+  [/ollama/i, 'ollama'],
+  [/hugging ?face|^hf$/i, 'huggingface'],
+];
+
+function orgMarkId(org: string): string | undefined {
+  for (const [re, id] of ORG_MARKS) if (re.test(org)) return id;
+  return undefined;
+}
+
+/**
+ * A model org's badge: its official mark where one exists, otherwise a tinted
+ * monogram.
  *
- * So the badge is deliberately a monogram, and made to look chosen rather than
- * failed: the tint is derived from the org name, so Qwen, NVIDIA and unsloth are
- * consistently different colours and the eye can still use it to scan. Real
- * marks need either inlined SVGs or avatars cached to disk and served over
- * `pd-file:` — both are real work, and neither is a URL in an <img>.
+ * The monogram is not a failure state — most HF orgs (`unsloth`,
+ * `mlx-community`, an individual's handle) have no registered mark, and that is
+ * the normal case rather than the exception. It is tinted from the name so the
+ * eye can still use it to scan a list, which a uniform grey square could not.
+ *
+ * An earlier version fetched avatars from huggingface.co and asserted in its own
+ * docstring that users saw the real marks. They never did — the CSP blocked
+ * every request and all 23 rendered grey. Marks are inlined now for that reason.
  */
 function orgTint(org: string): { bg: string; fg: string } {
   let h = 0;
@@ -184,6 +158,26 @@ export function OrgAvatar({
   className?: string;
 }) {
   const label = org.trim();
+  const markId = orgMarkId(label);
+  const brand = markId === undefined ? undefined : BRAND_SVGS[markId];
+
+  if (brand !== undefined) {
+    return (
+      <span
+        className={`inline-flex shrink-0 items-center justify-center rounded-lg ${className ?? ''}`}
+        style={{
+          width: size,
+          height: size,
+          background: `color-mix(in oklab, ${brand.hex} 14%, var(--pd-bg-inset))`,
+        }}
+        data-testid={`org-avatar-${label}`}
+        title={label}
+      >
+        <BrandMark id={markId as string} size={Math.round(size * 0.62)} />
+      </span>
+    );
+  }
+
   const initial = (label[0] ?? '?').toUpperCase();
   const tint = orgTint(label.toLowerCase());
   return (
