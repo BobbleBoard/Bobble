@@ -20,12 +20,14 @@ import type {
   AppEventMap,
   EngineInvokeMap,
   HarnessInvokeMap,
+  ModelCardInvokeMap,
   HfInvokeMap,
   LlmInvokeMap,
   LlmStatus,
 } from '../ipc-contract';
 import { installEngine, listEngines, uninstallEngine } from './engines-main';
 import { detectHarnesses } from './harness-main';
+import { fetchModelCard } from './modelcard-main';
 import type {
   HfListFilesReply,
   HfRegisterReply,
@@ -428,6 +430,10 @@ const harnessHandlers: IpcHandlers<HarnessInvokeMap> = {
   'harness:detect': (req) => ({ found: detectHarnesses(req.probes) }),
 };
 
+const modelCardHandlers: IpcHandlers<ModelCardInvokeMap> = {
+  'modelcard:fetch': (req) => fetchModelCard(req.repoId),
+};
+
 const engineHandlers: IpcHandlers<EngineInvokeMap> = {
   'engines:list': () => ({ engines: listEngines(KNOWN_ENGINE_IDS) }),
   'engines:install': (req) => installEngine(req.id),
@@ -441,6 +447,7 @@ export function registerLlmIpc(ipcMain: IpcMain, allowSender: (event: unknown) =
   registerIpcHandlers<LlmInvokeMap>(ipcMain, handlers, { allowSender });
   registerIpcHandlers<EngineInvokeMap>(ipcMain, engineHandlers, { allowSender });
   registerIpcHandlers<HarnessInvokeMap>(ipcMain, harnessHandlers, { allowSender });
+  registerIpcHandlers<ModelCardInvokeMap>(ipcMain, modelCardHandlers, { allowSender });
   registerIpcHandlers<HfInvokeMap>(ipcMain, hfHandlers, { allowSender });
   /*
    * Clear out any model server a PREVIOUS run left behind before standing up

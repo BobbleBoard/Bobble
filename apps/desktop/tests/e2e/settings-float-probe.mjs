@@ -340,6 +340,42 @@ try {
       `models view is not a full surface (${modelsGeom.w} of ${modelsGeom.winW})`,
     );
     console.log(`  models view is its own full-width surface (${Math.round(modelsGeom.w)}px)`);
+
+    /* The detail pane + rendered model card, which only exist outside compact.
+       The reference gives most of that pane to the card, so an empty one is the
+       thing to catch. */
+    const split = await page.$('[data-testid="view-split"]');
+    if (split !== null) {
+      await split.click();
+      await page.waitForTimeout(800);
+      const firstRow = await page.$('[data-testid^="model-row-"]');
+      if (firstRow !== null) await firstRow.click();
+      // Give the card fetch a real chance; it crosses the network.
+      await page.waitForFunction(
+        () => {
+          const el = document.querySelector('[data-testid="model-card"]');
+          return el !== null && !el.textContent.includes('Loading model card');
+        },
+        { timeout: 20_000 },
+      ).catch(() => null);
+      await page.waitForTimeout(400);
+      await page.screenshot({ path: path.join(OUT, '07-model-card.png') });
+      const card = await page.evaluate(() => {
+        const el = document.querySelector('[data-testid="model-card"]');
+        if (el === null) return { missing: true };
+        return {
+          missing: false,
+          chars: el.textContent.trim().length,
+          headings: el.querySelectorAll('h1,h2,h3').length,
+          links: el.querySelectorAll('a').length,
+          code: el.querySelectorAll('pre,code').length,
+        };
+      });
+      assert(card.missing !== true, 'the detail pane renders no model-card region');
+      console.log(
+        `  model card: ${card.chars} chars, ${card.headings} headings, ${card.links} links, ${card.code} code blocks`,
+      );
+    }
   }
 
   console.log(`\nsettings-float-probe OK — screenshots in ${OUT}`);

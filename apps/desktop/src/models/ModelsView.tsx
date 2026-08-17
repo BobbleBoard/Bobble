@@ -23,7 +23,7 @@
  * the Unsloth-style three-key quant sort. This file is composition; it does not
  * re-decide either.
  */
-import { ScrollArea, Spinner, Tooltip } from '@pi-desktop/ui';
+import { Markdown, ScrollArea, Spinner, Tooltip } from '@pi-desktop/ui';
 import { useEffect, useMemo, useState } from 'react';
 import type { HfModelHitDTO, HfSortOption, LlmCatalogEntry } from '../../electron/ipc-contract';
 import { cx } from '../onboarding/cx';
@@ -265,6 +265,9 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
   const [hits, setHits] = useState<HfModelHitDTO[]>([]);
   const [hfLoading, setHfLoading] = useState(false);
   const [hfError, setHfError] = useState<string | null>(null);
+  const [card, setCard] = useState<{ repo: string; markdown?: string; error?: string } | null>(
+    null,
+  );
 
   /*
    * DISCOVER SEARCHES HUGGING FACE. It used to filter the same 19 bundled
@@ -341,6 +344,32 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
      itself. */
   const trending = useMemo(() => sortModels(rows, 'trending').slice(0, 4), [rows]);
   const detail = rows.find((m) => m.id === selected) ?? rows[0];
+
+  /*
+   * THE MODEL CARD. The reference gives most of its detail pane to the rendered
+   * README; ours was mostly empty space. Keyed on the repo so switching rows
+   * swaps the card, and main caches so going back and forth is instant.
+   */
+  const detailRepo = detail?.id;
+  useEffect(() => {
+    if (detailRepo === undefined || !detailRepo.includes('/')) {
+      setCard(null);
+      return;
+    }
+    let cancelled = false;
+    setCard({ repo: detailRepo });
+    void window.piDesktop
+      .invoke('modelcard:fetch', { repoId: detailRepo })
+      .then((res) => {
+        if (!cancelled) setCard({ repo: detailRepo, ...res });
+      })
+      .catch(() => {
+        if (!cancelled) setCard({ repo: detailRepo, error: 'could not load the model card' });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [detailRepo]);
   const localCount = all.filter((m) => m.downloaded === true).length;
 
   /* The hub's whole purpose. This was a <span> with no handler, in a pane the
@@ -791,11 +820,41 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
                       </button>
                     </div>
 
+                    {/* Only chips we actually have a value for — a row of
+                        em-dashes is the thing this file already argues against
+                        for the table columns. */}
                     <div className="mt-3 flex flex-wrap gap-1.5 text-footnote text-text-muted">
-                      <Chip label="" value={relativeAge(detail.updatedAt, Date.now())} />
-                      <Chip label="" value={`↓ ${compactCount(detail.downloads)}`} />
-                      <Chip label="" value={`♡ ${compactCount(detail.likes)}`} />
-                      <Chip label="" value="GGUF" />
+                      {detail.updatedAt !== undefined ? (
+                        <Chip label="" value={relativeAge(detail.updatedAt, Date.now())} />
+                      ) : null}
+                      {detail.downloads !== undefined ? (
+                        <Chip label="" value={`↓ ${compactCount(detail.downloads)}`} />
+                      ) : null}
+                      {detail.likes !== undefined ? (
+                        <Chip label="" value={`♡ ${compactCount(detail.likes)}`} />
+                      ) : null}
+                      {detail.params !== undefined ? <Chip label="" value={detail.params} /> : null}
+                      {detail.formats.map((f) => (
+                        <Chip key={f} label="" value={f.toUpperCase()} />
+                      ))}
+                    </div>
+
+                    <div
+                      className="mt-4 border-t border-border-default pt-3"
+                      data-testid="model-card"
+                    >
+                      {card?.repo !== detail.id ||
+                      (card.markdown === undefined && card.error === undefined) ? (
+                        <p className="flex items-center gap-2 text-footnote text-text-muted">
+                          <Spinner size={12} /> Loading model card…
+                        </p>
+                      ) : card.error !== undefined ? (
+                        <p className="text-footnote text-text-muted">{card.error}</p>
+                      ) : (
+                        // Markdown renders its own .pd-prose container; do not
+                        // double-wrap it.
+                        <Markdown>{card.markdown ?? ''}</Markdown>
+                      )}
                     </div>
                   </aside>
                 ) : null}

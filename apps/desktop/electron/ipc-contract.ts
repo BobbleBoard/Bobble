@@ -386,6 +386,25 @@ export const HARNESS_INVOKE_CHANNELS = [
   'harness:detect',
 ] as const satisfies readonly (keyof HarnessInvokeMap)[];
 
+/**
+ * The model card (a repo's README) for the hub's detail pane.
+ *
+ * Its own channel rather than an `hf:` one because those proxy through the
+ * inference supervisor for its model registry, and fetching a public markdown
+ * file needs none of that. The renderer cannot fetch it directly — the CSP is
+ * `connect-src 'self' blob: pd-file:`.
+ */
+export type ModelCardInvokeMap = {
+  'modelcard:fetch': {
+    request: { repoId: string };
+    response: { markdown?: string; error?: string };
+  };
+};
+
+export const MODELCARD_INVOKE_CHANNELS = [
+  'modelcard:fetch',
+] as const satisfies readonly (keyof ModelCardInvokeMap)[];
+
 export const LLM_INVOKE_CHANNELS = [
   'llm:get-status',
   'llm:list-catalog',
@@ -587,6 +606,7 @@ export type AppInvokeMap = CoreInvokeMap &
   LlmInvokeMap &
   EngineInvokeMap &
   HarnessInvokeMap &
+  ModelCardInvokeMap &
   HfInvokeMap &
   AfmInvokeMap &
   SettingsInvokeMap &
@@ -636,6 +656,7 @@ export const APP_INVOKE_CHANNELS = [
   ...PI_INVOKE_CHANNELS,
   ...ENGINE_INVOKE_CHANNELS,
   ...HARNESS_INVOKE_CHANNELS,
+  ...MODELCARD_INVOKE_CHANNELS,
 ] as const satisfies readonly (keyof AppInvokeMap)[];
 
 type MissingChannels = Exclude<keyof AppInvokeMap, (typeof APP_INVOKE_CHANNELS)[number]>;
