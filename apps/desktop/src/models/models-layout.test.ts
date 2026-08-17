@@ -102,6 +102,21 @@ describe('sorting', () => {
     expect(sortModels(models, 'trending')[0]?.id).toBe('loved');
   });
 
+  it('"Newest" is NOT "Recently updated" — they were the same comparator', () => {
+    // A 2023 model re-quantised yesterday is recently updated and not new.
+    const models = [
+      m({ id: 'old-but-touched', createdAt: 1_000, updatedAt: 9_000 }),
+      m({ id: 'genuinely-new', createdAt: 8_000, updatedAt: 8_100 }),
+    ];
+    expect(sortModels(models, 'newest')[0]?.id).toBe('genuinely-new');
+    expect(sortModels(models, 'updated')[0]?.id).toBe('old-but-touched');
+  });
+
+  it('falls back to the update stamp when creation is unknown', () => {
+    const models = [m({ id: 'a', updatedAt: 1 }), m({ id: 'b', updatedAt: 5 })];
+    expect(sortModels(models, 'newest')[0]?.id).toBe('b');
+  });
+
   it('breaks ties on name so the list cannot jitter between renders', () => {
     const models = [m({ id: 'b', name: 'b' }), m({ id: 'a', name: 'a' })];
     expect(sortModels(models, 'downloads').map((x) => x.id)).toEqual(['a', 'b']);

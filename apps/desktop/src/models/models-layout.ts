@@ -66,6 +66,8 @@ export interface HubModel {
   readonly downloads?: number;
   readonly likes?: number;
   readonly updatedAt?: number;
+  /** Repo creation time — what "Newest" actually means. */
+  readonly createdAt?: number;
   readonly formats: readonly Exclude<ModelFormat, 'all' | 'finetune'>[];
   readonly capabilities: readonly Exclude<ModelCapability, 'all'>[];
   readonly downloaded?: boolean;
@@ -119,7 +121,12 @@ export function filterModels(models: readonly HubModel[], f: HubFilters): HubMod
 export function sortModels(models: readonly HubModel[], sort: ModelSort): HubModel[] {
   const by = (n: number | undefined): number => n ?? -1;
   const cmp: Record<ModelSort, (a: HubModel, b: HubModel) => number> = {
-    newest: (a, b) => by(b.updatedAt) - by(a.updatedAt),
+    /* NEWEST IS NOT RECENTLY-UPDATED. These were the same comparator on the
+       same field, so the two menu entries did the same thing. A 2023 model
+       re-quantised yesterday is recently updated and not new; `createdAt`
+       is the only field that separates them. Falls back to updatedAt only
+       when creation is unknown, so a source without it still sorts sanely. */
+    newest: (a, b) => by(b.createdAt ?? b.updatedAt) - by(a.createdAt ?? a.updatedAt),
     updated: (a, b) => by(b.updatedAt) - by(a.updatedAt),
     downloads: (a, b) => by(b.downloads) - by(a.downloads),
     likes: (a, b) => by(b.likes) - by(a.likes),

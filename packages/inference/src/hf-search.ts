@@ -75,6 +75,10 @@ export interface HfModelHit {
   readonly pipelineTag?: string;
   /** ISO timestamp of the last repo change (HF `lastModified`). */
   readonly updatedAt?: string;
+  /** ISO timestamp of repo CREATION (HF `createdAt`). Distinct from updatedAt:
+   * without it "Newest" and "Recently updated" are the same sort, which is what
+   * they were — a re-quantised 2023 model bumped yesterday is not new. */
+  readonly createdAt?: string;
   /** Recent-popularity signal (HF `trendingScore`), when present. */
   readonly likesRecent?: number;
 }
@@ -190,6 +194,7 @@ function parseHit(raw: unknown): HfModelHit | undefined {
     gated: readGated(r.gated),
     pipelineTag: readString(r.pipeline_tag),
     updatedAt: readString(r.lastModified),
+    createdAt: readString(r.createdAt),
     likesRecent: readNumber(r.trendingScore),
   };
 }

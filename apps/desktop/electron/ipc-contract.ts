@@ -423,6 +423,30 @@ export const ORGAVATAR_INVOKE_CHANNELS = [
   'orgavatar:fetch',
 ] as const satisfies readonly (keyof OrgAvatarInvokeMap)[];
 
+/** One dataset hit (the hub's Datasets page). */
+export interface DatasetHitDTO {
+  id: string;
+  author: string;
+  name: string;
+  downloads: number;
+  likes: number;
+  tags: string[];
+  updatedAt?: string;
+  createdAt?: string;
+  gated: boolean;
+}
+
+export type DatasetInvokeMap = {
+  'datasets:search': {
+    request: { query: string; sort?: string; limit?: number };
+    response: { hits: DatasetHitDTO[]; error?: string; rateLimited?: boolean };
+  };
+};
+
+export const DATASET_INVOKE_CHANNELS = [
+  'datasets:search',
+] as const satisfies readonly (keyof DatasetInvokeMap)[];
+
 export const LLM_INVOKE_CHANNELS = [
   'llm:get-status',
   'llm:list-catalog',
@@ -453,6 +477,8 @@ export interface HfModelHitDTO {
   gated: boolean;
   pipelineTag?: string;
   updatedAt?: string;
+  /** Repo creation time, so "Newest" differs from "Recently updated". */
+  createdAt?: string;
   likesRecent?: number;
 }
 
@@ -626,6 +652,7 @@ export type AppInvokeMap = CoreInvokeMap &
   HarnessInvokeMap &
   ModelCardInvokeMap &
   OrgAvatarInvokeMap &
+  DatasetInvokeMap &
   HfInvokeMap &
   AfmInvokeMap &
   SettingsInvokeMap &
@@ -677,6 +704,7 @@ export const APP_INVOKE_CHANNELS = [
   ...HARNESS_INVOKE_CHANNELS,
   ...MODELCARD_INVOKE_CHANNELS,
   ...ORGAVATAR_INVOKE_CHANNELS,
+  ...DATASET_INVOKE_CHANNELS,
 ] as const satisfies readonly (keyof AppInvokeMap)[];
 
 type MissingChannels = Exclude<keyof AppInvokeMap, (typeof APP_INVOKE_CHANNELS)[number]>;

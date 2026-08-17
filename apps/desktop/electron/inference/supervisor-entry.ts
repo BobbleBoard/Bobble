@@ -414,6 +414,7 @@ function toHfHit(hit: HfModelHit): HfModelHitDTO {
     gated: hit.gated,
     pipelineTag: hit.pipelineTag,
     updatedAt: hit.updatedAt,
+    createdAt: hit.createdAt,
     likesRecent: hit.likesRecent,
   };
 }

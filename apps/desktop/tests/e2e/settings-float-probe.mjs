@@ -331,15 +331,20 @@ try {
         w: r.width,
         winW: window.innerWidth,
         insideSettings: document.querySelector('[data-testid="settings-view"]') !== null,
+        sidebar: document.querySelector('.pd-sidebar-slot') !== null,
       };
     });
-    // ITS OWN SURFACE: full width, and no settings panel wrapped around it.
+    // ITS OWN SURFACE, BUT INSIDE THE SHELL. the user asked for the sidebar to stay,
+    // so the hub must NOT be full width and the chat sidebar must still exist.
     assert(!modelsGeom.insideSettings, 'the models view is still inside the settings panel');
+    assert(modelsGeom.sidebar, 'the chat sidebar disappeared when the hub opened');
     assert(
-      modelsGeom.w > modelsGeom.winW * 0.9,
-      `models view is not a full surface (${modelsGeom.w} of ${modelsGeom.winW})`,
+      modelsGeom.w < modelsGeom.winW - 100,
+      `the hub took over the window (${modelsGeom.w} of ${modelsGeom.winW}) — sidebar lost`,
     );
-    console.log(`  models view is its own full-width surface (${Math.round(modelsGeom.w)}px)`);
+    console.log(
+      `  hub renders inside the shell: ${Math.round(modelsGeom.w)}px of ${modelsGeom.winW}px, sidebar present`,
+    );
 
     /* The detail pane + rendered model card, which only exist outside compact.
        The reference gives most of that pane to the card, so an empty one is the

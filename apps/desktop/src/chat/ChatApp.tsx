@@ -25,6 +25,7 @@ import {
   SiteIconProvider,
   TopBar,
 } from '@pi-desktop/ui';
+import type { ReactNode } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { conversationNameFrom } from '../../electron/workspace/project-dir';
 import type { SettingsSection } from '../settings/SettingsView';
@@ -139,9 +140,12 @@ function StubPanel({ stub, onClose }: { stub: SidebarStub; onClose: () => void }
 }
 
 export function ChatApp({
+  contentOverride,
   onOpenSettings,
   onOpenConnectors,
 }: {
+  /** Render this INSTEAD of the thread + composer, keeping the shell. */
+  contentOverride?: ReactNode;
   onOpenSettings: (section: SettingsSection) => void;
   onOpenConnectors: () => void;
 }) {
@@ -529,8 +533,15 @@ export function ChatApp({
               />
 
               {/* A selected child agent (subagent / role) shows its own read-only chat
-              view in place of the main thread + composer. */}
-              {viewedChildId !== null ? (
+              view in place of the main thread + composer. `contentOverride` is the
+              same seam for a full surface — the Model hub — so the SIDEBAR AND TOP
+              BAR STAY PUT. the user: "ensure that this keeps the left sidebar present
+              when clicked". Replacing the whole window for it meant losing the
+              chat list, the project chip and the collapse rail, which is a lot to
+              give up to look at models. */}
+              {contentOverride !== undefined ? (
+                contentOverride
+              ) : viewedChildId !== null ? (
                 <ChildChatView childId={viewedChildId} />
               ) : (
                 /* One flex column that hosts BOTH states so the keyed composer slot

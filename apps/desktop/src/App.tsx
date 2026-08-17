@@ -221,8 +221,6 @@ export function App() {
             </div>
           ) : gate === 'onboarding' ? (
             <OnboardingWizard onComplete={() => setGate('ready')} />
-          ) : view === 'models' ? (
-            <ModelsView onClose={() => setView('chat')} />
           ) : view === 'connectors' ? (
             <ConnectorsScreen onClose={() => setView('chat')} />
           ) : view === 'gallery' ? (
@@ -244,9 +242,16 @@ export function App() {
             </div>
           ) : (
             <div className="relative h-full">
+              {/* The Model hub renders INSIDE the chat shell so the sidebar and
+                  top bar stay put — the user: "ensure that this keeps the left
+                  sidebar present when clicked". It is a content route, not a
+                  window takeover. */}
               <ChatApp
                 onOpenSettings={openSettings}
                 onOpenConnectors={() => setView('connectors')}
+                contentOverride={
+                  view === 'models' ? <ModelsView onClose={() => setView('chat')} /> : undefined
+                }
               />
               {/* Onboarding `tutorial` flag consumer: dismissible first-run tips. */}
               <FirstRunTips />

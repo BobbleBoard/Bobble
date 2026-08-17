@@ -32,6 +32,7 @@ import {
   IconExternal,
   IconGauge,
   IconInfo,
+  IconMore,
   IconRefresh,
   Markdown,
   ScrollArea,
@@ -39,7 +40,12 @@ import {
   Tooltip,
 } from '@pi-desktop/ui';
 import { useEffect, useMemo, useState } from 'react';
-import type { HfModelHitDTO, HfSortOption, LlmCatalogEntry } from '../../electron/ipc-contract';
+import type {
+  DatasetHitDTO,
+  HfModelHitDTO,
+  HfSortOption,
+  LlmCatalogEntry,
+} from '../../electron/ipc-contract';
 import { cx } from '../onboarding/cx';
 import { OrgAvatar } from '../settings/brand-icons';
 import { type QuantOption, ramVerdict } from '../settings/model-manager-logic';
@@ -149,6 +155,7 @@ function hfToHubModel(h: HfModelHitDTO): HubModel {
     downloads: h.downloads,
     likes: h.likes,
     updatedAt: h.updatedAt === undefined ? undefined : Date.parse(h.updatedAt),
+    createdAt: h.createdAt === undefined ? undefined : Date.parse(h.createdAt),
     formats,
     capabilities: caps,
   };
@@ -184,6 +191,100 @@ function quantLabel(quant: string | undefined, filePath: string): string {
  * that is what stops a wrap of eight of them reading as a word soup, because
  * the glyph is recognisable before the value is read.
  */
+/**
+ * The per-row `⋮` menu the reference has at the end of every row. Everything in
+ * it is reachable elsewhere, which is the point: a row menu is for the actions
+ * you want WITHOUT first making the row the selection.
+ */
+function RowMenu({
+  model,
+  onDownload,
+  onOpenHf,
+  onCopyId,
+}: {
+  model: HubModel;
+  onDownload: () => void;
+  onOpenHf: () => void;
+  onCopyId: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        setOpen(false);
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [open]);
+
+  const item = (label: string, run: () => void, disabled = false) => (
+    <button
+      type="button"
+      disabled={disabled}
+      data-testid={`row-menu-item-${label.toLowerCase().replace(/\s+/g, '-')}`}
+      onClick={(e) => {
+        e.stopPropagation();
+        setOpen(false);
+        run();
+      }}
+      className={cx(
+        'w-full rounded-lg px-2.5 py-1.5 text-left text-footnote',
+        disabled ? 'text-text-muted' : 'text-text-primary hover:bg-bg-hover',
+      )}
+    >
+      {label}
+    </button>
+  );
+
+  return (
+    <span className="relative flex justify-end">
+      <span
+        role="button"
+        tabIndex={0}
+        aria-label={`More actions for ${model.name}`}
+        data-testid={`row-menu-${model.id}`}
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen((v) => !v);
+        }}
+        onKeyDown={(e) => {
+          if (e.key !== 'Enter' && e.key !== ' ') return;
+          e.preventDefault();
+          e.stopPropagation();
+          setOpen((v) => !v);
+        }}
+        className="flex h-7 w-7 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-bg-active hover:text-text-primary"
+      >
+        <IconMore size={15} />
+      </span>
+      {open ? (
+        <>
+          <button
+            type="button"
+            aria-label="Close menu"
+            className="fixed inset-0 z-20 cursor-default"
+            onClick={(e) => {
+              e.stopPropagation();
+              setOpen(false);
+            }}
+          />
+          <div
+            data-testid="row-menu-panel"
+            className="absolute top-full right-0 z-30 mt-1 min-w-[180px] rounded-xl border border-border-subtle bg-bg-raised p-1 shadow-[0_8px_28px_rgba(0,0,0,0.14)]"
+          >
+            {item('Download', onDownload, model.downloaded === true)}
+            {item('Copy model id', onCopyId)}
+            {item('Open on Hugging Face', onOpenHf, !model.id.includes('/'))}
+          </div>
+        </>
+      ) : null}
+    </span>
+  );
+}
+
 function Chip({ label, value, icon }: { label?: string; value: string; icon?: React.ReactNode }) {
   return (
     <span className="inline-flex items-center gap-1.5 rounded-full border border-border-subtle bg-bg-raised px-2.5 py-1 text-footnote">
@@ -318,6 +419,12 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [hits, setHits] = useState<HfModelHitDTO[]>([]);
+  /* Datasets are the reference's sibling page. Same chrome, different corpus —
+     so they live here behind a kind switch rather than in a second view that
+     would duplicate the header, search and filter row. */
+  const [kind, setKind] = useState<'models' | 'datasets'>('models');
+  const [datasets, setDatasets] = useState<DatasetHitDTO[]>([]);
+  const [dsLoading, setDsLoading] = useState(false);
   const [hfLoading, setHfLoading] = useState(false);
   const [hfError, setHfError] = useState<string | null>(null);
   const [card, setCard] = useState<{ repo: string; markdown?: string; error?: string } | null>(
@@ -341,6 +448,9 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     if (tab !== 'discover') return;
     const sortMap: Record<string, HfSortOption> = {
+      // HF's `recent` is lastModified; there is no created sort in the DTO's
+      // option set, so newest asks for recent and we re-sort locally on
+      // createdAt, which the hit now carries.
       newest: 'recent',
       updated: 'recent',
       trending: 'trending',
@@ -380,6 +490,46 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
   }, [tab, filters.query, filters.sort]);
 
   useEffect(() => {
+    if (kind !== 'datasets') return;
+    let cancelled = false;
+    setDsLoading(true);
+    const t = setTimeout(() => {
+      void window.piDesktop
+        .invoke('datasets:search', {
+          query: filters.query.trim(),
+          sort:
+            filters.sort === 'downloads'
+              ? 'downloads'
+              : filters.sort === 'likes'
+                ? 'likes'
+                : filters.sort === 'trending'
+                  ? 'trending'
+                  : 'recent',
+          limit: 40,
+        })
+        .then((res) => {
+          if (cancelled) return;
+          setDatasets(res.hits);
+          setHfError(
+            res.rateLimited === true
+              ? 'Hugging Face is rate-limiting us — showing what we have.'
+              : (res.error ?? null),
+          );
+        })
+        .catch(() => {
+          if (!cancelled) setHfError('Could not reach Hugging Face.');
+        })
+        .finally(() => {
+          if (!cancelled) setDsLoading(false);
+        });
+    }, 300);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [kind, filters.query, filters.sort]);
+
+  useEffect(() => {
     void refreshCatalog();
     void window.piDesktop
       .invoke('app:get-info', undefined)
@@ -394,9 +544,30 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
     const local = new Set(all.filter((m) => m.downloaded === true).map((m) => m.id));
     return hits.map((h) => ({ ...hfToHubModel(h), downloaded: local.has(h.id) }));
   }, [hits, all]);
+  const datasetRows = useMemo<HubModel[]>(
+    () =>
+      datasets.map((d) => ({
+        id: d.id,
+        name: d.name,
+        org: d.author,
+        downloads: d.downloads,
+        likes: d.likes,
+        updatedAt: d.updatedAt === undefined ? undefined : Date.parse(d.updatedAt),
+        createdAt: d.createdAt === undefined ? undefined : Date.parse(d.createdAt),
+        formats: [],
+        capabilities: [],
+      })),
+    [datasets],
+  );
+
   const scoped = useMemo(
-    () => (tab === 'device' ? all.filter((m) => m.downloaded === true) : discovered),
-    [all, discovered, tab],
+    () =>
+      kind === 'datasets'
+        ? datasetRows
+        : tab === 'device'
+          ? all.filter((m) => m.downloaded === true)
+          : discovered,
+    [all, discovered, datasetRows, kind, tab],
   );
   const rows = useMemo(
     () => sortModels(filterModels(scoped, filters), filters.sort),
@@ -490,6 +661,13 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
 
   /* The hub's whole purpose. This was a <span> with no handler, in a pane the
      default view never rendered — so the page could not download a model. */
+  const openOnHf = (id: string) => {
+    void window.piDesktop
+      .invoke('canvas:open-external', { url: `https://huggingface.co/${id}` })
+      .catch(() => undefined);
+  };
+  const copyId = (id: string) => void navigator.clipboard?.writeText(id);
+
   const download = async (id: string, quant?: string) => {
     setBusyId(id);
     setError(null);
@@ -527,23 +705,28 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="flex h-full flex-col bg-bg-base" data-testid="models-view">
-      <div className="flex h-11 shrink-0 items-center gap-3 pr-4 pl-[80px] [-webkit-app-region:drag]">
-        <button
-          type="button"
-          data-testid="models-back"
-          onClick={onClose}
-          className="[-webkit-app-region:no-drag] rounded-lg px-2 py-1 text-footnote text-text-secondary transition-colors hover:bg-bg-hover hover:text-text-primary pd-focusable"
-        >
-          ‹ Back to chat
-        </button>
-      </div>
-
+      {/* No traffic-light strip: the hub renders INSIDE the chat shell now, which
+          already owns the drag region and the top bar. A second one here left a
+          dead 44px band and a back button under the real title. */}
       {/* Header + hardware strip */}
-      <div className="flex shrink-0 items-start justify-between gap-6 px-8 pb-3">
+      <div className="flex shrink-0 items-start justify-between gap-6 px-6 pt-3 pb-3">
         <div>
-          <h1 className="text-title text-text-primary">Model hub</h1>
+          <button
+            type="button"
+            data-testid="models-back"
+            onClick={onClose}
+            className="-ml-2 mb-1 flex items-center gap-1 rounded-lg px-2 py-1 text-footnote text-text-secondary transition-colors hover:bg-bg-hover hover:text-text-primary pd-focusable"
+          >
+            <IconChevronDown size={13} className="rotate-90" />
+            Back to chat
+          </button>
+          <h1 className="text-title text-text-primary">
+            {kind === 'datasets' ? 'Datasets' : 'Model hub'}
+          </h1>
           <p className="mt-0.5 text-footnote text-text-muted">
-            Discover, download, and run inference models locally.
+            {kind === 'datasets'
+              ? 'Discover, download, and train on datasets locally.'
+              : 'Discover, download, and run inference models locally.'}
           </p>
         </div>
         <div
@@ -562,8 +745,24 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
       </div>
 
       {/* Tabs + search */}
-      <div className="flex shrink-0 items-center gap-3 px-8 pb-3">
-        <div className="flex rounded-full bg-bg-inset p-0.5">
+      <div className="flex shrink-0 items-center gap-3 px-6 pb-3">
+        <div className="flex rounded-full bg-bg-inset p-0.5" data-testid="hub-kind">
+          {(['models', 'datasets'] as const).map((k) => (
+            <button
+              key={k}
+              type="button"
+              data-testid={`hub-kind-${k}`}
+              onClick={() => setKind(k)}
+              className={cx(
+                'rounded-full px-4 py-1.5 text-footnote transition-colors',
+                kind === k ? 'bg-bg-raised text-text-primary shadow-sm' : 'text-text-secondary',
+              )}
+            >
+              {k === 'models' ? 'Models' : 'Datasets'}
+            </button>
+          ))}
+        </div>
+        <div className={cx('flex rounded-full bg-bg-inset p-0.5', kind === 'datasets' && 'hidden')}>
           {(['discover', 'device'] as const).map((t) => (
             <button
               key={t}
@@ -589,7 +788,7 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
       </div>
 
       {/* Filter row */}
-      <div className="flex shrink-0 items-center gap-2 px-8 pb-4">
+      <div className="flex shrink-0 items-center gap-2 px-6 pb-4">
         <Dropdown
           testid="filter-format"
           value={filters.format}
@@ -686,7 +885,7 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
 
       {hfError !== null ? (
         <p
-          className="mx-8 mb-3 rounded-lg border border-border-default bg-bg-inset px-3 py-2 text-footnote text-text-secondary"
+          className="mx-6 mb-3 rounded-lg border border-border-default bg-bg-inset px-3 py-2 text-footnote text-text-secondary"
           data-testid="models-hf-error"
         >
           {hfError}
@@ -695,7 +894,7 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
 
       {error !== null ? (
         <p
-          className="mx-8 mb-3 rounded-lg border border-border-default bg-bg-inset px-3 py-2 text-footnote text-text-primary"
+          className="mx-6 mb-3 rounded-lg border border-border-default bg-bg-inset px-3 py-2 text-footnote text-text-primary"
           data-testid="models-error"
         >
           {error}
@@ -703,15 +902,28 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
       ) : null}
 
       <ScrollArea className="min-h-0 flex-1">
-        <div className="px-8 pb-10">
-          {(tab === 'discover' ? hfLoading && hits.length === 0 : catalog.length === 0) ? (
+        <div className="px-6 pb-10">
+          {(
+            kind === 'datasets'
+              ? dsLoading && datasets.length === 0
+              : tab === 'discover'
+                ? hfLoading && hits.length === 0
+                : catalog.length === 0
+          ) ? (
             <div className="flex items-center gap-2 py-10 text-body text-text-muted">
               <Spinner size={16} />{' '}
-              {tab === 'discover' ? 'Searching Hugging Face…' : 'Loading models…'}
+              {kind === 'datasets'
+                ? 'Searching datasets…'
+                : tab === 'discover'
+                  ? 'Searching Hugging Face…'
+                  : 'Loading models…'}
             </div>
           ) : (
             <>
-              {tab === 'discover' && view !== 'detail' && trending.length > 0 ? (
+              {kind === 'models' &&
+              tab === 'discover' &&
+              view !== 'detail' &&
+              trending.length > 0 ? (
                 <section className="mb-7">
                   <h2 className="mb-3 text-body font-medium text-text-primary">Trending Now</h2>
                   <div className="grid grid-cols-4 gap-3" data-testid="trending-row">
@@ -783,7 +995,11 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
                 <div>
                   <div className="mb-3 flex items-center gap-2">
                     <h2 className="text-body font-medium text-text-primary">
-                      {tab === 'device' ? 'On this machine' : 'All models'}
+                      {kind === 'datasets'
+                        ? 'All datasets'
+                        : tab === 'device'
+                          ? 'On this machine'
+                          : 'All models'}
                     </h2>
                     <button
                       type="button"
@@ -809,8 +1025,8 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
                         className={cx(
                           'grid items-center gap-2 border-b border-border-subtle bg-bg-sunken px-4 py-2.5 text-footnote text-text-muted',
                           hasCounts
-                            ? 'grid-cols-[1fr_120px_90px_110px_90px_44px]'
-                            : 'grid-cols-[1fr_120px_90px_44px]',
+                            ? 'grid-cols-[1fr_120px_90px_110px_90px_44px_40px]'
+                            : 'grid-cols-[1fr_120px_90px_44px_40px]',
                         )}
                       >
                         <span>Model</span>
@@ -819,6 +1035,7 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
                         {hasCounts ? <span>Downloads</span> : null}
                         {hasCounts ? <span>Likes</span> : null}
                         <span className="sr-only">Download</span>
+                        <span className="sr-only">Actions</span>
                       </div>
                       {rows.map((mdl) => (
                         <button
@@ -829,8 +1046,8 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
                           className={cx(
                             'grid w-full items-center gap-2 border-b border-border-subtle px-4 py-2.5 text-left transition-colors last:border-b-0 hover:bg-bg-hover',
                             hasCounts
-                              ? 'grid-cols-[1fr_120px_90px_110px_90px_44px]'
-                              : 'grid-cols-[1fr_120px_90px_44px]',
+                              ? 'grid-cols-[1fr_120px_90px_110px_90px_44px_40px]'
+                              : 'grid-cols-[1fr_120px_90px_44px_40px]',
                             selected === mdl.id ? 'bg-bg-active' : '',
                           )}
                         >
@@ -899,6 +1116,12 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
                               <IconDownload size={14} />
                             )}
                           </span>
+                          <RowMenu
+                            model={mdl}
+                            onDownload={() => void download(mdl.id)}
+                            onOpenHf={() => openOnHf(mdl.id)}
+                            onCopyId={() => copyId(mdl.id)}
+                          />
                         </button>
                       ))}
                       {rows.length === 0 ? (
@@ -973,7 +1196,7 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
                             type="button"
                             aria-label="Copy model id"
                             data-testid="detail-copy"
-                            onClick={() => void navigator.clipboard?.writeText(detail.id)}
+                            onClick={() => copyId(detail.id)}
                             className="shrink-0 rounded-md p-1 text-text-muted transition-colors hover:bg-bg-hover hover:text-text-primary pd-focusable"
                           >
                             <IconCopy size={14} />
@@ -983,11 +1206,7 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
                               type="button"
                               aria-label="Open on Hugging Face"
                               data-testid="detail-open"
-                              onClick={() =>
-                                void window.piDesktop.invoke('canvas:open-external', {
-                                  url: `https://huggingface.co/${detail.id}`,
-                                })
-                              }
+                              onClick={() => openOnHf(detail.id)}
                               className="shrink-0 rounded-md p-1 text-text-muted transition-colors hover:bg-bg-hover hover:text-text-primary pd-focusable"
                             >
                               <IconExternal size={14} />
