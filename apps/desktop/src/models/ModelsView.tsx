@@ -42,7 +42,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { HfModelHitDTO, HfSortOption, LlmCatalogEntry } from '../../electron/ipc-contract';
 import { cx } from '../onboarding/cx';
 import { OrgAvatar } from '../settings/brand-icons';
-import { ramVerdict } from '../settings/model-manager-logic';
+import { type QuantOption, ramVerdict } from '../settings/model-manager-logic';
 import { useLlmStore } from '../state/llm-store';
 import { CapabilityPills } from './model-pills';
 import {
@@ -61,6 +61,7 @@ import {
   sortModels,
   type ViewMode,
 } from './models-layout';
+import { QuantPicker } from './QuantPicker';
 
 /**
  * Catalog entry → the shape the hub renders.
@@ -154,13 +155,38 @@ function hfToHubModel(h: HfModelHitDTO): HubModel {
 }
 
 /**
+ * A readable name for one downloadable file.
+ *
+ * HF only sometimes reports a `quant`; the rest of the time the picker fell back
+ * to the whole filename, so the row read
+ * "zimageuncensoredtextencoderV10_v10.gguf" instead of "Q4_K_M". Pull the quant
+ * out of the filename where it is there — it almost always is, that being the
+ * convention — and only then fall back to the stem.
+ */
+function quantLabel(quant: string | undefined, filePath: string): string {
+  // Do NOT trust `quant` blindly: the supervisor falls back to the filename
+  // when it cannot parse one, so a naive check shows the whole ".gguf" path.
+  const looksParsed =
+    quant !== undefined &&
+    quant.length > 0 &&
+    quant.length < 24 &&
+    !quant.toLowerCase().endsWith('.gguf');
+  if (looksParsed) return quant;
+  const file = (quant ?? filePath).split('/').pop() ?? filePath;
+  const stem = file.replace(/\.gguf$/i, '');
+  // UD-Q4_K_XL / IQ3_M / Q8_0 / BF16 / F16 — the shapes that actually appear.
+  const m = /((?:UD-)?(?:IQ|Q)\d[A-Z0-9_]*|BF16|F16|F32)/i.exec(stem);
+  return m?.[1] ?? stem;
+}
+
+/**
  * A metadata chip. The reference's chips lead with a small monochrome ICON —
  * that is what stops a wrap of eight of them reading as a word soup, because
  * the glyph is recognisable before the value is read.
  */
 function Chip({ label, value, icon }: { label?: string; value: string; icon?: React.ReactNode }) {
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-full border border-border-default bg-bg-raised px-2.5 py-1 text-footnote">
+    <span className="inline-flex items-center gap-1.5 rounded-full border border-border-subtle bg-bg-raised px-2.5 py-1 text-footnote">
       {icon !== undefined ? <span className="text-text-muted">{icon}</span> : null}
       <span className="text-text-primary">{value}</span>
       {label !== undefined && label !== '' ? (
@@ -229,7 +255,7 @@ function Dropdown<T extends string>({
         type="button"
         data-testid={testid}
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-2 rounded-full border border-border-default bg-bg-raised px-3.5 py-1.5 text-footnote text-text-secondary transition-colors hover:bg-bg-hover hover:text-text-primary pd-focusable"
+        className="flex items-center gap-2 rounded-full border border-border-subtle bg-bg-raised px-3.5 py-1.5 text-footnote text-text-secondary shadow-[0_1px_2px_rgba(0,0,0,0.03)] transition-colors hover:bg-bg-hover hover:text-text-primary pd-focusable"
       >
         {current}
         <IconChevronDown size={14} className="text-text-muted" />
@@ -245,7 +271,7 @@ function Dropdown<T extends string>({
           />
           <div
             data-testid={`${testid}-menu`}
-            className="absolute top-full left-0 z-20 mt-1 min-w-[260px] rounded-xl border border-border-default bg-bg-raised p-1 shadow-xl"
+            className="absolute top-full left-0 z-20 mt-1 min-w-[260px] rounded-xl border border-border-subtle bg-bg-raised p-1 shadow-[0_8px_28px_rgba(0,0,0,0.14)]"
           >
             {options.map((o) => (
               <button
@@ -297,6 +323,14 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
   const [card, setCard] = useState<{ repo: string; markdown?: string; error?: string } | null>(
     null,
   );
+  /* The quant ladder for the selected model. HF entries need a file listing;
+     local catalog entries already carry theirs. */
+  const [quants, setQuants] = useState<{
+    repo: string;
+    options: QuantOption[];
+    mmprojBytes?: number;
+    loading: boolean;
+  } | null>(null);
 
   /*
    * DISCOVER SEARCHES HUGGING FACE. It used to filter the same 19 bundled
@@ -380,6 +414,59 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
    * swaps the card, and main caches so going back and forth is instant.
    */
   const detailRepo = detail?.id;
+
+  /*
+   * THE QUANT LADDER. `hf:list-files` returns every .gguf in the repo with its
+   * size, which is what the picker ranks; a local catalog entry already has its
+   * own list, so that path costs no request. Vision projectors are pulled out
+   * rather than offered as a choice — you never download an mmproj INSTEAD of
+   * the weights, it loads alongside them, and its bytes belong in the fit maths.
+   */
+  useEffect(() => {
+    if (detailRepo === undefined) {
+      setQuants(null);
+      return;
+    }
+    const local = catalog.find((e) => e.id === detailRepo);
+    if (local !== undefined) {
+      setQuants({
+        repo: detailRepo,
+        options: local.quants.filter((q) => q.bytes > 0),
+        loading: false,
+      });
+      return;
+    }
+    if (!detailRepo.includes('/')) {
+      setQuants({ repo: detailRepo, options: [], loading: false });
+      return;
+    }
+    let cancelled = false;
+    setQuants({ repo: detailRepo, options: [], loading: true });
+    void window.piDesktop
+      .invoke('hf:list-files', { repoId: detailRepo })
+      .then((res) => {
+        if (cancelled) return;
+        const files = res.files ?? [];
+        const mmproj = files.find((f) => f.mmproj === true)?.sizeBytes;
+        setQuants({
+          repo: detailRepo,
+          options: files
+            .filter((f) => f.mmproj !== true && (f.sizeBytes ?? 0) > 0)
+            .map((f) => ({
+              quant: quantLabel(f.quant, f.path),
+              bytes: f.sizeBytes ?? 0,
+            })),
+          mmprojBytes: mmproj,
+          loading: false,
+        });
+      })
+      .catch(() => {
+        if (!cancelled) setQuants({ repo: detailRepo, options: [], loading: false });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [detailRepo, catalog]);
   useEffect(() => {
     if (detailRepo === undefined || !detailRepo.includes('/')) {
       setCard(null);
@@ -403,11 +490,11 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
 
   /* The hub's whole purpose. This was a <span> with no handler, in a pane the
      default view never rendered — so the page could not download a model. */
-  const download = async (id: string) => {
+  const download = async (id: string, quant?: string) => {
     setBusyId(id);
     setError(null);
     const res = await window.piDesktop
-      .invoke('llm:download-model', { modelId: id })
+      .invoke('llm:download-model', quant === undefined ? { modelId: id } : { modelId: id, quant })
       .catch(() => ({ success: false, error: 'the download could not start' }));
     if (res.success !== true) setError(res.error ?? 'the download could not start');
     await refreshCatalog();
@@ -497,7 +584,7 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
           value={filters.query}
           onChange={(e) => setFilters((f) => ({ ...f, query: e.target.value }))}
           placeholder="Search all models"
-          className="min-w-0 flex-1 rounded-full border border-border-default bg-bg-raised px-4 py-2 text-body text-text-primary placeholder:text-text-muted pd-focusable"
+          className="min-w-0 flex-1 rounded-full border border-border-subtle bg-bg-raised px-4 py-2 text-body text-text-primary shadow-[0_1px_2px_rgba(0,0,0,0.03)] placeholder:text-text-muted pd-focusable"
         />
       </div>
 
@@ -541,7 +628,7 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
             </button>
           }
         />
-        <div className="ml-auto flex rounded-lg border border-border-default p-0.5">
+        <div className="ml-auto flex rounded-lg border border-border-subtle bg-bg-raised p-0.5">
           {(['split', 'detail', 'compact'] as const).map((v) => (
             <button
               key={v}
@@ -624,7 +711,7 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
             </div>
           ) : (
             <>
-              {tab === 'discover' && trending.length > 0 ? (
+              {tab === 'discover' && view !== 'detail' && trending.length > 0 ? (
                 <section className="mb-7">
                   <h2 className="mb-3 text-body font-medium text-text-primary">Trending Now</h2>
                   <div className="grid grid-cols-4 gap-3" data-testid="trending-row">
@@ -633,7 +720,7 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
                         key={mdl.id}
                         type="button"
                         onClick={() => setSelected(mdl.id)}
-                        className="rounded-2xl border border-border-default bg-bg-raised p-4 text-left transition-all hover:border-border-strong hover:shadow-sm pd-focusable"
+                        className="rounded-2xl border border-border-subtle bg-bg-raised p-4 text-left shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-all hover:border-border-default hover:shadow-[0_2px_8px_rgba(0,0,0,0.07)] pd-focusable"
                       >
                         <div className="flex items-start gap-2.5">
                           <OrgAvatar org={mdl.org} size={36} />
@@ -674,10 +761,23 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
                 </section>
               ) : null}
 
+              {/*
+               * THREE LAYOUTS, NOT TWO. `split` and `detail` rendered
+               * identically — three buttons, two behaviours, which is worse
+               * than offering two. They now differ in which side gets the room,
+               * matching the reference's own toggle icons: split favours the
+               * list, detail favours the card.
+               */}
               <section
+                data-testid="models-layout"
+                data-view={view}
                 className={cx(
                   'grid gap-5',
-                  view === 'compact' ? '' : 'grid-cols-[minmax(0,1fr)_440px]',
+                  view === 'compact'
+                    ? ''
+                    : view === 'split'
+                      ? 'grid-cols-[minmax(0,1fr)_420px]'
+                      : 'grid-cols-[300px_minmax(0,1fr)]',
                 )}
               >
                 <div>
@@ -700,14 +800,14 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
                   </div>
 
                   {view === 'compact' ? (
-                    <div className="overflow-hidden rounded-xl border border-border-default">
+                    <div className="overflow-hidden rounded-2xl border border-border-subtle bg-bg-raised shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
                       {/* Downloads/Likes only exist for HF-sourced entries. A
                           column of em-dashes is worse than no column: it looks
                           like the data failed to load rather than never
                           applying to a bundled catalog. */}
                       <div
                         className={cx(
-                          'grid items-center gap-2 border-b border-border-default bg-bg-sunken px-4 py-2 text-footnote text-text-muted',
+                          'grid items-center gap-2 border-b border-border-subtle bg-bg-sunken px-4 py-2.5 text-footnote text-text-muted',
                           hasCounts
                             ? 'grid-cols-[1fr_120px_90px_110px_90px_44px]'
                             : 'grid-cols-[1fr_120px_90px_44px]',
@@ -727,7 +827,7 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
                           data-testid={`model-row-${mdl.id}`}
                           onClick={() => setSelected(mdl.id)}
                           className={cx(
-                            'grid w-full items-center gap-2 border-b border-border-default px-4 py-3 text-left transition-colors last:border-b-0 hover:bg-bg-hover',
+                            'grid w-full items-center gap-2 border-b border-border-subtle px-4 py-2.5 text-left transition-colors last:border-b-0 hover:bg-bg-hover',
                             hasCounts
                               ? 'grid-cols-[1fr_120px_90px_110px_90px_44px]'
                               : 'grid-cols-[1fr_120px_90px_44px]',
@@ -812,34 +912,52 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
                     </div>
                   ) : (
                     <div className="flex flex-col gap-2">
-                      {rows.map((mdl) => (
-                        <button
-                          key={mdl.id}
-                          type="button"
-                          data-testid={`model-row-${mdl.id}`}
-                          onClick={() => setSelected(mdl.id)}
-                          className="flex items-center gap-3 rounded-xl border border-border-default bg-bg-raised px-4 py-3 text-left transition-colors hover:bg-bg-hover"
-                        >
-                          <OrgAvatar org={mdl.org} size={34} />
-                          <span className="min-w-0 flex-1">
-                            <span className="block truncate text-body text-text-primary">
-                              {mdl.name}
+                      {rows.map((mdl) => {
+                        const active = detail?.id === mdl.id;
+                        return (
+                          <button
+                            key={mdl.id}
+                            type="button"
+                            data-testid={`model-row-${mdl.id}`}
+                            onClick={() => setSelected(mdl.id)}
+                            className={cx(
+                              'flex items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-colors',
+                              active
+                                ? 'border-accent-primary bg-bg-active'
+                                : 'border-border-subtle bg-bg-raised shadow-[0_1px_2px_rgba(0,0,0,0.03)] hover:border-border-default',
+                            )}
+                          >
+                            <OrgAvatar org={mdl.org} size={view === 'detail' ? 28 : 34} />
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-body text-text-primary">
+                                {mdl.name}
+                              </span>
+                              <span className="block truncate text-footnote text-text-muted">
+                                {mdl.org}
+                              </span>
                             </span>
-                            <span className="text-footnote text-text-muted">{mdl.org}</span>
-                          </span>
-                          <span className="shrink-0 text-footnote text-text-muted">
-                            {mdl.params ?? compactBytes(mdl.bytes)}
-                          </span>
-                        </button>
-                      ))}
+                            {/* The rail is 300px; a size column there would
+                                squeeze the name to nothing. */}
+                            {view === 'split' ? (
+                              <span className="shrink-0 text-footnote text-text-muted">
+                                {mdl.params ?? compactBytes(mdl.bytes)}
+                              </span>
+                            ) : null}
+                          </button>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
 
                 {view !== 'compact' && detail !== undefined ? (
                   <aside
-                    className="max-h-[calc(100vh-260px)] overflow-y-auto rounded-2xl border border-border-default bg-bg-raised p-5"
+                    className={cx(
+                      'overflow-y-auto rounded-2xl border border-border-subtle bg-bg-raised p-5 shadow-[0_1px_3px_rgba(0,0,0,0.05)]',
+                      view === 'detail' ? 'max-h-[calc(100vh-190px)]' : 'max-h-[calc(100vh-260px)]',
+                    )}
                     data-testid="model-detail"
+                    data-view={view}
                   >
                     <div className="flex items-start gap-3">
                       <OrgAvatar org={detail.org} size={48} />
@@ -891,72 +1009,16 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
                       </div>
                     ) : null}
 
-                    <div className="mt-3 flex items-center gap-2.5 rounded-xl border border-border-default bg-bg-inset px-3 py-2.5">
-                      {/* The dot says THAT it fits; the tooltip says why not —
-                          the reference's "Exceeds combined VRAM and system RAM
-                          budget." is the whole reason the dot is worth having. */}
-                      <Tooltip
-                        label={
-                          detail.fitReason ??
-                          (detail.fits === true
-                            ? 'Fits in this machine’s memory budget.'
-                            : 'Not enough information to tell whether this fits.')
-                        }
-                        side="top"
-                      >
-                        <span
-                          className={cx(
-                            'h-2 w-2 shrink-0 rounded-full',
-                            detail.fits === false
-                              ? 'bg-status-danger-fg'
-                              : detail.fits === true
-                                ? 'bg-accent-primary'
-                                : // Unknown is NOT a fit. Painting it like one
-                                  // asserted a claim about the user's hardware
-                                  // that the filter simultaneously treated as
-                                  // false — one value, two opposite readings.
-                                  'bg-border-strong',
-                          )}
-                          data-testid="detail-fit-dot"
-                        />
-                      </Tooltip>
-                      {/* Quant + format + size, the reference's row. The quant
-                          picker itself is not built yet, so this states what
-                          will be fetched rather than implying a choice. */}
-                      <span className="flex min-w-0 flex-1 items-center gap-2">
-                        <span className="shrink-0 text-footnote font-medium text-text-primary">
-                          {detail.downloaded === true ? 'Installed' : 'Recommended'}
-                        </span>
-                        {detail.formats[0] !== undefined ? (
-                          <span className="shrink-0 rounded-md bg-bg-raised px-1.5 py-0.5 text-caption text-text-secondary">
-                            {detail.formats[0].toUpperCase()}
-                          </span>
-                        ) : null}
-                        {detail.bytes !== undefined ? (
-                          <span className="shrink-0 text-footnote text-text-muted">
-                            {compactBytes(detail.bytes)}
-                          </span>
-                        ) : null}
-                      </span>
-                      <button
-                        type="button"
-                        data-testid={`download-${detail.id}`}
-                        disabled={detail.downloaded === true || busyId === detail.id}
-                        onClick={() => void download(detail.id)}
-                        className={cx(
-                          'rounded-lg px-2.5 py-1 text-footnote transition-opacity pd-focusable',
-                          detail.downloaded === true
-                            ? 'bg-bg-active text-text-muted'
-                            : 'bg-accent-primary text-text-on-accent hover:opacity-90',
-                        )}
-                      >
-                        {detail.downloaded === true
-                          ? 'Installed'
-                          : busyId === detail.id
-                            ? 'Starting…'
-                            : 'Download'}
-                      </button>
-                    </div>
+                    <QuantPicker
+                      options={quants?.repo === detail.id ? quants.options : []}
+                      loading={quants?.repo === detail.id ? quants.loading : true}
+                      totalRamGB={hw?.ramGiB ?? 0}
+                      mmprojBytes={quants?.mmprojBytes}
+                      format={detail.formats[0]?.toUpperCase()}
+                      installed={detail.downloaded === true}
+                      downloading={busyId === detail.id}
+                      onDownload={(q) => void download(detail.id, q)}
+                    />
 
                     {/* Only chips we actually have a value for — a row of
                         em-dashes is the thing this file already argues against
