@@ -22,6 +22,7 @@ interface RawDataset {
   createdAt?: string;
   private?: boolean;
   gated?: unknown;
+  mainSize?: number;
 }
 
 const SORTS: Record<string, string> = {
@@ -41,6 +42,27 @@ export async function searchDatasets(req: {
     direction: '-1',
     sort: SORTS[req.sort ?? 'trending'] ?? 'trendingScore',
   });
+  /*
+   * `mainSize` is the dataset's total bytes, and it only arrives via `expand[]`.
+   *
+   * expand[] IS ALL-OR-NOTHING: HF then returns ONLY the keys listed here, so
+   * every field the mapper below reads has to be named or it silently becomes
+   * undefined — which for `tags` and `likes` means blank pills and zeroed
+   * counts while the field you added works fine.
+   */
+  for (const key of [
+    'author',
+    'createdAt',
+    'downloads',
+    'gated',
+    'lastModified',
+    'likes',
+    'mainSize',
+    'private',
+    'tags',
+  ]) {
+    params.append('expand[]', key);
+  }
   if (req.query.trim().length > 0) params.set('search', req.query.trim());
 
   try {
@@ -64,6 +86,7 @@ export async function searchDatasets(req: {
             downloads: r.downloads ?? 0,
             likes: r.likes ?? 0,
             tags: Array.isArray(r.tags) ? r.tags.filter((t) => typeof t === 'string') : [],
+            bytes: typeof r.mainSize === 'number' && r.mainSize > 0 ? r.mainSize : undefined,
             updatedAt: r.lastModified,
             createdAt: r.createdAt,
             gated: r.gated !== undefined && r.gated !== false,

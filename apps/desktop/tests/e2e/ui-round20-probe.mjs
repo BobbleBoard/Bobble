@@ -1,0 +1,287 @@
+/**
+ * ROUND-20 UI BATCH: harness tiles, the size slider, the restyled dropup.
+ *
+ * All three are things a unit test cannot see and the user asked for by looking at a
+ * screenshot, so this drives the real app and reads the real DOM:
+ *
+ *   1. HARNESS TILES — the user: "not rendering properly in this case… especially
+ *      the background for the icon is important, for example the free floating
+ *      pi looks odd in ours still." Codex and Hermes were EMPTY circles because
+ *      the old helper returned null for marks we don't ship. The check is that
+ *      every harness row has a tile with a non-transparent background AND
+ *      something drawn inside it — an empty tile is the bug we just fixed, so
+ *      "the element exists" is not the assertion worth making.
+ *
+ *   2. THE SIZE SLIDER — must exist for both models and datasets, and moving it
+ *      must actually reduce the row count. A control that renders and filters
+ *      nothing is the "only show models that fit" bug all over again.
+ *
+ *   3. THE DROPUP — the user: it "needs to be restyled to be the same as all other
+ *      dropdowns/ups in the app". The bespoke bit was a SegmentedControl inside
+ *      a menu, so the assertion is that no segmented control remains in there
+ *      and the mode rows are ordinary menu items like everything else.
+ *
+ * Isolated userData: the single-instance lock lives there and a shared one would
+ * steal focus from a running Bobble.
+ */
+import { existsSync, mkdirSync, mkdtempSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { _electron as electron } from 'playwright-core';
+
+const require = createRequire(import.meta.url);
+const electronBinary = require('electron');
+const appRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+const OUT = process.env.OUT ?? path.join(appRoot, '.probe-shots');
+
+const SIZE_CAP_MAX = 200;
+const failures = [];
+function check(condition, message) {
+  if (!condition) failures.push(message);
+  console.log(`  ${condition ? 'ok  ' : 'FAIL'} ${message}`);
+}
+
+if (!existsSync(path.join(appRoot, 'dist/index.html'))) {
+  throw new Error('app is not built — run `npm run build` first');
+}
+
+mkdirSync(OUT, { recursive: true });
+const userDataDir = mkdtempSync(path.join(tmpdir(), 'pi-round20-udd-'));
+
+const app = await electron.launch({
+  executablePath: electronBinary,
+  args: [appRoot, `--user-data-dir=${userDataDir}`],
+  env: { ...process.env, PI_E2E: '1', PI_E2E_BACKGROUND: '1' },
+});
+
+try {
+  const page = await app.firstWindow();
+  await page.waitForSelector('[data-testid="boot-state"]', { timeout: 20_000 });
+  await page.addStyleTag({
+    content: '[data-testid="first-run-tips"]{display:none !important}',
+  });
+  await page.waitForSelector('[data-testid="composer-input"]', { timeout: 20_000 });
+
+  /* ------------------------------------------------------- 3. profile dropup */
+  console.log('\nprofile dropup');
+  await page.click('[data-testid="profile-button"]');
+  await page.waitForSelector('[data-testid="profile-menu"]', { timeout: 5000 });
+  await page.waitForTimeout(400);
+  await page.screenshot({ path: path.join(OUT, 'r20-01-dropup.png') });
+
+  const dropup = await page.evaluate(() => {
+    const menu = document.querySelector('[data-testid="profile-menu"]');
+    if (menu === null) return null;
+    const cs = getComputedStyle(menu);
+    return {
+      // The bespoke block: a segmented control no other menu in the app has.
+      segmented: menu.querySelectorAll('[role="radiogroup"], .pd-segmented').length,
+      items: menu.querySelectorAll('[role="menuitem"]').length,
+      modeRowsAreMenuItems: ['user', 'power'].every(
+        (m) =>
+          document.querySelector(`[data-testid="usermode-${m}"]`)?.getAttribute('role') ===
+          'menuitem',
+      ),
+      settingsRow: document.querySelector('[data-testid="open-settings"]') !== null,
+      radius: cs.borderRadius,
+      bg: cs.backgroundColor,
+    };
+  });
+  check(dropup !== null, 'the dropup opens');
+  check(
+    dropup?.segmented === 0,
+    `no segmented control left inside the menu (${dropup?.segmented})`,
+  );
+  check(dropup?.modeRowsAreMenuItems === true, 'both mode rows are ordinary menu items');
+  check(dropup?.items >= 4, `menu has the expected rows (${dropup?.items})`);
+  check(dropup?.settingsRow === true, 'the open-settings row still exists (11 probes click it)');
+
+  /* Flip to Power user through the NEW menu row. Two things at once: it proves
+     the restyled row is a working control and not just markup, and Power mode is
+     what surfaces the hub entry ("More models") the slider checks need. */
+  await page.click('[data-testid="usermode-power"]');
+  await page.waitForTimeout(500);
+  const powerOn = await page.evaluate(
+    () => document.querySelector('[data-testid="usermode-power"]')?.textContent ?? '',
+  );
+  check(powerOn.includes('Power'), 'the Power-user row is still there after selecting it');
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(300);
+
+  /* --------------------------------------------------------- 1. harness tiles */
+  console.log('\nharness tiles');
+  await page.click('[data-testid="profile-button"]');
+  await page.click('[data-testid="open-settings"]');
+  await page.waitForSelector('[data-testid="settings-view"]', { timeout: 10_000 });
+  const harnessNav = await page.$('[data-testid="settings-nav-harness"]');
+  if (harnessNav === null) {
+    failures.push('no harness section in the settings nav');
+  } else {
+    await harnessNav.click();
+    await page.waitForTimeout(900);
+    await page.screenshot({ path: path.join(OUT, 'r20-02-harness.png') });
+
+    const tiles = await page.evaluate(() => {
+      const rows = [...document.querySelectorAll('[data-testid^="harness-row-"]')];
+      return rows.map((row) => {
+        const id = row.getAttribute('data-testid').replace('harness-row-', '');
+        const tile = row.querySelector('[data-testid^="harness-icon-"]');
+        if (tile === null) return { id, tile: false };
+        const cs = getComputedStyle(tile);
+        return {
+          id,
+          tile: true,
+          bg: cs.backgroundColor,
+          // Something has to be DRAWN in it: an svg mark or a monogram letter.
+          glyph: tile.querySelector('svg') !== null || tile.textContent.trim().length > 0,
+          box: tile.getBoundingClientRect().width,
+        };
+      });
+    });
+    check(tiles.length >= 3, `harness rows present (${tiles.length})`);
+    for (const t of tiles) {
+      check(t.tile === true, `${t.id}: has an icon tile`);
+      check(t.glyph === true, `${t.id}: the tile is not empty`);
+      const transparent = t.bg === 'rgba(0, 0, 0, 0)' || t.bg === 'transparent';
+      check(!transparent, `${t.id}: the tile has a real background (${t.bg})`);
+      check(t.box >= 24, `${t.id}: the tile is sized (${Math.round(t.box)}px)`);
+    }
+  }
+
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(400);
+
+  /* ---------------------------------------------------------- 2. size slider */
+  console.log('\nsize slider');
+  /* The hub is NOT a settings section any more, so there is no settings-nav row
+     for it. The user's way in is the composer's model chip -> "More models",
+     which only appears in Power mode (set above). */
+  await page.click('[data-testid="footer-model-chip"]');
+  await page.waitForSelector('[data-testid="footer-open-manager"]', { timeout: 5000 });
+  await page.click('[data-testid="footer-open-manager"]');
+  await page.waitForSelector('[data-testid="models-view"]', { timeout: 10_000 });
+  await page.waitForTimeout(1500);
+  await page.screenshot({ path: path.join(OUT, 'r20-03-models.png') });
+
+  /*
+   * THE SIZE COLUMN MUST NOT CONTRADICT THE NAME.
+   *
+   * HF's `gguf.total` describes one file it indexed, so trusting it over the
+   * repo name printed "0.0B" beside a repo called "…-27B-…". Only a screenshot
+   * showed it; this check is what keeps it visible without one.
+   */
+  const contradictions = await page.evaluate(() =>
+    [...document.querySelectorAll('[data-testid^="model-row-"]')]
+      .map((row) => {
+        const text = row.textContent ?? '';
+        const named = /(\d+(?:\.\d+)?)\s*[bB](?![a-z])/.exec(row.getAttribute('data-testid') ?? '');
+        const shown = /(\d+(?:\.\d+)?)B(?!\w)/.exec(text.replace(/^[^]*?—/, ''));
+        if (named === null || shown === null) return null;
+        const a = Number(named[1]);
+        const b = Number(shown[1]);
+        // Allow rounding, reject a different order of magnitude.
+        return Math.abs(a - b) > Math.max(1, a * 0.25)
+          ? `${row.getAttribute('data-testid')}: name says ${a}B, column says ${b}B`
+          : null;
+      })
+      .filter((x) => x !== null),
+  );
+  check(
+    contradictions.length === 0,
+    `no row's size contradicts its name (${contradictions.slice(0, 3).join('; ') || 'none'})`,
+  );
+
+  for (const kind of ['models', 'datasets']) {
+    const tab = await page.$(`[data-testid="hub-kind-${kind}"]`);
+    if (tab !== null) {
+      await tab.click();
+      await page.waitForTimeout(1200);
+    }
+    const slider = await page.$('[data-testid="filter-size"] input[type="range"]');
+    check(slider !== null, `${kind}: the size slider is present`);
+    if (slider === null) continue;
+
+    /*
+     * SWEEP THE CAP rather than test one value. A filter that returns
+     * everything or nothing at every setting looks like it works from a single
+     * assertion — this is exactly how "only show models that fit" shipped
+     * hiding all 19 rows. A monotonic curve with at least one INTERMEDIATE
+     * count is the evidence that the cap is reading real sizes.
+     */
+    const setCap = async (v) => {
+      await page.evaluate((val) => {
+        const el = document.querySelector('[data-testid="filter-size"] input[type="range"]');
+        const setter = Object.getOwnPropertyDescriptor(
+          window.HTMLInputElement.prototype,
+          'value',
+        ).set;
+        setter.call(el, String(val));
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+      }, v);
+      await page.waitForTimeout(450);
+      return page.evaluate(() => document.querySelectorAll('[data-testid^="model-row-"]').length);
+    };
+
+    const caps = [200, 60, 30, 12, 6, 2];
+    const counts = [];
+    for (const c of caps) counts.push(await setCap(c));
+    console.log(`     ${kind}: ${caps.map((c, i) => `${c}GB=${counts[i]}`).join('  ')}`);
+
+    const monotonic = counts.every((n, i) => i === 0 || n <= counts[i - 1]);
+    check(monotonic, `${kind}: lowering the cap never adds rows`);
+    const intermediate = counts.some((n, i) => i > 0 && n > 0 && n < counts[0]);
+    check(
+      intermediate,
+      `${kind}: some cap hides SOME rows, not all-or-nothing (${counts.join('/')})`,
+    );
+
+    /* The unit MUST be on the label. Datasets cap real bytes; a Discover repo
+       has only a parameter count, so a bare "≤ 2" would be a lie on one of the
+       two tabs whichever unit we picked. */
+    const label = await page.textContent('[data-testid="filter-size"] span');
+    const wantUnit = kind === 'datasets' ? '2 GB' : '2B params';
+    check(
+      label?.includes(wantUnit) === true,
+      `${kind}: the slider names its unit (want "${wantUnit}", got "${label}")`,
+    );
+    // Back to no cap so the next tab starts clean.
+    await setCap(SIZE_CAP_MAX);
+    if (kind === 'datasets') {
+      /*
+       * The hub must not tell someone their PUBLIC dataset is gated. `detail`
+       * falls back to rows[0], which sent a dataset id to hf:list-files — a
+       * /api/models path that 401s for a dataset — and the 401 branch printed
+       * "This repo is gated or private. Paste a Hugging Face token".
+       */
+      const gatedLie = await page.isVisible('[data-testid="hf-token-row"]').catch(() => false);
+      check(!gatedLie, 'datasets: no bogus "this repo is gated" token prompt');
+      const sizes = await page.evaluate(() =>
+        [...document.querySelectorAll('[data-testid^="model-row-"]')]
+          .map((r) => r.textContent)
+          .join(' '),
+      );
+      check(!/\d{4,} GB/.test(sizes), 'datasets: sizes read as TB, not five-digit GB');
+      const header = await page.evaluate(
+        () =>
+          [...document.querySelectorAll('span')].find((e) =>
+            ['Model', 'Dataset'].includes(e.textContent.trim()),
+          )?.textContent ?? '',
+      );
+      check(header.trim() === 'Dataset', `datasets: the column is headed "Dataset" (${header})`);
+      await page.screenshot({ path: path.join(OUT, 'r20-04-datasets-capped.png') });
+    }
+  }
+
+  console.log(
+    failures.length === 0
+      ? '\nui-round20-probe: all checks passed'
+      : `\nui-round20-probe: ${failures.length} FAILURE(S)\n - ${failures.join('\n - ')}`,
+  );
+  console.log(`shots in ${OUT}`);
+  if (failures.length > 0) process.exitCode = 1;
+} finally {
+  await app.close().catch(() => undefined);
+}

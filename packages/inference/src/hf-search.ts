@@ -81,6 +81,18 @@ export interface HfModelHit {
   readonly createdAt?: string;
   /** Recent-popularity signal (HF `trendingScore`), when present. */
   readonly likesRecent?: number;
+  /**
+   * EXACT parameter count from HF's `gguf.total` (e.g. 30532122624 for a 30B).
+   *
+   * The hub's Size column used to regex the repo NAME for "…-27B-…", which is
+   * blank for every repo that does not spell its size out — a third of any
+   * search page showed "—". `expand[]=gguf` returns the real number read from
+   * the GGUF header, so a size is known for repos whose name never says one.
+   *
+   * NOT a byte count: a GGUF repo holds every quant it publishes, so its total
+   * storage says nothing about what you would download.
+   */
+  readonly paramsTotal?: number;
 }
 
 export interface HfGgufFile {
@@ -173,9 +185,37 @@ export function buildSearchUrl(query: string, opts: HfSearchOptions = {}): strin
   p.set('sort', opts.sort ?? 'downloads');
   const limit = Math.min(Math.max(1, opts.limit ?? 20), 100);
   p.set('limit', String(limit));
-  p.set('full', 'true');
+  /*
+   * `expand[]` IS ALL-OR-NOTHING, and that is a trap worth spelling out.
+   *
+   * Adding `expand[]=gguf` alongside `full=true` does not add a field — HF
+   * switches to returning ONLY the expanded keys (plus id/_id/downloads).
+   * Measured: the reply went from 15 keys to 4, dropping tags, likes, author,
+   * pipeline_tag, lastModified and createdAt. Every capability pill, format
+   * badge, org avatar and date in the hub is derived from those, so the
+   * one-line "just add the param" version silently blanks half the UI while
+   * the field you wanted works perfectly.
+   *
+   * So every key `parseHit` reads is listed here. Anything new it starts
+   * reading has to be added, or it arrives undefined.
+   */
+  for (const key of EXPAND_FIELDS) p.append('expand[]', key);
   return url.toString();
 }
+
+/** Exactly the fields `parseHit` reads. See the note in `buildSearchUrl`. */
+const EXPAND_FIELDS = [
+  'author',
+  'createdAt',
+  'downloads',
+  'gated',
+  'gguf',
+  'lastModified',
+  'likes',
+  'pipeline_tag',
+  'tags',
+  'trendingScore',
+] as const;
 
 function parseHit(raw: unknown): HfModelHit | undefined {
   const r = asRecord(raw);
@@ -196,6 +236,7 @@ function parseHit(raw: unknown): HfModelHit | undefined {
     updatedAt: readString(r.lastModified),
     createdAt: readString(r.createdAt),
     likesRecent: readNumber(r.trendingScore),
+    paramsTotal: readNumber(asRecord(r.gguf).total),
   };
 }
 

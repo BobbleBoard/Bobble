@@ -88,16 +88,80 @@ export function BrandPi({ size = 20, className }: { size?: number; className?: s
 
 /** Which mark belongs to which harness id. Unknown ids get no icon rather than
  * a wrong one — a generic placeholder next to real marks looks like a bug. */
-export function harnessIcon(id: string, size = 20): React.ReactNode {
-  if (id.startsWith('pi-')) return <BrandPi size={size} />;
-  // codex + hermes have no correct mark available (see rule 2) and deliberately
-  // return null, so the caller shows a monogram instead of an invented logo.
-  return <BrandMark id={id} size={size} />;
-}
+/**
+ * A harness's icon AS A TILE — mark plus its own background.
+ *
+ * the user: "not rendering properly in this case… especially the background for the
+ * icon is important for example the free floating pi looks odd in ours still."
+ * Two faults: `harnessIcon` returned null for the marks we do not have, so Codex
+ * and Hermes rendered as EMPTY circles, which looks broken rather than
+ * unbranded; and the ones we do have sat on a flat neutral tile so the glyph
+ * floated.
+ *
+ * Every harness now gets a tile tinted from its own brand colour, and anything
+ * without a mark falls back to a monogram rather than nothing. A letter reads as
+ * "no logo available"; an empty circle reads as "your app failed to draw".
+ */
+const HARNESS_FALLBACK: Record<string, { letter: string; hex: string }> = {
+  // Brand colours taken from each product's own materials, used only to tint a
+  // monogram tile — not to imitate a mark we do not have.
+  codex: { letter: 'C', hex: '#10A37F' },
+  hermes: { letter: 'H', hex: '#6366F1' },
+};
 
-/** Brand colour for a harness tile, when we have the official mark. */
-export function harnessTint(id: string): string | undefined {
-  return BRAND_SVGS[id]?.hex;
+export function HarnessIcon({ id, size = 32 }: { id: string; size?: number }) {
+  const isPi = id.startsWith('pi-');
+  const brand = isPi ? undefined : BRAND_SVGS[id];
+  const fallback = HARNESS_FALLBACK[id];
+  const glyph = Math.round(size * 0.56);
+
+  // pi is a letterform rather than a logo, so it gets a neutral tile and the
+  // app's own ink — tinting it would invent a brand colour for it.
+  if (isPi) {
+    return (
+      <span
+        className="inline-flex shrink-0 items-center justify-center rounded-lg bg-bg-active text-text-primary"
+        style={{ width: size, height: size }}
+        data-testid={`harness-icon-${id}`}
+      >
+        <BrandPi size={glyph} />
+      </span>
+    );
+  }
+
+  if (brand !== undefined) {
+    return (
+      <span
+        className="inline-flex shrink-0 items-center justify-center rounded-lg"
+        style={{
+          width: size,
+          height: size,
+          background: `color-mix(in oklab, ${brand.hex} 16%, var(--pd-bg-inset))`,
+        }}
+        data-testid={`harness-icon-${id}`}
+      >
+        <BrandMark id={id} size={glyph} />
+      </span>
+    );
+  }
+
+  const tint = fallback?.hex ?? 'var(--pd-text-muted)';
+  return (
+    <span
+      className="inline-flex shrink-0 items-center justify-center rounded-lg font-medium"
+      style={{
+        width: size,
+        height: size,
+        fontSize: Math.round(size * 0.42),
+        background: `color-mix(in oklab, ${tint} 16%, var(--pd-bg-inset))`,
+        color: tint,
+      }}
+      data-testid={`harness-icon-${id}`}
+      aria-hidden
+    >
+      {fallback?.letter ?? id.charAt(0).toUpperCase()}
+    </span>
+  );
 }
 
 /**

@@ -150,9 +150,31 @@ function hfToHubModel(h: HfModelHitDTO): HubModel {
   if (tags.some((t) => t.includes('safetensors'))) formats.push('safetensors');
   if (formats.length === 0) formats.push('gguf');
 
-  // The reference's Size column is a PARAMETER COUNT (27B, 95B, 1573B), read
-  // off the repo name — HF search does not return a param field.
-  const params = /(\d+(?:\.\d+)?)\s*[bB](?![a-z])/.exec(h.name)?.[1];
+  /*
+   * The Size column is a PARAMETER COUNT (27B, 95B, 1573B), and it comes from
+   * TWO sources in this order, which took a screenshot to get right:
+   *
+   *   1. the repo NAME — the author's own statement about the model;
+   *   2. HF's `gguf.total`, only when the name says nothing.
+   *
+   * The tempting order is the other way round: `gguf.total` is an exact number
+   * read from a GGUF header, so it looks strictly better than a regex. It is
+   * not. That block describes ONE file HF happened to index, which for a repo
+   * whose featured file is an MTP head or a projector is 0.5B or ~0. Trusting
+   * it first rendered "Qwen3.8-27B-ARA-vision-MTP" as 0.5B and
+   * "Qwen3.8-27B-Uncensored-JoyFox" as 0.0B — both say 27B on the tin.
+   *
+   * So HF's number earns its place on the repos that never spell a size out,
+   * where this column used to show "—", and stays out of the way otherwise.
+   */
+  const fromName = Number.parseFloat(/(\d+(?:\.\d+)?)\s*[bB](?![a-z])/.exec(h.name)?.[1] ?? '');
+  const fromHeader =
+    h.paramsTotal !== undefined && h.paramsTotal > 0 ? h.paramsTotal / 1e9 : Number.NaN;
+  const paramsB = Number.isFinite(fromName) ? fromName : fromHeader;
+  const params = Number.isFinite(paramsB)
+    ? // A whole number reads better than "27.3B"; keep one decimal under 10B.
+      `${paramsB >= 10 ? Math.round(paramsB) : Number(paramsB.toFixed(1))}B`
+    : undefined;
 
   return {
     id: h.id,
@@ -161,7 +183,8 @@ function hfToHubModel(h: HfModelHitDTO): HubModel {
     /* NO verified badge. HF's search does not return one, and most of these
        authors are individuals rather than verified orgs — stamping a blue check
        on every row invents a credential HF actually grants selectively. */
-    params: params === undefined ? undefined : `${params}B`,
+    params,
+    paramsB: Number.isFinite(paramsB) ? paramsB : undefined,
     downloads: h.downloads,
     likes: h.likes,
     updatedAt: h.updatedAt === undefined ? undefined : Date.parse(h.updatedAt),
@@ -540,6 +563,10 @@ function Dropdown<T extends string>({
   );
 }
 
+/** Slider ceiling, which doubles as "no cap". Wide enough for a 120GB dataset
+ *  and a 200B model; past that the control is dead travel either way. */
+const SIZE_CAP_MAX = 200;
+
 export function ModelsView({ onClose }: { onClose: () => void }) {
   const catalog = useLlmStore((s) => s.catalog);
   const refreshCatalog = useLlmStore((s) => s.refreshCatalog);
@@ -576,6 +603,14 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
     if (kind === 'datasets') setDatasetFilters(apply);
     else setModelFilters(apply);
   };
+  /*
+   * Which quantity the size cap is measuring. Datasets and on-disk files have
+   * real bytes; a Discover repo has only a parameter count (see the note at the
+   * control). The label and the aria-label both follow this so the slider never
+   * shows a number without its unit.
+   */
+  const sizeUnit: 'gb' | 'params' = kind === 'datasets' || tab === 'device' ? 'gb' : 'params';
+
   const resetFilters = () =>
     kind === 'datasets'
       ? setDatasetFilters(DEFAULT_DATASET_FILTERS)
@@ -583,6 +618,7 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
   const isFiltered =
     filters.capabilities.length > 0 ||
     filters.onlyFits ||
+    filters.maxSize !== undefined ||
     filters.format !== (kind === 'datasets' ? DEFAULT_DATASET_FILTERS : DEFAULT_FILTERS).format;
 
   const hfToken = useHfToken();
@@ -722,6 +758,8 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
         org: d.author,
         downloads: d.downloads,
         likes: d.likes,
+        // A dataset's storage IS what you download, so bytes is its real size.
+        bytes: d.bytes,
         updatedAt: d.updatedAt === undefined ? undefined : Date.parse(d.updatedAt),
         createdAt: d.createdAt === undefined ? undefined : Date.parse(d.createdAt),
         formats: [],
@@ -777,6 +815,21 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
    * the weights, it loads alongside them, and its bytes belong in the fit maths.
    */
   useEffect(() => {
+    /*
+     * DATASETS HAVE NO QUANT LADDER, and asking anyway is not harmless.
+     *
+     * `detail` falls back to `rows[0]`, so the first row is an implicit detail
+     * even with nothing selected. On the Datasets tab that sent a dataset id to
+     * `hf:list-files`, which asks `/api/models/<id>/tree/main` — a path that
+     * does not exist for a dataset, so HF answers 401 (measured), the 401
+     * branch below reads that as gated, and the hub told the user "This repo is
+     * gated or private. Paste a Hugging Face token" about a public dataset it
+     * had just listed. A wrong question producing a confident wrong answer.
+     */
+    if (kind !== 'models') {
+      setQuants(null);
+      return;
+    }
     if (detailRepo === undefined) {
       setQuants(null);
       return;
@@ -834,9 +887,17 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
     return () => {
       cancelled = true;
     };
-  }, [detailRepo, catalog, hfToken]);
+  }, [detailRepo, catalog, hfToken, kind]);
   useEffect(() => {
     if (detailRepo === undefined || !detailRepo.includes('/')) {
+      setCard(null);
+      return;
+    }
+    if (kind !== 'models') {
+      // A dataset's card lives under /api/datasets, so asking the models
+      // endpoint yields "could not load the model card" about a card that
+      // exists. Rendering dataset cards is its own piece of work; claiming a
+      // failure we caused is not a placeholder for it.
       setCard(null);
       return;
     }
@@ -853,7 +914,7 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
     return () => {
       cancelled = true;
     };
-  }, [detailRepo]);
+  }, [detailRepo, kind]);
   const localCount = all.filter((m) => m.downloaded === true).length;
 
   /* The hub's whole purpose. This was a <span> with no handler, in a pane the
@@ -1055,6 +1116,42 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
             </button>
           }
         />
+        {/*
+         * SIZE CAP. A maximum rather than a range: the question a hub gets asked
+         * is "what fits", never "what is at least this big".
+         *
+         * The UNIT follows the rows, and the label says which. Datasets and
+         * on-disk files have real bytes; a Discover repo only has a parameter
+         * count, because its storage is every quant it publishes summed
+         * together. Capping repo bytes would hide a 27B repo that holds a
+         * perfectly good 8GB Q4 — so the axis there is B of parameters.
+         */}
+        <label
+          className="flex items-center gap-2 rounded-full border border-border-subtle bg-bg-raised px-3.5 py-1.5 text-footnote text-text-secondary shadow-[0_1px_2px_rgba(0,0,0,0.03)]"
+          data-testid="filter-size"
+        >
+          <span className="whitespace-nowrap">
+            {filters.maxSize === undefined
+              ? 'Any size'
+              : `≤ ${filters.maxSize}${sizeUnit === 'gb' ? ' GB' : 'B params'}`}
+          </span>
+          <input
+            type="range"
+            min={1}
+            max={SIZE_CAP_MAX}
+            step={1}
+            aria-label={sizeUnit === 'gb' ? 'Maximum size in GB' : 'Maximum parameters in B'}
+            value={filters.maxSize ?? SIZE_CAP_MAX}
+            onChange={(e) => {
+              const v = Number(e.target.value);
+              // The top of the range means "no cap", so the slider can be
+              // dismissed without a second control.
+              setFilters((f) => ({ ...f, maxSize: v >= SIZE_CAP_MAX ? undefined : v }));
+            }}
+            className="h-1 w-24 cursor-pointer accent-[var(--pd-accent-primary)]"
+          />
+        </label>
+
         {isFiltered ? (
           <button
             type="button"
@@ -1307,7 +1404,7 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
                             : 'grid-cols-[1fr_110px_80px_92px_36px]',
                         )}
                       >
-                        <span>Model</span>
+                        <span>{kind === 'datasets' ? 'Dataset' : 'Model'}</span>
                         <span>Capabilities</span>
                         <span>Size</span>
                         {hasCounts ? <span>Downloads</span> : null}

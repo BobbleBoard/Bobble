@@ -416,6 +416,7 @@ function toHfHit(hit: HfModelHit): HfModelHitDTO {
     updatedAt: hit.updatedAt,
     createdAt: hit.createdAt,
     likesRecent: hit.likesRecent,
+    paramsTotal: hit.paramsTotal,
   };
 }
 

@@ -34,7 +34,14 @@ export type ModelCapability =
   | 'image-generation'
   | 'video-generation'
   | '3d-generation';
-export type ModelSort = 'newest' | 'trending' | 'downloads' | 'updated' | 'likes';
+export type ModelSort =
+  | 'newest'
+  | 'trending'
+  | 'downloads'
+  | 'updated'
+  | 'likes'
+  | 'size-asc'
+  | 'size-desc';
 export type ViewMode = 'split' | 'detail' | 'compact';
 
 export const FORMAT_OPTIONS: Array<{ id: ModelFormat; label: string; dot?: string }> = [
@@ -67,6 +74,8 @@ export const SORT_OPTIONS: Array<{ id: ModelSort; label: string }> = [
   { id: 'downloads', label: 'Most downloads' },
   { id: 'updated', label: 'Recently updated' },
   { id: 'likes', label: 'Most likes' },
+  { id: 'size-asc', label: 'Smallest first' },
+  { id: 'size-desc', label: 'Largest first' },
 ];
 
 /** A row as the hub needs it, independent of where the entry came from. */
@@ -77,6 +86,9 @@ export interface HubModel {
   readonly org: string;
   readonly verified?: boolean;
   readonly params?: string;
+  /** Parameter count in BILLIONS, when known — the numeric twin of `params`.
+   * This is the size axis a Discover row actually has (see `maxSize`). */
+  readonly paramsB?: number;
   readonly bytes?: number;
   readonly downloads?: number;
   readonly likes?: number;
@@ -103,6 +115,28 @@ export interface HubFilters {
   readonly sort: ModelSort;
   readonly onlyFits: boolean;
   readonly query: string;
+  /**
+   * Upper bound in GB, or undefined for no cap. the user asked for "maybe a slider
+   * for size" — a MAXIMUM is the useful end of that range: the question people
+   * ask a hub is "what fits", never "what is at least this big".
+   */
+  /**
+   * ONE upper size bound, judged against whichever size the row actually knows.
+   *
+   * Its unit depends on the row, and that is deliberate rather than sloppy:
+   *   - a DATASET or an on-disk file has real bytes, so the cap is GB;
+   *   - a Discover MODEL row is a repo holding every quant it publishes, so its
+   *     total storage says nothing about what you would download. Its real size
+   *     axis is parameters, which is also what the Size column shows.
+   *
+   * Bytes win when a row somehow knows both. A row that knows NEITHER is kept —
+   * a cap cannot judge what it cannot see, and hiding unmeasured rows is how
+   * "only show models that fit" ended up showing nothing at all.
+   *
+   * The label at the control has to name the unit it is applying; a bare number
+   * over a slider is where this would turn into a lie.
+   */
+  readonly maxSize?: number;
 }
 
 export const DEFAULT_FILTERS: HubFilters = {
@@ -152,9 +186,25 @@ export function filterModels(models: readonly HubModel[], f: HubFilters): HubMod
     if (f.capabilities.length > 0 && !f.capabilities.some((c) => m.capabilities.includes(c)))
       return false;
     if (f.onlyFits && m.fits !== true) return false;
+    if (f.maxSize !== undefined) {
+      if (m.bytes !== undefined) {
+        if (m.bytes > f.maxSize * 1024 ** 3) return false;
+      } else if (m.paramsB !== undefined && m.paramsB > f.maxSize) {
+        return false;
+      }
+    }
     if (q.length > 0 && !`${m.name} ${m.org}`.toLowerCase().includes(q)) return false;
     return true;
   });
+}
+
+/** Unknown size sorts last ascending: absent is not "small". */
+function sizeKey(m: HubModel): number {
+  return m.bytes ?? Number.POSITIVE_INFINITY;
+}
+/** …and last descending too, hence a separate key rather than a negation. */
+function sizeKeyDesc(m: HubModel): number {
+  return m.bytes ?? Number.NEGATIVE_INFINITY;
 }
 
 /** Order for the chosen sort. Ties break on name so the list never jitters. */
@@ -174,6 +224,14 @@ export function sortModels(models: readonly HubModel[], sort: ModelSort): HubMod
     // recency rather than a second name for "most downloads".
     trending: (a, b) =>
       by(b.downloads) * 0.7 + by(b.likes) * 30 - (by(a.downloads) * 0.7 + by(a.likes) * 30),
+    /*
+     * Size sorts put UNKNOWN sizes last in both directions, rather than letting
+     * them win "smallest". A model whose size we never learned is not small; it
+     * is unmeasured, and sorting it to the top of "smallest first" would hand
+     * someone on 8GB exactly the rows we cannot vouch for.
+     */
+    'size-asc': (a, b) => sizeKey(a) - sizeKey(b),
+    'size-desc': (a, b) => sizeKeyDesc(b) - sizeKeyDesc(a),
   };
   return [...models].sort((a, b) => {
     const d = cmp[sort](a, b);
@@ -192,6 +250,10 @@ export function compactCount(n: number | undefined): string {
 /** "21 GB" / "850 GB" / "412 MB" — coarse, for a size chip. */
 export function compactBytes(bytes: number | undefined): string {
   if (bytes === undefined) return '—';
+  const tb = bytes / 1024 ** 4;
+  // Datasets go up here — HF lists several over a petabyte — and "12856 GB" is
+  // a number nobody can read at a glance.
+  if (tb >= 1) return `${tb >= 100 ? Math.round(tb) : Number(tb.toFixed(tb >= 10 ? 0 : 1))} TB`;
   const gb = bytes / 1024 ** 3;
   if (gb >= 1) return `${gb >= 100 ? Math.round(gb) : Number(gb.toFixed(gb >= 10 ? 0 : 1))} GB`;
   return `${Math.round(bytes / 1024 ** 2)} MB`;

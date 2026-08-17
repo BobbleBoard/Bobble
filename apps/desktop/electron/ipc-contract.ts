@@ -444,6 +444,9 @@ export interface DatasetHitDTO {
   updatedAt?: string;
   createdAt?: string;
   gated: boolean;
+  /** Total dataset bytes (HF `mainSize`), when known. Unlike a model repo, a
+   * dataset's storage IS the thing you download, so bytes is the right axis. */
+  bytes?: number;
 }
 
 export type DatasetInvokeMap = {
@@ -490,6 +493,9 @@ export interface HfModelHitDTO {
   /** Repo creation time, so "Newest" differs from "Recently updated". */
   createdAt?: string;
   likesRecent?: number;
+  /** Exact parameter count from HF's GGUF header (`gguf.total`), when known.
+   * Not bytes — a GGUF repo holds every quant it publishes. */
+  paramsTotal?: number;
 }
 
 /** One GGUF file in a repo (mirror of `HfGgufFile`) + a RAM estimate the

@@ -107,7 +107,7 @@ function jsonFetch(body: unknown, sink?: { url?: string; init?: RequestInit }): 
 // --- buildSearchUrl / param composition --------------------------------------
 
 describe('buildSearchUrl', () => {
-  it('composes search + ANDed filters + sort + limit + full', () => {
+  it('composes search + ANDed filters + sort + limit', () => {
     const u = new URL(
       buildSearchUrl('gemma gguf', {
         sort: 'likes',
@@ -120,7 +120,30 @@ describe('buildSearchUrl', () => {
     expect(u.searchParams.getAll('filter')).toEqual(['gguf', 'gemma4', 'text-generation']);
     expect(u.searchParams.get('sort')).toBe('likes');
     expect(u.searchParams.get('limit')).toBe('5');
-    expect(u.searchParams.get('full')).toBe('true');
+  });
+
+  it('asks for EVERY field the parser reads, because expand[] is all-or-nothing', () => {
+    /*
+     * This is the test that earns its keep. `expand[]` does not ADD a field —
+     * HF switches to returning only the listed keys (measured: 15 keys down to
+     * 4). So a hit's tags, likes, author and dates all silently vanish if they
+     * are not named, and the field someone added the param for works fine,
+     * which is what makes it hard to notice. If parseHit starts reading a new
+     * key, this list has to grow with it.
+     */
+    const expands = new URL(buildSearchUrl('x')).searchParams.getAll('expand[]');
+    expect([...expands].sort()).toEqual([
+      'author',
+      'createdAt',
+      'downloads',
+      'gated',
+      'gguf',
+      'lastModified',
+      'likes',
+      'pipeline_tag',
+      'tags',
+      'trendingScore',
+    ]);
   });
 
   it('omits the gguf filter when ggufOnly is false and defaults sort to downloads', () => {
@@ -168,6 +191,25 @@ describe('searchHfModels', () => {
     // A malformed row degrades to zeros/empties rather than throwing.
     expect(hits[2]?.downloads).toBe(0);
     expect(hits[2]?.tags).toEqual([]);
+  });
+
+  it('reads the parameter total off gguf.total, and survives its absence', async () => {
+    /*
+     * `gguf.total` is a PARAMETER count (30532122624 for a 30B), not bytes —
+     * a GGUF repo holds every quant it publishes, so its storage says nothing
+     * about the download. The hub's size axis for a repo is this number, and it
+     * exists for repos whose name never spells a size out.
+     */
+    const hits = await searchHfModels('q', {
+      fetchImpl: jsonFetch([
+        { id: 'a/sized', gguf: { total: 30_532_122_624, architecture: 'qwen3moe' } },
+        { id: 'a/unsized' },
+        { id: 'a/junk', gguf: 'not-an-object' },
+      ]),
+    });
+    expect(hits[0]?.paramsTotal).toBe(30_532_122_624);
+    expect(hits[1]?.paramsTotal).toBeUndefined();
+    expect(hits[2]?.paramsTotal).toBeUndefined();
   });
 
   it('applies client-side gated + minLikes filters', async () => {

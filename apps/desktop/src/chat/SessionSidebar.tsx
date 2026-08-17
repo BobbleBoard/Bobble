@@ -32,6 +32,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
   IconChat,
+  IconCheck,
   IconChevronDown,
   IconClock,
   IconConnector,
@@ -46,7 +47,6 @@ import {
   IconSparkles,
   IconTrash,
   Kbd,
-  SegmentedControl,
   Sidebar,
   SidebarRow,
   SidebarScroll,
@@ -89,7 +89,7 @@ import { setUserMode, useSettingsStore, useUserMode } from '../state/settings-st
 import { publishSessionList } from '../state/visible-projects';
 import { useThemeStore } from '../store/theme';
 import { BobbleMark } from './BobbleMark';
-import { PROFILE_MENU_ACTIONS, USER_MODE_OPTIONS, userModeBlurb } from './profile-menu';
+import { PROFILE_MENU_ACTIONS, USER_MODE_OPTIONS } from './profile-menu';
 
 /** Nav destinations that don't have a real page yet — open a "coming soon" stub. */
 export type SidebarStub = 'projects' | 'scheduled' | 'skills';
@@ -196,21 +196,39 @@ function SidebarProfileMenu({
 
         <DropdownMenuSeparator />
 
-        {/* Bottom: the User / Power-user experience toggle. A plain segmented
-            control (not a menu item) so flipping it doesn't dismiss the dropup. */}
-        <div className="px-2 pt-1 pb-1.5" data-testid="usermode-toggle">
-          <div className="pd-menu-label px-0 pb-1">Mode</div>
-          <SegmentedControl
-            aria-label="Experience mode"
-            className="w-full"
-            value={userMode}
-            onValueChange={(v) => void setUserMode(v as UserMode)}
-            options={USER_MODE_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
-          />
-          <p className="mt-1.5 text-caption text-text-muted" data-testid="usermode-blurb">
-            {userModeBlurb(userMode)}
-          </p>
-        </div>
+        {/*
+         * MODE AS MENU ITEMS, not an embedded control.
+         *
+         * the user: the dropup "needs to be restyled to be the same as all other
+         * dropdowns/ups in the app that are uniformly styled". It held a
+         * SegmentedControl and a paragraph of blurb — a bespoke block no other
+         * menu in the app has, which is exactly what made it look foreign. Two
+         * checkable rows say the same thing in the shared vocabulary, and the
+         * description moves onto each row as its hint rather than sitting under
+         * the control as prose.
+         */}
+        <div className="pd-menu-label">Mode</div>
+        {USER_MODE_OPTIONS.map((o) => (
+          <DropdownMenuItem
+            key={o.value}
+            data-testid={`usermode-${o.value}`}
+            icon={
+              userMode === o.value ? (
+                <IconCheck size={16} />
+              ) : (
+                <span style={{ width: 16, display: 'inline-block' }} />
+              )
+            }
+            // Stays open so switching and reading the effect happens in place.
+            onSelect={(e) => {
+              e.preventDefault();
+              void setUserMode(o.value as UserMode);
+            }}
+            hint={o.blurb}
+          >
+            {o.label}
+          </DropdownMenuItem>
+        ))}
       </DropdownMenuContent>
     </DropdownMenu>
   );

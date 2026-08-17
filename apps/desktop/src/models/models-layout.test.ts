@@ -134,6 +134,26 @@ describe('sorting', () => {
     expect(sortModels(models, 'newest')[0]?.id).toBe('b');
   });
 
+  it('sorts by size in both directions', () => {
+    const GB = 1024 ** 3;
+    const models = [
+      m({ id: 'big', bytes: 20 * GB }),
+      m({ id: 'small', bytes: 2 * GB }),
+      m({ id: 'mid', bytes: 8 * GB }),
+    ];
+    expect(sortModels(models, 'size-asc').map((x) => x.id)).toEqual(['small', 'mid', 'big']);
+    expect(sortModels(models, 'size-desc').map((x) => x.id)).toEqual(['big', 'mid', 'small']);
+  });
+
+  it('an UNKNOWN size sorts last in both directions — absent is not small', () => {
+    // Sorting unmeasured rows to the top of "smallest first" would hand someone
+    // on 8GB exactly the models we cannot vouch for.
+    const GB = 1024 ** 3;
+    const models = [m({ id: 'unknown' }), m({ id: 'known', bytes: 5 * GB })];
+    expect(sortModels(models, 'size-asc').map((x) => x.id)).toEqual(['known', 'unknown']);
+    expect(sortModels(models, 'size-desc').map((x) => x.id)).toEqual(['known', 'unknown']);
+  });
+
   it('breaks ties on name so the list cannot jitter between renders', () => {
     const models = [m({ id: 'b', name: 'b' }), m({ id: 'a', name: 'a' })];
     expect(sortModels(models, 'downloads').map((x) => x.id)).toEqual(['a', 'b']);
@@ -143,6 +163,41 @@ describe('sorting', () => {
     const models = [m({ id: 'a', downloads: 1 }), m({ id: 'b', downloads: 2 })];
     sortModels(models, 'downloads');
     expect(models.map((x) => x.id)).toEqual(['a', 'b']);
+  });
+});
+
+describe('the size cap', () => {
+  const GB = 1024 ** 3;
+
+  it('hides anything above the cap, in GB, when the row has real bytes', () => {
+    const models = [m({ id: 'fits', bytes: 4 * GB }), m({ id: 'huge', bytes: 40 * GB })];
+    const out = filterModels(models, { ...DEFAULT_FILTERS, maxSize: 10 });
+    expect(out.map((x) => x.id)).toEqual(['fits']);
+  });
+
+  it('caps a byteless repo row on PARAMETERS instead', () => {
+    // A Discover row is a repo holding every quant it publishes, so it has no
+    // meaningful byte size — only a parameter count. Ignoring that is how the
+    // slider shipped filtering nothing at all on the tab people actually use.
+    const models = [m({ id: 'small', paramsB: 4 }), m({ id: 'big', paramsB: 27 })];
+    const out = filterModels(models, { ...DEFAULT_FILTERS, maxSize: 12 });
+    expect(out.map((x) => x.id)).toEqual(['small']);
+  });
+
+  it('prefers real bytes over parameters when a row knows both', () => {
+    // A 27B model in a 6GB file on disk fits; judging it as "27" would hide it.
+    const models = [m({ id: 'quantised', bytes: 6 * GB, paramsB: 27 })];
+    expect(filterModels(models, { ...DEFAULT_FILTERS, maxSize: 12 })).toHaveLength(1);
+  });
+
+  it('keeps rows whose size is unknown either way — a cap cannot judge the unseen', () => {
+    const models = [m({ id: 'unknown' })];
+    expect(filterModels(models, { ...DEFAULT_FILTERS, maxSize: 1 })).toHaveLength(1);
+  });
+
+  it('no cap filters nothing', () => {
+    const models = [m({ id: 'huge', bytes: 900 * GB }), m({ id: 'wide', paramsB: 1573 })];
+    expect(filterModels(models, DEFAULT_FILTERS)).toHaveLength(2);
   });
 });
 
@@ -159,6 +214,13 @@ describe('the hub number formats', () => {
     expect(compactBytes(850 * 1024 ** 3)).toBe('850 GB');
     expect(compactBytes(1.2 * 1024 ** 3)).toBe('1.2 GB');
     expect(compactBytes(412 * 1024 ** 2)).toBe('412 MB');
+  });
+
+  it('switches to TB before the number stops being readable', () => {
+    // HF lists datasets in the thousands of GB; "12856 GB" is not a size.
+    expect(compactBytes(12_856 * 1024 ** 3)).toBe('13 TB');
+    expect(compactBytes(1782 * 1024 ** 3)).toBe('1.7 TB');
+    expect(compactBytes(850 * 1024 ** 3)).toBe('850 GB');
   });
 
   it('ages relative to a supplied now, never a hidden clock', () => {
