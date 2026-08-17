@@ -26,6 +26,7 @@
  */
 import { useEffect, useState } from 'react';
 import { BRAND_SVGS } from './brand-svg';
+import { EXTRA_BRAND_SVGS } from './brand-svg-extra';
 
 export interface BrandIconProps {
   size?: number;
@@ -36,6 +37,37 @@ export interface BrandIconProps {
  * One official mark, in its own brand colour on a soft tile of that colour.
  * `title` is on the <svg> so the mark is announced rather than silent.
  */
+/**
+ * ONE LOOKUP OVER TWO STORES.
+ *
+ * brand-svg.ts is generated from simple-icons and holds a single 24x24 path;
+ * brand-svg-extra.ts is hand-curated for marks simple-icons does not ship, and
+ * those need several paths and their own viewBox (OpenAI's knot is one path
+ * repeated at 60°). Callers should not care which store a mark came from, so the
+ * two are normalised here rather than at every call site.
+ */
+export function lookupMark(
+  id: string,
+): { title: string; hex: string; viewBox: string; paths: readonly PathPart[] } | undefined {
+  const extra = EXTRA_BRAND_SVGS[id];
+  if (extra !== undefined) {
+    return { title: extra.title, hex: extra.hex, viewBox: extra.viewBox, paths: extra.paths };
+  }
+  const brand = BRAND_SVGS[id];
+  if (brand === undefined) return undefined;
+  return {
+    title: brand.title,
+    hex: brand.hex,
+    viewBox: '0 0 24 24',
+    paths: [{ d: brand.path }],
+  };
+}
+
+interface PathPart {
+  readonly d: string;
+  readonly transform?: string;
+}
+
 export function BrandMark({
   id,
   size = 20,
@@ -45,20 +77,23 @@ export function BrandMark({
   size?: number;
   className?: string;
 }) {
-  const brand = BRAND_SVGS[id];
+  const brand = lookupMark(id);
   if (brand === undefined) return null;
   return (
     <svg
       width={size}
       height={size}
-      viewBox="0 0 24 24"
+      viewBox={brand.viewBox}
       fill={brand.hex}
       className={className}
       role="img"
       aria-label={brand.title}
     >
       <title>{brand.title}</title>
-      <path d={brand.path} />
+      {brand.paths.map((p, i) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: paths are a fixed literal list
+        <path key={i} d={p.d} transform={p.transform} />
+      ))}
     </svg>
   );
 }
@@ -111,7 +146,7 @@ const HARNESS_FALLBACK: Record<string, { letter: string; hex: string }> = {
 
 export function HarnessIcon({ id, size = 32 }: { id: string; size?: number }) {
   const isPi = id.startsWith('pi-');
-  const brand = isPi ? undefined : BRAND_SVGS[id];
+  const brand = isPi ? undefined : lookupMark(id);
   const fallback = HARNESS_FALLBACK[id];
   const glyph = Math.round(size * 0.56);
 
@@ -253,7 +288,7 @@ export function OrgAvatar({
 }) {
   const label = org.trim();
   const markId = orgMarkId(label);
-  const brand = markId === undefined ? undefined : BRAND_SVGS[markId];
+  const brand = markId === undefined ? undefined : lookupMark(markId);
   const [src, setSrc] = useState<string | undefined>(undefined);
 
   useEffect(() => {

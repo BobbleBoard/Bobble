@@ -64,6 +64,54 @@ try {
   });
   await page.waitForSelector('[data-testid="composer-input"]', { timeout: 20_000 });
 
+  /* ------------------------------------------- 0. the collapsed top-left corner */
+  /*
+   * THREE THINGS SHARE THIS CORNER: the macOS traffic lights (~x<78), the
+   * sidebar toggle, and the conversation title. The title's inset was written
+   * against a 64px collapsed RAIL; the curtain change made that 0px and nothing
+   * replaced the gap, so the title landed at x=46 — through the lights and
+   * under the toggle. the user: "the left sidebar expand/collapse button doesn't
+   * work at all anymore." It was there; clicks were landing on a title drawn on
+   * top of it. Geometry, not appearance, is what makes that visible to a test.
+   */
+  console.log('\ncollapsed corner');
+  await page.evaluate(() => document.querySelector('[data-testid="collapse-sidebar"]')?.click());
+  await page.waitForTimeout(900);
+  const corner = await page.evaluate(() => {
+    const btn = document.querySelector('[data-testid="expand-sidebar"]');
+    const b = btn?.getBoundingClientRect();
+    const title = [...document.querySelectorAll('div,span')].find(
+      (e) => e.children.length === 0 && /New chat/.test(e.textContent ?? ''),
+    );
+    const t = title?.getBoundingClientRect();
+    const hit =
+      b === undefined ? null : document.elementFromPoint(b.x + b.width / 2, b.y + b.height / 2);
+    return {
+      slot: Math.round(
+        document.querySelector('.pd-sidebar-slot')?.getBoundingClientRect().width ?? -1,
+      ),
+      titleX: t === undefined ? null : Math.round(t.x),
+      btnRight: b === undefined ? null : Math.round(b.right),
+      clearsLights: t === undefined ? null : t.x >= 78,
+      clearsButton: t === undefined || b === undefined ? null : t.x >= b.right,
+      hitIsButton: hit !== null && btn?.contains(hit) === true,
+    };
+  });
+  check(corner.slot === 0, `collapsing closes the sidebar fully (${corner.slot}px)`);
+  check(corner.clearsLights === true, `the title clears the traffic lights (x=${corner.titleX})`);
+  check(
+    corner.clearsButton === true,
+    `the title starts after the toggle (x=${corner.titleX} vs button right ${corner.btnRight})`,
+  );
+  check(corner.hitIsButton === true, 'a click at the toggle reaches the toggle, not the title');
+  await page.screenshot({ path: path.join(OUT, 'r20-00-collapsed.png') });
+  await page.evaluate(() => document.querySelector('[data-testid="expand-sidebar"]')?.click());
+  await page.waitForTimeout(900);
+  const reopened = await page.evaluate(() =>
+    Math.round(document.querySelector('.pd-sidebar-slot')?.getBoundingClientRect().width ?? -1),
+  );
+  check(reopened > 200, `the toggle round-trips back open (${reopened}px)`);
+
   /* ------------------------------------------------------- 3. profile dropup */
   console.log('\nprofile dropup');
   await page.click('[data-testid="profile-button"]');
@@ -141,6 +189,22 @@ try {
       });
     });
     check(tiles.length >= 3, `harness rows present (${tiles.length})`);
+    /* the user: "can you seriously not find any chatgpt / openai logo?" Codex and
+       Hermes have real marks now, so a letter in either tile is a regression. */
+    const marks = await page.evaluate(() =>
+      ['codex', 'hermes'].map((id) => {
+        const svg = document.querySelector(`[data-testid="harness-icon-${id}"] svg`);
+        return {
+          id,
+          label: svg?.getAttribute('aria-label') ?? null,
+          paths: svg?.querySelectorAll('path').length ?? 0,
+        };
+      }),
+    );
+    for (const m of marks) {
+      check(m.paths > 0, `${m.id}: draws a real mark, not a monogram (${m.paths} paths)`);
+      check(m.label !== null, `${m.id}: the mark names itself ("${m.label}")`);
+    }
     for (const t of tiles) {
       check(t.tile === true, `${t.id}: has an icon tile`);
       check(t.glyph === true, `${t.id}: the tile is not empty`);

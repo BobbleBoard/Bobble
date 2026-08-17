@@ -935,8 +935,8 @@ export function SessionSidebar({
 
       {/* Identity: the app mark + wordmark, above the search. */}
       <div className="flex items-center gap-2 px-3 pb-2" data-testid="sidebar-identity" aria-hidden>
-        <BobbleMark size={20} />
-        <span className="text-body font-medium text-text-primary">Bobble</span>
+        <BobbleMark size={24} />
+        <span className="pd-wordmark text-text-primary">Bobble</span>
       </div>
 
       <div className="px-2 pb-2">

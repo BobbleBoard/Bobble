@@ -660,17 +660,46 @@ body {
   background: var(--pd-bg-hover);
 }
 /*
- * When the sidebar is COLLAPSED to the ~52px rail, the top bar begins right after
- * it — so the conversation title would crowd under the macOS traffic lights that
- * overhang past that narrow rail. Inset the top bar's LEFT section (the title) so
- * it starts clear of the lights + the rail's expand control. The rail-width term
- * cancels the top bar's own start, landing the title at a stable ~88px window-x
- * in both flavors; a negative result (very large scale) simply clamps to 0.
- * Expanded, the wide sidebar already clears the lights, so no inset applies.
+ * WHEN THE SIDEBAR IS CLOSED, THE TITLE HAS TO CLEAR TWO THINGS.
+ *
+ * This inset was written when a collapsed sidebar was a 64px RAIL, so it
+ * subtracted the rail width — the rail supplied the rest of the gap. The curtain
+ * change made a collapsed slot 0px wide, and nothing replaced that 64px: the
+ * title landed at window-x 46, straight through the macOS traffic lights AND
+ * under the toggle button at x=84. MEASURED: the sidebar glyph rendered inside
+ * the word "chat", which is why the toggle read as broken — clicks were landing
+ * on a title.
+ *
+ * So the inset is now absolute rather than rail-relative:
+ *   78px  the traffic lights (titleBarStyle: hiddenInset)
+ * + 32px  the toggle button that sits immediately right of them
+ * + 14px  breathing room
+ * Expanded, the wide sidebar already clears both, so no inset applies.
  */
 .pd-topbar--sidebar-collapsed .pd-topbar-section:first-child {
-  padding-left: calc(80px - var(--pd-sidebar-rail));
+  padding-left: 124px;
 }
+/*
+ * THE WORDMARK. the user: "the bobble in the top left should be some nice font and
+ * a bit bigger."
+ *
+ * `ui-rounded` resolves to SF Pro Rounded on macOS — a system face, so nothing
+ * is downloaded and this still works with the network off, which the rest of
+ * this app insists on. It suits a name like Bobble and the three-tile mark far
+ * better than the UI text face does; elsewhere it falls back through the app's
+ * own sans stack rather than to something arbitrary.
+ *
+ * The optical-sizing and tracking matter more than the point size: at 20px a
+ * wordmark set with default tracking reads as a heading rather than a name.
+ */
+.pd-wordmark {
+  font-family: ui-rounded, 'SF Pro Rounded', 'Hiragino Maru Gothic ProN', var(--pd-font-sans);
+  font-size: 20px;
+  font-weight: 650;
+  letter-spacing: -0.014em;
+  line-height: 1.1;
+}
+
 .pd-chat-title-name {
   overflow: hidden;
   text-overflow: ellipsis;

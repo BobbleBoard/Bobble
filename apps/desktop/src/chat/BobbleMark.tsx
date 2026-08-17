@@ -7,9 +7,13 @@
  *
  * Drawn inline rather than loaded from build/icon.png so it is crisp at 20px,
  * re-themes with the app, and costs no request — the icon file is a 1024px
- * raster meant for the Dock. The geometry mirrors it: a dark squircle with
- * three tiles (teal top-right, amber bottom-left, pink bottom-right), which is
- * the shape people will recognise from their Dock.
+ * raster meant for the Dock.
+ *
+ * NO PLATE, because the Dock icon no longer has one (the user: "the app dock image
+ * shouldn't be there just the three squares"). The whole point of this mark is
+ * being the shape people recognise from their Dock, so the two have to agree;
+ * the proportions are build/icon.svg's 400px tiles inset 88px in a 1024 canvas,
+ * scaled to this 32 viewBox.
  */
 export function BobbleMark({ size = 20 }: { size?: number }) {
   return (
@@ -22,10 +26,9 @@ export function BobbleMark({ size = 20 }: { size?: number }) {
       style={{ display: 'block' }}
     >
       <title>Bobble</title>
-      <rect x="0.5" y="0.5" width="31" height="31" rx="8" fill="#26282D" />
-      <rect x="17" y="6" width="9" height="9" rx="2.6" fill="#10BDBD" />
-      <rect x="6" y="17" width="9" height="9" rx="2.6" fill="#FBC52B" />
-      <rect x="17" y="17" width="9" height="9" rx="2.6" fill="#F73E9C" />
+      <rect x="16.75" y="2.75" width="12.5" height="12.5" rx="3.5" fill="#10BDBD" />
+      <rect x="2.75" y="16.75" width="12.5" height="12.5" rx="3.5" fill="#FBC52B" />
+      <rect x="16.75" y="16.75" width="12.5" height="12.5" rx="3.5" fill="#F73E9C" />
     </svg>
   );
 }
