@@ -1,5 +1,6 @@
 /**
- * THE MODEL CARD — a Hugging Face repo's README, for the hub's detail pane.
+ * THE REPO CARD — a Hugging Face model OR dataset README, for the hub's detail
+ * pane.
  *
  * the user: "ensure you're rendering the model card/readme as nicely as unsloth
  * does". The reference gives most of its detail pane to the rendered card;
@@ -22,8 +23,6 @@
  *     not process raw HTML prints them as prose — MEASURED: the top of one card
  *     was four lines of literal comment markers before any real text.
  */
-import type { ModelCardInvokeMap } from '../ipc-contract';
-
 const MAX_CHARS = 60_000;
 const cache = new Map<string, string>();
 
@@ -39,9 +38,20 @@ function stripFrontmatter(md: string): string {
   return end === -1 ? md : md.slice(md.indexOf('\n', end + 1) + 1);
 }
 
+/**
+ * A dataset repo lives in its own namespace on the Hub. Asking the model path
+ * for a dataset's card does not 404 politely — it 401s, which reads as "gated"
+ * and sends the user off hunting for a token they do not need.
+ */
+function repoBase(repoId: string, kind: 'model' | 'dataset'): string {
+  return kind === 'dataset'
+    ? `https://huggingface.co/datasets/${repoId}`
+    : `https://huggingface.co/${repoId}`;
+}
+
 /** `./assets/x.png` means nothing here; make it point at the repo. */
-function absolutiseAssets(md: string, repoId: string): string {
-  const base = `https://huggingface.co/${repoId}/resolve/main/`;
+function absolutiseAssets(md: string, repoId: string, kind: 'model' | 'dataset'): string {
+  const base = `${repoBase(repoId, kind)}/resolve/main/`;
   return md.replace(/(!\[[^\]]*\]\()(?!https?:|data:)\.?\/?([^)\s]+)/g, (_m, head, rel) => {
     return `${head}${base}${rel}`;
   });
@@ -49,28 +59,39 @@ function absolutiseAssets(md: string, repoId: string): string {
 
 export async function fetchModelCard(
   repoId: string,
+  kind: 'model' | 'dataset' = 'model',
 ): Promise<{ markdown?: string; error?: string }> {
-  const cached = cache.get(repoId);
+  // The namespace is part of the identity: `wikitext` exists as both.
+  const key = `${kind}:${repoId}`;
+  const cached = cache.get(key);
   if (cached !== undefined) return { markdown: cached };
   try {
-    const res = await fetch(`https://huggingface.co/${repoId}/raw/main/README.md`, {
+    const res = await fetch(`${repoBase(repoId, kind)}/raw/main/README.md`, {
       signal: AbortSignal.timeout(12_000),
     });
     if (!res.ok) {
       // 404 is ordinary: plenty of repos have no card. Say so plainly rather
       // than showing an error box for a normal state.
-      return { error: res.status === 404 ? 'This model has no card.' : `HTTP ${res.status}` };
+      const noun = kind === 'dataset' ? 'dataset' : 'model';
+      return { error: res.status === 404 ? `This ${noun} has no card.` : `HTTP ${res.status}` };
     }
     const raw = await res.text();
-    let md = absolutiseAssets(stripHtmlComments(stripFrontmatter(raw)).trim(), repoId);
+    let md = absolutiseAssets(stripHtmlComments(stripFrontmatter(raw)).trim(), repoId, kind);
     if (md.length > MAX_CHARS) md = `${md.slice(0, MAX_CHARS)}\n\n…card truncated.`;
-    cache.set(repoId, md);
+    cache.set(key, md);
     return { markdown: md };
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'could not fetch the model card' };
   }
 }
 
-export const modelCardHandlers = {
-  'modelcard:fetch': (req: { repoId: string }) => fetchModelCard(req.repoId),
-} satisfies { [K in keyof ModelCardInvokeMap]: unknown };
+/*
+ * NO HANDLER MAP HERE.
+ *
+ * This file used to export one, and nothing imported it — llm-main.ts declares
+ * its own `modelCardHandlers` and that is the one actually registered. Two maps
+ * with the same name meant editing the wrong one looked correct and changed
+ * nothing: `kind` was threaded through the dead copy while every real request
+ * still went to the model namespace. One registration, in the file that does
+ * the registering.
+ */

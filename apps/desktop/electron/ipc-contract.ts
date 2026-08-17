@@ -396,7 +396,9 @@ export const HARNESS_INVOKE_CHANNELS = [
  */
 export type ModelCardInvokeMap = {
   'modelcard:fetch': {
-    request: { repoId: string };
+    /** `kind` picks the repo namespace: a dataset's card lives under
+     *  huggingface.co/datasets/<id>, and asking the model path 401s. */
+    request: { repoId: string; kind?: 'model' | 'dataset' };
     response: { markdown?: string; error?: string };
   };
 };

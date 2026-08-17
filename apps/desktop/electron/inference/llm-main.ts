@@ -18,19 +18,19 @@ import {
 import { app, BrowserWindow, type IpcMain, type UtilityProcess, utilityProcess } from 'electron';
 import type {
   AppEventMap,
+  DatasetInvokeMap,
   EngineInvokeMap,
   HarnessInvokeMap,
-  ModelCardInvokeMap,
-  DatasetInvokeMap,
-  OrgAvatarInvokeMap,
   HfInvokeMap,
   LlmInvokeMap,
   LlmStatus,
+  ModelCardInvokeMap,
+  OrgAvatarInvokeMap,
 } from '../ipc-contract';
+import { searchDatasets } from './dataset-search-main';
 import { installEngine, listEngines, uninstallEngine } from './engines-main';
 import { detectHarnesses } from './harness-main';
 import { fetchModelCard } from './modelcard-main';
-import { searchDatasets } from './dataset-search-main';
 import { cacheRemoteImage, fetchOrgAvatar } from './org-avatar-main';
 import type {
   HfListFilesReply,
@@ -435,7 +435,10 @@ const harnessHandlers: IpcHandlers<HarnessInvokeMap> = {
 };
 
 const modelCardHandlers: IpcHandlers<ModelCardInvokeMap> = {
-  'modelcard:fetch': (req) => fetchModelCard(req.repoId),
+  /* `kind` picks the Hub namespace. Dropping it — which this did — sent every
+     dataset README request to the model path, where HF answers 401, so the
+     pane showed "HTTP 401" for a public dataset whose card loads fine. */
+  'modelcard:fetch': (req) => fetchModelCard(req.repoId, req.kind ?? 'model'),
 };
 
 const orgAvatarHandlers: IpcHandlers<OrgAvatarInvokeMap> = {

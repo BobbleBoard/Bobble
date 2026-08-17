@@ -234,11 +234,14 @@ function RowMenu({
   onDownload,
   onOpenHf,
   onCopyId,
+  kind,
 }: {
   model: HubModel;
   onDownload: () => void;
   onOpenHf: () => void;
   onCopyId: () => void;
+  /** Datasets have no weights file to fetch and no "model id" to copy. */
+  kind: 'models' | 'datasets';
 }) {
   const [open, setOpen] = useState(false);
   useEffect(() => {
@@ -308,8 +311,8 @@ function RowMenu({
             data-testid="row-menu-panel"
             className="absolute top-full right-0 z-30 mt-1 min-w-[180px] rounded-xl border border-border-subtle bg-bg-raised p-1 shadow-[0_8px_28px_rgba(0,0,0,0.14)]"
           >
-            {item('Download', onDownload, model.downloaded === true)}
-            {item('Copy model id', onCopyId)}
+            {kind === 'models' ? item('Download', onDownload, model.downloaded === true) : null}
+            {item(kind === 'datasets' ? 'Copy dataset id' : 'Copy model id', onCopyId)}
             {item('Open on Hugging Face', onOpenHf, !model.id.includes('/'))}
           </div>
         </>
@@ -566,6 +569,19 @@ function Dropdown<T extends string>({
 /** Slider ceiling, which doubles as "no cap". Wide enough for a 120GB dataset
  *  and a 200B model; past that the control is dead travel either way. */
 const SIZE_CAP_MAX = 200;
+
+/**
+ * The compact table's column template, keyed by which optional columns are
+ * present. Written out rather than composed, because Tailwind only ships the
+ * classes it can SEE — a template built by string concatenation compiles to
+ * nothing and the table collapses into one column.
+ */
+const COMPACT_GRID: Record<string, string> = {
+  'caps-counts': 'grid-cols-[1fr_110px_80px_100px_80px_92px_36px]',
+  'caps-nocounts': 'grid-cols-[1fr_110px_80px_92px_36px]',
+  'nocaps-counts': 'grid-cols-[1fr_80px_100px_80px_92px_36px]',
+  'nocaps-nocounts': 'grid-cols-[1fr_80px_92px_36px]',
+};
 
 export function ModelsView({ onClose }: { onClose: () => void }) {
   const catalog = useLlmStore((s) => s.catalog);
@@ -893,23 +909,25 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
       setCard(null);
       return;
     }
-    if (kind !== 'models') {
-      // A dataset's card lives under /api/datasets, so asking the models
-      // endpoint yields "could not load the model card" about a card that
-      // exists. Rendering dataset cards is its own piece of work; claiming a
-      // failure we caused is not a placeholder for it.
-      setCard(null);
-      return;
-    }
     let cancelled = false;
     setCard({ repo: detailRepo });
     void window.piDesktop
-      .invoke('modelcard:fetch', { repoId: detailRepo })
+      /* `kind` is not optional in practice: a dataset's README lives under
+         huggingface.co/datasets/<id>, and the model path answers 401 for it —
+         which the hub used to render as "gated", about a public dataset. */
+      .invoke('modelcard:fetch', {
+        repoId: detailRepo,
+        kind: kind === 'datasets' ? 'dataset' : 'model',
+      })
       .then((res) => {
         if (!cancelled) setCard({ repo: detailRepo, ...res });
       })
       .catch(() => {
-        if (!cancelled) setCard({ repo: detailRepo, error: 'could not load the model card' });
+        if (!cancelled)
+          setCard({
+            repo: detailRepo,
+            error: `could not load the ${kind === 'datasets' ? 'dataset' : 'model'} card`,
+          });
       });
     return () => {
       cancelled = true;
@@ -920,11 +938,31 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
   /* The hub's whole purpose. This was a <span> with no handler, in a pane the
      default view never rendered — so the page could not download a model. */
   const openOnHf = (id: string) => {
+    // Datasets live in their own namespace on the Hub — huggingface.co/<id>
+    // for a dataset id is a 404 in the user's browser.
+    const path = kind === 'datasets' ? `datasets/${id}` : id;
     void window.piDesktop
-      .invoke('canvas:open-external', { url: `https://huggingface.co/${id}` })
+      .invoke('canvas:open-external', { url: `https://huggingface.co/${path}` })
       .catch(() => undefined);
   };
   const copyId = (id: string) => void navigator.clipboard?.writeText(id);
+
+  /*
+   * WHAT THE ROW'S PRIMARY BUTTON DOES.
+   *
+   * "Get" ran the model download path for datasets too, which looks for a GGUF
+   * ladder that does not exist and ended at "Could not resolve a file to
+   * download for this model." — about a dataset. Local dataset download is its
+   * own piece of work (fetching a repo, not a single weights file); until it
+   * exists the button offers the Hub page, which is a real destination.
+   */
+  const rowAction = (mdl: HubModel) => {
+    if (kind === 'datasets') {
+      openOnHf(mdl.id);
+      return;
+    }
+    if (mdl.downloaded !== true) void download(mdl.id);
+  };
 
   /*
    * DOWNLOADING AN HF MODEL IS A TWO-STEP. `llm:download-model` takes a CATALOG
@@ -973,6 +1011,12 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
   /* Describes the SOURCE ON SCREEN. Reading `all` (the local catalog) meant the
      columns stayed hidden even on Discover, where every row has real counts. */
   const hasCounts = scoped.some((m) => m.downloads !== undefined || m.likes !== undefined);
+  /* Same rule the counts columns follow: a column of em-dashes reads as data
+     that failed to load rather than a property this source does not have. On
+     the Datasets tab nothing has capabilities, so the column was 110px of
+     dashes. Data-driven rather than `kind === 'datasets'`, so it comes back on
+     its own if HF ever gives datasets modality tags. */
+  const hasCaps = scoped.some((m) => m.capabilities.length > 0);
 
   /*
    * Only offer filters this source can satisfy. The menus advertised
@@ -1399,13 +1443,13 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
                       <div
                         className={cx(
                           'grid items-center gap-2 border-b border-border-subtle bg-bg-sunken px-4 py-2.5 text-footnote text-text-muted',
-                          hasCounts
-                            ? 'grid-cols-[1fr_110px_80px_100px_80px_92px_36px]'
-                            : 'grid-cols-[1fr_110px_80px_92px_36px]',
+                          COMPACT_GRID[
+                            `${hasCaps ? 'caps' : 'nocaps'}-${hasCounts ? 'counts' : 'nocounts'}`
+                          ],
                         )}
                       >
                         <span>{kind === 'datasets' ? 'Dataset' : 'Model'}</span>
-                        <span>Capabilities</span>
+                        {hasCaps ? <span>Capabilities</span> : null}
                         <span>Size</span>
                         {hasCounts ? <span>Downloads</span> : null}
                         {hasCounts ? <span>Likes</span> : null}
@@ -1449,7 +1493,9 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
                               ) : null}
                             </span>
                           </span>
-                          <CapabilityPills caps={mdl.capabilities} dense max={4} />
+                          {hasCaps ? (
+                            <CapabilityPills caps={mdl.capabilities} dense max={4} />
+                          ) : null}
                           {/* The reference's Size column is a PARAMETER COUNT
                               (27B, 95B); bytes belong to a specific quant and
                               only exist once a file is chosen. */}
@@ -1480,13 +1526,13 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
                             aria-disabled={mdl.downloaded === true}
                             onClick={(ev) => {
                               ev.stopPropagation();
-                              if (mdl.downloaded !== true) void download(mdl.id);
+                              rowAction(mdl);
                             }}
                             onKeyDown={(ev) => {
                               if (ev.key !== 'Enter' && ev.key !== ' ') return;
                               ev.preventDefault();
                               ev.stopPropagation();
-                              if (mdl.downloaded !== true) void download(mdl.id);
+                              rowAction(mdl);
                             }}
                             className={cx(
                               'flex h-7 items-center justify-center gap-1 rounded-lg px-2.5 text-caption font-medium transition-opacity',
@@ -1497,7 +1543,11 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
                                   : 'cursor-pointer bg-accent-primary text-text-on-accent hover:opacity-90',
                             )}
                           >
-                            {mdl.downloaded === true ? (
+                            {kind === 'datasets' ? (
+                              <>
+                                <IconExternal size={12} /> Open
+                              </>
+                            ) : mdl.downloaded === true ? (
                               <>
                                 <IconCheck size={12} /> On disk
                               </>
@@ -1511,6 +1561,7 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
                           </span>
                           <RowMenu
                             model={mdl}
+                            kind={kind}
                             onDownload={() => void download(mdl.id)}
                             onOpenHf={() => openOnHf(mdl.id)}
                             onCopyId={() => copyId(mdl.id)}
@@ -1621,16 +1672,30 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
                       </div>
                     ) : null}
 
-                    <QuantPicker
-                      options={quants?.repo === detail.id ? quants.options : []}
-                      loading={quants?.repo === detail.id ? quants.loading : true}
-                      totalRamGB={hw?.ramGiB ?? 0}
-                      mmprojBytes={quants?.mmprojBytes}
-                      format={detail.formats[0]?.toUpperCase()}
-                      installed={detail.downloaded === true}
-                      downloading={busyId === detail.id}
-                      onDownload={(q) => void download(detail.id, q)}
-                    />
+                    {kind === 'datasets' ? (
+                      /* No quant ladder exists for a dataset, and the picker's
+                         loading state never resolves without one — it would sit
+                         on "Loading files…" for as long as the pane is open. */
+                      <button
+                        type="button"
+                        data-testid="dataset-open"
+                        onClick={() => openOnHf(detail.id)}
+                        className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl bg-accent-primary px-3 py-2.5 text-footnote text-text-on-accent transition-opacity hover:opacity-90 pd-focusable"
+                      >
+                        <IconExternal size={14} /> Open on Hugging Face
+                      </button>
+                    ) : (
+                      <QuantPicker
+                        options={quants?.repo === detail.id ? quants.options : []}
+                        loading={quants?.repo === detail.id ? quants.loading : true}
+                        totalRamGB={hw?.ramGiB ?? 0}
+                        mmprojBytes={quants?.mmprojBytes}
+                        format={detail.formats[0]?.toUpperCase()}
+                        installed={detail.downloaded === true}
+                        downloading={busyId === detail.id}
+                        onDownload={(q) => void download(detail.id, q)}
+                      />
+                    )}
 
                     {/* Only chips we actually have a value for — a row of
                         em-dashes is the thing this file already argues against

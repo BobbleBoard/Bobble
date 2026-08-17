@@ -275,6 +275,46 @@ try {
     }
   }
 
+  /* --------------------------------------------------- 4. the dataset card */
+  console.log('\ndataset card');
+  await page.click('[data-testid="hub-kind-datasets"]');
+  await page.waitForTimeout(1500);
+  // The card lives in the split pane; compact has none, and clicking a row
+  // switches to it — the same path a user takes.
+  const firstRow = await page.$('[data-testid^="model-row-"]');
+  if (firstRow === null) {
+    failures.push('no dataset rows to open');
+  } else {
+    await firstRow.click();
+    await page.waitForTimeout(2500);
+    await page.screenshot({ path: path.join(OUT, 'r20-05-dataset-card.png') });
+
+    const card = await page.evaluate(() => {
+      const body = document.querySelector('[data-testid="model-card-body"]');
+      return {
+        present: body !== null,
+        chars: body?.textContent?.trim().length ?? 0,
+        headings: body?.querySelectorAll('h1,h2,h3').length ?? 0,
+        links: body?.querySelectorAll('a').length ?? 0,
+        // The picker's loading state never resolves for a dataset.
+        quantSpinner: document.querySelector('[data-testid="quant-picker-loading"]') !== null,
+        openBtn: document.querySelector('[data-testid="dataset-open"]') !== null,
+        // Frontmatter is metadata; a card that opens with "annotations_creators:"
+        // is the raw file, not a document.
+        rawFrontmatter: /^(annotations_creators|license|task_categories):/m.test(
+          body?.textContent ?? '',
+        ),
+      };
+    });
+    check(card.present, 'a dataset renders a card at all');
+    check(card.chars > 200, `the dataset card has real content (${card.chars} chars)`);
+    check(card.headings > 0, `the dataset card renders headings (${card.headings})`);
+    check(!card.quantSpinner, 'no quant picker spinning "Loading files…" on a dataset');
+    check(card.openBtn, 'the dataset offers "Open on Hugging Face" instead of a quant ladder');
+    check(!card.rawFrontmatter, 'frontmatter is stripped from the dataset card');
+    console.log(`     card: ${card.chars} chars, ${card.headings} headings, ${card.links} links`);
+  }
+
   console.log(
     failures.length === 0
       ? '\nui-round20-probe: all checks passed'
