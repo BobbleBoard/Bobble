@@ -28,6 +28,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { LlmCatalogEntry } from '../../electron/ipc-contract';
 import { cx } from '../onboarding/cx';
 import { OrgAvatar } from '../settings/brand-icons';
+import { ramVerdict } from '../settings/model-manager-logic';
 import { useLlmStore } from '../state/llm-store';
 import {
   CAPABILITY_OPTIONS,
@@ -58,7 +59,7 @@ import {
  * largest known quant is the honest headline figure, and none is `undefined`
  * rather than zero.
  */
-function toHubModel(e: LlmCatalogEntry): HubModel {
+function toHubModel(e: LlmCatalogEntry, totalRamGB: number): HubModel {
   const caps: Array<Exclude<ModelCapability, 'all'>> = [];
   if (e.vision) caps.push('vision');
   if (e.spec !== undefined || e.mtp) caps.push('reasoning');
@@ -75,8 +76,19 @@ function toHubModel(e: LlmCatalogEntry): HubModel {
     formats: ['gguf'],
     capabilities: caps,
     downloaded: e.downloaded,
-    // Fit verdicts belong to model-manager-logic; the local catalog does not
-    // carry one per entry, so the hub says nothing rather than guessing.
+    /*
+     * The fit verdict, from model-manager-logic's ramVerdict — the same
+     * function the old panel used, so there is still one answer to "does this
+     * fit". Without it "Only show models that fit" filtered EVERY model out
+     * (it drops anything not known to fit), which made the hub's marquee
+     * control empty the page.
+     */
+    ...(totalRamGB > 0 && e.minRamGB > 0
+      ? (() => {
+          const v = ramVerdict(e.minRamGB, totalRamGB);
+          return { fits: v.fits, fitReason: v.detail ?? v.label };
+        })()
+      : {}),
   };
 }
 
@@ -104,6 +116,21 @@ function Dropdown<T extends string>({
 }) {
   const [open, setOpen] = useState(false);
   const current = options.find((o) => o.id === value)?.label ?? '';
+
+  /* Escape closes it, as it does every other overlay here. Without this the
+     full-screen click-away shield below swallowed every other control until
+     the menu was dismissed by clicking. */
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        setOpen(false);
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [open]);
   return (
     <div className="relative">
       <button
@@ -187,6 +214,8 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
   const [view, setView] = useState<ViewMode>('compact');
   const [tab, setTab] = useState<'discover' | 'device'>('discover');
   const [selected, setSelected] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     void refreshCatalog();
@@ -196,7 +225,7 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
       .catch(() => undefined);
   }, [refreshCatalog]);
 
-  const all = useMemo(() => catalog.map(toHubModel), [catalog]);
+  const all = useMemo(() => catalog.map((e) => toHubModel(e, hw?.ramGiB ?? 0)), [catalog, hw]);
   const scoped = useMemo(
     () => (tab === 'device' ? all.filter((m) => m.downloaded === true) : all),
     [all, tab],
@@ -205,12 +234,47 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
     () => sortModels(filterModels(scoped, filters), filters.sort),
     [scoped, filters],
   );
-  const trending = useMemo(() => sortModels(scoped, 'trending').slice(0, 4), [scoped]);
+  /* From the FILTERED rows, not the whole source: showing four trending cards
+     above an "Nothing matches these filters" table made the page argue with
+     itself. */
+  const trending = useMemo(() => sortModels(rows, 'trending').slice(0, 4), [rows]);
   const detail = rows.find((m) => m.id === selected) ?? rows[0];
   const localCount = all.filter((m) => m.downloaded === true).length;
+
+  /* The hub's whole purpose. This was a <span> with no handler, in a pane the
+     default view never rendered — so the page could not download a model. */
+  const download = async (id: string) => {
+    setBusyId(id);
+    setError(null);
+    const res = await window.piDesktop
+      .invoke('llm:download-model', { modelId: id })
+      .catch(() => ({ success: false, error: 'the download could not start' }));
+    if (res.success !== true) setError(res.error ?? 'the download could not start');
+    await refreshCatalog();
+    setBusyId(null);
+  };
   /* Does THIS source carry popularity data? The bundled catalog does not; the
      HF browse path does. Drives whether those columns exist at all. */
   const hasCounts = all.some((m) => m.downloads !== undefined || m.likes !== undefined);
+
+  /*
+   * Only offer filters this source can satisfy. The menus advertised
+   * Safetensors / MLX / Fine-tune-ready and Audio / Embeddings / Image
+   * generation against a catalog that is entirely GGUF text-and-vision, so six
+   * of the options could only ever produce "Nothing matches these filters" —
+   * a menu of dead ends is worse than a shorter menu.
+   */
+  const formatOptions = useMemo(() => {
+    const present = new Set(all.flatMap((m) => m.formats));
+    return FORMAT_OPTIONS.filter(
+      (o) =>
+        o.id === 'all' || (o.id === 'finetune' ? present.has('safetensors') : present.has(o.id)),
+    );
+  }, [all]);
+  const capabilityOptions = useMemo(() => {
+    const present = new Set(all.flatMap((m) => m.capabilities));
+    return CAPABILITY_OPTIONS.filter((o) => o.id === 'all' || present.has(o.id));
+  }, [all]);
 
   return (
     <div className="flex h-full flex-col bg-bg-base" data-testid="models-view">
@@ -280,13 +344,13 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
         <Dropdown
           testid="filter-format"
           value={filters.format}
-          options={FORMAT_OPTIONS}
+          options={formatOptions}
           onChange={(format) => setFilters((f) => ({ ...f, format }))}
         />
         <Dropdown
           testid="filter-capability"
           value={filters.capability}
-          options={CAPABILITY_OPTIONS}
+          options={capabilityOptions}
           onChange={(capability) => setFilters((f) => ({ ...f, capability }))}
         />
         <Dropdown
@@ -305,7 +369,7 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
                 className={cx(
                   'flex h-4 w-4 items-center justify-center rounded-full border text-caption',
                   filters.onlyFits
-                    ? 'border-transparent bg-accent-primary text-white'
+                    ? 'border-transparent bg-accent-primary text-text-on-accent'
                     : 'border-border-strong',
                 )}
               >
@@ -333,6 +397,15 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
           ))}
         </div>
       </div>
+
+      {error !== null ? (
+        <p
+          className="mx-8 mb-3 rounded-lg border border-border-default bg-bg-inset px-3 py-2 text-footnote text-text-primary"
+          data-testid="models-error"
+        >
+          {error}
+        </p>
+      ) : null}
 
       <ScrollArea className="min-h-0 flex-1">
         <div className="px-8 pb-10">
@@ -400,8 +473,8 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
                         className={cx(
                           'grid items-center gap-2 border-b border-border-default bg-bg-sunken px-4 py-2 text-footnote text-text-muted',
                           hasCounts
-                            ? 'grid-cols-[1fr_120px_90px_110px_90px]'
-                            : 'grid-cols-[1fr_120px_90px]',
+                            ? 'grid-cols-[1fr_120px_90px_110px_90px_44px]'
+                            : 'grid-cols-[1fr_120px_90px_44px]',
                         )}
                       >
                         <span>Model</span>
@@ -409,6 +482,7 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
                         <span>Size</span>
                         {hasCounts ? <span>Downloads</span> : null}
                         {hasCounts ? <span>Likes</span> : null}
+                        <span className="sr-only">Download</span>
                       </div>
                       {rows.map((mdl) => (
                         <button
@@ -419,8 +493,8 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
                           className={cx(
                             'grid w-full items-center gap-2 border-b border-border-default px-4 py-3 text-left transition-colors last:border-b-0 hover:bg-bg-hover',
                             hasCounts
-                              ? 'grid-cols-[1fr_120px_90px_110px_90px]'
-                              : 'grid-cols-[1fr_120px_90px]',
+                              ? 'grid-cols-[1fr_120px_90px_110px_90px_44px]'
+                              : 'grid-cols-[1fr_120px_90px_44px]',
                             selected === mdl.id ? 'bg-bg-active' : '',
                           )}
                         >
@@ -454,6 +528,34 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
                               ♡ {compactCount(mdl.likes)}
                             </span>
                           ) : null}
+                          {/* The compact table is the DEFAULT view and never
+                              renders the detail pane, so without this the hub
+                              had no download affordance at all on first open. */}
+                          <span
+                            role="button"
+                            tabIndex={0}
+                            aria-label={`Download ${mdl.name}`}
+                            data-testid={`row-download-${mdl.id}`}
+                            aria-disabled={mdl.downloaded === true}
+                            onClick={(ev) => {
+                              ev.stopPropagation();
+                              if (mdl.downloaded !== true) void download(mdl.id);
+                            }}
+                            onKeyDown={(ev) => {
+                              if (ev.key !== 'Enter' && ev.key !== ' ') return;
+                              ev.preventDefault();
+                              ev.stopPropagation();
+                              if (mdl.downloaded !== true) void download(mdl.id);
+                            }}
+                            className={cx(
+                              'flex h-7 w-7 items-center justify-center rounded-lg text-footnote transition-colors',
+                              mdl.downloaded === true
+                                ? 'text-text-muted'
+                                : 'text-text-secondary hover:bg-bg-active hover:text-text-primary',
+                            )}
+                          >
+                            {mdl.downloaded === true ? '✓' : '↓'}
+                          </span>
                         </button>
                       ))}
                       {rows.length === 0 ? (
@@ -525,13 +627,26 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
                           the reference's "Exceeds combined VRAM and system RAM
                           budget." is the whole reason the dot is worth having. */}
                       <Tooltip
-                        label={detail.fitReason ?? 'Fits in this machine’s memory budget.'}
+                        label={
+                          detail.fitReason ??
+                          (detail.fits === true
+                            ? 'Fits in this machine’s memory budget.'
+                            : 'Not enough information to tell whether this fits.')
+                        }
                         side="top"
                       >
                         <span
                           className={cx(
                             'h-2 w-2 shrink-0 rounded-full',
-                            detail.fits === false ? 'bg-red-500' : 'bg-accent-primary',
+                            detail.fits === false
+                              ? 'bg-status-danger-fg'
+                              : detail.fits === true
+                                ? 'bg-accent-primary'
+                                : // Unknown is NOT a fit. Painting it like one
+                                  // asserted a claim about the user's hardware
+                                  // that the filter simultaneously treated as
+                                  // false — one value, two opposite readings.
+                                  'bg-border-strong',
                           )}
                           data-testid="detail-fit-dot"
                         />
@@ -539,9 +654,24 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
                       <span className="flex-1 text-footnote text-text-primary">
                         {compactBytes(detail.bytes)}
                       </span>
-                      <span className="rounded-lg bg-accent-primary px-2.5 py-1 text-footnote text-white">
-                        {detail.downloaded === true ? 'Installed' : 'Download'}
-                      </span>
+                      <button
+                        type="button"
+                        data-testid={`download-${detail.id}`}
+                        disabled={detail.downloaded === true || busyId === detail.id}
+                        onClick={() => void download(detail.id)}
+                        className={cx(
+                          'rounded-lg px-2.5 py-1 text-footnote transition-opacity pd-focusable',
+                          detail.downloaded === true
+                            ? 'bg-bg-active text-text-muted'
+                            : 'bg-accent-primary text-text-on-accent hover:opacity-90',
+                        )}
+                      >
+                        {detail.downloaded === true
+                          ? 'Installed'
+                          : busyId === detail.id
+                            ? 'Starting…'
+                            : 'Download'}
+                      </button>
                     </div>
 
                     <div className="mt-3 flex flex-wrap gap-1.5 text-footnote text-text-muted">

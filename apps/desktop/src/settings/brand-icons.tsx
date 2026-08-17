@@ -149,14 +149,31 @@ export function harnessIcon(id: string, size = 20): React.ReactNode {
 }
 
 /**
- * A model org's avatar, from Hugging Face, with a letter fallback.
+ * A model org's badge.
  *
- * Hugging Face serves org avatars off a stable URL, so a browsing (therefore
- * online) user sees the real Qwen / NVIDIA / DeepSeek marks. The fallback is
- * NOT decorative: on a plane, in the On-Device tab, or for an org with no
- * avatar, the initial keeps the row's shape and alignment intact instead of
- * collapsing it — which is what a missing <img> would do.
+ * IT DOES NOT FETCH. The first version pulled `huggingface.co/...` and asserted
+ * in this very docstring that "a browsing user sees the real Qwen / NVIDIA /
+ * DeepSeek marks". They never did: the app's CSP is `img-src 'self' data: blob:
+ * pd-file:` (vite.config.ts), so every request was blocked and all 23 avatars
+ * rendered as the grey fallback — measured. The comment described an intention,
+ * not the build, which is the worse kind of wrong because it stops anyone
+ * looking.
+ *
+ * So the badge is deliberately a monogram, and made to look chosen rather than
+ * failed: the tint is derived from the org name, so Qwen, NVIDIA and unsloth are
+ * consistently different colours and the eye can still use it to scan. Real
+ * marks need either inlined SVGs or avatars cached to disk and served over
+ * `pd-file:` — both are real work, and neither is a URL in an <img>.
  */
+function orgTint(org: string): { bg: string; fg: string } {
+  let h = 0;
+  for (let i = 0; i < org.length; i++) h = (h * 31 + org.charCodeAt(i)) % 360;
+  return {
+    bg: `color-mix(in oklab, hsl(${h} 70% 55%) 18%, var(--pd-bg-inset))`,
+    fg: `hsl(${h} 55% 42%)`,
+  };
+}
+
 export function OrgAvatar({
   org,
   size = 28,
@@ -166,26 +183,24 @@ export function OrgAvatar({
   size?: number;
   className?: string;
 }) {
-  const initial = (org.trim()[0] ?? '?').toUpperCase();
+  const label = org.trim();
+  const initial = (label[0] ?? '?').toUpperCase();
+  const tint = orgTint(label.toLowerCase());
   return (
     <span
-      className={`relative inline-flex shrink-0 items-center justify-center overflow-hidden rounded-lg bg-bg-inset text-text-secondary ${className ?? ''}`}
-      style={{ width: size, height: size, fontSize: Math.round(size * 0.42) }}
-      data-testid={`org-avatar-${org}`}
+      className={`inline-flex shrink-0 items-center justify-center rounded-lg font-medium ${className ?? ''}`}
+      style={{
+        width: size,
+        height: size,
+        fontSize: Math.round(size * 0.42),
+        background: tint.bg,
+        color: tint.fg,
+      }}
+      data-testid={`org-avatar-${label}`}
+      title={label}
       aria-hidden
     >
       {initial}
-      <img
-        src={`https://huggingface.co/api/organizations/${encodeURIComponent(org)}/avatar`}
-        alt=""
-        loading="lazy"
-        className="absolute inset-0 h-full w-full object-cover"
-        onError={(e) => {
-          // Drop the broken image so the letter underneath shows through, rather
-          // than leaving a torn-image glyph on top of it.
-          e.currentTarget.remove();
-        }}
-      />
     </span>
   );
 }

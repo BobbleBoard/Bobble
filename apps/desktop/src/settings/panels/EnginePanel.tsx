@@ -186,7 +186,7 @@ export function EnginePanel() {
                       ? 'cursor-default border-border-default text-text-muted'
                       : installed
                         ? 'border-border-default text-text-secondary hover:bg-bg-hover hover:text-text-primary'
-                        : 'border-transparent bg-accent-primary text-white hover:opacity-90',
+                        : 'border-transparent bg-accent-primary text-text-on-accent hover:opacity-90',
                   )}
                 >
                   {busy ? (

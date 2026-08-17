@@ -131,7 +131,7 @@ export function SetupStep() {
         className={cx(
           'flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-caption',
           phase === 'done'
-            ? 'bg-accent-primary text-white'
+            ? 'bg-accent-primary text-text-on-accent'
             : phase === 'failed'
               ? 'border border-border-strong text-text-muted'
               : 'border border-border-strong text-text-muted',
@@ -187,7 +187,7 @@ export function SetupStep() {
           onClick={() => void setUp()}
           className={cx(
             'self-start rounded-lg px-3.5 py-2 text-body transition-opacity pd-focusable',
-            busy ? 'bg-bg-active text-text-muted' : 'bg-accent-primary text-white hover:opacity-90',
+            busy ? 'bg-bg-active text-text-muted' : 'bg-accent-primary text-text-on-accent hover:opacity-90',
           )}
         >
           {busy ? 'Setting up…' : 'Set up now'}

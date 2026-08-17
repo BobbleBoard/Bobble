@@ -151,7 +151,7 @@ export function HarnessPanel() {
               className={cx(
                 'shrink-0 rounded-lg border px-3 py-1.5 text-footnote transition-colors pd-focusable',
                 isSelected
-                  ? 'border-transparent bg-accent-primary text-white'
+                  ? 'border-transparent bg-accent-primary text-text-on-accent'
                   : selectable
                     ? 'border-border-default text-text-secondary hover:bg-bg-hover hover:text-text-primary'
                     : 'cursor-default border-border-default text-text-muted',
