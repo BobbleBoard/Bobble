@@ -405,6 +405,24 @@ export const MODELCARD_INVOKE_CHANNELS = [
   'modelcard:fetch',
 ] as const satisfies readonly (keyof ModelCardInvokeMap)[];
 
+/**
+ * A Hugging Face org/user avatar, cached to disk and returned as a `pd-file://`
+ * URL. Main does the fetching because the renderer's CSP is
+ * `img-src 'self' data: blob: pd-file:` — pointing an <img> at huggingface.co
+ * is silently blocked. `verified` is HF's own flag, so the blue check can be
+ * shown truthfully instead of assumed.
+ */
+export type OrgAvatarInvokeMap = {
+  'orgavatar:fetch': {
+    request: { org: string };
+    response: { path?: string; verified?: boolean; error?: string };
+  };
+};
+
+export const ORGAVATAR_INVOKE_CHANNELS = [
+  'orgavatar:fetch',
+] as const satisfies readonly (keyof OrgAvatarInvokeMap)[];
+
 export const LLM_INVOKE_CHANNELS = [
   'llm:get-status',
   'llm:list-catalog',
@@ -607,6 +625,7 @@ export type AppInvokeMap = CoreInvokeMap &
   EngineInvokeMap &
   HarnessInvokeMap &
   ModelCardInvokeMap &
+  OrgAvatarInvokeMap &
   HfInvokeMap &
   AfmInvokeMap &
   SettingsInvokeMap &
@@ -657,6 +676,7 @@ export const APP_INVOKE_CHANNELS = [
   ...ENGINE_INVOKE_CHANNELS,
   ...HARNESS_INVOKE_CHANNELS,
   ...MODELCARD_INVOKE_CHANNELS,
+  ...ORGAVATAR_INVOKE_CHANNELS,
 ] as const satisfies readonly (keyof AppInvokeMap)[];
 
 type MissingChannels = Exclude<keyof AppInvokeMap, (typeof APP_INVOKE_CHANNELS)[number]>;

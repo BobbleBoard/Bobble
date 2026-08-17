@@ -2070,3 +2070,44 @@ body {
 .pd-usermsg-more:hover {
   color: var(--pd-text-primary);
 }
+
+/* The model card renders a full README inside a ~420px side pane. The chat's
+ * prose scale is tuned for a wide reading column, so at this width an h1 spans
+ * three lines and swamps the pane — the reference's card is markedly denser.
+ * Scope a smaller rhythm rather than changing the shared prose voice. */
+.pd-model-card .pd-prose {
+  font-size: 0.8125rem;
+  line-height: 1.55;
+}
+.pd-model-card .pd-prose h1 {
+  font-size: 1rem;
+  line-height: 1.3;
+  margin-top: 1.1em;
+}
+.pd-model-card .pd-prose h2 {
+  font-size: 0.9375rem;
+  margin-top: 1em;
+}
+.pd-model-card .pd-prose h3,
+.pd-model-card .pd-prose h4 {
+  font-size: 0.875rem;
+  margin-top: 0.9em;
+}
+.pd-model-card .pd-prose pre {
+  font-size: 0.75rem;
+  padding: 0.6rem 0.7rem;
+}
+.pd-model-card .pd-prose :where(p, ul, ol) {
+  margin-block: 0.5em;
+}
+/* Cards are full of screenshots and badge rows; keep them inside the column. */
+.pd-model-card .pd-prose img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+}
+.pd-model-card .pd-prose table {
+  display: block;
+  overflow-x: auto;
+  font-size: 0.75rem;
+}

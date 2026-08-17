@@ -23,13 +23,28 @@
  * the Unsloth-style three-key quant sort. This file is composition; it does not
  * re-decide either.
  */
-import { Markdown, ScrollArea, Spinner, Tooltip } from '@pi-desktop/ui';
+import {
+  IconArrowUp,
+  IconCheck,
+  IconChevronDown,
+  IconClock,
+  IconCopy,
+  IconExternal,
+  IconGauge,
+  IconInfo,
+  IconRefresh,
+  Markdown,
+  ScrollArea,
+  Spinner,
+  Tooltip,
+} from '@pi-desktop/ui';
 import { useEffect, useMemo, useState } from 'react';
 import type { HfModelHitDTO, HfSortOption, LlmCatalogEntry } from '../../electron/ipc-contract';
 import { cx } from '../onboarding/cx';
 import { OrgAvatar } from '../settings/brand-icons';
 import { ramVerdict } from '../settings/model-manager-logic';
 import { useLlmStore } from '../state/llm-store';
+import { CapabilityPills } from './model-pills';
 import {
   CAPABILITY_OPTIONS,
   compactBytes,
@@ -138,12 +153,43 @@ function hfToHubModel(h: HfModelHitDTO): HubModel {
   };
 }
 
-function Chip({ label, value }: { label: string; value: string }) {
+/**
+ * A metadata chip. The reference's chips lead with a small monochrome ICON —
+ * that is what stops a wrap of eight of them reading as a word soup, because
+ * the glyph is recognisable before the value is read.
+ */
+function Chip({ label, value, icon }: { label?: string; value: string; icon?: React.ReactNode }) {
   return (
     <span className="inline-flex items-center gap-1.5 rounded-full border border-border-default bg-bg-raised px-2.5 py-1 text-footnote">
+      {icon !== undefined ? <span className="text-text-muted">{icon}</span> : null}
       <span className="text-text-primary">{value}</span>
-      <span className="text-text-muted">{label}</span>
+      {label !== undefined && label !== '' ? (
+        <span className="text-text-muted">{label}</span>
+      ) : null}
     </span>
+  );
+}
+
+/** Downloads have no dedicated icon in the set; a rotated arrow is the mark. */
+function IconDownload({ size = 13 }: { size?: number }) {
+  return <IconArrowUp size={size} className="rotate-180" />;
+}
+
+/** Nor a heart, and likes need one. Inline rather than a text glyph, which
+ *  renders in whatever emoji font the OS picks and never matches the row. */
+function IconHeart({ size = 13 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      aria-hidden
+    >
+      <path d="M12 20s-7-4.4-7-9.3A4.2 4.2 0 0 1 12 8a4.2 4.2 0 0 1 7 2.7C19 15.6 12 20 12 20Z" />
+    </svg>
   );
 }
 
@@ -186,7 +232,7 @@ function Dropdown<T extends string>({
         className="flex items-center gap-2 rounded-full border border-border-default bg-bg-raised px-3.5 py-1.5 text-footnote text-text-secondary transition-colors hover:bg-bg-hover hover:text-text-primary pd-focusable"
       >
         {current}
-        <span className="text-text-muted">⌄</span>
+        <IconChevronDown size={14} className="text-text-muted" />
       </button>
       {open ? (
         <>
@@ -199,7 +245,7 @@ function Dropdown<T extends string>({
           />
           <div
             data-testid={`${testid}-menu`}
-            className="absolute top-full left-0 z-20 mt-1 min-w-[220px] rounded-xl border border-border-default bg-bg-raised p-1 shadow-xl"
+            className="absolute top-full left-0 z-20 mt-1 min-w-[260px] rounded-xl border border-border-default bg-bg-raised p-1 shadow-xl"
           >
             {options.map((o) => (
               <button
@@ -219,7 +265,7 @@ function Dropdown<T extends string>({
                   />
                 ) : null}
                 <span className="flex-1">{o.label}</span>
-                {o.id === value ? <span className="text-text-muted">✓</span> : null}
+                {o.id === value ? <IconCheck size={14} className="text-text-muted" /> : null}
               </button>
             ))}
             {footer !== undefined ? (
@@ -229,23 +275,6 @@ function Dropdown<T extends string>({
         </>
       ) : null}
     </div>
-  );
-}
-
-function CapabilityPills({ caps }: { caps: readonly string[] }) {
-  if (caps.length === 0) return <span className="text-footnote text-text-muted">—</span>;
-  return (
-    <span className="flex items-center gap-1">
-      {caps.map((c) => (
-        <span
-          key={c}
-          title={c}
-          className="inline-flex h-5 w-5 items-center justify-center rounded-md bg-bg-inset text-caption text-text-secondary"
-        >
-          {c === 'vision' ? '👁' : c === 'reasoning' ? '💬' : '•'}
-        </span>
-      ))}
-    </span>
   );
 }
 
@@ -500,15 +529,15 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
             >
               <span
                 className={cx(
-                  'flex h-4 w-4 items-center justify-center rounded-full border text-caption',
+                  'flex h-4 w-4 shrink-0 items-center justify-center rounded-full border',
                   filters.onlyFits
                     ? 'border-transparent bg-accent-primary text-text-on-accent'
                     : 'border-border-strong',
                 )}
               >
-                {filters.onlyFits ? '✓' : ''}
+                {filters.onlyFits ? <IconCheck size={11} /> : null}
               </span>
-              Only show models that fit
+              <span className="whitespace-nowrap">Only show models that fit</span>
             </button>
           }
         />
@@ -525,7 +554,44 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
                 view === v ? 'bg-bg-active text-text-primary' : 'text-text-muted',
               )}
             >
-              {v === 'split' ? '▤' : v === 'detail' ? '▥' : '☰'}
+              <span className="flex h-4 w-4 items-center justify-center">
+                {v === 'compact' ? (
+                  <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden>
+                    <title>Compact</title>
+                    <rect x="1" y="3" width="14" height="1.6" rx=".8" fill="currentColor" />
+                    <rect x="1" y="7.2" width="14" height="1.6" rx=".8" fill="currentColor" />
+                    <rect x="1" y="11.4" width="14" height="1.6" rx=".8" fill="currentColor" />
+                  </svg>
+                ) : v === 'split' ? (
+                  <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden>
+                    <title>Split</title>
+                    <rect x="1" y="2" width="8.4" height="12" rx="1.4" fill="currentColor" />
+                    <rect
+                      x="10.8"
+                      y="2"
+                      width="4.2"
+                      height="12"
+                      rx="1.4"
+                      fill="currentColor"
+                      opacity=".45"
+                    />
+                  </svg>
+                ) : (
+                  <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden>
+                    <title>Detail</title>
+                    <rect
+                      x="1"
+                      y="2"
+                      width="5"
+                      height="12"
+                      rx="1.4"
+                      fill="currentColor"
+                      opacity=".45"
+                    />
+                    <rect x="7.4" y="2" width="7.6" height="12" rx="1.4" fill="currentColor" />
+                  </svg>
+                )}
+              </span>
             </button>
           ))}
         </div>
@@ -560,17 +626,17 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
             <>
               {tab === 'discover' && trending.length > 0 ? (
                 <section className="mb-7">
-                  <h2 className="mb-3 text-body text-text-primary">Trending Now</h2>
+                  <h2 className="mb-3 text-body font-medium text-text-primary">Trending Now</h2>
                   <div className="grid grid-cols-4 gap-3" data-testid="trending-row">
                     {trending.map((mdl) => (
                       <button
                         key={mdl.id}
                         type="button"
                         onClick={() => setSelected(mdl.id)}
-                        className="rounded-2xl border border-border-default bg-bg-raised p-3 text-left transition-colors hover:bg-bg-hover pd-focusable"
+                        className="rounded-2xl border border-border-default bg-bg-raised p-4 text-left transition-all hover:border-border-strong hover:shadow-sm pd-focusable"
                       >
                         <div className="flex items-start gap-2.5">
-                          <OrgAvatar org={mdl.org} size={34} />
+                          <OrgAvatar org={mdl.org} size={36} />
                           <span className="min-w-0">
                             <span className="block truncate text-body text-text-primary">
                               {mdl.name}
@@ -586,11 +652,21 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
                           </span>
                         </div>
                         <div className="mt-3 flex items-center gap-3 text-footnote text-text-muted">
-                          {hasCounts ? <span>↓ {compactCount(mdl.downloads)}</span> : null}
-                          {hasCounts ? <span>♡ {compactCount(mdl.likes)}</span> : null}
-                          <span className="ml-auto rounded-md bg-bg-inset px-1.5 py-0.5">
-                            {compactBytes(mdl.bytes)}
-                          </span>
+                          {hasCounts ? (
+                            <span className="inline-flex items-center gap-1">
+                              <IconDownload /> {compactCount(mdl.downloads)}
+                            </span>
+                          ) : null}
+                          {hasCounts ? (
+                            <span className="inline-flex items-center gap-1">
+                              <IconHeart /> {compactCount(mdl.likes)}
+                            </span>
+                          ) : null}
+                          {(mdl.params ?? mdl.bytes !== undefined) ? (
+                            <span className="ml-auto rounded-md bg-bg-inset px-2 py-0.5 font-medium text-text-secondary">
+                              {mdl.params ?? compactBytes(mdl.bytes)}
+                            </span>
+                          ) : null}
                         </div>
                       </button>
                     ))}
@@ -599,12 +675,29 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
               ) : null}
 
               <section
-                className={cx('grid gap-5', view === 'compact' ? '' : 'grid-cols-[1fr_380px]')}
+                className={cx(
+                  'grid gap-5',
+                  view === 'compact' ? '' : 'grid-cols-[minmax(0,1fr)_440px]',
+                )}
               >
                 <div>
-                  <h2 className="mb-3 text-body text-text-primary">
-                    {tab === 'device' ? 'On this machine' : 'All models'}
-                  </h2>
+                  <div className="mb-3 flex items-center gap-2">
+                    <h2 className="text-body font-medium text-text-primary">
+                      {tab === 'device' ? 'On this machine' : 'All models'}
+                    </h2>
+                    <button
+                      type="button"
+                      aria-label="Refresh"
+                      data-testid="models-refresh"
+                      onClick={() => void refreshCatalog()}
+                      className="rounded-md p-1 text-text-muted transition-colors hover:bg-bg-hover hover:text-text-primary pd-focusable"
+                    >
+                      <IconRefresh size={14} />
+                    </button>
+                    <span className="ml-auto text-footnote text-text-muted">
+                      {rows.length} model{rows.length === 1 ? '' : 's'}
+                    </span>
+                  </div>
 
                   {view === 'compact' ? (
                     <div className="overflow-hidden rounded-xl border border-border-default">
@@ -657,7 +750,7 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
                               ) : null}
                             </span>
                           </span>
-                          <CapabilityPills caps={mdl.capabilities} />
+                          <CapabilityPills caps={mdl.capabilities} dense max={4} />
                           {/* The reference's Size column is a PARAMETER COUNT
                               (27B, 95B); bytes belong to a specific quant and
                               only exist once a file is chosen. */}
@@ -665,13 +758,13 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
                             {mdl.params ?? compactBytes(mdl.bytes)}
                           </span>
                           {hasCounts ? (
-                            <span className="text-footnote text-text-secondary">
-                              ↓ {compactCount(mdl.downloads)}
+                            <span className="inline-flex items-center gap-1 text-footnote text-text-secondary">
+                              <IconDownload /> {compactCount(mdl.downloads)}
                             </span>
                           ) : null}
                           {hasCounts ? (
-                            <span className="text-footnote text-text-secondary">
-                              ♡ {compactCount(mdl.likes)}
+                            <span className="inline-flex items-center gap-1 text-footnote text-text-secondary">
+                              <IconHeart /> {compactCount(mdl.likes)}
                             </span>
                           ) : null}
                           {/* The compact table is the DEFAULT view and never
@@ -700,7 +793,11 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
                                 : 'text-text-secondary hover:bg-bg-active hover:text-text-primary',
                             )}
                           >
-                            {mdl.downloaded === true ? '✓' : '↓'}
+                            {mdl.downloaded === true ? (
+                              <IconCheck size={14} />
+                            ) : (
+                              <IconDownload size={14} />
+                            )}
                           </span>
                         </button>
                       ))}
@@ -730,8 +827,8 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
                             </span>
                             <span className="text-footnote text-text-muted">{mdl.org}</span>
                           </span>
-                          <span className="text-footnote text-text-muted">
-                            {compactBytes(mdl.bytes)}
+                          <span className="shrink-0 text-footnote text-text-muted">
+                            {mdl.params ?? compactBytes(mdl.bytes)}
                           </span>
                         </button>
                       ))}
@@ -741,13 +838,44 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
 
                 {view !== 'compact' && detail !== undefined ? (
                   <aside
-                    className="rounded-2xl border border-border-default bg-bg-raised p-4"
+                    className="max-h-[calc(100vh-260px)] overflow-y-auto rounded-2xl border border-border-default bg-bg-raised p-5"
                     data-testid="model-detail"
                   >
                     <div className="flex items-start gap-3">
-                      <OrgAvatar org={detail.org} size={44} />
-                      <div className="min-w-0">
-                        <h3 className="truncate text-body text-text-primary">{detail.name}</h3>
+                      <OrgAvatar org={detail.org} size={48} />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-start gap-1.5">
+                          <h3 className="min-w-0 flex-1 break-words text-body font-medium text-text-primary">
+                            {detail.name}
+                          </h3>
+                          {/* Copy the repo id and open it on the Hub — both are
+                              in the reference beside the title, and both are
+                              what someone actually wants from a card. */}
+                          <button
+                            type="button"
+                            aria-label="Copy model id"
+                            data-testid="detail-copy"
+                            onClick={() => void navigator.clipboard?.writeText(detail.id)}
+                            className="shrink-0 rounded-md p-1 text-text-muted transition-colors hover:bg-bg-hover hover:text-text-primary pd-focusable"
+                          >
+                            <IconCopy size={14} />
+                          </button>
+                          {detail.id.includes('/') ? (
+                            <button
+                              type="button"
+                              aria-label="Open on Hugging Face"
+                              data-testid="detail-open"
+                              onClick={() =>
+                                void window.piDesktop.invoke('canvas:open-external', {
+                                  url: `https://huggingface.co/${detail.id}`,
+                                })
+                              }
+                              className="shrink-0 rounded-md p-1 text-text-muted transition-colors hover:bg-bg-hover hover:text-text-primary pd-focusable"
+                            >
+                              <IconExternal size={14} />
+                            </button>
+                          ) : null}
+                        </div>
                         <p className="flex items-center gap-1 text-footnote text-text-muted">
                           {detail.org}
                           {detail.verified === true ? (
@@ -757,18 +885,13 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
                       </div>
                     </div>
 
-                    <div className="mt-3 flex flex-wrap gap-1.5">
-                      {detail.capabilities.map((c) => (
-                        <span
-                          key={c}
-                          className="rounded-md bg-bg-inset px-2 py-0.5 text-footnote text-text-secondary"
-                        >
-                          {c}
-                        </span>
-                      ))}
-                    </div>
+                    {detail.capabilities.length > 0 ? (
+                      <div className="mt-3 flex flex-wrap gap-1.5">
+                        <CapabilityPills caps={detail.capabilities} />
+                      </div>
+                    ) : null}
 
-                    <div className="mt-3 flex items-center gap-2 rounded-xl border border-border-default bg-bg-inset px-3 py-2">
+                    <div className="mt-3 flex items-center gap-2.5 rounded-xl border border-border-default bg-bg-inset px-3 py-2.5">
                       {/* The dot says THAT it fits; the tooltip says why not —
                           the reference's "Exceeds combined VRAM and system RAM
                           budget." is the whole reason the dot is worth having. */}
@@ -797,8 +920,23 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
                           data-testid="detail-fit-dot"
                         />
                       </Tooltip>
-                      <span className="flex-1 text-footnote text-text-primary">
-                        {compactBytes(detail.bytes)}
+                      {/* Quant + format + size, the reference's row. The quant
+                          picker itself is not built yet, so this states what
+                          will be fetched rather than implying a choice. */}
+                      <span className="flex min-w-0 flex-1 items-center gap-2">
+                        <span className="shrink-0 text-footnote font-medium text-text-primary">
+                          {detail.downloaded === true ? 'Installed' : 'Recommended'}
+                        </span>
+                        {detail.formats[0] !== undefined ? (
+                          <span className="shrink-0 rounded-md bg-bg-raised px-1.5 py-0.5 text-caption text-text-secondary">
+                            {detail.formats[0].toUpperCase()}
+                          </span>
+                        ) : null}
+                        {detail.bytes !== undefined ? (
+                          <span className="shrink-0 text-footnote text-text-muted">
+                            {compactBytes(detail.bytes)}
+                          </span>
+                        ) : null}
                       </span>
                       <button
                         type="button"
@@ -825,17 +963,25 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
                         for the table columns. */}
                     <div className="mt-3 flex flex-wrap gap-1.5 text-footnote text-text-muted">
                       {detail.updatedAt !== undefined ? (
-                        <Chip label="" value={relativeAge(detail.updatedAt, Date.now())} />
+                        <Chip
+                          icon={<IconClock size={12} />}
+                          value={relativeAge(detail.updatedAt, Date.now())}
+                        />
                       ) : null}
                       {detail.downloads !== undefined ? (
-                        <Chip label="" value={`↓ ${compactCount(detail.downloads)}`} />
+                        <Chip
+                          icon={<IconDownload size={12} />}
+                          value={compactCount(detail.downloads)}
+                        />
                       ) : null}
                       {detail.likes !== undefined ? (
-                        <Chip label="" value={`♡ ${compactCount(detail.likes)}`} />
+                        <Chip icon={<IconHeart size={12} />} value={compactCount(detail.likes)} />
                       ) : null}
-                      {detail.params !== undefined ? <Chip label="" value={detail.params} /> : null}
+                      {detail.params !== undefined ? (
+                        <Chip icon={<IconGauge size={12} />} value={detail.params} />
+                      ) : null}
                       {detail.formats.map((f) => (
-                        <Chip key={f} label="" value={f.toUpperCase()} />
+                        <Chip key={f} value={f.toUpperCase()} />
                       ))}
                     </div>
 
@@ -853,7 +999,9 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
                       ) : (
                         // Markdown renders its own .pd-prose container; do not
                         // double-wrap it.
-                        <Markdown>{card.markdown ?? ''}</Markdown>
+                        <div className="pd-model-card">
+                          <Markdown>{card.markdown ?? ''}</Markdown>
+                        </div>
                       )}
                     </div>
                   </aside>

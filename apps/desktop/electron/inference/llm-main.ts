@@ -21,6 +21,7 @@ import type {
   EngineInvokeMap,
   HarnessInvokeMap,
   ModelCardInvokeMap,
+  OrgAvatarInvokeMap,
   HfInvokeMap,
   LlmInvokeMap,
   LlmStatus,
@@ -28,6 +29,7 @@ import type {
 import { installEngine, listEngines, uninstallEngine } from './engines-main';
 import { detectHarnesses } from './harness-main';
 import { fetchModelCard } from './modelcard-main';
+import { fetchOrgAvatar } from './org-avatar-main';
 import type {
   HfListFilesReply,
   HfRegisterReply,
@@ -434,6 +436,10 @@ const modelCardHandlers: IpcHandlers<ModelCardInvokeMap> = {
   'modelcard:fetch': (req) => fetchModelCard(req.repoId),
 };
 
+const orgAvatarHandlers: IpcHandlers<OrgAvatarInvokeMap> = {
+  'orgavatar:fetch': (req) => fetchOrgAvatar(req.org),
+};
+
 const engineHandlers: IpcHandlers<EngineInvokeMap> = {
   'engines:list': () => ({ engines: listEngines(KNOWN_ENGINE_IDS) }),
   'engines:install': (req) => installEngine(req.id),
@@ -448,6 +454,7 @@ export function registerLlmIpc(ipcMain: IpcMain, allowSender: (event: unknown) =
   registerIpcHandlers<EngineInvokeMap>(ipcMain, engineHandlers, { allowSender });
   registerIpcHandlers<HarnessInvokeMap>(ipcMain, harnessHandlers, { allowSender });
   registerIpcHandlers<ModelCardInvokeMap>(ipcMain, modelCardHandlers, { allowSender });
+  registerIpcHandlers<OrgAvatarInvokeMap>(ipcMain, orgAvatarHandlers, { allowSender });
   registerIpcHandlers<HfInvokeMap>(ipcMain, hfHandlers, { allowSender });
   /*
    * Clear out any model server a PREVIOUS run left behind before standing up

@@ -24,6 +24,7 @@
  * Using a vendor's mark to identify their product in a picker is nominative
  * use; none of it implies endorsement.
  */
+import { useEffect, useState } from 'react';
 import { BRAND_SVGS } from './brand-svg';
 
 export interface BrandIconProps {
@@ -148,6 +149,35 @@ function orgTint(org: string): { bg: string; fg: string } {
   };
 }
 
+/**
+ * One in-flight/settled lookup per org, shared across every row that shows it.
+ * A list of 40 models with 8 distinct orgs must make 8 requests, not 40.
+ */
+const avatarCache = new Map<string, Promise<{ path?: string; verified?: boolean }>>();
+
+function lookupAvatar(org: string): Promise<{ path?: string; verified?: boolean }> {
+  const key = org.toLowerCase();
+  const hit = avatarCache.get(key);
+  if (hit !== undefined) return hit;
+  const p = window.piDesktop
+    .invoke('orgavatar:fetch', { org })
+    .then((r) => ({ path: r.path, verified: r.verified }))
+    .catch(() => ({}));
+  avatarCache.set(key, p);
+  return p;
+}
+
+/**
+ * A model org's badge: its REAL avatar where Hugging Face has one, then an
+ * official simple-icons mark, then a tinted monogram.
+ *
+ * The order matters. HF's own avatar is what the reference shows and covers
+ * every publisher including individuals; the bundled marks cover the big labs
+ * when offline or before the fetch lands; the monogram keeps the row's shape
+ * when neither exists. The avatar arrives as a `pd-file://` URL — main caches
+ * it to disk precisely because the CSP blocks a remote <img>, which is how the
+ * first version of this managed to render 23 grey squares.
+ */
 export function OrgAvatar({
   org,
   size = 28,
@@ -160,41 +190,52 @@ export function OrgAvatar({
   const label = org.trim();
   const markId = orgMarkId(label);
   const brand = markId === undefined ? undefined : BRAND_SVGS[markId];
+  const [src, setSrc] = useState<string | undefined>(undefined);
 
-  if (brand !== undefined) {
-    return (
-      <span
-        className={`inline-flex shrink-0 items-center justify-center rounded-lg ${className ?? ''}`}
-        style={{
-          width: size,
-          height: size,
-          background: `color-mix(in oklab, ${brand.hex} 14%, var(--pd-bg-inset))`,
-        }}
-        data-testid={`org-avatar-${label}`}
-        title={label}
-      >
-        <BrandMark id={markId as string} size={Math.round(size * 0.62)} />
-      </span>
+  useEffect(() => {
+    if (label === '') return;
+    let live = true;
+    void lookupAvatar(label).then((r) => {
+      if (live && r.path !== undefined) setSrc(r.path);
+    });
+    return () => {
+      live = false;
+    };
+  }, [label]);
+
+  const shell = (children: React.ReactNode, style?: React.CSSProperties) => (
+    <span
+      className={`inline-flex shrink-0 items-center justify-center overflow-hidden rounded-lg font-medium ${className ?? ''}`}
+      style={{ width: size, height: size, ...style }}
+      data-testid={`org-avatar-${label}`}
+      title={label}
+    >
+      {children}
+    </span>
+  );
+
+  if (src !== undefined) {
+    return shell(
+      <img
+        src={src}
+        alt=""
+        className="h-full w-full object-cover"
+        onError={() => setSrc(undefined)}
+      />,
     );
+  }
+
+  if (brand !== undefined && markId !== undefined) {
+    return shell(<BrandMark id={markId} size={Math.round(size * 0.62)} />, {
+      background: `color-mix(in oklab, ${brand.hex} 14%, var(--pd-bg-inset))`,
+    });
   }
 
   const initial = (label[0] ?? '?').toUpperCase();
   const tint = orgTint(label.toLowerCase());
-  return (
-    <span
-      className={`inline-flex shrink-0 items-center justify-center rounded-lg font-medium ${className ?? ''}`}
-      style={{
-        width: size,
-        height: size,
-        fontSize: Math.round(size * 0.42),
-        background: tint.bg,
-        color: tint.fg,
-      }}
-      data-testid={`org-avatar-${label}`}
-      title={label}
-      aria-hidden
-    >
-      {initial}
-    </span>
-  );
+  return shell(initial, {
+    background: tint.bg,
+    color: tint.fg,
+    fontSize: Math.round(size * 0.42),
+  });
 }
