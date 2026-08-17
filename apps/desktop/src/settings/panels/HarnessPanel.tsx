@@ -18,7 +18,8 @@ import { useCallback, useEffect, useState } from 'react';
 import type { HarnessDetected } from '../../../electron/ipc-contract';
 import { cx } from '../../onboarding/cx';
 import { useLlmStore } from '../../state/llm-store';
-import { setHarnessChoice, useHarnessChoice } from '../../state/settings-store';
+import { setHarnessChoice, useHarnessConfigPath, useHarnessId } from '../../state/settings-store';
+import { harnessIcon } from '../brand-icons';
 import {
   canDriveChat,
   connectScript,
@@ -59,9 +60,9 @@ export function HarnessPanel() {
   /* The choice is PERSISTED, not component state: main reads it when it builds
      the next pi bridge, so a selection that lived only in React would look
      applied and do nothing. */
-  const choice = useHarnessChoice();
-  const selected = choice.id;
-  const [customPath, setCustomPath] = useState(choice.configPath);
+  const selected = useHarnessId();
+  const savedConfigPath = useHarnessConfigPath();
+  const [customPath, setCustomPath] = useState(savedConfigPath);
   const [expanded, setExpanded] = useState<string | null>(null);
 
   const status = useLlmStore((s) => s.status);
@@ -107,6 +108,15 @@ export function HarnessPanel() {
         )}
       >
         <div className="flex items-start gap-3">
+          {/* The product's own mark, so the picker reads as a list of real
+              tools rather than rows of text. */}
+          <span
+            className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-bg-inset text-text-secondary"
+            data-testid={`harness-icon-${spec.id}`}
+            aria-hidden
+          >
+            {harnessIcon(spec.id, 18)}
+          </span>
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-body text-text-primary">{spec.name}</span>

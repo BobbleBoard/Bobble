@@ -492,6 +492,8 @@ function registerAppIpc(): void {
         nodeVersion: process.versions.node ?? 'unknown',
         platform: process.platform,
         arch: process.arch,
+        totalMemoryBytes: os.totalmem(),
+        cpuCount: os.cpus().length,
       }),
     },
     { allowSender },

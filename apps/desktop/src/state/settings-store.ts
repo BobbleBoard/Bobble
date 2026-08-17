@@ -238,11 +238,18 @@ export async function setEnginePreference(enginePreference: EnginePreference): P
  * chat. An in-flight conversation keeps the pi it started with on purpose:
  * swapping the binary underneath a live session would strand its state.
  */
-export function useHarnessChoice(): { id: string; configPath: string } {
-  return useSettingsStore((s) => ({
-    id: s.settings.harnessId,
-    configPath: s.settings.harnessConfigPath,
-  }));
+/*
+ * TWO selectors, not one returning an object. A selector that builds a fresh
+ * object every call never compares equal, so zustand re-renders forever — the
+ * same thrash that has bitten this store before. Each of these returns a
+ * primitive, which is stable by value.
+ */
+export function useHarnessId(): string {
+  return useSettingsStore((s) => s.settings.harnessId);
+}
+
+export function useHarnessConfigPath(): string {
+  return useSettingsStore((s) => s.settings.harnessConfigPath);
 }
 
 export async function setHarnessChoice(id: string, configPath?: string): Promise<void> {

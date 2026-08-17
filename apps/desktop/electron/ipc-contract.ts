@@ -54,6 +54,12 @@ export interface AppInfo {
   /** `process.arch`, e.g. `arm64`. Distinguishes Apple Silicon from an Intel
    * Mac, which decides whether the MLX engines can run at all. */
   arch: string;
+  /** Total system memory in bytes, for the model hub's hardware strip. Shown
+   * because every download decision is made against it — a hardcoded figure
+   * there would be decoration pretending to be information. */
+  totalMemoryBytes: number;
+  /** Logical CPU count, same strip. */
+  cpuCount: number;
 }
 
 /** Core app channels, registered exhaustively via registerIpcHandlers in
