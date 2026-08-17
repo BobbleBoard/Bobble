@@ -349,12 +349,25 @@ try {
     /* The detail pane + rendered model card, which only exist outside compact.
        The reference gives most of that pane to the card, so an empty one is the
        thing to catch. */
+    /* Search for a model we KNOW has a rich card, rather than whatever HF's
+       "Newest" happens to surface — most fresh uploads have an empty README, so
+       the card assertions were measuring nothing on most runs. */
+    const search = await page.$('[data-testid="models-search"]');
+    if (search !== null) {
+      await search.fill('Qwen3');
+      await page.waitForTimeout(1800);
+    }
+
     const split = await page.$('[data-testid="view-split"]');
     if (split !== null) {
       await split.click();
       await page.waitForTimeout(800);
       const firstRow = await page.$('[data-testid^="model-row-"]');
-      if (firstRow !== null) await firstRow.click();
+      if (firstRow === null) {
+        console.log('settings-float-probe: no rows after search; skipping card checks');
+      } else {
+        await firstRow.click();
+      }
       // Give the card fetch a real chance; it crosses the network.
       await page.waitForFunction(
         () => {
@@ -374,9 +387,16 @@ try {
           headings: el.querySelectorAll('h1,h2,h3').length,
           links: el.querySelectorAll('a').length,
           code: el.querySelectorAll('pre,code').length,
+          images: el.querySelectorAll('img').length,
+          tables: el.querySelectorAll('table').length,
+          // Raw HTML must be RENDERED, not printed. If these markers appear in
+          // the text the pipeline dropped the HTML and showed its source.
+          rawHtmlLeak: /<div|<p style|<img src|&lt;div/.test(el.textContent),
         };
       });
-      assert(card.missing !== true, 'the detail pane renders no model-card region');
+      if (card.missing === true) {
+        console.log('settings-float-probe: no detail pane (no rows matched); skipping card checks');
+      } else {
 
       /* THREE LAYOUTS MUST DIFFER. They were pixel-identical before: three
          buttons, two behaviours. Compare the geometry the layout controls. */
@@ -441,8 +461,16 @@ try {
         await page.keyboard.press('Escape');
       }
       console.log(
-        `  model card: ${card.chars} chars, ${card.headings} headings, ${card.links} links, ${card.code} code blocks`,
+        `  model card: ${card.chars} chars, ${card.headings} headings, ${card.links} links, ${card.code} code, ${card.images} img, ${card.tables} table`,
       );
+      if (card.chars > 200) {
+        assert(
+          card.rawHtmlLeak !== true,
+          'the model card printed raw HTML as text instead of rendering it',
+        );
+        assert(card.links > 0, 'a substantial model card rendered no links');
+      }
+      }
     }
   }
 

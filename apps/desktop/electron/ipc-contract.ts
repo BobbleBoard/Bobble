@@ -417,10 +417,20 @@ export type OrgAvatarInvokeMap = {
     request: { org: string };
     response: { path?: string; verified?: boolean; error?: string };
   };
+  /**
+   * Cache any remote image and return a `pd-file://` URL. Model cards embed
+   * badge rows and screenshots from github/hf, all of which the renderer's
+   * `img-src 'self' data: blob: pd-file:` blocks outright.
+   */
+  'image:cache': {
+    request: { url: string };
+    response: { path?: string; error?: string };
+  };
 };
 
 export const ORGAVATAR_INVOKE_CHANNELS = [
   'orgavatar:fetch',
+  'image:cache',
 ] as const satisfies readonly (keyof OrgAvatarInvokeMap)[];
 
 /** One dataset hit (the hub's Datasets page). */

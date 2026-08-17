@@ -31,7 +31,7 @@ import { installEngine, listEngines, uninstallEngine } from './engines-main';
 import { detectHarnesses } from './harness-main';
 import { fetchModelCard } from './modelcard-main';
 import { searchDatasets } from './dataset-search-main';
-import { fetchOrgAvatar } from './org-avatar-main';
+import { cacheRemoteImage, fetchOrgAvatar } from './org-avatar-main';
 import type {
   HfListFilesReply,
   HfRegisterReply,
@@ -440,6 +440,7 @@ const modelCardHandlers: IpcHandlers<ModelCardInvokeMap> = {
 
 const orgAvatarHandlers: IpcHandlers<OrgAvatarInvokeMap> = {
   'orgavatar:fetch': (req) => fetchOrgAvatar(req.org),
+  'image:cache': (req) => cacheRemoteImage(req.url),
 };
 
 const datasetHandlers: IpcHandlers<DatasetInvokeMap> = {

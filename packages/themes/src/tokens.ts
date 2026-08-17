@@ -530,7 +530,10 @@ const claudeLight: ThemeTokens = {
     raised: '#ffffff', // --bg-000
     overlay: '#ffffff', // CDS --surface-popover
     inset: '#f5f4ed', // --bg-200
-    hover: '#0b0b0b0d', // CDS --fill-ghost-hover (neutral-900 @ 5%)
+    // 5% was the CDS ghost-hover value and it reads as nothing on a real
+    // screen — the user: "hover highlights across the board are so faint". 9% is
+    // still a wash, not a fill, but it actually tells you the row is live.
+    hover: '#0b0b0b17', // neutral-900 @ 9% (was 5%)
     active: '#0b0b0b1a', // CDS --fill-control (neutral-900 @ 10%)
     backdrop: '#00000066', // CDS --backdrop rgb(0 0 0 / 0.4)
     sidebar: '#ffffff', // observed sidebar surface on Home
@@ -629,7 +632,7 @@ const claudeDark: ThemeTokens = {
     raised: '#30302e', // --bg-000 (dark ramp inverts: raised is lighter)
     overlay: '#383835', // CDS --surface-3
     inset: '#1f1e1d', // --bg-200
-    hover: '#ffffff0d', // CDS dark alpha ramp flips to white @ 5%
+    hover: '#ffffff1f', // white @ 12% (was 5%) — dark needs more to read
     active: '#ffffff1a', // white @ 10%
     backdrop: '#00000080', // CDS --backdrop dark rgb(0 0 0 / 0.5)
     sidebar: '#1f1e1df2', // gray-860 family @ 95% (vibrancy; solid-ish fallback)
@@ -725,7 +728,7 @@ const codexLight: ThemeTokens = {
     raised: '#ffffff', // elevated-primary-opaque (translucency needs vibrancy)
     overlay: '#ffffff', // elevated surfaces; the popover shadow does the lifting
     inset: '#1a1c1f05', // elevated-secondary: fg @ 2%
-    hover: '#1a1c1f0d', // hover grammar: fg @ 5%
+    hover: '#1a1c1f17', // fg @ 9% (was 5%)
     active: '#1a1c1f1a', // fg @ 10%
     backdrop: '#0000001a', // --color-simple-scrim (10%) — codex scrims are airy
     sidebar: '#f6f6f6', // app-shell-left-panel (solid fallback of the editor mix)
@@ -814,7 +817,7 @@ const codexDark: ThemeTokens = {
     raised: '#212121', // gray-800 (elevated-primary is #212121f5 over vibrancy)
     overlay: '#282828', // gray-750 (elevated-primary-opaque)
     inset: '#ffffff08', // elevated-secondary: white @ 3%
-    hover: '#ffffff14', // white @ 8%
+    hover: '#ffffff24', // white @ 14% (was 8%)
     active: '#ffffff1f', // white @ 12%
     backdrop: '#00000066', // derived: black @ 40% (harvest scrim is vibrancy-bound)
     sidebar: '#181818', // solid fallback of color-mix(editor-bg 55%) over vibrancy

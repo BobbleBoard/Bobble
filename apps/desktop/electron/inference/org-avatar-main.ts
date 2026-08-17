@@ -71,6 +71,72 @@ async function overview(org: string): Promise<Overview | undefined> {
   return undefined;
 }
 
+/**
+ * ANY remote image, cached to disk and returned as a `pd-file://` URL.
+ *
+ * Model cards are full of `<img src="https://github.com/...">` badge rows and
+ * screenshots, and the renderer's CSP (`img-src 'self' data: blob: pd-file:`)
+ * blocks every one — so a card that "renders HTML" still showed no pictures.
+ * Same mechanism as the org avatars, generalised: main fetches once, writes
+ * under the agent dir, hands back a URL the renderer may load. Offline after
+ * the first view, which a remote <img> never is.
+ *
+ * Fenced deliberately: http/https only, a size cap, and an image content-type,
+ * so a card cannot use this to pull down arbitrary files.
+ */
+export async function cacheRemoteImage(url: string): Promise<{ path?: string; error?: string }> {
+  const key = `img:${url}`;
+  const hit = memo.get(key);
+  if (hit !== undefined) return hit;
+
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return { error: 'bad url' };
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    return { error: 'unsupported protocol' };
+  }
+
+  const stem = `img-${safeName(url)}`;
+  try {
+    if (existsSync(CACHE_DIR)) {
+      const found = readdirSync(CACHE_DIR).find((f) => f.startsWith(`${stem}.`));
+      if (found !== undefined) {
+        const out = { path: pdFileUrl(path.join(CACHE_DIR, found)) };
+        memo.set(key, out);
+        return out;
+      }
+    }
+    const res = await fetch(url, { signal: AbortSignal.timeout(12_000) });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const type = res.headers.get('content-type') ?? '';
+    if (!type.startsWith('image/')) throw new Error('not an image');
+    const ext = type.includes('svg')
+      ? 'svg'
+      : type.includes('png')
+        ? 'png'
+        : type.includes('gif')
+          ? 'gif'
+          : type.includes('webp')
+            ? 'webp'
+            : 'jpg';
+    const bytes = Buffer.from(await res.arrayBuffer());
+    if (bytes.byteLength > 8_000_000) throw new Error('image too large');
+    mkdirSync(CACHE_DIR, { recursive: true });
+    const file = path.join(CACHE_DIR, `${stem}.${ext}`);
+    writeFileSync(file, bytes);
+    const out = { path: pdFileUrl(file) };
+    memo.set(key, out);
+    return out;
+  } catch (e) {
+    const out = { error: e instanceof Error ? e.message : 'could not fetch image' };
+    memo.set(key, out);
+    return out;
+  }
+}
+
 export async function fetchOrgAvatar(
   org: string,
 ): Promise<{ path?: string; verified?: boolean; error?: string }> {

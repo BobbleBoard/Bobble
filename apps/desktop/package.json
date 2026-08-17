@@ -44,9 +44,14 @@
     "@pi-desktop/web-tools": "workspace:*",
     "@xterm/addon-fit": "^0.10.0",
     "@xterm/xterm": "^5.5.0",
+    "clsx": "^2.1.1",
     "lexical": "^0.46.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
+    "react-markdown": "^10.1.0",
+    "rehype-raw": "^7.0.0",
+    "rehype-sanitize": "^6.0.0",
+    "remark-gfm": "^4.0.1",
     "zustand": "^5.0.14"
   },
   "optionalDependencies": {

@@ -34,7 +34,6 @@ import {
   IconInfo,
   IconMore,
   IconRefresh,
-  Markdown,
   ScrollArea,
   Spinner,
   Tooltip,
@@ -42,6 +41,7 @@ import {
 import { useEffect, useMemo, useState } from 'react';
 import type {
   DatasetHitDTO,
+  HfGgufFileDTO,
   HfModelHitDTO,
   HfSortOption,
   LlmCatalogEntry,
@@ -49,7 +49,9 @@ import type {
 import { cx } from '../onboarding/cx';
 import { OrgAvatar } from '../settings/brand-icons';
 import { type QuantOption, ramVerdict } from '../settings/model-manager-logic';
+import { useHfStore } from '../state/hf-store';
 import { useLlmStore } from '../state/llm-store';
+import { ModelCard } from './ModelCard';
 import { CapabilityPills } from './model-pills';
 import {
   CAPABILITY_OPTIONS,
@@ -435,6 +437,11 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
   const [quants, setQuants] = useState<{
     repo: string;
     options: QuantOption[];
+    /* The RAW file objects, kept because registering an HF model needs the file
+       itself (path/sha/size), not the display label we ranked it by. Dropping
+       them is what made every Discover download fail with "unknown model". */
+    files: HfGgufFileDTO[];
+    mmproj?: HfGgufFileDTO;
     mmprojBytes?: number;
     loading: boolean;
   } | null>(null);
@@ -603,36 +610,39 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
       setQuants({
         repo: detailRepo,
         options: local.quants.filter((q) => q.bytes > 0),
+        files: [],
         loading: false,
       });
       return;
     }
     if (!detailRepo.includes('/')) {
-      setQuants({ repo: detailRepo, options: [], loading: false });
+      setQuants({ repo: detailRepo, options: [], files: [], loading: false });
       return;
     }
     let cancelled = false;
-    setQuants({ repo: detailRepo, options: [], loading: true });
+    setQuants({ repo: detailRepo, options: [], files: [], loading: true });
     void window.piDesktop
       .invoke('hf:list-files', { repoId: detailRepo })
       .then((res) => {
         if (cancelled) return;
         const files = res.files ?? [];
-        const mmproj = files.find((f) => f.mmproj === true)?.sizeBytes;
+        const mmproj = files.find((f) => f.mmproj === true);
         setQuants({
           repo: detailRepo,
+          files,
+          mmproj,
           options: files
             .filter((f) => f.mmproj !== true && (f.sizeBytes ?? 0) > 0)
             .map((f) => ({
               quant: quantLabel(f.quant, f.path),
               bytes: f.sizeBytes ?? 0,
             })),
-          mmprojBytes: mmproj,
+          mmprojBytes: mmproj?.sizeBytes,
           loading: false,
         });
       })
       .catch(() => {
-        if (!cancelled) setQuants({ repo: detailRepo, options: [], loading: false });
+        if (!cancelled) setQuants({ repo: detailRepo, options: [], files: [], loading: false });
       });
     return () => {
       cancelled = true;
@@ -668,13 +678,45 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
   };
   const copyId = (id: string) => void navigator.clipboard?.writeText(id);
 
+  /*
+   * DOWNLOADING AN HF MODEL IS A TWO-STEP. `llm:download-model` takes a CATALOG
+   * id; an HF repo id is not one, so passing it straight through failed with
+   * "unknown model: unsloth/Qwen3.8-27B-GGUF" — every Discover download did.
+   * `hf:register` adapts the hit + the chosen file into a catalog entry and
+   * hands back the real id, which is what the existing Browse-HF flow does; we
+   * reuse that store rather than reimplementing the adaptation.
+   */
   const download = async (id: string, quant?: string) => {
     setBusyId(id);
     setError(null);
-    const res = await window.piDesktop
-      .invoke('llm:download-model', quant === undefined ? { modelId: id } : { modelId: id, quant })
-      .catch(() => ({ success: false, error: 'the download could not start' }));
-    if (res.success !== true) setError(res.error ?? 'the download could not start');
+    try {
+      const local = catalog.find((e) => e.id === id);
+      if (local !== undefined) {
+        const res = await window.piDesktop.invoke(
+          'llm:download-model',
+          quant === undefined ? { modelId: id } : { modelId: id, quant },
+        );
+        if (res.success !== true) setError(res.error ?? 'the download could not start');
+      } else {
+        const hit = hits.find((h) => h.id === id);
+        const files = quants?.repo === id ? quants.files : [];
+        // Match on the label the picker showed, then fall back to the ladder's
+        // best — a user who never opened the picker still gets a sane file.
+        const file =
+          files.find((f) => quantLabel(f.quant, f.path) === quant) ??
+          files.find((f) => f.mmproj !== true && (f.sizeBytes ?? 0) > 0);
+        if (hit === undefined || file === undefined) {
+          setError('Could not resolve a file to download for this model.');
+        } else {
+          await useHfStore.getState().addAndDownload(hit, file, {
+            mmproj: quants?.mmproj,
+            mtpFile: files.find((f) => f.mtp === true),
+          });
+        }
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'the download could not start');
+    }
     await refreshCatalog();
     setBusyId(null);
   };
@@ -932,7 +974,7 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
                         key={mdl.id}
                         type="button"
                         onClick={() => setSelected(mdl.id)}
-                        className="rounded-2xl border border-border-subtle bg-bg-raised p-4 text-left shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-all hover:border-border-default hover:shadow-[0_2px_8px_rgba(0,0,0,0.07)] pd-focusable"
+                        className="cursor-pointer rounded-2xl border border-border-subtle bg-bg-raised p-4 text-left shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-all hover:border-border-default hover:bg-bg-hover hover:shadow-[0_2px_8px_rgba(0,0,0,0.07)] pd-focusable"
                       >
                         <div className="flex items-start gap-2.5">
                           <OrgAvatar org={mdl.org} size={36} />
@@ -1025,8 +1067,8 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
                         className={cx(
                           'grid items-center gap-2 border-b border-border-subtle bg-bg-sunken px-4 py-2.5 text-footnote text-text-muted',
                           hasCounts
-                            ? 'grid-cols-[1fr_120px_90px_110px_90px_44px_40px]'
-                            : 'grid-cols-[1fr_120px_90px_44px_40px]',
+                            ? 'grid-cols-[1fr_110px_80px_100px_80px_92px_36px]'
+                            : 'grid-cols-[1fr_110px_80px_92px_36px]',
                         )}
                       >
                         <span>Model</span>
@@ -1042,12 +1084,19 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
                           key={mdl.id}
                           type="button"
                           data-testid={`model-row-${mdl.id}`}
-                          onClick={() => setSelected(mdl.id)}
+                          /* Clicking anywhere on the row opens the card — the user:
+                             "maybe clicking generally on it shows the model
+                             cart". In compact there is no pane, so it switches
+                             to split, which is where the card lives. */
+                          onClick={() => {
+                            setSelected(mdl.id);
+                            if (view === 'compact') setView('split');
+                          }}
                           className={cx(
-                            'grid w-full items-center gap-2 border-b border-border-subtle px-4 py-2.5 text-left transition-colors last:border-b-0 hover:bg-bg-hover',
+                            'grid w-full cursor-pointer items-center gap-2 border-b border-border-subtle px-4 py-2.5 text-left transition-colors last:border-b-0 hover:bg-bg-hover',
                             hasCounts
-                              ? 'grid-cols-[1fr_120px_90px_110px_90px_44px_40px]'
-                              : 'grid-cols-[1fr_120px_90px_44px_40px]',
+                              ? 'grid-cols-[1fr_110px_80px_100px_80px_92px_36px]'
+                              : 'grid-cols-[1fr_110px_80px_92px_36px]',
                             selected === mdl.id ? 'bg-bg-active' : '',
                           )}
                         >
@@ -1087,6 +1136,9 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
                           {/* The compact table is the DEFAULT view and never
                               renders the detail pane, so without this the hub
                               had no download affordance at all on first open. */}
+                          {/* A real, prominent button. the user: "maybe a big blue
+                              quick download button on the right". The faint
+                              glyph read as decoration. */}
                           <span
                             role="button"
                             tabIndex={0}
@@ -1104,16 +1156,24 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
                               if (mdl.downloaded !== true) void download(mdl.id);
                             }}
                             className={cx(
-                              'flex h-7 w-7 items-center justify-center rounded-lg text-footnote transition-colors',
+                              'flex h-7 items-center justify-center gap-1 rounded-lg px-2.5 text-caption font-medium transition-opacity',
                               mdl.downloaded === true
-                                ? 'text-text-muted'
-                                : 'text-text-secondary hover:bg-bg-active hover:text-text-primary',
+                                ? 'cursor-default bg-bg-active text-text-muted'
+                                : busyId === mdl.id
+                                  ? 'cursor-default bg-bg-active text-text-muted'
+                                  : 'cursor-pointer bg-accent-primary text-text-on-accent hover:opacity-90',
                             )}
                           >
                             {mdl.downloaded === true ? (
-                              <IconCheck size={14} />
+                              <>
+                                <IconCheck size={12} /> On disk
+                              </>
+                            ) : busyId === mdl.id ? (
+                              'Starting…'
                             ) : (
-                              <IconDownload size={14} />
+                              <>
+                                <IconDownload size={12} /> Get
+                              </>
                             )}
                           </span>
                           <RowMenu
@@ -1144,7 +1204,7 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
                             data-testid={`model-row-${mdl.id}`}
                             onClick={() => setSelected(mdl.id)}
                             className={cx(
-                              'flex items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-colors',
+                              'flex cursor-pointer items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-colors',
                               active
                                 ? 'border-accent-primary bg-bg-active'
                                 : 'border-border-subtle bg-bg-raised shadow-[0_1px_2px_rgba(0,0,0,0.03)] hover:border-border-default',
@@ -1280,9 +1340,14 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
                       ) : (
                         // Markdown renders its own .pd-prose container; do not
                         // double-wrap it.
-                        <div className="pd-model-card">
-                          <Markdown>{card.markdown ?? ''}</Markdown>
-                        </div>
+                        <ModelCard
+                          markdown={card.markdown ?? ''}
+                          onOpenLink={(url) =>
+                            void window.piDesktop
+                              .invoke('canvas:open-external', { url })
+                              .catch(() => undefined)
+                          }
+                        />
                       )}
                     </div>
                   </aside>

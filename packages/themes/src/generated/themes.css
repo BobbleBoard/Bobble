@@ -16,7 +16,7 @@
   --pd-bg-raised: #ffffff;
   --pd-bg-overlay: #ffffff;
   --pd-bg-inset: #f5f4ed;
-  --pd-bg-hover: #0b0b0b0d;
+  --pd-bg-hover: #0b0b0b17;
   --pd-bg-active: #0b0b0b1a;
   --pd-bg-backdrop: #00000066;
   --pd-bg-sidebar: #ffffff;
@@ -177,7 +177,7 @@
   --pd-bg-raised: #30302e;
   --pd-bg-overlay: #383835;
   --pd-bg-inset: #1f1e1d;
-  --pd-bg-hover: #ffffff0d;
+  --pd-bg-hover: #ffffff1f;
   --pd-bg-active: #ffffff1a;
   --pd-bg-backdrop: #00000080;
   --pd-bg-sidebar: #1f1e1df2;
@@ -338,7 +338,7 @@
   --pd-bg-raised: #ffffff;
   --pd-bg-overlay: #ffffff;
   --pd-bg-inset: #1a1c1f05;
-  --pd-bg-hover: #1a1c1f0d;
+  --pd-bg-hover: #1a1c1f17;
   --pd-bg-active: #1a1c1f1a;
   --pd-bg-backdrop: #0000001a;
   --pd-bg-sidebar: #f6f6f6;
@@ -499,7 +499,7 @@
   --pd-bg-raised: #212121;
   --pd-bg-overlay: #282828;
   --pd-bg-inset: #ffffff08;
-  --pd-bg-hover: #ffffff14;
+  --pd-bg-hover: #ffffff24;
   --pd-bg-active: #ffffff1f;
   --pd-bg-backdrop: #00000066;
   --pd-bg-sidebar: #181818;
