@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   buildSearchUrl,
+  MAX_AUTHOR_FANOUT,
   estimateRamGB,
   type HfGgufFile,
   type HfModelHit,
@@ -160,6 +161,74 @@ describe('buildSearchUrl', () => {
 });
 
 // --- searchHfModels ----------------------------------------------------------
+
+describe('the author fan-out', () => {
+  it('issues one request PER author and merges them', async () => {
+    // HF's `author` param takes a single handle — repeating it returns zero
+    // results (measured), which is why this cannot be one request.
+    const seen: string[] = [];
+    const fetchImpl = ((url: string) => {
+      const a = new URL(String(url)).searchParams.get('author') ?? '';
+      seen.push(a);
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        statusText: 'OK',
+        json: () => Promise.resolve([{ id: `${a}/model`, downloads: 1 }]),
+      } as Response);
+    }) as unknown as typeof fetch;
+
+    const hits = await searchHfModels('', { fetchImpl, authors: ['unsloth', 'bartowski'] });
+    expect(seen.sort()).toEqual(['bartowski', 'unsloth']);
+    expect(hits.map((h) => h.id).sort()).toEqual(['bartowski/model', 'unsloth/model']);
+  });
+
+  it('one failing author does not empty the list', async () => {
+    // A partial Recommended page beats an error where a list should be.
+    const fetchImpl = ((url: string) => {
+      const a = new URL(String(url)).searchParams.get('author');
+      if (a === 'broken') return Promise.reject(new Error('network'));
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        statusText: 'OK',
+        json: () => Promise.resolve([{ id: `${a}/ok`, downloads: 1 }]),
+      } as Response);
+    }) as unknown as typeof fetch;
+
+    const hits = await searchHfModels('', { fetchImpl, authors: ['broken', 'fine'] });
+    expect(hits.map((h) => h.id)).toEqual(['fine/ok']);
+  });
+
+  it('caps the fan-out so one browse cannot spend the rate limit', async () => {
+    let calls = 0;
+    const fetchImpl = (() => {
+      calls++;
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        statusText: 'OK',
+        json: () => Promise.resolve([]),
+      } as Response);
+    }) as unknown as typeof fetch;
+
+    const many = Array.from({ length: 40 }, (_, i) => `org${i}`);
+    await searchHfModels('', { fetchImpl, authors: many });
+    expect(calls).toBe(MAX_AUTHOR_FANOUT);
+  });
+
+  it('dedupes a repo returned by two author pages', async () => {
+    const fetchImpl = (() =>
+      Promise.resolve({
+        ok: true,
+        status: 200,
+        statusText: 'OK',
+        json: () => Promise.resolve([{ id: 'same/repo', downloads: 5 }]),
+      } as Response)) as unknown as typeof fetch;
+    const hits = await searchHfModels('', { fetchImpl, authors: ['a', 'b'] });
+    expect(hits).toHaveLength(1);
+  });
+});
 
 describe('searchHfModels', () => {
   it('parses hits, normalises gated, maps trendingScore → likesRecent', async () => {

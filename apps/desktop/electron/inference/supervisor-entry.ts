@@ -447,6 +447,7 @@ async function hfSearch(req: Extract<LlmRequest, { type: 'hf-search' }>): Promis
       sort: toHfSort(req.sort),
       limit: req.limit,
       hfToken: req.hfToken,
+      authors: req.authors,
     });
     return { hits: hits.map(toHfHit) };
   } catch (error) {

@@ -531,6 +531,11 @@ export type HfInvokeMap = {
       sort?: HfSortOption;
       limit?: number;
       hfToken?: string;
+      /** Restrict to these HF authors, server-side (one request each — HF's
+       *  `author` param takes a single handle). Powers the hub's Recommended
+       *  scope, which cannot work as a client-side filter over a page the API
+       *  already chose. */
+      authors?: string[];
     };
     response: { hits: HfModelHitDTO[]; error?: string; rateLimited?: boolean };
   };

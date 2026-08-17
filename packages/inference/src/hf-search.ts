@@ -47,6 +47,20 @@ export interface HfSearchFilters {
 
 export interface HfSearchOptions {
   readonly filters?: HfSearchFilters;
+  /**
+   * Restrict results to these HF authors, server-side.
+   *
+   * WHY THIS EXISTS AT ALL. The hub's Recommended scope first filtered by org
+   * in the renderer, over whatever page the API had already chosen — and HF's
+   * "newest" page is dominated by individual re-uploads, so Recommended showed
+   * ONE row out of forty. Filtering a server-chosen page can only ever subtract.
+   *
+   * HF's `author` param takes a SINGLE handle (repeating it returns zero
+   * results — measured), so this fans out one request per author and merges.
+   * Bounded by `MAX_AUTHOR_FANOUT` because the rate limit is ~500 requests per
+   * 300s and a browse view must not spend it all on one keystroke.
+   */
+  readonly authors?: readonly string[];
   readonly sort?: HfSort;
   /** Result cap (1…100, default 20). */
   readonly limit?: number;
@@ -168,10 +182,11 @@ export function parseQuant(path: string): string | undefined {
 // --- Search -------------------------------------------------------------------
 
 /** Compose the `/api/models` search URL (exported for testing param assembly). */
-export function buildSearchUrl(query: string, opts: HfSearchOptions = {}): string {
+export function buildSearchUrl(query: string, opts: HfSearchOptions = {}, author?: string): string {
   const url = new URL(HF_API);
   const p = url.searchParams;
   if (query.length > 0) p.set('search', query);
+  if (author !== undefined && author.length > 0) p.set('author', author);
 
   // Repeated `filter=` params are ANDed by HF.
   const filters: string[] = [];
@@ -245,12 +260,19 @@ function parseHit(raw: unknown): HfModelHit | undefined {
  * `filter` + `sort` + `limit` query, then applies client-side `gated` / `minLikes`
  * refinement the API does not express. Tolerant of the API's loose JSON shape.
  */
-export async function searchHfModels(
+/** How many author queries one search may spend. See `HfSearchOptions.authors`. */
+export const MAX_AUTHOR_FANOUT = 12;
+
+/** Upper bound on a merged fan-out result, so a browse page stays a page. */
+export const MERGED_CAP = 150;
+
+async function fetchPage(
   query: string,
-  opts: HfSearchOptions = {},
+  opts: HfSearchOptions,
+  author?: string,
 ): Promise<HfModelHit[]> {
   const doFetch = opts.fetchImpl ?? fetch;
-  const res = await doFetch(buildSearchUrl(query, opts), {
+  const res = await doFetch(buildSearchUrl(query, opts, author), {
     headers: authHeaders(opts.hfToken),
     signal: opts.signal,
   });
@@ -259,8 +281,45 @@ export async function searchHfModels(
   }
   const body: unknown = await res.json();
   const rows = Array.isArray(body) ? body : [];
+  return rows.map(parseHit).filter((h): h is HfModelHit => h !== undefined);
+}
 
-  let hits = rows.map(parseHit).filter((h): h is HfModelHit => h !== undefined);
+export async function searchHfModels(
+  query: string,
+  opts: HfSearchOptions = {},
+): Promise<HfModelHit[]> {
+  const authors = opts.authors ?? [];
+  let hits: HfModelHit[];
+  if (authors.length === 0) {
+    hits = await fetchPage(query, opts);
+  } else {
+    /*
+     * One page per author, in parallel. A single author 404ing or rate-limiting
+     * must not empty the whole list, so failures drop that author rather than
+     * rejecting — a partial Recommended page is far better than an error where
+     * a list should be.
+     */
+    const pages = await Promise.all(
+      authors.slice(0, MAX_AUTHOR_FANOUT).map((a) =>
+        fetchPage(query, opts, a).catch(() => [] as HfModelHit[]),
+      ),
+    );
+    /*
+     * Interleave the authors rather than concatenating them. Twelve pages of
+     * forty is ~270 repos and the caller only shows a fraction, so a plain
+     * concat + truncate would be "everything unsloth published, then nothing
+     * else". Round-robin keeps every reputable org represented at the top.
+     */
+    const byId = new Map<string, HfModelHit>();
+    const depth = Math.max(...pages.map((p) => p.length), 0);
+    for (let i = 0; i < depth && byId.size < MERGED_CAP; i++) {
+      for (const page of pages) {
+        const hit = page[i];
+        if (hit !== undefined) byId.set(hit.id, hit);
+      }
+    }
+    hits = [...byId.values()];
+  }
 
   const wantGated = opts.filters?.gated;
   if (wantGated !== undefined) hits = hits.filter((h) => h.gated === wantGated);

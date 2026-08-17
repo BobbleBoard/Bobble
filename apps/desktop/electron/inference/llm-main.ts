@@ -398,6 +398,7 @@ const hfHandlers: IpcHandlers<HfInvokeMap> = {
       query: req.query,
       family: req.family,
       task: req.task,
+      authors: req.authors,
       gated: req.gated,
       minLikes: req.minLikes,
       sort: req.sort,

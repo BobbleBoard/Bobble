@@ -23,6 +23,8 @@
  * the Unsloth-style three-key quant sort. This file is composition; it does not
  * re-decide either.
  */
+
+import { RELIABLE_PUBLISHERS } from '@pi-desktop/inference/catalog';
 import {
   IconArrowUp,
   IconCheck,
@@ -38,7 +40,7 @@ import {
   Spinner,
   Tooltip,
 } from '@pi-desktop/ui';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type {
   DatasetHitDTO,
   HfGgufFileDTO,
@@ -72,6 +74,7 @@ import {
   type ViewMode,
 } from './models-layout';
 import { QuantPicker } from './QuantPicker';
+import { useOutsideClose } from './use-outside-close';
 
 /**
  * Catalog entry → the shape the hub renders.
@@ -244,17 +247,12 @@ function RowMenu({
   kind: 'models' | 'datasets';
 }) {
   const [open, setOpen] = useState(false);
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.stopPropagation();
-        setOpen(false);
-      }
-    };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [open]);
+  const rootRef = useRef<HTMLSpanElement>(null);
+  const close = useCallback(() => setOpen(false), []);
+  /* Closes on an outside press and on Escape, WITHOUT a full-screen overlay —
+     the overlay swallowed the wheel across the whole window, so nothing behind
+     an open menu could be scrolled. See use-outside-close.ts. */
+  useOutsideClose(open, rootRef, close);
 
   const item = (label: string, run: () => void, disabled = false) => (
     <button
@@ -273,7 +271,7 @@ function RowMenu({
   );
 
   return (
-    <span className="relative flex justify-end">
+    <span className="relative flex justify-end" ref={rootRef}>
       <span
         role="button"
         tabIndex={0}
@@ -295,15 +293,6 @@ function RowMenu({
       </span>
       {open ? (
         <>
-          <button
-            type="button"
-            aria-label="Close menu"
-            className="fixed inset-0 z-20 cursor-default"
-            onClick={(e) => {
-              e.stopPropagation();
-              setOpen(false);
-            }}
-          />
           {/*
            * SHARED SURFACE, not a local one. Every dropdown in the app draws
            * from `.pd-menu` in packages/ui/styles/menu.css — the user wants "the
@@ -346,17 +335,12 @@ function CapabilityFilter({
   onChange: (next: ModelCapability[]) => void;
 }) {
   const [open, setOpen] = useState(false);
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.stopPropagation();
-        setOpen(false);
-      }
-    };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [open]);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const close = useCallback(() => setOpen(false), []);
+  /* Closes on an outside press and on Escape, WITHOUT a full-screen overlay —
+     the overlay swallowed the wheel across the whole window, so nothing behind
+     an open menu could be scrolled. See use-outside-close.ts. */
+  useOutsideClose(open, rootRef, close);
 
   const label =
     selected.length === 0
@@ -374,7 +358,7 @@ function CapabilityFilter({
   ];
 
   return (
-    <div className="relative">
+    <div className="relative" ref={rootRef}>
       <button
         type="button"
         data-testid="filter-capability"
@@ -386,12 +370,6 @@ function CapabilityFilter({
       </button>
       {open ? (
         <>
-          <button
-            type="button"
-            aria-label="Close menu"
-            className="fixed inset-0 z-10 cursor-default"
-            onClick={() => setOpen(false)}
-          />
           <div
             data-testid="filter-capability-menu"
             className="pd-menu absolute top-full left-0 z-20 mt-1 min-w-[240px]"
@@ -504,19 +482,11 @@ function Dropdown<T extends string>({
   /* Escape closes it, as it does every other overlay here. Without this the
      full-screen click-away shield below swallowed every other control until
      the menu was dismissed by clicking. */
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.stopPropagation();
-        setOpen(false);
-      }
-    };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [open]);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const close = useCallback(() => setOpen(false), []);
+  useOutsideClose(open, rootRef, close);
   return (
-    <div className="relative">
+    <div className="relative" ref={rootRef}>
       <button
         type="button"
         data-testid={testid}
@@ -528,13 +498,6 @@ function Dropdown<T extends string>({
       </button>
       {open ? (
         <>
-          {/* Click-away, as a button so it is not a static interactive div. */}
-          <button
-            type="button"
-            aria-label="Close menu"
-            className="fixed inset-0 z-10 cursor-default"
-            onClick={() => setOpen(false)}
-          />
           <div
             data-testid={`${testid}-menu`}
             className="pd-menu absolute top-full left-0 z-20 mt-1 min-w-[260px]"
@@ -642,6 +605,7 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
     filters.capabilities.length > 0 ||
     filters.onlyFits ||
     filters.maxSize !== undefined ||
+    (filters.scope ?? 'recommended') !== 'recommended' ||
     filters.format !== (kind === 'datasets' ? DEFAULT_DATASET_FILTERS : DEFAULT_FILTERS).format;
 
   const hfToken = useHfToken();
@@ -649,9 +613,13 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
   const [needsToken, setNeedsToken] = useState(false);
   const [hfLoading, setHfLoading] = useState(false);
   const [hfError, setHfError] = useState<string | null>(null);
-  const [card, setCard] = useState<{ repo: string; markdown?: string; error?: string } | null>(
-    null,
-  );
+  const [card, setCard] = useState<{
+    repo: string;
+    markdown?: string;
+    error?: string;
+    /** Explicit, so the pane never spins by default — see the fetch effect. */
+    loading?: boolean;
+  } | null>(null);
   /* The quant ladder for the selected model. HF entries need a file listing;
      local catalog entries already carry theirs. */
   const [quants, setQuants] = useState<{
@@ -693,6 +661,19 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
           query: filters.query.trim(),
           sort: sortMap[filters.sort] ?? 'trending',
           limit: 40,
+          /*
+           * RECOMMENDED IS A QUERY, NOT A FILTER.
+           *
+           * Asking for reputable orgs by filtering the reply in the renderer
+           * left ONE row out of forty on "Newest", because HF's newest page is
+           * almost entirely individual re-uploads — a client-side filter can
+           * only ever subtract from a page the API already chose. Sending the
+           * allowlist makes the API return those repos in the first place (one
+           * request per author; see hf-search.ts).
+           */
+          ...((filters.scope ?? 'recommended') === 'recommended'
+            ? { authors: [...RELIABLE_PUBLISHERS] }
+            : {}),
           // Gated repos and higher rate limits both need the token.
           ...(hfToken.length > 0 ? { hfToken } : {}),
         })
@@ -716,7 +697,7 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
       cancelled = true;
       clearTimeout(t);
     };
-  }, [tab, filters.query, filters.sort, hfToken]);
+  }, [tab, filters.query, filters.sort, filters.scope, hfToken]);
 
   useEffect(() => {
     if (kind !== 'datasets') return;
@@ -911,25 +892,67 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
       cancelled = true;
     };
   }, [detailRepo, catalog, hfToken, kind]);
+  /*
+   * WHICH REPO'S CARD TO FETCH.
+   *
+   * A Discover row's id IS the HF repo id. A LOCAL catalog entry's is not —
+   * it is a short slug like `qwen3.5-4b` with no slash — but the entry records
+   * the repo it came from in `hfRepo`, so its card is perfectly fetchable.
+   */
+  const cardRepo = useMemo(() => {
+    if (detailRepo === undefined) return undefined;
+    if (detailRepo.includes('/')) return detailRepo;
+    return catalog.find((e) => e.id === detailRepo)?.hfRepo;
+  }, [detailRepo, catalog]);
+
   useEffect(() => {
-    if (detailRepo === undefined || !detailRepo.includes('/')) {
+    if (detailRepo === undefined) {
       setCard(null);
       return;
     }
+    if (cardRepo === undefined) {
+      /*
+       * THE PERMANENT SPINNER. the user: "why is this 'loading model card' sometimes
+       * there and taking forever/not happening at all."
+       *
+       * This branch used to `setCard(null)` and return — and the pane reads a
+       * null card as "still loading", so every model without a slash in its id
+       * (i.e. every ON-DEVICE model) sat on "Loading model card…" for as long as
+       * you left it open. Not slow: never resolving, because nothing was ever
+       * started. A state with no terminal value is the bug; saying so plainly is
+       * the fix.
+       */
+      setCard({ repo: detailRepo, error: 'No card recorded for this local model.' });
+      return;
+    }
     let cancelled = false;
-    setCard({ repo: detailRepo });
+    setCard({ repo: detailRepo, loading: true });
+    /*
+     * AND A DEADLINE. Every branch above now ends somewhere, but "the spinner
+     * spins until something calls setCard" is only as good as every future
+     * caller. MEASURED across 8 repos here: 100-400ms, so 15s means something is
+     * genuinely wrong — an unsettled IPC, main wedged behind a download — and
+     * the pane should say so rather than pretend to still be working.
+     */
+    const deadline = setTimeout(() => {
+      if (!cancelled) {
+        setCard({ repo: detailRepo, error: 'The model card took too long to load.' });
+      }
+    }, 15_000);
     void window.piDesktop
       /* `kind` is not optional in practice: a dataset's README lives under
          huggingface.co/datasets/<id>, and the model path answers 401 for it —
          which the hub used to render as "gated", about a public dataset. */
       .invoke('modelcard:fetch', {
-        repoId: detailRepo,
+        repoId: cardRepo,
         kind: kind === 'datasets' ? 'dataset' : 'model',
       })
       .then((res) => {
+        clearTimeout(deadline);
         if (!cancelled) setCard({ repo: detailRepo, ...res });
       })
       .catch(() => {
+        clearTimeout(deadline);
         if (!cancelled)
           setCard({
             repo: detailRepo,
@@ -938,8 +961,9 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
       });
     return () => {
       cancelled = true;
+      clearTimeout(deadline);
     };
-  }, [detailRepo, kind]);
+  }, [detailRepo, cardRepo, kind]);
   const localCount = all.filter((m) => m.downloaded === true).length;
 
   /* The hub's whole purpose. This was a <span> with no handler, in a pane the
@@ -1167,6 +1191,35 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
             </button>
           }
         />
+        {/*
+         * RECOMMENDED / ALL. the user: "by default, the 'newest' will show just a
+         * bunch of random models, so if you could just have reputable
+         * organizations shown, for example a 'reccomended/all' toggle".
+         *
+         * A two-state pill rather than another dropdown: it has two values, it
+         * is the single biggest lever over what the list contains, and it should
+         * be visible without opening anything.
+         */}
+        <div className="flex rounded-full bg-bg-inset p-0.5" data-testid="hub-scope">
+          {(['recommended', 'all'] as const).map((v) => (
+            <button
+              key={v}
+              type="button"
+              data-testid={`hub-scope-${v}`}
+              aria-pressed={(filters.scope ?? 'recommended') === v}
+              onClick={() => setFilters((f) => ({ ...f, scope: v }))}
+              className={cx(
+                'rounded-full px-3 py-1 text-footnote transition-colors',
+                (filters.scope ?? 'recommended') === v
+                  ? 'bg-bg-raised text-text-primary shadow-[0_1px_2px_rgba(0,0,0,0.05)]'
+                  : 'text-text-muted hover:text-text-primary',
+              )}
+            >
+              {v === 'recommended' ? 'Recommended' : 'All'}
+            </button>
+          ))}
+        </div>
+
         {/*
          * SIZE CAP. A maximum rather than a range: the question a hub gets asked
          * is "what fits", never "what is at least this big".
@@ -1561,9 +1614,10 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
                             ) : busyId === mdl.id ? (
                               'Starting…'
                             ) : (
-                              <>
-                                <IconDownload size={12} /> Get
-                              </>
+                              // the user: "the quick 'Get' buttons with the down arrow
+                              // should just be replaced with a no arrow 'Download'
+                              // button."
+                              'Download'
                             )}
                           </span>
                           <RowMenu
@@ -1735,8 +1789,11 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
                       className="mt-4 border-t border-border-default pt-3"
                       data-testid="model-card"
                     >
-                      {card?.repo !== detail.id ||
-                      (card.markdown === undefined && card.error === undefined) ? (
+                      {/* Spin only while a fetch is EXPLICITLY in flight. The
+                          old condition spun whenever the state held neither a
+                          body nor an error, so any path that set nothing left it
+                          spinning forever. */}
+                      {card?.repo !== detail.id || card.loading === true ? (
                         <p className="flex items-center gap-2 text-footnote text-text-muted">
                           <Spinner size={12} /> Loading model card…
                         </p>

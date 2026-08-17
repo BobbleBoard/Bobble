@@ -92,21 +92,62 @@ export interface ModelPublisher {
   readonly reliable: boolean;
 }
 
-/** Reliable-publisher allowlist (exact HF handles, verified 2026-07-10). */
+/**
+ * Reliable-publisher allowlist (exact HF handles, verified 2026-07-10; the
+ * first-party model labs added 2026-08-17).
+ *
+ * It now backs the hub's Recommended/All toggle as well as the catalog's
+ * publisher flag — the user: "by default, the 'newest' will show just a bunch of
+ * random models, so if you could just have reputable organizations shown".
+ * ONE list rather than two: a hub that recommends an org the catalog considers
+ * unreliable, or the reverse, is a contradiction nobody would think to check.
+ *
+ * The original nine were GGUF HOSTS. Browsing needs the labs that publish the
+ * weights in the first place, so they are here too; both groups answer the same
+ * question — "would I trust a repo under this handle".
+ */
 export const RELIABLE_PUBLISHERS: readonly string[] = [
+  // GGUF hosts / re-quanters with a track record.
   'unsloth',
   'bartowski',
   'ggml-org',
+  'mlx-community',
+  'lmstudio-community',
+  // First-party labs.
   'nvidia',
   'Qwen',
   'google',
   'deepmind',
-  'mlx-community',
-  'lmstudio-community',
+  'meta-llama',
+  'mistralai',
+  'microsoft',
+  'deepseek-ai',
+  'openai',
+  'allenai',
+  'ibm-granite',
+  'HuggingFaceTB',
+  'tiiuae',
+  'CohereLabs',
+  'moonshotai',
+  'zai-org',
+  'baidu',
+  'openbmb',
+  'internlm',
+  'stabilityai',
+  'BAAI',
+  'THUDM',
+  'NousResearch',
 ];
 
+/**
+ * Case-insensitive on purpose: HF handles are shown with their published
+ * capitalisation ('Qwen', 'BAAI') but arrive from search exactly as the author
+ * typed them, and an exact-match test quietly answered "not reliable" for the
+ * very orgs this list exists to name.
+ */
 export function isReliablePublisher(handle: string): boolean {
-  return RELIABLE_PUBLISHERS.includes(handle);
+  const want = handle.toLowerCase();
+  return RELIABLE_PUBLISHERS.some((h) => h.toLowerCase() === want);
 }
 
 /** Convenience: an `unsloth`-hosted (reliable) publisher. */

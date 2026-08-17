@@ -403,6 +403,84 @@ try {
     console.log(`     card: ${card.chars} chars, ${card.headings} headings, ${card.links} links`);
   }
 
+  /* ------------------------------------------------------- 5. the quant menu */
+  console.log('\nquant menu');
+  await page.click('[data-testid="hub-kind-models"]');
+  await page.waitForTimeout(1500);
+  const firstModel = await page.$('[data-testid^="model-row-"]');
+  if (firstModel !== null) {
+    await firstModel.click();
+    await page.waitForTimeout(2500);
+    const trigger = await page.$('[data-testid="quant-current"]');
+    if (trigger === null) {
+      console.log('     no quant ladder on this model — skipped');
+    } else {
+      await trigger.click();
+      await page.waitForTimeout(400);
+      const m = await page.evaluate(() => {
+        const rows = [...document.querySelectorAll('[data-testid^="quant-opt-"]')];
+        const list = rows.filter((r) => r.dataset.testid.startsWith('quant-opt-list-'));
+        /* Read the exact bytes off the size cell rather than scraping row text:
+           "BF16" + "37 GB" concatenates to "1637 GB" and a regex believes it. */
+        const sizes = list.map((r) =>
+          Number(r.querySelector('[data-testid="quant-size"]')?.getAttribute('data-bytes') ?? NaN),
+        );
+        return {
+          pinned: rows.filter((r) => r.dataset.testid.startsWith('quant-opt-pinned-')).length,
+          list: list.length,
+          sizes,
+          selected: rows.filter((r) => r.dataset.selected === 'true').map((r) => r.dataset.testid),
+          rowH: Math.round(rows[0]?.getBoundingClientRect().height ?? 0),
+          dlH: Math.round(
+            document.querySelector('[data-testid="quant-download"]')?.getBoundingClientRect()
+              .height ?? 0,
+          ),
+          overscroll: getComputedStyle(document.querySelector('[data-testid="quant-menu"]'))
+            .overscrollBehaviorY,
+          // The full-screen close overlay is what stopped the card scrolling.
+          overlays: document.querySelectorAll('.fixed.inset-0').length,
+          verdictText: rows.some((r) => /Tight|Won't fit|Fits/.test(r.textContent ?? '')),
+        };
+      });
+      check(m.pinned === 1, `exactly one pinned Recommended row (${m.pinned})`);
+      const descending = m.sizes.every((n, i) => i === 0 || Number.isNaN(n) || n <= m.sizes[i - 1]);
+      check(descending, `the list runs largest to smallest (${m.sizes.slice(0, 5).join(' > ')})`);
+      check(
+        m.selected.length === 1 && m.selected[0].startsWith('quant-opt-pinned-'),
+        `the recommendation is live by default (${m.selected.join(',') || 'none'})`,
+      );
+      check(
+        Math.abs(m.rowH - m.dlH) <= 4,
+        `row height matches the Download button (${m.rowH} vs ${m.dlH})`,
+      );
+      check(m.overscroll === 'contain', `the menu does not chain its scroll (${m.overscroll})`);
+      check(m.overlays === 0, `no full-screen overlay blocking the page (${m.overlays})`);
+      check(!m.verdictText, 'no "Fits"/"Tight" text in rows — the dot owns the verdict');
+
+      /* The subtle half of the spec: the pinned row and its in-list twin are
+         SEPARATE selections even though they download the same file. */
+      const twin = await page.$(
+        `[data-testid="quant-opt-list-${m.selected[0]?.replace('quant-opt-pinned-', '')}"]`,
+      );
+      if (twin !== null) {
+        await twin.click();
+        await page.waitForTimeout(300);
+        await trigger.click();
+        await page.waitForTimeout(300);
+        const after = await page.evaluate(() =>
+          [...document.querySelectorAll('[data-testid^="quant-opt-"]')]
+            .filter((r) => r.dataset.selected === 'true')
+            .map((r) => r.dataset.testid),
+        );
+        check(
+          after.length === 1 && after[0].startsWith('quant-opt-list-'),
+          `clicking the in-list twin moves the highlight to it (${after.join(',') || 'none'})`,
+        );
+      }
+      await page.screenshot({ path: path.join(OUT, 'r20-06-quants.png') });
+    }
+  }
+
   console.log(
     failures.length === 0
       ? '\nui-round20-probe: all checks passed'

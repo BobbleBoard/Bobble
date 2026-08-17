@@ -300,32 +300,18 @@ export function displaySizeBytes(entry: LlmCatalogEntry, quant?: string): number
 // Reliable-publisher labelling (round-12 #2)
 // ---------------------------------------------------------------------------
 
-/**
- * Reliable-publisher allowlist — a renderer-side MIRROR of
- * `@pi-desktop/inference`'s catalog `RELIABLE_PUBLISHERS` (kept in sync with
- * keystone). We can't import the package barrel into the renderer bundle (it
- * re-exports the node-only supervisor/downloader), so curated cards read the
- * flag the contract already carries (`entry.publisher.reliable`) and this list
- * powers the Browse-HF author check, where no flag is wired. NOTE: community
- * re-quanters (e.g. `mradermacher`) are deliberately NOT reliable.
+/*
+ * The reliable-publisher allowlist used to be COPIED here, with a comment
+ * explaining that the package barrel could not be imported into the renderer
+ * because it re-exports the node-only supervisor and downloader. True, but the
+ * fix for that is a subpath export, not a second copy: `catalog.ts` has no
+ * imports at all, so `@pi-desktop/inference/catalog` is safe in the bundle.
+ *
+ * Two hand-synced lists is a bug waiting for someone to add an org to one of
+ * them — which is exactly what happened when the hub's Recommended filter
+ * needed the first-party labs.
  */
-export const RELIABLE_PUBLISHERS: readonly string[] = [
-  'unsloth',
-  'bartowski',
-  'ggml-org',
-  'nvidia',
-  'Qwen',
-  'google',
-  'deepmind',
-  'mlx-community',
-  'lmstudio-community',
-];
-
-/** Whether an HF publisher handle is in the reliable allowlist (exact match,
- * matching keystone's `isReliablePublisher`). */
-export function isReliablePublisher(handle: string): boolean {
-  return RELIABLE_PUBLISHERS.includes(handle);
-}
+export { isReliablePublisher, RELIABLE_PUBLISHERS } from '@pi-desktop/inference/catalog';
 
 // ---------------------------------------------------------------------------
 // De-duplicated model grouping — model → variant → quant (round-12 #1, #3)

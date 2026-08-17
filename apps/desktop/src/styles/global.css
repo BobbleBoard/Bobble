@@ -702,6 +702,17 @@ body {
  * The optical-sizing and tracking matter more than the point size: at 20px a
  * wordmark set with default tracking reads as a heading rather than a name.
  */
+/*
+ * The quant menu's rows match the Download button beside them rather than the
+ * app's standard menu row height — the user: "hover effect needs to be around same
+ * height as the download button". That button is text-footnote with py-1.5, so
+ * ~30px. Local to this menu on purpose: it is a proportion between two adjacent
+ * controls, not a claim about menus in general.
+ */
+.pd-quant-menu .pd-menu-item {
+  min-height: 30px;
+}
+
 .pd-wordmark {
   font-family: ui-rounded, 'SF Pro Rounded', 'Hiragino Maru Gothic ProN', var(--pd-font-sans);
   font-size: 20px;

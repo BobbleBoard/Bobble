@@ -17,6 +17,7 @@
  * the Unsloth-style three-key quant sort and the RAM verdicts, and duplicating
  * it would give us two answers to "does this fit".
  */
+import { isReliablePublisher } from '@pi-desktop/inference/catalog';
 
 export type ModelFormat = 'all' | 'gguf' | 'safetensors' | 'mlx' | 'finetune';
 /**
@@ -137,6 +138,20 @@ export interface HubFilters {
    * over a slider is where this would turn into a lie.
    */
   readonly maxSize?: number;
+  /**
+   * WHOSE REPOS TO SHOW. the user: "by default, the 'newest' will show just a bunch
+   * of random models, so if you could just have reputable organizations shown,
+   * for example a 'reccomended/all' toggle".
+   *
+   * 'recommended' keeps only orgs on the inference package's
+   * RELIABLE_PUBLISHERS allowlist — the same list the catalog uses to decide
+   * whether a publisher is trustworthy, so the two cannot disagree. 'all' is
+   * the unfiltered firehose.
+   *
+   * Defaults to 'recommended', because the default view is the one that decides
+   * what a newcomer thinks this hub is.
+   */
+  readonly scope?: 'recommended' | 'all';
 }
 
 export const DEFAULT_FILTERS: HubFilters = {
@@ -186,6 +201,7 @@ export function filterModels(models: readonly HubModel[], f: HubFilters): HubMod
     if (f.capabilities.length > 0 && !f.capabilities.some((c) => m.capabilities.includes(c)))
       return false;
     if (f.onlyFits && m.fits !== true) return false;
+    if (f.scope !== 'all' && !isReliablePublisher(m.org)) return false;
     if (f.maxSize !== undefined) {
       if (m.bytes !== undefined) {
         if (m.bytes > f.maxSize * 1024 ** 3) return false;

@@ -166,6 +166,47 @@ describe('sorting', () => {
   });
 });
 
+describe('the Recommended / All scope', () => {
+  it('hides orgs that are not on the reliable allowlist', () => {
+    // the user: "'newest' will show just a bunch of random models… have reputable
+    // organizations shown". Community re-quanters and individuals are the
+    // firehose the toggle exists to hold back.
+    const models = [
+      m({ id: 'a', org: 'unsloth' }),
+      m({ id: 'b', org: 'Krypto-Whitehat' }),
+      m({ id: 'c', org: 'mradermacher' }),
+    ];
+    const out = filterModels(models, { ...DEFAULT_FILTERS, scope: 'recommended' });
+    expect(out.map((x) => x.id)).toEqual(['a']);
+  });
+
+  it('"all" is the unfiltered firehose', () => {
+    const models = [m({ id: 'a', org: 'unsloth' }), m({ id: 'b', org: 'somebody' })];
+    expect(filterModels(models, { ...DEFAULT_FILTERS, scope: 'all' })).toHaveLength(2);
+  });
+
+  it('recommends by DEFAULT — the default view decides what the hub looks like', () => {
+    const models = [m({ id: 'a', org: 'unsloth' }), m({ id: 'b', org: 'somebody' })];
+    expect(filterModels(models, DEFAULT_FILTERS).map((x) => x.id)).toEqual(['a']);
+  });
+
+  it('matches a handle whatever its capitalisation', () => {
+    // HF shows 'Qwen' and 'BAAI' with their published caps but hands back
+    // whatever the author typed; an exact-match test answered "not reliable"
+    // for the very orgs the list names.
+    const models = [m({ id: 'a', org: 'qwen' }), m({ id: 'b', org: 'QWEN' })];
+    expect(filterModels(models, { ...DEFAULT_FILTERS, scope: 'recommended' })).toHaveLength(2);
+  });
+
+  it('includes the first-party labs, not just the GGUF re-hosts', () => {
+    const labs = ['meta-llama', 'mistralai', 'deepseek-ai', 'microsoft', 'allenai'];
+    const models = labs.map((org, i) => m({ id: `x${i}`, org }));
+    expect(filterModels(models, { ...DEFAULT_FILTERS, scope: 'recommended' })).toHaveLength(
+      labs.length,
+    );
+  });
+});
+
 describe('the size cap', () => {
   const GB = 1024 ** 3;
 

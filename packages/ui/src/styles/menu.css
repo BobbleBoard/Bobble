@@ -18,6 +18,19 @@
   max-height: var(--pd-menu-max-height, 24rem);
   overflow-y: auto;
   overflow-x: hidden;
+  /*
+   * THE WHEEL STOPS HERE. the user: "I scroll after i'm at the bottom of the
+   * dropdown then I start acidently scrolling down the model card… I hover over
+   * something, that's the thing I want to be scrolling, that's your guiding
+   * light no matter what."
+   *
+   * `contain` keeps the scroll chain from continuing into whatever is behind a
+   * menu once the menu hits its end. The other half of that rule — that the page
+   * BEHIND an open menu still scrolls when you hover it — is not a CSS problem:
+   * it was a full-screen invisible close-overlay swallowing the events, replaced
+   * by a document listener (see models/use-outside-close.ts).
+   */
+  overscroll-behavior: contain;
   margin: 1px;
   padding: var(--pd-menu-padding);
   border-radius: var(--pd-radius-popover);
