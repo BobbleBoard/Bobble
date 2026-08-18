@@ -9,11 +9,14 @@
  * re-themes with the app, and costs no request — the icon file is a 1024px
  * raster meant for the Dock.
  *
- * NO PLATE, because the Dock icon no longer has one (the user: "the app dock image
- * shouldn't be there just the three squares"). The whole point of this mark is
- * being the shape people recognise from their Dock, so the two have to agree;
- * the proportions are build/icon.svg's 400px tiles inset 88px in a 1024 canvas,
- * scaled to this 32 viewBox.
+ * NO PLATE — deliberately, and NOT in step with the Dock icon, which has its
+ * dark squircle back (the user: "restore the dark background to the app icon, (but
+ * not to the top left icon, make that one slightly bigger also)").
+ *
+ * The two therefore differ on purpose. In the Dock an icon needs its own ground
+ * to sit on, because it is competing with thirty other apps on an unknown
+ * wallpaper. Here the sidebar already IS the ground, so a plate would just be a
+ * dark square on a dark panel — the tiles alone read as the mark.
  */
 export function BobbleMark({ size = 20 }: { size?: number }) {
   return (
