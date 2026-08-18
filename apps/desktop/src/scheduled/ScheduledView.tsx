@@ -30,7 +30,8 @@ import {
 import type { ScheduledTask, TaskDraft } from '../../electron/scheduled/scheduled-contract';
 import { cx } from '../onboarding/cx';
 import { TaskDialog } from './TaskDialog';
-import { useTasksStore } from './tasks-store';
+import { TaskRuns } from './TaskRuns';
+import { isRunning, useTasksStore } from './tasks-store';
 import { TASK_TEMPLATES } from './templates';
 
 function RowMenuButton({
@@ -60,7 +61,7 @@ function RowMenuButton({
 }
 
 export function ScheduledView() {
-  const { enabled, tasks, loaded, running } = useTasksStore();
+  const { enabled, tasks, loaded, runs } = useTasksStore();
   const load = useTasksStore((s) => s.load);
   const setEnabled = useTasksStore((s) => s.setEnabled);
   const createTask = useTasksStore((s) => s.create);
@@ -71,14 +72,21 @@ export function ScheduledView() {
   const [draft, setDraft] = useState<Partial<ScheduledTask> | null>(null);
   const [editingId, setEditingId] = useState<string | undefined>(undefined);
   const [quick, setQuick] = useState('');
+  const [viewingRuns, setViewingRuns] = useState<string | null>(null);
   /** Re-render once a minute so "in 4h" stays true without a per-row timer. */
   const [now, setNow] = useState(() => Date.now());
 
+  const loadRuns = useTasksStore((s) => s.loadRuns);
   useEffect(() => {
     void load();
     const t = setInterval(() => setNow(Date.now()), 60_000);
     return () => clearInterval(t);
   }, [load]);
+  // Once tasks are known, fetch each one's history so a row can show "Running…"
+  // and so opening Past runs is instant. Cheap: a few small JSON reads.
+  useEffect(() => {
+    for (const t of tasks) void loadRuns(t.id);
+  }, [tasks, loadRuns]);
 
   const rows = useMemo(
     () =>
@@ -280,9 +288,14 @@ export function ScheduledView() {
                 </span>
                 <div className="flex shrink-0 items-center gap-0.5">
                   <RowMenuButton
-                    label={running.includes(task.id) ? 'Starting…' : 'Run now'}
+                    label={isRunning(runs[task.id]) ? 'Running…' : 'Run now'}
                     testid={`task-run-${task.id}`}
                     onClick={() => void runNow(task.id)}
+                  />
+                  <RowMenuButton
+                    label="Past runs"
+                    testid={`task-runs-${task.id}`}
+                    onClick={() => setViewingRuns(task.id)}
                   />
                   <RowMenuButton
                     label="Edit"
@@ -304,6 +317,15 @@ export function ScheduledView() {
           </div>
         )}
       </div>
+
+      {viewingRuns !== null
+        ? (() => {
+            const t = tasks.find((x) => x.id === viewingRuns);
+            return t === undefined ? null : (
+              <TaskRuns task={t} onClose={() => setViewingRuns(null)} />
+            );
+          })()
+        : null}
 
       {draft !== null ? (
         <TaskDialog

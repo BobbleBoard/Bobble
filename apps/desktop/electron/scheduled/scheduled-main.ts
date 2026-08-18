@@ -21,6 +21,7 @@
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import type { PiBridgeEvent } from '@pi-desktop/engine';
 import {
   createIpcEventSender,
   createLogger,
@@ -35,7 +36,8 @@ import {
   type ScheduledTask,
   type ScheduleState,
 } from './schedule-logic';
-import type { ScheduledEventMap, ScheduledInvokeMap } from './scheduled-contract';
+import type { ScheduledEventMap, ScheduledInvokeMap, TaskRun } from './scheduled-contract';
+import { createScheduledRunner, type RunBridge, type ScheduledRunner } from './scheduled-runner';
 
 const log = createLogger('desktop:scheduled');
 
@@ -157,21 +159,45 @@ function watchStore(notify: () => void): void {
   }
 }
 
-/** Stamp a run. Called when the renderer reports that a run actually STARTED —
- *  not when it is dispatched, so a task cannot be marked done by a run that
- *  never began. */
+/** Stamp a task as run. The runner calls this at run START, not on finish, so a
+ *  long run cannot re-fire on the next 30s tick while it is still going. */
 export function markRan(id: string, whenMs: number): void {
   save(patchTask(id, { lastRunAt: whenMs }));
+}
+
+let runner: ScheduledRunner | null = null;
+
+export function stopScheduler(): void {
+  if (timer !== undefined) clearInterval(timer);
+  timer = undefined;
+  runner?.dispose();
+  runner = null;
 }
 
 export function registerScheduledHandlers(
   ipcMain: IpcMain,
   opts: {
     allowSender: (event: unknown) => boolean;
-    /** The window that executes due tasks (see the note at the top). */
+    /** The window to notify of run/schedule changes (it does not RUN anything). */
     getWindow: () => BrowserWindow | null;
+    /** Build a headless top-level bridge — pi-main's createScheduledRunBridge. */
+    createRunBridge: (opts: { cwd?: string }, onEvent: (e: PiBridgeEvent) => void) => RunBridge;
   },
 ): void {
+  const emitRun = (run: TaskRun): void => {
+    const win = opts.getWindow();
+    if (win !== null && !win.isDestroyed())
+      events.send(win.webContents, 'tasks:run-updated', { run });
+  };
+
+  runner = createScheduledRunner({
+    createBridge: opts.createRunBridge,
+    onRunUpdated: emitRun,
+    markRan,
+    now: () => Date.now(),
+  });
+  const activeRunner = runner;
+
   const handlers: IpcHandlers<ScheduledInvokeMap> = {
     'tasks:get': () => load(),
     'tasks:set-enabled': (req) => {
@@ -193,12 +219,17 @@ export function registerScheduledHandlers(
     },
     'tasks:delete': (req) => {
       save({ ...load(), tasks: load().tasks.filter((t) => t.id !== req.id) });
+      activeRunner.deleteRunsForTask(req.id);
       return state;
     },
-    'tasks:mark-ran': (req) => {
-      markRan(req.id, req.whenMs ?? Date.now());
-      return state;
+    'tasks:run-now': (req) => {
+      const task = load().tasks.find((t) => t.id === req.id);
+      if (task === undefined) return { ok: false };
+      const { runId } = activeRunner.run(task);
+      return { ok: true, runId };
     },
+    'tasks:list-runs': (req) => ({ runs: activeRunner.listRuns(req.taskId) }),
+    'tasks:delete-run': (req) => ({ ok: activeRunner.deleteRun(req.taskId, req.runId) }),
   };
   registerIpcHandlers<ScheduledInvokeMap>(ipcMain, handlers, {
     allowSender: opts.allowSender,
@@ -210,13 +241,10 @@ export function registerScheduledHandlers(
     const current = load();
     const due = dueTasks(current.tasks, now, current.enabled);
     if (due.length === 0) return;
-    const win = opts.getWindow();
-    if (win === null || win.isDestroyed()) {
-      // Nothing is lost: lastRunAt is untouched, so these stay due.
-      return;
-    }
     log.info('scheduled tasks due', { ids: due.map((t) => t.id) });
-    events.send(win.webContents, 'tasks:due', { tasks: due, nowMs: now });
+    // Run headless, right here. markRan is stamped at run start (in the runner),
+    // so a task cannot be picked up twice while its run is still going.
+    for (const task of due) activeRunner.run(task);
   };
   /* A task created from a chat must appear in the list immediately, and be
      eligible for the very next tick. */
@@ -231,9 +259,4 @@ export function registerScheduledHandlers(
   // One early check so a task due while the app was closed runs at launch
   // rather than up to 30 seconds later.
   setTimeout(tick, 4_000);
-}
-
-export function stopScheduler(): void {
-  if (timer !== undefined) clearInterval(timer);
-  timer = undefined;
 }

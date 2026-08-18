@@ -39,7 +39,7 @@ import { registerLlmIpc, shutdownInference } from './inference/llm-main';
 import type { AppEventMap, CoreInvokeMap, FsInvokeMap } from './ipc-contract';
 import { disposeMacAgent, registerMacAgentIpc } from './mac/mac-agent';
 import { registerOfficeIpc } from './office/office-ipc';
-import { registerPiIpc } from './pi/pi-main';
+import { createScheduledRunBridge, registerPiIpc } from './pi/pi-main';
 import { registerProjectIpc } from './project/project-main';
 import { createRendererRecovery } from './renderer-recovery';
 import { registerScheduledHandlers } from './scheduled/scheduled-main';
@@ -579,12 +579,14 @@ function registerAppIpc(): void {
   // Projects (working folders): list/set/new/clear, persisted to projects.json.
   registerProjectIpc(ipcMain, allowSender);
 
-  /* Scheduled tasks: storage + a 30s tick. Main decides what is DUE; the
-     renderer runs it as a real chat (see scheduled/scheduled-main.ts for why
-     the run does not happen here). */
+  /* Scheduled tasks: storage + a 30s tick + HEADLESS execution. A due (or
+     run-now) task runs in a throwaway top-level pi bridge here in main — no
+     chat, no sidebar entry — and leaves only a run record. See
+     scheduled/scheduled-runner.ts. */
   registerScheduledHandlers(ipcMain, {
     allowSender,
     getWindow: () => mainWindow ?? null,
+    createRunBridge: createScheduledRunBridge,
   });
 
   // Connectors gallery: catalog + registry read/mutate + /Applications scan.

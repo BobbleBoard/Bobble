@@ -11,13 +11,12 @@ import { readFileSync } from 'node:fs';
 import type { PiBridgeEvent } from '@pi-desktop/engine';
 import { PiBridge } from '@pi-desktop/engine/main';
 import { createIpcEventSender, createLogger } from '@pi-desktop/shared';
-import { detectHarnesses } from '../inference/harness-main';
-import { readSettings } from '../settings/settings-main';
 import { app, type IpcMainInvokeEvent, ipcMain, type WebContents } from 'electron';
 import { resolveBundledPackageAsset } from '../app-paths';
 import { openStillWindow } from '../gen/hyperframes-window';
 import { registerGen3dBridge } from '../gen3d/gen3d-bridge';
 import { runImageJob } from '../gen3d/gen3d-main';
+import { detectHarnesses } from '../inference/harness-main';
 import {
   getInferenceLaunchMode,
   getInferenceUtility,
@@ -27,7 +26,11 @@ import {
 import type { AppEventMap } from '../ipc-contract';
 import { activeProjectPath, currentWorkspaceDir } from '../project/project-main';
 import { resolveSessionCwd } from '../sandbox';
-import { advancedSamplingFilePath, generationExperimentEnabled } from '../settings/settings-main';
+import {
+  advancedSamplingFilePath,
+  generationExperimentEnabled,
+  readSettings,
+} from '../settings/settings-main';
 import { isTrustedIpcEvent } from '../trusted-senders';
 import { type ChildAgents, createChildAgents } from './child-agents';
 import type { PiInvokeMap } from './contract';
@@ -275,6 +278,41 @@ function createChildBridge(
          */
         ...(opts.specialist !== undefined ? { PI_DESKTOP_SPECIALIST: opts.specialist } : {}),
       },
+      noSession: true,
+      extensionPaths: EXTENSION_PATHS,
+      extraArgs: ['--no-extensions', '--no-skills'],
+      killGraceMs: KILL_GRACE_MS,
+      detached: true,
+      appRoot: app.getAppPath(),
+    },
+    onEvent,
+  );
+}
+
+/**
+ * A bridge for a HEADLESS SCHEDULED RUN.
+ *
+ * Unlike `createChildBridge`, this is a TOP-LEVEL agent: no subagent-depth bump,
+ * so a scheduled run can delegate to specialists exactly as a normal chat can —
+ * "make me a news video and a portrait" may well want the video and image
+ * specialists. It is still sessionless (`noSession`), so it never writes a
+ * session JSONL and thus never appears in the sidebar; the run's trace lives in
+ * its own run record instead (scheduled-runner.ts).
+ *
+ * Full base config — same extensions and env as the main chat — because a
+ * scheduled run must be able to do anything the user could do by hand.
+ */
+export function createScheduledRunBridge(
+  opts: { cwd?: string },
+  onEvent: (event: PiBridgeEvent) => void,
+): PiBridge {
+  const cwd = resolveSessionCwd({
+    cwd: opts.cwd ?? currentWorkspaceDir() ?? activeProjectPath() ?? undefined,
+  });
+  return new PiBridge(
+    {
+      cwd,
+      env: buildPiEnv(cwd),
       noSession: true,
       extensionPaths: EXTENSION_PATHS,
       extraArgs: ['--no-extensions', '--no-skills'],

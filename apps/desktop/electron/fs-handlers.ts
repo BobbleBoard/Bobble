@@ -409,6 +409,10 @@ function allowedWriteRoots(): string[] {
   // sessionCwdRoots). Allowing the base covers every conversation's sandbox;
   // the realpath/O_NOFOLLOW checks below still fence out any symlink escape.
   roots.add(normalizeRoot(sandboxBaseDir()));
+  // Scheduled runs write their deliverables under ~/.pi/desktop/scheduled-runs;
+  // the past-runs view serves them back through pd-file://, which fences to these
+  // roots. Read AND write, since main writes the run's output here.
+  roots.add(normalizeRoot(path.join(HOME, '.pi', 'desktop', 'scheduled-runs')));
   return [...roots];
 }
 
