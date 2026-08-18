@@ -448,6 +448,7 @@ async function hfSearch(req: Extract<LlmRequest, { type: 'hf-search' }>): Promis
       limit: req.limit,
       hfToken: req.hfToken,
       authors: req.authors,
+      ggufOnly: req.ggufOnly,
     });
     return { hits: hits.map(toHfHit) };
   } catch (error) {

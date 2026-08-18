@@ -261,7 +261,7 @@ export function App() {
                 onOpenScheduled={() => setView('scheduled')}
                 contentOverride={
                   view === 'models' ? (
-                    <ModelsView onClose={() => setView('chat')} />
+                    <ModelsView />
                   ) : view === 'scheduled' ? (
                     /* Same seam as the model hub: a content route inside the chat
                        shell, so the sidebar and top bar stay put. */

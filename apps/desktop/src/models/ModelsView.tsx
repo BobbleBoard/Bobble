@@ -24,7 +24,11 @@
  * re-decide either.
  */
 
-import { RELIABLE_PUBLISHERS } from '@pi-desktop/inference/catalog';
+import {
+  DEFAULT_RECOMMENDED_AUTHORS,
+  type PublisherDomain,
+  reliableAuthorsForDomains,
+} from '@pi-desktop/inference/catalog';
 import {
   IconArrowUp,
   IconCheck,
@@ -33,12 +37,10 @@ import {
   IconCopy,
   IconExternal,
   IconGauge,
-  IconInfo,
   IconMore,
   IconRefresh,
   ScrollArea,
   Spinner,
-  Tooltip,
 } from '@pi-desktop/ui';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type {
@@ -64,6 +66,7 @@ import {
   DEFAULT_FILTERS,
   FORMAT_OPTIONS,
   filterModels,
+  formatPipelineTag,
   type HubFilters,
   type HubModel,
   type ModelCapability,
@@ -72,6 +75,7 @@ import {
   SORT_OPTIONS,
   sortModels,
   type ViewMode,
+  wantsNonGguf,
 } from './models-layout';
 import { QuantPicker } from './QuantPicker';
 import { useOutsideClose } from './use-outside-close';
@@ -132,6 +136,28 @@ function toHubModel(e: LlmCatalogEntry, totalRamGB: number): HubModel {
  * the real author org, the parameter count — comes from here, which is why the
  * Downloads/Likes columns and a meaningful "Trending" only exist on this tab.
  */
+/**
+ * The HF pipeline tag as an in→out chip — the user: "see at a glance the hf label
+ * that is in-out". Renders nothing for a tag we cannot read, so a row never
+ * shows a cryptic or wrong badge.
+ */
+function PipelineBadge({ tag, className }: { tag?: string; className?: string }) {
+  const label = formatPipelineTag(tag);
+  if (label === undefined) return null;
+  return (
+    <span
+      data-testid="pipeline-badge"
+      title={tag}
+      className={cx(
+        'shrink-0 rounded bg-bg-inset px-1.5 py-px text-caption text-text-secondary',
+        className,
+      )}
+    >
+      {label}
+    </span>
+  );
+}
+
 function hfToHubModel(h: HfModelHitDTO): HubModel {
   const tags = h.tags.map((t) => t.toLowerCase());
   const caps: Array<Exclude<ModelCapability, 'all'>> = [];
@@ -141,7 +167,11 @@ function hfToHubModel(h: HfModelHitDTO): HubModel {
   if (has('reason', 'thinking')) caps.push('reasoning');
   if (has('audio', 'speech', 'asr', 'tts')) caps.push('audio');
   if (has('embedding', 'sentence-similarity', 'feature-extraction')) caps.push('embeddings');
-  if (has('text-to-image', 'diffusion', 'image-generation')) caps.push('image-generation');
+  // NOT bare "diffusion": audio-diffusion (stable-audio) carries that tag too and
+  // was landing under the Image filter. The pipeline tag text-to-image and the
+  // named image families are the reliable signal.
+  if (has('text-to-image', 'image-to-image', 'stable-diffusion', 'image-generation', 'flux'))
+    caps.push('image-generation');
   // Generation types, now part of the same axis as capabilities.
   if (has('text-to-video', 'video-generation', 'image-to-video')) caps.push('video-generation');
   if (has('text-to-3d', 'image-to-3d', '3d')) caps.push('3d-generation');
@@ -188,6 +218,7 @@ function hfToHubModel(h: HfModelHitDTO): HubModel {
        on every row invents a credential HF actually grants selectively. */
     params,
     paramsB: Number.isFinite(paramsB) ? paramsB : undefined,
+    pipelineTag: h.pipelineTag,
     downloads: h.downloads,
     likes: h.likes,
     updatedAt: h.updatedAt === undefined ? undefined : Date.parse(h.updatedAt),
@@ -272,6 +303,7 @@ function RowMenu({
 
   return (
     <span className="relative flex justify-end" ref={rootRef}>
+      {/* biome-ignore lint/a11y/useSemanticElements: nested inside the row <button>; a real <button> here is invalid button-in-button HTML */}
       <span
         role="button"
         tabIndex={0}
@@ -369,60 +401,58 @@ function CapabilityFilter({
         <IconChevronDown size={14} className="text-text-muted" />
       </button>
       {open ? (
-        <>
-          <div
-            data-testid="filter-capability-menu"
-            className="pd-menu absolute top-full left-0 z-20 mt-1 min-w-[240px]"
-          >
-            {groups.map((g) => {
-              const inGroup = options.filter((o) => o.group === g.key);
-              if (inGroup.length === 0) return null;
-              return (
-                <div key={g.key}>
-                  <p className="pd-menu-label">{g.title}</p>
-                  {inGroup.map((o) => {
-                    const on = selected.includes(o.id);
-                    return (
-                      <button
-                        key={o.id}
-                        type="button"
-                        data-testid={`filter-capability-opt-${o.id}`}
-                        aria-pressed={on}
-                        // Deliberately does NOT close: multi-select.
-                        onClick={() => toggle(o.id)}
-                        className="pd-menu-item"
+        <div
+          data-testid="filter-capability-menu"
+          className="pd-menu absolute top-full left-0 z-20 mt-1 min-w-[240px]"
+        >
+          {groups.map((g) => {
+            const inGroup = options.filter((o) => o.group === g.key);
+            if (inGroup.length === 0) return null;
+            return (
+              <div key={g.key}>
+                <p className="pd-menu-label">{g.title}</p>
+                {inGroup.map((o) => {
+                  const on = selected.includes(o.id);
+                  return (
+                    <button
+                      key={o.id}
+                      type="button"
+                      data-testid={`filter-capability-opt-${o.id}`}
+                      aria-pressed={on}
+                      // Deliberately does NOT close: multi-select.
+                      onClick={() => toggle(o.id)}
+                      className="pd-menu-item"
+                    >
+                      <span
+                        className={cx(
+                          'flex h-4 w-4 shrink-0 items-center justify-center rounded border',
+                          on
+                            ? 'border-transparent bg-accent-primary text-text-on-accent'
+                            : 'border-border-strong',
+                        )}
                       >
-                        <span
-                          className={cx(
-                            'flex h-4 w-4 shrink-0 items-center justify-center rounded border',
-                            on
-                              ? 'border-transparent bg-accent-primary text-text-on-accent'
-                              : 'border-border-strong',
-                          )}
-                        >
-                          {on ? <IconCheck size={11} /> : null}
-                        </span>
-                        <span className="flex-1">{o.label}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              );
-            })}
-            {selected.length > 0 ? (
-              <div className="mt-1 border-t border-border-subtle pt-1">
-                <button
-                  type="button"
-                  data-testid="filter-capability-clear"
-                  onClick={() => onChange([])}
-                  className="w-full rounded-lg px-2.5 py-1.5 text-left text-footnote text-text-secondary hover:bg-bg-hover"
-                >
-                  Clear all
-                </button>
+                        {on ? <IconCheck size={11} /> : null}
+                      </span>
+                      <span className="flex-1">{o.label}</span>
+                    </button>
+                  );
+                })}
               </div>
-            ) : null}
-          </div>
-        </>
+            );
+          })}
+          {selected.length > 0 ? (
+            <div className="mt-1 border-t border-border-subtle pt-1">
+              <button
+                type="button"
+                data-testid="filter-capability-clear"
+                onClick={() => onChange([])}
+                className="w-full rounded-lg px-2.5 py-1.5 text-left text-footnote text-text-secondary hover:bg-bg-hover"
+              >
+                Clear all
+              </button>
+            </div>
+          ) : null}
+        </div>
       ) : null}
     </div>
   );
@@ -456,8 +486,10 @@ function IconHeart({ size = 13 }: { size?: number }) {
       fill="none"
       stroke="currentColor"
       strokeWidth="1.8"
-      aria-hidden
+      role="img"
+      aria-label="likes"
     >
+      <title>likes</title>
       <path d="M12 20s-7-4.4-7-9.3A4.2 4.2 0 0 1 12 8a4.2 4.2 0 0 1 7 2.7C19 15.6 12 20 12 20Z" />
     </svg>
   );
@@ -497,40 +529,35 @@ function Dropdown<T extends string>({
         <IconChevronDown size={14} className="text-text-muted" />
       </button>
       {open ? (
-        <>
-          <div
-            data-testid={`${testid}-menu`}
-            className="pd-menu absolute top-full left-0 z-20 mt-1 min-w-[260px]"
-          >
-            {options.map((o) => (
-              <button
-                key={o.id}
-                type="button"
-                data-testid={`${testid}-opt-${o.id}`}
-                onClick={() => {
-                  onChange(o.id);
-                  setOpen(false);
-                }}
-                className="pd-menu-item"
-              >
-                {o.dot !== undefined ? (
-                  <span
-                    className="h-1.5 w-1.5 shrink-0 rounded-full"
-                    style={{ background: o.dot }}
-                  />
-                ) : null}
-                <span className="flex-1">{o.label}</span>
-                {o.id === value ? <IconCheck size={14} className="text-text-muted" /> : null}
-              </button>
-            ))}
-            {footer !== undefined ? (
-              <>
-                <div className="pd-menu-separator" />
-                {footer}
-              </>
-            ) : null}
-          </div>
-        </>
+        <div
+          data-testid={`${testid}-menu`}
+          className="pd-menu absolute top-full left-0 z-20 mt-1 min-w-[260px]"
+        >
+          {options.map((o) => (
+            <button
+              key={o.id}
+              type="button"
+              data-testid={`${testid}-opt-${o.id}`}
+              onClick={() => {
+                onChange(o.id);
+                setOpen(false);
+              }}
+              className="pd-menu-item"
+            >
+              {o.dot !== undefined ? (
+                <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: o.dot }} />
+              ) : null}
+              <span className="flex-1">{o.label}</span>
+              {o.id === value ? <IconCheck size={14} className="text-text-muted" /> : null}
+            </button>
+          ))}
+          {footer !== undefined ? (
+            <>
+              <div className="pd-menu-separator" />
+              {footer}
+            </>
+          ) : null}
+        </div>
       ) : null}
     </div>
   );
@@ -539,6 +566,29 @@ function Dropdown<T extends string>({
 /** Slider ceiling, which doubles as "no cap". Wide enough for a 120GB dataset
  *  and a 200B model; past that the control is dead travel either way. */
 const SIZE_CAP_MAX = 200;
+
+/**
+ * Map the hub's capability filter to publisher domains, so "Recommended" fans
+ * out to the RIGHT reputable orgs: filter to Image and it queries
+ * black-forest-labs and stabilityai, not the LLM labs. No filter → the default
+ * cross-domain top set.
+ */
+const CAP_TO_DOMAIN: Record<string, PublisherDomain> = {
+  reasoning: 'text',
+  vision: 'text',
+  'text-generation': 'text',
+  embeddings: 'embeddings',
+  audio: 'audio',
+  'image-generation': 'image',
+  'video-generation': 'video',
+  '3d-generation': '3d',
+};
+
+function recommendedAuthors(capabilities: readonly string[]): string[] {
+  if (capabilities.length === 0) return [...DEFAULT_RECOMMENDED_AUTHORS];
+  const domains = [...new Set(capabilities.map((c) => CAP_TO_DOMAIN[c]).filter(Boolean))];
+  return reliableAuthorsForDomains(domains as PublisherDomain[], 16);
+}
 
 /**
  * The compact table's column template, keyed by which optional columns are
@@ -553,7 +603,7 @@ const COMPACT_GRID: Record<string, string> = {
   'nocaps-nocounts': 'grid-cols-[1fr_80px_92px_36px]',
 };
 
-export function ModelsView({ onClose }: { onClose: () => void }) {
+export function ModelsView() {
   const catalog = useLlmStore((s) => s.catalog);
   const refreshCatalog = useLlmStore((s) => s.refreshCatalog);
   /* The hardware strip reports THIS machine. A hardcoded "24 GiB" would be
@@ -661,6 +711,10 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
           query: filters.query.trim(),
           sort: sortMap[filters.sort] ?? 'trending',
           limit: 40,
+          /* Only force the server-side gguf filter when we actually want text
+             models. A generation modality (image/video/audio/3D) is not gguf, so
+             asking for gguf there returns nothing — see NON_GGUF_CAPABILITIES. */
+          ggufOnly: filters.format === 'gguf' && !wantsNonGguf(filters.capabilities),
           /*
            * RECOMMENDED IS A QUERY, NOT A FILTER.
            *
@@ -672,7 +726,7 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
            * request per author; see hf-search.ts).
            */
           ...((filters.scope ?? 'recommended') === 'recommended'
-            ? { authors: [...RELIABLE_PUBLISHERS] }
+            ? { authors: recommendedAuthors(filters.capabilities) }
             : {}),
           // Gated repos and higher rate limits both need the token.
           ...(hfToken.length > 0 ? { hfToken } : {}),
@@ -697,7 +751,7 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
       cancelled = true;
       clearTimeout(t);
     };
-  }, [tab, filters.query, filters.sort, filters.scope, hfToken]);
+  }, [tab, filters.query, filters.sort, filters.scope, filters.capabilities, hfToken]);
 
   useEffect(() => {
     if (kind !== 'datasets') return;
@@ -804,6 +858,7 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
    * It clears whenever the thing it referred to stops being what you are
    * looking at.
    */
+  // biome-ignore lint/correctness/useExhaustiveDependencies: intentionally clears on these changes
   useEffect(() => {
     setError(null);
     setNeedsToken(false);
@@ -1063,10 +1118,14 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
         o.id === 'all' || (o.id === 'finetune' ? present.has('safetensors') : present.has(o.id)),
     );
   }, [all]);
-  const capabilityOptions = useMemo(() => {
-    const present = new Set(all.flatMap((m) => m.capabilities));
-    return CAPABILITY_OPTIONS.filter((o) => present.has(o.id));
-  }, [all]);
+  /*
+   * ALWAYS the full modality set, not just the capabilities present in the
+   * current results. Deriving these from what is loaded made a chicken-and-egg
+   * trap: the default view is text/gguf, so "Image" / "Video" / "Audio" never
+   * appeared — and picking one is the only way to LOAD those models. The filter
+   * exists to switch modality, so it must offer modalities you cannot yet see.
+   */
+  const capabilityOptions = CAPABILITY_OPTIONS;
 
   return (
     <div className="flex h-full flex-col bg-bg-base" data-testid="models-view">
@@ -1543,14 +1602,17 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
                               <span className="block truncate text-body text-text-primary">
                                 {mdl.name}
                               </span>
-                              {mdl.org !== '' ? (
-                                <span className="flex items-center gap-1 text-footnote text-text-muted">
-                                  {mdl.org}
-                                  {mdl.verified === true ? (
-                                    <span className="text-accent-primary">✓</span>
-                                  ) : null}
-                                </span>
-                              ) : null}
+                              <span className="flex items-center gap-1.5 text-footnote text-text-muted">
+                                {mdl.org !== '' ? (
+                                  <span className="flex items-center gap-1 truncate">
+                                    {mdl.org}
+                                    {mdl.verified === true ? (
+                                      <span className="text-accent-primary">✓</span>
+                                    ) : null}
+                                  </span>
+                                ) : null}
+                                <PipelineBadge tag={mdl.pipelineTag} />
+                              </span>
                             </span>
                           </span>
                           {hasCaps ? (
@@ -1578,6 +1640,7 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
                           {/* A real, prominent button. the user: "maybe a big blue
                               quick download button on the right". The faint
                               glyph read as decoration. */}
+                          {/* biome-ignore lint/a11y/useSemanticElements: nested inside the row <button> — button-in-button is invalid */}
                           <span
                             role="button"
                             tabIndex={0}
@@ -1718,11 +1781,14 @@ export function ModelsView({ onClose }: { onClose: () => void }) {
                             </button>
                           ) : null}
                         </div>
-                        <p className="flex items-center gap-1 text-footnote text-text-muted">
-                          {detail.org}
-                          {detail.verified === true ? (
-                            <span className="text-accent-primary">✓</span>
-                          ) : null}
+                        <p className="flex flex-wrap items-center gap-1.5 text-footnote text-text-muted">
+                          <span className="flex items-center gap-1">
+                            {detail.org}
+                            {detail.verified === true ? (
+                              <span className="text-accent-primary">✓</span>
+                            ) : null}
+                          </span>
+                          <PipelineBadge tag={detail.pipelineTag} />
                         </p>
                       </div>
                     </div>

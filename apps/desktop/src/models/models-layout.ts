@@ -54,6 +54,90 @@ export const FORMAT_OPTIONS: Array<{ id: ModelFormat; label: string; dot?: strin
 ];
 
 /** Grouped so the menu reads as "what it understands" then "what it makes". */
+/**
+ * HF's pipeline tag, as a readable INPUT → OUTPUT badge.
+ *
+ * the user: "see at a glance the hf label that is in-out eg. image-text-text or
+ * whatever". HF's tags already encode the modalities on each side — `text-to-
+ * image`, `image-text-to-text`, `automatic-speech-recognition` — but the raw
+ * string is jargon. This turns it into "text → image", "image + text → text",
+ * "audio → text": same information, legible at a glance.
+ *
+ * Returns undefined for a tag we cannot confidently read, so a row shows nothing
+ * rather than a wrong or cryptic badge.
+ */
+const MODALITY_WORD: Record<string, string> = {
+  text: 'text',
+  image: 'image',
+  video: 'video',
+  audio: 'audio',
+  speech: 'audio',
+  '3d': '3D',
+  multimodal: 'any',
+  any: 'any',
+};
+
+/** Tags that do not follow the `X-to-Y` shape but still have a clear in→out. */
+const PIPELINE_SPECIAL: Record<string, string> = {
+  'text-generation': 'text → text',
+  conversational: 'text → text',
+  'fill-mask': 'text → text',
+  summarization: 'text → text',
+  translation: 'text → text',
+  'question-answering': 'text → text',
+  'automatic-speech-recognition': 'audio → text',
+  'text-to-speech': 'text → audio',
+  'audio-classification': 'audio → label',
+  'voice-activity-detection': 'audio → label',
+  'feature-extraction': 'embeddings',
+  'sentence-similarity': 'embeddings',
+  'text-classification': 'text → label',
+  'token-classification': 'text → labels',
+  'zero-shot-classification': 'text → label',
+  'image-classification': 'image → label',
+  'object-detection': 'image → boxes',
+  'image-segmentation': 'image → mask',
+  'visual-question-answering': 'image + text → text',
+  'document-question-answering': 'image + text → text',
+  'depth-estimation': 'image → depth',
+  'any-to-any': 'any → any',
+};
+
+export function formatPipelineTag(tag: string | undefined): string | undefined {
+  if (tag === undefined || tag.length === 0) return undefined;
+  const t = tag.toLowerCase();
+  const special = PIPELINE_SPECIAL[t];
+  if (special !== undefined) return special;
+  const m = /^(.+?)-to-(.+)$/.exec(t);
+  if (m === null) return undefined;
+  const side = (part: string): string => {
+    const words = part.split('-').map((w) => MODALITY_WORD[w] ?? w);
+    // Dedupe ("image-image") and join the input side with " + ".
+    return [...new Set(words)].join(' + ');
+  };
+  return `${side(m[1] ?? '')} → ${side(m[2] ?? '')}`;
+}
+
+/**
+ * Capabilities whose models do not come as GGUF — image/video/3D generators and
+ * audio models are diffusers/safetensors, run by a different engine. The hub
+ * defaults its FORMAT filter to gguf (how a text model is run here), so without
+ * this a user who ticks "Image" while format is still gguf would see nothing:
+ * the format gate and the `filter=gguf` search would both drop every diffuser.
+ * These capabilities exempt a model from the gguf format requirement.
+ */
+export const NON_GGUF_CAPABILITIES: ReadonlySet<ModelCapability> = new Set([
+  'image-generation',
+  'video-generation',
+  '3d-generation',
+  'audio',
+]);
+
+/** Does this filter ask for a modality that is not packaged as GGUF? */
+export function wantsNonGguf(capabilities: readonly ModelCapability[]): boolean {
+  return capabilities.some((c) => NON_GGUF_CAPABILITIES.has(c));
+}
+
 export const CAPABILITY_OPTIONS: Array<{
   id: ModelCapability;
   label: string;
@@ -98,6 +182,8 @@ export interface HubModel {
   readonly createdAt?: number;
   readonly formats: readonly Exclude<ModelFormat, 'all' | 'finetune'>[];
   readonly capabilities: readonly ModelCapability[];
+  /** HF pipeline tag verbatim, e.g. "image-text-to-text" — the in→out label. */
+  readonly pipelineTag?: string;
   readonly downloaded?: boolean;
   /** From model-manager-logic's fit verdict — this module never recomputes it. */
   readonly fits?: boolean;
@@ -190,10 +276,14 @@ export const DEFAULT_DATASET_FILTERS: HubFilters = {
 export function filterModels(models: readonly HubModel[], f: HubFilters): HubModel[] {
   const q = f.query.trim().toLowerCase();
   return models.filter((m) => {
+    // A generation model (image/video/3D/audio) is never GGUF, so the format
+    // gate does not apply to it — otherwise the default gguf format hides every
+    // diffuser the moment you filter to "Image".
+    const isGenModel = m.capabilities.some((c) => NON_GGUF_CAPABILITIES.has(c));
     if (f.format === 'finetune') {
       // "Fine-tune ready" is a safetensors property, not a quantised-file one.
       if (!m.formats.includes('safetensors')) return false;
-    } else if (f.format !== 'all' && !m.formats.includes(f.format)) {
+    } else if (f.format !== 'all' && !isGenModel && !m.formats.includes(f.format)) {
       return false;
     }
     /* OR, not AND: ticking Vision and Audio means "show me either", which is
@@ -209,7 +299,24 @@ export function filterModels(models: readonly HubModel[], f: HubFilters): HubMod
         return false;
       }
     }
-    if (q.length > 0 && !`${m.name} ${m.org}`.toLowerCase().includes(q)) return false;
+    if (q.length > 0) {
+      // Modality is searchable: the raw tag ("image-text-to-text"), the readable
+      // form ("image + text → text"), and the capability ids all match, so a
+      // user can type "speech", "vision", "text to image" and find it.
+      const haystack = [
+        m.name,
+        m.org,
+        m.pipelineTag ?? '',
+        formatPipelineTag(m.pipelineTag) ?? '',
+        m.capabilities.join(' '),
+      ]
+        .join(' ')
+        .toLowerCase();
+      // Match on the query as a whole AND on its words, so "text to image"
+      // (which the badge renders with arrows) still hits.
+      const words = q.split(/\s+/).filter(Boolean);
+      if (!haystack.includes(q) && !words.every((w) => haystack.includes(w))) return false;
+    }
     return true;
   });
 }

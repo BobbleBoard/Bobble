@@ -9,6 +9,7 @@ import {
   compactCount,
   DEFAULT_FILTERS,
   filterModels,
+  formatPipelineTag,
   type HubModel,
   relativeAge,
   sortModels,
@@ -163,6 +164,68 @@ describe('sorting', () => {
     const models = [m({ id: 'a', downloads: 1 }), m({ id: 'b', downloads: 2 })];
     sortModels(models, 'downloads');
     expect(models.map((x) => x.id)).toEqual(['a', 'b']);
+  });
+});
+
+describe('the pipeline tag as in→out', () => {
+  it('reads the X-to-Y shape, including a multi-input left side', () => {
+    expect(formatPipelineTag('text-to-image')).toBe('text → image');
+    expect(formatPipelineTag('image-to-text')).toBe('image → text');
+    expect(formatPipelineTag('image-text-to-text')).toBe('image + text → text');
+    expect(formatPipelineTag('text-to-video')).toBe('text → video');
+    expect(formatPipelineTag('image-to-3d')).toBe('image → 3D');
+  });
+
+  it('reads the tags that do not spell "-to-"', () => {
+    expect(formatPipelineTag('automatic-speech-recognition')).toBe('audio → text');
+    expect(formatPipelineTag('text-generation')).toBe('text → text');
+    expect(formatPipelineTag('feature-extraction')).toBe('embeddings');
+    expect(formatPipelineTag('visual-question-answering')).toBe('image + text → text');
+  });
+
+  it('shows NOTHING for a tag it cannot read, rather than a cryptic badge', () => {
+    expect(formatPipelineTag(undefined)).toBeUndefined();
+    expect(formatPipelineTag('')).toBeUndefined();
+    expect(formatPipelineTag('robotics')).toBeUndefined();
+  });
+});
+
+describe('modality is searchable', () => {
+  const m2 = (over: Partial<HubModel> & { id: string }): HubModel => ({
+    name: over.id,
+    org: 'someone',
+    formats: ['gguf'],
+    capabilities: [],
+    ...over,
+  });
+
+  it('finds a model by its pipeline tag, raw or readable', () => {
+    const models = [
+      m2({ id: 'flux', name: 'FLUX', pipelineTag: 'text-to-image' }),
+      m2({ id: 'llm', name: 'SomeLLM', pipelineTag: 'text-generation' }),
+    ];
+    // raw tag
+    expect(
+      filterModels(models, { ...DEFAULT_FILTERS, scope: 'all', query: 'text-to-image' }).map(
+        (x) => x.id,
+      ),
+    ).toEqual(['flux']);
+    // the readable form, word by word
+    expect(
+      filterModels(models, { ...DEFAULT_FILTERS, scope: 'all', query: 'text image' }).map(
+        (x) => x.id,
+      ),
+    ).toEqual(['flux']);
+  });
+
+  it('finds a model by a capability word', () => {
+    const models = [
+      m2({ id: 'sees', capabilities: ['vision'] }),
+      m2({ id: 'plain', capabilities: [] }),
+    ];
+    expect(
+      filterModels(models, { ...DEFAULT_FILTERS, scope: 'all', query: 'vision' }).map((x) => x.id),
+    ).toEqual(['sees']);
   });
 });
 

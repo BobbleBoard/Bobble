@@ -5,7 +5,9 @@ import {
   getCatalogFile,
   getCatalogModel,
   hfResolveUrl,
+  DEFAULT_RECOMMENDED_AUTHORS,
   isReliablePublisher,
+  reliableAuthorsForDomains,
   MLX_MODELS,
   MODEL_TIERS,
   modelEngine,
@@ -271,5 +273,32 @@ describe('catalog', () => {
     expect(hfResolveUrl('unsloth/gemma-4-E2B-it-GGUF', 'gemma-4-E2B-it-Q4_K_M.gguf')).toBe(
       'https://huggingface.co/unsloth/gemma-4-E2B-it-GGUF/resolve/main/gemma-4-E2B-it-Q4_K_M.gguf',
     );
+  });
+});
+
+describe('the reputable-org fan-out selector', () => {
+  it('returns the cross-domain default set when no domain is asked for', () => {
+    expect(reliableAuthorsForDomains([])).toEqual([...DEFAULT_RECOMMENDED_AUTHORS]);
+  });
+
+  it('returns image labs for the image domain, not the LLM labs', () => {
+    const authors = reliableAuthorsForDomains(['image']);
+    expect(authors).toContain('black-forest-labs');
+    expect(authors).toContain('stabilityai');
+    expect(authors).not.toContain('deepseek-ai');
+  });
+
+  it('returns the video labs the user named for video', () => {
+    const authors = reliableAuthorsForDomains(['video']);
+    expect(authors).toContain('Lightricks');
+  });
+
+  it('every author it can return is itself on the allowlist', () => {
+    const all = reliableAuthorsForDomains(['text', 'image', 'video', 'audio', 'embeddings', '3d'], 100);
+    for (const a of all) expect(RELIABLE_PUBLISHERS).toContain(a);
+  });
+
+  it('respects the cap so one browse cannot fan out to everyone', () => {
+    expect(reliableAuthorsForDomains(['text'], 5)).toHaveLength(5);
   });
 });

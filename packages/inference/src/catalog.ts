@@ -93,51 +93,133 @@ export interface ModelPublisher {
 }
 
 /**
- * Reliable-publisher allowlist (exact HF handles, verified 2026-07-10; the
- * first-party model labs added 2026-08-17).
+ * REPUTABLE-ORGANISATION ALLOWLIST, tagged by what each org is known for.
  *
- * It now backs the hub's Recommended/All toggle as well as the catalog's
- * publisher flag — the user: "by default, the 'newest' will show just a bunch of
- * random models, so if you could just have reputable organizations shown".
- * ONE list rather than two: a hub that recommends an org the catalog considers
- * unreliable, or the reverse, is a contradiction nobody would think to check.
+ * the user: "the initial reccomended items should show verified organizations…
+ * unsloth moonshot deepseek, qwen, nvidia, lighttricks, black forest etc. put a
+ * list together starting with that that are the repuatable organizations."
  *
- * The original nine were GGUF HOSTS. Browsing needs the labs that publish the
- * weights in the first place, so they are here too; both groups answer the same
- * question — "would I trust a repo under this handle".
+ * HF has no verified-org flag its search API exposes, so this IS the trust
+ * signal: a hand-curated list of orgs whose repos are worth leading with. It is
+ * tagged by domain because the hub is multi-modal now — when someone filters to
+ * image models, "recommended" should mean black-forest-labs and stabilityai,
+ * not the LLM labs. `reliableAuthorsForDomains` reads these tags.
+ *
+ * `gguf` marks the re-quant hosts that package OTHER labs' models to run locally
+ * — how a text model actually gets used here — so they ride along with text.
+ *
+ * Handles are the exact HF org names (case is normalised at the lookup).
  */
-export const RELIABLE_PUBLISHERS: readonly string[] = [
-  // GGUF hosts / re-quanters with a track record.
+export type PublisherDomain = 'text' | 'image' | 'video' | 'audio' | 'embeddings' | '3d' | 'gguf';
+
+export interface ReliablePublisher {
+  readonly handle: string;
+  readonly domains: readonly PublisherDomain[];
+}
+
+export const RELIABLE_PUBLISHER_LIST: readonly ReliablePublisher[] = [
+  // GGUF / local-run hosts — how text models get run in this app.
+  { handle: 'unsloth', domains: ['gguf', 'text'] },
+  { handle: 'bartowski', domains: ['gguf', 'text'] },
+  { handle: 'ggml-org', domains: ['gguf', 'text'] },
+  { handle: 'mlx-community', domains: ['gguf', 'text'] },
+  { handle: 'lmstudio-community', domains: ['gguf', 'text'] },
+  // First-party LLM / VLM labs.
+  { handle: 'Qwen', domains: ['text'] },
+  { handle: 'deepseek-ai', domains: ['text'] },
+  { handle: 'meta-llama', domains: ['text'] },
+  { handle: 'mistralai', domains: ['text'] },
+  { handle: 'google', domains: ['text', 'embeddings'] },
+  { handle: 'microsoft', domains: ['text', '3d'] },
+  { handle: 'nvidia', domains: ['text', 'audio'] },
+  { handle: 'moonshotai', domains: ['text'] },
+  { handle: 'zai-org', domains: ['text', 'video'] },
+  { handle: 'openai', domains: ['text', 'audio'] },
+  { handle: 'allenai', domains: ['text'] },
+  { handle: 'ibm-granite', domains: ['text'] },
+  { handle: 'HuggingFaceTB', domains: ['text'] },
+  { handle: 'tiiuae', domains: ['text'] },
+  { handle: 'CohereLabs', domains: ['text'] },
+  { handle: 'baidu', domains: ['text'] },
+  { handle: 'openbmb', domains: ['text'] },
+  { handle: 'internlm', domains: ['text'] },
+  { handle: 'NousResearch', domains: ['text'] },
+  { handle: 'THUDM', domains: ['text', 'video'] },
+  { handle: 'BAAI', domains: ['text', 'embeddings'] },
+  // Image generation.
+  { handle: 'black-forest-labs', domains: ['image'] },
+  { handle: 'stabilityai', domains: ['image', '3d'] },
+  { handle: 'playgroundai', domains: ['image'] },
+  { handle: 'Kwai-Kolors', domains: ['image'] },
+  { handle: 'ByteDance', domains: ['image', 'video'] },
+  { handle: 'shakker-labs', domains: ['image'] },
+  // Video generation.
+  { handle: 'Lightricks', domains: ['video'] },
+  { handle: 'Wan-AI', domains: ['video'] },
+  { handle: 'genmo', domains: ['video'] },
+  { handle: 'tencent', domains: ['video', '3d'] },
+  { handle: 'rhymes-ai', domains: ['video'] },
+  { handle: 'Skywork', domains: ['video'] },
+  // Audio / speech.
+  { handle: 'facebook', domains: ['audio', 'text'] },
+  { handle: 'fixie-ai', domains: ['audio'] },
+  { handle: 'hexgrad', domains: ['audio'] },
+  { handle: 'SWivid', domains: ['audio'] },
+  { handle: 'coqui', domains: ['audio'] },
+  { handle: 'amphion', domains: ['audio'] },
+  // Embeddings / retrieval.
+  { handle: 'sentence-transformers', domains: ['embeddings'] },
+  { handle: 'intfloat', domains: ['embeddings'] },
+  { handle: 'mixedbread-ai', domains: ['embeddings'] },
+  { handle: 'Alibaba-NLP', domains: ['embeddings', 'text'] },
+  { handle: 'nomic-ai', domains: ['embeddings'] },
+  { handle: 'jinaai', domains: ['embeddings'] },
+  // 3D generation.
+  { handle: 'VAST-AI-Research', domains: ['3d'] },
+];
+
+/** Flat handle list — what `isReliablePublisher` checks and the hub filters on. */
+export const RELIABLE_PUBLISHERS: readonly string[] = RELIABLE_PUBLISHER_LIST.map((p) => p.handle);
+
+/**
+ * The default "Recommended" fan-out: a cross-domain top set for when no modality
+ * filter is active. Leads with the GGUF hosts and the biggest LLM labs (the
+ * common case) and seeds one image lab so the grid is not all text.
+ */
+export const DEFAULT_RECOMMENDED_AUTHORS: readonly string[] = [
   'unsloth',
   'bartowski',
   'ggml-org',
-  'mlx-community',
-  'lmstudio-community',
-  // First-party labs.
-  'nvidia',
   'Qwen',
-  'google',
-  'deepmind',
+  'deepseek-ai',
   'meta-llama',
   'mistralai',
+  'google',
   'microsoft',
-  'deepseek-ai',
-  'openai',
-  'allenai',
-  'ibm-granite',
-  'HuggingFaceTB',
-  'tiiuae',
-  'CohereLabs',
+  'nvidia',
   'moonshotai',
-  'zai-org',
-  'baidu',
-  'openbmb',
-  'internlm',
-  'stabilityai',
-  'BAAI',
-  'THUDM',
-  'NousResearch',
+  'black-forest-labs',
 ];
+
+/**
+ * The reputable orgs for a set of domains, for the modality-aware fan-out.
+ * Ordered by how many of the requested domains each covers, so the most relevant
+ * orgs are queried first under the fan-out cap.
+ */
+export function reliableAuthorsForDomains(
+  domains: readonly PublisherDomain[],
+  limit = 16,
+): string[] {
+  if (domains.length === 0) return [...DEFAULT_RECOMMENDED_AUTHORS];
+  const want = new Set(domains);
+  const scored = RELIABLE_PUBLISHER_LIST.map((p) => ({
+    handle: p.handle,
+    score: p.domains.filter((d) => want.has(d)).length,
+  }))
+    .filter((p) => p.score > 0)
+    .sort((a, b) => b.score - a.score);
+  return scored.slice(0, limit).map((p) => p.handle);
+}
 
 /**
  * Case-insensitive on purpose: HF handles are shown with their published

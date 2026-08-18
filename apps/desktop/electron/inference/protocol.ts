@@ -43,6 +43,7 @@ export type LlmRequestBody =
       hfToken?: string;
       /** One request per author (HF's `author` takes a single handle). */
       authors?: string[];
+      ggufOnly?: boolean;
     }
   | { type: 'hf-list-files'; repoId: string; contextWindow?: number; hfToken?: string }
   | {

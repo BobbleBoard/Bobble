@@ -261,7 +261,7 @@ function parseHit(raw: unknown): HfModelHit | undefined {
  * refinement the API does not express. Tolerant of the API's loose JSON shape.
  */
 /** How many author queries one search may spend. See `HfSearchOptions.authors`. */
-export const MAX_AUTHOR_FANOUT = 12;
+export const MAX_AUTHOR_FANOUT = 16;
 
 /** Upper bound on a merged fan-out result, so a browse page stays a page. */
 export const MERGED_CAP = 150;
@@ -300,9 +300,9 @@ export async function searchHfModels(
      * a list should be.
      */
     const pages = await Promise.all(
-      authors.slice(0, MAX_AUTHOR_FANOUT).map((a) =>
-        fetchPage(query, opts, a).catch(() => [] as HfModelHit[]),
-      ),
+      authors
+        .slice(0, MAX_AUTHOR_FANOUT)
+        .map((a) => fetchPage(query, opts, a).catch(() => [] as HfModelHit[])),
     );
     /*
      * Interleave the authors rather than concatenating them. Twelve pages of

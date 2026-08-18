@@ -541,6 +541,9 @@ export type HfInvokeMap = {
        *  scope, which cannot work as a client-side filter over a page the API
        *  already chose. */
       authors?: string[];
+      /** Add the server-side `filter=gguf` (default true). False when browsing a
+       *  non-gguf modality (image/video/audio), where gguf returns nothing. */
+      ggufOnly?: boolean;
     };
     response: { hits: HfModelHitDTO[]; error?: string; rateLimited?: boolean };
   };
