@@ -39,6 +39,11 @@ import {
 import { IMPORT_INVOKE_CHANNELS, type ImportInvokeMap } from './import/import-contract';
 import { OFFICE_INVOKE_CHANNELS, type OfficeInvokeMap } from './office/office-contract';
 import { PI_INVOKE_CHANNELS, type PiEventMap, type PiInvokeMap } from './pi/contract';
+import {
+  SCHEDULED_INVOKE_CHANNELS,
+  type ScheduledEventMap,
+  type ScheduledInvokeMap,
+} from './scheduled/scheduled-contract';
 import { PROJECT_INVOKE_CHANNELS, type ProjectInvokeMap } from './project/project-contract';
 import { SETTINGS_INVOKE_CHANNELS, type SettingsInvokeMap } from './settings/settings-contract';
 import { SKILLS_INVOKE_CHANNELS, type SkillsInvokeMap } from './skills/skills-contract';
@@ -676,6 +681,7 @@ export type AppInvokeMap = CoreInvokeMap &
   ModelCardInvokeMap &
   OrgAvatarInvokeMap &
   DatasetInvokeMap &
+  ScheduledInvokeMap &
   HfInvokeMap &
   AfmInvokeMap &
   SettingsInvokeMap &
@@ -728,6 +734,7 @@ export const APP_INVOKE_CHANNELS = [
   ...MODELCARD_INVOKE_CHANNELS,
   ...ORGAVATAR_INVOKE_CHANNELS,
   ...DATASET_INVOKE_CHANNELS,
+  ...SCHEDULED_INVOKE_CHANNELS,
 ] as const satisfies readonly (keyof AppInvokeMap)[];
 
 type MissingChannels = Exclude<keyof AppInvokeMap, (typeof APP_INVOKE_CHANNELS)[number]>;
@@ -793,6 +800,7 @@ export type AppEventMap = {
   CorpEventMap &
   GenEventMap &
   Gen3dEventMap &
+  ScheduledEventMap &
   PiEventMap;
 
 /** Shape of `window.piDesktop` as exposed by the preload script. */

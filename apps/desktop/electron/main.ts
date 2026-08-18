@@ -42,6 +42,7 @@ import { registerOfficeIpc } from './office/office-ipc';
 import { registerPiIpc } from './pi/pi-main';
 import { registerProjectIpc } from './project/project-main';
 import { createRendererRecovery } from './renderer-recovery';
+import { registerScheduledHandlers } from './scheduled/scheduled-main';
 import {
   applySettingsEnvFromDisk,
   generationExperimentEnabled,
@@ -577,6 +578,14 @@ function registerAppIpc(): void {
 
   // Projects (working folders): list/set/new/clear, persisted to projects.json.
   registerProjectIpc(ipcMain, allowSender);
+
+  /* Scheduled tasks: storage + a 30s tick. Main decides what is DUE; the
+     renderer runs it as a real chat (see scheduled/scheduled-main.ts for why
+     the run does not happen here). */
+  registerScheduledHandlers(ipcMain, {
+    allowSender,
+    getWindow: () => mainWindow ?? null,
+  });
 
   // Connectors gallery: catalog + registry read/mutate + /Applications scan.
   // Owns ~/.pi/desktop/mcp-connectors.json (the file the mcp-lite pi extension

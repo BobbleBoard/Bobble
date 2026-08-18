@@ -91,7 +91,7 @@ import { BobbleMark } from './BobbleMark';
 import { PROFILE_MENU_ACTIONS } from './profile-menu';
 
 /** Nav destinations that don't have a real page yet — open a "coming soon" stub. */
-export type SidebarStub = 'projects' | 'scheduled' | 'skills';
+export type SidebarStub = 'projects' | 'skills';
 
 /**
  * Bottom-left profile control (round-12 #4). ONE compact button — the avatar
@@ -282,6 +282,7 @@ export function SessionSidebar({
   onOpenSettings,
   onOpenConnectors,
   onOpenStub,
+  onOpenScheduled,
 }: {
   open: boolean;
   onCollapse: () => void;
@@ -292,6 +293,8 @@ export function SessionSidebar({
   /** Open the Codex-style connectors gallery (its own top-level view). */
   onOpenConnectors: () => void;
   onOpenStub: (stub: SidebarStub) => void;
+  /** Scheduled tasks is a real view now, not a coming-soon stub. */
+  onOpenScheduled: () => void;
 }) {
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [query, setQuery] = useState('');
@@ -868,7 +871,7 @@ export function SessionSidebar({
       id: 'scheduled',
       label: 'Scheduled',
       icon: IconClock,
-      onClick: () => onOpenStub('scheduled'),
+      onClick: onOpenScheduled,
       testid: 'nav-scheduled',
     },
     {

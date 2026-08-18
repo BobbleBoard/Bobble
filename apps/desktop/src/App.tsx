@@ -10,6 +10,8 @@ import { GalleryView } from './gallery/GalleryView';
 import { ModelsView } from './models/ModelsView';
 import { FirstRunTips, resetFirstRunTips } from './onboarding/FirstRunTips';
 import { OnboardingWizard } from './onboarding/OnboardingWizard';
+import { ScheduledView } from './scheduled/ScheduledView';
+import { startTaskRunner } from './scheduled/tasks-store';
 import { type SettingsSection, SettingsView } from './settings/SettingsView';
 import { useModalityStore } from './state/modality-store';
 import { applyThemeAttributes, useThemeStore } from './store/theme';
@@ -70,7 +72,7 @@ function ProbeHooks() {
  * showing (see `settingsOpen`). `models` became one, because model management
  * is now a full surface of its own rather than a settings page.
  */
-type MainView = 'chat' | 'gallery' | 'models' | 'connectors';
+type MainView = 'chat' | 'gallery' | 'models' | 'connectors' | 'scheduled';
 
 export function App() {
   const flavor = useThemeStore((s) => s.flavor);
@@ -111,6 +113,13 @@ export function App() {
    * Deliberately not gated on onboarding finishing: a profile with no model
    * resolves to nothing and returns immediately.
    */
+  /* Scheduled tasks: main tells us what is due, this runs it as a real chat.
+     Wired once at app level so a task fires whatever view you are looking at. */
+  useEffect(() => {
+    if (IS_CANVAS_POPOUT || IS_SITUATION_DEMO || IS_TRIPO) return;
+    return startTaskRunner();
+  }, []);
+
   useEffect(() => {
     if (IS_CANVAS_POPOUT || IS_SITUATION_DEMO || IS_TRIPO) return;
     void import('./chat/auto-router')
@@ -249,8 +258,15 @@ export function App() {
               <ChatApp
                 onOpenSettings={openSettings}
                 onOpenConnectors={() => setView('connectors')}
+                onOpenScheduled={() => setView('scheduled')}
                 contentOverride={
-                  view === 'models' ? <ModelsView onClose={() => setView('chat')} /> : undefined
+                  view === 'models' ? (
+                    <ModelsView onClose={() => setView('chat')} />
+                  ) : view === 'scheduled' ? (
+                    /* Same seam as the model hub: a content route inside the chat
+                       shell, so the sidebar and top bar stay put. */
+                    <ScheduledView />
+                  ) : undefined
                 }
               />
               {/* Onboarding `tutorial` flag consumer: dismissible first-run tips. */}

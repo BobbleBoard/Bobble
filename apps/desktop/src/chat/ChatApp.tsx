@@ -115,10 +115,6 @@ const STUB_COPY: Record<SidebarStub, { title: string; body: string }> = {
     title: 'Projects',
     body: 'Group chats, files, and context into projects. Coming soon.',
   },
-  scheduled: {
-    title: 'Scheduled tasks',
-    body: 'Run Pi on a schedule and review the results. Coming soon.',
-  },
   skills: { title: 'Skills', body: 'Browse and manage the skills Pi can use. Coming soon.' },
 };
 
@@ -144,11 +140,13 @@ export function ChatApp({
   contentOverride,
   onOpenSettings,
   onOpenConnectors,
+  onOpenScheduled,
 }: {
   /** Render this INSTEAD of the thread + composer, keeping the shell. */
   contentOverride?: ReactNode;
   onOpenSettings: (section: SettingsSection) => void;
   onOpenConnectors: () => void;
+  onOpenScheduled: () => void;
 }) {
   const messageCount = usePiStore((s) => s.messages.length);
   const queuedCount = usePiStore((s) => s.queuedSends.length);
@@ -488,6 +486,7 @@ export function ChatApp({
                 onOpenSettings={onOpenSettings}
                 onOpenConnectors={onOpenConnectors}
                 onOpenStub={setStub}
+                onOpenScheduled={onOpenScheduled}
               />
             </div>
 

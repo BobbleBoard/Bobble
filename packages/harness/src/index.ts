@@ -85,6 +85,7 @@ import { detectBudget } from './subagent/budget.js';
 import { type SchedulerSnapshot, SubagentScheduler } from './subagent/scheduler.js';
 import { specialistFromEnv, specialistToolset } from './subagent/specialist-env.js';
 import { registerSubagentTool } from './subagent/subagent-tool.js';
+import { registerScheduledTaskTool } from './scheduled/schedule-tool.js';
 import {
   HARNESS_SUBAGENTS_STATUS_KEY,
   type HarnessSubagentsStatus,
@@ -1631,6 +1632,11 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
       bridgeRunChild !== null ? { scheduler, runChild: bridgeRunChild } : { scheduler },
     );
   }
+
+  /* Scheduled tasks: the model can turn "do this every morning" into something
+     the app will actually do, instead of agreeing and forgetting. It writes the
+     app's own schedule file, so it works from any harness with no bridge. */
+  registerScheduledTaskTool(pi);
 
   // Corp system as an OPTION (the user): at high/max effort the model can hand a
   // large, professional build to a manager + team via `create_production_hierarchy`
