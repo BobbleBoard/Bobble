@@ -2295,3 +2295,22 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
 [data-testid="settings-backdrop"] {
   cursor: default;
 }
+
+/*
+ * A modality whose module is not installed: dimmed, with its download size on
+ * the right. Deliberately still CLICKABLE — the workspace shows its own gate
+ * (blur + Download/View), so the row advertises the cost rather than blocking.
+ */
+.pd-child-row[data-installed='false'] {
+  opacity: 0.62;
+}
+.pd-child-row[data-installed='false']:hover {
+  opacity: 1;
+}
+.pd-child-row-meta {
+  margin-left: auto;
+  padding-left: 8px;
+  font-size: var(--pd-font-size-caption);
+  color: var(--pd-text-muted);
+  font-variant-numeric: tabular-nums;
+}

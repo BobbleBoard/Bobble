@@ -45,7 +45,6 @@ describe('catalog', () => {
     );
   });
 
-
   it('ships NO separate texture model — TRELLIS re-bakes its own colours', () => {
     // Texturing used to pull Hunyuan Paint: the paintpbr subset (6.89 GB) plus
     // dinov2-giant (4.55 GB) = 11.4 GB of weights for something TRELLIS already

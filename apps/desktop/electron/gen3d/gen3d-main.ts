@@ -17,6 +17,7 @@ import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import * as path from 'node:path';
 import {
+  CORE_MODULE_MODELS,
   consumeNdjsonStream,
   detectInstalled,
   engineCacheDir,
@@ -42,6 +43,7 @@ import {
   type IpcHandlers,
   registerIpcHandlers,
 } from '@pi-desktop/shared';
+import { ensureUv } from '@pi-desktop/web-tools';
 import { app, BrowserWindow, type IpcMain, type WebContents } from 'electron';
 import type { AppEventMap } from '../ipc-contract';
 import { DictationSession, transcribe } from './dictation-main';
@@ -160,11 +162,31 @@ async function startSidecar(): Promise<Gen3dSidecar | null> {
     log.warn('gen3d sidecar script missing', { serverScript });
     return null;
   }
-  const uvPath = await resolveUv({ pathEnv: process.env.PATH, home: app.getPath('home') });
+  /*
+   * FIND uv, OR FETCH IT. A Mac that has never run Python tooling has no uv, and
+   * "install uv and retry" is a dead end for someone who just wants to make a 3D
+   * model — the 3D module would be un-startable out of the box on most machines.
+   *
+   * `ensureUv` (packages/web-tools) is the app's existing bootstrap: it prefers
+   * one already on PATH and otherwise downloads a PINNED release and verifies it
+   * against the published checksum before use. It is what the web-tools Python
+   * path already relies on, so this is the same trust decision, not a new one.
+   */
+  let uvPath = await resolveUv({ pathEnv: process.env.PATH, home: app.getPath('home') });
   if (uvPath === undefined) {
-    log.warn('gen3d: uv not found — engine unavailable until uv is installed');
-    return null;
+    try {
+      log.info('gen3d: no uv found — bootstrapping a pinned copy');
+      const install = await ensureUv();
+      uvPath = install.uvPath;
+      log.info('gen3d: uv ready', { source: install.source });
+    } catch (error) {
+      log.warn('gen3d: uv bootstrap failed — engine unavailable', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return null;
+    }
   }
+  if (uvPath === undefined) return null;
   const cacheDir = cacheRoot();
   // MUST agree with the pd-file fence, which is defined against os.homedir().
   // Electron's app.getPath('home') ignores $HOME, so the two disagreed whenever
@@ -455,6 +477,20 @@ const handlers: IpcHandlers<Gen3dInvokeMap & DictationInvokeMap> = {
     return { ok: true };
   },
 
+  /*
+   * DISK ONLY — deliberately does not touch the sidecar. The sidebar renders the
+   * 3D row constantly; making that spawn uv + Python for a user who never opens
+   * the studio would be a real cost for a label.
+   */
+  'gen3d:module': () => {
+    const installed = detectInstalled(existsSync, cacheRoot());
+    const missing = CORE_MODULE_MODELS.filter((id) => installed[id] !== true);
+    const remainingBytes = missing.reduce((n, id) => {
+      const spec = GEN3D_MODEL_SPECS.find((sp) => sp.id === id);
+      return n + (spec === undefined ? 0 : specTotalBytes(spec));
+    }, 0);
+    return { installed: missing.length === 0, remainingBytes };
+  },
   'gen3d:catalog': async () => {
     // Report the live catalog ONLY if the sidecar is already up — never block
     // the first catalog call on booting it (that would leave the whole model

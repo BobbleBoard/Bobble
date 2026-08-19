@@ -51,6 +51,21 @@ export type Gen3dRole =
    * `skintokens` was added (commit d5f1c85). */
   | 'audio';
 
+/**
+ * The 3D module's state, judged from DISK ONLY — no sidecar boot.
+ *
+ * The sidebar shows whether the studio is installed (and how big it is) on every
+ * render; answering that through `gen3d:catalog` would spawn the uv/Python
+ * sidecar for someone who may never open the studio. This reads install stamps
+ * and nothing else.
+ */
+export interface Gen3dModuleInfo {
+  /** Every core model is on disk. */
+  readonly installed: boolean;
+  /** Bytes still to fetch for the core set (0 when installed). */
+  readonly remainingBytes: number;
+}
+
 export interface Gen3dModelInfo {
   readonly id: Gen3dModelId;
   readonly label: string;
@@ -142,6 +157,9 @@ export interface Gen3dDownloadUpdate {
 }
 
 export type Gen3dInvokeMap = {
+  /** Is the 3D module on disk, and how much is left to fetch? Disk-only: never
+   *  boots the sidecar, so the sidebar can ask on every render. */
+  'gen3d:module': { request: undefined; response: Gen3dModuleInfo };
   /** The engine catalog: every model with real sizes + installed state, plus
    * whether the sidecar runtime itself is ready. */
   'gen3d:catalog': {
@@ -334,6 +352,7 @@ export const DICTATION_INVOKE_CHANNELS = [
 ] as const satisfies readonly (keyof DictationInvokeMap)[];
 
 export const GEN3D_INVOKE_CHANNELS = [
+  'gen3d:module',
   'gen3d:catalog',
   'gen3d:download',
   'gen3d:cancel-download',

@@ -126,6 +126,24 @@ export const AUTOREMESHER_DMG_URL =
   'https://github.com/huxingyi/autoremesher/releases/download/1.0.0/autoremesher-1.0.0.dmg';
 export const AUTOREMESHER_DMG_BYTES = 17_259_387;
 
+/**
+ * The models that make the 3D studio USEFUL — the "module" the app offers as one
+ * download. Deliberately not every spec: a machine with geometry but no motion
+ * model can still generate, retopologise, segment and rig, and calling that "not
+ * installed" would hide a working studio behind a 40GB wall. Motion, the learned
+ * rig, image editing and audio are optional extras with their own in-panel
+ * downloads.
+ *
+ * Lives here so BOTH the main process (which answers the sidebar's cheap
+ * disk-only check) and the renderer judge the module by the same list.
+ */
+export const CORE_MODULE_MODELS: readonly Gen3dModelId[] = [
+  'mageflow',
+  'trellis2',
+  'autoremesher',
+  'humanoid-rig',
+];
+
 export const GEN3D_MODEL_SPECS: readonly Gen3dModelSpec[] = [
   {
     id: 'trellis2',

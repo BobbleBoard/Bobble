@@ -4599,3 +4599,148 @@
   min-height: 68px;
   resize: vertical;
 }
+
+/* ── The 3D module gate ────────────────────────────────────────────────────
+ * The studio renders behind this at full fidelity; only a blur sits on top, and
+ * "View" removes even that. the user: not "gatekeeping the UI from being seen at all
+ * as if it's a paid service". The shell stays MOUNTED while gated (inert), so
+ * View is an instant unblur rather than a second load.
+ */
+.tp-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  transition: filter var(--pd-duration-slow, 320ms) var(--pd-easing-standard, ease);
+}
+.tp-shell[data-gated="true"] {
+  filter: blur(7px) saturate(0.85);
+  /* Keeps the blur from sampling past the edges and showing a bright halo. */
+  transform: scale(1.01);
+  transform-origin: center;
+  user-select: none;
+}
+
+.tp-gate {
+  position: absolute;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  /* Just enough veil to hold the card; the studio must still read through it. */
+  background: color-mix(in oklab, var(--pd-bg-base) 55%, transparent);
+}
+.tp-gate-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: min(460px, 100%);
+  padding: 26px 26px 20px;
+  text-align: center;
+  border-radius: var(--pd-radius-popover);
+  background: var(--pd-bg-raised);
+  box-shadow:
+    var(--pd-shadow-hairline),
+    0 24px 60px rgb(0 0 0 / 0.36);
+}
+.tp-gate-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  border-radius: var(--pd-radius-md, 10px);
+  background: var(--pd-bg-inset);
+  color: var(--pd-text-secondary);
+}
+.tp-gate-title {
+  margin: 2px 0 0;
+  font-size: var(--pd-font-size-title);
+  font-weight: var(--pd-font-weight-semibold);
+  color: var(--pd-text-primary);
+}
+.tp-gate-copy {
+  margin: 0;
+  max-width: 42ch;
+  font-size: var(--pd-font-size-footnote);
+  line-height: 1.5;
+  color: var(--pd-text-secondary);
+}
+.tp-gate-copy code {
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: var(--pd-bg-inset);
+  font-family: var(--pd-font-mono);
+  font-size: 0.92em;
+}
+.tp-gate-error {
+  margin: 0;
+  font-size: var(--pd-font-size-footnote);
+  color: var(--pd-status-danger-fg);
+}
+.tp-gate-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+.tp-gate-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 16px;
+  border: 0;
+  border-radius: var(--pd-radius-button, 10px);
+  background: var(--pd-accent-primary);
+  color: var(--pd-text-on-accent);
+  font-size: var(--pd-font-size-footnote);
+  font-weight: var(--pd-font-weight-medium);
+  cursor: pointer;
+}
+.tp-gate-primary:hover:not(:disabled) {
+  opacity: 0.9;
+}
+.tp-gate-primary:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.tp-gate-secondary {
+  padding: 9px 16px;
+  border: 1px solid var(--pd-border-default);
+  border-radius: var(--pd-radius-button, 10px);
+  background: transparent;
+  color: var(--pd-text-primary);
+  font-size: var(--pd-font-size-footnote);
+  cursor: pointer;
+}
+.tp-gate-secondary:hover {
+  background: var(--pd-bg-hover);
+}
+.tp-gate-foot {
+  margin: 2px 0 0;
+  font-size: var(--pd-font-size-caption);
+  color: var(--pd-text-muted);
+}
+
+/* After View: a quiet strip so the download stays one click away. */
+.tp-gate-restore {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  z-index: 90;
+  padding: 8px 14px;
+  border: 1px solid var(--pd-border-default);
+  border-radius: var(--pd-radius-full, 999px);
+  background: var(--pd-bg-raised);
+  color: var(--pd-text-secondary);
+  font-size: var(--pd-font-size-caption);
+  cursor: pointer;
+  box-shadow: var(--pd-shadow-hairline);
+}
+.tp-gate-restore:hover {
+  background: var(--pd-bg-hover);
+  color: var(--pd-text-primary);
+}

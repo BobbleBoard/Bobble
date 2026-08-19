@@ -1,6 +1,7 @@
 export {
   AUTOREMESHER_DMG_BYTES,
   AUTOREMESHER_DMG_URL,
+  CORE_MODULE_MODELS,
   detectInstalled,
   engineCacheDir,
   GATED_MIRRORS,

@@ -81,6 +81,7 @@ import {
 import { useChildAgentStore, useChildrenByParent } from '../state/child-agent-store';
 import { useCorpStore } from '../state/corp-store';
 import { useModalityStore } from '../state/modality-store';
+import { formatModuleSize } from '../tripo/module-state';
 import { listSessions, newSession, restartPi, switchSession } from '../state/pi-connect';
 import { usePiStore } from '../state/pi-slice';
 import { useProjectStore } from '../state/project-store';
@@ -370,6 +371,23 @@ export function SessionSidebar({
   // The "Modalities" dropdown — full-window studios reached from the sidebar.
   const setModalityView = useModalityStore((s) => s.setView);
   const [modalitiesOpen, setModalitiesOpen] = useState(true);
+  /* Whether the 3D module is on disk, so the row can say so before you click.
+     `gen3d:module` is a DISK-ONLY check — asking the full catalog here would
+     spawn the uv/Python sidecar for a user who may never open the studio. */
+  const [module3d, setModule3d] = useState({ installed: true, remainingBytes: 0 });
+  useEffect(() => {
+    let live = true;
+    void window.piDesktop
+      .invoke('gen3d:module', undefined)
+      .then((info) => {
+        if (live) setModule3d(info);
+      })
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, []);
+  const moduleSize = formatModuleSize(module3d.remainingBytes);
 
   // Chat organization (B1/B2): projects, pins, renames, delete — persisted state.
   const org = useChatOrg();
@@ -959,16 +977,35 @@ export function SessionSidebar({
           </button>
           {modalitiesOpen ? (
             <div className="pd-child-rows" data-testid="modality-rows">
+              {/*
+               * NOT DISABLED — dimmed. the user wants the studio openable without the
+               * module so its UI can be looked at (the workspace itself carries
+               * the download/View gate); the row only has to SAY that it is not
+               * installed, and how big it is, before you click.
+               */}
               <button
                 type="button"
                 className="pd-child-row pd-focusable"
                 data-testid="modality-3d"
+                data-installed={module3d.installed}
+                title={
+                  module3d.installed
+                    ? '3D Studio'
+                    : `3D Studio — module not installed${
+                        moduleSize === '' ? '' : ` (${moduleSize})`
+                      }`
+                }
                 onClick={() => setModalityView('3d')}
               >
                 <span className="pd-child-row-icon">
                   <ModalityCube size={13} />
                 </span>
                 <span className="pd-child-row-label">3D Studio</span>
+                {!module3d.installed && moduleSize !== '' ? (
+                  <span className="pd-child-row-meta" data-testid="modality-3d-size">
+                    {moduleSize}
+                  </span>
+                ) : null}
               </button>
             </div>
           ) : null}

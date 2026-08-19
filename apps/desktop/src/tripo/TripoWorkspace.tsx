@@ -11,8 +11,10 @@
 import type { JSX } from 'react';
 import { useEffect, useState } from 'react';
 import { GenPanel } from './GenPanel';
-import { ensureGen3dWired } from './gen3d-client';
+import { ensureGen3dWired, useGen3dStore } from './gen3d-client';
 import { IcUpload } from './icons';
+import { ModuleGate } from './ModuleGate';
+import { moduleState } from './module-state';
 import { Rail } from './Rail';
 import { RightPanel } from './RightPanel';
 import { useTripoStore } from './store';
@@ -24,6 +26,20 @@ import './tripo.css';
 export function TripoWorkspace(): JSX.Element {
   const closeMenus = useTripoStore((s) => s.closeMenus);
   const [dropActive, setDropActive] = useState(false);
+  /*
+   * THE MODULE GATE. Without the 3D module the studio still MOUNTS and renders —
+   * it is blurred behind a panel offering the download, and "View" lifts the
+   * blur so the UI can be inspected. the user: not "gatekeeping the UI from being
+   * seen at all as if it's a paid service".
+   */
+  const engineReady = useGen3dStore((s) => s.engineReady);
+  const catalogLoaded = useGen3dStore((s) => s.loaded);
+  const models = useGen3dStore((s) => s.models);
+  const [viewing, setViewing] = useState(false);
+  const module3d = moduleState(engineReady, models);
+  // Gate only once the catalog has actually answered — flashing a download wall
+  // during the sidecar's boot would be a lie that corrects itself a second later.
+  const gated = catalogLoaded && !module3d.usable && !viewing;
 
   // Engine catalog + event wiring (idempotent).
   useEffect(() => {
@@ -108,14 +124,41 @@ export function TripoWorkspace(): JSX.Element {
   return (
     // Drops are handled by the document-level capture listeners above; the
     // root only carries the drop-overlay state attribute.
-    <div className="tp" data-testid="tp-root" data-drop-active={dropActive}>
-      <TopBar />
-      <div className="tp-body">
-        <Rail />
-        <GenPanel />
-        <Viewport />
-        <RightPanel />
+    <div
+      className="tp"
+      data-testid="tp-root"
+      data-drop-active={dropActive}
+      data-module={module3d.status}
+    >
+      {/* The studio itself, blurred (and inert) while gated — never unmounted,
+          so "View" is an instant unblur rather than a second load. */}
+      <div
+        className="tp-shell"
+        data-testid="tp-shell"
+        data-gated={gated}
+        {...(gated ? { inert: true } : {})}
+      >
+        <TopBar />
+        <div className="tp-body">
+          <Rail />
+          <GenPanel />
+          <Viewport />
+          <RightPanel />
+        </div>
       </div>
+      {gated ? <ModuleGate state={module3d} onView={() => setViewing(true)} /> : null}
+      {/* Once someone chooses View, the studio is fully usable to look at, and a
+          quiet strip keeps the download one click away rather than lost. */}
+      {catalogLoaded && !module3d.usable && viewing ? (
+        <button
+          type="button"
+          className="tp-gate-restore"
+          data-testid="tp-gate-restore"
+          onClick={() => setViewing(false)}
+        >
+          Viewing only — 3D module not installed. Download
+        </button>
+      ) : null}
       {dropActive ? (
         <div className="tp-drop-overlay" data-testid="tp-drop-overlay">
           <div className="tp-drop-card">
