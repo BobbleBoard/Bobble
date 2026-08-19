@@ -536,8 +536,15 @@ export function Viewport(): JSX.Element {
   const imageTool = useTripoStore((s) => s.tool);
   const imageVersions = useTripoStore((s) => s.imageVersions);
   const imageIndex = useTripoStore((s) => s.imageIndex);
+  const jobForImage = useGen3dStore((s) => s.job);
+  const generatingForImage = jobForImage !== null && !jobForImage.done;
   const imageStageView = (() => {
-    if (imageTool !== 'image' || imageVersions.length === 0) return null;
+    // Shown on the Image tool as its result — and ALSO mid-generation on any
+    // tool, because during a text->3D run this picture is the only thing that
+    // exists for the first minute or so. the user: "image and non textured model
+    // should be shown as soon as ready during pipeline generations."
+    if (imageVersions.length === 0) return null;
+    if (imageTool !== 'image' && !generatingForImage) return null;
     const i = Math.min(imageIndex, imageVersions.length - 1);
     const v = imageVersions[i];
     if (v === undefined) return null;
@@ -573,7 +580,7 @@ export function Viewport(): JSX.Element {
         <Suspense fallback={<div className="tp-canvas-loading">Preparing viewer…</div>}>
           <Viewer3D gizmoRef={gizmoRef} />
         </Suspense>
-      ) : generating ? null : imageStageView !== null ? (
+      ) : imageStageView !== null ? (
         /* The Image stage's picture belongs HERE, not squeezed into a 370px
            panel: it is the thing the user has to judge before spending minutes
            turning it into geometry, and this space was otherwise showing an
@@ -592,7 +599,7 @@ export function Viewport(): JSX.Element {
               : ''}
           </div>
         </div>
-      ) : (
+      ) : generating ? null : (
         <div className="tp-empty" data-testid="tp-empty-state">
           <LogoMark size={54} />
           {/* Sentence case, like every other empty state in the app ("No

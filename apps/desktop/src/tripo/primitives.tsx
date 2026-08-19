@@ -244,7 +244,13 @@ export function Segmented<T extends string>({
   size = 'md',
   testid,
 }: {
-  readonly options: readonly { readonly id: T; readonly label: ReactNode }[];
+  readonly options: readonly {
+    readonly id: T;
+    readonly label: ReactNode;
+    /** Present and un-pickable, with `hint` as the reason on hover. */
+    readonly disabled?: boolean;
+    readonly hint?: string;
+  }[];
   readonly value: T;
   readonly onChange: (id: T) => void;
   readonly size?: 'sm' | 'md';
@@ -255,7 +261,7 @@ export function Segmented<T extends string>({
   /** Select `next` and move DOM focus onto it, so the roving stop follows. */
   const moveTo = (next: number): void => {
     const opt = options[next];
-    if (opt === undefined) return;
+    if (opt === undefined || opt.disabled === true) return;
     onChange(opt.id);
     const el = groupRef.current?.children[next];
     if (el instanceof HTMLElement) el.focus();
@@ -266,10 +272,25 @@ export function Segmented<T extends string>({
     const from = i === -1 ? 0 : i;
     const last = options.length - 1;
     let next: number | null = null;
-    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') next = from === last ? 0 : from + 1;
-    else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') next = from === 0 ? last : from - 1;
-    else if (e.key === 'Home') next = 0;
-    else if (e.key === 'End') next = last;
+    // Step OVER disabled options rather than stopping on them: an arrow key
+    // that appears to do nothing reads as a broken control, not a blocked one.
+    const step = (start: number, dir: 1 | -1): number | null => {
+      for (let n = 1; n <= options.length; n++) {
+        const at = (start + dir * n + options.length * n) % options.length;
+        if (options[at]?.disabled !== true) return at;
+      }
+      return null;
+    };
+    const seek = (from0: number, dir: 1 | -1): number | null => {
+      for (let at = from0; at >= 0 && at <= last; at += dir) {
+        if (options[at]?.disabled !== true) return at;
+      }
+      return null;
+    };
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') next = step(from, 1);
+    else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') next = step(from, -1);
+    else if (e.key === 'Home') next = seek(0, 1);
+    else if (e.key === 'End') next = seek(last, -1);
     if (next === null) return;
     // Arrow keys inside a radio group must not also scroll the panel.
     e.preventDefault();
@@ -297,7 +318,15 @@ export function Segmented<T extends string>({
           tabIndex={value === o.id || (i === 0 && !options.some((x) => x.id === value)) ? 0 : -1}
           className="tp-segment"
           data-active={value === o.id}
-          onClick={() => onChange(o.id)}
+          data-disabled={o.disabled === true}
+          aria-disabled={o.disabled === true}
+          // NOT the `disabled` attribute: a disabled button gets no pointer
+          // events, so the title never appears and the option becomes a dead
+          // patch with no explanation. It stays hoverable and refuses the click.
+          title={o.hint}
+          onClick={() => {
+            if (o.disabled !== true) onChange(o.id);
+          }}
         >
           {o.label}
         </button>

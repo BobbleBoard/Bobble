@@ -4744,3 +4744,17 @@
   background: var(--pd-bg-hover);
   color: var(--pd-text-primary);
 }
+
+/*
+ * A segment that is present but not pickable — 1536³ resolution, which needs a
+ * datacentre GPU. Deliberately still hoverable (see Segmented: no `disabled`
+ * attribute) so the title explains WHY rather than leaving a dead patch.
+ */
+.tp-segment[data-disabled="true"] {
+  opacity: 0.38;
+  cursor: not-allowed;
+}
+.tp-segment[data-disabled="true"]:hover {
+  background: transparent;
+  color: inherit;
+}

@@ -42,8 +42,10 @@ import { ANIM_PREVIEWS } from './assets/anim-previews';
 import { ANIM_MODEL, LEARNED_RIG_MODEL, MEDIAL_MODEL, RIG_MODEL, TEMPLATE_RIG_MODEL } from './data';
 import { useGen3dStore } from './gen3d-client';
 import { IcAnimate, IcBolt, IcInfo, IcPlus, IcRig, IcSearch, IcSparkles, IcTrash } from './icons';
+import { hasPresetMotion } from './preset-motions';
 import { Segmented } from './primitives';
 import { currentVersion, useTripoStore } from './store';
+import { requestPresetMotion } from './viewer-io';
 
 /** Preset preview: a real skeletal-animation video on a humanoid dummy — the
  * mid-motion poster by default, playing on hover. These are BUNDLED sample
@@ -287,6 +289,25 @@ export function AnimatePanel(): JSX.Element {
     );
   };
 
+  /**
+   * Click a preset: play the bundled motion, or generate it if there is none.
+   *
+   * The bundled path is the normal one — every card except dance_01 has
+   * authored curves — and it is instant, so it runs before anything is asked of
+   * the engine. Falling back to ARDY keeps the odd one out working rather than
+   * dropping it from the library.
+   */
+  const applyPreset = (m: (typeof motions)[number]): void => {
+    if (
+      m.previewId !== undefined &&
+      hasPresetMotion(m.previewId) &&
+      requestPresetMotion(m.previewId)
+    ) {
+      return;
+    }
+    runMotion(m.prompt ?? m.name, true);
+  };
+
   const visible = motions.filter((m) => m.name.toLowerCase().includes(animSearch.toLowerCase()));
 
   /**
@@ -481,9 +502,19 @@ export function AnimatePanel(): JSX.Element {
                   className="tp-anim-card"
                   data-generated={m.kind === 'generated'}
                   data-testid={`tp-motion-${m.id}`}
-                  title={m.prompt ?? m.name}
-                  disabled={!motionInstalled || motionBusy}
-                  onClick={() => runMotion(m.prompt ?? m.name, true)}
+                  title={
+                    m.previewId !== undefined && hasPresetMotion(m.previewId)
+                      ? `${m.name} — plays instantly`
+                      : (m.prompt ?? m.name)
+                  }
+                  // A BUNDLED preset needs nothing downloaded and no engine, so
+                  // it must not be greyed out by the motion model's absence.
+                  disabled={
+                    m.previewId !== undefined && hasPresetMotion(m.previewId)
+                      ? false
+                      : !motionInstalled || motionBusy
+                  }
+                  onClick={() => applyPreset(m)}
                 >
                   <span className="tp-anim-add">
                     <IcPlus size={11} />

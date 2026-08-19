@@ -298,6 +298,15 @@ interface TripoState {
   toggleMenu: (id: string) => void;
   closeMenus: () => void;
   loadAsset: (id: string) => void;
+  /**
+   * Record that the LOADED version already carries a skeleton.
+   *
+   * Called by the viewer after it reads a dropped/imported file, because the
+   * file is the only thing that knows. Without it an already-rigged import sat
+   * at `rigged: false` and the Animate panel hid the entire motion library
+   * behind an offer to rig a model that is rigged.
+   */
+  markLoadedRigged: (humanoid: boolean) => void;
   /** Advance the loaded asset to a pipeline stage (no-op if nothing loaded). */
   runStage: (stage: TripoStage) => void;
   /** A brand-new asset (import or fresh generation) with its root version. */
@@ -456,6 +465,25 @@ export const useTripoStore = create<TripoState>((set, get) => ({
       // "?" button in the viewport rail (the user).
     });
   },
+  markLoadedRigged: (humanoid) =>
+    set((s) => {
+      if (s.loadedAssetId === null) return {};
+      let changed = false;
+      const assets = s.assets.map((a) => {
+        if (a.id !== s.loadedAssetId) return a;
+        const last = a.versions.length - 1;
+        const versions = a.versions.map((v, i) => {
+          if (i !== last) return v;
+          if (v.rigged === true && v.humanoid === humanoid) return v;
+          changed = true;
+          return { ...v, rigged: true, humanoid };
+        });
+        return changed ? { ...a, versions } : a;
+      });
+      // Comparing by VALUE, not just length: writing an identical assets array
+      // on every load would retrigger every selector subscribed to it.
+      return changed ? { assets } : {};
+    }),
   runStage: (stage) =>
     set((s) => {
       // Every stage runs on a real loaded asset — nothing to advance otherwise.

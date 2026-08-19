@@ -44,8 +44,13 @@ import type { JSX } from 'react';
 import { useEffect, useRef } from 'react';
 import { ensureModelBytes } from './asset-registry';
 import { HERO_MESH_GLB_B64, HERO_RIG_GLB_B64 } from './assets/hero-glb';
+import { buildPresetClip } from './preset-motions';
 import { useTripoStore } from './store';
-import { setViewerExportHandler, type ViewerExportRequest } from './viewer-io';
+import {
+  setPresetMotionHandler,
+  setViewerExportHandler,
+  type ViewerExportRequest,
+} from './viewer-io';
 
 /** Resolve an arbitrary CSS color expression (var()/color-mix()) to an sRGB
  * string three can parse, using a detached probe span's computed style. */
@@ -804,6 +809,33 @@ export default function Viewer3D({ gizmoRef }: Viewer3DProps): JSX.Element {
       }
       useTripoStore.getState().set('hasSkeleton', hasSkin);
 
+      /*
+       * A FILE THAT ARRIVES RIGGED IS RIGGED.
+       *
+       * `rigged` was only ever set by the rig STAGE, so importing a model that
+       * already carries a skeleton — including one this studio exported five
+       * minutes earlier — left the Animate panel offering to rig it and hiding
+       * the whole motion library. The skeleton is right there in the file; not
+       * believing it is the odd position.
+       *
+       * `humanoid` is decided by the joint NAMES rather than by re-measuring the
+       * mesh: the preset motions and ARDY both address cskel27 by name, so a rig
+       * that answers to those names is one they can drive, and a rig that does
+       * not (the medial rigger's joint_00…joint_17) is honestly not humanoid for
+       * this purpose whatever its shape.
+       */
+      if (hasSkin) {
+        const named = new Set<string>();
+        group.traverse((o) => {
+          if (o.name !== '') named.add(o.name);
+        });
+        const CSKEL_MARKERS = ['Hips', 'Spine', 'Head', 'LeftArm', 'RightArm', 'LeftUpLeg'];
+        const looksHumanoid = CSKEL_MARKERS.every(
+          (n) => named.has(n) || named.has(`mixamorig${n}`),
+        );
+        useTripoStore.getState().markLoadedRigged(looksHumanoid);
+      }
+
       // Real counts → asset row + (via applyState) the stats readout.
       let faces = 0;
       let verts = 0;
@@ -864,6 +896,32 @@ export default function Viewer3D({ gizmoRef }: Viewer3DProps): JSX.Element {
       host.dataset.tpExported = `${base}.${req.format.toLowerCase()}`;
     };
     setViewerExportHandler(onExport);
+
+    /**
+     * Play a bundled preset on the loaded model, immediately.
+     *
+     * The clip is built against THIS model's bones (see preset-motions), so it
+     * is the rig in the viewport that gets animated rather than a generic one,
+     * and it costs a clip construction rather than an ARDY run. Returns false
+     * when there is nothing rigged to play it on, so the panel can say so
+     * instead of appearing to have ignored the click.
+     */
+    const onPresetMotion = (presetId: string): boolean => {
+      if (importedGroup === null) return false;
+      const clip = buildPresetClip(presetId, importedGroup);
+      if (clip === null) return false;
+      // Replace whatever was playing — a generated clip and a preset are two
+      // answers to the same question, so they must not blend into each other.
+      if (importedMixer !== null) importedMixer.stopAllAction();
+      importedMixer = new THREE.AnimationMixer(importedGroup);
+      const action = importedMixer.clipAction(clip);
+      action.setLoop(THREE.LoopRepeat, Number.POSITIVE_INFINITY);
+      action.play();
+      // A preset performs where it stands, so nothing for the camera to follow.
+      travelTracking = null;
+      return true;
+    };
+    setPresetMotionHandler(onPresetMotion);
 
     /** Re-resolve every themed color (mount, store change, theme flip). Clay
      * deliberately stays FIXED white/grey (set at construction). */
@@ -1298,6 +1356,7 @@ export default function Viewer3D({ gizmoRef }: Viewer3DProps): JSX.Element {
     return () => {
       disposed = true;
       setViewerExportHandler(null);
+      setPresetMotionHandler(null);
       cancelAnimationFrame(raf);
       unsubscribe();
       themeObserver.disconnect();

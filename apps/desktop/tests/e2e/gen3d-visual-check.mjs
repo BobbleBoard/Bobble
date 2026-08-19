@@ -80,6 +80,29 @@ const stats = await win.evaluate(() => {
 });
 console.log(`${LABEL}: faces=${stats.faces} verts=${stats.verts}`);
 
+// PRESET=<id> clicks a motion card and grabs two frames close together, which
+// is what "instantly applicable" has to mean: no engine job, and the pose has
+// moved between the frames.
+const PRESET = process.env.PRESET ?? '';
+if (PRESET !== '') {
+  const card = `[data-testid="tp-motion-${PRESET}"]`;
+  const before = await win.evaluate((sel) => {
+    const el = document.querySelector(sel);
+    return el === null ? null : { disabled: el.disabled, title: el.getAttribute('title') };
+  }, card);
+  console.log(`  card: ${JSON.stringify(before)}`);
+  const t0 = Date.now();
+  await win.click(card);
+  await win.waitForTimeout(200);
+  await win.screenshot({ path: path.join(OUT, `${LABEL}-preset-a.png`) });
+  await win.waitForTimeout(400);
+  await win.screenshot({ path: path.join(OUT, `${LABEL}-preset-b.png`) });
+  const after = await win.evaluate(() => ({
+    engineBusy: /Generating|Loading the motion model|Sampling/i.test(document.body.textContent ?? ''),
+  }));
+  console.log(`  clicked, 2 frames in ${Date.now() - t0}ms, engineBusy=${after.engineBusy}`);
+}
+
 for (const mode of MODES) {
   if (mode === 'wireframe') {
     await win.click('[data-testid="tp-wire-toggle"]').catch(() => {});

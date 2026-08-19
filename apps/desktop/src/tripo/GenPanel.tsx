@@ -514,7 +514,16 @@ function ModelPanel(): JSX.Element {
             options={[
               { id: 'low', label: String(resolutions.low) },
               { id: 'medium', label: String(resolutions.medium) },
-              { id: 'high', label: String(resolutions.high) },
+              {
+                id: 'high',
+                label: String(resolutions.high),
+                // 1536^3 is 27x the voxels of 512 and 3.4x of 1024. Upstream
+                // quotes ~60s for it on an H100; the honest answer for a Mac is
+                // that it does not finish in a usable time, and offering it
+                // anyway spends the user's afternoon to find that out.
+                disabled: true,
+                hint: 'Too heavy for this machine — 1536³ needs a datacentre GPU. Use 1024 for the highest detail here.',
+              },
             ]}
             value={genResolution}
             onChange={(v) => set('genResolution', v)}

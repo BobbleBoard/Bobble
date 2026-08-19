@@ -51,7 +51,20 @@ try:
 
     os.environ.setdefault("SPARSE_CONV_BACKEND", "flex_gemm")
 except (ImportError, RuntimeError):
-    os.environ.setdefault("SPARSE_CONV_BACKEND", "none")
+    # "pytorch", NOT "none". There is no conv_none module in the checkout, so
+    # `none` is not a fallback at all — it is an import error deferred until the
+    # first model that actually builds a SparseConv3d. Nothing at 512 does, so
+    # this looked fine for as long as 512 was the only resolution anyone ran;
+    # the 1024 shape decoder builds one immediately and died with
+    #     ModuleNotFoundError: No module named 'trellis2.modules.sparse.conv.conv_none'
+    # which the pipeline loader then re-raised as a 404 for a HuggingFace repo
+    # called "ckpts/shape_dec_next_dc_f16c32_fp16" — so the one resolution that
+    # would not run reported itself as a missing download.
+    #
+    # The checkout's own __detect_defaults() picks 'pytorch' on Darwin when its
+    # flex_gemm MPS probe fails, and conv_pytorch.py is right there beside the
+    # others. This just stops overriding that with a value it cannot honour.
+    os.environ.setdefault("SPARSE_CONV_BACKEND", "pytorch")
 
 patch_tqdm()
 ROUTER.default_stage = "geometry"

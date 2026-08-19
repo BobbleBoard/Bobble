@@ -45,6 +45,26 @@ export function requestSendTo(targetId: string): void {
   exportHandler?.({ format: 'GLB', fileName: `${name ?? 'model'}-for-${targetId}` });
 }
 
+/**
+ * PRESET MOTION — applied by the viewer, in a frame, with no engine round trip.
+ *
+ * Separate from the export handler because it is a different capability: a
+ * build that could export but had no rigged model loaded should refuse this
+ * rather than silently do nothing, and the panel needs to know which it is.
+ */
+export type PresetMotionHandler = (presetId: string) => boolean;
+
+let presetMotionHandler: PresetMotionHandler | null = null;
+
+export function setPresetMotionHandler(h: PresetMotionHandler | null): void {
+  presetMotionHandler = h;
+}
+
+/** Play a bundled preset on the loaded model. False = nothing could play it. */
+export function requestPresetMotion(presetId: string): boolean {
+  return presetMotionHandler?.(presetId) ?? false;
+}
+
 /** True when the file is an importable 3D model (.glb/.gltf/.obj/.stl). */
 export function isModelFile(file: File): boolean {
   return importedFormatOf(file.name) !== null;
