@@ -182,6 +182,40 @@ def make_manifold(mesh, grid: int, say):
     return solid
 
 
+#: Quads per input triangle. QuadriFlow is asked for a FACE count; giving it a
+#: fixed one regardless of what came in is what broke this stage.
+#:
+#: MEASURED on the 300,000-face TRELLIS car, same input OBJ, same binary:
+#:   -f  20000  ->  17,633 quads, 14s — the door mirror comes out as a spray of
+#:                  loose shards, the rocker and wheel arch are torn, and the
+#:                  clay render (no texture at all) shows every one of them, so
+#:                  this is the geometry and not the bake.
+#:   -f  60000  ->  52,169 quads, 30s — mirror is one coherent solid, surface is
+#:                  smooth, no spikes.
+#:   -f 120000  -> 106,130 quads, 85s.
+#: A 17x reduction in one step is simply past what the solver can hold together
+#: on a stair-stepped marching-cubes surface; 6x is not.
+#:
+#: The quality FLAGS are not the lever, though they look like the obvious one:
+#: `-sharp` and `-mcf` both ran past 420s on this input and were killed (against
+#: 14s plain), so neither is usable at this size whatever they would do for the
+#: result.
+QUADS_PER_INPUT_FACE = 1.0 / 6.0
+MIN_ADAPTIVE_QUADS = 20_000
+MAX_ADAPTIVE_QUADS = 100_000
+
+
+def adaptive_target_quads(in_faces: int) -> int:
+    """How many quads to ask for, from how much mesh came in.
+
+    Bounded at both ends: a simple object should not be inflated to six figures
+    to hit a ratio, and a very dense input should not ask for a remesh that
+    takes minutes. Inside those bounds the ratio is what keeps the reduction
+    survivable.
+    """
+    return int(min(MAX_ADAPTIVE_QUADS, max(MIN_ADAPTIVE_QUADS, in_faces * QUADS_PER_INPUT_FACE)))
+
+
 def run_quadriflow(cli: str, in_obj: Path, out_obj: Path, faces: int, timeout_s: int):
     """QuadriFlow CLI: `-i in.obj -o out.obj -f <target faces>`."""
     return run_remesher(
@@ -313,7 +347,9 @@ def main() -> None:
     ap.add_argument("--quadriflow", default="")  # primary remesher
     # Voxel grid used only when the surface needs closing before remeshing.
     ap.add_argument("--voxel-grid", type=int, default=384)
-    ap.add_argument("--target-quads", type=int, default=20_000)
+    # 0 = "decide from the input" — see adaptive_target_quads. A fixed number
+    # here was the default for every run and it was far too small.
+    ap.add_argument("--target-quads", type=int, default=0)
     ap.add_argument("--adaptivity", type=float, default=1.0)
     ap.add_argument("--edge-scaling", type=float, default=1.0)
     ap.add_argument("--sharp-edge", type=float, default=90.0)
@@ -385,13 +421,15 @@ def main() -> None:
     out_obj = out_dir / "retopo-quads.obj"
     report = out_dir / "retopo-report.txt"
 
-    progress(STAGE, f"Remeshing to ~{args.target_quads:,} quads…", 3, TOTAL_STEPS)
+    # The UI's own number wins when it sends one; 0 means it did not.
+    target_quads = args.target_quads or adaptive_target_quads(len(healed.faces))
+    progress(STAGE, f"Remeshing to ~{target_quads:,} quads…", 3, TOTAL_STEPS)
     result = None
     engine = "QuadriFlow"
     # PRIMARY: QuadriFlow. MEASURED on the same TRELLIS model AutoRemesher could
     # not handle — 15s, 29,261 faces, 100% quads, 0 triangles.
     if args.quadriflow and Path(args.quadriflow).exists():
-        result = run_quadriflow(args.quadriflow, in_obj, out_obj, args.target_quads, args.timeout)
+        result = run_quadriflow(args.quadriflow, in_obj, out_obj, target_quads, args.timeout)
     # FALLBACK: AutoRemesher. Kept because it is the tool the user rates and it may
     # suit meshes QuadriFlow refuses — but it is NOT the default any more: it
     # dies on a vendored-geogram assertion (hexdom/quad_cover.cpp:207) even on a
@@ -404,7 +442,7 @@ def main() -> None:
             args.cli,
             "--input", str(in_obj),
             "--output", str(out_obj),
-            "--target-quads", str(args.target_quads),
+            "--target-quads", str(target_quads),
             "--adaptivity", str(args.adaptivity),
             "--edge-scaling", str(args.edge_scaling),
             "--sharp-edge", str(args.sharp_edge),

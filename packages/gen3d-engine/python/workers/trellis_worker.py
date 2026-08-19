@@ -379,9 +379,38 @@ def load_voxels(path: Path) -> VoxelVolume:
         attrs=torch.from_numpy(z["attrs"].astype(np.float32)),
         origin=torch.from_numpy(z["origin"]),
         voxel_size=float(z["voxel_size"]),
-        layout=str(z["layout"]),
+        layout=parse_attr_layout(str(z["layout"])),
     )
 
+
+
+def parse_attr_layout(text: str) -> dict:
+    """Turn the layout string saved in voxels.npz back into slices.
+
+    `save_voxels` writes `np.asarray(str(mesh_out.layout))` because an npz saved
+    with allow_pickle=False cannot hold a dict of slices. Nothing turned it back,
+    so a volume READ FROM DISK carried a layout of type str — and the reference
+    Metal bake indexes it as a mapping:
+
+        base_color = np.clip(attrs_full[..., attr_layout['base_color']]…)
+        TypeError: string indices must be integers, not 'str'
+
+    which is why the o_voxel path failed on every Texture-stage re-bake. That
+    failure is separate from the memory ones its opt-in switch documents, and it
+    would have looked exactly like them from outside: the stage falls back to the
+    KDTree baker and finishes, so nothing says the reference path was never
+    reached.
+    """
+    import re
+
+    if isinstance(text, dict):
+        return text
+    out: dict[str, slice] = {}
+    for name, start, stop in re.findall(r"'(\w+)':\s*slice\((\d+),\s*(\d+)", str(text)):
+        out[name] = slice(int(start), int(stop))
+    if not out:
+        raise ValueError(f"unreadable attr layout: {text!r}")
+    return out
 
 
 def dilate_atlas(img, valid, passes: int = 8):
@@ -440,6 +469,165 @@ def dilate_atlas(img, valid, passes: int = 8):
         out[fill] = (acc[fill] / cnt[fill][:, None]).astype(np.uint8)
         covered |= fill
     return out
+
+
+def uv_unwrap_padded(vertices, faces, size, padding=4):
+    """Unwrap with a real GUTTER between charts, which xatlas will not do by default.
+
+    trellis-mac calls `xatlas.parametrize(v, f)`, which takes the default
+    PackOptions — and that default padding is ZERO. Charts are therefore packed
+    edge to edge, so a chart of red paint can sit directly against a chart of
+    black tyre or dark cabin. Any filtered fetch near that border mixes the two,
+    which is what the dark specks scattered over the paint actually are: not
+    noise in the field (measured: zero isolated dark voxels), not unsampled
+    texels (measured: the baker's gate never fires), and not the far side of a
+    thin panel (measured: rejecting behind-surface voxels moved the count by
+    0.8%). Zoom the atlas to 1:1 and it is plain — angular chart-shaped black and
+    grey patches abutting the red, with no gutter anywhere.
+
+    Padding restores the gutter so `dilate_atlas` fills each chart's border with
+    that chart's OWN colour, and a neighbour's colour is never within the filter
+    footprint. `resolution` has to be set too, or padding is measured against an
+    atlas size xatlas picked for itself rather than the one we are about to bake.
+    """
+    import numpy as np
+    import xatlas
+
+    atlas = xatlas.Atlas()
+    atlas.add_mesh(
+        np.ascontiguousarray(vertices.astype(np.float32)),
+        np.ascontiguousarray(faces.astype(np.uint32)),
+    )
+    pack = xatlas.PackOptions()
+    pack.padding = padding
+    pack.resolution = int(size)
+    pack.bilinear = True
+    atlas.generate(pack_options=pack)
+    vmapping, indices, uvs = atlas[0]
+    return vertices[vmapping], indices.reshape(-1, 3), uvs, vmapping
+
+
+def bake_atlas_front_facing(verts, faces, uvs, coords, attrs, origin, voxel_size, size):
+    """Sample the voxel colour field into an atlas, from IN FRONT of the surface.
+
+    THE CAUSE OF THE DARK SPECKS ON THE PAINT. trellis-mac's `bake_texture`
+    takes the 8 nearest voxels to each texel and inverse-distance-weights them,
+    with no notion of which SIDE of the surface they are on:
+
+        distances, indices = tree.query(query_points, k=k_neighbors)
+        weights = 1.0 / (distances + eps)
+        weights[distances > voxel_size * 2.0] = 0.0
+
+    A car's body panels are thin shells — red on the outside, dark cabin and
+    wheel well on the inside — and at 512^3 the two surfaces are a voxel or two
+    apart. So a texel on the bonnet reaches straight THROUGH the panel and
+    averages in the darkness behind it, which is why the paint came out peppered
+    with dark specks.
+
+    Ruled out first, by measurement, so this is the cause rather than the next
+    guess: the field is not noisy (ZERO of its 56,129 dark voxels sit isolated in
+    a bright neighbourhood — they are coherent dark regions, i.e. real tyres and
+    interiors); the texels are not unsampled (every covered texel has a voxel
+    within the baker's own cut-off, so its `has_neighbor` gate never fires); and
+    alpha cannot be used to mask them (uniformly 1.000 across every voxel).
+
+    The fix is to give the sampler the one piece of information it was missing —
+    the surface normal, interpolated per texel by rasterising the same triangles
+    with vertex normals in place of positions — and drop any neighbour that lies
+    behind the surface. A texel with nothing at all in front of it keeps the
+    plain nearest voxel rather than going black.
+
+    No gamma here on purpose: the attributes are already display-referred, which
+    is what the reference `to_glb` relies on when it writes
+    `clip(attrs * 255)` straight out. The baker's extra pow(1/2.2) is the reason
+    a separate undo step existed.
+    """
+    import numpy as np
+    import trimesh
+    from scipy.spatial import cKDTree
+
+    from backends.texture_baker import _rasterize_uv_triangles
+
+    positions, cover = _rasterize_uv_triangles(verts, faces, uvs, size)
+    vn = trimesh.Trimesh(vertices=verts, faces=faces, process=False).vertex_normals
+    normals, _ = _rasterize_uv_triangles(np.asarray(vn, dtype=np.float32), faces, uvs, size)
+
+    ys, xs = np.where(cover)
+    base = np.zeros((size, size, 3), dtype=np.uint8)
+    mr = np.zeros((size, size, 3), dtype=np.uint8)
+    if len(ys) == 0:
+        return base, mr, cover
+
+    P = positions[ys, xs]
+    N = normals[ys, xs]
+    N = N / np.maximum(np.linalg.norm(N, axis=1, keepdims=True), 1e-9)
+
+    voxel_world = coords.astype(np.float32) * voxel_size + origin + voxel_size * 0.5
+    dist, idx = cKDTree(voxel_world).query(P, k=8, workers=-1)
+    offs = voxel_world[idx] - P[:, None, :]
+    ahead = np.einsum("mkc,mc->mk", offs, N)
+
+    weights = 1.0 / (dist + voxel_size * 0.1)
+    weights[dist > voxel_size * 3.0] = 0.0
+    # BEHIND THE SURFACE — the other face of a thin panel. Half a voxel of slack
+    # keeps the shell's own voxels, which straddle the surface they describe.
+    weights[ahead < -voxel_size * 0.5] = 0.0
+    total = weights.sum(axis=1, keepdims=True)
+    blind = total[:, 0] <= 0
+    if blind.any():
+        weights[blind] = 0.0
+        weights[blind, 0] = 1.0
+        total[blind] = 1.0
+    sampled = (attrs[idx] * (weights / total)[..., None]).sum(axis=1)
+
+    base[ys, xs] = (np.clip(sampled[:, 0:3], 0, 1) * 255).astype(np.uint8)
+    # glTF metallic-roughness packing: G roughness, B metallic.
+    mr[ys, xs, 1] = (np.clip(sampled[:, 4], 0, 1) * 255).astype(np.uint8)
+    mr[ys, xs, 2] = (np.clip(sampled[:, 3], 0, 1) * 255).astype(np.uint8)
+    progress("texture", f"Sampled {len(ys):,} texels ({int(blind.sum()):,} with nothing in front)")
+    return base, mr, cover
+
+
+def export_glb_pbr(vertices, faces, uvs, base_color_img, mr_img, out_path) -> None:
+    """Write the textured GLB ourselves instead of trellis-mac's exporter.
+
+    Two things that exporter does are wrong, and both are silent.
+
+    1. METAL IS MULTIPLIED AWAY. It builds the material as
+       `PBRMaterial(baseColorTexture=…, metallicFactor=0.0, roughnessFactor=0.8)`
+       and THEN attaches `metallicRoughnessTexture`. glTF multiplies factor by
+       texture, so a metallicFactor of 0 zeroes the entire metal channel the
+       bake just spent minutes producing. MEASURED on the car: the MR map holds
+       435,304 texels above 0.5 metallic (peak 213/255) and every one of them
+       renders as plain dielectric. Chrome, paint flake and bare metal all come
+       out looking like matte plastic, which is a large part of why our output
+       did not look like the reference renders. Factors of 1.0 mean "use the
+       maps", which is the whole point of having baked them.
+
+    2. NO NORMALS. The GLB goes out with POSITION and TEXCOORD_0 only, so every
+       consumer has to invent them: our viewer calls computeVertexNormals, but
+       Blender/Unity/Unreal — the Send To targets — flat-shade it, and a
+       decimated marching-cubes surface flat-shaded is all facets. Writing them
+       is a few hundred KB against a file already in the tens of MB.
+
+    Kept from the original: nothing else changes, so the atlas, the UVs and the
+    face order are byte-identical to what the bake produced.
+    """
+    import trimesh
+    from PIL import Image as PILImage
+
+    mesh = trimesh.Trimesh(vertices=vertices, faces=faces, process=False)
+    material = trimesh.visual.material.PBRMaterial(
+        baseColorTexture=PILImage.fromarray(base_color_img),
+        metallicFactor=1.0,
+        roughnessFactor=1.0,
+    )
+    if mr_img is not None:
+        material.metallicRoughnessTexture = PILImage.fromarray(mr_img)
+    mesh.visual = trimesh.visual.TextureVisuals(uv=uvs, material=material)
+    # Touching `vertex_normals` computes them; include_normals then writes them.
+    _ = mesh.vertex_normals
+    mesh.export(str(out_path), include_normals=True)
 
 
 def bake_textures(
@@ -538,9 +726,7 @@ def bake_textures(
         except RuntimeError as err:
             progress("texture", f"Metal bake failed ({err}); falling back to KDTree baker…")
 
-    progress("texture", f"Baking PBR textures via KDTree ({size}px)…")
-    from backends.texture_baker import bake_texture, export_glb_with_texture, uv_unwrap
-
+    progress("texture", f"Baking PBR textures ({size}px)…")
     bake_verts, bake_faces = verts, faces
     if len(faces) > target_faces:
         try:
@@ -550,8 +736,8 @@ def bake_textures(
             bake_verts, bake_faces = fast_simplification.simplify(verts, faces, ratio)
         except ImportError:
             pass
-    new_verts, new_faces, uvs, _ = uv_unwrap(bake_verts, bake_faces)
-    base_color_img, mr_img, _padded_mask = bake_texture(
+    new_verts, new_faces, uvs, _ = uv_unwrap_padded(bake_verts, bake_faces, size)
+    base_color_img, mr_img, true_cover = bake_atlas_front_facing(
         new_verts,
         new_faces,
         uvs,
@@ -559,17 +745,8 @@ def bake_textures(
         attrs.float().numpy(),
         volume.origin.float().numpy(),
         voxel_size,
-        texture_size=size,
+        size,
     )
-    base_color_img = undo_baker_gamma(base_color_img)
-    # RE-PAD FROM TRUE COVERAGE. The mask the baker returns is its own POST-
-    # padding one, which already claims the dark ring; seeding from it is a no-op
-    # (measured: identical atlas). `_rasterize_uv_triangles` gives the texels the
-    # triangles actually cover, which is the honest seed. It costs one extra
-    # rasterisation pass — seconds against a bake measured in minutes.
-    from backends.texture_baker import _rasterize_uv_triangles
-
-    _positions, true_cover = _rasterize_uv_triangles(new_verts, new_faces, uvs, size)
     base_color_img = dilate_atlas(base_color_img, true_cover)
     mr_img = dilate_atlas(mr_img, true_cover)
     PILImage.fromarray(base_color_img)  # touch to validate
@@ -593,8 +770,8 @@ def bake_textures(
     # coords/attrs/origin, which must stay in TRELLIS's original frame or the
     # texture lands on the wrong faces. A rigid rotation leaves UVs and face
     # indices untouched, so converting the positions here is safe.
-    export_glb_with_texture(
-        to_gltf_up(new_verts), new_faces, export_uvs, base_color_img, mr_img, str(out_path)
+    export_glb_pbr(
+        to_gltf_up(new_verts), new_faces, export_uvs, base_color_img, mr_img, out_path
     )
 
 

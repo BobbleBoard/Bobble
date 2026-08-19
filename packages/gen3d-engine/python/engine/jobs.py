@@ -438,7 +438,10 @@ class JobManager:
                     "--out-dir", str(job_dir),
                     "--cli", str(self.registry.autoremesher_cli()),
                     "--quadriflow", str(self.registry.quadriflow_cli()),
-                    "--target-quads", str(int(options.get("targetQuads") or 20_000)),
+                    # 0 lets the worker size it from the input — a fixed
+                    # 20,000 here overrode the adaptive default on every run
+                    # that did not come from the Face-limit control.
+                    "--target-quads", str(int(options.get("targetQuads") or 0)),
                     "--adaptivity", str(float(options.get("adaptivity") or 1.0)),
                 ]
                 cwd = self.registry.tool_dir("meshtools")
