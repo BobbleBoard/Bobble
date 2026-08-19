@@ -80,27 +80,26 @@ const stats = await win.evaluate(() => {
 });
 console.log(`${LABEL}: faces=${stats.faces} verts=${stats.verts}`);
 
-// PRESET=<id> clicks a motion card and grabs two frames close together, which
-// is what "instantly applicable" has to mean: no engine job, and the pose has
-// moved between the frames.
-const PRESET = process.env.PRESET ?? '';
-if (PRESET !== '') {
-  const card = `[data-testid="tp-motion-${PRESET}"]`;
-  const before = await win.evaluate((sel) => {
+// PRESET=<id>[,<id>...] clicks each motion card in turn and captures it mid
+// clip. One launch for the whole library, because the point is to LOOK at every
+// preset rather than to prove one of them fires.
+const PRESETS = (process.env.PRESET ?? '').split(',').map((p) => p.trim()).filter(Boolean);
+for (const preset of PRESETS) {
+  const card = `[data-testid="tp-motion-${preset}"]`;
+  const info = await win.evaluate((sel) => {
     const el = document.querySelector(sel);
     return el === null ? null : { disabled: el.disabled, title: el.getAttribute('title') };
   }, card);
-  console.log(`  card: ${JSON.stringify(before)}`);
+  if (info === null) {
+    console.log(`  ${preset}: NO CARD`);
+    continue;
+  }
   const t0 = Date.now();
   await win.click(card);
-  await win.waitForTimeout(200);
-  await win.screenshot({ path: path.join(OUT, `${LABEL}-preset-a.png`) });
-  await win.waitForTimeout(400);
-  await win.screenshot({ path: path.join(OUT, `${LABEL}-preset-b.png`) });
-  const after = await win.evaluate(() => ({
-    engineBusy: /Generating|Loading the motion model|Sampling/i.test(document.body.textContent ?? ''),
-  }));
-  console.log(`  clicked, 2 frames in ${Date.now() - t0}ms, engineBusy=${after.engineBusy}`);
+  // A third of the way in: past the rest pose, before the cycle returns to it.
+  await win.waitForTimeout(Number(process.env.PRESET_AT ?? 560));
+  await win.screenshot({ path: path.join(OUT, `${LABEL}-${preset}.png`) });
+  console.log(`  ${preset}: ${Date.now() - t0}ms  ${info.title}`);
 }
 
 for (const mode of MODES) {

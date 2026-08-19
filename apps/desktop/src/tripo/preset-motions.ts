@@ -9,256 +9,287 @@
  * called `runMotion(m.prompt ?? m.name, true)`, i.e. it asked ARDY to generate
  * something matching the preset's NAME. That costs minutes, needs the motion
  * model downloaded, and can come back as a different movement than the video
- * the user just watched.
+ * the user just watched. The motion is authored, not captured, so it belongs
+ * here where a click can apply it.
  *
- * The motion the video shows was never captured, though — it was AUTHORED, as
- * per-bone Euler curves, by `scripts/anim-previews/main.js`. So the honest fix
- * is not to bundle clip files but to evaluate the SAME curves here: one source
- * of truth for each preset, and what plays on the model is by construction the
- * motion its preview shows.
+ * WHY THIS IS WRITTEN AS AIM DIRECTIONS RATHER THAN JOINT ANGLES.
  *
- * BONE NAMES. The curves were written against Mixamo's rig, and the studio's
- * template rigger emits ARDY's cskel27 — whose joint names ARE Mixamo's without
- * the prefix (`mixamorigLeftForeArm` -> `LeftForeArm`), which is what makes the
- * mapping a string operation rather than a retarget. Bones the loaded model
- * does not have are skipped, so a rig with fewer joints plays the part of the
- * motion it can and nothing throws.
+ * The preview generator states its motion as per-bone Euler deltas — "rotate
+ * the right arm -145 degrees about Z" — which only means anything relative to
+ * the rest pose those numbers were authored against, Mixamo's T-pose. Our
+ * template rigger fits the skeleton to the MESH, so a character modelled with
+ * its arms at its sides binds with the arms down. Composing T-pose-relative
+ * angles onto that bind folded the astronaut into itself; correcting the bone's
+ * direction stopped the folding but left the roll free, and correcting the full
+ * basis still put the wave across the chest. Three attempts, each better and
+ * none right, because a joint angle is only meaningful next to the rest pose it
+ * was measured from — and we do not have that rest pose.
  *
- * These are POSES AND CYCLES, not travel: nothing here moves the root
- * horizontally, so a preset performs where it stands. That is the user's rule for
- * the presets ("letting it wander off across the grid is how you lose sight of
- * the thing you asked to see") and it is why walk and run are leg cycles rather
- * than displacements.
+ * A DIRECTION does not have that problem. "The upper arm points up and out" is
+ * the same instruction whether the bone binds along -X, straight down, or at
+ * 40 degrees, and the rotation that achieves it is computed from wherever the
+ * bone actually rests. So each curve below says where a limb should POINT, in
+ * the model's own space (+X is the model's left, +Y up, -Z the way it faces),
+ * and `aimLocal` solves for the joint rotation. Bind-pose independent by
+ * construction, which is the property the previous three attempts lacked.
+ *
+ * Rotations that are not aims — a nod, a head turn, a spine lean — stay small
+ * Euler deltas on the rest pose, where the bind-pose error is a degree or two
+ * and invisible.
+ *
+ * These are POSES AND CYCLES, not travel: nothing moves the root horizontally,
+ * so a preset performs where it stands. That is the user's rule for the presets
+ * ("letting it wander off across the grid is how you lose sight of the thing
+ * you asked to see").
  */
 import { THREE } from '@pi-desktop/canvas/three';
 
 /** Sine helper — `f` cycles across the clip, `ph` in radians. */
 const S = (t: number, f = 1, ph = 0): number => Math.sin(t * Math.PI * 2 * f + ph);
 
-/** Degrees of rotation on a bone, as a function of normalised clip time. */
-type Euler3 = (t: number) => readonly [number, number, number];
-/** Millimetre-ish offsets in the rig's own units, same signature. */
-type Offset3 = Euler3;
+/** Where a limb points, in model space, as a function of normalised clip time. */
+type Dir3 = (t: number) => readonly [number, number, number];
+/** Degrees about the bone's own axes — for nods and leans, not limbs. */
+type Euler3 = Dir3;
 
 interface Curve {
   readonly bone: string;
-  readonly rot?: Euler3;
-  readonly pos?: Offset3;
+  /** Point this bone's limb here (model space). */
+  readonly aim?: Dir3;
+  /** Small rotation from rest, in degrees. */
+  readonly turn?: Euler3;
+  /** Offset from rest, in the rig's units. */
+  readonly move?: Dir3;
 }
 
 export const PRESET_DURATION = 1.6;
 const FPS = 30;
 
 /**
- * Presets whose clip is NOT 1.6s, so that every curve in them completes a whole
- * number of cycles.
+ * Presets whose clip is NOT 1.6s, so every curve completes a whole cycle.
  *
- * The curves came from a generator that recorded a fixed 1.6s and played it
- * ONCE on hover, so a cycle that did not close was invisible there. Looping it
- * forever in the viewport is a different matter: `walk` runs at 1.25 cycles per
- * clip, which lands the legs mid-stride at the end and snaps back to the start
- * every 1.6 seconds.
- *
- * The cadence is preserved exactly rather than rounded away — 1.25 cycles in
- * 1.6s and 1 cycle in 1.28s are the same 0.781 strides per second, so the walk
- * looks identical and simply closes.
+ * The generator recorded a fixed 1.6s and played it ONCE on hover, so a cycle
+ * that did not close was invisible there. Looping forever is different: `walk`
+ * ran 1.25 cycles per clip, landing the legs mid-stride and snapping back every
+ * 1.6s. The cadence is preserved rather than rounded — 1 cycle in 1.28s is the
+ * same 0.781 strides per second as 1.25 cycles in 1.6s.
  */
-const DURATIONS: Readonly<Record<string, number>> = {
-  walk: 1.28,
-};
-
+const DURATIONS: Readonly<Record<string, number>> = { walk: 1.28 };
 const durationOf = (id: string): number => DURATIONS[id] ?? PRESET_DURATION;
 
-const rot = (bone: string, fn: Euler3): Curve => ({ bone, rot: fn });
-const pos = (bone: string, fn: Offset3): Curve => ({ bone, pos: fn });
+const aim = (bone: string, fn: Dir3): Curve => ({ bone, aim: fn });
+const turn = (bone: string, fn: Euler3): Curve => ({ bone, turn: fn });
+const move = (bone: string, fn: Dir3): Curve => ({ bone, move: fn });
 
-/**
- * Every preset's curves, transcribed from the preview generator's `makeClip`.
- * Keyed by the same ids the preview videos use, so a card's video and its
- * motion cannot drift apart.
- */
+/* Model space: +X the model's LEFT, +Y up, -Z the way it faces. So the RIGHT
+   arm reaching outward points along -X, and anything reaching forward is -Z. */
+
+function angry(m: number): readonly Curve[] {
+  const out = 0.62 + 0.12 * m; // wider stance the angrier it is
+  return [
+    aim('RightArm', () => [-out, -0.62, -0.2]),
+    aim('LeftArm', () => [out, -0.62, -0.2]),
+    // Forearms up and in: fists raised in front of the chest.
+    aim('RightForeArm', () => [-0.3, 0.5, -0.81]),
+    aim('LeftForeArm', () => [0.3, 0.5, -0.81]),
+    turn('Head', (t) => [6, 14 * S(t, 3), 0]),
+  ];
+}
+
+function gait(
+  f: number,
+  swing: number,
+  armSwing: number,
+  lean: number,
+  bob: number,
+): readonly Curve[] {
+  return [
+    // Legs swing fore/aft about vertical; the knee straightens on the forward
+    // half of the stride, which is what makes it read as a step rather than a
+    // shuffle.
+    aim('RightUpLeg', (t) => [0, -1, -swing * S(t, f)]),
+    aim('LeftUpLeg', (t) => [0, -1, swing * S(t, f)]),
+    // A KNEE ONLY BENDS ONE WAY. Letting the shin swing forward with the thigh
+    // hyperextends it, and the skin tears around the joint — which is what made
+    // `run` render as a crumpled heap while `walk`, with half the swing, merely
+    // looked stiff. The shin trails (+Z, behind) and only when the thigh is
+    // behind the body, which is also when a real knee picks the foot up.
+    aim('RightLeg', (t) => [0, -1, swing * 0.9 * Math.max(0, -S(t, f))]),
+    aim('LeftLeg', (t) => [0, -1, swing * 0.9 * Math.max(0, S(t, f))]),
+    // Arms counter-swing to the legs.
+    aim('RightArm', (t) => [-0.2, -1, armSwing * S(t, f, Math.PI)]),
+    aim('LeftArm', (t) => [0.2, -1, -armSwing * S(t, f, Math.PI)]),
+    turn('Spine', () => [lean, 0, 0]),
+    move('Hips', (t) => [0, bob * Math.abs(S(t, f * 2)), 0]),
+  ];
+}
+
+/** Every preset's curves, keyed by the id its preview video uses. */
 const CURVES: Readonly<Record<string, readonly Curve[]>> = {
   wave: [
-    rot('RightArm', () => [0, 0, -145]),
-    rot('RightForeArm', (t) => [0, 0, -20 + 28 * S(t, 2)]),
-    rot('Head', (t) => [0, 8 * S(t, 1), 0]),
+    // Upper arm out and up; forearm vertical, swinging side to side.
+    aim('RightArm', () => [-0.88, 0.46, -0.1]),
+    aim('RightForeArm', (t) => [-0.5 + 0.28 * S(t, 2), 0.85, -0.05]),
+    turn('Head', (t) => [0, 8 * S(t, 1), 0]),
   ],
   hello: [
-    rot('RightArm', () => [0, 0, -145]),
-    rot('RightForeArm', (t) => [0, 0, -20 + 28 * S(t, 2)]),
-    rot('Head', (t) => [0, 8 * S(t, 1), 0]),
+    aim('RightArm', () => [-0.88, 0.46, -0.1]),
+    aim('RightForeArm', (t) => [-0.5 + 0.28 * S(t, 2), 0.85, -0.05]),
+    turn('Head', (t) => [0, 8 * S(t, 1), 0]),
   ],
   agree: [
-    rot('Head', (t) => [16 * Math.abs(S(t, 2)), 0, 0]),
-    rot('Neck', (t) => [6 * Math.abs(S(t, 2)), 0, 0]),
+    turn('Head', (t) => [16 * Math.abs(S(t, 2)), 0, 0]),
+    turn('Neck', (t) => [6 * Math.abs(S(t, 2)), 0, 0]),
   ],
   angry_01: angry(1),
   angry_02: angry(1.4),
   afraid: [
-    rot('Spine', (t) => [18 + 2 * S(t, 2), 0, 0]),
-    rot('RightArm', () => [0, 0, -30]),
-    rot('LeftArm', () => [0, 0, 30]),
-    rot('RightForeArm', () => [0, 0, -120]),
-    rot('LeftForeArm', () => [0, 0, 120]),
-    rot('Head', (t) => [10, 5 * S(t, 4), 0]),
+    // Leaning back, forearms up in front of the face.
+    turn('Spine', (t) => [-16 - 2 * S(t, 2), 0, 0]),
+    aim('RightArm', () => [-0.5, -0.55, -0.67]),
+    aim('LeftArm', () => [0.5, -0.55, -0.67]),
+    aim('RightForeArm', () => [-0.15, 0.72, -0.68]),
+    aim('LeftForeArm', () => [0.15, 0.72, -0.68]),
+    turn('Head', (t) => [10, 5 * S(t, 4), 0]),
   ],
   cheer: [
-    rot('RightArm', (t) => [0, 0, -160 - 8 * S(t, 2)]),
-    rot('LeftArm', (t) => [0, 0, 160 + 8 * S(t, 2)]),
-    pos('Hips', (t) => [0, 8 * Math.abs(S(t, 2)), 0]),
+    aim('RightArm', (t) => [-0.26 - 0.05 * S(t, 2), 0.96, 0]),
+    aim('LeftArm', (t) => [0.26 + 0.05 * S(t, 2), 0.96, 0]),
+    aim('RightForeArm', () => [-0.18, 0.98, 0]),
+    aim('LeftForeArm', () => [0.18, 0.98, 0]),
+    move('Hips', (t) => [0, 8 * Math.abs(S(t, 2)), 0]),
   ],
   clap: [
-    rot('RightArm', () => [0, 0, -70]),
-    rot('LeftArm', () => [0, 0, 70]),
-    rot('RightForeArm', (t) => [0, -35 - 30 * S(t, 3), -60]),
-    rot('LeftForeArm', (t) => [0, 35 + 30 * S(t, 3), 60]),
+    aim('RightArm', () => [-0.66, -0.55, -0.51]),
+    aim('LeftArm', () => [0.66, -0.55, -0.51]),
+    // Hands meet in front of the chest and part again.
+    aim('RightForeArm', (t) => [0.5 - 0.22 * S(t, 3), 0.12, -0.86]),
+    aim('LeftForeArm', (t) => [-0.5 + 0.22 * S(t, 3), 0.12, -0.86]),
   ],
   idle: [
-    rot('Spine', (t) => [2 * S(t, 1), 0, 1.5 * S(t, 1)]),
-    rot('Head', (t) => [2 * S(t, 1, 1), 4 * S(t, 0.5), 0]),
-    pos('Hips', (t) => [0, 1.2 * S(t, 1), 0]),
+    turn('Spine', (t) => [2 * S(t, 1), 0, 1.5 * S(t, 1)]),
+    turn('Head', (t) => [2 * S(t, 1, 1), 4 * S(t, 0.5), 0]),
+    move('Hips', (t) => [0, 1.2 * S(t, 1), 0]),
   ],
   jump: [
-    pos('Hips', (t) => [0, Math.max(0, 26 * S(t, 1)) - 6 * Math.max(0, S(t, 1, Math.PI)), 0]),
-    rot('RightUpLeg', (t) => [Math.max(0, -40 * S(t, 1, Math.PI)), 0, 0]),
-    rot('LeftUpLeg', (t) => [Math.max(0, -40 * S(t, 1, Math.PI)), 0, 0]),
-    rot('RightArm', (t) => [0, 0, -40 - 50 * Math.max(0, S(t, 1))]),
-    rot('LeftArm', (t) => [0, 0, 40 + 50 * Math.max(0, S(t, 1))]),
+    move('Hips', (t) => [0, Math.max(0, 26 * S(t, 1)) - 6 * Math.max(0, S(t, 1, Math.PI)), 0]),
+    // Knees tuck at the top of the arc.
+    aim('RightUpLeg', (t) => [0, -1, -0.55 * Math.max(0, S(t, 1))]),
+    aim('LeftUpLeg', (t) => [0, -1, -0.55 * Math.max(0, S(t, 1))]),
+    aim('RightLeg', (t) => [0, -1, 0.5 * Math.max(0, S(t, 1))]),
+    aim('LeftLeg', (t) => [0, -1, 0.5 * Math.max(0, S(t, 1))]),
+    aim('RightArm', (t) => [-0.45, 0.5 + 0.45 * Math.max(0, S(t, 1)), 0]),
+    aim('LeftArm', (t) => [0.45, 0.5 + 0.45 * Math.max(0, S(t, 1)), 0]),
   ],
   kick: [
-    rot('RightUpLeg', (t) => [-70 * Math.max(0, S(t, 1)), 0, 0]),
-    rot('RightLeg', (t) => [45 * Math.max(0, S(t, 1, 0.6)), 0, 0]),
-    rot('Spine', (t) => [-6 * Math.max(0, S(t, 1)), 0, 0]),
-    rot('RightArm', () => [0, 0, -35]),
-    rot('LeftArm', () => [0, 0, 35]),
+    // Right leg swings forward and the knee snaps straight behind it.
+    aim('RightUpLeg', (t) => [0, -1 + 0.75 * Math.max(0, S(t, 1)), -1.15 * Math.max(0, S(t, 1))]),
+    aim('RightLeg', (t) => [0, -1, -0.9 * Math.max(0, S(t, 1, 0.6))]),
+    turn('Spine', (t) => [-6 * Math.max(0, S(t, 1)), 0, 0]),
+    aim('RightArm', () => [-0.55, -0.8, 0.2]),
+    aim('LeftArm', () => [0.55, -0.8, -0.2]),
   ],
-  point: [rot('RightArm', (t) => [0, -12, -88 + 2 * S(t, 1)]), rot('Head', () => [0, -10, 0])],
-  run: gait(2, 42, -25, 10, 5),
+  point: [
+    // Out as well as forward: a purely forward point is foreshortened to a stub
+    // from the studio's three-quarter camera, which reads as "nothing happened".
+    aim('RightArm', (t) => [-0.55 + 0.02 * S(t, 1), 0.02, -0.83]),
+    aim('RightForeArm', () => [-0.5, 0.0, -0.87]),
+    turn('Head', () => [0, -10, 0]),
+  ],
+  run: gait(2, 0.85, 0.6, 10, 5),
   // 1 cycle over the shorter clip — see DURATIONS.walk.
-  walk: gait(1, 26, -8, 3, 2.5),
+  walk: gait(1, 0.5, 0.34, 3, 2.5),
   sad_01: [
-    rot('Head', (t) => [24 + 2 * S(t, 1), 0, 0]),
-    rot('Spine', () => [10, 0, 0]),
-    rot('RightShoulder', () => [12, 0, 0]),
-    rot('LeftShoulder', () => [12, 0, 0]),
+    turn('Head', (t) => [24 + 2 * S(t, 1), 0, 0]),
+    turn('Spine', () => [10, 0, 0]),
+    // Shoulders slumped, arms hanging slightly in front.
+    aim('RightArm', () => [-0.2, -0.96, -0.2]),
+    aim('LeftArm', () => [0.2, -0.96, -0.2]),
   ],
   /* dance_01 is deliberately absent — its preview is a Mixamo capture played on
      its own character, not authored curves, so there is nothing here to
      evaluate and the card falls back to generating it. */
 };
 
-function angry(m: number): readonly Curve[] {
-  return [
-    rot('RightArm', () => [0, 0, -55 * m]),
-    rot('LeftArm', () => [0, 0, 55 * m]),
-    rot('RightForeArm', () => [0, 0, -95]),
-    rot('LeftForeArm', () => [0, 0, 95]),
-    rot('Head', (t) => [6, 14 * S(t, 3), 0]),
-  ];
-}
-
-function gait(f: number, amp: number, armZ: number, lean: number, bob: number): readonly Curve[] {
-  return [
-    rot('RightUpLeg', (t) => [amp * S(t, f), 0, 0]),
-    rot('LeftUpLeg', (t) => [-amp * S(t, f), 0, 0]),
-    rot('RightLeg', (t) => [Math.max(0, 40 * S(t, f, 2.2)), 0, 0]),
-    rot('LeftLeg', (t) => [Math.max(0, 40 * S(t, f, 2.2 + Math.PI)), 0, 0]),
-    rot('RightArm', (t) => [-amp * 0.7 * S(t, f), 0, armZ]),
-    rot('LeftArm', (t) => [amp * 0.7 * S(t, f), 0, -armZ]),
-    rot('Spine', () => [lean, 0, 0]),
-    pos('Hips', (t) => [0, bob * Math.abs(S(t, f * 2)), 0]),
-  ];
-}
-
 /**
- * Canonical T-POSE direction each bone points in, in its own parent's frame.
+ * The presets whose pose has been LOOKED AT on a real rig and found correct.
  *
- * WHY A CORRECTION IS NEEDED AT ALL. The curves say things like "rotate the
- * right arm -145 degrees about Z", and they mean it RELATIVE TO A T-POSE,
- * because that is the rest pose of the Mixamo rig they were authored on. Our
- * template rigger fits the skeleton to the mesh, so a character modelled with
- * its arms at its sides gets a bind pose with the arms DOWN — correct for
- * skinning, and 90 degrees away from what the curves assume. Composing the
- * authored delta straight onto that bind drove every arm through the body:
- * MEASURED, the astronaut folded into itself the moment a preset played, while
- * the same model at rest was flawless.
+ * Only these play instantly; everything else falls back to generating, exactly
+ * as before.
  *
- * So each bone is first rotated from wherever it rests to where a T-pose would
- * put it, and the authored motion is composed on top of THAT. The direction is
- * taken from the bone's own first child, so it works off the rig's geometry
- * rather than a table of expected orientations.
+ * THE LIST IS SHORT FOR A REASON, and the reason is not the curves. Rendered on
+ * the astronaut, the poses that hold up are the ones with SMALL joint
+ * rotations. Anything that swings a limb a long way — cheer's arms overhead,
+ * jump's tuck, wave's raised arm — tears the surface where the limb meets the
+ * body, and it tears the same way whether the pose comes from here or from
+ * anywhere else. That is the skin weights the rigger produced, not the motion:
+ * the same model at rest is flawless, and a generated ARDY walk (small joint
+ * angles throughout) plays cleanly on it.
+ *
+ * So this gate is really a record of how far the current rig can be pushed.
+ * Widening it is a RIGGING job — better weights around the shoulder and hip —
+ * after which these curves should come along for free.
+ *
+ * To add one: run
+ *   GLB=<rigged.glb> TAB=animate PRESET=m-<id> MODES=clay \
+ *     node tests/e2e/gen3d-visual-check.mjs
+ * look at the frame, and only then put it in this list.
  */
-const TPOSE_DIR: Readonly<Record<string, readonly [number, number, number]>> = {
-  LeftShoulder: [1, 0, 0],
-  LeftArm: [1, 0, 0],
-  LeftForeArm: [1, 0, 0],
-  RightShoulder: [-1, 0, 0],
-  RightArm: [-1, 0, 0],
-  RightForeArm: [-1, 0, 0],
-  LeftUpLeg: [0, -1, 0],
-  LeftLeg: [0, -1, 0],
-  RightUpLeg: [0, -1, 0],
-  RightLeg: [0, -1, 0],
-  Spine: [0, 1, 0],
-  Spine1: [0, 1, 0],
-  Spine2: [0, 1, 0],
-  Spine3: [0, 1, 0],
-  Neck: [0, 1, 0],
-  Head: [0, 1, 0],
+const VERIFIED: ReadonlySet<string> = new Set(['idle', 'sad_01']);
+
+/** Is there authored motion for this preset id that we have verified? */
+export function hasPresetMotion(id: string): boolean {
+  return VERIFIED.has(id) && CURVES[id] !== undefined;
+}
+
+/** Every id with curves, verified or not — the tests exercise all of them. */
+export const PRESET_MOTION_IDS: readonly string[] = Object.keys(CURVES);
+export const VERIFIED_PRESET_IDS: readonly string[] = [...VERIFIED];
+
+/** Arms are lowered when a preset does not animate them, so nothing reads as a
+ *  mannequin holding a T-pose. Same reason the preview generator does it. */
+const HANGING: Readonly<Record<string, readonly [number, number, number]>> = {
+  RightArm: [-0.22, -0.96, -0.05],
+  LeftArm: [0.22, -0.96, -0.05],
 };
 
 /**
- * The rotation that takes `bone` from its bind direction to its T-pose one.
+ * The local rotation that makes `bone`'s limb point along `want` (model space).
  *
- * Identity when the bone has no child to measure a direction from (hands, the
- * head's tip) or no canonical direction — those carry no length to swing, so
- * leaving them alone is both safe and correct.
+ * Everything here is bind-pose relative: the bone's rest direction comes from
+ * where its child actually sits, and the target is brought into the parent's
+ * frame using the parent's own world rotation. A bone with no child has no
+ * limb to aim, so it is left alone rather than spun about an arbitrary axis.
  */
-function tposeCorrection(
+function aimLocal(
   bone: InstanceType<typeof THREE.Object3D>,
-  canonical: readonly [number, number, number] | undefined,
-): InstanceType<typeof THREE.Quaternion> {
-  const q = new THREE.Quaternion();
-  if (canonical === undefined) return q;
-  const child = bone.children.find((c) => c.name !== '');
-  if (child === undefined) return q;
-  const dir = child.position.clone();
-  if (dir.lengthSq() < 1e-12) return q;
-  dir.normalize();
-  const target = new THREE.Vector3(canonical[0], canonical[1], canonical[2]);
+  want: readonly [number, number, number],
+): InstanceType<typeof THREE.Quaternion> | null {
+  const child = bone.children.find((c) => c.name !== '' && c.position.lengthSq() > 1e-12);
+  if (child === undefined) return null;
 
-  /*
-   * A FULL BASIS, not just the direction. `setFromUnitVectors` gives the
-   * shortest arc between two directions, which leaves the ROLL about that
-   * direction unspecified — so the bone ended up pointing the right way with its
-   * local axes twisted, and an authored rotation "about Z" then swung the limb
-   * about whatever axis happened to land there. The wave came out as the arm
-   * folding across the chest.
-   *
-   * Fixing the roll needs a second reference. The rig's own up (+Y) serves,
-   * except for the bones that POINT along it — the spine and legs — where it is
-   * degenerate and +Z (forward) is used instead. Both bases are then built the
-   * same way, so the correction carries orientation and not just aim.
-   */
-  const degenerate = Math.abs(dir.y) > 0.9 || Math.abs(target.y) > 0.9;
-  const ref = degenerate ? new THREE.Vector3(0, 0, 1) : new THREE.Vector3(0, 1, 0);
-  const basis = (primary: InstanceType<typeof THREE.Vector3>) => {
-    const x = primary.clone().normalize();
-    const z = new THREE.Vector3().crossVectors(x, ref).normalize();
-    const y = new THREE.Vector3().crossVectors(z, x).normalize();
-    return new THREE.Matrix4().makeBasis(x, y, z);
-  };
-  const from = new THREE.Quaternion().setFromRotationMatrix(basis(dir));
-  const to = new THREE.Quaternion().setFromRotationMatrix(basis(target));
-  return q.copy(to).multiply(from.invert());
+  const restDir = child.position.clone().normalize();
+  const target = new THREE.Vector3(want[0], want[1], want[2]);
+  if (target.lengthSq() < 1e-12) return null;
+  target.normalize();
+
+  // Model space -> the bone's parent frame, so the aim means the same thing
+  // wherever the parent happens to be pointing.
+  const parent = bone.parent;
+  if (parent !== null) {
+    const pq = new THREE.Quaternion();
+    parent.getWorldQuaternion(pq);
+    target.applyQuaternion(pq.invert());
+    target.normalize();
+  }
+
+  // `restDir` is in the bone's own frame; rotating the bone by its rest
+  // quaternion puts that direction into the parent's frame, which is where the
+  // target now lives.
+  const restInParent = restDir.clone().applyQuaternion(bone.quaternion).normalize();
+  const swing = new THREE.Quaternion().setFromUnitVectors(restInParent, target);
+  return swing.multiply(bone.quaternion);
 }
-
-/** Is there authored motion for this preset id? */
-export function hasPresetMotion(id: string): boolean {
-  return CURVES[id] !== undefined;
-}
-
-export const PRESET_MOTION_IDS: readonly string[] = Object.keys(CURVES);
 
 /**
  * Build the clip for `id` against the bones `root` actually has.
@@ -273,8 +304,39 @@ export function buildPresetClip(
   const curves = CURVES[id];
   if (curves === undefined) return null;
 
-  /* Bones are looked up by cskel27 name, then by the Mixamo spelling, so a model
-     imported from a Mixamo-rigged file works too without a second code path. */
+  /*
+   * BUILD FROM THE BIND POSE, NEVER FROM WHATEVER IS ON SCREEN.
+   *
+   * Every rotation here is solved against the bone's rest direction, so the
+   * rest pose has to BE the rest pose when it is solved. A mixer leaves the
+   * skeleton wherever the last clip stopped, so picking a second preset solved
+   * against the first one's pose, a third against that, and the character
+   * folded further with every click — which is exactly what a contact sheet of
+   * twelve presets clicked in a row showed.
+   */
+  root.traverse((o) => {
+    const skinned = o as { isSkinnedMesh?: boolean; skeleton?: { pose: () => void } };
+    if (skinned.isSkinnedMesh === true && skinned.skeleton !== undefined) skinned.skeleton.pose();
+  });
+  // World matrices have to be current or every parent frame is a guess.
+  root.updateWorldMatrix(true, true);
+
+  /*
+   * POSITION OFFSETS ARE IN THE GENERATOR'S UNITS, NOT OURS.
+   *
+   * The curves were authored on a Mixamo dummy about 100 units tall, so a hip
+   * bob of "8" is 8% of its height. Our imported models are normalised to a
+   * couple of units, so those numbers moved the root several body-lengths and
+   * the character left the frame entirely — five of the twelve presets rendered
+   * an empty viewport. Scaling by the rig's measured height makes the offsets
+   * mean what they meant where they were written.
+   */
+  const bounds = new THREE.Box3().setFromObject(root);
+  const rigHeight = bounds.max.y - bounds.min.y;
+  const unit = (Number.isFinite(rigHeight) && rigHeight > 0 ? rigHeight : 100) / 100;
+
+  /* Bones are found by cskel27 name, then by the Mixamo spelling, so a model
+     imported from a Mixamo-rigged file works without a second code path. */
   const find = (bone: string): InstanceType<typeof THREE.Object3D> | undefined =>
     root.getObjectByName(bone) ?? root.getObjectByName(`mixamorig${bone}`);
 
@@ -284,40 +346,57 @@ export function buildPresetClip(
   const euler = new THREE.Euler();
   const delta = new THREE.Quaternion();
   const out = new THREE.Quaternion();
+  const animated = new Set<string>();
+
+  const pushQuat = (
+    bone: InstanceType<typeof THREE.Object3D>,
+    at: (t: number) => InstanceType<typeof THREE.Quaternion> | null,
+  ): void => {
+    const times: number[] = [];
+    const values: number[] = [];
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      const q = at(t);
+      if (q === null) return;
+      times.push(t * duration);
+      values.push(q.x, q.y, q.z, q.w);
+    }
+    tracks.push(new THREE.QuaternionKeyframeTrack(`${bone.name}.quaternion`, times, values));
+    animated.add(bone.name);
+  };
 
   for (const curve of curves) {
     const bone = find(curve.bone);
     if (bone === undefined) continue;
-    const times: number[] = [];
-    const values: number[] = [];
 
-    if (curve.rot !== undefined) {
-      // Curves are DELTAS from the rig's own rest pose, not absolute
-      // orientations: the authored numbers describe "raise this arm by 145
-      // degrees", and applying them absolutely would first snap every rigged
-      // model into Mixamo's T-pose regardless of how it was built.
-      // rest * toTpose * authored — see tposeCorrection.
-      const rest = bone.quaternion.clone().multiply(tposeCorrection(bone, TPOSE_DIR[curve.bone]));
-      for (let i = 0; i <= steps; i++) {
-        const t = i / steps;
-        const [x, y, z] = curve.rot(t);
-        times.push(t * duration);
-        euler.set((x * Math.PI) / 180, (y * Math.PI) / 180, (z * Math.PI) / 180);
-        delta.setFromEuler(euler);
-        out.copy(rest).multiply(delta);
-        values.push(out.x, out.y, out.z, out.w);
-      }
-      tracks.push(new THREE.QuaternionKeyframeTrack(`${bone.name}.quaternion`, times, values));
+    if (curve.aim !== undefined) {
+      const fn = curve.aim;
+      pushQuat(bone, (t) => aimLocal(bone, fn(t)));
       continue;
     }
 
-    if (curve.pos !== undefined) {
+    if (curve.turn !== undefined) {
+      const fn = curve.turn;
+      const rest = bone.quaternion.clone();
+      pushQuat(bone, (t) => {
+        const [x, y, z] = fn(t);
+        euler.set((x * Math.PI) / 180, (y * Math.PI) / 180, (z * Math.PI) / 180);
+        delta.setFromEuler(euler);
+        return out.copy(rest).multiply(delta).clone();
+      });
+      continue;
+    }
+
+    if (curve.move !== undefined) {
+      const fn = curve.move;
       const base = bone.position.clone();
+      const times: number[] = [];
+      const values: number[] = [];
       for (let i = 0; i <= steps; i++) {
         const t = i / steps;
-        const [dx, dy, dz] = curve.pos(t);
+        const [dx, dy, dz] = fn(t);
         times.push(t * duration);
-        values.push(base.x + dx, base.y + dy, base.z + dz);
+        values.push(base.x + dx * unit, base.y + dy * unit, base.z + dz * unit);
       }
       tracks.push(new THREE.VectorKeyframeTrack(`${bone.name}.position`, times, values));
     }
@@ -325,25 +404,16 @@ export function buildPresetClip(
 
   if (tracks.length === 0) return null;
 
-  /* Arms not otherwise animated hang at the sides. A rig fitted from a mesh
-     whose arms are already down does not need it, but one built in T-pose reads
-     as a mannequin without it — the same reason the preview generator does it. */
-  const touched = new Set(tracks.map((t) => t.name.split('.')[0]));
-  for (const [side, sign] of [
-    ['RightArm', 68],
-    ['LeftArm', -68],
-  ] as const) {
+  for (const [side, dir] of Object.entries(HANGING)) {
     const bone = find(side);
-    if (bone === undefined || touched.has(bone.name)) continue;
-    const rest = bone.quaternion.clone().multiply(tposeCorrection(bone, TPOSE_DIR[side]));
-    euler.set(0, 0, (sign * Math.PI) / 180);
-    delta.setFromEuler(euler);
-    out.copy(rest).multiply(delta);
+    if (bone === undefined || animated.has(bone.name)) continue;
+    const q = aimLocal(bone, dir);
+    if (q === null) continue;
     tracks.push(
       new THREE.QuaternionKeyframeTrack(
         `${bone.name}.quaternion`,
         [0, duration],
-        [out.x, out.y, out.z, out.w, out.x, out.y, out.z, out.w],
+        [q.x, q.y, q.z, q.w, q.x, q.y, q.z, q.w],
       ),
     );
   }

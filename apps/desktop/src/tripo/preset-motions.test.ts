@@ -14,16 +14,51 @@ import {
   hasPresetMotion,
   PRESET_DURATION,
   PRESET_MOTION_IDS,
+  VERIFIED_PRESET_IDS,
 } from './preset-motions';
 
 /** A cskel27-named bone tree, deep enough for every preset's targets. */
 function rig(names: readonly string[]): InstanceType<typeof THREE.Object3D> {
+  // A CHAIN, not a flat list: the aim solver reads each bone's direction from
+  // where its child sits, so bones need children with real offsets. Built arms
+  // DOWN on purpose — that is the bind pose the old angle-based curves broke on.
   const root = new THREE.Object3D();
+  const made = new Map<string, InstanceType<typeof THREE.Object3D>>();
   for (const n of names) {
     const b = new THREE.Object3D();
     b.name = n;
-    root.add(b);
+    b.position.set(0, -0.2, 0);
+    made.set(n, b);
   }
+  const parentOf: Readonly<Record<string, string>> = {
+    Spine: 'Hips',
+    Spine1: 'Spine',
+    Spine2: 'Spine1',
+    Spine3: 'Spine2',
+    Neck: 'Spine3',
+    Head: 'Neck',
+    LeftShoulder: 'Spine3',
+    LeftArm: 'LeftShoulder',
+    LeftForeArm: 'LeftArm',
+    LeftHand: 'LeftForeArm',
+    RightShoulder: 'Spine3',
+    RightArm: 'RightShoulder',
+    RightForeArm: 'RightArm',
+    RightHand: 'RightForeArm',
+    LeftUpLeg: 'Hips',
+    LeftLeg: 'LeftUpLeg',
+    LeftFoot: 'LeftLeg',
+    RightUpLeg: 'Hips',
+    RightLeg: 'RightUpLeg',
+    RightFoot: 'RightLeg',
+  };
+  for (const n of names) {
+    const b = made.get(n);
+    if (b === undefined) continue;
+    const p = parentOf[n] === undefined ? root : (made.get(parentOf[n]) ?? root);
+    p.add(b);
+  }
+  root.updateWorldMatrix(true, true);
   return root;
 }
 
@@ -55,8 +90,22 @@ describe('preset motions', () => {
   it('ships a clip for every card except the one that is a capture', () => {
     // dance_01's preview is a Mixamo capture, not authored curves.
     expect(PRESET_MOTION_IDS.length).toBeGreaterThanOrEqual(15);
-    expect(hasPresetMotion('wave')).toBe(true);
+    expect(PRESET_MOTION_IDS).toContain('wave');
+    expect(PRESET_MOTION_IDS).not.toContain('dance_01');
+  });
+
+  it('only offers instant playback for poses that were rendered and checked', () => {
+    // The gate exists so an unverified pose falls back to generating instead of
+    // putting a wrong one a click away.
+    expect(hasPresetMotion('idle')).toBe(true);
+    // Large-swing poses are held back until the rig's weights can take them.
+    expect(hasPresetMotion('run')).toBe(false);
+    expect(hasPresetMotion('cheer')).toBe(false);
     expect(hasPresetMotion('dance_01')).toBe(false);
+    for (const id of VERIFIED_PRESET_IDS) {
+      expect(PRESET_MOTION_IDS).toContain(id);
+      expect(buildPresetClip(id, rig(CSKEL))).not.toBeNull();
+    }
   });
 
   it('builds a clip on a cskel27 rig', () => {
@@ -109,10 +158,50 @@ describe('preset motions', () => {
     }
   });
 
+  it("aims from the rig's OWN rest pose, so an arms-down bind works", () => {
+    // The whole reason this file states directions instead of joint angles.
+    const clip = buildPresetClip('wave', rig(CSKEL));
+    const arm = clip?.tracks.find((t) => t.name === 'RightArm.quaternion');
+    expect(arm).toBeDefined();
+    // The first keyframe must not be the identity — an arms-down bind has to be
+    // rotated to reach "up and out", and a no-op would mean it was not aimed.
+    const w = arm?.values[3] ?? 1;
+    expect(Math.abs(w)).toBeLessThan(0.999);
+  });
+
   it('skips bones the rig does not have rather than throwing', () => {
     // The medial rigger emits joint_00..joint_17; no preset bone exists there.
     const medial = rig(['joint_00', 'joint_01', 'joint_02']);
     expect(buildPresetClip('wave', medial)).toBeNull();
+  });
+
+  it('AIMS: the limb actually ends up pointing where the curve asked', () => {
+    // The decisive check for the aim solver — if this passes, a wrong-looking
+    // pose is a wrong TARGET, not broken maths, and those are fixed in very
+    // different places.
+    const root = rig(CSKEL);
+    const clip = buildPresetClip('wave', root);
+    const track = clip?.tracks.find((t) => t.name === 'RightArm.quaternion');
+    expect(track).toBeDefined();
+    const arm = root.getObjectByName('RightArm');
+    const fore = root.getObjectByName('RightForeArm');
+    expect(arm && fore).toBeTruthy();
+    if (arm === undefined || fore === undefined || track === undefined) return;
+
+    // Apply the first keyframe and read where the limb points, in model space.
+    arm.quaternion.set(track.values[0], track.values[1], track.values[2], track.values[3]);
+    root.updateWorldMatrix(true, true);
+    const a = new THREE.Vector3();
+    const b = new THREE.Vector3();
+    arm.getWorldPosition(a);
+    fore.getWorldPosition(b);
+    const dir = b.sub(a).normalize();
+
+    // Up and OUT — the numbers track wave's curve, so retuning the pose means
+    // retuning this too; what is being checked is that the solver hits whatever
+    // the curve asked for, not that the curve asks for something in particular.
+    const want = new THREE.Vector3(-0.88, 0.46, -0.1).normalize();
+    expect(dir.dot(want)).toBeGreaterThan(0.99);
   });
 
   it('is unknown-preset safe', () => {
