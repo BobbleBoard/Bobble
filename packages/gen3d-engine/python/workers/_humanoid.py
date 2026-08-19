@@ -203,6 +203,159 @@ def probe_humanoid(vertices: np.ndarray) -> HumanoidProbe:
     )
 
 
+#: A slice that splits into three x-runs — arm | torso | arm — is the signature
+#: of a figure standing with its arms down. Searched between these fractions of
+#: stature: below is the two-leg split (which reads as 2 runs, not 3), above is
+#: the shoulder line. Only the part of an arm that actually clears the body
+#: splits, so on a bulky figure this finds the hands and forearms alone — which
+#: is exactly what it is asked for, since the shoulder comes from the neck.
+ARMS_DOWN_BAND = (0.26, 0.72)
+
+
+#: How much clear air counts as "this limb is not the torso", as a fraction of
+#: the model's width. The leg split uses 0.06, which is far too coarse here: the
+#: astronaut's arms clear its suit by 0.04 against a 0.036 threshold, i.e. it
+#: passed by a hair and any slimmer figure would not have. Arms hang CLOSE to a
+#: body in a way legs never do, so this gets its own, tighter number.
+ARM_GAP_FRACTION = 0.02
+
+
+def _arm_columns(
+    vertices: np.ndarray, lo: np.ndarray, height: float, width: float
+) -> dict[str, float] | None:
+    """Find the two arm columns of a figure whose arms hang at its sides.
+
+    Returns the columns' x, their vertical extent and an arm half-width, or
+    None if the mesh never splits into three.
+
+    WHY THIS EXISTS. The joint heights below are fractions of stature taken from
+    a T-pose: shoulders at 0.80, hands at 0.785. `probe_humanoid` already
+    measures whether the mesh actually reaches wide up there — the astronaut
+    sample scores armSpanRatio 0.816, i.e. the upper body is NARROWER than the
+    hips, and the probe says so in as many words ("no arm span detected at
+    shoulder height"). Placing a T-pose anyway put both arms straight through
+    the helmet and left the real arms unrigged, which ARDY then swings about
+    pivots that are not in the limbs at all.
+
+    Width alone cannot find the shoulder line here — the helmet is the widest
+    part of the model — but the three-run split can, because it is about
+    CONNECTIVITY rather than extent: arms at the sides leave two gaps of empty
+    space that no single-blob torso ever shows.
+    """
+    gap = max(width, 1e-6) * ARM_GAP_FRACTION
+    lows, highs, lefts, rights, widths = [], [], [], [], []
+    steps = 40
+    for i in range(steps + 1):
+        frac = ARMS_DOWN_BAND[0] + (ARMS_DOWN_BAND[1] - ARMS_DOWN_BAND[0]) * i / steps
+        yy = float(lo[1] + height * frac)
+        band = vertices[np.abs(vertices[:, 1] - yy) < height * 0.012]
+        if band.size == 0:
+            continue
+        runs = _slice_components(band[:, 0], gap)
+        if len(runs) != 3:
+            continue
+        lows.append(yy)
+        highs.append(yy)
+        rights.append(float((runs[0][0] + runs[0][1]) * 0.5))
+        lefts.append(float((runs[-1][0] + runs[-1][1]) * 0.5))
+        widths.append(float(max(runs[0][1] - runs[0][0], runs[-1][1] - runs[-1][0])))
+    # One lucky slice can be a hole in the mesh rather than a limb; a real arm
+    # keeps splitting over a stretch of the body.
+    if len(lefts) < 3:
+        return None
+    return {
+        "left_x": float(np.median(lefts)),
+        "right_x": float(np.median(rights)),
+        "top_y": float(max(highs)),
+        "bottom_y": float(min(lows)),
+        "half": float(np.median(widths)) * 0.5,
+    }
+
+
+def _neck_frac(vertices: np.ndarray, lo: np.ndarray, height: float) -> float | None:
+    """The fraction of stature where the body is narrowest below the head.
+
+    A head sits on a neck, and a neck is a WAIST in the silhouette: narrower
+    than the torso below it and than the head above it. That holds whether the
+    head is a head or a fishbowl helmet, which is why this is measured rather
+    than taken from the 0.80-of-stature figure that anthropometry gives for
+    ordinary human proportions — on the astronaut sample that figure lands the
+    shoulders (and therefore both arms) inside the helmet.
+
+    Returns None when no such waist exists, e.g. a headless or blob-shaped mesh;
+    the caller then keeps the anthropometric default.
+    """
+    fracs = [0.55 + 0.37 * i / 36 for i in range(37)]
+    widths: list[float] = []
+    for frac in fracs:
+        yy = float(lo[1] + height * frac)
+        band = vertices[np.abs(vertices[:, 1] - yy) < height * 0.012]
+        widths.append(float(np.ptp(band[:, 0])) if band.size else 0.0)
+    inner = [(w, i) for i, w in enumerate(widths) if 0 < i < len(widths) - 1 and w > 0]
+    if not inner:
+        return None
+    _w, i = min(inner)
+    # A real neck has the head above it: something up there must be wider again.
+    if max(widths[i + 1 :], default=0.0) <= widths[i] * 1.08:
+        return None
+    return fracs[i]
+
+
+def _arms_tpose(
+    y, cx: float, cz: float, sh_off: float, hand_l: float, hand_r: float, height: float
+) -> dict[str, np.ndarray]:
+    """Arms out to the sides: the chain runs along X at a near-constant height."""
+    return {
+        "LeftShoulder": np.array([cx + sh_off * 0.5, y(0.80), cz]),
+        "LeftArm": np.array([cx + sh_off, y(0.795), cz]),
+        "LeftForeArm": np.array([cx + (hand_l - cx) * 0.55, y(0.79), cz]),
+        "LeftHand": np.array([cx + (hand_l - cx) * 0.88, y(0.785), cz]),
+        "LeftHandEnd": np.array([hand_l, y(0.783), cz]),
+        "LeftHandThumb1": np.array([cx + (hand_l - cx) * 0.93, y(0.778), cz + height * 0.02]),
+        "RightShoulder": np.array([cx - sh_off * 0.5, y(0.80), cz]),
+        "RightArm": np.array([cx - sh_off, y(0.795), cz]),
+        "RightForeArm": np.array([cx + (hand_r - cx) * 0.55, y(0.79), cz]),
+        "RightHand": np.array([cx + (hand_r - cx) * 0.88, y(0.785), cz]),
+        "RightHandEnd": np.array([hand_r, y(0.783), cz]),
+        "RightHandThumb1": np.array([cx + (hand_r - cx) * 0.93, y(0.778), cz + height * 0.02]),
+    }
+
+
+def _arms_hanging(
+    cols: dict[str, float], shoulder_y: float, cx: float, cz: float, sh_off: float, height: float
+) -> dict[str, np.ndarray]:
+    """Arms at the sides: the chain runs DOWN the arm, not out along X.
+
+    `shoulder_y` comes from the neck and the column from the mesh, so the two
+    ends of the chain are both measured; the elbow is placed between them at the
+    proportion a human arm has. The hand keeps the column's own bottom rather
+    than being interpolated, because that is the one point on the arm the
+    silhouette states outright.
+    """
+    hand_y = cols["bottom_y"] + cols["half"]
+    span = max(shoulder_y - hand_y, 1e-6)
+    lx, rx = cols["left_x"], cols["right_x"]
+
+    def at(x: float, frac: float) -> np.ndarray:
+        """`frac` 0 at the shoulder, 1 at the fingertips."""
+        return np.array([x, shoulder_y - span * frac, cz])
+
+    return {
+        "LeftShoulder": np.array([cx + sh_off * 0.5, shoulder_y, cz]),
+        "LeftArm": np.array([lx, shoulder_y, cz]),
+        "LeftForeArm": at(lx, 0.48),
+        "LeftHand": at(lx, 1.0),
+        "LeftHandEnd": at(lx, 1.12),
+        "LeftHandThumb1": np.array([lx, shoulder_y - span * 1.06, cz + height * 0.02]),
+        "RightShoulder": np.array([cx - sh_off * 0.5, shoulder_y, cz]),
+        "RightArm": np.array([rx, shoulder_y, cz]),
+        "RightForeArm": at(rx, 0.48),
+        "RightHand": at(rx, 1.0),
+        "RightHandEnd": at(rx, 1.12),
+        "RightHandThumb1": np.array([rx, shoulder_y - span * 1.06, cz + height * 0.02]),
+    }
+
+
 def fit_skeleton(vertices: np.ndarray) -> dict[str, np.ndarray]:
     """Place every BONE_NAMES joint on this mesh, in world space (Y-up).
 
@@ -244,6 +397,17 @@ def fit_skeleton(vertices: np.ndarray) -> dict[str, np.ndarray]:
     sh_off = min(body_half * 0.35, height * 0.09)
     hand_l, hand_r = arm_r, arm_l  # +X is the model's LEFT in glTF (Y-up, -Z fwd)
 
+    # ARMS DOWN. The heights just above describe a T-pose; when the mesh says
+    # its arms hang at its sides, run the chain down the measured columns
+    # instead. Everything else — spine, legs, head — is unchanged, so a figure
+    # that IS in T-pose takes exactly the path it always took.
+    down = _arm_columns(vertices, lo, height, float(hi[0] - lo[0]))
+    if down is None:
+        arms = _arms_tpose(y, cx, cz, sh_off, hand_l, hand_r, height)
+    else:
+        neck = _neck_frac(vertices, lo, height)
+        arms = _arms_hanging(down, y((neck or 0.835) - 0.075), cx, cz, sh_off, height)
+
     joints: dict[str, np.ndarray] = {
         "Hips": np.array([cx, y(0.53), cz]),
         "Spine": np.array([cx, y(0.58), cz]),
@@ -252,18 +416,7 @@ def fit_skeleton(vertices: np.ndarray) -> dict[str, np.ndarray]:
         "Spine3": np.array([cx, y(0.745), cz]),
         "Neck": np.array([cx, y(0.835), cz]),
         "Head": np.array([cx, y(0.88), cz]),
-        "LeftShoulder": np.array([cx + sh_off * 0.5, y(0.80), cz]),
-        "LeftArm": np.array([cx + sh_off, y(0.795), cz]),
-        "LeftForeArm": np.array([cx + (hand_l - cx) * 0.55, y(0.79), cz]),
-        "LeftHand": np.array([cx + (hand_l - cx) * 0.88, y(0.785), cz]),
-        "LeftHandEnd": np.array([hand_l, y(0.783), cz]),
-        "LeftHandThumb1": np.array([cx + (hand_l - cx) * 0.93, y(0.778), cz + height * 0.02]),
-        "RightShoulder": np.array([cx - sh_off * 0.5, y(0.80), cz]),
-        "RightArm": np.array([cx - sh_off, y(0.795), cz]),
-        "RightForeArm": np.array([cx + (hand_r - cx) * 0.55, y(0.79), cz]),
-        "RightHand": np.array([cx + (hand_r - cx) * 0.88, y(0.785), cz]),
-        "RightHandEnd": np.array([hand_r, y(0.783), cz]),
-        "RightHandThumb1": np.array([cx + (hand_r - cx) * 0.93, y(0.778), cz + height * 0.02]),
+        **arms,
         "LeftUpLeg": np.array([left_x, y(0.51), cz]),
         "LeftLeg": np.array([left_x, y(0.28), cz]),
         "LeftFoot": np.array([left_x, y(0.045), cz]),

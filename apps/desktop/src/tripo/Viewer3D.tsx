@@ -719,6 +719,17 @@ export default function Viewer3D({ gizmoRef }: Viewer3DProps): JSX.Element {
         if (mesh.geometry.getAttribute('normal') === undefined) {
           mesh.geometry.computeVertexNormals();
         }
+        // A SKINNED mesh is culled against its BIND pose's bounds, which the
+        // clip's own pose can reach outside of — so a character standing at the
+        // edge of the view pops out of existence while part of it is still on
+        // screen. The bundled rig path already opts out for this reason; an
+        // imported model is how a generated motion comes back in, so it needs
+        // the same. (This is NOT why a travelling clip leaves the frame: a
+        // typed prompt keeps its root motion by design, and a walk simply walks
+        // away. Presets pin the root instead — see AnimatePanel.runMotion.)
+        if ((mesh as { isSkinnedMesh?: boolean }).isSkinnedMesh === true) {
+          mesh.frustumCulled = false;
+        }
         // Stash the file's own material before the render mode overwrites it,
         // and make it double-sided for the same reason the studio materials are.
         const own = mesh.material;
@@ -752,11 +763,19 @@ export default function Viewer3D({ gizmoRef }: Viewer3DProps): JSX.Element {
       // signature does not know that — and bailing out of the whole loader on it
       // would skip the thumbnail and leave `loadingId` latched forever.
       const first = clips[0];
+      travelTracking = null;
       if (first !== undefined) {
         importedMixer = new THREE.AnimationMixer(group);
         const action = importedMixer.clipAction(first);
         action.setLoop(THREE.LoopRepeat, Number.POSITIVE_INFINITY);
         action.play();
+        // Follow the node the clip actually translates — the root bone, whose
+        // name is the rig's business, not this file's. Taking the first
+        // translated node keeps this working for a skeleton we did not author.
+        const moved = first.tracks.find((t) => t.name.endsWith('.position'));
+        const rootName = moved?.name.slice(0, -'.position'.length);
+        travelTracking = rootName === undefined ? null : (group.getObjectByName(rootName) ?? null);
+        if (travelTracking !== null) travelTracking.getWorldPosition(travelPrev);
       }
 
       // Skeleton overlay, when this model actually carries one. SkeletonHelper
@@ -977,7 +996,17 @@ export default function Viewer3D({ gizmoRef }: Viewer3DProps): JSX.Element {
         const fallback = modeMaterial(assetId);
         for (const { mesh } of activeBodies) {
           const own = originalMaterials.get(mesh);
-          mesh.material = own !== undefined && hasTextureMaps(own) ? own : fallback;
+          if (own !== undefined && hasTextureMaps(own)) {
+            mesh.material = own;
+          } else if (mesh.geometry.getAttribute('color') != null) {
+            // The file carries COLOR_0 — a segment run's parts.glb is the case
+            // that matters. Painting the flat fallback over it renders the whole
+            // thing white and throws away colour the file actually has, which
+            // reads as "the stage produced one undifferentiated blob".
+            mesh.material = segMat;
+          } else {
+            mesh.material = fallback;
+          }
         }
       } else {
         const mat = modeMaterial(assetId);
@@ -1191,6 +1220,38 @@ export default function Viewer3D({ gizmoRef }: Viewer3DProps): JSX.Element {
       useTripoStore.getState().setAssetThumb(assetId, out.toDataURL('image/png'));
     };
 
+    /**
+     * KEEP A TRAVELLING CLIP IN SHOT.
+     *
+     * A typed prompt keeps its root motion on purpose — "walking forward
+     * confidently" should walk forward, and the exported GLB must carry that
+     * or the clip is not the one that was asked for. MEASURED on the ARDY walk:
+     * the hips travel 3.617 units over 5.95s on a 1-unit-tall model, so the
+     * character clears the framed view in under two seconds and the viewport
+     * goes empty while the asset row, thumbnail and face count all say it
+     * loaded. the user's rule for the presets — "letting it wander off across the
+     * grid is how you lose sight of the thing you asked to see" — is about
+     * exactly that, and it is no less true of a walk the user typed.
+     *
+     * So the DATA is left alone and the CAMERA moves instead: both the orbit
+     * target and the eye shift by the same delta, which keeps whatever angle
+     * and distance the user chose while the subject stays centred.
+     */
+    const travelPrev = new THREE.Vector3();
+    let travelTracking: InstanceType<typeof THREE.Object3D> | null = null;
+    const travelNow = new THREE.Vector3();
+    const travelDelta = new THREE.Vector3();
+    const followTravel = () => {
+      if (travelTracking === null) return;
+      travelTracking.getWorldPosition(travelNow);
+      travelDelta.subVectors(travelNow, travelPrev);
+      travelDelta.y = 0; // a bob is not travel; following it would make the shot seasick
+      if (travelDelta.lengthSq() < 1e-10) return;
+      camera.position.add(travelDelta);
+      controls.target.add(travelDelta);
+      travelPrev.copy(travelNow);
+    };
+
     // ── render loop + frame/fps instrumentation (probe hooks) ───────────────
     const clock = new THREE.Clock();
     let raf = 0;
@@ -1205,7 +1266,10 @@ export default function Viewer3D({ gizmoRef }: Viewer3DProps): JSX.Element {
       // The user's own clip plays in EVERY panel, not just Animate: they asked
       // for a moving character, and it should still be moving when they switch
       // to look at something else.
-      if (importedMixer !== null) importedMixer.update(dt);
+      if (importedMixer !== null) {
+        importedMixer.update(dt);
+        followTravel();
+      }
       controls.update();
       renderer.render(scene, camera);
       syncGizmo();

@@ -54,6 +54,25 @@ PART_PALETTE = [
     (151, 163, 173),  # #97a3ad slate
 ]
 
+
+def srgb_to_linear(rgb: tuple[int, int, int]) -> tuple[int, int, int]:
+    """PART_PALETTE is written in sRGB, the space its CSS twin lives in.
+
+    glTF's COLOR_0 is LINEAR, and trimesh writes `face_colors` into it verbatim.
+    Handing it sRGB bytes makes every renderer decode them a second time, so the
+    part came out about a stop too bright: #e8863a orange rendered as pale cream
+    and #4a90d9 blue as powder blue, which is exactly the mismatch the legend
+    swatches were supposed to be free of. Converting here keeps one palette in
+    one space and makes the GLB correct for Blender and every other viewer too,
+    not just ours.
+    """
+    out = []
+    for c in rgb:
+        u = c / 255.0
+        lin = u / 12.92 if u <= 0.04045 else ((u + 0.055) / 1.055) ** 2.4
+        out.append(round(lin * 255))
+    return (out[0], out[1], out[2])
+
 patch_tqdm()
 ROUTER.default_stage = STAGE
 # CubePart's diffusion loop has no tqdm description, and on CPU it runs for
@@ -379,7 +398,7 @@ def main() -> None:
             continue
         name = parts[i].replace(" ", "_") if i < len(parts) else f"part_{i}"
         submesh = trimesh.Trimesh(verts, faces)
-        submesh.visual.face_colors = palette[i % len(palette)]
+        submesh.visual.face_colors = srgb_to_linear(palette[i % len(palette)])
         submesh.export(str(out_dir / f"part_{i:02d}_{name}.glb"))
         scene.add_geometry(submesh, geom_name=f"part_{i:02d}_{name}")
         saved += 1

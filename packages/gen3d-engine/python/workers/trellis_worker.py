@@ -383,6 +383,65 @@ def load_voxels(path: Path) -> VoxelVolume:
     )
 
 
+
+def dilate_atlas(img, valid, passes: int = 8):
+    """Pad each UV island with its OWN colour, not a blur of the empty gutter.
+
+    THE DARK-CRACKLE BUG. the user, on a textured generation: "texture wireframe
+    artifacting" — every triangle edge carried a thin dark line, so the model
+    looked cracked all over. The geometry is perfect (the clay render is clean),
+    so it is entirely in the baked sheet.
+
+    A TRELLIS surface is stair-stepped, so xatlas splits a chart at nearly every
+    edge: the atlas is tens of thousands of tiny islands with 1-2 texel gutters
+    between them. Bilinear filtering and mipmaps read slightly OUTSIDE a triangle
+    at its border, so those gutter texels have to carry the island's colour.
+
+    The upstream baker does try — it dilates 8 times and fills each new ring with
+    `uniform_filter(channel, size=3)`. But that box blur averages over the ring's
+    neighbourhood INCLUDING the texels that are still black, so the padding it
+    writes comes out at a fraction of the island's brightness. The gutter ends up
+    dark rather than unfilled, which is exactly the dark rim we see. (This also
+    defeated the first version of this function: it was handed the baker's
+    POST-padding mask, so it considered those dark texels already covered and
+    left them alone.)
+
+    So the fill here is a proper nearest-colour dilation seeded from the TRUE
+    triangle coverage: only genuinely-covered texels vote, and each pass averages
+    over covered neighbours ONLY. Vectorised with numpy shifts — a per-texel loop
+    over 4096x4096 would take minutes.
+    """
+    import numpy as np
+
+    out = img.astype(np.uint8, copy=True)
+    covered = valid.astype(bool, copy=True)
+    if covered.ndim == 3:
+        covered = covered[..., 0]
+    if not covered.any() or covered.all():
+        return out
+
+    # Everything outside the real coverage is unknown, whatever the baker left
+    # there — that is the dark ring we are replacing.
+    for _ in range(passes):
+        holes = ~covered
+        if not holes.any():
+            break
+        acc = np.zeros((*out.shape[:2], out.shape[2]), dtype=np.float32)
+        cnt = np.zeros(out.shape[:2], dtype=np.float32)
+        for axis, shift in ((0, 1), (0, -1), (1, 1), (1, -1)):
+            nbr_c = np.roll(covered, shift, axis=axis)
+            nbr_v = np.roll(out, shift, axis=axis)
+            take = nbr_c & holes
+            acc[take] += nbr_v[take].astype(np.float32)
+            cnt[take] += 1.0
+        fill = cnt > 0
+        if not fill.any():
+            break
+        out[fill] = (acc[fill] / cnt[fill][:, None]).astype(np.uint8)
+        covered |= fill
+    return out
+
+
 def bake_textures(
     volume: VoxelVolume,
     verts,
@@ -492,7 +551,7 @@ def bake_textures(
         except ImportError:
             pass
     new_verts, new_faces, uvs, _ = uv_unwrap(bake_verts, bake_faces)
-    base_color_img, mr_img, _mask = bake_texture(
+    base_color_img, mr_img, _padded_mask = bake_texture(
         new_verts,
         new_faces,
         uvs,
@@ -503,6 +562,16 @@ def bake_textures(
         texture_size=size,
     )
     base_color_img = undo_baker_gamma(base_color_img)
+    # RE-PAD FROM TRUE COVERAGE. The mask the baker returns is its own POST-
+    # padding one, which already claims the dark ring; seeding from it is a no-op
+    # (measured: identical atlas). `_rasterize_uv_triangles` gives the texels the
+    # triangles actually cover, which is the honest seed. It costs one extra
+    # rasterisation pass — seconds against a bake measured in minutes.
+    from backends.texture_baker import _rasterize_uv_triangles
+
+    _positions, true_cover = _rasterize_uv_triangles(new_verts, new_faces, uvs, size)
+    base_color_img = dilate_atlas(base_color_img, true_cover)
+    mr_img = dilate_atlas(mr_img, true_cover)
     PILImage.fromarray(base_color_img)  # touch to validate
     # FLIP V FOR EXPORT — this is the bug behind "texturing is completely messed
     # up". The baker rasterizes into an image array, so its v runs DOWNWARD with
