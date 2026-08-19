@@ -22,7 +22,6 @@ describe('catalog', () => {
     expect(GEN3D_MODEL_SPECS.map((s) => s.id).sort()).toEqual([
       'ardy-motion',
       'autoremesher',
-      'cube3d',
       'cubepart',
       'dasheng-sfx',
       'fluid-1-cleanup',
@@ -46,15 +45,6 @@ describe('catalog', () => {
     );
   });
 
-  it('cube3d is a TEXT-to-shape geometry model sharing the CubePart checkout', () => {
-    // Two models in one repo: cube3d generates from text with no image hop,
-    // cubepart decomposes an existing shape. They share the 'cubepart' env
-    // because they share the checkout and its venv.
-    const cube = GEN3D_MODEL_SPECS.find((s) => s.id === 'cube3d');
-    expect(cube?.role).toBe('geometry');
-    expect(cube?.env).toBe('cubepart');
-    expect(cube?.repos[0]?.repo).toBe('Roblox/cube3d-v0.5');
-  });
 
   it('ships NO separate texture model — TRELLIS re-bakes its own colours', () => {
     // Texturing used to pull Hunyuan Paint: the paintpbr subset (6.89 GB) plus
@@ -89,7 +79,7 @@ describe('catalog', () => {
 
   it('sidecar registry carries repos, mirrors and pipeline types', () => {
     const registry = toSidecarRegistry();
-    expect(registry.models).toHaveLength(13);
+    expect(registry.models).toHaveLength(12); // cube3d removed
     expect(registry.gatedMirrors['facebook/dinov3-vitl16-pretrain-lvd1689m']).toContain(
       'camenduru',
     );

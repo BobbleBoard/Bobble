@@ -24,7 +24,6 @@ import * as path from 'node:path';
 
 export type Gen3dModelId =
   | 'trellis2'
-  | 'cube3d'
   | 'mageflow'
   | 'mageflow-edit'
   | 'cubepart'
@@ -179,20 +178,6 @@ export const GEN3D_MODEL_SPECS: readonly Gen3dModelSpec[] = [
         // Measured on disk for exactly these patterns, not copied from the
         // generator's entry.
         bytes: 17_463_884_035,
-      },
-    ],
-  },
-  {
-    id: 'cube3d',
-    label: 'Cube 3D',
-    role: 'geometry',
-    note: 'Text → 3D shape directly, no image step (Roblox cube3d-v0.5). Geometry only — no texture.',
-    env: 'cubepart',
-    repos: [
-      {
-        repo: 'Roblox/cube3d-v0.5',
-        allowPatterns: ['*.safetensors'],
-        bytes: 8_270_000_000,
       },
     ],
   },

@@ -191,26 +191,16 @@ class JobManager:
             image_paths = [body["imagePath"]]
         # imageOnly stops after the text→image hop (the Image panel's use).
         image_only = bool(body.get("imageOnly"))
-        engine = body.get("engine") or "trellis2"
         texture_size = int(body.get("textureSize") or 0)
         # 0 = Adaptive (let the worker size it); anything else caps the mesh the
         # textures are painted onto.
         face_budget = int(body.get("faceBudget") or 0)
-        parts = [str(p).strip() for p in (body.get("parts") or []) if str(p).strip()]
         edit_from = str(body.get("editFrom") or "")
-        # Cube3D is TEXT→SHAPE. It needs no image model, produces no texture,
-        # and can hand straight to CubePart — so it skips most of what follows.
-        cube3d = engine == "cube3d" and kind == "text" and not image_only
 
         if kind == "text":
             if not prompt:
                 return {"ok": False, "error": "a prompt is required for text → 3D"}
-            if cube3d:
-                if not self.registry.is_installed("cube3d"):
-                    return {"ok": False, "error": "Cube 3D is not installed yet"}
-                if parts and not self.registry.is_installed("cubepart"):
-                    return {"ok": False, "error": "CubePart is not installed yet"}
-            elif not self.registry.is_installed("mageflow"):
+            if not self.registry.is_installed("mageflow"):
                 return {"ok": False, "error": "Mage-Flow is not installed yet"}
         elif kind == "image":
             image_paths = [p for p in image_paths if p and Path(p).exists()]
@@ -219,18 +209,8 @@ class JobManager:
         else:
             return {"ok": False, "error": f"unknown kind: {kind}"}
         # The geometry model is only needed when we actually reach it.
-        if not image_only and not cube3d and not self.registry.is_installed("trellis2"):
+        if not image_only and not self.registry.is_installed("trellis2"):
             return {"ok": False, "error": "TRELLIS-2 is not installed yet"}
-
-        if cube3d:
-            plan = ["geometry"] + (["segment"] if parts else [])
-            job = self._new_job(plan)
-            threading.Thread(
-                target=self._run_cube3d,
-                args=(job, prompt, parts),
-                daemon=True,
-            ).start()
-            return {"ok": True, "jobId": job.job_id}
 
         if image_only:
             plan = ["image"]
@@ -250,35 +230,6 @@ class JobManager:
             daemon=True,
         ).start()
         return {"ok": True, "jobId": job.job_id}
-
-    def _run_cube3d(self, job: Job, prompt: str, parts: list[str]) -> None:
-        """Text → shape with no image hop, optionally split into named parts."""
-        job_dir = self.sandbox_dir / job.job_id
-        job_dir.mkdir(parents=True, exist_ok=True)
-        try:
-            args = [
-                "--prompt", prompt,
-                "--out-dir", str(job_dir),
-                "--cube-dir", str(self.registry.tool_dir("cube")),
-            ]
-            if parts:
-                args += ["--parts", ",".join(parts)]
-            self._publish(job, "geometry", message="Starting Cube 3D…")
-            self._run_worker(
-                job,
-                self.registry.venv_python("cube"),
-                WORKERS_DIR / "cube3d_worker.py",
-                args,
-                cwd=self.registry.tool_dir("cube"),
-                default_stage="geometry",
-            )
-            if job.cancelled.is_set():
-                raise InterruptedError
-            self._publish(job, "geometry", message="Done", done=True, stageDone=True)
-        except InterruptedError:
-            self._publish(job, "geometry", message="Cancelled", done=True, error="cancelled")
-        except Exception as err:  # noqa: BLE001
-            self._publish(job, "geometry", message=str(err), done=True, error=str(err))
 
     def start_stage(self, body: dict) -> dict:
         op = body.get("op")

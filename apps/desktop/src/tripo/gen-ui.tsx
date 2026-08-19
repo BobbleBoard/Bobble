@@ -168,7 +168,6 @@ const ROLE_BLURB: Record<Gen3dRole, string> = {
  * headline — and three of them were then flatly wrong, each sitting directly
  * above a `note` from the catalog that said the opposite:
  *   Mage-Flow Edit  headline "Generate images from text"  note "Edit a generated image…"
- *   Cube 3D         headline "an image or a text prompt"  note "Text → 3D … no image step"
  *   SkinTokens      headline "Fit a HUMANOID skeleton"    note "predicts a skeleton … for any mesh"
  * A download card is the one place a 17 GB commitment gets explained, so it is
  * the worst place to describe the wrong model. The proper home for this is a
@@ -177,7 +176,6 @@ const ROLE_BLURB: Record<Gen3dRole, string> = {
  */
 const MODEL_BLURB: Partial<Record<Gen3dModelId, string>> = {
   'mageflow-edit': 'Change a generated image with an instruction, before it becomes 3D.',
-  cube3d: 'Turn a text prompt straight into a shape — no image in between.',
   skintokens: 'Predict a skeleton and skin weights for any mesh, humanoid or not.',
 };
 

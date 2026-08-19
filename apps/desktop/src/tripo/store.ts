@@ -203,9 +203,6 @@ interface TripoState {
   genModel: string;
   /** TRELLIS structure resolution preset for generation. */
   genResolution: 'low' | 'medium' | 'high';
-  /** Which shape model text→3D uses. TRELLIS goes via an image; Cube3D does
-   * not, and produces no texture. Image→3D is always TRELLIS. */
-  genEngine: 'trellis2' | 'cube3d';
   /**
    * Every image this session produced, oldest first: a generation followed by
    * whatever edits were made from it. The user picks which one becomes 3D, so
@@ -221,8 +218,6 @@ interface TripoState {
   hasSkeleton: boolean;
   /** TRELLIS bake resolution in texels. */
   genTextureSize: 1024 | 2048 | 4096;
-  /** Cube3D: comma-separated part names to split the result into (optional). */
-  genParts: string;
   /** Chain Hunyuan Paint texturing after geometry. */
   genAutoTexture: boolean;
   /** Picked input images for image→3D (1 = single image, more = multi-image
@@ -388,13 +383,11 @@ export const useTripoStore = create<TripoState>((set, get) => ({
   symmetry: 'auto',
   genModel: 'trellis-2',
   genResolution: 'medium',
-  genEngine: 'trellis2',
   imageVersions: [],
   imageIndex: 0,
   showSkeleton: false,
   hasSkeleton: false,
   genTextureSize: 2048,
-  genParts: '',
   genAutoTexture: true,
   genImages: [],
 

@@ -9,7 +9,7 @@
  * asset version, and that handover is exactly where a stage that passes its own
  * test still leaves the next one with nothing to run on.
  *
- *   ENGINE     'cube3d' (default, fast, geometry only) or 'trellis2' (slower,
+ *   (geometry is always TRELLIS-2 now; cube3d was removed)
  *              produces the colour volume the texture stage bakes from)
  *   PROMPT     what to generate
  *   TIMEOUT_M  minutes allowed per stage (default 25)
@@ -26,7 +26,7 @@ import { _electron as electron } from 'playwright-core';
 import { backgroundLaunch } from './_focus.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const ENGINE = process.env.ENGINE ?? 'cube3d';
+const ENGINE = 'trellis2'; // cube3d removed — TRELLIS is the geometry engine
 const PROMPT = process.env.PROMPT ?? 'a standing human character, arms out to the sides, T-pose';
 const STAGE_MS = Number(process.env.TIMEOUT_M ?? 25) * 60_000;
 const OUT_DIR =
@@ -125,11 +125,6 @@ try {
   // only exists once text input is selected.
   await win.click('[data-testid="tp-input-tab-text"]');
   await win.waitForTimeout(400);
-  // Cube3D vs TRELLIS is a Segmented, whose options carry no ids of their own.
-  const engineLabel = ENGINE === 'cube3d' ? 'Cube 3D' : 'TRELLIS';
-  await win
-    .click(`[data-testid="tp-engine"] >> text=${engineLabel}`)
-    .catch(() => console.log(`   (engine picker not present — using the default)`));
   await win.fill('[data-testid="tp-prompt"]', PROMPT);
   await win.waitForTimeout(300);
   // `tp-generate-btn` is the Generate Model action. NOT `tp-genmodel-btn` —
@@ -162,9 +157,8 @@ try {
   }
 
   // ── 2. texture ──────────────────────────────────────────────────────────
-  // Cube3D emits geometry ONLY (no colour volume), so the texture stage has
-  // nothing to bake from. That is a property of the generator, not a failure of
-  // the chain, and it is reported as skipped rather than passed over silently.
+  // TRELLIS-2 bakes from the colour volume it already produced. A model that
+  // somehow carries no colour data is reported as skipped, not failed.
   console.log('\n2. texture');
   await win.click('[data-testid="tp-rail-texture"]').catch(() => {});
   await win.waitForTimeout(800);
@@ -181,9 +175,8 @@ try {
   } else {
     await texBtn.click();
     const done = await runToEnd('texture');
-    // The engine declining because a Cube3D mesh carries no colour volume is a
-    // SKIP — the stage is not applicable to this model, and calling that a
-    // failure buries the real ones.
+    // The engine declining for want of a colour volume is a SKIP — not
+    // applicable to this model — and calling that a failure buries the real ones.
     const why = (await snap())?.msg ?? '';
     if (/no colour data|nothing to texture/i.test(why))
       note('texture', 'skipped', why.slice(0, 110));

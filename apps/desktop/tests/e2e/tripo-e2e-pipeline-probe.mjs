@@ -304,11 +304,10 @@ try {
     }
   };
 
-  // ── 4. TEXT → 3D (Cube3D) ─────────────────────────────────────────────
+  // ── 4. TEXT → 3D (TRELLIS, via Mage-Flow) ───────────────────────────────
   steps.text3d = async () => {
     await win.click('[data-testid="tp-rail-model"]');
     await win.click('[data-testid="tp-input-tab-text"]');
-    await win.locator('[data-testid="tp-engine"] button', { hasText: 'Cube 3D' }).click();
     await win.fill('[data-testid="tp-prompt"]', TEXT3D_PROMPT);
     const r = await runJob(
       'text3d',
@@ -318,9 +317,9 @@ try {
     const snap = await snapshot();
     const s = await shot('04-text-to-3d');
     record(
-      'text→3D (Cube3D)',
+      'text→3D (TRELLIS)',
       r.ok ? 'PASS' : 'FAIL',
-      r.ok ? `Cube3D mesh in the viewport, stats "${snap.stats}" (${r.seconds}s)` : r.why,
+      r.ok ? `text→3D mesh in the viewport, stats "${snap.stats}" (${r.seconds}s)` : r.why,
       [s],
       r.seconds,
     );
@@ -333,7 +332,7 @@ try {
     const cards = win.locator('.tp-asset-card .tp-asset-hit');
     const n = await cards.count();
     if (n === 0) return false;
-    // Cards are newest-first; the TRELLIS run is the older one when Cube3D also ran.
+    // Cards are newest-first; the earlier TRELLIS run is the older one when text3d also ran.
     await cards
       .nth(STAGES.includes('text3d') && n > 1 ? n - 1 : 0)
       .click()
@@ -381,7 +380,6 @@ try {
         () => win.click('[data-testid="tp-segment-btn"]'),
         60 * 60_000,
       );
-      const parts = await win.locator('[data-testid="tp-parts-list"] .tp-part-row').count();
       const s = await shot('05-segmented');
       record(
         'segmentation (CubePart)',

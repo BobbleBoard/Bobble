@@ -220,8 +220,7 @@ class Registry:
         if env == "mageflow":
             return self.venv_python("Mage").exists()
         if env == "cubepart":
-            # Cube3D and CubePart are two models in ONE checkout and share its
-            # venv, so the same env check serves both.
+            # CubePart lives in the 'cube' checkout; this env check serves it.
             return self.venv_python("cube").exists()
         if env == "paint":
             return self.venv_python("Hunyuan3D-2.1-mac").exists()
