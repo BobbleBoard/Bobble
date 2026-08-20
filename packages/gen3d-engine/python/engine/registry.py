@@ -23,6 +23,20 @@ TOOL_REPOS = {
         "https://github.com/shivampkumar/trellis-mac.git",
         "d58628f4f5b9c3de8274cb110074154f4b31cef2",
     ),
+    "trellis2-apple": (
+        # The MLX tree: geometry at ~3x the PyTorch-MPS tree's speed, the only
+        # path that runs 1024, and the only one carrying the texturing pipeline
+        # that can paint an EXISTING mesh. It was missing from this table
+        # entirely, so `_provision_trellis_mlx` raised KeyError on any machine
+        # that did not already have the checkout — i.e. every machine but the
+        # one it was set up on by hand.
+        "https://github.com/pedronaugusto/trellis2-apple.git",
+        # Pinned like SkinTokens and for the same reason: patches/o_voxel_cpu.py
+        # writes a file this checkout does not ship and rewrites two of its
+        # sources, so an upstream change needs those re-checked rather than
+        # silently applied to something different.
+        "6055b868734af6e12769d229d90580e775fae9f0",
+    ),
     "SkinTokens": (
         "https://github.com/VAST-AI-Research/SkinTokens.git",
         # Pinned deliberately: the shims written by _provision_skintokens patch

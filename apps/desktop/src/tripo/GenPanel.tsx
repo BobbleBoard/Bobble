@@ -13,7 +13,7 @@
  *  - Animate (SkinTokens rig / ARDY motion): AnimatePanel.
  */
 import type { JSX, ReactNode } from 'react';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Gen3dModelId, Gen3dRole } from '../../electron/gen3d/gen3d-contract';
 import { AnimatePanel } from './AnimatePanel';
 import { GEN_MODELS, RETOPO_MODEL, SEGMENT_MODEL, TEXTURE_MODEL } from './data';
@@ -36,6 +36,7 @@ import {
   IcUpload,
 } from './icons';
 import { Hint, MenuAnchor, MenuItem, Segmented, SliderRow, Toggle } from './primitives';
+import { estimateSeconds, formatEstimate, stageKey } from './stage-estimates';
 import { currentVersion, type TripoInputMode, useTripoStore } from './store';
 import { addInputImages, importModelFile, MAX_INPUT_IMAGES } from './viewer-io';
 
@@ -500,6 +501,16 @@ function ModelPanel(): JSX.Element {
     });
   };
 
+  /* Text -> image -> geometry -> texture is minutes, and the resolution
+     control multiplies it. Saying so on the button is the difference between a
+     considered choice and a surprise. */
+  const genMemoryBytes = useTotalMemoryBytes();
+  const generateEstimate = formatEstimate(
+    estimateSeconds({ key: `generate:${genResolution}`, totalMemoryBytes: genMemoryBytes }),
+  );
+  const generateLabel =
+    generateEstimate === null ? 'Generate Model' : `Generate Model · ${generateEstimate}`;
+
   return (
     <>
       <PanelHeader icon={<IcSparkles size={17} />} title="Generate Model" />
@@ -565,7 +576,7 @@ function ModelPanel(): JSX.Element {
         ) : null}
         {canRunReal ? (
           <GenerateButton
-            label={busy ? 'Generating…' : 'Generate Model'}
+            label={busy ? 'Generating…' : generateLabel}
             disabled={busy || missingInput}
             testid="tp-generate-btn"
             onClick={onGenerate}
@@ -828,6 +839,27 @@ function ImagePanel(): JSX.Element {
  *  - installed, nothing loaded → invite generate/upload/drop.
  *  - installed + model loaded → the real Target row + the run button.
  */
+/**
+ * The machine's RAM, for the time estimates. Fetched once and shared — every
+ * panel wants it and it never changes while the app is open.
+ */
+let cachedMemoryBytes: number | null = null;
+
+function useTotalMemoryBytes(): number {
+  const [bytes, setBytes] = useState(cachedMemoryBytes ?? 0);
+  useEffect(() => {
+    if (cachedMemoryBytes !== null) return;
+    void window.piDesktop
+      .invoke('app:get-info', undefined)
+      .then((i) => {
+        cachedMemoryBytes = i.totalMemoryBytes;
+        setBytes(i.totalMemoryBytes);
+      })
+      .catch(() => undefined);
+  }, []);
+  return bytes;
+}
+
 function StagePanel({
   icon,
   title,
@@ -881,10 +913,22 @@ function StagePanel({
    * than asked for. The engine prefers real colours when they exist and only
    * falls back to the image, so passing it is always safe.
    */
+  const totalMemoryBytes = useTotalMemoryBytes();
   const reference = imageVersions[Math.min(imageIndex, imageVersions.length - 1)];
   const needsReference = op === 'texture' && loaded?.source === 'imported';
   const missingReference = needsReference && reference === undefined;
   const runnable = onDisk && !missingReference;
+
+  /* WHAT THIS WILL COST THE USER, before they commit to it. A segment run is
+     ten minutes; the button said only "Segment Parts". */
+  const estimate = formatEstimate(
+    estimateSeconds({
+      key: stageKey(op, { painting: needsReference }),
+      totalMemoryBytes,
+      faces: version?.faces,
+    }),
+  );
+  const runLabelWithCost = estimate === null ? runLabel : `${runLabel} · ${estimate}`;
 
   let footer: ReactNode;
   if (!engineInstalled) {
@@ -897,11 +941,13 @@ function StagePanel({
       />
     );
   } else if (loaded === undefined || !runnable || busy) {
-    footer = <GenerateButton label={busy ? 'Running…' : runLabel} disabled testid={runTestid} />;
+    footer = (
+      <GenerateButton label={busy ? 'Running…' : runLabelWithCost} disabled testid={runTestid} />
+    );
   } else {
     footer = (
       <GenerateButton
-        label={runLabel}
+        label={runLabelWithCost}
         testid={runTestid}
         onClick={() => {
           if (version?.diskPath === undefined) return;
