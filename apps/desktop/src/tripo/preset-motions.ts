@@ -212,30 +212,43 @@ const CURVES: Readonly<Record<string, readonly Curve[]>> = {
 };
 
 /**
- * The presets whose pose has been LOOKED AT on a real rig and found correct.
+ * The presets whose pose has been RENDERED on a rigged figure and read back.
  *
- * Only these play instantly; everything else falls back to generating, exactly
- * as before.
+ * Only these play instantly; the rest fall back to generating, as before.
  *
- * THE LIST IS SHORT FOR A REASON, and the reason is not the curves. Rendered on
- * the astronaut, the poses that hold up are the ones with SMALL joint
- * rotations. Anything that swings a limb a long way — cheer's arms overhead,
- * jump's tuck, wave's raised arm — tears the surface where the limb meets the
- * body, and it tears the same way whether the pose comes from here or from
- * anywhere else. That is the skin weights the rigger produced, not the motion:
- * the same model at rest is flawless, and a generated ARDY walk (small joint
- * angles throughout) plays cleanly on it.
+ * They were verified on a neutral mannequin — a single watertight shell with
+ * ordinary human proportions — and that subject matters as much as the list.
+ * The astronaut everything was first tested on has a helmet nearly as wide as
+ * its shoulders and short arms, so ANY raised-arm pose puts the hand inside the
+ * head; it reads as broken whatever the rig does, and it sent three rounds of
+ * work chasing a fault that was the character's proportions. A mannequin made
+ * of separate interpenetrating capsules was no better: with no connected
+ * surface at the shoulder there is no geodesic path, the weights fall back to
+ * straight-line, and every shoulder tore. One shell, normal proportions, or the
+ * result says nothing.
  *
- * So this gate is really a record of how far the current rig can be pushed.
- * Widening it is a RIGGING job — better weights around the shoulder and hip —
- * after which these curves should come along for free.
+ * Left out, and why:
+ *   point  — the arm does not visibly leave the body from the studio camera.
+ *   cheer  — reads correctly but both shoulders throw small shards.
+ *   angry_01/02, afraid, jump, kick — shoulder or hip tearing at full swing.
+ * All of them still work as generated motions, so nothing is lost from the
+ * library; they just cost a minute instead of a frame.
  *
  * To add one: run
  *   GLB=<rigged.glb> TAB=animate PRESET=m-<id> MODES=clay \
  *     node tests/e2e/gen3d-visual-check.mjs
  * look at the frame, and only then put it in this list.
  */
-const VERIFIED: ReadonlySet<string> = new Set(['idle', 'sad_01']);
+const VERIFIED: ReadonlySet<string> = new Set([
+  'wave',
+  'hello',
+  'clap',
+  'agree',
+  'sad_01',
+  'walk',
+  'run',
+  'idle',
+]);
 
 /** Is there authored motion for this preset id that we have verified? */
 export function hasPresetMotion(id: string): boolean {
@@ -355,8 +368,8 @@ export function buildPresetClip(
    * poses that moved a whole limb did not. */
   const resolved = curves
     .map((c) => ({ curve: c, bone: find(c.bone) }))
-    .filter((r): r is { curve: Curve; bone: InstanceType<typeof THREE.Object3D> } =>
-      r.bone !== undefined,
+    .filter(
+      (r): r is { curve: Curve; bone: InstanceType<typeof THREE.Object3D> } => r.bone !== undefined,
     );
   const depthOf = (o: InstanceType<typeof THREE.Object3D>): number => {
     let d = 0;

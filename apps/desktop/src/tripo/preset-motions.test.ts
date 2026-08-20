@@ -98,8 +98,11 @@ describe('preset motions', () => {
     // The gate exists so an unverified pose falls back to generating instead of
     // putting a wrong one a click away.
     expect(hasPresetMotion('idle')).toBe(true);
-    // Large-swing poses are held back until the rig's weights can take them.
-    expect(hasPresetMotion('run')).toBe(false);
+    expect(hasPresetMotion('wave')).toBe(true);
+    expect(hasPresetMotion('run')).toBe(true);
+    // Held back after rendering them: the arm does not read from the studio
+    // camera, and both shoulders shard at full swing, respectively.
+    expect(hasPresetMotion('point')).toBe(false);
     expect(hasPresetMotion('cheer')).toBe(false);
     expect(hasPresetMotion('dance_01')).toBe(false);
     for (const id of VERIFIED_PRESET_IDS) {

@@ -221,7 +221,11 @@ ARM_GAP_FRACTION = 0.02
 
 
 def _arm_columns(
-    vertices: np.ndarray, lo: np.ndarray, height: float, width: float
+    vertices: np.ndarray,
+    lo: np.ndarray,
+    height: float,
+    width: float,
+    leg_x: float | None = None,
 ) -> dict[str, float] | None:
     """Find the two arm columns of a figure whose arms hang at its sides.
 
@@ -263,9 +267,27 @@ def _arm_columns(
     # keeps splitting over a stretch of the body.
     if len(lefts) < 3:
         return None
+
+    left_x = float(np.median(lefts))
+    right_x = float(np.median(rights))
+
+    # ARMS HANG OUTBOARD OF THE LEGS. Without this the two LEGS, with the hips
+    # between them, read as a perfectly good three-run split and the "arm"
+    # columns came back at the leg's x — so the arm chain was fitted down the
+    # legs and every raised-arm pose swung the wrong limb. MEASURED on a test
+    # figure: columns at x=±0.063, which is exactly where its legs are.
+    #
+    # The legs are the right yardstick and the hips are not: a band taken at hip
+    # height catches the hands as well on an arms-down figure, so the hips
+    # measure wider than the arms and the test rejects the very thing it is
+    # looking for.
+    if leg_x is not None and leg_x > 1e-9:
+        if max(abs(left_x), abs(right_x)) < leg_x * 1.3:
+            return None
+
     return {
-        "left_x": float(np.median(lefts)),
-        "right_x": float(np.median(rights)),
+        "left_x": left_x,
+        "right_x": right_x,
         "top_y": float(max(highs)),
         "bottom_y": float(min(lows)),
         "half": float(np.median(widths)) * 0.5,
@@ -401,7 +423,9 @@ def fit_skeleton(vertices: np.ndarray) -> dict[str, np.ndarray]:
     # its arms hang at its sides, run the chain down the measured columns
     # instead. Everything else — spine, legs, head — is unchanged, so a figure
     # that IS in T-pose takes exactly the path it always took.
-    down = _arm_columns(vertices, lo, height, float(hi[0] - lo[0]))
+    down = _arm_columns(
+        vertices, lo, height, float(hi[0] - lo[0]), max(abs(left_x), abs(right_x))
+    )
     if down is None:
         arms = _arms_tpose(y, cx, cz, sh_off, hand_l, hand_r, height)
     else:
