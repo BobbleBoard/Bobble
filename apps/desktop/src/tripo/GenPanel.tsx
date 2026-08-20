@@ -860,12 +860,31 @@ function StagePanel({
   const engineModel = models.find((m) => m.id === engineId);
   const engineInstalled = engineReady && engineModel?.installed === true;
   const targetQuads = useTripoStore((s) => s.faceLimit);
+  const imageVersions = useTripoStore((s) => s.imageVersions);
+  const imageIndex = useTripoStore((s) => s.imageIndex);
+  const genResolution = useTripoStore((s) => s.genResolution);
+  const genTextureSize = useTripoStore((s) => s.genTextureSize);
 
   const op = capability as 'segment' | 'retopo' | 'texture' | 'rig';
   const busy = job !== null && !job.done;
   // A version can only feed a stage op if its bytes exist on disk — a version
   // restored from a previous session without a path cannot be re-processed.
-  const runnable = version?.diskPath !== undefined;
+  const onDisk = version?.diskPath !== undefined;
+
+  /*
+   * TEXTURING A MODEL THAT HAS NO COLOURS OF ITS OWN.
+   *
+   * The stage re-bakes the voxel colour field a GENERATION saved beside its
+   * mesh, so an imported model has nothing to re-bake. TRELLIS.2 can paint any
+   * mesh from a reference image instead, and the picture the user already has
+   * open in the Image tool is the obvious reference — so it is offered rather
+   * than asked for. The engine prefers real colours when they exist and only
+   * falls back to the image, so passing it is always safe.
+   */
+  const reference = imageVersions[Math.min(imageIndex, imageVersions.length - 1)];
+  const needsReference = op === 'texture' && loaded?.source === 'imported';
+  const missingReference = needsReference && reference === undefined;
+  const runnable = onDisk && !missingReference;
 
   let footer: ReactNode;
   if (!engineInstalled) {
@@ -895,8 +914,15 @@ function StagePanel({
               : // Texturing re-bakes from the colours the GENERATION saved, so
                 // point the engine at this asset's root version — a mesh that
                 // has since been retopologised sits in a different job dir.
+                // `imagePath` is the fallback for a mesh that has no colours at
+                // all; the engine uses it only when it finds no voxel field.
                 op === 'texture'
-                ? { sourcePath: loaded.versions[0]?.diskPath }
+                ? {
+                    sourcePath: loaded.versions[0]?.diskPath,
+                    ...(reference !== undefined ? { imagePath: reference.path } : {}),
+                    resolution: genResolution,
+                    textureSize: genTextureSize,
+                  }
                 : undefined,
           );
         }}
@@ -921,10 +947,22 @@ function StagePanel({
                 ) : null}
               </span>
             </div>
-            {!runnable ? (
+            {!onDisk ? (
               <p className="tp-stage-warn" data-testid="tp-stage-unrunnable">
                 This version has no file on disk (restored from a previous session), so it can't be
                 re-processed. Load a newer version or re-import the model.
+              </p>
+            ) : null}
+            {needsReference ? (
+              <div className="tp-engine-row" data-testid="tp-texture-reference">
+                <span className="tp-field-label">Reference image</span>
+                <span className="tp-engine-name">{reference?.label ?? 'None yet'}</span>
+              </div>
+            ) : null}
+            {missingReference ? (
+              <p className="tp-stage-warn" data-testid="tp-stage-needs-reference">
+                An imported model carries no colours to re-bake, so texturing paints it from a
+                reference image. Make or drop one in the Image tool first.
               </p>
             ) : null}
           </>

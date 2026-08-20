@@ -10,6 +10,7 @@ import json
 import os
 import plistlib
 import subprocess
+import sys
 import threading
 import shutil
 import urllib.request
@@ -40,6 +41,10 @@ def _uv_env(registry: Registry) -> dict:
 def provision(registry: Registry, model: dict, log, cancelled: threading.Event) -> None:
     env_kind = model["env"]
     if env_kind == "trellis":
+        # The MLX tree is the one that runs 1024 and can texture an existing
+        # mesh, so it is provisioned alongside — not instead of — the PyTorch
+        # tree, which still owns the KDTree texture baker.
+        _provision_trellis_mlx(registry, log)
         _provision_trellis(registry, log)
     elif env_kind == "mageflow":
         _provision_mageflow(registry, log)
@@ -71,6 +76,45 @@ def _metal_env() -> dict:
         if probe.returncode != 0:
             return {"DEVELOPER_DIR": str(xcode)}
     return {}
+
+
+def _provision_trellis_mlx(registry: Registry, log) -> None:
+    """The MLX TRELLIS checkout — geometry at 3x the speed, and the only path
+    that can texture an existing mesh.
+
+    This had NO provisioning at all: the checkout existed on the machine it was
+    set up on by hand, and a fresh Mac would silently fall back to the slower
+    PyTorch-MPS tree with no texturing pipeline and no 1024 resolution. "Works
+    out of the box" cannot rest on a directory somebody made once.
+
+    The o_voxel CPU extension is built here too. It is a hard requirement for
+    encoding a mesh's shape latent, it compiles with the clang in Command Line
+    Tools (no Xcode, no Metal compiler), and the checkout ships it unbuildable —
+    see patches/o_voxel_cpu.py for the three reasons and the fixes.
+    """
+    tool = registry.ensure_tool_clone("trellis2-apple", log)
+    py = registry.venv_python("trellis2-apple")
+    env = _uv_env(registry)
+    env["HF_HOME"] = str(registry.hf_home)
+    env.update(_metal_env())
+
+    if not py.exists():
+        log("Creating the MLX TRELLIS environment…")
+        _run([registry.uv_path, "venv", "--python", "3.12", ".venv"], tool, log, env)
+        _run(
+            [registry.uv_path, "pip", "install", "--python", str(py),
+             "--no-build-isolation", "-r", "requirements_macos.txt"],
+            tool, log, env,
+        )
+
+    # Import-time guard on the texturing pipeline, and the shape encoder itself.
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "patches"))
+    try:
+        import o_voxel_cpu
+
+        o_voxel_cpu.apply(tool, py, registry.uv_path, env, log)
+    except Exception as err:  # noqa: BLE001 — a missing extension is degraded, not fatal
+        log(f"o_voxel CPU extension unavailable ({err}); texture-from-image will be off")
 
 
 def _provision_trellis(registry: Registry, log) -> None:

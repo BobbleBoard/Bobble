@@ -85,6 +85,10 @@ STAGE_OPTION_KEYS = (
     "rigger",
     "sourcePath",
     "faceBudget",
+    # Texture stage: the reference image for a mesh that carries no colours.
+    "imagePath",
+    "resolution",
+    "textureSize",
 )
 
 
@@ -538,6 +542,28 @@ class JobManager:
                 voxels = _find_voxels(Path(model_path), options.get("sourcePath"))
                 if voxels is not None:
                     args += ["--voxels", str(voxels)]
+                elif options.get("imagePath"):
+                    # NO COLOURS TO RE-BAKE — PAINT IT INSTEAD. A mesh that did
+                    # not come out of a generation here (anything imported) has
+                    # no voxel field, and re-baking was the only thing this
+                    # stage could do, so it refused. TRELLIS.2's texturing
+                    # pipeline takes a mesh and a reference IMAGE, which is the
+                    # operation a person actually wants for a model they
+                    # already have.
+                    args = [
+                        "--texture-from-image",
+                        "--mesh", model_path,
+                        "--image", str(options["imagePath"]),
+                        "--out-dir", str(job_dir),
+                        "--pipeline-type", self.registry.pipeline_type(
+                            str(options.get("resolution") or "low")
+                        ),
+                        *(
+                            ["--texture-size", str(int(options.get("textureSize") or 0))]
+                            if int(options.get("textureSize") or 0) > 0
+                            else []
+                        ),
+                    ]
                 cwd = self.registry.geometry_tool_dir()
 
             self._publish(job, op, message=f"Starting {op}…")

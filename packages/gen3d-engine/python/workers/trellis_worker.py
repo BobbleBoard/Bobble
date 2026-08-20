@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import gc
 import os
 import sys
 import time
@@ -24,6 +25,20 @@ from typing import NamedTuple
 
 # --- backend env BEFORE torch/trellis imports (mirrors trellis-mac) ---------
 os.environ.setdefault("PYTORCH_ENABLE_MPS_FALLBACK", "1")
+# LET A BIG JOB FINISH INSTEAD OF FAILING AT THE CAP.
+#
+# MPS refuses an allocation that would take the process past a fraction of the
+# machine's "recommended working set", and on unified memory that cap sits well
+# below what the Mac can actually provide — so a mesh whose surface fills more
+# voxels than the cap allows died with "MPS backend out of memory" partway
+# through, having already spent minutes. MEASURED on the astronaut: 774,044
+# voxels at 512³ hit the wall on a 24 GB Mac, and with the cap lifted the same
+# job completed in 112s.
+#
+# Removing the cap does not make a job that already fits use any more memory —
+# it only stops the allocator refusing one that would have to lean on swap. This
+# is a per-job subprocess, so the blast radius is the job.
+os.environ.setdefault("PYTORCH_MPS_HIGH_WATERMARK_RATIO", "0.0")
 os.environ.setdefault("ATTN_BACKEND", "sdpa")
 os.environ.setdefault("SPARSE_ATTN_BACKEND", "sdpa")
 
@@ -315,6 +330,10 @@ MIN_TEXELS_PER_FACE = 64
 # cheap-and-soft end of the trade is one click away instead of mandatory.
 BAKE_FACE_BUDGET = 300_000
 
+#: Faces handed to the texturing pipeline's shape ENCODER. Far below the bake
+#: budget on purpose — see texture_from_image for the measurement.
+ENCODE_FACE_BUDGET = 150_000
+
 # The Metal baker (o_voxel + mtldiffrast) does not survive real volumes on this
 # machine: MEASURED three times on a 1.28M-voxel helicopter it failed every
 # time — twice with an allocation error ("Invalid buffer size: 14.75 GiB", then
@@ -323,6 +342,8 @@ BAKE_FACE_BUDGET = 300_000
 # the same channels, is verified correct, and cannot take the process with it,
 # so it is the default. Set PI_GEN3D_METAL_BAKE=1 to try Metal first.
 METAL_BAKE = os.environ.get("PI_GEN3D_METAL_BAKE", "0") == "1"
+
+STAGE_TEXTURE = "texture"
 
 
 def undo_baker_gamma(base_color_img):
@@ -641,6 +662,321 @@ def export_glb_pbr(vertices, faces, uvs, base_color_img, mr_img, out_path) -> No
     # Touching `vertex_normals` computes them; include_normals then writes them.
     _ = mesh.vertex_normals
     mesh.export(str(out_path), include_normals=True)
+
+
+def encode_voxel_budget() -> int:
+    """Occupied voxels the shape encoder can take on THIS machine.
+
+    Unified memory means the GPU budget is the machine's RAM, so this scales
+    with it rather than being a constant tuned on one laptop. The ratio comes
+    from the measurement that failed: ~775k voxels exhausted a 24 GB Mac, so
+    roughly 26k voxels per GB is the ceiling and two thirds of that is a working
+    figure with room for the rest of the pipeline.
+    """
+    try:
+        total_gb = os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES") / (1024**3)
+    except (ValueError, OSError, AttributeError):
+        total_gb = 16.0
+    return int(total_gb * 26_000 * 0.66)
+
+
+def count_encode_voxels(mesh, resolution: int) -> int:
+    """How many voxels this mesh's surface occupies at `resolution`.
+
+    The same dual-grid conversion the encoder runs, asked for its size only. It
+    is CPU work and takes seconds, against minutes for the sampling it guards.
+    """
+    import numpy as np
+    import o_voxel
+    import torch
+
+    voxel_indices, _dual, _hit = o_voxel.convert.mesh_to_flexible_dual_grid(
+        torch.from_numpy(np.asarray(mesh.vertices)).float().cpu(),
+        torch.from_numpy(np.asarray(mesh.faces)).long().cpu(),
+        grid_size=resolution,
+        aabb=[[-0.5, -0.5, -0.5], [0.5, 0.5, 0.5]],
+        face_weight=1.0,
+        boundary_weight=0.2,
+        regularization_weight=1e-2,
+        timing=False,
+    )
+    return int(len(voxel_indices))
+
+
+def texture_from_image(args) -> None:
+    """Paint an EXISTING mesh from a reference image — no voxels, no Xcode.
+
+    the user: "can I texture existing models…?"
+
+    Not before this. The Texture stage was only ever a RE-BAKE: the generation
+    saved a voxel colour field beside its mesh and texturing sampled it again,
+    so a mesh that did not come out of a generation here — anything imported,
+    anything modelled elsewhere — had no colours to re-bake and the stage
+    refused. That is most of the meshes a person owns.
+
+    TRELLIS.2 ships `Trellis2TexturingPipeline` for exactly this: it conditions
+    the texture flow on an IMAGE plus the shape latent of whatever mesh you hand
+    it. Its four checkpoints are already inside the TRELLIS.2-4B download, so
+    this costs no extra bytes.
+
+    WHY THE IMPORT IS PROPPED UP. That module refuses to load at all without
+    `cumesh` + `mtldiffrast`, and `cumesh` needs `mtlbvh`, which is a Metal
+    kernel that compiles only with a full Xcode — not Command Line Tools. Most
+    Macs do not have Xcode, this one does not, and a 10 GB developer install is
+    not something to put between a user and a texture button.
+
+    It does not need them. Reading the module, the rasteriser is used in exactly
+    one place — `postprocess_mesh`, to UV-unwrap a mesh that has no UVs and to
+    rasterise those UVs into per-texel positions. We already do both, with
+    `uv_unwrap_padded` (xatlas) and `_rasterize_uv_triangles`, and our baker is
+    better anyway: it samples front-facing only and pads charts with their own
+    colour. So the guard gets a stub to satisfy, the pipeline is used for the
+    part only it can do — image + shape -> a PBR colour volume — and the atlas
+    is baked here.
+    """
+    import numpy as np
+    import torch
+    import trimesh
+    from PIL import Image as PILImage
+
+    # The module-level guard checks `backends.MeshBackend is not None` and
+    # nothing on the sampling path ever calls it — postprocess_mesh, the only
+    # caller, is the step we replace.
+    import trellis2.backends as _backends
+
+    if _backends.MeshBackend is None:
+        class _UnwrapNotUsed:  # pragma: no cover - exists to satisfy an import
+            def __init__(self, *_a, **_k) -> None:
+                raise RuntimeError(
+                    "the Metal mesh backend is unavailable and should not be reached — "
+                    "this worker unwraps with xatlas"
+                )
+
+        _backends.MeshBackend = _UnwrapNotUsed
+
+    from trellis2.pipelines import Trellis2TexturingPipeline
+
+    weights = os.environ.get("PI_GEN3D_MLX_WEIGHTS") or "microsoft/TRELLIS.2-4B"
+    resolution = 512 if str(args.pipeline_type).startswith("512") else 1024
+    progress(STAGE_TEXTURE, "Loading the texturing pipeline (first load ≈100 s)…")
+    t0 = time.time()
+    pipeline = Trellis2TexturingPipeline.from_pretrained(weights, "texturing_pipeline.json")
+    pipeline.to(torch.device("mps"))
+    progress(STAGE_TEXTURE, f"Pipeline loaded in {time.time() - t0:.0f}s — painting…")
+
+    # DROP THE FLOW MODEL WE ARE NOT GOING TO USE. The pipeline loads both the
+    # 512 and the 1024 texture flow models — 1.3B parameters each — and a run
+    # uses exactly one. On unified memory the idle one is not free, it is a
+    # couple of gigabytes standing between this stage and finishing.
+    unused = "tex_slat_flow_model_1024" if resolution == 512 else "tex_slat_flow_model_512"
+    if pipeline.models.get(unused) is not None:
+        del pipeline.models[unused]
+        gc.collect()
+        if hasattr(torch, "mps"):
+            torch.mps.empty_cache()
+
+    # BiRefNet (background removal) loads at the checkpoint's own precision —
+    # half — while its transform hands it float32, so the first conv dies with
+    # "Input type (float) and bias type (c10::Half) should be the same". Forcing
+    # the weights to float32 matches the input rather than the other way round,
+    # because the alternative is casting inside someone else's remote-code model.
+    # DINOv3 MOVED A LEVEL DOWN. The feature extractor walks `self.model.layer`,
+    # which was the layer list in the transformers this fork was written
+    # against; in 5.x `DINOv3ViTModel` keeps the encoder at `.model` and the
+    # layers at `.model.layer`, so the walk dies with "'DINOv3ViTModel' object
+    # has no attribute 'layer'". Aliasing the list back onto the model is the
+    # smallest correct fix — the layers are the same modules either way, and
+    # nothing else in the extractor changed.
+    cond_model = getattr(getattr(pipeline, "image_cond_model", None), "model", None)
+    if cond_model is not None and not hasattr(cond_model, "layer"):
+        inner_encoder = getattr(cond_model, "model", None)
+        layers = getattr(inner_encoder, "layer", None) or getattr(inner_encoder, "layers", None)
+        if layers is not None:
+            cond_model.layer = layers
+
+    rembg = getattr(pipeline, "rembg_model", None)
+    inner = getattr(rembg, "model", None)
+    if inner is not None and hasattr(inner, "float"):
+        inner.float()
+
+    mesh = trimesh.load(args.mesh, force="mesh", process=False)
+    image = pipeline.preprocess_image(PILImage.open(args.image[0]).convert("RGB"))
+
+    # ENCODE FROM A LIGHTER COPY. The shape latent's cost scales with the mesh
+    # handed to it, and a generated model arrives at seven figures: MEASURED,
+    # the 1,099,136-face astronaut exhausted 30 GiB of unified memory inside
+    # encode_shape_slat while a 165,694-face figure sailed through. What comes
+    # out of the pipeline is a voxel COLOUR FIELD, not a mesh, so it does not
+    # care how dense the shape it was encoded from was — and the atlas is baked
+    # onto the full-resolution mesh afterwards either way. Decimating only the
+    # copy that gets encoded is therefore free of quality, and it is what makes
+    # this run on a machine with less memory rather than only on a big one.
+    encode_mesh = mesh
+    if len(mesh.faces) > ENCODE_FACE_BUDGET:
+        try:
+            import fast_simplification
+
+            ratio = 1.0 - (ENCODE_FACE_BUDGET / len(mesh.faces))
+            verts_s, faces_s = fast_simplification.simplify(
+                np.asarray(mesh.vertices, dtype=np.float32),
+                np.asarray(mesh.faces, dtype=np.int32),
+                ratio,
+            )
+            encode_mesh = trimesh.Trimesh(verts_s, faces_s, process=False)
+            progress(
+                STAGE_TEXTURE,
+                f"Encoding shape from {len(faces_s):,} of {len(mesh.faces):,} faces…",
+            )
+        except ImportError:
+            pass
+
+    # Background removal is finished with; so is the image encoder once the
+    # conditioning exists. Each is released the moment its output is in hand
+    # rather than at the end, because the peak is in the middle.
+    if rembg is not None and hasattr(rembg, "to"):
+        rembg.to("cpu")
+    gc.collect()
+
+    t1 = time.time()
+    torch.manual_seed(args.seed)
+    cond = pipeline.get_cond([image], resolution)
+    cond_holder = getattr(pipeline, "image_cond_model", None)
+    if cond_holder is not None and hasattr(cond_holder, "to"):
+        cond_holder.to("cpu")
+    gc.collect()
+    if hasattr(torch, "mps"):
+        torch.mps.empty_cache()
+
+    prepared = pipeline.preprocess_mesh(encode_mesh)
+
+    # PREDICT THE COST BEFORE PAYING IT. What drives the shape encoder is the
+    # number of OCCUPIED VOXELS, and that is surface area at the grid
+    # resolution — not face count. MEASURED on the astronaut: decimating from
+    # 1,528,728 faces to 150,000 and then to 40,000 moved occupancy by 0.2%
+    # (774,044 -> 775,944), because the surface is the same surface either way.
+    # So decimating cannot rescue a mesh that is too detailed, and the honest
+    # thing is to say so BEFORE spending three minutes arriving at an allocator
+    # failure the user cannot interpret.
+    #
+    # The dual grid itself is cheap and runs on the CPU, so asking it first
+    # costs seconds and answers the question exactly.
+    occupied = count_encode_voxels(prepared, resolution)
+    budget_voxels = encode_voxel_budget()
+    progress(
+        STAGE_TEXTURE,
+        f"Shape occupies {occupied:,} voxels at {resolution}³ "
+        f"(this machine allows about {budget_voxels:,})",
+    )
+    if occupied > budget_voxels:
+        # OVER THE COMFORTABLE BUDGET IS NOT A REFUSAL. With the allocator cap
+        # lifted (see the top of this file) the job completes by leaning on
+        # swap; it is slower, and saying so beats either failing or going quiet
+        # for several minutes. Retopologising first does NOT help and must not
+        # be suggested — MEASURED, it moved the astronaut from 697,472 voxels to
+        # 993,180, because a remesh's open edges add surface rather than remove
+        # it.
+        over = occupied / max(budget_voxels, 1)
+        progress(
+            STAGE_TEXTURE,
+            f"That is past what fits in memory ({over:.1f}x), so this will use "
+            f"swap and take roughly {over:.0f}x longer than usual — it will finish.",
+        )
+
+    shape_slat = pipeline.encode_shape_slat(prepared, resolution)
+    tex_model = pipeline.models[
+        "tex_slat_flow_model_512" if resolution == 512 else "tex_slat_flow_model_1024"
+    ]
+    tex_slat = pipeline.sample_tex_slat(cond, tex_model, shape_slat, {})
+
+    # HAND THE MEMORY BACK BEFORE DECODING. Sampling is done with the flow
+    # model, the image encoder, the background remover and the shape encoder,
+    # and none of them are needed to decode — but on unified memory they are
+    # still holding most of it. MEASURED: decode asked for another 934 MiB with
+    # 29.69 GiB already resident and died on the MPS watermark, on a machine
+    # with plenty of room once the finished stages let go.
+    for spent in ("tex_slat_flow_model_512", "tex_slat_flow_model_1024", "shape_slat_encoder"):
+        module = pipeline.models.get(spent)
+        if module is not None:
+            module.to("cpu")
+    for attr in ("image_cond_model", "rembg_model"):
+        holder = getattr(pipeline, attr, None)
+        if holder is not None and hasattr(holder, "to"):
+            holder.to("cpu")
+    del cond, shape_slat, tex_model
+    gc.collect()
+    if hasattr(torch, "mps"):
+        torch.mps.empty_cache()
+
+    pbr = pipeline.decode_tex_slat(tex_slat)
+    progress(STAGE_TEXTURE, f"Colour field predicted in {time.time() - t1:.0f}s — baking…")
+
+    # The volume, in the layout our baker expects: base_color, metallic,
+    # roughness. `coords` carry a leading batch column.
+    layout = pipeline.pbr_attr_layout
+    feats = pbr.feats.detach().float().cpu().numpy()
+    attrs = np.concatenate(
+        [
+            feats[:, layout["base_color"]],
+            feats[:, layout["metallic"]],
+            feats[:, layout["roughness"]],
+        ],
+        axis=1,
+    )
+    coords = pbr.coords[:, 1:4].detach().int().cpu().numpy()
+    origin = np.array([-0.5, -0.5, -0.5], dtype=np.float32)
+    voxel_size = 1.0 / float(resolution)
+
+    # The atlas goes on the mesh the user gave us, at the same budget the
+    # generate path uses — not on the decimated copy the encoder saw.
+    bake_mesh = mesh
+    budget = args.bake_faces or BAKE_FACE_BUDGET
+    if len(mesh.faces) > budget:
+        try:
+            import fast_simplification
+
+            ratio = 1.0 - (budget / len(mesh.faces))
+            bv, bf = fast_simplification.simplify(
+                np.asarray(mesh.vertices, dtype=np.float32),
+                np.asarray(mesh.faces, dtype=np.int32),
+                ratio,
+            )
+            bake_mesh = trimesh.Trimesh(bv, bf, process=False)
+        except ImportError:
+            pass
+    # THE ATLAS MUST BE BAKED IN THE VOLUME'S OWN SPACE. `preprocess_mesh`
+    # does not just normalise — it centres, scales into the unit cube AND swaps
+    # axes (y = -z, z = y). The colour field comes out in THAT space, so baking
+    # against the mesh's original coordinates samples empty space: MEASURED,
+    # 5,190,327 of 5,668,518 texels found nothing in front of them, and the
+    # result was a black, sideways model. Running the full-resolution mesh
+    # through the same preprocess puts both in one frame.
+    bake_prepared = pipeline.preprocess_mesh(bake_mesh)
+    verts = np.asarray(bake_prepared.vertices, dtype=np.float32)
+    faces = np.asarray(bake_prepared.faces, dtype=np.int64)
+    size = atlas_size_for(len(faces), args.texture_size)
+    new_verts, new_faces, uvs, _ = uv_unwrap_padded(verts, faces, size)
+    base_color_img, mr_img, cover = bake_atlas_front_facing(
+        new_verts, new_faces, uvs, coords, attrs, origin, voxel_size, size
+    )
+    base_color_img = dilate_atlas(base_color_img, cover)
+    mr_img = dilate_atlas(mr_img, cover)
+
+    out_path = Path(args.out_dir) / "model.glb"
+    export_uvs = np.column_stack([uvs[:, 0], 1.0 - uvs[:, 1]])
+    # Undo preprocess_mesh's swap exactly — it did y = -z, z = y, so the way
+    # back is y = z', z = -y'. Using the generate path's `to_gltf_up` here would
+    # be a different rotation and lay the model on its side.
+    out_verts = np.asarray(new_verts, dtype=np.float32).copy()
+    y_prime = out_verts[:, 1].copy()
+    out_verts[:, 1] = out_verts[:, 2]
+    out_verts[:, 2] = -y_prime
+    export_glb_pbr(out_verts, new_faces, export_uvs, base_color_img, mr_img, out_path)
+    del pipeline
+    if hasattr(torch, "mps"):
+        torch.mps.empty_cache()
+    progress(STAGE_TEXTURE, f"Painted in {time.time() - t1:.0f}s")
+    artifact(STAGE_TEXTURE, "model-glb", str(out_path), "Textured model")
+    stage_done(STAGE_TEXTURE, "Texturing done")
 
 
 def bake_textures(
@@ -982,6 +1318,11 @@ def _build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--serve", action="store_true")
     # Texture stage: re-bake an existing mesh, no pipeline load at all.
     ap.add_argument("--bake-only", action="store_true")
+    ap.add_argument(
+        "--texture-from-image",
+        action="store_true",
+        help="paint --mesh from --image; no voxel field needed",
+    )
     ap.add_argument("--mesh")
     ap.add_argument("--voxels")
     ap.add_argument("--bake-faces", type=int, default=0)
@@ -1023,6 +1364,14 @@ def main() -> None:
     args = ap.parse_args()
     if args.serve:
         _serve(ap)
+        return
+    if args.texture_from_image:
+        if not args.mesh or not args.image or not args.out_dir:
+            ap.error("--texture-from-image needs --mesh, --image and --out-dir")
+        try:
+            texture_from_image(args)
+        except WorkerFailure:
+            sys.exit(2)
         return
     if args.bake_only:
         if not args.mesh or not args.out_dir:
