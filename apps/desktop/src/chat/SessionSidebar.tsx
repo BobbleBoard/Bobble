@@ -81,13 +81,13 @@ import {
 import { useChildAgentStore, useChildrenByParent } from '../state/child-agent-store';
 import { useCorpStore } from '../state/corp-store';
 import { useModalityStore } from '../state/modality-store';
-import { formatModuleSize } from '../tripo/module-state';
 import { listSessions, newSession, restartPi, switchSession } from '../state/pi-connect';
 import { usePiStore } from '../state/pi-slice';
 import { useProjectStore } from '../state/project-store';
 import { useSettingsStore } from '../state/settings-store';
 import { publishSessionList } from '../state/visible-projects';
 import { useThemeStore } from '../store/theme';
+import { formatModuleSize } from '../tripo/module-state';
 import { BobbleMark } from './BobbleMark';
 import { PROFILE_MENU_ACTIONS } from './profile-menu';
 
