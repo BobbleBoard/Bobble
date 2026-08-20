@@ -21,6 +21,7 @@ import {
   type ThemeModePref,
   type UserMode,
 } from '../../electron/settings/settings-contract';
+import { DEFAULT_QUICK_MENU, type QuickMenuConfig } from '../chat/quick-menu';
 import { type ThemeFlavor, useThemeStore } from '../store/theme';
 import { applyHarnessConfig } from './pi-connect';
 
@@ -294,6 +295,17 @@ export function useModelSelection(): ModelSelection {
 }
 
 /** Reactive hook: the current effort mode ('auto' or an explicit level). */
+/**
+ * The user's quick menu, or the defaults when they have never touched it.
+ *
+ * Settings written before this existed have no `modelQuickMenu` at all, and the
+ * right reading of that is "they have not customised it" rather than "they have
+ * an empty menu" — so the fallback is the shipped configuration, not `{}`.
+ */
+export function useQuickMenu(): QuickMenuConfig {
+  return useSettingsStore((s) => s.settings.modelQuickMenu) ?? DEFAULT_QUICK_MENU;
+}
+
 export function useEffortMode(): EffortMode {
   return useSettingsStore(selectEffortMode);
 }

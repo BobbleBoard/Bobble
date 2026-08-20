@@ -40,7 +40,14 @@ describe('R14-C shell + scroll styles', () => {
     });
 
     it('drops the old elastic containment + JS transform wrapper', () => {
-      expect(css).not.toMatch(/overscroll-behavior:\s*contain/);
+      // SCOPED TO THE THREAD SCROLLER, which is what this guard is about. The
+      // assertion used to scan the whole stylesheet for
+      // `overscroll-behavior: contain`, and that is too wide a net: a nested
+      // scroller inside a popup — the quick menu's model list — needs
+      // containment precisely so a flick that reaches its end does not scroll
+      // the page underneath. Banning the property everywhere would forbid the
+      // correct use in order to catch the incorrect one.
+      expect(block('.pd-elastic-scroll')).not.toMatch(/overscroll-behavior:\s*contain/);
       // The JS rubber-band rode on `.pd-elastic-content { will-change: transform }`.
       expect(css).not.toContain('.pd-elastic-content');
     });

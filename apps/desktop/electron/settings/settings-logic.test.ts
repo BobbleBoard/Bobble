@@ -227,3 +227,48 @@ describe('seedFromOnboarding', () => {
     expect(seedFromOnboarding(null, null)).toEqual(DEFAULT_SETTINGS);
   });
 });
+
+describe('quick menu settings', () => {
+  it('treats a missing quick menu as "never customised", not as an empty one', () => {
+    // The renderer falls back to the shipped defaults on undefined; returning
+    // {favourites: [], slots: []} instead would render a menu with no tiers.
+    expect(clampSettings({}).modelQuickMenu).toBeUndefined();
+    expect(clampSettings({ modelQuickMenu: 'nonsense' }).modelQuickMenu).toBeUndefined();
+    expect(
+      clampSettings({ modelQuickMenu: { favourites: [], slots: [] } }).modelQuickMenu,
+    ).toBeUndefined();
+  });
+
+  it('keeps a real config through a round trip', () => {
+    const cfg = {
+      favourites: ['qwen/Qwen3-27B'],
+      slots: [{ id: 'balanced', label: 'Daily', modelId: 'google/gemma-4-12b', tier: 'balanced' }],
+    };
+    expect(clampSettings({ modelQuickMenu: cfg }).modelQuickMenu).toEqual(cfg);
+  });
+
+  it('drops slots that could not be rendered or selected', () => {
+    const got = clampSettings({
+      modelQuickMenu: {
+        favourites: ['ok', 42, ''],
+        slots: [
+          { id: '', label: 'no id', modelId: null },
+          { id: 'blank', label: '   ', modelId: null },
+          { id: 'good', label: 'Good', modelId: null },
+        ],
+      },
+    }).modelQuickMenu;
+    expect(got?.favourites).toEqual(['ok']);
+    expect(got?.slots.map((s) => s.id)).toEqual(['good']);
+  });
+
+  it('refuses a tier it does not recognise rather than persisting it', () => {
+    const got = clampSettings({
+      modelQuickMenu: {
+        favourites: [],
+        slots: [{ id: 'x', label: 'X', modelId: null, tier: 'wildly-wrong' }],
+      },
+    }).modelQuickMenu;
+    expect(got?.slots[0]?.tier).toBeUndefined();
+  });
+});

@@ -714,7 +714,7 @@ body {
 }
 
 .pd-wordmark {
-  font-family: ui-rounded, 'SF Pro Rounded', 'Hiragino Maru Gothic ProN', var(--pd-font-sans);
+  font-family: ui-rounded, "SF Pro Rounded", "Hiragino Maru Gothic ProN", var(--pd-font-sans);
   font-size: 20px;
   font-weight: 650;
   letter-spacing: -0.014em;
@@ -2301,10 +2301,10 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
  * the right. Deliberately still CLICKABLE — the workspace shows its own gate
  * (blur + Download/View), so the row advertises the cost rather than blocking.
  */
-.pd-child-row[data-installed='false'] {
+.pd-child-row[data-installed="false"] {
   opacity: 0.62;
 }
-.pd-child-row[data-installed='false']:hover {
+.pd-child-row[data-installed="false"]:hover {
   opacity: 1;
 }
 .pd-child-row-meta {
@@ -2313,4 +2313,157 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
   font-size: var(--pd-font-size-caption);
   color: var(--pd-text-muted);
   font-variant-numeric: tabular-nums;
+}
+
+/*
+ * THE "MORE MODELS" LIST inside the quick menu.
+ *
+ * It lives in a dropdown, so it has to be bounded: a list of every model on
+ * disk would otherwise push the menu off the screen on a machine with a lot of
+ * them. The height is a scroll region rather than a cap on how many are shown,
+ * because hiding models from a list whose whole job is to show them all would
+ * be the wrong trade.
+ */
+.pd-quickmenu {
+  border-top: 1px solid var(--pd-border-subtle);
+  margin-top: 4px;
+  padding-top: 4px;
+}
+.pd-quickmenu-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px 6px;
+  color: var(--pd-text-muted);
+}
+.pd-quickmenu-search-input {
+  flex: 1;
+  min-width: 0;
+  background: var(--pd-bg-inset);
+  border: 1px solid var(--pd-border-subtle);
+  border-radius: 7px;
+  padding: 4px 8px;
+  font-size: var(--pd-font-size-footnote);
+  color: var(--pd-text-primary);
+}
+.pd-quickmenu-search-input::placeholder {
+  color: var(--pd-text-muted);
+}
+.pd-quickmenu-list {
+  max-height: 260px;
+  overflow-y: auto;
+  /* The menu behind this scrolls too; without containment a flick that reaches
+     the end of this list keeps going and scrolls the page under it. */
+  overscroll-behavior: contain;
+}
+.pd-quickmenu-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.pd-quickmenu-pick {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  padding: 5px 8px;
+  border-radius: 7px;
+  text-align: left;
+}
+.pd-quickmenu-pick:hover,
+.pd-quickmenu-star:hover {
+  background: var(--pd-bg-hover);
+}
+.pd-quickmenu-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--pd-font-size-footnote);
+  color: var(--pd-text-primary);
+}
+.pd-quickmenu-size {
+  flex-shrink: 0;
+  font-size: var(--pd-font-size-caption);
+  color: var(--pd-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.pd-quickmenu-star {
+  flex-shrink: 0;
+  padding: 5px;
+  border-radius: 6px;
+  color: var(--pd-text-muted);
+}
+/* A pinned model reads as pinned without a second icon: the accent IS the state. */
+.pd-quickmenu-star[data-starred="true"] {
+  color: var(--pd-accent-primary);
+}
+.pd-quickmenu-empty {
+  padding: 10px 10px 12px;
+  font-size: var(--pd-font-size-footnote);
+  color: var(--pd-text-muted);
+}
+
+/* Customising the quick menu — the second mode of the "More models" popup. */
+.pd-quickmenu-edit-toggle {
+  width: 100%;
+  text-align: left;
+  padding: 6px 10px;
+  font-size: var(--pd-font-size-footnote);
+  color: var(--pd-text-secondary);
+  border-top: 1px solid var(--pd-border-subtle);
+}
+.pd-quickmenu-edit-toggle:hover {
+  background: var(--pd-bg-hover);
+  color: var(--pd-text-primary);
+}
+.pd-quickmenu-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px;
+  border-top: 1px solid var(--pd-border-subtle);
+}
+.pd-quickmenu-editrow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.pd-quickmenu-editname {
+  flex: 1 1 40%;
+  min-width: 0;
+  background: var(--pd-bg-inset);
+  border: 1px solid var(--pd-border-subtle);
+  border-radius: 6px;
+  padding: 3px 6px;
+  font-size: var(--pd-font-size-caption);
+  color: var(--pd-text-primary);
+}
+.pd-quickmenu-editmodel {
+  flex: 1 1 55%;
+  min-width: 0;
+  background: var(--pd-bg-inset);
+  border: 1px solid var(--pd-border-subtle);
+  border-radius: 6px;
+  padding: 3px 4px;
+  font-size: var(--pd-font-size-caption);
+  color: var(--pd-text-secondary);
+}
+.pd-quickmenu-editdel,
+.pd-quickmenu-editadd {
+  flex: 0 0 auto;
+  padding: 3px 7px;
+  border-radius: 6px;
+  font-size: var(--pd-font-size-caption);
+  color: var(--pd-text-muted);
+}
+.pd-quickmenu-editdel:hover,
+.pd-quickmenu-editadd:not(:disabled):hover {
+  background: var(--pd-bg-hover);
+  color: var(--pd-text-primary);
+}
+.pd-quickmenu-editadd:disabled {
+  opacity: 0.45;
 }

@@ -19,16 +19,26 @@ import {
   IconCheck,
   IconChevronRight,
   IconGauge,
+  IconPin,
   IconSparkles,
   IconSpeed,
 } from '@pi-desktop/ui';
-import type { ReactNode } from 'react';
+import { type ReactNode, useState } from 'react';
 import type { ModelTier } from '../../../../packages/harness/src/classify/tier.ts';
+import { compactBytes } from '../models/models-layout';
 import { useLlmStore } from '../state/llm-store';
 import { selectionTier } from '../state/model-selection';
-import { useModelSelection, useUserMode } from '../state/settings-store';
-import { selectAuto, selectTier } from './auto-router';
+import { useModelSelection, useQuickMenu, useSettingsStore } from '../state/settings-store';
+import { selectAuto, selectModel, selectTier } from './auto-router';
 import { buildTierRows } from './footer-models';
+import { QuickMenuPanel } from './QuickMenuPanel';
+import {
+  DEFAULT_QUICK_MENU,
+  type MenuModel,
+  orgOf,
+  type QuickMenuConfig,
+  quickMenuRows,
+} from './quick-menu';
 
 /** Leading glyph per capability tier (fast=speed, balanced=gauge, smart=spark). */
 const TIER_ICON: Record<ModelTier, ReactNode> = {
@@ -58,6 +68,10 @@ export function TierPickerMenu({
 }: TierPickerMenuProps) {
   const recommendation = useLlmStore((s) => s.recommendation);
   const refreshCatalog = useLlmStore((s) => s.refreshCatalog);
+  const catalog = useLlmStore((s) => s.catalog);
+  const quickMenu = useQuickMenu();
+  const updateSettings = useSettingsStore((s) => s.update);
+  const [showAll, setShowAll] = useState(false);
   const selection = useModelSelection();
   const isAuto = selection.mode === 'auto';
   const activeTier = selectionTier(selection);
@@ -69,6 +83,63 @@ export function TierPickerMenu({
    */
   const tierRows = buildTierRows(recommendation?.tierModels, 'power');
   const showManager = onOpenManager !== undefined;
+
+  /* The catalog in the shape the menu logic reads. `bytesOnDisk` is what the
+     model actually occupies, which is the number the size-ordered list is
+     sorting on — `quants` describes what COULD be fetched. */
+  const menuModels: MenuModel[] = catalog.map((entry) => ({
+    id: entry.id,
+    displayName: entry.displayName,
+    bytes: entry.downloadedBytes ?? 0,
+    org: orgOf(entry.id, entry.hfRepo),
+    downloaded: entry.downloaded,
+  }));
+
+  /* Favourites first, then the slots — see quick-menu.ts for why that order. */
+  /* The app's own pick per tier, read from the RECOMMENDATION rather than from
+     the rendered rows. `buildTierRows` in power mode puts the model name in
+     `primary` and the tier label in `secondary`, so taking `secondary` as the
+     model name labelled every slot with its own tier — "Fast · Fast". The
+     recommendation is where the model actually lives. */
+  const tierPicks = Object.fromEntries(
+    tierRows.map((r) => {
+      const pick = recommendation?.tierModels?.[r.tier];
+      return [
+        r.tier,
+        {
+          displayName: pick?.displayName ?? r.primary,
+          downloaded: r.downloaded,
+          bytes: r.bytes,
+        },
+      ];
+    }),
+  );
+  const rows = quickMenuRows(quickMenu, menuModels, tierPicks);
+  /*
+   * APPLY AGAINST THE LATEST CONFIG, NOT THE RENDERED ONE.
+   *
+   * The panel builds its next config from the `config` it was rendered with,
+   * and settings round-trip through IPC — so two edits in quick succession both
+   * started from the pre-edit value and the second silently undid the first.
+   * MEASURED: pin a model, rename a slot a second later, and the favourite was
+   * gone from settings.json. Reading the store at apply time closes that
+   * window; the panel keeps its simple `(next) => …` shape.
+   */
+  const applyQuickMenu = (next: QuickMenuConfig): void => {
+    const live = useSettingsStore.getState().settings.modelQuickMenu ?? DEFAULT_QUICK_MENU;
+    void updateSettings({
+      modelQuickMenu: {
+        // Whichever half this edit did not touch keeps the live value.
+        favourites: [
+          ...(next.favourites === quickMenu.favourites ? live.favourites : next.favourites),
+        ],
+        slots: (next.slots === quickMenu.slots ? live.slots : next.slots).map((sl) => ({ ...sl })),
+      },
+    });
+  };
+
+  const favourites = rows.filter((r) => r.kind === 'favourite');
+  const slotRows = rows.filter((r) => r.kind === 'slot');
 
   return (
     <DropdownMenu
@@ -103,9 +174,41 @@ export function TierPickerMenu({
 
         <DropdownMenuSeparator />
 
-        {tierRows.map((row) => (
+        {favourites.length > 0 ? (
+          <>
+            {favourites.map((fav) => (
+              <DropdownMenuItem
+                key={fav.key}
+                data-testid="footer-favourite"
+                description={fav.bytes > 0 ? compactBytes(fav.bytes) : undefined}
+                hint={
+                  selection.mode === 'model' && selection.modelId === fav.modelId ? (
+                    <IconCheck size={14} />
+                  ) : undefined
+                }
+                onSelect={() => {
+                  if (fav.modelId !== null) void selectModel(fav.modelId);
+                }}
+              >
+                <span className="flex items-center gap-1.5">
+                  <IconPin size={13} />
+                  {fav.label}
+                </span>
+              </DropdownMenuItem>
+            ))}
+            <DropdownMenuSeparator />
+          </>
+        ) : null}
+
+        {/* THE SLOT ROWS COME FROM THE USER'S CONFIG, not the fixed tier list.
+            They rendered from `tierRows` — the app's own three tiers — so a
+            renamed slot kept showing its old name and an added one never
+            appeared at all, even though both were correctly persisted. The
+            label is the user's word for the row; the model underneath is the
+            grey secondary, so renaming never hides which model runs. */}
+        {slotRows.map((row) => (
           <DropdownMenuItem
-            key={row.tier}
+            key={row.key}
             data-testid="footer-tier"
             description={
               row.secondary === null
@@ -114,19 +217,29 @@ export function TierPickerMenu({
                   ? row.secondary
                   : `${row.secondary} · download`
             }
-            // Only a DOWNLOADED tier can read as the active model (the user #4): a
-            // tier whose model isn't on disk never shows a selected checkmark —
-            // picking it opens the download flow (selectTier) instead of pretending
-            // it's active.
-            hint={activeTier === row.tier && row.downloaded ? <IconCheck size={14} /> : undefined}
-            // No preventDefault: the menu MUST close on selection (the user #3). The
-            // download flow (non-downloaded pick) opens its own dialog from
-            // selectTier, so keeping the menu open is unnecessary and felt broken.
-            onSelect={() => void selectTier(row.tier)}
+            // Only a DOWNLOADED row can read as the active model (the user #4): one
+            // whose model isn't on disk never shows a selected checkmark —
+            // picking it opens the download flow instead of pretending it's
+            // active.
+            hint={
+              row.downloaded &&
+              (row.modelId !== null
+                ? selection.mode === 'model' && selection.modelId === row.modelId
+                : row.tier !== undefined && activeTier === row.tier) ? (
+                <IconCheck size={14} />
+              ) : undefined
+            }
+            // No preventDefault: the menu MUST close on selection (the user #3). A
+            // slot the user pinned to a model selects that model; one still
+            // following the app's choice selects the tier, as before.
+            onSelect={() => {
+              if (row.modelId !== null) void selectModel(row.modelId);
+              else if (row.tier !== undefined) void selectTier(row.tier);
+            }}
           >
             <span className="flex items-center gap-1.5">
-              {TIER_ICON[row.tier]}
-              {row.primary}
+              {row.tier === undefined ? <IconSparkles size={14} /> : TIER_ICON[row.tier]}
+              {row.label}
             </span>
           </DropdownMenuItem>
         ))}
@@ -134,12 +247,36 @@ export function TierPickerMenu({
         {showManager ? (
           <>
             <DropdownMenuSeparator />
+            {/* "More models" opens the list in place rather than jumping
+                straight to the manager: the common case is picking something
+                already downloaded, and leaving the chat to do that is a bigger
+                interruption than the choice deserves. The manager is still one
+                click further on. */}
+            <DropdownMenuItem
+              data-testid="footer-more-models"
+              hint={<IconChevronRight size={14} />}
+              onSelect={(e) => {
+                e.preventDefault();
+                setShowAll((v) => !v);
+              }}
+            >
+              More models
+            </DropdownMenuItem>
+            {showAll ? (
+              <QuickMenuPanel
+                models={menuModels}
+                config={quickMenu}
+                activeModelId={selection.mode === 'model' ? selection.modelId : null}
+                onConfigChange={applyQuickMenu}
+                onPick={(id) => void selectModel(id)}
+              />
+            ) : null}
             <DropdownMenuItem
               data-testid="footer-open-manager"
               hint={<IconChevronRight size={14} />}
               onSelect={() => onOpenManager?.()}
             >
-              More models
+              Manage models…
             </DropdownMenuItem>
           </>
         ) : null}

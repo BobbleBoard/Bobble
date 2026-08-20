@@ -737,6 +737,19 @@ export async function selectAuto(): Promise<void> {
  * present (so the chip never claims a non-downloaded tier is active, and the
  * checkmark never lies). The tier only becomes active after the download lands.
  */
+/**
+ * Pin a SPECIFIC model — a favourite, or a row from the full list.
+ *
+ * The tier path exists because a tier is a capability the app resolves to a
+ * model; this is the user naming the model themselves, so there is no tier to
+ * resolve and no download prompt to run: the list this is called from only
+ * offers models that are already on disk.
+ */
+export async function selectModel(modelId: string): Promise<void> {
+  useModelSelectionStore.getState().setPendingDownload(null);
+  await setModelSelection({ mode: 'model', modelId });
+}
+
 export async function selectTier(tier: ModelTier): Promise<void> {
   const models = tierModels();
   const pick = models?.[tier];

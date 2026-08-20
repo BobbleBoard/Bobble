@@ -31,6 +31,8 @@ import {
   UI_SCALE_MAX,
   UI_SCALE_MIN,
   USER_MODES,
+  type QuickMenuSettings,
+  type QuickSlotSettings,
 } from './settings-contract';
 
 const FLAVORS: readonly ThemeFlavor[] = ['claude', 'codex', 'bobble'];
@@ -40,6 +42,49 @@ const EFFORT_LEVELS: readonly EffortLevel[] = ['low', 'medium', 'high', 'max'];
 const ENGINE_PREFS: readonly EnginePreference[] = ENGINE_PREFERENCES;
 
 /** Normalize an untrusted model-selection union, falling back on anything invalid. */
+/**
+ * The user's quick menu, validated rather than trusted.
+ *
+ * Settings arrive from disk, so every field is untrusted input: a slot with no
+ * id would produce a row that cannot be selected, a favourite that is not a
+ * string would crash the menu that maps over it. Undefined is a real answer —
+ * "never customised" — and stays undefined so the renderer can fall back to the
+ * shipped defaults rather than to an empty menu.
+ */
+function clampQuickMenu(value: unknown): QuickMenuSettings | undefined {
+  if (typeof value !== 'object' || value === null) return undefined;
+  const v = value as Record<string, unknown>;
+  const favourites = Array.isArray(v.favourites)
+    ? v.favourites.filter((id): id is string => typeof id === 'string' && id.length > 0)
+    : [];
+  const slots = Array.isArray(v.slots)
+    ? v.slots.flatMap((raw): QuickSlotSettings[] => {
+        if (typeof raw !== 'object' || raw === null) return [];
+        const slot = raw as Record<string, unknown>;
+        if (typeof slot.id !== 'string' || slot.id.length === 0) return [];
+        if (typeof slot.label !== 'string' || slot.label.trim() === '') return [];
+        const tier =
+          typeof slot.tier === 'string' &&
+          (MODEL_SELECTION_TIERS as readonly string[]).includes(slot.tier)
+            ? (slot.tier as ModelSelectionTier)
+            : undefined;
+        return [
+          {
+            id: slot.id,
+            label: slot.label,
+            modelId: typeof slot.modelId === 'string' && slot.modelId.length > 0
+              ? slot.modelId
+              : null,
+            ...(tier === undefined ? {} : { tier }),
+          },
+        ];
+      })
+    : [];
+  // A config with nothing usable in it is the same as never having one.
+  if (favourites.length === 0 && slots.length === 0) return undefined;
+  return { favourites, slots };
+}
+
 function clampModelSelection(value: unknown, fallback: ModelSelection): ModelSelection {
   if (typeof value !== 'object' || value === null) return fallback;
   const v = value as Record<string, unknown>;
@@ -218,6 +263,7 @@ export function clampSettings(raw: unknown): DesktopSettings {
     userMode: oneOf(o.userMode, USER_MODES, d.userMode),
     enginePreference: oneOf(o.enginePreference, ENGINE_PREFS, d.enginePreference),
     modelSelection: clampModelSelection(o.modelSelection, d.modelSelection),
+    modelQuickMenu: clampQuickMenu(o.modelQuickMenu),
     effortMode: oneOf(o.effortMode, EFFORT_MODES, d.effortMode),
     search: { brave: str(search.brave, ''), tavily: str(search.tavily, '') },
     mcpMode: oneOf(o.mcpMode, MCP_MODES, d.mcpMode),

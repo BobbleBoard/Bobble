@@ -59,6 +59,22 @@ export const MODEL_SELECTION_TIERS = [
  *   - `tier`  → pinned to a capability tier (router disabled);
  *   - `model` → pinned to a specific catalog/HF model id (router disabled).
  */
+/** One configurable row of the quick menu. Mirrors QuickSlot in quick-menu.ts;
+ * inlined so this contract stays dependency-free. */
+export interface QuickSlotSettings {
+  id: string;
+  label: string;
+  /** The model this slot runs, or null to let the app keep choosing. */
+  modelId: string | null;
+  tier?: ModelSelectionTier;
+}
+
+export interface QuickMenuSettings {
+  /** Model ids in the order the user arranged them. */
+  favourites: string[];
+  slots: QuickSlotSettings[];
+}
+
 export type ModelSelection =
   | { mode: 'auto' }
   | { mode: 'tier'; tier: ModelSelectionTier }
@@ -177,6 +193,12 @@ export interface DesktopSettings {
   enginePreference: EnginePreference;
   /** The model-selection mode (default `{ mode: 'auto' }`). */
   modelSelection: ModelSelection;
+  /**
+   * The user's quick menu: favourites, and the tier slots they have renamed,
+   * rebound or added. Absent on settings written before this existed, which the
+   * reader treats as "the defaults" — see quick-menu.ts.
+   */
+  modelQuickMenu?: QuickMenuSettings;
   /** Effort resolution mode (default `auto`). `effort` stays the explicit level +
    * the last-resolved level for display. */
   effortMode: EffortMode;
@@ -251,6 +273,7 @@ export interface DesktopSettingsPatch {
   enginePreference?: EnginePreference;
   /** Full replacement of the selection union (no deep-merge). */
   modelSelection?: ModelSelection;
+  modelQuickMenu?: QuickMenuSettings;
   effortMode?: EffortMode;
   search?: Partial<SearchKeys>;
   mcpMode?: McpMode;
