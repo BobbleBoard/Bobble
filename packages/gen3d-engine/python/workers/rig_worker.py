@@ -180,7 +180,12 @@ def main() -> None:
     joints = fit_skeleton(vertices)
 
     progress(STAGE, f"Skinning {len(vertices):,} vertices to {len(BONE_NAMES)} bones…", 4, TOTAL_STEPS)
-    joint_index, joint_weight = skin_weights(vertices, joints)
+    # FACES are what make the distance geodesic. Without them an arm hanging
+    # beside the ribs takes the chest with it when it swings — see
+    # _geodesic_to_bones.
+    joint_index, joint_weight = skin_weights(
+        vertices, joints, faces=np.asarray(healed.faces, dtype=np.int64)
+    )
 
     progress(STAGE, "Writing rigged GLB…", 5, TOTAL_STEPS)
     normals = np.asarray(healed.vertex_normals, dtype=np.float32)

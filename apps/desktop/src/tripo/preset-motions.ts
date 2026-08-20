@@ -340,66 +340,95 @@ export function buildPresetClip(
   const find = (bone: string): InstanceType<typeof THREE.Object3D> | undefined =>
     root.getObjectByName(bone) ?? root.getObjectByName(`mixamorig${bone}`);
 
-  const tracks: InstanceType<typeof THREE.KeyframeTrack>[] = [];
   const duration = durationOf(id);
   const steps = Math.round(duration * FPS);
   const euler = new THREE.Euler();
   const delta = new THREE.Quaternion();
-  const out = new THREE.Quaternion();
-  const animated = new Set<string>();
 
-  const pushQuat = (
-    bone: InstanceType<typeof THREE.Object3D>,
-    at: (t: number) => InstanceType<typeof THREE.Quaternion> | null,
-  ): void => {
-    const times: number[] = [];
-    const values: number[] = [];
-    for (let i = 0; i <= steps; i++) {
-      const t = i / steps;
-      const q = at(t);
-      if (q === null) return;
-      times.push(t * duration);
-      values.push(q.x, q.y, q.z, q.w);
-    }
-    tracks.push(new THREE.QuaternionKeyframeTrack(`${bone.name}.quaternion`, times, values));
-    animated.add(bone.name);
+  /* Resolve the bones once, and order them PARENT FIRST.
+   *
+   * An aim is solved in the parent's frame, so the parent has to already be
+   * where the pose puts it. Solving every bone against the BIND pose instead
+   * meant a shoulder's rotation was never accounted for when the upper arm was
+   * aimed, nor the upper arm's when the forearm was — and the error compounds
+   * down the chain, which is why poses that moved one bone looked right and
+   * poses that moved a whole limb did not. */
+  const resolved = curves
+    .map((c) => ({ curve: c, bone: find(c.bone) }))
+    .filter((r): r is { curve: Curve; bone: InstanceType<typeof THREE.Object3D> } =>
+      r.bone !== undefined,
+    );
+  const depthOf = (o: InstanceType<typeof THREE.Object3D>): number => {
+    let d = 0;
+    for (let p = o.parent; p !== null; p = p.parent) d++;
+    return d;
   };
+  resolved.sort((a, b) => depthOf(a.bone) - depthOf(b.bone));
 
-  for (const curve of curves) {
-    const bone = find(curve.bone);
-    if (bone === undefined) continue;
+  const rest = new Map(resolved.map((r) => [r.bone, r.bone.quaternion.clone()]));
+  const restPos = new Map(resolved.map((r) => [r.bone, r.bone.position.clone()]));
+  const quatKeys = new Map<InstanceType<typeof THREE.Object3D>, number[]>();
+  const posKeys = new Map<InstanceType<typeof THREE.Object3D>, number[]>();
+  const times: number[] = [];
 
-    if (curve.aim !== undefined) {
-      const fn = curve.aim;
-      pushQuat(bone, (t) => aimLocal(bone, fn(t)));
-      continue;
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    times.push(t * duration);
+    // Back to bind, then build the whole pose top-down so each aim sees the
+    // parent already posed.
+    for (const { bone } of resolved) {
+      bone.quaternion.copy(rest.get(bone) as InstanceType<typeof THREE.Quaternion>);
+      bone.position.copy(restPos.get(bone) as InstanceType<typeof THREE.Vector3>);
     }
+    root.updateWorldMatrix(true, true);
 
-    if (curve.turn !== undefined) {
-      const fn = curve.turn;
-      const rest = bone.quaternion.clone();
-      pushQuat(bone, (t) => {
-        const [x, y, z] = fn(t);
+    for (const { curve, bone } of resolved) {
+      if (curve.aim !== undefined) {
+        const q = aimLocal(bone, curve.aim(t));
+        if (q !== null) bone.quaternion.copy(q);
+      } else if (curve.turn !== undefined) {
+        const [x, y, z] = curve.turn(t);
         euler.set((x * Math.PI) / 180, (y * Math.PI) / 180, (z * Math.PI) / 180);
         delta.setFromEuler(euler);
-        return out.copy(rest).multiply(delta).clone();
-      });
-      continue;
-    }
-
-    if (curve.move !== undefined) {
-      const fn = curve.move;
-      const base = bone.position.clone();
-      const times: number[] = [];
-      const values: number[] = [];
-      for (let i = 0; i <= steps; i++) {
-        const t = i / steps;
-        const [dx, dy, dz] = fn(t);
-        times.push(t * duration);
-        values.push(base.x + dx * unit, base.y + dy * unit, base.z + dz * unit);
+        bone.quaternion
+          .copy(rest.get(bone) as InstanceType<typeof THREE.Quaternion>)
+          .multiply(delta);
+      } else if (curve.move !== undefined) {
+        const [dx, dy, dz] = curve.move(t);
+        const base = restPos.get(bone) as InstanceType<typeof THREE.Vector3>;
+        bone.position.set(base.x + dx * unit, base.y + dy * unit, base.z + dz * unit);
       }
-      tracks.push(new THREE.VectorKeyframeTrack(`${bone.name}.position`, times, values));
+      // Only this bone's subtree can be affected, and the next bone to be
+      // solved may be inside it.
+      bone.updateWorldMatrix(false, true);
+
+      if (curve.move !== undefined) {
+        const arr = posKeys.get(bone) ?? [];
+        arr.push(bone.position.x, bone.position.y, bone.position.z);
+        posKeys.set(bone, arr);
+      } else {
+        const arr = quatKeys.get(bone) ?? [];
+        arr.push(bone.quaternion.x, bone.quaternion.y, bone.quaternion.z, bone.quaternion.w);
+        quatKeys.set(bone, arr);
+      }
     }
+  }
+
+  // Leave the rig as we found it — the clip carries the pose from here.
+  for (const { bone } of resolved) {
+    bone.quaternion.copy(rest.get(bone) as InstanceType<typeof THREE.Quaternion>);
+    bone.position.copy(restPos.get(bone) as InstanceType<typeof THREE.Vector3>);
+  }
+  root.updateWorldMatrix(true, true);
+
+  const tracks: InstanceType<typeof THREE.KeyframeTrack>[] = [];
+  const animated = new Set<string>();
+  for (const [bone, values] of quatKeys) {
+    tracks.push(new THREE.QuaternionKeyframeTrack(`${bone.name}.quaternion`, times, values));
+    animated.add(bone.name);
+  }
+  for (const [bone, values] of posKeys) {
+    tracks.push(new THREE.VectorKeyframeTrack(`${bone.name}.position`, times, values));
   }
 
   if (tracks.length === 0) return null;

@@ -532,15 +532,126 @@ def _segment_distance(points: np.ndarray, a: np.ndarray, b: np.ndarray) -> np.nd
     return np.linalg.norm(points - (a + t * ab), axis=1)
 
 
-def skin_weights(
-    vertices: np.ndarray, joints: dict[str, np.ndarray], influences: int = 4
-) -> tuple[np.ndarray, np.ndarray]:
-    """Distance-falloff skinning: (joint_index[N,4], weight[N,4]).
+def _geodesic_to_bones(
+    vertices: np.ndarray,
+    faces: np.ndarray,
+    dists: np.ndarray,
+    seed_frac: float = 0.35,
+) -> np.ndarray | None:
+    """Distance from every vertex to every bone ALONG THE SURFACE.
 
-    Each bone is the segment from its head to its parent's head; a vertex is
-    weighted by inverse distance to the nearest bone segments. Crude next to a
-    learned or heat-diffusion solver, but it deforms smoothly and every weight
-    is real (normalised, top-4, glTF-conformant).
+    THE REASON THIS EXISTS. Straight-line distance cannot tell an arm from the
+    chest it is hanging beside. On a character modelled with its arms down —
+    which is most of them — the upper-arm bone runs a couple of centimetres from
+    the ribs, so torso vertices come out closer to it than to the spine and take
+    real arm weight. Swing that arm and it drags the chest with it: MEASURED, a
+    90-degree rotation of `LeftArm` on the astronaut tore a flap of surface off
+    the shoulder and pulled it across the body.
+
+    Along the SURFACE those two points are nowhere near each other — you have to
+    travel down the arm, around the shoulder and back across the chest. So each
+    bone seeds the vertices that are unambiguously its own (nearest to it, and
+    within `seed_frac` of the closest vertex's distance), and a single Dijkstra
+    per bone from a virtual source wired to all of its seeds gives the distance
+    the deformation actually cares about.
+
+    Returns None when the mesh has no usable edge graph or SciPy is absent, so
+    the caller can fall back to the straight-line weights rather than fail a rig.
+    """
+    try:
+        from scipy.sparse import coo_matrix
+        from scipy.sparse.csgraph import dijkstra
+    except ImportError:
+        return None
+
+    n = len(vertices)
+    if n == 0 or len(faces) == 0:
+        return None
+
+    # Undirected edge graph of the mesh, weighted by real edge length.
+    e = np.concatenate([faces[:, [0, 1]], faces[:, [1, 2]], faces[:, [2, 0]]])
+    e = np.unique(np.sort(e, axis=1), axis=0)
+    length = np.linalg.norm(vertices[e[:, 0]] - vertices[e[:, 1]], axis=1)
+    keep = length > 0
+    e, length = e[keep], length[keep]
+    if len(e) == 0:
+        return None
+
+    n_bones = dists.shape[1]
+    nearest = dists.argmin(axis=1)
+    out = np.empty_like(dists)
+
+    for b in range(n_bones):
+        own = np.where(nearest == b)[0]
+        if len(own) == 0:
+            # No vertex calls this bone its own — a tip inside the body, say.
+            # Its straight-line field is the honest answer here.
+            out[:, b] = dists[:, b]
+            continue
+        d_own = dists[own, b]
+        cut = d_own.min() + seed_frac * (d_own.max() - d_own.min() + 1e-12)
+        seeds = own[d_own <= cut]
+        if len(seeds) == 0:
+            seeds = own[: max(1, len(own) // 10)]
+
+        # A virtual node (index n) joined to every seed with zero cost, so one
+        # Dijkstra answers "distance to the nearest seed of this bone".
+        rows = np.concatenate([e[:, 0], e[:, 1], np.full(len(seeds), n)])
+        cols = np.concatenate([e[:, 1], e[:, 0], seeds])
+        vals = np.concatenate([length, length, np.zeros(len(seeds))])
+        g = coo_matrix((vals, (rows, cols)), shape=(n + 1, n + 1)).tocsr()
+        d = dijkstra(g, directed=False, indices=n)[:n]
+        # Disconnected islands come back as inf; the straight line is all we know.
+        bad = ~np.isfinite(d)
+        if bad.any():
+            d = np.where(bad, dists[:, b], d)
+        out[:, b] = d
+
+    return out
+
+
+def _smooth_weights(w: np.ndarray, faces: np.ndarray, n: int, rounds: int = 3) -> np.ndarray:
+    """Average each vertex's weights with its neighbours', a few times.
+
+    Weight painting is a job of two halves: decide WHICH bone owns a region, and
+    make the handover between regions gradual. Distance answers the first and
+    says nothing about the second, so a boundary between two bones is a cliff —
+    and a cliff in the weights is a crack in the surface once the two bones move
+    apart. Blurring along the mesh turns each cliff into a ramp a few vertices
+    wide, which is what lets a shoulder rotate without the seam opening.
+
+    Three rounds is enough to close the seams and few enough that a limb does
+    not start dragging its neighbour again, which is the failure this whole path
+    exists to avoid.
+    """
+    e = np.concatenate([faces[:, [0, 1]], faces[:, [1, 2]], faces[:, [2, 0]]])
+    e = np.unique(np.sort(e, axis=1), axis=0)
+    if len(e) == 0:
+        return w
+    deg = np.bincount(e[:, 0], minlength=n) + np.bincount(e[:, 1], minlength=n)
+    deg = np.maximum(deg, 1)[:, None]
+    for _ in range(rounds):
+        acc = np.zeros_like(w)
+        np.add.at(acc, e[:, 0], w[e[:, 1]])
+        np.add.at(acc, e[:, 1], w[e[:, 0]])
+        # Half the vertex's own value, half its neighbourhood: a blur that keeps
+        # the region's identity while softening its edge.
+        w = 0.5 * w + 0.5 * (acc / deg)
+        w /= w.sum(axis=1, keepdims=True)
+    return w
+
+
+def skin_weights(
+    vertices: np.ndarray,
+    joints: dict[str, np.ndarray],
+    influences: int = 4,
+    faces: np.ndarray | None = None,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Skin weights from distance to the bones: (joint_index[N,4], weight[N,4]).
+
+    Each bone is the segment from its head to its parent's head. Distance is
+    measured ALONG THE MESH when `faces` is given (see `_geodesic_to_bones` for
+    why that matters), and in a straight line otherwise.
     """
     names = BONE_NAMES
     n_verts = len(vertices)
@@ -554,10 +665,38 @@ def skin_weights(
             d = d * 2.5  # tips should not claim the whole limb
         dists[:, i] = d
 
+    geodesic = False
+    if faces is not None:
+        geo = _geodesic_to_bones(vertices, faces, dists)
+        if geo is not None:
+            dists = geo
+            geodesic = True
+
     scale = float(np.linalg.norm(vertices.max(axis=0) - vertices.min(axis=0))) or 1.0
     eps = scale * 1e-3
-    order = np.argsort(dists, axis=1)[:, :influences]
-    picked = np.take_along_axis(dists, order, axis=1)
-    weights = 1.0 / np.power(picked + eps, 3.0)
-    weights /= weights.sum(axis=1, keepdims=True)
+
+    # SOFTER FALLOFF ON GEODESIC DISTANCE. Inverse-CUBE was tuned for
+    # straight-line distance, where the numbers are small and close together.
+    # Geodesic distances are longer and spread much wider, so cubing them makes
+    # the winner take essentially everything — and a vertex right next to it,
+    # whose nearest bone differs, takes everything from a different bone. The
+    # surface then splits along those boundaries instead of bending: MEASURED,
+    # the first geodesic rig deformed into shards on any multi-bone pose while
+    # single-bone bends were clean.
+    power = 1.5 if geodesic else 3.0
+    full = 1.0 / np.power(dists + eps, power)
+    full /= full.sum(axis=1, keepdims=True)
+
+    if geodesic and faces is not None:
+        full = _smooth_weights(full, faces, len(vertices))
+
+    order = np.argsort(-full, axis=1)[:, :influences]
+    weights = np.take_along_axis(full, order, axis=1)
+    total = weights.sum(axis=1, keepdims=True)
+    weights = np.divide(weights, total, out=np.zeros_like(weights), where=total > 0)
+    # A vertex that somehow got nothing still has to sum to 1, or it collapses
+    # to the origin when the mesh is posed.
+    dead = (total[:, 0] <= 0)
+    if dead.any():
+        weights[dead, 0] = 1.0
     return order.astype(np.uint16), weights.astype(np.float32)
