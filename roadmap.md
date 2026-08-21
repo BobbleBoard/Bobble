@@ -1,4 +1,48 @@
 critical: tool dropdowns not generic code blocks, custom ui for each, just like web search for example currently is. file edits/writes parsed live and open and focus canvas to them, running python/bash opens a terminal in the canvas and shows it there. and another critical thing is latency, thing I found (https://github.com/co-l/cache-hunter)) TTFT and decode speed being minimized as hard as possible and aggresive adaption per hardware to provide a seamless out of the box extremely high performance experience in 90+% of cases for hardware, this includes amd and intel gpus, 
+
+── STATUS (updated 2026-08-20) ──────────────────────────────────────────────
+DONE SINCE 08-18: 3D studio finished end to end (texture an existing model,
+  CubePart on imports, 1024^3, instant preset motions, geodesic skinning,
+  per-stage time estimates, self-provisioning, a fresh Mac gets a button not an
+  instruction); model management wave 1 (favourites + configurable quick menu);
+  left-sidebar close now slides instead of vanishing.
+DONE: rebrand→Bobble + third UI mode (Apple-frosted default); harness swap
+  (pi/system-pi/custom + Codex/Hermes/OpenCode connect, real marks); model hub
+  rebuilt (Unsloth-style: discover/on-device/datasets, real HF search, model
+  cards, quant picker, Recommended=reputable-orgs-by-domain, modality search +
+  HF in→out badges, size filter, HF token); onboarding (engine/model/harness);
+  settings floating panel + engine install/uninstall; scheduled tasks (headless
+  throwaway-session runs, per-task past-runs history with inline artifacts, a
+  create_scheduled_task tool usable from any harness).
+NEGATIVE RESULTS (settled, do not reopen without new info): unified rapid-mlx+
+  DFlash engine (c=1 target unreachable — Qwen3.5-4B is a GatedDeltaNet SSM
+  hybrid needing per-position rollback); MLX Metal fp32 ~8e-4 accurate by
+  default (root cause of the "clean on Metal, garbage out" family).
+NEEDS ATTENTION: corp harness unexercised since 2026-08-06 (all work since has
+  been UI) — run a full LocalConvert before leaning on it.
+
+── CURRENT ORDERED PLAN (the user 2026-08-18) ───────────────────────────────────
+A. 3D: wire the real ported engines to the studio (TRELLIS/autoremesher/
+   SkinTokens/ARDY|HY-Motion) — item 1 below, now the front of the queue.
+B. Custom UI per tool call (the `critical:` line): bespoke card per tool like
+   web search; file edits open+focus the canvas; bash/python open a canvas
+   terminal.
+C. Modularity + heaviness audit, surfaced in-app: make Bobble as light or as
+   feature-packed as the user wants, and make the COST legible from the start —
+   disk size + RAM/compute weight shown BEFORE install for every optional
+   component (generation engines + weights, connectors, extensions, inference
+   engines), all add/removable.
+D. Studio UIs + chat wiring for image / video / audio, the same treatment 3D
+   got (item 2 below).
+E. Other harnesses as first-class GUI, not TUI (tentative, effort unknown):
+   click a connected harness and drive it inside Bobble, parsing its tool
+   stream into the per-tool-call UI from step B. Scope-spike first.
+F. Usability + out-of-box optimization (last): any generation type at high
+   optimization on 99% of hardware (incl. AMD/Intel) with no setup; every
+   technical knob available but out of the way; interface-preference options
+   (a big one: inline widgets vs canvas for SVG/video/etc. display).
+─────────────────────────────────────────────────────────────────────────────
+
 0. third UI mode default, rename the app 'bobble', custom UI style. add to onboarding and settings canvas/inline option for visuals/files and onboarding checking for installed opencode/hermes/pi and offer importing from any (just show options to import from any that are installed).
 1. tripo style 3d workspace, trellis generation, autoremesher(Now MIT liscnesed as of last month!!! https://github.com/huxingyi/autoremesher)), auto rigging (https://github.com/VAST-AI-Research/SkinTokens?tab=MIT-1-ov-file), nvidia ARDY for animation generation working
 2. 3d/image/video/audio/music baseline generation working and tested, from the chat model should be able to call a tool to generate any of this or call 
@@ -45,3 +89,128 @@ https://huggingface.co/Lightricks/LTX-2.3
 text
 https://huggingface.co/nvidia/Nemotron-Labs-Diffusion-VLM-8B
 https://huggingface.co/microsoft/Fara1.5-4B
+
+## Queued — assessed 2026-08-19
+
+### 1. Model management: favourites + a configurable quick menu — **DONE 2026-08-20**
+The footer already has a tier dropdown (`footer-models.ts`, fast / balanced /
+intelligent, with USER mode leading on the tier label and POWER mode leading on
+the model name). What is missing is that it is not the user's:
+
+- **Favourites** — pin models so they lead the menu regardless of tier.
+- **Configurable tiers** — choose which model each slot maps to, rename slots,
+  add slots. Names are model names, per the user; no invented marketing words.
+- **"More models"** — reveals a search box once the list is long enough to need
+  one, plus every downloaded model, **largest first**, with its org icon and
+  name. Largest-first is the right sort because size is the thing the user is
+  trading against: it reads as a capability ladder.
+- Org icons already exist (`settings/brand-svg.ts` + `brand-svg-extra.ts`), so
+  this is assembly rather than new artwork.
+
+Assessment: worth doing and well-scoped — the pieces (tiers, icons, the
+downloaded-model list) all exist and are not joined up. The one design call is
+that a renamed slot must keep pointing at a real model id, so the rename is a
+label over a binding, never a replacement for it.
+
+BUILT (`chat/quick-menu.ts`, `TierPickerMenu.tsx`, `QuickMenuPanel.tsx`): all
+four bullets, with the binding rule held. Two bugs the build surfaced and fixed:
+the menu was still rendering the OLD fixed tiers so renames never appeared, and
+a rename following a favourite clobbered it (a stale config captured in a popup
+closure — the apply path now reads the store at apply time).
+
+### 2. Models to add: LFM 2.5–2.6B, Qwen3 8B–27B at Q3 — **NEXT**
+Assessment: catalogue work, cheap, and it belongs AFTER (1) — the point of new
+models is choosing between them, and the choosing is what (1) builds. Qwen3 at
+Q3 is the interesting one on 24 GB: it is the largest thing that fits with a
+real context window, so it wants the fit-verdict maths already in
+`model-manager-logic.ts` rather than a hand-written size note.
+
+### 2b. DFlash 2 — an UPDATE to DFlash, not a model (the user's correction)
+I had this filed as a model to add; it is not one. DFlash is a speculative
+decoding METHOD, already modelled as one: `SpecMethod = 'mtp' | 'eagle3' |
+'dflash'`, with per-model `SpecVariant`s carrying a `draftRepo`, and llama.cpp
+takes it as `--spec-type draft-dflash`. So DFlash 2 is a version bump on that
+path — new draft repos and whatever the flag becomes — and lands in
+`packages/inference/src/catalog.ts` beside the existing variants, NOT in the
+model list. Worth checking at the same time whether the variant picker should
+name the version, since a model carrying DFlash 1 and one carrying DFlash 2 are
+different speed characteristics under one label.
+
+### 3. ninfer / ninfer3090 when exactly one 3090 or 5090 is present
+Assessment: **do the generalisable half, skip the specific half for now.** A
+single-GPU NVIDIA fast path is real work aimed at hardware this app does not
+otherwise target, and `perf-args.ts` already notes that nvidia-smi / rocm-smi
+probing does not exist yet. the user's own instinct is the valuable part: if a piece
+of hardware-specific work can be done once and pay off across every Apple
+Silicon Mac, do it that way. The Apple-Silicon-shaped version of this is (4).
+
+### 4. High vs low power mode — **brainstorm written, not built**
+See "Power modes" below. Directly reachable today: the 3D workers already
+demonstrate every mechanism it needs (per-step model residency, an allocator cap
+that can be lifted or lowered, encode budgets that scale with RAM).
+
+### 5. 3D studio — **DONE 2026-08-19/20**, with the boundaries recorded
+Texture-an-existing-model, CubePart on imports, 1024, instant preset motions,
+geodesic skinning, per-stage time estimates and self-provisioning all landed.
+The known boundaries, stated rather than hidden: six preset poses fall back to
+generating because they shard at full swing; the reference `o_voxel` bake is
+opt-in because its GLB maps as static in our viewer; ARDY's download stays
+excluded by request.
+
+## Power modes — brainstorm (not built)
+
+the user: run everything slower and lighter so the fans stay off and the machine
+stays usable — for long unattended work (a corp harness run, a 3D generation)
+where wall-clock does not matter but being blocked does.
+
+**The framing that makes this tractable:** it is not a "slow mode", it is
+*pretending to be a smaller machine*. Every knob we would need already exists,
+because we already have to behave well on an 8 GB Air — Low Power is simply
+choosing those settings on a machine that did not force them.
+
+**Knobs we already own, and what each buys:**
+
+| Knob | Where it lives now | Effect |
+|---|---|---|
+| Model residency per step | `low_vram` in the TRELLIS pipelines | Peak memory drops to one model instead of the set; costs shuttling time |
+| Allocator ceiling | `PYTORCH_MPS_HIGH_WATERMARK_RATIO` | We raise it to let big jobs finish; LOWERING it caps a job's footprint so the rest of the machine keeps its pages |
+| Encode/bake budgets | `ENCODE_FACE_BUDGET`, `BAKE_FACE_BUDGET`, `encode_voxel_budget()` | Already scale with RAM — Low Power just feeds them a smaller number than the machine has |
+| Resolution | 512 vs 1024 | The single biggest lever; 512 is ~2.3x faster and a fraction of the memory |
+| llama-server slots + KV | `perf-args.ts` | Fewer slots and a smaller context = less resident memory, less bandwidth |
+| Process concurrency | the job runner | Serialising stages keeps one core group busy instead of all of them |
+
+**The part that is NOT just settings, and is the actual product idea:** thermals
+are about *sustained* draw, not peak. A job that runs at 60% for twenty minutes
+can be quieter than one that runs at 100% for eight, and the user cannot tell
+the difference if they are not watching. So the honest control is not a slider
+labelled "slow" but a **duty cycle** — do a chunk of work, yield, do the next —
+which the stage-per-subprocess architecture already makes possible: the runner
+can simply wait between stages. That also gives a natural place to hand the
+machine back for interactive use.
+
+**What I would want to measure before building it:** wall-clock and peak memory
+for one 1024 generation at three settings (as-is, low_vram everywhere, low_vram
+plus a duty cycle), and fan RPM or `powermetrics` package power alongside. The
+claim to test is "quiet and finishes" versus "quiet and never finishes" — if the
+duty-cycled run takes 4x, that is a different product than the one the user
+described, and worth knowing before shipping a toggle.
+
+**Where the toggle belongs:** next to the effort slider, not buried in settings,
+because it is the same kind of decision — how much of the machine this work is
+allowed to have. And it should be per-run overridable, since "leave it going
+overnight" and "I need this now" are the same user an hour apart.
+
+## Dropped / stale from the founding prompt (the user, 2026-08-19)
+
+- **Per-task classifier — DROPPED.** The original brief opened every task with a
+  classifier labelling it simple-QA / basic-tools / full-shebang and preloading
+  tool sets from that. Not doing it. Tool search plus the semantic preload
+  already put the likely tools in reach without a gate that can be wrong, and a
+  misclassification is worse than no classification: it withholds capability at
+  the exact moment the model needed it.
+- **The model list in the founding prompt is STALE.** Qwen3.6-27b/35b-a3b,
+  Gemma4, LTX-2.3, TRELLIS-2, Hunyuan3D Omni, Hunyuan Motion/World, Hyperframes,
+  LiveEdit were the state of the art when it was written; almost all have newer
+  versions now. Treat those names as *the shape of the intent* — a strong
+  general model, an audio-native small one, a video model, a 3D model — and
+  resolve the actual version at the time the work is done, not from that list.
