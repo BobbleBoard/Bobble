@@ -8,10 +8,11 @@
  *   4. Every card has a plain Download that becomes a progress bar + red X.
  *   Plus: everything filterable by OUTPUT.
  */
-import { _electron } from '@playwright/test';
+
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { _electron } from '@playwright/test';
 
 const OUT = process.env.OUT ?? '/tmp/model-hub';
 const app = await _electron.launch({
@@ -32,7 +33,12 @@ const box = (sel) =>
     const el = document.querySelector(s);
     if (el === null) return null;
     const r = el.getBoundingClientRect();
-    return { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width), h: Math.round(r.height) };
+    return {
+      x: Math.round(r.x),
+      y: Math.round(r.y),
+      w: Math.round(r.width),
+      h: Math.round(r.height),
+    };
   }, sel);
 const fail = (m) => {
   throw new Error(`model-hub-curated-probe: ${m}`);
@@ -69,8 +75,8 @@ try {
   await win.screenshot({ path: path.join(OUT, '2-expanded.png') });
 
   // 3. PICK A VERSION → the pane fills; then SCROLL and it must stay put.
-  const variant = await win.evaluate(
-    () => document.querySelector('[data-testid^="family-variant-"]')?.getAttribute('data-testid'),
+  const variant = await win.evaluate(() =>
+    document.querySelector('[data-testid^="family-variant-"]')?.getAttribute('data-testid'),
   );
   await win.click(`[data-testid="${variant}"] button`);
   await win.waitForTimeout(1200);
@@ -80,7 +86,9 @@ try {
   await win.screenshot({ path: path.join(OUT, '3-detail.png') });
 
   await win.evaluate(() => {
-    const sc = [...document.querySelectorAll('.pd-scroll')].find((e) => e.scrollHeight > e.clientHeight + 40);
+    const sc = [...document.querySelectorAll('.pd-scroll')].find(
+      (e) => e.scrollHeight > e.clientHeight + 40,
+    );
     if (sc) sc.scrollTop = sc.scrollHeight;
   });
   await win.waitForTimeout(700);
@@ -131,13 +139,22 @@ try {
     const el = document.querySelector('[data-testid="detail-download-bar"]');
     return el === null ? null : el.getAttribute('data-fraction');
   });
-  const cancelBtn = await box('[data-testid="detail-download-cancel"]');
+  const cancelBtn = await box('[data-testid="detail-download-bar-cancel"]');
+  // The bar is pinned to the top bar too — cancellable from anywhere.
+  const pinned = await box('[data-testid="topbar-downloads"]');
+  console.log('top-bar download indicator:', JSON.stringify(pinned));
+  if (pinned === null) fail('the download is not pinned to the top bar');
+  const pctText = await win.evaluate(() =>
+    document.querySelector('[data-testid="detail-download-progress"]')?.textContent?.trim(),
+  );
+  if (pctText !== undefined && /%/.test(pctText))
+    fail(`the bar still shows a percentage: ${pctText}`);
   console.log('progress bar at:', bar, '· cancel button:', JSON.stringify(cancelBtn));
   if (cancelBtn === null) fail('the progress state has no cancel control');
   await win.screenshot({ path: path.join(OUT, '7-downloading.png') });
 
   const t0 = Date.now();
-  await win.click('[data-testid="detail-download-cancel"]');
+  await win.click('[data-testid="detail-download-bar-cancel"]');
   await win.waitForSelector('[data-testid="detail-download"]', { timeout: 4000 });
   console.log(`cancel → Download button restored in ${Date.now() - t0}ms`);
   await win.screenshot({ path: path.join(OUT, '8-cancelled.png') });
@@ -161,9 +178,13 @@ try {
     () => document.querySelector('[data-testid="detail-gen-install"]')?.textContent?.trim() ?? null,
   );
   const realButton = await box('[data-testid="detail-download"]');
-  console.log('generation family says:', JSON.stringify(genBlock));
-  if (genBlock === null) fail('a generation model showed no install explanation');
+  // the user: the "whole repository, into this app's model store" line "is not
+  // needed and especially not true in this case above" — so nothing should be
+  // said here at all unless the machine cannot run what it is about to fetch.
+  console.log('generation family caveat:', JSON.stringify(genBlock));
   if (realButton === null) fail('a generation model has no Download button');
+  if (genBlock !== null && !/memory/.test(genBlock))
+    fail(`the card is still explaining itself: ${genBlock}`);
   await win.screenshot({ path: path.join(OUT, '9-generation-family.png') });
 
   // 7. THE TAGS, AND THE MACHINE-FIT VERDICT.
@@ -200,6 +221,33 @@ try {
     if (!p.rounded.startsWith('9999') && !p.rounded.includes('px')) fail('a tag is not a pill');
     if (p.border === '0px') fail(`the "${p.text}" tag has no border`);
   }
+
+  // 8. THE CARD'S OWN BAR, and the top-bar twin, on a generation download.
+  await win.click('[data-testid="family-toggle-minimax-h3"]');
+  await win.waitForTimeout(300);
+  await win.click('[data-testid="filter-output-video"]');
+  await win.waitForTimeout(300);
+  await win.click('[data-testid="filter-output-audio"]');
+  await win.waitForTimeout(500);
+  await win.click('[data-testid="family-toggle-kokoro"]');
+  await win.waitForTimeout(400);
+  await win.click('[data-testid="family-download-hexgrad/Kokoro-82M:82M"]');
+  await win.waitForTimeout(2500);
+  const rowBar = await box('[data-testid="family-progress-hexgrad/Kokoro-82M"]');
+  const rowX = await box('[data-testid="family-progress-hexgrad/Kokoro-82M-cancel"]');
+  const topBar = await box('[data-testid="topbar-downloads"]');
+  console.log('row bar:', JSON.stringify(rowBar), 'row X:', JSON.stringify(rowX));
+  console.log('top bar while a repo downloads:', JSON.stringify(topBar));
+  await win.screenshot({ path: path.join(OUT, '11-download-bar.png') });
+  if (rowBar === null) fail('the family row shows no progress bar');
+  if (rowX === null) fail('the family row bar has no cancel');
+  if (topBar === null) fail('a store download is not pinned to the top bar');
+  // Cancel it from the TOP BAR, which is the point of pinning it there.
+  await win.click('[data-testid="topbar-downloads"] button');
+  await win.waitForTimeout(1200);
+  if ((await box('[data-testid="topbar-downloads"]')) !== null)
+    fail('cancelling from the top bar left the indicator up');
+  console.log('cancelled from the top bar');
 
   console.log('model-hub-curated-probe OK');
 } finally {

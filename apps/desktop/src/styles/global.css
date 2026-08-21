@@ -2376,6 +2376,59 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
 }
 
 /*
+ * THE DOWNLOAD BAR — the user: "a simple ---------- X progressbar and X button al
+ * centered circle red hover on x blue and light blue for progress on the bar.
+ * no % needed".
+ *
+ * So: a light-blue track, a blue fill, and a circular X beside it that colours
+ * red only under the pointer. The two blues are mixed from the app's own info
+ * token rather than hardcoded, so they stay right in both themes — a fixed pair
+ * of hexes would go muddy in one of them.
+ */
+.pd-dl-track {
+  flex: 1;
+  min-width: 48px;
+  height: 6px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: color-mix(in oklab, var(--pd-status-info-fg) 22%, transparent);
+}
+.pd-dl-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--pd-status-info-fg);
+  transition: width 200ms var(--pd-easing-standard, ease);
+}
+.pd-dl-fill--sweep {
+  width: 33%;
+  transition: none;
+  animation: pd-download-sweep 1.1s var(--pd-easing-standard, ease-in-out) infinite;
+}
+.pd-dl-x {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  border: 1px solid var(--pd-border-default);
+  background: transparent;
+  color: var(--pd-text-muted);
+  cursor: pointer;
+  transition:
+    color var(--pd-duration-fast) var(--pd-easing-standard),
+    border-color var(--pd-duration-fast) var(--pd-easing-standard),
+    background var(--pd-duration-fast) var(--pd-easing-standard);
+}
+.pd-dl-x:hover {
+  color: var(--pd-status-danger-fg);
+  border-color: color-mix(in oklab, var(--pd-status-danger-fg) 55%, transparent);
+  background: color-mix(in oklab, var(--pd-status-danger-fg) 12%, transparent);
+}
+
+/*
  * The indeterminate half of the download bar (DownloadAction).
  *
  * A download has no total until the file listing resolves, and those first

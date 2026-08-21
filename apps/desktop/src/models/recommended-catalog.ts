@@ -522,12 +522,43 @@ export const RECOMMENDED_FAMILIES: readonly RecommendedFamily[] = [
      */
     variants: [
       {
+        /*
+         * A RECIPE, NOT THE REPO. This entry used to name the repo with no
+         * `allow`, and the user caught what that meant on screen: "0% · 466 MB of
+         * 237 GB". `Lightricks/LTX-Video` is a 254 GB archive of every LTX
+         * release — four 13B checkpoints, their fp8 twins, upscalers, LoRAs —
+         * and Download meant all of it. What you actually want is one 2B
+         * transformer plus the encoder and VAE it loads with.
+         */
         repo: 'Lightricks/LTX-Video',
-        label: '2B distilled',
+        label: '2B distilled · fp8',
         paramsB: 2,
         note: 'The small, quick one — the only member most machines can run.',
+        allow: [
+          'ltxv-2b-0.9.8-distilled-fp8.safetensors',
+          'text_encoder/*',
+          'tokenizer/*',
+          'vae/*',
+          '*.json',
+        ],
         tasks: ['text-to-video', 'image-to-video'],
-        minMemoryGB: 12,
+        approxBytes: 25_190_000_000,
+        minMemoryGB: 16,
+      },
+      {
+        repo: 'Lightricks/LTX-Video',
+        label: '2B distilled · bf16',
+        paramsB: 2,
+        allow: [
+          'ltxv-2b-0.9.8-distilled.safetensors',
+          'text_encoder/*',
+          'tokenizer/*',
+          'vae/*',
+          '*.json',
+        ],
+        tasks: ['text-to-video', 'image-to-video'],
+        approxBytes: 27_070_000_000,
+        minMemoryGB: 20,
       },
       {
         repo: 'Lightricks/LTX-2.5',
@@ -632,17 +663,6 @@ export const RECOMMENDED_FAMILIES: readonly RecommendedFamily[] = [
       },
     ],
   },
-  {
-    id: 'wan',
-    name: 'Wan 2.1',
-    org: 'Wan-AI',
-    output: 'video',
-    blurb: 'Text-to-video at 1.3B — the smallest video model worth running.',
-    variants: [
-      { repo: 'Wan-AI/Wan2.1-T2V-1.3B', label: 'T2V 1.3B', paramsB: 1.3, minMemoryGB: 10 },
-    ],
-  },
-
   // ── AUDIO ─────────────────────────────────────────────────────────────────
   {
     id: 'kokoro',

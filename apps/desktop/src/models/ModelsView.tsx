@@ -1266,7 +1266,16 @@ export function ModelsView() {
     });
   };
 
-  /** 0..1 per repo, for the little inline percentage on a family row. */
+  /** Stop whichever downloader is carrying this variant. */
+  const cancelVariant = async (family: RecommendedFamily, variant: RecommendedVariant) => {
+    if (installKindOf(family) === 'gguf') {
+      await cancelHere();
+      return;
+    }
+    await storeCancel(variant.repo);
+  };
+
+  /** 0..1 per repo, for the bar on a family row. */
   const storeFractions = useMemo(() => {
     const out: Record<string, number> = {};
     for (const [repo, p] of Object.entries(storeProgress)) out[repo] = p.fraction;
@@ -1816,6 +1825,7 @@ export function ModelsView() {
                           progress={storeFractions}
                           onSelect={setSelected}
                           onDownload={(variant) => void downloadVariant(family, variant)}
+                          onCancel={(variant) => void cancelVariant(family, variant)}
                         />
                       ))}
                       {families.length === 0 ? (
@@ -2130,17 +2140,25 @@ export function ModelsView() {
                           onCancel={() => void storeCancel(detail.id)}
                           testid="detail-download"
                         />
-                        <p
-                          className="mt-2 text-caption text-text-muted"
-                          data-testid="detail-gen-install"
-                        >
-                          {curatedPick.variant.allow === undefined
-                            ? 'The whole repository, into this app\u2019s model store.'
-                            : `${curatedPick.variant.allow.length} file${curatedPick.variant.allow.length === 1 ? '' : 's'} from the repository \u2014 exactly what this configuration needs.`}
-                          {fitFor(curatedPick.variant, hw?.ramGiB ?? 0) === 'too-big'
-                            ? ' It needs more memory than this Mac has, so it will download but not run here.'
-                            : ''}
-                        </p>
+                        {/*
+                         * the user: "that line about 'the whole repository in this
+                         * apps model store' or something is not needed and
+                         * especially not true in this case above." It was both:
+                         * noise on every card, and wrong wherever the variant is
+                         * a recipe rather than the repo. The size is already on
+                         * the row that was clicked; the only thing left worth
+                         * saying is when the machine cannot run what it is about
+                         * to fetch.
+                         */}
+                        {fitFor(curatedPick.variant, hw?.ramGiB ?? 0) === 'too-big' ? (
+                          <p
+                            className="mt-2 text-caption text-status-danger-fg"
+                            data-testid="detail-gen-install"
+                          >
+                            Needs more memory than this Mac has — it will download, but not run
+                            here.
+                          </p>
+                        ) : null}
                       </>
                     ) : (
                       <>

@@ -62,6 +62,28 @@ describe('the curated recommended list', () => {
     expect(new Set(bundles).size).toBe(bundles.length);
   });
 
+  it('never offers a whole repo where the whole repo is an archive', () => {
+    /*
+     * The bug the user caught on screen: "0% · 466 MB of 237 GB". The LTX 2B entry
+     * named `Lightricks/LTX-Video` with no `allow`, and that repo is a 254 GB
+     * archive of every LTX release ever published — so Download meant all of it.
+     * Any variant of a family whose repo is one of these archives must be a
+     * recipe, never the bare repo.
+     */
+    const ARCHIVES = new Set([
+      'Lightricks/LTX-Video',
+      'Lightricks/LTX-2.5',
+      'unsloth/MiniMax-H3-GGUF',
+      'unsloth/DeepSeek-V4-Flash-0731-GGUF',
+    ]);
+    for (const f of RECOMMENDED_FAMILIES) {
+      for (const v of f.variants) {
+        if (!ARCHIVES.has(v.repo)) continue;
+        expect(v.allow, `${v.repo} ${v.label} would download the whole archive`).toBeDefined();
+      }
+    }
+  });
+
   it('gives every partial-repo variant a real measured size', () => {
     // A recipe's size cannot be inferred from the repo (LTX-2.5's tree is ~200GB
     // and no configuration is), so an `allow` without `approxBytes` would make
@@ -79,8 +101,8 @@ describe('the curated recommended list', () => {
     // for this machine if it can't run".
     const ltx = RECOMMENDED_FAMILIES.find((f) => f.id === 'ltx');
     if (ltx === undefined) throw new Error('LTX is missing');
-    const big = ltx.variants.find((v) => v.label.includes('bf16'));
-    if (big === undefined) throw new Error('the bf16 recipe is missing');
+    const big = ltx.variants.find((v) => v.label.startsWith('22B dev'));
+    if (big === undefined) throw new Error('the 22B dev recipe is missing');
     expect(fitFor(big, 24)).toBe('too-big');
     expect(fitFor(big, 128)).toBe('fits');
     // A model that fits but leaves nothing over is neither a yes nor a no.

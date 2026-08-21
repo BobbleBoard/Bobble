@@ -29,6 +29,7 @@ import { IconCheck, IconChevronDown } from '@pi-desktop/ui';
 import { type JSX, useEffect, useRef, useState } from 'react';
 import { cx } from '../onboarding/cx';
 import { OrgAvatar } from '../settings/brand-icons';
+import { DownloadBar } from './DownloadBar';
 import { compactBytes } from './models-layout';
 import { Pill } from './Pill';
 import {
@@ -52,6 +53,7 @@ export interface FamilyCardProps {
   readonly progress?: Readonly<Record<string, number>>;
   readonly onSelect: (repo: string) => void;
   readonly onDownload: (variant: RecommendedVariant) => void;
+  readonly onCancel: (variant: RecommendedVariant) => void;
 }
 
 /** "2.6B" / "820M" — the size column, from a parameter count in billions. */
@@ -85,6 +87,7 @@ export function FamilyCard({
   progress = {},
   onSelect,
   onDownload,
+  onCancel,
 }: FamilyCardProps): JSX.Element {
   const [open, setOpen] = useState(false);
   const [height, setHeight] = useState<number | 'auto'>(0);
@@ -164,12 +167,16 @@ export function FamilyCard({
             On disk
           </Pill>
         ) : pct !== undefined ? (
-          <span
-            className="shrink-0 text-caption text-text-muted tabular-nums"
-            data-testid={`family-progress-${v.repo}`}
-          >
-            {Math.round(pct * 100)}%
-          </span>
+          /* The Download button becomes the bar in place — the user: "the download
+             button (quick one in the card) needs to be replaced with a simple
+             ---------- X progressbar and X button". No number: a bar says the
+             same thing at a glance and lets you look away. */
+          <DownloadBar
+            fraction={pct > 0 ? pct : null}
+            label={`Cancel ${v.repo}`}
+            testid={`family-progress-${v.repo}`}
+            onCancel={() => onCancel(v)}
+          />
         ) : (
           <button
             type="button"

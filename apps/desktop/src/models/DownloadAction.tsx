@@ -24,8 +24,7 @@
  */
 import { IconArrowUp, IconCheck, IconClose } from '@pi-desktop/ui';
 import type { JSX } from 'react';
-import { cx } from '../onboarding/cx';
-import { compactBytes } from './models-layout';
+import { DownloadBar } from './DownloadBar';
 
 /** The set has no download glyph; a rotated arrow is the mark this hub uses. */
 function IconDownload({ size = 14 }: { size?: number }) {
@@ -91,50 +90,21 @@ export function DownloadAction({
     );
   }
 
-  const pct = fraction === null ? null : Math.round(Math.max(0, Math.min(1, fraction)) * 100);
-  const caption =
-    received !== undefined && total !== undefined && total !== null && total > 0
-      ? `${compactBytes(received)} of ${compactBytes(total)}`
-      : 'Starting…';
-
+  /*
+   * THE SAME BAR AS EVERYWHERE ELSE. the user asked for "a simple ---------- X
+   * progressbar and X button… no % needed", and the number that used to sit
+   * here is exactly what he was removing: it invited you to watch a transfer
+   * you had already decided to leave running. The size is on the row you
+   * clicked, and the top bar carries the same control once you navigate away.
+   */
   return (
     <div className="mt-3 flex items-center gap-2" data-testid={`${testid}-progress`}>
-      <div className="min-w-0 flex-1">
-        <div
-          className="h-2 w-full overflow-hidden rounded-full bg-bg-inset"
-          role="progressbar"
-          aria-label="Download progress"
-          aria-valuemin={0}
-          aria-valuemax={100}
-          {...(pct === null ? {} : { 'aria-valuenow': pct })}
-          data-testid={`${testid}-bar`}
-          data-fraction={pct ?? 'indeterminate'}
-        >
-          <div
-            className={cx(
-              'h-full rounded-full bg-accent-primary',
-              // No width transition while indeterminate — the sweep IS the
-              // animation, and a transition on top of it reads as stutter.
-              pct === null ? 'pd-download-sweep w-1/3' : 'transition-[width] duration-200',
-            )}
-            style={pct === null ? undefined : { width: `${pct}%` }}
-          />
-        </div>
-        <p className="mt-1 flex items-center gap-1.5 text-caption text-text-muted tabular-nums">
-          <span>{pct === null ? caption : `${pct}% · ${caption}`}</span>
-          {eta !== undefined && eta !== '' ? <span>· {eta}</span> : null}
-        </p>
-      </div>
-      <button
-        type="button"
-        aria-label="Cancel download"
-        title="Cancel and discard what has downloaded so far"
-        data-testid={`${testid}-cancel`}
-        onClick={onCancel}
-        className="pd-focusable flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-status-danger-fg transition-colors hover:bg-status-danger-bg"
-      >
-        <IconClose size={14} />
-      </button>
+      <DownloadBar
+        grow
+        fraction={fraction !== null && fraction > 0 ? fraction : null}
+        testid={`${testid}-bar`}
+        onCancel={onCancel}
+      />
     </div>
   );
 }

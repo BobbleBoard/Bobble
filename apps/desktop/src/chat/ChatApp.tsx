@@ -29,6 +29,7 @@ import {
 import type { ReactNode } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { conversationNameFrom } from '../../electron/workspace/project-dir';
+import { TopBarDownloads } from '../models/TopBarDownloads';
 import type { SettingsSection } from '../settings/SettingsView';
 import { registerCanvasController, useCanvasStore } from '../state/canvas-store';
 import { useChildAgentStore } from '../state/child-agent-store';
@@ -526,7 +527,14 @@ export function ChatApp({
                   // The canvas toggle (round-8 #11/#16) plus, for power users only,
                   // the brain/gear advanced-params entry to its left. In simple mode
                   // the top-right is exactly the canvas toggle, unchanged.
-                  <div className="flex items-center gap-1">
+                  //
+                  // Ahead of both: any download in flight. the user asked for the bar
+                  // to be "pinned to the top bar easily cancellable from anywhere
+                  // and monitorable" — a 25 GB fetch is a background fact you
+                  // start and then walk away from, and until this it could only be
+                  // watched or stopped from the row that started it.
+                  <div className="flex items-center gap-2">
+                    <TopBarDownloads />
                     <AdvancedParamsButton />
                     <CanvasTopBarControls />
                   </div>
