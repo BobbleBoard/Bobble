@@ -32,6 +32,10 @@ const IS_TRIPO = new URLSearchParams(window.location.search).has('tripo');
 const TripoWorkspace = lazy(() =>
   import('./tripo/TripoWorkspace').then((m) => ({ default: m.TripoWorkspace })),
 );
+/** The ComfyUI-backed image/video Studio. Lazy for the same reason. */
+const StudioView = lazy(() =>
+  import('./studio/StudioView').then((m) => ({ default: m.StudioView })),
+);
 
 /**
  * Hidden probe hooks: keep the boot-event / theme / app-info testids the
@@ -181,6 +185,21 @@ export function App() {
   // The 3D Studio modality: reached from the sidebar "Modalities" dropdown (or
   // the ?tripo=1 dev route). A full-window takeover with its own back-to-chat
   // button; when active it replaces the chat shell entirely.
+  /*
+   * THE IMAGE & VIDEO STUDIO — the same full-surface routing the 3D one uses.
+   * Lazy, because it pulls nothing until someone opens it, and the boot path is
+   * exactly where a few hundred kilobytes of unused view would be felt.
+   */
+  if (modalityView === 'studio') {
+    return (
+      <TooltipProvider delayDuration={200}>
+        <Suspense fallback={null}>
+          <StudioView />
+        </Suspense>
+      </TooltipProvider>
+    );
+  }
+
   if (IS_TRIPO || modalityView === '3d') {
     return (
       <TooltipProvider delayDuration={200}>

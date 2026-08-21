@@ -36,23 +36,28 @@ import {
   type Gen3dEventMap,
   type Gen3dInvokeMap,
 } from './gen3d/gen3d-contract';
+import { IMPORT_INVOKE_CHANNELS, type ImportInvokeMap } from './import/import-contract';
 import {
   STORE_EVENT_CHANNELS,
   STORE_INVOKE_CHANNELS,
   type StoreEventMap,
   type StoreInvokeMap,
 } from './model-store/store-contract';
-import { IMPORT_INVOKE_CHANNELS, type ImportInvokeMap } from './import/import-contract';
 import { OFFICE_INVOKE_CHANNELS, type OfficeInvokeMap } from './office/office-contract';
 import { PI_INVOKE_CHANNELS, type PiEventMap, type PiInvokeMap } from './pi/contract';
+import { PROJECT_INVOKE_CHANNELS, type ProjectInvokeMap } from './project/project-contract';
 import {
   SCHEDULED_INVOKE_CHANNELS,
   type ScheduledEventMap,
   type ScheduledInvokeMap,
 } from './scheduled/scheduled-contract';
-import { PROJECT_INVOKE_CHANNELS, type ProjectInvokeMap } from './project/project-contract';
 import { SETTINGS_INVOKE_CHANNELS, type SettingsInvokeMap } from './settings/settings-contract';
 import { SKILLS_INVOKE_CHANNELS, type SkillsInvokeMap } from './skills/skills-contract';
+import {
+  STUDIO_INVOKE_CHANNELS,
+  type StudioEventMap,
+  type StudioInvokeMap,
+} from './studio/studio-contract';
 import { PTY_INVOKE_CHANNELS, type PtyEventMap, type PtyInvokeMap } from './terminal/pty-contract';
 
 export interface AppInfo {
@@ -703,6 +708,7 @@ export type AppInvokeMap = CoreInvokeMap &
   GenInvokeMap &
   Gen3dInvokeMap &
   StoreInvokeMap &
+  StudioInvokeMap &
   DictationInvokeMap &
   BrowserInvokeMap &
   BrowserAgentInvokeMap &
@@ -732,6 +738,7 @@ export const APP_INVOKE_CHANNELS = [
   ...GEN_INVOKE_CHANNELS,
   ...GEN3D_INVOKE_CHANNELS,
   ...STORE_INVOKE_CHANNELS,
+  ...STUDIO_INVOKE_CHANNELS,
   ...DICTATION_INVOKE_CHANNELS,
   ...BROWSER_INVOKE_CHANNELS,
   ...BROWSER_AGENT_INVOKE_CHANNELS,
@@ -812,6 +819,7 @@ export type AppEventMap = {
   GenEventMap &
   Gen3dEventMap &
   StoreEventMap &
+  StudioEventMap &
   ScheduledEventMap &
   PiEventMap;
 

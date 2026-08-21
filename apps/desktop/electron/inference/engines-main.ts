@@ -21,7 +21,7 @@
  * one-click uninstall honest.
  */
 import { spawn } from 'node:child_process';
-import { existsSync, readdirSync, rmSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { cacheRoot } from '@pi-desktop/inference';
 import type { EngineState } from '../ipc-contract';
@@ -29,6 +29,21 @@ import type { EngineState } from '../ipc-contract';
 /** Where the managed Python venv for the MLX engines lives. */
 function pyRoot(): string {
   return path.join(cacheRoot(), 'engines', 'mlx-venv');
+}
+
+/** ComfyUI's checkout, and the venv that runs it. */
+function comfyRoot(): string {
+  return path.join(cacheRoot(), 'engines', 'comfyui');
+}
+function comfyVenv(): string {
+  return path.join(comfyRoot(), '.venv');
+}
+export function comfyMainPy(): string {
+  return path.join(comfyRoot(), 'main.py');
+}
+/** Where ComfyUI is told to look for weights — the app's own model store. */
+export function comfyModelPathsYaml(): string {
+  return path.join(comfyRoot(), 'pi-model-paths.yaml');
 }
 
 function llamaRoot(): string {
@@ -142,6 +157,40 @@ interface EngineOps {
   uninstall: () => Promise<void>;
 }
 
+/**
+ * Point ComfyUI at OUR model store instead of its own `models/` tree.
+ *
+ * ComfyUI expects `models/checkpoints`, `models/vae`, `models/text_encoders`
+ * and so on under its checkout. Everything this app downloads lives in the
+ * store, organised by what it MAKES rather than by what kind of tensor it is —
+ * and copying weights into a second tree to satisfy a naming convention would
+ * double the disk cost of every model.
+ *
+ * `--extra-model-paths-config` is ComfyUI's own answer to this: a YAML naming
+ * extra roots per category. Pointing every category at the store's kind
+ * directories means Comfy searches them recursively and finds whatever we have
+ * fetched, wherever inside a repo's tree it happens to sit.
+ */
+function writeComfyModelPaths(): void {
+  const store = path.join(cacheRoot(), 'store');
+  const yaml = [
+    '# Written by Bobble. ComfyUI reads its weights from the app model store.',
+    'bobble:',
+    `    base_path: ${store}`,
+    '    is_default: true',
+    '    checkpoints: image|video',
+    '    diffusion_models: image|video',
+    '    unet: image|video',
+    '    vae: image|video',
+    '    clip: image|video',
+    '    text_encoders: image|video',
+    '    loras: image|video',
+    '    audio_checkpoints: audio',
+    '',
+  ].join('\n');
+  writeFileSync(comfyModelPathsYaml(), yaml, 'utf8');
+}
+
 const OPS: Record<string, EngineOps> = {
   llamacpp: {
     installed: () => existsSync(llamaRoot()) && readdirSync(llamaRoot()).length > 0,
@@ -168,6 +217,58 @@ const OPS: Record<string, EngineOps> = {
       const uv = uvPath();
       if (uv === null) return;
       await run(uv, ['pip', 'uninstall', '--python', pyRoot(), 'rapid-mlx']).catch(() => undefined);
+    },
+  },
+  /*
+   * COMFYUI: a git clone plus its own venv, both under the app cache.
+   *
+   * Not pip-installable — upstream ships it as a checkout you run `main.py`
+   * from, and it derives its base directory from that file's location. So the
+   * clone IS the install, `--depth 1` because nobody here needs its history, and
+   * the venv sits inside it so uninstalling is one `rm -rf`.
+   *
+   * The requirements pull Torch, which is the 6 GB the catalog quotes. On macOS
+   * that is the MPS build and comes from the default index; no CUDA wheel is
+   * requested, which is what would otherwise download 3 GB of unusable CUDA
+   * libraries onto a Mac.
+   */
+  comfyui: {
+    installed: () => existsSync(comfyMainPy()) && existsSync(comfyVenv()),
+    // A Torch venv is tens of thousands of files, and the default walk budget
+    // stopped a third of the way in — MEASURED 768 MB reported against 1.4 GB on
+    // disk. A settings panel opening is not a hot path; the budget can afford
+    // the whole tree here, and a size that is wrong by half is worse than slow.
+    bytes: () => (existsSync(comfyRoot()) ? dirBytes(comfyRoot(), 400_000) : undefined),
+    install: async () => {
+      const uv = uvPath();
+      if (uv === null) throw new Error('uv is required to install ComfyUI and was not found');
+      if (!existsSync(comfyMainPy())) {
+        rmSync(comfyRoot(), { recursive: true, force: true });
+        await run(
+          'git',
+          ['clone', '--depth', '1', 'https://github.com/comfyanonymous/ComfyUI.git', comfyRoot()],
+          10 * 60_000,
+        );
+      }
+      if (!existsSync(comfyVenv())) {
+        await run(uv, ['venv', comfyVenv(), '--python', '3.12']);
+      }
+      await run(
+        uv,
+        [
+          'pip',
+          'install',
+          '--python',
+          comfyVenv(),
+          '-r',
+          path.join(comfyRoot(), 'requirements.txt'),
+        ],
+        30 * 60_000,
+      );
+      writeComfyModelPaths();
+    },
+    uninstall: async () => {
+      rmSync(comfyRoot(), { recursive: true, force: true });
     },
   },
   'dflash-mlx': {

@@ -34,11 +34,11 @@ import { fsHandlers } from './fs-handlers';
 import { disposeGen, registerGenCatalogIpc, registerGenIpc } from './gen/gen-manager';
 import { genWorkerCandidates, resolveGenWorkerScript } from './gen/worker-path';
 import { registerGen3dIpc } from './gen3d/gen3d-main';
-import { registerStoreIpc } from './model-store/store-main';
 import { registerImportIpc } from './import/import-main';
 import { registerLlmIpc, shutdownInference } from './inference/llm-main';
 import type { AppEventMap, CoreInvokeMap, FsInvokeMap } from './ipc-contract';
 import { disposeMacAgent, registerMacAgentIpc } from './mac/mac-agent';
+import { registerStoreIpc } from './model-store/store-main';
 import { registerOfficeIpc } from './office/office-ipc';
 import { createScheduledRunBridge, registerPiIpc } from './pi/pi-main';
 import { registerProjectIpc } from './project/project-main';
@@ -51,6 +51,7 @@ import {
   registerSettingsIpc,
 } from './settings/settings-main';
 import { registerSkillsIpc } from './skills/skills-main';
+import { disposeStudio, registerStudioIpc } from './studio/studio-main';
 import { disposeAllPtys, registerPtyIpc } from './terminal/pty-manager';
 import {
   isTrustedIpcEvent,
@@ -464,7 +465,8 @@ function installAppMenu(): void {
  * window (so it completes before `app.exit()`):
  *   - the inference utilityProcess + its llama-server grandchild (shutdownInference),
  *   - the long-lived pi-mac computer-use helper (disposeMacAgent), and
- *   - any terminal PTY/shell sessions (disposeAllPtys).
+ *   - any terminal PTY/shell sessions (disposeAllPtys), and
+ *   - the ComfyUI server, when the studio started one (disposeStudio).
  * The pi children (and, via their process group, their subagent grandchildren)
  * are reaped by the quit-hold's own `disposeAll`. `allSettled` so one slow/failed
  * teardown never blocks the others; the quit-hold's grace cap bounds the whole
@@ -477,6 +479,9 @@ async function reapChildProcesses(): Promise<void> {
     (async () => disposeAllPtys())(),
     // Close the gen bridge socket server if the experimental stack stood it up.
     (async () => disposeGen())(),
+    // The ComfyUI server is a Python process holding a model resident — the same
+    // kind of survivor as an orphaned llama-server, and reaped the same way.
+    (async () => disposeStudio())(),
   ]);
 }
 
@@ -543,6 +548,21 @@ function registerAppIpc(): void {
     },
     () => readSettings().hfToken || undefined,
   );
+
+  /*
+   * THE IMAGE & VIDEO STUDIO, on ComfyUI. the user: "let's have comfy as a
+   * downloadable inference engine and then wire up a primitive for now
+   * image/video studio) and have those run through it."
+   *
+   * The engine installs from Settings › Engines like any other; this is the part
+   * that starts it and runs one graph. Registered unconditionally because it is
+   * honest when the engine is absent — `studio:status` says so and the panel
+   * offers the install rather than the app pretending the surface is missing.
+   */
+  registerStudioIpc(ipcMain, allowSender, (channel, payload) => {
+    const wc = mainWindow?.webContents;
+    if (wc !== undefined) events.send(wc, channel, payload);
+  });
 
   // EXPERIMENTAL generation stack (default OFF). The full generation socket
   // bridge (`generate_image` / `generate_video` → JobQueue → mflux/MLX/ComfyUI,

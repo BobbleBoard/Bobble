@@ -36,6 +36,7 @@ import {
   IconClock,
   IconConnector,
   IconFolderPlus,
+  IconImage,
   IconMore,
   IconPencil,
   IconPin,
@@ -1075,6 +1076,24 @@ export function SessionSidebar({
                     {moduleSize}
                   </span>
                 ) : null}
+              </button>
+              {/*
+               * IMAGE & VIDEO, on ComfyUI. Openable whether or not the engine is
+               * installed, for the same reason the 3D row is: the surface itself
+               * explains what is missing and where to get it, which is a better
+               * answer than a row that will not click.
+               */}
+              <button
+                type="button"
+                className="pd-child-row pd-focusable"
+                data-testid="modality-studio"
+                title="Studio — images and video, generated on this machine"
+                onClick={() => setModalityView('studio')}
+              >
+                <span className="pd-child-row-icon">
+                  <IconImage size={13} />
+                </span>
+                <span className="pd-child-row-label">Studio</span>
               </button>
             </div>
           ) : null}

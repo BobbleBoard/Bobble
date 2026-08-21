@@ -1,12 +1,13 @@
 /**
  * Which top-level MODALITY the app is showing. Chat is the default; other
- * modalities (the 3D Studio workspace, and later image/video/audio studios) are
+ * modalities (the 3D Studio workspace, and the ComfyUI-backed image/video
+ * Studio) are
  * full-window takeovers reached from the sidebar "Modalities" dropdown, each
  * with its own back-to-chat affordance. UI-only routing — no persistence.
  */
 import { create } from 'zustand';
 
-export type Modality = 'chat' | '3d';
+export type Modality = 'chat' | '3d' | 'studio';
 
 interface ModalityState {
   view: Modality;

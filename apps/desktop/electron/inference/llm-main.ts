@@ -459,7 +459,14 @@ const engineHandlers: IpcHandlers<EngineInvokeMap> = {
 };
 
 /** Ids main can report on. Mirrors settings/engine-catalog.ts. */
-const KNOWN_ENGINE_IDS = ['llamacpp', 'rapid-mlx', 'dflash-mlx', 'lemonade', 'vllm'] as const;
+const KNOWN_ENGINE_IDS = [
+  'llamacpp',
+  'rapid-mlx',
+  'dflash-mlx',
+  'comfyui',
+  'lemonade',
+  'vllm',
+] as const;
 
 export function registerLlmIpc(ipcMain: IpcMain, allowSender: (event: unknown) => boolean): void {
   registerIpcHandlers<LlmInvokeMap>(ipcMain, handlers, { allowSender });

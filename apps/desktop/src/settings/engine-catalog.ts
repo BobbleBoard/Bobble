@@ -103,6 +103,29 @@ export const ENGINES: readonly EngineSpec[] = [
     requires: ['rapid-mlx'],
   },
   {
+    /*
+     * COMFYUI — the engine for everything that is not text.
+     *
+     * the user: "let's have comfy as a downloadable inference engine and then wire
+     * up a primitive for now image/video studio) and have those run through it."
+     *
+     * It earns a row here because it is the same KIND of decision as the others:
+     * a runtime you install once and every model of that sort then runs on. The
+     * difference is which models — llama.cpp and the MLX engines run text, this
+     * runs image, video and audio, so it is the only entry whose absence means a
+     * whole modality is unavailable rather than slower.
+     *
+     * The size is the install itself (a clone plus a Torch venv); model weights
+     * are the store's problem and are counted there.
+     */
+    id: 'comfyui',
+    name: 'ComfyUI',
+    blurb: 'Runs image, video and audio models — one runtime for every generation model.',
+    role: 'general',
+    platforms: ['darwin', 'win32', 'linux'],
+    approxBytes: 6 * GB,
+  },
+  {
     id: 'lemonade',
     name: 'Lemonade',
     blurb: 'Runs models on an AMD NPU/iGPU instead of the CPU, where one is present.',
