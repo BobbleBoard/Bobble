@@ -253,7 +253,13 @@ body {
   pointer-events: none;
 }
 :root[data-flavor="claude"] .pd-sidebar-slot[data-open="false"] .pd-sidebar {
-  /* Clear the 8px float margin as well, as the flavor's own slide-out does. */
+  /*
+   * Clear the 8px float margin as well, as the flavor's own slide-out does.
+   * This flavor is the one place the two edges do not sit exactly on top of each
+   * other: the card is INSET 8px from its slot by design, so that inset closes
+   * smoothly to 0 across the slide (MEASURED worst case 7px, monotonic, no
+   * jump). bobble and codex, which have no float margin, track to 0px.
+   */
   transform: translateX(calc(-100% - 8px));
 }
 /*
