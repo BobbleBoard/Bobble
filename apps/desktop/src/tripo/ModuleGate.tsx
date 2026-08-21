@@ -70,8 +70,8 @@ export function ModuleGate({ state, onView }: ModuleGateProps): JSX.Element {
 
         {runtimeMissing ? (
           <p className="tp-gate-copy">
-            Bobble runs 3D generation through a local Python engine, and it could not be started.
-            Installing <code>uv</code> gives it what it needs — nothing else here has to change.
+            3D generation runs through a local Python engine. Bobble fetches everything it needs —
+            the runtime included — the first time you set it up. Nothing to install by hand.
           </p>
         ) : state.status === 'installing' ? (
           <p className="tp-gate-copy" data-testid="tp-gate-progress">
@@ -94,24 +94,39 @@ export function ModuleGate({ state, onView }: ModuleGateProps): JSX.Element {
         ) : null}
 
         <div className="tp-gate-actions">
-          {runtimeMissing ? null : (
-            <button
-              type="button"
-              className="tp-gate-primary"
-              data-testid="tp-gate-download"
-              disabled={state.status === 'installing' || starting || size === ''}
-              onClick={start}
-            >
-              <IcDownload size={15} />
-              {state.status === 'installing' || starting
-                ? 'Downloading…'
+          {/*
+            THE PRIMARY ACTION IS ALWAYS THERE, INCLUDING WITH NO RUNTIME.
+            It used to be withheld exactly then, leaving a fresh Mac looking at
+            a blurred studio with only "View" and a paragraph telling the user to
+            go install `uv` themselves — which is the manual setup this module is
+            supposed to be free of. The engine bootstraps its own runtime
+            (ensureUv fetches a pinned, checksum-verified uv), so the same button
+            starts the same flow; only the label differs, because "set up" and
+            "download" are honestly different amounts of work.
+          */}
+          <button
+            type="button"
+            className="tp-gate-primary"
+            data-testid="tp-gate-download"
+            disabled={state.status === 'installing' || starting}
+            onClick={start}
+          >
+            <IcDownload size={15} />
+            {state.status === 'installing' || starting
+              ? runtimeMissing
+                ? 'Setting up…'
+                : 'Downloading…'
+              : runtimeMissing
+                ? /* The size is unknown until the engine answers, and it cannot
+                     answer without a runtime — so this one names the action
+                     rather than a number it does not have. */
+                  'Set up 3D'
                 : /* No size means the catalog has not answered yet; asking for a
                      download we cannot cost is how a button lies. */
                   size === ''
                   ? 'Checking…'
                   : `Download module (${size})`}
-            </button>
-          )}
+          </button>
           <button
             type="button"
             className="tp-gate-secondary"
