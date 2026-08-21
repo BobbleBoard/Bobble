@@ -52,7 +52,8 @@
     "rehype-raw": "^7.0.0",
     "rehype-sanitize": "^6.0.0",
     "remark-gfm": "^4.0.1",
-    "zustand": "^5.0.14"
+    "zustand": "^5.0.14",
+    "@pi-desktop/model-store": "workspace:*"
   },
   "optionalDependencies": {
     "node-pty": "^1.1.0"

@@ -56,6 +56,7 @@ import { type QuantOption, ramVerdict } from '../settings/model-manager-logic';
 import { useHfStore } from '../state/hf-store';
 import { downloadEtaSeconds, downloadFraction, formatEta, useLlmStore } from '../state/llm-store';
 import { setHfToken, useHfToken } from '../state/settings-store';
+import { hasRepo, useStoreModels } from '../state/store-models';
 import { DownloadAction } from './DownloadAction';
 import { FamilyCard } from './FamilyCard';
 import { ModelCard } from './ModelCard';
@@ -81,6 +82,7 @@ import {
 } from './models-layout';
 import { QuantPicker } from './QuantPicker';
 import {
+  fitFor,
   installKindOf,
   OUTPUT_LABEL,
   type OutputModality,
@@ -648,6 +650,23 @@ export function ModelsView() {
    */
   const progress = useLlmStore((s) => s.download);
   const cancelDownload = useLlmStore((s) => s.cancelDownload);
+  /*
+   * THE STORE — everything that is not one GGUF out of a ladder.
+   *
+   * the user: "we need to be able to download anything and store it properly in an
+   * organized format… (eg say we add a video/image studio.)" So an image, video,
+   * audio or 3D pick is a real download now, into `<cache>/store/<kind>/<slug>/`
+   * with a manifest beside the weights, rather than a card explaining that the
+   * app cannot fetch it.
+   */
+  const storeModels = useStoreModels((s) => s.models);
+  const storeProgress = useStoreModels((s) => s.progress);
+  const storeDownload = useStoreModels((s) => s.download);
+  const storeCancel = useStoreModels((s) => s.cancel);
+  const refreshStore = useStoreModels((s) => s.refresh);
+  useEffect(() => {
+    void refreshStore();
+  }, [refreshStore]);
   const [hits, setHits] = useState<HfModelHitDTO[]>([]);
   /* Datasets are the reference's sibling page. Same chrome, different corpus —
      so they live here behind a kind switch rather than in a second view that
@@ -899,8 +918,15 @@ export function ModelsView() {
       if (e.hfRepo !== undefined) set.add(e.hfRepo);
       set.add(e.id);
     }
+    // …and everything the store holds, which is where every non-GGUF model now
+    // lands. Without this half the curated list would report "not downloaded"
+    // about weights sitting on the disk.
+    for (const m of storeModels) {
+      if (m.incomplete === true) continue;
+      set.add(m.repo);
+    }
     return set;
-  }, [catalog]);
+  }, [catalog, storeModels]);
   /* From the FILTERED rows, not the whole source: showing four trending cards
      above an "Nothing matches these filters" table made the page argue with
      itself. */
@@ -1213,6 +1239,39 @@ export function ModelsView() {
     await refreshCatalog();
     setBusyId(null);
   };
+
+  /*
+   * ONE CLICK, TWO DOWNLOADERS, and the variant decides which.
+   *
+   * A text family is a GGUF out of a ladder and belongs to the inference
+   * supervisor, which knows about quants and about the server that will load it.
+   * Everything else is a repo — or a RECIPE within one, `allow` naming the
+   * transformer, the encoder and the VAE — and goes to the store. Choosing here
+   * rather than at the button means the card never has to know the difference.
+   */
+  const downloadVariant = async (family: RecommendedFamily, variant: RecommendedVariant) => {
+    if (installKindOf(family) === 'gguf') {
+      setSelected(variant.repo);
+      await download(variant.repo);
+      return;
+    }
+    await storeDownload({
+      repo: variant.repo,
+      kind: family.output,
+      name: `${family.name} ${variant.label}`,
+      family: family.id,
+      ...(variant.tasks === undefined ? {} : { tasks: variant.tasks }),
+      ...(variant.allow === undefined ? {} : { allow: variant.allow }),
+      ...(variant.note === undefined ? {} : { notes: variant.note }),
+    });
+  };
+
+  /** 0..1 per repo, for the little inline percentage on a family row. */
+  const storeFractions = useMemo(() => {
+    const out: Record<string, number> = {};
+    for (const [repo, p] of Object.entries(storeProgress)) out[repo] = p.fraction;
+    return out;
+  }, [storeProgress]);
 
   /*
    * CANCEL, ACKNOWLEDGED FIRST. the user: "immediate feedback even if download
@@ -1753,11 +1812,10 @@ export function ModelsView() {
                           family={family}
                           downloaded={downloadedRepos}
                           selectedRepo={selected}
+                          memoryGB={hw?.ramGiB ?? 0}
+                          progress={storeFractions}
                           onSelect={setSelected}
-                          onDownload={(repo) => {
-                            setSelected(repo);
-                            void download(repo);
-                          }}
+                          onDownload={(variant) => void downloadVariant(family, variant)}
                         />
                       ))}
                       {families.length === 0 ? (
@@ -2052,31 +2110,38 @@ export function ModelsView() {
                       </button>
                     ) : curatedPick !== undefined && installKindOf(curatedPick.family) === 'gen' ? (
                       /*
-                       * A GENERATION MODEL DOES NOT DOWNLOAD FROM HERE, and the
-                       * button must not pretend otherwise. These are diffusers /
-                       * safetensors weights that their backend pulls into its own
-                       * cache the first time you generate with them — there is no
-                       * single file for this downloader to fetch, and offering
-                       * one produced "No downloadable files listed." under a big
-                       * blue Download.
+                       * A GENERATION MODEL DOWNLOADS FOR REAL, into the store.
+                       * What it does NOT get is the quant ladder below: there is
+                       * no ladder to pick from, because the choice was already
+                       * made in the family card — which transformer, which
+                       * precision, which job — and travels here as the recipe
+                       * this variant names.
                        */
-                      <div
-                        className="mt-3 rounded-xl border border-border-subtle bg-bg-inset p-3"
-                        data-testid="detail-gen-install"
-                      >
-                        <p className="text-footnote text-text-secondary">
-                          Fetched by the {OUTPUT_LABEL[curatedPick.family.output].toLowerCase()}{' '}
-                          stack the first time you use it — no separate download.
-                        </p>
-                        <button
-                          type="button"
-                          data-testid="detail-gen-open-hf"
-                          onClick={() => openOnHf(detail.id)}
-                          className="pd-focusable mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg border border-border-default px-3 py-2 text-footnote text-text-primary transition-colors hover:bg-bg-hover"
+                      <>
+                        <DownloadAction
+                          installed={hasRepo(storeModels, detail.id)}
+                          busy={storeProgress[detail.id] !== undefined}
+                          fraction={storeProgress[detail.id]?.fraction ?? null}
+                          received={storeProgress[detail.id]?.received}
+                          total={storeProgress[detail.id]?.total}
+                          onDownload={() =>
+                            void downloadVariant(curatedPick.family, curatedPick.variant)
+                          }
+                          onCancel={() => void storeCancel(detail.id)}
+                          testid="detail-download"
+                        />
+                        <p
+                          className="mt-2 text-caption text-text-muted"
+                          data-testid="detail-gen-install"
                         >
-                          <IconExternal size={14} /> View on Hugging Face
-                        </button>
-                      </div>
+                          {curatedPick.variant.allow === undefined
+                            ? 'The whole repository, into this app\u2019s model store.'
+                            : `${curatedPick.variant.allow.length} file${curatedPick.variant.allow.length === 1 ? '' : 's'} from the repository \u2014 exactly what this configuration needs.`}
+                          {fitFor(curatedPick.variant, hw?.ramGiB ?? 0) === 'too-big'
+                            ? ' It needs more memory than this Mac has, so it will download but not run here.'
+                            : ''}
+                        </p>
+                      </>
                     ) : (
                       <>
                         {/* The headline action: one click, the recommended file,

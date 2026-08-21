@@ -1,0 +1,28 @@
+{
+  "name": "@pi-desktop/model-store",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "license": "GPL-3.0-or-later",
+  "description": "One index over every model on this machine — where its weights are, what it makes, and how big — plus a downloader that can fetch any Hugging Face repo into it.",
+  "exports": {
+    ".": "./src/index.ts",
+    "./layout": "./src/layout.ts",
+    "./manifest": "./src/manifest.ts"
+  },
+  "scripts": {
+    "lint": "biome check .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@pi-desktop/inference": "workspace:*"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.2",
+    "@pi-desktop/shared": "workspace:*",
+    "@types/node": "^24.13.2",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.10"
+  }
+}

@@ -15,15 +15,29 @@
  * moves). So the open height comes from the content's own box, and the card
  * releases to `auto` once it arrives — otherwise a variant list that reflows
  * later, on a resize, would be stuck at the height it had when it opened.
+ *
+ * WHAT A ROW SAYS, and why each part is there:
+ *   - the JOB, in words ("first + last frame → video"), because the user's point
+ *     about MiniMax-H3 is that you download one per in→out you want, and a row
+ *     that only says "Q4" cannot tell you which one you are getting;
+ *   - the real DOWNLOAD SIZE of that recipe, not the repo's total, since one
+ *     configuration of LTX-2.5 is 35 GB out of a ~200 GB tree;
+ *   - the FIT VERDICT for this machine, up front — "of course all of these are
+ *     vram dependent, show a not recommended for this machine if it can't run".
  */
 import { IconCheck, IconChevronDown } from '@pi-desktop/ui';
 import { type JSX, useEffect, useRef, useState } from 'react';
 import { cx } from '../onboarding/cx';
 import { OrgAvatar } from '../settings/brand-icons';
+import { compactBytes } from './models-layout';
+import { Pill } from './Pill';
 import {
+  type FitVerdict,
+  fitFor,
   installKindOf,
   type RecommendedFamily,
   type RecommendedVariant,
+  TASK_LABEL,
 } from './recommended-catalog';
 
 export interface FamilyCardProps {
@@ -32,8 +46,12 @@ export interface FamilyCardProps {
   readonly downloaded: ReadonlySet<string>;
   /** The repo the detail pane is showing, so the card can mark it. */
   readonly selectedRepo: string | null;
+  /** This machine's unified memory, for the fit verdict. 0 = not yet known. */
+  readonly memoryGB: number;
+  /** 0..1 while a variant is downloading, keyed by its repo. */
+  readonly progress?: Readonly<Record<string, number>>;
   readonly onSelect: (repo: string) => void;
-  readonly onDownload: (repo: string) => void;
+  readonly onDownload: (variant: RecommendedVariant) => void;
 }
 
 /** "2.6B" / "820M" — the size column, from a parameter count in billions. */
@@ -42,10 +60,29 @@ function paramsLabel(paramsB: number | undefined): string {
   return paramsB < 1 ? `${Math.round(paramsB * 1000)}M` : `${Number(paramsB.toFixed(1))}B`;
 }
 
+const FIT_PILL: Record<
+  Exclude<FitVerdict, 'unknown'>,
+  { tone: 'success' | 'warning' | 'danger'; label: string; why: string }
+> = {
+  fits: { tone: 'success', label: 'Fits', why: 'Comfortably within this machine’s memory.' },
+  tight: {
+    tone: 'warning',
+    label: 'Tight',
+    why: 'It will load, but with little room left — expect swapping.',
+  },
+  'too-big': {
+    tone: 'danger',
+    label: 'Too big for this Mac',
+    why: 'Needs more memory than this machine has.',
+  },
+};
+
 export function FamilyCard({
   family,
   downloaded,
   selectedRepo,
+  memoryGB,
+  progress = {},
   onSelect,
   onDownload,
 }: FamilyCardProps): JSX.Element {
@@ -72,14 +109,25 @@ export function FamilyCard({
   // with their parent and are never a choice of their own.
   const shown = family.variants.filter((v) => v.draftFor === undefined);
   const onDisk = shown.filter((v) => downloaded.has(v.repo)).length;
+  // The best any member manages here — a family whose smallest recipe is out of
+  // reach should say so on the closed card, not only once you open it.
+  const bestFit = shown.reduce<FitVerdict>((best, v) => {
+    const f = fitFor(v, memoryGB);
+    if (best === 'fits' || f === 'fits') return f === 'fits' ? 'fits' : best;
+    if (best === 'tight' || f === 'tight') return 'tight';
+    return f === 'unknown' ? best : f;
+  }, 'unknown');
 
   const variantRow = (v: RecommendedVariant) => {
     const here = selectedRepo === v.repo;
     const have = downloaded.has(v.repo);
+    const fit = fitFor(v, memoryGB);
+    const pct = progress[v.repo];
+    const size = v.approxBytes !== undefined ? compactBytes(v.approxBytes) : paramsLabel(v.paramsB);
     return (
       <div
-        key={v.repo}
-        data-testid={`family-variant-${v.repo}`}
+        key={`${v.repo}:${v.label}`}
+        data-testid={`family-variant-${v.repo}:${v.label}`}
         data-selected={here}
         className={cx(
           'flex items-center gap-3 rounded-lg px-2.5 py-2 text-left transition-colors',
@@ -92,36 +140,41 @@ export function FamilyCard({
           className="pd-focusable flex min-w-0 flex-1 items-center gap-3 text-left"
         >
           <span className="min-w-0 flex-1">
-            <span className="block truncate text-footnote text-text-primary">{v.label}</span>
+            <span className="flex flex-wrap items-center gap-1.5">
+              <span className="truncate text-footnote text-text-primary">{v.label}</span>
+              {(v.tasks ?? []).map((t) => (
+                <Pill key={t} tone="info" testid={`task-${t}`}>
+                  {TASK_LABEL[t]}
+                </Pill>
+              ))}
+              {fit !== 'unknown' && fit !== 'fits' ? (
+                <Pill tone={FIT_PILL[fit].tone} title={FIT_PILL[fit].why} testid={`fit-${fit}`}>
+                  {FIT_PILL[fit].label}
+                </Pill>
+              ) : null}
+            </span>
             {v.note !== undefined ? (
-              <span className="block truncate text-caption text-text-muted">{v.note}</span>
+              <span className="mt-0.5 block truncate text-caption text-text-muted">{v.note}</span>
             ) : null}
           </span>
-          <span className="shrink-0 text-caption text-text-muted tabular-nums">
-            {paramsLabel(v.paramsB)}
-          </span>
+          <span className="shrink-0 text-caption text-text-muted tabular-nums">{size}</span>
         </button>
         {have ? (
-          <span className="flex shrink-0 items-center gap-1 text-caption text-text-muted">
-            <IconCheck size={12} /> On disk
-          </span>
-        ) : installKindOf(family) === 'gen' ? (
-          /* A generation model has no single file to fetch — its backend pulls
-             the weights on first use. A blue Download here would be the same
-             promise the detail pane already refuses to make. */
-          <button
-            type="button"
-            data-testid={`family-open-${v.repo}`}
-            onClick={() => onSelect(v.repo)}
-            className="pd-focusable shrink-0 rounded-lg border border-border-default px-2.5 py-1 text-caption text-text-secondary transition-colors hover:bg-bg-hover hover:text-text-primary"
+          <Pill tone="success" icon={<IconCheck size={11} />} testid={`on-disk-${v.repo}`}>
+            On disk
+          </Pill>
+        ) : pct !== undefined ? (
+          <span
+            className="shrink-0 text-caption text-text-muted tabular-nums"
+            data-testid={`family-progress-${v.repo}`}
           >
-            Details
-          </button>
+            {Math.round(pct * 100)}%
+          </span>
         ) : (
           <button
             type="button"
-            data-testid={`family-download-${v.repo}`}
-            onClick={() => onDownload(v.repo)}
+            data-testid={`family-download-${v.repo}:${v.label}`}
+            onClick={() => onDownload(v)}
             className="pd-focusable shrink-0 rounded-lg bg-accent-primary px-2.5 py-1 text-caption font-medium text-text-on-accent transition-opacity hover:opacity-90"
           >
             Download
@@ -146,20 +199,35 @@ export function FamilyCard({
       >
         <OrgAvatar org={family.org} size={32} />
         <span className="min-w-0 flex-1">
-          <span className="flex items-center gap-1.5">
+          <span className="flex flex-wrap items-center gap-1.5">
             <span className="truncate text-body text-text-primary">{family.name}</span>
             {family.fast === true ? (
-              <span
+              <Pill
+                tone="warning"
+                testid={`fast-${family.id}`}
                 title="Unusually fast for its class — the reason it works on a modest machine"
-                className="shrink-0 rounded-full border border-border-default px-1.5 text-caption text-text-secondary"
               >
                 Fast
-              </span>
+              </Pill>
+            ) : null}
+            {installKindOf(family) === 'gen' ? (
+              <Pill tone="neutral" outline title="Runs on the generation stack, not llama.cpp">
+                {family.output}
+              </Pill>
             ) : null}
             {onDisk > 0 ? (
-              <span className="shrink-0 rounded-full bg-bg-active px-1.5 text-caption text-text-muted">
+              <Pill tone="success" testid={`family-on-disk-${family.id}`}>
                 {onDisk} on disk
-              </span>
+              </Pill>
+            ) : null}
+            {bestFit === 'too-big' ? (
+              <Pill
+                tone="danger"
+                title={FIT_PILL['too-big'].why}
+                testid={`family-fit-${family.id}`}
+              >
+                Not for this Mac
+              </Pill>
             ) : null}
           </span>
           <span className="block truncate text-footnote text-text-muted">{family.blurb}</span>

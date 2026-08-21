@@ -117,7 +117,7 @@ try {
   await win.waitForTimeout(500);
   await win.click('[data-testid="family-toggle-lfm2.5"]');
   await win.waitForTimeout(500);
-  await win.click('[data-testid="family-variant-LiquidAI/LFM2.5-1.2B-Instruct-GGUF"] button');
+  await win.click('[data-testid="family-variant-LiquidAI/LFM2.5-1.2B-Instruct-GGUF:1.2B"] button');
   await win.waitForTimeout(2500);
   const hasButton = await box('[data-testid="detail-download"]');
   console.log('download button before:', JSON.stringify(hasButton));
@@ -155,20 +155,51 @@ try {
   await win.waitForTimeout(500);
   await win.click('[data-testid="family-toggle-z-image"]');
   await win.waitForTimeout(400);
-  const genRowButtons = await win.evaluate(() =>
-    document.querySelectorAll('[data-testid^="family-download-Tongyi-MAI"]').length,
-  );
-  if (genRowButtons > 0) fail('a generation variant row still offers a blue Download');
-  await win.click('[data-testid="family-variant-Tongyi-MAI/Z-Image-Turbo"] button');
+  await win.click('[data-testid="family-variant-Tongyi-MAI/Z-Image-Turbo:Turbo"] button');
   await win.waitForTimeout(1500);
   const genBlock = await win.evaluate(
     () => document.querySelector('[data-testid="detail-gen-install"]')?.textContent?.trim() ?? null,
   );
-  const fakeButton = await box('[data-testid="detail-download"]');
+  const realButton = await box('[data-testid="detail-download"]');
   console.log('generation family says:', JSON.stringify(genBlock));
   if (genBlock === null) fail('a generation model showed no install explanation');
-  if (fakeButton !== null) fail('a generation model still offered a Download that cannot work');
+  if (realButton === null) fail('a generation model has no Download button');
   await win.screenshot({ path: path.join(OUT, '9-generation-family.png') });
+
+  // 7. THE TAGS, AND THE MACHINE-FIT VERDICT.
+  await win.click('[data-testid="filter-output-image"]');
+  await win.waitForTimeout(300);
+  await win.click('[data-testid="filter-output-video"]');
+  await win.waitForTimeout(500);
+  await win.click('[data-testid="family-toggle-minimax-h3"]');
+  await win.waitForTimeout(500);
+  await win.click('[data-testid="family-toggle-ltx"]');
+  await win.waitForTimeout(600);
+  const pills = await win.evaluate(() => {
+    const read = (sel) =>
+      [...document.querySelectorAll(sel)].map((el) => ({
+        text: el.textContent?.trim(),
+        tone: el.getAttribute('data-tone'),
+        rounded: getComputedStyle(el).borderRadius,
+        border: getComputedStyle(el).borderTopWidth,
+      }));
+    return {
+      tasks: read('[data-testid^="task-"]').slice(0, 6),
+      fits: read('[data-testid^="fit-"]').slice(0, 4),
+      familyFit: read('[data-testid^="family-fit-"]'),
+      fast: read('[data-testid^="fast-"]').slice(0, 2),
+    };
+  });
+  console.log('task pills:', JSON.stringify(pills.tasks));
+  console.log('fit pills:', JSON.stringify(pills.fits));
+  console.log('family-level fit:', JSON.stringify(pills.familyFit));
+  await win.screenshot({ path: path.join(OUT, '10-video-tasks-and-fit.png') });
+  if (pills.tasks.length === 0) fail('no in→out task labels on the video variants');
+  if (pills.fits.length === 0) fail('nothing told the user what this machine can run');
+  for (const p of [...pills.tasks, ...pills.fits]) {
+    if (!p.rounded.startsWith('9999') && !p.rounded.includes('px')) fail('a tag is not a pill');
+    if (p.border === '0px') fail(`the "${p.text}" tag has no border`);
+  }
 
   console.log('model-hub-curated-probe OK');
 } finally {

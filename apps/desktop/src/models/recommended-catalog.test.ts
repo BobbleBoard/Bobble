@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   availableOutputs,
   familySizeB,
+  fitFor,
   type OutputModality,
   RECOMMENDED_FAMILIES,
   recommendedFamilies,
@@ -49,11 +50,42 @@ describe('the curated recommended list', () => {
     expect(new Set(both.map((f) => f.output))).toEqual(new Set(['audio', '3d']));
   });
 
-  it('never lists the same repo twice', () => {
-    // A repo in two families would download once and appear on disk in both,
-    // which reads as a bug in the "on disk" count rather than in the data.
-    const repos = recommendedRepos();
-    expect(new Set(repos).size).toBe(repos.length);
+  it('never lists the same BUNDLE twice', () => {
+    // A repo may legitimately appear several times — MiniMax-H3 publishes the
+    // keyframe weights, the reference-image weights and the text encoder in one
+    // tree, and each is its own download. What must be unique is the recipe:
+    // repo plus the files it takes. Two identical recipes would race each other
+    // into the same directory.
+    const bundles = RECOMMENDED_FAMILIES.flatMap((f) =>
+      f.variants.map((v) => `${v.repo}::${(v.allow ?? []).join(',')}`),
+    );
+    expect(new Set(bundles).size).toBe(bundles.length);
+  });
+
+  it('gives every partial-repo variant a real measured size', () => {
+    // A recipe's size cannot be inferred from the repo (LTX-2.5's tree is ~200GB
+    // and no configuration is), so an `allow` without `approxBytes` would make
+    // the card guess. Better to require the number than to show a wrong one.
+    for (const f of RECOMMENDED_FAMILIES) {
+      for (const v of f.variants) {
+        if (v.allow === undefined) continue;
+        expect(v.approxBytes, `${v.repo} ${v.label}`).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it('says what this machine can do with the big ones', () => {
+    // the user: "of course all of these are vram dependent, show a not recommended
+    // for this machine if it can't run".
+    const ltx = RECOMMENDED_FAMILIES.find((f) => f.id === 'ltx');
+    if (ltx === undefined) throw new Error('LTX is missing');
+    const big = ltx.variants.find((v) => v.label.includes('bf16'));
+    if (big === undefined) throw new Error('the bf16 recipe is missing');
+    expect(fitFor(big, 24)).toBe('too-big');
+    expect(fitFor(big, 128)).toBe('fits');
+    // A model that fits but leaves nothing over is neither a yes nor a no.
+    expect(fitFor({ repo: 'a/b', label: 'x', minMemoryGB: 22 }, 24)).toBe('tight');
+    expect(fitFor({ repo: 'a/b', label: 'x' }, 24)).toBe('unknown');
   });
 
   it('gives every family at least one variant that is not a draft', () => {

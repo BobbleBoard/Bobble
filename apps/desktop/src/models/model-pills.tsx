@@ -62,7 +62,8 @@ export function capabilityLabel(cap: string): string {
 export function CapabilityPill({ cap, dense = false }: { cap: string; dense?: boolean }) {
   const style = STYLES[cap as Capability];
   if (style === undefined) return null;
-  const bg = `color-mix(in oklab, var(${style.token}) 13%, transparent)`;
+  const bg = `color-mix(in oklab, var(${style.token}) 14%, transparent)`;
+  const border = `color-mix(in oklab, var(${style.token}) 34%, transparent)`;
   const fg = `var(${style.token})`;
   return (
     <span
@@ -70,10 +71,13 @@ export function CapabilityPill({ cap, dense = false }: { cap: string; dense?: bo
       data-testid={`cap-${cap}`}
       className={
         dense
-          ? 'inline-flex h-6 w-6 items-center justify-center rounded-md'
-          : 'inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-caption font-medium'
+          ? 'inline-flex h-6 w-6 items-center justify-center rounded-full border'
+          : // Fully rounded and BORDERED, matching Pill.tsx — the user asked for the
+            // hub's tags to be "bordered pill colored highlight and such", and a
+            // squarer, borderless chip beside a pill reads as two systems.
+            'inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-caption font-medium leading-tight'
       }
-      style={{ background: bg, color: fg }}
+      style={{ background: bg, borderColor: border, color: fg }}
     >
       {style.icon}
       {dense ? null : style.label}

@@ -36,6 +36,12 @@ import {
   type Gen3dEventMap,
   type Gen3dInvokeMap,
 } from './gen3d/gen3d-contract';
+import {
+  STORE_EVENT_CHANNELS,
+  STORE_INVOKE_CHANNELS,
+  type StoreEventMap,
+  type StoreInvokeMap,
+} from './model-store/store-contract';
 import { IMPORT_INVOKE_CHANNELS, type ImportInvokeMap } from './import/import-contract';
 import { OFFICE_INVOKE_CHANNELS, type OfficeInvokeMap } from './office/office-contract';
 import { PI_INVOKE_CHANNELS, type PiEventMap, type PiInvokeMap } from './pi/contract';
@@ -696,6 +702,7 @@ export type AppInvokeMap = CoreInvokeMap &
   GenCatalogInvokeMap &
   GenInvokeMap &
   Gen3dInvokeMap &
+  StoreInvokeMap &
   DictationInvokeMap &
   BrowserInvokeMap &
   BrowserAgentInvokeMap &
@@ -724,6 +731,7 @@ export const APP_INVOKE_CHANNELS = [
   ...GEN_CATALOG_INVOKE_CHANNELS,
   ...GEN_INVOKE_CHANNELS,
   ...GEN3D_INVOKE_CHANNELS,
+  ...STORE_INVOKE_CHANNELS,
   ...DICTATION_INVOKE_CHANNELS,
   ...BROWSER_INVOKE_CHANNELS,
   ...BROWSER_AGENT_INVOKE_CHANNELS,
@@ -803,6 +811,7 @@ export type AppEventMap = {
   CorpEventMap &
   GenEventMap &
   Gen3dEventMap &
+  StoreEventMap &
   ScheduledEventMap &
   PiEventMap;
 

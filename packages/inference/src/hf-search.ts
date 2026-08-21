@@ -360,6 +360,63 @@ function parseTreeEntry(raw: unknown): HfGgufFile | undefined {
   return entry;
 }
 
+/** One file in a repo, whatever its extension. */
+export interface HfRepoFile {
+  readonly path: string;
+  readonly sizeBytes?: number;
+  /** git-lfs oid, when the entry is lfs-tracked — a real sha256 to verify against. */
+  readonly sha256?: string;
+}
+
+function parseAnyTreeEntry(raw: unknown): HfRepoFile | undefined {
+  const r = asRecord(raw);
+  if (readString(r.type) !== 'file') return undefined;
+  const path = readString(r.path);
+  if (path === undefined) return undefined;
+  const lfs = asRecord(r.lfs);
+  const oid = readString(lfs.oid);
+  const entry: HfRepoFile = {
+    path,
+    sizeBytes: readNumber(lfs.size) ?? readNumber(r.size),
+    ...(oid !== undefined && /^[0-9a-f]{64}$/.test(oid) ? { sha256: oid } : {}),
+  };
+  return entry;
+}
+
+/**
+ * EVERY file in a repo, not just the GGUFs.
+ *
+ * `listHfGgufFiles` answers "which quant do I want", which is the only question
+ * a llama.cpp model poses. An image / video / 3D model is a whole tree —
+ * transformer shards, a VAE, a text encoder, config JSON — and there is no one
+ * file to choose; you take the repo. This is the lister for that case, and it is
+ * the same paging loop with the extension gate removed rather than a second
+ * implementation that could drift from it.
+ */
+export async function listHfRepoFiles(
+  repoId: string,
+  opts: HfTreeOptions = {},
+): Promise<HfRepoFile[]> {
+  const doFetch = opts.fetchImpl ?? fetch;
+  let next: string | undefined = `${HF_API}/${repoId}/tree/main?recursive=true`;
+  const files: HfRepoFile[] = [];
+  for (let page = 0; next !== undefined && page < 40; page++) {
+    const res = await doFetch(next, { headers: authHeaders(opts.hfToken), signal: opts.signal });
+    if (!res.ok) {
+      throw new Error(`HF tree failed for ${repoId}: HTTP ${res.status} ${res.statusText}`);
+    }
+    const body: unknown = await res.json();
+    if (Array.isArray(body)) {
+      for (const row of body) {
+        const entry = parseAnyTreeEntry(row);
+        if (entry !== undefined) files.push(entry);
+      }
+    }
+    next = parseNextLink(res.headers.get('link'));
+  }
+  return files;
+}
+
 /**
  * List a repo's `.gguf` files (including any `mmproj-*` / `mtp-*` siblings, each
  * flagged) via the tree API, with sizes, sha256, and parsed quant labels. Follows

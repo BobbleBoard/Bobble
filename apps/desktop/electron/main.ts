@@ -34,6 +34,7 @@ import { fsHandlers } from './fs-handlers';
 import { disposeGen, registerGenCatalogIpc, registerGenIpc } from './gen/gen-manager';
 import { genWorkerCandidates, resolveGenWorkerScript } from './gen/worker-path';
 import { registerGen3dIpc } from './gen3d/gen3d-main';
+import { registerStoreIpc } from './model-store/store-main';
 import { registerImportIpc } from './import/import-main';
 import { registerLlmIpc, shutdownInference } from './inference/llm-main';
 import type { AppEventMap, CoreInvokeMap, FsInvokeMap } from './ipc-contract';
@@ -46,6 +47,7 @@ import { registerScheduledHandlers } from './scheduled/scheduled-main';
 import {
   applySettingsEnvFromDisk,
   generationExperimentEnabled,
+  readSettings,
   registerSettingsIpc,
 } from './settings/settings-main';
 import { registerSkillsIpc } from './skills/skills-main';
@@ -519,6 +521,28 @@ function registerAppIpc(): void {
   // Currently the honest stub (real sizes, engineReady:false) — the sidecar
   // wave swaps the internals behind the same contract.
   registerGen3dIpc(ipcMain, allowSender, () => mainWindow?.webContents ?? null);
+
+  /*
+   * THE UNIFIED MODEL STORE. the user: "we need to be able to download anything and
+   * store it properly in an organized format so that no matter what we add
+   * either now or later we have an easy way to list relevant models and know
+   * where their weights are stored their names relevant info etc."
+   *
+   * `llm:*` keeps the GGUF case (one file of a ladder, feeding a running
+   * server). These channels take a whole Hugging Face repo of any modality into
+   * `<cache>/store/<kind>/<slug>/`, with a manifest beside the weights — and
+   * `store:list` answers across all three places weights currently live, so a
+   * studio added later asks one question rather than inventing a fourth cache.
+   */
+  registerStoreIpc(
+    ipcMain,
+    allowSender,
+    (channel, payload) => {
+      const wc = mainWindow?.webContents;
+      if (wc !== undefined) events.send(wc, channel, payload);
+    },
+    () => readSettings().hfToken || undefined,
+  );
 
   // EXPERIMENTAL generation stack (default OFF). The full generation socket
   // bridge (`generate_image` / `generate_video` → JobQueue → mflux/MLX/ComfyUI,

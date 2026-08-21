@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { App } from './App';
 import { connectChildAgents } from './state/child-agent-store';
 import { connectGen } from './state/gen-store';
+import { connectStoreModels } from './state/store-models';
 import { connectHf } from './state/hf-store';
 import { connectLlm } from './state/llm-store';
 import { connectPi } from './state/pi-connect';
@@ -19,6 +20,7 @@ if (!new URLSearchParams(window.location.search).has('canvasPopout')) {
   connectLlm();
   connectHf();
   connectGen();
+  connectStoreModels();
   connectSettings();
 }
 
