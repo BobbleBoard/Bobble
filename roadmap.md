@@ -157,6 +157,45 @@ generating because they shard at full swing; the reference `o_voxel` bake is
 opt-in because its GLB maps as static in our viewer; ARDY's download stays
 excluded by request.
 
+## Perceived speed — instant window, snappy UI (the user 2026-08-21)
+
+the user: "because this runs locally we want users to feel absolutely instant
+startup and general UI snappiness (especially when it doesn't actually matter to
+the end user whether the functionality was as snappy as the UI suggested — such
+as the app window immediately showing up is infinitely better than a slow 10
+second load, even if the initial prompt typed in and submitted rapidly takes an
+extra few seconds)."
+
+**The principle, stated so it can be applied rather than admired:** the user's
+clock starts when they click, not when we are ready. Every second before the
+window paints is a second they spend wondering whether the click registered;
+every second after it paints, while they are reading and typing, is free. So the
+work moves BEHIND the first paint, not before it.
+
+**What that means concretely here, roughly in order of payoff:**
+
+- **Paint the window before anything else exists.** The shell — sidebar, top
+  bar, empty composer — depends on nothing but settings. Model catalog, hardware
+  probe, HF token, chat list, engine status can all arrive afterwards into a
+  window that is already up and typeable.
+- **The composer accepts input before the engine is ready.** Typing and submit
+  are the two things that must never wait; a queued first message that takes an
+  extra two seconds to answer is invisible next to a window that took ten
+  seconds to appear. We already queue mid-turn sends, so the mechanism exists.
+- **Nothing on the boot path may be synchronous I/O.** Every `readFileSync` and
+  every `await` before `show()` is a frame the user does not get.
+- **Optimistic UI on anything local and reversible.** A chat rename, a pin, a
+  favourite, a project move: apply it, persist behind it, reconcile if the write
+  fails. These cannot fail in a way the user can act on anyway.
+- **Measure it like the TTFT work.** The existing probes time first token; the
+  equivalent here is click → first paint → first typeable frame, sampled the way
+  `ttft-probe.mjs` samples generation. An unmeasured "feels faster" is how this
+  kind of work quietly regresses.
+
+Related and already done: preemptive system-prompt warmup (MEASURED ~20× on
+turn-1 TTFT), and the sidebar/canvas slide work — the same instinct applied to
+one animation.
+
 ## Power modes — brainstorm (not built)
 
 the user: run everything slower and lighter so the fans stay off and the machine
