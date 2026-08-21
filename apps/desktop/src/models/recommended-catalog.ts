@@ -126,6 +126,20 @@ export interface RecommendedVariant {
   readonly allow?: readonly string[];
   /** What these particular files can do. See {@link ModelTask}. */
   readonly tasks?: readonly ModelTask[];
+  /**
+   * EXTRA REPOS this recipe needs, when one is not enough.
+   *
+   * A ComfyUI video graph wants three things — a transformer, a text encoder and
+   * a VAE — and the quantized community builds publish them SEPARATELY: the
+   * transformer at `city96/LTX-Video-0.9.6-distilled-gguf`, the T5 encoder at
+   * `city96/t5-v1_1-xxl-encoder-gguf`. One `repo` + `allow` cannot express that,
+   * and asking the user to notice they also need an encoder is how someone ends
+   * up with 1.3 GB of weights that cannot run.
+   *
+   * `repo`/`allow` above stay the PRIMARY part (what the row is named after);
+   * these are fetched alongside it and counted into `approxBytes`.
+   */
+  readonly parts?: readonly { readonly repo: string; readonly allow?: readonly string[] }[];
   /** Real download size of THIS selection, in bytes. Measured from the repo tree. */
   readonly approxBytes?: number;
   /**
@@ -504,99 +518,88 @@ export const RECOMMENDED_FAMILIES: readonly RecommendedFamily[] = [
   // ── VIDEO ─────────────────────────────────────────────────────────────────
   {
     id: 'ltx',
-    name: 'LTX-2.5',
-    org: 'Lightricks',
+    name: 'LTX-Video',
+    org: 'city96',
     output: 'video',
-    blurb:
-      'The fast end of open video. One repo, several precisions — pick the one your Mac holds.',
+    blurb: 'The fast end of open video, in quants a Mac can actually hold.',
     fast: true,
     /*
-     * LTX-2.5 IS A KIT, NOT A FILE. The repo publishes five 22B transformers at
-     * different precisions, two text encoders and three VAEs — roughly 200 GB in
-     * total, of which any one working setup is a transformer + an encoder + the
-     * video VAE. So each variant below is a RECIPE (`allow`), and the size on the
-     * card is that recipe's real bytes, taken from the repo tree.
+     * QUANTS, NOT FULL PRECISION — and on a Mac that is not a preference, it is
+     * the only thing that works. the user: "comfyui supports quants however right?
+     * so we never have to actually do the full things, we can go for 8 bit or
+     * lower depending on hardware/user preference."
      *
-     * All three are large enough that most machines will see "Too big for this
-     * Mac", which is the point of saying it up front rather than after 35 GB.
+     * Right, with one Mac-specific catch worth writing down because it decided
+     * every entry below. ComfyUI's own `model_management.supports_cast()` returns
+     * FALSE for MPS before it ever reaches its fp8 branches — so an fp8
+     * checkpoint on Apple Silicon is either silently upcast to bf16 (no memory
+     * saved) or fails outright with "Trying to convert Float8_e4m3fn to the MPS
+     * backend". GGUF is the quant path that works here, via ComfyUI-GGUF's
+     * `UnetLoaderGGUF`, which is the node our workflow template already uses.
+     *
+     * The previous entries were bf16/fp8 recipes at 25-70 GB, all of them marked
+     * "Too big for this Mac". These are 7-20 GB and run.
      */
     variants: [
       {
-        /*
-         * A RECIPE, NOT THE REPO. This entry used to name the repo with no
-         * `allow`, and the user caught what that meant on screen: "0% · 466 MB of
-         * 237 GB". `Lightricks/LTX-Video` is a 254 GB archive of every LTX
-         * release — four 13B checkpoints, their fp8 twins, upscalers, LoRAs —
-         * and Download meant all of it. What you actually want is one 2B
-         * transformer plus the encoder and VAE it loads with.
-         */
-        repo: 'Lightricks/LTX-Video',
-        label: '2B distilled · fp8',
+        repo: 'city96/LTX-Video-0.9.6-distilled-gguf',
+        label: '2B distilled · Q4',
         paramsB: 2,
-        note: 'The small, quick one — the only member most machines can run.',
+        note: 'The whole kit is under 7 GB. Start here.',
         allow: [
-          'ltxv-2b-0.9.8-distilled-fp8.safetensors',
-          'text_encoder/*',
-          'tokenizer/*',
-          'vae/*',
-          '*.json',
+          'ltxv-2b-0.9.6-distilled-04-25-Q4_K_M.gguf',
+          'LTX-Video-0.9.6-VAE-BF16.safetensors',
+        ],
+        parts: [
+          { repo: 'city96/t5-v1_1-xxl-encoder-gguf', allow: ['t5-v1_1-xxl-encoder-Q4_K_M.gguf'] },
         ],
         tasks: ['text-to-video', 'image-to-video'],
-        approxBytes: 25_190_000_000,
-        minMemoryGB: 16,
+        approxBytes: 6_720_000_000,
+        minMemoryGB: 10,
       },
       {
-        repo: 'Lightricks/LTX-Video',
-        label: '2B distilled · bf16',
+        repo: 'city96/LTX-Video-0.9.6-distilled-gguf',
+        label: '2B distilled · Q8',
         paramsB: 2,
-        allow: [
-          'ltxv-2b-0.9.8-distilled.safetensors',
-          'text_encoder/*',
-          'tokenizer/*',
-          'vae/*',
-          '*.json',
+        note: 'Better fidelity for about three more gigabytes.',
+        allow: ['ltxv-2b-0.9.6-distilled-04-25-Q8_0.gguf', 'LTX-Video-0.9.6-VAE-BF16.safetensors'],
+        parts: [
+          { repo: 'city96/t5-v1_1-xxl-encoder-gguf', allow: ['t5-v1_1-xxl-encoder-Q8_0.gguf'] },
         ],
         tasks: ['text-to-video', 'image-to-video'],
-        approxBytes: 27_070_000_000,
-        minMemoryGB: 20,
+        approxBytes: 9_800_000_000,
+        minMemoryGB: 14,
       },
       {
-        repo: 'Lightricks/LTX-2.5',
-        label: '22B distilled · nvfp4',
-        note: 'The cheapest way into 2.5.',
-        allow: [
-          'diffusion_models/ltx-2.5-22b-distilled-transformer-nvfp4.safetensors',
-          'text_encoders/gemma4-12b-with-proj-ltx-2.5-comfy-int8-convrot.safetensors',
-          'vae/ltx-2.5-video-vae-bf16.safetensors',
+        repo: 'Abiray/LTX-2.5-Distilled-GGUF',
+        label: '2.5 22B · Q3',
+        note: 'The current release, quantized far enough to fit 24 GB.',
+        allow: ['LTX-2.5-Distilled-Q3_K_S.gguf'],
+        parts: [
+          { repo: 'city96/t5-v1_1-xxl-encoder-gguf', allow: ['t5-v1_1-xxl-encoder-Q4_K_M.gguf'] },
+          {
+            repo: 'Lightricks/LTX-2.5',
+            allow: ['vae/ltx-2.5-video-vae-bf16.safetensors'],
+          },
         ],
         tasks: ['text-to-video', 'image-to-video'],
-        approxBytes: 35_560_000_000,
-        minMemoryGB: 48,
+        approxBytes: 17_020_000_000,
+        minMemoryGB: 22,
       },
       {
-        repo: 'Lightricks/LTX-2.5',
-        label: '22B distilled · int8',
-        allow: [
-          'diffusion_models/ltx-2.5-22b-distilled-transformer-comfy-int8-convrot.safetensors',
-          'text_encoders/gemma4-12b-with-proj-ltx-2.5-comfy-int8-convrot.safetensors',
-          'vae/ltx-2.5-video-vae-bf16.safetensors',
+        repo: 'Abiray/LTX-2.5-Distilled-GGUF',
+        label: '2.5 22B · Q4',
+        allow: ['LTX-2.5-Distilled-Q4_K_M.gguf'],
+        parts: [
+          { repo: 'city96/t5-v1_1-xxl-encoder-gguf', allow: ['t5-v1_1-xxl-encoder-Q4_K_M.gguf'] },
+          {
+            repo: 'Lightricks/LTX-2.5',
+            allow: ['vae/ltx-2.5-video-vae-bf16.safetensors'],
+          },
         ],
         tasks: ['text-to-video', 'image-to-video'],
-        approxBytes: 38_340_000_000,
-        minMemoryGB: 48,
-      },
-      {
-        repo: 'Lightricks/LTX-2.5',
-        label: '22B dev · bf16',
-        note: 'Full precision. Workstation territory.',
-        allow: [
-          'diffusion_models/ltx-2.5-22b-dev-transformer-bf16.safetensors',
-          'text_encoders/gemma4-12b-with-proj-ltx-2.5-bf16.safetensors',
-          'vae/ltx-2.5-video-vae-bf16.safetensors',
-        ],
-        tasks: ['text-to-video', 'image-to-video'],
-        approxBytes: 69_750_000_000,
-        minMemoryGB: 96,
+        approxBytes: 20_060_000_000,
+        minMemoryGB: 28,
       },
     ],
   },

@@ -73,6 +73,7 @@ describe('the curated recommended list', () => {
     const ARCHIVES = new Set([
       'Lightricks/LTX-Video',
       'Lightricks/LTX-2.5',
+      'city96/t5-v1_1-xxl-encoder-gguf',
       'unsloth/MiniMax-H3-GGUF',
       'unsloth/DeepSeek-V4-Flash-0731-GGUF',
     ]);
@@ -80,6 +81,27 @@ describe('the curated recommended list', () => {
       for (const v of f.variants) {
         if (!ARCHIVES.has(v.repo)) continue;
         expect(v.allow, `${v.repo} ${v.label} would download the whole archive`).toBeDefined();
+      }
+    }
+  });
+
+  it('fetches an encoder and a VAE alongside every quantized video transformer', () => {
+    /*
+     * A GGUF transformer on its own cannot generate anything — a ComfyUI video
+     * graph loads a transformer, a text encoder and a VAE, and the quantized
+     * community builds publish them in SEPARATE repos. A recipe that named only
+     * the transformer would leave someone with weights that will not run and no
+     * hint as to why.
+     */
+    for (const f of RECOMMENDED_FAMILIES) {
+      if (f.output !== 'video') continue;
+      for (const v of f.variants) {
+        if (!/\.gguf$/i.test((v.allow ?? []).join(' '))) continue;
+        const everything = [
+          ...(v.allow ?? []),
+          ...(v.parts ?? []).flatMap((part) => part.allow ?? [part.repo]),
+        ].join(' ');
+        expect(/t5|gemma|encoder|qwen3vl/i.test(everything), `${f.id} ${v.label}`).toBe(true);
       }
     }
   });
@@ -101,10 +123,15 @@ describe('the curated recommended list', () => {
     // for this machine if it can't run".
     const ltx = RECOMMENDED_FAMILIES.find((f) => f.id === 'ltx');
     if (ltx === undefined) throw new Error('LTX is missing');
-    const big = ltx.variants.find((v) => v.label.startsWith('22B dev'));
-    if (big === undefined) throw new Error('the 22B dev recipe is missing');
+    const big = ltx.variants.find((v) => v.label.includes('22B · Q4'));
+    if (big === undefined) throw new Error('the 22B Q4 recipe is missing');
     expect(fitFor(big, 24)).toBe('too-big');
     expect(fitFor(big, 128)).toBe('fits');
+    // …and the small quant is the one that makes the family usable here, which
+    // is the whole reason the recipes are GGUF rather than bf16.
+    const small = ltx.variants.find((v) => v.label.includes('2B distilled · Q4'));
+    if (small === undefined) throw new Error('the 2B Q4 recipe is missing');
+    expect(fitFor(small, 24)).toBe('fits');
     // A model that fits but leaves nothing over is neither a yes nor a no.
     expect(fitFor({ repo: 'a/b', label: 'x', minMemoryGB: 22 }, 24)).toBe('tight');
     expect(fitFor({ repo: 'a/b', label: 'x' }, 24)).toBe('unknown');

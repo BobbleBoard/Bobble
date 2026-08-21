@@ -95,7 +95,7 @@ export function registerStudioIpc(
         const model = stored.find((m) => m.id === req.modelId || m.repo === req.modelId);
         if (model === undefined) return { ok: false, error: `${req.modelId} is not downloaded` };
 
-        const resolved = resolveWorkflow(model, req.kind);
+        const resolved = resolveWorkflow(model, req.kind, stored);
         if (resolved === undefined) {
           // Said plainly rather than failing inside Comfy five minutes later:
           // the graph for this family has not been written yet.

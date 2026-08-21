@@ -1255,7 +1255,14 @@ export function ModelsView() {
       await download(variant.repo);
       return;
     }
-    await storeDownload({
+    /*
+     * A RECIPE CAN SPAN REPOS, and all of it has to arrive or none of it is
+     * useful: a quantized LTX transformer without its T5 encoder and VAE is 1.3
+     * GB that cannot generate anything. The parts are queued in order behind the
+     * primary — the store runs one at a time, so this is a queue rather than a
+     * race, and the top-bar bar shows whichever is moving.
+     */
+    const primary = {
       repo: variant.repo,
       kind: family.output,
       name: `${family.name} ${variant.label}`,
@@ -1263,7 +1270,18 @@ export function ModelsView() {
       ...(variant.tasks === undefined ? {} : { tasks: variant.tasks }),
       ...(variant.allow === undefined ? {} : { allow: variant.allow }),
       ...(variant.note === undefined ? {} : { notes: variant.note }),
-    });
+    };
+    await storeDownload(primary);
+    for (const part of variant.parts ?? []) {
+      await storeDownload({
+        repo: part.repo,
+        kind: family.output,
+        name: part.repo.split('/')[1] ?? part.repo,
+        family: family.id,
+        ...(part.allow === undefined ? {} : { allow: part.allow }),
+        notes: `Needed by ${family.name} ${variant.label}`,
+      });
+    }
   };
 
   /** Stop whichever downloader is carrying this variant. */
@@ -1272,7 +1290,10 @@ export function ModelsView() {
       await cancelHere();
       return;
     }
+    // Every part, not just the one that is moving: cancelling a recipe means
+    // cancelling the recipe.
     await storeCancel(variant.repo);
+    for (const part of variant.parts ?? []) await storeCancel(part.repo);
   };
 
   /** 0..1 per repo, for the bar on a family row. */

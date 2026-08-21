@@ -215,6 +215,14 @@ try {
   console.log('fit pills:', JSON.stringify(pills.fits));
   console.log('family-level fit:', JSON.stringify(pills.familyFit));
   await win.screenshot({ path: path.join(OUT, '10-video-tasks-and-fit.png') });
+  // The LTX quants must be reachable on THIS 24 GB machine — the point of
+  // going GGUF rather than bf16/fp8.
+  const ltxSizes = await win.evaluate(() =>
+    [...document.querySelectorAll('[data-testid^="family-variant-city96"], [data-testid^="family-variant-Abiray"]')].map(
+      (el) => el.textContent?.replace(/\s+/g, ' ').trim().slice(0, 90),
+    ),
+  );
+  console.log('LTX recipes:', JSON.stringify(ltxSizes, null, 0));
   if (pills.tasks.length === 0) fail('no in→out task labels on the video variants');
   if (pills.fits.length === 0) fail('nothing told the user what this machine can run');
   for (const p of [...pills.tasks, ...pills.fits]) {

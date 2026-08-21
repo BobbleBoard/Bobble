@@ -56,15 +56,39 @@ function pickTransformer(model: StoredModel): string | undefined {
 export function resolveWorkflow(
   model: StoredModel,
   kind: 'image' | 'video',
+  /**
+   * Everything else in the store, because a recipe spans repos.
+   *
+   * The quantized community builds publish the transformer, the T5 encoder and
+   * the VAE separately — so the encoder for an LTX GGUF is not in the LTX GGUF
+   * model, it is in `city96/t5-v1_1-xxl-encoder-gguf` sitting beside it. Looking
+   * only inside the chosen model would refuse a setup that is complete.
+   */
+  siblings: readonly StoredModel[] = [],
 ): ResolvedWorkflow | undefined {
   const transformer = pickTransformer(model);
   if (transformer === undefined) return undefined;
 
-  const vae = pick(model, [/(^|\/)vae\/.*\.safetensors$/i, /vae.*\.safetensors$/i]);
-  const clip = pick(model, [
-    /(^|\/)text_encoders?\/.*\.safetensors$/i,
+  const VAE_PATTERNS = [/(^|\/)vae\/.*\.(safetensors|gguf)$/i, /vae.*\.(safetensors|gguf)$/i];
+  const CLIP_PATTERNS = [
+    /(^|\/)text_encoders?\/.*\.(safetensors|gguf)$/i,
     /(t5|gemma|clip|qwen3vl).*\.(safetensors|gguf)$/i,
-  ]);
+  ];
+  const across = (patterns: readonly RegExp[]): string | undefined => {
+    const here = pick(model, patterns);
+    if (here !== undefined) return here;
+    for (const other of siblings) {
+      if (other.id === model.id) continue;
+      const there = pick(other, patterns);
+      // ComfyUI resolves loader names against the roots in our
+      // extra-model-paths yaml, which are the store's KIND directories — so a
+      // sibling's file is named relative to that root, not to this model.
+      if (there !== undefined) return `${other.id}/${there}`;
+    }
+    return undefined;
+  };
+  const vae = across(VAE_PATTERNS);
+  const clip = across(CLIP_PATTERNS);
 
   if (kind === 'video' && (model.family === 'ltx' || /ltx/i.test(model.repo))) {
     if (vae === undefined || clip === undefined) return undefined;
