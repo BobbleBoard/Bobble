@@ -101,6 +101,13 @@ interface Gen3dState {
       /** Motion: the movement to generate. Required for that op — every other
        * stage acts on the mesh alone. */
       readonly prompt?: string;
+      /** Texture: paint this image on instead of re-baking saved colours —
+       * what a mesh with no colour volume of its own needs. */
+      readonly imagePath?: string;
+      /** Texture: the voxel resolution the paint pass runs at. */
+      readonly resolution?: 'low' | 'medium' | 'high';
+      /** Texture: the atlas edge, in texels. */
+      readonly textureSize?: 1024 | 2048 | 4096;
       /**
        * The humanoid verdict the user already confirmed, carried onto the
        * version this job produces. UI-only — stripped before the IPC call.

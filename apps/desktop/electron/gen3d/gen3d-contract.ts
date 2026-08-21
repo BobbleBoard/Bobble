@@ -268,6 +268,19 @@ export type Gen3dInvokeMap = {
       /** Motion: pin the root so the clip performs on the spot instead of
        * travelling. What a preset wants — a performance, not a journey. */
       readonly inPlace?: boolean;
+      /**
+       * Texture: PAINT this image onto the mesh instead of re-baking colours.
+       *
+       * The engine reaches for it only when the mesh has no colour volume to
+       * re-bake from — an imported model, or one generated before texturing
+       * existed. That run is the full TRELLIS.2 texturing pipeline rather than
+       * an atlas bake, which is why it costs minutes rather than seconds.
+       */
+      readonly imagePath?: string;
+      /** Texture: the voxel resolution the paint pass runs at. */
+      readonly resolution?: 'low' | 'medium' | 'high';
+      /** Texture: the atlas edge, in texels. */
+      readonly textureSize?: 1024 | 2048 | 4096;
     };
     response: { readonly ok: boolean; readonly jobId?: string; readonly error?: string };
   };

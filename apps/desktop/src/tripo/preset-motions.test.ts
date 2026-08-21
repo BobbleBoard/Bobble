@@ -18,6 +18,21 @@ import {
 } from './preset-motions';
 
 /** A cskel27-named bone tree, deep enough for every preset's targets. */
+/**
+ * One sample of a keyframe track, by index.
+ *
+ * The tracks are Float32Arrays read by computed offsets, and under
+ * `noUncheckedIndexedAccess` every one of those reads is `number | undefined`.
+ * Sprinkling `!` through the assertions would silence that by lying; this says
+ * out loud what an out-of-range read means here — the clip is malformed, and
+ * the test should stop rather than quietly compare against nothing.
+ */
+function at(values: ArrayLike<number>, i: number): number {
+  const v = values[i];
+  if (v === undefined) throw new Error(`track has no sample at ${i} (length ${values.length})`);
+  return v;
+}
+
 function rig(names: readonly string[]): InstanceType<typeof THREE.Object3D> {
   // A CHAIN, not a flat list: the aim solver reads each bone's direction from
   // where its child sits, so bones need children with real offsets. Built arms
@@ -141,7 +156,7 @@ describe('preset motions', () => {
       const stride = t.values.length / t.times.length;
       for (let k = 1; k < t.times.length; k++) {
         for (let i = 0; i < stride; i++) {
-          if (Math.abs(t.values[i] - t.values[k * stride + i]) > 1e-6) return true;
+          if (Math.abs(at(t.values, i) - at(t.values, k * stride + i)) > 1e-6) return true;
         }
       }
       return false;
@@ -155,7 +170,7 @@ describe('preset motions', () => {
       for (const t of clip?.tracks ?? []) {
         const stride = t.values.length / t.times.length;
         for (let i = 0; i < stride; i++) {
-          expect(t.values[i]).toBeCloseTo(t.values[t.values.length - stride + i], 5);
+          expect(at(t.values, i)).toBeCloseTo(at(t.values, t.values.length - stride + i), 5);
         }
       }
     }
@@ -192,7 +207,12 @@ describe('preset motions', () => {
     if (arm === undefined || fore === undefined || track === undefined) return;
 
     // Apply the first keyframe and read where the limb points, in model space.
-    arm.quaternion.set(track.values[0], track.values[1], track.values[2], track.values[3]);
+    arm.quaternion.set(
+      at(track.values, 0),
+      at(track.values, 1),
+      at(track.values, 2),
+      at(track.values, 3),
+    );
     root.updateWorldMatrix(true, true);
     const a = new THREE.Vector3();
     const b = new THREE.Vector3();
@@ -218,8 +238,8 @@ describe('preset motions', () => {
       if (hips === undefined) continue;
       // Only vertical movement: x and z stay at the rest value.
       for (let i = 0; i < hips.values.length; i += 3) {
-        expect(hips.values[i]).toBeCloseTo(hips.values[0], 6);
-        expect(hips.values[i + 2]).toBeCloseTo(hips.values[2], 6);
+        expect(at(hips.values, i)).toBeCloseTo(at(hips.values, 0), 6);
+        expect(at(hips.values, i + 2)).toBeCloseTo(at(hips.values, 2), 6);
       }
     }
   });
