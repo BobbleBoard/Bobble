@@ -73,6 +73,10 @@ export function QuickMenuPanel({
             // open would make the keyboard path worse, not better.
             autoComplete="off"
             spellCheck={false}
+            // Belt and braces with the submenu's own handler: a menu's typeahead
+            // treats every printable key as "jump to the row starting with
+            // this", which is the opposite of what a search field is for.
+            onKeyDown={(e) => e.stopPropagation()}
           />
         </div>
       ) : null}

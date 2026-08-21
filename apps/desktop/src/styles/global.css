@@ -2376,18 +2376,23 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
 }
 
 /*
- * THE "MORE MODELS" LIST inside the quick menu.
+ * THE "MORE MODELS" LIST — the quick menu's side flyout.
  *
- * It lives in a dropdown, so it has to be bounded: a list of every model on
- * disk would otherwise push the menu off the screen on a machine with a lot of
- * them. The height is a scroll region rather than a cap on how many are shown,
- * because hiding models from a list whose whole job is to show them all would
- * be the wrong trade.
+ * It has to be bounded: a list of every model on disk would otherwise run off
+ * the screen on a machine with a lot of them. The height is a scroll region
+ * rather than a cap on how many are shown, because hiding models from a list
+ * whose whole job is to show them all would be the wrong trade.
+ *
+ * It used to open INSIDE the quick menu, below a separator, which is why it
+ * carried a top border and margin. the user: "I need to hover on the more models >
+ * and then have the stuff popup on the right side, not click and have a menu
+ * within a menu." As a submenu it IS the surface, so the divider would be a
+ * line across the top of a panel with nothing above it; the width belongs here
+ * for the same reason, since nothing else in that flyout sets one.
  */
 .pd-quickmenu {
-  border-top: 1px solid var(--pd-border-subtle);
-  margin-top: 4px;
-  padding-top: 4px;
+  width: 300px;
+  max-width: min(360px, calc(100vw - 32px));
 }
 .pd-quickmenu-search {
   display: flex;

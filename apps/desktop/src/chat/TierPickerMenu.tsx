@@ -17,13 +17,16 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
   IconCheck,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   IconChevronRight,
   IconGauge,
   IconPin,
   IconSparkles,
   IconSpeed,
 } from '@pi-desktop/ui';
-import { type ReactNode, useState } from 'react';
+import type { ReactNode } from 'react';
 import type { ModelTier } from '../../../../packages/harness/src/classify/tier.ts';
 import { compactBytes } from '../models/models-layout';
 import { useLlmStore } from '../state/llm-store';
@@ -71,7 +74,6 @@ export function TierPickerMenu({
   const catalog = useLlmStore((s) => s.catalog);
   const quickMenu = useQuickMenu();
   const updateSettings = useSettingsStore((s) => s.update);
-  const [showAll, setShowAll] = useState(false);
   const selection = useModelSelection();
   const isAuto = selection.mode === 'auto';
   const activeTier = selectionTier(selection);
@@ -247,30 +249,45 @@ export function TierPickerMenu({
         {showManager ? (
           <>
             <DropdownMenuSeparator />
-            {/* "More models" opens the list in place rather than jumping
-                straight to the manager: the common case is picking something
-                already downloaded, and leaving the chat to do that is a bigger
-                interruption than the choice deserves. The manager is still one
-                click further on. */}
-            <DropdownMenuItem
-              data-testid="footer-more-models"
-              hint={<IconChevronRight size={14} />}
-              onSelect={(e) => {
-                e.preventDefault();
-                setShowAll((v) => !v);
-              }}
-            >
-              More models
-            </DropdownMenuItem>
-            {showAll ? (
-              <QuickMenuPanel
-                models={menuModels}
-                config={quickMenu}
-                activeModelId={selection.mode === 'model' ? selection.modelId : null}
-                onConfigChange={applyQuickMenu}
-                onPick={(id) => void selectModel(id)}
-              />
-            ) : null}
+            {/*
+              * "More models" FLIES OUT TO THE SIDE. the user: "I need to hover on
+              * the more models > and then have the stuff popup on the right
+              * side, not click and have a menu within a menu."
+              *
+              * It used to toggle the list open INSIDE this menu, which pushed
+              * every row below it down and grew the dropdown past the height of
+              * what it was covering. A submenu is the shape the chevron was
+              * already promising: hover to open, alongside rather than within,
+              * and the short chosen list stays exactly where it was while you
+              * browse the long one.
+              *
+              * The list still opens in the chat rather than jumping to the
+              * manager — the common case is picking something already
+              * downloaded, and leaving the chat for that is a bigger
+              * interruption than the choice deserves. The manager is one click
+              * further on.
+              */}
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger data-testid="footer-more-models">
+                More models
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent
+                data-testid="footer-more-models-panel"
+                alignOffset={-4}
+                /* The panel carries a search field, and Radix's menu typeahead
+                   would otherwise eat the keystrokes and jump focus to whatever
+                   row started with that letter. */
+                onKeyDown={(e) => e.stopPropagation()}
+              >
+                <QuickMenuPanel
+                  models={menuModels}
+                  config={quickMenu}
+                  activeModelId={selection.mode === 'model' ? selection.modelId : null}
+                  onConfigChange={applyQuickMenu}
+                  onPick={(id) => void selectModel(id)}
+                />
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
             <DropdownMenuItem
               data-testid="footer-open-manager"
               hint={<IconChevronRight size={14} />}
