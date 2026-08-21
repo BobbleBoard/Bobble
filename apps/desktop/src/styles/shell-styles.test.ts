@@ -65,6 +65,42 @@ describe('R14-C shell + scroll styles', () => {
     });
   });
 
+  /*
+   * The close the user sent back: "left sidebar does not close cleanly, it's instant
+   * dissapear and then slide left rather than the correct slide in like the
+   * canvas sidebar does."
+   *
+   * The panel had been leaving the DOM on the closing frame while the slot's
+   * width animated on alone, so what slid was an empty gap. The fix is a pair of
+   * curves that have to stay a pair: the slot's width and the panel's transform,
+   * same duration token, same easing, both keyed off the SLOT's `data-open` so
+   * they start on the same frame. Break either half — retime one, or drop the
+   * `@starting-style` that gives a freshly mounted panel something to slide FROM
+   * — and the animation degrades quietly, which is exactly how it shipped last
+   * time. Hence these.
+   */
+  describe('sidebar slide — the panel rides the closing edge', () => {
+    it('the slot animates its width, and clips while it does', () => {
+      expect(block('.pd-sidebar-slot ')).toMatch(
+        /transition:\s*width var\(--pd-duration-slow/,
+      );
+      expect(block('.pd-sidebar-slot[data-open="false"] {')).toMatch(/overflow:\s*hidden/);
+      expect(block('.pd-sidebar-slot[data-open="false"] {')).toMatch(/width:\s*0/);
+    });
+
+    it('the panel parks off the left edge, driven by the SLOT (same frame)', () => {
+      const parked = block('.pd-sidebar-slot[data-open="false"] .pd-sidebar');
+      expect(parked).toMatch(/transform:\s*translateX\(-100%\)/);
+      expect(parked).toMatch(/pointer-events:\s*none/);
+    });
+
+    it('a freshly mounted panel has a from-frame, so OPENING slides too', () => {
+      expect(css).toMatch(
+        /@starting-style\s*\{[\s\S]*?\.pd-sidebar-slot\[data-open="true"\] \.pd-sidebar\s*\{[\s\S]*?translateX\(-100%\)/,
+      );
+    });
+  });
+
   describe('C1 — collapsed rail card chrome moved onto .pd-rail', () => {
     it('the full-height shell is transparent + chrome-less when collapsed', () => {
       const shell = block('.pd-sidebar[data-open="false"]');

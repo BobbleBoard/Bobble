@@ -221,6 +221,60 @@ body {
 :root[data-flavor="claude"] .pd-sidebar-slot[data-open="false"] {
   width: 0;
 }
+
+/*
+ * …AND THE PANEL RIDES THE CURTAIN DOWN. the user, on the round after: "left sidebar
+ * does not close cleanly, it's instant dissapear and then slide left rather than
+ * the correct slide in like the canvas sidebar does."
+ *
+ * The width above was already animating; what was missing was anything INSIDE it
+ * to watch. The panel used to leave the DOM on the closing frame, so the 300ms
+ * that followed was an empty gap narrowing. It now stays for the slide and parks
+ * itself off the left edge here (SessionSidebar's `data-sliding`, which owns the
+ * mount lifetime and the two-frame handshake that makes OPENING slide too).
+ *
+ * BOTH HALVES HANG OFF THE SLOT's OWN `data-open`, deliberately: that attribute
+ * flips in the very same render that starts the width animation, so the two
+ * curves begin on the same frame. Driving the panel from a React effect instead
+ * lands it a frame or two later, and MEASURED, that lag put the panel's right
+ * edge up to 80px behind the closing edge — the curtain eating content that had
+ * not slid away yet.
+ *
+ * The transform transition comes from the base `.pd-sidebar` rule and uses the
+ * same `--pd-duration-slow` + `--pd-easing-standard` as the slot's width above.
+ * That pairing is the whole trick: translate by exactly the panel's own width on
+ * the same curve the slot shrinks on, and the panel's right edge sits on the
+ * slot's right edge in every frame — so the content travels left with the border
+ * instead of being squashed by it, and the slot's `overflow: hidden` shears off
+ * whatever has crossed the line.
+ */
+.pd-sidebar-slot[data-open="false"] .pd-sidebar {
+  transform: translateX(-100%);
+  pointer-events: none;
+}
+:root[data-flavor="claude"] .pd-sidebar-slot[data-open="false"] .pd-sidebar {
+  /* Clear the 8px float margin as well, as the flavor's own slide-out does. */
+  transform: translateX(calc(-100% - 8px));
+}
+/*
+ * The same parked position, declared as where a FRESHLY MOUNTED panel starts
+ * from. Opening remounts the sidebar (it unmounts at the end of its slide-out),
+ * and a transition has nothing to run from on an element's first paint — the
+ * panel would simply be there, revealed by the widening slot, while closing
+ * slides. `@starting-style` supplies that first frame in the browser rather than
+ * in React: the hand-rolled alternative is a two-frame requestAnimationFrame
+ * handshake, and MEASURED, those two frames left the panel's leading edge ~30px
+ * behind the opening slot for the whole animation — a sliver of chat background
+ * showing along the edge that should have been under the sidebar.
+ */
+@starting-style {
+  .pd-sidebar-slot[data-open="true"] .pd-sidebar {
+    transform: translateX(-100%);
+  }
+  :root[data-flavor="claude"] .pd-sidebar-slot[data-open="true"] .pd-sidebar {
+    transform: translateX(calc(-100% - 8px));
+  }
+}
 .pd-sidebar[data-open="false"] {
   transform: none;
   opacity: 1;

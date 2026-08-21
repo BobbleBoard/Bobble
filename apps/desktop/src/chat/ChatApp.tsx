@@ -474,9 +474,10 @@ export function ChatApp({
       <SiteIconProvider value={useSiteIcon}>
         <OpenUrlProvider value={openResultUrl}>
           <div className="relative flex h-full">
-            {/* The sidebar stays mounted; when collapsed the slot narrows to a
-            ~64px ICON RAIL (round-8 #1) rather than hiding — global.css owns the
-            rail width + the panel's stay-put override. */}
+            {/* The slot owns the sidebar's footprint: its width animates to 0 on
+            collapse so the main surface reclaims the space, and it clips while it
+            does. The panel inside slides out on the same curve and unmounts after
+            (SessionSidebar's `data-sliding`) — there is no icon rail. */}
             <div className="pd-sidebar-slot" data-open={sidebarOpen}>
               <SessionSidebar
                 open={sidebarOpen}

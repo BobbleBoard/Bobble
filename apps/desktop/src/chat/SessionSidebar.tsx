@@ -202,6 +202,28 @@ function SidebarProfileMenu({
   );
 }
 
+/**
+ * How long the sidebar's slide actually lasts here, in ms.
+ *
+ * Read from the live `--pd-duration-slow` token rather than hardcoded, because
+ * the flavors disagree (250ms / 300ms) and the reduced-motion theme sets it to
+ * 0.01ms. A hardcoded hold would keep the panel mounted well past the end of its
+ * movement in the first case, and in the second it would sit there holding a
+ * slide that the theme has asked not to happen at all.
+ */
+function slideMs(): number {
+  if (typeof window === 'undefined') return 300;
+  const raw = getComputedStyle(document.documentElement)
+    .getPropertyValue('--pd-duration-slow')
+    .trim();
+  const ms = raw.endsWith('ms')
+    ? Number.parseFloat(raw)
+    : raw.endsWith('s')
+      ? Number.parseFloat(raw) * 1000
+      : Number.NaN;
+  return Number.isFinite(ms) ? ms : 300;
+}
+
 /** A 40×40 icon-only button for the collapsed rail (tooltip = its label). */
 function RailButton({
   label,
@@ -297,6 +319,41 @@ export function SessionSidebar({
   /** Scheduled tasks is a real view now, not a coming-soon stub. */
   onOpenScheduled: () => void;
 }) {
+  /*
+   * THE SLIDE. the user: "left sidebar does not close cleanly, it's instant
+   * dissapear and then slide left rather than the correct slide in like the
+   * canvas sidebar does."
+   *
+   * MEASURED, before this: on the closing frame the panel left the DOM outright
+   * (`if (!open) return null`) while the slot's width carried on animating
+   * 272 → 0 for another ~280ms. So the content vanished at frame 0 and an empty
+   * gap finished the animation by itself — exactly what he saw. The canvas rail
+   * has always done the other thing: its width runs 158 → 0 while its content
+   * stays 440px wide inside it, clipped as it goes.
+   *
+   * The movement itself is CSS (global.css, off the slot's own `data-open`, so
+   * the panel's transform and the slot's width start on the same frame). All
+   * this component owes it is the one thing CSS cannot do: keep the panel in the
+   * tree until the slide is over. `exiting` does that, then lets it go — a
+   * closed sidebar that stayed mounted would keep its buttons in the tab order.
+   */
+  const [exiting, setExiting] = useState(false);
+  const prevOpen = useRef(open);
+  useEffect(() => {
+    const wasOpen = prevOpen.current;
+    prevOpen.current = open;
+    if (open) {
+      setExiting(false);
+      return;
+    }
+    // Only a panel that WAS open has anything to slide out; a sidebar that
+    // starts closed must not animate itself away on first mount.
+    if (!wasOpen) return;
+    setExiting(true);
+    const t = window.setTimeout(() => setExiting(false), slideMs() + 60);
+    return () => window.clearTimeout(t);
+  }, [open]);
+
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [query, setQuery] = useState('');
   const currentFile = usePiStore((s) => s.session?.sessionFile ?? null);
@@ -902,20 +959,32 @@ export function SessionSidebar({
   ];
 
   /*
-   * COLLAPSED: NOTHING. the user: "when we close the left sidebar now it just
-   * completely closes, right border of the left sidebar just slides to the left
-   * like a curtain and the whole thing dissapears, button stays fixed up right
-   * next to the traffic light buttons."
+   * COLLAPSED: NOTHING — eventually. the user: "when we close the left sidebar now
+   * it just completely closes, right border of the left sidebar just slides to
+   * the left like a curtain and the whole thing dissapears, button stays fixed
+   * up right next to the traffic light buttons."
    *
-   * The icon rail is gone with it. The toggle that brings the sidebar back lives
-   * in the shell (ChatApp), not in here — a control that has to survive this
+   * There is no icon rail, and the toggle that brings the sidebar back lives in
+   * the shell (ChatApp), not in here — a control that has to survive this
    * component unmounting cannot be rendered by it.
+   *
+   * The panel does still have to be HERE for the length of the curtain, though,
+   * or the thing sliding left is an empty gap. `exiting` holds it that long;
+   * `justClosed` covers the one render between `open` flipping and that effect
+   * running, which would otherwise unmount it before the slide ever started.
    */
-  if (!open) return null;
+  const justClosed = !open && prevOpen.current;
+  if (!open && !exiting && !justClosed) return null;
 
   // ── EXPANDED: the full sidebar ─────────────────────────────────────────────
   return (
-    <Sidebar open={open}>
+    /*
+     * `data-open` stays TRUE for as long as the panel is mounted: it is the full
+     * sidebar the whole time, including while it slides out. The SLOT (ChatApp)
+     * is the single source of truth for open/closed — it owns the width, the
+     * clip, and (via a descendant rule) where the panel is parked.
+     */
+    <Sidebar open>
       {/* Traffic-light clearance strip (draggable). The collapse toggle moved OUT
           of the sidebar entirely — it now sits beside the macOS lights in the
           shell, so it survives the sidebar unmounting. */}
