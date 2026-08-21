@@ -11,6 +11,7 @@ import {
   filterModels,
   formatPipelineTag,
   type HubModel,
+  outputOfPipelineTag,
   relativeAge,
   sortModels,
 } from './models-layout';
@@ -333,5 +334,52 @@ describe('the hub number formats', () => {
     expect(relativeAge(now - 2 * 86_400_000, now)).toBe('2d ago');
     expect(relativeAge(now - 60 * 86_400_000, now)).toBe('2mo ago');
     expect(relativeAge(now - 800 * 86_400_000, now)).toBe('2y ago');
+  });
+});
+
+describe('output modality — what a model MAKES', () => {
+  it('reads the output side of an X-to-Y tag', () => {
+    expect(outputOfPipelineTag('text-to-image')).toBe('image');
+    expect(outputOfPipelineTag('image-to-video')).toBe('video');
+    expect(outputOfPipelineTag('image-text-to-video')).toBe('video');
+    expect(outputOfPipelineTag('image-to-3d')).toBe('3d');
+    expect(outputOfPipelineTag('text-to-3d')).toBe('3d');
+    expect(outputOfPipelineTag('text-to-speech')).toBe('audio');
+    expect(outputOfPipelineTag('text-to-audio')).toBe('audio');
+  });
+
+  it('reads the tags that do not follow that shape', () => {
+    // A chat model's tag says nothing about "to"; it still makes text.
+    expect(outputOfPipelineTag('text-generation')).toBe('text');
+    expect(outputOfPipelineTag('image-text-to-text')).toBe('text');
+    expect(outputOfPipelineTag('automatic-speech-recognition')).toBe('text');
+  });
+
+  it('says nothing for models that generate nothing', () => {
+    // A classifier or an embedder has no generative output, and inventing one
+    // would put a depth estimator in the image results.
+    expect(outputOfPipelineTag('image-classification')).toBeUndefined();
+    expect(outputOfPipelineTag('feature-extraction')).toBeUndefined();
+    expect(outputOfPipelineTag(undefined)).toBeUndefined();
+  });
+
+  it('filters rows by their output', () => {
+    const rows = [
+      m({ id: 'a', pipelineTag: 'text-to-image' }),
+      m({ id: 'b', pipelineTag: 'image-to-video' }),
+      m({ id: 'c', pipelineTag: 'text-generation' }),
+      m({ id: 'd', pipelineTag: 'image-classification' }),
+    ];
+    const f = { ...DEFAULT_FILTERS, scope: 'all' as const, outputs: ['image', 'video'] as const };
+    expect(filterModels(rows, f).map((m) => m.id)).toEqual(['a', 'b']);
+  });
+
+  it('is off when nothing is selected', () => {
+    const rows = [
+      m({ id: 'a', pipelineTag: 'text-to-image' }),
+      m({ id: 'd', pipelineTag: 'image-classification' }),
+    ];
+    const f = { ...DEFAULT_FILTERS, scope: 'all' as const, outputs: [] as const };
+    expect(filterModels(rows, f).map((m) => m.id)).toEqual(['a', 'd']);
   });
 });

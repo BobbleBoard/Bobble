@@ -229,9 +229,21 @@ export const useLlmStore = create<LlmStoreState>((set, get) => ({
     await get().downloadModel(d.modelId, d.quant);
   },
 
+  /*
+   * CANCEL IS ACKNOWLEDGED BEFORE IT IS OBEYED. the user: "clicking x cancels
+   * (immediate feedback even if download doesn't cancel immediately it shows up
+   * that way — progress bar removes and download button restored, partial
+   * download auto cleaned and deleted)".
+   *
+   * The bar used to stay up until the main process answered, which on a slow
+   * write is long enough for the click to feel ignored and be pressed again. The
+   * supervisor's abort is not in doubt — it discards the `.part` files on the
+   * cancel path — so the UI states the outcome first and lets the plumbing catch
+   * up. If the abort somehow failed, the next progress event puts the bar back.
+   */
   cancelDownload: async () => {
-    await window.piDesktop.invoke('llm:cancel-download', undefined);
     set({ download: null });
+    await window.piDesktop.invoke('llm:cancel-download', undefined);
     await get().refreshCatalog();
   },
 

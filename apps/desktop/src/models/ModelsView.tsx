@@ -54,8 +54,10 @@ import { cx } from '../onboarding/cx';
 import { OrgAvatar } from '../settings/brand-icons';
 import { type QuantOption, ramVerdict } from '../settings/model-manager-logic';
 import { useHfStore } from '../state/hf-store';
-import { useLlmStore } from '../state/llm-store';
+import { downloadEtaSeconds, downloadFraction, formatEta, useLlmStore } from '../state/llm-store';
 import { setHfToken, useHfToken } from '../state/settings-store';
+import { DownloadAction } from './DownloadAction';
+import { FamilyCard } from './FamilyCard';
 import { ModelCard } from './ModelCard';
 import { CapabilityPills } from './model-pills';
 import {
@@ -78,6 +80,15 @@ import {
   wantsNonGguf,
 } from './models-layout';
 import { QuantPicker } from './QuantPicker';
+import {
+  installKindOf,
+  OUTPUT_LABEL,
+  type OutputModality,
+  RECOMMENDED_FAMILIES,
+  type RecommendedFamily,
+  type RecommendedVariant,
+  recommendedFamilies,
+} from './recommended-catalog';
 import { useOutsideClose } from './use-outside-close';
 
 /**
@@ -626,6 +637,17 @@ export function ModelsView() {
   const [selected, setSelected] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /*
+   * THE LIVE DOWNLOAD, from the store rather than from here.
+   *
+   * The supervisor runs ONE download at a time — `llm:pause-download` and
+   * `llm:cancel-download` take no id precisely because there is nothing to
+   * disambiguate — so the single global progress record belongs to whichever
+   * row started it, and that row is `busyId`. Reading it per-row instead would
+   * be inventing a distinction the engine does not make.
+   */
+  const progress = useLlmStore((s) => s.download);
+  const cancelDownload = useLlmStore((s) => s.cancelDownload);
   const [hits, setHits] = useState<HfModelHitDTO[]>([]);
   /* Datasets are the reference's sibling page. Same chrome, different corpus —
      so they live here behind a kind switch rather than in a second view that
@@ -652,6 +674,7 @@ export function ModelsView() {
       ? setDatasetFilters(DEFAULT_DATASET_FILTERS)
       : setModelFilters(DEFAULT_FILTERS);
   const isFiltered =
+    (filters.outputs ?? []).length > 0 ||
     filters.capabilities.length > 0 ||
     filters.onlyFits ||
     filters.maxSize !== undefined ||
@@ -839,11 +862,74 @@ export function ModelsView() {
     () => sortModels(filterModels(scoped, filters), filters.sort),
     [scoped, filters],
   );
+
+  /*
+   * RECOMMENDED IS A CURATED LIST, not a filtered search.
+   *
+   * the user: "the newest is just clogged immediately with 10 bartowski ornith 1.5
+   * quants from the different model sizes… we need to have reccomended section
+   * and then have that by default that has good organization and such… but we
+   * let people do from hf and deal with the messy default search if they want."
+   *
+   * So Discover has two genuinely different sources under one toggle: a
+   * hand-picked, family-grouped list (recommended-catalog.ts) and the raw Hub.
+   * Filtering the Hub harder could never have produced the first one — every one
+   * of those ten quant repos passes a reputable-publisher test.
+   */
+  const curated =
+    kind === 'models' && tab === 'discover' && (filters.scope ?? 'recommended') === 'recommended';
+  const families = useMemo(
+    () => (curated ? recommendedFamilies(filters.outputs ?? []) : []),
+    [curated, filters.outputs],
+  );
+  /** repo → its family and variant, for turning a click into a detail pane. */
+  const curatedIndex = useMemo(() => {
+    const map = new Map<string, { family: RecommendedFamily; variant: RecommendedVariant }>();
+    for (const family of RECOMMENDED_FAMILIES) {
+      for (const variant of family.variants) map.set(variant.repo, { family, variant });
+    }
+    return map;
+  }, []);
+  /* What is on disk, by REPO — the curated list names repos, while the local
+     catalog is keyed by its own ids and carries the repo alongside. */
+  const downloadedRepos = useMemo(() => {
+    const set = new Set<string>();
+    for (const e of catalog) {
+      if (e.downloaded !== true) continue;
+      if (e.hfRepo !== undefined) set.add(e.hfRepo);
+      set.add(e.id);
+    }
+    return set;
+  }, [catalog]);
   /* From the FILTERED rows, not the whole source: showing four trending cards
      above an "Nothing matches these filters" table made the page argue with
      itself. */
   const trending = useMemo(() => sortModels(rows, 'trending').slice(0, 4), [rows]);
-  const detail = rows.find((m) => m.id === selected) ?? rows[0];
+  /*
+   * The detail pane works off a `HubModel`, and a curated pick is not in `rows`
+   * — the curated list is a different source. Rather than special-casing every
+   * consumer (quant ladder, model card, download), the catalogue entry is turned
+   * INTO a HubModel here, keyed on the repo. Everything downstream then behaves
+   * exactly as it does for a Hub search result, because for those purposes it is
+   * one: same repo id, same file listing, same README.
+   */
+  const curatedPick = selected === null ? undefined : curatedIndex.get(selected);
+  const detail: HubModel | undefined =
+    curated && curatedPick !== undefined
+      ? {
+          id: curatedPick.variant.repo,
+          name: `${curatedPick.family.name} ${curatedPick.variant.label}`,
+          org: curatedPick.variant.repo.split('/')[0] ?? curatedPick.family.org,
+          params:
+            curatedPick.variant.paramsB === undefined
+              ? undefined
+              : `${Number(curatedPick.variant.paramsB.toFixed(1))}B`,
+          paramsB: curatedPick.variant.paramsB,
+          formats: [],
+          capabilities: [],
+          downloaded: downloadedRepos.has(curatedPick.variant.repo),
+        }
+      : (rows.find((m) => m.id === selected) ?? (curated ? undefined : rows[0]));
 
   /*
    * THE MODEL CARD. The reference gives most of its detail pane to the rendered
@@ -1068,9 +1154,37 @@ export function ModelsView() {
           'llm:download-model',
           quant === undefined ? { modelId: id } : { modelId: id, quant },
         );
-        if (res.success !== true) setError(res.error ?? 'the download could not start');
+        // A cancel comes back as `success: false`. Reading that as a failure
+        // put "the download could not start" on screen every time someone
+        // pressed the X — the one outcome they had just asked for.
+        if (res.success !== true && res.cancelled !== true && res.paused !== true) {
+          setError(res.error ?? 'the download could not start');
+        }
       } else {
-        const hit = hits.find((h) => h.id === id);
+        /*
+         * A CURATED PICK IS NOT IN THE SEARCH RESULTS, and used to fail here.
+         *
+         * This path resolved the repo by looking it up in `hits` — the current
+         * Hugging Face search — which is exactly what a hand-picked list is not
+         * in. Every Download on the Recommended tab ended at "Could not resolve
+         * a file to download for this model." The registration only needs the
+         * repo's identity, so a curated entry supplies its own: same shape, from
+         * the catalogue instead of from a search we did not run.
+         */
+        const curatedHit = curatedIndex.get(id);
+        const hit =
+          hits.find((h) => h.id === id) ??
+          (curatedHit === undefined
+            ? undefined
+            : {
+                id,
+                author: id.split('/')[0] ?? curatedHit.family.org,
+                name: id.split('/')[1] ?? curatedHit.family.name,
+                downloads: 0,
+                likes: 0,
+                tags: [],
+                gated: false,
+              });
         const files = quants?.repo === id ? quants.files : [];
         // Match on the label the picker showed, then fall back to the ladder's
         // best — a user who never opened the picker still gets a sane file.
@@ -1078,7 +1192,14 @@ export function ModelsView() {
           files.find((f) => quantLabel(f.quant, f.path) === quant) ??
           files.find((f) => f.mmproj !== true && (f.sizeBytes ?? 0) > 0);
         if (hit === undefined || file === undefined) {
-          setError('Could not resolve a file to download for this model.');
+          // Being specific about WHICH half failed: a repo with no GGUF in it is
+          // an image/video/audio model that this downloader cannot install, and
+          // saying "could not resolve a file" sends people looking for a bug.
+          setError(
+            file === undefined && hit !== undefined
+              ? `${id} publishes no GGUF weights — it runs on the generation stack, which fetches it on first use.`
+              : 'Could not resolve a file to download for this model.',
+          );
         } else {
           await useHfStore.getState().addAndDownload(hit, file, {
             mmproj: quants?.mmproj,
@@ -1091,6 +1212,20 @@ export function ModelsView() {
     }
     await refreshCatalog();
     setBusyId(null);
+  };
+
+  /*
+   * CANCEL, ACKNOWLEDGED FIRST. the user: "immediate feedback even if download
+   * doesn't cancel immediately it shows up that way". Clearing `busyId` here
+   * restores the Download button on the same frame as the click; the store
+   * clears the progress record the same way, and the supervisor discards the
+   * `.part` files on its own cancel path. The in-flight `download()` above then
+   * returns `{cancelled: true}`, which is why it must not be read as a failure.
+   */
+  const cancelHere = async () => {
+    setBusyId(null);
+    setError(null);
+    await cancelDownload();
   };
   /* Does THIS source carry popularity data? The bundled catalog does not; the
      HF browse path does. Drives whether those columns exist at all. */
@@ -1280,6 +1415,48 @@ export function ModelsView() {
         </div>
 
         {/*
+         * OUTPUT — what a model MAKES. the user: "everything filterable by output
+         * also".
+         *
+         * Pills rather than another dropdown, because this is the axis people
+         * arrive with ("I want to make a video") and there are only five of
+         * them: a menu would hide a five-item choice behind a click. Multi-select
+         * with none-means-all, the same grammar as the capability filter.
+         */}
+        <div className="flex items-center gap-1" data-testid="filter-output">
+          {(['text', 'image', 'video', 'audio', '3d'] as const).map((o) => {
+            const on = (filters.outputs ?? []).includes(o);
+            return (
+              <button
+                key={o}
+                type="button"
+                data-testid={`filter-output-${o}`}
+                aria-pressed={on}
+                onClick={() =>
+                  setFilters((f) => {
+                    const cur = f.outputs ?? [];
+                    return {
+                      ...f,
+                      outputs: cur.includes(o)
+                        ? cur.filter((x) => x !== o)
+                        : ([...cur, o] as readonly OutputModality[]),
+                    };
+                  })
+                }
+                className={cx(
+                  'rounded-full border px-3 py-1.5 text-footnote transition-colors pd-focusable',
+                  on
+                    ? 'border-transparent bg-accent-primary text-text-on-accent'
+                    : 'border-border-subtle bg-bg-raised text-text-secondary hover:bg-bg-hover hover:text-text-primary',
+                )}
+              >
+                {OUTPUT_LABEL[o]}
+              </button>
+            );
+          })}
+        </div>
+
+        {/*
          * SIZE CAP. A maximum rather than a range: the question a hub gets asked
          * is "what fits", never "what is at least this big".
          *
@@ -1457,7 +1634,8 @@ export function ModelsView() {
             </div>
           ) : (
             <>
-              {kind === 'models' &&
+              {!curated &&
+              kind === 'models' &&
               tab === 'discover' &&
               view !== 'detail' &&
               trending.length > 0 ? (
@@ -1522,21 +1700,28 @@ export function ModelsView() {
                 data-view={view}
                 className={cx(
                   'grid gap-5',
-                  view === 'compact'
-                    ? ''
-                    : view === 'split'
-                      ? 'grid-cols-[minmax(0,1fr)_420px]'
-                      : 'grid-cols-[300px_minmax(0,1fr)]',
+                  // The curated list is cards, not a table, so it keeps the
+                  // detail pane beside it even in the compact view — otherwise
+                  // clicking a version would have nowhere to show it.
+                  curated
+                    ? 'grid-cols-[minmax(0,1fr)_420px]'
+                    : view === 'compact'
+                      ? ''
+                      : view === 'split'
+                        ? 'grid-cols-[minmax(0,1fr)_420px]'
+                        : 'grid-cols-[300px_minmax(0,1fr)]',
                 )}
               >
                 <div>
                   <div className="mb-3 flex items-center gap-2">
                     <h2 className="text-body font-medium text-text-primary">
-                      {kind === 'datasets'
-                        ? 'All datasets'
-                        : tab === 'device'
-                          ? 'On this machine'
-                          : 'All models'}
+                      {curated
+                        ? 'Recommended'
+                        : kind === 'datasets'
+                          ? 'All datasets'
+                          : tab === 'device'
+                            ? 'On this machine'
+                            : 'All models'}
                     </h2>
                     <button
                       type="button"
@@ -1548,12 +1733,40 @@ export function ModelsView() {
                       <IconRefresh size={14} />
                     </button>
                     <span className="ml-auto text-footnote text-text-muted">
-                      {rows.length} {kind === 'datasets' ? 'dataset' : 'model'}
-                      {rows.length === 1 ? '' : 's'}
+                      {curated
+                        ? `${families.length} families, smallest first`
+                        : `${rows.length} ${kind === 'datasets' ? 'dataset' : 'model'}${rows.length === 1 ? '' : 's'}`}
                     </span>
                   </div>
 
-                  {view === 'compact' ? (
+                  {curated ? (
+                    /*
+                     * The curated list REPLACES the results table here rather
+                     * than sitting above it: two lists of models on one screen,
+                     * one hand-picked and one not, is exactly the ambiguity the
+                     * Recommended/All toggle exists to remove.
+                     */
+                    <div className="flex flex-col gap-2" data-testid="curated-families">
+                      {families.map((family) => (
+                        <FamilyCard
+                          key={family.id}
+                          family={family}
+                          downloaded={downloadedRepos}
+                          selectedRepo={selected}
+                          onSelect={setSelected}
+                          onDownload={(repo) => {
+                            setSelected(repo);
+                            void download(repo);
+                          }}
+                        />
+                      ))}
+                      {families.length === 0 ? (
+                        <p className="py-6 text-body text-text-muted" data-testid="curated-empty">
+                          Nothing recommended makes that yet — switch to All to search the Hub.
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : view === 'compact' ? (
                     <div className="overflow-hidden rounded-2xl border border-border-subtle bg-bg-raised shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
                       {/* Downloads/Likes only exist for HF-sourced entries. A
                           column of em-dashes is worse than no column: it looks
@@ -1741,10 +1954,36 @@ export function ModelsView() {
                   )}
                 </div>
 
-                {view !== 'compact' && detail !== undefined ? (
+                {curated && detail === undefined ? (
+                  /* The pane is pinned and empty until something is picked;
+                     saying so beats a 420px hole beside the list. */
+                  <aside
+                    className="sticky top-0 self-start rounded-2xl border border-border-subtle border-dashed p-5 text-footnote text-text-muted"
+                    data-testid="curated-detail-hint"
+                  >
+                    Open a family and pick a version to see its card, its quant ladder and what it
+                    needs.
+                  </aside>
+                ) : null}
+                {(curated || view !== 'compact') && detail !== undefined ? (
+                  /*
+                   * PINNED. the user: "the right item showing the model card needs
+                   * to be pinned and not lost as we scroll down otherwise we
+                   * scroll down through the list find something we like, click
+                   * it and nothing appears on the right."
+                   *
+                   * It already had its own max-height and inner scroll, but it
+                   * sat in normal flow — so a list long enough to scroll carried
+                   * the pane off the top of the window with it, and by the time
+                   * you had scrolled to something worth clicking, the place its
+                   * details appear was somewhere above the viewport. `sticky`
+                   * with `self-start` is the whole fix: self-start stops the
+                   * grid stretching it to the row's full height, which is what
+                   * would otherwise leave it nothing to stick within.
+                   */
                   <aside
                     className={cx(
-                      'overflow-y-auto rounded-2xl border border-border-subtle bg-bg-raised p-5 shadow-[0_1px_3px_rgba(0,0,0,0.05)]',
+                      'sticky top-0 self-start overflow-y-auto rounded-2xl border border-border-subtle bg-bg-raised p-5 shadow-[0_1px_3px_rgba(0,0,0,0.05)]',
                       view === 'detail' ? 'max-h-[calc(100vh-190px)]' : 'max-h-[calc(100vh-260px)]',
                     )}
                     data-testid="model-detail"
@@ -1811,17 +2050,62 @@ export function ModelsView() {
                       >
                         <IconExternal size={14} /> Open on Hugging Face
                       </button>
+                    ) : curatedPick !== undefined && installKindOf(curatedPick.family) === 'gen' ? (
+                      /*
+                       * A GENERATION MODEL DOES NOT DOWNLOAD FROM HERE, and the
+                       * button must not pretend otherwise. These are diffusers /
+                       * safetensors weights that their backend pulls into its own
+                       * cache the first time you generate with them — there is no
+                       * single file for this downloader to fetch, and offering
+                       * one produced "No downloadable files listed." under a big
+                       * blue Download.
+                       */
+                      <div
+                        className="mt-3 rounded-xl border border-border-subtle bg-bg-inset p-3"
+                        data-testid="detail-gen-install"
+                      >
+                        <p className="text-footnote text-text-secondary">
+                          Fetched by the {OUTPUT_LABEL[curatedPick.family.output].toLowerCase()}{' '}
+                          stack the first time you use it — no separate download.
+                        </p>
+                        <button
+                          type="button"
+                          data-testid="detail-gen-open-hf"
+                          onClick={() => openOnHf(detail.id)}
+                          className="pd-focusable mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg border border-border-default px-3 py-2 text-footnote text-text-primary transition-colors hover:bg-bg-hover"
+                        >
+                          <IconExternal size={14} /> View on Hugging Face
+                        </button>
+                      </div>
                     ) : (
-                      <QuantPicker
-                        options={quants?.repo === detail.id ? quants.options : []}
-                        loading={quants?.repo === detail.id ? quants.loading : true}
-                        totalRamGB={hw?.ramGiB ?? 0}
-                        mmprojBytes={quants?.mmprojBytes}
-                        format={detail.formats[0]?.toUpperCase()}
-                        installed={detail.downloaded === true}
-                        downloading={busyId === detail.id}
-                        onDownload={(q) => void download(detail.id, q)}
-                      />
+                      <>
+                        {/* The headline action: one click, the recommended file,
+                            no question asked. The ladder below is for the people
+                            who want to answer that question anyway. */}
+                        <DownloadAction
+                          installed={detail.downloaded === true}
+                          busy={busyId === detail.id}
+                          fraction={progress === null ? null : downloadFraction(progress)}
+                          received={progress?.jobReceived ?? progress?.received}
+                          total={progress?.jobTotal ?? progress?.total}
+                          eta={
+                            progress === null ? undefined : formatEta(downloadEtaSeconds(progress))
+                          }
+                          onDownload={() => void download(detail.id)}
+                          onCancel={() => void cancelHere()}
+                          testid="detail-download"
+                        />
+                        <QuantPicker
+                          options={quants?.repo === detail.id ? quants.options : []}
+                          loading={quants?.repo === detail.id ? quants.loading : true}
+                          totalRamGB={hw?.ramGiB ?? 0}
+                          mmprojBytes={quants?.mmprojBytes}
+                          format={detail.formats[0]?.toUpperCase()}
+                          installed={detail.downloaded === true}
+                          downloading={busyId === detail.id}
+                          onDownload={(q) => void download(detail.id, q)}
+                        />
+                      </>
                     )}
 
                     {/* Only chips we actually have a value for — a row of

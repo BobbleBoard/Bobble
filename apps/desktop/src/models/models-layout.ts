@@ -18,6 +18,7 @@
  * it would give us two answers to "does this fit".
  */
 import { isReliablePublisher } from '@pi-desktop/inference/catalog';
+import type { OutputModality } from './recommended-catalog';
 
 export type ModelFormat = 'all' | 'gguf' | 'safetensors' | 'mlx' | 'finetune';
 /**
@@ -116,6 +117,48 @@ export function formatPipelineTag(tag: string | undefined): string | undefined {
     return [...new Set(words)].join(' + ');
   };
   return `${side(m[1] ?? '')} → ${side(m[2] ?? '')}`;
+}
+
+/**
+ * WHAT A MODEL MAKES, from its pipeline tag.
+ *
+ * the user: "everything filterable by output also". The output side of the tag is
+ * the axis — it is the question someone actually arrives with ("I want to make a
+ * video"), where `capabilities` mixes what a model understands with what it
+ * produces.
+ *
+ * Returns undefined when the tag names no generative output (a classifier, an
+ * embedder, a detector). Those are not hidden by a filter that is not set; they
+ * simply cannot answer "shows me things that make video", and pretending
+ * otherwise would put a depth estimator in the image results.
+ */
+export function outputOfPipelineTag(tag: string | undefined): OutputModality | undefined {
+  if (tag === undefined || tag.length === 0) return undefined;
+  const t = tag.toLowerCase();
+  const direct: Record<string, OutputModality> = {
+    'text-generation': 'text',
+    conversational: 'text',
+    summarization: 'text',
+    translation: 'text',
+    'question-answering': 'text',
+    'image-text-to-text': 'text',
+    'visual-question-answering': 'text',
+    'document-question-answering': 'text',
+    'automatic-speech-recognition': 'text',
+    'text-to-speech': 'audio',
+    'text-to-audio': 'audio',
+  };
+  const hit = direct[t];
+  if (hit !== undefined) return hit;
+  const m = /^(?:.+?)-to-(.+)$/.exec(t);
+  if (m === null) return undefined;
+  const out = m[1] ?? '';
+  if (out.includes('3d')) return '3d';
+  if (out.includes('video')) return 'video';
+  if (out.includes('image')) return 'image';
+  if (out.includes('audio') || out.includes('speech')) return 'audio';
+  if (out.includes('text')) return 'text';
+  return undefined;
 }
 
 /**
@@ -238,6 +281,15 @@ export interface HubFilters {
    * what a newcomer thinks this hub is.
    */
   readonly scope?: 'recommended' | 'all';
+  /**
+   * WHAT IT MAKES. the user: "everything filterable by output also".
+   *
+   * Multi-select, and empty means no filter — the same shape as `capabilities`,
+   * for the same reason: a magic 'all' member gives the set two ways to say the
+   * same thing. A row whose tag names no generative output is dropped when this
+   * is set, because "makes video" is a claim it cannot support.
+   */
+  readonly outputs?: readonly OutputModality[];
 }
 
 export const DEFAULT_FILTERS: HubFilters = {
@@ -292,6 +344,10 @@ export function filterModels(models: readonly HubModel[], f: HubFilters): HubMod
       return false;
     if (f.onlyFits && m.fits !== true) return false;
     if (f.scope !== 'all' && !isReliablePublisher(m.org)) return false;
+    if (f.outputs !== undefined && f.outputs.length > 0) {
+      const out = outputOfPipelineTag(m.pipelineTag);
+      if (out === undefined || !f.outputs.includes(out)) return false;
+    }
     if (f.maxSize !== undefined) {
       if (m.bytes !== undefined) {
         if (m.bytes > f.maxSize * 1024 ** 3) return false;

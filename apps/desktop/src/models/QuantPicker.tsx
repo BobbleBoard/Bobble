@@ -245,7 +245,11 @@ export function QuantPicker({
               : 'bg-accent-primary text-text-on-accent hover:opacity-90',
           )}
         >
-          {installed ? 'Installed' : downloading ? 'Starting…' : 'Download'}
+          {/* "Starting…" forever was the old story here, and it now sits under a
+              bar that is reporting real bytes — two controls disagreeing about
+              the same transfer. The headline action owns the progress; this one
+              just steps back while it runs. */}
+          {installed ? 'Installed' : downloading ? 'Downloading…' : 'Download'}
         </button>
       </div>
 

@@ -2376,6 +2376,33 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
 }
 
 /*
+ * The indeterminate half of the download bar (DownloadAction).
+ *
+ * A download has no total until the file listing resolves, and those first
+ * seconds are exactly when someone is watching hardest. A bar parked at 0%
+ * reads as stalled, so it sweeps instead — the honest statement being "started,
+ * size unknown" rather than "no progress".
+ */
+@keyframes pd-download-sweep {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(300%);
+  }
+}
+.pd-download-sweep {
+  animation: pd-download-sweep 1.1s var(--pd-easing-standard, ease-in-out) infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pd-download-sweep {
+    animation: none;
+    /* Still says "running" without moving: a third of the track, filled. */
+    opacity: 0.6;
+  }
+}
+
+/*
  * THE "MORE MODELS" LIST — the quick menu's side flyout.
  *
  * It has to be bounded: a list of every model on disk would otherwise run off
