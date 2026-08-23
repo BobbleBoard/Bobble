@@ -55,6 +55,8 @@ import { OrgAvatar } from '../settings/brand-icons';
 import { type QuantOption, ramVerdict } from '../settings/model-manager-logic';
 import { useHfStore } from '../state/hf-store';
 import { downloadEtaSeconds, downloadFraction, formatEta, useLlmStore } from '../state/llm-store';
+import { activateLocalModel } from '../state/local-model';
+import { useModalityStore } from '../state/modality-store';
 import { setHfToken, useHfToken } from '../state/settings-store';
 import { hasRepo, useStoreModels } from '../state/store-models';
 import { BestForYourMachine } from './BestForYourMachine';
@@ -62,6 +64,7 @@ import { DownloadAction } from './DownloadAction';
 import { FamilyCard } from './FamilyCard';
 import { ModelCard } from './ModelCard';
 import { CapabilityPills } from './model-pills';
+import type { ModelRecommendation } from './model-recommender';
 import {
   CAPABILITY_OPTIONS,
   compactBytes,
@@ -661,17 +664,6 @@ export function ModelsView() {
    * app cannot fetch it.
    */
   const hardware = useLlmStore((s) => s.hardware);
-  /*
-   * WHICH ENGINES ARE ALREADY ON DISK, so a recommendation can break a near tie
-   * toward the one that needs no download. Read once here rather than per card.
-   */
-  const [installedEngines, setInstalledEngines] = useState<string[]>([]);
-  useEffect(() => {
-    void window.piDesktop
-      .invoke('engines:list', undefined)
-      .then((r) => setInstalledEngines(r.engines.filter((e) => e.installed).map((e) => e.id)))
-      .catch(() => undefined);
-  }, []);
   const storeModels = useStoreModels((s) => s.models);
   const storeProgress = useStoreModels((s) => s.progress);
   const storeDownload = useStoreModels((s) => s.download);
@@ -1297,6 +1289,26 @@ export function ModelsView() {
     }
   };
 
+  /*
+   * "USE" IS A REAL ACTION, not a second way to select a row.
+   *
+   * the user replaced the on-disk badge with a button that says Use, which means the
+   * button IS the state — and a button that only re-selects what clicking the
+   * card already selects would make that a lie. So a text model becomes the chat
+   * model, and a generation model opens the studio that runs it. Both are the
+   * thing someone wanted when they pressed it.
+   */
+  const useRecommendation = async (rec: ModelRecommendation): Promise<void> => {
+    if (rec.family.output === 'text') {
+      const entry = catalog.find((e) => e.hfRepo === rec.variant.repo);
+      if (entry !== undefined) {
+        await activateLocalModel(entry.id, rec.quant?.rung.quant);
+        return;
+      }
+    }
+    useModalityStore.getState().setView(rec.family.output === '3d' ? '3d' : 'studio');
+  };
+
   /** Stop whichever downloader is carrying this variant. */
   const cancelVariant = async (family: RecommendedFamily, variant: RecommendedVariant) => {
     if (installKindOf(family) === 'gguf') {
@@ -1845,12 +1857,12 @@ export function ModelsView() {
                     <BestForYourMachine
                       hardware={hardware}
                       downloaded={downloadedRepos}
-                      installedEngines={installedEngines}
                       onSelect={setSelected}
                       onDownload={(rec) => {
                         setSelected(rec.variant.repo);
                         void downloadVariant(rec.family, rec.variant);
                       }}
+                      onUse={(rec) => void useRecommendation(rec)}
                     />
                   ) : null}
                   {curated ? (

@@ -59,21 +59,70 @@ try {
   );
   console.log(`families on screen (${families.length}):`, families.map((f) => f.id).join(', '));
   if (families.length < 10) fail(`only ${families.length} families rendered`);
-  // THE CORE OF THE WHOLE THING: what this machine should run, per modality,
-  // decided from real detected hardware rather than a guess.
+  /*
+   * THE TOP OF THE HUB. What matters is as much what is ABSENT as what is
+   * present — the user cut the header, the machine name, the memory budget, the
+   * reason line and the engine line as noise for "any random user using this
+   * app", and a card that quietly grows one of them back is the regression.
+   */
   const best = await win.evaluate(() => {
     const cards = [...document.querySelectorAll('[data-testid^="best-"]')]
-      .filter((el) => /^best-(text|image|video|audio|3d)$/.test(el.getAttribute('data-testid') ?? ''))
+      .filter((el) =>
+        /^best-(text|image|video|audio|3d)$/.test(el.getAttribute('data-testid') ?? ''),
+      )
       .map((el) => el.textContent?.replace(/\s+/g, ' ').trim() ?? '');
-    const header = document
-      .querySelector('[data-testid="best-for-your-machine"] span')
-      ?.textContent?.trim();
-    return { header, cards };
+    const strip = document.querySelector('[data-testid="best-for-your-machine"]');
+    return {
+      cards,
+      stripText: strip?.textContent?.replace(/\s+/g, ' ').trim() ?? '',
+      buttons: [...document.querySelectorAll('[data-testid^="best-use-"]')].map((b) =>
+        b.textContent?.trim(),
+      ),
+      tags: [...document.querySelectorAll('[data-testid^="best-task-"]')].map((b) =>
+        b.textContent?.trim(),
+      ),
+      // The button must be about half the card — the user asked for "<half card
+      // width Download button bottom right".
+      widths: [...document.querySelectorAll('[data-testid^="best-download-"]')].map((b) => {
+        // The button's OWN testid starts with `best-`, so a prefix `closest`
+        // matches the button itself and reports 100% every time.
+        const card = b.closest(
+          '[data-testid="best-text"],[data-testid="best-image"],[data-testid="best-video"],[data-testid="best-audio"],[data-testid="best-3d"]',
+        );
+        return card === null
+          ? null
+          : Math.round(
+              (b.getBoundingClientRect().width / card.getBoundingClientRect().width) * 100,
+            );
+      }),
+    };
   });
-  console.log('detected machine:', JSON.stringify(best.header));
-  for (const c of best.cards) console.log('  •', c.slice(0, 150));
+  for (const c of best.cards) console.log('  •', c.slice(0, 120));
+  console.log('HF task tags:', JSON.stringify(best.tags));
+  console.log('button width as % of card:', JSON.stringify(best.widths));
+  console.log('on-disk buttons say:', JSON.stringify(best.buttons));
   if (best.cards.length === 0) fail('no per-modality recommendation was shown');
-  if (!/GB to work with/.test(best.header ?? '')) fail('the strip does not say the memory budget');
+  if (best.tags.length !== best.cards.length) fail('a card has no Hugging Face task tag');
+  if (!best.tags.every((t) => /-to-|generation/.test(t ?? '')))
+    fail(`not HF task tags: ${best.tags}`);
+  for (const w of best.widths) {
+    if (w === null || w < 35 || w > 60) fail(`the button is ${w}% of the card, not about half`);
+  }
+  if (best.buttons.some((b) => b !== 'Use')) fail('an on-disk card does not say Use');
+  // The cut copy must be GONE, not merely moved.
+  for (const gone of [
+    'Best for your machine',
+    'to work with',
+    'needs',
+    'Runs on',
+    'runs everywhere',
+    'what the 3D Studio generates with',
+  ]) {
+    if (best.stripText.includes(gone)) fail(`"${gone}" is still on the cards`);
+  }
+  if (/On disk/.test(best.stripText))
+    fail('the on-disk tag is still there — the button is the state');
+
   await win.screenshot({ path: path.join(OUT, '1-recommended.png') });
 
   // 2. EXPAND — measure the card growing rather than trusting the class.
@@ -233,9 +282,11 @@ try {
   // The LTX quants must be reachable on THIS 24 GB machine — the point of
   // going GGUF rather than bf16/fp8.
   const ltxSizes = await win.evaluate(() =>
-    [...document.querySelectorAll('[data-testid^="family-variant-city96"], [data-testid^="family-variant-Abiray"]')].map(
-      (el) => el.textContent?.replace(/\s+/g, ' ').trim().slice(0, 90),
-    ),
+    [
+      ...document.querySelectorAll(
+        '[data-testid^="family-variant-city96"], [data-testid^="family-variant-Abiray"]',
+      ),
+    ].map((el) => el.textContent?.replace(/\s+/g, ' ').trim().slice(0, 90)),
   );
   console.log('LTX recipes:', JSON.stringify(ltxSizes, null, 0));
   if (pills.tasks.length === 0) fail('no in→out task labels on the video variants');

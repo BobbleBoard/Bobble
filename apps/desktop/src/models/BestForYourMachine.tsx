@@ -1,111 +1,103 @@
 /**
- * WHAT THIS MACHINE SHOULD RUN — one card per modality, at the top of the hub.
+ * THE TOP OF THE HUB: one card per modality, for whoever opens this app.
  *
- * the user: "for now, in model manager->reccomended, you just show these as the top
- * things in each modality… this is the core of the entire idea."
+ * the user, on the first version: "there's a lot of unnessasary info for users, for
+ * example <size> is fine, but not immediately after putting needs <size> out of
+ * <vram>. that's redundant. 'what the 3d studio generates with' 'runs on
+ * comfyui' 'runs everywhere' doesn't need to be there either… don't display the
+ * 'best for your machine' 'apple m5 pro' '18gb to work with' all that stuff
+ * needs to go. keep in mind you're not talking to me when you write this you're
+ * talking to any random user using this app."
  *
- * WHAT EACH CARD HAS TO SAY, and why nothing less will do. A recommendation
- * nobody believes is worse than none, because it teaches people to scroll past
- * the thing that was supposed to save them the research. So every card carries:
+ * That last line is the whole brief. The first version was a report on the
+ * reasoning — chip name, memory budget, which engine, why this model — because
+ * that is what the person who ASKED for the system wants to see. A user does not
+ * want the reasoning; they want the result, and every extra line pushes the one
+ * thing they came for further down. So the card is now: what it is, how big, the
+ * job it does, and a button.
  *
- *   - the MODEL and the exact variant, not a family name that could mean any of
- *     six downloads;
- *   - the QUANT, when there was a choice to make, because that is the decision
- *     a person who knows what they are doing would have made by hand;
- *   - the MEMORY it expects to need against what this machine has — the number
- *     the whole thing turns on;
- *   - the ENGINE that will run it, and where a better one exists that we have
- *     not integrated, that too. Hiding the gap would make the ranking a claim
- *     rather than a report.
+ * WHAT STAYED AND WHY:
+ *   - the SIZE, once. It is the only number that changes what someone does next.
+ *   - the QUANT, beside it, because two downloads of the same model differ by
+ *     little else and someone who does not know what Q4 means loses nothing.
+ *   - the HUGGING FACE TASK TAG, bottom left, per the user's "show the modality from
+ *     HF eg. 'image-3d'" — it says what goes in and what comes out, in the
+ *     vocabulary the rest of the ecosystem already uses.
+ *   - one button, bottom right, half the card. "Use" when it is already here,
+ *     which is why no separate on-disk badge is needed: the button IS the state.
  *
- * The reason line is written per family in model-recommender.ts, where the
- * judgement lives, rather than assembled here from adjectives.
+ * The reasoning did not disappear, it moved. Fit verdicts still live on the
+ * family rows below, where someone comparing options is actually looking.
  */
 import type { JSX } from 'react';
 import type { LlmHardware } from '../../electron/ipc-contract';
 import { OrgAvatar } from '../settings/brand-icons';
-import { formatOfRepo, pickEngine, summarisePick } from '../settings/engine-picker';
 import { type ModelRecommendation, recommendAll } from './model-recommender';
 import { compactBytes } from './models-layout';
 import { Pill } from './Pill';
-import { OUTPUT_LABEL, type OutputModality } from './recommended-catalog';
+import type { ModelTask, OutputModality } from './recommended-catalog';
 
 export interface BestForYourMachineProps {
   readonly hardware: LlmHardware | null;
-  /** Repos already on disk, so a card can say it is done rather than offering it. */
+  /** Repos already on disk — decides whether the button offers or activates. */
   readonly downloaded: ReadonlySet<string>;
-  readonly installedEngines: readonly string[];
   readonly onSelect: (repo: string) => void;
   readonly onDownload: (rec: ModelRecommendation) => void;
+  /** Already here: put it to work rather than fetching it again. */
+  readonly onUse: (rec: ModelRecommendation) => void;
 }
 
-/** The machine as the two recommenders need it, from the IPC's hardware DTO. */
-function hostsFrom(hw: LlmHardware) {
-  const usable = hw.usableMemoryGB ?? Math.max(1, Math.round(hw.totalRamGB * 0.75));
-  return {
-    recommender: { usableMemoryGB: usable, totalRamGB: hw.totalRamGB },
-    picker: {
-      platform: hw.platform ?? 'darwin',
-      appleSilicon: hw.isAppleSilicon,
-      gpuVendor: hw.gpuVendor ?? (hw.isAppleSilicon ? ('apple' as const) : ('unknown' as const)),
-      ...(hw.cudaMajor === undefined ? {} : { cudaMajor: hw.cudaMajor }),
-      npu: hw.npu ?? false,
-      usableMemoryGB: usable,
-    },
-  };
+/**
+ * The Hugging Face task tag for a recommendation.
+ *
+ * Prefers the variant's own declared task, because a recipe knows exactly what
+ * its files do (MiniMax's keyframe weights are `keyframes-to-video`, not
+ * "video"). Falls back to the modality's ordinary tag, which is what the repo
+ * would carry on the Hub anyway.
+ */
+const FALLBACK_TAG: Record<OutputModality, string> = {
+  text: 'text-generation',
+  image: 'text-to-image',
+  video: 'text-to-video',
+  audio: 'text-to-speech',
+  '3d': 'image-to-3d',
+};
+
+export function taskTagFor(rec: {
+  modality: OutputModality;
+  tasks?: readonly ModelTask[];
+}): string {
+  return rec.tasks?.[0] ?? FALLBACK_TAG[rec.modality];
 }
 
 function Card({
   rec,
-  hardware,
   downloaded,
-  installedEngines,
   onSelect,
   onDownload,
+  onUse,
 }: {
   rec: ModelRecommendation;
-  hardware: LlmHardware;
   downloaded: ReadonlySet<string>;
-  installedEngines: readonly string[];
   onSelect: (repo: string) => void;
   onDownload: (rec: ModelRecommendation) => void;
+  onUse: (rec: ModelRecommendation) => void;
 }): JSX.Element {
-  const { picker } = hostsFrom(hardware);
-  const pick = pickEngine(
-    {
-      repo: rec.variant.repo,
-      modality: rec.modality,
-      format: formatOfRepo(rec.variant.repo, rec.variant.allow ?? []),
-    },
-    picker,
-    installedEngines,
-  );
-  const engineLine = summarisePick(pick);
   const have = downloaded.has(rec.variant.repo);
   const size =
-    rec.variant.approxBytes !== undefined ? compactBytes(rec.variant.approxBytes) : undefined;
+    rec.variant.approxBytes !== undefined
+      ? compactBytes(rec.variant.approxBytes)
+      : `${rec.needsGB} GB`;
+  const tag = taskTagFor({
+    modality: rec.modality,
+    ...(rec.variant.tasks === undefined ? {} : { tasks: rec.variant.tasks }),
+  });
 
   return (
     <div
-      className="flex flex-col gap-2 rounded-xl border border-border-subtle bg-bg-raised p-3"
+      className="flex flex-col gap-3 rounded-xl border border-border-subtle bg-bg-raised p-3"
       data-testid={`best-${rec.modality}`}
     >
-      <div className="flex items-center gap-2">
-        <Pill tone="accent" testid={`best-modality-${rec.modality}`}>
-          {OUTPUT_LABEL[rec.modality]}
-        </Pill>
-        {rec.quant !== undefined ? (
-          <Pill tone="info" testid={`best-quant-${rec.modality}`}>
-            {rec.quant.rung.quant}
-          </Pill>
-        ) : null}
-        {have ? (
-          <Pill tone="success" testid={`best-ondisk-${rec.modality}`}>
-            On disk
-          </Pill>
-        ) : null}
-      </div>
-
       <button
         type="button"
         onClick={() => onSelect(rec.variant.repo)}
@@ -117,28 +109,26 @@ function Card({
             {rec.family.name} {rec.variant.label}
           </span>
           <span className="block truncate text-caption text-text-muted">
-            {size ?? `${rec.needsGB} GB`} · needs {rec.needsGB} GB of {hardware.totalRamGB} GB
+            {size}
+            {rec.quant === undefined ? '' : ` · ${rec.quant.rung.quant}`}
           </span>
         </span>
       </button>
 
-      <p className="text-caption text-text-secondary">{rec.reason}</p>
-      {engineLine !== undefined ? (
-        <p className="text-caption text-text-muted" data-testid={`best-engine-${rec.modality}`}>
-          Runs on {engineLine}
-        </p>
-      ) : null}
-
-      {have ? null : (
+      {/* The footer: what it does, and the one thing to do about it. */}
+      <div className="mt-auto flex items-center gap-2">
+        <Pill tone="info" testid={`best-task-${rec.modality}`}>
+          {tag}
+        </Pill>
         <button
           type="button"
-          data-testid={`best-download-${rec.modality}`}
-          onClick={() => onDownload(rec)}
-          className="pd-focusable mt-1 rounded-lg bg-accent-primary px-2.5 py-1 text-caption font-medium text-text-on-accent transition-opacity hover:opacity-90"
+          data-testid={have ? `best-use-${rec.modality}` : `best-download-${rec.modality}`}
+          onClick={() => (have ? onUse(rec) : onDownload(rec))}
+          className="pd-focusable ml-auto w-1/2 rounded-lg bg-accent-primary px-2.5 py-1.5 text-caption font-medium text-text-on-accent transition-opacity hover:opacity-90"
         >
-          Download
+          {have ? 'Use' : 'Download'}
         </button>
-      )}
+      </div>
     </div>
   );
 }
@@ -146,44 +136,29 @@ function Card({
 export function BestForYourMachine({
   hardware,
   downloaded,
-  installedEngines,
   onSelect,
   onDownload,
+  onUse,
 }: BestForYourMachineProps): JSX.Element | null {
   if (hardware === null) return null;
-  const { recommender } = hostsFrom(hardware);
-  const all = recommendAll(recommender);
+  const usable = hardware.usableMemoryGB ?? Math.max(1, Math.round(hardware.totalRamGB * 0.75));
+  const all = recommendAll({ usableMemoryGB: usable, totalRamGB: hardware.totalRamGB });
   const order: OutputModality[] = ['text', 'image', 'video', 'audio', '3d'];
   const cards = order.map((m) => all[m]).filter((r): r is ModelRecommendation => r !== undefined);
   if (cards.length === 0) return null;
 
-  const machine =
-    hardware.gpuName !== undefined && hardware.gpuName.length > 0
-      ? hardware.gpuName
-      : (hardware.chip ?? 'this machine');
-  const budget = hardware.usableMemoryGB ?? Math.round(hardware.totalRamGB * 0.75);
-
   return (
-    <section className="mb-5" data-testid="best-for-your-machine">
-      <div className="mb-2 flex items-baseline gap-2">
-        <h2 className="text-body font-medium text-text-primary">Best for your machine</h2>
-        <span className="text-footnote text-text-muted">
-          {machine} · {budget} GB to work with
-        </span>
-      </div>
-      <div className="grid grid-cols-3 gap-3">
-        {cards.map((rec) => (
-          <Card
-            key={rec.modality}
-            rec={rec}
-            hardware={hardware}
-            downloaded={downloaded}
-            installedEngines={installedEngines}
-            onSelect={onSelect}
-            onDownload={onDownload}
-          />
-        ))}
-      </div>
+    <section className="mb-5 grid grid-cols-3 gap-3" data-testid="best-for-your-machine">
+      {cards.map((rec) => (
+        <Card
+          key={rec.modality}
+          rec={rec}
+          downloaded={downloaded}
+          onSelect={onSelect}
+          onDownload={onDownload}
+          onUse={onUse}
+        />
+      ))}
     </section>
   );
 }
