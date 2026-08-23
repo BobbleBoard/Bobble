@@ -81,34 +81,56 @@ try {
       tags: [...document.querySelectorAll('[data-testid^="best-task-"]')].map((b) =>
         b.textContent?.trim(),
       ),
-      // The button must be about half the card — the user asked for "<half card
-      // width Download button bottom right".
-      widths: [...document.querySelectorAll('[data-testid^="best-download-"]')].map((b) => {
-        // The button's OWN testid starts with `best-`, so a prefix `closest`
-        // matches the button itself and reports 100% every time.
-        const card = b.closest(
-          '[data-testid="best-text"],[data-testid="best-image"],[data-testid="best-video"],[data-testid="best-audio"],[data-testid="best-3d"]',
-        );
-        return card === null
-          ? null
-          : Math.round(
-              (b.getBoundingClientRect().width / card.getBoundingClientRect().width) * 100,
-            );
-      }),
     };
   });
   for (const c of best.cards) console.log('  •', c.slice(0, 120));
   console.log('HF task tags:', JSON.stringify(best.tags));
-  console.log('button width as % of card:', JSON.stringify(best.widths));
   console.log('on-disk buttons say:', JSON.stringify(best.buttons));
   if (best.cards.length === 0) fail('no per-modality recommendation was shown');
   if (best.tags.length !== best.cards.length) fail('a card has no Hugging Face task tag');
   if (!best.tags.every((t) => /-to-|generation/.test(t ?? '')))
     fail(`not HF task tags: ${best.tags}`);
-  for (const w of best.widths) {
-    if (w === null || w < 35 || w > 60) fail(`the button is ${w}% of the card, not about half`);
-  }
   if (best.buttons.some((b) => b !== 'Use')) fail('an on-disk card does not say Use');
+
+  // THE HEADINGS. the user: "the little 'recommended' text shouldn't be there, the 5
+  // cards you show should say 'Top Recommended' much larger and then 'More'".
+  const headings = await win.evaluate(() => {
+    const read = (sel) => {
+      const el = document.querySelector(sel);
+      return el === null
+        ? null
+        : { text: el.textContent?.trim(), px: Number.parseFloat(getComputedStyle(el).fontSize) };
+    };
+    return {
+      top: read('[data-testid="top-recommended-heading"]'),
+      more: read('[data-testid="more-heading"]'),
+      body: Number.parseFloat(
+        getComputedStyle(document.querySelector('[data-testid="models-view"]')).fontSize,
+      ),
+    };
+  });
+  console.log('headings:', JSON.stringify(headings));
+  if (headings.top?.text !== 'Top Recommended') fail('no "Top Recommended" heading');
+  if (headings.more?.text !== 'More') fail('no "More" heading');
+  if ((headings.top?.px ?? 0) <= headings.body) fail('the heading is not larger than body text');
+
+  // The BUTTON must hug its word — the user: "no extra akward blue space left and
+  // right, don't stretch the pill excessively at all, the word ends, the pill
+  // ends." Measured against the text it contains rather than against the card.
+  const hug = await win.evaluate(() => {
+    const b = document.querySelector('[data-testid^="best-download-"]');
+    if (b === null) return null;
+    const range = document.createRange();
+    range.selectNodeContents(b);
+    const text = range.getBoundingClientRect().width;
+    const button = b.getBoundingClientRect().width;
+    return { text: Math.round(text), button: Math.round(button), fontPx: Number.parseFloat(getComputedStyle(b).fontSize) };
+  });
+  console.log('download button:', JSON.stringify(hug));
+  if (hug === null) fail('no download button to measure');
+  // Padding, not stretching: the slack either side should be small.
+  if (hug.button - hug.text > 40) fail(`the button has ${hug.button - hug.text}px of slack around a ${hug.text}px word`);
+  if (hug.fontPx < 12) fail(`the Download text is only ${hug.fontPx}px`);
   // The cut copy must be GONE, not merely moved.
   for (const gone of [
     'Best for your machine',
@@ -208,11 +230,18 @@ try {
   const pinned = await box('[data-testid="topbar-downloads"]');
   console.log('top-bar download indicator:', JSON.stringify(pinned));
   if (pinned === null) fail('the download is not pinned to the top bar');
-  const pctText = await win.evaluate(() =>
-    document.querySelector('[data-testid="detail-download-progress"]')?.textContent?.trim(),
-  );
-  if (pctText !== undefined && /%/.test(pctText))
-    fail(`the bar still shows a percentage: ${pctText}`);
+  // The numbers EXIST but are hidden until hover — the user wanted no resident
+  // percentage, then asked for the bar to reveal "downloaded/total n%" on hover.
+  // So the assertion is about opacity, not about absence.
+  const caption = await win.evaluate(() => {
+    const el = document.querySelector('[data-testid="detail-download-bar-caption"]');
+    return el === null
+      ? null
+      : { text: el.textContent?.trim(), opacity: getComputedStyle(el).opacity };
+  });
+  console.log('progress caption at rest:', JSON.stringify(caption));
+  if (caption === null) fail('the progress bar has no caption to reveal');
+  if (caption.opacity !== '0') fail('the percentage is showing without a hover');
   console.log('progress bar at:', bar, '· cancel button:', JSON.stringify(cancelBtn));
   if (cancelBtn === null) fail('the progress state has no cancel control');
   await win.screenshot({ path: path.join(OUT, '7-downloading.png') });
@@ -322,6 +351,64 @@ try {
   if ((await box('[data-testid="topbar-downloads"]')) !== null)
     fail('cancelling from the top bar left the indicator up');
   console.log('cancelled from the top bar');
+
+  // 9. THE IN-CARD BAR: the button becomes it, hovering reveals the numbers,
+  //    and the X gets its red circle. All three are hover states, so the only
+  //    way to know is to drive them.
+  await win.click('[data-testid="filter-output-audio"]');
+  await win.waitForTimeout(400);
+  await win.click('[data-testid="best-download-audio"]');
+  await win.waitForTimeout(2500);
+  const barSel = '[data-testid="best-progress-audio"]';
+  const restHeight = await win.evaluate(
+    (sel) => document.querySelector(sel)?.getBoundingClientRect().height ?? null,
+    barSel,
+  );
+  await win.hover(barSel);
+  await win.waitForTimeout(500);
+  const hoverState = await win.evaluate((sel) => {
+    const bar = document.querySelector(sel);
+    const cap = document.querySelector('[data-testid="best-progress-audio-caption"]');
+    return {
+      height: bar?.getBoundingClientRect().height ?? null,
+      barTop: bar?.getBoundingClientRect().top ?? null,
+      captionTop: cap?.getBoundingClientRect().top ?? null,
+      caption: cap?.textContent?.trim() ?? null,
+      opacity: cap === null ? null : getComputedStyle(cap).opacity,
+    };
+  }, barSel);
+  console.log(`bar height ${restHeight} → ${hoverState.height} on hover`);
+  console.log('caption on hover:', JSON.stringify(hoverState));
+  await win.screenshot({ path: path.join(OUT, '12-bar-hover.png') });
+  if (hoverState.opacity === '0') fail('hovering the bar reveals nothing');
+  if (!/\/|%/.test(hoverState.caption ?? '')) fail(`the caption is not size/size n%: ${hoverState.caption}`);
+  // The bar must NOT change — the user: "nothing goes inside the bar it does not
+  // change thickness". The caption is a popup above it, so the track's geometry
+  // is identical hovered and not.
+  if (hoverState.height !== restHeight)
+    fail(`the bar changed thickness on hover (${restHeight} → ${hoverState.height})`);
+  if ((hoverState.captionTop ?? 0) >= (hoverState.barTop ?? 0))
+    fail('the caption is not above the bar');
+
+  await win.hover('[data-testid="best-progress-audio-cancel"]');
+  await win.waitForTimeout(400);
+  const xHover = await win.evaluate((sel) => {
+    const el = document.querySelector(sel);
+    if (el === null) return null;
+    const cs = getComputedStyle(el);
+    return { background: cs.backgroundColor, radius: cs.borderRadius, color: cs.color };
+  }, '[data-testid="best-progress-audio-cancel"]');
+  console.log('X on hover:', JSON.stringify(xHover));
+  await win.screenshot({ path: path.join(OUT, '13-x-hover.png') });
+  if (xHover === null) fail('no cancel control on the card bar');
+  if (/rgba\(0, 0, 0, 0\)|transparent/.test(xHover.background))
+    fail('the X has no highlight on hover');
+
+  // …and it stops immediately.
+  const t1 = Date.now();
+  await win.click('[data-testid="best-progress-audio-cancel"]');
+  await win.waitForSelector('[data-testid="best-download-audio"]', { timeout: 4000 });
+  console.log(`cancel → Download restored in ${Date.now() - t1}ms`);
 
   console.log('model-hub-curated-probe OK');
 } finally {

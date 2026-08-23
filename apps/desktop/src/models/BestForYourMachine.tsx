@@ -32,6 +32,7 @@
 import type { JSX } from 'react';
 import type { LlmHardware } from '../../electron/ipc-contract';
 import { OrgAvatar } from '../settings/brand-icons';
+import { DownloadBar } from './DownloadBar';
 import { type ModelRecommendation, recommendAll } from './model-recommender';
 import { compactBytes } from './models-layout';
 import { Pill } from './Pill';
@@ -45,6 +46,11 @@ export interface BestForYourMachineProps {
   readonly onDownload: (rec: ModelRecommendation) => void;
   /** Already here: put it to work rather than fetching it again. */
   readonly onUse: (rec: ModelRecommendation) => void;
+  readonly onCancel: (rec: ModelRecommendation) => void;
+  /** Live transfers keyed by repo, so a card can become its own progress bar. */
+  readonly progress?: Readonly<
+    Record<string, { readonly received: number; readonly total: number; readonly fraction: number }>
+  >;
 }
 
 /**
@@ -73,15 +79,19 @@ export function taskTagFor(rec: {
 function Card({
   rec,
   downloaded,
+  progress,
   onSelect,
   onDownload,
   onUse,
+  onCancel,
 }: {
   rec: ModelRecommendation;
   downloaded: ReadonlySet<string>;
+  progress?: { readonly received: number; readonly total: number; readonly fraction: number };
   onSelect: (repo: string) => void;
   onDownload: (rec: ModelRecommendation) => void;
   onUse: (rec: ModelRecommendation) => void;
+  onCancel: (rec: ModelRecommendation) => void;
 }): JSX.Element {
   const have = downloaded.has(rec.variant.repo);
   const size =
@@ -120,14 +130,36 @@ function Card({
         <Pill tone="info" testid={`best-task-${rec.modality}`}>
           {tag}
         </Pill>
-        <button
-          type="button"
-          data-testid={have ? `best-use-${rec.modality}` : `best-download-${rec.modality}`}
-          onClick={() => (have ? onUse(rec) : onDownload(rec))}
-          className="pd-focusable ml-auto w-1/2 rounded-lg bg-accent-primary px-2.5 py-1.5 text-caption font-medium text-text-on-accent transition-opacity hover:opacity-90"
-        >
-          {have ? 'Use' : 'Download'}
-        </button>
+        {progress !== undefined ? (
+          /* The button BECOMES the bar, in place and at the same width — the user:
+             "blue download button changes to a blue bar that is most of the
+             width of the button, however with some space left on the right for
+             a red X button". */
+          <span className="ml-auto flex w-1/2 items-center">
+            <DownloadBar
+              grow
+              fraction={progress.total > 0 ? progress.fraction : null}
+              received={progress.received}
+              total={progress.total}
+              label={`Cancel ${rec.family.name}`}
+              testid={`best-progress-${rec.modality}`}
+              onCancel={() => onCancel(rec)}
+            />
+          </span>
+        ) : (
+          <button
+            type="button"
+            data-testid={have ? `best-use-${rec.modality}` : `best-download-${rec.modality}`}
+            onClick={() => (have ? onUse(rec) : onDownload(rec))}
+            /* The pill ends where the word ends — the user: "no extra akward blue
+               space left and right, don't stretch the pill excessively at all".
+               So no width class: the padding sizes it, and `ml-auto` keeps it
+               against the right edge without stretching to meet it. */
+            className="pd-focusable ml-auto rounded-lg bg-accent-primary px-4 py-1.5 text-body font-medium text-text-on-accent transition-opacity hover:opacity-90"
+          >
+            {have ? 'Use' : 'Download'}
+          </button>
+        )}
       </div>
     </div>
   );
@@ -136,9 +168,11 @@ function Card({
 export function BestForYourMachine({
   hardware,
   downloaded,
+  progress = {},
   onSelect,
   onDownload,
   onUse,
+  onCancel,
 }: BestForYourMachineProps): JSX.Element | null {
   if (hardware === null) return null;
   const usable = hardware.usableMemoryGB ?? Math.max(1, Math.round(hardware.totalRamGB * 0.75));
@@ -154,9 +188,13 @@ export function BestForYourMachine({
           key={rec.modality}
           rec={rec}
           downloaded={downloaded}
+          {...(progress[rec.variant.repo] === undefined
+            ? {}
+            : { progress: progress[rec.variant.repo] })}
           onSelect={onSelect}
           onDownload={onDownload}
           onUse={onUse}
+          onCancel={onCancel}
         />
       ))}
     </section>

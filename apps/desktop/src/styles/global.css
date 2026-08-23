@@ -2376,26 +2376,44 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
 }
 
 /*
- * THE DOWNLOAD BAR — the user: "a simple ---------- X progressbar and X button al
- * centered circle red hover on x blue and light blue for progress on the bar.
- * no % needed".
+ * THE DOWNLOAD BAR — the user: "blue download button changes to a blue bar that is
+ * most of the width of the button, however with some space left on the right for
+ * a red X button, the blue bar highlights and hovers showing downloaded/total
+ * size n%. the X hovers specifically with a red circle highlight and is nothing
+ * but a vertical+horizontal symmetrical red X."
  *
- * So: a light-blue track, a blue fill, and a circular X beside it that colours
- * red only under the pointer. The two blues are mixed from the app's own info
- * token rather than hardcoded, so they stay right in both themes — a fixed pair
- * of hexes would go muddy in one of them.
+ * THE CAPTION LIVES INSIDE THE TRACK and appears on hover. Putting it beside the
+ * bar would make the control change WIDTH as the numbers grow, which is exactly
+ * the jitter a progress indicator must not have; overlaying it keeps the
+ * geometry fixed and costs only a background that has to stay legible under
+ * text. Hence the bar grows on hover — from a 6px line to something a caption
+ * fits in — rather than the caption finding room elsewhere.
+ *
+ * Both blues are mixed from the app's own info token rather than hardcoded, so
+ * they hold up in either theme; a fixed pair of hexes goes muddy in one of them.
  */
-.pd-dl-track {
+.pd-dl-slot {
+  position: relative;
+  display: flex;
+  align-items: center;
   flex: 1;
   min-width: 48px;
+}
+.pd-dl-track {
+  position: relative;
+  display: block;
+  width: 100%;
   height: 6px;
   border-radius: 999px;
   overflow: hidden;
   background: color-mix(in oklab, var(--pd-status-info-fg) 22%, transparent);
+  cursor: default;
 }
 .pd-dl-fill {
+  position: absolute;
+  inset-block: 0;
+  left: 0;
   display: block;
-  height: 100%;
   border-radius: 999px;
   background: var(--pd-status-info-fg);
   transition: width 200ms var(--pd-easing-standard, ease);
@@ -2405,6 +2423,38 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
   transition: none;
   animation: pd-download-sweep 1.1s var(--pd-easing-standard, ease-in-out) infinite;
 }
+/*
+ * The numbers, as a small card ABOVE the bar. Absolutely positioned so nothing
+ * about the bar's own geometry depends on whether a pointer is over it — see the
+ * component docstring.
+ */
+.pd-dl-caption {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%) translateY(2px);
+  z-index: 20;
+  padding: 3px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--pd-border-default);
+  background: var(--pd-bg-raised);
+  box-shadow: 0 4px 12px rgb(0 0 0 / 22%);
+  font-size: var(--pd-font-size-caption);
+  line-height: 1.2;
+  white-space: nowrap;
+  color: var(--pd-text-primary);
+  font-variant-numeric: tabular-nums;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity var(--pd-duration-fast, 140ms) var(--pd-easing-standard, ease),
+    transform var(--pd-duration-fast, 140ms) var(--pd-easing-standard, ease);
+}
+.pd-dl-slot:hover .pd-dl-caption {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
 .pd-dl-x {
   display: inline-flex;
   align-items: center;
@@ -2413,19 +2463,15 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
   width: 20px;
   height: 20px;
   border-radius: 999px;
-  border: 1px solid var(--pd-border-default);
+  border: 0;
   background: transparent;
-  color: var(--pd-text-muted);
+  color: var(--pd-status-danger-fg);
   cursor: pointer;
-  transition:
-    color var(--pd-duration-fast) var(--pd-easing-standard),
-    border-color var(--pd-duration-fast) var(--pd-easing-standard),
-    background var(--pd-duration-fast) var(--pd-easing-standard);
+  transition: background var(--pd-duration-fast) var(--pd-easing-standard);
 }
 .pd-dl-x:hover {
-  color: var(--pd-status-danger-fg);
-  border-color: color-mix(in oklab, var(--pd-status-danger-fg) 55%, transparent);
-  background: color-mix(in oklab, var(--pd-status-danger-fg) 12%, transparent);
+  /* A red CIRCLE, per the spec — the mark itself never changes shape. */
+  background: color-mix(in oklab, var(--pd-status-danger-fg) 20%, transparent);
 }
 
 /*

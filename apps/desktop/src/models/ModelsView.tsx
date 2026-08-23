@@ -1329,6 +1329,25 @@ export function ModelsView() {
   }, [storeProgress]);
 
   /*
+   * Bytes as well as the fraction, because the recommendation cards reveal
+   * "1.2 GB / 6.3 GB · 19%" on hover and a fraction alone cannot say that.
+   * The GGUF path folds in here too — the user does not know there are two
+   * downloaders, so a text recommendation must show a bar like any other.
+   */
+  const storeProgressByRepo = useMemo(() => {
+    const out: Record<string, { received: number; total: number; fraction: number }> = {};
+    for (const [repo, p] of Object.entries(storeProgress)) {
+      out[repo] = { received: p.received, total: p.total, fraction: p.fraction };
+    }
+    if (progress !== null && busyId !== null) {
+      const total = progress.jobTotal ?? progress.total ?? 0;
+      const received = progress.jobReceived ?? progress.received;
+      out[busyId] = { received, total, fraction: downloadFraction(progress) ?? 0 };
+    }
+    return out;
+  }, [storeProgress, progress, busyId]);
+
+  /*
    * CANCEL, ACKNOWLEDGED FIRST. the user: "immediate feedback even if download
    * doesn't cancel immediately it shows up that way". Clearing `busyId` here
    * restores the Download button on the same frame as the click; the store
@@ -1827,31 +1846,51 @@ export function ModelsView() {
                 )}
               >
                 <div>
-                  <div className="mb-3 flex items-center gap-2">
-                    <h2 className="text-body font-medium text-text-primary">
-                      {curated
-                        ? 'Recommended'
-                        : kind === 'datasets'
+                  {/*
+                   * TWO HEADINGS ON THE CURATED TAB, not one. the user: "the little
+                   * 'recommended' text shouldn't be there, the 5 cards you show
+                   * should say 'Top Recommended' much larger and then 'More'
+                   * below."
+                   *
+                   * The old single "Recommended · 26 families, smallest first"
+                   * labelled the whole tab, which left the five picks and the
+                   * long browsable list looking like one undifferentiated pile.
+                   * They are different offers — here is what to get, and here is
+                   * everything else — so each gets its own heading and the
+                   * counting furniture goes.
+                   */}
+                  {!curated ? (
+                    <div className="mb-3 flex items-center gap-2">
+                      <h2 className="text-body font-medium text-text-primary">
+                        {kind === 'datasets'
                           ? 'All datasets'
                           : tab === 'device'
                             ? 'On this machine'
                             : 'All models'}
-                    </h2>
-                    <button
-                      type="button"
-                      aria-label="Refresh"
-                      data-testid="models-refresh"
-                      onClick={() => void refreshCatalog()}
-                      className="rounded-md p-1 text-text-muted transition-colors hover:bg-bg-hover hover:text-text-primary pd-focusable"
+                      </h2>
+                      <button
+                        type="button"
+                        aria-label="Refresh"
+                        data-testid="models-refresh"
+                        onClick={() => void refreshCatalog()}
+                        className="rounded-md p-1 text-text-muted transition-colors hover:bg-bg-hover hover:text-text-primary pd-focusable"
+                      >
+                        <IconRefresh size={14} />
+                      </button>
+                      <span className="ml-auto text-footnote text-text-muted">
+                        {`${rows.length} ${kind === 'datasets' ? 'dataset' : 'model'}${rows.length === 1 ? '' : 's'}`}
+                      </span>
+                    </div>
+                  ) : null}
+
+                  {curated ? (
+                    <h2
+                      className="mb-3 text-title font-medium text-text-primary"
+                      data-testid="top-recommended-heading"
                     >
-                      <IconRefresh size={14} />
-                    </button>
-                    <span className="ml-auto text-footnote text-text-muted">
-                      {curated
-                        ? `${families.length} families, smallest first`
-                        : `${rows.length} ${kind === 'datasets' ? 'dataset' : 'model'}${rows.length === 1 ? '' : 's'}`}
-                    </span>
-                  </div>
+                      Top Recommended
+                    </h2>
+                  ) : null}
 
                   {curated ? (
                     <BestForYourMachine
@@ -1863,6 +1902,8 @@ export function ModelsView() {
                         void downloadVariant(rec.family, rec.variant);
                       }}
                       onUse={(rec) => void useRecommendation(rec)}
+                      onCancel={(rec) => void cancelVariant(rec.family, rec.variant)}
+                      progress={storeProgressByRepo}
                     />
                   ) : null}
                   {curated ? (
@@ -1873,6 +1914,12 @@ export function ModelsView() {
                      * Recommended/All toggle exists to remove.
                      */
                     <div className="flex flex-col gap-2" data-testid="curated-families">
+                      <h2
+                        className="mt-4 mb-1 text-title font-medium text-text-primary"
+                        data-testid="more-heading"
+                      >
+                        More
+                      </h2>
                       {families.map((family) => (
                         <FamilyCard
                           key={family.id}
