@@ -306,21 +306,41 @@ export const RECOMMENDED_FAMILIES: readonly RecommendedFamily[] = [
     name: 'Qwen3.8',
     org: 'unsloth',
     output: 'text',
-    blurb: 'The current flagship of the Qwen line — the most capable thing that fits 24 GB.',
+    blurb: 'The strongest open model that fits a personal machine. The default when it does.',
+    /*
+     * THE STANDING TOP PICK. the user: "qwen3.8 27b as the top choice always if the
+     * user's machine can do it." Independently confirmed: Artificial Analysis
+     * puts it first among open weights at an intelligence index of 52, ahead of
+     * MiniMax-M3 (45) and Muse Glimmer (35) — and those two are 428B and 30B.
+     *
+     * ONE VARIANT ON PURPOSE. Qwen3.6's sizes used to live here, which made the
+     * recommender hand a 4090 "Qwen3.8 3.6 35B-A3B" — a name that is two model
+     * versions welded together, for a pick that is not the one the user asked for.
+     * A family is a version now, and 3.6 is its own entry below.
+     */
     variants: [
       {
         repo: 'unsloth/Qwen3.8-27B-GGUF',
         label: '27B',
         paramsB: 27,
-        note: 'Q3 or Q4 on a 24 GB Mac; Q5+ wants 32 GB.',
+        note: 'Q4 on a 32 GB machine, Q3 on 24 GB.',
         minMemoryGB: 20,
       },
-      { repo: 'unsloth/Qwen3.6-27B-MTP-GGUF', label: '3.6 27B', paramsB: 27, minMemoryGB: 20 },
+    ],
+  },
+  {
+    id: 'qwen3.6',
+    name: 'Qwen3.6',
+    org: 'unsloth',
+    output: 'text',
+    blurb: 'The previous generation — the 35B mixture-of-experts decodes like a 3B.',
+    variants: [
+      { repo: 'unsloth/Qwen3.6-27B-MTP-GGUF', label: '27B', paramsB: 27, minMemoryGB: 20 },
       {
         repo: 'unsloth/Qwen3.6-35B-A3B-GGUF',
-        label: '3.6 35B-A3B',
+        label: '35B-A3B',
         paramsB: 35,
-        note: 'MoE — decodes at roughly a 3B model’s speed.',
+        note: 'MoE — decodes at roughly a 3B model\u2019s speed.',
         minMemoryGB: 25,
       },
     ],
@@ -425,35 +445,62 @@ export const RECOMMENDED_FAMILIES: readonly RecommendedFamily[] = [
     name: 'Mage Flow',
     org: 'Comfy-Org',
     output: 'image',
-    blurb: 'Fast, good, and small enough to be the default on a modest machine. Edits too.',
+    blurb: 'Few-step, so it stays quick on any machine. The default image model.',
     fast: true,
     /*
-     * A CAVEAT WORTH KEEPING. Microsoft's own Mage-Flow repos 404 now, so the
-     * split Turbo/Edit variants only exist at `mage-flow-community` — a mirror
-     * with a couple of hundred downloads against Comfy-Org's 183k. The base repo
-     * leads for that reason; if the community mirror goes the way of the
-     * originals, the family is still reachable through Comfy-Org.
+     * the user's top image pick, and the reason is speed rather than fidelity: "for
+     * any generally 'slow' machine, mage flow models are inevitably going to be
+     * like an order of magnitude faster than any flux 2 klien or even something
+     * like z image is". Our own measurement points the same way — Mage-Flow-Turbo
+     * 11s against FLUX.2 Klein 4B's 13s on MLX, and 71s for the same Mage Flow
+     * on PyTorch — and a few-step model's advantage GROWS as the machine slows.
+     *
+     * SIZES ARE FILE SIZES, read from the Comfy-Org repo tree rather than
+     * estimated: the transformer is 4.16 GB at int8 and 8.23 GB at bf16, the
+     * Qwen3-VL text encoder is 8.88 GB, the VAE 0.35 GB. The encoder is most of
+     * the download, which is why even the int8 kit is 13 GB and why this family
+     * genuinely does not fit an 8 GB machine.
      */
     variants: [
       {
-        repo: 'mage-flow-community/Mage-Flow-Turbo',
-        label: 'Turbo',
-        note: 'Few-step — the one to start with.',
-        minMemoryGB: 12,
-      },
-      {
-        repo: 'mage-flow-community/Mage-Flow-Edit-Turbo',
-        label: 'Edit Turbo',
-        note: 'Few-step editing from an existing image.',
+        repo: 'Comfy-Org/Mage-Flow',
+        label: 'Turbo · int8',
+        note: 'Few-step and quantized — the one to start with.',
+        allow: [
+          'diffusion_models/mage_flow_turbo_int8_convrot.safetensors',
+          'text_encoders/qwen3vl_4b_bf16.safetensors',
+          'vae/mage_flow_vae_bf16.safetensors',
+        ],
+        tasks: ['text-to-image'],
+        approxBytes: 13_390_000_000,
         minMemoryGB: 12,
       },
       {
         repo: 'Comfy-Org/Mage-Flow',
-        label: 'Base',
-        note: 'Full quality, more steps.',
-        minMemoryGB: 16,
+        label: 'Edit Turbo · int8',
+        note: 'Edits an existing image from an instruction.',
+        allow: [
+          'diffusion_models/mage_flow_edit_turbo_int8_convrot.safetensors',
+          'text_encoders/qwen3vl_4b_bf16.safetensors',
+          'vae/mage_flow_vae_bf16.safetensors',
+        ],
+        tasks: ['image-to-image'],
+        approxBytes: 13_390_000_000,
+        minMemoryGB: 12,
       },
-      { repo: 'mage-flow-community/Mage-Flow-Edit', label: 'Edit', minMemoryGB: 16 },
+      {
+        repo: 'Comfy-Org/Mage-Flow',
+        label: 'Turbo · bf16',
+        note: 'Full precision, for machines with room.',
+        allow: [
+          'diffusion_models/mage_flow_turbo_bf16.safetensors',
+          'text_encoders/qwen3vl_4b_bf16.safetensors',
+          'vae/mage_flow_vae_bf16.safetensors',
+        ],
+        tasks: ['text-to-image'],
+        approxBytes: 17_460_000_000,
+        minMemoryGB: 20,
+      },
     ],
   },
   {

@@ -14,6 +14,7 @@ import {
   type HostCapabilities,
   installPrerequisites,
   orderEnginesForDisplay,
+  bestKnownEngine,
   preferredEngine,
   recommendedEngine,
 } from './engine-catalog';
@@ -172,10 +173,13 @@ describe('engines per (platform, modality)', () => {
 
   it('prefers the fast path where one exists and the baseline where none does', () => {
     expect(preferredEngine('text', mac)?.id).toBe('dflash-mlx');
-    // Nothing beats the portable one for images anywhere yet — which is a fact
-    // about our engine list, not about the hardware.
-    expect(preferredEngine('image', mac)?.id).toBe('comfyui');
+    // On a Mac the image fast path is real and MEASURED (mflux, 71s -> 11s).
+    expect(preferredEngine('image', mac)?.id).toBe('mflux');
+    // On Windows nothing we have WIRED beats the portable one — Nunchaku
+    // outranks it in the catalogue and is not integrated, which is exactly the
+    // gap `wired` exists to keep visible instead of silently routing to it.
     expect(preferredEngine('image', win)?.id).toBe('comfyui');
+    expect(bestKnownEngine('image', win)?.id).toBe('nunchaku');
   });
 
   it('never lets a specialist be the only answer for a modality', () => {

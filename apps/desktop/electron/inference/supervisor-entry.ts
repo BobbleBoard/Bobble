@@ -31,6 +31,7 @@ import {
   chooseContextCap,
   chooseServerPerfArgs,
   createMlxSupervisor,
+  detectAccelerators,
   detectHardware,
   downloadModel,
   ensureChatTemplate,
@@ -55,6 +56,7 @@ import {
   resolveTierModels,
   searchHfModels,
   type TierPick,
+  usableMemoryGB,
   writeModelsJson,
 } from '@pi-desktop/inference';
 import type {
@@ -355,12 +357,37 @@ function tierPickDto(pick: TierPick): LlmTierPick {
   };
 }
 
+/*
+ * ACCELERATOR DETECTION IS CACHED FOR THE PROCESS. It spawns `nvidia-smi` /
+ * `system_profiler` / `lspci`, none of which change while the app is open, and
+ * the catalog is listed on every model-manager open.
+ */
+let acceleratorCache: Awaited<ReturnType<typeof detectAccelerators>> | null = null;
+async function accelerators(): Promise<Awaited<ReturnType<typeof detectAccelerators>>> {
+  acceleratorCache ??= await detectAccelerators();
+  return acceleratorCache;
+}
+
 async function listCatalog(): Promise<LlmCatalogReply> {
   const hw = await getHardware();
+  const acc = await accelerators().catch(() => null);
+  const gpu = acc?.gpus[0];
   const hardware: LlmHardware = {
     totalRamGB: hw.totalRamGB,
     chip: hw.chip ?? null,
     isAppleSilicon: hw.isAppleSilicon,
+    ...(acc === null
+      ? {}
+      : {
+          platform: acc.platform,
+          gpuVendor: gpu?.vendor ?? 'unknown',
+          ...(gpu?.name === undefined ? {} : { gpuName: gpu.name }),
+          ...(gpu?.vramGB === undefined ? {} : { vramGB: gpu.vramGB }),
+          ...(gpu?.cudaMajor === undefined ? {} : { cudaMajor: gpu.cudaMajor }),
+          unifiedMemory: acc.unifiedMemory,
+          npu: acc.npu,
+          usableMemoryGB: usableMemoryGB(acc),
+        }),
   };
   let recommendedModelId: string | null = null;
   let recommendation: LlmCatalogReply['recommendation'] = null;

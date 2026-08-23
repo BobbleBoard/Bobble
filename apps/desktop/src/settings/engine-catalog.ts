@@ -34,6 +34,8 @@
  * multiplier has to quote the pessimistic one.
  */
 
+import type { GpuVendor } from '@pi-desktop/inference';
+
 export type EnginePlatform = 'darwin' | 'win32' | 'linux';
 
 /**
@@ -51,6 +53,9 @@ export type EnginePlatform = 'darwin' | 'win32' | 'linux';
  */
 export type EngineModality = 'text' | 'image' | 'video' | 'audio' | '3d';
 
+/** Weight formats an engine can load. */
+export type EngineFormat = 'gguf' | 'safetensors' | 'mlx' | 'exl3' | 'onnx' | 'trt' | 'diffusers';
+
 /** What an engine is good FOR — the panel groups and sorts on this. */
 export type EngineRole = 'general' | 'single-user' | 'concurrency' | 'npu';
 
@@ -62,6 +67,39 @@ export interface EngineSpec {
   readonly role: EngineRole;
   /** Platforms the engine actually runs on. */
   readonly platforms: readonly EnginePlatform[];
+  /**
+   * WHICH ACCELERATORS it can use. Undefined means "anything, including CPU" —
+   * the property that makes an engine a candidate baseline.
+   *
+   * This is not a preference list. CUDA kernels on an AMD card are not slow,
+   * they are absent, so an engine whose vendors do not include the one in the
+   * machine is not a worse choice — it is not a choice.
+   */
+  readonly gpuVendors?: readonly GpuVendor[];
+  /**
+   * Minimum CUDA compute-capability major version, where one applies.
+   * 7 = Turing (RTX 20), 8 = Ampere (RTX 30), 9 = Hopper, 12 = Blackwell.
+   */
+  readonly minCudaMajor?: number;
+  /** Needs a dedicated NPU (Copilot+, Ryzen AI). */
+  readonly requiresNpu?: boolean;
+  /**
+   * WEIGHT FORMATS it can load. The axis that answers the user's "for any model on
+   * the hf hub, what is the optimal engine" — a GGUF cannot run on vLLM and a
+   * safetensors diffusion repo cannot run on llama.cpp, and neither fact has
+   * anything to do with which is faster.
+   */
+  readonly formats: readonly EngineFormat[];
+  /**
+   * WE HAVE ACTUALLY INTEGRATED THIS, versus catalogued it for later.
+   *
+   * the user asked for the catalogue to cover everything worth including, "not
+   * installed on the users machine yet possibly but easily one click
+   * downloadable" — which means the list will always be ahead of the wiring.
+   * Saying which is which here keeps the ranking honest: an unwired engine can
+   * top a theoretical ranking and must never be handed a job.
+   */
+  readonly wired?: boolean;
   /** What it can generate. An engine with none of a modality never competes for it. */
   readonly modalities: readonly EngineModality[];
   /**
@@ -112,6 +150,8 @@ export const ENGINES: readonly EngineSpec[] = [
     blurb: 'Runs GGUF models everywhere. The safe default — widest model support.',
     role: 'general',
     platforms: ['darwin', 'win32', 'linux'],
+    formats: ['gguf'],
+    wired: true,
     modalities: ['text'],
     baseline: true,
     rank: 10,
@@ -124,6 +164,9 @@ export const ENGINES: readonly EngineSpec[] = [
     blurb: 'Fastest with many agents at once. Batches requests; best prefill on Apple Silicon.',
     role: 'concurrency',
     platforms: ['darwin'],
+    formats: ['mlx'],
+    gpuVendors: ['apple'],
+    wired: true,
     modalities: ['text'],
     rank: 30,
     requiresAppleSilicon: true,
@@ -135,6 +178,9 @@ export const ENGINES: readonly EngineSpec[] = [
     blurb: 'Fastest for a single chat — around 1.4-1.6x. Needs a draft model.',
     role: 'single-user',
     platforms: ['darwin'],
+    formats: ['mlx'],
+    gpuVendors: ['apple'],
+    wired: true,
     modalities: ['text'],
     rank: 40,
     requiresAppleSilicon: true,
@@ -163,6 +209,8 @@ export const ENGINES: readonly EngineSpec[] = [
     blurb: 'Runs image, video and audio models — one runtime for every generation model.',
     role: 'general',
     platforms: ['darwin', 'win32', 'linux'],
+    formats: ['gguf', 'safetensors', 'diffusers'],
+    wired: true,
     modalities: ['image', 'video', 'audio'],
     baseline: true,
     rank: 10,
@@ -174,9 +222,178 @@ export const ENGINES: readonly EngineSpec[] = [
     blurb: 'Runs models on an AMD NPU/iGPU instead of the CPU, where one is present.',
     role: 'npu',
     platforms: ['win32', 'linux'],
+    formats: ['onnx', 'gguf'],
+    gpuVendors: ['amd'],
+    requiresNpu: true,
     modalities: ['text'],
     rank: 20,
     approxBytes: 400 * MB,
+  },
+  {
+    /*
+     * ik_llama.cpp — a llama.cpp fork carrying quant types upstream has not
+     * taken (IQ*_KS/KT and friends) plus CPU/GPU-split work. It matters for
+     * exactly one situation, which is a common one: a large MoE that does not
+     * fit in VRAM and has to run partly on the CPU.
+     */
+    id: 'ik-llama',
+    name: 'ik_llama.cpp',
+    blurb: 'A llama.cpp fork with extra quant types — better when a big model must spill to CPU.',
+    role: 'general',
+    platforms: ['darwin', 'win32', 'linux'],
+    formats: ['gguf'],
+    modalities: ['text'],
+    rank: 15,
+    approxBytes: 30 * MB,
+  },
+  {
+    /*
+     * SGLang: vLLM's rival for throughput, with RadixAttention prefix caching
+     * that suits a chat app's repeated system prompt. Linux + NVIDIA, like vLLM.
+     */
+    id: 'sglang',
+    name: 'SGLang',
+    blurb: 'High-throughput server with prefix caching. Big NVIDIA GPUs, Linux.',
+    role: 'concurrency',
+    platforms: ['linux'],
+    formats: ['safetensors'],
+    gpuVendors: ['nvidia'],
+    modalities: ['text'],
+    rank: 22,
+    approxBytes: 2 * GB,
+  },
+  {
+    /*
+     * TensorRT-LLM: NVIDIA's own compiler-based runtime. The fastest thing on
+     * an NVIDIA card and the least convenient — it builds a per-GPU engine
+     * before it serves anything, which is minutes of work the user pays once.
+     */
+    id: 'tensorrt-llm',
+    name: 'TensorRT-LLM',
+    blurb: "NVIDIA's own runtime — fastest on their cards, but compiles per GPU first.",
+    role: 'concurrency',
+    platforms: ['linux', 'win32'],
+    formats: ['trt', 'safetensors'],
+    gpuVendors: ['nvidia'],
+    minCudaMajor: 8,
+    modalities: ['text'],
+    rank: 25,
+    approxBytes: 4 * GB,
+  },
+  {
+    /*
+     * ExLlamaV3: EXL3 quantisation plus a very fast single-user CUDA runtime —
+     * the NVIDIA counterpart to what DFlash/MLX is on a Mac. Ampere or newer.
+     */
+    id: 'exllamav3',
+    name: 'ExLlamaV3',
+    blurb: 'Fastest single chat on an NVIDIA card, with its own EXL3 quants. RTX 30-series up.',
+    role: 'single-user',
+    platforms: ['linux', 'win32'],
+    formats: ['exl3', 'safetensors'],
+    gpuVendors: ['nvidia'],
+    minCudaMajor: 8,
+    modalities: ['text'],
+    rank: 35,
+    approxBytes: 1 * GB,
+  },
+  {
+    /*
+     * ONNX Runtime GenAI: the path to a Windows NPU (Copilot+) and to DirectML,
+     * which covers the Intel and AMD GPUs nothing else here targets on Windows.
+     */
+    id: 'onnx-genai',
+    name: 'ONNX Runtime GenAI',
+    blurb: 'Runs on a Windows NPU or any DirectML GPU — the Intel and AMD path on Windows.',
+    role: 'npu',
+    platforms: ['win32', 'linux'],
+    formats: ['onnx'],
+    gpuVendors: ['intel', 'amd', 'nvidia'],
+    modalities: ['text'],
+    rank: 18,
+    approxBytes: 500 * MB,
+  },
+  {
+    /*
+     * stable-diffusion.cpp — the diffusion counterpart to llama.cpp, and the
+     * most PORTABLE thing in this list by some distance: pure C/C++, GGUF, and
+     * backends for CPU (AVX/AVX2/AVX512), CUDA, Vulkan, Metal, OpenCL and SYCL.
+     * It covers SD/SDXL/FLUX 1-2/SD3.5/Qwen-Image/Z-Image AND video (Wan 2.1/
+     * 2.2, MiniMax-H3, LTX-2.3, HunyuanVideo).
+     *
+     * NOT marked `baseline` yet, deliberately: baseline means "the one we
+     * guarantee", and today that is ComfyUI because ComfyUI is the one actually
+     * wired and verified here. This is the stronger portability story and the
+     * obvious candidate to take that title once it is wired.
+     */
+    id: 'sdcpp',
+    name: 'stable-diffusion.cpp',
+    blurb: 'Image and video with no Python at all — CPU, CUDA, Vulkan, Metal or SYCL.',
+    role: 'general',
+    platforms: ['darwin', 'win32', 'linux'],
+    formats: ['gguf', 'safetensors'],
+    modalities: ['image', 'video'],
+    rank: 12,
+    approxBytes: 60 * MB,
+  },
+  {
+    /*
+     * Nunchaku (SVDQuant): 4-bit diffusion with real numbers behind it — 3.6x
+     * memory reduction and 8.7x over BF16 for FLUX.1-dev on a 16 GB laptop
+     * 4090, 3.1x on a 5090. NVIDIA 20-series and up only.
+     */
+    id: 'nunchaku',
+    name: 'Nunchaku',
+    blurb: '4-bit diffusion on NVIDIA — around 8x faster and a third of the memory for FLUX.',
+    role: 'single-user',
+    platforms: ['linux', 'win32'],
+    formats: ['safetensors'],
+    gpuVendors: ['nvidia'],
+    minCudaMajor: 7,
+    modalities: ['image'],
+    rank: 30,
+    approxBytes: 2 * GB,
+  },
+  {
+    /*
+     * mflux — MLX image generation on Apple Silicon. MEASURED here, on this
+     * machine, against the PyTorch path: Mage-Flow-Turbo 71s -> 11s at 8-bit,
+     * 14.69 GB peak. The largest single speedup anywhere in this catalogue that
+     * we have taken ourselves.
+     */
+    id: 'mflux',
+    name: 'mflux (MLX)',
+    blurb: 'Apple Silicon image generation on MLX — MEASURED 6x faster than the PyTorch path.',
+    role: 'single-user',
+    platforms: ['darwin'],
+    formats: ['mlx', 'safetensors'],
+    gpuVendors: ['apple'],
+    requiresAppleSilicon: true,
+    modalities: ['image'],
+    rank: 30,
+    approxBytes: 400 * MB,
+    wired: true,
+  },
+  {
+    /*
+     * Draw Things: its own Swift engine with hand-written Metal FlashAttention
+     * kernels, a headless gRPC server, and GPL-3 — the same licence as this app,
+     * so bundling is not a licence question. Their numbers: ~25% faster than
+     * mflux per FLUX iteration, up to 50% less memory, and MFA v2.5 claims
+     * 3.6-5.5x on M5 over M4. Ours: none yet, which is why it is not ranked
+     * above mflux.
+     */
+    id: 'drawthings',
+    name: 'Draw Things',
+    blurb: 'Metal-native image and video on Apple Silicon, with its own kernels.',
+    role: 'single-user',
+    platforms: ['darwin'],
+    formats: ['safetensors'],
+    gpuVendors: ['apple'],
+    requiresAppleSilicon: true,
+    modalities: ['image', 'video'],
+    rank: 28,
+    approxBytes: 1 * GB,
   },
   {
     id: 'vllm',
@@ -184,6 +401,8 @@ export const ENGINES: readonly EngineSpec[] = [
     blurb: 'High-throughput server for big GPUs. Linux only.',
     role: 'concurrency',
     platforms: ['linux'],
+    formats: ['safetensors'],
+    gpuVendors: ['nvidia', 'amd'],
     modalities: ['text'],
     rank: 20,
     approxBytes: 2 * GB,
@@ -245,8 +464,26 @@ export function enginesFor(
     .sort((a, b) => (b.rank ?? 0) - (a.rank ?? 0));
 }
 
-/** The engine to try FIRST for this modality here, or undefined if none runs. */
+/**
+ * The engine to actually USE for this modality here, or undefined if none runs.
+ *
+ * WIRED ONLY, and the distinction is the whole reason that flag exists: the
+ * catalogue's ranking answers "what is best", this answers "what can we run
+ * right now". They disagree today on an NVIDIA box — ExLlamaV3 and Nunchaku
+ * both outrank what we have integrated — and pretending otherwise would route a
+ * job to something that cannot take it. `enginesFor` still returns the full
+ * ranking, so the gap is visible rather than hidden.
+ */
 export function preferredEngine(
+  modality: EngineModality,
+  host: HostCapabilities,
+  engines: readonly EngineSpec[] = ENGINES,
+): EngineSpec | undefined {
+  return enginesFor(modality, host, engines).find((e) => e.wired === true);
+}
+
+/** The best engine in the CATALOGUE for this cell, wired or not — what we are aiming at. */
+export function bestKnownEngine(
   modality: EngineModality,
   host: HostCapabilities,
   engines: readonly EngineSpec[] = ENGINES,
@@ -294,7 +531,15 @@ export function recommendedEngine(
   host: HostCapabilities,
   engines: readonly EngineSpec[] = ENGINES,
 ): EngineSpec {
-  const supported = engines.filter((e) => engineSupport(e, host).supported);
+  /*
+   * ONBOARDING CAN ONLY INSTALL WHAT IS WIRED. The catalogue deliberately runs
+   * ahead of the integration — the user asked for it to cover everything worth
+   * including, installed or not — so a theoretical ranking will happily put
+   * ExLlamaV3 at the top of an NVIDIA box we cannot yet drive. Handing that to
+   * a first-run install is how a fresh machine ends up with an engine nothing
+   * can talk to.
+   */
+  const supported = engines.filter((e) => e.wired === true && engineSupport(e, host).supported);
   const preference: EngineRole[] = ['single-user', 'general', 'concurrency', 'npu'];
   for (const role of preference) {
     const hit = supported.find((e) => e.role === role);

@@ -157,6 +157,69 @@ generating because they shard at full swing; the reference `o_voxel` bake is
 opt-in because its GLB maps as static in our viewer; ARDY's download stays
 excluded by request.
 
+## Optimal out of the box — the picker and the recommender (the user 2026-08-23)
+
+the user: "this is paramount to the whole out of the box experience on any users
+machine, this is paramount to the whole backend idea of this app out of the box
+optimized, you get 99% of the way there on 99% of models on 99% of hardware to a
+person who knows how to do their stuff and manually configures stuff for maximum
+performance… this is the core of the entire idea."
+
+**Four pieces, each of which is useless without the ones under it:**
+
+1. **`packages/inference/src/accelerator.ts`** — real detection on every
+   platform: OS, arch, GPU vendor/name, VRAM, CUDA compute capability, NPU,
+   unified-vs-dedicated memory. Every probe is best-effort; a box with no
+   nvidia-smi, no wmic and no lspci still answers. `usableMemoryGB` is the
+   number everything above turns on, and it is VRAM on a discrete card and 75%
+   of system RAM on unified memory — conflating those is the most common way a
+   recommender promises something that OOMs.
+
+2. **`settings/engine-catalog.ts`** — 15 engines with the axes a decision needs:
+   platforms, GPU vendors, min CUDA generation, NPU, WEIGHT FORMATS, modality,
+   rank, and `wired` (have we integrated it). Text: llama.cpp, ik_llama.cpp,
+   rapid-mlx, DFlash, vLLM, SGLang, TensorRT-LLM, ExLlamaV3, Lemonade,
+   ONNX Runtime GenAI. Image/video: ComfyUI, stable-diffusion.cpp, Nunchaku,
+   mflux, Draw Things.
+
+3. **`settings/engine-picker.ts`** — for ANY model, the best engine this machine
+   can run it with. Three hard gates then one preference, and the order is the
+   design: can it load the FILE, does it make this KIND of thing, does the
+   HARDWARE exist, and only then which is fastest. Every rejection carries its
+   reason in words ("needs RTX 20-series or newer", "does not load gguf
+   weights"). `best` is always something we can drive; `bestPossible` says what
+   we are leaving on the table, so the wiring gap is visible rather than hidden.
+
+4. **`models/model-recommender.ts` + `quant-ladder.ts`** — per modality, the
+   model AND the quant. the user's rules, encoded and tested:
+   - Qwen3.8 27B first whenever it fits (independently #1 on Artificial
+     Analysis among open weights, intelligence 52 vs MiniMax-M3's 45).
+   - **The floor: never below IQ3_XS under 100B.** When it is hit the
+     recommender steps down a MODEL SIZE, not another quant — a 27B at Q2 is
+     worse than a 9B at Q5 on every axis anyone notices, and slower.
+   - Diffusion gets a HIGHER floor (Q4_K_M): a language model degrades legibly,
+     a diffusion model at too few bits produces artefacts that read as a broken
+     app. Evidence: ComfyUI-GGUF's own note that DiTs tolerate quantisation
+     where UNets do not.
+   - Mage Flow leads images (few-step, and the advantage grows as the machine
+     slows); LTX leads video over MiniMax-H3 (same quality to the eye, much
+     faster); TRELLIS leads 3D because it is what our studio actually runs.
+
+**Surfaced now** as "Best for your machine" at the top of Recommended: one card
+per modality with the exact variant, the quant, the memory against what this
+machine has, the reason, and the engine that will run it. MEASURED end to end on
+this machine: "Apple M5 Pro · 18 GB to work with" → Qwen3.8 27B at Q3_K_M on
+llama.cpp, Mage Flow Turbo int8 on mflux, LTX 2B Q4 on ComfyUI, Kokoro, TRELLIS.2.
+
+**`recommendation-matrix.test.ts` prints the whole table** — every machine class
+against every modality. It is not an assertion; it is how three real bugs
+surfaced that no unit test caught. Keep it: the cheapest way to audit a pile of
+judgement calls is to look at all of them at once.
+
+**Still to do:** the picker is not yet consulted at RUN time (the chat still
+starts llama.cpp directly), and the unwired engines are catalogued rather than
+integrated — ExLlamaV3 and Nunchaku both outrank what we have on an NVIDIA box.
+
 ## Engines are a MATRIX, not a ranking (the user 2026-08-21)
 
 the user, correcting a Mac-shaped answer of mine: "this thing about targeting an m5

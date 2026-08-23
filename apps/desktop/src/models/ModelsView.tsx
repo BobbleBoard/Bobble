@@ -57,6 +57,7 @@ import { useHfStore } from '../state/hf-store';
 import { downloadEtaSeconds, downloadFraction, formatEta, useLlmStore } from '../state/llm-store';
 import { setHfToken, useHfToken } from '../state/settings-store';
 import { hasRepo, useStoreModels } from '../state/store-models';
+import { BestForYourMachine } from './BestForYourMachine';
 import { DownloadAction } from './DownloadAction';
 import { FamilyCard } from './FamilyCard';
 import { ModelCard } from './ModelCard';
@@ -659,6 +660,18 @@ export function ModelsView() {
    * with a manifest beside the weights, rather than a card explaining that the
    * app cannot fetch it.
    */
+  const hardware = useLlmStore((s) => s.hardware);
+  /*
+   * WHICH ENGINES ARE ALREADY ON DISK, so a recommendation can break a near tie
+   * toward the one that needs no download. Read once here rather than per card.
+   */
+  const [installedEngines, setInstalledEngines] = useState<string[]>([]);
+  useEffect(() => {
+    void window.piDesktop
+      .invoke('engines:list', undefined)
+      .then((r) => setInstalledEngines(r.engines.filter((e) => e.installed).map((e) => e.id)))
+      .catch(() => undefined);
+  }, []);
   const storeModels = useStoreModels((s) => s.models);
   const storeProgress = useStoreModels((s) => s.progress);
   const storeDownload = useStoreModels((s) => s.download);
@@ -1828,6 +1841,18 @@ export function ModelsView() {
                     </span>
                   </div>
 
+                  {curated ? (
+                    <BestForYourMachine
+                      hardware={hardware}
+                      downloaded={downloadedRepos}
+                      installedEngines={installedEngines}
+                      onSelect={setSelected}
+                      onDownload={(rec) => {
+                        setSelected(rec.variant.repo);
+                        void downloadVariant(rec.family, rec.variant);
+                      }}
+                    />
+                  ) : null}
                   {curated ? (
                     /*
                      * The curated list REPLACES the results table here rather

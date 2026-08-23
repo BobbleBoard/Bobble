@@ -262,6 +262,24 @@ export interface LlmHardware {
   totalRamGB: number;
   chip: string | null;
   isAppleSilicon: boolean;
+  /*
+   * THE FULL PICTURE, added for the engine/model recommender.
+   *
+   * The three fields above were enough to size a GGUF on a Mac. They cannot
+   * answer "which engine" on anything else — an engine ranking that does not
+   * know whether there is a CUDA card in the box is a ranking of opinions. See
+   * packages/inference/src/accelerator.ts for what each of these decides.
+   */
+  platform?: 'darwin' | 'win32' | 'linux';
+  gpuVendor?: 'apple' | 'nvidia' | 'amd' | 'intel' | 'unknown';
+  gpuName?: string;
+  /** Dedicated VRAM, absent on unified memory — see GpuInfo.vramGB. */
+  vramGB?: number;
+  cudaMajor?: number;
+  unifiedMemory?: boolean;
+  npu?: boolean;
+  /** What a model actually gets: VRAM on a discrete card, most of RAM otherwise. */
+  usableMemoryGB?: number;
 }
 
 /** The hardware-detected recommendation (from packages/inference `recommend`),

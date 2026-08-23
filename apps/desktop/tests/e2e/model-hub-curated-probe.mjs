@@ -59,6 +59,21 @@ try {
   );
   console.log(`families on screen (${families.length}):`, families.map((f) => f.id).join(', '));
   if (families.length < 10) fail(`only ${families.length} families rendered`);
+  // THE CORE OF THE WHOLE THING: what this machine should run, per modality,
+  // decided from real detected hardware rather than a guess.
+  const best = await win.evaluate(() => {
+    const cards = [...document.querySelectorAll('[data-testid^="best-"]')]
+      .filter((el) => /^best-(text|image|video|audio|3d)$/.test(el.getAttribute('data-testid') ?? ''))
+      .map((el) => el.textContent?.replace(/\s+/g, ' ').trim() ?? '');
+    const header = document
+      .querySelector('[data-testid="best-for-your-machine"] span')
+      ?.textContent?.trim();
+    return { header, cards };
+  });
+  console.log('detected machine:', JSON.stringify(best.header));
+  for (const c of best.cards) console.log('  •', c.slice(0, 150));
+  if (best.cards.length === 0) fail('no per-modality recommendation was shown');
+  if (!/GB to work with/.test(best.header ?? '')) fail('the strip does not say the memory budget');
   await win.screenshot({ path: path.join(OUT, '1-recommended.png') });
 
   // 2. EXPAND — measure the card growing rather than trusting the class.
