@@ -5,13 +5,16 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
+  baselineEngine,
   ENGINES,
   type EngineSpec,
   engineSupport,
+  enginesFor,
   formatEngineSize,
   type HostCapabilities,
   installPrerequisites,
   orderEnginesForDisplay,
+  preferredEngine,
   recommendedEngine,
 } from './engine-catalog';
 
@@ -122,5 +125,69 @@ describe('prerequisites', () => {
       { ...byId('llamacpp'), id: 'b', requires: ['a'] },
     ];
     expect(installPrerequisites('a', cyclic).map((e) => e.id)).toEqual(['b']);
+  });
+});
+
+/**
+ * THE PORTABILITY MATRIX. the user, correcting a Mac-shaped answer: "we target all
+ * major OS and all major hardware eventually in a modular fashion such that we
+ * have a boatload of alternatives that we know of and can get working quick to
+ * get max out of the box no setup fast inference for any hardware on any OS."
+ *
+ * These are the invariants that keep that true as engines are added — the ones a
+ * plausible next commit could break without anyone noticing on a Mac.
+ */
+describe('engines per (platform, modality)', () => {
+  const mac: HostCapabilities = { platform: 'darwin', appleSilicon: true };
+  const intelMac: HostCapabilities = { platform: 'darwin', appleSilicon: false };
+  const win: HostCapabilities = { platform: 'win32', appleSilicon: false };
+  const linux: HostCapabilities = { platform: 'linux', appleSilicon: false };
+
+  it('gives EVERY platform a text engine and an image engine', () => {
+    // The whole promise: no host is left with a modality it cannot do at all.
+    for (const host of [mac, intelMac, win, linux]) {
+      expect(enginesFor('text', host).length, `text on ${host.platform}`).toBeGreaterThan(0);
+      expect(enginesFor('image', host).length, `image on ${host.platform}`).toBeGreaterThan(0);
+      expect(enginesFor('video', host).length, `video on ${host.platform}`).toBeGreaterThan(0);
+    }
+  });
+
+  it('keeps a BASELINE for every modality on every platform', () => {
+    // A fast path is an optimisation over something that already works. If the
+    // only engine for a modality is a fast path, the modality is unsupported on
+    // every machine that path was not written for.
+    for (const host of [mac, intelMac, win, linux]) {
+      for (const modality of ['text', 'image', 'video'] as const) {
+        expect(baselineEngine(modality, host), `${modality} on ${host.platform}`).toBeDefined();
+      }
+    }
+  });
+
+  it('does not offer an Apple-Silicon engine to an Intel Mac', () => {
+    // Same platform string, different hardware — the case that a `platforms`
+    // check alone gets wrong.
+    expect(enginesFor('text', intelMac).map((e) => e.id)).not.toContain('rapid-mlx');
+    expect(enginesFor('text', mac).map((e) => e.id)).toContain('rapid-mlx');
+  });
+
+  it('prefers the fast path where one exists and the baseline where none does', () => {
+    expect(preferredEngine('text', mac)?.id).toBe('dflash-mlx');
+    // Nothing beats the portable one for images anywhere yet — which is a fact
+    // about our engine list, not about the hardware.
+    expect(preferredEngine('image', mac)?.id).toBe('comfyui');
+    expect(preferredEngine('image', win)?.id).toBe('comfyui');
+  });
+
+  it('never lets a specialist be the only answer for a modality', () => {
+    for (const host of [mac, intelMac, win, linux]) {
+      for (const modality of ['text', 'image', 'video', 'audio'] as const) {
+        const list = enginesFor(modality, host);
+        if (list.length === 0) continue;
+        expect(
+          list.some((e) => e.baseline === true),
+          `${modality} on ${host.platform}`,
+        ).toBe(true);
+      }
+    }
   });
 });

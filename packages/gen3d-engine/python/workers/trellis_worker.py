@@ -59,6 +59,7 @@ if _SIBLING_TRELLIS != TRELLIS_ROOT and (_SIBLING_TRELLIS / "backends").is_dir()
     sys.path.append(str(_SIBLING_TRELLIS))
     sys.path.append(str(_SIBLING_TRELLIS / "stubs"))
 
+from _device import empty_cache, pick_device  # noqa: E402
 from _progress import ROUTER, artifact, emit, patch_tqdm, progress, stage_done  # noqa: E402
 
 try:
@@ -761,7 +762,7 @@ def texture_from_image(args) -> None:
     progress(STAGE_TEXTURE, "Loading the texturing pipeline (first load ≈100 s)…")
     t0 = time.time()
     pipeline = Trellis2TexturingPipeline.from_pretrained(weights, "texturing_pipeline.json")
-    pipeline.to(torch.device("mps"))
+    pipeline.to(torch.device(pick_device()))
     progress(STAGE_TEXTURE, f"Pipeline loaded in {time.time() - t0:.0f}s — painting…")
 
     # DROP THE FLOW MODEL WE ARE NOT GOING TO USE. The pipeline loads both the
@@ -772,8 +773,7 @@ def texture_from_image(args) -> None:
     if pipeline.models.get(unused) is not None:
         del pipeline.models[unused]
         gc.collect()
-        if hasattr(torch, "mps"):
-            torch.mps.empty_cache()
+        empty_cache()
 
     # BiRefNet (background removal) loads at the checkpoint's own precision —
     # half — while its transform hands it float32, so the first conv dies with
@@ -844,8 +844,7 @@ def texture_from_image(args) -> None:
     if cond_holder is not None and hasattr(cond_holder, "to"):
         cond_holder.to("cpu")
     gc.collect()
-    if hasattr(torch, "mps"):
-        torch.mps.empty_cache()
+    empty_cache()
 
     prepared = pipeline.preprocess_mesh(encode_mesh)
 
@@ -904,8 +903,7 @@ def texture_from_image(args) -> None:
             holder.to("cpu")
     del cond, shape_slat, tex_model
     gc.collect()
-    if hasattr(torch, "mps"):
-        torch.mps.empty_cache()
+    empty_cache()
 
     pbr = pipeline.decode_tex_slat(tex_slat)
     progress(STAGE_TEXTURE, f"Colour field predicted in {time.time() - t1:.0f}s — baking…")
@@ -972,8 +970,7 @@ def texture_from_image(args) -> None:
     out_verts[:, 2] = -y_prime
     export_glb_pbr(out_verts, new_faces, export_uvs, base_color_img, mr_img, out_path)
     del pipeline
-    if hasattr(torch, "mps"):
-        torch.mps.empty_cache()
+    empty_cache()
     progress(STAGE_TEXTURE, f"Painted in {time.time() - t1:.0f}s")
     artifact(STAGE_TEXTURE, "model-glb", str(out_path), "Textured model")
     stage_done(STAGE_TEXTURE, "Texturing done")
@@ -1158,7 +1155,7 @@ def load_pipeline():
         from trellis2.pipelines.trellis2_image_to_3d import Trellis2ImageTo3DPipeline
 
         pipeline = Trellis2ImageTo3DPipeline.from_pretrained("microsoft/TRELLIS.2-4B")
-        pipeline.to(torch.device("mps"))
+        pipeline.to(torch.device(pick_device()))
     progress("geometry", f"Pipeline loaded in {time.time() - t0:.0f}s — generating…")
     return pipeline
 

@@ -157,6 +157,59 @@ generating because they shard at full swing; the reference `o_voxel` bake is
 opt-in because its GLB maps as static in our viewer; ARDY's download stays
 excluded by request.
 
+## Engines are a MATRIX, not a ranking (the user 2026-08-21)
+
+the user, correcting a Mac-shaped answer of mine: "this thing about targeting an m5
+is not correct. remember we're working on this mac, but we target all major OS
+and all major hardware eventually in a modular fashion such that we have a
+boatload of alternatives that we know of and can get working quick to get max
+out of the box no setup fast inference for any* hardware on any OS."
+
+**The correction, and why it matters more than a wording fix.** I had ranked
+engines by how fast they are on the machine in front of me. That produces
+recommendations that are meaningless one platform over — "use Draw Things for
+images" has no answer on a Windows box with an Intel GPU. The right question is
+never "which engine is best" but "**which engines can serve THIS modality on
+THIS host, in order**", and that is a matrix with a guaranteed last element.
+
+**Now data rather than prose** (`settings/engine-catalog.ts`): every engine
+declares its `modalities` alongside its `platforms`, one per modality is marked
+`baseline`, and `enginesFor(modality, host)` returns the ordered list.
+`preferredEngine` takes the head, `baselineEngine` the portable one. Tests pin
+the invariants that a Mac-only session would never notice breaking: every
+platform has a text, image and video engine; every (platform, modality) cell
+keeps a baseline; an Intel Mac is never offered an Apple-Silicon engine.
+
+**THE BASELINE IS NEVER DROPPED**, even where something faster is installed. A
+fast path is an optimisation over something that already works — if the only
+engine for a modality is a fast path, the modality is unsupported on every
+machine that path was not written for. ComfyUI is that baseline for
+image/video/audio precisely because it is portable (CUDA, ROCm, Intel, MPS,
+CPU), not because it is quick; llama.cpp is it for text for the same reason.
+
+**The shape to fill in:**
+
+| modality | portable baseline | fast paths, where they exist |
+|---|---|---|
+| text | llama.cpp (all) | rapid-mlx / DFlash (Apple Silicon), vLLM (Linux+CUDA), Lemonade (AMD NPU) |
+| image | ComfyUI (all) | mflux/MLX (Apple, MEASURED 71s→11s), Draw Things (Apple, GPL-3 like us), TensorRT/SDNext (CUDA) — none wired |
+| video | ComfyUI (all) | Draw Things (Apple), MiniMax-H3 MLX port (Apache-2.0) — none wired |
+| audio | ComfyUI (all) | mlx-audio (Apple) — partly wired via gen3d |
+| 3d | our gen3d stack | — |
+
+**3D is closer to portable than it looks, and the direction of the work is why.**
+Everything upstream was CUDA-first; almost all our Mac work REMOVED a CUDA
+assumption rather than adding a Mac one — SDPA instead of flash-attn,
+`SPARSE_CONV_BACKEND=pytorch` instead of the CUDA sparse kernel, a CPU build of
+o_voxel's `_C`, ARDY needing no patches at all (two call-site device decisions).
+Those paths still work on CUDA, and CUDA gets the faster upstream versions back.
+The SkinTokens shims are COPIED IN rather than patched over, so a CUDA install
+simply does not copy them. `workers/_device.py` now answers "which accelerator"
+in one place (cuda → mps → cpu) instead of each worker hardcoding `mps`.
+
+The ONE genuine gap: the text→image hop is mflux/MLX, which is Apple-only. On
+CUDA that needs the ComfyUI path — which is the argument for the baseline again.
+
 ## Perceived speed — instant window, snappy UI (the user 2026-08-21)
 
 the user: "because this runs locally we want users to feel absolutely instant

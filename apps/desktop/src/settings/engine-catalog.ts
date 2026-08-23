@@ -36,6 +36,21 @@
 
 export type EnginePlatform = 'darwin' | 'win32' | 'linux';
 
+/**
+ * WHAT AN ENGINE CAN MAKE. The second axis of the portability matrix.
+ *
+ * the user: "we target all major OS and all major hardware eventually in a modular
+ * fashion such that we have a boatload of alternatives that we know of and can
+ * get working quick to get max out of the box no setup fast inference for any
+ * hardware on any OS."
+ *
+ * Platform alone was never enough to answer "what runs here": llama.cpp and
+ * ComfyUI both run on all three platforms and have no overlap in what they DO.
+ * A choice is only meaningful within one modality, so the matrix is
+ * (platform x modality) -> an ordered list of engines, and this is the column.
+ */
+export type EngineModality = 'text' | 'image' | 'video' | 'audio' | '3d';
+
 /** What an engine is good FOR — the panel groups and sorts on this. */
 export type EngineRole = 'general' | 'single-user' | 'concurrency' | 'npu';
 
@@ -47,6 +62,24 @@ export interface EngineSpec {
   readonly role: EngineRole;
   /** Platforms the engine actually runs on. */
   readonly platforms: readonly EnginePlatform[];
+  /** What it can generate. An engine with none of a modality never competes for it. */
+  readonly modalities: readonly EngineModality[];
+  /**
+   * THE PORTABLE BASELINE for its modalities — the one that runs everywhere,
+   * on any GPU vendor, without a fast path having to exist first.
+   *
+   * There is at most one per modality and it is never the fastest anywhere;
+   * that is the point. A fast path is an OPTIMISATION over a baseline that
+   * already works, and an app whose only runtime for a modality is a fast path
+   * is an app that does not support that modality on the hardware the fast path
+   * was not written for.
+   */
+  readonly baseline?: boolean;
+  /**
+   * Ranking WITHIN a (platform, modality) cell, higher first. Purely relative —
+   * it says "prefer this one here", never "this one is good".
+   */
+  readonly rank?: number;
   /**
    * Apple-Silicon only? MLX engines run on darwin but NOT on an Intel Mac, and
    * saying "macOS" to an Intel user who then watches it fail is worse than
@@ -79,6 +112,9 @@ export const ENGINES: readonly EngineSpec[] = [
     blurb: 'Runs GGUF models everywhere. The safe default — widest model support.',
     role: 'general',
     platforms: ['darwin', 'win32', 'linux'],
+    modalities: ['text'],
+    baseline: true,
+    rank: 10,
     approxBytes: 26 * MB,
     autoInstalls: true,
   },
@@ -88,6 +124,8 @@ export const ENGINES: readonly EngineSpec[] = [
     blurb: 'Fastest with many agents at once. Batches requests; best prefill on Apple Silicon.',
     role: 'concurrency',
     platforms: ['darwin'],
+    modalities: ['text'],
+    rank: 30,
     requiresAppleSilicon: true,
     approxBytes: 771 * MB,
   },
@@ -97,6 +135,8 @@ export const ENGINES: readonly EngineSpec[] = [
     blurb: 'Fastest for a single chat — around 1.4-1.6x. Needs a draft model.',
     role: 'single-user',
     platforms: ['darwin'],
+    modalities: ['text'],
+    rank: 40,
     requiresAppleSilicon: true,
     // The package is 1.8 MB; what actually costs disk is the drafter it needs.
     approxBytes: 1.2 * GB,
@@ -123,6 +163,9 @@ export const ENGINES: readonly EngineSpec[] = [
     blurb: 'Runs image, video and audio models — one runtime for every generation model.',
     role: 'general',
     platforms: ['darwin', 'win32', 'linux'],
+    modalities: ['image', 'video', 'audio'],
+    baseline: true,
+    rank: 10,
     approxBytes: 6 * GB,
   },
   {
@@ -131,6 +174,8 @@ export const ENGINES: readonly EngineSpec[] = [
     blurb: 'Runs models on an AMD NPU/iGPU instead of the CPU, where one is present.',
     role: 'npu',
     platforms: ['win32', 'linux'],
+    modalities: ['text'],
+    rank: 20,
     approxBytes: 400 * MB,
   },
   {
@@ -139,6 +184,8 @@ export const ENGINES: readonly EngineSpec[] = [
     blurb: 'High-throughput server for big GPUs. Linux only.',
     role: 'concurrency',
     platforms: ['linux'],
+    modalities: ['text'],
+    rank: 20,
     approxBytes: 2 * GB,
   },
 ];
@@ -169,6 +216,59 @@ export function engineSupport(spec: EngineSpec, host: HostCapabilities): EngineS
     return { supported: false, reason: 'Needs Apple Silicon' };
   }
   return { supported: true };
+}
+
+/**
+ * THE PORTABILITY MATRIX: which engines can serve this modality on this host,
+ * best first, baseline always present.
+ *
+ * This is the function the rest of the app should ask rather than naming an
+ * engine. "Use Draw Things for images" is true on one platform and meaningless
+ * on the other two; "give me the image engines for this host, in order" is the
+ * same question phrased so that it still has an answer on a Windows box with an
+ * Intel GPU.
+ *
+ * THE BASELINE IS NEVER DROPPED, even when a faster engine is present and
+ * installed. It is what the app falls back to when the fast path does not
+ * support a particular model, when its install is broken, and when someone
+ * copies their settings onto different hardware. An ordered list with a
+ * guaranteed last element is the shape that makes "no setup, it just runs" true.
+ */
+export function enginesFor(
+  modality: EngineModality,
+  host: HostCapabilities,
+  engines: readonly EngineSpec[] = ENGINES,
+): EngineSpec[] {
+  return engines
+    .filter((e) => e.modalities.includes(modality))
+    .filter((e) => engineSupport(e, host).supported)
+    .sort((a, b) => (b.rank ?? 0) - (a.rank ?? 0));
+}
+
+/** The engine to try FIRST for this modality here, or undefined if none runs. */
+export function preferredEngine(
+  modality: EngineModality,
+  host: HostCapabilities,
+  engines: readonly EngineSpec[] = ENGINES,
+): EngineSpec | undefined {
+  return enginesFor(modality, host, engines)[0];
+}
+
+/**
+ * The portable last resort for a modality on this host.
+ *
+ * Separate from `enginesFor(...).at(-1)` on purpose: the last entry of a sorted
+ * list is whatever happened to rank lowest, while THIS is the one we have
+ * committed to keeping able to run everything. A modality with no baseline on a
+ * platform is a gap in the matrix, and returning undefined says so rather than
+ * quietly handing back a specialist that only covers half the models.
+ */
+export function baselineEngine(
+  modality: EngineModality,
+  host: HostCapabilities,
+  engines: readonly EngineSpec[] = ENGINES,
+): EngineSpec | undefined {
+  return enginesFor(modality, host, engines).find((e) => e.baseline === true);
 }
 
 /**
