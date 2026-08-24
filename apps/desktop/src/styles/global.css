@@ -2376,6 +2376,72 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
 }
 
 /*
+ * THE MODEL CARD's chrome, in one place so the hub cannot end up with two kinds.
+ *
+ * the user: "bordering of the card something like shown or like a shadow, reasonably
+ * noticable, apply to all the cards aswell." A `border-subtle` hairline is
+ * genuinely invisible on the dark surfaces this app defaults to — the reference
+ * he sent is a light theme, where the same hairline reads fine. So the border is
+ * the DEFAULT weight and there is a real shadow under it, which is what survives
+ * both themes.
+ */
+.pd-model-card {
+  border: 1px solid var(--pd-border-default);
+  border-radius: 12px;
+  background: var(--pd-bg-raised);
+  box-shadow:
+    0 1px 3px rgb(0 0 0 / 18%),
+    0 4px 12px rgb(0 0 0 / 10%);
+  transition:
+    border-color var(--pd-duration-fast) var(--pd-easing-standard),
+    box-shadow var(--pd-duration-fast) var(--pd-easing-standard);
+}
+.pd-model-card:hover {
+  border-color: var(--pd-border-strong);
+  box-shadow:
+    0 2px 6px rgb(0 0 0 / 22%),
+    0 8px 20px rgb(0 0 0 / 14%);
+}
+
+/*
+ * The horizontal card row (Carousel.tsx) and its edge arrows.
+ *
+ * The scrollbar is hidden because the arrows carry the affordance; hiding it
+ * without them would leave a row that cannot advertise what it is holding.
+ */
+.pd-carousel {
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+}
+.pd-carousel::-webkit-scrollbar {
+  display: none;
+}
+.pd-carousel > * {
+  scroll-snap-align: start;
+}
+.pd-carousel-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  border: 1px solid var(--pd-border-default);
+  background: var(--pd-bg-raised);
+  color: var(--pd-text-primary);
+  box-shadow: 0 2px 10px rgb(0 0 0 / 22%);
+  cursor: pointer;
+  transition: background var(--pd-duration-fast) var(--pd-easing-standard);
+}
+.pd-carousel-arrow:hover {
+  background: var(--pd-bg-hover);
+}
+
+/*
  * THE DOWNLOAD BAR — the user: "blue download button changes to a blue bar that is
  * most of the width of the button, however with some space left on the right for
  * a red X button, the blue bar highlights and hovers showing downloaded/total
@@ -2406,7 +2472,10 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
   height: 6px;
   border-radius: 999px;
   overflow: hidden;
-  background: color-mix(in oklab, var(--pd-status-info-fg) 22%, transparent);
+  /* the user: "the unfilled part of the bar isn't blue enough it seems grey it
+     should read very blue still just unfilled." 22% against a dark surface
+     desaturates into grey; 45% keeps the hue and still reads as the empty half. */
+  background: color-mix(in oklab, var(--pd-status-info-fg) 45%, transparent);
   cursor: default;
 }
 .pd-dl-fill {

@@ -30,6 +30,7 @@ import { type JSX, useEffect, useRef, useState } from 'react';
 import { cx } from '../onboarding/cx';
 import { OrgAvatar } from '../settings/brand-icons';
 import { DownloadBar } from './DownloadBar';
+import { quickPickFor } from './model-recommender';
 import { compactBytes } from './models-layout';
 import { Pill } from './Pill';
 import {
@@ -54,6 +55,10 @@ export interface FamilyCardProps {
   readonly onSelect: (repo: string) => void;
   readonly onDownload: (variant: RecommendedVariant) => void;
   readonly onCancel: (variant: RecommendedVariant) => void;
+  /** Bytes per repo for the in-row bar, so Quick Download can become one. */
+  readonly bytes?: Readonly<
+    Record<string, { readonly received: number; readonly total: number; readonly fraction: number }>
+  >;
 }
 
 /** "2.6B" / "820M" — the size column, from a parameter count in billions. */
@@ -85,6 +90,7 @@ export function FamilyCard({
   selectedRepo,
   memoryGB,
   progress = {},
+  bytes,
   onSelect,
   onDownload,
   onCancel,
@@ -191,65 +197,110 @@ export function FamilyCard({
     );
   };
 
+  /*
+   * QUICK DOWNLOAD — the user: "need a button that says Quick Download same bar same
+   * pill guidelines next to each collection under the 'more' group."
+   *
+   * The word quick is the specification: it must not open the family, must not
+   * ask which quant, and must not fetch the biggest thing in there. It takes the
+   * same judgement the top-of-page picks make, scoped to this family — the best
+   * variant this machine can hold — so the fast path and the considered path
+   * agree rather than being two different opinions with one button each.
+   */
+  const quick =
+    memoryGB > 0
+      ? quickPickFor(family, { usableMemoryGB: memoryGB, totalRamGB: memoryGB })
+      : undefined;
+  const quickHave = quick !== undefined && downloaded.has(quick.variant.repo);
+  const quickProgress = quick === undefined ? undefined : bytes?.[quick.variant.repo];
+
   return (
     <div
       data-testid={`family-card-${family.id}`}
       data-open={open}
-      className="overflow-hidden rounded-xl border border-border-subtle bg-bg-raised shadow-[0_1px_2px_rgba(0,0,0,0.03)] transition-colors hover:border-border-default"
+      className="pd-model-card overflow-hidden"
     >
-      <button
-        type="button"
-        data-testid={`family-toggle-${family.id}`}
-        aria-expanded={open}
-        onClick={() => setOpen((v) => !v)}
-        className="pd-focusable flex w-full items-center gap-3 px-3 py-2.5 text-left"
-      >
-        <OrgAvatar org={family.org} size={32} />
-        <span className="min-w-0 flex-1">
-          <span className="flex flex-wrap items-center gap-1.5">
-            <span className="truncate text-body text-text-primary">{family.name}</span>
-            {family.fast === true ? (
-              <Pill
-                tone="warning"
-                testid={`fast-${family.id}`}
-                title="Unusually fast for its class — the reason it works on a modest machine"
-              >
-                Fast
-              </Pill>
-            ) : null}
-            {installKindOf(family) === 'gen' ? (
-              <Pill tone="neutral" outline title="Runs on the generation stack, not llama.cpp">
-                {family.output}
-              </Pill>
-            ) : null}
-            {onDisk > 0 ? (
-              <Pill tone="success" testid={`family-on-disk-${family.id}`}>
-                {onDisk} on disk
-              </Pill>
-            ) : null}
-            {bestFit === 'too-big' ? (
-              <Pill
-                tone="danger"
-                title={FIT_PILL['too-big'].why}
-                testid={`family-fit-${family.id}`}
-              >
-                Not for this Mac
-              </Pill>
-            ) : null}
+      {/* The header is a row, not a single button: it now holds a second control
+          and a button inside a button is invalid markup. */}
+      <div className="flex w-full items-center gap-3 px-3 py-2.5">
+        <button
+          type="button"
+          data-testid={`family-toggle-${family.id}`}
+          aria-expanded={open}
+          onClick={() => setOpen((v) => !v)}
+          className="pd-focusable flex min-w-0 flex-1 items-center gap-3 text-left"
+        >
+          <OrgAvatar org={family.org} size={32} />
+          <span className="min-w-0 flex-1">
+            <span className="flex flex-wrap items-center gap-1.5">
+              <span className="truncate text-body text-text-primary">{family.name}</span>
+              {family.fast === true ? (
+                <Pill
+                  tone="warning"
+                  testid={`fast-${family.id}`}
+                  title="Unusually fast for its class — the reason it works on a modest machine"
+                >
+                  Fast
+                </Pill>
+              ) : null}
+              {installKindOf(family) === 'gen' ? (
+                <Pill tone="neutral" outline title="Runs on the generation stack, not llama.cpp">
+                  {family.output}
+                </Pill>
+              ) : null}
+              {onDisk > 0 ? (
+                <Pill tone="success" testid={`family-on-disk-${family.id}`}>
+                  {onDisk} on disk
+                </Pill>
+              ) : null}
+              {bestFit === 'too-big' ? (
+                <Pill
+                  tone="danger"
+                  title={FIT_PILL['too-big'].why}
+                  testid={`family-fit-${family.id}`}
+                >
+                  Not for this Mac
+                </Pill>
+              ) : null}
+            </span>
+            <span className="block truncate text-footnote text-text-muted">{family.blurb}</span>
           </span>
-          <span className="block truncate text-footnote text-text-muted">{family.blurb}</span>
-        </span>
-        <span className="shrink-0 text-footnote text-text-muted tabular-nums">
-          {shown.length} {shown.length === 1 ? 'version' : 'versions'}
-        </span>
-        <IconChevronDown
-          size={16}
-          className={cx(
-            'shrink-0 text-text-muted transition-transform duration-200',
-            open && 'rotate-180',
-          )}
-        />
-      </button>
+          <span className="shrink-0 text-footnote text-text-muted tabular-nums">
+            {shown.length} {shown.length === 1 ? 'version' : 'versions'}
+          </span>
+          <IconChevronDown
+            size={16}
+            className={cx(
+              'shrink-0 text-text-muted transition-transform duration-200',
+              open && 'rotate-180',
+            )}
+          />
+        </button>
+
+        {quick === undefined ? null : quickProgress !== undefined ? (
+          <span className="flex w-[150px] shrink-0 items-center">
+            <DownloadBar
+              grow
+              fraction={quickProgress.total > 0 ? quickProgress.fraction : null}
+              received={quickProgress.received}
+              total={quickProgress.total}
+              label={`Cancel ${family.name}`}
+              testid={`family-quick-progress-${family.id}`}
+              onCancel={() => onCancel(quick.variant)}
+            />
+          </span>
+        ) : (
+          <button
+            type="button"
+            data-testid={quickHave ? `family-quick-use-${family.id}` : `family-quick-${family.id}`}
+            onClick={() => (quickHave ? onSelect(quick.variant.repo) : onDownload(quick.variant))}
+            title={`${quick.variant.label}${quick.quant === undefined ? '' : ` · ${quick.quant.rung.quant}`}`}
+            className="pd-focusable shrink-0 rounded-lg bg-accent-primary px-4 py-1.5 text-body font-medium text-text-on-accent transition-opacity hover:opacity-90"
+          >
+            {quickHave ? 'Use' : 'Quick Download'}
+          </button>
+        )}
+      </div>
 
       <div
         style={{ height: height === 'auto' ? undefined : height }}

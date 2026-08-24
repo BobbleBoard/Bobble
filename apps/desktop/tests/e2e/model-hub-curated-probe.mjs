@@ -124,12 +124,17 @@ try {
     range.selectNodeContents(b);
     const text = range.getBoundingClientRect().width;
     const button = b.getBoundingClientRect().width;
-    return { text: Math.round(text), button: Math.round(button), fontPx: Number.parseFloat(getComputedStyle(b).fontSize) };
+    return {
+      text: Math.round(text),
+      button: Math.round(button),
+      fontPx: Number.parseFloat(getComputedStyle(b).fontSize),
+    };
   });
   console.log('download button:', JSON.stringify(hug));
   if (hug === null) fail('no download button to measure');
   // Padding, not stretching: the slack either side should be small.
-  if (hug.button - hug.text > 40) fail(`the button has ${hug.button - hug.text}px of slack around a ${hug.text}px word`);
+  if (hug.button - hug.text > 40)
+    fail(`the button has ${hug.button - hug.text}px of slack around a ${hug.text}px word`);
   if (hug.fontPx < 12) fail(`the Download text is only ${hug.fontPx}px`);
   // The cut copy must be GONE, not merely moved.
   for (const gone of [
@@ -381,7 +386,8 @@ try {
   console.log('caption on hover:', JSON.stringify(hoverState));
   await win.screenshot({ path: path.join(OUT, '12-bar-hover.png') });
   if (hoverState.opacity === '0') fail('hovering the bar reveals nothing');
-  if (!/\/|%/.test(hoverState.caption ?? '')) fail(`the caption is not size/size n%: ${hoverState.caption}`);
+  if (!/\/|%/.test(hoverState.caption ?? ''))
+    fail(`the caption is not size/size n%: ${hoverState.caption}`);
   // The bar must NOT change — the user: "nothing goes inside the bar it does not
   // change thickness". The caption is a popup above it, so the track's geometry
   // is identical hovered and not.
@@ -409,6 +415,91 @@ try {
   await win.click('[data-testid="best-progress-audio-cancel"]');
   await win.waitForSelector('[data-testid="best-download-audio"]', { timeout: 4000 });
   console.log(`cancel → Download restored in ${Date.now() - t1}ms`);
+
+  // 10. ONE ROW, SCROLLED SIDEWAYS, with an arrow that only exists when there is
+  //     somewhere to go — and Quick Download on every collection below it.
+  await win.click('[data-testid="filter-output-audio"]');
+  await win.waitForTimeout(400);
+  // Park it at the start first: earlier steps clicked cards inside the row, and
+  // the browser scrolls a focused element into view — so "is the back arrow
+  // hidden?" has to be asked of a known position, not of wherever we left it.
+  await win.evaluate(() => {
+    const el = document.querySelector('[data-testid="best-carousel"]');
+    if (el !== null) el.scrollLeft = 0;
+  });
+  await win.waitForTimeout(400);
+  const row = await win.evaluate(() => {
+    const el = document.querySelector('[data-testid="best-carousel"]');
+    if (el === null) return null;
+    const cards = [...el.children].map((c) => c.getBoundingClientRect());
+    return {
+      scrollable: el.scrollWidth > el.clientWidth + 1,
+      // One row means every card shares a top edge.
+      tops: [...new Set(cards.map((r) => Math.round(r.top)))],
+      count: cards.length,
+      next: document.querySelector('[data-testid="best-carousel-next"]') !== null,
+      prev: document.querySelector('[data-testid="best-carousel-prev"]') !== null,
+    };
+  });
+  console.log('top row:', JSON.stringify(row));
+  if (row === null) fail('the recommendations are not in a carousel');
+  if (row.tops.length !== 1) fail(`the cards are stacked across ${row.tops.length} rows`);
+  if (row.scrollable && !row.next) fail('there is more to scroll to and no arrow saying so');
+  if (row.prev) fail('a back arrow is showing at the start of the row');
+  // …and it appears once there is something behind you.
+  if (row.scrollable) {
+    await win.click('[data-testid="best-carousel-next"]');
+    await win.waitForTimeout(800);
+    const after = await win.evaluate(() => ({
+      prev: document.querySelector('[data-testid="best-carousel-prev"]') !== null,
+      scrollLeft: Math.round(
+        document.querySelector('[data-testid="best-carousel"]')?.scrollLeft ?? 0,
+      ),
+    }));
+    console.log('after paging right:', JSON.stringify(after));
+    if (after.scrollLeft <= 0) fail('the next arrow did not scroll the row');
+    if (!after.prev) fail('no back arrow after scrolling away from the start');
+  }
+
+  // The chrome, on BOTH kinds of card — the user asked for it "on all the cards".
+  const chrome = await win.evaluate(() => {
+    const read = (sel) => {
+      const el = document.querySelector(sel);
+      if (el === null) return null;
+      const cs = getComputedStyle(el);
+      return { border: cs.borderTopWidth, shadow: cs.boxShadow !== 'none' };
+    };
+    return {
+      best: read('[data-testid="best-audio"]'),
+      family: read('[data-testid^="family-card-"]'),
+    };
+  });
+  console.log('card chrome:', JSON.stringify(chrome));
+  for (const [which, c] of Object.entries(chrome)) {
+    if (c === null || c.border === '0px' || !c.shadow)
+      fail(`${which} card has no border or shadow`);
+  }
+
+  const quick = await win.evaluate(() => {
+    const b = document.querySelector('[data-testid^="family-quick-"]');
+    return b === null ? null : { text: b.textContent?.trim(), title: b.getAttribute('title') };
+  });
+  console.log('quick download:', JSON.stringify(quick));
+  if (quick === null) fail('no Quick Download beside a collection');
+  if (!/Quick Download|Use/.test(quick.text ?? '')) fail(`unexpected label: ${quick.text}`);
+
+  // The unfilled track must read BLUE, not grey.
+  await win.click('[data-testid="best-download-audio"]');
+  await win.waitForTimeout(1500);
+  const track = await win.evaluate(() => {
+    const el = document.querySelector('[data-testid="best-progress-audio"]');
+    return el === null ? null : getComputedStyle(el).backgroundColor;
+  });
+  console.log('unfilled track:', track);
+  await win.evaluate(() =>
+    document.querySelector('[data-testid="best-progress-audio-cancel"]')?.click(),
+  );
+  await win.waitForTimeout(600);
 
   console.log('model-hub-curated-probe OK');
 } finally {

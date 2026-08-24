@@ -32,6 +32,7 @@
 import type { JSX } from 'react';
 import type { LlmHardware } from '../../electron/ipc-contract';
 import { OrgAvatar } from '../settings/brand-icons';
+import { Carousel } from './Carousel';
 import { DownloadBar } from './DownloadBar';
 import { type ModelRecommendation, recommendAll } from './model-recommender';
 import { compactBytes } from './models-layout';
@@ -105,7 +106,12 @@ function Card({
 
   return (
     <div
-      className="flex flex-col gap-3 rounded-xl border border-border-subtle bg-bg-raised p-3"
+      /* the user: "buffer between the download and edge, margins borders needed.
+         bordering of the card something like shown or like a shadow, reasonably
+         noticable, apply to all the cards aswell." A hairline `border-subtle` on
+         a dark surface is invisible; this is the default border plus a real
+         shadow, and p-4 keeps the footer button off the edge it was touching. */
+      className="pd-model-card flex w-[300px] shrink-0 flex-col gap-3 p-4"
       data-testid={`best-${rec.modality}`}
     >
       <button
@@ -182,21 +188,25 @@ export function BestForYourMachine({
   if (cards.length === 0) return null;
 
   return (
-    <section className="mb-5 grid grid-cols-3 gap-3" data-testid="best-for-your-machine">
-      {cards.map((rec) => (
-        <Card
-          key={rec.modality}
-          rec={rec}
-          downloaded={downloaded}
-          {...(progress[rec.variant.repo] === undefined
-            ? {}
-            : { progress: progress[rec.variant.repo] })}
-          onSelect={onSelect}
-          onDownload={onDownload}
-          onUse={onUse}
-          onCancel={onCancel}
-        />
-      ))}
+    /* ONE ROW, scrolled sideways — the user: "top reccomended needs to be 1 row no
+       stacking and h scrollable", with the edge arrows Unsloth uses. */
+    <section className="mb-5" data-testid="best-for-your-machine">
+      <Carousel testid="best-carousel">
+        {cards.map((rec) => (
+          <Card
+            key={rec.modality}
+            rec={rec}
+            downloaded={downloaded}
+            {...(progress[rec.variant.repo] === undefined
+              ? {}
+              : { progress: progress[rec.variant.repo] })}
+            onSelect={onSelect}
+            onDownload={onDownload}
+            onUse={onUse}
+            onCancel={onCancel}
+          />
+        ))}
+      </Carousel>
     </section>
   );
 }

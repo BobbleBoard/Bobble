@@ -1928,6 +1928,7 @@ export function ModelsView() {
                           selectedRepo={selected}
                           memoryGB={hw?.ramGiB ?? 0}
                           progress={storeFractions}
+                          bytes={storeProgressByRepo}
                           onSelect={setSelected}
                           onDownload={(variant) => void downloadVariant(family, variant)}
                           onCancel={(variant) => void cancelVariant(family, variant)}

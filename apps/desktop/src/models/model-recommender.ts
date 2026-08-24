@@ -188,6 +188,21 @@ function reasonFor(
   return `${family.blurb} ${size}${q}.`;
 }
 
+/**
+ * The best variant of ONE family for this machine — what "Quick Download" gets.
+ *
+ * the user asked for a Quick Download beside every collection, and the word quick is
+ * the specification: it must not open the family, it must not ask which quant,
+ * and it must not fetch the biggest thing in there. It is the same judgement the
+ * per-modality pick already makes, scoped to one family.
+ */
+export function quickPickFor(
+  family: RecommendedFamily,
+  host: RecommenderHost,
+): { variant: RecommendedVariant; quant?: QuantChoice; needsGB: number } | undefined {
+  return bestVariant(family, host.usableMemoryGB);
+}
+
 /** The one model to recommend for this modality, or undefined if none fits. */
 export function recommendFor(
   modality: OutputModality,
