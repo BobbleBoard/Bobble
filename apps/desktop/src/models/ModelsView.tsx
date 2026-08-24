@@ -30,13 +30,11 @@ import {
   reliableAuthorsForDomains,
 } from '@pi-desktop/inference/catalog';
 import {
-  IconArrowUp,
   IconCheck,
   IconChevronDown,
   IconClock,
   IconCopy,
   IconExternal,
-  IconGauge,
   IconMore,
   IconRefresh,
   ScrollArea,
@@ -129,6 +127,7 @@ function toHubModel(e: LlmCatalogEntry, totalRamGB: number): HubModel {
     formats: ['gguf'],
     capabilities: caps,
     downloaded: e.downloaded,
+    downloadedQuants: e.downloadedQuants,
     /*
      * The fit verdict, from model-manager-logic's ramVerdict — the same
      * function the old panel used, so there is still one answer to "does this
@@ -487,9 +486,43 @@ function Chip({ label, value, icon }: { label?: string; value: string; icon?: Re
   );
 }
 
-/** Downloads have no dedicated icon in the set; a rotated arrow is the mark. */
+/**
+ * Does the model's own name already state its parameter count?
+ *
+ * Most do — "Qwen3.5 9B · MLX" — and appending "· 9B" to the line underneath
+ * says the same number twice within 40px.
+ */
+const NAME_SAYS_SIZE = /\d+(?:\.\d+)?\s*[BM]\b/i;
+
+/**
+ * The download mark.
+ *
+ * the user: "the down arrow feels out of place, maybe better with the bottom half
+ * of a square's edge line below the down arrow and being slightly thicker."
+ *
+ * It was `IconArrowUp` rotated 180deg — a bare arrow, which at 12-13px beside a
+ * number reads as a sort direction or a chevron, not as a count of downloads.
+ * The tray is what makes it the download glyph everywhere else in software, and
+ * the extra stroke keeps three short strokes legible next to text.
+ */
 function IconDownload({ size = 13 }: { size?: number }) {
-  return <IconArrowUp size={size} className="rotate-180" />;
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.7}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M8 2.75v6.5" />
+      <path d="M5.25 6.75 8 9.5l2.75-2.75" />
+      <path d="M3.25 10.5v2.25h9.5V10.5" />
+    </svg>
+  );
 }
 
 /** Nor a heart, and likes need one. Inline rather than a text glyph, which
@@ -1136,6 +1169,17 @@ export function ModelsView() {
       clearTimeout(deadline);
     };
   }, [detailRepo, cardRepo, kind]);
+  /*
+   * Which quants of the model on screen are actually on disk. Recreated per
+   * detail so the picker's `isDownloaded` identity is stable across renders —
+   * it feeds a `useMemo` in there, and a fresh closure every render would
+   * recompute the recommendation on every keystroke elsewhere on the page.
+   */
+  const quantOnDisk = useMemo(() => {
+    const set = new Set(detail?.downloadedQuants ?? []);
+    return (q: string) => set.has(q);
+  }, [detail?.downloadedQuants]);
+
   const localCount = all.filter((m) => m.downloaded === true).length;
 
   /* The hub's whole purpose. This was a <span> with no handler, in a pane the
@@ -1677,60 +1721,72 @@ export function ModelsView() {
             Reset
           </button>
         ) : null}
-        <div className="ml-auto flex rounded-lg border border-border-subtle bg-bg-raised p-0.5">
-          {(['split', 'detail', 'compact'] as const).map((v) => (
-            <button
-              key={v}
-              type="button"
-              data-testid={`view-${v}`}
-              aria-pressed={view === v}
-              onClick={() => setView(v)}
-              className={cx(
-                'rounded-md px-2 py-1 text-footnote',
-                view === v ? 'bg-bg-active text-text-primary' : 'text-text-muted',
-              )}
-            >
-              <span className="flex h-4 w-4 items-center justify-center">
-                {v === 'compact' ? (
-                  <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden>
-                    <title>Compact</title>
-                    <rect x="1" y="3" width="14" height="1.6" rx=".8" fill="currentColor" />
-                    <rect x="1" y="7.2" width="14" height="1.6" rx=".8" fill="currentColor" />
-                    <rect x="1" y="11.4" width="14" height="1.6" rx=".8" fill="currentColor" />
-                  </svg>
-                ) : v === 'split' ? (
-                  <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden>
-                    <title>Split</title>
-                    <rect x="1" y="2" width="8.4" height="12" rx="1.4" fill="currentColor" />
-                    <rect
-                      x="10.8"
-                      y="2"
-                      width="4.2"
-                      height="12"
-                      rx="1.4"
-                      fill="currentColor"
-                      opacity=".45"
-                    />
-                  </svg>
-                ) : (
-                  <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden>
-                    <title>Detail</title>
-                    <rect
-                      x="1"
-                      y="2"
-                      width="5"
-                      height="12"
-                      rx="1.4"
-                      fill="currentColor"
-                      opacity=".45"
-                    />
-                    <rect x="7.4" y="2" width="7.6" height="12" rx="1.4" fill="currentColor" />
-                  </svg>
+        {/*
+         * THE LAYOUT SWITCH HAS NO LAYOUT TO SWITCH ON THE CURATED VIEW.
+         *
+         * the user: "the layout buttons actually don't do anything except they
+         * oddly resize the model card." Exactly right — the curated grid is
+         * hardcoded to list-plus-420px-pane (a card list has nowhere to put a
+         * table), so the only thing these three buttons still reached was the
+         * pane's max-height, which made the card grow and shrink for no stated
+         * reason. They belong to the table, so they appear with it.
+         */}
+        {curated ? null : (
+          <div className="ml-auto flex rounded-lg border border-border-subtle bg-bg-raised p-0.5">
+            {(['split', 'detail', 'compact'] as const).map((v) => (
+              <button
+                key={v}
+                type="button"
+                data-testid={`view-${v}`}
+                aria-pressed={view === v}
+                onClick={() => setView(v)}
+                className={cx(
+                  'rounded-md px-2 py-1 text-footnote',
+                  view === v ? 'bg-bg-active text-text-primary' : 'text-text-muted',
                 )}
-              </span>
-            </button>
-          ))}
-        </div>
+              >
+                <span className="flex h-4 w-4 items-center justify-center">
+                  {v === 'compact' ? (
+                    <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden>
+                      <title>Compact</title>
+                      <rect x="1" y="3" width="14" height="1.6" rx=".8" fill="currentColor" />
+                      <rect x="1" y="7.2" width="14" height="1.6" rx=".8" fill="currentColor" />
+                      <rect x="1" y="11.4" width="14" height="1.6" rx=".8" fill="currentColor" />
+                    </svg>
+                  ) : v === 'split' ? (
+                    <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden>
+                      <title>Split</title>
+                      <rect x="1" y="2" width="8.4" height="12" rx="1.4" fill="currentColor" />
+                      <rect
+                        x="10.8"
+                        y="2"
+                        width="4.2"
+                        height="12"
+                        rx="1.4"
+                        fill="currentColor"
+                        opacity=".45"
+                      />
+                    </svg>
+                  ) : (
+                    <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden>
+                      <title>Detail</title>
+                      <rect
+                        x="1"
+                        y="2"
+                        width="5"
+                        height="12"
+                        rx="1.4"
+                        fill="currentColor"
+                        opacity=".45"
+                      />
+                      <rect x="7.4" y="2" width="7.6" height="12" rx="1.4" fill="currentColor" />
+                    </svg>
+                  )}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {hfError !== null ? (
@@ -2250,6 +2306,13 @@ export function ModelsView() {
                               <span className="text-accent-primary">✓</span>
                             ) : null}
                           </span>
+                          {/* The parameter count belongs to the model's NAME, not
+                              to the popularity stats below. On its own down there
+                              it was a single stray tag floating between the
+                              Download button and the card. */}
+                          {detail.params !== undefined && !NAME_SAYS_SIZE.test(detail.name) ? (
+                            <span>· {detail.params}</span>
+                          ) : null}
                           <PipelineBadge tag={detail.pipelineTag} />
                         </p>
                       </div>
@@ -2320,26 +2383,40 @@ export function ModelsView() {
                         {/* The headline action: one click, the recommended file,
                             no question asked. The ladder below is for the people
                             who want to answer that question anyway. */}
-                        <DownloadAction
-                          installed={detail.downloaded === true}
-                          busy={busyId === detail.id}
-                          fraction={progress === null ? null : downloadFraction(progress)}
-                          received={progress?.jobReceived ?? progress?.received}
-                          total={progress?.jobTotal ?? progress?.total}
-                          eta={
-                            progress === null ? undefined : formatEta(downloadEtaSeconds(progress))
-                          }
-                          onDownload={() => void download(detail.id)}
-                          onCancel={() => void cancelHere()}
-                          testid="detail-download"
-                        />
+                        {/*
+                          NO "ON DISK" SLAB ABOVE THE LADDER. the user: "there's a
+                          'on disk' and 'installed' greyed out here… 'on disk'
+                          has no place there." The ladder below already answers
+                          it per FILE, which is the answer that is true — the
+                          slab was a second, coarser reply to the same question,
+                          sitting directly on top of the accurate one.
+                        */}
+                        {detail.downloaded === true ? null : (
+                          <DownloadAction
+                            installed={false}
+                            busy={busyId === detail.id}
+                            fraction={progress === null ? null : downloadFraction(progress)}
+                            received={progress?.jobReceived ?? progress?.received}
+                            total={progress?.jobTotal ?? progress?.total}
+                            eta={
+                              progress === null
+                                ? undefined
+                                : formatEta(downloadEtaSeconds(progress))
+                            }
+                            onDownload={() => void download(detail.id)}
+                            onCancel={() => void cancelHere()}
+                            testid="detail-download"
+                          />
+                        )}
                         <QuantPicker
                           options={quants?.repo === detail.id ? quants.options : []}
                           loading={quants?.repo === detail.id ? quants.loading : true}
                           totalRamGB={hw?.ramGiB ?? 0}
                           mmprojBytes={quants?.mmprojBytes}
                           format={detail.formats[0]?.toUpperCase()}
-                          installed={detail.downloaded === true}
+                          /* The per-QUANT truth. Without it the picker fell back
+                             to the repo-level flag and mislabelled every row. */
+                          isDownloaded={quantOnDisk}
                           downloading={busyId === detail.id}
                           onDownload={(q) => void download(detail.id, q)}
                         />
@@ -2365,18 +2442,17 @@ export function ModelsView() {
                       {detail.likes !== undefined ? (
                         <Chip icon={<IconHeart size={12} />} value={compactCount(detail.likes)} />
                       ) : null}
-                      {detail.params !== undefined ? (
-                        <Chip icon={<IconGauge size={12} />} value={detail.params} />
-                      ) : null}
                       {detail.formats.map((f) => (
                         <Chip key={f} value={f.toUpperCase()} />
                       ))}
                     </div>
 
-                    <div
-                      className="mt-4 border-t border-border-default pt-3"
-                      data-testid="model-card"
-                    >
+                    {/* No rule above the card. the user: "that top border with the
+                        fade out of the model card has no need to happen." The
+                        README opens with its own heading, which separates it
+                        from the chips better than a hairline that reads as the
+                        pane's second top edge. */}
+                    <div className="mt-5" data-testid="model-card">
                       {/* Spin only while a fetch is EXPLICITLY in flight. The
                           old condition spun whenever the state held neither a
                           body nor an error, so any path that set nothing left it

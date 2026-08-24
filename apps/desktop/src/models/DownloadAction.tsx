@@ -25,6 +25,7 @@
 import { IconCheck } from '@pi-desktop/ui';
 import type { JSX } from 'react';
 import { DownloadBar } from './DownloadBar';
+import { Pill } from './Pill';
 
 export interface DownloadActionProps {
   /** Already on disk — the button becomes a statement rather than an action. */
@@ -62,12 +63,17 @@ export function DownloadAction({
   testid = 'download-action',
 }: DownloadActionProps): JSX.Element {
   if (installed) {
+    /*
+     * A TAG, NOT A SLAB. This used to be a full-width grey block the size of the
+     * Download button it replaced — the loudest element in the pane, spent on
+     * the one state that needs no action from anybody. It is a statement of
+     * fact, so it is shaped like every other statement of fact in the hub.
+     */
     return (
-      <div
-        className="mt-3 flex items-center justify-center gap-1.5 rounded-xl bg-bg-active px-3 py-2.5 text-footnote text-text-muted"
-        data-testid={`${testid}-installed`}
-      >
-        <IconCheck size={14} /> On disk
+      <div className="mt-3 flex" data-testid={`${testid}-installed`}>
+        <Pill tone="success" icon={<IconCheck size={11} />}>
+          On disk
+        </Pill>
       </div>
     );
   }
@@ -85,7 +91,10 @@ export function DownloadAction({
         type="button"
         data-testid={testid}
         onClick={onDownload}
-        className="pd-focusable mt-3 rounded-full bg-accent-primary px-5 py-2 text-body font-medium text-text-on-accent transition-opacity hover:opacity-90"
+        /* The SAME pill as the family cards: px-4 py-1.5. At px-5 py-2 it was
+           visibly the biggest button in the hub for no reason other than having
+           more room around it. */
+        className="pd-focusable mt-3 rounded-full bg-accent-primary px-4 py-1.5 text-body font-medium text-text-on-accent transition-opacity hover:opacity-90"
       >
         Download
       </button>

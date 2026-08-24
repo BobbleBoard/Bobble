@@ -64,7 +64,6 @@ export interface QuantPickerProps {
   /** Called with the quant to fetch; undefined while none is resolvable. */
   readonly onDownload: (quant: string | undefined) => void;
   readonly downloading?: boolean;
-  readonly installed?: boolean;
 }
 
 export function QuantPicker({
@@ -77,7 +76,6 @@ export function QuantPicker({
   format,
   onDownload,
   downloading = false,
-  installed = false,
 }: QuantPickerProps) {
   const fitInput = useMemo(
     () => ({ totalRamGB, modelMaxContext, mmprojBytes }),
@@ -112,6 +110,7 @@ export function QuantPicker({
   const active = ordered.find((o) => o.quant === (picked?.quant ?? best?.quant)) ?? best;
   const activeFit =
     active === undefined ? undefined : quantFit({ ...fitInput, modelBytes: active.bytes });
+  const activeOnDisk = active !== undefined && isDownloaded(active.quant);
 
   if (loading) {
     return (
@@ -125,16 +124,17 @@ export function QuantPicker({
   }
 
   if (active === undefined) {
-    // No ladder: the repo lists no sized files we can choose between. Say so —
-    // an empty picker that looks interactive is worse than a plain statement.
-    return (
-      <div
-        className="mt-3 flex items-center gap-2 rounded-xl border border-border-subtle bg-bg-inset px-3 py-2.5"
-        data-testid="quant-picker-empty"
-      >
-        <span className="flex-1 text-footnote text-text-muted">No downloadable files listed.</span>
-      </div>
-    );
+    /*
+     * NOTHING TO PICK FROM MEANS NOTHING TO DRAW.
+     *
+     * An MLX or safetensors repo publishes no quant ladder, and this used to
+     * answer that with a full-width bordered slab reading "No downloadable
+     * files listed." — directly under a Download button that works fine. The
+     * picker is an optional refinement of a choice already made above it, so
+     * its absence is not news; the slab only managed to make a working card
+     * look broken.
+     */
+    return null;
   }
 
   /** One row. `pinned` carries the badge; its twin in the list below does not. */
@@ -233,14 +233,23 @@ export function QuantPicker({
           ) : null}
         </button>
 
+        {/*
+         * THE STATE OF THE FILE THIS ROW NAMES, not of the repo it came from.
+         *
+         * `installed` was a per-REPO boolean, so owning a model at Q3_K_M put
+         * "Installed" on the BF16 row — 47 GB nobody had fetched, reported as
+         * already here. The picker is the one control on the page whose whole
+         * job is telling quants apart, so it is the last place that can afford
+         * to answer at repo granularity.
+         */}
         <button
           type="button"
           data-testid="quant-download"
-          disabled={downloading || installed}
+          disabled={downloading || activeOnDisk}
           onClick={() => onDownload(active.quant)}
           className={cx(
             'pd-focusable shrink-0 rounded-full px-3 py-1.5 text-footnote transition-opacity',
-            installed
+            activeOnDisk
               ? 'bg-bg-active text-text-muted'
               : 'bg-accent-primary text-text-on-accent hover:opacity-90',
           )}
@@ -249,7 +258,7 @@ export function QuantPicker({
               bar that is reporting real bytes — two controls disagreeing about
               the same transfer. The headline action owns the progress; this one
               just steps back while it runs. */}
-          {installed ? 'Installed' : downloading ? 'Downloading…' : 'Download'}
+          {activeOnDisk ? 'On disk' : downloading ? 'Downloading…' : 'Download'}
         </button>
       </div>
 

@@ -288,12 +288,33 @@ function statusTone(label: string): 'done' | 'error' | 'paused' | 'waiting' | un
 }
 
 /** Stylized isometric cube — the 3D Studio modality glyph. */
+/**
+ * The Modalities glyph.
+ *
+ * DRAWN, NOT FILLED. It used to be three solid faces at 0.9/0.7/0.5 opacity —
+ * the only filled icon in a rail of 1.5px outlines, which is exactly the kind
+ * of mismatch you notice without being able to name: one row looks heavier and
+ * slightly closer to you than its neighbours. Same 16 grid and the same
+ * `pd-icon` class as the shared set, so it takes the same stroke token and
+ * changes weight with them.
+ */
 function ModalityCube({ size = 16 }: { size?: number }): ReactNode {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path d="M12 3 L20 7.5 L12 12 L4 7.5 Z" fill="currentColor" opacity={0.9} />
-      <path d="M4 7.5 L12 12 L12 21 L4 16.5 Z" fill="currentColor" opacity={0.5} />
-      <path d="M20 7.5 L20 16.5 L12 21 L12 12 Z" fill="currentColor" opacity={0.7} />
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.5}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="pd-icon"
+      aria-hidden="true"
+    >
+      <path d="M8 2 13.5 5 8 8 2.5 5Z" />
+      <path d="M2.5 5v6l5.5 3 5.5-3V5" />
+      <path d="M8 8v6" />
     </svg>
   );
 }
@@ -760,6 +781,18 @@ export function SessionSidebar({
           <SidebarRow
             // No caret by default; a chat with agents swaps its bubble for a fold
             // caret ON HOVER (CSS) so nothing shifts (the user A4).
+            /*
+             * NO BUBBLE ON A PLAIN CHAT. the user: "chat icon on the left felt very
+             * generic, do we even need that icon for each chat?" — and no: an
+             * identical glyph on every row of a list of chats distinguishes
+             * nothing, while costing ~24px of a column whose titles were all
+             * truncating to "Build me a fully functional …".
+             *
+             * A chat WITH agents keeps it, because there the glyph is a control:
+             * it swaps to the fold caret on hover. Those rows sit slightly
+             * proud of the rest, which is what a row that opens into other rows
+             * should look like.
+             */
             icon={
               hasKids ? (
                 <span className="pd-chat-icon-swap">
@@ -769,9 +802,7 @@ export function SessionSidebar({
                     className={`pd-chat-icon-caret ${expanded ? '' : '-rotate-90'}`}
                   />
                 </span>
-              ) : (
-                <IconChat size={16} />
-              )
+              ) : undefined
             }
             label={title}
             // Priority: needs-input dot > running spinner > finished dot > pin glyph > time.
@@ -1068,7 +1099,7 @@ export function SessionSidebar({
                 onClick={() => setModalityView('3d')}
               >
                 <span className="pd-child-row-icon">
-                  <ModalityCube size={13} />
+                  <ModalityCube size={15} />
                 </span>
                 <span className="pd-child-row-label">3D Studio</span>
                 {!module3d.installed && moduleSize !== '' ? (
@@ -1091,7 +1122,7 @@ export function SessionSidebar({
                 onClick={() => setModalityView('studio')}
               >
                 <span className="pd-child-row-icon">
-                  <IconImage size={13} />
+                  <IconImage size={15} />
                 </span>
                 {/* "Studio" sat directly beneath "3D Studio" in the same list,
                     which made the pair read as one thing and its 3D variant

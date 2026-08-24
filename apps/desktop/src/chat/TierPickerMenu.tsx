@@ -15,11 +15,11 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
-  DropdownMenuTrigger,
-  IconCheck,
   DropdownMenuSub,
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+  IconCheck,
   IconChevronRight,
   IconGauge,
   IconPin,
@@ -250,23 +250,23 @@ export function TierPickerMenu({
           <>
             <DropdownMenuSeparator />
             {/*
-              * "More models" FLIES OUT TO THE SIDE. the user: "I need to hover on
-              * the more models > and then have the stuff popup on the right
-              * side, not click and have a menu within a menu."
-              *
-              * It used to toggle the list open INSIDE this menu, which pushed
-              * every row below it down and grew the dropdown past the height of
-              * what it was covering. A submenu is the shape the chevron was
-              * already promising: hover to open, alongside rather than within,
-              * and the short chosen list stays exactly where it was while you
-              * browse the long one.
-              *
-              * The list still opens in the chat rather than jumping to the
-              * manager — the common case is picking something already
-              * downloaded, and leaving the chat for that is a bigger
-              * interruption than the choice deserves. The manager is one click
-              * further on.
-              */}
+             * "More models" FLIES OUT TO THE SIDE. the user: "I need to hover on
+             * the more models > and then have the stuff popup on the right
+             * side, not click and have a menu within a menu."
+             *
+             * It used to toggle the list open INSIDE this menu, which pushed
+             * every row below it down and grew the dropdown past the height of
+             * what it was covering. A submenu is the shape the chevron was
+             * already promising: hover to open, alongside rather than within,
+             * and the short chosen list stays exactly where it was while you
+             * browse the long one.
+             *
+             * The list still opens in the chat rather than jumping to the
+             * manager — the common case is picking something already
+             * downloaded, and leaving the chat for that is a bigger
+             * interruption than the choice deserves. The manager is one click
+             * further on.
+             */}
             <DropdownMenuSub>
               <DropdownMenuSubTrigger data-testid="footer-more-models">
                 More models

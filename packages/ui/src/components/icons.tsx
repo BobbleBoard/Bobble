@@ -223,12 +223,26 @@ export function IconGears(props: IconProps) {
   );
 }
 
-/** "Opens in canvas" glyph (box + arrow leaving to the corner). */
+/**
+ * "Opens elsewhere" glyph: a box with its top-right CORNER open, and an arrow
+ * leaving through the gap.
+ *
+ * The old geometry closed the top edge all the way to x=12 and put the gap on
+ * the right edge below it, so the arrow crossed a nearly-complete box and read
+ * as a line struck THROUGH a square — or, at 12-14px, as a scribble. The whole
+ * idea of the glyph is that the corner is missing because something left
+ * through it, so that is the corner that has to be missing.
+ *
+ * The arrow head is drawn as the two edges meeting at the corner rather than as
+ * a chevron on the diagonal: at this size a chevron and its shaft merge into a
+ * blob, while a right angle stays legible down to 12px.
+ */
 export function IconExternal(props: IconProps) {
   return (
     <Icon {...props}>
-      <path d="M12 4H4.5A1.5 1.5 0 0 0 3 5.5v6A1.5 1.5 0 0 0 4.5 13h6a1.5 1.5 0 0 0 1.5-1.5V8" />
-      <path d="M9 3.5h4v4M13 3.5 8 8.5" />
+      <path d="M12 8.5V11.5A1.5 1.5 0 0 1 10.5 13H4.5A1.5 1.5 0 0 1 3 11.5V5.5A1.5 1.5 0 0 1 4.5 4H7.5" />
+      <path d="M10 3h3v3" />
+      <path d="M13 3 8 8" />
     </Icon>
   );
 }

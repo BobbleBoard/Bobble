@@ -228,6 +228,16 @@ export interface HubModel {
   /** HF pipeline tag verbatim, e.g. "image-text-to-text" — the in→out label. */
   readonly pipelineTag?: string;
   readonly downloaded?: boolean;
+  /**
+   * WHICH quants are on disk, not merely whether ANY is.
+   *
+   * The boolean above is per-REPO, and the quant picker was using it to label
+   * whatever row happened to be selected: open a model you own at Q3 and the
+   * picker said "Installed" over BF16, a 47 GB file nobody had fetched. A
+   * control that reports the state of a different file than the one it names is
+   * worse than one that reports nothing.
+   */
+  readonly downloadedQuants?: readonly string[];
   /** From model-manager-logic's fit verdict — this module never recomputes it. */
   readonly fits?: boolean;
   readonly fitReason?: string;

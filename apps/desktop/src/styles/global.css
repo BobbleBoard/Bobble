@@ -2824,7 +2824,8 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
  */
 .pd-detail-scroll {
   scrollbar-width: thin;
-  scrollbar-color: color-mix(in oklab, var(--pd-text-primary) 18%, transparent) transparent;
+  transition: scrollbar-color var(--pd-duration-fast) var(--pd-easing-standard);
+  scrollbar-color: transparent transparent;
   scrollbar-gutter: stable;
 }
 
@@ -2836,16 +2837,27 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
   background: transparent;
 }
 
+/*
+ * AND IT ONLY APPEARS WHEN YOU ARE IN IT. Even inset, a permanent second bar
+ * 30px from the page's own is two parallel rails down the right of the window
+ * — obvious on the light themes, where both read as solid grey lines. macOS
+ * overlay scrollbars solve this by fading out at rest; the pane does the same,
+ * so at rest there is one bar on screen and it is the page's.
+ */
 .pd-detail-scroll::-webkit-scrollbar-thumb {
-  background: color-mix(in oklab, var(--pd-text-primary) 16%, transparent);
+  background: transparent;
   border-radius: 999px;
   /* A transparent border keeps the thumb narrow and away from the card edge. */
   border: 3px solid transparent;
   background-clip: padding-box;
 }
 
+.pd-detail-scroll:hover {
+  scrollbar-color: color-mix(in oklab, var(--pd-text-primary) 26%, transparent) transparent;
+}
+
 .pd-detail-scroll:hover::-webkit-scrollbar-thumb {
-  background: color-mix(in oklab, var(--pd-text-primary) 30%, transparent);
+  background: color-mix(in oklab, var(--pd-text-primary) 26%, transparent);
   background-clip: padding-box;
 }
 
