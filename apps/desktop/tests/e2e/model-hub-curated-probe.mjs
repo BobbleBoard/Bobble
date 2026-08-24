@@ -151,6 +151,11 @@ try {
     fail('the on-disk tag is still there — the button is the state');
 
   await win.screenshot({ path: path.join(OUT, '1-recommended.png') });
+  // The row with the pointer on it — arrows up, edges faded — since that state
+  // is invisible in a plain screenshot.
+  await win.hover('[data-testid="best-carousel"]');
+  await win.waitForTimeout(400);
+  await win.screenshot({ path: path.join(OUT, '1b-row-hovered.png') });
 
   // 2. EXPAND — measure the card growing rather than trusting the class.
   const first = families[0].id;
@@ -442,6 +447,51 @@ try {
     };
   });
   console.log('top row:', JSON.stringify(row));
+
+  /*
+   * The three layering/clipping complaints, each asked of the DOM rather than of
+   * the CSS file: arrows hidden until the pointer is on the row, an arrow that
+   * actually sits on top of a hovered card, a scroller with room for its
+   * children's shadows, and a faded edge rather than a cut.
+   */
+  const edges = await win.evaluate(() => {
+    const el = document.querySelector('[data-testid="best-carousel"]');
+    const wrap = document.querySelector('[data-testid="best-carousel-wrap"]');
+    const arrow = document.querySelector('[data-testid="best-carousel-next"]');
+    const cs = el === null ? null : getComputedStyle(el);
+    return {
+      mask: cs === null ? null : (cs.maskImage ?? cs.webkitMaskImage),
+      padBottom: cs === null ? null : cs.paddingBottom,
+      isolation: wrap === null ? null : getComputedStyle(wrap).isolation,
+      arrowOpacityAtRest: arrow === null ? null : getComputedStyle(arrow).opacity,
+    };
+  });
+  console.log('carousel edges:', JSON.stringify(edges));
+  if (edges.arrowOpacityAtRest !== '0') fail('the arrows are visible without a hover');
+  if (edges.isolation !== 'isolate') fail('the wrapper is not an isolated stacking context');
+  if (Number.parseFloat(edges.padBottom ?? '0') < 8)
+    fail('the scroller has no room for the card shadows — they will be clipped');
+  if (!/gradient/.test(edges.mask ?? '')) fail('the row edge is a hard cut, not a fade');
+
+  // Hover the row: arrows appear, and the arrow paints ABOVE the card art that
+  // was covering it.
+  await win.hover('[data-testid="best-carousel"]');
+  await win.waitForTimeout(400);
+  const onHover = await win.evaluate(() => {
+    const arrow = document.querySelector('[data-testid="best-carousel-next"]');
+    if (arrow === null) return null;
+    const r = arrow.getBoundingClientRect();
+    const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+    return {
+      opacity: getComputedStyle(arrow).opacity,
+      hitsArrow: arrow.contains(top) || arrow === top,
+      topTag: top?.tagName ?? null,
+    };
+  });
+  console.log('arrow on hover:', JSON.stringify(onHover));
+  if (onHover?.opacity !== '1') fail('hovering the row does not reveal the arrows');
+  if (onHover?.hitsArrow !== true)
+    fail(`something is painting over the arrow (${onHover?.topTag})`);
   if (row === null) fail('the recommendations are not in a carousel');
   if (row.tops.length !== 1) fail(`the cards are stacked across ${row.tops.length} rows`);
   if (row.scrollable && !row.next) fail('there is more to scroll to and no arrow saying so');

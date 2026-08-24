@@ -2406,12 +2406,57 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
 /*
  * The horizontal card row (Carousel.tsx) and its edge arrows.
  *
- * The scrollbar is hidden because the arrows carry the affordance; hiding it
- * without them would leave a row that cannot advertise what it is holding.
+ * THREE THINGS THIS FIXES, all reported together and all the same shape of bug —
+ * a container doing something to its children that it was never asked to:
+ *
+ *   1. `overflow-x: auto` clips the OTHER axis too (the spec forces `overflow-y`
+ *      from `visible` to `auto` when one axis is not visible). That is the "hard
+ *      border on the bottom cutting off the shadow" — the scroller was slicing
+ *      the cards' own shadows. The vertical padding gives them room INSIDE the
+ *      clip, which is the only fix that keeps the row scrollable.
+ *   2. `isolation: isolate` settles the paint order once, instead of a z-index
+ *      auction between an arrow and whichever card is hovered.
+ *   3. The mask replaces a hard cut with a fade, and only on the side that has
+ *      somewhere to go — a fade at scroll zero would advertise content that is
+ *      not there.
  */
+.pd-carousel-wrap {
+  position: relative;
+  isolation: isolate;
+}
 .pd-carousel {
+  /* Room for the card shadows, which this container would otherwise clip. */
+  padding: 6px 2px 14px;
   scroll-snap-type: x proximity;
   scrollbar-width: none;
+  --pd-fade: 40px;
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    #000 var(--pd-fade),
+    #000 calc(100% - var(--pd-fade)),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    #000 var(--pd-fade),
+    #000 calc(100% - var(--pd-fade)),
+    transparent 100%
+  );
+}
+/* No fade on an edge with nothing behind it. */
+.pd-carousel[data-at-start="true"] {
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - var(--pd-fade)), transparent 100%);
+  mask-image: linear-gradient(to right, #000 calc(100% - var(--pd-fade)), transparent 100%);
+}
+.pd-carousel[data-at-end="true"] {
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 var(--pd-fade));
+  mask-image: linear-gradient(to right, transparent 0, #000 var(--pd-fade));
+}
+.pd-carousel[data-at-start="true"][data-at-end="true"] {
+  -webkit-mask-image: none;
+  mask-image: none;
 }
 .pd-carousel::-webkit-scrollbar {
   display: none;
@@ -2433,9 +2478,19 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
   border: 1px solid var(--pd-border-default);
   background: var(--pd-bg-raised);
   color: var(--pd-text-primary);
-  box-shadow: 0 2px 10px rgb(0 0 0 / 22%);
+  box-shadow: 0 1px 6px rgb(0 0 0 / 14%);
   cursor: pointer;
-  transition: background var(--pd-duration-fast) var(--pd-easing-standard);
+  /* An affordance, not decoration: present while the pointer is on the row. */
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity var(--pd-duration-fast) var(--pd-easing-standard),
+    background var(--pd-duration-fast) var(--pd-easing-standard);
+}
+.pd-carousel-wrap:hover .pd-carousel-arrow,
+.pd-carousel-arrow:focus-visible {
+  opacity: 1;
+  pointer-events: auto;
 }
 .pd-carousel-arrow:hover {
   background: var(--pd-bg-hover);
@@ -2507,7 +2562,7 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
   border-radius: 8px;
   border: 1px solid var(--pd-border-default);
   background: var(--pd-bg-raised);
-  box-shadow: 0 4px 12px rgb(0 0 0 / 22%);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 16%);
   font-size: var(--pd-font-size-caption);
   line-height: 1.2;
   white-space: nowrap;

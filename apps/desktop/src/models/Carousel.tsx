@@ -12,9 +12,15 @@
  * means they are also the answer to "is there more?", not just the way to get
  * there.
  *
- * THE CLIP IS PART OF THE MESSAGE. A card cut by the right edge says "more" more
- * clearly than any control, which is why the row is not padded to end on a card
- * boundary.
+ * THE EDGE FADES RATHER THAN CUTS. A card sliced by a hard line reads as a
+ * rendering fault; the same card fading out reads as "there is more". the user: "no
+ * hard cutoff here." The fade is a mask on the scroller and it only applies to
+ * the side that HAS more — fading the left edge at scroll zero would be a
+ * promise of content that is not there.
+ *
+ * THE ARROWS FADE WITH THE POINTER. They are an affordance, not decoration, so
+ * they appear when the pointer is over the row and go when it leaves — which
+ * also keeps them off the cards while someone is reading them.
  */
 import { IconChevronLeft, IconChevronRight } from '@pi-desktop/ui';
 import { type JSX, type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
@@ -33,10 +39,16 @@ export function Carousel({ children, testid = 'carousel' }: CarouselProps): JSX.
   const measure = useCallback(() => {
     const el = ref.current;
     if (el === null) return;
-    setAtStart(el.scrollLeft <= 1);
-    // 1px of slack: fractional widths mean the exact end is rarely an integer,
-    // and an arrow that never quite disappears looks broken.
-    setAtEnd(el.scrollLeft + el.clientWidth >= el.scrollWidth - 1);
+    /*
+     * SLACK ON BOTH ENDS, and 1px was not enough. Fractional card widths mean
+     * the exact end is rarely an integer, and `scroll-snap` settles against the
+     * scroller's own padding rather than against zero — MEASURED, a row parked
+     * at "the start" reported scrollLeft ~2 and grew a back arrow that went
+     * nowhere. 4px covers both without hiding a real first step.
+     */
+    const SLACK = 4;
+    setAtStart(el.scrollLeft <= SLACK);
+    setAtEnd(el.scrollLeft + el.clientWidth >= el.scrollWidth - SLACK);
   }, []);
 
   useEffect(() => {
@@ -70,11 +82,22 @@ export function Carousel({ children, testid = 'carousel' }: CarouselProps): JSX.
     );
 
   return (
-    <div className="relative" data-testid={`${testid}-wrap`}>
+    /*
+     * `isolation: isolate` (pd-carousel-wrap) rather than a z-index race. the user:
+     * "the profile picture appears on top of the button but only when hovered."
+     * A hovered card was winning the paint order against an absolutely
+     * positioned sibling, which is the kind of bug that gets "fixed" by bidding
+     * the z-index up until it stops. Isolating the wrapper makes the arrows and
+     * the row members members of one stacking context, where the arrows' index
+     * settles it once.
+     */
+    <div className="pd-carousel-wrap" data-testid={`${testid}-wrap`}>
       <div
         ref={ref}
         onScroll={measure}
-        className="pd-carousel pd-scroll--hidden flex gap-3 overflow-x-auto"
+        className="pd-carousel flex gap-3 overflow-x-auto"
+        data-at-start={atStart}
+        data-at-end={atEnd}
         data-testid={testid}
       >
         {children}
