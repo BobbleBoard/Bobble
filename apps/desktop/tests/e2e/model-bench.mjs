@@ -42,9 +42,16 @@ const appRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../.
 const MODEL = process.env.MODEL;
 const OUT = process.env.OUT;
 const CAP_MS = Number(process.env.CAP_MS ?? 480_000);
-const TASKS = JSON.parse(
+const ALL_TASKS = JSON.parse(
   readFileSync(process.env.TASKS ?? path.join(appRoot, 'tests/e2e/bench-tasks.json'), 'utf8'),
 );
+/*
+ * START lets a run pick up where a dead one stopped. MEASURED: the app died
+ * outright partway through a ten-task run — once, not reproducibly — and
+ * without this the only options were re-running eight completed tasks or
+ * throwing the run away.
+ */
+const TASKS = ALL_TASKS.slice(Number(process.env.START ?? 0));
 if (MODEL === undefined || OUT === undefined) {
   console.error('model-bench: MODEL and OUT are required');
   process.exit(2);
@@ -85,6 +92,7 @@ const app = await electron.launch({
   env: { ...process.env, PI_E2E: '1', PI_E2E_BACKGROUND: '1' },
 });
 const mainLog = [];
+app.process().on('exit', (code, sig) => console.log(`[bench] ELECTRON EXITED code=${code} signal=${sig}`));
 for (const s of [app.process().stdout, app.process().stderr]) {
   s?.on('data', (d) => {
     for (const line of String(d).split('\n'))
@@ -106,17 +114,51 @@ try {
     const task = TASKS[i];
     // A fresh chat per task: its own context and its own working folder.
     if (i > 0) {
+      /*
+       * WAIT FOR THE NEW CHAT TO EXIST, don't sleep at it. MEASURED on the
+       * first Ling run: a fixed 2.5s wait raced the session reset, the typed
+       * prompt went nowhere, and the task sat until the 7-minute cap with the
+       * server at 0% CPU — a harness failure that reads exactly like a model
+       * that cannot answer.
+       */
       await page.click('[data-testid="new-chat"]').catch(() => undefined);
-      await page.waitForTimeout(2500).catch(() => undefined);
+      await page
+        .waitForFunction(
+          () => (window.__pi_store?.().getState?.().messages ?? []).length === 0,
+          undefined,
+          { timeout: 30_000 },
+        )
+        .catch(() => undefined);
+      await page.waitForTimeout(1500).catch(() => undefined);
     }
     const before = await page
       .evaluate(() => window.__pi_store?.().getState?.().messages?.length ?? 0)
       .catch(() => 0);
     const startedAt = Date.now();
-    await page.click('[data-testid="composer-input"]');
-    await page.keyboard.type(task.prompt);
-    await page.keyboard.press('Enter');
-    console.log(`\n[${i + 1}/${TASKS.length}] ${task.id} — sent`);
+    /*
+     * AND CONFIRM THE SEND LANDED. Enter into a composer that is still
+     * re-mounting is silently dropped; the only proof is a user row appearing
+     * in the store. One retry, then give up loudly rather than burning the cap.
+     */
+    let sent = false;
+    for (let attempt = 0; attempt < 2 && !sent; attempt++) {
+      await page.click('[data-testid="composer-input"]').catch(() => undefined);
+      await page.keyboard.type(task.prompt).catch(() => undefined);
+      await page.keyboard.press('Enter').catch(() => undefined);
+      sent = await page
+        .waitForFunction(
+          (n) =>
+            (window.__pi_store?.().getState?.().messages ?? [])
+              .slice(n)
+              .some((m) => m.kind === 'user'),
+          before,
+          { timeout: 20_000 },
+        )
+        .then(() => true)
+        .catch(() => false);
+      if (!sent) console.log(`[${i + 1}/${TASKS.length}] ${task.id} — send did not land, retrying`);
+    }
+    console.log(`\n[${i + 1}/${TASKS.length}] ${task.id} — sent${sent ? '' : ' (NEVER LANDED)'}`);
 
     const firstPaint = await page
       .waitForFunction(

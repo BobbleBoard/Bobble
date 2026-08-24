@@ -26,7 +26,7 @@ import type { LaunchMode } from '@pi-desktop/inference';
 import { useLlmStore } from './llm-store';
 import { getModels, restartPi, setModel } from './pi-connect';
 import { usePiStore } from './pi-slice';
-import { applySavedHarnessConfig } from './settings-store';
+import { applySavedHarnessConfig, useSettingsStore } from './settings-store';
 
 /** The models.json provider key a model's engine binds to. */
 function providerForEngine(engine: 'llamacpp' | 'mlx' | undefined): string {
@@ -89,6 +89,12 @@ export interface VisionState {
   readonly model?: { readonly id: string; readonly quant?: string } | null;
   /** Catalog entries (only `id` + `vision` are read). */
   readonly catalog: ReadonlyArray<{ readonly id: string; readonly vision?: boolean }>;
+  /**
+   * The model the user PINNED by name, when they pinned one (null under Auto or
+   * a tier). Its presence disables the switch-to-another-model fallback below —
+   * see {@link resolveVisionTarget}.
+   */
+  readonly pinnedModelId?: string | null;
   /** Resolved tier picks (for the text-only-model fallback), when loaded. */
   readonly tierModels?: Record<
     'fast' | 'balanced' | 'intelligent',
@@ -110,9 +116,24 @@ export type VisionDecision =
  * Pure: decide how to get the running setup into a vision-capable state.
  *   - already multimodal → nothing to do (vision is sticky for the session),
  *   - current model supports vision → relaunch IT in multimodal,
+ *   - the user PINNED a text-only model → do nothing, and say why,
  *   - else → the best downloaded vision-capable tier pick (intelligent → balanced
  *     → fast) so an image on a text-only model is still seen,
  *   - else → nothing available.
+ *
+ * A PIN IS AN INSTRUCTION, NOT A PREFERENCE.
+ *
+ * MEASURED, and it cost two ten-task benchmark runs before the log gave it up:
+ * with Ling 3.0 (text-only) explicitly pinned, a tool screenshotted a page, main
+ * raised `llm:vision-wanted`, and this function answered "relaunch
+ * qwen3.5-9b-mtp" — a model the user had not chosen, on a 105-second load, which
+ * took the running turn with it. The turn produced zero characters and sat until
+ * the cap. Nothing on screen said the model had changed.
+ *
+ * Falling back to another model is right when the app is choosing the model
+ * anyway (Auto, or a tier). When the user has named one, silently running a
+ * different one is worse than not seeing the image — the image is one turn, and
+ * the swap is the rest of the session.
  */
 export function resolveVisionTarget(s: VisionState): VisionDecision {
   if (s.launchMode === 'multimodal') return { action: 'already-on' };
@@ -122,6 +143,13 @@ export function resolveVisionTarget(s: VisionState): VisionDecision {
     currentId !== null && s.catalog.find((e) => e.id === currentId)?.vision === true;
   if (currentVision && currentId !== null) {
     return { action: 'relaunch', modelId: currentId, quant: s.model?.quant };
+  }
+
+  if (s.pinnedModelId !== undefined && s.pinnedModelId !== null) {
+    return {
+      action: 'none',
+      reason: `${s.pinnedModelId} is pinned and cannot see images; not switching models`,
+    };
   }
 
   const tiers = s.tierModels;
@@ -158,10 +186,12 @@ export async function ensureVisionMode(): Promise<{
   reason?: string;
 }> {
   const llm = useLlmStore.getState();
+  const selection = useSettingsStore.getState().settings.modelSelection;
   const decision = resolveVisionTarget({
     launchMode: llm.status.launchMode,
     model: llm.status.model,
     catalog: llm.catalog,
+    pinnedModelId: selection?.mode === 'model' ? selection.modelId : null,
     tierModels: llm.recommendation?.tierModels,
   });
 
