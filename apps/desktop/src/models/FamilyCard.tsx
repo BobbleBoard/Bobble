@@ -188,7 +188,7 @@ export function FamilyCard({
             type="button"
             data-testid={`family-download-${v.repo}:${v.label}`}
             onClick={() => onDownload(v)}
-            className="pd-focusable shrink-0 rounded-lg bg-accent-primary px-2.5 py-1 text-caption font-medium text-text-on-accent transition-opacity hover:opacity-90"
+            className="pd-focusable shrink-0 rounded-full bg-accent-primary px-3 py-1 text-caption font-medium text-text-on-accent transition-opacity hover:opacity-90"
           >
             Download
           </button>
@@ -231,6 +231,10 @@ export function FamilyCard({
           className="pd-focusable flex min-w-0 flex-1 items-center gap-3 text-left"
         >
           <OrgAvatar org={family.org} size={32} />
+          {/* Name and tags only — the user: "no descriptions on the model cards
+              please". The blurb still exists in the catalogue, where it is the
+              one-sentence justification for a family being in a curated list at
+              all; it is simply not what a row is for. */}
           <span className="min-w-0 flex-1">
             <span className="flex flex-wrap items-center gap-1.5">
               <span className="truncate text-body text-text-primary">{family.name}</span>
@@ -263,7 +267,6 @@ export function FamilyCard({
                 </Pill>
               ) : null}
             </span>
-            <span className="block truncate text-footnote text-text-muted">{family.blurb}</span>
           </span>
           <span className="shrink-0 text-footnote text-text-muted tabular-nums">
             {shown.length} {shown.length === 1 ? 'version' : 'versions'}
@@ -295,7 +298,7 @@ export function FamilyCard({
             data-testid={quickHave ? `family-quick-use-${family.id}` : `family-quick-${family.id}`}
             onClick={() => (quickHave ? onSelect(quick.variant.repo) : onDownload(quick.variant))}
             title={`${quick.variant.label}${quick.quant === undefined ? '' : ` · ${quick.quant.rung.quant}`}`}
-            className="pd-focusable shrink-0 rounded-lg bg-accent-primary px-4 py-1.5 text-body font-medium text-text-on-accent transition-opacity hover:opacity-90"
+            className="pd-focusable shrink-0 rounded-full bg-accent-primary px-4 py-1.5 text-body font-medium text-text-on-accent transition-opacity hover:opacity-90"
           >
             {quickHave ? 'Use' : 'Quick Download'}
           </button>

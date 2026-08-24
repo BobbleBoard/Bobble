@@ -161,7 +161,7 @@ function Card({
                space left and right, don't stretch the pill excessively at all".
                So no width class: the padding sizes it, and `ml-auto` keeps it
                against the right edge without stretching to meet it. */
-            className="pd-focusable ml-auto rounded-lg bg-accent-primary px-4 py-1.5 text-body font-medium text-text-on-accent transition-opacity hover:opacity-90"
+            className="pd-focusable ml-auto rounded-full bg-accent-primary px-4 py-1.5 text-body font-medium text-text-on-accent transition-opacity hover:opacity-90"
           >
             {have ? 'Use' : 'Download'}
           </button>

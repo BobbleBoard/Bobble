@@ -83,7 +83,7 @@ export function DownloadAction({
         type="button"
         data-testid={testid}
         onClick={onDownload}
-        className="pd-focusable mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl bg-accent-primary px-3 py-2.5 text-footnote font-medium text-text-on-accent transition-opacity hover:opacity-90"
+        className="pd-focusable mt-3 flex w-full items-center justify-center gap-1.5 rounded-full bg-accent-primary px-3 py-2.5 text-footnote font-medium text-text-on-accent transition-opacity hover:opacity-90"
       >
         <IconDownload size={14} /> Download
       </button>

@@ -485,6 +485,36 @@ try {
     return b === null ? null : { text: b.textContent?.trim(), title: b.getAttribute('title') };
   });
   console.log('quick download:', JSON.stringify(quick));
+  // Pill-shaped, not a rounded rectangle — the user: "round the edges of the blue
+  // buttons to be pill shaped". A pill's radius is at least half its height.
+  const shape = await win.evaluate(() => {
+    const out = {};
+    for (const [name, sel] of [
+      ['best', '[data-testid^="best-download-"]'],
+      ['quick', '[data-testid^="family-quick-"]'],
+    ]) {
+      const el = document.querySelector(sel);
+      if (el === null) continue;
+      const cs = getComputedStyle(el);
+      out[name] = {
+        radius: Number.parseFloat(cs.borderTopLeftRadius),
+        height: Math.round(el.getBoundingClientRect().height),
+      };
+    }
+    return out;
+  });
+  console.log('button shape:', JSON.stringify(shape));
+  for (const [name, v] of Object.entries(shape)) {
+    if (v.radius < v.height / 2) fail(`the ${name} button is a rounded rectangle, not a pill`);
+  }
+  // …and no description line survives on a family row.
+  const desc = await win.evaluate(() => {
+    const card = document.querySelector('[data-testid^="family-card-"]');
+    return card?.textContent?.replace(/\s+/g, ' ').trim() ?? '';
+  });
+  console.log('family row text:', JSON.stringify(desc.slice(0, 90)));
+  if (/parameters of speech|The quality tier|smallest models here/.test(desc))
+    fail('a description is still on the card');
   if (quick === null) fail('no Quick Download beside a collection');
   if (!/Quick Download|Use/.test(quick.text ?? '')) fail(`unexpected label: ${quick.text}`);
 

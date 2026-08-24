@@ -154,6 +154,14 @@ describe('the curated recommended list', () => {
   });
 
   it('names a real org and a blurb for every family', () => {
+    /*
+     * The blurb is no longer drawn on the cards — the user: "no descriptions on the
+     * model cards please" — but it stays REQUIRED, and deliberately. It is the
+     * one-sentence justification for a family being in a curated list at all,
+     * and a list where entries can be added without one is a list that fills up
+     * with things nobody can defend. It also still feeds the recommender's
+     * reason text and the family's own detail copy.
+     */
     for (const f of RECOMMENDED_FAMILIES) {
       expect(f.org.length).toBeGreaterThan(0);
       expect(f.blurb.length).toBeGreaterThan(10);

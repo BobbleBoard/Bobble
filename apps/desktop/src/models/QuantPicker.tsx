@@ -239,7 +239,7 @@ export function QuantPicker({
           disabled={downloading || installed}
           onClick={() => onDownload(active.quant)}
           className={cx(
-            'pd-focusable shrink-0 rounded-lg px-3 py-1.5 text-footnote transition-opacity',
+            'pd-focusable shrink-0 rounded-full px-3 py-1.5 text-footnote transition-opacity',
             installed
               ? 'bg-bg-active text-text-muted'
               : 'bg-accent-primary text-text-on-accent hover:opacity-90',
