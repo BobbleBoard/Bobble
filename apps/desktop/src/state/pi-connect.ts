@@ -1361,4 +1361,13 @@ async function ensurePiOnViewedSession(): Promise<void> {
 // read/tamper handle to the whole chat state.
 if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('piE2E')) {
   window.__pi_store = () => usePiStore;
+  /*
+   * Stop, for probes. A benchmark that gives a task a time limit has to be able
+   * to END the turn when the limit is reached — otherwise the next task types
+   * into a composer that is still busy and its send is silently dropped, which
+   * reads as a task the model never attempted.
+   */
+  window.__pi_abort = () => {
+    void abortPi();
+  };
 }

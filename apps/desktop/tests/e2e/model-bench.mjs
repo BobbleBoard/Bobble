@@ -28,7 +28,17 @@
  *   CAP_MS  per-task ceiling            (default 480000 — 8 minutes)
  */
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  closeSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  openSync,
+  readFileSync,
+  readSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { createRequire } from 'node:module';
 import { homedir, tmpdir } from 'node:os';
 import path from 'node:path';
@@ -201,6 +211,20 @@ try {
     }
     const wallMs = Date.now() - startedAt;
 
+    /*
+     * A CAPPED TASK IS STILL RUNNING. MEASURED: after task 8 hit the cap the
+     * runner clicked New chat and typed the next prompt into a composer whose
+     * turn had never stopped — the send went nowhere and task 9 was recorded as
+     * "NEVER LANDED", which is the harness losing a task, not the model failing
+     * one. Abort the turn before moving on.
+     */
+    if (!done) {
+      await page
+        .evaluate(() => window.__pi_abort?.())
+        .catch(() => undefined);
+      await page.waitForTimeout(6000).catch(() => undefined);
+    }
+
     const state = await page
       .evaluate((n) => {
         const st = window.__pi_store?.().getState?.();
@@ -248,11 +272,23 @@ try {
     const files = [];
     if (state.cwd !== null && existsSync(state.cwd)) {
       try {
+        /*
+         * SKIP THE SCAFFOLD, AND NEVER MATERIALISE A WHOLE FILE.
+         *
+         * MEASURED: the runner died with "JavaScript heap out of memory" after
+         * six tasks. `readFileSync(f).toString('utf8')` builds the ENTIRE file
+         * as a JS string before the `.slice(0, 1500)` throws it away — and the
+         * working folder has a node_modules tree in it. Read a fixed head off
+         * the descriptor instead, and do not walk the parts of the tree no task
+         * is ever graded on.
+         */
         const out = execFileSync(
           '/bin/sh',
           [
             '-c',
-            `find ${JSON.stringify(state.cwd)} -type f -not -path '*/.git/*' -not -name '.DS_Store' | head -40`,
+            `find ${JSON.stringify(state.cwd)} -type f ` +
+              `-not -path '*/node_modules/*' -not -path '*/.git/*' -not -path '*/dist/*' ` +
+              `-not -name '.DS_Store' -size -4M | head -40`,
           ],
           { encoding: 'utf8' },
         );
@@ -260,9 +296,12 @@ try {
           let bytes = 0;
           let head = '';
           try {
-            const buf = readFileSync(f);
-            bytes = buf.length;
-            head = buf.toString('utf8').slice(0, 1500);
+            bytes = statSync(f).size;
+            const fd = openSync(f, 'r');
+            const buf = Buffer.alloc(Math.min(2000, bytes));
+            readSync(fd, buf, 0, buf.length, 0);
+            closeSync(fd);
+            head = buf.toString('utf8');
           } catch {}
           files.push({ path: f.replace(state.cwd, '.'), bytes, head });
         }
