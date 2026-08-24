@@ -328,6 +328,7 @@ export function SessionSidebar({
   onOpenConnectors,
   onOpenStub,
   onOpenScheduled,
+  onEnterChat,
 }: {
   open: boolean;
   onCollapse: () => void;
@@ -340,6 +341,20 @@ export function SessionSidebar({
   onOpenStub: (stub: SidebarStub) => void;
   /** Scheduled tasks is a real view now, not a coming-soon stub. */
   onOpenScheduled: () => void;
+  /**
+   * "The user is going to a conversation now." Fired for every way OUT of a
+   * content route and INTO a chat: New chat, a chat row, a project's new chat,
+   * a subagent row.
+   *
+   * BUG THIS EXISTS FOR: the model hub renders as a `contentOverride` inside
+   * this same shell, so the sidebar stayed live while it was open — and picking
+   * a chat switched the session underneath without ever taking the hub down.
+   * You clicked New chat and kept looking at the model hub, with your new chat
+   * behind it. Deliberately a callback rather than App watching the session id:
+   * only a person navigating should pull the view, never a scheduled task
+   * firing while someone browses models.
+   */
+  onEnterChat?: () => void;
 }) {
   /*
    * THE SLIDE. the user: "left sidebar does not close cleanly, it's instant
@@ -527,9 +542,33 @@ export function SessionSidebar({
   // toast fires and nothing new bounces in the dock (the old restartPi path did
   // both). newSession() owns the store reset + custom-instructions re-arm.
   const onNewChat = useCallback(async () => {
+    onEnterChat?.();
     await newSession();
     refresh();
-  }, [refresh]);
+  }, [refresh, onEnterChat]);
+
+  /*
+   * ⌘N, WHICH THE ROW HAS BEEN ADVERTISING WITHOUT ANYONE BINDING IT.
+   *
+   * MEASURED: press it anywhere in the app and the selected chat does not
+   * change. The `<Kbd keys="⌘N" />` chip beside "New chat" is a promise the app
+   * was not keeping — and a shortcut that silently does nothing is worse than
+   * no shortcut, because you stop trusting the other hints too.
+   *
+   * Bound in the renderer rather than as a menu accelerator so it stays with
+   * the control it belongs to. `preventDefault` because Chromium's own ⌘N is
+   * "new window", which is not a thing this app has.
+   */
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'n' && e.key !== 'N') return;
+      if (!(e.metaKey || e.ctrlKey) || e.altKey || e.shiftKey) return;
+      e.preventDefault();
+      void onNewChat();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onNewChat]);
 
   // Start a fresh chat that belongs to a project, ROOTED at the project's working
   // folder (or, when it has none, a stable shared sandbox named after the project —
@@ -541,6 +580,7 @@ export function SessionSidebar({
   // persists against that path, so it appears under the project once it has content.
   const newChatInProject = useCallback(
     async (project: ChatProject) => {
+      onEnterChat?.();
       await newSession();
       const file = usePiStore.getState().session?.sessionFile;
 
@@ -601,6 +641,7 @@ export function SessionSidebar({
   );
 
   const onOpen = async (file: string) => {
+    onEnterChat?.();
     const result = await switchSession(file);
     if (result.truncated) onTruncated();
     refresh();
@@ -915,7 +956,10 @@ export function SessionSidebar({
                 className="pd-child-row pd-focusable"
                 data-testid={`child-row-${c.childId}`}
                 data-selected={viewedChildId === c.childId || undefined}
-                onClick={() => setViewedChild(c.childId)}
+                onClick={() => {
+                  onEnterChat?.();
+                  setViewedChild(c.childId);
+                }}
               >
                 <span className="pd-child-row-icon">
                   <IconChat size={13} />

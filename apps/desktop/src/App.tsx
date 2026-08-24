@@ -278,6 +278,11 @@ export function App() {
                 onOpenSettings={openSettings}
                 onOpenConnectors={() => setView('connectors')}
                 onOpenScheduled={() => setView('scheduled')}
+                /* Picking a chat takes the content route down. Without this the
+                   hub (or Scheduled) stayed on screen while the session changed
+                   underneath it — you clicked New chat and kept looking at the
+                   model hub. */
+                onEnterChat={() => setView('chat')}
                 contentOverride={
                   view === 'models' ? (
                     <ModelsView />

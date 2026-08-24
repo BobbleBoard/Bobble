@@ -142,12 +142,16 @@ export function ChatApp({
   onOpenSettings,
   onOpenConnectors,
   onOpenScheduled,
+  onEnterChat,
 }: {
   /** Render this INSTEAD of the thread + composer, keeping the shell. */
   contentOverride?: ReactNode;
   onOpenSettings: (section: SettingsSection) => void;
   onOpenConnectors: () => void;
   onOpenScheduled: () => void;
+  /** The user navigated to a conversation — whoever owns `contentOverride`
+      needs to take it down, or the chat opens invisibly behind it. */
+  onEnterChat?: () => void;
 }) {
   const messageCount = usePiStore((s) => s.messages.length);
   const queuedCount = usePiStore((s) => s.queuedSends.length);
@@ -489,6 +493,7 @@ export function ChatApp({
                 onOpenConnectors={onOpenConnectors}
                 onOpenStub={setStub}
                 onOpenScheduled={onOpenScheduled}
+                onEnterChat={onEnterChat}
               />
             </div>
 
