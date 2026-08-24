@@ -745,9 +745,41 @@ export async function selectAuto(): Promise<void> {
  * resolve and no download prompt to run: the list this is called from only
  * offers models that are already on disk.
  */
+/**
+ * Pin a SPECIFIC model — and actually load it.
+ *
+ * THE BUG THIS FIXES. This used to persist the pin and stop there. Its sibling
+ * `selectTier` ends in `performSwitch`, which starts the server, respawns pi on
+ * the same session and re-points the provider; picking a model by name did none
+ * of that. So the choice was recorded, the picker drew its checkmark against
+ * it, and the inference server carried on holding whatever was already resident
+ * — which is why the user's composer chip kept saying "Qwen3.5 4B (MTP)" after he
+ * picked LFM (it was reporting the truth), and why the very next turn answered
+ * "fetch failed": pi had been re-pointed at a provider model nobody had loaded.
+ *
+ * Two surfaces disagreeing was the visible symptom; this is the cause, and the
+ * chip's own fix (naming the pinned model) is only honest once the pin is real.
+ *
+ * NO-OP WHEN IT IS ALREADY RESIDENT, so re-picking the current model from the
+ * menu does not pay for a multi-second llama restart to arrive where it is.
+ */
 export async function selectModel(modelId: string): Promise<void> {
   useModelSelectionStore.getState().setPendingDownload(null);
   await setModelSelection({ mode: 'model', modelId });
+
+  if (useLlmStore.getState().status.model?.id === modelId) return;
+
+  const entry = useLlmStore.getState().catalog.find((e) => e.id === modelId);
+  const store = useModelSelectionStore.getState();
+  store.setSwitching({ toTier: entry?.tier ?? 'balanced', toName: entry?.displayName ?? modelId });
+  try {
+    await activateLocalModel(modelId);
+  } catch {
+    // Leave the current model in place; the next turn re-derives from live state
+    // — the same contract as performSwitch.
+  } finally {
+    useModelSelectionStore.getState().setSwitching(null);
+  }
 }
 
 export async function selectTier(tier: ModelTier): Promise<void> {

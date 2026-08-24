@@ -106,12 +106,12 @@ try {
     const task = TASKS[i];
     // A fresh chat per task: its own context and its own working folder.
     if (i > 0) {
-      await page.click('[data-testid="new-chat"]');
-      await page.waitForTimeout(2500);
+      await page.click('[data-testid="new-chat"]').catch(() => undefined);
+      await page.waitForTimeout(2500).catch(() => undefined);
     }
-    const before = await page.evaluate(
-      () => window.__pi_store?.().getState?.().messages?.length ?? 0,
-    );
+    const before = await page
+      .evaluate(() => window.__pi_store?.().getState?.().messages?.length ?? 0)
+      .catch(() => 0);
     const startedAt = Date.now();
     await page.click('[data-testid="composer-input"]');
     await page.keyboard.type(task.prompt);
@@ -138,44 +138,70 @@ try {
      */
     let done = false;
     while (Date.now() - startedAt < CAP_MS) {
-      done = await page.evaluate((n) => {
-        const ms = window.__pi_store?.().getState?.().messages ?? [];
-        const after = ms.slice(n);
-        if (!after.some((m) => m.kind === 'assistant')) return false;
-        return !after.some((m) => m.isStreaming === true);
-      }, before);
+      /*
+       * A FAILED POLL IS NOT A FAILED RUN. The renderer's execution context is
+       * destroyed and rebuilt whenever the pi bridge restarts — which it does on
+       * the first turn of a session, milliseconds after the send — and an
+       * unguarded `evaluate` there throws "Execution context was destroyed" and
+       * takes the whole ten-task run with it. Killed the first attempt one
+       * second into task 1.
+       */
+      done = await page
+        .evaluate((n) => {
+          const ms = window.__pi_store?.().getState?.().messages ?? [];
+          const after = ms.slice(n);
+          if (!after.some((m) => m.kind === 'assistant')) return false;
+          return !after.some((m) => m.isStreaming === true);
+        }, before)
+        .catch(() => false);
       if (done) break;
-      await page.waitForTimeout(3000);
+      await page.waitForTimeout(3000).catch(() => undefined);
     }
     const wallMs = Date.now() - startedAt;
 
-    const state = await page.evaluate((n) => {
-      const st = window.__pi_store?.().getState?.();
-      const ms = (st?.messages ?? []).slice(n);
-      let toolCalls = 0;
-      let usage;
-      let text = '';
-      const tools = [];
-      for (const m of ms) {
-        if (m.kind !== 'assistant') continue;
-        if (m.usage !== undefined) usage = m.usage;
-        for (const b of m.blocks ?? []) {
-          if (b.type === 'toolCall') {
-            toolCalls++;
-            if (tools.length < 40) tools.push(b.name ?? b.tool ?? '?');
+    const state = await page
+      .evaluate((n) => {
+        const st = window.__pi_store?.().getState?.();
+        const ms = (st?.messages ?? []).slice(n);
+        let toolCalls = 0;
+        let usage;
+        let text = '';
+        const tools = [];
+        for (const m of ms) {
+          if (m.kind !== 'assistant') continue;
+          if (m.usage !== undefined) usage = m.usage;
+          for (const b of m.blocks ?? []) {
+            if (b.type === 'toolCall') {
+              toolCalls++;
+              if (tools.length < 40) tools.push(b.name ?? b.tool ?? '?');
+            }
+            if (b.type === 'text') text += b.text ?? '';
           }
-          if (b.type === 'text') text += b.text ?? '';
         }
-      }
-      return {
-        toolCalls,
-        tools,
-        usage,
-        text: text.slice(0, 4000),
-        cwd: st?.session?.cwd ?? null,
-        sessionFile: st?.session?.sessionFile ?? null,
-      };
-    }, before);
+        return {
+          toolCalls,
+          tools,
+          usage,
+          text: text.slice(0, 4000),
+          /*
+           * THE WORKING FOLDER, and it is not on the session object. MEASURED on
+           * the first Ling run: `session.cwd` is undefined, so every task reported
+           * zero files while the model was in fact writing them — a grader that
+           * would have failed a passing model. The project store is where the
+           * resolved workspace path actually lives.
+           */
+          cwd: window.__pi_project?.().getState?.().activePath ?? st?.session?.cwd ?? null,
+          sessionFile: st?.session?.sessionFile ?? null,
+        };
+      }, before)
+      .catch(() => ({
+        toolCalls: 0,
+        tools: [],
+        usage: undefined,
+        text: '',
+        cwd: null,
+        sessionFile: null,
+      }));
 
     const files = [];
     if (state.cwd !== null && existsSync(state.cwd)) {
