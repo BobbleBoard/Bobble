@@ -316,20 +316,26 @@ export function OrgAvatar({
   const shell = (children: React.ReactNode, style?: React.CSSProperties) => (
     <span
       /*
-       * A DISC, NOT A ROUNDED SQUARE. Publishers upload whatever they like —
-       * seen in six consecutive rows: a black circle, a bare monogram, a white
-       * circle, a green circle and a hard-cornered square — and a rounded-square
-       * frame preserves every one of those shapes, so the column read as six
-       * different kinds of object. Cropping them all to the same disc is what
-       * every avatar column does, and it costs nothing: a logo drawn inside a
-       * square canvas keeps its centre.
+       * A BORDERED SQUIRCLE — the app-icon shape. the user, with a reference image
+       * of three of them: "border organization icons and embed them into shapes
+       * as shown rather than circles."
+       *
+       * The problem a disc was solving is still solved: publishers upload
+       * whatever they like (a black circle, a bare monogram, a white circle, a
+       * hard-cornered square), and left unframed the column read as six
+       * different kinds of object. The frame is what unifies them; a disc was
+       * one way to draw it and this is the other, and it is the one that reads
+       * as "this is a piece of software by someone" rather than "this is a
+       * person". The radius is a fraction of the size so a 32px row badge and a
+       * 40px header badge are the same shape, not the same number of pixels.
        */
-      className={`inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full font-medium ${className ?? ''}`}
+      className={`inline-flex shrink-0 items-center justify-center overflow-hidden font-medium ${className ?? ''}`}
       style={{
         width: size,
         height: size,
+        borderRadius: Math.round(size * 0.28),
         background: 'var(--pd-bg-inset)',
-        boxShadow: 'inset 0 0 0 1px color-mix(in oklab, var(--pd-text-primary) 10%, transparent)',
+        boxShadow: 'inset 0 0 0 1px color-mix(in oklab, var(--pd-text-primary) 14%, transparent)',
         ...style,
       }}
       data-testid={`org-avatar-${label}`}

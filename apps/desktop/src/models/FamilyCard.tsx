@@ -241,10 +241,13 @@ export function FamilyCard({
             type="button"
             data-testid={`family-download-${v.repo}:${v.label}`}
             onClick={() => onDownload(v)}
-            /* SECONDARY. The card already has one solid-blue Quick Download in
-               its header; a second identical blue on every child row makes a
-               list of six variants look like six competing calls to action. */
-            className="pd-focusable pd-quiet-accent shrink-0 rounded-full px-3 py-1 text-caption font-medium transition-colors"
+            /* ONE DOWNLOAD BUTTON IN THIS APP. the user: "those download buttons
+               need to be the same as the others, blue background white text,
+               exact same as the others." The tinted second rank made the
+               variant rows read as a different, weaker kind of control — and a
+               user does not care which of two blues is more important, only
+               which thing is the button. */
+            className="pd-focusable shrink-0 rounded-full bg-accent-primary px-3 py-1 text-caption font-medium text-text-on-accent transition-opacity hover:opacity-90"
           >
             Download
           </button>

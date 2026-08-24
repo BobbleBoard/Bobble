@@ -487,6 +487,16 @@ function Chip({ label, value, icon }: { label?: string; value: string; icon?: Re
 }
 
 /**
+ * The pinned panel's height.
+ *
+ * A HEIGHT, not a max-height: the dividing border has to run the whole column
+ * whether the card is two lines or two thousand, and a max-height stops it
+ * wherever the content happens to end. The subtrahend is the chrome above the
+ * scroll area (title block, tabs, filter row) plus its bottom padding.
+ */
+const DETAIL_HEIGHT = 'h-[calc(100vh-236px)]';
+
+/**
  * Does the model's own name already state its parameter count?
  *
  * Most do — "Qwen3.5 9B · MLX" — and appending "· 9B" to the line underneath
@@ -1847,7 +1857,15 @@ export function ModelsView() {
       ) : null}
 
       <ScrollArea className="min-h-0 flex-1">
-        <div className="px-6 pb-10">
+        {/*
+          MORE ROOM AT THE BOTTOM. the user: "I scrolled to the bottom here and the
+          stable 3 audio is cut off on the bottom." At max scroll the last card
+          cleared the fold by exactly the 40px of padding — and the scroll area
+          paints a 16px bottom fade over that, so the final card was landing in
+          a 40px gap with a gradient across half of it. The last row of a long
+          list should end well clear of the edge, not just barely inside it.
+        */}
+        <div className="px-6 pb-16">
           {(
             kind === 'datasets'
               ? dsLoading && datasets.length === 0
@@ -1930,20 +1948,27 @@ export function ModelsView() {
                 data-testid="models-layout"
                 data-view={view}
                 className={cx(
-                  'grid gap-5',
+                  'grid',
                   // The curated list is cards, not a table, so it keeps the
                   // detail pane beside it even in the compact view — otherwise
                   // clicking a version would have nowhere to show it.
+                  //
+                  // NO GAP THERE. The pane is a panel divided from the list by
+                  // one hairline, not a card floating beside it, so the two
+                  // columns meet and the border does the separating.
                   curated
-                    ? 'grid-cols-[minmax(0,1fr)_420px]'
+                    ? 'grid-cols-[minmax(0,1fr)_460px] gap-0'
                     : view === 'compact'
-                      ? ''
+                      ? 'gap-5'
                       : view === 'split'
-                        ? 'grid-cols-[minmax(0,1fr)_420px]'
-                        : 'grid-cols-[300px_minmax(0,1fr)]',
+                        ? 'grid-cols-[minmax(0,1fr)_420px] gap-5'
+                        : 'grid-cols-[300px_minmax(0,1fr)] gap-5',
                 )}
               >
-                <div>
+                {/* A gutter, so the cards do not run into the divider. With the
+                    columns flush the family cards' right borders sat ~8px from
+                    the panel's hairline and read as one crowded double line. */}
+                <div className={curated ? 'pr-6' : undefined}>
                   {/*
                    * TWO HEADINGS ON THE CURATED TAB, not one. the user: "the little
                    * 'recommended' text shouldn't be there, the 5 cards you show
@@ -2230,10 +2255,12 @@ export function ModelsView() {
                   /* The pane is pinned and empty until something is picked;
                      saying so beats a 420px hole beside the list. */
                   <aside
-                    /* A DASHED BORDER READS AS A DROP TARGET. This is an empty
-                       state, not a place to drag something onto — so it is the
-                       same card as everything else on the page, just quiet. */
-                    className="pd-hub-card sticky top-0 self-start p-5 text-footnote text-text-muted"
+                    /* Same panel as the filled state, so nothing moves or
+                       changes shape when a version is picked. */
+                    className={cx(
+                      'pd-detail-panel sticky top-0 self-start text-footnote text-text-muted',
+                      DETAIL_HEIGHT,
+                    )}
                     data-testid="curated-detail-hint"
                   >
                     Open a family and pick a version to see its card, its quant ladder and what it
@@ -2262,8 +2289,17 @@ export function ModelsView() {
                       // to carry its own lighter border and a 5%-black shadow
                       // that vanished on a dark theme, so the one pane that is
                       // always on screen was the one with no visible edge.
-                      'pd-hub-card pd-detail-scroll sticky top-0 self-start overflow-y-auto p-5',
-                      view === 'detail' ? 'max-h-[calc(100vh-190px)]' : 'max-h-[calc(100vh-260px)]',
+                      'pd-detail-scroll sticky top-0 self-start overflow-y-auto',
+                      // Curated: a full-height panel. Otherwise: the old card,
+                      // which still floats beside a TABLE and should.
+                      curated
+                        ? cx('pd-detail-panel', DETAIL_HEIGHT)
+                        : cx(
+                            'pd-hub-card p-5',
+                            view === 'detail'
+                              ? 'max-h-[calc(100vh-190px)]'
+                              : 'max-h-[calc(100vh-260px)]',
+                          ),
                     )}
                     data-testid="model-detail"
                     data-view={view}

@@ -2398,18 +2398,20 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
   border: 1px solid color-mix(in oklab, var(--pd-text-primary) 14%, var(--pd-bg-raised));
   border-radius: 12px;
   background: var(--pd-bg-raised);
-  box-shadow:
-    0 1px 3px rgb(0 0 0 / 18%),
-    0 4px 12px rgb(0 0 0 / 10%);
+  /*
+   * LIGHT. the user: "lessen the shadows here, (all not just this type of card,
+   * hover and regular)". The border does the separating now — a drop shadow
+   * deep enough to be noticed on its own makes a list of eight cards look like
+   * eight things hovering at different depths.
+   */
+  box-shadow: 0 1px 2px rgb(0 0 0 / 7%);
   transition:
     border-color var(--pd-duration-fast) var(--pd-easing-standard),
     box-shadow var(--pd-duration-fast) var(--pd-easing-standard);
 }
 .pd-hub-card:hover {
   border-color: var(--pd-border-strong);
-  box-shadow:
-    0 2px 6px rgb(0 0 0 / 22%),
-    0 8px 20px rgb(0 0 0 / 14%);
+  box-shadow: 0 2px 5px rgb(0 0 0 / 10%);
 }
 
 /*
@@ -2446,8 +2448,16 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
    * first card, permanently showing a back arrow that went nowhere. Snap buys
    * nothing on a free-browsing row of unequal-width cards.
    */
-  padding: 6px 16px 16px;
+  /*
+   * THE HARD LINE UNDER THE ROW. `overflow-x: auto` forces `overflow-y: auto`,
+   * so the bottom of this box is a CLIP — and the cards' shadows were reaching
+   * exactly as far as the padding, which sliced them off at a dead-straight
+   * horizontal edge running the width of the row. the user caught it twice. The
+   * shadows are lighter now and the padding clears them with room to spare.
+   */
+  padding: 8px 16px 28px;
   margin-inline: -16px;
+  margin-bottom: -12px;
   scrollbar-width: none;
   --pd-fade: 40px;
   -webkit-mask-image: linear-gradient(
@@ -2862,19 +2872,44 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
 }
 
 /*
- * THE SECOND-RANK BLUE.
+ * THE MODEL CARD IS A PANEL, NOT A CARD.
  *
- * A family card carries one solid Quick Download in its header and then one
- * Download per variant underneath. Painted the same accent, six variants read
- * as six equally-urgent calls to action and the header's primary stops leading.
- * Same hue, a fraction of the weight: the hierarchy is visible without the row
- * losing its identity as the blue button.
+ * the user: "the model card, come to think of it, it doesn't at all need to be in a
+ * floating card, just have it use as much area as is there. just put a border
+ * between the 'more' area and the model card and fade out on the top edge."
+ *
+ * Right — it is the only thing that can ever be in that column, it is pinned
+ * there for the life of the page, and a rounded card with a shadow floating in
+ * a fixed slot is chrome drawn around a region that is already a region. So it
+ * takes the full height, runs to the window edge, and one hairline separates it
+ * from the list.
+ *
+ * THE FADE sits in the top padding, so at rest it washes nothing out; it only
+ * bites once content scrolls up into it, which is the moment a hard clip would
+ * otherwise slice a line of text in half.
  */
-.pd-quiet-accent {
-  background: color-mix(in oklab, var(--pd-accent-primary) 16%, transparent);
-  color: var(--pd-accent-primary);
-}
-
-.pd-quiet-accent:hover {
-  background: color-mix(in oklab, var(--pd-accent-primary) 28%, transparent);
+.pd-detail-panel {
+  padding: 24px 20px 28px 24px;
+  /* Past the page's own 24px gutter, so the panel reaches the window edge. */
+  margin-right: -24px;
+  /*
+   * THE DIVIDER IS A BACKGROUND STRIPE, NOT A BORDER — so the mask below can
+   * fade it. A real `border-left` started with a dead-straight cut at the top
+   * of the column, which is the same hard edge this whole pass is about.
+   * `background-attachment` defaults to `scroll`, which in an overflow container
+   * means "fixed to the element", so the stripe stays put while the card
+   * scrolls past it.
+   */
+  background-image: linear-gradient(
+    to bottom,
+    var(--pd-border-default),
+    var(--pd-border-default)
+  );
+  background-size: 1px 100%;
+  background-repeat: no-repeat;
+  background-position: left top;
+  /* The fade lands in the top padding, so at rest it washes nothing out; it
+     only bites once content scrolls up into it. */
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 24px);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 24px);
 }

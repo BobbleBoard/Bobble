@@ -120,6 +120,28 @@ try {
   });
   console.log('DETAIL:', JSON.stringify(detail, null, 1));
 
+  /*
+   * THE LAST CARD AT THE BOTTOM OF THE LIST. the user: "I scrolled to the bottom
+   * here and the stable 3 audio is cut off on the bottom." The scroll area
+   * paints a 16px bottom fade, so the final card has to clear the fold by more
+   * than that or it lands half inside a gradient.
+   */
+  const bottom = await win.evaluate(() => {
+    const sc = document.querySelector('[data-testid="models-layout"]')?.closest('.pd-scroll');
+    if (sc === null || sc === undefined) return null;
+    sc.scrollTop = sc.scrollHeight;
+    const last = [...document.querySelectorAll('[data-testid^="family-card-"]')].at(-1);
+    if (last === undefined) return null;
+    return {
+      id: last.getAttribute('data-testid'),
+      clearance: Math.round(sc.getBoundingClientRect().bottom - last.getBoundingClientRect().bottom),
+      fade: getComputedStyle(sc).getPropertyValue('--pd-fade-end').trim(),
+    };
+  });
+  console.log('BOTTOM:', JSON.stringify(bottom));
+  if (bottom !== null && bottom.clearance < 40)
+    throw new Error(`the last card clears the fold by only ${bottom.clearance}px`);
+
   // The version count on a single-version family.
   const versions = await win.evaluate(() =>
     [...document.querySelectorAll('[data-testid^="family-card-"]')].slice(0, 6).map((el) => {
