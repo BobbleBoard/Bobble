@@ -302,10 +302,36 @@ export function OrgAvatar({
     };
   }, [label]);
 
+  /*
+   * ONE CONTAINER, WHATEVER IS INSIDE IT.
+   *
+   * Seen at 4x zoom in three consecutive rows: Kokoro rendered as a black tile,
+   * Stability as a bare "S." floating on the card with no edge at all, and Qwen
+   * as a white circle. Three treatments of the same object, because only the
+   * BRAND-MARK path set a background and the fetched-avatar path set none — so
+   * the shape of the badge was decided by whatever the publisher happened to
+   * upload. The backing and the hairline are unconditional now; a logo with its
+   * own opaque square simply covers them.
+   */
   const shell = (children: React.ReactNode, style?: React.CSSProperties) => (
     <span
-      className={`inline-flex shrink-0 items-center justify-center overflow-hidden rounded-lg font-medium ${className ?? ''}`}
-      style={{ width: size, height: size, ...style }}
+      /*
+       * A DISC, NOT A ROUNDED SQUARE. Publishers upload whatever they like —
+       * seen in six consecutive rows: a black circle, a bare monogram, a white
+       * circle, a green circle and a hard-cornered square — and a rounded-square
+       * frame preserves every one of those shapes, so the column read as six
+       * different kinds of object. Cropping them all to the same disc is what
+       * every avatar column does, and it costs nothing: a logo drawn inside a
+       * square canvas keeps its centre.
+       */
+      className={`inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full font-medium ${className ?? ''}`}
+      style={{
+        width: size,
+        height: size,
+        background: 'var(--pd-bg-inset)',
+        boxShadow: 'inset 0 0 0 1px color-mix(in oklab, var(--pd-text-primary) 10%, transparent)',
+        ...style,
+      }}
       data-testid={`org-avatar-${label}`}
       title={label}
     >

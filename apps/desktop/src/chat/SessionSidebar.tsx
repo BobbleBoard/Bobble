@@ -1093,7 +1093,11 @@ export function SessionSidebar({
                 <span className="pd-child-row-icon">
                   <IconImage size={13} />
                 </span>
-                <span className="pd-child-row-label">Studio</span>
+                {/* "Studio" sat directly beneath "3D Studio" in the same list,
+                    which made the pair read as one thing and its 3D variant
+                    rather than two different workspaces. The name says what it
+                    makes, the way its neighbour does. */}
+                <span className="pd-child-row-label">Image &amp; Video</span>
               </button>
             </div>
           ) : null}

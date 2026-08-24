@@ -60,6 +60,8 @@ export interface DownloadBarProps {
   /** Bytes so far and expected — revealed on hover, per the spec above. */
   readonly received?: number;
   readonly total?: number | null;
+  /** "45s left", already formatted — omitted when the rate is too noisy. */
+  readonly eta?: string;
   /** Tooltip on the X — which download this is, when several could run. */
   readonly label?: string;
   /** Fill the row it sits in rather than taking a fixed width. */
@@ -72,6 +74,7 @@ export function DownloadBar({
   onCancel,
   received,
   total,
+  eta,
   label = 'Cancel download',
   grow = false,
   testid = 'download-bar',
@@ -79,11 +82,12 @@ export function DownloadBar({
   const [hovered, setHovered] = useState(false);
   const pct = fraction === null ? null : Math.round(Math.max(0, Math.min(1, fraction)) * 100);
   const known = received !== undefined && total !== undefined && total !== null && total > 0;
+  const left = eta === undefined || eta === '' ? '' : ` · ${eta}`;
   const caption = known
-    ? `${compactBytes(received)} / ${compactBytes(total)}${pct === null ? '' : ` · ${pct}%`}`
+    ? `${compactBytes(received)} / ${compactBytes(total)}${pct === null ? '' : ` · ${pct}%`}${left}`
     : pct === null
       ? 'Starting…'
-      : `${pct}%`;
+      : `${pct}%${left}`;
 
   return (
     <span

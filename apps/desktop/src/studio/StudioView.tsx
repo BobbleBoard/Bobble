@@ -89,7 +89,7 @@ export function StudioView(): JSX.Element {
           <IconChevronLeft size={16} />
         </button>
         <div>
-          <h1 className="text-heading text-text-primary">Studio</h1>
+          <h1 className="text-heading text-text-primary">Image &amp; Video Studio</h1>
           <p className="text-footnote text-text-muted">
             Images and video, generated on this machine with ComfyUI.
           </p>

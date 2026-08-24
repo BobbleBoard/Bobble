@@ -79,7 +79,7 @@ const FIT_PILL: Record<
   },
   'too-big': {
     tone: 'danger',
-    label: 'Too big for this Mac',
+    label: 'Too large',
     why: 'Needs more memory than this machine has.',
   },
 };
@@ -127,21 +127,57 @@ export function FamilyCard({
     return f === 'unknown' ? best : f;
   }, 'unknown');
 
+  /**
+   * Does this variant's own label already state a size?
+   *
+   * A substring check was not enough: the label "0.8B" and the fallback "800M"
+   * are the same number in different units, so the row read "0.8B 800M". If the
+   * label names a parameter count at all, it has already answered the question.
+   */
+  const SAYS_ITS_SIZE = /\d+(?:\.\d+)?\s*[BM]\b/i;
+
   const variantRow = (v: RecommendedVariant) => {
     const here = selectedRepo === v.repo;
     const have = downloaded.has(v.repo);
     const fit = fitFor(v, memoryGB);
     const pct = progress[v.repo];
-    const size = v.approxBytes !== undefined ? compactBytes(v.approxBytes) : paramsLabel(v.paramsB);
+    /*
+     * NOT THE SAME FACT TWICE. With the size moved next to the label, rows in
+     * families whose labels ARE their parameter count came out as "0.8B 800M",
+     * "2B 2B", "4B 4B" — the fallback re-stating what the reader had just read,
+     * once in B and once in M. Real bytes are always worth showing; the
+     * parameter fallback only earns its place when the label does not already
+     * say it.
+     */
+    const fallback = paramsLabel(v.paramsB);
+    const size =
+      v.approxBytes !== undefined
+        ? compactBytes(v.approxBytes)
+        : fallback !== '' && !SAYS_ITS_SIZE.test(v.label)
+          ? fallback
+          : undefined;
     return (
       <div
         key={`${v.repo}:${v.label}`}
         data-testid={`family-variant-${v.repo}:${v.label}`}
         data-selected={here}
+        /*
+         * SELECTED IS NOT HOVER. Both states used to paint the same pale wash,
+         * so the open variant looked permanently moused-over — and since the
+         * wash is LIGHTER than the card, the child row read as raised out of
+         * its own parent. Selection is now an accent rail plus a faint accent
+         * tint, which is a different signal from the neutral hover, and both
+         * sit at or below the card's own surface.
+         */
         className={cx(
-          'flex items-center gap-3 rounded-lg px-2.5 py-2 text-left transition-colors',
-          here ? 'bg-bg-active' : 'hover:bg-bg-hover',
+          'flex items-center gap-3 rounded-l-none rounded-r-lg border-l-2 px-2.5 py-2 text-left transition-colors',
+          here ? 'border-accent-primary' : 'border-transparent hover:bg-bg-hover',
         )}
+        style={
+          here
+            ? { background: 'color-mix(in oklab, var(--pd-accent-primary) 12%, transparent)' }
+            : undefined
+        }
       >
         <button
           type="button"
@@ -151,6 +187,14 @@ export function FamilyCard({
           <span className="min-w-0 flex-1">
             <span className="flex flex-wrap items-center gap-1.5">
               <span className="truncate text-footnote text-text-primary">{v.label}</span>
+              {/* MEASURED: pushed to the far right of a 1100px card, the size
+                  sat alone across a screen-wide gap from the name it belongs
+                  to — "base" at one end and "500M" at the other. It is part of
+                  the model's name in every other surface here, so it reads as
+                  one phrase. */}
+              {size === undefined ? null : (
+                <span className="shrink-0 text-caption text-text-muted tabular-nums">{size}</span>
+              )}
               {(v.tasks ?? []).map((t) => (
                 <Pill key={t} tone="info" testid={`task-${t}`}>
                   {TASK_LABEL[t]}
@@ -166,7 +210,6 @@ export function FamilyCard({
               <span className="mt-0.5 block truncate text-caption text-text-muted">{v.note}</span>
             ) : null}
           </span>
-          <span className="shrink-0 text-caption text-text-muted tabular-nums">{size}</span>
         </button>
         {have ? (
           <Pill tone="success" icon={<IconCheck size={11} />} testid={`on-disk-${v.repo}`}>
@@ -188,7 +231,10 @@ export function FamilyCard({
             type="button"
             data-testid={`family-download-${v.repo}:${v.label}`}
             onClick={() => onDownload(v)}
-            className="pd-focusable shrink-0 rounded-full bg-accent-primary px-3 py-1 text-caption font-medium text-text-on-accent transition-opacity hover:opacity-90"
+            /* SECONDARY. The card already has one solid-blue Quick Download in
+               its header; a second identical blue on every child row makes a
+               list of six variants look like six competing calls to action. */
+            className="pd-focusable pd-quiet-accent shrink-0 rounded-full px-3 py-1 text-caption font-medium transition-colors"
           >
             Download
           </button>
@@ -218,7 +264,7 @@ export function FamilyCard({
     <div
       data-testid={`family-card-${family.id}`}
       data-open={open}
-      className="pd-model-card overflow-hidden"
+      className="pd-hub-card overflow-hidden"
     >
       {/* The header is a row, not a single button: it now holds a second control
           and a button inside a button is invalid markup. */}
@@ -227,7 +273,18 @@ export function FamilyCard({
           type="button"
           data-testid={`family-toggle-${family.id}`}
           aria-expanded={open}
-          onClick={() => setOpen((v) => !v)}
+          /*
+           * A ONE-VERSION FAMILY HAS NOTHING TO EXPAND. With the count and the
+           * chevron hidden (see below), clicking such a row opened a list of one
+           * — an unannounced disclosure whose whole content was the row you had
+           * just clicked. It opens the card instead, which is what you wanted
+           * from a row with exactly one thing in it.
+           */
+          onClick={() => {
+            const only = shown.length === 1 ? shown[0] : undefined;
+            if (only !== undefined) onSelect(only.repo);
+            else setOpen((v) => !v);
+          }}
           className="pd-focusable flex min-w-0 flex-1 items-center gap-3 text-left"
         >
           <OrgAvatar org={family.org} size={32} />
@@ -247,8 +304,11 @@ export function FamilyCard({
                   Fast
                 </Pill>
               ) : null}
+              {/* Filled, like every other tag in the hub. As an outline neutral
+                  it was the one grey hairline in a row of tinted pills, which
+                  reads as disabled rather than informative. */}
               {installKindOf(family) === 'gen' ? (
-                <Pill tone="neutral" outline title="Runs on the generation stack, not llama.cpp">
+                <Pill tone="info" title="What this family generates">
                   {family.output}
                 </Pill>
               ) : null}
@@ -263,46 +323,66 @@ export function FamilyCard({
                   title={FIT_PILL['too-big'].why}
                   testid={`family-fit-${family.id}`}
                 >
-                  Not for this Mac
+                  Too large
                 </Pill>
+              ) : null}
+              {/*
+               * NOTHING TO SAY ABOUT ONE VERSION. A family with a single member
+               * was offering "1 version ⌄" and an expansion that shows the same
+               * model again at the same size — a control whose only outcome is
+               * to repeat itself. Count and chevron appear from two upwards.
+               *
+               * AND IT SITS WITH THE NAME. Right-aligned it floated in the
+               * middle of a 1100px row, 700px from the name it counts and
+               * 150px from a button it has nothing to do with, which made a
+               * disclosure control read as a stray statistic.
+               */}
+              {shown.length > 1 ? (
+                <span className="flex shrink-0 items-center gap-0.5 text-footnote text-text-muted tabular-nums">
+                  {shown.length} versions
+                  <IconChevronDown
+                    size={15}
+                    className={cx('transition-transform duration-200', open && 'rotate-180')}
+                  />
+                </span>
               ) : null}
             </span>
           </span>
-          <span className="shrink-0 text-footnote text-text-muted tabular-nums">
-            {shown.length} {shown.length === 1 ? 'version' : 'versions'}
-          </span>
-          <IconChevronDown
-            size={16}
-            className={cx(
-              'shrink-0 text-text-muted transition-transform duration-200',
-              open && 'rotate-180',
-            )}
-          />
         </button>
 
-        {quick === undefined ? null : quickProgress !== undefined ? (
-          <span className="flex w-[150px] shrink-0 items-center">
-            <DownloadBar
-              grow
-              fraction={quickProgress.total > 0 ? quickProgress.fraction : null}
-              received={quickProgress.received}
-              total={quickProgress.total}
-              label={`Cancel ${family.name}`}
-              testid={`family-quick-progress-${family.id}`}
-              onCancel={() => onCancel(quick.variant)}
-            />
-          </span>
-        ) : (
-          <button
-            type="button"
-            data-testid={quickHave ? `family-quick-use-${family.id}` : `family-quick-${family.id}`}
-            onClick={() => (quickHave ? onSelect(quick.variant.repo) : onDownload(quick.variant))}
-            title={`${quick.variant.label}${quick.quant === undefined ? '' : ` · ${quick.quant.rung.quant}`}`}
-            className="pd-focusable shrink-0 rounded-full bg-accent-primary px-4 py-1.5 text-body font-medium text-text-on-accent transition-opacity hover:opacity-90"
-          >
-            {quickHave ? 'Use' : 'Quick Download'}
-          </button>
-        )}
+        {/*
+         * A FIXED-WIDTH SLOT for the action, because the button inside it is
+         * not fixed width: "Use" is a third of "Quick Download", and with the
+         * cluster right-aligned every row's version count landed at a different
+         * x. Reserving the widest case makes the column straight.
+         */}
+        <span className="flex w-[150px] shrink-0 items-center justify-end">
+          {quick === undefined ? null : quickProgress !== undefined ? (
+            <span className="flex w-full items-center">
+              <DownloadBar
+                grow
+                fraction={quickProgress.total > 0 ? quickProgress.fraction : null}
+                received={quickProgress.received}
+                total={quickProgress.total}
+                label={`Cancel ${family.name}`}
+                testid={`family-quick-progress-${family.id}`}
+                onCancel={() => onCancel(quick.variant)}
+              />
+            </span>
+          ) : (
+            <button
+              type="button"
+              data-testid={
+                quickHave ? `family-quick-use-${family.id}` : `family-quick-${family.id}`
+              }
+              onClick={() => (quickHave ? onSelect(quick.variant.repo) : onDownload(quick.variant))}
+              title={`${quick.variant.label}${quick.quant === undefined ? '' : ` · ${quick.quant.rung.quant}`}`}
+              className="pd-focusable shrink-0 rounded-full bg-accent-primary px-4 py-1.5 text-body font-medium text-text-on-accent transition-opacity hover:opacity-90"
+            >
+              {quickHave ? 'Use' : 'Quick Download'}
+            </button>
+          )}
+        </span>
       </div>
 
       <div

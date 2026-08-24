@@ -55,6 +55,10 @@ try {
     [...document.querySelectorAll('[data-testid^="family-card-"]')].map((el) => ({
       id: el.getAttribute('data-testid')?.replace('family-card-', ''),
       title: el.querySelector('button span span span')?.textContent?.trim(),
+      // A family with one member has nothing to expand: clicking its header
+      // opens that model's card instead of a list of one. So the expansion
+      // measurements below have to pick a family that actually expands.
+      versions: el.querySelectorAll('[data-testid^="family-variant-"]').length,
     })),
   );
   console.log(`families on screen (${families.length}):`, families.map((f) => f.id).join(', '));
@@ -158,7 +162,7 @@ try {
   await win.screenshot({ path: path.join(OUT, '1b-row-hovered.png') });
 
   // 2. EXPAND — measure the card growing rather than trusting the class.
-  const first = families[0].id;
+  const first = (families.find((f) => f.versions > 1) ?? families[0]).id;
   const before = await box(`[data-testid="family-card-${first}"]`);
   await win.click(`[data-testid="family-toggle-${first}"]`);
   await win.waitForTimeout(120);
@@ -171,8 +175,12 @@ try {
   await win.screenshot({ path: path.join(OUT, '2-expanded.png') });
 
   // 3. PICK A VERSION → the pane fills; then SCROLL and it must stay put.
-  const variant = await win.evaluate(() =>
-    document.querySelector('[data-testid^="family-variant-"]')?.getAttribute('data-testid'),
+  const variant = await win.evaluate(
+    (id) =>
+      document
+        .querySelector(`[data-testid="family-card-${id}"] [data-testid^="family-variant-"]`)
+        ?.getAttribute('data-testid'),
+    first,
   );
   await win.click(`[data-testid="${variant}"] button`);
   await win.waitForTimeout(1200);
@@ -273,9 +281,9 @@ try {
   await win.waitForTimeout(300);
   await win.click('[data-testid="filter-output-image"]');
   await win.waitForTimeout(500);
+  // Z-Image publishes one build, so its row opens that model's card directly
+  // rather than expanding a list of one — one click, not two.
   await win.click('[data-testid="family-toggle-z-image"]');
-  await win.waitForTimeout(400);
-  await win.click('[data-testid="family-variant-Tongyi-MAI/Z-Image-Turbo:Turbo"] button');
   await win.waitForTimeout(1500);
   const genBlock = await win.evaluate(
     () => document.querySelector('[data-testid="detail-gen-install"]')?.textContent?.trim() ?? null,
@@ -342,12 +350,12 @@ try {
   await win.waitForTimeout(300);
   await win.click('[data-testid="filter-output-audio"]');
   await win.waitForTimeout(500);
-  await win.click('[data-testid="family-toggle-kokoro"]');
-  await win.waitForTimeout(400);
-  await win.click('[data-testid="family-download-hexgrad/Kokoro-82M:82M"]');
+  // Kokoro is a one-build family too, so the row's own Quick Download is the
+  // control that starts it — the same bar, in the header rather than a child.
+  await win.click('[data-testid="family-quick-kokoro"]');
   await win.waitForTimeout(2500);
-  const rowBar = await box('[data-testid="family-progress-hexgrad/Kokoro-82M"]');
-  const rowX = await box('[data-testid="family-progress-hexgrad/Kokoro-82M-cancel"]');
+  const rowBar = await box('[data-testid="family-quick-progress-kokoro"]');
+  const rowX = await box('[data-testid="family-quick-progress-kokoro-cancel"]');
   const topBar = await box('[data-testid="topbar-downloads"]');
   console.log('row bar:', JSON.stringify(rowBar), 'row X:', JSON.stringify(rowX));
   console.log('top bar while a repo downloads:', JSON.stringify(topBar));

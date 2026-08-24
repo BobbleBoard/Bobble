@@ -1412,19 +1412,31 @@ export function ModelsView() {
           <p className="mt-0.5 text-footnote text-text-muted">
             {kind === 'datasets'
               ? 'Discover, download, and train on datasets locally.'
-              : 'Discover, download, and run inference models locally.'}
+              : 'Find, download and run models on this computer.'}
           </p>
         </div>
         <div
           className="flex max-w-[560px] flex-wrap items-center justify-end gap-1.5"
           data-testid="hardware-strip"
         >
-          <Chip label="Local" value={String(localCount)} />
-          <Chip label="Models" value={String(all.length)} />
+          {/*
+           * READ THESE OUT LOUD. They used to say "4 Local · 21 Models · 24 GiB
+           * RAM · 15 CPU" — two different counts of models with no way to tell
+           * which was which, a unit nobody outside a datasheet writes, and
+           * "15 CPU", which is not a thing. This strip is the first line a new
+           * user's eye lands on after the title, and it was reading like a
+           * debug HUD.
+           *
+           * GB rather than GiB because `compactBytes` already labels 1024-based
+           * gigabytes "GB" on every card in the hub, and one screen should not
+           * use two conventions for the same quantity.
+           */}
+          <Chip label="downloaded" value={String(localCount)} />
+          <Chip label="available" value={String(all.length)} />
           {hw !== null ? (
             <>
-              <Chip label="RAM" value={`${hw.ramGiB} GiB`} />
-              <Chip label="CPU" value={String(hw.cpus)} />
+              <Chip label="GB RAM" value={String(hw.ramGiB)} />
+              <Chip label={hw.cpus === 1 ? 'CPU core' : 'CPU cores'} value={String(hw.cpus)} />
             </>
           ) : null}
         </div>
@@ -1432,7 +1444,10 @@ export function ModelsView() {
 
       {/* Tabs + search */}
       <div className="flex shrink-0 items-center gap-3 px-6 pb-3">
-        <div className="flex rounded-full bg-bg-inset p-0.5" data-testid="hub-kind">
+        <div
+          className="flex rounded-full border border-border-subtle bg-bg-inset p-0.5"
+          data-testid="hub-kind"
+        >
           {(['models', 'datasets'] as const).map((k) => (
             <button
               key={k}
@@ -1448,7 +1463,16 @@ export function ModelsView() {
             </button>
           ))}
         </div>
-        <div className={cx('flex rounded-full bg-bg-inset p-0.5', kind === 'datasets' && 'hidden')}>
+        {/* Same hairline as its neighbour: `bg-inset` is within a few percent of
+            the page on the dark themes, so without it the unselected half is a
+            word floating loose beside a button rather than the other side of a
+            switch. */}
+        <div
+          className={cx(
+            'flex rounded-full border border-border-subtle bg-bg-inset p-0.5',
+            kind === 'datasets' && 'hidden',
+          )}
+        >
           {(['discover', 'device'] as const).map((t) => (
             <button
               key={t}
@@ -1473,11 +1497,22 @@ export function ModelsView() {
         />
       </div>
 
-      {/* Filter row */}
+      {/*
+        Filter row.
+
+        WHAT IS HIDDEN ON THE RECOMMENDED VIEW, AND WHY. The curated list has its
+        own order — smallest way into each family first — and its own shape: a
+        family, not a repo. So the sort, the quant format and the capability
+        filter have nothing to act on there. Left visible they were worse than
+        useless: the sort read "Newest" over a list that is not sorted by date,
+        which is a control telling the user something untrue about what they are
+        looking at. The Recommended/All switch is right beside them, so the full
+        set is one click away and nothing is buried.
+       */}
       <div className="flex shrink-0 items-center gap-2 px-6 pb-4">
         {/* A quant format is a model property; datasets have none, so offering
             the control there is offering a dead end. */}
-        {kind === 'models' ? (
+        {kind === 'models' && !curated ? (
           <Dropdown
             testid="filter-format"
             value={filters.format}
@@ -1485,39 +1520,41 @@ export function ModelsView() {
             onChange={(format) => setFilters((f) => ({ ...f, format }))}
           />
         ) : null}
-        {kind === 'models' ? (
+        {kind === 'models' && !curated ? (
           <CapabilityFilter
             selected={filters.capabilities}
             options={capabilityOptions}
             onChange={(capabilities) => setFilters((f) => ({ ...f, capabilities }))}
           />
         ) : null}
-        <Dropdown
-          testid="filter-sort"
-          value={filters.sort}
-          options={SORT_OPTIONS}
-          onChange={(sort) => setFilters((f) => ({ ...f, sort }))}
-          footer={
-            <button
-              type="button"
-              data-testid="filter-only-fits"
-              onClick={() => setFilters((f) => ({ ...f, onlyFits: !f.onlyFits }))}
-              className="flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-left text-body text-text-secondary hover:bg-bg-hover"
-            >
-              <span
-                className={cx(
-                  'flex h-4 w-4 shrink-0 items-center justify-center rounded-full border',
-                  filters.onlyFits
-                    ? 'border-transparent bg-accent-primary text-text-on-accent'
-                    : 'border-border-strong',
-                )}
+        {curated ? null : (
+          <Dropdown
+            testid="filter-sort"
+            value={filters.sort}
+            options={SORT_OPTIONS}
+            onChange={(sort) => setFilters((f) => ({ ...f, sort }))}
+            footer={
+              <button
+                type="button"
+                data-testid="filter-only-fits"
+                onClick={() => setFilters((f) => ({ ...f, onlyFits: !f.onlyFits }))}
+                className="flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-left text-body text-text-secondary hover:bg-bg-hover"
               >
-                {filters.onlyFits ? <IconCheck size={11} /> : null}
-              </span>
-              <span className="whitespace-nowrap">Only show models that fit</span>
-            </button>
-          }
-        />
+                <span
+                  className={cx(
+                    'flex h-4 w-4 shrink-0 items-center justify-center rounded-full border',
+                    filters.onlyFits
+                      ? 'border-transparent bg-accent-primary text-text-on-accent'
+                      : 'border-border-strong',
+                  )}
+                >
+                  {filters.onlyFits ? <IconCheck size={11} /> : null}
+                </span>
+                <span className="whitespace-nowrap">Only show models that fit</span>
+              </button>
+            }
+          />
+        )}
         {/*
          * RECOMMENDED / ALL. the user: "by default, the 'newest' will show just a
          * bunch of random models, so if you could just have reputable
@@ -1527,7 +1564,10 @@ export function ModelsView() {
          * is the single biggest lever over what the list contains, and it should
          * be visible without opening anything.
          */}
-        <div className="flex rounded-full bg-bg-inset p-0.5" data-testid="hub-scope">
+        <div
+          className="flex rounded-full border border-border-subtle bg-bg-inset p-0.5"
+          data-testid="hub-scope"
+        >
           {(['recommended', 'all'] as const).map((v) => (
             <button
               key={v}
@@ -1599,31 +1639,33 @@ export function ModelsView() {
          * together. Capping repo bytes would hide a 27B repo that holds a
          * perfectly good 8GB Q4 — so the axis there is B of parameters.
          */}
-        <label
-          className="flex items-center gap-2 rounded-full border border-border-subtle bg-bg-raised px-3.5 py-1.5 text-footnote text-text-secondary shadow-[0_1px_2px_rgba(0,0,0,0.03)]"
-          data-testid="filter-size"
-        >
-          <span className="whitespace-nowrap">
-            {filters.maxSize === undefined
-              ? 'Any size'
-              : `≤ ${filters.maxSize}${sizeUnit === 'gb' ? ' GB' : 'B params'}`}
-          </span>
-          <input
-            type="range"
-            min={1}
-            max={SIZE_CAP_MAX}
-            step={1}
-            aria-label={sizeUnit === 'gb' ? 'Maximum size in GB' : 'Maximum parameters in B'}
-            value={filters.maxSize ?? SIZE_CAP_MAX}
-            onChange={(e) => {
-              const v = Number(e.target.value);
-              // The top of the range means "no cap", so the slider can be
-              // dismissed without a second control.
-              setFilters((f) => ({ ...f, maxSize: v >= SIZE_CAP_MAX ? undefined : v }));
-            }}
-            className="h-1 w-24 cursor-pointer accent-[var(--pd-accent-primary)]"
-          />
-        </label>
+        {curated ? null : (
+          <label
+            className="flex items-center gap-2 rounded-full border border-border-subtle bg-bg-raised px-3.5 py-1.5 text-footnote text-text-secondary shadow-[0_1px_2px_rgba(0,0,0,0.03)]"
+            data-testid="filter-size"
+          >
+            <span className="whitespace-nowrap">
+              {filters.maxSize === undefined
+                ? 'Any size'
+                : `≤ ${filters.maxSize}${sizeUnit === 'gb' ? ' GB' : 'B params'}`}
+            </span>
+            <input
+              type="range"
+              min={1}
+              max={SIZE_CAP_MAX}
+              step={1}
+              aria-label={sizeUnit === 'gb' ? 'Maximum size in GB' : 'Maximum parameters in B'}
+              value={filters.maxSize ?? SIZE_CAP_MAX}
+              onChange={(e) => {
+                const v = Number(e.target.value);
+                // The top of the range means "no cap", so the slider can be
+                // dismissed without a second control.
+                setFilters((f) => ({ ...f, maxSize: v >= SIZE_CAP_MAX ? undefined : v }));
+              }}
+              className="h-1 w-24 cursor-pointer accent-[var(--pd-accent-primary)]"
+            />
+          </label>
+        )}
 
         {isFiltered ? (
           <button
@@ -2132,7 +2174,10 @@ export function ModelsView() {
                   /* The pane is pinned and empty until something is picked;
                      saying so beats a 420px hole beside the list. */
                   <aside
-                    className="sticky top-0 self-start rounded-2xl border border-border-subtle border-dashed p-5 text-footnote text-text-muted"
+                    /* A DASHED BORDER READS AS A DROP TARGET. This is an empty
+                       state, not a place to drag something onto — so it is the
+                       same card as everything else on the page, just quiet. */
+                    className="pd-hub-card sticky top-0 self-start p-5 text-footnote text-text-muted"
                     data-testid="curated-detail-hint"
                   >
                     Open a family and pick a version to see its card, its quant ladder and what it
@@ -2157,7 +2202,11 @@ export function ModelsView() {
                    */
                   <aside
                     className={cx(
-                      'sticky top-0 self-start overflow-y-auto rounded-2xl border border-border-subtle bg-bg-raised p-5 shadow-[0_1px_3px_rgba(0,0,0,0.05)]',
+                      // The same edge as every other card on the page. It used
+                      // to carry its own lighter border and a 5%-black shadow
+                      // that vanished on a dark theme, so the one pane that is
+                      // always on screen was the one with no visible edge.
+                      'pd-hub-card pd-detail-scroll sticky top-0 self-start overflow-y-auto p-5',
                       view === 'detail' ? 'max-h-[calc(100vh-190px)]' : 'max-h-[calc(100vh-260px)]',
                     )}
                     data-testid="model-detail"
@@ -2261,7 +2310,7 @@ export function ModelsView() {
                             className="mt-2 text-caption text-status-danger-fg"
                             data-testid="detail-gen-install"
                           >
-                            Needs more memory than this Mac has — it will download, but not run
+                            Needs more memory than this computer has — it will download, but not run
                             here.
                           </p>
                         ) : null}

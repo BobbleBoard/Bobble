@@ -111,7 +111,7 @@ function Card({
          noticable, apply to all the cards aswell." A hairline `border-subtle` on
          a dark surface is invisible; this is the default border plus a real
          shadow, and p-4 keeps the footer button off the edge it was touching. */
-      className="pd-model-card flex w-[300px] shrink-0 flex-col gap-3 p-4"
+      className="pd-hub-card flex w-[300px] shrink-0 flex-col gap-3 p-4"
       data-testid={`best-${rec.modality}`}
     >
       <button

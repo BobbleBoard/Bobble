@@ -249,7 +249,7 @@ export const RECOMMENDED_FAMILIES: readonly RecommendedFamily[] = [
         repo: 'unsloth/Qwen3.5-4B-MTP-GGUF',
         label: '4B',
         paramsB: 4,
-        note: 'The fast tier on a 16 GB Mac.',
+        note: 'The fast tier on a 16 GB machine.',
         minMemoryGB: 6,
       },
       {
@@ -410,7 +410,7 @@ export const RECOMMENDED_FAMILIES: readonly RecommendedFamily[] = [
     name: 'DeepSeek V4 Flash',
     org: 'unsloth',
     output: 'text',
-    blurb: 'A frontier-class open model. The small quants are the only ones a Mac holds.',
+    blurb: 'A frontier-class open model. The small quants are the only ones that fit a laptop.',
     variants: [
       {
         repo: 'unsloth/DeepSeek-V4-Flash-0731-GGUF',
@@ -517,7 +517,7 @@ export const RECOMMENDED_FAMILIES: readonly RecommendedFamily[] = [
     name: 'FLUX.2',
     org: 'black-forest-labs',
     output: 'image',
-    blurb: 'The photorealism leader among open weights. klein is the size that fits a Mac.',
+    blurb: 'The photorealism leader among open weights. klein is the size that fits a laptop.',
     variants: [
       {
         repo: 'black-forest-labs/FLUX.2-klein-4B',
@@ -566,9 +566,9 @@ export const RECOMMENDED_FAMILIES: readonly RecommendedFamily[] = [
   {
     id: 'ltx',
     name: 'LTX-Video',
-    org: 'city96',
+    org: 'Lightricks',
     output: 'video',
-    blurb: 'The fast end of open video, in quants a Mac can actually hold.',
+    blurb: 'The fast end of open video, in quants a laptop can actually hold.',
     fast: true,
     /*
      * QUANTS, NOT FULL PRECISION — and on a Mac that is not a preference, it is
@@ -808,7 +808,7 @@ export const RECOMMENDED_FAMILIES: readonly RecommendedFamily[] = [
   },
   {
     id: 'trellis',
-    name: 'TRELLIS.2',
+    name: 'TRELLIS',
     org: 'microsoft',
     output: '3d',
     blurb: 'The quality tier for image-to-3D, and what the 3D Studio generates with.',
@@ -816,7 +816,7 @@ export const RECOMMENDED_FAMILIES: readonly RecommendedFamily[] = [
       { repo: 'microsoft/TRELLIS-image-large', label: 'v1 large', paramsB: 1.2, minMemoryGB: 10 },
       {
         repo: 'microsoft/TRELLIS.2-4B',
-        label: '4B',
+        label: 'v2 · 4B',
         paramsB: 4,
         note: 'PBR textures.',
         minMemoryGB: 18,

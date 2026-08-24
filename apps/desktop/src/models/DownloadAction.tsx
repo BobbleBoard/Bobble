@@ -22,14 +22,9 @@
  * THE X IS DESTRUCTIVE AND LOOKS IT. Pausing keeps the `.part` file and cancel
  * throws it away, so cancel is red — the same reading as any other discard.
  */
-import { IconArrowUp, IconCheck, IconClose } from '@pi-desktop/ui';
+import { IconCheck } from '@pi-desktop/ui';
 import type { JSX } from 'react';
 import { DownloadBar } from './DownloadBar';
-
-/** The set has no download glyph; a rotated arrow is the mark this hub uses. */
-function IconDownload({ size = 14 }: { size?: number }) {
-  return <IconArrowUp size={size} className="rotate-180" />;
-}
 
 export interface DownloadActionProps {
   /** Already on disk — the button becomes a statement rather than an action. */
@@ -79,13 +74,20 @@ export function DownloadAction({
 
   if (!busy) {
     return (
+      /*
+       * NOT FULL WIDTH, and no glyph. MEASURED at 368px it was a blue slab
+       * across the whole pane while every other Download in the hub is a pill
+       * that ends where its word ends — two answers to the same question on one
+       * screen. The arrow that used to sit in it was `IconArrowUp` rotated,
+       * hairline against bold text, and it said nothing the word did not.
+       */
       <button
         type="button"
         data-testid={testid}
         onClick={onDownload}
-        className="pd-focusable mt-3 flex w-full items-center justify-center gap-1.5 rounded-full bg-accent-primary px-3 py-2.5 text-footnote font-medium text-text-on-accent transition-opacity hover:opacity-90"
+        className="pd-focusable mt-3 rounded-full bg-accent-primary px-5 py-2 text-body font-medium text-text-on-accent transition-opacity hover:opacity-90"
       >
-        <IconDownload size={14} /> Download
+        Download
       </button>
     );
   }
@@ -102,6 +104,12 @@ export function DownloadAction({
       <DownloadBar
         grow
         fraction={fraction !== null && fraction > 0 ? fraction : null}
+        /* The bytes and the estimate are what the hover card is FOR — this pane
+           was accepting them and dropping them on the floor, so the one bar a
+           user can sit and watch was the one with an empty caption. */
+        received={received}
+        total={total}
+        eta={eta}
         testid={`${testid}-bar`}
         onCancel={onCancel}
       />

@@ -2376,7 +2376,13 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
 }
 
 /*
- * THE MODEL CARD's chrome, in one place so the hub cannot end up with two kinds.
+ * THE HUB CARD's chrome, in one place so the hub cannot end up with two kinds.
+ *
+ * NAMED `pd-hub-card`, NOT `pd-model-card`. That name was already taken — by the
+ * typography rules for a README, three hundred lines above — so giving the
+ * container the same name put a border and a drop shadow around every rendered
+ * model card, nested inside the pane that already had one. Two meanings, one
+ * class, and the collision only showed up as a box inside a box at 2x zoom.
  *
  * the user: "bordering of the card something like shown or like a shadow, reasonably
  * noticable, apply to all the cards aswell." A `border-subtle` hairline is
@@ -2385,8 +2391,11 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
  * the DEFAULT weight and there is a real shadow under it, which is what survives
  * both themes.
  */
-.pd-model-card {
-  border: 1px solid var(--pd-border-default);
+.pd-hub-card {
+  /* MEASURED at 4x zoom: `border-default` on `bg-raised` is a ~4% step and
+     effectively invisible. Mixing toward the text colour gives an edge that
+     reads in both themes without becoming a drawn line. */
+  border: 1px solid color-mix(in oklab, var(--pd-text-primary) 14%, var(--pd-bg-raised));
   border-radius: 12px;
   background: var(--pd-bg-raised);
   box-shadow:
@@ -2396,7 +2405,7 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
     border-color var(--pd-duration-fast) var(--pd-easing-standard),
     box-shadow var(--pd-duration-fast) var(--pd-easing-standard);
 }
-.pd-model-card:hover {
+.pd-hub-card:hover {
   border-color: var(--pd-border-strong);
   box-shadow:
     0 2px 6px rgb(0 0 0 / 22%),
@@ -2425,9 +2434,20 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
   isolation: isolate;
 }
 .pd-carousel {
-  /* Room for the card shadows, which this container would otherwise clip. */
-  padding: 6px 2px 14px;
-  scroll-snap-type: x proximity;
+  /*
+   * ROOM ON ALL FOUR SIDES, pulled back out with a negative margin so the first
+   * card still lines up with the heading above it. MEASURED: with 2px of padding
+   * the first card sat flush against the clip and its left border and shadow had
+   * nowhere to live — the "obvious left cutoff".
+   *
+   * AND NO SCROLL-SNAP. That was the other half of the same bug: snapping aligns
+   * a child's start against the scroll PORT, so with any left padding the row
+   * came to rest at scrollLeft: 2 (measured) — permanently two pixels into the
+   * first card, permanently showing a back arrow that went nowhere. Snap buys
+   * nothing on a free-browsing row of unequal-width cards.
+   */
+  padding: 6px 16px 16px;
+  margin-inline: -16px;
   scrollbar-width: none;
   --pd-fade: 40px;
   -webkit-mask-image: linear-gradient(
@@ -2461,11 +2481,11 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
 .pd-carousel::-webkit-scrollbar {
   display: none;
 }
-.pd-carousel > * {
-  scroll-snap-align: start;
-}
 .pd-carousel-arrow {
   position: absolute;
+  /* Just outside the card edge, over the fade — an arrow sitting on top of a
+     Download button is a click the user did not mean to make ambiguous. */
+  margin-inline: -6px;
   top: 50%;
   transform: translateY(-50%);
   z-index: 5;
@@ -2493,7 +2513,14 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
   pointer-events: auto;
 }
 .pd-carousel-arrow:hover {
-  background: var(--pd-bg-hover);
+  /*
+   * the user: "maybe it's translucency" — and it was. `--pd-bg-hover` is an OVERLAY
+   * colour (rgba(255,255,255,0.06), measured), meant to be laid ON a surface,
+   * not to be one. Assigning it to `background` replaced the opaque
+   * `--pd-bg-raised` outright, so the card behind showed straight through the
+   * button. Mixed into the surface here instead, which is what the token is for.
+   */
+  background: color-mix(in oklab, var(--pd-text-primary) 8%, var(--pd-bg-raised));
 }
 
 /*
@@ -2781,4 +2808,61 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
 }
 .pd-quickmenu-editadd:disabled {
   opacity: 0.45;
+}
+
+/*
+ * THE PINNED DETAIL PANE'S SCROLLBAR, WHICH WAS SITTING ON ITS BORDER.
+ *
+ * Seen at 3x zoom: two vertical bars 30px apart down the right of the hub —
+ * the page's own, and the pane's — and the pane's was drawn ON TOP of the card
+ * edge, erasing the border it was meant to sit inside. A pinned pane is on
+ * screen the whole time you use this page, so its scrollbar is the one piece of
+ * chrome nobody can look away from.
+ *
+ * Reserving the gutter keeps the thumb off the border and stops the content
+ * shifting sideways when a short README makes the bar disappear.
+ */
+.pd-detail-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in oklab, var(--pd-text-primary) 18%, transparent) transparent;
+  scrollbar-gutter: stable;
+}
+
+.pd-detail-scroll::-webkit-scrollbar {
+  width: 10px;
+}
+
+.pd-detail-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.pd-detail-scroll::-webkit-scrollbar-thumb {
+  background: color-mix(in oklab, var(--pd-text-primary) 16%, transparent);
+  border-radius: 999px;
+  /* A transparent border keeps the thumb narrow and away from the card edge. */
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+
+.pd-detail-scroll:hover::-webkit-scrollbar-thumb {
+  background: color-mix(in oklab, var(--pd-text-primary) 30%, transparent);
+  background-clip: padding-box;
+}
+
+/*
+ * THE SECOND-RANK BLUE.
+ *
+ * A family card carries one solid Quick Download in its header and then one
+ * Download per variant underneath. Painted the same accent, six variants read
+ * as six equally-urgent calls to action and the header's primary stops leading.
+ * Same hue, a fraction of the weight: the hierarchy is visible without the row
+ * losing its identity as the blue button.
+ */
+.pd-quiet-accent {
+  background: color-mix(in oklab, var(--pd-accent-primary) 16%, transparent);
+  color: var(--pd-accent-primary);
+}
+
+.pd-quiet-accent:hover {
+  background: color-mix(in oklab, var(--pd-accent-primary) 28%, transparent);
 }
