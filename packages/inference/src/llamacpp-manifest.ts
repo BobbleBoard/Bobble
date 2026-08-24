@@ -14,6 +14,16 @@
  * NOTE (catalog correction): the W4 research catalog pinned ~b9907, but that
  * file was absent from the scratchpad at build time. The live latest at build
  * time was b9934; it is pinned here with its published digest.
+ *
+ * BUMPED b9934 → b10603 for `bailingmoe3`.
+ *
+ * MEASURED: b9934's libllama exports `bailingmoe` and `bailingmoe2` only, and
+ * Ling 3.0's GGUF declares `general.architecture = bailingmoe3` (read out of the
+ * file header: 128 experts x 1.0B, 8 used, 24 blocks, 131072 context). So the
+ * whole Ling family — the newest small MoE worth having — could not load at all
+ * on the pinned engine, and would have failed with an unknown-architecture error
+ * rather than anything a user could act on. b10603 has it; the tarball's sha256
+ * below was verified against the download, not just copied from the API.
  */
 export interface LlamaCppAsset {
   /** Asset file name within the release. */
@@ -34,12 +44,12 @@ export interface LlamaCppRelease {
 }
 
 export const PINNED_LLAMACPP: LlamaCppRelease = {
-  tag: 'b9934',
+  tag: 'b10603',
   repo: 'ggml-org/llama.cpp',
   macosArm64: {
-    name: 'llama-b9934-bin-macos-arm64.tar.gz',
-    sha256: 'f9338784c562b91b48e3044aab29f7f2b7664da456f05e945bbc10f4b546b502',
-    sizeBytes: 10721280,
+    name: 'llama-b10603-bin-macos-arm64.tar.gz',
+    sha256: '8cffd63989a0301d8d487e32d248d1c8c24e010634ebe42a783122006a4127f2',
+    sizeBytes: 10744173,
   },
 };
 

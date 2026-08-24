@@ -1078,6 +1078,56 @@ const MLX_QWEN36_27B: CatalogModel = {
   quantRange: 'OptiQ-4bit (KL-sensitivity mixed precision)',
 };
 
+/**
+ * Ling 3.0 Tiny — a 7.9B MoE with ~0.8B active (128 experts, 8 used).
+ *
+ * Read straight out of the GGUF header rather than trusted from a card:
+ * `general.architecture = bailingmoe3`, 128 experts x 1.0B, 8 used, 24 blocks,
+ * 131072 context. That architecture is why the pinned llama.cpp had to move —
+ * b9934 knows `bailingmoe` and `bailingmoe2` only, so every Ling 3.0 build
+ * would have failed to load with an unknown-architecture error.
+ *
+ * WHY IT IS WORTH A SLOT. The active-parameter count is what decides speed, and
+ * 0.8B active puts it in Qwen3.5-2B territory for tokens/sec while carrying
+ * 7.9B of total weights' worth of knowledge. That trade is the whole argument
+ * for small MoEs, and this is the current one.
+ *
+ * QUANTS from bloomer010 rather than unsloth, who have not published this repo
+ * — the user checked: "no direct from unsloth but this seems to have everything
+ * ... dynamic 2.0 still". The UD- builds there are Unsloth Dynamic 2.0.
+ */
+const LING3_TINY: CatalogModel = {
+  id: 'ling-3.0-tiny',
+  displayName: 'Ling 3.0 Tiny',
+  hfRepo: 'bloomer010/Ling-3.0-tiny-GGUF',
+  baseRepo: 'inclusionAI/Ling-3.0-tiny',
+  files: [
+    {
+      name: 'Ling-3.0-tiny-UD-Q6_K_XL.gguf',
+      bytes: 7_274_546_528,
+      quant: 'UD-Q6_K_XL',
+      sha256: 'a31376fc9c56309046cff6c43888adf180c5c40fa48228ef644937ee9bd5d64b',
+    },
+    {
+      name: 'Ling-3.0-tiny-UD-Q4_K_XL.gguf',
+      bytes: 5_340_611_552,
+      quant: 'UD-Q4_K_XL',
+      sha256: '7faee4091379ce1c644e09dd88848a8f0bc3348a216d2ee1c90a5388de6a5b13',
+    },
+  ],
+  license: 'MIT',
+  // An MoE's resident cost is its TOTAL weights, not its active ones — the
+  // router can reach any expert on any token, so all 128 have to be in memory.
+  minRamGB: 12,
+  contextWindow: 32_768,
+  input: ['text'],
+  verified: true,
+  engine: 'llamacpp',
+  publisher: { handle: 'bloomer010', reliable: false },
+  tier: 'fast',
+  quantRange: 'Q1–Q8 + UD + IQ',
+};
+
 export const CATALOG: readonly CatalogModel[] = [
   GEMMA4_E2B,
   GEMMA4_E4B,
@@ -1088,6 +1138,7 @@ export const CATALOG: readonly CatalogModel[] = [
   QWEN35_2B_MTP,
   QWEN35_4B_MTP,
   QWEN35_9B_MTP,
+  LING3_TINY,
   QWEN35_122B_A10B_MTP,
   QWEN36_27B_MTP,
   QWEN36_35B_A3B_MTP,

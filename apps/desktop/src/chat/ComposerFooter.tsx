@@ -106,6 +106,7 @@ export function ComposerFooter({
   const agentModel = usePiStore((s) => s.agent.model);
   const messages = usePiStore((s) => s.messages);
   const status = useLlmStore((s) => s.status);
+  const catalog = useLlmStore((s) => s.catalog);
   const download = useLlmStore((s) => s.download);
   // Round-12 (W3): the model chip + its picker are mode-aware. The picker itself
   // (Auto + the three capability tiers) is the shared TierPickerMenu; here we
@@ -119,8 +120,14 @@ export function ComposerFooter({
   // provider model name. Falls back to a "pick a model" affordance when nothing is
   // named yet.
   const loadedModelName = status.model?.displayName ?? agentModel?.name ?? null;
+  /* The PINNED model's own name, from the same catalog the picker's rows and
+     its checkmark come from — so the chip and the menu cannot disagree. */
+  const pinnedModelName =
+    selection.mode === 'model'
+      ? (catalog.find((e) => e.id === selection.modelId)?.displayName ?? null)
+      : null;
   const label =
-    chipLabel(userMode, selection, loadedModelName) ??
+    chipLabel(userMode, selection, loadedModelName, pinnedModelName) ??
     (piModels.length > 0 ? 'Choose model' : 'Pick a model');
 
   // Context window used by the info popover's input/output percentages (the

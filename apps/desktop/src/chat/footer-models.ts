@@ -89,6 +89,11 @@ export function chipLabel(
   userMode: UserMode,
   selection: ModelSelection,
   loadedModelName: string | null,
+  /**
+   * The display name of the model the user has PINNED, when they have pinned
+   * one. Separate from `loadedModelName` on purpose — see below.
+   */
+  pinnedModelName?: string | null,
 ): string | null {
   // Auto names the ACTUALLY-LOADED model in both user and power mode
   // ("Auto · gemma4 e2b"), resting on plain "Auto" before a model is resident.
@@ -96,6 +101,22 @@ export function chipLabel(
     return loadedModelName !== null ? `Auto · ${loadedModelName}` : 'Auto';
   // A pinned capability tier → the friendly tier label alone.
   if (selection.mode === 'tier') return TIER_LABEL[selection.tier];
-  // A pinned specific model → its friendly name (null → caller fallback).
+  /*
+   * A PINNED MODEL NAMES ITSELF, NOT WHATEVER IS STILL RESIDENT.
+   *
+   * the user: "lfm selected, but also qwen3.5-4b still selected in the input bar."
+   * Exactly — the picker showed a checkmark on LFM (it reads the persisted
+   * selection) while this chip kept saying Qwen3.5 4B, because it returned the
+   * model the inference server currently HOLDS. Two controls, one of them the
+   * trigger for the other, disagreeing about which model you are talking to.
+   *
+   * The resident model is the honest answer under Auto, where the whole point is
+   * that the app chose and you want to know what it chose. Under a pin the user
+   * has already said which one; the only thing the chip can usefully report is
+   * whether the app heard them. If the load is slow or fails, that belongs in
+   * the thread — which does say so — not in a chip that quietly names something
+   * else.
+   */
+  if (pinnedModelName !== undefined && pinnedModelName !== null) return pinnedModelName;
   return loadedModelName;
 }

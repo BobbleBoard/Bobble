@@ -103,3 +103,35 @@ describe('chipLabel (round-A #3)', () => {
     expect(chipLabel('user', { mode: 'model', modelId: 'm1' }, null)).toBeNull();
   });
 });
+
+describe('the chip and the picker must agree', () => {
+  /*
+   * the user, with a screenshot of the picker showing a checkmark on LFM while the
+   * composer chip still read "Qwen3.5 4B (MTP)": "lfm selected, but also
+   * qwen3.5-4b still selected in the input bar."
+   *
+   * The chip returned the model the inference SERVER holds. Under Auto that is
+   * the useful answer — the point of Auto is telling you what it chose. Under a
+   * pin the user has already said which one, and naming a different model is
+   * the one thing the trigger for that very menu must not do.
+   */
+  const pinned = { mode: 'model', modelId: 'lfm2.5-2.6b' } as const;
+
+  it('names the PINNED model, not the one still resident', () => {
+    expect(chipLabel('power', pinned, 'Qwen3.5 4B (MTP)', 'LFM2.5 2.6B')).toBe('LFM2.5 2.6B');
+  });
+
+  it('falls back to the resident name when the pin cannot be resolved', () => {
+    // A pinned id with no catalog entry (a model deleted from disk, say) still
+    // has to render something rather than an empty chip.
+    expect(chipLabel('power', pinned, 'Qwen3.5 4B (MTP)', null)).toBe('Qwen3.5 4B (MTP)');
+  });
+
+  it('still names the RESIDENT model under Auto', () => {
+    // Unchanged, and deliberately: under Auto "what did it pick" is the whole
+    // question the chip exists to answer.
+    expect(chipLabel('power', { mode: 'auto' }, 'Qwen3.5 4B (MTP)', 'LFM2.5 2.6B')).toBe(
+      'Auto · Qwen3.5 4B (MTP)',
+    );
+  });
+});

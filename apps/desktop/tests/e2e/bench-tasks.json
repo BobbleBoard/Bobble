@@ -1,0 +1,52 @@
+[
+  {
+    "id": "moons-table",
+    "difficulty": 1,
+    "prompt": "Create a single self-contained HTML file called moons.html: a styled one-page reference on the five largest moons of Saturn. It must have a table with each moon's name, diameter in km, and year of discovery, sorted largest first, plus a short intro paragraph. Use real figures. Save the file, then tell me the diameter you used for Titan."
+  },
+  {
+    "id": "solar-chart",
+    "difficulty": 2,
+    "prompt": "Create solar.html: a self-contained page with a horizontal bar chart drawn in inline SVG (no libraries, no CDN) showing the six countries with the most installed solar PV capacity, each bar labelled with the country and its capacity in GW. Include a caption naming the year the figures are from. Save it, then tell me the top country and its GW figure."
+  },
+  {
+    "id": "http3-deck",
+    "difficulty": 3,
+    "prompt": "Build deck.html: a six-slide presentation, one slide visible at a time, left and right arrow keys to navigate, explaining how HTTP/3 differs from HTTP/2. One slide must contain an inline SVG diagram of the protocol stack for both. Save it, then tell me which slide number holds the diagram."
+  },
+  {
+    "id": "llm-compare",
+    "difficulty": 4,
+    "prompt": "Create models.html: a comparison page of five open-weight language models released in 2025 or later. For each, give the parameter count, the context window, and the licence, in a sortable-looking table with a legend. Below the table, add a paragraph naming which of the five is the smallest and why that matters for local use. Save it and tell me the five you chose."
+  },
+  {
+    "id": "apollo-timeline",
+    "difficulty": 5,
+    "prompt": "Create apollo.html: an interactive vertical timeline of the crewed Apollo missions 11 through 17, each entry showing the launch date, the crew names, and one sentence on the outcome. Add working filter buttons for 'landed' and 'did not land' that hide and show entries with vanilla JS. Save it, then tell me which mission your 'did not land' filter selects."
+  },
+  {
+    "id": "population-dash",
+    "difficulty": 6,
+    "prompt": "Create population.html: a dashboard with three stat tiles at the top and, below them, a line chart in inline SVG of world population by decade from 1950 to 2020 with real figures and labelled axes. The tiles must show the 1950 value, the 2020 value, and the multiple between them, computed from your own data. Save it, then tell me the multiple."
+  },
+  {
+    "id": "bloom-filter",
+    "difficulty": 7,
+    "prompt": "Create bloom.html: a technical explainer on Bloom filters with a WORKING interactive demo in vanilla JS — an input to add strings, an input to test membership, a visual of the bit array updating, and a live false-positive rate. Explain the maths of the false-positive rate in prose above the demo. Save it, then tell me how many hash functions your demo uses and why."
+  },
+  {
+    "id": "vector-search",
+    "difficulty": 8,
+    "prompt": "Research and then create vectors.html: a decision brief comparing HNSW, IVF and ScaNN for vector search. Include a table of build complexity, query complexity, memory overhead and recall behaviour, and a closing recommendation section that picks one for a 10-million-vector on-device index and justifies it. Save it, then tell me which one you recommended and the single deciding factor."
+  },
+  {
+    "id": "osi-site",
+    "difficulty": 9,
+    "prompt": "Build a three-page mini-site in a folder called osi: index.html plus lower.html and upper.html, with working relative links between all three. index.html lists the seven OSI layers with one-line descriptions; lower.html covers layers 1-4 in depth with a protocol example each; upper.html covers layers 5-7 the same way. Give all three a shared stylesheet file. Save them, then tell me which file you put TCP in."
+  },
+  {
+    "id": "co2-analysis",
+    "difficulty": 10,
+    "prompt": "Create co2.html: a visualization of atmospheric CO2 concentration in ppm by year from 1960 to 2020 at ten-year steps, using real Mauna Loa figures embedded in the file (it must not fetch anything at runtime). Draw it as an inline SVG line chart with gridlines and labelled axes, and write a two-paragraph analysis underneath that quotes the actual 1960 and 2020 values and computes the total increase and the average annual rate. Save it, then tell me the average annual rate you calculated."
+  }
+]

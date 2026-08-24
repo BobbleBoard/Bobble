@@ -276,6 +276,49 @@ export const RECOMMENDED_FAMILIES: readonly RecommendedFamily[] = [
     ],
   },
   {
+    id: 'ling3',
+    name: 'Ling 3.0',
+    org: 'inclusionAI',
+    output: 'text',
+    fast: true,
+    blurb:
+      'A 7.9B MoE that only runs 0.8B of itself per token — small-model speed, ' +
+      'mid-model knowledge.',
+    /*
+     * READ OUT OF THE GGUF HEADER, not off the model card: architecture
+     * `bailingmoe3`, 128 experts x 1.0B with 8 used, 24 blocks, 131072 context.
+     * The architecture is the reason the pinned llama.cpp moved to b10603 —
+     * b9934 knows `bailingmoe` and `bailingmoe2` only, so every build of this
+     * family would have failed to load.
+     *
+     * The quants are bloomer010's rather than unsloth's, who have not published
+     * this repo; theirs are Unsloth Dynamic 2.0 builds and cover the full ladder.
+     *
+     * MEMORY IS THE TOTAL, NOT THE ACTIVE. A MoE router can reach any expert on
+     * any token, so all 128 have to be resident — 0.8B active buys speed, not a
+     * smaller footprint.
+     */
+    variants: [
+      {
+        repo: 'bloomer010/Ling-3.0-tiny-GGUF',
+        label: 'tiny · Q4',
+        paramsB: 7.9,
+        allow: ['Ling-3.0-tiny-UD-Q4_K_XL.gguf'],
+        approxBytes: 5_340_611_552,
+        minMemoryGB: 9,
+      },
+      {
+        repo: 'bloomer010/Ling-3.0-tiny-GGUF',
+        label: 'tiny · Q6',
+        paramsB: 7.9,
+        allow: ['Ling-3.0-tiny-UD-Q6_K_XL.gguf'],
+        approxBytes: 7_274_546_528,
+        note: 'The one to take if it fits.',
+        minMemoryGB: 12,
+      },
+    ],
+  },
+  {
     id: 'gemma4',
     name: 'Gemma 4',
     org: 'unsloth',
