@@ -162,22 +162,25 @@ export function FamilyCard({
         data-testid={`family-variant-${v.repo}:${v.label}`}
         data-selected={here}
         /*
-         * SELECTED IS NOT HOVER. Both states used to paint the same pale wash,
-         * so the open variant looked permanently moused-over — and since the
-         * wash is LIGHTER than the card, the child row read as raised out of
-         * its own parent. Selection is now an accent rail plus a faint accent
-         * tint, which is a different signal from the neutral hover, and both
-         * sit at or below the card's own surface.
+         * SELECTED IS NOT HOVER, AND IT IS NOT BLUE EITHER.
+         *
+         * Both states used to paint the same pale wash, so the open variant
+         * looked permanently moused-over — and since that wash is LIGHTER than
+         * the card, the child read as raised out of its own parent. The first
+         * fix separated them with an accent rail and a 12% accent tint; the user
+         * did not like the blue, and he is right that it was doing too much:
+         * accent in this app means "act on this", and a row you are merely
+         * LOOKING at is not an action.
+         *
+         * So the two states differ by DIRECTION rather than by colour. Hover
+         * lifts (the light wash, above the card); selection recesses (the inset
+         * surface, below it). That reads on both themes, needs no hue, and
+         * leaves accent to mean what it means everywhere else.
          */
         className={cx(
-          'flex items-center gap-3 rounded-l-none rounded-r-lg border-l-2 px-2.5 py-2 text-left transition-colors',
-          here ? 'border-accent-primary' : 'border-transparent hover:bg-bg-hover',
+          'flex items-center gap-3 rounded-lg px-2.5 py-2 text-left transition-colors',
+          here ? 'bg-bg-inset' : 'hover:bg-bg-hover',
         )}
-        style={
-          here
-            ? { background: 'color-mix(in oklab, var(--pd-accent-primary) 12%, transparent)' }
-            : undefined
-        }
       >
         <button
           type="button"
@@ -186,7 +189,14 @@ export function FamilyCard({
         >
           <span className="min-w-0 flex-1">
             <span className="flex flex-wrap items-center gap-1.5">
-              <span className="truncate text-footnote text-text-primary">{v.label}</span>
+              <span
+                className={cx(
+                  'truncate text-footnote text-text-primary',
+                  here ? 'font-medium' : '',
+                )}
+              >
+                {v.label}
+              </span>
               {/* MEASURED: pushed to the far right of a 1100px card, the size
                   sat alone across a screen-wide gap from the name it belongs
                   to — "base" at one end and "500M" at the other. It is part of
