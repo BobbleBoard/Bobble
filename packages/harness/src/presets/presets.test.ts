@@ -6,7 +6,6 @@ import {
   isToolSearchOnly,
   PRESET_TOOLS,
   resolvePresetTools,
-  SUBAGENT_PRESET_CLASSES,
   TOOL_SEARCH_TOOL_NAME,
 } from './presets.js';
 
@@ -125,6 +124,40 @@ describe('resolvePresetTools — what every turn can reach', () => {
       for (const t of BASELINE) {
         expect(tools, `${cls} is missing ${t}`).toContain(t);
       }
+    }
+  });
+
+  it('advertises the WHOLE browser suite to a class that gets it', () => {
+    /*
+     * THE GUARD THIS FILE ALREADY DESCRIBED AND NO LONGER ASSERTED.
+     *
+     * `BROWSER_SUITE` sat here with its measured-cause comment and not one
+     * expectation reading it, so the invariant it documents — all ten names,
+     * not navigate + snapshot — was being carried by a comment. A run's tool
+     * array is snapshotted when the run begins, so a missing name cannot arrive
+     * later: `capability` said "browser is on … browser_click" and the very
+     * next browser_click answered "Tool browser_click not found".
+     */
+    const tools = resolvePresetTools('browser-use', ALL_TOOLS);
+    for (const name of BROWSER_SUITE) {
+      expect(tools, `browser-use was missing ${name}`).toContain(name);
+    }
+  });
+
+  it('lets EVERY class hand work out', () => {
+    /*
+     * Handing work out is baseline, not a privilege of certain task classes.
+     * It was gated to `SUBAGENT_PRESET_CLASSES` once, which made "can this
+     * model commission anything" depend on how a keyword classifier read the
+     * prompt — and that is how a CEO told to research and commission
+     * specialists ended up able to do neither (MEASURED, runs 10-12).
+     *
+     * `presets.ts` says all of this in a comment beside the code that fixed it.
+     * Nothing asserted it, so the gate could come back silently.
+     */
+    for (const cls of TASK_CLASSES) {
+      const tools = resolvePresetTools(cls, ALL_TOOLS);
+      expect(tools, `${cls} cannot commission anything`).toContain(SPAWN_SUBAGENT_TOOL_NAME);
     }
   });
 

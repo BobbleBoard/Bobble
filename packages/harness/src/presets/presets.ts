@@ -163,7 +163,10 @@ export const ALWAYS_ACTIVE_TOOLS: readonly string[] = [
    */
   'web_search',
   'web_fetch',
-  'spawn_subagent',
+  // The CONSTANT, not the string it happens to equal: this list and the tool's
+  // own registration have to move together, and a literal lets them drift
+  // silently. The import was already here, unused, for exactly this reason.
+  SPAWN_SUBAGENT_TOOL_NAME,
 ];
 
 /**
