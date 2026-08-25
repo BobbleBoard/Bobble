@@ -116,12 +116,73 @@ try {
       audioPlayers: document.querySelectorAll('[data-testid="thread-audio"]').length,
       fileCards: document.querySelectorAll('[data-testid="thread-file-card"]').length,
       waveBars: document.querySelectorAll('.pd-thread-audio-bar').length,
+      images: document.querySelectorAll('[data-testid="thread-image"]').length,
+      videos: document.querySelectorAll('[data-testid="thread-video"]').length,
       cardText: document.querySelector('[data-testid="thread-file-card"]')?.textContent ?? null,
     };
   }, before);
 
   console.log('[e2e] finished:', done, 'in', Math.round((Date.now() - t0) / 1000), 's');
   console.log('[e2e] RESULT:', JSON.stringify(result, null, 1));
+  // Is the collapsed chain summary ACCURATE? It read "read a file" on a turn
+  // whose only call was generate_speech, which is either a labelling bug or a
+  // true statement about a step I did not capture. Worth knowing which.
+  const chain = await win.evaluate(() => ({
+    summary: document.querySelector('.pd-chain-summary-text')?.textContent ?? null,
+    steps: [...document.querySelectorAll('.pd-chain-step-label')].map((n) => n.textContent),
+  }));
+  console.log('[e2e] CHAIN:', JSON.stringify(chain));
+
+  /*
+   * THE SPEECH ROW MUST OPEN.
+   *
+   * The chain keeps every step MOUNTED when collapsed (it animates
+   * `grid-template-rows: 0fr → 1fr`), so counting nodes proves nothing — an
+   * earlier version of this check called the reveal "clickable" while the chain
+   * was shut. Measure boxes, and wait for the animation rather than racing it.
+   */
+  const reveal = await win.evaluate(async () => {
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    const box = (el) => {
+      if (!el) return 0;
+      const r = el.getBoundingClientRect();
+      return Math.round(r.height);
+    };
+    const IGNORE = /^(Thought|Done)$/;
+    const generateRow = (root) =>
+      [...root.querySelectorAll('.pd-chain-step-row')].find((r) => {
+        const t = r.querySelector('.pd-chain-step-label')?.textContent?.trim() ?? '';
+        return t !== '' && !IGNORE.test(t);
+      });
+    const chain = [...document.querySelectorAll('.pd-chain')].find((c) => generateRow(c));
+    if (!chain) return { found: false };
+
+    const out = { found: true, expandedAtRest: chain.dataset.expanded === 'true' };
+    if (!out.expandedAtRest) {
+      chain.querySelector('.pd-chain-summary')?.click();
+      await sleep(600);
+    }
+    out.expandedNow = chain.dataset.expanded === 'true';
+
+    const row = generateRow(chain);
+    out.rowLabel = row?.querySelector('.pd-chain-step-label')?.textContent?.trim() ?? null;
+    out.rowHeight = box(row);
+    if (!row || out.rowHeight === 0) return out;
+
+    row.click();
+    await sleep(700);
+    // The step's own body — the reveal this fix is about.
+    const body = row.closest('.pd-chain-step')?.querySelector('.pd-chain-facts, .pd-chain-preview');
+    out.factLabels = [...(row.closest('.pd-chain-step')?.querySelectorAll('.pd-chain-fact-label') ?? [])].map(
+      (n) => n.textContent,
+    );
+    out.revealHeight = box(body);
+    out.revealText = body ? body.innerText.replace(/\s+/g, ' ').slice(0, 160) : null;
+    return out;
+  });
+  console.log('[e2e] SPEECH ROW REVEAL:', JSON.stringify(reveal));
+  const chainShot = win.locator('.pd-chain').first();
+  await chainShot.screenshot({ path: `${OUT}/chain-expanded.png` }).catch(() => {});
   await win.screenshot({ path: path.join(OUT, 'chat.png'), fullPage: true });
   writeFileSync(path.join(OUT, 'main.log'), log.join(''));
 } finally {

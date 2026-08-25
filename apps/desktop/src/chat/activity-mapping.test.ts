@@ -4,6 +4,7 @@
  * (bash command+output, edit diff, read preview, media opensInCanvas + tabSpec).
  */
 import type { AssistantMsg, ContentBlock, ToolResultMsg } from '@pi-desktop/engine';
+import { summarizeActivity } from '@pi-desktop/ui';
 import { describe, expect, it } from 'vitest';
 // The harness SOURCE module, not the barrel — promotion.ts → org-chart.ts has
 // no imports at all, so this stays node/browser-safe (see auto-router.ts).
@@ -17,6 +18,8 @@ import {
   isEmptyThinking,
   mapThinkingStep,
   mapToolStep,
+  reportedFacts,
+  reportedOutputPath,
   resolveTool,
   segmentBlocks,
   segmentGroup,
@@ -199,6 +202,48 @@ describe('resolveTool (R14 registry — each tool its own kind, neutral fallback
     // `ls` used to be 'read' too, which is why a directory listing rendered as
     // "Read a file — buggyapp" with a file sheet. A folder is not a file.
     expect(toolStepKind('ls')).toBe('folder');
+  });
+});
+
+describe('mapToolStep — the generate family keeps its own kind', () => {
+  /*
+   * THE REGRESSION. `mapToolStep`'s fallback arm hardcoded `kind: 'read'`, so
+   * every kind added after it was written arrived as a file read. The LABEL is
+   * computed from the true kind, which hid it on the row itself — the lie only
+   * surfaced in the collapsed summary, which aggregates by kind.
+   *
+   * MEASURED in the app before the fix: steps ["Thought", "Read it aloud",
+   * "Thought", "Done"] under the summary "Thought for 2s, read a file".
+   */
+  const CASES = [
+    ['generate_speech', 'speech'],
+    ['generate_music', 'music'],
+    ['generate_sfx', 'sfx'],
+    ['generate_video', 'video'],
+  ] as const;
+
+  for (const [tool, kind] of CASES) {
+    it(`${tool} is a '${kind}' step, not a read`, () => {
+      const step = mapToolStep(
+        call('c1', tool, { prompt: 'a door slam' }),
+        result('c1', 'pd-file://f/Users/x/Bobble/out.wav'),
+        false,
+      ).data;
+      expect(step.kind).toBe(kind);
+      if (step.kind !== kind) throw new Error(`expected ${kind}`);
+      // The produced file travels with the row, as it does for `image`.
+      expect(step.src).toBe('pd-file://f/Users/x/Bobble/out.wav');
+    });
+  }
+
+  it('the collapsed summary describes the generation, not a read', () => {
+    const steps = [
+      { kind: 'thinking', label: 'Thought', status: 'done' } as const,
+      mapToolStep(call('c1', 'generate_speech', { text: 'hello' }), result('c1', 'ok'), false).data,
+    ];
+    const summary = summarizeActivity(steps);
+    expect(summary).not.toContain('read a file');
+    expect(summary.toLowerCase()).toContain('aloud');
   });
 });
 
@@ -911,5 +956,101 @@ describe('the corp coordination rows are specific, not generic', () => {
     expect(step.kind).toBe('delegate');
     expect(step.label).toBe('Ready to delegate');
     expect(step.argsText).toContain('1. deck → engineer 1');
+  });
+});
+
+describe('reportedOutputPath', () => {
+  const listed = (p: string) => `Generated 1 audio file:\n  1. ${p} (seed 769838462)\nModel: x`;
+
+  it('reads the path a generation named in prose', () => {
+    expect(reportedOutputPath(listed('/Users/user/Bobble/generated/run/cand0_000.wav'))).toBe(
+      '/Users/user/Bobble/generated/run/cand0_000.wav',
+    );
+  });
+
+  it('survives a home directory with a space in it', () => {
+    // "/Users/Ada Lovelace/…" — a whitespace-terminated rule returns "/Users/Ada",
+    // which looks like a path and opens nothing.
+    expect(reportedOutputPath(listed('/Users/Ada Lovelace/Bobble/out.wav'))).toBe(
+      '/Users/Ada Lovelace/Bobble/out.wav',
+    );
+  });
+
+  it('handles a bare listing with no seed tail', () => {
+    expect(reportedOutputPath('Made it:\n  1. /tmp/a b/c.mp4')).toBe('/tmp/a b/c.mp4');
+  });
+
+  it('is undefined when nothing was named', () => {
+    expect(reportedOutputPath('done')).toBeUndefined();
+    expect(reportedOutputPath(undefined)).toBeUndefined();
+  });
+});
+
+describe('reportedFacts', () => {
+  const text =
+    'Generated 1 audio file:\n  1. /Users/user/Bobble/generated/run/cand0.wav (seed 769838462)\nModel: qwen3-tts-1.7b';
+
+  it('lifts the model and seed out of the tool prose', () => {
+    expect(reportedFacts(text)).toEqual([
+      { label: 'Model', value: 'qwen3-tts-1.7b' },
+      { label: 'Seed', value: '769838462', mono: true },
+    ]);
+  });
+
+  it('reports what it found and nothing more', () => {
+    // A generator that names neither yields empty VALUES, which ChainFacts
+    // drops — so the reveal falls back to the tool's own sentence.
+    expect(reportedFacts('done').every((f) => f.value === undefined)).toBe(true);
+  });
+
+  it('is carried on a generated step', () => {
+    const step = mapToolStep(
+      call('c1', 'generate_music', { prompt: 'lo-fi' }),
+      result('c1', text),
+      false,
+    ).data;
+    if (step.kind !== 'music') throw new Error('expected music');
+    expect(step.facts).toContainEqual({ label: 'Model', value: 'qwen3-tts-1.7b' });
+    expect(step.filename).toBe('cand0.wav');
+  });
+});
+
+describe('a generated row prefers a readable path to an internal URL', () => {
+  it('shows the filesystem path when the tool reports both', () => {
+    const step = mapToolStep(
+      call('c1', 'generate_video', { prompt: 'a boat' }),
+      result(
+        'c1',
+        'pd-file://f/Users/user/Bobble/out.mp4\nGenerated 1 video:\n  1. /Users/user/Bobble/out.mp4',
+      ),
+      false,
+    ).data;
+    if (step.kind !== 'video') throw new Error('expected video');
+    expect(step.src).toBe('/Users/user/Bobble/out.mp4');
+  });
+
+  it('falls back to the URL when that is all there is', () => {
+    const step = mapToolStep(
+      call('c1', 'generate_video', { prompt: 'a boat' }),
+      result('c1', 'pd-file://f/Users/user/Bobble/out.mp4'),
+      false,
+    ).data;
+    if (step.kind !== 'video') throw new Error('expected video');
+    expect(step.src).toBe('pd-file://f/Users/user/Bobble/out.mp4');
+  });
+});
+
+describe('reportedOutputPath does not mine a path out of a URL', () => {
+  it('finds nothing in a bare pd-file URL', () => {
+    // "pd-file://f/Users/x/out.wav" contains "/f/Users/x/out.wav", which is not
+    // a path any file lives at.
+    expect(reportedOutputPath('pd-file://f/Users/x/out.wav')).toBeUndefined();
+    expect(reportedOutputPath('https://example.com/a/b.png')).toBeUndefined();
+  });
+
+  it('still finds the real path when both are present', () => {
+    expect(reportedOutputPath('pd-file://f/Users/x/out.wav\nSaved to /Users/x/out.wav')).toBe(
+      '/Users/x/out.wav',
+    );
   });
 });

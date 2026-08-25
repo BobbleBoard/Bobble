@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   type ActivityStepData,
+  type ActivityStepKind,
   activitySummary,
   chainIsDone,
   formatDuration,
@@ -495,5 +496,100 @@ describe('chainIsDone — when a tool chain may say Done', () => {
     expect(chainIsDone({ complete: false, quiet: true, settledGuess: true })).toBe(false);
     // …nor hold back a turn its owner has declared finished.
     expect(chainIsDone({ complete: true, quiet: true, settledGuess: false })).toBe(true);
+  });
+});
+
+/*
+ * THE GUARD FOR A WHOLE BUG CLASS.
+ *
+ * Twice now a kind has been added — its icon drawn, its verb written, its rows
+ * rendering correctly — while the COLLAPSED SUMMARY quietly disagreed with the
+ * steps underneath it, because the summary aggregates by walking `KIND_ORDER`
+ * and silently skips anything missing from that list.
+ *
+ * Both were found by reading a real chain, not by a failing test. This makes
+ * the next one fail here instead: a kind that cannot appear in a summary is a
+ * kind whose turn will be described as something other than what it did.
+ */
+describe('every kind can appear in a summary', () => {
+  const KINDS: ActivityStepKind[] = [
+    'thinking',
+    'bash',
+    'python',
+    'edit',
+    'read',
+    'folder',
+    'talk',
+    'manager',
+    'commission',
+    'delegate',
+    'toolkit',
+    'submit',
+    'search',
+    'tool-search',
+    'video',
+    'speech',
+    'music',
+    'sfx',
+    'image',
+    'pdf',
+    'canvas-open',
+    'file',
+    'skill',
+    'connector',
+    'tool',
+    'browser-navigate',
+    'browser-click',
+    'browser-type',
+    'browser-read',
+  ];
+
+  for (const kind of KINDS) {
+    it(`a lone '${kind}' step is described by the summary`, () => {
+      const summary = summarizeActivity([
+        { kind, label: kind, status: 'done', durationMs: 1000 } as ActivityStepData,
+      ]);
+      expect(summary).not.toBe('');
+      // "Thought for 1s" is the only summary allowed to be about thinking.
+      if (kind !== 'thinking') expect(summary).not.toBe('Thought for 1s');
+    });
+  }
+
+  it('a corp turn names the hand-off, not just the thinking', () => {
+    const summary = summarizeActivity([
+      { kind: 'thinking', label: 'Thought', status: 'done', durationMs: 2000 },
+      { kind: 'manager', label: 'Briefed the manager', status: 'done' },
+    ] as ActivityStepData[]);
+    expect(summary).toContain('manager');
+  });
+});
+
+describe('a generated artifact row can be opened', () => {
+  /*
+   * Regression: taking the generate family out of the `read` shape also took it
+   * out of what made those rows expandable, and these tools carry no path
+   * argument — so the row had no src, no filename and no detail, and clicking it
+   * did nothing. MEASURED in the app: {"rows":1,"clickable":false}.
+   */
+  const step = {
+    kind: 'speech',
+    label: 'Read it aloud',
+    status: 'done',
+    filename: 'cand0.wav',
+    src: '/Users/x/Bobble/generated/cand0.wav',
+    preview: 'Generated 1 audio file… (seed 769838462)',
+  } as ActivityStepData;
+
+  it('has inline content once settled', () => {
+    expect(hasInlineContent(step)).toBe(true);
+  });
+
+  it('needs only the tool text — no path is ever passed to these tools', () => {
+    const bare = { kind: 'sfx', label: 'Made a sound', status: 'done', preview: 'made it' };
+    expect(hasInlineContent(bare as ActivityStepData)).toBe(true);
+  });
+
+  it('stays closed while still running', () => {
+    expect(hasInlineContent({ ...step, status: 'running' } as ActivityStepData)).toBe(false);
   });
 });

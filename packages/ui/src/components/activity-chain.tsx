@@ -199,7 +199,30 @@ export type ActivityStepData =
       output?: string;
     })
   | (ActivityStepCommon & {
-      kind: 'image' | 'pdf' | 'canvas-open';
+      /*
+       * THE ARTIFACT ROWS — a step whose product is a FILE.
+       *
+       * The generate family (video/speech/music/sfx) had icons, verbs and a
+       * KIND_ORDER slot but no member here, so the mapping's fallback arm could
+       * only emit them as `read` — the identical defect the corp rows carry a
+       * note about above. MEASURED before the fix: a turn whose steps were
+       * ["Thought", "Read it aloud", "Thought", "Done"] collapsed to the summary
+       * "Thought for 2s, read a file", describing a read that never happened.
+       */
+      kind: 'image' | 'pdf' | 'canvas-open' | 'video' | 'speech' | 'music' | 'sfx';
+      /**
+       * What the tool said it made, in ITS words. The fallback for a generator
+       * whose result this app cannot parse — losing the only account of a job
+       * is worse than showing an unstyled sentence.
+       */
+      preview?: ReactNode;
+      /**
+       * That same account, parsed. The chain lays these out the way every other
+       * reveal lays out its facts, which is the difference between a scannable
+       * row and a run-on line: newlines collapse in HTML, so the raw text
+       * renders as one long sentence.
+       */
+      facts?: readonly { label: string; value?: string; mono?: boolean }[];
       /**
        * Where the artifact actually lives (file path, data URI, canvas tab
        * title). These rows normally route to the canvas via `opensInCanvas`, but
@@ -288,6 +311,22 @@ const KIND_ORDER: ActivityStepKind[] = [
   'bash',
   'python',
   'thinking',
+  /*
+   * THE COORDINATION KINDS, which were absent — so they were dropped from every
+   * collapsed summary, the aggregation walking this list and skipping what it
+   * does not find. MEASURED: a turn whose steps were [thinking, manager,
+   * submit] summarised as "Thought for 2s", omitting both the delegation and
+   * the hand-back that were the entire point of the turn.
+   *
+   * They lead, ahead of the file work, because on a corp turn the hand-off IS
+   * the headline: "Briefed the manager" is what happened, and the edits are how.
+   */
+  'manager',
+  'delegate',
+  'commission',
+  'toolkit',
+  'talk',
+  'submit',
   'edit',
   'read',
   'folder',
@@ -770,6 +809,18 @@ function StepContent({ step, live = false }: { step: ActivityStepData; live?: bo
           detail={step.detail}
         />
       );
+    /*
+     * THE GENERATE FAMILY reveals differently from `image`, because its output
+     * is ALREADY IN THE THREAD — the clip is playing a few pixels below the
+     * row. MediaReveal's "this has no canvas target, so it cannot be opened"
+     * would be both wrong and unhelpful there. What the row can add is the
+     * provenance: which file, and what the tool said (seed, model).
+     */
+    case 'video':
+    case 'speech':
+    case 'music':
+    case 'sfx':
+      return <GeneratedReveal src={step.src} note={step.preview} facts={step.facts} />;
     // Generic tool / connector / tool_search: show ONLY the tool's result, as one
     // clean block — never the raw args JSON (that's the schema noise the user called
     // out). The row header already surfaces the tool name + its primary arg.
@@ -925,18 +976,60 @@ function BrowserReveal({
  * to fall back on, so a generated image became a line of text with nothing
  * behind it. Naming the artifact is the least it can do.
  */
+/**
+ * The reveal for a step that GENERATED something.
+ *
+ * Where the file landed, and what the tool said about making it. No thumbnail:
+ * a generated clip or image mounts inline in the thread directly beneath this
+ * chain, so a second copy inside the row would be the same artifact twice on
+ * one screen.
+ */
+function GeneratedReveal({
+  src,
+  note,
+  facts,
+}: {
+  src?: string;
+  note?: ReactNode;
+  facts?: readonly { label: string; value?: string; mono?: boolean }[];
+}) {
+  /* No File row: the row's own header already carries the filename, and this
+     reveal opened directly beneath it. Three copies of one string is not
+     thoroughness. */
+  const rows = [{ label: 'Path', value: src, mono: true }, ...(facts ?? [])];
+  // The raw sentence appears ONLY when nothing could be parsed out of it, so a
+  // reveal is never empty and never says the same thing twice.
+  return rows.some((r) => nonEmpty(r.value)) ? (
+    <ChainFacts rows={rows} />
+  ) : note !== undefined ? (
+    <div className="pd-chain-preview">{note}</div>
+  ) : null;
+}
+
 function MediaReveal({
   kind,
   src,
   filename,
   detail,
 }: {
-  kind: 'image' | 'pdf' | 'canvas-open';
+  kind: 'image' | 'pdf' | 'canvas-open' | 'video' | 'speech' | 'music' | 'sfx';
   src?: string;
   filename?: string;
   detail?: string;
 }) {
-  const noun = kind === 'pdf' ? 'PDF' : kind === 'image' ? 'image' : 'canvas tab';
+  /* Each artifact names ITSELF here. The sentence below ends in this noun, and
+     "This canvas tab has no canvas target" is not a thing to tell someone who
+     asked for a door slam. */
+  const NOUNS: Record<string, string> = {
+    pdf: 'PDF',
+    image: 'image',
+    video: 'video',
+    speech: 'recording',
+    music: 'track',
+    sfx: 'sound',
+    'canvas-open': 'canvas tab',
+  };
+  const noun = NOUNS[kind] ?? 'file';
   const where = nonEmpty(src) ? src : nonEmpty(detail) ? detail : undefined;
   return (
     <>
@@ -1084,6 +1177,17 @@ export function hasInlineContent(step: ActivityStepData): boolean {
     case 'pdf':
     case 'canvas-open':
       return settled && (nonEmpty(step.src) || nonEmpty(step.detail) || nonEmpty(step.filename));
+    case 'video':
+    case 'speech':
+    case 'music':
+    case 'sfx':
+      return (
+        settled &&
+        (nonEmpty(step.src) ||
+          nonEmpty(step.filename) ||
+          (step.facts ?? []).some((f) => nonEmpty(f.value)) ||
+          step.preview !== undefined)
+      );
     case 'tool-search':
     case 'tool':
     case 'connector':

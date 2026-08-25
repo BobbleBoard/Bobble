@@ -773,6 +773,57 @@ const MEDIA_URL_RE = /^(data:|https?:|pd-file:)/;
  * every previous image tool returned — are unaffected, and no media URL contains
  * a newline.
  */
+/**
+ * The absolute path a generation tool reported writing.
+ *
+ * These tools take no path ARGUMENT — you ask for a sound, not for a file — and
+ * they name what they made in prose: "Generated 1 audio file:\n  1. /Users/…
+ * /cand0_seed769838462_000.wav (seed …)". So the row has nothing to show for
+ * itself unless the path is read back out of the result, which is what leaves a
+ * "Made a sound effect" step with no file, no source and nothing to open.
+ *
+ * Two passes, because a home directory may contain a SPACE ("/Users/Ada
+ * Lovelace/Bobble/…") and a rule that stops at whitespace would hand back half
+ * a path — which reads as correct and opens nothing. The listed form is
+ * matched first, taking everything up to the trailing "(seed …)"; the loose
+ * scan is the fallback for a tool that phrases its result some other way.
+ */
+/**
+ * The facts a generation reported about itself — the model that made it and the
+ * seed it used, the two things you reach for when a take is worth repeating or
+ * worth never seeing again.
+ *
+ * They are in the result text, but as prose across three lines, and HTML
+ * collapses newlines: rendered raw it becomes "Generated 1 audio file: 1.
+ * /Users/… (seed 769838462) Model: qwen3-tts-1.7b" on one line. Parsed, they
+ * lay out like every other reveal in the chain.
+ */
+export function reportedFacts(
+  text: string | undefined,
+): { label: string; value?: string; mono?: boolean }[] {
+  if (text === undefined) return [];
+  const model = /^\s*Model:\s*(.+)$/m.exec(text)?.[1]?.trim();
+  const seed = /\bseed\s+(\d+)/i.exec(text)?.[1];
+  return [
+    { label: 'Model', value: model },
+    { label: 'Seed', value: seed, mono: true },
+  ];
+}
+
+export function reportedOutputPath(text: string | undefined): string | undefined {
+  if (text === undefined) return undefined;
+  const listed = /^\s*\d+\.\s+(\/.+?)(?:\s+\(seed\b|\s*$)/m.exec(text)?.[1];
+  if (listed !== undefined) return listed.trim();
+  /*
+   * NOT A SLASH INSIDE A URL. "pd-file://f/Users/x/out.wav" contains the
+   * substring "/f/Users/x/out.wav", which looks exactly like an absolute path
+   * and is not one — this scan handed it back, and the row then showed a
+   * location no file has ever been at. A candidate must start at whitespace or
+   * the start of a line, never mid-token.
+   */
+  return /(?<![:\w/])(\/[^\s()]+\.[A-Za-z0-9]{2,5})/.exec(text)?.[1];
+}
+
 export function firstMediaUrl(text: string | undefined): string | undefined {
   if (text === undefined) return undefined;
   for (const line of text.split('\n')) {
@@ -1048,10 +1099,68 @@ function mapToolStepData(
       return {
         data: { kind: 'folder', label, status, detail: path, filename, preview: str(result?.text) },
       };
-    default:
-      // read / file-preview: show the tool output inline.
+    /*
+     * THE GENERATE FAMILY: an artifact row, not a file-read row.
+     *
+     * These rows do not route to the canvas — the clip or picture is already
+     * mounted in the thread beneath them — so `src` is not a canvas target
+     * here. It is what the row can say for itself when opened: where the file
+     * it made actually landed.
+     */
+    case 'video':
+    case 'speech':
+    case 'music':
+    case 'sfx': {
+      /*
+       * THE PLAIN PATH WINS over a `pd-file://` URL when the tool reports both.
+       * This row's only use for it is a line a person reads and copies, and
+       * "pd-file://f/Users/…" is this app's internal address for the same file.
+       * The URL is the fallback, for a generator that returns nothing else.
+       *
+       * `preview` keeps the tool's own words for the same fallback reason — the
+       * seed and the model are what you reach for when a take is worth
+       * repeating, and a generator this app cannot parse still has them.
+       */
+      const produced = reportedOutputPath(str(result?.text)) ?? firstMediaUrl(str(result?.text));
+      const src = produced ?? path;
       return {
-        data: { kind: 'read', label, status, detail: path, filename, preview: str(result?.text) },
+        data: {
+          kind,
+          label,
+          status,
+          /*
+           * THE HEADER SHOWS THE FILENAME, not the path. The row's inline
+           * detail truncates from the RIGHT — "…/bobble-can-speak-now-14/
+           * cand0_seed2…" — so a full path spends the whole line on the
+           * directory and cuts off the one part you were looking for. The
+           * location is a click away in the reveal.
+           */
+          detail: filename ?? baseName(produced) ?? path,
+          filename: filename ?? baseName(produced),
+          preview: str(result?.text),
+          facts: reportedFacts(str(result?.text)),
+          ...(src !== undefined ? { src } : {}),
+        },
+      };
+    }
+    default:
+      /*
+       * PASS THE REAL KIND THROUGH.
+       *
+       * This arm used to hardcode `kind: 'read'`, which was fine while every
+       * kind reaching it WAS read-ish — and silently wrong for each one added
+       * since. The label is computed from the true kind, so the row read "Read
+       * it aloud" while the collapsed summary, which aggregates by kind, said
+       * "read a file" about a turn that read nothing. MEASURED: steps
+       * ["Thought", "Read it aloud", "Thought", "Done"] under the summary
+       * "Thought for 2s, read a file".
+       *
+       * The shape here is the generic one (label + detail + preview), so every
+       * kind that lands in this arm renders identically — only the icon and the
+       * summary phrase change, which is exactly what was broken.
+       */
+      return {
+        data: { kind, label, status, detail: path, filename, preview: str(result?.text) },
       };
   }
 }
