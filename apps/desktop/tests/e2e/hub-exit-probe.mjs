@@ -19,7 +19,7 @@ const app = await _electron.launch({
   env: { ...process.env, PI_E2E: '1', PI_E2E_BACKGROUND: '1' },
 });
 const win = await app.firstWindow();
-await win.waitForTimeout(4000);
+await win.waitForTimeout(4000).catch(() => undefined);
 
 const shot = async (name) => {
   await win.screenshot({ path: path.join(OUT, `${name}.png`) });
@@ -37,12 +37,12 @@ const shot = async (name) => {
 
 console.log('start            ', JSON.stringify(await shot('0-start')));
 await win.click('[data-testid="nav-model-management"]');
-await win.waitForTimeout(1500);
+await win.waitForTimeout(1500).catch(() => undefined);
 console.log('in hub           ', JSON.stringify(await shot('1-hub')));
 
 // Exit 1: New chat.
 await win.click('[data-testid="new-chat"]');
-await win.waitForTimeout(1500);
+await win.waitForTimeout(1500).catch(() => undefined);
 const afterNew = await shot('2-new-chat');
 console.log('after New chat   ', JSON.stringify(afterNew));
 /* THE BUG: the hub renders as a `contentOverride` inside the chat shell, so
@@ -52,7 +52,7 @@ if (afterNew.hub) throw new Error('the model hub survived New chat');
 
 // Back to the hub, then exit 2: an existing chat row.
 await win.click('[data-testid="nav-model-management"]');
-await win.waitForTimeout(1200);
+await win.waitForTimeout(1200).catch(() => undefined);
 const row = await win.evaluate(
   () =>
     [...document.querySelectorAll('[data-testid^="chat-row-"]')]
@@ -61,8 +61,19 @@ const row = await win.evaluate(
 );
 console.log('existing row     ', row);
 if (row === null) throw new Error('no existing chat to click');
-await win.click(`[data-testid="${row}"]`);
-await win.waitForTimeout(1800);
+/*
+ * BY HANDLE, NOT BY SELECTOR STRING. A chat is titled from its first message,
+ * so any conversation containing a quote mark produces a testid that cannot be
+ * expressed in a CSS attribute selector — and the probe died on its own test
+ * data rather than on anything the app did.
+ */
+await win.evaluate((id) => {
+  const el = [...document.querySelectorAll('[data-testid^="chat-row-"]')].find(
+    (n) => n.getAttribute('data-testid') === id,
+  );
+  el?.click();
+}, row);
+await win.waitForTimeout(1800).catch(() => undefined);
 const after = await shot('3-existing-chat');
 console.log('after chat click ', JSON.stringify(after));
 if (after.hub) throw new Error('the model hub survived opening a chat');
@@ -81,7 +92,7 @@ const selected = () =>
   );
 const beforeKey = await selected();
 await win.keyboard.press('Meta+n');
-await win.waitForTimeout(1500);
+await win.waitForTimeout(1500).catch(() => undefined);
 const afterKey = await selected();
 console.log('cmd-n            ', JSON.stringify({ beforeKey, afterKey }));
 if (beforeKey === afterKey) throw new Error('⌘N is advertised but bound to nothing');

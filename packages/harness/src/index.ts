@@ -1825,7 +1825,17 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
           dbgPath,
           `applyPreset: effort=${runtime.config.effort} corpEnabled=${corpToolEnabled(
             runtime.config.effort,
-          )} corpRegistered=${corpRegistered} wantCorp=${wantCorp}\n`,
+          )} corpRegistered=${corpRegistered} wantCorp=${wantCorp}\n` +
+            /*
+             * WHICH TOOLS PI ACTUALLY KNOWS, and which we are about to advertise.
+             * Added while chasing a capability that activated cleanly and still
+             * left its tools uncallable: without these two lines the question
+             * "is the tool registered but unadvertised, or not registered at
+             * all" cannot be answered from outside, and it is the first thing
+             * worth knowing.
+             */
+            `  available(${available.length}): ${available.join(',')}\n` +
+            `  target(${target.length}): ${target.join(',')}\n`,
         );
       } catch {
         /* a diagnostic must never break a turn */
