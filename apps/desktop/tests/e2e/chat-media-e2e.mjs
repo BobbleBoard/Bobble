@@ -80,7 +80,7 @@ try {
   if (midway) {
     console.log('[e2e] capability activated; sending the follow-up turn');
     await win.click('[data-testid="composer-input"]');
-    await win.keyboard.type('Go ahead now.');
+    await win.keyboard.type(process.env.FOLLOWUP ?? 'Go ahead now.');
     await win.keyboard.press('Enter');
     const t1 = Date.now();
     while (Date.now() - t1 < CAP_MS) {

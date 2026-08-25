@@ -48,6 +48,7 @@ import glob
 import json
 import os
 import re
+import runpy
 import subprocess
 import sys
 import threading
@@ -139,7 +140,7 @@ def watch_steps(job_id, cand_idx, step_dir, total, stop):
         time.sleep(0.25)
 
 
-def drain_output(job_id, stream):
+def drain_output(job_id, stream, keep=None):
     """Drain the merged child output so tqdm never blocks on backpressure, and
     surface a coarse `download` event while weights are fetched. tqdm redraws with
     \\r, so we split on both \\r and \\n. Shared by every modality's subprocess."""
@@ -185,8 +186,15 @@ def drive_subprocess(job_id, cmd, env=None):
         bufsize=1,
         env=env,
     )
+    # KEEP THE TAIL. A subprocess that fails reports an exit code and nothing
+    # else, which is how "mlx-audio TTS exited with code 1" became a dead end —
+    # the traceback that says WHY was drained to the event stream and dropped on
+    # the floor. The last lines are what a person needs, so they travel with the
+    # failure. Bounded so a chatty run cannot balloon the error.
+    global _LAST_OUTPUT
+    _LAST_OUTPUT = []
     try:
-        drain_output(job_id, proc.stdout)
+        drain_output(job_id, proc.stdout, keep=_LAST_OUTPUT)
     finally:
         proc.wait()
     return proc.returncode
@@ -351,9 +359,36 @@ def synthesize_audio(job_id, spec, seed, cand_idx, out_dir):
     fmt = str(spec.get("audioFormat") or "wav")
     prefix = f"cand{cand_idx}_seed{seed}"
     cmd = build_audio_cmd(spec, prefix, out_dir, fmt)
-    rc = drive_subprocess(job_id, cmd)
-    if rc != 0:
-        raise RuntimeError(f"mlx-audio TTS exited with code {rc}")
+
+    """
+    IN-PROCESS, NOT A CHILD.
+
+    MEASURED: the identical argv succeeds when run by hand and fails with
+    "exited with code 1" and NO OUTPUT AT ALL when the worker spawns it. The
+    interpreter it spawns is `sys.executable`, which under `uv run --with ...`
+    is an EPHEMERAL BUILD ENV — /Users/…/.cache/uv/builds-v0/.tmpkWysrq/bin/python
+    — that is not guaranteed to survive, or to carry the installed packages, by
+    the time the child starts. Nothing is printed because the child dies before
+    it can import anything worth reporting.
+
+    mlx-audio is importable in THIS interpreter by construction (uv installed it
+    for this worker), so calling its entry point directly removes the spawn, the
+    stale path and the silence in one go. `sys.argv` is swapped for the call
+    because the module is a CLI and reads it; SystemExit(0) is its success path.
+    """
+    argv = cmd[3:]  # drop [python, -m, module]
+    saved = sys.argv
+    sys.argv = ["mlx_audio.tts.generate", *argv]
+    try:
+        runpy.run_module("mlx_audio.tts.generate", run_name="__main__")
+    except SystemExit as exc:
+        code = exc.code if isinstance(exc.code, int) else 0
+        if code != 0:
+            raise RuntimeError(f"mlx-audio TTS exited with code {code}") from exc
+    except Exception as exc:  # noqa: BLE001 - the message IS the product here
+        raise RuntimeError(f"mlx-audio TTS failed: {exc}") from exc
+    finally:
+        sys.argv = saved
     out_path = find_audio_output(out_dir, prefix, fmt)
     if out_path is None:
         raise RuntimeError(f"mlx-audio produced no {fmt} output for prefix {prefix}")

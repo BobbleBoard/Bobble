@@ -138,6 +138,17 @@ export class GenServiceClient {
     const workerScript = resolveWorkerScript(this.#opts.workerScript);
     const args = buildWorkerUvArgs({
       workerScript,
+      /*
+       * THE JOB'S OWN BACKEND, which this had never passed.
+       *
+       * `buildWorkerUvArgs` defaults `backend` to 'mflux', so EVERY job that
+       * reaches the uv worker got an env with mflux in it and nothing else —
+       * correct for image and wrong for every other backend that runs here.
+       * MEASURED, from the Audio Studio: "No module named 'mlx_audio'", after
+       * the identical argv had been confirmed to work by hand. `baseWorkerWith`
+       * has always known the right dep per backend; nobody was asking it.
+       */
+      backend: job.backend,
       mfluxPin: this.#opts.mfluxPin,
       python: this.#opts.python,
       extraWith: options.extraWith,

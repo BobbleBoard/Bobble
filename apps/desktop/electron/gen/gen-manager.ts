@@ -442,7 +442,22 @@ export function registerGenIpc(opts: GenManagerOptions): void {
       // pack is missing PROMPTS the user, downloads on accept, then continues here.
       const need = needForModel(model);
       if (need !== undefined && ensureAsset !== undefined) await ensureAsset(need);
-      const outputs = await jobQueue.enqueue(job, { heavy: model.heavy, onEvent }).result;
+      const outputs = await jobQueue.enqueue(job, {
+        heavy: model.heavy,
+        onEvent,
+        /*
+         * THE MODEL'S OWN EXTRA DEPENDENCIES.
+         *
+         * MEASURED: the Audio Studio's first real run died with "mlx-audio TTS
+         * exited with code 1". Kokoro's catalogue entry carries
+         * `auxDeps: ['misaki[en]']` — its G2P front-end, without which the
+         * KokoroPipeline import fails — and nothing was passing it to the uv
+         * env. The queue has taken `extraWith` all along; no caller used it.
+         */
+        ...(model.auxDeps !== undefined && model.auxDeps.length > 0
+          ? { extraWith: model.auxDeps }
+          : {}),
+      }).result;
       progress = undefined;
       send('gen:update', { tabId, payload: payload('done') });
       // A chat model can't watch an MP4 — extract a still poster frame (best-effort).
@@ -547,7 +562,22 @@ export function registerGenIpc(opts: GenManagerOptions): void {
       // or SFX model whose weights pack is missing prompts, downloads, continues.
       const need = needForModel(model);
       if (need !== undefined && ensureAsset !== undefined) await ensureAsset(need);
-      const outputs = await jobQueue.enqueue(job, { heavy: model.heavy, onEvent }).result;
+      const outputs = await jobQueue.enqueue(job, {
+        heavy: model.heavy,
+        onEvent,
+        /*
+         * THE MODEL'S OWN EXTRA DEPENDENCIES.
+         *
+         * MEASURED: the Audio Studio's first real run died with "mlx-audio TTS
+         * exited with code 1". Kokoro's catalogue entry carries
+         * `auxDeps: ['misaki[en]']` — its G2P front-end, without which the
+         * KokoroPipeline import fails — and nothing was passing it to the uv
+         * env. The queue has taken `extraWith` all along; no caller used it.
+         */
+        ...(model.auxDeps !== undefined && model.auxDeps.length > 0
+          ? { extraWith: model.auxDeps }
+          : {}),
+      }).result;
       progress = undefined;
       send('gen:update', { tabId, payload: payload('done') });
       return {
