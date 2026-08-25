@@ -18,12 +18,19 @@ import {
   getModel,
   modelsForModality,
 } from '@pi-desktop/gen-service';
-import { Type } from '@sinclair/typebox';
+import { type TSchema, Type } from '@sinclair/typebox';
 import type { GenBridge } from './gen-bridge-client.js';
-import type { GenerateImageResult, GenerateVideoResult } from './gen-contract.js';
+import type {
+  GenerateAudioResult,
+  GenerateImageResult,
+  GenerateVideoResult,
+} from './gen-contract.js';
 
 export const GENERATE_IMAGE_TOOL = 'generate_image';
 export const GENERATE_VIDEO_TOOL = 'generate_video';
+export const GENERATE_SPEECH_TOOL = 'generate_speech';
+export const GENERATE_MUSIC_TOOL = 'generate_music';
+export const GENERATE_SFX_TOOL = 'generate_sfx';
 
 /** Attach at most this many candidate images back to the model (context budget). */
 const MAX_ATTACHED_IMAGES = 4;
@@ -76,6 +83,13 @@ export function parseSize(size: string | undefined): { width: number; height: nu
 
 const IMAGE_MODEL_IDS = modelsForModality('image').map((m) => m.id);
 const VIDEO_MODEL_IDS = modelsForModality('video').map((m) => m.id);
+const AUDIO_MODELS = modelsForModality('audio');
+/* Speech runs on the uv worker; music and SFX run ComfyUI graphs. The split is
+   what decides which arm of the job runs, so the tools advertise it too. */
+const SPEECH_MODEL_IDS = AUDIO_MODELS.filter(
+  (m) => m.backend === 'mlx-audio' || m.backend === 'torch-tts',
+).map((m) => m.id);
+const SOUND_MODEL_IDS = AUDIO_MODELS.filter((m) => m.backend === 'comfyui').map((m) => m.id);
 
 /**
  * A prompt that reads as MOTION GRAPHICS (animated text / titles / charts,
@@ -310,4 +324,178 @@ export function registerGenTools(pi: ExtensionAPI, options: GenToolsOptions): vo
       }
     },
   });
+}
+
+/** Error result for an audio tool, named so the model reads which one failed. */
+function audioErrResult(tool: string, message: string): AgentToolResult<GenerateDetails> {
+  return {
+    content: [{ type: 'text', text: `${tool} failed: ${message}` }],
+    details: { ok: false, error: message },
+  };
+}
+
+/**
+ * THREE TOOLS, NOT ONE.
+ *
+ * `generate_audio(kind=…)` would have been fewer lines and worse: a model
+ * choosing between "speech", "music" and "sfx" inside one schema picks wrong far
+ * more often than a model choosing between three named tools, and the parameters
+ * barely overlap — narration wants a voice and a reference clip, a sound effect
+ * wants a length in seconds and several variations to pick from. Separate tools
+ * let each describe only what it actually takes.
+ */
+export function registerAudioTools(pi: ExtensionAPI, options: GenToolsOptions): void {
+  const bridge = options.bridge;
+
+  const audioTool = (
+    name: string,
+    label: string,
+    kind: 'speech' | 'music' | 'sfx',
+    description: string,
+    snippet: string,
+    extra: Record<string, TSchema>,
+    ids: readonly string[],
+  ): void => {
+    pi.registerTool({
+      name,
+      label,
+      description,
+      promptSnippet: snippet,
+      parameters: Type.Object({
+        prompt: Type.String({
+          description:
+            kind === 'speech'
+              ? 'The exact text to read aloud.'
+              : 'What the sound should be. Be specific about instruments, mood, materials.',
+        }),
+        model: Type.Optional(
+          Type.String({
+            description: `Model id. One of: ${ids.join(', ')}. Default: recommended.`,
+          }),
+        ),
+        seed: Type.Optional(Type.Number({ description: 'Base RNG seed.' })),
+        ...extra,
+      }),
+      async execute(_id, params): Promise<AgentToolResult<GenerateDetails>> {
+        if (bridge === null) {
+          return audioErrResult(
+            name,
+            'generation bridge unavailable (the gen-tools extension must run inside Pi Desktop)',
+          );
+        }
+        const p = params as Record<string, unknown>;
+        const modelId = typeof p.model === 'string' ? p.model : undefined;
+        if (modelId !== undefined && !ids.includes(modelId)) {
+          return audioErrResult(
+            name,
+            `unknown model "${modelId}". Choose one of: ${ids.join(', ')}`,
+          );
+        }
+        try {
+          const result = await bridge.request<GenerateAudioResult>('generateAudio', {
+            prompt: p.prompt,
+            kind,
+            model: modelId,
+            seconds: p.seconds,
+            steps: p.steps,
+            voice: p.voice,
+            speed: p.speed,
+            lang: p.lang,
+            refAudio: p.reference_audio,
+            refText: p.reference_text,
+            seed: p.seed,
+            count: p.n,
+          });
+          const outputs = result.outputs;
+          if (outputs.length === 0) return audioErrResult(name, 'no audio was produced');
+          const lines = outputs.map(
+            (o, i) => `  ${i + 1}. ${o.path}${o.seed !== undefined ? ` (seed ${o.seed})` : ''}`,
+          );
+          const first = outputs[0];
+          const footnote = first === undefined ? '' : `\nModel: ${first.model}`;
+          return {
+            content: [
+              {
+                type: 'text',
+                text:
+                  `Generated ${outputs.length} audio file${outputs.length === 1 ? '' : 's'}:\n` +
+                  `${lines.join('\n')}${footnote}`,
+              },
+            ],
+            details: {
+              ok: true,
+              jobId: result.jobId,
+              outputs: outputs.map((o) => ({
+                outputPath: o.path,
+                modality: 'audio' as const,
+                model: o.model,
+                ...(o.seed !== undefined ? { seed: o.seed } : {}),
+              })),
+            },
+          };
+        } catch (err) {
+          return audioErrResult(name, messageOf(err));
+        }
+      },
+    });
+  };
+
+  audioTool(
+    GENERATE_SPEECH_TOOL,
+    'Generate: Speech',
+    'speech',
+    'Read text aloud in a synthetic voice, locally on-device. Supports preset voices and ' +
+      'ZERO-SHOT VOICE CLONING from a 3-10 second reference clip (reference_audio). Use this for ' +
+      `narration, dialogue and read-alouds. Available models: ${SPEECH_MODEL_IDS.join(', ')}.`,
+    'Read text aloud on-device, optionally cloning a voice',
+    {
+      voice: Type.Optional(Type.String({ description: 'Preset voice id (e.g. "af_heart").' })),
+      speed: Type.Optional(Type.Number({ description: 'Speaking rate. 1.0 is normal.' })),
+      lang: Type.Optional(
+        Type.String({ description: 'Language code (e.g. "a" = American English).' }),
+      ),
+      reference_audio: Type.Optional(
+        Type.String({
+          description:
+            'Absolute path to a 3-10s clip of a voice to CLONE. Without it, a preset voice is used.',
+        }),
+      ),
+      reference_text: Type.Optional(
+        Type.String({ description: 'Transcript of reference_audio, when the model wants it.' }),
+      ),
+    },
+    SPEECH_MODEL_IDS,
+  );
+
+  audioTool(
+    GENERATE_MUSIC_TOOL,
+    'Generate: Music',
+    'music',
+    'Compose a piece of music from a description, locally on-device. Describe genre, ' +
+      `instruments, tempo and mood. Available models: ${SOUND_MODEL_IDS.join(', ')}.`,
+    'Compose music from a description (on-device)',
+    {
+      seconds: Type.Optional(Type.Number({ description: 'Length in seconds. Default 20.' })),
+      steps: Type.Optional(Type.Number({ description: 'Diffusion steps. Higher is slower.' })),
+    },
+    SOUND_MODEL_IDS,
+  );
+
+  audioTool(
+    GENERATE_SFX_TOOL,
+    'Generate: Sound effect',
+    'sfx',
+    'Generate a short sound effect from a description (a door slam, footsteps on gravel, a ' +
+      'sword being drawn), locally on-device. Keep these SHORT — cost scales with length. Ask ' +
+      `for several variations with n and pick one. Available models: ${SOUND_MODEL_IDS.join(', ')}.`,
+    'Generate a short sound effect (on-device)',
+    {
+      seconds: Type.Optional(
+        Type.Number({ description: 'Length in seconds. Default 5, keep it short.' }),
+      ),
+      steps: Type.Optional(Type.Number({ description: 'Diffusion steps. Higher is slower.' })),
+      n: Type.Optional(Type.Number({ description: 'How many variations to produce. Default 1.' })),
+    },
+    SOUND_MODEL_IDS,
+  );
 }

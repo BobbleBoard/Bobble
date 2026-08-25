@@ -12,7 +12,7 @@
  */
 import type { ExtensionAPI } from '@mariozechner/pi-coding-agent';
 import { GenBridgeClient } from './gen-bridge-client.js';
-import { type GenToolsOptions, registerGenTools } from './tools.js';
+import { type GenToolsOptions, registerAudioTools, registerGenTools } from './tools.js';
 
 export * from './gen-bridge-client.js';
 export * from './gen-contract.js';
@@ -21,10 +21,12 @@ export * from './tools.js';
 /** Register the gen tools with an explicit bridge (test / app seam). */
 export function registerGenUse(pi: ExtensionAPI, options: GenToolsOptions): void {
   registerGenTools(pi, options);
+  registerAudioTools(pi, options);
 }
 
 /** pi extension factory (zero-config; reads the bridge socket from env). */
 export default function activate(pi: ExtensionAPI): void {
   const bridge = GenBridgeClient.fromEnv();
   registerGenTools(pi, { bridge });
+  registerAudioTools(pi, { bridge });
 }

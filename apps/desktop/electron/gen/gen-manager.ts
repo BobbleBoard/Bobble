@@ -50,6 +50,8 @@ import {
   GEN_TOKEN_ENV,
   type GenBridgeRequest,
   type GenBridgeResponse,
+  type GenerateAudioParams,
+  type GenerateAudioResult,
   type GenerateImageParams,
   type GenerateImageResult,
   type GenerateVideoParams,
@@ -65,6 +67,7 @@ import {
   type GenAssetNeed,
   makeComfyAssetGate,
 } from './asset-gate';
+import { audioOutputName, buildAudioJob, defaultAudioModel } from './audio-dispatch';
 import { type ComfyInstallManager, GPL_CONSENT_DISCLOSURE } from './comfy-install';
 import { surfaceModalityCatalog } from './gen-catalog-dto';
 import type {
@@ -456,12 +459,120 @@ export function registerGenIpc(opts: GenManagerOptions): void {
     }
   }
 
+  /**
+   * SPEECH, MUSIC AND SOUND EFFECTS.
+   *
+   * The audio side of the catalogue was the most complete unreachable thing in
+   * the app — eleven models, three ComfyUI graphs, a fully written `run_audio`
+   * in the Python worker, and a `GenJob.audio` arm in the protocol — with no
+   * caller, because `dispatch()` knew `generate` and `generateVideo` and
+   * nothing else. This is that caller.
+   *
+   * It runs through the SAME JobQueue as image and video, deliberately: one
+   * queue means one cancel path, one heavy-job gate and one place where a
+   * second request waits rather than fighting the first for the GPU.
+   */
+  async function handleGenerateAudio(raw: GenerateAudioParams): Promise<GenerateAudioResult> {
+    const kind = raw.kind ?? 'speech';
+    const fallback = defaultAudioModel(kind, activeModels());
+    const model = getModel(raw.model ?? fallback?.id ?? '');
+    if (model === undefined || model.modality !== 'audio') {
+      throw new Error(`unknown or non-audio model "${raw.model ?? ''}"`);
+    }
+
+    const jobId = `gen_${Date.now()}_${randomBytes(3).toString('hex')}`;
+    const outputDir = path.join(
+      outputRoot,
+      uniqueName(outputRoot, slug(raw.prompt, audioOutputName(kind, raw.prompt))),
+    );
+    await mkdir(outputDir, { recursive: true });
+
+    const count = Math.max(1, Math.min(8, Math.round(raw.count ?? 1)));
+    const base = raw.seed ?? randomInt(0, 1_000_000_000);
+    const seeds = Array.from({ length: count }, (_, i) => base + i);
+
+    const job: GenJob = buildAudioJob(
+      model,
+      {
+        prompt: raw.prompt,
+        kind,
+        seeds,
+        ...(raw.seconds !== undefined ? { seconds: raw.seconds } : {}),
+        ...(raw.steps !== undefined ? { steps: raw.steps } : {}),
+        ...(raw.voice !== undefined ? { voice: raw.voice } : {}),
+        ...(raw.speed !== undefined ? { speed: raw.speed } : {}),
+        ...(raw.lang !== undefined ? { lang: raw.lang } : {}),
+        ...(raw.refAudio !== undefined ? { refAudio: raw.refAudio } : {}),
+        ...(raw.refText !== undefined ? { refText: raw.refText } : {}),
+      },
+      jobId,
+      outputDir,
+    );
+
+    const tabId = `pi:gen-${jobId}`;
+    const modelInfo = { id: model.id, label: model.label, license: model.license };
+    let candidates: GenSurfacePayload['candidates'] = seeds.map((seed) => ({
+      seed,
+      status: 'pending' as const,
+    }));
+    let progress: GenSurfacePayload['progress'];
+
+    const payload = (status: GenSurfacePayload['status'], error?: string): GenSurfacePayload => ({
+      model: modelInfo,
+      prompt: raw.prompt,
+      candidates: candidates.map((c) => ({ ...c })),
+      progress,
+      status,
+      error,
+    });
+
+    send('gen:open', { tabId, payload: payload('generating') });
+
+    let doneCount = 0;
+    const onEvent = (event: GenEvent): void => {
+      if (event.event === 'progress') {
+        progress = { candidate: doneCount, step: event.step, total: event.total };
+        send('gen:update', { tabId, payload: payload('generating') });
+      } else if (event.event === 'candidate') {
+        candidates = candidates.map((c, i) =>
+          i === doneCount ? { ...c, status: 'done', finalSrc: toSrc(event.output.outputPath) } : c,
+        );
+        doneCount += 1;
+        send('gen:update', { tabId, payload: payload('generating') });
+      }
+    };
+
+    try {
+      // Same download-then-continue courtesy the video path gets: a ComfyUI music
+      // or SFX model whose weights pack is missing prompts, downloads, continues.
+      const need = needForModel(model);
+      if (need !== undefined && ensureAsset !== undefined) await ensureAsset(need);
+      const outputs = await jobQueue.enqueue(job, { heavy: model.heavy, onEvent }).result;
+      progress = undefined;
+      send('gen:update', { tabId, payload: payload('done') });
+      return {
+        jobId,
+        outputs: outputs.map((o) => ({
+          path: o.outputPath,
+          model: o.model,
+          ...(o.seed !== undefined ? { seed: o.seed } : {}),
+        })),
+      };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      send('gen:update', { tabId, payload: payload('error', message) });
+      throw err;
+    }
+  }
+
   async function dispatch(method: string, params: Record<string, unknown>): Promise<unknown> {
     switch (method) {
       case 'generate':
         return handleGenerate(params as unknown as GenerateImageParams);
       case 'generateVideo':
         return handleGenerateVideo(params as unknown as GenerateVideoParams);
+      case 'generateAudio':
+        return handleGenerateAudio(params as unknown as GenerateAudioParams);
       case 'cancel': {
         const jobId = String((params as { jobId?: unknown }).jobId ?? '');
         return { canceled: jobQueue.cancel(jobId) };

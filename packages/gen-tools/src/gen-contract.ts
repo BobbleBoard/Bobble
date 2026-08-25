@@ -32,7 +32,12 @@ export const GEN_TOKEN_ENV = 'PI_GEN_TOKEN';
  * `dispatch()` deliberately errors on video). `generate` stays image-only so the
  * existing `generate_image` tool is unaffected.
  */
-export type GenBridgeMethod = 'generate' | 'generateVideo' | 'cancel' | 'listModels';
+export type GenBridgeMethod =
+  | 'generate'
+  | 'generateVideo'
+  | 'generateAudio'
+  | 'cancel'
+  | 'listModels';
 
 /** One request on the wire. */
 export interface GenBridgeRequest {
@@ -90,6 +95,60 @@ export interface GenerateVideoParams {
   readonly seed?: number;
   /** What to avoid in the video. */
   readonly negativePrompt?: string;
+}
+
+/**
+ * Params for `generateAudio` — speech, music and sound effects.
+ *
+ * ONE METHOD, THREE SHAPES. `kind` is what decides which arm of the job runs
+ * (speech → the uv/mlx-audio worker, music and sfx → a ComfyUI graph) and which
+ * of the fields below mean anything. It is an explicit input rather than
+ * something inferred from the model id, because a caller asking for narration
+ * and a caller asking for a door slam want different defaults and different
+ * failure messages — and inferring it works right up until someone points a
+ * music model at a line of dialogue and gets thirty seconds of singing.
+ */
+export interface GenerateAudioParams {
+  /** For speech, the text to read. For music and sfx, the description. */
+  readonly prompt: string;
+  /** What is being asked for. Default `speech`. */
+  readonly kind?: 'speech' | 'music' | 'sfx';
+  /** Catalog audio model id. Default = the catalogue default for `kind`. */
+  readonly model?: string;
+  /** Length in seconds — music and sfx only; speech runs as long as its text. */
+  readonly seconds?: number;
+  /** Diffusion steps, where the model has them. */
+  readonly steps?: number;
+  /** Preset voice, speech only (e.g. `af_heart`). */
+  readonly voice?: string;
+  /** Speaking rate, speech only. */
+  readonly speed?: number;
+  /** Language code, speech only (e.g. `a` = American English). */
+  readonly lang?: string;
+  /**
+   * Absolute path to a reference clip for ZERO-SHOT VOICE CLONING, speech only.
+   * This is the field that makes the catalogue's "3s zero-shot clone" claims
+   * real in-product; without it synthesis uses a preset voice.
+   */
+  readonly refAudio?: string;
+  /** Transcript of {@link refAudio}, for clone models that want it. */
+  readonly refText?: string;
+  /** Base RNG seed. */
+  readonly seed?: number;
+  /** How many candidates to produce (distinct seeds). Default 1. */
+  readonly count?: number;
+}
+
+/** Result of a completed `generateAudio`: the job id and every produced clip. */
+export interface GenerateAudioResult {
+  readonly jobId: string;
+  readonly outputs: readonly {
+    readonly path: string;
+    readonly seed?: number;
+    readonly model: string;
+    /** Clip length in seconds, when the runner reports one. */
+    readonly seconds?: number;
+  }[];
 }
 
 /**
