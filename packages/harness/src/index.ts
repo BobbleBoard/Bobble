@@ -62,6 +62,7 @@ import {
   type ToolSchemaLike,
 } from './repair/rungs.js';
 import { adversarialCheck, reviewOutput } from './review/review.js';
+import { registerScheduledTaskTool } from './scheduled/schedule-tool.js';
 import { registerSkillInstructions } from './skills/skill-instructions.js';
 import {
   DEFAULT_CONFIG,
@@ -85,7 +86,6 @@ import { detectBudget } from './subagent/budget.js';
 import { type SchedulerSnapshot, SubagentScheduler } from './subagent/scheduler.js';
 import { specialistFromEnv, specialistToolset } from './subagent/specialist-env.js';
 import { registerSubagentTool } from './subagent/subagent-tool.js';
-import { registerScheduledTaskTool } from './scheduled/schedule-tool.js';
 import {
   HARNESS_SUBAGENTS_STATUS_KEY,
   type HarnessSubagentsStatus,
@@ -1834,6 +1834,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
              * all" cannot be answered from outside, and it is the first thing
              * worth knowing.
              */
+            `  cls=${cls} prompt=${JSON.stringify(String(runtime.lastPrompt ?? '').slice(0, 120))}\n` +
             `  available(${available.length}): ${available.join(',')}\n` +
             `  target(${target.length}): ${target.join(',')}\n`,
         );

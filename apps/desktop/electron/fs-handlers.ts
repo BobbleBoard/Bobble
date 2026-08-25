@@ -413,6 +413,15 @@ function allowedWriteRoots(): string[] {
   // the past-runs view serves them back through pd-file://, which fences to these
   // roots. Read AND write, since main writes the run's output here.
   roots.add(normalizeRoot(path.join(HOME, '.pi', 'desktop', 'scheduled-runs')));
+  /*
+   * WHERE GENERATED MEDIA LANDS. `~/Bobble/generated` is the app's OWN output
+   * directory — every image, video and audio file a generation writes — and it
+   * was not a served root, so the thread's player and file card fetched their
+   * own output and got 404. The card displayed the failure as the file's size:
+   * "audio · 9 B", nine bytes being the length of "not found". MEASURED twice,
+   * from two different directions, before the shared cause was obvious.
+   */
+  roots.add(normalizeRoot(path.join(HOME, 'Bobble')));
   return [...roots];
 }
 

@@ -115,6 +115,32 @@ export const ALWAYS_ACTIVE_TOOLS: readonly string[] = [
    */
   'present',
   /*
+   * THE GENERATION TOOLS, on every turn — the same argument `WEB` won.
+   *
+   * the user: "from the chat interface, these backends should be connected. I should
+   * be able to go to a new chat and ask for any of these types of media."
+   *
+   * They cannot arrive any other way. The per-turn class is HARDCODED to
+   * 'coding' (index.ts: `preset === 'auto' ? 'coding' : …`) because semantic
+   * tool preload was removed on purpose — it churned the KV prefix — so no
+   * class-based preset for image, video, 3D or audio is ever selected. And the
+   * capability route cannot finish the job either: `use` dispatches through the
+   * harness's OWN registry and every extension gets its own api object, so
+   * `use({tool:'generate_speech'})` answers "cannot be called this way" exactly
+   * as `browser_click` and `mac_click` did. MEASURED, on a real turn: the model
+   * discovered the capability, activated it, called `use`, and was refused.
+   *
+   * Five names on every prefix is a real cost, and it is the same trade `WEB`
+   * makes: STABLE (never varies with the wording of a message, so the prefix is
+   * still reused) and filtered against what is registered below, so a build
+   * without gen-tools lists none of them.
+   */
+  'generate_image',
+  'generate_video',
+  'generate_speech',
+  'generate_music',
+  'generate_sfx',
+  /*
    * A CEO COMMISSIONS. the user: "it should always have the commission tools…
    * that's what we wanted right, clean context ceo, until really needed for
    * testing, no clutter with browser tools or anything (it can have the basic
@@ -186,6 +212,11 @@ const IMAGE_GEN = ['generate_image', 'edit_image', 'image_generate', 'image_edit
 const VIDEO_GEN = ['video_generate', 'video_edit'] as const;
 const MOTION_GEN = ['motion_graphics_render'] as const;
 const THREE_D_GEN = ['model_3d_generate', 'model_3d_view'] as const;
+/*
+ * The audio generation family. Filtered by `available` like every other group,
+ * so a build without gen-tools simply advertises none of them.
+ */
+const AUDIO_GEN = ['generate_speech', 'generate_music', 'generate_sfx'] as const;
 // Typed ffmpeg façade (safe argv, no denoise) — the video-edit preset core.
 const VIDEO_EDIT = ['video_edit', 'extract_frames', 'probe'] as const;
 // On-device perception: Falcon-Perception (MLX) + ffmpeg-sampled video locate.
@@ -216,6 +247,10 @@ export const PRESET_TOOLS: Record<TaskClass, readonly string[]> = {
   perception: [...PERCEPTION, 'video_edit'],
   '3d': [...THREE_D_GEN, ...IMAGE_GEN],
   '2d-art': [...IMAGE_GEN],
+  // Audio gets its class, for the same reason image and video have theirs: the
+  // tools are in hand on the FIRST turn, rather than after a capability
+  // round-trip the user has to sit through.
+  audio: [...AUDIO_GEN],
   // A GENUINE macOS personal-app request (calendar/mail/messages/contacts/
   // reminders keywords → the 'connectors' class, classify.ts). Front-load the
   // connectors so "what's on my calendar" / "any new mail" / "text mom" has the

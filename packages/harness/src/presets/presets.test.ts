@@ -29,6 +29,11 @@ const ALL_TOOLS = [
   'ask_user',
   'present',
   'spawn_subagent',
+  'generate_image',
+  'generate_video',
+  'generate_speech',
+  'generate_music',
+  'generate_sfx',
   'read',
   'write',
   'edit',
@@ -123,13 +128,43 @@ describe('resolvePresetTools — what every turn can reach', () => {
     }
   });
 
-  it('keeps the heavy suites OUT unless the class is about them', () => {
-    /* A CEO commissions this work; it does not carry the tools around. */
+  it('keeps the BROWSER suite out unless the class is about it', () => {
     for (const cls of ['coding', 'simple-QA', 'other', 'file-ops'] as TaskClass[]) {
       const tools = resolvePresetTools(cls, ALL_TOOLS);
       expect(tools, `${cls} dragged in the browser suite`).not.toContain('browser_snapshot');
-      expect(tools, `${cls} dragged in image generation`).not.toContain('generate_image');
     }
+  });
+
+  it('DOES carry the generation tools on every turn', () => {
+    /*
+     * THIS EXPECTATION IS A REVERSAL, and deliberately so. It used to assert the
+     * opposite — "a CEO commissions this work; it does not carry the tools
+     * around" — which was coherent while generation was something you delegated.
+     *
+     * the user: "from the chat interface, these backends should be connected. I
+     * should be able to go to a new chat and ask for any of these types of media
+     * or files, all are delivered." That is the browser argument in reverse: a
+     * suite you occasionally drive stays behind a class, and a verb you might
+     * reach for in ANY conversation has to be in hand.
+     *
+     * They cannot arrive another way. The per-turn class is hardcoded to
+     * 'coding', so no generation preset is ever selected, and `use` cannot
+     * dispatch another extension's tool.
+     */
+    for (const cls of ['coding', 'simple-QA', 'other', 'file-ops'] as TaskClass[]) {
+      const tools = resolvePresetTools(cls, ALL_TOOLS);
+      for (const t of ['generate_image', 'generate_video', 'generate_speech']) {
+        expect(tools, `${cls} could not reach ${t}`).toContain(t);
+      }
+    }
+  });
+
+  it('lists no generation tool a build has not registered', () => {
+    // The filter that keeps this honest: a desktop without gen-tools advertises
+    // none of them rather than five names the grammar can emit and nothing can
+    // answer.
+    const tools = resolvePresetTools('coding', ['read', 'write', 'bash']);
+    expect(tools.some((t) => t.startsWith('generate_'))).toBe(false);
   });
 
   it('still front-loads the browser suite for a turn whose job IS a page', () => {

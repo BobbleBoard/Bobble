@@ -33,6 +33,7 @@ export type TaskCategory =
   | 'perception'
   | '3d'
   | '2d-art'
+  | 'audio'
   | 'connectors'
   | 'other';
 
@@ -50,6 +51,7 @@ export const TASK_CATEGORIES: readonly TaskCategory[] = [
   'perception',
   '3d',
   '2d-art',
+  'audio',
   'connectors',
   'other',
 ];
@@ -250,6 +252,38 @@ const CATEGORY_RULES: readonly CategoryRule[] = [
       [/\bvideo\b/, 1],
       [/\bfilm\b/, 1],
       [/\bmovie clip\b/, 1],
+    ],
+  },
+  {
+    /*
+     * AUDIO — speech, music and sound effects.
+     *
+     * Image, video and 3D each had a class that front-loads their generation
+     * tools; audio did not, so "read this out loud" fell to the generic `other`
+     * with nothing in hand and the model answered that it had no speech tool.
+     *
+     * SPEECH PATTERNS ARE THE STRONG ONES because they are the least ambiguous:
+     * "read this aloud" is never a request for anything else. "music" and
+     * "sound" score lower — a sentence can mention a sound without wanting one
+     * synthesised, and the tier check below still has to clear.
+     */
+    category: 'audio',
+    patterns: [
+      [/\bread (this|that|it|the following)?\s*(out )?loud\b/, 3],
+      [/\b(text|speech)[- ]to[- ](speech|text)\b/, 3],
+      [/\bvoice[- ]?(over|clone|cloning)\b/, 3],
+      [/\bclone (my |his |her |their |the )?voice\b/, 3],
+      [/\b(say|speak|narrate|pronounce) (this|that|it|the following)\b/, 2],
+      [
+        /\b(generate|make|create|compose|write) (me )?(some |a |an )?(music|song|melody|jingle|soundtrack)\b/,
+        3,
+      ],
+      [/\b(generate|make|create) (me )?(a |an )?sound (effect|fx)\b/, 3],
+      [/\bsound effects?\b/, 2],
+      [/\bnarration\b/, 2],
+      [/\btts\b/, 2],
+      [/\baudio clip\b/, 2],
+      [/\bfoley\b/, 2],
     ],
   },
   {

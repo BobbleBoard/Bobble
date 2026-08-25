@@ -541,19 +541,36 @@ export function registerGenIpc(opts: GenManagerOptions): void {
       error,
     });
 
-    send('gen:open', { tabId, payload: payload('generating') });
+    /*
+     * NO CANVAS TAB FOR AUDIO.
+     *
+     * `gen-image` is the only registered surface and it renders candidates as
+     * <img>, so an audio job drew a BROKEN IMAGE labelled "Candidate 1 (seed …)"
+     * in the rail — next to a thread already showing the same clip with a
+     * working waveform. Guarding in the renderer could not fix it: at `gen:open`
+     * the candidates are still `pending` with no `finalSrc`, so nothing there
+     * can yet tell audio from an image. The job knows, so the job decides.
+     *
+     * `payload`/`tabId` stay built and the events stay wired for the day an
+     * audio surface exists; they simply are not sent.
+     */
+    const canvasPush = (name: 'gen:open' | 'gen:update', p: GenSurfacePayload): void => {
+      void name;
+      void p;
+    };
+    canvasPush('gen:open', payload('generating'));
 
     let doneCount = 0;
     const onEvent = (event: GenEvent): void => {
       if (event.event === 'progress') {
         progress = { candidate: doneCount, step: event.step, total: event.total };
-        send('gen:update', { tabId, payload: payload('generating') });
+        canvasPush('gen:update', payload('generating'));
       } else if (event.event === 'candidate') {
         candidates = candidates.map((c, i) =>
           i === doneCount ? { ...c, status: 'done', finalSrc: toSrc(event.output.outputPath) } : c,
         );
         doneCount += 1;
-        send('gen:update', { tabId, payload: payload('generating') });
+        canvasPush('gen:update', payload('generating'));
       }
     };
 
@@ -579,7 +596,7 @@ export function registerGenIpc(opts: GenManagerOptions): void {
           : {}),
       }).result;
       progress = undefined;
-      send('gen:update', { tabId, payload: payload('done') });
+      canvasPush('gen:update', payload('done'));
       return {
         jobId,
         outputs: outputs.map((o) => ({
@@ -590,7 +607,7 @@ export function registerGenIpc(opts: GenManagerOptions): void {
       };
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      send('gen:update', { tabId, payload: payload('error', message) });
+      canvasPush('gen:update', payload('error', message));
       throw err;
     }
   }

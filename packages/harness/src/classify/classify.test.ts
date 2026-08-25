@@ -237,3 +237,32 @@ describe('classifyWithEscalation — tier-2 seam', () => {
     expect(r.class).toBe('advanced-video');
   });
 });
+
+describe('audio requests reach the audio class', () => {
+  /*
+   * The regression this exists for: image, video and 3D each had a class that
+   * front-loads their generation tools and audio did not, so "read this out
+   * loud" landed in the generic `other` with nothing in hand — and the model
+   * replied, accurately for what it could see, that it had no speech tool.
+   */
+  const CASES: readonly [string, string][] = [
+    ['Read this out loud: hello there.', 'audio'],
+    ['Use text-to-speech on this paragraph.', 'audio'],
+    ['Clone my voice from this sample.', 'audio'],
+    ['Compose some music for a title screen.', 'audio'],
+    ['Generate a sound effect of a door slamming.', 'audio'],
+    ['Write me a jingle for a coffee advert.', 'audio'],
+    ['Narrate the following text.', 'audio'],
+  ];
+  for (const [prompt, want] of CASES) {
+    it(`routes ${JSON.stringify(prompt)}`, () => {
+      expect(classify({ prompt }).class).toBe(want);
+    });
+  }
+
+  it('does NOT hijack an ordinary mention of sound', () => {
+    // "sound" alone is a word, not a request — the strong patterns are the
+    // unambiguous ones and this must stay out of their way.
+    expect(classify({ prompt: 'Does this code sound correct to you?' }).class).not.toBe('audio');
+  });
+});
