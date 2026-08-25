@@ -64,6 +64,20 @@ try {
       }, before)
       .catch(() => false);
     if (done) break;
+    /*
+     * A CLOSED WINDOW IS NOT A SLOW TURN. Every probe of the window here is
+     * `.catch(() => false)`, so when the app goes away the loop reads "not
+     * finished yet" and keeps saying it until the cap — ten minutes of waiting
+     * on something that ended in the first one, and then a stack trace from the
+     * next unguarded evaluate rather than the actual cause.
+     */
+    if (win.isClosed()) {
+      console.error('[e2e] the app window closed mid-turn — nothing left to measure');
+      // Its own output is the only evidence left of WHY, so keep it.
+      writeFileSync(`${OUT}/main.log`, log.join(''));
+      console.error(log.join('').slice(-4000));
+      process.exit(2);
+    }
     await win.waitForTimeout(4000).catch(() => undefined);
   }
 
@@ -180,7 +194,29 @@ try {
     out.revealText = body ? body.innerText.replace(/\s+/g, ' ').slice(0, 160) : null;
     return out;
   });
-  console.log('[e2e] SPEECH ROW REVEAL:', JSON.stringify(reveal));
+  console.log('[e2e] GENERATE ROW:', JSON.stringify(reveal));
+
+  /*
+   * THE CANVAS TAB A GENERATED IMAGE OPENS. An image row routes to the canvas
+   * rather than expanding, and that tab opened on nothing — "Failed to load
+   * file content" under the title "PNG" — while the picture sat correctly in
+   * the thread. The tab is a different surface with a different src, so the
+   * thread rendering says nothing about it.
+   */
+  const canvas = await win.evaluate(() => {
+    const tab =
+      document.querySelector('.pd-canvas-tab[data-active] .pd-canvas-tab-label') ??
+      document.querySelector('.pd-canvas-tab-label');
+    const err = document.querySelector('.pd-media-error');
+    const img = document.querySelector('.pd-media-body img');
+    return {
+      tabTitle: tab?.textContent?.trim() ?? null,
+      failed: err !== null,
+      imgSrc: img?.getAttribute('src') ?? null,
+      imgLoaded: img instanceof HTMLImageElement ? img.naturalWidth > 0 : null,
+    };
+  });
+  console.log('[e2e] CANVAS TAB:', JSON.stringify(canvas));
   const chainShot = win.locator('.pd-chain').first();
   await chainShot.screenshot({ path: `${OUT}/chain-expanded.png` }).catch(() => {});
   await win.screenshot({ path: path.join(OUT, 'chat.png'), fullPage: true });

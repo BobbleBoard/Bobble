@@ -24,6 +24,7 @@ import type {
 // `HarnessStatus.tsx`/`composer-bar-logic.ts` use for harness/src.
 import { connectorIconSvg } from '../../../../packages/mcp-lite/src/connector-icons.ts';
 import { type DetectedArtifact, segmentMessageText } from './canvas/artifacts';
+import { pdFileUrl } from './canvas/file-preview';
 import { CONTENT_KEYS, PATH_KEYS, partialJsonString } from './partial-json';
 
 type ToolCallBlock = Extract<ContentBlock, { type: 'toolCall' }>;
@@ -840,6 +841,21 @@ function pickMediaSrc(
 ): string | undefined {
   const fromResult = firstMediaUrl(str(result?.text));
   if (fromResult !== undefined) return fromResult;
+  /*
+   * THE PATH THE TOOL NAMED, made loadable.
+   *
+   * `generate_image` takes no path ARGUMENT and its result names the file in
+   * prose — no `pd-file://` URL anywhere in it — so both branches below came
+   * back empty and the canvas tab opened on nothing: "Failed to load file
+   * content", under the title "PNG" because the filename was equally absent.
+   * MEASURED in the app on a real generate_image turn (the picture was fine in
+   * the thread the whole time; only the tab it opened was broken).
+   *
+   * A bare disk path cannot be rendered by an <img>, which is what that surface
+   * is, so it has to become the app's own file URL to be worth anything.
+   */
+  const named = reportedOutputPath(str(result?.text));
+  if (named !== undefined) return pdFileUrl(named);
   const fromArgs = str(args.url) ?? str(args.src) ?? pickPath(args);
   return fromArgs;
 }
@@ -1015,16 +1031,19 @@ function mapToolStepData(
     case 'pdf': {
       const src = pickMediaSrc(args, result);
       const mediaType = kind === 'pdf' ? 'PDF' : 'PNG';
+      // The tab is titled with the file, falling back to the bare type only when
+      // there is genuinely no name to use — "PNG · PNG" tells you nothing.
+      const mediaName = filename ?? baseName(reportedOutputPath(str(result?.text)));
       return {
         // `src` rides along even though `opensInCanvas` is set: it is what the
         // step can still name about itself if it ever reaches the chain without
         // a canvas destination (B1 deliberately keeps the tab even for a missing
         // src, so today that is a fallback rather than a live path).
-        data: { kind, label, status, filename, src, opensInCanvas: true },
+        data: { kind, label, status, filename: mediaName, src, opensInCanvas: true },
         tabSpec: {
           kind,
           key: block.id,
-          title: filename ?? mediaType,
+          title: mediaName ?? mediaType,
           mediaSrc: src,
           mediaType,
           // Intentionally UNCONTROLLED: MediaPreviewSurface derives load/loaded/

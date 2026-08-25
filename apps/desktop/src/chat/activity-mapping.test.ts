@@ -1054,3 +1054,37 @@ describe('reportedOutputPath does not mine a path out of a URL', () => {
     );
   });
 });
+
+describe('a generated image opens a canvas tab that can actually load it', () => {
+  /*
+   * MEASURED in the app: clicking the "Generated an image" row opened a tab
+   * titled "PNG · PNG" reading "Failed to load file content", while the picture
+   * itself sat correctly in the thread. `generate_image` takes no path argument
+   * and its result names the file in prose, so the tab got neither a src nor a
+   * name.
+   */
+  const RESULT =
+    'Generated 1 image on the canvas:\n  1. /Users/user/Bobble/generated/fox/cand0_seed115173204.png (seed 115173204)\nModel: FLUX.2 klein (4B)';
+
+  it('gives the tab the file URL and the file name', () => {
+    const step = mapToolStep(
+      call('c1', 'generate_image', { prompt: 'a fox' }),
+      result('c1', RESULT),
+      false,
+    );
+    expect(step.tabSpec?.title).toBe('cand0_seed115173204.png');
+    expect(step.tabSpec?.mediaSrc).toBe(
+      'pd-file://f/Users/user/Bobble/generated/fox/cand0_seed115173204.png',
+    );
+    expect(step.data.filename).toBe('cand0_seed115173204.png');
+  });
+
+  it('still prefers a pd-file URL the tool returned itself', () => {
+    const step = mapToolStep(
+      call('c1', 'generate_image', { prompt: 'a fox' }),
+      result('c1', 'pd-file://f/tmp/a.png\nSaved to /tmp/a.png'),
+      false,
+    );
+    expect(step.tabSpec?.mediaSrc).toBe('pd-file://f/tmp/a.png');
+  });
+});
