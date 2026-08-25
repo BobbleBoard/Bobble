@@ -14,15 +14,15 @@ import {
   IconFolderOpen,
   IconGateOpen,
   IconGears,
-  IconHandoff,
-  IconOrg,
-  IconSubmit,
   IconGlobe,
+  IconHandoff,
   IconKeyboard,
+  IconOrg,
   IconPencil,
   IconPuzzle,
   IconSearch,
   IconSparkles,
+  IconSubmit,
   IconTerminal,
 } from './icons.tsx';
 
@@ -64,6 +64,15 @@ export type ToolIconKind =
   // The `tool_search` builtin: a magnifier over the TOOL registry (not the web),
   // so it reads "Searched tools" with the search-glass glyph, never the web globe.
   | 'tool-search'
+  /*
+   * THE GENERATE FAMILY. Each names what it produced rather than sharing one
+   * "image" bucket: a row that says "Made a sound effect" beside a waveform is
+   * doing work, and "Used a tool" beside the same waveform is not.
+   */
+  | 'video'
+  | 'speech'
+  | 'music'
+  | 'sfx'
   | 'file'
   // A SKILL / tool-instructions read (a SKILL.md under the pi skills dir):
   // reads distinctly as "Read a skill" with its own sparkle glyph — NOT the
@@ -219,6 +228,12 @@ export function toolIcon(
       );
     case 'image':
       return <FileExtIcon ext={fileExt(filename) || 'PNG'} size={size + 4} />;
+    case 'video':
+      return <FileExtIcon ext={fileExt(filename) || 'MP4'} size={size + 4} />;
+    case 'speech':
+    case 'music':
+    case 'sfx':
+      return <FileExtIcon ext={fileExt(filename) || 'WAV'} size={size + 4} />;
     case 'pdf':
       return <FileExtIcon ext={fileExt(filename) || 'PDF'} size={size + 4} />;
     default:

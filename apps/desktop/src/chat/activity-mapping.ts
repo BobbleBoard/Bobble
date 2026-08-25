@@ -197,6 +197,10 @@ const STEP_LABELS: Record<ActivityStepKind, [running: string, done: string]> = {
   connector: ['Using a connector', 'Used a connector'],
   tool: ['Running a tool', 'Used a tool'],
   image: ['Generating an image', 'Generated an image'],
+  video: ['Generating a video', 'Generated a video'],
+  speech: ['Reading it aloud', 'Read it aloud'],
+  music: ['Composing music', 'Composed music'],
+  sfx: ['Making a sound effect', 'Made a sound effect'],
   pdf: ['Creating a PDF', 'Created a PDF'],
   'canvas-open': ['Opening the canvas', 'Opened the canvas'],
 };
@@ -299,6 +303,15 @@ const TOOL_REGISTRY: Record<string, ToolResolution> = {
   // entries because `edit_image` would otherwise be swallowed by the edit/write
   // heuristic below and render as a file edit instead of a picture.
   generate_image: { kind: 'image' },
+  /*
+   * The rest of the generate family. Without these the row read "Used a tool"
+   * over a picture of a waveform — the least informative sentence available,
+   * next to the most informative object on the screen.
+   */
+  generate_video: { kind: 'video' },
+  generate_speech: { kind: 'speech' },
+  generate_music: { kind: 'music' },
+  generate_sfx: { kind: 'sfx' },
   edit_image: { kind: 'image', label: ['Editing an image', 'Edited an image'] },
   // web search
   web_search: { kind: 'search' },

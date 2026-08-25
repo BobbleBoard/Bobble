@@ -81,9 +81,7 @@ describe('R14-C shell + scroll styles', () => {
    */
   describe('sidebar slide — the panel rides the closing edge', () => {
     it('the slot animates its width, and clips while it does', () => {
-      expect(block('.pd-sidebar-slot ')).toMatch(
-        /transition:\s*width var\(--pd-duration-slow/,
-      );
+      expect(block('.pd-sidebar-slot ')).toMatch(/transition:\s*width var\(--pd-duration-slow/);
       expect(block('.pd-sidebar-slot[data-open="false"] {')).toMatch(/overflow:\s*hidden/);
       expect(block('.pd-sidebar-slot[data-open="false"] {')).toMatch(/width:\s*0/);
     });

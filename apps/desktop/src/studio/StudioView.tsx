@@ -19,6 +19,7 @@
 import { Button, IconChevronLeft, ScrollArea, Spinner } from '@pi-desktop/ui';
 import { type JSX, useEffect, useMemo, useState } from 'react';
 import type { StudioProgress, StudioStatus } from '../../electron/studio/studio-contract';
+import { pdFileUrl } from '../chat/canvas/file-preview';
 import { DownloadBar } from '../models/DownloadBar';
 import { cx } from '../onboarding/cx';
 import { exitModality } from '../state/modality-store';
@@ -211,14 +212,14 @@ export function StudioView(): JSX.Element {
                   // biome-ignore lint/a11y/useMediaCaption: a generated clip has no captions
                   <video
                     key={file}
-                    src={`pd-file://${file}`}
+                    src={pdFileUrl(file)}
                     controls
                     className="w-full rounded-xl border border-border-subtle"
                   />
                 ) : (
                   <img
                     key={file}
-                    src={`pd-file://${file}`}
+                    src={pdFileUrl(file)}
                     alt={prompt}
                     className="w-full rounded-xl border border-border-subtle"
                   />

@@ -271,6 +271,10 @@ const VERBS: Record<ActivityStepKind, VerbSpec> = {
   connector: { verb: 'Used', singular: 'a connector', plural: 'connectors' },
   tool: { verb: 'Used', singular: 'a tool', plural: 'tools' },
   image: { verb: 'Generated', singular: 'an image', plural: 'images', attempt: 'image' },
+  video: { verb: 'Generated', singular: 'a video', plural: 'videos', attempt: 'video' },
+  speech: { verb: 'Read', singular: 'it aloud', plural: 'passages', attempt: 'read-aloud' },
+  music: { verb: 'Composed', singular: 'music', plural: 'pieces', attempt: 'piece' },
+  sfx: { verb: 'Made', singular: 'a sound effect', plural: 'sound effects', attempt: 'sound' },
   pdf: { verb: 'Created', singular: 'a PDF', plural: 'PDFs', attempt: 'PDF' },
   'canvas-open': { verb: 'Opened', singular: 'the canvas', plural: '' },
 };
@@ -298,6 +302,13 @@ const KIND_ORDER: ActivityStepKind[] = [
   'connector',
   'tool',
   'image',
+  /* The rest of the generate family. Omitted here they are invisible to the
+     chain SUMMARY — the collapsed header aggregates by KIND_ORDER, so a turn
+     whose only step was a sound effect summarised as something else entirely. */
+  'video',
+  'speech',
+  'music',
+  'sfx',
   'pdf',
   'canvas-open',
 ];
@@ -464,6 +475,10 @@ const RUNNING_PHRASE: Record<ActivityStepKind, string> = {
   connector: 'Using a connector',
   tool: 'Running a tool',
   image: 'Generating an image',
+  video: 'Generating a video',
+  speech: 'Reading it aloud',
+  music: 'Composing music',
+  sfx: 'Making a sound effect',
   pdf: 'Creating a PDF',
   'canvas-open': 'Opening the canvas',
 };

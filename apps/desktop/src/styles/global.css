@@ -2900,11 +2900,7 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
    * means "fixed to the element", so the stripe stays put while the card
    * scrolls past it.
    */
-  background-image: linear-gradient(
-    to bottom,
-    var(--pd-border-default),
-    var(--pd-border-default)
-  );
+  background-image: linear-gradient(to bottom, var(--pd-border-default), var(--pd-border-default));
   background-size: 1px 100%;
   background-repeat: no-repeat;
   background-position: left top;
@@ -2912,4 +2908,164 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
      only bites once content scrolls up into it. */
   -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 24px);
   mask-image: linear-gradient(to bottom, transparent 0, #000 24px);
+}
+
+/*
+ * GENERATED MEDIA, IN THE THREAD THAT MADE IT.
+ *
+ * the user: "all are delivered and embedded cleanly and in full quality into the
+ * chat aswell as with a file presentation card(s) to export/reveal."
+ *
+ * The sizing rule throughout: bounded by the COLUMN, never by a fixed pixel
+ * count. A generated image used to be capped at 414px because it was competing
+ * with a canvas row showing the same picture; nothing competes with it here, so
+ * the only limit is the width of the conversation.
+ */
+.pd-thread-media {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 10px;
+}
+
+.pd-thread-media-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.pd-thread-video {
+  width: 100%;
+  max-height: 420px;
+  border-radius: 12px;
+  background: #000;
+  display: block;
+  border: 1px solid color-mix(in oklab, var(--pd-text-primary) 12%, var(--pd-bg-raised));
+}
+
+/* ---- the audio transport ------------------------------------------------- */
+
+.pd-thread-audio {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: var(--pd-bg-raised);
+  border: 1px solid color-mix(in oklab, var(--pd-text-primary) 12%, var(--pd-bg-raised));
+}
+
+.pd-thread-audio-play {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex: none;
+  border-radius: 999px;
+  border: none;
+  cursor: pointer;
+  background: var(--pd-accent-primary);
+  color: var(--pd-text-on-accent);
+  transition:
+    transform var(--pd-duration-fast) var(--pd-easing-standard),
+    opacity var(--pd-duration-fast) var(--pd-easing-standard);
+}
+.pd-thread-audio-play:hover {
+  opacity: 0.9;
+}
+/* A press that moves is how a transport says it heard you; 0.94 is small enough
+   not to read as a bounce at the 32px this button actually is. */
+.pd-thread-audio-play:active {
+  transform: scale(0.94);
+}
+
+.pd-thread-audio-wave {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+  height: 34px;
+  cursor: pointer;
+}
+
+.pd-thread-audio-bar {
+  flex: 1;
+  min-width: 1px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--pd-text-primary) 22%, transparent);
+  transition: background var(--pd-duration-fast) var(--pd-easing-standard);
+}
+/* Played bars carry the accent — the position readout is the COLOUR BOUNDARY,
+   which is legible at a glance in a way a 2px playhead line is not. */
+.pd-thread-audio-bar[data-on="true"] {
+  background: var(--pd-accent-primary);
+}
+
+.pd-thread-audio-flat {
+  flex: 1;
+  height: 3px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--pd-text-primary) 18%, transparent);
+}
+
+.pd-thread-audio-time {
+  flex: none;
+  font-size: 0.75rem;
+  color: var(--pd-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- the file presentation card ----------------------------------------- */
+
+.pd-file-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px 8px 12px;
+  border-radius: 10px;
+  background: var(--pd-bg-inset);
+  border: 1px solid color-mix(in oklab, var(--pd-text-primary) 10%, transparent);
+}
+
+.pd-file-card-icon {
+  display: inline-flex;
+  color: var(--pd-text-muted);
+  flex: none;
+}
+
+.pd-file-card-name {
+  display: block;
+  font-size: 0.8125rem;
+  color: var(--pd-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pd-file-card-meta {
+  display: block;
+  font-size: 0.6875rem;
+  color: var(--pd-text-muted);
+  /* NO text-transform. It was lowercasing the whole line to keep the kind word
+     tidy and turned "209 KB" into "209 kb" — the kind is already lowercase in
+     the markup, so the transform only ever had units to damage. */
+}
+
+.pd-file-card-action {
+  flex: none;
+  border: none;
+  cursor: pointer;
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--pd-accent-primary);
+  background: color-mix(in oklab, var(--pd-accent-primary) 14%, transparent);
+  transition: background var(--pd-duration-fast) var(--pd-easing-standard);
+}
+.pd-file-card-action:hover {
+  background: color-mix(in oklab, var(--pd-accent-primary) 26%, transparent);
 }

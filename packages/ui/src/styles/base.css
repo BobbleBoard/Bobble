@@ -141,8 +141,7 @@
     to right,
     transparent,
     var(--pd-edge-line-color, var(--pd-border-subtle)) var(--pd-edge-line-inset, 12%),
-    var(--pd-edge-line-color, var(--pd-border-subtle))
-      calc(100% - var(--pd-edge-line-inset, 12%)),
+    var(--pd-edge-line-color, var(--pd-border-subtle)) calc(100% - var(--pd-edge-line-inset, 12%)),
     transparent
   );
 }

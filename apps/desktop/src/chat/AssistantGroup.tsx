@@ -24,6 +24,30 @@ import { InlineArtifact } from './canvas/InlineArtifacts';
 import { Markdown } from './markdown';
 import { ThreadActivityChain } from './ThreadActivity';
 import { ThreadImagePlaceholder } from './ThreadImagePlaceholder';
+import { ThreadMedia } from './ThreadMedia';
+import { mediaFromToolResult, type ThreadMediaItem } from './thread-media';
+
+/**
+ * The media a chain segment's generate-tool calls produced.
+ *
+ * Reads the tool RESULTS rather than the calls: a call that is still running,
+ * or that failed, has produced nothing to show, and mounting a player for it
+ * would be a broken box in the transcript.
+ */
+function mediaForSegment(
+  seg: { kind: string; blocks?: readonly ContentBlock[] },
+  resultForBlock: Map<string, ToolResultMsg>,
+): ThreadMediaItem[] {
+  if (seg.kind !== 'chain' || seg.blocks === undefined) return [];
+  const out: ThreadMediaItem[] = [];
+  for (const b of seg.blocks) {
+    if (b.type !== 'toolCall') continue;
+    const result = resultForBlock.get(b.id);
+    if (result === undefined) continue;
+    out.push(...mediaFromToolResult(result.toolName, result.text, result.isError));
+  }
+  return out;
+}
 
 export function AssistantGroup({
   group,
@@ -169,6 +193,13 @@ export function AssistantGroup({
                 own DOM, so it must MOUNT ONCE per generation. Remounting it
                 would replay its entrance animation mid-run. */}
             {pendingHere ? <ThreadImagePlaceholder /> : null}
+            {/* WHAT THE TURN MADE, under the chain that made it. Generated
+                images used to reach the thread only as a 414px markdown embed
+                and generated audio/video only as a path in prose; the user wants
+                every produced file embedded at full quality with a card to
+                reveal it. Keyed off the tool RESULT, so it appears when the
+                file exists rather than when the model mentions one. */}
+            <ThreadMedia items={mediaForSegment(seg, resultForBlock)} />
           </div>
         );
       })}
