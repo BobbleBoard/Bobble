@@ -114,7 +114,20 @@ export const MODALITY_CATALOG: readonly ModalityModel[] = [
     license: 'apache-2.0',
     commercialUse: true,
     approxSizeGB: 4.3,
-    minUnifiedMemoryGB: 6,
+    /*
+     * MEASURED, not derived from the download size (2026-08-25, M5 Pro 24GB).
+     * The 4-bit weights are 4.3GB on disk, but a job's PEAK is activations, and
+     * activations scale with the picture:
+     *
+     *   512²   4 steps   3.6s   MLX peak  4.95 GB
+     *   1024²  4 steps   8.4s   MLX peak 12.37 GB
+     *
+     * The old `6` described the weights sitting still. The app's default size is
+     * 1024², so 12.4GB plus the OS and this app is the floor a machine actually
+     * needs — and this number is what the model card's RAM verdict reads, so a
+     * 6 here told someone with 8GB they were fine.
+     */
+    minUnifiedMemoryGB: 16,
     runsLocally: true,
     heavy: false,
     recommended: true,
@@ -127,7 +140,7 @@ export const MODALITY_CATALOG: readonly ModalityModel[] = [
     },
     defaultSteps: 4,
     notes:
-      'Default. Apache, mflux auto-fetches text-enc+VAE (no manual aux). Pre-quantized 4-bit mflux repo (no on-the-fly -q). ~5-6s/512 · ~85s/1024 [measured].',
+      'Default. Apache, mflux auto-fetches text-enc+VAE (no manual aux). Pre-quantized 4-bit mflux repo (no on-the-fly -q). 3.6s/512² (4.95GB peak) · 8.4s/1024² (12.4GB peak) ALONE [measured 2026-08-25]. Alongside a resident 9B chat model on 24GB, 1024² swaps: ~2min/step.',
   },
   {
     id: 'z-image-turbo',
