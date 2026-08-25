@@ -19,9 +19,9 @@ import { createRequire } from 'node:module';
 import { join } from 'node:path';
 import { createLogger } from '@pi-desktop/shared';
 import { app, BrowserWindow, type WebContents, type WebContentsView } from 'electron';
-import type { OfficeBounds, OfficeKind } from './office-contract';
 import { officeChromeCss, officeChromeScript } from './office-chrome';
-import { officeThemeCss, type OfficeThemeTokens } from './office-theme';
+import type { OfficeBounds, OfficeKind } from './office-contract';
+import { type OfficeThemeTokens, officeThemeCss } from './office-theme';
 
 const log = createLogger('desktop:office');
 const requireCjs = createRequire(import.meta.url);

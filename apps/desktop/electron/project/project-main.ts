@@ -5,13 +5,14 @@
  * file-tree root; this module only persists the list and runs the native
  * folder picker for "New project". Trusted-sender gated like the other channels.
  */
-import { resolveProjectDir } from '../workspace/project-dir';
+
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { createLogger, type IpcHandlers, registerIpcHandlers } from '@pi-desktop/shared';
 import { dialog, type IpcMain } from 'electron';
 import { ensureSandboxDir } from '../sandbox';
+import { resolveProjectDir } from '../workspace/project-dir';
 import type { ProjectEntry, ProjectInvokeMap } from './project-contract';
 
 const log = createLogger('desktop:project');

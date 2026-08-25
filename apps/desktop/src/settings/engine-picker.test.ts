@@ -58,7 +58,11 @@ describe('reading the format off a repo', () => {
 });
 
 describe('a GGUF text model', () => {
-  const gguf = { repo: 'unsloth/Qwen3.8-27B-GGUF', modality: 'text' as const, format: 'gguf' as const };
+  const gguf = {
+    repo: 'unsloth/Qwen3.8-27B-GGUF',
+    modality: 'text' as const,
+    format: 'gguf' as const,
+  };
 
   it('runs on llama.cpp everywhere, including a machine with no GPU at all', () => {
     const cpuOnly: PickerHost = {

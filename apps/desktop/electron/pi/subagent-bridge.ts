@@ -18,8 +18,8 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { createLogger } from '@pi-desktop/shared';
 import { type IpcMainInvokeEvent, ipcMain, type WebContents } from 'electron';
-import { isTrustedIpcEvent } from '../trusted-senders';
 import { runCorpForBridge } from '../corp/corp-main';
+import { isTrustedIpcEvent } from '../trusted-senders';
 import type { ChildAgents } from './child-agents';
 
 const log = createLogger('desktop:subagent-bridge');

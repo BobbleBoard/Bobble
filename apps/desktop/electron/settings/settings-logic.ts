@@ -25,14 +25,14 @@ import {
   type ModelSelection,
   type ModelSelectionTier,
   type PermissionMode,
+  type QuickMenuSettings,
+  type QuickSlotSettings,
   type ThemeFlavor,
   type ThemeModePref,
   UI_SCALE_DEFAULT,
   UI_SCALE_MAX,
   UI_SCALE_MIN,
   USER_MODES,
-  type QuickMenuSettings,
-  type QuickSlotSettings,
 } from './settings-contract';
 
 const FLAVORS: readonly ThemeFlavor[] = ['claude', 'codex', 'bobble'];
@@ -72,9 +72,8 @@ function clampQuickMenu(value: unknown): QuickMenuSettings | undefined {
           {
             id: slot.id,
             label: slot.label,
-            modelId: typeof slot.modelId === 'string' && slot.modelId.length > 0
-              ? slot.modelId
-              : null,
+            modelId:
+              typeof slot.modelId === 'string' && slot.modelId.length > 0 ? slot.modelId : null,
             ...(tier === undefined ? {} : { tier }),
           },
         ];

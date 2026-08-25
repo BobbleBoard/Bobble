@@ -247,6 +247,31 @@ export function IconExternal(props: IconProps) {
   );
 }
 
+/** Film frame — the Video Studio's rail glyph. */
+export function IconVideo(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect x="2" y="4" width="9" height="8" rx="1.5" />
+      <path d="M11 7.2 14 5.4v5.2L11 8.8z" />
+    </Icon>
+  );
+}
+
+/**
+ * Waveform — the Audio Studio's rail glyph.
+ *
+ * Bars rather than a sine: a sine reads as "signal" in the abstract, while
+ * uneven bars read as a RECORDING, which is what this room makes. Asymmetric on
+ * purpose; a symmetrical set looks like a chart axis.
+ */
+export function IconWaveform(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M2.5 7v2M5 4.5v7M7.5 6v4M10 3.5v9M12.5 6.5v3" />
+    </Icon>
+  );
+}
+
 export function IconDiff(props: IconProps) {
   return (
     <Icon {...props}>

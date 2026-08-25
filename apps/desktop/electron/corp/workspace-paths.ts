@@ -110,8 +110,7 @@ function leafShadowRoot(abs: string): string | undefined {
   } catch {
     return undefined;
   }
-  const marker = (dir: string): boolean =>
-    ENTRY_MARKERS.some((m) => existsSync(path.join(dir, m)));
+  const marker = (dir: string): boolean => ENTRY_MARKERS.some((m) => existsSync(path.join(dir, m)));
   if (marker(abs)) return undefined; // the real project is already at the top
   if (marker(candidate)) return candidate;
   // Or one level further in, which is how run 19 nested it.
@@ -343,4 +342,3 @@ export function deliveryFromTask(task: string, home: string): string | null {
   }
   return best;
 }
-

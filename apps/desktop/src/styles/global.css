@@ -3069,3 +3069,248 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
 .pd-file-card-action:hover {
   background: color-mix(in oklab, var(--pd-accent-primary) 26%, transparent);
 }
+
+/*
+ * THE STUDIOS — image, video, audio.
+ *
+ * One stylesheet for all three because they are one program with different
+ * knobs, and three that drifted apart would be three that felt like different
+ * apps. The layout is fixed-header / fixed-composer / scrolling results: the
+ * description you are iterating on must stay under your hands while the output
+ * changes below it.
+ */
+.pd-studio {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: var(--pd-bg-base);
+  color: var(--pd-text-primary);
+}
+
+/*
+ * THE HEADER SPANS THE WINDOW, NOT THE COLUMN.
+ *
+ * Centring it with the content put the BACK button 525px from the left edge,
+ * floating in the middle of an empty bar — and back is a window-level control
+ * that belongs at the window's edge, the way it does in every other takeover
+ * here. The title travels with it; only the working column below is centred.
+ */
+.pd-studio-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 20px 14px;
+  flex: none;
+}
+/* Clears the macOS traffic lights (titleBarStyle: hiddenInset ≈ 78px) and stays
+   draggable, exactly as the other full-window takeovers do. */
+.pd-studio-head-drag {
+  width: 74px;
+  height: 44px;
+  flex: none;
+  -webkit-app-region: drag;
+}
+
+.pd-studio-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex: none;
+  border: none;
+  cursor: pointer;
+  border-radius: 999px;
+  padding: 6px 14px 6px 9px;
+  font-size: 0.8125rem;
+  color: var(--pd-text-secondary);
+  background: var(--pd-bg-raised);
+  border: 1px solid color-mix(in oklab, var(--pd-text-primary) 12%, transparent);
+  transition:
+    background var(--pd-duration-fast) var(--pd-easing-standard),
+    color var(--pd-duration-fast) var(--pd-easing-standard);
+}
+.pd-studio-back:hover {
+  background: var(--pd-bg-hover);
+  color: var(--pd-text-primary);
+}
+
+.pd-studio-title {
+  font-size: 1.0625rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+.pd-studio-sub {
+  font-size: 0.8125rem;
+  color: var(--pd-text-muted);
+  margin-top: 1px;
+}
+
+/* ---- the composer ------------------------------------------------------- */
+
+/*
+ * ONE COLUMN FOR THE WHOLE ROOM.
+ *
+ * MEASURED at 1440px: the prompt field stretched to 1400px and the Generate
+ * button sat 1300px away from it at the far right edge, while the results below
+ * were capped at 780px — so the composer and the thing it produced did not even
+ * share a left margin. A description is a sentence, not a spreadsheet row; past
+ * about 70 characters of width a single-line field stops being easier to read
+ * and starts being harder to aim at.
+ */
+.pd-studio-compose {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 0 20px 16px;
+  border-bottom: 1px solid color-mix(in oklab, var(--pd-text-primary) 10%, transparent);
+}
+.pd-studio-compose > *,
+.pd-studio-results {
+  width: 100%;
+  max-width: var(--pd-studio-col, 860px);
+  margin-inline: auto;
+}
+
+.pd-studio-prompt {
+  width: 100%;
+  border-radius: 12px;
+  border: 1px solid color-mix(in oklab, var(--pd-text-primary) 14%, transparent);
+  background: var(--pd-bg-raised);
+  color: var(--pd-text-primary);
+  padding: 11px 14px;
+  font-size: 0.9375rem;
+  font-family: inherit;
+  transition: border-color var(--pd-duration-fast) var(--pd-easing-standard);
+}
+.pd-studio-prompt::placeholder {
+  color: var(--pd-text-muted);
+}
+.pd-studio-prompt:focus {
+  outline: none;
+  border-color: var(--pd-accent-primary);
+}
+.pd-studio-prompt--multi {
+  resize: vertical;
+  min-height: 84px;
+  line-height: 1.5;
+}
+
+.pd-studio-controls {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.pd-studio-knob {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.pd-studio-knob-label {
+  font-size: 0.6875rem;
+  color: var(--pd-text-muted);
+  white-space: nowrap;
+}
+
+.pd-studio-select,
+.pd-studio-input {
+  border-radius: 8px;
+  border: 1px solid color-mix(in oklab, var(--pd-text-primary) 14%, transparent);
+  background: var(--pd-bg-raised);
+  color: var(--pd-text-primary);
+  padding: 6px 9px;
+  font-size: 0.8125rem;
+  font-family: inherit;
+  height: 32px;
+}
+.pd-studio-select {
+  max-width: 190px;
+}
+.pd-studio-input--num {
+  width: 68px;
+}
+.pd-studio-input--wide {
+  width: 190px;
+}
+.pd-studio-select:focus,
+.pd-studio-input:focus {
+  outline: none;
+  border-color: var(--pd-accent-primary);
+}
+
+.pd-studio-range {
+  width: 120px;
+  height: 32px;
+  accent-color: var(--pd-accent-primary);
+  cursor: pointer;
+}
+
+/* The mode switch (audio: Speech / Music / Sound effects). */
+.pd-seg {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--pd-bg-inset);
+  border: 1px solid color-mix(in oklab, var(--pd-text-primary) 10%, transparent);
+}
+.pd-seg-item {
+  border: none;
+  cursor: pointer;
+  border-radius: 999px;
+  padding: 6px 16px;
+  font-size: 0.8125rem;
+  color: var(--pd-text-muted);
+  background: transparent;
+  transition:
+    background var(--pd-duration-fast) var(--pd-easing-standard),
+    color var(--pd-duration-fast) var(--pd-easing-standard);
+}
+.pd-seg-item:hover {
+  color: var(--pd-text-primary);
+}
+.pd-seg-item[data-on="true"] {
+  background: var(--pd-bg-raised);
+  color: var(--pd-text-primary);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 8%);
+}
+
+.pd-studio-blocked,
+.pd-studio-error {
+  font-size: 0.8125rem;
+}
+.pd-studio-blocked {
+  color: var(--pd-text-muted);
+}
+.pd-studio-error {
+  color: var(--pd-status-danger-fg);
+}
+
+/* ---- results ------------------------------------------------------------ */
+
+.pd-studio-results {
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+  padding: 20px 20px 60px;
+}
+
+.pd-studio-run-prompt {
+  font-size: 0.8125rem;
+  color: var(--pd-text-muted);
+  margin-bottom: 8px;
+  /* The description that produced this run, quoted — with several takes on
+     screen you need to know which knob each one came from. */
+  border-left: 2px solid color-mix(in oklab, var(--pd-text-primary) 18%, transparent);
+  padding-left: 10px;
+}
+
+.pd-studio-empty {
+  font-size: 0.875rem;
+  color: var(--pd-text-muted);
+  line-height: 1.55;
+  max-width: 46ch;
+  padding-top: 22px;
+}

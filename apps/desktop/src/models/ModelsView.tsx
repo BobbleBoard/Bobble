@@ -1360,7 +1360,14 @@ export function ModelsView() {
         return;
       }
     }
-    useModalityStore.getState().setView(rec.family.output === '3d' ? '3d' : 'studio');
+    /* Straight to the room that makes this kind of thing, rather than to one
+       studio that then has to be told which mode it is in. */
+    const out = rec.family.output;
+    useModalityStore
+      .getState()
+      .setView(
+        out === '3d' ? '3d' : out === 'video' ? 'video' : out === 'audio' ? 'audio' : 'image',
+      );
   };
 
   /** Stop whichever downloader is carrying this variant. */

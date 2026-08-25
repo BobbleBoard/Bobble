@@ -33,8 +33,14 @@ const TripoWorkspace = lazy(() =>
   import('./tripo/TripoWorkspace').then((m) => ({ default: m.TripoWorkspace })),
 );
 /** The ComfyUI-backed image/video Studio. Lazy for the same reason. */
-const StudioView = lazy(() =>
-  import('./studio/StudioView').then((m) => ({ default: m.StudioView })),
+const ImageStudio = lazy(() =>
+  import('./studio/ImageStudio').then((m) => ({ default: m.ImageStudio })),
+);
+const VideoStudio = lazy(() =>
+  import('./studio/VideoStudio').then((m) => ({ default: m.VideoStudio })),
+);
+const AudioStudio = lazy(() =>
+  import('./studio/AudioStudio').then((m) => ({ default: m.AudioStudio })),
 );
 
 /**
@@ -190,11 +196,17 @@ export function App() {
    * Lazy, because it pulls nothing until someone opens it, and the boot path is
    * exactly where a few hundred kilobytes of unused view would be felt.
    */
-  if (modalityView === 'studio') {
+  if (modalityView === 'image' || modalityView === 'video' || modalityView === 'audio') {
     return (
       <TooltipProvider delayDuration={200}>
         <Suspense fallback={null}>
-          <StudioView />
+          {modalityView === 'image' ? (
+            <ImageStudio />
+          ) : modalityView === 'video' ? (
+            <VideoStudio />
+          ) : (
+            <AudioStudio />
+          )}
         </Suspense>
       </TooltipProvider>
     );

@@ -243,7 +243,7 @@ describe('the pause is built from the claims just made', () => {
   /* the user: "list out every claim that was just made about the final product state
    * and verify it completely". The old pause had summary/verification in hand and
    * ignored both, which is how a run shipped four .svg files that did not exist. */
-  it('lists the engineer\'s own claims back, numbered', async () => {
+  it("lists the engineer's own claims back, numbered", async () => {
     const tool = createSubmitWorkTool({ cwd: process.cwd() });
     const out = await raw(tool, {
       summary: 'Built the player controller in player.gd with jump and gravity.',

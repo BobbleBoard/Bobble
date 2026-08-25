@@ -7,8 +7,12 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { repairNote, repairShadowTree, shadowRoots, unmanglePath,
+import {
   deliveryFromTask,
+  repairNote,
+  repairShadowTree,
+  shadowRoots,
+  unmanglePath,
 } from './workspace-paths';
 
 describe('the path the agent meant', () => {
@@ -182,7 +186,6 @@ describe('the one-component shadow', () => {
     expect(shadowRoots(root)).not.toContain(path.join(root, path.basename(root)));
   });
 });
-
 
 describe('deliveryFromTask — sentence punctuation is not part of the path', () => {
   const HOME = '/Users/user';

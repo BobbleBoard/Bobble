@@ -110,7 +110,7 @@ describe('heredocBody — the live-write body for a shell write', () => {
   it('captures a quoted heredoc, which is how agents actually write files', () => {
     // Verbatim shape from the corp run: the manager wrote project.godot this
     // way, and the canvas showed a blank file because nothing carried the text.
-    const cmd = "cat << 'PROJECTGODOT' > project.godot\n[config]\nname = \"x\"\nPROJECTGODOT";
+    const cmd = 'cat << \'PROJECTGODOT\' > project.godot\n[config]\nname = "x"\nPROJECTGODOT';
     expect(heredocBody(cmd)).toBe('[config]\nname = "x"\n');
     const w = shellWrites(cmd);
     expect(w[0]?.path).toBe('project.godot');
@@ -127,4 +127,4 @@ describe('heredocBody — the live-write body for a shell write', () => {
     expect(heredocBody('echo hi > a.txt')).toBeUndefined();
     expect(shellWrites('echo hi > a.txt')[0]?.body).toBeUndefined();
   });
-})
+});

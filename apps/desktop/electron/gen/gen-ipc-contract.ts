@@ -97,6 +97,45 @@ export const GEN_CATALOG_INVOKE_CHANNELS = [
 
 /** renderer→main invoke channels. Compose into AppInvokeMap. */
 export type GenInvokeMap = {
+  /**
+   * START A GENERATION FROM THE RENDERER.
+   *
+   * Until this existed the ONLY way to generate anything was the agent: the gen
+   * bridge is an RPC from the tool server, and `dispatch()` was reachable from
+   * nowhere else. Every image the app has ever made came from a model deciding
+   * to make one. A studio needs to ask directly, and it must ask through the
+   * SAME path — one JobQueue, one cancel, one heavy gate, one asset prompt —
+   * rather than growing a second pipeline beside it.
+   */
+  'gen:generate': {
+    request: {
+      kind: 'image' | 'video' | 'audio';
+      prompt: string;
+      model?: string;
+      /** image */
+      size?: string;
+      n?: number;
+      negativePrompt?: string;
+      /** video */
+      seconds?: number;
+      fps?: number;
+      /** audio */
+      audioKind?: 'speech' | 'music' | 'sfx';
+      voice?: string;
+      speed?: number;
+      lang?: string;
+      refAudio?: string;
+      refText?: string;
+      /** shared */
+      steps?: number;
+      seed?: number;
+    };
+    response: {
+      jobId: string;
+      outputs: readonly { path: string; seed?: number; model?: string }[];
+      error?: string;
+    };
+  };
   'gen:register': { request: { tabId: string }; response: { ok: boolean } };
   'gen:cancel': { request: { jobId: string }; response: { canceled: boolean } };
   /** Record the one-time GPL-3.0 consent (the disclosure modal's Accept). */
@@ -119,6 +158,7 @@ export const GEN_EVENT_CHANNELS = [
   'gen:comfy-install',
 ] as const satisfies readonly (keyof GenEventMap)[];
 export const GEN_INVOKE_CHANNELS = [
+  'gen:generate',
   'gen:register',
   'gen:cancel',
   'gen:comfy-consent',

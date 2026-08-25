@@ -32,11 +32,7 @@
  */
 
 import { execFile } from 'node:child_process';
-import {
-  extractClaims,
-  finalCheck,
-  type VerificationProfile,
-} from '@pi-desktop/harness/corp';
+import { extractClaims, finalCheck, type VerificationProfile } from '@pi-desktop/harness/corp';
 
 /** The name the prompts and the allowlist must agree on. */
 export const SUBMIT_WORK_TOOL = 'submit_work';

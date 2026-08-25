@@ -46,6 +46,8 @@ import {
   IconSidebar,
   IconSparkles,
   IconTrash,
+  IconVideo,
+  IconWaveform,
   Kbd,
   Sidebar,
   SidebarRow,
@@ -1153,26 +1155,49 @@ export function SessionSidebar({
                 ) : null}
               </button>
               {/*
-               * IMAGE & VIDEO, on ComfyUI. Openable whether or not the engine is
+               * THE THREE STUDIOS. Openable whether or not their engine is
                * installed, for the same reason the 3D row is: the surface itself
                * explains what is missing and where to get it, which is a better
                * answer than a row that will not click.
+               *
+               * Each names what it MAKES. "Studio" sitting under "3D Studio"
+               * read as one thing and its 3D variant rather than separate rooms.
                */}
               <button
                 type="button"
                 className="pd-child-row pd-focusable"
-                data-testid="modality-studio"
-                title="Studio — images and video, generated on this machine"
-                onClick={() => setModalityView('studio')}
+                data-testid="modality-image"
+                title="Image Studio — pictures, generated on this machine"
+                onClick={() => setModalityView('image')}
               >
                 <span className="pd-child-row-icon">
                   <IconImage size={15} />
                 </span>
-                {/* "Studio" sat directly beneath "3D Studio" in the same list,
-                    which made the pair read as one thing and its 3D variant
-                    rather than two different workspaces. The name says what it
-                    makes, the way its neighbour does. */}
-                <span className="pd-child-row-label">Image &amp; Video</span>
+                <span className="pd-child-row-label">Image</span>
+              </button>
+              <button
+                type="button"
+                className="pd-child-row pd-focusable"
+                data-testid="modality-video"
+                title="Video Studio — short clips, generated on this machine"
+                onClick={() => setModalityView('video')}
+              >
+                <span className="pd-child-row-icon">
+                  <IconVideo size={15} />
+                </span>
+                <span className="pd-child-row-label">Video</span>
+              </button>
+              <button
+                type="button"
+                className="pd-child-row pd-focusable"
+                data-testid="modality-audio"
+                title="Audio Studio — speech, voice cloning, music and sound effects"
+                onClick={() => setModalityView('audio')}
+              >
+                <span className="pd-child-row-icon">
+                  <IconWaveform size={15} />
+                </span>
+                <span className="pd-child-row-label">Audio</span>
               </button>
             </div>
           ) : null}

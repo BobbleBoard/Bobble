@@ -26,10 +26,10 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import { createIpcEventSender, createLogger } from '@pi-desktop/shared';
+import type { WebContents } from 'electron';
 import { getInferenceLaunchMode } from '../inference/llm-main';
 import { wantVision } from '../inference/vision-want';
 import type { AppEventMap } from '../ipc-contract';
-import type { WebContents } from 'electron';
 
 const log = createLogger('desktop:present');
 /*
@@ -128,7 +128,6 @@ export async function describeProject(
   }
   return head.join('\n');
 }
-
 
 /**
  * Render a Godot project and return a PNG of what it actually draws, or null.

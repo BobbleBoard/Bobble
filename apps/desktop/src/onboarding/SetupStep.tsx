@@ -187,7 +187,9 @@ export function SetupStep() {
           onClick={() => void setUp()}
           className={cx(
             'self-start rounded-lg px-3.5 py-2 text-body transition-opacity pd-focusable',
-            busy ? 'bg-bg-active text-text-muted' : 'bg-accent-primary text-text-on-accent hover:opacity-90',
+            busy
+              ? 'bg-bg-active text-text-muted'
+              : 'bg-accent-primary text-text-on-accent hover:opacity-90',
           )}
         >
           {busy ? 'Setting up…' : 'Set up now'}

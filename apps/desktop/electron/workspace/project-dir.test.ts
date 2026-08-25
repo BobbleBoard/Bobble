@@ -165,8 +165,9 @@ describe('conversationNameFrom — the name exists before any tool runs', () => 
       ),
     ).toBe('Ask the manager to build');
     // The bug this replaces produced a sixty-character directory.
-    expect(projectSlug(conversationNameFrom('Build a small command line todo tool in python')).length)
-      .toBeLessThan(40);
+    expect(
+      projectSlug(conversationNameFrom('Build a small command line todo tool in python')).length,
+    ).toBeLessThan(40);
   });
 
   it('drops throat-clearing so the name is about the work', () => {

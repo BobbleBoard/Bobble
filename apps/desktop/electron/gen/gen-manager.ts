@@ -647,6 +647,83 @@ export function registerGenIpc(opts: GenManagerOptions): void {
       throw new Error(`[gen] rejected "${channel}": untrusted`);
     }
   };
+  /*
+   * The renderer's way in — the studios. Routes to the SAME three handlers the
+   * agent bridge reaches, so a studio job and a chat job are the same job: one
+   * queue, one cancel, one heavy gate, one asset prompt. Errors come back as a
+   * field rather than a rejection so a studio can render the sentence instead of
+   * an unhandled promise.
+   */
+  ipcMain.handle(
+    'gen:generate',
+    async (
+      _event,
+      req: GenInvokeMap['gen:generate']['request'],
+    ): Promise<GenInvokeMap['gen:generate']['response']> => {
+      try {
+        if (req.kind === 'audio') {
+          const r = await handleGenerateAudio({
+            prompt: req.prompt,
+            kind: req.audioKind ?? 'speech',
+            ...(req.model !== undefined ? { model: req.model } : {}),
+            ...(req.seconds !== undefined ? { seconds: req.seconds } : {}),
+            ...(req.steps !== undefined ? { steps: req.steps } : {}),
+            ...(req.voice !== undefined ? { voice: req.voice } : {}),
+            ...(req.speed !== undefined ? { speed: req.speed } : {}),
+            ...(req.lang !== undefined ? { lang: req.lang } : {}),
+            ...(req.refAudio !== undefined ? { refAudio: req.refAudio } : {}),
+            ...(req.refText !== undefined ? { refText: req.refText } : {}),
+            ...(req.seed !== undefined ? { seed: req.seed } : {}),
+            ...(req.n !== undefined ? { count: req.n } : {}),
+          });
+          return { jobId: r.jobId, outputs: r.outputs };
+        }
+        if (req.kind === 'video') {
+          const r = await handleGenerateVideo({
+            prompt: req.prompt,
+            ...(req.model !== undefined ? { model: req.model } : {}),
+            ...(req.seconds !== undefined ? { seconds: req.seconds } : {}),
+            ...(req.size !== undefined ? { size: req.size } : {}),
+            ...(req.fps !== undefined ? { fps: req.fps } : {}),
+            ...(req.seed !== undefined ? { seed: req.seed } : {}),
+            ...(req.negativePrompt !== undefined ? { negativePrompt: req.negativePrompt } : {}),
+          });
+          return {
+            jobId: r.jobId,
+            outputs: r.outputs.map((o) => ({
+              path: o.outputPath,
+              ...(o.seed !== undefined ? { seed: o.seed } : {}),
+              model: o.model,
+            })),
+          };
+        }
+        const r = await handleGenerate({
+          prompt: req.prompt,
+          ...(req.model !== undefined ? { model: req.model } : {}),
+          ...(req.size !== undefined ? { size: req.size } : {}),
+          ...(req.n !== undefined ? { n: req.n } : {}),
+          ...(req.steps !== undefined ? { steps: req.steps } : {}),
+          ...(req.seed !== undefined ? { seed: req.seed } : {}),
+          ...(req.negativePrompt !== undefined ? { negativePrompt: req.negativePrompt } : {}),
+        });
+        return {
+          jobId: r.jobId,
+          outputs: r.outputs.map((o) => ({
+            path: o.outputPath,
+            ...(o.seed !== undefined ? { seed: o.seed } : {}),
+            model: o.model,
+          })),
+        };
+      } catch (err) {
+        return {
+          jobId: '',
+          outputs: [],
+          error: err instanceof Error ? err.message : String(err),
+        };
+      }
+    },
+  );
+
   ipcMain.handle('gen:cancel', (event, req: { jobId: string }) => {
     guard(event, 'gen:cancel');
     return { canceled: jobQueue.cancel(req.jobId) };

@@ -4,16 +4,16 @@
  * module the tests can drive without an ipcMain.
  */
 import { createLogger } from '@pi-desktop/shared';
-import { ipcMain, type IpcMainInvokeEvent, type WebContents } from 'electron';
+import { type IpcMainInvokeEvent, ipcMain, type WebContents } from 'electron';
 import { isTrustedIpcEvent } from '../trusted-senders';
 import type { OfficeBounds, OfficeKind } from './office-contract';
 import {
   captureView,
   clickView,
-  lastCaptureError,
   createOfficeView,
   destroyView,
   isDirty,
+  lastCaptureError,
   officeAvailable,
   setBoundsFor,
   setOfficeTheme,
@@ -38,10 +38,7 @@ export function registerOfficeIpc(): void {
   handle('office:available', () => ({ available: officeAvailable() }));
 
   handle('office:set-theme', (_owner, req) => {
-    setOfficeTheme(
-      (req.tokens ?? {}) as Record<string, string>,
-      req.dark === true,
-    );
+    setOfficeTheme((req.tokens ?? {}) as Record<string, string>, req.dark === true);
     return { ok: true };
   });
 

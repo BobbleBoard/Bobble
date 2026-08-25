@@ -6,6 +6,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   baselineEngine,
+  bestKnownEngine,
   ENGINES,
   type EngineSpec,
   engineSupport,
@@ -14,7 +15,6 @@ import {
   type HostCapabilities,
   installPrerequisites,
   orderEnginesForDisplay,
-  bestKnownEngine,
   preferredEngine,
   recommendedEngine,
 } from './engine-catalog';
