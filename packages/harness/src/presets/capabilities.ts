@@ -100,7 +100,9 @@ export const CAPABILITIES: readonly Capability[] = [
   },
   {
     name: 'generation',
-    summary: 'Create and edit images, video, motion graphics and 3D models, on-device.',
+    summary:
+      'Create images, video, speech, music and sound effects on-device — including ' +
+      'reading text aloud and cloning a voice from a short sample.',
     guidance:
       'Use when the deliverable IS the media, rather than a description of it. For a picture ' +
       'that has to be GOOD rather than merely produced, commission the image specialist with ' +
@@ -114,7 +116,24 @@ export const CAPABILITIES: readonly Capability[] = [
      * nearest. the user: "you can remove things from being explicitly in the ui gallery
      * card." So: the four that a real extension registers, and nothing else.
      */
-    tools: ['generate_image', 'edit_image', 'generate_video'],
+    /*
+     * AUDIO ADDED. The three audio tools were registered by the gen-tools
+     * extension and reachable through `use`, but this capability's summary said
+     * "images, video, motion graphics and 3D models" and its list named none of
+     * them — so a model asked to read a sentence aloud answered, correctly from
+     * what it could see, "I don't have a speech or text-to-speech tool
+     * available." MEASURED: exactly that reply, on a real turn.
+     *
+     * Same rule as the note above — only names a real extension registers.
+     */
+    tools: [
+      'generate_image',
+      'edit_image',
+      'generate_video',
+      'generate_speech',
+      'generate_music',
+      'generate_sfx',
+    ],
   },
   {
     name: 'connectors',
