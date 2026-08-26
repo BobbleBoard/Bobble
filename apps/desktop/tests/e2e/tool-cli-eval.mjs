@@ -274,10 +274,22 @@ const TEMPLATES = path.join(homedir(), '.cache/pi-desktop/chat-templates');
 const SERVER_BIN = findServerBin();
 const PORT = Number(process.env.PORT ?? 8099);
 
+/**
+ * The NEWEST llama-server build, by build NUMBER.
+ *
+ * Sorting the directory names as strings puts `b9934` above `b10603`, because
+ * '9' > '1' — so this quietly picked the July build over the August one, and
+ * Ling-3.0-tiny "failed to load" with `unknown model architecture: bailingmoe3`
+ * on an engine that simply predated the architecture. The models that did run
+ * ran on the wrong binary too. Compare the numbers, not the strings.
+ */
 function findServerBin() {
   const root = path.join(homedir(), '.cache/pi-desktop/llamacpp');
-  for (const build of readdirSync(root).sort().reverse()) {
-    const p = path.join(root, build);
+  const builds = readdirSync(root)
+    .map((name) => ({ name, n: Number(/^b(\d+)$/.exec(name)?.[1] ?? '-1') }))
+    .sort((a, b) => b.n - a.n);
+  for (const build of builds) {
+    const p = path.join(root, build.name);
     for (const inner of readdirSync(p)) {
       const bin = path.join(p, inner, 'llama-server');
       if (existsSync(bin)) return bin;
@@ -447,7 +459,7 @@ async function runTask(task, config) {
     error: null,
   };
 
-  for (let turn = 0; turn < 4; turn += 1) {
+  for (let turn = 0; turn < MAX_TURNS; turn += 1) {
     record.turns = turn + 1;
     let msg;
     try {
@@ -552,6 +564,11 @@ const DEFAULT_MODELS = [
 ];
 const MODELS = (process.env.MODELS ?? DEFAULT_MODELS.join(',')).split(',').filter(Boolean);
 const CONFIGS = (process.env.CONFIGS ?? 'schemas,cli,cli-listed').split(',').filter(Boolean);
+/* The turn cap is a MEASUREMENT BOUNDARY, not a property of the interface: a
+   model that probes the system before reading its own help can find the right
+   command on turn 5 and be scored a failure at 4. Raise it to tell "cannot"
+   apart from "slow". */
+const MAX_TURNS = Number(process.env.MAX_TURNS ?? 4);
 
 log(`[eval] ${ALL_TOOLS.length} tools, ${CLI.groups.length} cli groups, ${TASKS.length} tasks`);
 log(`[eval] cli surface:\n${renderRootHelp(CLI)}\n`);
