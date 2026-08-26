@@ -254,6 +254,45 @@ const SYSTEM_CLI = [
   'running a command — there is no other tool interface.',
 ].join('\n');
 
+/*
+ * THE TUNED PREAMBLE — written against the FAILURES, not from taste.
+ *
+ * Three things went wrong in the measured runs, and each line here answers one:
+ *
+ *   1. Ling-3.0-tiny treated the shell as a real Unix box and went shopping —
+ *      `festival`, `say`, `which ffmpeg`, `pip list`, `ls /usr/bin`, PIL — for
+ *      three turns before it ever read its own help. When your tools look like
+ *      commands, the whole command ecosystem looks like your tools. So the
+ *      prompt says these are the only ones, and names the temptations.
+ *
+ *   2. Several models answered "I only have access to shell commands" and never
+ *      looked. So it states outright that the commands ARE the ability.
+ *
+ *   3. Two models ran `--help`, found the right command, and then stopped
+ *      without running it. So it says what to do after reading help.
+ *
+ * Kept to a dozen lines: this rides in every request, and a preamble that
+ * lectures is a preamble that crowds out the conversation.
+ */
+const SYSTEM_CLI_TUNED = () =>
+  [
+    "You are a helpful assistant running locally on the user's Mac.",
+    '',
+    'These commands are your abilities. Run them with the `bash` tool.',
+    '',
+    renderRootHelp(CLI),
+    '',
+    'They are the ONLY way to make images, video, speech, music or sound effects.',
+    'Do not look for other programs — ffmpeg, sox, say, festival, python imaging',
+    'libraries and the like are not installed and are not how this works. Do not',
+    'check whether anything exists first; just run the command.',
+    '',
+    "If you are unsure of a command's arguments, run `<command> --help`, then run",
+    'the real command. Reading the help is not finishing the task.',
+    '',
+    'Never tell the user you are unable to do something one of these commands does.',
+  ].join('\n');
+
 const BASH_ONLY = [EXTRA_TOOLS[0]];
 
 /** JSON-schema tool definitions in the OpenAI shape llama-server expects. */
@@ -440,7 +479,13 @@ function tokenize(line) {
 async function runTask(task, config) {
   const isCli = config.startsWith('cli');
   const system =
-    config === 'cli' ? SYSTEM_CLI : config === 'cli-listed' ? SYSTEM_CLI_LISTED() : SYSTEM_SCHEMAS;
+    config === 'cli'
+      ? SYSTEM_CLI
+      : config === 'cli-listed'
+        ? SYSTEM_CLI_LISTED()
+        : config === 'cli-tuned'
+          ? SYSTEM_CLI_TUNED()
+          : SYSTEM_SCHEMAS;
   const messages = [
     { role: 'system', content: system },
     { role: 'user', content: task.ask },

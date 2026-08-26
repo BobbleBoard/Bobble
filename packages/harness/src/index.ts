@@ -1808,17 +1808,43 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
    * stable tokens rather than N schemas that change per turn.
    */
 
-  /** The command list, as the system prompt states it. Built from the registry. */
+  /**
+   * The command list, as the system prompt states it. Built from the registry.
+   *
+   * TUNED AGAINST MEASURED FAILURES, not taste. Each line answers something a
+   * real model did in tests/e2e/tool-cli-eval.mjs across six local models:
+   *
+   *   "these are the ONLY way" + the named temptations — Ling-3.0-tiny treated
+   *   the shell as a real Unix box and went shopping: `say`, `festival`,
+   *   `which ffmpeg`, `pip list`, `ls /usr/bin`, PIL, for three turns before it
+   *   ever read its own help. When your tools look like commands, the whole
+   *   command ecosystem looks like your tools.
+   *
+   *   "never say you are unable" — several models answered "I only have access
+   *   to shell commands" and never looked. 14 such refusals without the list.
+   *
+   *   "reading the help is not finishing" — two models ran `--help`, found the
+   *   right command, and stopped without running it.
+   *
+   * MEASURED: this wording took the interface from 31/36 with one refusal to
+   * 34/36 with none, and five of the six models to a clean sweep. Kept short on
+   * purpose — it rides in every request.
+   */
   function toolCliPreamble(): string {
     const cli = buildCli(CAPABILITIES, pi.getAllTools());
     return [
-      'Your abilities are COMMANDS in this shell, run with the `bash` tool.',
-      'You CAN do everything these commands do — running one is how you do it.',
-      'Never say you are unable to do something one of them does.',
+      'These commands are your abilities. Run them with the `bash` tool.',
       '',
       renderRootHelp(cli),
       '',
-      'Run `<command> --help` first if you are unsure of a command’s arguments.',
+      'They are the ONLY way to do what they do. Do not look for other programs —',
+      'ffmpeg, sox, say, festival, imaging libraries and the like are not how this',
+      'works. Do not check whether anything exists first; just run the command.',
+      '',
+      'If you are unsure of a command’s arguments, run `<command> --help`, then run',
+      'the real command. Reading the help is not finishing the task.',
+      '',
+      'Never tell the user you are unable to do something one of these commands does.',
     ].join('\n');
   }
 
