@@ -26,6 +26,23 @@ export type UserMode = 'user' | 'power';
 export const USER_MODES = ['user', 'power'] as const satisfies readonly UserMode[];
 /** Connector surfacing mode; mirrors @pi-desktop/mcp-lite's McpMode. `bash-cli`
  * exposes connectors through the real bash tool via a generated `pi-tool`. */
+/**
+ * HOW TOOLS ARE OFFERED TO THE MODEL.
+ *
+ * `schemas` is the way it has always worked: each tool is a JSON tool
+ * definition in the request, and the harness decides which ones to include this
+ * turn. `bash-cli` is the user's experiment — every tool becomes a command on PATH,
+ * the advertised surface shrinks to `bash`, and the whole registry is
+ * discoverable with `tools`, `tools search` and `--help` at no per-turn cost.
+ *
+ * Default stays `schemas`. The experiment is measured in
+ * `tests/e2e/tool-cli-eval.mjs`, and the short version is that the CLI only
+ * matches schemas once the command list is in the system prompt — a model given
+ * a bare terminal answers "I only have access to shell commands" and never goes
+ * looking.
+ */
+export type ToolInterface = 'schemas' | 'bash-cli';
+
 export type McpMode = 'lite' | 'native' | 'bash-cli';
 /** Valid MCP modes, in UI order. */
 export const MCP_MODES = ['lite', 'native', 'bash-cli'] as const satisfies readonly McpMode[];
@@ -204,6 +221,8 @@ export interface DesktopSettings {
   effortMode: EffortMode;
   search: SearchKeys;
   mcpMode: McpMode;
+  /** How tools are offered to the model (see {@link ToolInterface}). */
+  toolInterface: ToolInterface;
   capabilities: GenerationCapabilities;
   /** User system-instructions prepended to the first prompt of each NEW session
    * (see pi-connect's session-instructions seam). Empty = none. */
@@ -277,6 +296,7 @@ export interface DesktopSettingsPatch {
   effortMode?: EffortMode;
   search?: Partial<SearchKeys>;
   mcpMode?: McpMode;
+  toolInterface?: ToolInterface;
   capabilities?: Partial<GenerationCapabilities>;
   customInstructions?: string;
   iconStroke?: number;

@@ -50,7 +50,7 @@ import {
   type PermissionController,
   registerPermissions,
 } from './permissions/modes.js';
-import { capabilityForTool } from './presets/capabilities.js';
+import { CAPABILITIES, capabilityForTool } from './presets/capabilities.js';
 import { resolvePresetTools } from './presets/presets.js';
 import { augmentSystemPrompt } from './prompt/capability-prompt.js';
 import { connectRepairBridge, type LiveRepairDeps } from './repair/bridge.js';
@@ -104,6 +104,8 @@ import { registerPresentTool } from './tools/present.js';
 import { presentBridgeFromEnv } from './tools/present-bridge.js';
 import { withRepeatNotice } from './tools/repeat-notice.js';
 import { registerSandboxFileTools, resolveWorkspaceRoot } from './tools/sandbox-fs.js';
+import { buildCli, renderRootHelp } from './tools/tool-cli.js';
+import { registerToolCli } from './tools/tool-cli-bridge.js';
 import { truncateToolOutput } from './tools/tool-output-truncate.js';
 import { captureRegisteredTools } from './tools/tool-registry.js';
 import { registerUseTool } from './tools/use-tool.js';
@@ -667,6 +669,9 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
    * registry is what `use` dispatches through, which is what lets a capability
    * be pure text and cost no re-prefill. See tools/tool-registry.ts.
    */
+  const TOOL_CLI_PINNED = ['bash', 'ask_user', 'update_plan'] as const;
+  const toolCliMode = process.env.PI_DESKTOP_TOOL_CLI === '1';
+
   const toolRegistry = captureRegisteredTools(pi);
   const runtime: HarnessRuntime = {
     config: DEFAULT_CONFIG,
@@ -1455,6 +1460,44 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     active: () => runtime.activeTools,
   });
 
+  /*
+   * THE COMMANDS THEMSELVES, when the bash-cli interface is on.
+   *
+   * Installed once per session: a 0700 shim dir prepended to PATH, one
+   * executable per capability group plus `tools`, and a token-gated socket back
+   * into this process. It grants nothing new — every command routes to a tool
+   * `use` could already dispatch — and it is removed on shutdown.
+   *
+   * `pi.getAllTools()` rather than our own capture, for the reason written on
+   * the capability tool above: each extension gets its own api object, so a
+   * capture only ever sees its own tools, and a CLI that could not reach the
+   * browser or the mac tools would be the same false-availability bug in a new
+   * costume.
+   */
+  if (toolCliMode) {
+    const handle = registerToolCli({
+      tools: () => pi.getAllTools(),
+      groups: () => CAPABILITIES,
+      call: async (name, args) => {
+        const target = toolRegistry.get(name);
+        if (target === undefined) {
+          return { text: `${name}: not registered in this build.`, isError: true };
+        }
+        const res = (await target.execute('tool-cli', args)) as {
+          content?: { type: string; text?: string }[];
+          isError?: boolean;
+        };
+        const text = (res.content ?? [])
+          .map((c) => (c.type === 'text' ? (c.text ?? '') : `[${c.type}]`))
+          .join('\n');
+        return { text, isError: res.isError === true };
+      },
+    });
+    /* pi's ExtensionAPI has no shutdown hook, so the disposer rides the process
+       it belongs to. `once` so a double signal cannot double-unlink. */
+    process.once('exit', () => handle.dispose());
+  }
+
   /**
    * INTENT BIAS — the model says what it means to do; make that the easy thing.
    *
@@ -1751,6 +1794,34 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
    * the user: "ensure there's not conflicting 'mid run changes'".
    */
 
+  /*
+   * BASH-CLI TOOL INTERFACE — the user's experiment, off by default.
+   *
+   * When the desktop setting is on, the model is advertised ONE tool (`bash`)
+   * and reaches everything else as a command on PATH. What stays advertised
+   * beside it is only the plumbing a command line cannot express: asking the
+   * user a question and updating the plan are UI round-trips, not shell verbs.
+   *
+   * MEASURED before wiring this: a model handed a bare terminal and told to go
+   * looking answers "I only have access to shell commands" and never runs
+   * `tools` — so the command list goes into the system prompt, where it is ~40
+   * stable tokens rather than N schemas that change per turn.
+   */
+
+  /** The command list, as the system prompt states it. Built from the registry. */
+  function toolCliPreamble(): string {
+    const cli = buildCli(CAPABILITIES, pi.getAllTools());
+    return [
+      'Your abilities are COMMANDS in this shell, run with the `bash` tool.',
+      'You CAN do everything these commands do — running one is how you do it.',
+      'Never say you are unable to do something one of them does.',
+      '',
+      renderRootHelp(cli),
+      '',
+      'Run `<command> --help` first if you are unsure of a command’s arguments.',
+    ].join('\n');
+  }
+
   function applyPreset(
     cls: TaskClass,
     ctx: ExtensionContext,
@@ -1768,6 +1839,21 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
      * is the right fallback, because an agent pinned to zero tools can do
      * nothing whatsoever.
      */
+    if (toolCliMode) {
+      const pinned = TOOL_CLI_PINNED.filter((t) => available.includes(t));
+      if (pinned.length > 0) {
+        runtime.activeClass = cls;
+        if (
+          pinned.length !== runtime.activeTools.length ||
+          pinned.some((t, i) => runtime.activeTools[i] !== t)
+        ) {
+          runtime.activeTools = pinned;
+          pi.setActiveTools(pinned);
+        }
+        return;
+      }
+    }
+
     const specialist = specialistFromEnv();
     if (specialist !== undefined) {
       const pinned = specialistToolset(specialist, available);
@@ -1983,7 +2069,10 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     // built — the freeze below is what made the team section unreachable, because
     // warm-up runs at default effort and the session is raised afterwards.
     const augmentedSystemPrompt =
-      runtime.canonicalSystemPrompt ?? augmentSystemPrompt(event.systemPrompt);
+      runtime.canonicalSystemPrompt ??
+      (toolCliMode
+        ? `${augmentSystemPrompt(event.systemPrompt)}\n\n${toolCliPreamble()}`
+        : augmentSystemPrompt(event.systemPrompt));
     runtime.canonicalSystemPrompt = augmentedSystemPrompt;
     // Classification REMOVED from the turn path (the user: "we seldom use it at all,
     // let's just completely remove"). The turn-1 {title,class} piggyback cost

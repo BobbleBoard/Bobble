@@ -30,6 +30,7 @@ import {
   advancedSamplingFilePath,
   generationExperimentEnabled,
   readSettings,
+  readSettings,
 } from '../settings/settings-main';
 import { isTrustedIpcEvent } from '../trusted-senders';
 import { type ChildAgents, createChildAgents } from './child-agents';
@@ -156,6 +157,13 @@ function buildPiEnv(cwd: string | undefined): Record<string, string | undefined>
     // the file may not exist yet (default profile) — the hook no-ops then.
     PI_ADV_SAMPLING_FILE: advancedSamplingFilePath(),
     PI_DESKTOP_VISION: vision,
+    /*
+     * THE TOOL INTERFACE. '1' turns on the user's bash-CLI experiment: the harness
+     * advertises `bash` and little else, installs a shim per capability group on
+     * PATH, and puts the command list in the system prompt. Default is off, so
+     * this is '0' unless the Harness settings panel says otherwise.
+     */
+    PI_DESKTOP_TOOL_CLI: readSettings().toolInterface === 'bash-cli' ? '1' : '0',
     // …and the live file, which children re-read. The env value above is a
     // spawn-time snapshot and a subagent outlives it — see serverCanSeeImages.
     PI_DESKTOP_VISION_FILE: visionStateFilePath(),

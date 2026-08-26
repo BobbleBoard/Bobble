@@ -35,6 +35,7 @@ const base: DesktopSettings = {
   hideDeleteChatConfirm: false,
   harnessId: 'pi-bundled',
   harnessConfigPath: '',
+  toolInterface: 'schemas',
 };
 
 describe('sliderToLevel / levelToSlider', () => {

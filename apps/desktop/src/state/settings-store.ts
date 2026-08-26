@@ -38,6 +38,7 @@ const DEFAULTS: DesktopSettings = {
   effortMode: 'auto',
   search: { brave: '', tavily: '' },
   mcpMode: 'lite',
+  toolInterface: 'schemas',
   capabilities: { image: false, video: false, audio: false, threeD: false },
   customInstructions: '',
   iconStroke: ICON_STROKE_DEFAULT,

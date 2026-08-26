@@ -13,12 +13,18 @@
  * serving, so they get the exact shell lines that point them at it. Presenting
  * both as one list of interchangeable options would be the lie worth avoiding.
  */
-import { Spinner } from '@pi-desktop/ui';
+import { SegmentedControl, Spinner } from '@pi-desktop/ui';
 import { useCallback, useEffect, useState } from 'react';
 import type { HarnessDetected } from '../../../electron/ipc-contract';
+import type { ToolInterface } from '../../../electron/settings/settings-contract';
 import { cx } from '../../onboarding/cx';
 import { useLlmStore } from '../../state/llm-store';
-import { setHarnessChoice, useHarnessConfigPath, useHarnessId } from '../../state/settings-store';
+import {
+  setHarnessChoice,
+  useHarnessConfigPath,
+  useHarnessId,
+  useSettingsStore,
+} from '../../state/settings-store';
 import { HarnessIcon } from '../brand-icons';
 import {
   canDriveChat,
@@ -28,6 +34,7 @@ import {
   isSelectable,
   orderHarnessesForDisplay,
 } from '../harness-catalog';
+import { SettingRow, SettingSection } from '../parts';
 
 function CopyBox({ text, testid }: { text: string; testid: string }) {
   const [copied, setCopied] = useState(false);
@@ -213,6 +220,8 @@ export function HarnessPanel() {
 
   return (
     <div className="flex flex-col gap-5" data-testid="harness-panel">
+      <ToolInterfaceSection />
+
       <section className="flex flex-col gap-2">
         <div>
           <h3 className="text-body text-text-primary">Bobble’s own agent</h3>
@@ -248,5 +257,44 @@ export function HarnessPanel() {
         Re-scan
       </button>
     </div>
+  );
+}
+
+/**
+ * HOW TOOLS ARE OFFERED — the user's bash-CLI experiment, kept as an option.
+ *
+ * It lives here rather than under Connectors because it is not about
+ * connectors: it changes how EVERY tool is reached — connectors, media
+ * generation, the browser, all of it. Connectors keep their own mode switch for
+ * their own three ways of being exposed.
+ */
+function ToolInterfaceSection() {
+  const value = useSettingsStore((s) => s.settings.toolInterface ?? 'schemas');
+  const update = useSettingsStore((s) => s.update);
+  return (
+    <SettingSection
+      title="Tool interface"
+      description="How the model reaches everything it can do."
+    >
+      <SettingRow
+        label="Tools as"
+        hint={
+          value === 'bash-cli'
+            ? 'Every tool is a command on PATH. One tool is advertised (bash) and the whole registry is discoverable with `tools`, `tools search` and `--help`. Experimental.'
+            : 'Each tool is a JSON schema in the request, chosen per turn. The default.'
+        }
+      >
+        <SegmentedControl
+          aria-label="Tool interface"
+          data-testid="settings-tool-interface"
+          value={value}
+          onValueChange={(v) => void update({ toolInterface: v as ToolInterface })}
+          options={[
+            { value: 'schemas', label: 'Schemas' },
+            { value: 'bash-cli', label: 'Bash CLI' },
+          ]}
+        />
+      </SettingRow>
+    </SettingSection>
   );
 }
