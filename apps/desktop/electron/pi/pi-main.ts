@@ -30,7 +30,6 @@ import {
   advancedSamplingFilePath,
   generationExperimentEnabled,
   readSettings,
-  readSettings,
 } from '../settings/settings-main';
 import { isTrustedIpcEvent } from '../trusted-senders';
 import { type ChildAgents, createChildAgents } from './child-agents';

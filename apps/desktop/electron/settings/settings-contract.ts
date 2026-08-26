@@ -47,6 +47,8 @@ export type McpMode = 'lite' | 'native' | 'bash-cli';
 /** Valid MCP modes, in UI order. */
 export const MCP_MODES = ['lite', 'native', 'bash-cli'] as const satisfies readonly McpMode[];
 
+export const TOOL_INTERFACES = ['schemas', 'bash-cli'] as const satisfies readonly ToolInterface[];
+
 /**
  * Preferred local inference engine (round-12 #4 — the Model Manager's "Prefer MLX
  * (experimental)" toggle). `llamacpp` = the default GGUF backend; `mlx` opts into

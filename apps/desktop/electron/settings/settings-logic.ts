@@ -29,6 +29,7 @@ import {
   type QuickSlotSettings,
   type ThemeFlavor,
   type ThemeModePref,
+  TOOL_INTERFACES,
   UI_SCALE_DEFAULT,
   UI_SCALE_MAX,
   UI_SCALE_MIN,
@@ -112,6 +113,7 @@ export const DEFAULT_SETTINGS: DesktopSettings = {
   effortMode: 'auto',
   search: { brave: '', tavily: '' },
   mcpMode: 'lite',
+  toolInterface: 'schemas',
   capabilities: { image: false, video: false, audio: false, threeD: false },
   customInstructions: '',
   iconStroke: ICON_STROKE_DEFAULT,
@@ -266,6 +268,7 @@ export function clampSettings(raw: unknown): DesktopSettings {
     effortMode: oneOf(o.effortMode, EFFORT_MODES, d.effortMode),
     search: { brave: str(search.brave, ''), tavily: str(search.tavily, '') },
     mcpMode: oneOf(o.mcpMode, MCP_MODES, d.mcpMode),
+    toolInterface: oneOf(o.toolInterface, TOOL_INTERFACES, d.toolInterface),
     capabilities: {
       image: bool(caps.image, d.capabilities.image),
       video: bool(caps.video, d.capabilities.video),
