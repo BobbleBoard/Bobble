@@ -16,7 +16,6 @@
 import type { CanvasController } from '@pi-desktop/canvas';
 import { genImageContent, registerGenSurfacesDefault } from '@pi-desktop/gen-canvas';
 import { useEffect } from 'react';
-import { useCanvasStore } from '../../state/canvas-store';
 import { usePiStore } from '../../state/pi-slice';
 import { useExperimentalGeneration } from '../../state/settings-store';
 
@@ -51,8 +50,16 @@ export function useGen(controller: CanvasController): void {
       // into the chat the user is currently viewing (session-agnostic IPC channel).
       if (usePiStore.getState().bgRun?.streaming === true) return;
       const id = upsert(tabId, payload);
-      // Ensure the rail is open so the freshly-routed surface is visible.
-      useCanvasStore.getState().setCanvasOpen(true);
+      /*
+       * THE RAIL DOES NOT OPEN ITSELF.
+       *
+       * the user: "don't open canvas with the content by default when these are
+       * accessed in chat." Asking for a picture in a conversation is a request
+       * for a picture, not a request to rearrange the window around one — and
+       * the answer already arrives in the thread, inline, with a file card. The
+       * tab is still created and still streams, so the rail has it the moment
+       * you open the rail; the generated row in the chain opens it on demand.
+       */
       void window.piDesktop.invoke('gen:register', { tabId: id });
     });
 

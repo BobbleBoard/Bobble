@@ -134,10 +134,23 @@ function One({ item }: { item: ThreadMediaItem }): JSX.Element {
  * Every file a generate turn produced, mounted under the activity chain that
  * produced it.
  */
-export function ThreadMedia({ items }: { items: readonly ThreadMediaItem[] }): JSX.Element | null {
+export function ThreadMedia({
+  items,
+  layout = 'single',
+}: {
+  items: readonly ThreadMediaItem[];
+  /*
+   * SEVERAL CANDIDATES ARE A SET. Four pictures from one description exist to
+   * be compared, and a column of full-width images makes that impossible: one
+   * fills the window and the second is below the fold, so the knob whose entire
+   * purpose is "generate four and keep the best" could not be acted on. A grid
+   * puts them side by side.
+   */
+  layout?: 'single' | 'grid';
+}): JSX.Element | null {
   if (items.length === 0) return null;
   return (
-    <div className="pd-thread-media" data-testid="thread-media">
+    <div className="pd-thread-media" data-layout={layout} data-testid="thread-media">
       {items.map((item) => (
         <One key={item.path} item={item} />
       ))}

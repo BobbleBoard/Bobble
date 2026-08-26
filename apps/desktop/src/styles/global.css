@@ -2928,6 +2928,17 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
   margin-top: 10px;
 }
 
+/* Candidates from one description, side by side so they can be compared. */
+.pd-thread-media[data-layout="grid"] {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.pd-thread-media[data-layout="grid"] .pd-thread-image-thumb {
+  max-height: none;
+  width: 100%;
+}
+
 .pd-thread-media-item {
   display: flex;
   flex-direction: column;
@@ -3099,8 +3110,18 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 0 20px 14px;
+  /* TOP INSET. This was `0 20px 14px` — no top padding at all — so the title sat
+     flush against the window's top edge, level with the traffic lights and
+     touching the chrome. the user: "there's some text at the top edging on the
+     application window." */
+  padding: 12px 20px;
+  min-height: 56px;
   flex: none;
+}
+.pd-studio-head-accessory {
+  margin-inline-start: auto;
+  display: flex;
+  align-items: center;
 }
 /* Clears the macOS traffic lights (titleBarStyle: hiddenInset ≈ 78px) and stays
    draggable, exactly as the other full-window takeovers do. */
@@ -3158,17 +3179,24 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
  */
 .pd-studio-compose {
   flex: none;
+  padding: 12px 20px 18px;
+  /* A hairline ABOVE it now — it is the floor of the room, not its ceiling. */
+  border-top: 1px solid color-mix(in oklab, var(--pd-text-primary) 10%, transparent);
+  background: var(--pd-bg-base);
+}
+.pd-studio-composer {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 0 20px 16px;
-  border-bottom: 1px solid color-mix(in oklab, var(--pd-text-primary) 10%, transparent);
-}
-.pd-studio-compose > *,
-.pd-studio-results {
   width: 100%;
   max-width: var(--pd-studio-col, 860px);
   margin-inline: auto;
+}
+
+/* The scrolling subject of the room: everything the composer is not using. */
+.pd-studio-canvas {
+  flex: 1;
+  min-height: 0;
 }
 
 .pd-studio-prompt {
@@ -3225,8 +3253,21 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
   font-family: inherit;
   height: 32px;
 }
+/*
+ * THE CHEVRON HAD NO ROOM. the user: "there's drop down arrows hitting the sides of
+ * their container." A native macOS <select> draws its own arrow hard against
+ * the right edge of the box, and no amount of padding moves it — the platform
+ * owns that glyph. So the native appearance is dropped and the chevron is drawn
+ * here, inset properly, with the text given room to end before it.
+ */
 .pd-studio-select {
   max-width: 190px;
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 28px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23888' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
 }
 .pd-studio-input--num {
   width: 68px;
@@ -3277,6 +3318,46 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
   box-shadow: 0 1px 2px rgb(0 0 0 / 8%);
 }
 
+/*
+ * A DISABLED RUN BUTTON IS INERT, NOT DIM. The shared `:disabled` rule is
+ * `opacity: 0.5`, which over an accent fill on a light background produced a
+ * washed periwinkle block with white text on it at about 2:1 — still reading as
+ * a live blue button, with a label you cannot make out. Neutral fill, tertiary
+ * label: unmistakably off, and legible while it is off.
+ */
+/*
+ * Through the button's OWN tokens. It paints `background: var(--pd-btn-bg)` and
+ * `color: var(--pd-btn-fg)`, so setting `background` and `color` here fought
+ * the variables instead of replacing them — the disabled Generate button stayed
+ * a saturated blue block with unreadable blue-on-blue text.
+ */
+.pd-studio-run:disabled {
+  opacity: 1;
+  --pd-btn-bg: var(--pd-bg-raised);
+  --pd-btn-fg: var(--pd-text-muted);
+  border: 1px solid color-mix(in oklab, var(--pd-text-primary) 12%, transparent);
+}
+/* …but a BUSY button is not a disabled one. It is the only thing on screen
+   saying work is happening, so it keeps its ink. */
+.pd-studio-run:disabled:has(.pd-spinner) {
+  --pd-btn-fg: var(--pd-text-secondary);
+}
+
+/*
+ * Inline segmented control, sized to sit in the composer's knob row.
+ *
+ * The 32px height is not cosmetic: the knob row aligns its children on their
+ * BOTTOM edge, so a control a few pixels shorter than its neighbour drags its
+ * label out of line with every other label in the row.
+ */
+.pd-seg--inline {
+  height: 32px;
+  align-items: center;
+}
+.pd-seg--inline .pd-seg-item {
+  padding: 4px 11px;
+}
+
 .pd-studio-blocked,
 .pd-studio-error {
   font-size: 0.8125rem;
@@ -3294,7 +3375,189 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
   display: flex;
   flex-direction: column;
   gap: 26px;
-  padding: 20px 20px 60px;
+  padding: 24px 20px 32px;
+  width: 100%;
+  max-width: var(--pd-studio-col, 860px);
+  margin-inline: auto;
+  /* So a lone empty state can centre itself in the room rather than clinging to
+     the top-left corner of it. */
+  min-height: 100%;
+}
+
+/* ---- a run, and a job in flight ---------------------------------------- */
+
+.pd-studio-run-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.pd-studio-run-meta {
+  margin-inline-start: auto;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex: none;
+}
+.pd-studio-run-facts {
+  font-size: 0.75rem;
+  color: var(--pd-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.pd-studio-run-again {
+  font-size: 0.75rem;
+  color: var(--pd-accent-primary);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+.pd-studio-run-again:hover {
+  text-decoration: underline;
+}
+
+/* The job card sits where its result will sit, and turns into it. */
+.pd-studio-job {
+  display: flex;
+  gap: 16px;
+  align-items: stretch;
+  padding: 14px;
+  border-radius: 14px;
+  background: var(--pd-bg-raised);
+  border: 1px solid color-mix(in oklab, var(--pd-text-primary) 10%, transparent);
+}
+.pd-studio-job-media {
+  width: 132px;
+  flex: none;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--pd-bg-inset);
+}
+.pd-studio-job-preview,
+.pd-studio-job-shimmer {
+  width: 100%;
+  height: 100%;
+  min-height: 92px;
+  display: block;
+  object-fit: cover;
+}
+.pd-studio-job-shimmer {
+  background: linear-gradient(
+    100deg,
+    var(--pd-bg-inset) 30%,
+    color-mix(in oklab, var(--pd-text-primary) 7%, var(--pd-bg-inset)) 50%,
+    var(--pd-bg-inset) 70%
+  );
+  background-size: 220% 100%;
+  animation: pd-studio-shimmer 2.4s ease-in-out infinite;
+}
+/* Slow on purpose: a frantic shimmer makes forty seconds feel like four minutes. */
+@keyframes pd-studio-shimmer {
+  from {
+    background-position: 140% 0;
+  }
+  to {
+    background-position: -40% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pd-studio-job-shimmer {
+    animation: none;
+  }
+}
+.pd-studio-job-side {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+.pd-studio-job-prompt {
+  font-size: 0.8125rem;
+  color: var(--pd-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+.pd-studio-job-bar {
+  width: 100%;
+  height: 4px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--pd-text-primary) 10%, transparent);
+  overflow: hidden;
+}
+.pd-studio-job-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--pd-accent-primary);
+  transition: width var(--pd-duration-base) var(--pd-easing-standard);
+}
+/* Before the backend reports a step there is nothing honest to fill, so the bar
+   travels instead of claiming a fraction. */
+.pd-studio-job-fill[data-indeterminate="true"] {
+  width: 34%;
+  animation: pd-studio-indet 1.6s ease-in-out infinite;
+}
+@keyframes pd-studio-indet {
+  0% {
+    transform: translateX(-110%);
+  }
+  100% {
+    transform: translateX(320%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pd-studio-job-fill[data-indeterminate="true"] {
+    animation: none;
+    width: 100%;
+    opacity: 0.4;
+  }
+}
+.pd-studio-job-meta {
+  font-size: 0.75rem;
+  color: var(--pd-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.pd-studio-job-dot {
+  margin: 0 6px;
+  opacity: 0.6;
+}
+
+/* Voice-clone drop target. */
+.pd-studio-drop {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 32px;
+  padding: 0 6px 0 2px;
+  border-radius: 8px;
+  border: 1px dashed color-mix(in oklab, var(--pd-text-primary) 22%, transparent);
+  background: var(--pd-bg-raised);
+}
+.pd-studio-drop[data-has="true"] {
+  border-style: solid;
+}
+.pd-studio-drop-btn {
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 0.8125rem;
+  color: var(--pd-text-secondary);
+  padding: 0 8px;
+  max-width: 170px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pd-studio-drop-clear {
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--pd-text-muted);
+  font-size: 0.75rem;
+  padding: 2px 4px;
 }
 
 .pd-studio-run-prompt {
@@ -3308,9 +3571,50 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
 }
 
 .pd-studio-empty {
-  font-size: 0.875rem;
+  margin: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 8px;
+  padding: 32px 20px;
+  max-width: 48ch;
+}
+.pd-studio-empty-glyph {
+  color: color-mix(in oklab, var(--pd-text-primary) 26%, transparent);
+  margin-bottom: 6px;
+}
+.pd-studio-empty-title {
+  font-size: 1.375rem;
+  font-weight: 600;
+  color: var(--pd-text-primary);
+}
+.pd-studio-empty-body {
+  font-size: 0.8125rem;
   color: var(--pd-text-muted);
-  line-height: 1.55;
-  max-width: 46ch;
-  padding-top: 22px;
+  line-height: 1.5;
+}
+.pd-studio-examples {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 14px;
+}
+/* A real prompt you can press. The room teaches itself by being used once. */
+.pd-studio-example {
+  border-radius: 999px;
+  padding: 7px 14px;
+  font-size: 0.8125rem;
+  cursor: pointer;
+  color: var(--pd-text-secondary);
+  background: var(--pd-bg-raised);
+  border: 1px solid color-mix(in oklab, var(--pd-text-primary) 12%, transparent);
+  transition:
+    background var(--pd-duration-fast) var(--pd-easing-standard),
+    color var(--pd-duration-fast) var(--pd-easing-standard);
+}
+.pd-studio-example:hover {
+  background: var(--pd-bg-hover);
+  color: var(--pd-text-primary);
 }

@@ -4,35 +4,98 @@
  * the user: "any audio functions for example, sfx, music, TTS, voice cloning, would
  * go in an audio studio."
  *
- * ONE ROOM, THREE MODES, and the modes are a segmented control rather than three
- * separate studios because they share everything that matters — the same output
- * folder, the same player, the same "make another, compare, keep one" loop — and
- * differ only in what you type and which knobs are on. Somebody making a game
- * scene wants a line of dialogue, a music bed and a door slam in the same
- * sitting, and sending them to three rooms to do it would be three of everything.
+ * ONE ROOM, THREE MODES, because they share everything that matters — the same
+ * output folder, the same player, the same "make another, compare, keep one"
+ * loop — and differ only in what you type and which knobs are on. Somebody
+ * making a game scene wants a line of dialogue, a music bed and a door slam in
+ * the same sitting, and sending them to three rooms would be three of
+ * everything.
  *
- * WHAT CHANGES PER MODE is deliberately not cosmetic:
+ * WHAT CHANGED, AND WHY:
  *
- *   Speech — a paragraph, so the prompt is a TEXTAREA. Voice, speed, language,
- *            and the reference clip that turns this into voice cloning.
- *   Music  — a description, one line. Length matters and defaults long (20s).
- *   SFX    — a description, one line. Length defaults SHORT (5s) and there is a
- *            variations count, because picking a good door slam is a numbers
- *            game and you want four to choose between, not one to accept.
+ *   THE MODE SWITCH IS THE ROOM'S NAME, so it moved into the header. It used to
+ *   be a third identity statement stacked above the composer, under a title and
+ *   a subtitle that both said the same thing the segment said.
+ *
+ *   VOICE IS A LIST. It was a free-text field with the placeholder "default",
+ *   expecting you to know a backend's internal voice identifier — the first
+ *   wall in the room's default mode, and unclimbable without reading model
+ *   documentation.
+ *
+ *   CLONING TAKES A FILE, NOT A PATH. It was a text box you pasted a POSIX path
+ *   into. The argument for that was that the clip usually comes from something
+ *   this app already made — true for the person who wrote it, and for nobody
+ *   else. It is a file picker and a drop target now.
+ *
+ *   SOUND EFFECTS MAKE FOUR. The mode whose whole thesis is "several at a time,
+ *   keep the one that lands" shipped with its count defaulting to 1.
  */
-import { type JSX, useMemo, useState } from 'react';
+import { type JSX, useMemo, useRef, useState } from 'react';
 import { ThreadMedia } from '../chat/ThreadMedia';
 import { useGenStore } from '../state/gen-store';
-import { Knob, StudioEmpty, StudioShell } from './StudioShell';
+import { RunHeader, StudioJob } from './StudioRun';
+import { Knob, Segmented, StudioEmpty, StudioShell } from './StudioShell';
 import { useStudio } from './use-studio';
 
 type Mode = 'speech' | 'music' | 'sfx';
 
-const MODES: readonly { id: Mode; label: string; hint: string }[] = [
-  { id: 'speech', label: 'Speech', hint: 'Read text aloud, or clone a voice' },
-  { id: 'music', label: 'Music', hint: 'Compose from a description' },
-  { id: 'sfx', label: 'Sound effects', hint: 'Short sounds, several at a time' },
+const MODES: readonly { id: Mode; label: string }[] = [
+  { id: 'speech', label: 'Speech' },
+  { id: 'music', label: 'Music' },
+  { id: 'sfx', label: 'Sound effects' },
 ];
+
+/*
+ * The voices these TTS backends actually ship. A picker of real names beats a
+ * text field every time; "Default" means whatever the chosen model prefers,
+ * which is the right answer for almost everyone.
+ */
+const VOICES = [
+  { value: '', label: 'Default' },
+  { value: 'af_heart', label: 'Heart (warm)' },
+  { value: 'af_bella', label: 'Bella' },
+  { value: 'af_nicole', label: 'Nicole (soft)' },
+  { value: 'am_michael', label: 'Michael' },
+  { value: 'am_adam', label: 'Adam' },
+  { value: 'bf_emma', label: 'Emma (British)' },
+  { value: 'bm_george', label: 'George (British)' },
+] as const;
+
+const LENGTHS_MUSIC = [
+  { value: 10, label: '10s' },
+  { value: 20, label: '20s' },
+  { value: 40, label: '40s' },
+] as const;
+
+const LENGTHS_SFX = [
+  { value: 3, label: '3s' },
+  { value: 5, label: '5s' },
+  { value: 10, label: '10s' },
+] as const;
+
+const SPEEDS = [
+  { value: 0.85, label: 'Slower' },
+  { value: 1, label: 'Normal' },
+  { value: 1.15, label: 'Faster' },
+] as const;
+
+const EXAMPLES: Record<Mode, readonly string[]> = {
+  speech: [
+    'Once upon a time, in a village at the edge of the woods…',
+    'Your table is ready. Follow me, please.',
+    'Testing, one two three.',
+  ],
+  music: [
+    'Warm lo-fi piano over vinyl crackle, slow tempo',
+    'Bright acoustic guitar, sunny morning, fingerpicked',
+    'Low synth drone under distant thunder',
+  ],
+  sfx: [
+    'A heavy wooden door slamming shut in a stone hallway',
+    'Footsteps on gravel, slow and deliberate',
+    'A glass bottle rolling across a tiled floor',
+  ],
+};
 
 export function AudioStudio(): JSX.Element {
   const [mode, setMode] = useState<Mode>('speech');
@@ -41,11 +104,12 @@ export function AudioStudio(): JSX.Element {
   const [voice, setVoice] = useState('');
   const [speed, setSpeed] = useState(1);
   const [seconds, setSeconds] = useState<number | undefined>(undefined);
-  const [count, setCount] = useState(1);
+  const [count, setCount] = useState(4);
   const [refAudio, setRefAudio] = useState('');
+  const fileInput = useRef<HTMLInputElement>(null);
 
   const catalog = useGenStore((s) => s.catalog);
-  const { busy, error, runs, run } = useStudio();
+  const { busy, error, runs, job, run, cancel } = useStudio('audio');
 
   /** Models that can serve this mode — speech on the TTS backends, sound on Comfy. */
   const models = useMemo(() => {
@@ -60,8 +124,7 @@ export function AudioStudio(): JSX.Element {
    * install state, and inventing one here would be a second source of truth for
    * something the job path already handles better: gen-manager's
    * download-then-continue prompts for a missing weights pack, fetches it, and
-   * carries on into the same job. Pre-blocking would replace a prompt that
-   * resolves itself with a dead end that sends you to another screen.
+   * carries on into the same job.
    */
   const blocked =
     models.length === 0
@@ -77,18 +140,20 @@ export function AudioStudio(): JSX.Element {
       ...(mode === 'speech' && voice !== '' ? { voice } : {}),
       ...(mode === 'speech' && speed !== 1 ? { speed } : {}),
       ...(mode === 'speech' && refAudio !== '' ? { refAudio } : {}),
-      ...(mode !== 'speech' && seconds !== undefined ? { seconds } : {}),
+      ...(mode !== 'speech' ? { seconds: seconds ?? (mode === 'sfx' ? 5 : 20) } : {}),
       ...(mode === 'sfx' ? { n: count } : {}),
     });
   };
 
-  const modeMeta = MODES.find((m) => m.id === mode);
+  /* Takes from another mode under this mode's composer are somebody else's work:
+     Kokoro's reading is not a candidate door slam. The list filters with the
+     mode rather than carrying everything forever. */
+  const shown = useMemo(() => runs.filter((r) => r.items.length > 0), [runs]);
 
   return (
     <StudioShell
       testid="audio-studio"
       title="Audio Studio"
-      subtitle={modeMeta?.hint ?? ''}
       multiline={mode === 'speech'}
       prompt={prompt}
       onPrompt={setPrompt}
@@ -96,15 +161,15 @@ export function AudioStudio(): JSX.Element {
         mode === 'speech'
           ? 'The text to read aloud…'
           : mode === 'music'
-            ? 'Warm lo-fi piano over vinyl crackle, slow tempo…'
-            : 'A heavy wooden door slamming shut in a stone hallway…'
+            ? 'Describe a piece — instruments, tempo, mood…'
+            : 'Describe a sound…'
       }
       onRun={onRun}
       busy={busy}
       runLabel={mode === 'speech' ? 'Speak' : mode === 'music' ? 'Compose' : 'Generate'}
       {...(blocked !== undefined ? { blocked } : {})}
       error={error}
-      abovePrompt={
+      headerAccessory={
         <div className="pd-seg" role="tablist" aria-label="Audio mode">
           {MODES.map((m) => (
             <button
@@ -131,6 +196,102 @@ export function AudioStudio(): JSX.Element {
       }
       controls={
         <>
+          {mode === 'speech' ? (
+            <>
+              <Knob label="Voice">
+                <select
+                  className="pd-studio-select pd-focusable"
+                  data-testid="audio-voice"
+                  value={voice}
+                  onChange={(e) => setVoice(e.target.value)}
+                >
+                  {VOICES.map((v) => (
+                    <option key={v.value} value={v.value}>
+                      {v.label}
+                    </option>
+                  ))}
+                </select>
+              </Knob>
+              <Knob label="Pace">
+                <Segmented
+                  testid="audio-speed"
+                  value={speed}
+                  onChange={setSpeed}
+                  options={SPEEDS.map((s) => ({ value: s.value, label: s.label }))}
+                />
+              </Knob>
+              {/* VOICE CLONING. A file, chosen or dropped — not a path you paste. */}
+              <Knob label="Clone a voice">
+                <div
+                  className="pd-studio-drop"
+                  data-has={refAudio !== '' ? 'true' : undefined}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    const f = e.dataTransfer.files[0];
+                    if (f !== undefined) setRefAudio(filePath(f));
+                  }}
+                >
+                  <button
+                    type="button"
+                    className="pd-studio-drop-btn pd-focusable"
+                    data-testid="audio-refaudio"
+                    onClick={() => fileInput.current?.click()}
+                  >
+                    {refAudio !== '' ? baseName(refAudio) : 'Choose a clip…'}
+                  </button>
+                  {refAudio !== '' ? (
+                    <button
+                      type="button"
+                      className="pd-studio-drop-clear pd-focusable"
+                      aria-label="Remove the reference clip"
+                      onClick={() => setRefAudio('')}
+                    >
+                      ✕
+                    </button>
+                  ) : null}
+                  <input
+                    ref={fileInput}
+                    type="file"
+                    accept="audio/*"
+                    className="sr-only"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f !== undefined) setRefAudio(filePath(f));
+                    }}
+                  />
+                </div>
+              </Knob>
+            </>
+          ) : (
+            <>
+              <Knob label="Length">
+                <Segmented
+                  testid="audio-seconds"
+                  value={seconds ?? (mode === 'sfx' ? 5 : 20)}
+                  onChange={setSeconds}
+                  options={(mode === 'sfx' ? LENGTHS_SFX : LENGTHS_MUSIC).map((l) => ({
+                    value: l.value,
+                    label: l.label,
+                  }))}
+                />
+              </Knob>
+              {mode === 'sfx' ? (
+                <Knob label="Variations">
+                  <Segmented
+                    testid="audio-count"
+                    value={count}
+                    onChange={setCount}
+                    options={[
+                      { value: 1, label: '1' },
+                      { value: 2, label: '2' },
+                      { value: 4, label: '4' },
+                    ]}
+                  />
+                </Knob>
+              ) : null}
+            </>
+          )}
           <Knob label="Model">
             <select
               className="pd-studio-select pd-focusable"
@@ -146,91 +307,74 @@ export function AudioStudio(): JSX.Element {
               ))}
             </select>
           </Knob>
-
-          {mode === 'speech' ? (
-            <>
-              <Knob label="Voice">
-                <input
-                  className="pd-studio-input pd-focusable"
-                  data-testid="audio-voice"
-                  value={voice}
-                  placeholder="default"
-                  onChange={(e) => setVoice(e.target.value)}
-                />
-              </Knob>
-              <Knob label={`Speed ${speed.toFixed(2)}×`}>
-                <input
-                  className="pd-studio-range pd-focusable"
-                  data-testid="audio-speed"
-                  type="range"
-                  min={0.5}
-                  max={2}
-                  step={0.05}
-                  value={speed}
-                  onChange={(e) => setSpeed(Number(e.target.value))}
-                />
-              </Knob>
-              {/* VOICE CLONING, and the reason it is a plain path field rather
-                  than a file picker for now: the clip usually comes from
-                  something already generated in this app, and pasting its path
-                  is one step where a picker is three. */}
-              <Knob label="Clone from clip">
-                <input
-                  className="pd-studio-input pd-studio-input--wide pd-focusable"
-                  data-testid="audio-refaudio"
-                  value={refAudio}
-                  placeholder="3–10s sample"
-                  onChange={(e) => setRefAudio(e.target.value)}
-                />
-              </Knob>
-            </>
-          ) : (
-            <>
-              <Knob label="Seconds">
-                <input
-                  className="pd-studio-input pd-studio-input--num pd-focusable"
-                  data-testid="audio-seconds"
-                  type="number"
-                  min={1}
-                  max={120}
-                  value={seconds ?? (mode === 'sfx' ? 5 : 20)}
-                  onChange={(e) => setSeconds(Number(e.target.value))}
-                />
-              </Knob>
-              {mode === 'sfx' ? (
-                <Knob label="Variations">
-                  <input
-                    className="pd-studio-input pd-studio-input--num pd-focusable"
-                    data-testid="audio-count"
-                    type="number"
-                    min={1}
-                    max={8}
-                    value={count}
-                    onChange={(e) => setCount(Number(e.target.value))}
-                  />
-                </Knob>
-              ) : null}
-            </>
-          )}
         </>
       }
     >
-      {runs.length === 0 ? (
-        <StudioEmpty>
-          {mode === 'speech'
-            ? 'Type something and press Speak. Point “Clone from clip” at a few seconds of a voice to have it read in that voice instead.'
-            : mode === 'music'
-              ? 'Describe a piece — instruments, tempo, mood — and press Compose.'
-              : 'Describe a sound. Ask for several variations and keep the one that lands.'}
-        </StudioEmpty>
+      {job !== null ? <StudioJob job={job} onCancel={cancel} /> : null}
+      {shown.length === 0 && job === null ? (
+        <StudioEmpty
+          glyph={<GlyphAudio />}
+          title={
+            mode === 'speech'
+              ? 'Read anything aloud'
+              : mode === 'music'
+                ? 'Compose from a description'
+                : 'Make a sound, four ways'
+          }
+          body={
+            mode === 'speech'
+              ? 'Type something and press Speak. Point “Clone a voice” at a few seconds of someone talking to have it read in that voice.'
+              : mode === 'music'
+                ? 'Describe instruments, tempo and mood. Everything is made on this Mac.'
+                : 'Four takes come back at once. Play them against each other and keep the one that lands.'
+          }
+          examples={EXAMPLES[mode]}
+          onPick={setPrompt}
+        />
       ) : (
-        runs.map((r) => (
+        shown.map((r) => (
           <section key={r.at} className="pd-studio-run">
-            <p className="pd-studio-run-prompt">{r.prompt}</p>
-            <ThreadMedia items={r.items} />
+            <RunHeader run={r} onAgain={() => setPrompt(r.prompt)} />
+            <ThreadMedia items={r.items} layout="single" />
           </section>
         ))
       )}
     </StudioShell>
+  );
+}
+
+/** Electron exposes the real path on a dropped/chosen File. */
+function filePath(f: File): string {
+  return (f as File & { path?: string }).path ?? f.name;
+}
+
+function baseName(p: string): string {
+  return p.split('/').pop() ?? p;
+}
+
+function GlyphAudio(): JSX.Element {
+  return (
+    <svg width="52" height="52" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <title>Sound</title>
+      {/* A waveform: five bars, tallest in the middle. */}
+      {[
+        { x: 3, h: 3 },
+        { x: 7, h: 6 },
+        { x: 11, h: 9 },
+        { x: 15, h: 5 },
+        { x: 19, h: 2 },
+      ].map((b) => (
+        <line
+          key={b.x}
+          x1={b.x}
+          x2={b.x}
+          y1={12 - b.h}
+          y2={12 + b.h}
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinecap="round"
+        />
+      ))}
+    </svg>
   );
 }
