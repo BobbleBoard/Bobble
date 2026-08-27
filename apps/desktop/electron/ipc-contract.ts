@@ -201,6 +201,20 @@ export type FsInvokeMap = {
    * owns the clipboard, and round-tripping through a save dialog to copy a
    * paragraph would be absurd. A cancelled save is `ok:false` with no error.
    */
+  /**
+   * The instruction files loaded for a working directory — the AGENTS.md chain.
+   *
+   * The model reads these on every turn and the user could not see which ones,
+   * so "why did it do that" had an answer nothing in the app would show. pi's
+   * RPC state carries no context-file field, so this recomputes with pi's own
+   * `loadProjectContextFiles` rather than inventing a second walk that could
+   * disagree with the one that actually loaded.
+   */
+  'fs:project-instructions': {
+    request: { cwd: string };
+    /** `label` is the path with `~` collapsed — main knows HOME, the renderer does not. */
+    response: { files: Array<{ path: string; label: string; bytes: number }> };
+  };
   'fs:export-session': {
     request: {
       file: string;
@@ -221,6 +235,7 @@ export const FS_INVOKE_CHANNELS = [
   'fs:write-file',
   'fs:delete-session',
   'fs:export-session',
+  'fs:project-instructions',
 ] as const satisfies readonly (keyof FsInvokeMap)[];
 
 // ---------------------------------------------------------------------------

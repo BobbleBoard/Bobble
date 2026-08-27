@@ -377,6 +377,43 @@ function deleteSession(file: string): { ok: boolean; error?: string } {
 }
 
 /**
+ * Which instruction files this working directory actually loads.
+ *
+ * Uses pi's OWN `loadProjectContextFiles` rather than walking for AGENTS.md
+ * here: a second implementation could disagree with the one that really loaded,
+ * and a list that is subtly wrong about what the model was told is worse than
+ * no list.
+ *
+ * Sizes, not contents — the point is "these are in effect, here is where they
+ * live", and the app can already open a path.
+ */
+async function projectInstructions(cwd: string): Promise<{
+  files: Array<{ path: string; label: string; bytes: number }>;
+}> {
+  const resolved = cwd ? resolveUserPath(cwd) : '';
+  if (resolved === '' || statSafe(resolved)?.isDirectory() !== true) return { files: [] };
+  try {
+    /*
+     * DYNAMIC IMPORT, not a static one. `@mariozechner/pi-coding-agent` is
+     * ESM-only and this bundle is CJS, so a static value import compiles to
+     * `require()` and kills main at boot — no window, no error the user can
+     * see. The same trap role-agent.ts documents on `loadPi`; this handler is
+     * the one place in fs-handlers that needs the SDK, so it loads it here.
+     */
+    const { loadProjectContextFiles } = await import('@mariozechner/pi-coding-agent');
+    return {
+      files: loadProjectContextFiles({ cwd: resolved, agentDir: AGENT_DIR }).map((f) => ({
+        path: f.path,
+        label: f.path.replace(HOME, '~'),
+        bytes: Buffer.byteLength(f.content, 'utf8'),
+      })),
+    };
+  } catch {
+    return { files: [] };
+  }
+}
+
+/**
  * Export a chat to disk, or hand its text back for the clipboard.
  *
  * Fenced exactly like `deleteSession` — the source must be a session JSONL —
@@ -709,8 +746,23 @@ function writeFileFenced(
 export { writeFileFenced };
 
 /** The fs channel implementations, spread into main.ts's registerIpcHandlers. */
+/**
+ * ONE handler is async, and only one.
+ *
+ * `fs:project-instructions` must load the ESM-only pi SDK through a dynamic
+ * import — a static one compiles to `require()` in this CJS bundle and kills
+ * main at boot, with no window and no error the user can see. Typing the whole
+ * map as possibly-async to accommodate it would make every caller await a
+ * synchronous read, so that one key is singled out instead.
+ */
+type AsyncFsChannel = 'fs:project-instructions';
+
 export const fsHandlers: {
-  [K in keyof FsInvokeMap]: (req: FsInvokeMap[K]['request']) => FsInvokeMap[K]['response'];
+  [K in Exclude<keyof FsInvokeMap, AsyncFsChannel>]: (
+    req: FsInvokeMap[K]['request'],
+  ) => FsInvokeMap[K]['response'];
+} & {
+  [K in AsyncFsChannel]: (req: FsInvokeMap[K]['request']) => Promise<FsInvokeMap[K]['response']>;
 } = {
   'fs:list-files': (req) => listFiles(req.cwd ?? '', req.query ?? '', req.limit ?? 30),
   'fs:list-sessions': (req) => listAllSessions(req?.cwd, req?.query),
@@ -723,4 +775,5 @@ export const fsHandlers: {
   'fs:write-file': (req) => writeFileFenced(req.path, req.content),
   'fs:delete-session': (req) => deleteSession(req.file),
   'fs:export-session': (req) => exportSession(req),
+  'fs:project-instructions': (req) => projectInstructions(req.cwd),
 };

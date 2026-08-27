@@ -1132,6 +1132,40 @@ export async function createCorpModelProvider(
 // ---------------------------------------------------------------------------
 
 /** The inputs to one role-agent run. */
+/**
+ * How much of a project's instruction files a corp role will carry.
+ *
+ * Every role pays this out of a window that is already tight, so it is capped
+ * rather than trusted. A truncated instruction beats a role with no room to
+ * work, and the truncation says so rather than ending mid-sentence.
+ */
+const ROLE_INSTRUCTIONS_MAX_CHARS = 4000;
+
+/**
+ * The project's own AGENTS.md chain, as a block to append to a role's prompt.
+ *
+ * Null when there is nothing — an empty header would read as an instruction
+ * that the project has no instructions.
+ */
+async function readProjectInstructions(cwd: string): Promise<string | null> {
+  let files: Array<{ path: string; content: string }>;
+  try {
+    // Through the cached dynamic loader: a STATIC value import of the ESM-only
+    // SDK compiles to `require()` in the CJS main bundle and kills boot before
+    // a window exists. See `loadPi`.
+    const { loadProjectContextFiles } = await loadPi();
+    files = loadProjectContextFiles({ cwd, agentDir: path.join(os.homedir(), '.pi', 'agent') });
+  } catch {
+    return null;
+  }
+  if (files.length === 0) return null;
+  let body = files.map((f) => `# ${f.path}\n\n${f.content.trim()}`).join('\n\n');
+  if (body.length > ROLE_INSTRUCTIONS_MAX_CHARS) {
+    body = `${body.slice(0, ROLE_INSTRUCTIONS_MAX_CHARS)}\n\n[…truncated]`;
+  }
+  return `PROJECT INSTRUCTIONS. The user wrote these down for this project; they apply to your work here.\n\n${body}`;
+}
+
 export interface RoleAgentConfig {
   /** The corp turn this role plays (or a free-form label). Recorded, not routed. */
   readonly purpose: CorpTurnPurpose | string;
@@ -1715,11 +1749,31 @@ export async function openRoleSession(
   const settings = SettingsManager.inMemory({
     compaction: compactionSettingsFor(handle.model.contextWindow),
   });
+  /*
+   * THE USER'S PROJECT INSTRUCTIONS REACH THE TEAM TOO.
+   *
+   * `noContextFiles: true` stays — pi's loader is all-or-nothing, and turning
+   * it on would also pull skills, prompt templates and themes into every role,
+   * none of which a role charter wants. But leaving it at that meant a project's
+   * AGENTS.md applied to the ordinary chat and silently to NOBODY on a corp run:
+   * the user writes down how their project works, hires a team, and the team has
+   * never heard of it.
+   *
+   * So the project chain — and only that — is appended to the role's own prompt,
+   * where its cost is visible and its position is known. Capped, because every
+   * role pays it out of a window that is already tight, and a truncated
+   * instruction is better than a role with no room to work.
+   */
+  const projectInstructions = await readProjectInstructions(config.cwd);
+  const systemPrompt =
+    projectInstructions === null
+      ? config.systemPrompt
+      : `${config.systemPrompt}\n\n${projectInstructions}`;
   const loader = new DefaultResourceLoader({
     cwd: config.cwd,
     agentDir,
     settingsManager: settings,
-    systemPrompt: config.systemPrompt,
+    systemPrompt,
     noContextFiles: true,
     noSkills: true,
     noPromptTemplates: true,

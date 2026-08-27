@@ -53,6 +53,7 @@ import {
   usesSandbox,
 } from './composer-bar-logic';
 import { PREFIX_WARM_STATUS, showLoadingModel, useHarnessStatus } from './harness-status';
+import { InstructionsChip } from './InstructionsChip';
 
 /** LEFT: the relocated project (working-folder) chip, slimmed for the bar. When
  * the selected project folder is MISSING and pi fell back to the conversation
@@ -389,6 +390,9 @@ export function ComposerBar() {
     <div className="pd-composer-bar" data-testid="composer-bar">
       <div className="pd-composer-bar-left">
         <ProjectRegion />
+        {/* What ELSE the model was told, next to the folder it was told it
+            about. Absent when the project has no instruction files. */}
+        <InstructionsChip />
       </div>
       {/* Empty flex spacer (round-15) — pushes the project chip left and the
           effort button right. The routed tier now lives on the footer chip. */}
