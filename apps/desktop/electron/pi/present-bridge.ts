@@ -27,7 +27,7 @@ import path from 'node:path';
 import { promisify } from 'node:util';
 import { createIpcEventSender, createLogger } from '@pi-desktop/shared';
 import type { WebContents } from 'electron';
-import { getInferenceLaunchMode } from '../inference/llm-main';
+import { getInferenceVisionReady } from '../inference/llm-main';
 import { wantVision } from '../inference/vision-want';
 import type { AppEventMap } from '../ipc-contract';
 
@@ -277,13 +277,13 @@ async function handle(req: Request): Promise<Record<string, unknown>> {
      * capability this app owns and can turn on.
      *
      * The mechanism already existed and `present` was simply not attached to it:
-     * an image produced while the server is text-only records a want, and the
+     * an image produced while the server cannot see records a want, and the
      * turn boundary spends it (see inference/vision-want.ts — going multimodal
      * is a hard restart, so firing it here would kill the turn that just
      * rendered). Same call the browser agent makes for a screenshot, for exactly
      * the same reason.
      */
-    if (preview.imageBase64 !== undefined && getInferenceLaunchMode() === 'fast-text') {
+    if (preview.imageBase64 !== undefined && !getInferenceVisionReady()) {
       wantVision();
     }
     return preview;

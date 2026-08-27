@@ -91,8 +91,13 @@ export function getInferenceContextWindow(): number | null {
   return lastStatus?.model?.contextWindow ?? null;
 }
 
-export function getInferenceLaunchMode(): 'fast-text' | 'multimodal' | null {
-  return lastStatus?.launchMode ?? null;
+/**
+ * Whether the running server can READ AN IMAGE — ask this, not the launch mode.
+ *
+ * A projector is attached on every llama.cpp launch, so `fast-text` sees fine.
+ */
+export function getInferenceVisionReady(): boolean {
+  return lastStatus?.visionReady ?? lastStatus?.launchMode === 'multimodal';
 }
 
 /** The file every pi process reads to learn whether the server can SEE. */
@@ -137,9 +142,25 @@ function writeUtilityState(): void {
   }
 }
 
-function writeVisionState(mode: 'fast-text' | 'multimodal' | null): void {
+/**
+ * Record whether the running server can READ AN IMAGE.
+ *
+ * This used to be `launchMode === 'multimodal'`, which stopped being the same
+ * question. The vision projector is attached on every launch now — measured at
+ * 0.9% throughput on qwen3.5-4b-mtp, for 641 MB — so an ordinary `fast-text`
+ * server can already see. Writing '0' for it meant the first image in a session
+ * triggered an on-demand relaunch into multimodal: a full unload and reload
+ * (~105s on the 9B) to acquire a capability the process already had, and one
+ * that ALSO drops speculative decoding for the rest of the session.
+ *
+ * So it reads the fact the supervisor reports (`visionReady`, true when a
+ * projector was actually attached) and falls back to the old test only when a
+ * status predates the field.
+ */
+function writeVisionState(status: { visionReady?: boolean; launchMode?: string } | null): void {
+  const canSee = status?.visionReady ?? status?.launchMode === 'multimodal';
   try {
-    writeFileSync(visionStateFilePath(), mode === 'multimodal' ? '1' : '0');
+    writeFileSync(visionStateFilePath(), canSee ? '1' : '0');
   } catch {
     // Best effort — the env snapshot remains the fallback.
   }
@@ -284,8 +305,11 @@ function ensureChild(): UtilityProcess {
   proc.on('message', (message: LlmOutbound) => {
     if (message.kind === 'status') {
       const before = lastStatus?.launchMode;
+      const sawBefore = lastStatus?.visionReady;
       lastStatus = message.status;
-      if (message.status.launchMode !== before) writeVisionState(message.status.launchMode ?? null);
+      if (message.status.launchMode !== before || message.status.visionReady !== sawBefore) {
+        writeVisionState(message.status);
+      }
       // The endpoint file tracks EVERY status change, not just a launch-mode
       // flip: "the server just came up" is exactly the transition a pi child
       // that started first needs to hear about.

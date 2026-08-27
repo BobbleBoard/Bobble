@@ -22,6 +22,30 @@ describe('resolveVisionTarget', () => {
     expect(resolveVisionTarget({ launchMode: 'multimodal', catalog }).action).toBe('already-on');
   });
 
+  it('no-ops when a fast-text server already has a projector attached', () => {
+    // The regression this exists for: the projector is attached on EVERY launch
+    // now, so the first image used to force a ~105s unload/reload into
+    // multimodal to gain vision the server already had — and lose speculative
+    // decoding for the rest of the session.
+    const d = resolveVisionTarget({
+      launchMode: 'fast-text',
+      visionReady: true,
+      model: { id: 'gemma-4-e2b-it', quant: 'Q4_K_M' },
+      catalog,
+    });
+    expect(d.action).toBe('already-on');
+  });
+
+  it('still relaunches when the server genuinely cannot see', () => {
+    const d = resolveVisionTarget({
+      launchMode: 'fast-text',
+      visionReady: false,
+      model: { id: 'gemma-4-e2b-it', quant: 'Q4_K_M' },
+      catalog,
+    });
+    expect(d).toEqual({ action: 'relaunch', modelId: 'gemma-4-e2b-it', quant: 'Q4_K_M' });
+  });
+
   it('relaunches the CURRENT model in multimodal when it supports vision', () => {
     const d = resolveVisionTarget({
       launchMode: 'fast-text',

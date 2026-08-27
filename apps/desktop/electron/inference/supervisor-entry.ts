@@ -226,6 +226,15 @@ interface CurrentServer {
   /** The launch mode this server came up in (fast-text speed, or multimodal
    * vision). Surfaced in LlmStatus so the app knows if vision is already on. */
   launchMode: LaunchMode;
+  /**
+   * Whether a vision projector was actually attached to THIS server.
+   *
+   * The truth the launch mode used to stand in for, badly. `mmprojFileFor` now
+   * returns the projector on every launch (measured 0.9% cost), so a `fast-text`
+   * server can read an image — and asking `launchMode === 'multimodal'` said it
+   * could not.
+   */
+  visionReady: boolean;
 }
 
 let current: CurrentServer | null = null;
@@ -303,6 +312,9 @@ function status(): LlmStatus {
       .filter((m) => m.files.some((f) => isDownloaded(m, f)))
       .map((m) => m.id),
     launchMode: current?.launchMode,
+    /* A projector was attached → the server can read an image, whatever mode it
+       was launched in. MLX has no projector path, so it reports false. */
+    visionReady: current?.visionReady ?? false,
     error: lastError,
   };
 }
@@ -725,7 +737,16 @@ async function startMlxServer(
     });
     const started = await supervisor.start();
     const baseUrl = supervisor.baseUrl;
-    current = { supervisor, model, file, contextWindow, baseUrl, launchMode: 'fast-text' };
+    current = {
+      supervisor,
+      model,
+      file,
+      contextWindow,
+      baseUrl,
+      launchMode: 'fast-text',
+      // mlx_lm.server takes no projector, so this engine cannot read an image.
+      visionReady: false,
+    };
     phase = 'ready';
     await writeModelsJson(
       MODELS_JSON,
@@ -1079,7 +1100,15 @@ async function startServerExclusive(
 
     const started = await supervisor.start();
     const baseUrl = supervisor.baseUrl;
-    current = { supervisor, model, file, contextWindow, baseUrl, launchMode };
+    current = {
+      supervisor,
+      model,
+      file,
+      contextWindow,
+      baseUrl,
+      launchMode,
+      visionReady: mmprojPath !== undefined,
+    };
     phase = 'ready';
 
     await writeModelsJson(

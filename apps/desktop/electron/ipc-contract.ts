@@ -191,6 +191,16 @@ export interface LlmStatus {
   /** The launch mode of the currently-running server, so the app knows whether
    * vision (multimodal) is already on before requesting an on-demand restart. */
   launchMode?: 'fast-text' | 'multimodal';
+  /**
+   * Whether the RUNNING server can actually read an image.
+   *
+   * Distinct from `launchMode`, and that distinction is the point. The vision
+   * projector is now attached on every launch (measured cost: 0.9%), so a
+   * plain `fast-text` server can already see — but the app went on deciding
+   * "can it see?" from the launch mode, wrote "no", and relaunched into
+   * multimodal on the first image to gain a capability it already had.
+   */
+  visionReady?: boolean;
   error?: string;
 }
 

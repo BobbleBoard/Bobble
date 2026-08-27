@@ -34,7 +34,7 @@ import {
 } from '@pi-desktop/browser-use/protocol';
 import { createIpcEventSender, createLogger } from '@pi-desktop/shared';
 import { type IpcMainInvokeEvent, ipcMain, type WebContents } from 'electron';
-import { getInferenceLaunchMode } from '../inference/llm-main';
+import { getInferenceVisionReady } from '../inference/llm-main';
 import { wantVision } from '../inference/vision-want';
 import type { AppEventMap } from '../ipc-contract';
 import { isTrustedIpcEvent } from '../trusted-senders';
@@ -300,12 +300,17 @@ async function dispatch(
     case 'screenshot': {
       const id = await ensureAgentTab();
       /*
-       * The model just captured something to LOOK at. If the running server is
-       * text-only it cannot, so record the want — the turn boundary relaunches
-       * multimodal (restarting here would kill this very turn). Without this the
+       * The model just captured something to LOOK at. If the running server has
+       * no vision projector it cannot, so record the want — the turn boundary
+       * spends it (restarting here would kill this very turn). Without this the
        * model retries the capture until it gives up and calls the tool broken.
+       *
+       * Asks whether the server can SEE, not which mode it launched in: the
+       * projector is attached on every launch now, so a `fast-text` server
+       * usually can, and asking the old question raised a want on every single
+       * screenshot for a capability that was already there.
        */
-      if (getInferenceLaunchMode() === 'fast-text') wantVision();
+      if (!getInferenceVisionReady()) wantVision();
       return { dataUrl: await browserManager.capture(id) };
     }
     case 'click': {

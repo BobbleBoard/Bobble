@@ -85,6 +85,14 @@ export async function activateLocalModel(
 export interface VisionState {
   /** The launch mode of the running server (multimodal ⇒ vision already on). */
   readonly launchMode?: 'fast-text' | 'multimodal';
+  /**
+   * Whether the RUNNING server already has a vision projector attached — the
+   * question `launchMode` was standing in for, and got wrong. The projector is
+   * attached on every llama.cpp launch now (0.9% measured), so an ordinary
+   * fast-text server can see, and relaunching it buys nothing while costing a
+   * ~105s reload and the session's speculative decoding.
+   */
+  readonly visionReady?: boolean;
   /** The running model, or null when none is up. */
   readonly model?: { readonly id: string; readonly quant?: string } | null;
   /** Catalog entries (only `id` + `vision` are read). */
@@ -114,7 +122,7 @@ export type VisionDecision =
 
 /**
  * Pure: decide how to get the running setup into a vision-capable state.
- *   - already multimodal → nothing to do (vision is sticky for the session),
+ *   - the running server can already see → nothing to do,
  *   - current model supports vision → relaunch IT in multimodal,
  *   - the user PINNED a text-only model → do nothing, and say why,
  *   - else → the best downloaded vision-capable tier pick (intelligent → balanced
@@ -136,7 +144,9 @@ export type VisionDecision =
  * the swap is the rest of the session.
  */
 export function resolveVisionTarget(s: VisionState): VisionDecision {
-  if (s.launchMode === 'multimodal') return { action: 'already-on' };
+  // Already able to see: either a projector is attached (the normal case now)
+  // or this server was explicitly launched multimodal.
+  if (s.visionReady === true || s.launchMode === 'multimodal') return { action: 'already-on' };
 
   const currentId = s.model?.id ?? null;
   const currentVision =
@@ -189,6 +199,7 @@ export async function ensureVisionMode(): Promise<{
   const selection = useSettingsStore.getState().settings.modelSelection;
   const decision = resolveVisionTarget({
     launchMode: llm.status.launchMode,
+    visionReady: llm.status.visionReady,
     model: llm.status.model,
     catalog: llm.catalog,
     pinnedModelId: selection?.mode === 'model' ? selection.modelId : null,

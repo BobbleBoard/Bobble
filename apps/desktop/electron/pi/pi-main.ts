@@ -18,8 +18,8 @@ import { registerGen3dBridge } from '../gen3d/gen3d-bridge';
 import { runImageJob } from '../gen3d/gen3d-main';
 import { detectHarnesses } from '../inference/harness-main';
 import {
-  getInferenceLaunchMode,
   getInferenceUtility,
+  getInferenceVisionReady,
   utilityStateFilePath,
   visionStateFilePath,
 } from '../inference/llm-main';
@@ -141,7 +141,7 @@ function buildPiEnv(cwd: string | undefined): Record<string, string | undefined>
   const utility = getInferenceUtility();
   // Whether the server this child will talk to can SEE. Read by the provider so
   // an image is never sent to a text-only server as undecodable tokens.
-  const vision = getInferenceLaunchMode() === 'multimodal' ? '1' : '0';
+  const vision = getInferenceVisionReady() ? '1' : '0';
   return {
     ...process.env,
     // File-spill containment (blind-test round-2 #2): turn ON the harness's
