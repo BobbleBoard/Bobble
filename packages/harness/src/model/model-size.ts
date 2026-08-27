@@ -74,6 +74,42 @@ export function isSmallModel(
   return inspectModelSize(model, thresholdB).isSmall;
 }
 
+/**
+ * Capabilities that stress a small local model, keyed by capability name
+ * (`presets/capabilities.ts`) rather than by task class.
+ *
+ * WHY NOT THE TASK CLASS. `ADVANCED_CLASSES` above is the brief's original
+ * framing and it stopped being reachable when per-turn classification was
+ * removed: `cls` is now the preset, and under the default Auto that is always
+ * `'coding'`, which is deliberately not advanced. So the warning the brief asked
+ * for could not fire on the case it was written for — a 4B asked to do 3D work.
+ *
+ * A capability the model actually REACHES FOR is better evidence than a guess
+ * about the prompt anyway: it fires when the risk materialises, it works the
+ * same in both tool interfaces, and it cannot be wrong about intent.
+ */
+export const DEMANDING_CAPABILITIES: ReadonlySet<string> = new Set([
+  'browser',
+  'computer-use',
+  'generation',
+]);
+
+/**
+ * Warn when a known-small model reaches for a demanding capability. Null when
+ * there is nothing to say. Fire this at most once per session — it is a caveat,
+ * not an alarm, and repeating it on every browser click would be noise.
+ */
+export function smallModelCapabilityWarning(
+  model: ModelLike,
+  capability: string,
+  thresholdB: number = SMALL_MODEL_THRESHOLD_B,
+): string | null {
+  const { params, isSmall } = inspectModelSize(model, thresholdB);
+  if (!isSmall || !DEMANDING_CAPABILITIES.has(capability)) return null;
+  const size = params !== null ? `${params}B` : 'small';
+  return `${model.name ?? model.id} (~${size}) is small for ${capability} work — results may be unreliable. Consider a larger model.`;
+}
+
 /** True when the class is one that stresses a small model. */
 export function isAdvancedClass(cls: TaskClass): boolean {
   return ADVANCED_CLASSES.has(cls);

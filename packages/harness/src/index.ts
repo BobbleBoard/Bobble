@@ -41,7 +41,11 @@ import { CREATE_PRODUCTION_HIERARCHY } from './corp/promotion.js';
 import { effortKnobs, isEffortLevel } from './effort/effort.js';
 import { HANDBACK_NUDGE, isChoiceHandback } from './loop/handback.js';
 import { createLoopDetector, type LoopDetector, loopDetectorConfig } from './loop/loop-detector.js';
-import { parseModelParams, smallModelWarning } from './model/model-size.js';
+import {
+  parseModelParams,
+  smallModelCapabilityWarning,
+  smallModelWarning,
+} from './model/model-size.js';
 import { type CallModel, callModelFromEnv } from './model-call/call-model.js';
 import { warmSystemPrompt } from './model-call/warmup.js';
 import { createBashFlagger } from './permissions/flag-bash.js';
@@ -104,7 +108,7 @@ import { registerPresentTool } from './tools/present.js';
 import { presentBridgeFromEnv } from './tools/present-bridge.js';
 import { withRepeatNotice } from './tools/repeat-notice.js';
 import { registerSandboxFileTools, resolveWorkspaceRoot } from './tools/sandbox-fs.js';
-import { buildCli, type CliGroupSpec, renderRootHelp } from './tools/tool-cli.js';
+import { buildCli, type CliGroupSpec, commandNameFor, renderRootHelp } from './tools/tool-cli.js';
 import { registerToolCli } from './tools/tool-cli-bridge.js';
 import { truncateToolOutput } from './tools/tool-output-truncate.js';
 import { captureRegisteredTools } from './tools/tool-registry.js';
@@ -312,6 +316,8 @@ interface HarnessRuntime {
   delegatedThisTurn: boolean;
   /** One handback nudge per session — see the agent_end hook. */
   nudgedHandback: boolean;
+  /** One small-model caveat per session — see the tool_call hook. */
+  warnedSmallModel: boolean;
   /** One-shot: the output-limit steer has already been sent this session. */
   nudgedOutputLimit: boolean;
   /** Remaining REAL-verify fix steers allowed in the active verify sequence. */
@@ -723,6 +729,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     touchedFiles: [],
     ranCommands: [],
     delegatedThisTurn: false,
+    warnedSmallModel: false,
     nudgedHandback: false,
     nudgedOutputLimit: false,
     verifyFixesRemaining: 0,
@@ -2077,6 +2084,45 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     publishStatus(ctx);
   }
 
+  /**
+   * The ≤12B caveat, keyed off a capability the model actually REACHED FOR.
+   *
+   * It used to key off the task class, and per-turn classification is gone —
+   * `cls` is the preset, and under the default Auto that is always `'coding'`,
+   * which is not an advanced class. So the warning the brief asked for could
+   * never fire on the case it was written for. What the model reaches for is
+   * better evidence than a guess about the prompt, and it reads the same in
+   * both tool interfaces: a schema-mode tool name maps through
+   * `capabilityForTool`, and a CLI-mode `bash` command starts with the group
+   * word, which IS the capability's command name.
+   *
+   * Once per session. It is a caveat, not an alarm.
+   */
+  function warnIfSmallModelForCapability(
+    toolName: string,
+    input: unknown,
+    ctx: ExtensionContext,
+  ): void {
+    if (runtime.warnedSmallModel || runtime.model === null || !ctx.hasUI) return;
+    const capability =
+      toolName === 'bash' ? capabilityForCliCommand(input) : capabilityForTool(toolName)?.name;
+    if (capability === undefined) return;
+    const warning = smallModelCapabilityWarning(runtime.model, capability);
+    if (warning === null) return;
+    runtime.warnedSmallModel = true;
+    ctx.ui.notify(warning, 'warning');
+  }
+
+  /** The capability behind a CLI-mode bash command, via its leading group word. */
+  function capabilityForCliCommand(input: unknown): string | undefined {
+    if (!toolCliMode) return undefined;
+    const command = (input as { command?: unknown })?.command;
+    if (typeof command !== 'string') return undefined;
+    const head = command.trim().split(/\s+/)[0];
+    if (head === undefined) return undefined;
+    return toolCliGroups().find((g) => commandNameFor(g.name) === head)?.name;
+  }
+
   function persistConfig(): void {
     pi.appendEntry(HARNESS_CONFIG_ENTRY, runtime.config);
   }
@@ -2387,6 +2433,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
   // (before execution) and the consecutive-error streak (after execution).
   pi.on('tool_call', (event, ctx) => {
     runtime.currentCtx = ctx;
+    warnIfSmallModelForCapability(event.toolName, event.input, ctx);
     /*
      * A COMMAND THAT NEVER RETURNS TAKES THE WHOLE TURN WITH IT — in the ORDINARY
      * chat, not only inside a corporation.

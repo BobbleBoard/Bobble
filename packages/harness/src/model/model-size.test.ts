@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { isSmallModel, parseModelParams, smallModelWarning } from './model-size.js';
+import {
+  isSmallModel,
+  parseModelParams,
+  smallModelCapabilityWarning,
+  smallModelWarning,
+} from './model-size.js';
 
 describe('parseModelParams', () => {
   const cases: [string, number | null][] = [
@@ -68,5 +73,29 @@ describe('smallModelWarning', () => {
   it("warns on 'other' with a small model (connector/integration work)", () => {
     expect(smallModelWarning({ id: 'gemma4-e2b', name: 'Gemma4 E2B' }, 'other')).toContain('small');
     expect(smallModelWarning({ id: 'qwen3.6-27b' }, 'other')).toBeNull();
+  });
+});
+
+describe('smallModelCapabilityWarning', () => {
+  const small = { id: 'qwen3.5-4b-mtp', name: 'Qwen3.5 4B' };
+  const large = { id: 'qwen3.5-32b', name: 'Qwen3.5 32B' };
+
+  it('warns a small model reaching for a demanding capability', () => {
+    const w = smallModelCapabilityWarning(small, 'generation');
+    expect(w).toContain('4B');
+    expect(w).toContain('generation');
+  });
+
+  it('is silent for a large model, and for routine capabilities', () => {
+    expect(smallModelCapabilityWarning(large, 'generation')).toBeNull();
+    expect(smallModelCapabilityWarning(small, 'personal')).toBeNull();
+    expect(smallModelCapabilityWarning(small, 'web-research')).toBeNull();
+  });
+
+  it('is reachable where the class-keyed warning is not', () => {
+    // The regression: per-turn classification is gone, so `cls` is the preset
+    // and under Auto that is always 'coding' — never an advanced class.
+    expect(smallModelWarning(small, 'coding')).toBeNull();
+    expect(smallModelCapabilityWarning(small, 'browser')).not.toBeNull();
   });
 });
