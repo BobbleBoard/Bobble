@@ -507,7 +507,7 @@ export function registerGenIpc(opts: GenManagerOptions): void {
         throw new Error(
           kind === 'speech'
             ? 'no speech model is available on this machine'
-            : `${kind === 'music' ? 'Music' : 'Sound effect'} generation runs on ComfyUI, which is not set up on this machine — install it from the Audio studio. Speech (text-to-speech) works without it.`,
+            : `no ${kind === 'music' ? 'music' : 'sound-effect'} model is set up on this machine yet — those run on ComfyUI graphs, and the Audio studio is where they are installed. Speech (text-to-speech) works without any of that.`,
         );
       }
       throw new Error(`unknown or non-audio model "${requested}"`);
