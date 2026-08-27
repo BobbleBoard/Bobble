@@ -720,6 +720,26 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
       summary: 'Hand work to a subagent, or to the manager who runs a whole team.',
       tools: [SPAWN_SUBAGENT_TOOL_NAME, TALK_TO_MANAGER],
     },
+    /*
+     * THE FENCED FILE TOOLS, BY NAME.
+     *
+     * Every accumulated file-safety fix hangs off the harness's `write`/`edit`
+     * overrides — the sandbox write fence, `guardDestructiveRewrite`,
+     * `stripCodeFence`, `repairDroppedRootSlash`, the failed-edit diagnosis —
+     * and in this mode `bash` was the only advertised tool, so none of them ran.
+     * Shell redirection is the alternative and it is unfenced by nature.
+     *
+     * Bash already spawns with `cwd` set to the workspace root, so a RELATIVE
+     * `cat > notes.md` lands in the right place; the exposure is absolute and
+     * `~/…` paths, plus losing every repair above. Giving the fenced path a name
+     * is the part that is mechanism. The preamble points at it; a model that
+     * still redirects is not something a command list can prevent.
+     */
+    {
+      name: 'file',
+      summary: 'Read, write, edit and list files — the safe path, and the one that repairs itself.',
+      tools: ['read', 'write', 'edit', 'ls'],
+    },
   ];
   /** Every group the CLI offers: the capabilities, plus the extras above. */
   const toolCliGroups = (): CliGroupSpec[] => [...CAPABILITIES, ...TOOL_CLI_EXTRA_GROUPS];
@@ -2010,6 +2030,16 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
       'cannot be carried out at all without an answer, and never ask twice.',
       '',
       'Never tell the user you are unable to do something one of these commands does.',
+      '',
+      /*
+       * The file commands are fenced and self-repairing (write fence, dropped
+       * root slash, stray markdown fence, edit diagnosis); shell redirection is
+       * none of those. `bash` already runs in the workspace root, so relative
+       * redirection lands correctly — the loss is the repairs, and absolute
+       * paths. Naming the preferred path is the part a prompt can do.
+       */
+      'To create or change a file, use `file write` / `file edit` rather than shell',
+      'redirection — they land in the right place and repair common mistakes.',
     ].join('\n');
   }
 

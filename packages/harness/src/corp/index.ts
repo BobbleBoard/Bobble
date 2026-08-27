@@ -34,6 +34,7 @@ export * from './mesh.js';
 export * from './org-chart.js';
 export * from './persistence.js';
 export * from './plan.js';
+export * from './preflight.js';
 export * from './promotion.js';
 export * from './prompts.js';
 export * from './raise-hand.js';
