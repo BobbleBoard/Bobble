@@ -613,6 +613,13 @@ function allowedWriteRoots(): string[] {
   // roots. Read AND write, since main writes the run's output here.
   roots.add(normalizeRoot(path.join(HOME, '.pi', 'desktop', 'scheduled-runs')));
   /*
+   * Per-turn file checkpoints (harness verify/checkpoints.ts): a copy of every
+   * file a turn is about to change, so the user can put one back. Written by
+   * the pi child through the fenced tools, which is why it has to be a root —
+   * without it the safety net is refused by the safety net.
+   */
+  roots.add(normalizeRoot(path.join(HOME, '.pi', 'desktop', 'checkpoints')));
+  /*
    * WHERE GENERATED MEDIA LANDS. `~/Bobble/generated` is the app's OWN output
    * directory — every image, video and audio file a generation writes — and it
    * was not a served root, so the thread's player and file card fetched their

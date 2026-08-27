@@ -20,6 +20,7 @@
 import { appendFileSync, statSync } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
+import { join } from 'node:path';
 import type {
   ExtensionAPI,
   ExtensionCommandContext,
@@ -114,6 +115,7 @@ import { registerToolCli } from './tools/tool-cli-bridge.js';
 import { truncateToolOutput } from './tools/tool-output-truncate.js';
 import { type CapturedTool, captureRegisteredTools } from './tools/tool-registry.js';
 import { registerUseTool } from './tools/use-tool.js';
+import { type Checkpoint, capture, prune, restore } from './verify/checkpoints.js';
 import { readmeIn, undemonstrated, workRootOf } from './verify/documented.js';
 import {
   detectProjectCheck,
@@ -310,6 +312,8 @@ interface HarnessRuntime {
   loopDetector: LoopDetector | null;
   /** Files the current agent loop wrote/edited (for the verify syntax fallback). */
   touchedFiles: string[];
+  /** What each of those files looked like BEFORE this turn touched it. */
+  checkpoints: Checkpoint[];
   /** Commands this turn actually ran — the other half of "did you exercise it". */
   ranCommands: string[];
   /** This turn handed work to a subagent, whose commands never reach
@@ -521,6 +525,7 @@ const HELP = [
   '  effort <low|medium|high|max>',
   `  preset <auto|${TASK_CLASSES.join('|')}>`,
   '  classify <text>            debug: classify a prompt',
+  '  restore [path]             list what this turn changed, or put one file back',
 ].join('\n');
 
 /**
@@ -745,6 +750,17 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
   const toolCliGroups = (): CliGroupSpec[] => [...CAPABILITIES, ...TOOL_CLI_EXTRA_GROUPS];
 
   /**
+   * Where a turn's file checkpoints live.
+   *
+   * Under the app's own directory rather than the workspace: a `.checkpoints`
+   * folder appearing inside someone's project is litter, and it would end up in
+   * their commits. The app allowlists this path for writes.
+   */
+  function checkpointRoot(): string {
+    return join(homedir(), '.pi', 'desktop', 'checkpoints');
+  }
+
+  /**
    * The tools the CLI may list AND run — one source, used by both the command
    * surface and the system prompt's command list.
    *
@@ -829,6 +845,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     stage: 'idle',
     loopDetector: null,
     touchedFiles: [],
+    checkpoints: [],
     ranCommands: [],
     delegatedThisTurn: false,
     warnedSmallModel: false,
@@ -1875,6 +1892,11 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
       plan: runtime.plan,
       planTitle: runtime.planTitle,
       stage: runtime.stage,
+      // What this turn changed, and whether each file existed beforehand.
+      changedFiles: runtime.checkpoints.map((c) => ({
+        path: c.target,
+        created: c.backup === null,
+      })),
     };
   }
 
@@ -2281,6 +2303,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     runtime.stage = 'idle';
     runtime.loopDetector = null;
     runtime.touchedFiles = [];
+    runtime.checkpoints = [];
     runtime.ranCommands = [];
     runtime.delegatedThisTurn = false;
     runtime.verifyActive = false;
@@ -2345,6 +2368,10 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
       loopDetectorConfig(effortKnobs(runtime.config.effort)),
     );
     runtime.touchedFiles = [];
+    /* A fresh turn's checkpoints. The ones on DISK survive (that is the point —
+       you notice a bad change a few turns later), pruned to KEEP_TURNS below. */
+    runtime.checkpoints = [];
+    prune(checkpointRoot());
     runtime.ranCommands = [];
     runtime.delegatedThisTurn = false;
     // Capability-affirming system prompt (fix: the model must KNOW it can act on
@@ -2584,6 +2611,18 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
       const path = input.path ?? input.file_path ?? input.filePath;
       if (typeof path === 'string' && path.length > 0 && !runtime.touchedFiles.includes(path)) {
         runtime.touchedFiles.push(path);
+        /*
+         * A COPY BEFORE THE WRITE, so the turn can be put back.
+         *
+         * Here rather than on the result: the `edit` tool's result hook fires
+         * only on `isError`, so a SUCCESSFUL edit would never be captured — and
+         * by the time any result exists the previous content is gone.
+         *
+         * Never throws (see checkpoints.ts): a failed snapshot must not fail
+         * the write it was shadowing.
+         */
+        const cp = capture(checkpointRoot(), runtime.turnIndex, path);
+        if (cp !== null) runtime.checkpoints.push(cp);
       }
     }
     /*
@@ -2709,7 +2748,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
 
   // /harness command protocol.
   pi.registerCommand('harness', {
-    description: 'Configure the harness: set-mode, effort, preset, status, classify.',
+    description: 'Configure the harness: set-mode, effort, preset, status, classify, restore.',
     handler: async (args: string, ctx: ExtensionCommandContext) => {
       const trimmed = args.trim();
       const spaceIdx = trimmed.indexOf(' ');
@@ -2728,6 +2767,42 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
           return;
         }
 
+        /*
+         * `/harness restore <path>` — put one file back the way this turn found
+         * it.
+         *
+         * A command rather than a tool: this is the USER undoing the model, and
+         * a tool would let the model undo itself, which is the opposite of a
+         * safety net.
+         */
+        case 'restore': {
+          const target = rest.trim();
+          if (target === '') {
+            ctx.ui.notify(
+              runtime.checkpoints.length === 0
+                ? 'This turn changed no files.'
+                : `This turn changed:\n${runtime.checkpoints
+                    .map((c) => `  ${c.target}${c.backup === null ? ' (new)' : ''}`)
+                    .join('\n')}\n\nRestore one with: /harness restore <path>`,
+            );
+            return;
+          }
+          const cp = runtime.checkpoints.find((c) => c.target === target);
+          if (cp === undefined) {
+            ctx.ui.notify(`No checkpoint for ${target} in this turn.`, 'warning');
+            return;
+          }
+          const res = restore(cp);
+          ctx.ui.notify(
+            res.ok
+              ? cp.backup === null
+                ? `Deleted ${target} — this turn created it.`
+                : `Restored ${target}.`
+              : `Could not restore ${target}: ${res.error ?? 'unknown reason'}`,
+            res.ok ? 'info' : 'warning',
+          );
+          return;
+        }
         case 'set-mode': {
           if (!isPermissionMode(rest)) {
             ctx.ui.notify(

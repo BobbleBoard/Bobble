@@ -136,6 +136,14 @@ export interface HarnessStatus extends HarnessConfig {
    * live activity indicator. Set at the harness's existing seams.
    */
   readonly stage: HarnessStage;
+  /**
+   * What the CURRENT turn changed, and how to put each file back.
+   *
+   * Published so the app can say "this turn changed three files" and offer to
+   * restore one. `backup: null` means the turn CREATED the file, so restoring
+   * it is a delete — a real state, not a missing value.
+   */
+  readonly changedFiles: readonly { readonly path: string; readonly created: boolean }[];
 }
 
 /** Minimal structural view of a persisted session entry. */
