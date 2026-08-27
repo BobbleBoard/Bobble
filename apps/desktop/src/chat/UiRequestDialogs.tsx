@@ -23,6 +23,7 @@ import {
 } from '@pi-desktop/ui';
 import { respondUi } from '../state/pi-connect';
 import { usePiStore } from '../state/pi-slice';
+import { PermissionDialog } from './PermissionDialog';
 
 export function UiRequestDialogs() {
   // Only show a dialog for the chat the user is VIEWING. A request raised by a chat
@@ -39,6 +40,24 @@ export function UiRequestDialogs() {
   const onOpenChange = (open: boolean) => {
     if (!open) cancel();
   };
+
+  /*
+   * A PERMISSION PROMPT — three answers and a preview of what it would do.
+   *
+   * The answer round-trips as the `input` request's string value, which is how
+   * it crossed in the first place (pi's dialog protocol has no three-way
+   * method). Anything the harness does not recognise is a refusal, so a closed
+   * dialog can never become a yes.
+   */
+  if (request.method === 'permission' && request.permission !== undefined) {
+    const spec = request.permission;
+    return (
+      <PermissionDialog
+        request={{ toolName: spec.toolName, reason: spec.reason, args: spec.args }}
+        onAnswer={(answer) => void respondUi(request.id, { value: answer })}
+      />
+    );
+  }
 
   // confirm — a plain yes/no dialog (QuestionCard has no confirm mode).
   if (request.method === 'confirm') {

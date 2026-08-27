@@ -16,6 +16,7 @@
 import type { ExtensionAPI, ToolCallEvent } from '@mariozechner/pi-coding-agent';
 import { isToolCallEventType } from '@mariozechner/pi-coding-agent';
 import { readSubagentDepth } from '../subagent/types.js';
+import { encodePermission, parsePermissionAnswer, permissionKey } from './prompt.js';
 import { checkScaryBash, type ScaryBashRules } from './rules.js';
 
 export type PermissionMode = 'bypass' | 'reviewer' | 'review-all';
@@ -100,6 +101,24 @@ export function registerPermissions(
 ): PermissionController {
   let mode: PermissionMode = opts.initialMode ?? 'reviewer';
 
+  /*
+   * "ALLOW FOR THIS CHAT" — AND ONLY THIS CHAT.
+   *
+   * This set lives in the closure of a PI CHILD, and the child outlives a chat:
+   * neither a new chat nor a session switch respawns it. So a grant kept here
+   * and never cleared would silently apply to every chat the user opens
+   * afterwards — the user allows a destructive command in a scratch project and
+   * it stays allowed in their real one.
+   *
+   * `session_start` is the boundary: pi fires it on a new session AND on a
+   * switch, so clearing there makes the scope actually mean what the button
+   * says.
+   */
+  const sessionGrants = new Set<string>();
+  pi.on('session_start', () => {
+    sessionGrants.clear();
+  });
+
   pi.on('tool_call', async (event: ToolCallEvent, ctx) => {
     // Resolve a scary reason for bash up front (rules + optional model hook).
     let scaryReason: string | null | undefined;
@@ -142,12 +161,43 @@ export function registerPermissions(
       opts.onBlock?.({ toolName: event.toolName, reason: decision.reason });
       return { block: true, reason: `${decision.reason} (no UI to confirm)` };
     }
-    const preview = bashCommand !== undefined ? `\n\n${bashCommand.slice(0, 200)}` : '';
-    const ok = await ctx.ui.confirm(`Allow ${event.toolName}?`, `${decision.reason}${preview}`);
-    if (!ok) {
+    /*
+     * ALREADY ALLOWED IN THIS CHAT?
+     *
+     * The grant is keyed by tool + its salient argument, so allowing
+     * `rm -rf build` once does not also allow `rm -rf /`.
+     */
+    const args = (event.input ?? {}) as Record<string, unknown>;
+    const key = permissionKey(event.toolName, args);
+    if (sessionGrants.has(key)) return;
+
+    /*
+     * THREE ANSWERS, NOT TWO. `ctx.ui.confirm` returns a boolean, and "allow
+     * once" and "allow for this chat" are different decisions: collapsing them
+     * means either re-asking about the same command every turn or granting
+     * something permanently on a single click. The spec rides the sentinel
+     * (see prompt.ts) through `input`, which is the one open-ended blocking
+     * method pi emits, and the renderer decodes it.
+     *
+     * The RAW arguments cross, not a rendered preview: this package cannot
+     * import the app's UI, and the renderer already knows how to draw a diff.
+     */
+    const answered = await ctx.ui.input(
+      `Allow ${event.toolName}?`,
+      encodePermission({
+        v: 1,
+        toolName: event.toolName,
+        reason: decision.reason,
+        args,
+        ...(event.toolCallId !== undefined ? { toolCallId: event.toolCallId } : {}),
+      }),
+    );
+    const answer = parsePermissionAnswer(answered);
+    if (answer === 'deny') {
       opts.onBlock?.({ toolName: event.toolName, reason: decision.reason });
       return { block: true, reason: `declined: ${decision.reason}` };
     }
+    if (answer === 'session') sessionGrants.add(key);
     return;
   });
 

@@ -125,3 +125,24 @@
     transform: scale(1.01);
   }
 }
+
+/*
+ * The preview inside a permission prompt: the command, the content, or the
+ * change. Scrolls rather than growing — a decision dialog that runs off the
+ * screen is one nobody can answer.
+ */
+.pd-permission-preview {
+  max-height: 40vh;
+  overflow: auto;
+  overscroll-behavior: contain;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--pd-radius-sm, 6px);
+  background: var(--pd-bg-inset);
+  color: var(--pd-text-primary);
+  font-family: var(--pd-font-mono);
+  font-size: var(--pd-font-size-footnote);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}

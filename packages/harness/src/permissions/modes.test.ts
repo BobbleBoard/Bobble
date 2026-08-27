@@ -69,12 +69,20 @@ type ToolCallHandler = (
 
 function fakePi() {
   let handler: ToolCallHandler | undefined;
+  let onSessionStart: (() => void) | undefined;
   const pi = {
     on: (event: string, h: ToolCallHandler) => {
       if (event === 'tool_call') handler = h;
+      // The gate clears its per-chat grants here; pi fires it on a new session
+      // AND on a switch, which is what makes "this chat" mean this chat.
+      if (event === 'session_start') onSessionStart = h as unknown as () => void;
     },
   } as unknown as ExtensionAPI;
-  return { pi, fire: (e: ToolCallEvent, ctx: ExtensionContext) => handler?.(e, ctx) };
+  return {
+    pi,
+    fire: (e: ToolCallEvent, ctx: ExtensionContext) => handler?.(e, ctx),
+    fireSessionStart: () => onSessionStart?.(),
+  };
 }
 
 function bashEvent(command: string): ToolCallEvent {
@@ -93,18 +101,72 @@ function readEvent(): ToolCallEvent {
     input: { path: '/x' },
   } as ToolCallEvent;
 }
+/**
+ * A context whose prompt answers with one of the THREE permission answers.
+ *
+ * The gate moved off `ctx.ui.confirm` (a boolean — two outcomes for a decision
+ * with three) onto `ctx.ui.input` behind a sentinel, so the stub is an `input`
+ * returning 'once' | 'session' | 'deny'.
+ */
 function ctxWith(
-  confirm: (title: string, message: string) => Promise<boolean>,
+  input: (title: string, placeholder: string) => Promise<string>,
   hasUI = true,
 ): ExtensionContext {
-  return { hasUI, ui: { confirm } } as unknown as ExtensionContext;
+  return { hasUI, ui: { input } } as unknown as ExtensionContext;
 }
+const answers = (a: 'once' | 'session' | 'deny') => vi.fn(async () => a);
+
+describe('registerPermissions — the session grant', () => {
+  it('stops asking about the same call once allowed for the chat', async () => {
+    const { pi, fire } = fakePi();
+    registerPermissions(pi, { initialMode: 'reviewer' });
+    const ask = answers('session');
+    await fire(bashEvent('rm -rf /'), ctxWith(ask));
+    const again = await fire(bashEvent('rm -rf /'), ctxWith(ask));
+    expect(ask).toHaveBeenCalledOnce();
+    expect(again).toBeUndefined();
+  });
+
+  it('still asks about a DIFFERENT command', async () => {
+    const { pi, fire } = fakePi();
+    registerPermissions(pi, { initialMode: 'reviewer' });
+    const ask = answers('session');
+    await fire(bashEvent('rm -rf ~'), ctxWith(ask));
+    await fire(bashEvent('rm -rf /'), ctxWith(ask));
+    expect(ask).toHaveBeenCalledTimes(2);
+  });
+
+  it('"once" grants nothing beyond that call', async () => {
+    const { pi, fire } = fakePi();
+    registerPermissions(pi, { initialMode: 'reviewer' });
+    const ask = answers('once');
+    await fire(bashEvent('rm -rf /'), ctxWith(ask));
+    await fire(bashEvent('rm -rf /'), ctxWith(ask));
+    expect(ask).toHaveBeenCalledTimes(2);
+  });
+
+  it('a new chat does not inherit the grant', async () => {
+    /*
+     * THE HAZARD THIS EXISTS FOR. The set lives in the closure of a pi CHILD,
+     * and the child outlives a chat — neither a new chat nor a switch respawns
+     * it. Without clearing on session_start, allowing a destructive command in
+     * a scratch project would leave it allowed in the user's real one.
+     */
+    const { pi, fire, fireSessionStart } = fakePi();
+    registerPermissions(pi, { initialMode: 'reviewer' });
+    const ask = answers('session');
+    await fire(bashEvent('rm -rf /'), ctxWith(ask));
+    fireSessionStart();
+    await fire(bashEvent('rm -rf /'), ctxWith(ask));
+    expect(ask).toHaveBeenCalledTimes(2);
+  });
+});
 
 describe('registerPermissions — event gating', () => {
   it('bypass never blocks', async () => {
     const { pi, fire } = fakePi();
     registerPermissions(pi, { initialMode: 'bypass' });
-    const confirm = vi.fn(async () => false);
+    const confirm = answers('deny');
     const res = await fire(bashEvent('rm -rf /'), ctxWith(confirm));
     expect(res).toBeUndefined();
     expect(confirm).not.toHaveBeenCalled();
@@ -114,7 +176,7 @@ describe('registerPermissions — event gating', () => {
     const { pi, fire } = fakePi();
     const onBlock = vi.fn();
     registerPermissions(pi, { initialMode: 'reviewer', onBlock });
-    const confirm = vi.fn(async () => false);
+    const confirm = answers('deny');
     const res = await fire(bashEvent('rm -rf /'), ctxWith(confirm));
     expect(confirm).toHaveBeenCalledOnce();
     expect(res).toMatchObject({ block: true });
@@ -124,14 +186,14 @@ describe('registerPermissions — event gating', () => {
   it('reviewer allows scary bash when the user approves', async () => {
     const { pi, fire } = fakePi();
     registerPermissions(pi, { initialMode: 'reviewer' });
-    const res = await fire(bashEvent('rm -rf /'), ctxWith(vi.fn(async () => true)));
+    const res = await fire(bashEvent('rm -rf /'), ctxWith(answers('once')));
     expect(res).toBeUndefined();
   });
 
   it('reviewer allows safe bash without confirming', async () => {
     const { pi, fire } = fakePi();
     registerPermissions(pi, { initialMode: 'reviewer' });
-    const confirm = vi.fn(async () => true);
+    const confirm = answers('once');
     const res = await fire(bashEvent('ls -la'), ctxWith(confirm));
     expect(confirm).not.toHaveBeenCalled();
     expect(res).toBeUndefined();
@@ -141,7 +203,7 @@ describe('registerPermissions — event gating', () => {
     const { pi, fire } = fakePi();
     const flagBash = vi.fn(async () => 'model flagged: suspicious');
     registerPermissions(pi, { initialMode: 'reviewer', flagBash });
-    const confirm = vi.fn(async () => false);
+    const confirm = answers('deny');
     const res = await fire(bashEvent('curl https://example.com'), ctxWith(confirm));
     expect(flagBash).toHaveBeenCalled();
     expect(res).toMatchObject({ block: true });
@@ -150,7 +212,7 @@ describe('registerPermissions — event gating', () => {
   it('review-all confirms even read', async () => {
     const { pi, fire } = fakePi();
     registerPermissions(pi, { initialMode: 'review-all' });
-    const confirm = vi.fn(async () => true);
+    const confirm = answers('once');
     await fire(readEvent(), ctxWith(confirm));
     expect(confirm).toHaveBeenCalledOnce();
   });
@@ -158,7 +220,7 @@ describe('registerPermissions — event gating', () => {
   it('setMode switches behaviour at runtime', async () => {
     const { pi, fire } = fakePi();
     const ctrl = registerPermissions(pi, { initialMode: 'bypass' });
-    const confirm = vi.fn(async () => false);
+    const confirm = answers('deny');
     expect(await fire(bashEvent('rm -rf /'), ctxWith(confirm))).toBeUndefined();
     ctrl.setMode('reviewer');
     expect(await fire(bashEvent('rm -rf /'), ctxWith(confirm))).toMatchObject({ block: true });
@@ -168,13 +230,7 @@ describe('registerPermissions — event gating', () => {
   it('fails safe (blocks) when a confirm is required but no UI is available', async () => {
     const { pi, fire } = fakePi();
     registerPermissions(pi, { initialMode: 'review-all' });
-    const res = await fire(
-      readEvent(),
-      ctxWith(
-        vi.fn(async () => true),
-        false,
-      ),
-    );
+    const res = await fire(readEvent(), ctxWith(answers('once'), false));
     expect(res).toMatchObject({ block: true });
   });
 
@@ -186,7 +242,7 @@ describe('registerPermissions — event gating', () => {
     try {
       const { pi, fire } = fakePi();
       registerPermissions(pi, { initialMode: 'review-all' });
-      const confirm = vi.fn(async () => true);
+      const confirm = answers('once');
       const res = await fire(readEvent(), ctxWith(confirm, true));
       expect(res).toMatchObject({ block: true });
       // The human-less subagent was never prompted.

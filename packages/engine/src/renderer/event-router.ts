@@ -23,6 +23,7 @@ import type { ToolResultMsg } from '../types/chat';
 import {
   type AssistantMessage,
   decodeAskUserPlaceholder,
+  decodePermissionPlaceholder,
   type PiBridgeEvent,
   type RpcExtensionUIRequest,
   type ThinkingLevel,
@@ -189,16 +190,28 @@ export function createEventRouter(sink: StoreSink, options: EventRouterOptions =
         // synthetic `askUser` dialog the QuestionCard renders; anything else is
         // a plain input. The reply still round-trips as the input's string value.
         const ask = e.method === 'input' ? decodeAskUserPlaceholder(req.placeholder) : null;
+        /*
+         * A PERMISSION PROMPT rides `input` for the same reason: pi's dialog
+         * protocol is frozen and `confirm` returns a boolean — two outcomes for
+         * a decision with three ("once", "this chat", "no"). Decoded into a
+         * synthetic `permission` dialog the app renders with a preview of what
+         * it is about to do.
+         */
+        const permission =
+          e.method === 'input' && ask === null
+            ? decodePermissionPlaceholder(req.placeholder)
+            : null;
         sink.uiRequest({
           id: e.id,
-          method: ask !== null ? 'askUser' : e.method,
+          method: ask !== null ? 'askUser' : permission !== null ? 'permission' : e.method,
           title: e.title,
           message: req.message,
           options: req.options,
-          placeholder: ask !== null ? undefined : req.placeholder,
+          placeholder: ask !== null || permission !== null ? undefined : req.placeholder,
           prefill: req.prefill,
           timeout: req.timeout,
           ...(ask !== null ? { ask } : {}),
+          ...(permission !== null ? { permission } : {}),
         });
         // pi auto-resolves the dialog on its side at `timeout` and emits NO
         // event, so the router must self-expire the request from the store or

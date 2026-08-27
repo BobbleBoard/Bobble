@@ -17,6 +17,7 @@ import type { ChatMsg, ContentBlock, ToolResultMsg } from '../types/chat';
 import type {
   AssistantMessage,
   HarnessAskUserSpec,
+  HarnessPermissionSpec,
   RendererDialogMethod,
   StopReason,
   ThinkingLevel,
@@ -55,6 +56,9 @@ export interface UiDialogRequest {
   /** Present when `method === 'askUser'`: the rich QuestionCard spec decoded
    * from a sentinel-tagged `input` request (multi-select / slider / etc.). */
   ask?: HarnessAskUserSpec;
+  /** Present when `method === 'permission'`: what the model wants to do, and
+   * why it is being asked. The RAW arguments, so the renderer can preview. */
+  permission?: HarnessPermissionSpec;
   /** ms; pi auto-resolves its side with a default on expiry but emits NO
    * event. The router runs the expiry timer and calls
    * {@link StoreSink.resolveUiRequest} — answers sent after that are ids pi

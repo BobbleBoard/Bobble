@@ -431,7 +431,7 @@ export type ExtensionUiDialogMethod = 'confirm' | 'select' | 'input' | 'editor';
  * encodes a rich {@link HarnessAskUserSpec} over the open-ended `input` method;
  * the app decodes it here and renders it through the design-system QuestionCard.
  */
-export type RendererDialogMethod = ExtensionUiDialogMethod | 'askUser';
+export type RendererDialogMethod = ExtensionUiDialogMethod | 'askUser' | 'permission';
 
 /** Sentinel prefixing an encoded {@link HarnessAskUserSpec} in an `input`
  * placeholder. MUST match the encoder in `@pi-desktop/harness`
@@ -472,6 +472,67 @@ export function decodeAskUserPlaceholder(
     const mode = parsed.mode;
     if (mode !== 'choice' && mode !== 'multi' && mode !== 'slider' && mode !== 'free') return null;
     return { v: 1, ...(parsed as object), mode, question: parsed.question } as HarnessAskUserSpec;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Sentinel prefixing an encoded {@link HarnessPermissionSpec} in an `input`
+ * placeholder. MUST match the encoder in `@pi-desktop/harness`
+ * (permissions/prompt.ts `PERMISSION_SENTINEL`).
+ */
+export const HARNESS_PERMISSION_SENTINEL = 'PI_DESKTOP_PERMISSION::v1::';
+
+/**
+ * What the user is being asked to allow.
+ *
+ * Rides `input` for the same reason `ask_user` does: pi's dialog protocol is
+ * frozen, and `confirm` returns a boolean — two outcomes for a decision with
+ * three ("once", "this chat", "no"). The RAW arguments cross so the renderer
+ * can build the preview with its own components; the harness cannot import
+ * them.
+ */
+export interface HarnessPermissionSpec {
+  readonly v: 1;
+  readonly toolName: string;
+  readonly reason: string;
+  readonly args: Record<string, unknown>;
+  readonly toolCallId?: string;
+}
+
+/**
+ * Decode an `input` placeholder into a {@link HarnessPermissionSpec}, or null.
+ *
+ * Defensive in the same direction as the ask-user decoder: anything malformed
+ * degrades to a plain input dialog, where the safe answer is still the default
+ * (the harness treats every unrecognised reply as a refusal).
+ */
+export function decodePermissionPlaceholder(
+  placeholder: string | undefined,
+): HarnessPermissionSpec | null {
+  if (placeholder === undefined || !placeholder.startsWith(HARNESS_PERMISSION_SENTINEL)) {
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(placeholder.slice(HARNESS_PERMISSION_SENTINEL.length)) as {
+      v?: unknown;
+      toolName?: unknown;
+      reason?: unknown;
+      args?: unknown;
+      toolCallId?: unknown;
+    };
+    if (parsed.v !== 1 || typeof parsed.toolName !== 'string') return null;
+    return {
+      v: 1,
+      toolName: parsed.toolName,
+      reason: typeof parsed.reason === 'string' ? parsed.reason : '',
+      args:
+        typeof parsed.args === 'object' && parsed.args !== null
+          ? (parsed.args as Record<string, unknown>)
+          : {},
+      ...(typeof parsed.toolCallId === 'string' ? { toolCallId: parsed.toolCallId } : {}),
+    };
   } catch {
     return null;
   }
