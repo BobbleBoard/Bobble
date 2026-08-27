@@ -15,6 +15,14 @@ export interface AcItem {
   subtitle?: string;
   section?: string;
   kind: AcItemKind;
+  /**
+   * For a file: its ABSOLUTE path.
+   *
+   * `id` is what goes into the editor (`@src/x.ts`, relative and prefixed), and
+   * reconstructing an absolute path from it means re-deriving the root that
+   * produced it. The picker already knows; it carries it.
+   */
+  path?: string;
 }
 
 function iconFor(kind: AcItemKind): ReactNode {

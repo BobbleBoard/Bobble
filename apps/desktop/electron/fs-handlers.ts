@@ -299,32 +299,55 @@ const SKIP = new Set([
 
 /** Fuzzy file listing for the composer @-mention autocomplete. Hard depth/count
  * caps keep this from ever recursing into node_modules et al. */
+/** How deep the `@` picker looks, and how many files it will consider. */
+const LIST_MAX_DEPTH = 3;
+const LIST_MAX_ENTRIES = 600;
+
+/**
+ * Files for the composer's `@` picker.
+ *
+ * BREADTH-FIRST, and that is the fix rather than a preference. The walk was
+ * depth-first under a 600-entry budget, so the first big subtree spent it and
+ * everything after was simply invisible. MEASURED on this repo at the shipped
+ * settings: an empty `@` collected 618 entries and `scripts/` and `tools/` did
+ * not appear at all — not ranked low, absent. Level by level, every top-level
+ * directory is represented before any one of them goes deep.
+ *
+ * Synchronous on the main process, so the budget is a real cost bound, not a
+ * formality; the renderer debounces on top of it.
+ */
 function listFiles(cwd: string, query: string, limit = 30): Array<{ path: string; rel: string }> {
   const expanded = cwd ? resolveUserPath(cwd) : '';
   const root = expanded && statSafe(expanded)?.isDirectory() === true ? expanded : HOME;
   const out: Array<{ path: string; rel: string; score: number }> = [];
   const q = query.toLowerCase();
 
-  function walk(dir: string, depth: number): void {
-    if (depth > 3 || out.length > 600) return;
-    let entries: fs.Dirent[] = [];
-    try {
-      entries = fs.readdirSync(dir, { withFileTypes: true });
-    } catch {
-      return;
-    }
-    for (const e of entries) {
-      if (SKIP.has(e.name) || e.name.startsWith('.')) continue;
-      const full = path.join(dir, e.name);
-      const rel = path.relative(root, full);
-      if (e.isDirectory()) walk(full, depth + 1);
-      else if (e.isFile()) {
+  let frontier: string[] = [root];
+  for (let depth = 0; depth <= LIST_MAX_DEPTH && frontier.length > 0; depth++) {
+    const next: string[] = [];
+    for (const dir of frontier) {
+      if (out.length >= LIST_MAX_ENTRIES) break;
+      let entries: fs.Dirent[] = [];
+      try {
+        entries = fs.readdirSync(dir, { withFileTypes: true });
+      } catch {
+        continue;
+      }
+      for (const e of entries) {
+        if (SKIP.has(e.name) || e.name.startsWith('.')) continue;
+        const full = path.join(dir, e.name);
+        if (e.isDirectory()) {
+          next.push(full);
+          continue;
+        }
+        if (!e.isFile() || out.length >= LIST_MAX_ENTRIES) continue;
+        const rel = path.relative(root, full);
         const score = fuzzyScore(rel.toLowerCase(), q);
         if (q === '' || score > 0) out.push({ path: full, rel, score });
       }
     }
+    frontier = next;
   }
-  walk(root, 0);
   out.sort((a, b) => b.score - a.score || a.rel.length - b.rel.length);
   return out.slice(0, limit).map(({ path: p, rel }) => ({ path: p, rel }));
 }

@@ -65,6 +65,14 @@ const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v
  */
 const DOUBLE_ESCAPE_MS = 1000;
 
+/**
+ * How long `@` typing settles before the file walk runs.
+ *
+ * The walk is synchronous on the main process, so a request per keystroke is a
+ * stall per keystroke — and it grows with the size of the tree.
+ */
+const MENTION_DEBOUNCE_MS = 90;
+
 interface SlashCommand {
   name: string;
   description?: string;
@@ -414,6 +422,27 @@ export function ChatComposer({
     }
   };
 
+  /**
+   * Resolve an `@`-mentioned path into a text attachment.
+   *
+   * Silent on every failure — a binary, a file too large, an unreadable path.
+   * The mention already put the path in the message, so the model can still
+   * read it itself; turning a picker click into an error toast would be worse
+   * than the turn it saves.
+   */
+  const attachMentionedFile = async (absPath: string): Promise<void> => {
+    const name = absPath.split('/').pop() ?? absPath;
+    if (attachments.some((a) => a.name === name && a.kind === 'text')) return;
+    const res = await window.piDesktop
+      .invoke('fs:read-file', { path: absPath, maxBytes: TEXT_MAX_BYTES })
+      .catch(() => null);
+    if (res === null || res.binary || res.tooLarge || typeof res.text !== 'string') return;
+    setAttachments((prev) => [
+      ...prev,
+      { id: crypto.randomUUID(), name, kind: 'text', text: res.text as string },
+    ]);
+  };
+
   // A large plain-text paste (the user): rather than dumping a wall of text into the
   // editor, capture it as a "pasted content" text attachment — same model as a
   // dropped .txt, so it echoes as a tidy chip AND feeds predictive prefill. Returns
@@ -474,7 +503,13 @@ export function ChatComposer({
     };
   }, [modelReady]);
 
-  // Resolve autocomplete suggestions for the active token.
+  /*
+   * Resolve autocomplete suggestions for the active token.
+   *
+   * DEBOUNCED for `@`: the file walk is synchronous on the main process, so a
+   * request per keystroke is a stall per keystroke. Slash commands are answered
+   * from memory and stay instant.
+   */
   useEffect(() => {
     let cancelled = false;
     setSelectedIndex(0);
@@ -482,7 +517,8 @@ export function ChatComposer({
       setItems([]);
       return;
     }
-    void (async () => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const run = async () => {
       if (token.mode === 'mention') {
         const files = await window.piDesktop
           .invoke('fs:list-files', { cwd, query: token.query, limit: 12 })
@@ -496,6 +532,7 @@ export function ChatComposer({
               subtitle: f.rel,
               section: 'Files',
               kind: 'file',
+              path: f.path,
             }),
           ),
         );
@@ -519,9 +556,13 @@ export function ChatComposer({
             ),
         );
       }
-    })();
+    };
+    // A file walk waits for typing to settle; commands come from memory.
+    if (token.mode === 'mention') timer = setTimeout(() => void run(), MENTION_DEBOUNCE_MS);
+    else void run();
     return () => {
       cancelled = true;
+      if (timer !== null) clearTimeout(timer);
     };
   }, [token.mode, token.query, cwd, commands]);
 
@@ -908,8 +949,25 @@ export function ChatComposer({
           selectedIndex={selectedIndex}
           onPick={(item) => {
             apiRef.current?.insertToken(token.tokenStart, item.id);
+            const picked = token.mode;
             setToken(EMPTY_TOKEN);
             apiRef.current?.focus();
+            /*
+             * AN `@` MENTION BRINGS THE FILE WITH IT.
+             *
+             * It used to insert the path as text and stop, so the model had to
+             * spend a turn reading a file the user had already pointed at.
+             * Resolving it into the SAME attachments array a dropped file uses
+             * means `buildAgentMessage` folds it in and the predictive prefill
+             * primes its tokens while the rest of the message is still being
+             * typed — so by the time it is sent, the file is already resident.
+             *
+             * The path stays in the visible text: the user asked about THAT
+             * file by name, and a chip alone loses which one they meant.
+             */
+            if (picked === 'mention' && item.path !== undefined) {
+              void attachMentionedFile(item.path);
+            }
           }}
           onHover={setSelectedIndex}
         />
