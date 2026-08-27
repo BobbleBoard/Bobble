@@ -202,9 +202,22 @@ function getModel(id: string): CatalogModel | undefined {
 }
 
 /** All models the manager knows about: curated + discovered HF (dedup by id). */
+/**
+ * The catalogue as this MACHINE sees it.
+ *
+ * MLX entries are served by `mlx_lm.server`, which is Apple-Silicon-only by
+ * construction (Metal). Listing them elsewhere offered models that cannot start
+ * — the launch gate refuses correctly, but only after the user has picked one
+ * and, on the model screen, tried to download it. The gate belongs where the
+ * list is built, so a Linux or Windows host simply never sees them.
+ */
 function allModels(): CatalogModel[] {
+  const mlxOk = isMlxSupported();
   const byId = new Map<string, CatalogModel>();
-  for (const m of CATALOG) byId.set(m.id, m);
+  for (const m of CATALOG) {
+    if (!mlxOk && modelEngine(m) === 'mlx') continue;
+    byId.set(m.id, m);
+  }
   for (const m of hfModels.values()) if (!byId.has(m.id)) byId.set(m.id, m);
   return [...byId.values()];
 }
@@ -548,6 +561,21 @@ async function downloadOne(
 ): Promise<{ success: boolean; error?: string; paused?: boolean; cancelled?: boolean }> {
   const model = getModel(modelId);
   if (model === undefined) return { success: false, error: `unknown model: ${modelId}` };
+  /*
+   * MLX MODELS ARE NOT OURS TO DOWNLOAD. `mlx_lm.server` fetches the
+   * `mlx-community/*` repo into the HF cache on first launch, so the catalogue
+   * entry has no single file to fetch: its `files[0].name` is the REPO, and
+   * `hfResolveUrl` on it resolves to a directory. Running this anyway wrote
+   * nothing and reported success, and `isDownloaded` then stat'd a path
+   * `mlx_lm.server` never writes — so the model never read as downloaded and the
+   * button stayed live forever. Selecting the model is the whole flow.
+   */
+  if (modelEngine(model) === 'mlx') {
+    return {
+      success: false,
+      error: `${model.displayName} downloads itself on first use — just select it.`,
+    };
+  }
   // Serialize: one download at a time. A second request while one runs is a
   // no-op so the UI can't fork two writers onto the same `.part`.
   if (cancellation.running) return { success: false, error: 'a download is already running' };

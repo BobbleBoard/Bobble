@@ -62,3 +62,23 @@ describe('off macOS', () => {
     expect(info.cpuCount ?? 0).toBeGreaterThan(0);
   });
 });
+
+describe('Apple Silicon is a platform AND an arch', () => {
+  it('is false on Linux ARM, which is not a Metal machine', () => {
+    // The regression: `osArch === 'arm64'` alone was true on a Raspberry Pi and
+    // on Linux ARM servers, routing them into the Metal performance path and
+    // offering MLX models that cannot run there.
+    const hw = parseHardware({ memsize: String(16 * 1024 ** 3) }, 'arm64', 'linux');
+    expect(hw.isAppleSilicon).toBe(false);
+    expect(hw.metal).toBe(false);
+  });
+
+  it('is true on darwin/arm64, by sysctl or by arch', () => {
+    expect(parseHardware({ arm64: '1' }, 'x64', 'darwin').isAppleSilicon).toBe(true);
+    expect(parseHardware({}, 'arm64', 'darwin').isAppleSilicon).toBe(true);
+  });
+
+  it('is false on an Intel Mac', () => {
+    expect(parseHardware({ arm64: '0' }, 'x64', 'darwin').isAppleSilicon).toBe(false);
+  });
+});

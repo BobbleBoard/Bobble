@@ -35,10 +35,22 @@ export interface SysctlValues {
 }
 
 /** Pure: derive {@link HardwareInfo} from raw sysctl strings + os fallbacks. */
-export function parseHardware(v: SysctlValues, osArch: string = arch()): HardwareInfo {
+export function parseHardware(
+  v: SysctlValues,
+  osArch: string = arch(),
+  osPlatform: string = platform(),
+): HardwareInfo {
   const bytes = Number(v.memsize);
   const totalRamGB = Number.isFinite(bytes) && bytes > 0 ? Math.round(bytes / 1024 ** 3) : 0;
-  const isAppleSilicon = v.arm64 === '1' || osArch === 'arm64';
+  /*
+   * APPLE SILICON IS A PLATFORM AND AN ARCH, not just an arch. `osArch ===
+   * 'arm64'` alone is true on a Raspberry Pi and on Linux ARM servers, which
+   * routed those hosts into the Metal performance path and offered them MLX
+   * models that cannot run there. `sysctl hw.optional.arm64` is macOS-only and
+   * therefore already implies darwin; the arch fallback is what needed the
+   * platform check beside it.
+   */
+  const isAppleSilicon = osPlatform === 'darwin' && (v.arm64 === '1' || osArch === 'arm64');
   const cpu = Number(v.logicalcpu);
   return {
     totalRamGB,
