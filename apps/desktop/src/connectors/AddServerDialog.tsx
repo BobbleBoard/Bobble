@@ -125,45 +125,62 @@ export function AddServerDialog({
           <DialogTitle>Add an MCP server</DialogTitle>
         </DialogHeader>
         <div className="flex flex-col gap-3">
-          <Field label="Name" hint="Shown on the card. Also becomes the tool prefix.">
+          <Field
+            id="add-server-name"
+            label="Name"
+            hint="Shown on the card. Also becomes the tool prefix."
+          >
             <input
               className="pd-input pd-focusable"
+              id="add-server-name"
               data-testid="add-server-name"
               value={fields.name}
               onChange={(e) => set('name', e.target.value)}
               placeholder="Weather"
             />
           </Field>
-          <Field label="Command" hint="The executable that starts the server.">
+          <Field
+            id="add-server-command"
+            label="Command"
+            hint="The executable that starts the server."
+          >
             <input
               className="pd-input pd-focusable"
+              id="add-server-command"
               data-testid="add-server-command"
               value={fields.command}
               onChange={(e) => set('command', e.target.value)}
               placeholder="npx"
             />
           </Field>
-          <Field label="Arguments" hint="Optional. Space-separated; quotes are respected.">
+          <Field
+            id="add-server-args"
+            label="Arguments"
+            hint="Optional. Space-separated; quotes are respected."
+          >
             <input
               className="pd-input pd-focusable"
+              id="add-server-args"
               data-testid="add-server-args"
               value={fields.args}
               onChange={(e) => set('args', e.target.value)}
               placeholder="-y @acme/weather-mcp"
             />
           </Field>
-          <Field label="Working directory" hint="Optional.">
+          <Field id="add-server-cwd" label="Working directory" hint="Optional.">
             <input
               className="pd-input pd-focusable"
+              id="add-server-cwd"
               data-testid="add-server-cwd"
               value={fields.cwd}
               onChange={(e) => set('cwd', e.target.value)}
               placeholder="/Users/you/projects/weather"
             />
           </Field>
-          <Field label="Environment" hint="Optional. One KEY=value per line.">
+          <Field id="add-server-env" label="Environment" hint="Optional. One KEY=value per line.">
             <textarea
               className="pd-input pd-focusable min-h-[64px]"
+              id="add-server-env"
               data-testid="add-server-env"
               value={fields.env}
               onChange={(e) => set('env', e.target.value)}
@@ -191,19 +208,26 @@ export function AddServerDialog({
 }
 
 function Field({
+  id,
   label,
   hint,
   children,
 }: {
+  id: string;
   label: string;
   hint: string;
   children: React.ReactNode;
 }) {
   return (
-    <label className="flex flex-col gap-1">
-      <span className="text-caption text-text-secondary">{label}</span>
+    <div className="flex flex-col gap-1">
+      {/* `htmlFor` rather than wrapping: a wrapped label does not associate for
+          a screen reader when the control is a child component, and a dialog
+          whose whole job is to be typed into should not have that problem. */}
+      <label className="text-caption text-text-secondary" htmlFor={id}>
+        {label}
+      </label>
       {children}
       <span className="text-footnote text-text-muted">{hint}</span>
-    </label>
+    </div>
   );
 }

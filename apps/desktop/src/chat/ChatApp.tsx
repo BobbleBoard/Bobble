@@ -18,7 +18,6 @@ import {
 import type { Model } from '@pi-desktop/engine';
 import {
   IconButton,
-  IconClose,
   IconGears,
   IconSidebar,
   MainSurface,

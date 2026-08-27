@@ -96,6 +96,12 @@ function FileCard({ item }: { item: ThreadMediaItem }): JSX.Element {
   };
 
   return (
+    /*
+     * Drag is a mouse-only affordance by nature, which is what the a11y rule is
+     * warning about — so the same action has a keyboard-and-screen-reader path
+     * beside it: the Save button, which is why it is there.
+     */
+    // biome-ignore lint/a11y/noStaticElementInteractions: Save is the accessible equivalent.
     <div
       className="pd-file-card"
       data-testid="thread-file-card"
