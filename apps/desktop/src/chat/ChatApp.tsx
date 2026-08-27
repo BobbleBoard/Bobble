@@ -26,7 +26,7 @@ import {
   TopBar,
 } from '@pi-desktop/ui';
 import type { ReactNode } from 'react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { conversationNameFrom } from '../../electron/workspace/project-dir';
 import { TopBarDownloads } from '../models/TopBarDownloads';
 import type { SettingsSection } from '../settings/SettingsView';
@@ -40,7 +40,7 @@ import {
   startCorpTask,
 } from '../state/corp-connect';
 import { useCorpStore } from '../state/corp-store';
-import { getModels, setSessionName, startPi, syncWorkspace } from '../state/pi-connect';
+import { getModels, newSession, setSessionName, startPi, syncWorkspace } from '../state/pi-connect';
 import { usePiStore } from '../state/pi-slice';
 import { connectPresent } from '../state/present-store';
 import { useProjectStore } from '../state/project-store';
@@ -52,6 +52,7 @@ import { ChatComposer } from './ChatComposer';
 import { ChatThread } from './ChatThread';
 import { ChatTitle } from './ChatTitle';
 import { ChildChatView } from './ChildChatView';
+import { CommandPalette, type PaletteAction } from './CommandPalette';
 import { CanvasTabsPanel } from './canvas/CanvasTabsPanel';
 import { CorpDebugHud } from './corp/CorpDebugHud';
 import { useHarnessTitleSync } from './harness-title';
@@ -140,6 +141,40 @@ export function ChatApp({
   const flavor = useThemeStore((s) => s.flavor);
   const [piModels, setPiModels] = useState<Model[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  /*
+   * ⌘K — one way in, instead of a growing table of keys.
+   *
+   * The actions live HERE because the shell owns them: opening settings, the
+   * connectors gallery, the scheduled view. The palette knows how to find
+   * chats and commands on its own.
+   */
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'k' && e.key !== 'K') return;
+      if (!(e.metaKey || e.ctrlKey) || e.altKey || e.shiftKey) return;
+      e.preventDefault();
+      setPaletteOpen((v) => !v);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+  const paletteActions = useMemo(
+    (): PaletteAction[] => [
+      { id: 'new-chat', label: 'New chat', hint: '⌘N', run: () => void newSession() },
+      { id: 'settings', label: 'Settings', run: () => onOpenSettings('personalization') },
+      { id: 'models', label: 'Model management', run: () => onOpenSettings('models') },
+      { id: 'connectors', label: 'Connectors', run: onOpenConnectors },
+      { id: 'scheduled', label: 'Scheduled tasks', run: onOpenScheduled },
+      {
+        id: 'sidebar',
+        label: sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar',
+        run: () => setSidebarOpen((v) => !v),
+      },
+    ],
+    [onOpenSettings, onOpenConnectors, onOpenScheduled, sidebarOpen],
+  );
   const [truncatedNote, setTruncatedNote] = useState(false);
 
   // Load the persisted project (working folder) first, then spawn the window's
@@ -455,6 +490,12 @@ export function ChatApp({
             collapse so the main surface reclaims the space, and it clips while it
             does. The panel inside slides out on the same curve and unmounts after
             (SessionSidebar's `data-sliding`) — there is no icon rail. */}
+            <CommandPalette
+              open={paletteOpen}
+              onOpenChange={setPaletteOpen}
+              actions={paletteActions}
+              onEnterChat={onEnterChat}
+            />
             <div className="pd-sidebar-slot" data-open={sidebarOpen}>
               <SessionSidebar
                 open={sidebarOpen}

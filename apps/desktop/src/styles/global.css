@@ -3594,3 +3594,129 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
   background: var(--pd-bg-hover);
   color: var(--pd-text-primary);
 }
+
+/* ---------------------------------------------------------------------------
+   ⌘K COMMAND PALETTE
+
+   Centred and high on the screen rather than middle: a list that grows
+   downward should not shift its first row every time the query changes, and
+   the first row is the one being read.
+   --------------------------------------------------------------------------- */
+
+.pd-palette-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 14vh;
+  background: color-mix(in srgb, black 34%, transparent);
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
+}
+
+.pd-palette {
+  display: flex;
+  width: min(620px, 92vw);
+  max-height: 62vh;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: var(--pd-radius-popover);
+  background: var(--pd-bg-overlay);
+  box-shadow: var(--pd-shadow-hairline), var(--pd-shadow-popover);
+}
+
+.pd-palette-field {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex: none;
+  padding: 13px 15px;
+  border-bottom: 1px solid var(--pd-border-subtle, transparent);
+}
+
+.pd-palette-field-icon {
+  flex: none;
+  color: var(--pd-text-muted);
+}
+
+.pd-palette-input {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--pd-text-primary);
+  font-family: var(--pd-font-sans);
+  font-size: var(--pd-font-size-body);
+  outline: none;
+}
+
+.pd-palette-input::placeholder {
+  color: var(--pd-text-muted);
+}
+
+.pd-palette-list {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 6px;
+}
+
+.pd-palette-section {
+  padding: 8px 8px 3px;
+  color: var(--pd-text-muted);
+  font-size: var(--pd-font-size-caption);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.pd-palette-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 9px;
+  border-radius: var(--pd-radius-sm, 6px);
+  color: var(--pd-text-primary);
+  font-size: var(--pd-font-size-body);
+  cursor: pointer;
+}
+
+.pd-palette-row[data-selected] {
+  background: var(--pd-bg-active);
+}
+
+.pd-palette-row-icon {
+  flex: none;
+  display: inline-flex;
+  color: var(--pd-text-muted);
+}
+
+.pd-palette-row-label {
+  flex: none;
+  white-space: nowrap;
+}
+
+/* The subtitle takes the slack and truncates: a long cwd must never push the
+   name it belongs to out of view. */
+.pd-palette-row-sub {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  color: var(--pd-text-muted);
+  font-size: var(--pd-font-size-footnote);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pd-palette-row-hint {
+  flex: none;
+  margin-left: auto;
+  color: var(--pd-text-muted);
+  font-size: var(--pd-font-size-caption);
+}
+
+.pd-palette-empty {
+  padding: 18px 12px;
+  color: var(--pd-text-muted);
+  font-size: var(--pd-font-size-body);
+  text-align: center;
+}

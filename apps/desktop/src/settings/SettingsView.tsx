@@ -128,14 +128,23 @@ export function SettingsView({
   const titleId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
 
-  /* Escape closes, from anywhere in the panel — a floating dialog that can only
-     be dismissed by hitting a small X is the kind of thing that reads as broken. */
+  /*
+   * Escape closes, from anywhere in the panel — a floating dialog that can only
+   * be dismissed by hitting a small X is the kind of thing that reads as broken.
+   *
+   * BUT NOT WHEN SOMETHING IS OVER IT. This listened on `document` and only
+   * called `stopPropagation`, which does nothing to a listener already attached
+   * to the same target — so one Escape dismissed the thing on top AND the
+   * settings behind it. `defaultPrevented` plus the same "is a dialog open?"
+   * check StudioShell already uses keeps the topmost layer the one that closes.
+   */
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.stopPropagation();
-        onClose();
-      }
+      if (e.key !== 'Escape' || e.defaultPrevented) return;
+      // A palette, a menu or a nested dialog is above this panel and owns the key.
+      if (document.querySelector('[data-escape-layer], [role="menu"]') !== null) return;
+      e.preventDefault();
+      onClose();
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
