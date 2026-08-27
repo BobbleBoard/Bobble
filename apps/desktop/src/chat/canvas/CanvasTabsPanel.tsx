@@ -320,6 +320,31 @@ export function CanvasTabsPanel() {
     [controller, cwd, setCanvasOpen],
   );
 
+  /*
+   * ⌘P AND ⌘T, WHICH THE MENU HAS BEEN PRINTING ALL ALONG.
+   *
+   * The canvas `+` menu shows "Files ⌘P" and "Browser ⌘T"; neither was bound
+   * anywhere, so the hint was decoration. A printed shortcut that does nothing
+   * is the same failure as a menu row that does nothing — it teaches the user
+   * the app is broken rather than that the feature is elsewhere.
+   *
+   * `preventDefault` for the same reason ⌘N needs it: Chromium's own ⌘P is
+   * Print, which this app has no use for. Routed through `onNewTab` so the
+   * keyboard and the menu cannot drift — the corp situation-room special case
+   * and the panel-open side effect come along for free.
+   */
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || e.altKey || e.shiftKey) return;
+      const key = e.key.toLowerCase();
+      if (key !== 'p' && key !== 't') return;
+      e.preventDefault();
+      onNewTab(key === 'p' ? 'filetree' : 'browser');
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onNewTab]);
+
   // Clicking a subagent row opens (or refreshes) a per-subagent "work" tab — a
   // markdown view of what that child did: its activity timeline + its full output
   // (the summary that also returns to chat). The child's live transcript never

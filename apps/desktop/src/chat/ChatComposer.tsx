@@ -781,6 +781,23 @@ export function ChatComposer({
   // Escape reads these (see the keymap's `escape`), and they are only known here.
   busyRef.current = isBusy;
   stopRef.current = stopBusy;
+
+  /*
+   * ⌘U, which the + menu has been printing all along.
+   *
+   * "Add files or photos ⌘U" was a hint for a binding that did not exist. Opens
+   * the same hidden file input the menu row clicks, so there is one path.
+   */
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'u' && e.key !== 'U') return;
+      if (!(e.metaKey || e.ctrlKey) || e.altKey || e.shiftKey) return;
+      e.preventDefault();
+      fileInputRef.current?.click();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
   // Pause (plain chat only; left of Stop): halt the reply to free the model but
   // keep it resumable + let any queued message through. Flip the button back to
   // Send instantly — the turn is ending.
