@@ -26,6 +26,7 @@ import {
   IconPin,
   IconPlus,
   IconSettings,
+  IconShare,
   IconTrash,
   IconVideo,
   IconWaveform,
@@ -751,6 +752,24 @@ export function SessionSidebar({
     if (renamingProject !== null) void renameProject(renamingProject, renameDraft);
     setRenamingProject(null);
   };
+  /**
+   * Export one chat. The TITLE comes from here rather than from main, which
+   * does not know about renames — exporting under a name the user changed six
+   * weeks ago is exactly the small wrongness that makes an export untrustworthy.
+   */
+  const exportChat = async (
+    s: SessionSummary,
+    format: 'markdown' | 'jsonl',
+    to: 'file' | 'clipboard',
+  ): Promise<void> => {
+    const res = await window.piDesktop
+      .invoke('fs:export-session', { file: s.file, format, title: displayTitle(s, org), to })
+      .catch(() => ({ ok: false }) as { ok: boolean; text?: string });
+    if (to === 'clipboard' && res.ok && typeof res.text === 'string') {
+      await navigator.clipboard.writeText(res.text).catch(() => undefined);
+    }
+  };
+
   // Delete: skip the dialog when the user chose "don't ask again".
   const requestDeleteChat = (s: SessionSummary) => {
     if (hideDeleteConfirm) {
@@ -959,6 +978,38 @@ export function SessionSidebar({
                       onSelect={() => void createProjectAndAssign(s.file)}
                     >
                       New project…
+                    </DropdownMenuItem>
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
+                {/*
+                  A CHAT YOU CAN KEEP.
+
+                  Everything here is already a real file on disk and there was
+                  still no way to get a conversation out — not into a note, not
+                  to a colleague, not into a commit message. Markdown is for a
+                  person; the raw JSONL is the session verbatim, for anything
+                  that reads it back, this app included.
+                */}
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger icon={<IconShare size={16} />}>
+                    Export
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent className="min-w-[190px]">
+                    <DropdownMenuItem
+                      onSelect={() => void exportChat(s, 'markdown', 'file')}
+                      data-testid={`chat-export-md-${title}`}
+                    >
+                      Save as Markdown…
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => void exportChat(s, 'jsonl', 'file')}>
+                      Save raw JSONL…
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onSelect={() => void exportChat(s, 'markdown', 'clipboard')}
+                      data-testid={`chat-copy-${title}`}
+                    >
+                      Copy to clipboard
                     </DropdownMenuItem>
                   </DropdownMenuSubContent>
                 </DropdownMenuSub>

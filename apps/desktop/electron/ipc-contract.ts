@@ -170,6 +170,23 @@ export type FsInvokeMap = {
     request: { file: string };
     response: { ok: boolean; error?: string };
   };
+  /**
+   * A chat as a file someone can keep: Markdown for a person, the raw JSONL
+   * verbatim for anything that reads it back.
+   *
+   * `to:'clipboard'` returns the text instead of writing a file — the renderer
+   * owns the clipboard, and round-tripping through a save dialog to copy a
+   * paragraph would be absurd. A cancelled save is `ok:false` with no error.
+   */
+  'fs:export-session': {
+    request: {
+      file: string;
+      format: 'markdown' | 'jsonl';
+      title: string;
+      to: 'file' | 'clipboard';
+    };
+    response: { ok: boolean; savedTo?: string; text?: string; error?: string };
+  };
 };
 
 export const FS_INVOKE_CHANNELS = [
@@ -180,6 +197,7 @@ export const FS_INVOKE_CHANNELS = [
   'fs:read-file',
   'fs:write-file',
   'fs:delete-session',
+  'fs:export-session',
 ] as const satisfies readonly (keyof FsInvokeMap)[];
 
 // ---------------------------------------------------------------------------
@@ -684,6 +702,23 @@ export type CanvasInvokeMap = {
   'canvas:open-default': { request: { path: string }; response: { ok: boolean; error?: string } };
   /** File operation bar "Open in folder" → shell.showItemInFolder. */
   'canvas:reveal': { request: { path: string }; response: { ok: boolean } };
+  /**
+   * Start an OS drag carrying a real file, so it can be dropped into Finder,
+   * Mail, Slack — anywhere that accepts a file.
+   *
+   * The thing a local app can do that a browser tab cannot. Everything the model
+   * produces is already a real file at a real path; this is the one API call
+   * between that and the gesture people expect from it.
+   */
+  'canvas:start-drag': { request: { path: string }; response: { ok: boolean } };
+  /**
+   * Save a copy of a file somewhere the user picks. `ok:false` with no error is
+   * a cancelled dialog, which is not a failure and must not be reported as one.
+   */
+  'canvas:save-as': {
+    request: { path: string; suggestedName?: string };
+    response: { ok: boolean; savedTo?: string; error?: string };
+  };
   /** Renderer → main: report a compact snapshot of what's on the canvas right now
    * (canvas-awareness). Main caches it and serves it to the pi child's `context`
    * hook (browser url/title re-enriched from the live view). Debounced by the
@@ -705,6 +740,8 @@ export const CANVAS_INVOKE_CHANNELS = [
   'canvas:open-with',
   'canvas:open-default',
   'canvas:reveal',
+  'canvas:start-drag',
+  'canvas:save-as',
   'canvas:report-state',
   'canvas:site-icon',
 ] as const satisfies readonly (keyof CanvasInvokeMap)[];

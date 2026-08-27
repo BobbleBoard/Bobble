@@ -16,6 +16,7 @@
  */
 import { execFile } from 'node:child_process';
 import {
+  copyFileSync,
   createReadStream,
   existsSync,
   readFileSync,
@@ -28,7 +29,17 @@ import path from 'node:path';
 import { Readable } from 'node:stream';
 import { promisify } from 'node:util';
 import { createIpcEventSender, createLogger } from '@pi-desktop/shared';
-import { app, type IpcMainInvokeEvent, ipcMain, protocol, shell, type WebContents } from 'electron';
+import {
+  app,
+  BrowserWindow,
+  dialog,
+  type IpcMainInvokeEvent,
+  ipcMain,
+  nativeImage,
+  protocol,
+  shell,
+  type WebContents,
+} from 'electron';
 import { allowedWriteRoots } from '../fs-handlers';
 import type {
   AppEventMap,
@@ -438,6 +449,60 @@ export function registerCanvasIpc(
     guard(event, 'canvas:reveal');
     shell.showItemInFolder(path.resolve(req.path));
     return { ok: true };
+  });
+
+  /*
+   * DRAG A GENERATED FILE STRAIGHT INTO FINDER.
+   *
+   * The thing a desktop app can do that a browser tab cannot, and everything the
+   * model produces is already a real file at a real path — so the whole gap
+   * between "it made me an image" and "it is in my Downloads folder" was one
+   * unwired API call.
+   *
+   * `startDrag` needs an icon or it silently does nothing on macOS, and it
+   * throws if the file is gone, so both are handled rather than left to fail
+   * mid-gesture with no feedback.
+   */
+  ipcMain.handle('canvas:start-drag', (event, req: { path: string }) => {
+    guard(event, 'canvas:start-drag');
+    const file = path.resolve(req.path);
+    if (!existsSync(file)) return { ok: false };
+    try {
+      // An empty image is a valid drag icon; the OS substitutes the file's own.
+      event.sender.startDrag({ file, icon: nativeImage.createEmpty() });
+      return { ok: true };
+    } catch (error) {
+      log.warn('start-drag failed', { error: String(error) });
+      return { ok: false };
+    }
+  });
+
+  /*
+   * SAVE A COPY WHERE THE USER WANTS IT.
+   *
+   * A cancelled dialog is `ok:false` with NO error — a caller that treats every
+   * falsy result as a failure would report "save failed" for someone who simply
+   * changed their mind, which is worse than doing nothing.
+   */
+  ipcMain.handle('canvas:save-as', async (event, req: { path: string; suggestedName?: string }) => {
+    guard(event, 'canvas:save-as');
+    const from = path.resolve(req.path);
+    if (!existsSync(from)) return { ok: false, error: 'that file is no longer there' };
+    const win = BrowserWindow.fromWebContents(event.sender);
+    const result = await (win === null
+      ? dialog.showSaveDialog({ defaultPath: req.suggestedName ?? path.basename(from) })
+      : dialog.showSaveDialog(win, {
+          defaultPath: req.suggestedName ?? path.basename(from),
+        }));
+    if (result.canceled || result.filePath === undefined) return { ok: false };
+    try {
+      copyFileSync(from, result.filePath);
+      return { ok: true, savedTo: result.filePath };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      log.warn('save-as failed', { error: message });
+      return { ok: false, error: message };
+    }
   });
 }
 

@@ -12,8 +12,10 @@
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { dialog } from 'electron';
 import type { FsInvokeMap, FsTreeNode, SessionSummary } from './ipc-contract';
 import { sandboxBaseDir } from './sandbox';
+import { renderSessionMarkdown } from './session-export';
 
 const HOME = os.homedir();
 
@@ -352,6 +354,53 @@ function deleteSession(file: string): { ok: boolean; error?: string } {
 }
 
 /**
+ * Export a chat to disk, or hand its text back for the clipboard.
+ *
+ * Fenced exactly like `deleteSession` — the source must be a session JSONL —
+ * because the request carries a path from the renderer and "read any file the
+ * user names and save it wherever" is not what this is for.
+ *
+ * A CANCELLED DIALOG IS NOT A FAILURE. It returns `ok:false` with no `error`,
+ * so a caller that shows every failure as a toast does not tell someone who
+ * changed their mind that the export broke.
+ */
+function exportSession(req: {
+  file: string;
+  format: 'markdown' | 'jsonl';
+  title: string;
+  to: 'file' | 'clipboard';
+}): { ok: boolean; savedTo?: string; text?: string; error?: string } {
+  const resolved = resolveUserPath(req.file);
+  if (!resolved.startsWith(SESSIONS_DIR + path.sep) || !resolved.endsWith('.jsonl')) {
+    return { ok: false, error: 'refused: not a session file' };
+  }
+  const jsonl = safeRead(resolved);
+  if (jsonl === null) return { ok: false, error: 'that chat could not be read' };
+  const text = req.format === 'jsonl' ? jsonl : renderSessionMarkdown(jsonl, req.title);
+  if (req.to === 'clipboard') return { ok: true, text };
+
+  const safeTitle =
+    req.title
+      .trim()
+      .replace(/[^\w\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .slice(0, 60) || 'chat';
+  /* Sync, like every other handler in this file. A save dialog is modal to the
+     user anyway, so there is nothing to keep responsive behind it, and the
+     alternative makes every caller of this map await. */
+  const filePath = dialog.showSaveDialogSync({
+    defaultPath: `${safeTitle}.${req.format === 'jsonl' ? 'jsonl' : 'md'}`,
+  });
+  if (filePath === undefined) return { ok: false };
+  try {
+    fs.writeFileSync(filePath, text, 'utf8');
+    return { ok: true, savedTo: filePath };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+/**
  * Bounded directory tree for the canvas file operation bar's file-tree panel.
  * Same hard caps + skip-list as `listFiles` so it never recurses into
  * node_modules et al: depth ≤ `maxDepth` (default 3), ≤ TREE_MAX_ENTRIES nodes,
@@ -650,4 +699,5 @@ export const fsHandlers: {
   'fs:read-file': (req) => readFileBounded(req.path, req.maxBytes ?? READ_FILE_DEFAULT_MAX),
   'fs:write-file': (req) => writeFileFenced(req.path, req.content),
   'fs:delete-session': (req) => deleteSession(req.file),
+  'fs:export-session': (req) => exportSession(req),
 };

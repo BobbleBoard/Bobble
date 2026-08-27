@@ -15,6 +15,7 @@
  * file you cannot find again — the card is the part that says what it is called,
  * how big it is, and gives you Reveal, which is how it leaves the app.
  */
+import type React from 'react';
 import { type JSX, useEffect, useState } from 'react';
 /*
  * The canonical builder, NOT a hand-rolled template.
@@ -76,9 +77,32 @@ function FileCard({ item }: { item: ThreadMediaItem }): JSX.Element {
   const reveal = (): void => {
     void window.piDesktop.invoke('canvas:reveal', { path: item.path }).catch(() => undefined);
   };
+  const saveAs = (): void => {
+    void window.piDesktop
+      .invoke('canvas:save-as', { path: item.path, suggestedName: item.name })
+      .catch(() => undefined);
+  };
+  /*
+   * DRAG THE CARD INTO FINDER.
+   *
+   * The file is already real and already at a real path, so this is the gesture
+   * people expect and the one a browser tab cannot offer. `preventDefault`
+   * stops the HTML5 drag (which would carry text) so the OS drag started in
+   * main is the only one running.
+   */
+  const onDragStart = (e: React.DragEvent): void => {
+    e.preventDefault();
+    void window.piDesktop.invoke('canvas:start-drag', { path: item.path }).catch(() => undefined);
+  };
 
   return (
-    <div className="pd-file-card" data-testid="thread-file-card">
+    <div
+      className="pd-file-card"
+      data-testid="thread-file-card"
+      draggable
+      onDragStart={onDragStart}
+      title={`${item.path} — drag me anywhere`}
+    >
       <span className="pd-file-card-icon">
         <KindGlyph kind={item.kind} />
       </span>
@@ -91,6 +115,14 @@ function FileCard({ item }: { item: ThreadMediaItem }): JSX.Element {
           {bytes !== undefined ? ` · ${humanSize(bytes)}` : ''}
         </span>
       </span>
+      <button
+        type="button"
+        className="pd-file-card-action pd-focusable"
+        data-testid="thread-file-save"
+        onClick={saveAs}
+      >
+        Save
+      </button>
       <button
         type="button"
         className="pd-file-card-action pd-focusable"
