@@ -38,7 +38,14 @@
  *   MODELS=qwen3.5-4b-mtp node tests/e2e/tool-cli-eval.mjs
  */
 import { execFileSync, spawn } from 'node:child_process';
-import { appendFileSync, existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
+import {
+  appendFileSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  writeFileSync,
+} from 'node:fs';
 import { homedir } from 'node:os';
 import path from 'node:path';
 import {
@@ -293,6 +300,31 @@ const SYSTEM_CLI_TUNED = () =>
     'Never tell the user you are unable to do something one of these commands does.',
   ].join('\n');
 
+/**
+ * THE PROMPT THAT ACTUALLY SHIPS, read from a capture rather than rebuilt.
+ *
+ * The tuned arm above is ~20 lines. The shipped bash-CLI prompt is that plus
+ * everything pi puts in front of it — its own tool-usage guidance, the harness's
+ * verify section, the working directory — which measured 5,172 characters. So
+ * `cli-tuned`'s numbers describe a prompt no user ever receives, and the gap
+ * between the two is exactly what this arm exists to size.
+ *
+ * It reads a file rather than reconstructing the prompt, because a
+ * reconstruction is a second implementation that can drift from the first. The
+ * default path is what `prompt-truth-probe.mjs` writes, so the two compose:
+ *
+ *   node tests/e2e/prompt-truth-probe.mjs        # capture what went over the wire
+ *   node tests/e2e/tool-cli-eval.mjs             # measure it
+ */
+const SHIPPED_PROMPT_PATH =
+  process.env.SHIPPED_PROMPT ?? path.join('/tmp/prompt-truth', 'first-system.txt');
+
+const SYSTEM_CLI_SHIPPED = () => {
+  if (!existsSync(SHIPPED_PROMPT_PATH)) return null;
+  const text = readFileSync(SHIPPED_PROMPT_PATH, 'utf8').trim();
+  return text.length > 0 ? text : null;
+};
+
 const BASH_ONLY = [EXTRA_TOOLS[0]];
 
 /** JSON-schema tool definitions in the OpenAI shape llama-server expects. */
@@ -485,7 +517,9 @@ async function runTask(task, config) {
         ? SYSTEM_CLI_LISTED()
         : config === 'cli-tuned'
           ? SYSTEM_CLI_TUNED()
-          : SYSTEM_SCHEMAS;
+          : config === 'cli-shipped'
+            ? (SYSTEM_CLI_SHIPPED() ?? SYSTEM_CLI_TUNED())
+            : SYSTEM_SCHEMAS;
   const messages = [
     { role: 'system', content: system },
     { role: 'user', content: task.ask },
@@ -608,7 +642,14 @@ const DEFAULT_MODELS = [
   'qwen3.5-9b-mtp',
 ];
 const MODELS = (process.env.MODELS ?? DEFAULT_MODELS.join(',')).split(',').filter(Boolean);
-const CONFIGS = (process.env.CONFIGS ?? 'schemas,cli,cli-listed').split(',').filter(Boolean);
+/*
+ * `cli-shipped` is in the default set on purpose: the tuned arm measures a
+ * prompt nobody receives, and shipping a number from it is how "34/36" came to
+ * describe a configuration that does not exist.
+ */
+const CONFIGS = (process.env.CONFIGS ?? 'schemas,cli-tuned,cli-shipped')
+  .split(',')
+  .filter(Boolean);
 /* The turn cap is a MEASUREMENT BOUNDARY, not a property of the interface: a
    model that probes the system before reading its own help can find the right
    command on turn 5 and be scored a failure at 4. Raise it to tell "cannot"

@@ -1978,8 +1978,23 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
   function canonicalPrompt(base: string): string {
     const augmented = augmentSystemPrompt(base, {
       toolInterface: toolCliMode ? 'bash-cli' : 'schemas',
+      // In CLI mode, pi's own guidance names tools by their TOOL name — it
+      // renders usage lines for every registered tool, advertised or not — so
+      // it is retargeted onto the commands that actually reach them.
+      ...(toolCliMode ? { commandFor: toolCliCommandNames() } : {}),
     });
     return toolCliMode ? `${augmented}\n\n${toolCliPreamble()}` : augmented;
+  }
+
+  /** Tool name → the command line that runs it, straight from the CLI model. */
+  function toolCliCommandNames(): Map<string, string> {
+    const map = new Map<string, string>();
+    for (const group of buildCli(toolCliGroups(), cliVisibleTools()).groups) {
+      for (const command of group.commands) {
+        map.set(command.tool.name, [group.name, ...command.path].join(' '));
+      }
+    }
+    return map;
   }
 
   /**

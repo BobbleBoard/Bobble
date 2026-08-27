@@ -272,11 +272,102 @@ export const TEAM_PROMPT_MARKER = 'You lead a TEAM';
 /** The half of the old team section worth keeping, now unconditional. */
 export const VERIFY_PROMPT = `VERIFY BEFORE YOU SUBMIT. Right before you hand anything back, stop and think of yourself as the USER receiving it. Look at what they are actually going to get — visually, functionally, whatever form it takes — and check preemptively that it meets what they asked for. That check is not optional; it is the difference between finishing and merely stopping.`;
 
+/**
+ * Lines in pi's own base prompt that are FALSE once the CLI is the interface.
+ *
+ * Not a matter of naming — these two tell the model to prefer a set of tools it
+ * cannot call over the one thing it can. Renaming them would produce advice like
+ * "prefer grep over bash" in a mode where every command IS bash.
+ */
+const SCHEMA_ONLY_LINES: readonly RegExp[] = [
+  /^-\s*Prefer\s+grep\/find\/ls\s+tools\s+over\s+bash\b.*$/im,
+  /^-\s*Use\s+read\s+to\s+examine\s+files\s+instead\s+of\s+cat\s+or\s+sed\b.*$/im,
+];
+
+/**
+ * Rewrite tool names in a prompt as the commands that actually reach them.
+ *
+ * WHY. pi renders usage guidance for every REGISTERED tool, not just the
+ * advertised ones, so the shipped bash-CLI prompt told the model to "call
+ * `update_plan` early", "use `spawn_subagent` for independent sub-tasks" and
+ * "use `edit` for precise changes" — three tools it cannot call, named eight
+ * times, immediately above a command list saying those commands are its
+ * abilities. Every one of those instructions is still CORRECT advice; only the
+ * name is wrong, and a rename is enough to make it true.
+ *
+ * Derived from the CLI model rather than hand-written, so a tool added to a
+ * capability is retargeted by existing rather than by being remembered here.
+ * Longest name first: `update_plan` must not be rewritten by a `plan` entry.
+ */
+export function retargetToolNames(text: string, commandFor: ReadonlyMap<string, string>): string {
+  const names = [...commandFor.keys()]
+    .filter((n) => commandFor.get(n) !== n)
+    .sort((a, b) => b.length - a.length);
+  if (names.length === 0) return text;
+  /*
+   * ONE PASS, not one pass per name. Replacing sequentially rewrites its own
+   * output: `browser_read` became `browser read`, and the `read` entry then
+   * matched inside THAT, giving "browser `file read`". A single alternation
+   * (longest first) consumes each name once and never revisits it.
+   *
+   * Word-bounded and not inside a longer identifier, so `edits[].oldText`
+   * survives intact — the parameter is still called `edits`.
+   */
+  /*
+   * A BARE ENGLISH WORD IS NOT ALWAYS A TOOL NAME. `edit`, `read`, `write` and
+   * `ls` are tools AND ordinary words, and rewriting every occurrence turned
+   * "not for a question, a quick edit, or a one-file task" into "a quick `file
+   * edit`". So a single-word name is retargeted only where it is unambiguously
+   * a reference — already backticked, the object of "Use"/"call", or read as a
+   * noun in "one edit call" — while a name with an underscore (`update_plan`,
+   * `spawn_subagent`, `browser_read`) is never English and is retargeted
+   * anywhere.
+   */
+  const asCommand = (name: string): string => `\`${commandFor.get(name) ?? name}\``;
+  const unambiguous = names.filter((n) => n.includes('_'));
+  const bare = names.filter((n) => !n.includes('_'));
+
+  let out = text;
+  if (unambiguous.length > 0) {
+    out = out.replace(
+      new RegExp(`(?<![\\w.\`])(${unambiguous.join('|')})(?![\\w.[])`, 'g'),
+      (_m, name: string) => asCommand(name),
+    );
+  }
+  if (bare.length > 0) {
+    const alt = bare.join('|');
+    out = out
+      .replace(new RegExp(`\`(${alt})\``, 'g'), (_m, name: string) => asCommand(name))
+      .replace(
+        new RegExp(`\\b(Use|use|call|Call)\\s+(${alt})(?![\\w.[])`, 'g'),
+        (_m, verb: string, name: string) => `${verb} ${asCommand(name)}`,
+      )
+      .replace(
+        new RegExp(`\\b(${alt})(\\s+calls?\\b)`, 'g'),
+        (_m, name: string, rest: string) => `${asCommand(name)}${rest}`,
+      );
+  }
+  // A name that was already in backticks is now doubly quoted.
+  return out.replace(/``+/g, '`');
+}
+
 export function augmentSystemPrompt(
   base: string | undefined,
-  opts: { team?: boolean; toolInterface?: 'schemas' | 'bash-cli' } = {},
+  opts: {
+    team?: boolean;
+    toolInterface?: 'schemas' | 'bash-cli';
+    /** Tool name → the command that runs it, for {@link retargetToolNames}. */
+    commandFor?: ReadonlyMap<string, string>;
+  } = {},
 ): string {
-  const trimmed = stripToolCatalog((base ?? '').trim());
+  let trimmed = stripToolCatalog((base ?? '').trim());
+  if (opts.toolInterface === 'bash-cli') {
+    for (const line of SCHEMA_ONLY_LINES) trimmed = trimmed.replace(line, '').trim();
+    if (opts.commandFor !== undefined) trimmed = retargetToolNames(trimmed, opts.commandFor);
+    // A dropped guideline leaves a hole — "Guidelines:" followed by a blank
+    // line, or a gap in the middle of the bullet list.
+    trimmed = trimmed.replace(/\n{3,}/g, '\n\n').replace(/(:\n)\n+(?=- )/g, '$1');
+  }
   /*
    * THE CAPABILITY SECTION DESCRIBES THE SCHEMA INTERFACE, AND ONLY THAT ONE.
    *

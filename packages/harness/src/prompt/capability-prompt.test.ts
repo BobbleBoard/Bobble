@@ -4,6 +4,7 @@ import {
   CAPABILITY_PROMPT,
   CAPABILITY_PROMPT_MARKER,
   MANAGER_PROMPT_MARKER,
+  retargetToolNames,
   stripToolCatalog,
   VERIFY_PROMPT,
 } from './capability-prompt.js';
@@ -388,5 +389,65 @@ describe('the prompt must not contradict the interface it ships with', () => {
       const p = augmentSystemPrompt('base', { toolInterface: mode });
       expect(p.length).toBeGreaterThan('base'.length + 50);
     }
+  });
+});
+
+describe('bash-CLI prompt is about commands, not tools', () => {
+  const commandFor = new Map([
+    ['update_plan', 'plan update'],
+    ['spawn_subagent', 'team spawn'],
+    ['edit', 'file edit'],
+    ['read', 'file read'],
+    ['write', 'file write'],
+    ['browser_read', 'browser read'],
+  ]);
+
+  it('renames every tool the guidance names', () => {
+    // pi renders usage guidance for REGISTERED tools, not advertised ones, so
+    // the shipped CLI prompt told the model to call three tools it cannot call,
+    // right above a command list saying those commands are its abilities.
+    const base = [
+      '- Use edit for precise changes (edits[].oldText must match exactly)',
+      '- For any task with more than one step, call update_plan early.',
+      '- Use spawn_subagent for independent sub-tasks.',
+    ].join('\n');
+    const out = augmentSystemPrompt(base, { toolInterface: 'bash-cli', commandFor });
+    expect(out).toContain('`file edit`');
+    expect(out).toContain('`plan update`');
+    expect(out).toContain('`team spawn`');
+    expect(out).not.toMatch(/\bspawn_subagent\b/);
+    expect(out).not.toMatch(/\bupdate_plan\b/);
+  });
+
+  it('leaves parameter names alone — edits[] is still edits[]', () => {
+    const out = augmentSystemPrompt('- edits[].oldText must match exactly', {
+      toolInterface: 'bash-cli',
+      commandFor,
+    });
+    expect(out).toContain('edits[].oldText');
+  });
+
+  it('does not rename a longer tool through a shorter entry', () => {
+    const out = retargetToolNames('use browser_read on the page', commandFor);
+    expect(out).toBe('use `browser read` on the page');
+  });
+
+  it('drops the two lines that are false once bash is the interface', () => {
+    const base = [
+      '- Prefer grep/find/ls tools over bash for file exploration (faster)',
+      '- Use read to examine files instead of cat or sed.',
+      '- Be concise in your responses',
+    ].join('\n');
+    const out = augmentSystemPrompt(base, { toolInterface: 'bash-cli', commandFor });
+    expect(out).not.toContain('Prefer grep/find/ls');
+    expect(out).not.toContain('instead of cat or sed');
+    expect(out).toContain('Be concise');
+  });
+
+  it('leaves the schema-mode prompt untouched', () => {
+    const base = '- Use spawn_subagent for independent sub-tasks.';
+    expect(augmentSystemPrompt(base, { toolInterface: 'schemas', commandFor })).toContain(
+      'spawn_subagent',
+    );
   });
 });
