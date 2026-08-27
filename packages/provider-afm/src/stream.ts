@@ -174,10 +174,53 @@ export function createAfmStream(deps: AfmStreamDeps = {}): AfmStreamFn {
       try {
         events.push({ type: 'start', partial: output });
 
-        const request = buildAfmRequest(model, context, options);
+        /*
+         * THE HOST'S HOOKS, on an engine that is not an HTTP server.
+         *
+         * pi's `before_provider_request` / `after_provider_response` carry four
+         * mechanisms — the user's sampling overrides, the prose loop detector,
+         * intent-bias activation and the corp hang watchdog — and this provider
+         * called neither, so all four were silently inert on Apple FM while
+         * working on llama.cpp.
+         *
+         * Apple FM takes an `AfmRequest` ({prompt, instructions, messages,
+         * temperature, maxTokens}), not a chat-completions body, so the hook
+         * sees a shape it was not written for. That is safe in both directions:
+         * `temperature` is the one sampling field whose name matches and it
+         * applies correctly; anything else the hook stamps on is a key the
+         * helper ignores; and the ground-truth extractor returns null rather
+         * than throwing when the shape does not match. The result is only
+         * adopted if it still looks like a request, so a hook that mangles it
+         * cannot break the turn.
+         */
+        let request = buildAfmRequest(model, context, options);
+        const replaced = await options?.onPayload?.(
+          request as unknown as Record<string, unknown>,
+          model,
+        );
+        if (
+          replaced !== null &&
+          replaced !== undefined &&
+          typeof replaced === 'object' &&
+          typeof (replaced as { prompt?: unknown }).prompt === 'string'
+        ) {
+          request = replaced as unknown as typeof request;
+        }
+        /*
+         * "The engine answered" is the FIRST DELTA here, not the end of the
+         * stream — the watchdog exists to tell a hung socket from a legitimately
+         * long generation, and `stream()` only resolves once the whole
+         * generation is done. Reporting at the end would arm the watchdog for
+         * the entire reply and disarm it exactly when it no longer matters.
+         */
+        let announced = false;
         const result = await stream(request, {
           onDelta: (delta) => {
             if (delta.length === 0) return;
+            if (!announced) {
+              announced = true;
+              void options?.onResponse?.({ status: 200, headers: {} }, model);
+            }
             const idx = ensureTextBlock();
             const block = output.content[idx];
             if (block?.type === 'text') block.text += delta;

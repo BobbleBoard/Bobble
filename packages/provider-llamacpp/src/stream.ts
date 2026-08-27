@@ -466,7 +466,14 @@ async function readBody(res: Response): Promise<AsyncIterable<Uint8Array>> {
 
 /** Flatten a `Headers` object to a plain record for pi's `onResponse` hook. Best-
  * effort: a mock/non-standard headers object degrades to an empty record. */
-function headersToRecord(headers: Headers | undefined): Record<string, string> {
+/**
+ * `Headers` → a plain record, because pi's `ProviderResponse` wants one.
+ *
+ * Exported so the MLX and Apple-FM providers can call the same host hooks
+ * without each growing a copy. When the shared engine contract lands this moves
+ * with it; until then, one implementation beats three.
+ */
+export function headersToRecord(headers: Headers | undefined): Record<string, string> {
   const out: Record<string, string> = {};
   if (headers === undefined || typeof headers.forEach !== 'function') return out;
   try {

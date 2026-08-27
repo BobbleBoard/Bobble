@@ -96,3 +96,4 @@ export * from './repair.js';
 export * from './repair-bridge.js';
 export * from './sse.js';
 export * from './stream.js';
+export { headersToRecord } from './stream.js';

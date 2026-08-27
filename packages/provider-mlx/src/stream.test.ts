@@ -152,3 +152,49 @@ describe('createMlxStream — REUSES the repair ladder (matters more for MLX #10
     expect(call?.type === 'toolCall' && call.arguments).toEqual({ path: '/live' });
   });
 });
+
+describe('the host hooks', () => {
+  /*
+   * MEASURED by a repo audit: this provider called neither `onPayload` nor
+   * `onResponse`, so four host mechanisms were silently inert on MLX while
+   * working on llama.cpp — the user's advanced sampling overrides, the prose
+   * loop detector, intent-bias tool activation, and the corp hang watchdog,
+   * which is armed per call and disarmed by `onResponse`. On this engine it
+   * could arm and never disarm.
+   *
+   * A user switching engines lost four behaviours and was told nothing.
+   */
+  it('offers the payload to the host, and sends back what it returns', async () => {
+    let seen: Record<string, unknown> | null = null;
+    const fetchImpl = (async (_u: string, init: { body: string }) => {
+      seen = JSON.parse(init.body);
+      return new Response('data: [DONE]\n\n', {
+        status: 200,
+        headers: { 'content-type': 'text/event-stream' },
+      });
+    }) as unknown as typeof fetch;
+
+    const events = createMlxStream({ fetchImpl })(makeModel(), emptyContext(), {
+      onPayload: async (body: Record<string, unknown>) => ({ ...body, temperature: 0.123 }),
+    } as never);
+    await consume(events);
+    expect(seen).not.toBeNull();
+    expect((seen as unknown as { temperature?: number })?.temperature).toBe(0.123);
+  });
+
+  it('tells the host the engine responded, so a watchdog can disarm', async () => {
+    const statuses: number[] = [];
+    const fetchImpl = (async () =>
+      new Response('data: [DONE]\n\n', {
+        status: 200,
+        headers: { 'content-type': 'text/event-stream' },
+      })) as unknown as typeof fetch;
+    const events = createMlxStream({ fetchImpl })(makeModel(), emptyContext(), {
+      onResponse: async (r: { status: number }) => {
+        statuses.push(r.status);
+      },
+    } as never);
+    await consume(events);
+    expect(statuses).toEqual([200]);
+  });
+});

@@ -31,6 +31,7 @@ import {
 } from '@mariozechner/pi-ai';
 import {
   buildChatCompletionsRequest,
+  headersToRecord,
   parseSSE,
   type RepairRung,
   repairToolCallArguments,
@@ -157,13 +158,33 @@ export function createMlxStream(deps: MlxStreamDeps = {}): MlxStreamFn {
       try {
         stream.push({ type: 'start', partial: output });
 
-        const body = buildChatCompletionsRequest(model, context, options);
+        /*
+         * THE HOST'S HOOKS, which this provider was not calling.
+         *
+         * `onPayload` is pi's `before_provider_request` and `onResponse` its
+         * `after_provider_response`. Four mechanisms hang off them and were all
+         * silently inert on MLX while working on llama.cpp: the user's advanced
+         * sampling overrides, the prose loop detector, intent-bias tool
+         * activation, and the corp's hang watchdog — which is armed per call and
+         * DISARMED by `onResponse`, so on this engine it could arm and never
+         * disarm. A user switching engines lost four behaviours and was told
+         * nothing.
+         */
+        let body = buildChatCompletionsRequest(model, context, options);
+        const replaced = await options?.onPayload?.(body, model);
+        if (replaced !== null && replaced !== undefined && typeof replaced === 'object') {
+          body = replaced as typeof body;
+        }
         const res = await doFetch(`${model.baseUrl}/chat/completions`, {
           method: 'POST',
           headers: { 'content-type': 'application/json', ...(model.headers ?? {}) },
           body: JSON.stringify(body),
           signal: options?.signal,
         });
+        await options?.onResponse?.(
+          { status: res.status, headers: headersToRecord(res.headers) },
+          model,
+        );
         if (!res.ok) {
           const detail = await res.text().catch(() => '');
           throw new Error(`mlx_lm.server HTTP ${res.status}: ${detail.slice(0, 500)}`);
