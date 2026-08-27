@@ -173,6 +173,41 @@ export function registerAdvancedParamsHook(
           dbg,
           `cwd=${cwdLine} team=${team} tools[${names.length}] sysPromptChars=${gt.systemPrompt.length}: ${names.join(', ')}\n`,
         );
+        /*
+         * THE PROMPT ITSELF, not a measurement of it.
+         *
+         * the user: "often the issue is that the instructions we for whatever
+         * reason actually just [are] not appended to the system prompt. ensure
+         * you have a reliable way to pull the raw ground truth context."
+         *
+         * The line above has counted the prompt's characters since it was
+         * written, which can tell you it CHANGED and never what it SAYS — and
+         * the comment two paragraphs up records a marker that read `false` for
+         * three runs because the text it looked for had been deleted. Counting
+         * a prompt is not reading one. With PI_ADV_DEBUG_PROMPT set to a path,
+         * every request appends the whole thing as JSON: system prompt
+         * verbatim, tool names, message roles, sampling.
+         */
+        const promptFile = process.env.PI_ADV_DEBUG_PROMPT;
+        if (promptFile !== undefined && promptFile.length > 0) {
+          appendFileSync(
+            promptFile,
+            `${JSON.stringify({
+              at: Date.now(),
+              pid: process.pid,
+              model: body.model ?? null,
+              system: gt.systemPrompt,
+              tools: names,
+              roles: gt.messages.map((m) => m.role),
+              sampling: {
+                temperature: body.temperature ?? null,
+                top_p: body.top_p ?? null,
+                top_k: body.top_k ?? null,
+              },
+            })}\n`,
+            'utf8',
+          );
+        }
       } catch {
         // never break a turn for a diagnostic write.
       }

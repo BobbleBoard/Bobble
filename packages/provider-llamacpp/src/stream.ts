@@ -10,7 +10,7 @@
  * Electron-free; `fetchImpl` is injectable so tests feed fixture SSE without a
  * live server.
  */
-import { readFileSync } from 'node:fs';
+import { appendFileSync, readFileSync } from 'node:fs';
 import {
   type Api,
   type AssistantMessage,
@@ -282,6 +282,16 @@ export function contextHasImage(context: Context): boolean {
 }
 
 /** Build the OpenAI chat/completions request body from pi's Context. Pure. */
+/**
+ * Append one outgoing request to the tap file, if `PI_DESKTOP_PROMPT_TAP` names
+ * one.
+ *
+ * Records the system prompt IN FULL plus the advertised tool names, the message
+ * roles and the sampling parameters — the four things worth arguing about, and
+ * small enough to append on every request of a long session. Set
+ * `PI_DESKTOP_PROMPT_TAP_FULL=1` to keep the whole body when the question is
+ * about something this summary drops.
+ */
 export function buildChatCompletionsRequest(
   model: Model<Api>,
   context: Context,
@@ -477,6 +487,25 @@ export function createLlamaCppStream(deps: LlamaCppStreamDeps = {}): LlamaCppStr
   const doFetch = deps.fetchImpl ?? fetch;
 
   return (model, context, options) => {
+    /* One-line diagnostic: is OUR provider even the one pi calls? Gated on the
+       same env var as the prompt dump, so it costs nothing when unset. */
+    if (process.env.PI_ADV_DEBUG_PROMPT !== undefined && process.env.PI_ADV_DEBUG_PROMPT !== '') {
+      try {
+        appendFileSync(
+          process.env.PI_ADV_DEBUG_PROMPT,
+          `${JSON.stringify({
+            at: Date.now(),
+            pid: process.pid,
+            event: 'stream-entered',
+            api: model.api,
+            hasOnPayload: typeof options?.onPayload === 'function',
+          })}\n`,
+          'utf8',
+        );
+      } catch {
+        /* never break a turn for a diagnostic */
+      }
+    }
     const stream = createAssistantMessageEventStream();
 
     const output: AssistantMessage = {
