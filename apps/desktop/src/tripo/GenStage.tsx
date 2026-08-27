@@ -164,6 +164,11 @@ function useEased(target: number, animate: boolean): number {
  */
 function useStalled(percent: number, running: boolean, afterMs = 5000): boolean {
   const [stalled, setStalled] = useState(false);
+  /* `percent` is the TRIGGER, not a value the body reads: every progress update
+     restarts the stall timer, which is the entire mechanism. Dropping it, as
+     the rule suggests, would arm the timer once and call the stage stalled
+     forever after five seconds. */
+  // biome-ignore lint/correctness/useExhaustiveDependencies: progress is the trigger.
   useEffect(() => {
     setStalled(false);
     if (!running) return;
@@ -208,6 +213,9 @@ function Chunk({
           return (
             <span
               className="tp-chunk-tick"
+              // A tick has no identity beyond its position, and the row is a
+              // fixed-length Array.from that is never reordered or filtered.
+              // biome-ignore lint/suspicious/noArrayIndexKey: position IS the identity.
               key={i}
               data-pulse={stalled && state === 'active' && i === leading}
               style={{ ['--tp-tick' as string]: fill }}

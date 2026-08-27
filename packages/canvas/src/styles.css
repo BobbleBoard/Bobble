@@ -3000,6 +3000,11 @@
   color: var(--pd-status-success-fg);
 }
 
+/* The rule pairs this with `.pd-sitroom-task-marker[data-state="done"] svg
+   path` because they share a trailing `svg path`. They target different
+   classes and can never both match one element, so there is no cascade to
+   resolve — only a source order the rule cannot see is irrelevant. */
+/* biome-ignore lint/style/noDescendingSpecificity: different classes, no overlap. */
 .pd-sitroom-testrun-check svg path {
   stroke-dasharray: 16;
   animation: pd-sitroom-checkdraw 0.45s var(--pd-easing-standard) both;

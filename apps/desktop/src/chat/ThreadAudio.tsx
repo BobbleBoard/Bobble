@@ -114,6 +114,7 @@ export function ThreadAudio({ src, name }: { src: string; name?: string }): JSX.
 
       {/* biome-ignore lint/a11y/useKeyWithClickEvents: the play button above is
           the keyboard affordance; this is a pointer-only seek surface. */}
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: same reason. */}
       <div
         className="pd-thread-audio-wave"
         data-testid="thread-audio-wave"

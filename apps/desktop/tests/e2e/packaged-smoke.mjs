@@ -27,6 +27,11 @@ import { homedir, tmpdir } from 'node:os';
 import path from 'node:path';
 import { _electron as electron } from 'playwright-core';
 
+/* Stripping ANSI is the one place a control character in a regex is the point,
+   so it is named rather than suppressed at the call site. */
+// biome-ignore lint/suspicious/noControlCharactersInRegex: stripping ANSI is the purpose.
+const ANSI_ESCAPE = /\x1b\[[0-9;]*m/g;
+
 const appBundle = process.argv[2] ?? '/Applications/Bobble.app';
 const executable = path.join(appBundle, 'Contents/MacOS/Bobble');
 const resources = path.join(appBundle, 'Contents/Resources');
@@ -162,7 +167,7 @@ try {
   // cli.js (source: 'bundled'), not a stray `pi` on PATH. Strip ANSI colour codes
   // first — the main logger colourises `source: 'bundled'` (→ `source:
   // \x1b[32m'bundled'\x1b[39m`), which otherwise defeats the literal match.
-  const cleanLog = mainLog.replace(/\x1b\[[0-9;]*m/g, '');
+  const cleanLog = mainLog.replace(ANSI_ESCAPE, '');
   assert(
     /pi bridge spawned[\s\S]*source: 'bundled'/.test(cleanLog),
     `main log did not show a bundled pi bridge spawn:\n${cleanLog}`,

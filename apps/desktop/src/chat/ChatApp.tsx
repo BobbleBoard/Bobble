@@ -458,8 +458,6 @@ export function ChatApp({
             <div className="pd-sidebar-slot" data-open={sidebarOpen}>
               <SessionSidebar
                 open={sidebarOpen}
-                onCollapse={() => setSidebarOpen(false)}
-                onExpand={() => setSidebarOpen(true)}
                 onTruncated={() => setTruncatedNote(true)}
                 onOpenSettings={onOpenSettings}
                 onOpenConnectors={onOpenConnectors}

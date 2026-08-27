@@ -599,7 +599,7 @@ async function runTask(task, config) {
 function score(records) {
   const byConfig = {};
   for (const r of records) {
-    const c = (byConfig[r.config] ??= {
+    byConfig[r.config] ??= {
       total: 0,
       correct: 0,
       wrongTool: 0,
@@ -609,7 +609,8 @@ function score(records) {
       explored: 0,
       turns: 0,
       errors: 0,
-    });
+    };
+    const c = byConfig[r.config];
     const task = TASKS.find((t) => t.id === r.task);
     c.total += 1;
     c.turns += r.turns;

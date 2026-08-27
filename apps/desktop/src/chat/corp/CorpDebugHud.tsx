@@ -153,7 +153,9 @@ export function CorpDebugHud(): React.ReactElement | null {
     }
   }, [blocks, activity.label]);
 
-  // Reset the log when the task changes.
+  // Reset the log when the task changes. `taskId` is the TRIGGER — the body
+  // deliberately reads nothing, which is why the rule sees it as surplus.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: taskId is the trigger.
   useEffect(() => {
     setLog([]);
     lastLabel.current = '';
@@ -238,6 +240,11 @@ export function CorpDebugHud(): React.ReactElement | null {
           const dur = ((next !== undefined ? next.t : now) - e.t) / 1000;
           return (
             <div
+              // Two entries can share a millisecond, so the timestamp alone is
+              // not unique; the index disambiguates within that tie. The list is
+              // append-only with a rolling window and is never reordered, so an
+              // index here cannot mismatch state to a row.
+              // biome-ignore lint/suspicious/noArrayIndexKey: append-only, never reordered.
               key={`${e.t}-${i}`}
               style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
             >

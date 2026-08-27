@@ -672,7 +672,6 @@ export function SituationRoomHost({
   taskId,
   userMode,
   onSelectNode,
-  onSelectMain,
   selectedNodeId,
   nodeTiming,
 }: SituationRoomHostProps) {

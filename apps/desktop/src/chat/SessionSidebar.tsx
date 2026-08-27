@@ -310,8 +310,6 @@ function ModalityCube({ size = 16 }: { size?: number }): ReactNode {
 
 export function SessionSidebar({
   open,
-  onCollapse,
-  onExpand,
   onTruncated,
   onOpenSettings,
   onOpenConnectors,
@@ -319,9 +317,6 @@ export function SessionSidebar({
   onEnterChat,
 }: {
   open: boolean;
-  onCollapse: () => void;
-  /** Expand the rail back to the full sidebar (round-8 rail). */
-  onExpand: () => void;
   onTruncated: () => void;
   onOpenSettings: (section: SettingsSection) => void;
   /** Open the Codex-style connectors gallery (its own top-level view). */
@@ -625,7 +620,7 @@ export function SessionSidebar({
       }
       refresh();
     },
-    [refresh],
+    [refresh, onEnterChat],
   );
 
   // Attach a working folder to a project (native picker → persisted on the
@@ -642,7 +637,7 @@ export function SessionSidebar({
   );
 
   // Drop a project's working folder → its chats fall back to the shared sandbox.
-  const useSharedSandbox = useCallback(
+  const switchToSharedSandbox = useCallback(
     async (project: ChatProject) => {
       await setProjectCwd(project.id, null);
       refresh();
@@ -1372,7 +1367,9 @@ export function SessionSidebar({
                               {project.cwd ? 'Change working folder…' : 'Set working folder…'}
                             </DropdownMenuItem>
                             {project.cwd ? (
-                              <DropdownMenuItem onSelect={() => void useSharedSandbox(project)}>
+                              <DropdownMenuItem
+                                onSelect={() => void switchToSharedSandbox(project)}
+                              >
                                 Use shared sandbox
                               </DropdownMenuItem>
                             ) : null}

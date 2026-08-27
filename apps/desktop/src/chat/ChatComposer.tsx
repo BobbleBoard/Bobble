@@ -757,7 +757,6 @@ export function ChatComposer({
   const realBusy = (isStreaming && !bgStreaming) || corpRunning || promptInFlight || resuming;
   const [pendingStart, setPendingStart] = useState(false);
   const [pendingStop, setPendingStop] = useState(false);
-  // biome-ignore lint/correctness/useExhaustiveDependencies: reconcile on realBusy transitions only
   useEffect(() => {
     if (realBusy) {
       setPendingStart(false); // the real turn is live now — hand off to it

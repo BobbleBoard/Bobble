@@ -367,7 +367,6 @@ if (!SKIP_CHAT) {
     PI_DESKTOP_CACHE_DIR: realCache,
     GEN3D_CACHE_DIR: path.join(realCache, 'gen3d'),
   };
-  // biome-ignore lint/performance/noDelete: the flag must be ABSENT, not empty.
   delete envC.PI_E2E;
 
   const appC = await electron.launch({

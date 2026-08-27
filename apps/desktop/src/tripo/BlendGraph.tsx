@@ -224,7 +224,6 @@ export function BlendGraph(): JSX.Element {
         </button>
       </div>
 
-      {/* biome-ignore lint/a11y/noStaticElementInteractions: canvas surface for a node-graph editor (nodes carry the real controls) */}
       <div
         ref={canvasRef}
         className="tp-graph-canvas"
@@ -266,8 +265,7 @@ export function BlendGraph(): JSX.Element {
               <g key={t.id} className="tp-edge" data-selected={t.id === selTr}>
                 <path className="tp-edge-hit" d={edgePath(pa, pb)} />
                 <path className="tp-edge-line" d={edgePath(pa, pb)} markerEnd="url(#tp-arrow)" />
-                {/* biome-ignore lint/a11y/noStaticElementInteractions: SVG transition label, not a control surface */}
-                {/* biome-ignore lint/a11y/useKeyWithClickEvents: SVG label; the transition is also selectable/editable via its target node */}
+                {/* biome-ignore lint/a11y/noStaticElementInteractions: SVG transition label, not a control surface; the target node carries the real controls */}
                 <g
                   className="tp-edge-label"
                   transform={`translate(${mid.x}, ${mid.y})`}

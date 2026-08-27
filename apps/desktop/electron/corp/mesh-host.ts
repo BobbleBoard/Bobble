@@ -1414,7 +1414,7 @@ export function createMeshAgentHost(config: MeshAgentHostConfig): MeshAgentHost 
     value: classifyVerification(config.task ?? ''),
   };
 
-  const run: RunAgentTurn = async ({ agentId, from, message, talk }) => {
+  const run: RunAgentTurn = async ({ agentId, message, talk }) => {
     // Live, not captured: the server restarts and a stale window would stick.
     const liveContextWindow = getInferenceContextWindow();
     const agent = roster.get(agentId);

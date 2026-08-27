@@ -263,7 +263,11 @@ export function loadAssetTree(): void {
     // that already has the collision heals on its next launch instead of
     // needing the library cleared by hand.
     const seen = new Set<string>();
-    const deduped = assets.filter((a) => (seen.has(a.id) ? false : (seen.add(a.id), true)));
+    const deduped = assets.filter((a) => {
+      if (seen.has(a.id)) return false;
+      seen.add(a.id);
+      return true;
+    });
     if (deduped.length > 0) useTripoStore.setState({ assets: deduped });
   } catch {
     // Corrupt payload — start clean rather than crash the studio.

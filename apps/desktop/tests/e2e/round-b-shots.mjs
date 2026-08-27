@@ -19,7 +19,7 @@ const dir = path.join(homedir(), '.pi/agent/sessions', '-tmp-shots-');
 mkdirSync(dir, { recursive: true });
 writeFileSync(
   path.join(dir, 'shots.jsonl'),
-  [
+  `${[
     JSON.stringify({
       type: 'session',
       id: 'shots',
@@ -34,7 +34,7 @@ writeFileSync(
       type: 'message',
       message: { role: 'assistant', content: 'Done — the notarization step is the slow one.' },
     }),
-  ].join('\n') + '\n',
+  ].join('\n')}\n`,
 );
 
 const app = await electron.launch({

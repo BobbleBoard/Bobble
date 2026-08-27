@@ -751,6 +751,11 @@ export function useNativeSurfaces(controller: CanvasController): NativeSurfacesA
   // a hardcoded copy would drift silently and only show up in a screenshot.
   const flavor = useThemeStore((s) => s.flavor);
   const mode = useThemeStore((s) => s.mode);
+  /* `flavor` and `mode` are TRIGGERS, not values: the effect reads the computed
+     CSS rather than these, which is the point (a theme edit lands in the
+     editors for free). Dropping them, as the rule suggests, would stop the
+     re-push on a theme change and leave the editors on the old palette. */
+  // biome-ignore lint/correctness/useExhaustiveDependencies: theme change is the trigger.
   useEffect(() => {
     const push = (): void => {
       const cs = getComputedStyle(document.documentElement);

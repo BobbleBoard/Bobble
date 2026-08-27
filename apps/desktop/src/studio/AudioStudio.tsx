@@ -222,6 +222,9 @@ export function AudioStudio(): JSX.Element {
               </Knob>
               {/* VOICE CLONING. A file, chosen or dropped — not a path you paste. */}
               <Knob label="Clone a voice">
+                {/* Drop is a pointer gesture by nature; the "Choose a clip…"
+                    button inside is the keyboard path to the same thing. */}
+                {/* biome-ignore lint/a11y/noStaticElementInteractions: the button is the accessible path. */}
                 <div
                   className="pd-studio-drop"
                   data-has={refAudio !== '' ? 'true' : undefined}

@@ -203,6 +203,12 @@ export function StudioShell({
 /** A labelled knob. Keeps every control in every studio the same shape. */
 export function Knob({ label, children }: { label: string; children: ReactNode }): JSX.Element {
   return (
+    /* Wrapping DOES associate: every Knob's child is a native control, and a
+       label that contains one is bound to it by the browser. The rule fires
+       because it cannot see through `children` to know that. Switching to
+       `htmlFor` would mean inventing an id at each of the studios' ~20 call
+       sites for no gain a screen reader could notice. */
+    // biome-ignore lint/a11y/noLabelWithoutControl: the control is `children`, a native input.
     <label className="pd-studio-knob">
       <span className="pd-studio-knob-label">{label}</span>
       {children}
@@ -231,6 +237,12 @@ export function Segmented<T extends string | number>({
   return (
     <div className="pd-seg pd-seg--inline" role="radiogroup" data-testid={testid}>
       {options.map((o) => (
+        /* A segmented control is buttons with `role="radio"` inside a
+           `role="radiogroup"` — the standard ARIA pattern. `<input
+           type="radio">`, which the rule wants, cannot carry this styling and
+           would change every studio's appearance to satisfy a lint the roles
+           already answer. */
+        // biome-ignore lint/a11y/useSemanticElements: radiogroup pattern, styled.
         <button
           key={String(o.value)}
           type="button"

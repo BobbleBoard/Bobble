@@ -3114,7 +3114,6 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
   align-items: center;
   gap: 3px;
   flex: none;
-  border: none;
   cursor: pointer;
   border-radius: 999px;
   padding: 6px 14px 6px 9px;

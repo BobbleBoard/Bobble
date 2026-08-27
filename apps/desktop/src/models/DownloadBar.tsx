@@ -97,6 +97,9 @@ export function DownloadBar({
       {/* The bar is a bar: one thickness, one solid fill, nothing written on it.
           The numbers live in a popup ABOVE it, which is why this wrapper is the
           positioning context. */}
+      {/* Hover reveals the numbers; it adds nothing a keyboard user needs, and
+          the bar's own controls carry every action. */}
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: hover-only garnish. */}
       <span
         className="pd-dl-slot"
         onMouseEnter={() => setHovered(true)}

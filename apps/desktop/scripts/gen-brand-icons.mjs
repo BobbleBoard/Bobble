@@ -37,7 +37,11 @@ const WANT = {
 };
 
 const rows = [];
+/* Dynamic access is the point: this is a BUILD script that looks up icons by a
+   name from a table, and the tree-shaking the rule protects does not apply to a
+   script that runs once and writes a file. */
 for (const [id, key] of Object.entries(WANT)) {
+  // biome-ignore lint/performance/noDynamicNamespaceImportAccess: a build script, by name, on purpose.
   const icon = si[key];
   if (icon === undefined) {
     console.error(`missing ${key}; skipping ${id}`);

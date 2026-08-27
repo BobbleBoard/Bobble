@@ -22,7 +22,9 @@ export interface BrowserSurfaceProps extends ContentSlotOptions {
  */
 export function BrowserSurface({
   url,
-  driving = false,
+  // `driving` is deliberately not destructured: it stays in the props type
+  // because callers pass it and the state is real, but nothing draws it (see
+  // the note in the body).
   onMount,
   onRectChange,
   className,

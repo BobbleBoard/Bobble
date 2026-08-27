@@ -103,9 +103,9 @@ async function dumpOrder(page, label) {
     console.log('  (store not exposed — is PI_E2E=1 set?)');
     return rows;
   }
-  rows.forEach((r, i) =>
-    console.log(`  ${i}. ${r.kind}${r.streaming ? '*' : ''}: ${JSON.stringify(r.text)}`),
-  );
+  rows.forEach((r, i) => {
+    console.log(`  ${i}. ${r.kind}${r.streaming ? '*' : ''}: ${JSON.stringify(r.text)}`);
+  });
   return rows;
 }
 

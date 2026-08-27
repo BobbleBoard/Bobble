@@ -841,7 +841,15 @@ export function ModelsView() {
       cancelled = true;
       clearTimeout(t);
     };
-  }, [tab, filters.query, filters.sort, filters.scope, filters.capabilities, hfToken]);
+  }, [
+    tab,
+    filters.query,
+    filters.sort,
+    filters.scope,
+    filters.capabilities,
+    filters.format,
+    hfToken,
+  ]);
 
   useEffect(() => {
     if (kind !== 'datasets') return;
@@ -1352,7 +1360,7 @@ export function ModelsView() {
    * model, and a generation model opens the studio that runs it. Both are the
    * thing someone wanted when they pressed it.
    */
-  const useRecommendation = async (rec: ModelRecommendation): Promise<void> => {
+  const applyRecommendation = async (rec: ModelRecommendation): Promise<void> => {
     if (rec.family.output === 'text') {
       const entry = catalog.find((e) => e.hfRepo === rec.variant.repo);
       if (entry !== undefined) {
@@ -2031,7 +2039,7 @@ export function ModelsView() {
                         setSelected(rec.variant.repo);
                         void downloadVariant(rec.family, rec.variant);
                       }}
-                      onUse={(rec) => void useRecommendation(rec)}
+                      onUse={(rec) => void applyRecommendation(rec)}
                       onCancel={(rec) => void cancelVariant(rec.family, rec.variant)}
                       progress={storeProgressByRepo}
                     />

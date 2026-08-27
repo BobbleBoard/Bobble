@@ -265,7 +265,7 @@ try {
       .map((row) => {
         const text = row.textContent ?? '';
         const named = /(\d+(?:\.\d+)?)\s*[bB](?![a-z])/.exec(row.getAttribute('data-testid') ?? '');
-        const shown = /(\d+(?:\.\d+)?)B(?!\w)/.exec(text.replace(/^[^]*?—/, ''));
+        const shown = /(\d+(?:\.\d+)?)B(?!\w)/.exec(text.replace(/^[\s\S]*?—/, ''));
         if (named === null || shown === null) return null;
         const a = Number(named[1]);
         const b = Number(shown[1]);

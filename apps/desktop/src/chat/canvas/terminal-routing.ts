@@ -120,5 +120,5 @@ export function useBashTerminalCanvasRouting(): void {
         controller.updateTab(existing.id, { data });
       }
     }
-  }, [messages, controller]);
+  }, [messages, controller, cwd]);
 }

@@ -32,7 +32,7 @@ mkdirSync(dir, { recursive: true });
 const file = path.join(dir, `export-probe-${Date.now()}.jsonl`);
 writeFileSync(
   file,
-  [
+  `${[
     JSON.stringify({ type: 'session', id: 'e1', cwd: '/tmp/w', timestamp: '2026-01-01T00:00:00Z' }),
     JSON.stringify({ type: 'message', message: { role: 'user', content: 'build the thing' } }),
     JSON.stringify({
@@ -45,7 +45,7 @@ writeFileSync(
         ],
       },
     }),
-  ].join('\n') + '\n',
+  ].join('\n')}\n`,
 );
 
 const media = path.join(tmpdir(), `pd-drag-${Date.now()}.txt`);

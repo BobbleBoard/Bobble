@@ -474,6 +474,7 @@ function HelpModal(): JSX.Element {
   const set = useTripoStore((s) => s.set);
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: backdrop dismissal; Escape and the close/OK buttons are the keyboard paths
+    // biome-ignore lint/a11y/useKeyWithClickEvents: same — the modal's buttons carry the keyboard.
     <div
       className="tp-modal-backdrop"
       data-testid="tp-help-modal"

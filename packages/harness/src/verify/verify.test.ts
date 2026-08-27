@@ -127,8 +127,8 @@ describe('godot project check', () => {
       stdout: godotOutput,
       stderr: '',
     }));
-    expect(c).toBeDefined();
-    if (c === undefined) return;
+    expect(c).not.toBeNull();
+    if (c === null) return;
     const r = await runCheck(run, c, { cwd: '/w' });
     expect(r.status).toBe('fail');
     expect(r.exitCode).toBe(0);
@@ -150,8 +150,8 @@ describe('godot project check', () => {
     // no output — indistinguishable from a clean run on exit code ALONE, which
     // is why the file test has to come first rather than be inferred later.
     const run: VerifyBashRunner = vi.fn(async () => ({ exitCode: 1, stdout: '', stderr: '' }));
-    expect(c).toBeDefined();
-    if (c === undefined) return;
+    expect(c).not.toBeNull();
+    if (c === null) return;
     const r = await runCheck(run, c, { cwd: '/w' });
     expect(r.status).toBe('fail');
   });
@@ -163,8 +163,8 @@ describe('godot project check', () => {
       stdout: 'Godot Engine v4.7.1.stable.official - https://godotengine.org',
       stderr: '',
     }));
-    expect(c).toBeDefined();
-    if (c === undefined) return;
+    expect(c).not.toBeNull();
+    if (c === null) return;
     expect((await runCheck(run, c, { cwd: '/w' })).status).toBe('pass');
   });
 
@@ -177,7 +177,9 @@ describe('godot project check', () => {
       stderr: '',
       timedOut: true,
     }));
-    expect((await runCheck(run, c!, { cwd: '/w' })).status).toBe('inconclusive');
+    expect(c).not.toBeNull();
+    if (c === null) return;
+    expect((await runCheck(run, c, { cwd: '/w' })).status).toBe('inconclusive');
   });
 });
 

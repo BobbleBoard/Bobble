@@ -59,7 +59,6 @@ function AnimPreviewCard({ preset }: { readonly preset: string | undefined }): J
       </div>
     );
   return (
-    // biome-ignore lint/a11y/useMediaCaption: silent motion previews of animation presets — there is no speech to caption
     <video
       className="tp-anim-video"
       src={preview.video}
