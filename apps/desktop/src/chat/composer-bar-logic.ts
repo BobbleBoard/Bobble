@@ -137,7 +137,7 @@ export interface EffortSliderView {
 export function effortSliderView(
   effortMode: EffortMode,
   effort: EffortLevel,
-  activeTier: ModelTier | null,
+  _activeTier: ModelTier | null,
 ): EffortSliderView {
   if (effortMode === 'auto') {
     // In Auto the readout says "Adaptive" ("Effort · Adaptive"), NOT the resolved

@@ -54,7 +54,11 @@ writeFileSync(
       id: 'a1',
       parentId: 'u1',
       timestamp: 't',
-      message: { role: 'assistant', content: [{ type: 'text', text: 'Apples are great.' }], timestamp: 1 },
+      message: {
+        role: 'assistant',
+        content: [{ type: 'text', text: 'Apples are great.' }],
+        timestamp: 1,
+      },
     }),
   ].join('\n'),
 );
@@ -87,7 +91,9 @@ try {
         {
           kind: 'assistant',
           id: 'a1',
-          blocks: [{ type: 'text', text: 'Apples are pomaceous fruits of the tree Malus domestica…' }],
+          blocks: [
+            { type: 'text', text: 'Apples are pomaceous fruits of the tree Malus domestica…' },
+          ],
           timestamp: 2,
           isStreaming: true,
         },
@@ -110,7 +116,7 @@ try {
   await page.waitForSelector('[data-testid="why-queued-link"]', { timeout: 8000 });
   const reasonLine = await page.textContent('[data-testid="queued-message"]');
   assert(
-    reasonLine !== null && reasonLine.includes('switch to Gemma 4 31B'),
+    reasonLine?.includes('switch to Gemma 4 31B'),
     `queued reason line should name the switch target; got: ${reasonLine}`,
   );
   // Composer shows Pause LEFT of Stop while busy.
@@ -134,7 +140,7 @@ try {
   await page.waitForSelector('[data-testid="modal-running-chat"]', { timeout: 8000 });
   const modalText = await page.textContent('[data-testid="why-queued-modal"]');
   assert(
-    modalText !== null && modalText.includes('Gemma 4 31B') && modalText.includes('Gemma 4 12B'),
+    modalText?.includes('Gemma 4 31B') && modalText.includes('Gemma 4 12B'),
     `modal blurb should name both models; got: ${modalText}`,
   );
   assert(
@@ -145,14 +151,17 @@ try {
   await page.waitForSelector('[data-testid="modal-stop"]', { timeout: 8000 });
   const rowText = await page.textContent('[data-testid="modal-running-chat"]');
   assert(
-    rowText !== null && rowText.includes('Apples chat') && rowText.includes('Gemma 4 12B'),
+    rowText?.includes('Apples chat') && rowText.includes('Gemma 4 12B'),
     `running-chat row should show the title + loaded model; got: ${rowText}`,
   );
   await page.screenshot({ path: path.join(OUT_DIR, '02-why-queued-modal.png') });
 
   // Close the modal (Esc) before the next state.
   await page.keyboard.press('Escape');
-  await page.waitForSelector('[data-testid="why-queued-modal"]', { state: 'detached', timeout: 8000 });
+  await page.waitForSelector('[data-testid="why-queued-modal"]', {
+    state: 'detached',
+    timeout: 8000,
+  });
 
   // (C) A same-model queue → the plainer sequential-wait reason (no swap).
   await page.evaluate(() => {
@@ -169,7 +178,7 @@ try {
   await page.waitForFunction(
     () => {
       const el = document.querySelector('[data-testid="queued-message"]');
-      return el !== null && el.textContent.includes('sends when the current reply finishes');
+      return el?.textContent.includes('sends when the current reply finishes');
     },
     { timeout: 8000 },
   );

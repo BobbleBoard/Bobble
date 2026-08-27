@@ -55,7 +55,7 @@ function codeBlocks(readme: string): string[] {
 /** Prose, not a command: sentence-shaped, or a comment/output line. */
 function looksLikeProse(line: string): boolean {
   if (line.length === 0 || line.length > 120) return true;
-  if (/^[#>$%]/.test(line)) return line.startsWith('$') || line.startsWith('%') ? false : true;
+  if (/^[#>$%]/.test(line)) return !(line.startsWith('$') || line.startsWith('%'));
   if (/[.!?]$/.test(line)) return true;
   // A command has few words and no sentence capitalisation mid-line.
   return line.split(/\s+/).length > 8;

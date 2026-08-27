@@ -345,7 +345,7 @@ export function SituationRoomSurface({
             <SubagentList
               nodes={team}
               onSelectNode={onSelectNode}
-      {...(onSelectMain !== undefined ? { onSelectMain } : {})}
+              {...(onSelectMain !== undefined ? { onSelectMain } : {})}
               selectedNodeId={selectedNodeId}
               nodeTiming={nodeTiming}
               now={now}
@@ -445,7 +445,8 @@ function durationOr(ms: number | undefined, prefix: string, fallback: string): s
  */
 export function isGenerating(node: OrgNodeView): boolean {
   if (node.state !== 'working') return false;
-  const parked = (node.role === 'ceo' || node.role === 'manager') && node.currentAction === undefined;
+  const parked =
+    (node.role === 'ceo' || node.role === 'manager') && node.currentAction === undefined;
   return !parked;
 }
 
@@ -610,14 +611,26 @@ function SubagentList({ nodes, onSelectNode, selectedNodeId, nodeTiming, now }: 
                  * screen. Nothing is shown while it IS working — that already has
                  * the shimmer and the clock, and a badge there would be noise.
                  */}
-                {(working && !generating ? { word: 'waiting', tone: 'waiting' as const } : agentStopped(node.state)) !== null ? (
+                {(working && !generating
+                  ? { word: 'waiting', tone: 'waiting' as const }
+                  : agentStopped(node.state)) !== null ? (
                   <span
                     className="pd-sitroom-agent-why"
-                    data-why={(working && !generating ? { word: 'waiting', tone: 'waiting' as const } : agentStopped(node.state))?.tone}
+                    data-why={
+                      (working && !generating
+                        ? { word: 'waiting', tone: 'waiting' as const }
+                        : agentStopped(node.state)
+                      )?.tone
+                    }
                     data-testid="subagent-why"
                   >
                     <span className="pd-sitroom-agent-why-dot" aria-hidden />
-                    {(working && !generating ? { word: 'waiting', tone: 'waiting' as const } : agentStopped(node.state))?.word}
+                    {
+                      (working && !generating
+                        ? { word: 'waiting', tone: 'waiting' as const }
+                        : agentStopped(node.state)
+                      )?.word
+                    }
                   </span>
                 ) : null}
               </>

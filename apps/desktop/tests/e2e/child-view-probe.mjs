@@ -72,35 +72,41 @@ try {
 
   // Inject a child agent under this chat with a realistic transcript (thinking +
   // tool call + text), as the fold would have produced from its event stream.
-  await page.evaluate(({ parentId, readPath }) => {
-    const store = window.__child_store.getState();
-    store.ensureChild('sub-1', parentId, 'Research subagent');
-    store.replaceMessages('sub-1', [
-      { kind: 'user', id: 'u1', text: 'Research quantum error correction', timestamp: 1 },
-      {
-        kind: 'assistant',
-        id: 'a1',
-        timestamp: 2,
-        isStreaming: false,
-        blocks: [
-          { type: 'thinking', thinking: 'Let me look at the recent papers in the folder.' },
-          { type: 'toolCall', id: 't1', name: 'bash', arguments: { command: 'ls papers/' } },
-          { type: 'toolCall', id: 't2', name: 'read_file', arguments: { path: readPath } },
-          { type: 'text', text: 'Found 3 papers. The surface-code approach looks most promising.' },
-        ],
-      },
-      {
-        kind: 'toolResult',
-        id: 'r1',
-        toolCallId: 't1',
-        toolName: 'bash',
-        text: 'surface-code.pdf\nldpc.pdf\ncat-qubits.pdf',
-        isError: false,
-        timestamp: 3,
-      },
-    ]);
-    store.setRunning('sub-1', false);
-  }, { parentId: alphaFile, readPath: readFile });
+  await page.evaluate(
+    ({ parentId, readPath }) => {
+      const store = window.__child_store.getState();
+      store.ensureChild('sub-1', parentId, 'Research subagent');
+      store.replaceMessages('sub-1', [
+        { kind: 'user', id: 'u1', text: 'Research quantum error correction', timestamp: 1 },
+        {
+          kind: 'assistant',
+          id: 'a1',
+          timestamp: 2,
+          isStreaming: false,
+          blocks: [
+            { type: 'thinking', thinking: 'Let me look at the recent papers in the folder.' },
+            { type: 'toolCall', id: 't1', name: 'bash', arguments: { command: 'ls papers/' } },
+            { type: 'toolCall', id: 't2', name: 'read_file', arguments: { path: readPath } },
+            {
+              type: 'text',
+              text: 'Found 3 papers. The surface-code approach looks most promising.',
+            },
+          ],
+        },
+        {
+          kind: 'toolResult',
+          id: 'r1',
+          toolCallId: 't1',
+          toolName: 'bash',
+          text: 'surface-code.pdf\nldpc.pdf\ncat-qubits.pdf',
+          isError: false,
+          timestamp: 3,
+        },
+      ]);
+      store.setRunning('sub-1', false);
+    },
+    { parentId: alphaFile, readPath: readFile },
+  );
 
   // MP3: the child appears as an indented row under its parent in the sidebar.
   await page.waitForSelector('[data-testid="child-rows"]', { timeout: 8000 });
@@ -138,8 +144,14 @@ try {
     text: el.textContent ?? '',
     openable: el.querySelector('button') !== null,
   }));
-  assert(readInfo.text.includes('notes.md'), `MP4-canvas: read row names its file: ${readInfo.text}`);
-  assert(readInfo.openable, 'MP4-canvas: the child view read row is a button (opens the file in canvas, same as the main chat)');
+  assert(
+    readInfo.text.includes('notes.md'),
+    `MP4-canvas: read row names its file: ${readInfo.text}`,
+  );
+  assert(
+    readInfo.openable,
+    'MP4-canvas: the child view read row is a button (opens the file in canvas, same as the main chat)',
+  );
   await page.screenshot({ path: path.join(OUT_DIR, '03-child-canvas.png') });
 
   // Back returns to the main chat.

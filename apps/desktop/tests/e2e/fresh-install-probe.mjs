@@ -5,10 +5,11 @@
  * cache, so it sees what a Mac that has never run this app sees — no settings,
  * no models, no 3D module. The user's real profile is never touched.
  */
-import { _electron } from '@playwright/test';
+
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { _electron } from '@playwright/test';
 
 const APP = process.env.APP ?? '/Applications/Bobble.app';
 const OUT = process.env.OUT ?? tmpdir();
@@ -41,13 +42,19 @@ const seen = await win.evaluate(() => {
   const el = document.querySelector('[data-testid="modality-3d"]');
   return {
     onboarding: document.body.textContent?.match(/coming from|experience|Claude|Codex/) !== null,
-    buttons: [...document.querySelectorAll('button')].map((b) => b.textContent?.trim()).filter(Boolean).slice(0, 10),
+    buttons: [...document.querySelectorAll('button')]
+      .map((b) => b.textContent?.trim())
+      .filter(Boolean)
+      .slice(0, 10),
     heading: document.querySelector('h1,h2')?.textContent?.trim() ?? null,
-    threeD: el === null ? null : {
-      installed: el.getAttribute('data-installed'),
-      title: el.getAttribute('title'),
-      size: t('[data-testid="modality-3d-size"]'),
-    },
+    threeD:
+      el === null
+        ? null
+        : {
+            installed: el.getAttribute('data-installed'),
+            title: el.getAttribute('title'),
+            size: t('[data-testid="modality-3d-size"]'),
+          },
     chip: t('[data-testid="footer-model-chip"]'),
   };
 });
@@ -59,13 +66,15 @@ await win.waitForTimeout(3000);
 const gate = await win.evaluate(() => {
   const g = document.querySelector('[data-testid="tp-module-gate"]');
   const shell = document.querySelector('.tp-shell');
-  return g === null ? null : {
-    status: g.getAttribute('data-status'),
-    download: document.querySelector('[data-testid="tp-gate-download"]')?.textContent ?? null,
-    view: document.querySelector('[data-testid="tp-gate-view"]')?.textContent ?? null,
-    blurred: shell === null ? null : getComputedStyle(shell).filter,
-    inert: shell?.hasAttribute('inert') ?? null,
-  };
+  return g === null
+    ? null
+    : {
+        status: g.getAttribute('data-status'),
+        download: document.querySelector('[data-testid="tp-gate-download"]')?.textContent ?? null,
+        view: document.querySelector('[data-testid="tp-gate-view"]')?.textContent ?? null,
+        blurred: shell === null ? null : getComputedStyle(shell).filter,
+        inert: shell?.hasAttribute('inert') ?? null,
+      };
 });
 console.log('3D gate:', JSON.stringify(gate));
 await win.screenshot({ path: path.join(OUT, 'fresh-2-3d.png') });

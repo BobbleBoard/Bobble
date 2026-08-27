@@ -33,16 +33,13 @@ import {
   Thread,
 } from '@pi-desktop/ui';
 import { useEffect, useRef, useState } from 'react';
-import { fetchWorkerTranscript } from '../state/corp-connect';
 import { useCorpStore } from '../state/corp-store';
 import { useLlmStore } from '../state/llm-store';
 import { forkAndReprompt, switchBranch } from '../state/pi-connect';
 import { usePiStore } from '../state/pi-slice';
 import { openPresented, usePresentStore } from '../state/present-store';
 import { AssistantGroup } from './AssistantGroup';
-import { focusSituationTab } from './canvas/corp-canvas-routing';
-import { CorpInlineTurn } from './corp/CorpInlineTurn';
-import { corpChatView, corpPeekAvailable } from './corp/corp-thread-view';
+import { corpChatView } from './corp/corp-thread-view';
 import { HarnessChecklistPanel, ThreadStatusIndicator } from './HarnessStatus';
 
 /** Concatenated visible text of an assistant response group (for copy). */
@@ -378,7 +375,7 @@ export function ChatThread() {
               const group = item.group;
               const first = group[0];
               if (first === undefined) return null;
-              const totalTokens = [...group].reverse().find((m) => m.usage !== undefined)
+              const _totalTokens = [...group].reverse().find((m) => m.usage !== undefined)
                 ?.usage?.totalTokens;
               const streaming = group.some((m) => m.isStreaming === true);
               // Pre-first-token: an EMPTY streaming assistant would render a bare row

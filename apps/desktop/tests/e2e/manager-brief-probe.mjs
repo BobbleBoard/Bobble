@@ -112,9 +112,25 @@ async function main() {
   serverProc = spawn(
     SERVER_BIN,
     // prettier-ignore
-    ['-m', MODEL_GGUF, '--host', '127.0.0.1', '--port', String(PORT), '-c', '32768',
-     '--parallel', '1', '--spec-type', 'draft-mtp', '--spec-draft-n-max', '2',
-     '--jinja', '--chat-template-file', CHAT_TEMPLATE],
+    [
+      '-m',
+      MODEL_GGUF,
+      '--host',
+      '127.0.0.1',
+      '--port',
+      String(PORT),
+      '-c',
+      '32768',
+      '--parallel',
+      '1',
+      '--spec-type',
+      'draft-mtp',
+      '--spec-draft-n-max',
+      '2',
+      '--jinja',
+      '--chat-template-file',
+      CHAT_TEMPLATE,
+    ],
     { stdio: ['ignore', 'ignore', 'ignore'] },
   );
   const deadline = Date.now() + 180_000;
@@ -164,7 +180,9 @@ async function main() {
   // thing under test.
   const reply = await mesh.run('manager', vision);
 
-  console.log(`\n${'='.repeat(78)}\nCONTRACTS THE MANAGER WROTE: ${contracts.length}\n${'='.repeat(78)}`);
+  console.log(
+    `\n${'='.repeat(78)}\nCONTRACTS THE MANAGER WROTE: ${contracts.length}\n${'='.repeat(78)}`,
+  );
   contracts.forEach((c, i) => {
     console.log(`\n──── ${i + 1}. to ${c.to} ────`);
     console.log(c.message);

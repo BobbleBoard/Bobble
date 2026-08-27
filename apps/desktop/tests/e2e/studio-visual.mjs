@@ -59,18 +59,19 @@ await win.evaluate(() => {
 const geom = async (label) => {
   const g = await win.evaluate(() => {
     const q = (s) => document.querySelector(s);
-    const box = (el) => (el === null ? null : {
-      x: Math.round(el.getBoundingClientRect().x),
-      y: Math.round(el.getBoundingClientRect().y),
-      w: Math.round(el.getBoundingClientRect().width),
-      h: Math.round(el.getBoundingClientRect().height),
-    });
+    const box = (el) =>
+      el === null
+        ? null
+        : {
+            x: Math.round(el.getBoundingClientRect().x),
+            y: Math.round(el.getBoundingClientRect().y),
+            w: Math.round(el.getBoundingClientRect().width),
+            h: Math.round(el.getBoundingClientRect().height),
+          };
     const controls = [...document.querySelectorAll('.pd-studio-knob')].map((k) => ({
       label: k.querySelector('.pd-studio-knob-label')?.textContent ?? '',
       h: Math.round(k.getBoundingClientRect().height),
-      inputH: Math.round(
-        (k.querySelector('input,select')?.getBoundingClientRect().height ?? 0),
-      ),
+      inputH: Math.round(k.querySelector('input,select')?.getBoundingClientRect().height ?? 0),
     }));
     const row = q('.pd-studio-controls');
     return {

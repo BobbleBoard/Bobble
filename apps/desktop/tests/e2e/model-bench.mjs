@@ -102,7 +102,9 @@ const app = await electron.launch({
   env: { ...process.env, PI_E2E: '1', PI_E2E_BACKGROUND: '1' },
 });
 const mainLog = [];
-app.process().on('exit', (code, sig) => console.log(`[bench] ELECTRON EXITED code=${code} signal=${sig}`));
+app
+  .process()
+  .on('exit', (code, sig) => console.log(`[bench] ELECTRON EXITED code=${code} signal=${sig}`));
 for (const s of [app.process().stdout, app.process().stderr]) {
   s?.on('data', (d) => {
     for (const line of String(d).split('\n'))
@@ -219,9 +221,7 @@ try {
      * one. Abort the turn before moving on.
      */
     if (!done) {
-      await page
-        .evaluate(() => window.__pi_abort?.())
-        .catch(() => undefined);
+      await page.evaluate(() => window.__pi_abort?.()).catch(() => undefined);
       await page.waitForTimeout(6000).catch(() => undefined);
     }
 

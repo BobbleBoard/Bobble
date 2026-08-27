@@ -4085,20 +4085,20 @@
   opacity: 0.75;
 }
 
-.pd-sitroom-agent-why[data-why='done'] {
+.pd-sitroom-agent-why[data-why="done"] {
   color: var(--pd-status-success-fg);
 }
-.pd-sitroom-agent-why[data-why='error'] {
+.pd-sitroom-agent-why[data-why="error"] {
   color: var(--pd-status-danger-fg);
 }
-.pd-sitroom-agent-why[data-why='paused'] {
+.pd-sitroom-agent-why[data-why="paused"] {
   color: var(--pd-status-warning-fg);
 }
 /* Waiting/queued keeps the muted default — it is the normal state, not news. */
 
 /* The faint glow, only where it earns attention. */
-.pd-sitroom-agent-why[data-why='error'] .pd-sitroom-agent-why-dot,
-.pd-sitroom-agent-why[data-why='paused'] .pd-sitroom-agent-why-dot {
+.pd-sitroom-agent-why[data-why="error"] .pd-sitroom-agent-why-dot,
+.pd-sitroom-agent-why[data-why="paused"] .pd-sitroom-agent-why-dot {
   box-shadow: 0 0 5px currentColor;
 }
 

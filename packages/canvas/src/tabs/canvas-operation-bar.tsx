@@ -25,7 +25,6 @@ import {
   IconCode,
   IconDownload,
   IconExpand,
-  IconFolder,
   IconFolders,
   IconMarkup,
 } from '../tab-icons.tsx';
@@ -350,7 +349,7 @@ function FileOps({
  * The app's system icon (a `data:` URL) or the generic app glyph fallback, sized
  * for the split-button primary segment (`slot="split"`) or a menu row.
  */
-function AppIcon({ app, slot = 'split' }: { app?: OpenWithApp; slot?: 'split' | 'menu' }) {
+function _AppIcon({ app, slot = 'split' }: { app?: OpenWithApp; slot?: 'split' | 'menu' }) {
   const className = slot === 'menu' ? 'pd-menu-icon pd-canvas-app-icon' : 'pd-canvas-app-icon';
   return (
     <span className={className} aria-hidden="true">

@@ -524,7 +524,7 @@ export function registerGenIpc(opts: GenManagerOptions): void {
       outputDir,
     );
 
-    const tabId = `pi:gen-${jobId}`;
+    const _tabId = `pi:gen-${jobId}`;
     const modelInfo = { id: model.id, label: model.label, license: model.license };
     let candidates: GenSurfacePayload['candidates'] = seeds.map((seed) => ({
       seed,

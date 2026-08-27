@@ -139,7 +139,7 @@ try {
 
   // ── N4: a backgrounded chat with NO disk file stays in the sidebar + spins.
   await page.evaluate(() => {
-    window.__pi_store().setState((s) => ({
+    window.__pi_store().setState((_s) => ({
       bgRun: {
         sessionFile: '/tmp/unwritten-newchat.jsonl',
         messages: [],

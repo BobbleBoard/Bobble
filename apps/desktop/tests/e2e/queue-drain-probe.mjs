@@ -70,7 +70,7 @@ try {
   // Inject a background run + a queued message (as if a different chat is running
   // and the user queued a send here).
   await page.evaluate(() => {
-    window.__pi_store().setState((s) => ({
+    window.__pi_store().setState((_s) => ({
       bgRun: {
         sessionFile: '/tmp/other.jsonl',
         messages: [],

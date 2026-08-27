@@ -77,11 +77,13 @@ try {
   const msgs = await win.evaluate(() =>
     (window.__pi_store().getState().messages ?? []).map((m) => ({
       kind: m.kind,
-      text: (m.text ?? (m.blocks ?? []).map((b) => b.text ?? b.thinking ?? `[${b.type}]`).join(''))
-        .slice(0, 90),
+      text: (
+        m.text ?? (m.blocks ?? []).map((b) => b.text ?? b.thinking ?? `[${b.type}]`).join('')
+      ).slice(0, 90),
     })),
   );
-  for (const [i, m] of msgs.entries()) console.log(`  msg${i} ${m.kind}: ${JSON.stringify(m.text)}`);
+  for (const [i, m] of msgs.entries())
+    console.log(`  msg${i} ${m.kind}: ${JSON.stringify(m.text)}`);
 } finally {
   await app.close();
 }

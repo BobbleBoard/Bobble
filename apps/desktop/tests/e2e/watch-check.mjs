@@ -86,12 +86,18 @@ try {
   const want = ['mainspring', 'barrel', 'escapement', 'pallet', 'balance', 'dial', 'hand'];
   const blob = `${info.bodyText} ${info.hooks.join(' ')}`.toLowerCase();
   const missing = want.filter((w) => !blob.includes(w));
-  record('the named parts are present', missing.length === 0, missing.length ? `missing: ${missing.join(', ')}` : '');
+  record(
+    'the named parts are present',
+    missing.length === 0,
+    missing.length ? `missing: ${missing.join(', ')}` : '',
+  );
 
   record(
     'the build exposes something to drive it',
     info.hooks.length > 0,
-    info.hooks.length ? info.hooks.join(', ') : 'no window hook — a wrong assembly cannot be tested',
+    info.hooks.length
+      ? info.hooks.join(', ')
+      : 'no window hook — a wrong assembly cannot be tested',
   );
 
   const passed = results.filter((r) => r.ok).length;

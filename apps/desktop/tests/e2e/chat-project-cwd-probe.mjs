@@ -80,10 +80,9 @@ try {
   await page.keyboard.press('Enter');
 
   // The new chat appears UNDER the project (assignment beats sandbox grouping).
-  await page.waitForSelector(
-    `[data-testid="project-chats-${projId}"] [data-testid^="chat-row-"]`,
-    { timeout: 12000 },
-  );
+  await page.waitForSelector(`[data-testid="project-chats-${projId}"] [data-testid^="chat-row-"]`, {
+    timeout: 12000,
+  });
   await page.screenshot({ path: path.join(OUT_DIR, '01-projectless-new-chat.png') });
 
   // ── The composer folder chip shows the PROJECT NAME, not "Sandbox" ──────────

@@ -1,19 +1,3 @@
-/**
- * Session sidebar. Two shapes driven by `open`:
- *   - EXPANDED: the collapse toggle sits to the LEFT of a click-to-expand
- *     `CollapsibleSearch` (round-8 #1/#2), then New chat, the Workspace nav
- *     (Projects, Model management, Connectors, Scheduled, Skills — Artifacts +
- *     the redundant Settings entry removed, #4/#5), then the Chats history and
- *     the bottom-left profile button (round-12 #4: one button → a dropup with
- *     Settings / Toggle theme / the User–Power toggle).
- *   - COLLAPSED: a NARROW ICON RAIL (~64px) — the SVG icons stay visible; the
- *     search becomes just the magnifying glass; the same profile button (avatar
- *     only) pins to the bottom. Never fully hidden. Width + label-hiding live in
- *     global.css.
- * Sessions are read from the fs channels; mutations go through pi.
- */
-
-import type { OrgNodeView } from '@pi-desktop/coordination';
 import {
   Checkbox,
   CollapsibleSearch,
@@ -41,9 +25,7 @@ import {
   IconPencil,
   IconPin,
   IconPlus,
-  IconSearch,
   IconSettings,
-  IconSidebar,
   IconSparkles,
   IconTrash,
   IconVideo,
@@ -65,7 +47,7 @@ import {
   useState,
 } from 'react';
 import type { SessionSummary } from '../../electron/ipc-contract';
-import type { ChatProject, UserMode } from '../../electron/settings/settings-contract';
+import type { ChatProject } from '../../electron/settings/settings-contract';
 import { IconCpu, IconMoon, IconSun } from '../settings/icons';
 import type { SettingsSection } from '../settings/SettingsView';
 import {
@@ -228,7 +210,7 @@ function slideMs(): number {
 }
 
 /** A 40×40 icon-only button for the collapsed rail (tooltip = its label). */
-function RailButton({
+function _RailButton({
   label,
   icon,
   onClick,
@@ -675,8 +657,7 @@ export function SessionSidebar({
     // still on its first turn) would otherwise vanish from the sidebar until its
     // reply lands — keep it visible + spinning via an optimistic row.
     if (
-      bgRun !== null &&
-      bgRun.streaming &&
+      bgRun?.streaming &&
       !list.some((s) => s.file === bgRun.sessionFile) &&
       bgRun.sessionFile !== effectiveCurrentFile
     ) {

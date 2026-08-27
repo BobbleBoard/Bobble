@@ -9,10 +9,11 @@
  * rather than inside it — so this measures the parent menu's right edge against
  * the panel's left edge, and shoots the result.
  */
-import { _electron } from '@playwright/test';
+
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { _electron } from '@playwright/test';
 
 const OUT = process.env.OUT ?? '/tmp/quickmenu-flyout';
 const app = await _electron.launch({
@@ -54,10 +55,13 @@ try {
     ['narrow', 1440, 868],
     ['wide', 1900, 1000],
   ]) {
-    await app.evaluate(({ BrowserWindow }, size) => {
-      const win0 = BrowserWindow.getAllWindows()[0];
-      win0?.setBounds({ x: 60, y: 60, width: size.w, height: size.h });
-    }, { w: width, h: height });
+    await app.evaluate(
+      ({ BrowserWindow }, size) => {
+        const win0 = BrowserWindow.getAllWindows()[0];
+        win0?.setBounds({ x: 60, y: 60, width: size.w, height: size.h });
+      },
+      { w: width, h: height },
+    );
     await win.waitForTimeout(700);
 
     await win.click('[data-testid="footer-model-chip"]');

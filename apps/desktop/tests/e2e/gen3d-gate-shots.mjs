@@ -10,10 +10,11 @@
  * re-enters the studio the instant "Chat" exits it — so the sidebar has to be
  * photographed WITHOUT that flag or the back button looks broken when it is not.
  */
-import { _electron } from '@playwright/test';
+
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { _electron } from '@playwright/test';
 
 const OUT = process.env.OUT ?? path.join(tmpdir(), 'gate-shots');
 const empty = mkdtempSync(path.join(tmpdir(), 'gen3d-empty-'));

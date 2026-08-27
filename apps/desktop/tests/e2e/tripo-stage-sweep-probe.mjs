@@ -22,7 +22,17 @@ const PARTS = process.env.TRIPO_STAGE_PARTS ?? '';
 const OUT_DIR = process.env.TRIPO_SWEEP_OUT ?? path.join(tmpdir(), `tripo-stage-${STAGE}`);
 const APP =
   process.env.TRIPO_STAGE_APP ??
-  path.resolve(here, '..', '..', 'release', 'mac-arm64', 'Bobble.app', 'Contents', 'MacOS', 'Bobble');
+  path.resolve(
+    here,
+    '..',
+    '..',
+    'release',
+    'mac-arm64',
+    'Bobble.app',
+    'Contents',
+    'MacOS',
+    'Bobble',
+  );
 mkdirSync(OUT_DIR, { recursive: true });
 if (GLB.length === 0) throw new Error('set TRIPO_STAGE_GLB');
 
@@ -78,8 +88,11 @@ let outcome = 'timeout';
 while (Date.now() - t0 < 2_700_000) {
   const s = await win
     .evaluate(() => ({
-      phase: document.querySelector('[data-testid="tp-genstage"]')?.getAttribute('data-phase') ?? null,
-      failed: document.querySelector('[data-testid="tp-genstage"]')?.getAttribute('data-failed') === 'true',
+      phase:
+        document.querySelector('[data-testid="tp-genstage"]')?.getAttribute('data-phase') ?? null,
+      failed:
+        document.querySelector('[data-testid="tp-genstage"]')?.getAttribute('data-failed') ===
+        'true',
       msg: document.querySelector('[data-testid="tp-genstage-msg"]')?.textContent ?? '',
       startError: document.querySelector('[data-testid="tp-start-error"]')?.textContent ?? null,
       steps: document.querySelector('[class*="tp-asset-steps"]')?.textContent ?? '1',
@@ -116,7 +129,9 @@ console.log(
   `\noutcome: ${outcome}  cards: ${end.cards}  versions: ${end.versions}\nstats: ${end.stats.replace(/\s+/g, ' ').slice(0, 90)}`,
 );
 const ok = outcome === 'done' && end.cards === 1 && Number(end.versions) >= 2;
-console.log(`\nVERDICT: ${STAGE} ${ok ? 'ran and added a version to the SAME asset' : 'DID NOT complete cleanly'}`);
+console.log(
+  `\nVERDICT: ${STAGE} ${ok ? 'ran and added a version to the SAME asset' : 'DID NOT complete cleanly'}`,
+);
 console.log(`shots in ${OUT_DIR}`);
 await app.close().catch(() => {});
 process.exit(ok ? 0 : 1);

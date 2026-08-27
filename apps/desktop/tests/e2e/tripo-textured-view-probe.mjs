@@ -24,7 +24,17 @@ const GLB = process.env.TRIPO_TEX_GLB ?? '';
 const OUT_DIR = process.env.TRIPO_TEX_OUT ?? path.join(tmpdir(), 'tripo-textured');
 const APP =
   process.env.TRIPO_TEX_APP ??
-  path.resolve(here, '..', '..', 'release', 'mac-arm64', 'Bobble.app', 'Contents', 'MacOS', 'Bobble');
+  path.resolve(
+    here,
+    '..',
+    '..',
+    'release',
+    'mac-arm64',
+    'Bobble.app',
+    'Contents',
+    'MacOS',
+    'Bobble',
+  );
 mkdirSync(OUT_DIR, { recursive: true });
 if (GLB.length === 0) throw new Error('set TRIPO_TEX_GLB');
 

@@ -11,7 +11,7 @@
  *   DIR   folder the run wrote into   (required)
  *   OUT   where to write grade.json   (required)
  */
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
 const DIR = process.env.DIR;
@@ -30,7 +30,7 @@ const read = (rel) => {
     return null;
   }
 };
-const has = (s, re) => (s === null ? false : (typeof re === 'string' ? s.includes(re) : re.test(s)));
+const has = (s, re) => (s === null ? false : typeof re === 'string' ? s.includes(re) : re.test(s));
 const near = (s, re, want, tol) => {
   if (s === null) return false;
   for (const m of s.matchAll(re)) {
@@ -46,7 +46,10 @@ const CHECKS = [
     file: 'moons.html',
     checks: (s) => [
       ['is a table', has(s, /<table/i)],
-      ['names five moons', ['Titan', 'Rhea', 'Iapetus', 'Dione', 'Tethys'].filter((m) => has(s, m)).length >= 5],
+      [
+        'names five moons',
+        ['Titan', 'Rhea', 'Iapetus', 'Dione', 'Tethys'].filter((m) => has(s, m)).length >= 5,
+      ],
       ['Titan diameter ~5149 km', near(s, /([\d,]{4,6})/g, 5149, 40)],
       ['has discovery years', has(s, /1[6-8]\d\d/)],
     ],
@@ -57,7 +60,20 @@ const CHECKS = [
     checks: (s) => [
       ['inline SVG', has(s, /<svg/i)],
       ['no CDN', !has(s, /<script[^>]+src="https?:/i) && !has(s, /<link[^>]+href="https?:/i)],
-      ['six countries', ['China', 'United States', 'India', 'Japan', 'Germany', 'Brazil', 'Spain', 'Australia', 'Italy'].filter((c) => has(s, c)).length >= 6],
+      [
+        'six countries',
+        [
+          'China',
+          'United States',
+          'India',
+          'Japan',
+          'Germany',
+          'Brazil',
+          'Spain',
+          'Australia',
+          'Italy',
+        ].filter((c) => has(s, c)).length >= 6,
+      ],
       ['GW figures', has(s, /\d\s?GW/i)],
       ['names the year', has(s, /20[12]\d/)],
     ],
@@ -87,11 +103,17 @@ const CHECKS = [
     id: 'apollo-timeline',
     file: 'apollo.html',
     checks: (s) => [
-      ['all seven missions', [11, 12, 13, 14, 15, 16, 17].filter((n) => has(s, `Apollo ${n}`)).length === 7],
+      [
+        'all seven missions',
+        [11, 12, 13, 14, 15, 16, 17].filter((n) => has(s, `Apollo ${n}`)).length === 7,
+      ],
       ['crew names', has(s, /Armstrong/) && has(s, /Lovell/)],
       ['filter buttons', (s?.match(/<button/gi) ?? []).length >= 2],
       ['wired up', has(s, /addEventListener|onclick/i)],
-      ['Apollo 13 is the non-landing', has(s, /13/) && has(s, /did ?-?not ?-?land|aborted|no landing/i)],
+      [
+        'Apollo 13 is the non-landing',
+        has(s, /13/) && has(s, /did ?-?not ?-?land|aborted|no landing/i),
+      ],
     ],
   },
   {
@@ -100,8 +122,16 @@ const CHECKS = [
     checks: (s) => [
       ['three tiles', (s?.match(/class="[^"]*(tile|stat|card)/gi) ?? []).length >= 3],
       ['SVG line chart', has(s, /<svg/i) && has(s, /<(polyline|path)/i)],
-      ['1950 ~2.5bn', near(s, /([\d.,]+)\s*(?:billion|bn)/gi, 2.5, 0.25) || near(s, /(2[,.]5\d{2}[,.]?\d*)/g, 2500, 200)],
-      ['2020 ~7.8bn', near(s, /([\d.,]+)\s*(?:billion|bn)/gi, 7.8, 0.3) || near(s, /(7[,.]7\d{2}[,.]?\d*)/g, 7800, 300)],
+      [
+        '1950 ~2.5bn',
+        near(s, /([\d.,]+)\s*(?:billion|bn)/gi, 2.5, 0.25) ||
+          near(s, /(2[,.]5\d{2}[,.]?\d*)/g, 2500, 200),
+      ],
+      [
+        '2020 ~7.8bn',
+        near(s, /([\d.,]+)\s*(?:billion|bn)/gi, 7.8, 0.3) ||
+          near(s, /(7[,.]7\d{2}[,.]?\d*)/g, 7800, 300),
+      ],
       ['the multiple', has(s, /3\.\d|×|x\b/)],
     ],
   },
@@ -130,10 +160,24 @@ const CHECKS = [
     id: 'osi-site',
     dir: 'osi',
     checks: (_s, files) => [
-      ['three pages', ['index.html', 'lower.html', 'upper.html'].filter((f) => files.includes(f)).length === 3],
+      [
+        'three pages',
+        ['index.html', 'lower.html', 'upper.html'].filter((f) => files.includes(f)).length === 3,
+      ],
       ['a shared stylesheet', files.some((f) => f.endsWith('.css'))],
       ['links between pages', has(read('osi/index.html'), /href="(lower|upper)\.html"/)],
-      ['seven layers on the index', ['Physical', 'Data Link', 'Network', 'Transport', 'Session', 'Presentation', 'Application'].filter((l) => has(read('osi/index.html'), l)).length === 7],
+      [
+        'seven layers on the index',
+        [
+          'Physical',
+          'Data Link',
+          'Network',
+          'Transport',
+          'Session',
+          'Presentation',
+          'Application',
+        ].filter((l) => has(read('osi/index.html'), l)).length === 7,
+      ],
       ['TCP is in lower.html', has(read('osi/lower.html'), /TCP/)],
     ],
   },

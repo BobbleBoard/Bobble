@@ -619,7 +619,7 @@ const VIDEO_TOOLS = ['generate_video'];
  * out — that is the separation that actually matters — and the prompt says
  * plainly that typing a heredoc means it has taken someone else's job.
  */
-const DEFAULT_MANAGER_TOOLS = [
+const _DEFAULT_MANAGER_TOOLS = [
   'read',
   'ls',
   'grep',

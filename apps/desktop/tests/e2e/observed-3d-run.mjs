@@ -46,7 +46,7 @@ const LOG = path.join(OUT, 'run.jsonl');
 const MAIN_LOG = path.join(OUT, 'main.log');
 function logline(obj) {
   const rec = { t: new Date().toISOString(), ...obj };
-  appendFileSync(LOG, JSON.stringify(rec) + '\n');
+  appendFileSync(LOG, `${JSON.stringify(rec)}\n`);
   console.log(JSON.stringify(rec));
 }
 

@@ -667,7 +667,7 @@ export function unusableWritePath(target: string): string | undefined {
  * the one thing that fixes it, because a refusal the model cannot act on just
  * becomes a retry loop.
  */
-export function unusablePathRefusal(toolName: string, target: string, why: string): string {
+export function unusablePathRefusal(toolName: string, _target: string, why: string): string {
   return (
     `The ${toolName} did NOT happen: ${why}. Nothing was written, and nothing was ` +
     `moved somewhere else — the file does not exist. Call ${toolName} again with an ` +

@@ -108,7 +108,11 @@ describe('closing the LAST tab closes the rail', () => {
    */
   it('fires onEmpty when the final tab goes', () => {
     let closed = 0;
-    const c = createCanvasController({ onEmpty: () => { closed += 1; } });
+    const c = createCanvasController({
+      onEmpty: () => {
+        closed += 1;
+      },
+    });
     const a = c.openTab({ kind: 'file', title: 'a.ts' });
     const b = c.openTab({ kind: 'file', title: 'b.ts' });
     c.closeTab(a);
@@ -119,7 +123,11 @@ describe('closing the LAST tab closes the rail', () => {
 
   it('does NOT fire for a close that leaves tabs behind', () => {
     let closed = 0;
-    const c = createCanvasController({ onEmpty: () => { closed += 1; } });
+    const c = createCanvasController({
+      onEmpty: () => {
+        closed += 1;
+      },
+    });
     c.openTab({ kind: 'file', title: 'a.ts' });
     const b = c.openTab({ kind: 'file', title: 'b.ts' });
     c.closeTab(b);
@@ -128,7 +136,11 @@ describe('closing the LAST tab closes the rail', () => {
 
   it('does NOT fire for an unknown id, which removes nothing', () => {
     let closed = 0;
-    const c = createCanvasController({ onEmpty: () => { closed += 1; } });
+    const c = createCanvasController({
+      onEmpty: () => {
+        closed += 1;
+      },
+    });
     c.closeTab('nope');
     expect(closed).toBe(0);
   });

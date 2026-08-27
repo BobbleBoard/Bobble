@@ -311,7 +311,7 @@ describe('a ~ inside quotes is never expanded by the shell', () => {
     // `weird~name.py` is a real file; only a LEADING ~/ means home.
     const cmd = syntaxCheckCommand(['/tmp/weird~name.py'])?.command ?? '';
     expect(cmd).toContain('weird~name.py');
-    expect(cmd).not.toContain(os.homedir() + 'name');
+    expect(cmd).not.toContain(`${os.homedir()}name`);
   });
 
   it('still quotes, so a path with spaces survives', () => {

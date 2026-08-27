@@ -102,7 +102,7 @@ const ENGINEERS = Number(flag('engineers', '2'));
 const BUDGET_MS = Number(flag('minutes', '45')) * 60_000;
 
 const appRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-const repoRoot = path.resolve(appRoot, '../..');
+const _repoRoot = path.resolve(appRoot, '../..');
 const MESH_HOST_TS = path.join(appRoot, 'electron', 'corp', 'mesh-host.ts');
 const ROLE_AGENT_TS = path.join(appRoot, 'electron', 'corp', 'role-agent.ts');
 
@@ -132,7 +132,10 @@ const WORKSPACE = process.env.WORKSPACE ?? path.join('/tmp', `cw-${path.basename
  */
 const TEAM_DIR =
   process.env.TEAM_DIR ??
-  path.join('/tmp', `corp-team-${createHash('sha256').update(WORKSPACE).digest('hex').slice(0, 12)}`);
+  path.join(
+    '/tmp',
+    `corp-team-${createHash('sha256').update(WORKSPACE).digest('hex').slice(0, 12)}`,
+  );
 mkdirSync(TEAM_DIR, { recursive: true });
 mkdirSync(WORKSPACE, { recursive: true });
 

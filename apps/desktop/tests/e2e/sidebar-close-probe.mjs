@@ -64,7 +64,8 @@ async function sample(page, ms) {
           panelR: panel === null ? null : Math.round(panel.getBoundingClientRect().right),
           panelOpacity: panel === null ? null : getComputedStyle(panel).opacity,
           railW: rail === null ? null : Math.round(rail.getBoundingClientRect().width),
-          railInnerW: railInner === null ? null : Math.round(railInner.getBoundingClientRect().width),
+          railInnerW:
+            railInner === null ? null : Math.round(railInner.getBoundingClientRect().width),
         });
         if (performance.now() - t0 < duration) requestAnimationFrame(tick);
         else resolve(rows);

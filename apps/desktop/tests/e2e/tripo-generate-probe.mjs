@@ -157,13 +157,19 @@ const over250 = sorted.filter((g) => g > 250);
 const stalled = Math.round(over250.reduce((s, g) => s + g, 0));
 
 console.log('\n──────── REAL TRELLIS GENERATION ────────');
-console.log(`total: ${Math.round(doneAt / 1000)}s   first asset on screen: ${Math.round(firstMeshAt / 1000)}s`);
+console.log(
+  `total: ${Math.round(doneAt / 1000)}s   first asset on screen: ${Math.round(firstMeshAt / 1000)}s`,
+);
 console.log(`worst rAF gaps: ${sorted.slice(0, 6).map(Math.round).join('ms, ')}ms`);
 console.log(`frames >250ms: ${over250.length}   >1000ms: ${sorted.filter((g) => g > 1000).length}`);
 console.log(`total time the UI was stalled: ${stalled}ms`);
 const failed = interactions.filter((i) => !i.ok);
 const slow = interactions.filter((i) => i.ok && i.ms > 500);
-console.log(`interactions: ${interactions.length} total, ${failed.length} FROZE, ${slow.length} slow(>500ms)`);
+console.log(
+  `interactions: ${interactions.length} total, ${failed.length} FROZE, ${slow.length} slow(>500ms)`,
+);
 await win.screenshot({ path: path.join(OUT_DIR, 'after.png') });
-console.log(`\nVERDICT: ${failed.length === 0 && stalled < 1000 ? 'UI STAYED INTERACTIVE' : 'UI BLOCKED'}`);
+console.log(
+  `\nVERDICT: ${failed.length === 0 && stalled < 1000 ? 'UI STAYED INTERACTIVE' : 'UI BLOCKED'}`,
+);
 await app.close();

@@ -7,7 +7,6 @@ import { mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } fro
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { _electron as electron } from 'playwright-core';
 
 const require = createRequire(import.meta.url);
@@ -80,8 +79,8 @@ const measure = async (specs) =>
         gap: cs.gap,
         color: cs.color,
         bg: cs.backgroundColor,
-        border: cs.borderTopWidth + ' ' + cs.borderTopColor,
-        transition: cs.transitionProperty + ' / ' + cs.transitionDuration,
+        border: `${cs.borderTopWidth} ${cs.borderTopColor}`,
+        transition: `${cs.transitionProperty} / ${cs.transitionDuration}`,
         fontFamily: cs.fontFamily.slice(0, 42),
       };
     }
@@ -120,7 +119,9 @@ try {
   // Sidebar section label typography (the "Modalities"/"Projects" caps rows).
   findings.chatSidebarLabels = await page.evaluate(() => {
     const out = [];
-    for (const el of document.querySelectorAll('.pd-sidebar-row-label, .pd-sidebar-heading, .pd-sidebar-section')) {
+    for (const el of document.querySelectorAll(
+      '.pd-sidebar-row-label, .pd-sidebar-heading, .pd-sidebar-section',
+    )) {
       const cs = getComputedStyle(el);
       out.push({
         cls: el.className,
@@ -136,7 +137,9 @@ try {
   });
 
   // Open a menu in the main app for menu-geometry parity.
-  const menuTrigger = page.locator('[data-testid="model-picker-btn"], [data-testid="composer-plus"]').first();
+  const menuTrigger = page
+    .locator('[data-testid="model-picker-btn"], [data-testid="composer-plus"]')
+    .first();
   if (await menuTrigger.count()) {
     await menuTrigger.click().catch(() => {});
     await page.waitForTimeout(400);
@@ -146,7 +149,9 @@ try {
   }
 
   // Settings dialog — the app's canonical panel/dialog/form surface.
-  const settingsBtn = page.locator('[data-testid="open-settings"], [data-testid="settings-btn"]').first();
+  const settingsBtn = page
+    .locator('[data-testid="open-settings"], [data-testid="settings-btn"]')
+    .first();
   if (await settingsBtn.count()) {
     await settingsBtn.click().catch(() => {});
     await page.waitForTimeout(600);
@@ -177,9 +182,7 @@ try {
   }
   await modality3d.click();
   await page.waitForSelector('[data-testid="tp-root"]', { timeout: 20000 });
-  await page.waitForTimeout
-    ? await page.waitForTimeout(700)
-    : null;
+  (await page.waitForTimeout) ? await page.waitForTimeout(700) : null;
   await shot('B01-studio-empty-dark');
 
   findings.studio = await measure([
@@ -241,8 +244,12 @@ try {
 
   // The download panel (the app's "engine missing" state).
   await page.click('[data-testid="tp-generate-btn"]').catch(() => {});
-  await page.waitForSelector('[data-testid="tp-download-panel"]', { timeout: 10000 }).catch(() => {});
-  await page.waitForSelector('[data-testid="tp-dlcard-trellis2"]', { timeout: 10000 }).catch(() => {});
+  await page
+    .waitForSelector('[data-testid="tp-download-panel"]', { timeout: 10000 })
+    .catch(() => {});
+  await page
+    .waitForSelector('[data-testid="tp-dlcard-trellis2"]', { timeout: 10000 })
+    .catch(() => {});
   await shot('B03-studio-download-panel-dark');
   findings.studioDownload = await measure([
     '.tp-download-panel',

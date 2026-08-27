@@ -23,7 +23,17 @@ const INSTR = process.env.TRIPO_EDIT_INSTR ?? 'make it bright blue';
 const OUT_DIR = process.env.TRIPO_EDIT_OUT ?? path.join(tmpdir(), 'tripo-image-edit');
 const APP =
   process.env.TRIPO_EDIT_APP ??
-  path.resolve(here, '..', '..', 'release', 'mac-arm64', 'Bobble.app', 'Contents', 'MacOS', 'Bobble');
+  path.resolve(
+    here,
+    '..',
+    '..',
+    'release',
+    'mac-arm64',
+    'Bobble.app',
+    'Contents',
+    'MacOS',
+    'Bobble',
+  );
 mkdirSync(OUT_DIR, { recursive: true });
 
 const app = await electron.launch({
@@ -41,10 +51,14 @@ win.on('console', (m) => {
 const state = () =>
   win
     .evaluate(() => ({
-      phase: document.querySelector('[data-testid="tp-genstage"]')?.getAttribute('data-phase') ?? null,
-      failed: document.querySelector('[data-testid="tp-genstage"]')?.getAttribute('data-failed') === 'true',
+      phase:
+        document.querySelector('[data-testid="tp-genstage"]')?.getAttribute('data-phase') ?? null,
+      failed:
+        document.querySelector('[data-testid="tp-genstage"]')?.getAttribute('data-failed') ===
+        'true',
       msg: document.querySelector('[data-testid="tp-genstage-msg"]')?.textContent ?? '',
-      preview: document.querySelector('[data-testid="tp-image-preview"]')?.getAttribute('src') ?? null,
+      preview:
+        document.querySelector('[data-testid="tp-image-preview"]')?.getAttribute('src') ?? null,
       steps: document.querySelector('[data-testid="tp-image-steps"]') !== null,
       counter: document.querySelector('.tp-image-count')?.textContent?.trim() ?? '',
       make3d: document.querySelector('[data-testid="tp-image-make3d"]') !== null,
@@ -88,11 +102,7 @@ const firstSrc = made.preview;
 await win.fill('[data-testid="tp-image-edit-prompt"]', INSTR);
 await win.click('[data-testid="tp-image-edit-btn"]');
 console.log(`editing: “${INSTR}”…`);
-const edited = await until(
-  (s) => s.preview !== null && s.preview !== firstSrc,
-  'edit',
-  900_000,
-);
+const edited = await until((s) => s.preview !== null && s.preview !== firstSrc, 'edit', 900_000);
 if (edited === null) {
   console.log('FAIL: the edit never produced a new image');
   await app.close();

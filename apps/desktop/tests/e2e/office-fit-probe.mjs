@@ -47,7 +47,9 @@ async function measure(label) {
     const all = webContents.getAllWebContents();
     const guest = all.find((wc) => {
       const u = wc.getURL();
-      return u.includes('sheet') || u.includes('doc') || u.includes('slide') || u.includes('office');
+      return (
+        u.includes('sheet') || u.includes('doc') || u.includes('slide') || u.includes('office')
+      );
     });
     if (!guest) return { error: 'no office webContents', urls: all.map((w) => w.getURL()) };
     const js = `(() => {

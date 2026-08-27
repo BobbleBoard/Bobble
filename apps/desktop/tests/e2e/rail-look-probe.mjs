@@ -64,8 +64,7 @@ const report = await win.evaluate(() => {
       // Where the button's centre sits relative to the rail's centre.
       offsetFromRailCentre: +(b.left + b.width / 2 - (rr.left + rr.width / 2)).toFixed(1),
       // Where the GLYPH sits relative to its own button's centre.
-      glyphOffset:
-        i === null ? null : +(i.left + i.width / 2 - (b.left + b.width / 2)).toFixed(1),
+      glyphOffset: i === null ? null : +(i.left + i.width / 2 - (b.left + b.width / 2)).toFixed(1),
       glyph: i === null ? null : `${Math.round(i.width)}x${Math.round(i.height)}`,
     });
   }
@@ -76,10 +75,7 @@ const report = await win.evaluate(() => {
     railGap: cs.gap,
     railAlign: cs.alignItems,
     sepWidth: sep === null ? null : Math.round(sep.getBoundingClientRect().width),
-    sepInset:
-      sep === null
-        ? null
-        : +(sep.getBoundingClientRect().left - rr.left).toFixed(1),
+    sepInset: sep === null ? null : +(sep.getBoundingClientRect().left - rr.left).toFixed(1),
     rows,
   };
 });

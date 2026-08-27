@@ -503,7 +503,7 @@ export function createPiSink(
   // the user looks at another one, without its tokens leaking into that view.
   const threadSet = (mutate: (msgs: ChatMsg[]) => ChatMsg[]) =>
     set((s) =>
-      s.bgRun !== null && s.bgRun.streaming
+      s.bgRun?.streaming
         ? { bgRun: { ...s.bgRun, messages: mutate(s.bgRun.messages) } }
         : { messages: mutate(s.messages) },
     );
@@ -529,9 +529,7 @@ export function createPiSink(
         };
         // A backgrounded turn just finished — mark it done (its buffer stays for a
         // restore; the sidebar flips its spinner to the finished notice).
-        return s.bgRun !== null && s.bgRun.streaming
-          ? { ...patch, bgRun: { ...s.bgRun, streaming: false } }
-          : patch;
+        return s.bgRun?.streaming ? { ...patch, bgRun: { ...s.bgRun, streaming: false } } : patch;
       }),
 
     beginAssistantTurn: (id) =>
@@ -602,7 +600,7 @@ export function createPiSink(
     upsertToolResult: (result: ToolResultMsg) =>
       set((s) => {
         // Route into the background buffer while a non-viewed session streams.
-        const bg = s.bgRun !== null && s.bgRun.streaming;
+        const bg = s.bgRun?.streaming;
         const thread = bg ? (s.bgRun as BgRun).messages : s.messages;
         // Match by row id (assistant-scoped), never bare toolCallId: providers
         // reuse toolCallIds across runs, and an unscoped match would overwrite
@@ -671,7 +669,7 @@ export function createPiSink(
         // asked (same invariant threadSet uses). A bg request is NOT shown as a
         // dialog over the viewed chat; instead its chat gets a needs-input dot +
         // the top banner picks it up (UiRequestDialogs gates on this tag).
-        const bgAsking = s.bgRun !== null && s.bgRun.streaming;
+        const bgAsking = s.bgRun?.streaming;
         const sessionFile = bgAsking ? s.bgRun?.sessionFile : (s.session?.sessionFile ?? undefined);
         const tagged = { ...request, ...(sessionFile !== undefined ? { sessionFile } : {}) };
         if (bgAsking && s.bgRun !== null) {
@@ -710,7 +708,7 @@ export function createPiSink(
         // VIEWING (they'd auto-focus a canvas tab for the wrong chat). Drop them
         // while a bg run streams — the artifact still exists as a tool row in the
         // bg thread, and canvas routing re-derives from the active chat on return.
-        if (s.bgRun !== null && s.bgRun.streaming) return {};
+        if (s.bgRun?.streaming) return {};
         // Dedupe by identity (path per kind): the router intentionally pushes
         // again on tool_execution_start as a re-focus signal — the newest
         // touch moves to the head instead of duplicating the entry.

@@ -3,7 +3,7 @@
  * images only, and a `null` for anything it cannot use — because the card it
  * feeds already draws a letter chip and must never show a broken image.
  */
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { clearFaviconCache, faviconHost, siteFavicon } from './favicons';
 
 const realFetch = globalThis.fetch;

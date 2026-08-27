@@ -8,9 +8,10 @@
  * textured model — rather than the blank panel the viewport used to show for
  * the first minute.
  */
-import { _electron } from '@playwright/test';
+
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
+import { _electron } from '@playwright/test';
 
 const IMG = process.env.IMG ?? '';
 const OUT = process.env.OUT ?? '/tmp';
@@ -35,7 +36,9 @@ await win.evaluate(async (b64) => {
   for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
   const dt = new DataTransfer();
   dt.items.add(new File([arr], 'source.png', { type: 'image/png' }));
-  document.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt }));
+  document.dispatchEvent(
+    new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt }),
+  );
 }, b64);
 await win.waitForTimeout(2500);
 
@@ -51,14 +54,19 @@ for (let i = 0; i < MINUTES * 6; i++) {
     canvas: document.querySelector('[data-testid="tp-canvas-host"] canvas') !== null,
     empty: document.querySelector('[data-testid="tp-empty-state"]') !== null,
     faces: /Faces\s*([\d,]+)/.exec(document.body.textContent ?? '')?.[1] ?? null,
-    stage: (document.body.textContent ?? '').match(/(Sampling[^.\n]{0,40}|Baking[^.\n]{0,30}|Texturing done|Geometry done)/)?.[1] ?? '',
+    stage:
+      (document.body.textContent ?? '').match(
+        /(Sampling[^.\n]{0,40}|Baking[^.\n]{0,30}|Texturing done|Geometry done)/,
+      )?.[1] ?? '',
   }));
   const key = `${s.img}|${s.canvas}|${s.empty}|${s.faces}`;
   const at = Math.round((Date.now() - t0) / 1000);
   if (!seen.includes(key)) {
     seen.push(key);
     await win.screenshot({ path: path.join(OUT, `prog-${String(at).padStart(3, '0')}s.png`) });
-    console.log(`  ${at}s  image=${s.img} canvas=${s.canvas} empty=${s.empty} faces=${s.faces} ${s.stage}`);
+    console.log(
+      `  ${at}s  image=${s.img} canvas=${s.canvas} empty=${s.empty} faces=${s.faces} ${s.stage}`,
+    );
   }
   if (s.faces !== null && s.canvas) {
     // Keep going a little past first geometry so the textured swap is caught.

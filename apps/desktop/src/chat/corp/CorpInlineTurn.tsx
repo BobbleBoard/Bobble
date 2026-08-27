@@ -28,7 +28,7 @@
 import { contractProgress, formatEta, type SituationState, workingCount } from '@pi-desktop/canvas';
 import type { OrgNodeView, WorkerTranscriptView } from '@pi-desktop/coordination';
 import { Button, IconCheck, IconChevronRight, IconEye, ShimmerText, Spinner } from '@pi-desktop/ui';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useChildAgentStore } from '../../state/child-agent-store';
 import { corpChildId } from '../../state/corp-child-bridge';
 import './CorpInlineTurn.css';

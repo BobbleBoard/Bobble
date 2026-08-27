@@ -24,7 +24,17 @@ const GLB = process.env.TRIPO_RIG_GLB ?? '';
 const OUT_DIR = process.env.TRIPO_RIG_OUT ?? path.join(tmpdir(), 'tripo-rig-stage');
 const APP =
   process.env.TRIPO_RIG_APP ??
-  path.resolve(here, '..', '..', 'release', 'mac-arm64', 'Bobble.app', 'Contents', 'MacOS', 'Bobble');
+  path.resolve(
+    here,
+    '..',
+    '..',
+    'release',
+    'mac-arm64',
+    'Bobble.app',
+    'Contents',
+    'MacOS',
+    'Bobble',
+  );
 mkdirSync(OUT_DIR, { recursive: true });
 if (GLB.length === 0) throw new Error('set TRIPO_RIG_GLB');
 
@@ -72,8 +82,11 @@ await btn.click();
 const snap = () =>
   win
     .evaluate(() => ({
-      phase: document.querySelector('[data-testid="tp-genstage"]')?.getAttribute('data-phase') ?? null,
-      failed: document.querySelector('[data-testid="tp-genstage"]')?.getAttribute('data-failed') === 'true',
+      phase:
+        document.querySelector('[data-testid="tp-genstage"]')?.getAttribute('data-phase') ?? null,
+      failed:
+        document.querySelector('[data-testid="tp-genstage"]')?.getAttribute('data-failed') ===
+        'true',
       msg: document.querySelector('[data-testid="tp-genstage-msg"]')?.textContent ?? '',
       asking: document.querySelector('[data-testid="tp-humanoid-ask"]') !== null,
       confirm: document.querySelector('[data-testid="tp-humanoid-confirm"]') !== null,

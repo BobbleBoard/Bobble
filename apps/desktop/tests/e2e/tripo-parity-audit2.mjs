@@ -144,14 +144,18 @@ try {
     // Is the last motion card visually behind the sticky CTA?
     const cards = [...document.querySelectorAll('.tp-anim-card')];
     const last = cards.at(-1);
-    const footer = document.querySelector('.tp-panel-foot, .tp-stage-foot, [data-testid="tp-open-graph"]');
+    const footer = document.querySelector(
+      '.tp-panel-foot, .tp-stage-foot, [data-testid="tp-open-graph"]',
+    );
     return {
-      panelScroll: probe('.tp-panel-scroll') ?? probe('.tp-gen-scroll') ?? probe('.tp-stage-scroll'),
+      panelScroll:
+        probe('.tp-panel-scroll') ?? probe('.tp-gen-scroll') ?? probe('.tp-stage-scroll'),
       allScrollers: [...document.querySelectorAll('.tp *')]
         .filter((e) => {
           const cs = getComputedStyle(e);
           return (
-            (cs.overflowY === 'auto' || cs.overflowY === 'scroll') && e.scrollHeight > e.clientHeight
+            (cs.overflowY === 'auto' || cs.overflowY === 'scroll') &&
+            e.scrollHeight > e.clientHeight
           );
         })
         .map((e) => ({

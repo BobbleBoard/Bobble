@@ -120,8 +120,6 @@ export {
 // Surfaces
 export type { BrowserSurfaceProps } from './surfaces/browser-surface.tsx';
 export { BrowserSurface } from './surfaces/browser-surface.tsx';
-export type { OfficeSurfaceProps } from './surfaces/office-surface.tsx';
-export { OfficeSurface } from './surfaces/office-surface.tsx';
 export { streamingUpdateSpec } from './surfaces/code-append.ts';
 export type { CodeSurfaceProps } from './surfaces/code-surface.tsx';
 export { CodeSurface, rawSourceContent } from './surfaces/code-surface.tsx';
@@ -144,6 +142,8 @@ export {
   MediaPreviewSurface,
   mediaPreviewTransition,
 } from './surfaces/media-preview-surface.tsx';
+export type { OfficeSurfaceProps } from './surfaces/office-surface.tsx';
+export { OfficeSurface } from './surfaces/office-surface.tsx';
 export { ensureDefaultSurfaces, registerBuiltinSurfaces } from './surfaces/register-builtins.tsx';
 export type { SubagentSurfaceProps } from './surfaces/subagent-surface.tsx';
 export { SubagentSurface } from './surfaces/subagent-surface.tsx';

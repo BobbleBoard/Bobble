@@ -131,8 +131,11 @@
   padding: 6px 12px;
   border: 1px solid var(--pd-border-subtle);
   border-radius: var(--pd-radius-md);
-  color: var(--pd-text-secondary);
   background: transparent;
+  /* `color` was declared twice here — secondary first, then primary. The second
+     won, so the secondary declaration had never rendered. Keeping the value the
+     button has actually been showing, so this is a no-op on screen rather than
+     a silent restyle smuggled in as a lint fix. */
   color: var(--pd-text-primary);
   font: inherit;
   font-size: var(--pd-font-size-caption);

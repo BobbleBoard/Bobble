@@ -81,9 +81,10 @@ try {
   });
 
   // A big paste — the fixed start of the next user message.
-  const filler = `Reference notes.\n${'The wall is twelve metres wide with a slight overhang. '.repeat(
-    Math.ceil(PASTE_CHARS / 55),
-  )}`.slice(0, PASTE_CHARS);
+  const filler =
+    `Reference notes.\n${'The wall is twelve metres wide with a slight overhang. '.repeat(
+      Math.ceil(PASTE_CHARS / 55),
+    )}`.slice(0, PASTE_CHARS);
   await win.click('[data-testid="composer-input"]');
   await win.evaluate((text) => {
     const el = document.querySelector('[data-testid="composer-input"]');

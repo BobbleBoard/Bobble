@@ -67,7 +67,7 @@ await win.waitForTimeout(400);
 
 // 2. A very long prompt.
 await win.click('[data-testid="studio-prompt"]');
-await win.keyboard.type('A '.repeat(400) + 'very long description that goes on and on.');
+await win.keyboard.type(`${'A '.repeat(400)}very long description that goes on and on.`);
 await win.waitForTimeout(400);
 await layout('long prompt');
 await win.screenshot({ path: path.join(OUT, 'long-prompt.png') });
@@ -90,7 +90,12 @@ console.log('MODE STATE:', JSON.stringify(modeState));
 await win.screenshot({ path: path.join(OUT, 'after-rapid.png') });
 
 // 4. Hover every knob + the run button, looking for a jump.
-for (const sel of ['.pd-studio-select', '.pd-studio-input', '[data-testid="studio-run"]', '[data-testid="studio-back"]']) {
+for (const sel of [
+  '.pd-studio-select',
+  '.pd-studio-input',
+  '[data-testid="studio-run"]',
+  '[data-testid="studio-back"]',
+]) {
   await win.hover(sel).catch(() => {});
   await win.waitForTimeout(150);
 }

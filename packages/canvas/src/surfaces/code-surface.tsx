@@ -1,7 +1,7 @@
 import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
 import { Compartment, EditorState, type Extension, Transaction } from '@codemirror/state';
-import { tags as t } from '@lezer/highlight';
 import { EditorView, keymap, lineNumbers } from '@codemirror/view';
+import { tags as t } from '@lezer/highlight';
 import { IconCheck, IconCopy } from '@pi-desktop/ui';
 import { useEffect, useRef, useState } from 'react';
 import type { ArtifactContent } from '../model.ts';
@@ -23,11 +23,21 @@ import { languageExtension } from './languages.ts';
  * can go stale against a background it was never checked on.
  */
 const pdHighlight = HighlightStyle.define([
-  { tag: [t.keyword, t.modifier, t.controlKeyword, t.moduleKeyword], color: 'var(--pd-syntax-keyword)' },
+  {
+    tag: [t.keyword, t.modifier, t.controlKeyword, t.moduleKeyword],
+    color: 'var(--pd-syntax-keyword)',
+  },
   { tag: [t.string, t.special(t.string), t.regexp], color: 'var(--pd-syntax-string)' },
   { tag: [t.number, t.bool, t.null, t.atom], color: 'var(--pd-syntax-number)' },
-  { tag: [t.comment, t.lineComment, t.blockComment], color: 'var(--pd-syntax-comment)', fontStyle: 'italic' },
-  { tag: [t.function(t.variableName), t.function(t.propertyName)], color: 'var(--pd-syntax-function)' },
+  {
+    tag: [t.comment, t.lineComment, t.blockComment],
+    color: 'var(--pd-syntax-comment)',
+    fontStyle: 'italic',
+  },
+  {
+    tag: [t.function(t.variableName), t.function(t.propertyName)],
+    color: 'var(--pd-syntax-function)',
+  },
   { tag: [t.typeName, t.className, t.namespace, t.self], color: 'var(--pd-syntax-type)' },
   { tag: [t.propertyName, t.attributeName], color: 'var(--pd-syntax-property)' },
   { tag: [t.operator, t.punctuation, t.bracket], color: 'var(--pd-syntax-punctuation)' },

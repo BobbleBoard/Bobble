@@ -105,7 +105,7 @@ try {
     };
   });
   assert(
-    afterSwitch.bgFile !== null && afterSwitch.bgFile.includes('alpha'),
+    afterSwitch.bgFile?.includes('alpha'),
     `A should be backgrounded; got ${afterSwitch.bgFile}`,
   );
   assert(afterSwitch.bgStreaming === true, 'the backgrounded chat should still be streaming');

@@ -72,18 +72,20 @@ await win.evaluate(() => {
 });
 await win.setInputFiles('[data-testid="tp-upload-card-input"]', MODEL);
 await win.waitForSelector('.tp-asset-card', { timeout: 30_000 });
-await win.waitForFunction(
-  () => document.querySelector('[data-tp-canvas-ready]') !== null,
-  undefined,
-  { timeout: 120_000 },
-).catch(() => {});
+await win
+  .waitForFunction(() => document.querySelector('[data-tp-canvas-ready]') !== null, undefined, {
+    timeout: 120_000,
+  })
+  .catch(() => {});
 {
   const g = await win.evaluate(() => /** @type {any} */ (window).__resp.gaps);
   const sorted = [...g].sort((a, b) => b - a);
   const stalled = Math.round(sorted.filter((x) => x > 250).reduce((s, x) => s + x, 0));
   console.log(`\nIMPORT of ${path.basename(MODEL)}:`);
   console.log(`  worst rAF gaps: ${sorted.slice(0, 5).map(Math.round).join('ms, ')}ms`);
-  console.log(`  frames >250ms: ${sorted.filter((x) => x > 250).length}  stalled total: ${stalled}ms`);
+  console.log(
+    `  frames >250ms: ${sorted.filter((x) => x > 250).length}  stalled total: ${stalled}ms`,
+  );
 }
 await win.click(`[data-testid="tp-rail-${OP}"]`);
 await win.waitForFunction(
@@ -189,8 +191,12 @@ ipcOk.sort((a, b) => b - a);
 
 console.log('\n──────── UI RESPONSIVENESS DURING THE JOB ────────');
 console.log(`renderer rAF gaps: worst ${worst.join('ms, ')}ms`);
-console.log(`  frames >250ms: ${over250}   >1000ms: ${over1000}   stalled total: ${totalStalled}ms`);
-console.log(`main-process IPC round-trip: worst ${ipcOk.slice(0, 5).join('ms, ')}ms (n=${ipcOk.length})`);
+console.log(
+  `  frames >250ms: ${over250}   >1000ms: ${over1000}   stalled total: ${totalStalled}ms`,
+);
+console.log(
+  `main-process IPC round-trip: worst ${ipcOk.slice(0, 5).join('ms, ')}ms (n=${ipcOk.length})`,
+);
 console.log(`model render after job: ${visibleMs}`);
 console.log('interactions mid-run:');
 for (const i of interactions) {

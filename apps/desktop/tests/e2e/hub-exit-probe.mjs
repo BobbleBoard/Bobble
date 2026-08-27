@@ -5,7 +5,7 @@
  * chat causes weird behavior that's very not expected." So: open the hub, then
  * take each exit a user actually has and photograph what lands.
  */
-import { mkdtempSync, mkdirSync } from 'node:fs';
+import { mkdirSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { _electron } from '@playwright/test';
@@ -26,8 +26,7 @@ const shot = async (name) => {
   return win.evaluate(() => ({
     hub: document.querySelector('[data-testid="hardware-strip"]') !== null,
     composer: document.querySelector('[data-testid="composer"]') !== null,
-    modelHubTitle:
-      document.querySelector('h1')?.textContent?.trim() ?? null,
+    modelHubTitle: document.querySelector('h1')?.textContent?.trim() ?? null,
     navSelected: [...document.querySelectorAll('[data-selected="true"]')]
       .map((e) => e.getAttribute('data-testid') ?? e.textContent?.trim()?.slice(0, 30))
       .filter(Boolean),

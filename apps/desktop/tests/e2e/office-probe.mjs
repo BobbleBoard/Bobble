@@ -100,8 +100,7 @@ try {
     check(existsSync(filePath), `${c.ext}: fixture exists`);
 
     const tabId = await page.evaluate(
-      ({ filePath, title }) =>
-        window.__pi_canvas().openTab({ kind: 'office', title, filePath }),
+      ({ filePath, title }) => window.__pi_canvas().openTab({ kind: 'office', title, filePath }),
       { filePath, title: c.file },
     );
     check(typeof tabId === 'string' && tabId.length > 0, `${c.ext}: canvas tab opened`);
@@ -114,7 +113,10 @@ try {
         window.piDesktop.invoke('office:create', { tabId, kind, filePath }),
       { tabId, kind: c.kind, filePath },
     );
-    check(created?.ok === true, `${c.ext}: editor view created${created?.error ? ` (${created.error})` : ''}`);
+    check(
+      created?.ok === true,
+      `${c.ext}: editor view created${created?.error ? ` (${created.error})` : ''}`,
+    );
 
     // Editors mount asynchronously — Univer especially. Poll rather than guess
     // a single timeout: a fixed wait either fails a slow editor or slows every
@@ -143,7 +145,10 @@ try {
     );
     if (check(stats !== null, `${c.ext}: captured a PNG from the native view`)) {
       writeFileSync(path.join(SHOTS, `${c.ext}.png`), stats.buf);
-      check(stats.width > 200 && stats.height > 200, `${c.ext}: capture is ${stats.width}x${stats.height}`);
+      check(
+        stats.width > 200 && stats.height > 200,
+        `${c.ext}: capture is ${stats.width}x${stats.height}`,
+      );
       // A view that never painted compresses to almost nothing. This is a
       // floor, not a rendering check — the images are for human eyes.
       check(stats.bytes > 6000, `${c.ext}: capture has content (${stats.bytes} bytes)`);
@@ -265,7 +270,9 @@ try {
       await page.waitForTimeout(1200);
 
       const panelWidth = await page.evaluate(
-        () => document.querySelector('[data-testid="canvas-tabs-panel"]')?.getBoundingClientRect().width ?? 0,
+        () =>
+          document.querySelector('[data-testid="canvas-tabs-panel"]')?.getBoundingClientRect()
+            .width ?? 0,
       );
       const tabId = await page.evaluate(() => window.__pi_canvas().getState().activeTabId);
       const shot = await page.evaluate(
@@ -276,13 +283,14 @@ try {
       if (check(stats !== null, `resize ${label}: captured`)) {
         writeFileSync(path.join(SHOTS, `resize-${label}.png`), stats.buf);
         sizes.push({ label, panelWidth: Math.round(panelWidth), capture: stats.width });
-        console.log(`      resize ${label}: panel=${Math.round(panelWidth)}px capture=${stats.width}x${stats.height}`);
+        console.log(
+          `      resize ${label}: panel=${Math.round(panelWidth)}px capture=${stats.width}x${stats.height}`,
+        );
       }
     }
     const widths = new Set(sizes.map((s) => s.capture));
     check(widths.size > 1, `resize: the editor followed the canvas (${[...widths].join(', ')})`);
   }
-
 } catch (err) {
   failures.push(`threw: ${err?.message ?? err}`);
   console.error(err);

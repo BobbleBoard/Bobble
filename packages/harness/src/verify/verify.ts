@@ -320,7 +320,7 @@ export async function runCheck(
   // its own lie, an otherwise-passing run that matches it is a FAIL — checked
   // against the combined stdout+stderr, because the tools that do this are
   // exactly the ones that report on stderr while exiting 0.
-  const lies = check.failIfOutputMatches !== undefined && check.failIfOutputMatches.test(output);
+  const lies = check.failIfOutputMatches?.test(output);
   const status: CheckOutcome['status'] = timedOut
     ? 'inconclusive'
     : res.exitCode === 0

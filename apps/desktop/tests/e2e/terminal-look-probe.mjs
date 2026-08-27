@@ -69,14 +69,19 @@ const term = win.locator('.xterm-screen').first();
 if ((await term.count()) > 0) {
   await term.click();
   await win.waitForTimeout(900);
-  await win.screenshot({ path: path.join(OUT, '03-cursor-FOCUSED.png'), clip: await (async () => {
-    const b = await term.boundingBox();
-    return { x: b.x, y: b.y, width: Math.min(320, b.width), height: 60 };
-  })() });
+  await win.screenshot({
+    path: path.join(OUT, '03-cursor-FOCUSED.png'),
+    clip: await (async () => {
+      const b = await term.boundingBox();
+      return { x: b.x, y: b.y, width: Math.min(320, b.width), height: 60 };
+    })(),
+  });
   const focusOwner = () =>
     win.evaluate(() => {
       const a = document.activeElement;
-      return a === null ? 'none' : `${a.tagName.toLowerCase()}.${(a.className || '').toString().split(' ')[0]}`;
+      return a === null
+        ? 'none'
+        : `${a.tagName.toLowerCase()}.${(a.className || '').toString().split(' ')[0]}`;
     });
   console.log('FOCUS while clicked into terminal:', await focusOwner());
   // Click away — the composer — so the terminal blurs.
@@ -89,12 +94,17 @@ if ((await term.count()) > 0) {
   const after = await focusOwner();
   console.log('FOCUS after clicking away:', after);
   console.log(
-    after.includes('xterm') ? 'BLUR FAILED — screenshot below is still the FOCUSED state' : 'blur confirmed',
+    after.includes('xterm')
+      ? 'BLUR FAILED — screenshot below is still the FOCUSED state'
+      : 'blur confirmed',
   );
-  await win.screenshot({ path: path.join(OUT, '04-cursor-BLURRED.png'), clip: await (async () => {
-    const b = await term.boundingBox();
-    return { x: b.x, y: b.y, width: Math.min(320, b.width), height: 60 };
-  })() });
+  await win.screenshot({
+    path: path.join(OUT, '04-cursor-BLURRED.png'),
+    clip: await (async () => {
+      const b = await term.boundingBox();
+      return { x: b.x, y: b.y, width: Math.min(320, b.width), height: 60 };
+    })(),
+  });
 }
 
 const report = await win.evaluate(() => {

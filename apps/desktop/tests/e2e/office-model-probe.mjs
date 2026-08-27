@@ -106,10 +106,7 @@ for (const [ext, c] of Object.entries(selected)) {
         break;
       }
     }
-    if (
-      !check(made, `${ext}: the model created ${c.out}`) &&
-      existsSync(WORK)
-    ) {
+    if (!check(made, `${ext}: the model created ${c.out}`) && existsSync(WORK)) {
       console.log(`      files in workdir: ${readdirSync(WORK).join(', ') || '(none)'}`);
       continue;
     }

@@ -6,7 +6,7 @@
  * scrolls behind it, and the model card nested inside it — had never been
  * photographed on the theme he actually looks at.
  */
-import { mkdtempSync, mkdirSync } from 'node:fs';
+import { mkdirSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { _electron } from '@playwright/test';
@@ -47,7 +47,9 @@ if (local !== null) {
         ...document.querySelectorAll(
           `[data-testid="family-card-${id}"] [data-testid^="family-variant-"]`,
         ),
-      ].at(-1)?.getAttribute('data-testid') ?? null,
+      ]
+        .at(-1)
+        ?.getAttribute('data-testid') ?? null,
     local,
   );
   if (v !== null) await win.click(`[data-testid="${v}"] button`);
@@ -75,10 +77,10 @@ const pane = await win.evaluate(() => {
   const cardCs = card === null ? null : getComputedStyle(card);
   return {
     mask: cs.maskImage,
-    borderTop: cs.borderTopWidth + ' ' + cs.borderTopColor,
+    borderTop: `${cs.borderTopWidth} ${cs.borderTopColor}`,
     overflow: cs.overflowY,
     scrollbarGutter: cs.scrollbarGutter,
-    cardBorder: cardCs === null ? null : cardCs.borderTopWidth + ' ' + cardCs.borderTopColor,
+    cardBorder: cardCs === null ? null : `${cardCs.borderTopWidth} ${cardCs.borderTopColor}`,
     cardShadow: cardCs === null ? null : cardCs.boxShadow,
     cardPadding: cardCs === null ? null : cardCs.padding,
   };

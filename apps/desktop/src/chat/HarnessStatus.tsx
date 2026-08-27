@@ -95,7 +95,7 @@ function ProcessingRing({
  * inline tool rows carry the run from there. Renders nothing when idle.
  */
 export function ThreadStatusIndicator(): ReactElement | null {
-  const isStreaming = usePiStore((s) => s.agent.isStreaming);
+  const _isStreaming = usePiStore((s) => s.agent.isStreaming);
   const promptInFlight = usePiStore((s) => s.promptInFlight);
   // Prefill progress rides the generic extensionStatus channel (the REAL
   // processed/total the server reports via provider-llamacpp's `prompt_progress`

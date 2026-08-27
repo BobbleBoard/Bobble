@@ -17,7 +17,8 @@ export function useOutsideClose(
     if (!open) return;
     const onDown = (event: MouseEvent): void => {
       const target = event.target as Node;
-      const inside = ref.current?.contains(target) === true || ref2?.current?.contains(target) === true;
+      const inside =
+        ref.current?.contains(target) === true || ref2?.current?.contains(target) === true;
       if (!inside) close();
     };
     window.addEventListener('mousedown', onDown);

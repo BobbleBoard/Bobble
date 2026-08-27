@@ -174,7 +174,8 @@ if (rootId === null) throw new Error('could not find the root version row');
 await win.click(`[data-testid="tp-ver-make-${rootId}"]`);
 await win.waitForTimeout(600);
 const currentIsRoot = await win.evaluate(
-  (id) => document.querySelector(`[data-testid="tp-ver-${id}"]`)?.getAttribute('data-current') === 'true',
+  (id) =>
+    document.querySelector(`[data-testid="tp-ver-${id}"]`)?.getAttribute('data-current') === 'true',
   rootId,
 );
 assert(currentIsRoot, 'switching the working version back to the root must stick');
@@ -214,7 +215,10 @@ const branched = await win.evaluate(() => ({
 }));
 console.log('after branching:', JSON.stringify(branched));
 assert(branched.nodes === 4, `tree should have 4 nodes after branching (got ${branched.nodes})`);
-assert(branched.branchTags >= 2, `siblings must be tagged as a branch (got ${branched.branchTags})`);
+assert(
+  branched.branchTags >= 2,
+  `siblings must be tagged as a branch (got ${branched.branchTags})`,
+);
 await shot('10-branched');
 
 // ── persistence: the tree must survive a reload ──────────────────────────────

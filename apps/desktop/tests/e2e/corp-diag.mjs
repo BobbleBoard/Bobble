@@ -34,7 +34,7 @@ mkdirSync(OUT, { recursive: true });
 const LOG = path.join(OUT, 'diag.jsonl');
 const CAP_MS = Number(process.env.OBS_CAP_MIN ?? 12) * 60 * 1000;
 function logline(o) {
-  appendFileSync(LOG, JSON.stringify({ t: new Date().toISOString(), ...o }) + '\n');
+  appendFileSync(LOG, `${JSON.stringify({ t: new Date().toISOString(), ...o })}\n`);
 }
 
 if (!existsSync(path.join(appRoot, 'dist/index.html'))) {

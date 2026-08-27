@@ -43,14 +43,17 @@ try {
 
   const tabs = () =>
     page.evaluate(() =>
-      window.__pi_canvas().getState().tabs.map((t) => ({
-        key: t.key,
-        kind: t.kind,
-        title: t.title,
-        subtitle: t.subtitle,
-        active: t.id === window.__pi_canvas().getState().activeTabId,
-        mirror: t.data?.mirrorText ?? null,
-      })),
+      window
+        .__pi_canvas()
+        .getState()
+        .tabs.map((t) => ({
+          key: t.key,
+          kind: t.kind,
+          title: t.title,
+          subtitle: t.subtitle,
+          active: t.id === window.__pi_canvas().getState().activeTabId,
+          mirror: t.data?.mirrorText ?? null,
+        })),
     );
 
   // A run starts: a team forms and the situation room opens (what ChatApp does
@@ -75,13 +78,18 @@ try {
         edges: [{ from: 'ceo', to: 'eng-1' }],
       },
     });
-    corp.getState().selectNode({ id: 'eng-1', role: 'engineer', name: 'Engineer 1', state: 'working' });
+    corp
+      .getState()
+      .selectNode({ id: 'eng-1', role: 'engineer', name: 'Engineer 1', state: 'working' });
   });
   await page.waitForTimeout(400);
 
   const roomFirst = (await tabs()).find((t) => t.key === 'situation:t1');
-  check('clicking a subagent leaves the situation room in front', roomFirst?.active === true,
-    JSON.stringify((await tabs()).map((t) => `${t.key}${t.active ? '*' : ''}`)));
+  check(
+    'clicking a subagent leaves the situation room in front',
+    roomFirst?.active === true,
+    JSON.stringify((await tabs()).map((t) => `${t.key}${t.active ? '*' : ''}`)),
+  );
 
   // It writes a file.
   await page.evaluate(() => {
@@ -98,45 +106,74 @@ try {
   await page.waitForTimeout(400);
   let all = await tabs();
   const asFile = all.find((t) => t.key === 'corp:activity');
-  check('ONE "Agent activity" tab, showing the file', asFile?.kind === 'file', JSON.stringify(asFile));
-  check('its title is stable and the subtitle says what is inside',
+  check(
+    'ONE "Agent activity" tab, showing the file',
+    asFile?.kind === 'file',
+    JSON.stringify(asFile),
+  );
+  check(
+    'its title is stable and the subtitle says what is inside',
     asFile?.title === 'Agent activity' && asFile?.subtitle === 'engine.py',
-    `${asFile?.title} / ${asFile?.subtitle}`);
-  check('it did NOT steal focus from the room',
-    all.find((t) => t.key === 'situation:t1')?.active === true);
-  check('no per-file tab appeared alongside it',
+    `${asFile?.title} / ${asFile?.subtitle}`,
+  );
+  check(
+    'it did NOT steal focus from the room',
+    all.find((t) => t.key === 'situation:t1')?.active === true,
+  );
+  check(
+    'no per-file tab appeared alongside it',
     all.filter((t) => t.key?.startsWith('corpfile:')).length === 0,
-    JSON.stringify(all.map((t) => t.key)));
+    JSON.stringify(all.map((t) => t.key)),
+  );
 
   // Then it runs a command — the SAME tab becomes a terminal.
   await page.evaluate(() => {
     window.__corpStore.getState().foldWorkerActivity({
-      type: 'worker-activity', nodeId: 'eng-1', kind: 'tool', toolName: 'bash',
+      type: 'worker-activity',
+      nodeId: 'eng-1',
+      kind: 'tool',
+      toolName: 'bash',
       detail: 'python3 -m pytest -q',
     });
   });
   await page.waitForTimeout(400);
   all = await tabs();
   const asTerm = all.find((t) => t.key === 'corp:activity');
-  check('the SAME tab morphed into a terminal', asTerm?.kind === 'terminal', JSON.stringify(asTerm?.kind));
-  check('a running command shows its prompt line, nothing invented',
-    asTerm?.mirror === '$ python3 -m pytest -q\n\n', JSON.stringify(asTerm?.mirror));
-  check('still exactly two tabs (room + activity)', all.length === 2,
-    JSON.stringify(all.map((t) => t.key)));
+  check(
+    'the SAME tab morphed into a terminal',
+    asTerm?.kind === 'terminal',
+    JSON.stringify(asTerm?.kind),
+  );
+  check(
+    'a running command shows its prompt line, nothing invented',
+    asTerm?.mirror === '$ python3 -m pytest -q\n\n',
+    JSON.stringify(asTerm?.mirror),
+  );
+  check(
+    'still exactly two tabs (room + activity)',
+    all.length === 2,
+    JSON.stringify(all.map((t) => t.key)),
+  );
 
   // Output arrives: the mirror must GROW, so the xterm can append it.
   const before = asTerm?.mirror ?? '';
   await page.evaluate(() => {
     window.__corpStore.getState().foldWorkerActivity({
-      type: 'worker-activity', nodeId: 'eng-1', kind: 'tool', toolName: 'bash',
-      detail: 'python3 -m pytest -q', output: '..\n2 passed in 0.10s',
+      type: 'worker-activity',
+      nodeId: 'eng-1',
+      kind: 'tool',
+      toolName: 'bash',
+      detail: 'python3 -m pytest -q',
+      output: '..\n2 passed in 0.10s',
     });
   });
   await page.waitForTimeout(400);
   const grown = (await tabs()).find((t) => t.key === 'corp:activity')?.mirror ?? '';
-  check('output EXTENDS the mirror (so the terminal appends, keeping scrollback)',
+  check(
+    'output EXTENDS the mirror (so the terminal appends, keeping scrollback)',
     grown.startsWith(before) && grown.length > before.length,
-    JSON.stringify(grown));
+    JSON.stringify(grown),
+  );
 
   // Focus the activity tab and confirm the xterm actually painted the output.
   await page.evaluate(() => {
@@ -151,8 +188,11 @@ try {
   const painted = await page.evaluate(
     () => document.querySelector('.xterm-rows')?.textContent ?? '',
   );
-  check('the live terminal is actually showing the run', painted.includes('2 passed'),
-    painted.slice(0, 120));
+  check(
+    'the live terminal is actually showing the run',
+    painted.includes('2 passed'),
+    painted.slice(0, 120),
+  );
 
   console.log(`\nScreenshots: ${OUT}`);
 } finally {

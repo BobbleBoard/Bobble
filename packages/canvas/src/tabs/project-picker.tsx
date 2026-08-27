@@ -272,8 +272,12 @@ export function ProjectPicker({
                 onClick={() => pick(onClear)}
               >
                 <span className="pd-menu-icon" aria-hidden="true">
-                  {/* Folder with a slash — "no working folder". */}
+                  {/* Folder with a slash — "no working folder". Decorative: the
+                      row's label says the same thing in text, and the parent
+                      span is already aria-hidden. Repeated on the element
+                      because the lint cannot see the parent's attribute. */}
                   <svg
+                    aria-hidden="true"
                     width="16"
                     height="16"
                     viewBox="0 0 24 24"

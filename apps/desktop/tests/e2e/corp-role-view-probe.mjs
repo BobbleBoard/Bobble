@@ -104,9 +104,21 @@ try {
             { id: 'manager', role: 'manager', name: 'Manager', parentId: 'ceo', state: 'working' },
             // Ran, finished its turn, can be talked to again — the row that used
             // to read "queued" with a full transcript one click away.
-            { id: 'eng1', role: 'engineer', name: 'Engineer 1', parentId: 'manager', state: 'waiting' },
+            {
+              id: 'eng1',
+              role: 'engineer',
+              name: 'Engineer 1',
+              parentId: 'manager',
+              state: 'waiting',
+            },
             // Genuinely never started.
-            { id: 'eng2', role: 'engineer', name: 'Engineer 2', parentId: 'manager', state: 'idle' },
+            {
+              id: 'eng2',
+              role: 'engineer',
+              name: 'Engineer 2',
+              parentId: 'manager',
+              state: 'idle',
+            },
           ],
           edges: [],
         },
@@ -116,9 +128,18 @@ try {
       },
     });
     const push = (e) => corp.getState().foldWorkerActivity({ type: 'worker-activity', ...e });
-    push({ nodeId: 'manager', kind: 'briefing', delta: 'Build a 3D pocket watch. It must run offline.' });
+    push({
+      nodeId: 'manager',
+      kind: 'briefing',
+      delta: 'Build a 3D pocket watch. It must run offline.',
+    });
     push({ nodeId: 'manager', kind: 'text', phase: 'start' });
-    push({ nodeId: 'manager', kind: 'text', phase: 'delta', delta: 'Splitting this into three contracts.' });
+    push({
+      nodeId: 'manager',
+      kind: 'text',
+      phase: 'delta',
+      delta: 'Splitting this into three contracts.',
+    });
     push({ nodeId: 'manager', kind: 'text', phase: 'end' });
     push({
       nodeId: 'manager',
@@ -137,8 +158,15 @@ try {
       argsText: 'Why a team: three disciplines\n\nBuild the movement first.',
       recipient: 'manager',
     });
-    corp.getState().selectCorpNodeAndFocus?.({ id: 'manager', role: 'manager', name: 'Manager', state: 'working' });
-    corp.setState({ pinnedNode: { id: 'manager', role: 'manager', name: 'Manager', state: 'working' } });
+    corp.getState().selectCorpNodeAndFocus?.({
+      id: 'manager',
+      role: 'manager',
+      name: 'Manager',
+      state: 'working',
+    });
+    corp.setState({
+      pinnedNode: { id: 'manager', role: 'manager', name: 'Manager', state: 'working' },
+    });
   });
 
   await page.waitForTimeout(1500);
@@ -198,7 +226,11 @@ try {
     const last = chains[chains.length - 1];
     return last === undefined ? null : last.querySelector('.pd-chain-done') !== null;
   });
-  check('the LIVE chain shows no premature "Done"', liveChainDone === false, `last chain done=${liveChainDone}`);
+  check(
+    'the LIVE chain shows no premature "Done"',
+    liveChainDone === false,
+    `last chain done=${liveChainDone}`,
+  );
 
   // 6 — the sidebar speaks the situation room's vocabulary. Corp roles render as
   // CHILD rows (the corp-row-* path is gone), so this drives that store and then
@@ -227,7 +259,11 @@ try {
   const statuses = await page.$$eval('.pd-child-row-status', (els) =>
     els.map((e) => e.textContent ?? ''),
   );
-  check('sidebar says "waiting" for the agent that RAN', statuses.includes('waiting'), statuses.join(', '));
+  check(
+    'sidebar says "waiting" for the agent that RAN',
+    statuses.includes('waiting'),
+    statuses.join(', '),
+  );
   check(
     'sidebar still says "queued" for the one that never started',
     statuses.includes('queued'),

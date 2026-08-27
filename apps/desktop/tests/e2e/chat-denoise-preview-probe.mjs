@@ -472,7 +472,7 @@ async function runMode(mode) {
       await page.waitForFunction(
         () => {
           const i = document.querySelector('[data-testid="thread-image"] img');
-          return i !== null && i.complete && i.naturalWidth > 0;
+          return i?.complete && i.naturalWidth > 0;
         },
         { timeout: 20_000 },
       );

@@ -13,13 +13,13 @@
  * and `store:list` reports it beside the GGUF models the other downloader owns.
  * Then it cancels a second download mid-flight and checks the partial is gone.
  */
-import { _electron } from '@playwright/test';
-import { mkdtempSync } from 'node:fs';
-import { existsSync, readFileSync } from 'node:fs';
+
+import { existsSync, mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { _electron } from '@playwright/test';
 
-const OUT = process.env.OUT ?? '/tmp/model-store';
+const _OUT = process.env.OUT ?? '/tmp/model-store';
 const CACHE = mkdtempSync(path.join(tmpdir(), 'pd-store-cache-'));
 const REPO = process.env.REPO ?? 'hexgrad/Kokoro-82M';
 
@@ -114,7 +114,12 @@ try {
   const second = 'stabilityai/TripoSR';
   await win.evaluate(
     (repo) =>
-      window.piDesktop.invoke('store:download', { repo, kind: '3d', name: 'TripoSR', family: 'triposr' }),
+      window.piDesktop.invoke('store:download', {
+        repo,
+        kind: '3d',
+        name: 'TripoSR',
+        family: 'triposr',
+      }),
     second,
   );
   await win.waitForTimeout(4000);

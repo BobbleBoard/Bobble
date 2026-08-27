@@ -6,7 +6,6 @@ import {
   type OutputModality,
   RECOMMENDED_FAMILIES,
   recommendedFamilies,
-  recommendedRepos,
 } from './recommended-catalog';
 
 /**

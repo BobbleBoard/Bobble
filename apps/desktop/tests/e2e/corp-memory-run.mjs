@@ -96,8 +96,21 @@ async function main() {
   serverProc = spawn(
     SERVER_BIN,
     // prettier-ignore
-    ['-m', MODEL_GGUF, '--host', HOST, '--port', String(PORT), '-c', '32768',
-     '--parallel', '1', '--jinja', '--chat-template-file', CHAT_TEMPLATE],
+    [
+      '-m',
+      MODEL_GGUF,
+      '--host',
+      HOST,
+      '--port',
+      String(PORT),
+      '-c',
+      '32768',
+      '--parallel',
+      '1',
+      '--jinja',
+      '--chat-template-file',
+      CHAT_TEMPLATE,
+    ],
     { stdio: ['ignore', 'pipe', 'pipe'] },
   );
   const append = (d) => {
@@ -156,8 +169,11 @@ async function main() {
     spec,
     'What is the project codename I gave you? Reply with just the codename.',
   );
-  check('LIVE SESSION — remembers across turns with nothing replayed', second.finalText,
-    second.finalText.includes(SECRET));
+  check(
+    'LIVE SESSION — remembers across turns with nothing replayed',
+    second.finalText,
+    second.finalText.includes(SECRET),
+  );
 
   // 3. The hard half: close the session entirely, then ask again. Only the file
   //    on disk can answer this — which is what makes a team survive a restart.
@@ -181,8 +197,11 @@ async function main() {
     spec,
     'Once more: what was the project codename? Just the codename.',
   );
-  check('RESUMED FROM DISK — the same person, after the session was closed', third.finalText,
-    third.finalText.includes(SECRET));
+  check(
+    'RESUMED FROM DISK — the same person, after the session was closed',
+    third.finalText,
+    third.finalText.includes(SECRET),
+  );
 
   pool.disposeAll();
 

@@ -292,7 +292,7 @@ try {
       await page.waitForTimeout(300);
       const script = await page.textContent('[data-testid="harness-script-claude-code"]');
       assert(
-        script !== null && script.includes('ANTHROPIC_BASE_URL'),
+        script?.includes('ANTHROPIC_BASE_URL'),
         'Claude Code connect block does not set ANTHROPIC_BASE_URL',
       );
       await page.screenshot({ path: path.join(OUT, '06-harness-connect.png') });
@@ -369,13 +369,15 @@ try {
         await firstRow.click();
       }
       // Give the card fetch a real chance; it crosses the network.
-      await page.waitForFunction(
-        () => {
-          const el = document.querySelector('[data-testid="model-card"]');
-          return el !== null && !el.textContent.includes('Loading model card');
-        },
-        { timeout: 20_000 },
-      ).catch(() => null);
+      await page
+        .waitForFunction(
+          () => {
+            const el = document.querySelector('[data-testid="model-card"]');
+            return el !== null && !el.textContent.includes('Loading model card');
+          },
+          { timeout: 20_000 },
+        )
+        .catch(() => null);
       await page.waitForTimeout(400);
       await page.screenshot({ path: path.join(OUT, '07-model-card.png') });
       const card = await page.evaluate(() => {
@@ -397,79 +399,78 @@ try {
       if (card.missing === true) {
         console.log('settings-float-probe: no detail pane (no rows matched); skipping card checks');
       } else {
-
-      /* THREE LAYOUTS MUST DIFFER. They were pixel-identical before: three
+        /* THREE LAYOUTS MUST DIFFER. They were pixel-identical before: three
          buttons, two behaviours. Compare the geometry the layout controls. */
-      const geomFor = async (mode) => {
-        const btn = await page.$(`[data-testid="view-${mode}"]`);
-        if (btn === null) return null;
-        await btn.click();
-        await page.waitForTimeout(500);
-        return page.evaluate(() => {
-          const pane = document.querySelector('[data-testid="model-detail"]');
-          const row = document.querySelector('[data-testid^="model-row-"]');
+        const geomFor = async (mode) => {
+          const btn = await page.$(`[data-testid="view-${mode}"]`);
+          if (btn === null) return null;
+          await btn.click();
+          await page.waitForTimeout(500);
+          return page.evaluate(() => {
+            const pane = document.querySelector('[data-testid="model-detail"]');
+            const row = document.querySelector('[data-testid^="model-row-"]');
+            return {
+              pane: pane === null ? 0 : Math.round(pane.getBoundingClientRect().width),
+              row: row === null ? 0 : Math.round(row.getBoundingClientRect().width),
+              trending: document.querySelector('[data-testid="trending-row"]') !== null,
+            };
+          });
+        };
+        const gSplit = await geomFor('split');
+        const gDetail = await geomFor('detail');
+        if (gSplit !== null && gDetail !== null) {
+          console.log(
+            `  split: list ${gSplit.row}px / pane ${gSplit.pane}px · detail: list ${gDetail.row}px / pane ${gDetail.pane}px`,
+          );
+          assert(
+            gSplit.pane !== gDetail.pane || gSplit.row !== gDetail.row,
+            'split and detail render identically — three buttons, two behaviours',
+          );
+          assert(gDetail.pane > gSplit.pane, 'detail view does not give the card more room');
+        }
+
+        /* The quant picker must offer a real choice, with fit tones. */
+        await (await page.$('[data-testid="view-split"]'))?.click();
+        await page.waitForTimeout(600);
+        const picker = await page.evaluate(() => {
+          const el = document.querySelector('[data-testid="quant-picker"]');
+          if (el === null) {
+            const empty = document.querySelector('[data-testid="quant-picker-empty"]');
+            const loading = document.querySelector('[data-testid="quant-picker-loading"]');
+            return { state: empty !== null ? 'empty' : loading !== null ? 'loading' : 'absent' };
+          }
+          const cur = el.querySelector('[data-testid="quant-current"]');
           return {
-            pane: pane === null ? 0 : Math.round(pane.getBoundingClientRect().width),
-            row: row === null ? 0 : Math.round(row.getBoundingClientRect().width),
-            trending: document.querySelector('[data-testid="trending-row"]') !== null,
+            state: 'ready',
+            label: cur?.textContent?.trim().slice(0, 60) ?? '',
+            tone: el.querySelector('[data-testid="quant-fit-dot"]')?.getAttribute('data-tone'),
+            canOpen: cur !== null && !cur.hasAttribute('disabled'),
           };
         });
-      };
-      const gSplit = await geomFor('split');
-      const gDetail = await geomFor('detail');
-      if (gSplit !== null && gDetail !== null) {
-        console.log(
-          `  split: list ${gSplit.row}px / pane ${gSplit.pane}px · detail: list ${gDetail.row}px / pane ${gDetail.pane}px`,
-        );
-        assert(
-          gSplit.pane !== gDetail.pane || gSplit.row !== gDetail.row,
-          'split and detail render identically — three buttons, two behaviours',
-        );
-        assert(gDetail.pane > gSplit.pane, 'detail view does not give the card more room');
-      }
-
-      /* The quant picker must offer a real choice, with fit tones. */
-      await (await page.$('[data-testid="view-split"]'))?.click();
-      await page.waitForTimeout(600);
-      const picker = await page.evaluate(() => {
-        const el = document.querySelector('[data-testid="quant-picker"]');
-        if (el === null) {
-          const empty = document.querySelector('[data-testid="quant-picker-empty"]');
-          const loading = document.querySelector('[data-testid="quant-picker-loading"]');
-          return { state: empty !== null ? 'empty' : loading !== null ? 'loading' : 'absent' };
+        console.log(`  quant picker: ${JSON.stringify(picker)}`);
+        if (picker.state === 'ready' && picker.canOpen === true) {
+          await (await page.$('[data-testid="quant-current"]'))?.click();
+          await page.waitForTimeout(400);
+          const opts = await page.evaluate(() =>
+            [...document.querySelectorAll('[data-testid^="quant-opt-"]')].map((el) =>
+              el.textContent.trim().replace(/\s+/g, ' ').slice(0, 48),
+            ),
+          );
+          assert(opts.length > 1, 'the quant menu opened with fewer than two choices');
+          console.log(`  quant options (${opts.length}): ${opts.slice(0, 4).join(' | ')}`);
+          await page.screenshot({ path: path.join(OUT, '08-quant-picker.png') });
+          await page.keyboard.press('Escape');
         }
-        const cur = el.querySelector('[data-testid="quant-current"]');
-        return {
-          state: 'ready',
-          label: cur?.textContent?.trim().slice(0, 60) ?? '',
-          tone: el.querySelector('[data-testid="quant-fit-dot"]')?.getAttribute('data-tone'),
-          canOpen: cur !== null && !cur.hasAttribute('disabled'),
-        };
-      });
-      console.log(`  quant picker: ${JSON.stringify(picker)}`);
-      if (picker.state === 'ready' && picker.canOpen === true) {
-        await (await page.$('[data-testid="quant-current"]'))?.click();
-        await page.waitForTimeout(400);
-        const opts = await page.evaluate(() =>
-          [...document.querySelectorAll('[data-testid^="quant-opt-"]')].map((el) =>
-            el.textContent.trim().replace(/\s+/g, ' ').slice(0, 48),
-          ),
+        console.log(
+          `  model card: ${card.chars} chars, ${card.headings} headings, ${card.links} links, ${card.code} code, ${card.images} img, ${card.tables} table`,
         );
-        assert(opts.length > 1, 'the quant menu opened with fewer than two choices');
-        console.log(`  quant options (${opts.length}): ${opts.slice(0, 4).join(' | ')}`);
-        await page.screenshot({ path: path.join(OUT, '08-quant-picker.png') });
-        await page.keyboard.press('Escape');
-      }
-      console.log(
-        `  model card: ${card.chars} chars, ${card.headings} headings, ${card.links} links, ${card.code} code, ${card.images} img, ${card.tables} table`,
-      );
-      if (card.chars > 200) {
-        assert(
-          card.rawHtmlLeak !== true,
-          'the model card printed raw HTML as text instead of rendering it',
-        );
-        assert(card.links > 0, 'a substantial model card rendered no links');
-      }
+        if (card.chars > 200) {
+          assert(
+            card.rawHtmlLeak !== true,
+            'the model card printed raw HTML as text instead of rendering it',
+          );
+          assert(card.links > 0, 'a substantial model card rendered no links');
+        }
       }
     }
   }

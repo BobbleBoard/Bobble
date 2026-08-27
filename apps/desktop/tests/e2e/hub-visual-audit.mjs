@@ -10,10 +10,11 @@
  * is 20px. The crops are the deliverable; the assertions are deliberately few,
  * because the point is to LOOK.
  */
-import { _electron } from '@playwright/test';
+
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { _electron } from '@playwright/test';
 
 const OUT = process.env.OUT ?? '/tmp/hub-audit';
 const app = await _electron.launch({
@@ -95,9 +96,7 @@ try {
   // An EXPANDED family, which is where the variant rows live.
   await win.click('[data-testid="family-toggle-qwen3.5"]');
   await win.waitForTimeout(600);
-  await win.click(
-    '[data-testid="family-card-qwen3.5"] [data-testid^="family-variant-"] button',
-  );
+  await win.click('[data-testid="family-card-qwen3.5"] [data-testid^="family-variant-"] button');
   await win.waitForTimeout(2500);
   await win.screenshot({ path: path.join(OUT, 'expanded.png') });
 
@@ -134,7 +133,9 @@ try {
     if (last === undefined) return null;
     return {
       id: last.getAttribute('data-testid'),
-      clearance: Math.round(sc.getBoundingClientRect().bottom - last.getBoundingClientRect().bottom),
+      clearance: Math.round(
+        sc.getBoundingClientRect().bottom - last.getBoundingClientRect().bottom,
+      ),
       fade: getComputedStyle(sc).getPropertyValue('--pd-fade-end').trim(),
     };
   });

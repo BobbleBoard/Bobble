@@ -83,7 +83,10 @@ console.log(`${LABEL}: faces=${stats.faces} verts=${stats.verts}`);
 // PRESET=<id>[,<id>...] clicks each motion card in turn and captures it mid
 // clip. One launch for the whole library, because the point is to LOOK at every
 // preset rather than to prove one of them fires.
-const PRESETS = (process.env.PRESET ?? '').split(',').map((p) => p.trim()).filter(Boolean);
+const PRESETS = (process.env.PRESET ?? '')
+  .split(',')
+  .map((p) => p.trim())
+  .filter(Boolean);
 for (const preset of PRESETS) {
   const card = `[data-testid="tp-motion-${preset}"]`;
   const info = await win.evaluate((sel) => {

@@ -10,7 +10,6 @@ import {
   IconExternal,
   IconEye,
   IconFile,
-  IconFolder,
   IconFolderOpen,
   IconGateOpen,
   IconGears,

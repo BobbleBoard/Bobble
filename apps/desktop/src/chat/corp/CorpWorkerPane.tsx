@@ -26,7 +26,7 @@
  */
 import { formatDuration, TaskBriefingBubble } from '@pi-desktop/canvas';
 import type { OrgNodeView, WorkerTranscriptView } from '@pi-desktop/coordination';
-import { ContextGauge, MessageRow, ShimmerText, Spinner, Thread } from '@pi-desktop/ui';
+import { ContextGauge, ShimmerText, Spinner, Thread } from '@pi-desktop/ui';
 import { useEffect, useRef, useState } from 'react';
 import { fetchWorkerTranscript } from '../../state/corp-connect';
 import { useCorpStore } from '../../state/corp-store';

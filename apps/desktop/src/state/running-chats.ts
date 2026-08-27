@@ -119,18 +119,17 @@ export function useRunningChats(): readonly RunningChat[] {
     prefillPct: parsePrefillPercent(prefillRaw),
   });
 
-  const bgChat: RunningChat | null =
-    bgRun !== null && bgRun.streaming
-      ? {
-          sessionFile: bgRun.sessionFile,
-          title: bgRun.title !== null && bgRun.title.length > 0 ? bgRun.title : 'Chat',
-          modelId: agentModel?.id ?? loadedModel?.id ?? null,
-          modelName: agentModel?.name ?? loadedModel?.displayName ?? null,
-          status: 'generating',
-          prefillPct: null,
-          isActive: false,
-        }
-      : null;
+  const bgChat: RunningChat | null = bgRun?.streaming
+    ? {
+        sessionFile: bgRun.sessionFile,
+        title: bgRun.title !== null && bgRun.title.length > 0 ? bgRun.title : 'Chat',
+        modelId: agentModel?.id ?? loadedModel?.id ?? null,
+        modelName: agentModel?.name ?? loadedModel?.displayName ?? null,
+        status: 'generating',
+        prefillPct: null,
+        isActive: false,
+      }
+    : null;
 
   // Stable identity when idle so consumers don't re-render on every store tick.
   return useMemo(() => {

@@ -76,12 +76,9 @@ try {
   await page.waitForFunction(
     () => {
       const c = window.__child_store?.getState().children['child-1'];
-      return (
-        c !== undefined &&
-        c.messages.some(
-          (m) =>
-            m.kind === 'assistant' && m.blocks.some((b) => b.type === 'text' && b.text.length > 0),
-        )
+      return c?.messages.some(
+        (m) =>
+          m.kind === 'assistant' && m.blocks.some((b) => b.type === 'text' && b.text.length > 0),
       );
     },
     { timeout: 12000 },

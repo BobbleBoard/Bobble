@@ -37,7 +37,17 @@ const TEXTURE = process.env.TRIPO_RUN_TEXTURE === '1';
 // the bits that contain it, and the user's installed copy may be open.
 const APP =
   process.env.TRIPO_RUN_APP ??
-  path.resolve(here, '..', '..', 'release', 'mac-arm64', 'Bobble.app', 'Contents', 'MacOS', 'Bobble');
+  path.resolve(
+    here,
+    '..',
+    '..',
+    'release',
+    'mac-arm64',
+    'Bobble.app',
+    'Contents',
+    'MacOS',
+    'Bobble',
+  );
 const OUT_DIR = process.env.TRIPO_RUN_OUT ?? path.join(tmpdir(), 'tripo-real-run');
 mkdirSync(OUT_DIR, { recursive: true });
 if (IMAGE.length === 0) throw new Error('set TRIPO_RUN_IMAGE');
@@ -104,7 +114,9 @@ if (!TEXTURE) await win.click('[data-testid="tp-autotexture-toggle"]').catch(() 
 await win.setInputFiles('[data-testid="tp-image-input"]', IMAGE);
 await win.waitForTimeout(600);
 const before = await snapshot();
-console.log(`BEFORE: ${before.cards.length} asset card(s) — the sidebar starts ${before.cards.length === 0 ? 'EMPTY (the user\'s repro)' : 'with existing assets'}`);
+console.log(
+  `BEFORE: ${before.cards.length} asset card(s) — the sidebar starts ${before.cards.length === 0 ? "EMPTY (the user's repro)" : 'with existing assets'}`,
+);
 await win.screenshot({ path: path.join(OUT_DIR, '01-before.png') });
 
 const t0 = Date.now();
@@ -126,7 +138,12 @@ while (Date.now() < deadline) {
     outcome = 'dead';
     break;
   }
-  const key = JSON.stringify([s.cards, s.chunks.map((c) => `${c.label}:${c.state}`), s.phase, s.msg]);
+  const key = JSON.stringify([
+    s.cards,
+    s.chunks.map((c) => `${c.label}:${c.state}`),
+    s.phase,
+    s.msg,
+  ]);
   if (key !== lastKey) {
     lastKey = key;
     timeline.push({ at, ...s });

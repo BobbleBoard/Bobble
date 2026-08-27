@@ -86,7 +86,7 @@ export function buildTierRows(
  * component pulls in `window`-touching modules).
  */
 export function chipLabel(
-  userMode: UserMode,
+  _userMode: UserMode,
   selection: ModelSelection,
   loadedModelName: string | null,
   /**

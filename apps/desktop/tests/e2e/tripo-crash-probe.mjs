@@ -28,8 +28,7 @@ import { _electron as electron } from 'playwright-core';
 const IMAGE = process.env.TRIPO_CRASH_IMAGE ?? '';
 const RES = process.env.TRIPO_CRASH_RES ?? 'low'; // 'low' == 512
 const TEXTURE = process.env.TRIPO_CRASH_TEXTURE === '1';
-const APP =
-  process.env.TRIPO_CRASH_APP ?? '/Applications/Bobble.app/Contents/MacOS/Bobble';
+const APP = process.env.TRIPO_CRASH_APP ?? '/Applications/Bobble.app/Contents/MacOS/Bobble';
 const OUT_DIR = process.env.TRIPO_CRASH_OUT ?? path.join(tmpdir(), 'tripo-crash-shots');
 mkdirSync(OUT_DIR, { recursive: true });
 if (IMAGE.length === 0) throw new Error('set TRIPO_CRASH_IMAGE');
@@ -123,7 +122,9 @@ const sample = async () => {
       heap.push({ at, mb: snap.usedMb });
       if (snap.msg !== lastMsg && snap.msg.length > 0) {
         lastMsg = snap.msg;
-        console.log(`  [${at}s] heap ${snap.usedMb}MB/${snap.limitMb}MB — ${snap.msg.slice(0, 90)}`);
+        console.log(
+          `  [${at}s] heap ${snap.usedMb}MB/${snap.limitMb}MB — ${snap.msg.slice(0, 90)}`,
+        );
       }
       if (snap.lost > 0) console.log(`  [${at}s] !!! WEBGL CONTEXT LOST`);
       if (snap.done) return 'done';
@@ -149,23 +150,31 @@ await win.screenshot({ path: path.join(OUT_DIR, '02-after.png') }).catch(() => {
 const trace = path.join(userDataDir, 'diagnostics', 'renderer-health.jsonl');
 let gone = [];
 if (existsSync(trace)) {
-  const lines = readFileSync(trace, 'utf8').trim().split('\n').map((l) => JSON.parse(l));
-  gone = lines.filter(
-    (l) => l.event === 'render-process-gone' || l.event === 'child-process-gone',
-  );
+  const lines = readFileSync(trace, 'utf8')
+    .trim()
+    .split('\n')
+    .map((l) => JSON.parse(l));
+  gone = lines.filter((l) => l.event === 'render-process-gone' || l.event === 'child-process-gone');
   const mem = lines.filter((l) => l.event === 'memory');
   const peak = mem.reduce(
     (m, l) => Math.max(m, ...(l.renderers ?? []).map((r) => r.workingSetKb)),
     0,
   );
-  console.log(`\nmain-process trace: ${lines.length} entries, peak renderer RSS ${Math.round(peak / 1024)}MB`);
+  console.log(
+    `\nmain-process trace: ${lines.length} entries, peak renderer RSS ${Math.round(peak / 1024)}MB`,
+  );
 }
 
 const peakHeap = heap.reduce((m, h) => Math.max(m, h.mb), 0);
 console.log('\n──────── RENDERER SURVIVAL ────────');
 console.log(`outcome: ${outcome}   elapsed: ${Math.round((Date.now() - t0) / 1000)}s`);
 console.log(`renderer JS heap: peak ${peakHeap}MB  (${heap.length} samples)`);
-console.log(`heap curve: ${heap.filter((_, i) => i % 5 === 0).map((h) => `${h.at}s:${h.mb}`).join('  ')}`);
+console.log(
+  `heap curve: ${heap
+    .filter((_, i) => i % 5 === 0)
+    .map((h) => `${h.at}s:${h.mb}`)
+    .join('  ')}`,
+);
 if (gone.length > 0) {
   console.log('PROCESS DEATHS:');
   for (const g of gone) console.log('  ', JSON.stringify(g));

@@ -90,6 +90,14 @@ function FolderGlyph() {
 /** Glyphs, one per kind. Inline so the card needs no icon dependency. */
 function KindGlyph({ kind }: { kind: PresentKind }): ReactNode {
   const common = {
+    /*
+     * DECORATIVE, and marked so. Each glyph sits immediately beside the item's
+     * name in text (`pd-present-name`), so a <title> would make a screen reader
+     * announce the kind twice — "image, image, fox.png". `aria-hidden` is the
+     * correct answer for an icon that duplicates adjacent text, and it satisfies
+     * the a11y lint for the right reason rather than by adding noise.
+     */
+    'aria-hidden': true,
     width: 20,
     height: 20,
     viewBox: '0 0 24 24',
@@ -98,12 +106,11 @@ function KindGlyph({ kind }: { kind: PresentKind }): ReactNode {
     strokeWidth: 1.6,
     strokeLinecap: 'round' as const,
     strokeLinejoin: 'round' as const,
-    'aria-hidden': true,
   };
   switch (kind) {
     case 'image':
       return (
-        <svg {...common}>
+        <svg {...common} aria-hidden="true">
           <rect x="3" y="4" width="18" height="16" rx="2" />
           <circle cx="8.5" cy="9.5" r="1.5" />
           <path d="M21 16l-5-5-9 9" />
@@ -111,33 +118,33 @@ function KindGlyph({ kind }: { kind: PresentKind }): ReactNode {
       );
     case 'page':
       return (
-        <svg {...common}>
+        <svg {...common} aria-hidden="true">
           <rect x="3" y="4" width="18" height="16" rx="2" />
           <path d="M3 9h18" />
         </svg>
       );
     case 'code':
       return (
-        <svg {...common}>
+        <svg {...common} aria-hidden="true">
           <path d="M9 8l-4 4 4 4M15 8l4 4-4 4" />
         </svg>
       );
     case 'project':
       return (
-        <svg {...common}>
+        <svg {...common} aria-hidden="true">
           <path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
         </svg>
       );
     case 'media':
       return (
-        <svg {...common}>
+        <svg {...common} aria-hidden="true">
           <rect x="3" y="5" width="18" height="14" rx="2" />
           <path d="M10 9.5l5 2.5-5 2.5z" />
         </svg>
       );
     default:
       return (
-        <svg {...common}>
+        <svg {...common} aria-hidden="true">
           <path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8z" />
           <path d="M14 3v5h5" />
         </svg>

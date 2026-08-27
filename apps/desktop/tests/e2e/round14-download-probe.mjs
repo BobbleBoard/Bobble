@@ -91,7 +91,7 @@ try {
   await page.waitForSelector('.pd-dialog-overlay', { timeout: 8000 });
   const dialogClass = await page.getAttribute('[data-testid="auto-download-prompt"]', 'class');
   assert(
-    dialogClass !== null && dialogClass.includes('pd-dialog'),
+    dialogClass?.includes('pd-dialog'),
     `expected the prompt to be a .pd-dialog, got class="${dialogClass}"`,
   );
 

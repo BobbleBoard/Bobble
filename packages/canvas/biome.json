@@ -1,6 +1,7 @@
 {
   "$schema": "https://biomejs.dev/schemas/2.5.2/schema.json",
   "extends": ["../../biome.json"],
+  "root": false,
   "vcs": { "useIgnoreFile": false },
   "files": {
     "includes": ["**", "!harness", "!node_modules", "!.turbo"]

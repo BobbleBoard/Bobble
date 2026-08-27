@@ -18,14 +18,13 @@ import {
   RAISE_HAND_TOOL,
   WAIT_TOOL,
 } from '@pi-desktop/harness/corp';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
   CLEAN_LOAD,
   communicationTools,
   dispatchesTo,
   emptyProjectComplaint,
   emptyReplyCause,
-  excerptFailures,
   hasProduct,
   hostPassthrough,
   isUncheckable,

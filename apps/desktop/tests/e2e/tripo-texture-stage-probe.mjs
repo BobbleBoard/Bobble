@@ -24,7 +24,17 @@ const GLB = process.env.TRIPO_STAGE_GLB ?? '';
 const OUT_DIR = process.env.TRIPO_STAGE_OUT ?? path.join(tmpdir(), 'tripo-texture-stage');
 const APP =
   process.env.TRIPO_STAGE_APP ??
-  path.resolve(here, '..', '..', 'release', 'mac-arm64', 'Bobble.app', 'Contents', 'MacOS', 'Bobble');
+  path.resolve(
+    here,
+    '..',
+    '..',
+    'release',
+    'mac-arm64',
+    'Bobble.app',
+    'Contents',
+    'MacOS',
+    'Bobble',
+  );
 mkdirSync(OUT_DIR, { recursive: true });
 if (GLB.length === 0) throw new Error('set TRIPO_STAGE_GLB');
 
@@ -80,7 +90,8 @@ while (Date.now() - t0 < 900_000) {
         msg: document.querySelector('[data-testid="tp-genstage-msg"]')?.textContent ?? '',
         title: document.querySelector('[data-testid="tp-genstage-title"]')?.textContent ?? '',
         chunks: [...document.querySelectorAll('.tp-chunk')].map(
-          (c) => `${c.querySelector('.tp-chunk-label')?.textContent}[${c.getAttribute('data-state')}]`,
+          (c) =>
+            `${c.querySelector('.tp-chunk-label')?.textContent}[${c.getAttribute('data-state')}]`,
         ),
         versions: document.querySelector('[class*="tp-asset-steps"]')?.textContent ?? '1',
       };

@@ -138,7 +138,7 @@ const DONE_STATE = (() => {
   return state;
 })();
 
-const EMITTER_TRANSCRIPT: WorkerTranscriptView = {
+const _EMITTER_TRANSCRIPT: WorkerTranscriptView = {
   nodeId: 'eng-live',
   role: 'engineer',
   briefing: {

@@ -52,7 +52,10 @@ try {
 
   // The raw IPC first, so a null result is distinguishable from a render problem.
   const ipc = await page.evaluate(
-    async (d) => await window.piDesktop.invoke('project:set', { path: d }).catch((e) => ({ error: String(e) })),
+    async (d) =>
+      await window.piDesktop
+        .invoke('project:set', { path: d })
+        .catch((e) => ({ error: String(e) })),
     dir,
   );
 
@@ -74,7 +77,9 @@ try {
     return { chipFound: el !== null, chipText: (el?.textContent || '').trim(), cands };
   });
 
-  console.log(JSON.stringify({ dir, before, ipcProject: ipc?.project ?? ipc, viaStore, chip }, null, 2));
+  console.log(
+    JSON.stringify({ dir, before, ipcProject: ipc?.project ?? ipc, viaStore, chip }, null, 2),
+  );
 } catch (err) {
   console.error(err);
   process.exitCode = 1;

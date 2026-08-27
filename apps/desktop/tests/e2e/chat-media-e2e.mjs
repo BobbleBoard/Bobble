@@ -19,7 +19,8 @@ import { _electron } from '@playwright/test';
 const OUT = process.env.OUT ?? '/tmp/chat-e2e';
 mkdirSync(OUT, { recursive: true });
 const MODEL = process.env.MODEL ?? 'qwen3.5-9b-mtp';
-const ASK = process.env.ASK ?? 'Use your speech tool to read this out loud: "Bobble can speak now."';
+const ASK =
+  process.env.ASK ?? 'Use your speech tool to read this out loud: "Bobble can speak now."';
 const CAP_MS = Number(process.env.CAP_MS ?? 420_000);
 
 const settingsPath = path.join(homedir(), '.pi/desktop/settings.json');
@@ -44,9 +45,7 @@ try {
   await win.waitForSelector('[data-testid="composer-input"]', { timeout: 30000 });
   await win.waitForTimeout(6000);
 
-  const before = await win.evaluate(
-    () => window.__pi_store?.().getState?.().messages?.length ?? 0,
-  );
+  const before = await win.evaluate(() => window.__pi_store?.().getState?.().messages?.length ?? 0);
   await win.click('[data-testid="composer-input"]');
   await win.keyboard.type(ASK);
   await win.keyboard.press('Enter');
@@ -89,7 +88,9 @@ try {
    */
   const midway = await win.evaluate((n) => {
     const ms = window.__pi_store?.().getState?.().messages ?? [];
-    return ms.slice(n).some((m) => m.kind === 'toolResult' && /generation" is on/.test(m.text ?? ''));
+    return ms
+      .slice(n)
+      .some((m) => m.kind === 'toolResult' && /generation" is on/.test(m.text ?? ''));
   }, before);
   if (midway) {
     console.log('[e2e] capability activated; sending the follow-up turn');
@@ -102,7 +103,9 @@ try {
         .evaluate(() => {
           const ms = window.__pi_store?.().getState?.().messages ?? [];
           const tail = ms.slice(-4);
-          return tail.some((m) => m.kind === 'assistant') && !ms.some((m) => m.isStreaming === true);
+          return (
+            tail.some((m) => m.kind === 'assistant') && !ms.some((m) => m.isStreaming === true)
+          );
         })
         .catch(() => false);
       if (d) break;
@@ -187,9 +190,9 @@ try {
     await sleep(700);
     // The step's own body — the reveal this fix is about.
     const body = row.closest('.pd-chain-step')?.querySelector('.pd-chain-facts, .pd-chain-preview');
-    out.factLabels = [...(row.closest('.pd-chain-step')?.querySelectorAll('.pd-chain-fact-label') ?? [])].map(
-      (n) => n.textContent,
-    );
+    out.factLabels = [
+      ...(row.closest('.pd-chain-step')?.querySelectorAll('.pd-chain-fact-label') ?? []),
+    ].map((n) => n.textContent);
     out.revealHeight = box(body);
     out.revealText = body ? body.innerText.replace(/\s+/g, ' ').slice(0, 160) : null;
     return out;

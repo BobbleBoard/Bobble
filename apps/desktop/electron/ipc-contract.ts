@@ -38,7 +38,6 @@ import {
 } from './gen3d/gen3d-contract';
 import { IMPORT_INVOKE_CHANNELS, type ImportInvokeMap } from './import/import-contract';
 import {
-  STORE_EVENT_CHANNELS,
   STORE_INVOKE_CHANNELS,
   type StoreEventMap,
   type StoreInvokeMap,

@@ -75,7 +75,14 @@ try {
           },
         ],
       },
-      { kind: 'toolResult', id: 'r1', toolCallId: 'call-1', toolName: 'web_search', text, timestamp: 0 },
+      {
+        kind: 'toolResult',
+        id: 'r1',
+        toolCallId: 'call-1',
+        toolName: 'web_search',
+        text,
+        timestamp: 0,
+      },
     ]);
   }, TOOL_TEXT);
 
@@ -146,7 +153,8 @@ try {
   );
   check(
     'exactly ONE new surface opened, and it is the canvas browser on that link',
-    contents.length === 2 && contents.filter((u) => u.startsWith('https://example.com')).length === 1,
+    contents.length === 2 &&
+      contents.filter((u) => u.startsWith('https://example.com')).length === 1,
     contents.join(' | '),
   );
 

@@ -7,7 +7,7 @@
  * something on every styling change, and it exercises the same code path.
  */
 import { mkdirSync, mkdtempSync } from 'node:fs';
-import { tmpdir, homedir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import path from 'node:path';
 import { _electron } from '@playwright/test';
 
@@ -68,10 +68,13 @@ const probe = await win.evaluate(() => {
   const wave = document.querySelector('[data-testid="thread-audio-wave"]');
   const card = document.querySelector('[data-testid="thread-file-card"]');
   const bars = document.querySelectorAll('.pd-thread-audio-bar');
-  const r = (n) => (n === null ? null : {
-    w: Math.round(n.getBoundingClientRect().width),
-    h: Math.round(n.getBoundingClientRect().height),
-  });
+  const r = (n) =>
+    n === null
+      ? null
+      : {
+          w: Math.round(n.getBoundingClientRect().width),
+          h: Math.round(n.getBoundingClientRect().height),
+        };
   return {
     audio: r(el),
     wave: r(wave),
@@ -86,7 +89,10 @@ const rowText = await win.evaluate(() => {
   const group = media?.closest('div')?.parentElement;
   const texts = [...(group?.querySelectorAll('*') ?? [])]
     .filter((n) => n.children.length === 0 && (n.textContent ?? '').trim().length > 0)
-    .map((n) => `${n.tagName}.${String(n.className).slice(0, 28)}: ${(n.textContent ?? '').trim().slice(0, 40)}`);
+    .map(
+      (n) =>
+        `${n.tagName}.${String(n.className).slice(0, 28)}: ${(n.textContent ?? '').trim().slice(0, 40)}`,
+    );
   return texts.slice(0, 10);
 });
 console.log('ACTIVITY ROWS:', JSON.stringify(rowText));
