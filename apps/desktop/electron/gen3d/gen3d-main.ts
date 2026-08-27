@@ -211,6 +211,23 @@ async function startSidecar(): Promise<Gen3dSidecar | null> {
     onDown: () => {
       if (sidecar === instance) sidecar = null;
       sidecarStarting = null;
+      /*
+       * A DEAD SIDECAR TOOK ITS JOBS WITH IT, and nothing here noticed.
+       *
+       * `jobPlans` kept every plan for jobs that can no longer report, so the
+       * next `generate_image` found a stale entry and image generation in chat
+       * stayed broken until the app was restarted. And every caller awaiting a
+       * job sat there until its own fifteen-minute timeout, because the thing
+       * that would have settled it no longer exists.
+       *
+       * A crash here is expected, not exceptional: OOM is a normal outcome for
+       * on-device generation on 24 GB. It has to be survivable, and it is a
+       * prerequisite for any overnight batch — otherwise a night's work is one
+       * image and several hundred lock errors by morning.
+       */
+      jobPlans.clear();
+      imageJobs.failAll('the generation sidecar stopped before this job finished');
+      stopMemorySampling();
       broadcast('gen3d:catalog-changed', { at: Date.now() });
     },
   });

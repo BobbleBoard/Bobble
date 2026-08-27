@@ -88,3 +88,31 @@ describe('ImageJobTracker', () => {
     void expect(t.wait('j49', 60_000)).resolves.toEqual({ ok: true, path: '/out/49.png' });
   });
 });
+
+describe('when the sidecar dies mid-job', () => {
+  /*
+   * A crash here is expected, not exceptional — OOM is a normal outcome for
+   * on-device generation on 24 GB. Before `failAll`, every caller awaiting a job
+   * sat until its own fifteen-minute timeout, because the process that would
+   * have settled it was gone. In chat that is "generate an image" hanging,
+   * once, for a quarter of an hour, with no output and no error.
+   */
+  it('settles every waiter instead of leaving them hanging', async () => {
+    const tracker = new ImageJobTracker();
+    const a = tracker.wait('job-a', 60_000);
+    const b = tracker.wait('job-b', 60_000);
+
+    tracker.failAll('the generation sidecar stopped before this job finished');
+
+    for (const p of [a, b]) {
+      const r = await p;
+      expect(r.ok).toBe(false);
+      if (r.ok) throw new Error('expected failure');
+      expect(r.error).toContain('sidecar stopped');
+    }
+  });
+
+  it('is safe to call with nothing in flight', () => {
+    expect(() => new ImageJobTracker().failAll('x')).not.toThrow();
+  });
+});

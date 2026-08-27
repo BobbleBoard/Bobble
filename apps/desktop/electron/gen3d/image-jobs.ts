@@ -48,6 +48,21 @@ export class ImageJobTracker {
   /** jobId → outcome, for jobs that finished before their waiter existed. */
   private readonly outcomes = new Map<string, ImageJobResult>();
 
+  /**
+   * The sidecar died — settle everything waiting on it.
+   *
+   * Without this, a crash (OOM is an expected outcome on 24 GB) left every
+   * in-flight caller waiting for a process that is gone, until its own
+   * fifteen-minute timeout. The chat's image tools await a specific job, so
+   * "generate an image" simply hung, once, for a quarter of an hour.
+   */
+  failAll(reason: string): void {
+    for (const resolve of this.waiters.values()) {
+      resolve({ ok: false, error: reason });
+    }
+    this.waiters.clear();
+  }
+
   /** Fold one job update in, settling the waiter when the job ends. */
   note(update: ImageJobProgress): void {
     if (update.artifact?.kind === 'image' && update.artifact.path !== '') {
