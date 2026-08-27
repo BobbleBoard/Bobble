@@ -41,6 +41,31 @@ function comfyVenvPython(): string {
   return path.join(cacheRoot(), 'engines', 'comfyui', '.venv', 'bin', 'python');
 }
 
+export function comfyEngineInstalled(): boolean {
+  return engineInstalled();
+}
+
+/**
+ * The studio's ComfyUI origin, for anything else in the app that needs one.
+ *
+ * The generation stack had none: `registerGenIpc` was never given a
+ * `comfyResolveOrigin`, so its ComfyClient fell back to a rejection and every
+ * ComfyUI-backed model — all of music, SFX and photoreal video — was
+ * unreachable from the tools, while this file was already starting and
+ * health-checking the exact server they needed. One supervisor, memoized here,
+ * shared rather than duplicated: two ComfyUI servers on one machine would fight
+ * for the same GPU and the same port.
+ */
+export async function comfyOrigin(): Promise<string> {
+  if (!engineInstalled()) {
+    throw new Error(
+      'ComfyUI is not installed on this machine — install it from the Video or Audio studio, ' +
+        'then music, sound effects and photoreal video will run here.',
+    );
+  }
+  return supervisor().resolveOrigin();
+}
+
 function engineInstalled(): boolean {
   return existsSync(comfyMainPy()) && existsSync(comfyVenvPython());
 }

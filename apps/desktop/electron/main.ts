@@ -51,7 +51,7 @@ import {
   registerSettingsIpc,
 } from './settings/settings-main';
 import { registerSkillsIpc } from './skills/skills-main';
-import { disposeStudio, registerStudioIpc } from './studio/studio-main';
+import { comfyOrigin, disposeStudio, registerStudioIpc } from './studio/studio-main';
 import { disposeAllPtys, registerPtyIpc } from './terminal/pty-manager';
 import {
   isTrustedIpcEvent,
@@ -572,6 +572,13 @@ function registerAppIpc(): void {
   // gen socket, no gen env published, and pi-main omits the `gen-tools`
   // extension too). Sibling to the corp gate. Standing this up BEFORE the first
   // pi spawn publishes PI_GEN_SOCK/PI_GEN_TOKEN for the gen-tools extension.
+  // ComfyUI comes from the STUDIO's supervisor (`comfyOrigin`), which already
+  // spawns and health-checks it — passing it here is what makes music, sound
+  // effects and photoreal video reachable from the tools at all. Without it the
+  // ComfyClient fell back to a rejection, and `generate_music` failed earlier
+  // still, with `unknown or non-audio model ""`, because every ComfyUI audio
+  // entry is `reserved` and so absent from `activeModels()`.
+  //
   // NEXT (video pillar): pass `comfyInstall` (a real ComfyInstallManager whose
   // `emit` → `events.send('gen:comfy-install')`) to answer the modular-download
   // UI + drive the download-then-continue gate end-to-end.
@@ -591,6 +598,7 @@ function registerAppIpc(): void {
     registerGenIpc({
       getWindow: () => (mainWindow !== null ? mainWindow.webContents : null),
       ...(genWorker !== undefined ? { workerScript: genWorker } : {}),
+      comfyResolveOrigin: comfyOrigin,
       // gen event channels are a subset of AppEventMap; forward through the
       // app-wide sender (the cast only bridges the two generic key domains).
       sendEvent: (wc, channel, payload) =>

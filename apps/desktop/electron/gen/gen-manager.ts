@@ -490,9 +490,27 @@ export function registerGenIpc(opts: GenManagerOptions): void {
   async function handleGenerateAudio(raw: GenerateAudioParams): Promise<GenerateAudioResult> {
     const kind = raw.kind ?? 'speech';
     const fallback = defaultAudioModel(kind, activeModels());
-    const model = getModel(raw.model ?? fallback?.id ?? '');
+    const requested = raw.model ?? fallback?.id ?? '';
+    const model = getModel(requested);
     if (model === undefined || model.modality !== 'audio') {
-      throw new Error(`unknown or non-audio model "${raw.model ?? ''}"`);
+      /*
+       * SAY WHICH OF THE TWO THINGS WENT WRONG.
+       *
+       * `unknown or non-audio model ""` was the message for the COMMON case —
+       * `generate_music` with no model named — and it described neither the
+       * cause nor the fix. Music and SFX route to ComfyUI, every ComfyUI audio
+       * entry is `reserved`, `activeModels()` drops reserved entries, so the
+       * default resolved to nothing and the empty string was reported as if the
+       * caller had asked for it.
+       */
+      if (requested === '') {
+        throw new Error(
+          kind === 'speech'
+            ? 'no speech model is available on this machine'
+            : `${kind === 'music' ? 'Music' : 'Sound effect'} generation runs on ComfyUI, which is not set up on this machine — install it from the Audio studio. Speech (text-to-speech) works without it.`,
+        );
+      }
+      throw new Error(`unknown or non-audio model "${requested}"`);
     }
 
     const jobId = `gen_${Date.now()}_${randomBytes(3).toString('hex')}`;
