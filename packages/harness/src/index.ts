@@ -1983,7 +1983,23 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
       // it is retargeted onto the commands that actually reach them.
       ...(toolCliMode ? { commandFor: toolCliCommandNames() } : {}),
     });
-    return toolCliMode ? `${augmented}\n\n${toolCliPreamble()}` : augmented;
+    /*
+     * THE COMMAND LIST GOES FIRST.
+     *
+     * MEASURED, ling-3.0-tiny, six tasks: with the preamble appended AFTER pi's
+     * base prompt it scored 2/6 — four tasks where it never called anything. It
+     * opened by checking for PIL, numpy, ffmpeg, moviepy and imagemagick, then
+     * degenerated into repeating `ls`. The same model on the same tasks with a
+     * ~20-line prompt whose first words are the command list: 5/6.
+     *
+     * The anti-DIY paragraph is identical in both. What differs is that ~4,500
+     * characters of "you are an expert coding assistant… executing commands,
+     * editing code" arrive first, and a small model acts on the framing it read
+     * first rather than the list it read last.
+     *
+     * Ordering does not touch the KV prefix — the prompt is frozen per session.
+     */
+    return toolCliMode ? `${toolCliPreamble()}\n\n${augmented}` : augmented;
   }
 
   /** Tool name → the command line that runs it, straight from the CLI model. */
