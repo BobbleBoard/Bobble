@@ -358,3 +358,35 @@ describe('pixel work is code, not generation', () => {
     expect(CAPABILITY_PROMPT).toMatch(/never draw on a blank canvas/i);
   });
 });
+
+describe('the prompt must not contradict the interface it ships with', () => {
+  /*
+   * MEASURED by a repo-wide audit: in bash-CLI mode the shipped 12,934-char
+   * system prompt told the model to reach tools with `capability` (not
+   * advertised — the active set is ['bash']), named six tools it cannot call,
+   * and ended with "NEVER type a tool name at the shell" — while the CLI
+   * preamble in the same prompt said "These commands are your abilities."
+   *
+   * A model given both has been told the one thing it needs to be sure of, and
+   * its opposite. It is the best available explanation for the measured
+   * behaviour where it reimplemented a capability by hand instead of running
+   * the command.
+   */
+  it('drops the capability section in bash-CLI mode', () => {
+    const cli = augmentSystemPrompt('base', { toolInterface: 'bash-cli' });
+    expect(cli).not.toContain('NEVER type a tool name at the shell');
+    expect(cli).not.toContain('call `capability`');
+  });
+
+  it('keeps it in the schema mode it describes', () => {
+    const schemas = augmentSystemPrompt('base', { toolInterface: 'schemas' });
+    expect(schemas).toContain('NEVER type a tool name at the shell');
+  });
+
+  it('keeps the verify guidance in both — checking your work is interface-independent', () => {
+    for (const mode of ['schemas', 'bash-cli'] as const) {
+      const p = augmentSystemPrompt('base', { toolInterface: mode });
+      expect(p.length).toBeGreaterThan('base'.length + 50);
+    }
+  });
+});

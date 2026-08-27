@@ -274,10 +274,31 @@ export const VERIFY_PROMPT = `VERIFY BEFORE YOU SUBMIT. Right before you hand an
 
 export function augmentSystemPrompt(
   base: string | undefined,
-  _opts: { team?: boolean } = {},
+  opts: { team?: boolean; toolInterface?: 'schemas' | 'bash-cli' } = {},
 ): string {
   const trimmed = stripToolCatalog((base ?? '').trim());
-  const section = `${CAPABILITY_PROMPT}\n\n${VERIFY_PROMPT}`;
+  /*
+   * THE CAPABILITY SECTION DESCRIBES THE SCHEMA INTERFACE, AND ONLY THAT ONE.
+   *
+   * It tells the model to reach tools by calling `capability`, names
+   * `browser_navigate`, `present`, `spawn_subagent`, `talk_to_manager` and
+   * `mac_snapshot`, and ends with "NEVER type a tool name at the shell —
+   * `mac_snapshot` is a tool, not a command."
+   *
+   * In bash-CLI mode every one of those statements is false. `capability` is
+   * not advertised (the active set is `['bash']`), none of those tool names are
+   * callable, and typing a command at the shell is the ONLY thing the model can
+   * do. The turn shipped both this and the CLI preamble, which says "These
+   * commands are your abilities" — a flat contradiction, in the same prompt,
+   * about the one thing the model needs to be sure of.
+   *
+   * That also means the 34/36 measured in tests/e2e/tool-cli-eval.mjs describes
+   * a clean ~20-line prompt and NOT the shipped configuration. The verify
+   * section still applies — how to check your work is interface-independent —
+   * so only the capability half is dropped.
+   */
+  const section =
+    opts.toolInterface === 'bash-cli' ? VERIFY_PROMPT : `${CAPABILITY_PROMPT}\n\n${VERIFY_PROMPT}`;
   if (trimmed.includes(CAPABILITY_PROMPT_MARKER)) return trimmed;
   if (trimmed.length === 0) return section;
   return `${trimmed}\n\n${section}`;

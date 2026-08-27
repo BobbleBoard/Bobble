@@ -57,6 +57,8 @@ export interface ToolCliOptions {
   readonly execPath?: string;
   readonly env?: NodeJS.ProcessEnv;
   readonly onLog?: (m: string) => void;
+  /** Must exceed the bash tool's timeout. See DEFAULT_DISPATCH_TIMEOUT_MS. */
+  readonly dispatchTimeoutMs?: number;
 }
 
 export interface ToolCliHandle {
@@ -101,13 +103,27 @@ export function buildDecoy(name: string, suggestion: string): string {
 }
 
 /**
+ * How long a command may take before the shim gives up.
+ *
+ * MUST EXCEED THE BASH TOOL'S OWN TIMEOUT, or the shim reports failure for work
+ * the harness is still doing. It was 120s against a bash tool that allows 300s,
+ * and on-device generation lives in between — a 512px TRELLIS render measures
+ * ~225s. The model was told its command FAILED while the job ran to completion
+ * and wrote its result into a closed socket, which is about the strongest
+ * argument a model could be given for doing the job by hand next time.
+ *
+ * The harness passes its real bash timeout in, so the two cannot drift apart.
+ */
+export const DEFAULT_DISPATCH_TIMEOUT_MS = 600_000;
+
+/**
  * The dispatcher: argv → socket → text on stdout.
  *
  * Written as source rather than shipped as a file because it has to live beside
  * the shims in the temp dir the shims point at, and because it must not depend
  * on anything in the app bundle's module graph.
  */
-export function buildDispatcherSource(): string {
+export function buildDispatcherSource(timeoutMs = DEFAULT_DISPATCH_TIMEOUT_MS): string {
   return `
 const net = require('node:net');
 const sock = process.env['${TOOL_CLI_SOCK_ENV}'];
@@ -116,7 +132,7 @@ const argv = process.argv.slice(2);
 if (!sock) { console.error('tool bridge not available in this shell'); process.exit(2); }
 const c = net.createConnection(sock);
 let buf = '';
-const timer = setTimeout(() => { console.error('tool bridge timed out'); process.exit(3); }, 120000);
+const timer = setTimeout(() => { console.error('tool bridge timed out'); process.exit(3); }, ${timeoutMs});
 c.on('connect', () => c.write(JSON.stringify({ token, argv }) + '\\n'));
 c.on('data', (d) => {
   buf += d.toString();
@@ -145,7 +161,11 @@ export function registerToolCli(host: ToolCliHost, opts: ToolCliOptions = {}): T
 
   const dispatcherPath = path.join(shimDir, 'dispatcher.js');
   fs.mkdirSync(shimDir, { recursive: true, mode: 0o700 });
-  fs.writeFileSync(dispatcherPath, buildDispatcherSource(), 'utf8');
+  fs.writeFileSync(
+    dispatcherPath,
+    buildDispatcherSource(opts.dispatchTimeoutMs ?? DEFAULT_DISPATCH_TIMEOUT_MS),
+    'utf8',
+  );
 
   /*
    * A shim per capability group — named from the GROUPS ALONE, never from the

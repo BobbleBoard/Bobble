@@ -1502,45 +1502,55 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
    * costume.
    */
   if (toolCliMode) {
-    const handle = registerToolCli({
-      /*
-       * ONLY WHAT WE CAN ACTUALLY RUN.
-       *
-       * This advertised from `pi.getAllTools()` — which sees every extension —
-       * and executed through `toolRegistry`, which is a monkey-patch of THIS
-       * extension's `registerTool` and therefore holds only the harness's own
-       * tools. So `media generate image`, `browser click`, `mac snapshot` and
-       * every connector command were listed by `tools`, documented by `--help`,
-       * and answered "not registered in this build" when run.
-       *
-       * The comment three paragraphs above says a CLI that cannot reach those
-       * tools "would be the same false-availability bug in a new costume", and
-       * then the code did exactly that. It is the defect this whole mode exists
-       * to remove, reproduced one layer down, by me, in the fix for it.
-       *
-       * pi offers no way to execute another extension's tool: `ToolInfo` is
-       * `Pick<ToolDefinition, 'name'|'description'|'parameters'>` with no
-       * `execute` (pi-coding-agent types.d.ts:990). So until those commands are
-       * routed through the app's own bridges, the honest surface is the one we
-       * can serve — a short true list beats a long false one.
-       */
-      tools: () => pi.getAllTools().filter((t) => toolRegistry.get(t.name) !== undefined),
-      groups: () => toolCliGroups(),
-      call: async (name, args) => {
-        const target = toolRegistry.get(name);
-        if (target === undefined) {
-          return { text: `${name}: not registered in this build.`, isError: true };
-        }
-        const res = (await target.execute('tool-cli', args)) as {
-          content?: { type: string; text?: string }[];
-          isError?: boolean;
-        };
-        const text = (res.content ?? [])
-          .map((c) => (c.type === 'text' ? (c.text ?? '') : `[${c.type}]`))
-          .join('\n');
-        return { text, isError: res.isError === true };
+    const handle = registerToolCli(
+      {
+        /*
+         * ONLY WHAT WE CAN ACTUALLY RUN.
+         *
+         * This advertised from `pi.getAllTools()` — which sees every extension —
+         * and executed through `toolRegistry`, which is a monkey-patch of THIS
+         * extension's `registerTool` and therefore holds only the harness's own
+         * tools. So `media generate image`, `browser click`, `mac snapshot` and
+         * every connector command were listed by `tools`, documented by `--help`,
+         * and answered "not registered in this build" when run.
+         *
+         * The comment three paragraphs above says a CLI that cannot reach those
+         * tools "would be the same false-availability bug in a new costume", and
+         * then the code did exactly that. It is the defect this whole mode exists
+         * to remove, reproduced one layer down, by me, in the fix for it.
+         *
+         * pi offers no way to execute another extension's tool: `ToolInfo` is
+         * `Pick<ToolDefinition, 'name'|'description'|'parameters'>` with no
+         * `execute` (pi-coding-agent types.d.ts:990). So until those commands are
+         * routed through the app's own bridges, the honest surface is the one we
+         * can serve — a short true list beats a long false one.
+         */
+        tools: () => pi.getAllTools().filter((t) => toolRegistry.get(t.name) !== undefined),
+        groups: () => toolCliGroups(),
+        call: async (name, args) => {
+          const target = toolRegistry.get(name);
+          if (target === undefined) {
+            return { text: `${name}: not registered in this build.`, isError: true };
+          }
+          const res = (await target.execute('tool-cli', args)) as {
+            content?: { type: string; text?: string }[];
+            isError?: boolean;
+          };
+          const text = (res.content ?? [])
+            .map((c) => (c.type === 'text' ? (c.text ?? '') : `[${c.type}]`))
+            .join('\n');
+          return { text, isError: res.isError === true };
+        },
       },
-    });
+      {
+        /*
+         * Past the bash tool's own limit, so a long generation is never reported
+         * as a failure while it is still running. Derived from the same constant
+         * the bash tool uses, so raising one cannot silently strand the other.
+         */
+        dispatchTimeoutMs: (DEFAULT_BASH_TIMEOUT_S + 120) * 1000,
+      },
+    );
     /* pi's ExtensionAPI has no shutdown hook, so the disposer rides the process
        it belongs to. `once` so a double signal cannot double-unlink. */
     process.once('exit', () => handle.dispose());
@@ -1878,7 +1888,9 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
    * warm-up was added to avoid.
    */
   function canonicalPrompt(base: string): string {
-    const augmented = augmentSystemPrompt(base);
+    const augmented = augmentSystemPrompt(base, {
+      toolInterface: toolCliMode ? 'bash-cli' : 'schemas',
+    });
     return toolCliMode ? `${augmented}\n\n${toolCliPreamble()}` : augmented;
   }
 
