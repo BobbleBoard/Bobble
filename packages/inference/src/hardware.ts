@@ -5,7 +5,7 @@
  * unit-tests without a subprocess. Electron-free.
  */
 import { execFile as execFileCb } from 'node:child_process';
-import { arch, platform } from 'node:os';
+import { arch, cpus, platform, totalmem } from 'node:os';
 import { promisify } from 'node:util';
 import type { ExecFileFn } from './llamacpp-manager.js';
 
@@ -60,15 +60,29 @@ async function sysctl(key: string, exec: ExecFileFn): Promise<string | undefined
 }
 
 /**
- * Detect the host hardware. On non-macOS hosts (CI Linux) `sysctl` is absent,
- * so the fields degrade gracefully (RAM 0, not Apple Silicon).
+ * Detect the host hardware.
+ *
+ * macOS answers through `sysctl`. Everywhere else Node's own `os` module knows
+ * the two things that actually matter — total RAM and core count — and it knows
+ * them on every platform without spawning anything.
+ *
+ * This used to return RAM 0 off macOS, which the roadmap lists as one of the
+ * three mechanical blockers to running anywhere else: every downstream decision
+ * that asks "will this model fit" reads that number, so on Linux or Windows the
+ * honest answer "0 GB" means nothing fits and the app cannot pick a model. A
+ * wrong-but-plausible value would be worse than useless, and the real value was
+ * one function call away the whole time.
  */
 export async function detectHardware(
   opts: { execFileImpl?: ExecFileFn } = {},
 ): Promise<HardwareInfo> {
   const exec = opts.execFileImpl ?? execFile;
   if (platform() !== 'darwin' && opts.execFileImpl === undefined) {
-    return parseHardware({});
+    return parseHardware({
+      memsize: String(totalmem()),
+      logicalcpu: String(cpus().length),
+      brand: cpus()[0]?.model,
+    });
   }
   const [memsize, brand, arm64, logicalcpu] = await Promise.all([
     sysctl('hw.memsize', exec),

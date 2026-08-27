@@ -45,3 +45,20 @@ describe('parseHardware', () => {
     expect(hw.isAppleSilicon).toBe(true);
   });
 });
+
+describe('off macOS', () => {
+  /*
+   * The roadmap lists "hardware.ts returning RAM 0 on non-Darwin" as one of the
+   * three mechanical blockers to running on Windows or Linux. Everything that
+   * decides whether a model fits reads that number, so 0 means nothing fits and
+   * the app cannot choose a model at all.
+   *
+   * `detectHardware` takes the real branch only when no exec stub is passed, so
+   * this asserts the shape the OS itself reports rather than a fixture.
+   */
+  it('reports real RAM and cores from the OS, not zero', async () => {
+    const info = await detectHardware();
+    expect(info.totalRamGB).toBeGreaterThan(0);
+    expect(info.cpuCount ?? 0).toBeGreaterThan(0);
+  });
+});

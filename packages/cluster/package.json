@@ -1,0 +1,21 @@
+{
+  "name": "@pi-desktop/cluster",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "license": "GPL-3.0-or-later",
+  "description": "Finds the other machines on this tailnet and reports which of them can do work.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "lint": "biome check .",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.3.5",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  }
+}

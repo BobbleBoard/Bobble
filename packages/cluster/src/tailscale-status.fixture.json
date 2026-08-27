@@ -1,0 +1,34 @@
+{
+  "Version": "1.102.3-t9329c3677-ga522f65e9",
+  "BackendState": "Running",
+  "Self": {
+    "ID": "nPUa83N6Lq11CNTRL",
+    "HostName": "My MacBook Pro",
+    "OS": "macOS",
+    "TailscaleIPs": ["100.101.102.103", "fd7a:115c:a1e0::ab12:cd34"],
+    "Online": true
+  },
+  "Peer": {
+    "nodekey:8083bbf8afc1ebeb2a71284ca1d9a5348e427f73bbd1ec0ec59a24899cc72418": {
+      "ID": "nbYS7qLqVy11CNTRL",
+      "HostName": "linux-ms-7e59",
+      "OS": "linux",
+      "TailscaleIPs": ["100.101.102.110", "fd7a:115c:a1e0::ab12:cd40"],
+      "Online": true
+    },
+    "nodekey:90500692bdd5cb32910a7d2afa9d3e0ea0300a4f21542ab9f855cd275ad5142f": {
+      "ID": "nmnQiGMMeJ11CNTRL",
+      "HostName": "Parent\u2019s MacBook Pro",
+      "OS": "macOS",
+      "TailscaleIPs": ["100.101.102.120", "fd7a:115c:a1e0::ab12:cd50"],
+      "Online": false
+    },
+    "nodekey:a5ce863008852db99e372d41874b6d809848d5e575e2e452372534416017da1c": {
+      "ID": "ndPE5QR79J11CNTRL",
+      "HostName": "Parent\u2019s MacBook Pro",
+      "OS": "macOS",
+      "TailscaleIPs": ["100.101.102.121", "fd7a:115c:a1e0::ab12:cd51"],
+      "Online": false
+    }
+  }
+}
