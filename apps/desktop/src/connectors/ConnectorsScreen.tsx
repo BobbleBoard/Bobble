@@ -35,6 +35,7 @@ import {
 import { useEffect, useMemo, useState } from 'react';
 import { installedServer, isEnabled, useConnectorsStore } from '../state/connectors-store';
 import { useSettingsStore } from '../state/settings-store';
+import { AddServerDialog } from './AddServerDialog';
 import { ConnectorCard } from './ConnectorCard';
 import { ConnectorDetail } from './ConnectorDetail';
 import { ConnectorSection } from './ConnectorSection';
@@ -64,10 +65,10 @@ const MODE_HINTS: Record<McpMode, string> = {
     'Bash CLI — connectors are driven from the terminal via a discoverable `--help` command surface.',
 };
 
-const CREATE_ITEMS = ['Create plugin', 'Add marketplace', 'Record a skill', 'Request a plugin'];
-
 export function ConnectorsScreen({ onClose }: { onClose: () => void }) {
   const registry = useConnectorsStore((s) => s.registry);
+  const upsert = useConnectorsStore((s) => s.upsert);
+  const [addOpen, setAddOpen] = useState(false);
   const catalog = useConnectorsStore((s) => s.catalog);
   const recommended = useConnectorsStore((s) => s.recommended);
   const busyId = useConnectorsStore((s) => s.busyId);
@@ -160,14 +161,31 @@ export function ConnectorsScreen({ onClose }: { onClose: () => void }) {
                     <IconPlus size={14} /> Create <IconChevronDown size={14} />
                   </Button>
                 </DropdownMenuTrigger>
+                {/*
+                  ONE ROW THAT WORKS, instead of four that did not.
+
+                  This menu listed "Create plugin", "Add marketplace", "Record a
+                  skill" and "Request a plugin", every one of them
+                  `onSelect={() => undefined}`. The thing people actually want —
+                  point the app at an MCP server it does not know about — already
+                  had its IPC handler, its registry writer and a store action
+                  with zero callers, and no way in. The other three describe
+                  features that do not exist.
+                */}
                 <DropdownMenuContent align="end">
-                  {CREATE_ITEMS.map((label) => (
-                    <DropdownMenuItem key={label} onSelect={() => undefined}>
-                      {label}
-                    </DropdownMenuItem>
-                  ))}
+                  <DropdownMenuItem
+                    onSelect={() => setAddOpen(true)}
+                    data-testid="connectors-add-server"
+                  >
+                    Add an MCP server
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+              <AddServerDialog
+                open={addOpen}
+                onOpenChange={setAddOpen}
+                onAdd={(server) => void upsert(server)}
+              />
             </div>
 
             <Tabs value={tab} onValueChange={(v) => setTab(v as 'plugins' | 'skills')}>
