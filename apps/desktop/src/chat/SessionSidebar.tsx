@@ -26,7 +26,6 @@ import {
   IconPin,
   IconPlus,
   IconSettings,
-  IconSparkles,
   IconTrash,
   IconVideo,
   IconWaveform,
@@ -75,9 +74,6 @@ import { useThemeStore } from '../store/theme';
 import { formatModuleSize } from '../tripo/module-state';
 import { BobbleMark } from './BobbleMark';
 import { PROFILE_MENU_ACTIONS } from './profile-menu';
-
-/** Nav destinations that don't have a real page yet — open a "coming soon" stub. */
-export type SidebarStub = 'projects' | 'skills';
 
 /**
  * Bottom-left profile control (round-12 #4). ONE compact button — the avatar
@@ -310,7 +306,6 @@ export function SessionSidebar({
   onTruncated,
   onOpenSettings,
   onOpenConnectors,
-  onOpenStub,
   onOpenScheduled,
   onEnterChat,
 }: {
@@ -322,8 +317,7 @@ export function SessionSidebar({
   onOpenSettings: (section: SettingsSection) => void;
   /** Open the Codex-style connectors gallery (its own top-level view). */
   onOpenConnectors: () => void;
-  onOpenStub: (stub: SidebarStub) => void;
-  /** Scheduled tasks is a real view now, not a coming-soon stub. */
+  /** Open the scheduled-tasks view. */
   onOpenScheduled: () => void;
   /**
    * "The user is going to a conversation now." Fired for every way OUT of a
@@ -1007,13 +1001,6 @@ export function SessionSidebar({
       icon: IconClock,
       onClick: onOpenScheduled,
       testid: 'nav-scheduled',
-    },
-    {
-      id: 'skills',
-      label: 'Skills',
-      icon: IconSparkles,
-      onClick: () => onOpenStub('skills'),
-      testid: 'nav-skills',
     },
   ];
 

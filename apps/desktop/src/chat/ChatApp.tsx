@@ -57,7 +57,7 @@ import { CanvasTabsPanel } from './canvas/CanvasTabsPanel';
 import { CorpDebugHud } from './corp/CorpDebugHud';
 import { useHarnessTitleSync } from './harness-title';
 import { InputNeededBanner } from './InputNeededBanner';
-import { SessionSidebar, type SidebarStub } from './SessionSidebar';
+import { SessionSidebar } from './SessionSidebar';
 import { useSiteIcon } from './site-icons';
 import { ToastHost } from './ToastHost';
 import { UiRequestDialogs } from './UiRequestDialogs';
@@ -111,32 +111,6 @@ function AdvancedParamsButton() {
   );
 }
 
-const STUB_COPY: Record<SidebarStub, { title: string; body: string }> = {
-  projects: {
-    title: 'Projects',
-    body: 'Group chats, files, and context into projects. Coming soon.',
-  },
-  skills: { title: 'Skills', body: 'Browse and manage the skills Pi can use. Coming soon.' },
-};
-
-/** A lightweight "coming soon" overlay for nav destinations without a page yet. */
-function StubPanel({ stub, onClose }: { stub: SidebarStub; onClose: () => void }) {
-  const { title, body } = STUB_COPY[stub];
-  return (
-    <div className="pd-stub-overlay" data-testid="stub-panel">
-      <div className="pd-stub-card">
-        <div className="flex items-center justify-between gap-4">
-          <h2 className="text-heading text-text-primary">{title}</h2>
-          <IconButton aria-label="Close" onClick={onClose}>
-            <IconClose size={14} />
-          </IconButton>
-        </div>
-        <p className="text-body text-text-muted">{body}</p>
-      </div>
-    </div>
-  );
-}
-
 export function ChatApp({
   contentOverride,
   onOpenSettings,
@@ -168,7 +142,6 @@ export function ChatApp({
   const [piModels, setPiModels] = useState<Model[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [truncatedNote, setTruncatedNote] = useState(false);
-  const [stub, setStub] = useState<SidebarStub | null>(null);
 
   // Load the persisted project (working folder) first, then spawn the window's
   // pi session rooted at it (so the initial session adopts the active project's
@@ -491,7 +464,6 @@ export function ChatApp({
                 onTruncated={() => setTruncatedNote(true)}
                 onOpenSettings={onOpenSettings}
                 onOpenConnectors={onOpenConnectors}
-                onOpenStub={setStub}
                 onOpenScheduled={onOpenScheduled}
                 onEnterChat={onEnterChat}
               />
@@ -595,8 +567,6 @@ export function ChatApp({
                   </div>
                 </div>
               )}
-
-              {stub !== null ? <StubPanel stub={stub} onClose={() => setStub(null)} /> : null}
             </MainSurface>
 
             {/*

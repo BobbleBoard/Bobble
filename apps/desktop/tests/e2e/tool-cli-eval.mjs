@@ -647,9 +647,7 @@ const MODELS = (process.env.MODELS ?? DEFAULT_MODELS.join(',')).split(',').filte
  * prompt nobody receives, and shipping a number from it is how "34/36" came to
  * describe a configuration that does not exist.
  */
-const CONFIGS = (process.env.CONFIGS ?? 'schemas,cli-tuned,cli-shipped')
-  .split(',')
-  .filter(Boolean);
+const CONFIGS = (process.env.CONFIGS ?? 'schemas,cli-tuned,cli-shipped').split(',').filter(Boolean);
 /* The turn cap is a MEASUREMENT BOUNDARY, not a property of the interface: a
    model that probes the system before reading its own help can find the right
    command on turn 5 and be scored a failure at 4. Raise it to tell "cannot"

@@ -26,10 +26,11 @@ import {
   EffortSlider,
   IconGauge,
   Popover,
+  PopoverAnchor,
   PopoverContent,
   PopoverTrigger,
 } from '@pi-desktop/ui';
-import { useMemo, useRef } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { assignChat, createProject, useChatOrg } from '../state/chat-org';
 import { useCorpStore } from '../state/corp-store';
 import { useLlmStore } from '../state/llm-store';
@@ -316,14 +317,34 @@ function EffortRegion() {
     void useSettingsStore.getState().update({ effortMode: 'auto' });
   };
 
+  /*
+   * ANCHOR TO THE WHOLE COMPOSER, NOT THE BUTTON.
+   *
+   * `side="top"` off the trigger opens the popover over the editor directly
+   * above it — measured at 56.63 px of overlap, which is the editor's full
+   * height, across the right 38% of it. You could not read the prompt you were
+   * choosing an effort level for. A fixed `sideOffset` cannot fix it because the
+   * editor grows with the draft.
+   *
+   * Anchoring to `.pd-composer-root` — the card AND the bar — puts "above" above
+   * the whole thing at any height. Resolved from the trigger rather than passed
+   * down so the bar stays a leaf component; a null anchor (a different host,
+   * a test) falls back to the trigger, which is the old behaviour.
+   */
+  const [anchor, setAnchor] = useState<HTMLElement | null>(null);
+  const anchorRef = useRef<HTMLElement | null>(null);
+  anchorRef.current = anchor;
+
   return (
     <Popover>
+      {anchor !== null ? <PopoverAnchor virtualRef={anchorRef as never} /> : null}
       <PopoverTrigger asChild>
         <button
           type="button"
           className="pd-effort-trigger"
           data-testid="composer-effort"
           aria-label="Effort"
+          ref={(el) => setAnchor(el?.closest<HTMLElement>('.pd-composer-root') ?? null)}
         >
           <IconGauge size={14} />
           <span>{view.label}</span>

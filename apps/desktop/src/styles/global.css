@@ -620,29 +620,6 @@ body {
 }
 
 /* #A6 stub: a centered "coming soon" panel for not-yet-built nav destinations. */
-.pd-stub-overlay {
-  position: absolute;
-  inset: 0;
-  z-index: 30;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-  background: color-mix(in srgb, var(--pd-bg-base) 82%, transparent);
-  -webkit-backdrop-filter: blur(3px);
-  backdrop-filter: blur(3px);
-}
-.pd-stub-card {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  width: min(420px, 100%);
-  padding: 24px;
-  border-radius: var(--pd-radius-lg);
-  background: var(--pd-bg-raised);
-  box-shadow: var(--pd-shadow-hairline), var(--pd-shadow-lg);
-}
-
 /*
  * Round-5 #2/#4: the top bar takes the CHAT-AREA color in BOTH flavors, so it
  * flows seamlessly into the conversation surface (no sidebar-tinted bar).

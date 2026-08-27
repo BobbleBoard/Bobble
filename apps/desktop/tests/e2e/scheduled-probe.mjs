@@ -44,11 +44,11 @@ try {
   await page.waitForSelector('[data-testid="composer-input"]', { timeout: 20_000 });
   await page.addStyleTag({ content: '[data-testid="first-run-tips"]{display:none !important}' });
 
-  /* 1. The nav opens a real view, not the old "coming soon" stub. */
+  /* 1. The nav opens the real view. (The "coming soon" stub it replaced is gone
+     from the app entirely, so there is nothing left to assert its absence.) */
   console.log('\nthe view');
   await page.click('[data-testid="nav-scheduled"]');
   await page.waitForSelector('[data-testid="scheduled-view"]', { timeout: 10_000 });
-  check((await page.$('[data-testid="stub-panel"]')) === null, 'it is a real view, not a stub');
   check(
     (await page.$('[data-testid="tasks-empty"]')) !== null,
     'an empty schedule offers templates',
