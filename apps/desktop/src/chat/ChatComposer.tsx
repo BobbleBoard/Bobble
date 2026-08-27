@@ -53,6 +53,15 @@ import { useDictation } from './useDictation';
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
+/**
+ * How long the first Escape stays armed before a second one clears the draft.
+ *
+ * Long enough to be a deliberate double-press, short enough that an Escape now
+ * and another a minute later cannot combine to delete a paragraph someone was
+ * still writing.
+ */
+const DOUBLE_ESCAPE_MS = 1000;
+
 interface SlashCommand {
   name: string;
   description?: string;
@@ -513,6 +522,16 @@ export function ChatComposer({
     };
   }, [token.mode, token.query, cwd, commands]);
 
+  /*
+   * What Escape needs, through refs, because the keymap object is stable and
+   * `isBusy` / `stopBusy` are derived further down the component.
+   */
+  const busyRef = useRef(false);
+  const stopRef = useRef<() => void>(() => {});
+  const hasDraftRef = useRef(false);
+  const lastEscapeRef = useRef(0);
+  hasDraftRef.current = text.trim().length > 0;
+
   // Stable keymap object: methods read the latest state through refs so the
   // editor never has to re-register its commands.
   const tokenRef = useRef(token);
@@ -538,6 +557,34 @@ export function ChatComposer({
     moveSuggestion: () => false,
     acceptSuggestion: () => false,
     dismissSuggestions: () => false,
+    /*
+     * ESC STOPS THE TURN; ESC ESC CLEARS THE DRAFT.
+     *
+     * The key every terminal agent binds to "stop" did nothing here — halting a
+     * reply meant finding and clicking the Stop button, which is a long way to
+     * reach for the most reflexive gesture there is.
+     *
+     * Stop takes precedence when something is running, because that is the
+     * urgent case and a draft is not going anywhere. When nothing is running,
+     * one press arms and a second within the window clears — a single stray Esc
+     * must never silently delete a paragraph someone was writing.
+     */
+    escape: () => {
+      if (busyRef.current) {
+        stopRef.current();
+        lastEscapeRef.current = 0;
+        return true;
+      }
+      const now = Date.now();
+      if (now - lastEscapeRef.current <= DOUBLE_ESCAPE_MS) {
+        lastEscapeRef.current = 0;
+        if (!hasDraftRef.current) return false;
+        apiRef.current?.clear();
+        return true;
+      }
+      lastEscapeRef.current = now;
+      return hasDraftRef.current;
+    },
     close: () => setToken(EMPTY_TOKEN),
   }).current;
 
@@ -731,6 +778,9 @@ export function ChatComposer({
     if (corpRunning && corpTaskId !== null) void abortCorpTask(corpTaskId);
     else void abortPi();
   };
+  // Escape reads these (see the keymap's `escape`), and they are only known here.
+  busyRef.current = isBusy;
+  stopRef.current = stopBusy;
   // Pause (plain chat only; left of Stop): halt the reply to free the model but
   // keep it resumable + let any queued message through. Flip the button back to
   // Send instantly — the turn is ending.

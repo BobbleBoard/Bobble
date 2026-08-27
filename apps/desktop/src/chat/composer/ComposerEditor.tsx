@@ -53,6 +53,14 @@ export interface ComposerKeymap {
   acceptSuggestion: () => boolean;
   /** Esc with no autocomplete open: dismiss the suggestion overlay if shown. */
   dismissSuggestions: () => boolean;
+  /**
+   * Esc with nothing left to dismiss. The one key every terminal agent binds to
+   * "stop", and here it did nothing at all — the only way to halt a reply was to
+   * find and click the Stop button. Owned by the composer because the policy
+   * (stop a running turn; a second press within a beat clears the draft) needs
+   * state the editor does not have. Returns true when it consumed the key.
+   */
+  escape: () => boolean;
   close: () => void;
 }
 
@@ -208,11 +216,14 @@ function EditorBridge(props: Omit<ComposerEditorProps, 'placeholder' | 'disabled
         KEY_ESCAPE_COMMAND,
         () => {
           const { keymap } = cb.current;
+          // Most-local first: an open autocomplete, then the suggestion overlay,
+          // and only with nothing left to dismiss does Esc reach the turn.
           if (keymap.isAcOpen()) {
             keymap.close();
             return true;
           }
-          return keymap.dismissSuggestions();
+          if (keymap.dismissSuggestions()) return true;
+          return keymap.escape();
         },
         COMMAND_PRIORITY_HIGH,
       ),
