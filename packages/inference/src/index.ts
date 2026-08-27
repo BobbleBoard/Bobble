@@ -6,12 +6,12 @@
  */
 export const packageName = '@pi-desktop/inference';
 
+export * from './accelerator.js';
 export * from './catalog.js';
 export * from './chat-template.js';
 export * from './context-cap.js';
 export * from './download.js';
 export * from './hardware.js';
-export * from './accelerator.js';
 export * from './hf-search.js';
 export * from './llamacpp-manager.js';
 export * from './llamacpp-manifest.js';

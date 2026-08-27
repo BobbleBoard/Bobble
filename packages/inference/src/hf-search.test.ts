@@ -5,12 +5,12 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   buildSearchUrl,
-  MAX_AUTHOR_FANOUT,
   estimateRamGB,
   type HfGgufFile,
   type HfModelHit,
   hfModelToCatalogEntry,
   listHfGgufFiles,
+  MAX_AUTHOR_FANOUT,
   parseQuant,
   searchHfModels,
 } from './hf-search.js';

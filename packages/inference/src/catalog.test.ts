@@ -1,17 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import {
   CATALOG,
+  DEFAULT_RECOMMENDED_AUTHORS,
   GEMMA4_E2B,
   getCatalogFile,
   getCatalogModel,
   hfResolveUrl,
-  DEFAULT_RECOMMENDED_AUTHORS,
   isReliablePublisher,
-  reliableAuthorsForDomains,
   MLX_MODELS,
   MODEL_TIERS,
   modelEngine,
   RELIABLE_PUBLISHERS,
+  reliableAuthorsForDomains,
 } from './catalog.js';
 import { modelSupportsVision } from './mmproj.js';
 
@@ -294,7 +294,10 @@ describe('the reputable-org fan-out selector', () => {
   });
 
   it('every author it can return is itself on the allowlist', () => {
-    const all = reliableAuthorsForDomains(['text', 'image', 'video', 'audio', 'embeddings', '3d'], 100);
+    const all = reliableAuthorsForDomains(
+      ['text', 'image', 'video', 'audio', 'embeddings', '3d'],
+      100,
+    );
     for (const a of all) expect(RELIABLE_PUBLISHERS).toContain(a);
   });
 
