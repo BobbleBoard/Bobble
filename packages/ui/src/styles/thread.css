@@ -380,3 +380,31 @@
 .pd-jump-latest:active {
   transform: translateY(0);
 }
+
+/*
+ * A HARNESS WARNING, IN THE TRANSCRIPT.
+ *
+ * These describe a specific turn — a model too small for the work it just
+ * reached for, a failed verify, a loop-guard steer — so they sit beside it
+ * rather than sliding past as a toast. Quiet by design: this is a caveat the
+ * reader should be able to skip, not an error demanding attention.
+ */
+.pd-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 6px 0;
+  padding: 8px 12px;
+  border-left: 2px solid var(--pd-status-warning-border);
+  border-radius: var(--pd-radius-sm, 6px);
+  background: var(--pd-status-warning-bg);
+  color: var(--pd-text-secondary);
+  font-size: var(--pd-font-size-footnote);
+  line-height: var(--pd-leading-body);
+}
+
+.pd-notice-icon {
+  flex: none;
+  margin-top: 1px;
+  color: var(--pd-status-warning-fg);
+}

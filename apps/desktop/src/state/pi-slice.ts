@@ -638,6 +638,36 @@ export function createPiSink(
 
     notify: (level, message) =>
       set((s) => {
+        /*
+         * A WARNING BELONGS TO A TURN, so it goes in the transcript.
+         *
+         * The harness raises these where it matters — a model too small for the
+         * work it just reached for, a failed verify, the loop guard steering a
+         * stuck turn — and they were dropped at the event router, which passed
+         * only errors. A toast would be the wrong home even now: it slides away
+         * after four seconds, while these describe a specific turn and should
+         * stay beside it.
+         */
+        if (level === 'warning') {
+          const text = message.trim();
+          if (text === '') return {};
+          // The harness re-raises the same steer on consecutive turns; a run of
+          // identical rows says nothing the first one did not.
+          const last = s.messages[s.messages.length - 1];
+          if (last?.kind === 'notice' && last.text === text) return {};
+          return {
+            messages: [
+              ...s.messages,
+              {
+                kind: 'notice' as const,
+                id: nextLocalId('notice'),
+                level: 'warning' as const,
+                text,
+                timestamp: Date.now(),
+              },
+            ],
+          };
+        }
         // A user pause/stop is a clean, expected end — never a red toast. Swallow
         // any error notification that is the fingerprint of an abort, whatever
         // path raised it (turn error, extension error, bridge error).

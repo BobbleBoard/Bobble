@@ -141,10 +141,22 @@ export function createEventRouter(sink: StoreSink, options: EventRouterOptions =
   function handleExtensionUiRequest(e: RpcExtensionUIRequest): void {
     switch (e.method) {
       case 'notify': {
-        // Errors only. info/success/warning are status chatter ("✓ LLM up",
-        // "tool finished in 0.5s"...) — real apps don't popcorn the user.
-        if ((e.notifyType ?? 'info') === 'error') {
-          sink.notify('error', stripAnsi(e.message ?? ''));
+        /*
+         * ERRORS AND WARNINGS. `info` and `success` are status chatter ("✓ LLM
+         * up", "tool finished in 0.5s") and, worse, machine echo — the app fires
+         * `/harness set-mode`, `effort`, `workspace` and `preset`
+         * programmatically on every settings change, chat open and gen action.
+         * Routing those would popcorn an ordinary conversation with its own
+         * plumbing.
+         *
+         * `warning` is neither. It is where the harness says the model is too
+         * small for what it just reached for, that a verify pass failed, that
+         * the loop guard is steering a stuck turn — and dropping it here is why
+         * none of those had ever been seen by a user.
+         */
+        const level = e.notifyType ?? 'info';
+        if (level === 'error' || level === 'warning') {
+          sink.notify(level, stripAnsi(e.message ?? ''));
         }
         break;
       }

@@ -15,6 +15,8 @@ declare global {
     /** E2E hook: accessor for the pi Zustand store. Present only when the
      * app was loaded with ?piE2E=1 (see state/pi-connect.ts). */
     __pi_store?: () => typeof usePiStore;
+    /** The StoreSink the event router drives — probes raise notifications with it. */
+    __pi_sink?: () => import('@pi-desktop/engine').StoreSink;
     /** Probe-only: stop the running turn (see pi-connect abortPi). */
     __pi_abort?: () => void;
     /** E2E hook: accessor for the canvas controller (open browser/terminal

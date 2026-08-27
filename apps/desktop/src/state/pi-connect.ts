@@ -1373,4 +1373,12 @@ if (typeof window !== 'undefined' && new URLSearchParams(window.location.search)
   window.__pi_abort = () => {
     void abortPi();
   };
+  /*
+   * The SINK, for probes — the same object the event router drives.
+   *
+   * `notify` lives on the sink, not on the store, so a probe checking that a
+   * harness warning becomes a visible row has no other way to raise one without
+   * a live model that happens to trip a warning.
+   */
+  window.__pi_sink = () => createPiSink();
 }

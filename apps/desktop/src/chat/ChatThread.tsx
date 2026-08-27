@@ -17,6 +17,7 @@ import type {
   BashExecMsg,
   ChatMsg,
   ContentBlock,
+  NoticeMsg,
   ToolResultMsg,
   UserMsg,
 } from '@pi-desktop/engine';
@@ -34,6 +35,7 @@ import {
   Thread,
 } from '@pi-desktop/ui';
 import { useEffect, useRef, useState } from 'react';
+import { IconWarning } from '../settings/icons';
 import { useCorpStore } from '../state/corp-store';
 import { useLlmStore } from '../state/llm-store';
 import { forkAndReprompt, switchBranch } from '../state/pi-connect';
@@ -66,6 +68,7 @@ type RenderItem =
   | { kind: 'user'; message: UserMsg }
   | { kind: 'bash'; message: BashExecMsg }
   | { kind: 'orphanTool'; message: ToolResultMsg }
+  | { kind: 'notice'; message: NoticeMsg }
   | { kind: 'assistant'; group: AssistantMsg[] };
 
 /** Coalesce consecutive assistant messages (no user turn between) into groups. */
@@ -89,6 +92,7 @@ function toRenderItems(messages: ChatMsg[], claimed: Set<string>): RenderItem[] 
     if (m.kind === 'user') items.push({ kind: 'user', message: m });
     else if (m.kind === 'bashExec') items.push({ kind: 'bash', message: m });
     else if (m.kind === 'toolResult') items.push({ kind: 'orphanTool', message: m });
+    else if (m.kind === 'notice') items.push({ kind: 'notice', message: m });
   }
   flush();
   return items;
@@ -348,6 +352,18 @@ export function ChatThread() {
           ) : null}
 
           {items.map((item) => {
+            if (item.kind === 'notice') {
+              /* The harness saying something the user needs — a model too small
+                 for the work it just reached for, a failed verify, a loop-guard
+                 steer. It sits with the turn it describes rather than sliding
+                 past as a toast. */
+              return (
+                <div key={item.message.id} className="pd-notice" data-testid="chat-notice">
+                  <IconWarning size={14} className="pd-notice-icon" />
+                  <span>{item.message.text}</span>
+                </div>
+              );
+            }
             if (item.kind === 'user') {
               const message = item.message;
               const ordinal = userOrdinalById.get(message.id) ?? -1;

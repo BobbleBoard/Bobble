@@ -554,7 +554,7 @@ describe('event router — streaming args path peek', () => {
   });
 });
 
-describe('event router — errors-only notify policy', () => {
+describe('event router — notify policy: errors and warnings, never chatter', () => {
   const notify = (notifyType: string | undefined, message: string): PiBridgeEvent =>
     ({
       type: 'extension_ui_request',
@@ -564,13 +564,27 @@ describe('event router — errors-only notify policy', () => {
       notifyType,
     }) as unknown as PiBridgeEvent;
 
-  it('drops info/warning/success chatter and surfaces errors (ANSI-stripped)', () => {
+  it('surfaces errors and warnings, ANSI-stripped, and drops the chatter', () => {
+    /*
+     * WARNINGS USED TO BE DROPPED HERE, and that was the whole bug: the harness
+     * raises them where it matters — a model too small for the work it just
+     * reached for, a failed verify, a loop-guard steer — and none had ever been
+     * seen by a user.
+     *
+     * `info` stays dropped, and this is the reason to keep asserting it: the app
+     * fires `/harness set-mode`, `effort`, `workspace` and `preset`
+     * PROGRAMMATICALLY on every settings change, chat open and gen action, so
+     * routing info would inject "effort → high" rows into ordinary chats.
+     */
     const { sink, route } = makeRouter();
     route(notify('info', 'llm up'));
-    route(notify('warning', 'careful'));
+    route(notify('warning', '\u001b[33mcareful\u001b[0m'));
     route(notify(undefined, 'defaults to info'));
     route(notify('error', '\u001b[31mboom\u001b[0m'));
-    expect(sink.callsFor('notify')).toEqual([['notify', 'error', 'boom']]);
+    expect(sink.callsFor('notify')).toEqual([
+      ['notify', 'warning', 'careful'],
+      ['notify', 'error', 'boom'],
+    ]);
   });
 
   it('extension_error and bridge exit surface as error notifications', () => {

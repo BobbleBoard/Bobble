@@ -70,4 +70,30 @@ export interface BashExecMsg {
   timestamp: number;
 }
 
-export type ChatMsg = UserMsg | AssistantMsg | ToolResultMsg | BashExecMsg;
+/**
+ * A harness warning, in the transcript rather than in a toast.
+ *
+ * The harness raises real, actionable warnings — a model too small for the work
+ * it just reached for, a verify pass that failed, the loop guard steering a
+ * stuck turn — and every one of them was DROPPED at the event router, which
+ * passed only `error` through. Even routed, a toast is the wrong shape: these
+ * describe a specific turn and should stay beside it, not slide away after four
+ * seconds.
+ *
+ * Warnings only. `info` is machine echo — the app fires `/harness set-mode`,
+ * `effort`, `workspace` and `preset` programmatically on every settings change,
+ * chat open and gen action, so routing it would inject "effort → high" rows into
+ * ordinary conversations.
+ *
+ * IN MEMORY ONLY. `setMessages` on rehydrate replaces the thread from the
+ * session file, which does not carry these — a reopened chat has no notices.
+ */
+export interface NoticeMsg {
+  kind: 'notice';
+  id: string;
+  level: 'warning';
+  text: string;
+  timestamp: number;
+}
+
+export type ChatMsg = UserMsg | AssistantMsg | ToolResultMsg | BashExecMsg | NoticeMsg;
