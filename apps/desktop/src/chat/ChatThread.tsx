@@ -24,6 +24,7 @@ import {
   ActivityRow,
   BranchSwitcher,
   EditableMessage,
+  IconChevronDown,
   IconTerminal,
   MessageActions,
   MessageRow,
@@ -41,6 +42,15 @@ import { openPresented, usePresentStore } from '../state/present-store';
 import { AssistantGroup } from './AssistantGroup';
 import { corpChatView } from './corp/corp-thread-view';
 import { HarnessChecklistPanel, ThreadStatusIndicator } from './HarnessStatus';
+
+/**
+ * How far from the bottom counts as "away", for the jump-to-latest control.
+ *
+ * Generous next to the 16 px stick threshold on purpose: the stick asks "should
+ * I follow?" and wants to be strict, while this asks "is there anything below
+ * worth a button?" and should not blink on and off during a stream.
+ */
+const JUMP_THRESHOLD_PX = 120;
 
 /** Concatenated visible text of an assistant response group (for copy). */
 function groupPlainText(group: AssistantMsg[]): string {
@@ -218,6 +228,7 @@ export function ChatThread() {
     const el = scrollRef.current;
     if (el === null) return;
     pinnedRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 16;
+    syncAway();
   };
 
   // Release the stick on any explicit upward intent BEFORE the next streaming
@@ -257,10 +268,39 @@ export function ChatThread() {
     };
   }, []);
 
+  /*
+   * THE WAY BACK DOWN.
+   *
+   * Releasing the stick is deliberately easy — one upward wheel tick, an arrow
+   * key, a touch drag — and until now there was no way to re-arm it except
+   * scrolling all the way to the bottom by hand. Someone who glanced up during a
+   * long generation had to chase the stream down to get it following again.
+   *
+   * Mirrored into state (the stick itself stays a ref, so a streaming render
+   * never re-runs on it) and only while there is somewhere to go: `away` is
+   * false at the bottom, so the control appears exactly when it is useful.
+   */
+  const [away, setAway] = useState(false);
+  const syncAway = (): void => {
+    const el = scrollRef.current;
+    if (el === null) return;
+    setAway(el.scrollHeight - el.scrollTop - el.clientHeight > JUMP_THRESHOLD_PX);
+  };
+  const jumpToLatest = (): void => {
+    const el = scrollRef.current;
+    if (el === null) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+    pinnedRef.current = true;
+    setAway(false);
+  };
+
   // Keep the newest content in view ONLY while pinned (never fights a scroll-up).
   useEffect(() => {
     const el = scrollRef.current;
     if (el !== null && pinnedRef.current) el.scrollTop = el.scrollHeight;
+    // Streaming grows the content, so "am I away from the bottom" changes
+    // without anyone scrolling.
+    syncAway();
   });
 
   // Index tool results by both the assistant-scoped id and the bare callId so a
@@ -290,7 +330,7 @@ export function ChatThread() {
   const items = toRenderItems(messages, claimed);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    <div className="relative flex min-h-0 flex-1 flex-col">
       {/* The live task checklist stays pinned above the scrolling transcript so
           the user watches items flip pending → in_progress → done during a task. */}
       <HarnessChecklistPanel />
@@ -561,6 +601,18 @@ export function ChatThread() {
           <div className="h-28 shrink-0" aria-hidden />
         </Thread>
       </ScrollArea>
+      {away ? (
+        <button
+          type="button"
+          className="pd-jump-latest pd-focusable"
+          onClick={jumpToLatest}
+          aria-label="Jump to latest"
+          title="Jump to latest"
+          data-testid="chat-jump-latest"
+        >
+          <IconChevronDown size={16} />
+        </button>
+      ) : null}
     </div>
   );
 }

@@ -336,3 +336,47 @@
     transition: none;
   }
 }
+
+/*
+ * JUMP TO LATEST — the way back down.
+ *
+ * Releasing the autoscroll stick is deliberately easy (one upward wheel tick),
+ * and until this there was no way to re-arm it except scrolling to the bottom by
+ * hand: someone who glanced up during a long generation had to chase the stream
+ * down. Floats over the thread rather than sitting in the layout, so appearing
+ * and disappearing never reflows what is being read.
+ */
+.pd-jump-latest {
+  position: absolute;
+  right: 20px;
+  bottom: 16px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--pd-radius-full);
+  /* The same opaque surface every menu uses — it floats over the thread and has
+     to be readable wherever the reader happens to be. */
+  background: var(--pd-bg-overlay);
+  color: var(--pd-text-secondary);
+  box-shadow: var(--pd-shadow-hairline), var(--pd-shadow-popover);
+  cursor: pointer;
+  transition:
+    color var(--pd-duration-fast) var(--pd-easing-standard),
+    background var(--pd-duration-fast) var(--pd-easing-standard),
+    transform var(--pd-duration-fast) var(--pd-easing-standard);
+}
+
+.pd-jump-latest:hover {
+  background: var(--pd-bg-hover);
+  color: var(--pd-text-primary);
+  transform: translateY(-1px);
+}
+
+.pd-jump-latest:active {
+  transform: translateY(0);
+}
