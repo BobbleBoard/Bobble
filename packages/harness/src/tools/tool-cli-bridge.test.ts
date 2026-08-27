@@ -279,3 +279,47 @@ describe('buildShim', () => {
     expect(s).toContain('"/tmp/d.js" media "$@"');
   });
 });
+
+describe('the CLI never advertises what it cannot run', () => {
+  /*
+   * THE BUG A 21-AGENT AUDIT FOUND IN THE FIX FOR THE SAME BUG.
+   *
+   * The harness advertised its command surface from `pi.getAllTools()` — which
+   * sees every extension — and executed through a registry that holds only its
+   * own. `media generate image` was listed, documented by `--help`, and answered
+   * "not registered in this build" when run. That is false availability, which
+   * is the exact defect this mode was built to remove.
+   *
+   * The rule this pins: whatever `tools()` returns must be runnable by `call()`.
+   */
+  it('a command that resolves must be executable', async () => {
+    const runnable = new Set(['generate_image']);
+    const calls: string[] = [];
+    const partial: ToolCliHost = {
+      // The registry can only run one of the two; `tools()` must say so.
+      tools: () => TOOLS.filter((t) => runnable.has(t.name)),
+      groups: () => GROUPS,
+      call: async (name) => {
+        calls.push(name);
+        if (!runnable.has(name)) return { text: `${name}: not registered`, isError: true };
+        return { text: `${name} ran`, isError: false };
+      },
+    };
+
+    // The runnable one works…
+    expect(await dispatchToolCli(partial, ['media', 'generate', 'image', 'x'])).toEqual({
+      text: 'generate_image ran',
+      isError: false,
+    });
+
+    // …and the one that cannot run is not offered at all, rather than being
+    // listed and then failing.
+    const listed = await dispatchToolCli(partial, ['media']);
+    expect(listed.text).not.toContain('generate sfx');
+    const attempted = await dispatchToolCli(partial, ['media', 'generate', 'sfx', 'x']);
+    expect(attempted.isError).toBe(true);
+    expect(attempted.text).toContain('no such command');
+    // It never reached execution, so it never produced "not registered".
+    expect(calls).toEqual(['generate_image']);
+  });
+});

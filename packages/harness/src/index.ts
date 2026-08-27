@@ -1503,7 +1503,28 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
    */
   if (toolCliMode) {
     const handle = registerToolCli({
-      tools: () => pi.getAllTools(),
+      /*
+       * ONLY WHAT WE CAN ACTUALLY RUN.
+       *
+       * This advertised from `pi.getAllTools()` — which sees every extension —
+       * and executed through `toolRegistry`, which is a monkey-patch of THIS
+       * extension's `registerTool` and therefore holds only the harness's own
+       * tools. So `media generate image`, `browser click`, `mac snapshot` and
+       * every connector command were listed by `tools`, documented by `--help`,
+       * and answered "not registered in this build" when run.
+       *
+       * The comment three paragraphs above says a CLI that cannot reach those
+       * tools "would be the same false-availability bug in a new costume", and
+       * then the code did exactly that. It is the defect this whole mode exists
+       * to remove, reproduced one layer down, by me, in the fix for it.
+       *
+       * pi offers no way to execute another extension's tool: `ToolInfo` is
+       * `Pick<ToolDefinition, 'name'|'description'|'parameters'>` with no
+       * `execute` (pi-coding-agent types.d.ts:990). So until those commands are
+       * routed through the app's own bridges, the honest surface is the one we
+       * can serve — a short true list beats a long false one.
+       */
+      tools: () => pi.getAllTools().filter((t) => toolRegistry.get(t.name) !== undefined),
       groups: () => toolCliGroups(),
       call: async (name, args) => {
         const target = toolRegistry.get(name);
