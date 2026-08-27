@@ -27,6 +27,7 @@
  * force platform in tests).
  */
 import type { AgentToolResult, ExtensionAPI } from '@mariozechner/pi-coding-agent';
+import { shareTool } from '@pi-desktop/tool-bus';
 import { Type } from '@sinclair/typebox';
 import { type CalendarEvent, runCalendarCreateEvent, runCalendarListEvents } from './calendar.js';
 import { runContactsSearch } from './contacts.js';
@@ -163,7 +164,7 @@ export function registerMacConnectors(pi: ExtensionAPI, options: MacConnectorsOp
   const platform = options.platform;
 
   // --- calendar_list_events (read) -----------------------------------------
-  pi.registerTool({
+  shareTool(pi, {
     name: CALENDAR_LIST_EVENTS_TOOL,
     label: 'List Calendar Events',
     description:
@@ -213,7 +214,7 @@ export function registerMacConnectors(pi: ExtensionAPI, options: MacConnectorsOp
   });
 
   // --- calendar_create_event (WRITE) ---------------------------------------
-  pi.registerTool({
+  shareTool(pi, {
     name: CALENDAR_CREATE_EVENT_TOOL,
     label: 'Create Calendar Event',
     description:
@@ -248,7 +249,7 @@ export function registerMacConnectors(pi: ExtensionAPI, options: MacConnectorsOp
   });
 
   // --- reminders_list (read) -----------------------------------------------
-  pi.registerTool({
+  shareTool(pi, {
     name: REMINDERS_LIST_TOOL,
     label: 'List Reminders',
     description:
@@ -296,7 +297,7 @@ export function registerMacConnectors(pi: ExtensionAPI, options: MacConnectorsOp
   });
 
   // --- reminders_create (WRITE) --------------------------------------------
-  pi.registerTool({
+  shareTool(pi, {
     name: REMINDERS_CREATE_TOOL,
     label: 'Create Reminder',
     description:
@@ -327,7 +328,7 @@ export function registerMacConnectors(pi: ExtensionAPI, options: MacConnectorsOp
   });
 
   // --- contacts_search (read) ----------------------------------------------
-  pi.registerTool({
+  shareTool(pi, {
     name: CONTACTS_SEARCH_TOOL,
     label: 'Search Contacts',
     description:
@@ -370,7 +371,7 @@ export function registerMacConnectors(pi: ExtensionAPI, options: MacConnectorsOp
   });
 
   // --- mail_search (read) --------------------------------------------------
-  pi.registerTool({
+  shareTool(pi, {
     name: MAIL_SEARCH_TOOL,
     label: 'Search Mail',
     description:
@@ -422,7 +423,7 @@ export function registerMacConnectors(pi: ExtensionAPI, options: MacConnectorsOp
   });
 
   // --- mail_recent (read) --------------------------------------------------
-  pi.registerTool({
+  shareTool(pi, {
     name: MAIL_RECENT_TOOL,
     label: 'Recent Mail',
     description:
@@ -465,7 +466,7 @@ export function registerMacConnectors(pi: ExtensionAPI, options: MacConnectorsOp
   });
 
   // --- mail_read (read) ----------------------------------------------------
-  pi.registerTool({
+  shareTool(pi, {
     name: MAIL_READ_TOOL,
     label: 'Read Mail Message',
     description:
@@ -493,7 +494,7 @@ export function registerMacConnectors(pi: ExtensionAPI, options: MacConnectorsOp
   });
 
   // --- messages_recent (read; needs Full Disk Access) ----------------------
-  pi.registerTool({
+  shareTool(pi, {
     name: MESSAGES_RECENT_TOOL,
     label: 'Recent Messages',
     description:
@@ -544,7 +545,7 @@ export function registerMacConnectors(pi: ExtensionAPI, options: MacConnectorsOp
   });
 
   // --- messages_send (WRITE) -----------------------------------------------
-  pi.registerTool({
+  shareTool(pi, {
     name: MESSAGES_SEND_TOOL,
     label: 'Send Message',
     description:

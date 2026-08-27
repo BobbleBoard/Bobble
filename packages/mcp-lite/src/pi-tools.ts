@@ -11,6 +11,7 @@
  * Both route through a single {@link ConnectorHost}.
  */
 import type { AgentToolResult, ExtensionAPI } from '@mariozechner/pi-coding-agent';
+import { shareTool } from '@pi-desktop/tool-bus';
 import { type Static, Type } from '@sinclair/typebox';
 import { renderCatalogText } from './catalog';
 import type { ConnectedServer, ConnectorHost } from './connector-host';
@@ -64,7 +65,7 @@ export function registerNativeTools(
   for (const tool of server.tools) {
     const name = server.prefix + tool.name;
     registered.push(name);
-    pi.registerTool({
+    shareTool(pi, {
       name,
       label: `${server.config.name}: ${tool.name}`,
       description: tool.description ?? `MCP tool "${tool.name}" from ${server.config.name}.`,
@@ -105,7 +106,7 @@ export const PROXY_TOOL_NAMES = ['mcp_list', 'mcp_schema', 'mcp_call'] as const;
  * call once regardless of how many lite-mode servers are connected.
  */
 export function registerProxyTools(pi: ExtensionAPI, host: ConnectorHost): string[] {
-  pi.registerTool({
+  shareTool(pi, {
     name: 'mcp_list',
     label: 'MCP: list tools',
     description:
@@ -121,7 +122,7 @@ export function registerProxyTools(pi: ExtensionAPI, host: ConnectorHost): strin
     },
   });
 
-  pi.registerTool({
+  shareTool(pi, {
     name: 'mcp_schema',
     label: 'MCP: tool schema',
     description:
@@ -159,7 +160,7 @@ export function registerProxyTools(pi: ExtensionAPI, host: ConnectorHost): strin
     },
   });
 
-  pi.registerTool({
+  shareTool(pi, {
     name: 'mcp_call',
     label: 'MCP: call tool',
     description:

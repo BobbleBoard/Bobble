@@ -18,10 +18,16 @@
  * and parameters but no `execute`, and a `tool_call` handler may block a call but
  * not rewrite its name. So `use` had nothing to dispatch through.
  *
- * It does now. The harness loads BEFORE web-tools, browser-use, mac-connectors
- * and mac-computer-use (see the desktop app's extension order), so wrapping
- * `pi.registerTool` here sees every one of their definitions as it lands. The
- * wrapper is transparent: it records the definition and passes it straight on.
+ * It does now, for OUR tools. The wrapper is transparent: it records the
+ * definition and passes it straight on.
+ *
+ * IT DOES NOT SEE OTHER EXTENSIONS. This file used to claim that loading before
+ * web-tools, browser-use and the mac extensions meant wrapping `pi.registerTool`
+ * caught their definitions too. It does not: pi hands each extension its own
+ * `ExtensionAPI`, so this patch only ever sits in the harness's own path. The
+ * claim held for long enough to build a CLI on it that listed the whole app and
+ * could run a tenth of it. Cross-extension dispatch lives in
+ * `@pi-desktop/tool-bus`, which every extension publishes into as it registers.
  */
 
 /** The shape we need from a tool definition — kept structural, no SDK import. */

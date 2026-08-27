@@ -51,6 +51,7 @@ export {
   MAC_TYPE_TOOL,
 } from './tool-names.js';
 
+import { shareTool } from '@pi-desktop/tool-bus';
 import {
   CHROME_CLICK_TOOL,
   CHROME_GO_TOOL,
@@ -179,7 +180,7 @@ export function registerMacComputerUseTools(
   }
 
   // --- mac_snapshot --------------------------------------------------------
-  pi.registerTool({
+  shareTool(pi, {
     name: MAC_SNAPSHOT_TOOL,
     label: 'Mac: Snapshot',
     description:
@@ -259,7 +260,7 @@ export function registerMacComputerUseTools(
   });
 
   // --- mac_click -----------------------------------------------------------
-  pi.registerTool({
+  shareTool(pi, {
     name: MAC_CLICK_TOOL,
     label: 'Mac: Click',
     description:
@@ -325,7 +326,7 @@ export function registerMacComputerUseTools(
   });
 
   // --- mac_type ------------------------------------------------------------
-  pi.registerTool({
+  shareTool(pi, {
     name: MAC_TYPE_TOOL,
     label: 'Mac: Type',
     description:
@@ -409,7 +410,7 @@ export function registerMacComputerUseTools(
   });
 
   // --- mac_key -------------------------------------------------------------
-  pi.registerTool({
+  shareTool(pi, {
     name: MAC_KEY_TOOL,
     label: 'Mac: Key',
     description:
@@ -446,7 +447,7 @@ export function registerMacComputerUseTools(
   });
 
   // --- mac_scroll ----------------------------------------------------------
-  pi.registerTool({
+  shareTool(pi, {
     name: MAC_SCROLL_TOOL,
     label: 'Mac: Scroll',
     description:
@@ -512,7 +513,7 @@ export function registerMacComputerUseTools(
   });
 
   // --- mac_launch ----------------------------------------------------------
-  pi.registerTool({
+  shareTool(pi, {
     name: MAC_LAUNCH_TOOL,
     label: 'Mac: Launch',
     description:
@@ -671,7 +672,7 @@ export function registerChromeTools(pi: ExtensionAPI): void {
     return { text: res.value, ok: true };
   }
 
-  pi.registerTool({
+  shareTool(pi, {
     name: CHROME_SNAPSHOT_TOOL,
     label: 'Chrome: Snapshot',
     description:
@@ -687,7 +688,7 @@ export function registerChromeTools(pi: ExtensionAPI): void {
     },
   });
 
-  pi.registerTool({
+  shareTool(pi, {
     name: CHROME_CLICK_TOOL,
     label: 'Chrome: Click',
     description:
@@ -703,7 +704,7 @@ export function registerChromeTools(pi: ExtensionAPI): void {
     },
   });
 
-  pi.registerTool({
+  shareTool(pi, {
     name: CHROME_TYPE_TOOL,
     label: 'Chrome: Type',
     description:
@@ -720,7 +721,7 @@ export function registerChromeTools(pi: ExtensionAPI): void {
     },
   });
 
-  pi.registerTool({
+  shareTool(pi, {
     name: CHROME_GO_TOOL,
     label: 'Chrome: Navigate',
     description: "Navigate the active tab of the user's Chrome to a URL.",

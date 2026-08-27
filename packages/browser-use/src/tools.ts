@@ -17,6 +17,7 @@ import { writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import path from 'node:path';
 import type { AgentToolResult, ExtensionAPI } from '@mariozechner/pi-coding-agent';
+import { shareTool } from '@pi-desktop/tool-bus';
 import { Type } from '@sinclair/typebox';
 import type { BrowserBridge } from './bridge-client.js';
 import { formatSnapshot } from './format.js';
@@ -127,7 +128,7 @@ export function registerBrowserUseTools(pi: ExtensionAPI, options: BrowserUseOpt
   }
 
   // --- browser_navigate ----------------------------------------------------
-  pi.registerTool({
+  shareTool(pi, {
     name: BROWSER_NAVIGATE_TOOL,
     label: 'Browse: Navigate',
     description:
@@ -174,7 +175,7 @@ export function registerBrowserUseTools(pi: ExtensionAPI, options: BrowserUseOpt
   });
 
   // --- browser_snapshot ----------------------------------------------------
-  pi.registerTool({
+  shareTool(pi, {
     name: BROWSER_SNAPSHOT_TOOL,
     label: 'Browse: Snapshot',
     description:
@@ -283,7 +284,7 @@ export function registerBrowserUseTools(pi: ExtensionAPI, options: BrowserUseOpt
   });
 
   // --- browser_click -------------------------------------------------------
-  pi.registerTool({
+  shareTool(pi, {
     name: BROWSER_CLICK_TOOL,
     label: 'Browse: Click',
     description:
@@ -340,7 +341,7 @@ export function registerBrowserUseTools(pi: ExtensionAPI, options: BrowserUseOpt
   });
 
   // --- browser_type --------------------------------------------------------
-  pi.registerTool({
+  shareTool(pi, {
     name: BROWSER_TYPE_TOOL,
     label: 'Browse: Type',
     description:
@@ -384,7 +385,7 @@ export function registerBrowserUseTools(pi: ExtensionAPI, options: BrowserUseOpt
   });
 
   // --- browser_scroll ------------------------------------------------------
-  pi.registerTool({
+  shareTool(pi, {
     name: BROWSER_SCROLL_TOOL,
     label: 'Browse: Scroll',
     description: 'Scroll the page. Use to reveal below-the-fold elements, then re-snapshot.',
@@ -425,7 +426,7 @@ export function registerBrowserUseTools(pi: ExtensionAPI, options: BrowserUseOpt
   });
 
   // --- browser_read --------------------------------------------------------
-  pi.registerTool({
+  shareTool(pi, {
     name: BROWSER_READ_TOOL,
     label: 'Browse: Read',
     description:
@@ -462,7 +463,7 @@ export function registerBrowserUseTools(pi: ExtensionAPI, options: BrowserUseOpt
   });
 
   // --- browser_wait --------------------------------------------------------
-  pi.registerTool({
+  shareTool(pi, {
     name: BROWSER_WAIT_TOOL,
     label: 'Browse: Wait',
     description:
@@ -497,7 +498,7 @@ export function registerBrowserUseTools(pi: ExtensionAPI, options: BrowserUseOpt
 
   // --- browser_back / browser_forward --------------------------------------
   const history = (name: string, method: 'back' | 'forward', label: string): void => {
-    pi.registerTool({
+    shareTool(pi, {
       name,
       label,
       description: `Go ${method} in the browser history, then re-snapshot.`,
@@ -523,7 +524,7 @@ export function registerBrowserUseTools(pi: ExtensionAPI, options: BrowserUseOpt
   history(BROWSER_FORWARD_TOOL, 'forward', 'Browse: Forward');
 
   // --- browser_key ---------------------------------------------------------
-  pi.registerTool({
+  shareTool(pi, {
     name: BROWSER_KEY_TOOL,
     label: 'Browse: Key',
     description:

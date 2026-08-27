@@ -26,6 +26,7 @@ import type {
   ExtensionContext,
 } from '@mariozechner/pi-coding-agent';
 import { createBashToolDefinition } from '@mariozechner/pi-coding-agent';
+import { sharedTool, sharedToolNames } from '@pi-desktop/tool-bus';
 import {
   type AsyncClassifier,
   type ClassifyInput,
@@ -111,7 +112,7 @@ import { registerSandboxFileTools, resolveWorkspaceRoot } from './tools/sandbox-
 import { buildCli, type CliGroupSpec, commandNameFor, renderRootHelp } from './tools/tool-cli.js';
 import { registerToolCli } from './tools/tool-cli-bridge.js';
 import { truncateToolOutput } from './tools/tool-output-truncate.js';
-import { captureRegisteredTools } from './tools/tool-registry.js';
+import { type CapturedTool, captureRegisteredTools } from './tools/tool-registry.js';
 import { registerUseTool } from './tools/use-tool.js';
 import { readmeIn, undemonstrated, workRootOf } from './verify/documented.js';
 import {
@@ -727,15 +728,19 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
    * The tools the CLI may list AND run — one source, used by both the command
    * surface and the system prompt's command list.
    *
-   * ONLY WHAT WE CAN ACTUALLY RUN. `pi.getAllTools()` sees every extension, but
-   * commands execute through `toolRegistry`, a monkey-patch of THIS extension's
-   * `registerTool` that therefore holds only the harness's own tools. Listing
-   * from the wider set put `media generate image`, `browser click` and every
-   * connector command in the help, where running them answered "not registered
-   * in this build" — the false-availability bug this mode exists to remove,
-   * reproduced one layer down. pi offers no way to execute another extension's
-   * tool (`ToolInfo` is `Pick<ToolDefinition,'name'|'description'|'parameters'>`
-   * with no `execute`), so the honest surface is the one we can serve.
+   * ONLY WHAT WE CAN ACTUALLY RUN, and that used to be very little. `ToolInfo`
+   * — what `getAllTools()` returns — has no `execute`, so this extension could
+   * see every tool in the process and run none but its own. `browser click`,
+   * `mac snapshot`, `media generate image` and every connector command were
+   * listed, documented by `--help`, and answered "not registered in this
+   * build". Filtering them out made the CLI honest and nearly empty: a live run
+   * with generation on offered `media edit image` and nothing else, and the
+   * model correctly concluded it could not make a sound effect.
+   *
+   * `@pi-desktop/tool-bus` closes it. Every extension publishes its executors
+   * into one process-level map as it registers them, so the CLI can dispatch
+   * across the boundary. The registry capture stays as the first source — it is
+   * this extension's own tools, and it is authoritative for them.
    *
    * A SPECIALIST NARROWS THIS, not the pinned tool list. Only `bash` is
    * advertised in this mode, so pinning a specialist's toolset onto
@@ -744,8 +749,30 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
    * CLI and found the whole app in it, which is the "goes and reads source
    * instead of making the picture" failure the pin was built to prevent.
    */
+  /** The executor for a tool name: ours if we registered it, the bus otherwise. */
+  function cliRunnable(name: string): CapturedTool | undefined {
+    return toolRegistry.get(name) ?? (sharedTool(name) as CapturedTool | undefined);
+  }
+
   function cliVisibleTools(): ReturnType<typeof pi.getAllTools> {
-    const registered = pi.getAllTools().filter((t) => toolRegistry.get(t.name) !== undefined);
+    const all = pi.getAllTools();
+    const registered = all.filter((t) => cliRunnable(t.name) !== undefined);
+    /* WHY A COMMAND IS MISSING, in one line: what pi knows, what we can run, and
+       what the bus holds. Without all three, "the browser commands are not in
+       the help" is a guess between three different causes. */
+    const dbg = process.env.PI_ADV_DEBUG_TOOLS;
+    if (dbg !== undefined && dbg.length > 0) {
+      try {
+        appendFileSync(
+          dbg,
+          `cliVisibleTools: all(${all.length})=${all.map((t) => t.name).join(',')}\n` +
+            `  runnable(${registered.length})=${registered.map((t) => t.name).join(',')}\n` +
+            `  bus(${sharedToolNames().length})=${sharedToolNames().join(',')}\n`,
+        );
+      } catch {
+        /* a diagnostic must never break a turn */
+      }
+    }
     const specialist = specialistFromEnv();
     if (specialist === undefined) return registered;
     const allowed = new Set(
@@ -1569,7 +1596,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
         tools: cliVisibleTools,
         groups: () => toolCliGroups(),
         call: async (name, args) => {
-          const target = toolRegistry.get(name);
+          const target = cliRunnable(name);
           if (target === undefined) {
             return { text: `${name}: not registered in this build.`, isError: true };
           }

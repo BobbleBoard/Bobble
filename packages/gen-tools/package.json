@@ -24,6 +24,7 @@
   "dependencies": {
     "@mariozechner/pi-coding-agent": "0.68.1",
     "@pi-desktop/gen-service": "workspace:*",
+    "@pi-desktop/tool-bus": "workspace:*",
     "@sinclair/typebox": "^0.34.49"
   }
 }

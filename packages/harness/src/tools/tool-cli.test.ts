@@ -312,7 +312,7 @@ describe('delegation is reachable from the CLI', () => {
   });
 
   it('drops the group when this build registered neither (a depth-capped child)', () => {
-    const cli = buildCli(groups, [tools[0]]);
+    const cli = buildCli(groups, tools.slice(0, 1));
     expect(cli.groups.map((g) => g.name)).toEqual(['browser']);
   });
 });

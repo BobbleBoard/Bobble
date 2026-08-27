@@ -17,6 +17,7 @@ import type {
   ExtensionAPI,
   ExtensionContext,
 } from '@mariozechner/pi-coding-agent';
+import { shareTool } from '@pi-desktop/tool-bus';
 import { Type } from '@sinclair/typebox';
 import {
   DEFAULT_MAX_BYTES,
@@ -167,7 +168,7 @@ export function registerWebTools(pi: ExtensionAPI, options: WebToolsOptions = {}
   const searchConfig: WebSearchConfig = { ...webSearchConfigFromEnv(), ...options.search };
   const backends = resolveSearchBackends(searchConfig);
 
-  pi.registerTool({
+  shareTool(pi, {
     name: WEB_SEARCH_TOOL,
     label: 'Web Search',
     description:
@@ -230,7 +231,7 @@ export function registerWebTools(pi: ExtensionAPI, options: WebToolsOptions = {}
 
   // --- web_fetch -----------------------------------------------------------
   const fetchOpts = options.fetch ?? {};
-  pi.registerTool({
+  shareTool(pi, {
     name: WEB_FETCH_TOOL,
     label: 'Fetch URL',
     description:
@@ -276,7 +277,7 @@ export function registerWebTools(pi: ExtensionAPI, options: WebToolsOptions = {}
   const pyTimeout = options.python?.defaultTimeoutMs ?? DEFAULT_PYTHON_TIMEOUT_MS;
   const pyMaxOutput = options.python?.maxOutputBytes ?? DEFAULT_MAX_OUTPUT_BYTES;
 
-  pi.registerTool({
+  shareTool(pi, {
     name: PYTHON_RUN_TOOL,
     label: 'Run Python',
     description:
@@ -351,7 +352,7 @@ export function registerWebTools(pi: ExtensionAPI, options: WebToolsOptions = {}
   const spotlightOpts = options.spotlight ?? {};
   const spotlightRunner = spotlightOpts.runner ?? systemSpotlightRunner();
 
-  pi.registerTool({
+  shareTool(pi, {
     name: SPOTLIGHT_SEARCH_TOOL,
     label: 'Spotlight Search',
     description:

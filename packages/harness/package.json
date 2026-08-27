@@ -32,6 +32,7 @@
     "@pi-desktop/browser-use": "workspace:*",
     "@pi-desktop/mac-computer-use": "workspace:*",
     "@pi-desktop/mac-connectors": "workspace:*",
+    "@pi-desktop/tool-bus": "workspace:*",
     "@sinclair/typebox": "^0.34.49"
   },
   "devDependencies": {

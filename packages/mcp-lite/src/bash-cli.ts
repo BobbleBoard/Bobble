@@ -27,6 +27,7 @@ import net from 'node:net';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import type { ExtensionAPI } from '@mariozechner/pi-coding-agent';
+import { shareTool } from '@pi-desktop/tool-bus';
 import { type Static, Type } from '@sinclair/typebox';
 import { renderCatalogText } from './catalog';
 import type { ConnectorHost } from './connector-host';
@@ -310,7 +311,7 @@ const cliToolSchema = Type.Object({
  * the real `pi-tool` dispatcher.
  */
 export function registerCliTool(pi: ExtensionAPI, host: ConnectorHost): void {
-  pi.registerTool({
+  shareTool(pi, {
     name: 'cli',
     label: 'Connector CLI',
     description:

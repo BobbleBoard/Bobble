@@ -18,6 +18,7 @@ import {
   getModel,
   modelsForModality,
 } from '@pi-desktop/gen-service';
+import { shareTool } from '@pi-desktop/tool-bus';
 import { type TSchema, Type } from '@sinclair/typebox';
 import type { GenBridge } from './gen-bridge-client.js';
 import type {
@@ -120,7 +121,7 @@ export function registerGenTools(pi: ExtensionAPI, options: GenToolsOptions): vo
   const bridge = options.bridge;
   const readImage = options.readImage ?? ((p: string) => readFile(p));
 
-  pi.registerTool({
+  shareTool(pi, {
     name: GENERATE_IMAGE_TOOL,
     label: 'Generate: Image',
     description:
@@ -217,7 +218,7 @@ export function registerGenTools(pi: ExtensionAPI, options: GenToolsOptions): vo
     },
   });
 
-  pi.registerTool({
+  shareTool(pi, {
     name: GENERATE_VIDEO_TOOL,
     label: 'Generate: Video',
     description:
@@ -356,7 +357,7 @@ export function registerAudioTools(pi: ExtensionAPI, options: GenToolsOptions): 
     extra: Record<string, TSchema>,
     ids: readonly string[],
   ): void => {
-    pi.registerTool({
+    shareTool(pi, {
       name,
       label,
       description,

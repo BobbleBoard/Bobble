@@ -24,6 +24,7 @@
   "dependencies": {
     "@mariozechner/pi-coding-agent": "0.68.1",
     "@mozilla/readability": "^0.6.0",
+    "@pi-desktop/tool-bus": "workspace:*",
     "@sinclair/typebox": "^0.34.49",
     "linkedom": "^0.18.13",
     "turndown": "^7.2.4"
