@@ -314,7 +314,20 @@ export function ChatComposer({
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [skipped, setSkipped] = useState<string[]>([]);
   const [commands, setCommands] = useState<SlashCommand[]>(BUILTIN_COMMANDS);
-  const [webSearch, setWebSearch] = useState(false);
+  /*
+   * NO WEB-SEARCH TOGGLE, until it does something.
+   *
+   * It was a checkbox the user could tick, held in state here, and read by
+   * nothing — `submit()` never looked at it, so turning it on changed no
+   * request and no tool set. A control that reports a preference the system
+   * does not act on is worse than no control: it makes the user believe they
+   * asked for something.
+   *
+   * Bringing it back means deciding what it MEANS — pin `web_search` into the
+   * turn's advertised tools, or bias the model toward it — and plumbing that to
+   * the harness per message. The menu renders the row again the moment an
+   * `onWebSearchChange` handler is passed.
+   */
   // A composer "+" force-action (spec §3.2) pins the harness task class for the
   // NEXT send; consumed + cleared in submit(). Drives the renderer Auto-route
   // classify via `forcedClass` (the toolset preset is pinned eagerly on select,
@@ -891,8 +904,6 @@ export function ChatComposer({
               side="top"
               align="start"
               onAddFiles={() => fileInputRef.current?.click()}
-              webSearch={webSearch}
-              onWebSearchChange={setWebSearch}
               onGenerateImage={() => onGenAction('image')}
               onGenerateVideo={() => onGenAction('video')}
               onGenerateMotion={() => onGenAction('motion')}

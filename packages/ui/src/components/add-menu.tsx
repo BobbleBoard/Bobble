@@ -161,7 +161,20 @@ export function ComposerAddMenu({
           </IconButton>
         )}
       </DropdownMenuTrigger>
-      {/* Round-10 (#11): the composer "+" menu opens/closes instantly. */}
+      {/*
+        Round-10 (#11): the composer "+" menu opens/closes instantly.
+
+        A ROW EXISTS ONLY IF IT CAN ACT. Every optional item used to render
+        unconditionally with `onSelect={() => onThing?.()}` — so an absent
+        handler produced a menu row that highlighted, accepted a click, closed
+        the menu and did nothing. MEASURED by driving the built app: 8 of 13
+        rows in the app's only capability surface were dead that way.
+
+        An unimplemented row is worse than an absent one: it teaches the user
+        the app is broken rather than that the feature is elsewhere. Gating on
+        the handler also means wiring one up makes its row appear — nothing to
+        re-add, and no way to ship a dead row again.
+      */}
       <DropdownMenuContent className="pd-menu--instant" side={side} align={align}>
         <DropdownMenuItem
           icon={<IconPaperclip size={16} />}
@@ -170,33 +183,39 @@ export function ComposerAddMenu({
         >
           Add files or photos
         </DropdownMenuItem>
-        <DropdownMenuItem icon={<IconImage size={16} />} onSelect={() => onTakeScreenshot?.()}>
-          Take a screenshot
-        </DropdownMenuItem>
+        {onTakeScreenshot !== undefined ? (
+          <DropdownMenuItem icon={<IconImage size={16} />} onSelect={onTakeScreenshot}>
+            Take a screenshot
+          </DropdownMenuItem>
+        ) : null}
         {variant === 'full' ? (
           <>
             <DropdownMenuSeparator />
-            <DropdownMenuItem
-              icon={<IconFolderPlus size={16} />}
-              onSelect={() => onAddToProject?.()}
-            >
-              Add to project
-            </DropdownMenuItem>
-            <DropdownMenuItem icon={<IconGithub size={16} />} onSelect={() => onAddFromGitHub?.()}>
-              Add from GitHub
-            </DropdownMenuItem>
-            <DropdownMenuItem icon={<IconSparkles size={16} />} onSelect={() => onSkills?.()}>
-              Skills
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              icon={<IconConnector size={16} />}
-              onSelect={() => onAddConnector?.()}
-            >
-              Add connector
-            </DropdownMenuItem>
-            <DropdownMenuItem icon={<IconPuzzle size={16} />} onSelect={() => onAddPlugins?.()}>
-              Add plugins…
-            </DropdownMenuItem>
+            {onAddToProject !== undefined ? (
+              <DropdownMenuItem icon={<IconFolderPlus size={16} />} onSelect={onAddToProject}>
+                Add to project
+              </DropdownMenuItem>
+            ) : null}
+            {onAddFromGitHub !== undefined ? (
+              <DropdownMenuItem icon={<IconGithub size={16} />} onSelect={onAddFromGitHub}>
+                Add from GitHub
+              </DropdownMenuItem>
+            ) : null}
+            {onSkills !== undefined ? (
+              <DropdownMenuItem icon={<IconSparkles size={16} />} onSelect={onSkills}>
+                Skills
+              </DropdownMenuItem>
+            ) : null}
+            {onAddConnector !== undefined ? (
+              <DropdownMenuItem icon={<IconConnector size={16} />} onSelect={onAddConnector}>
+                Add connector
+              </DropdownMenuItem>
+            ) : null}
+            {onAddPlugins !== undefined ? (
+              <DropdownMenuItem icon={<IconPuzzle size={16} />} onSelect={onAddPlugins}>
+                Add plugins…
+              </DropdownMenuItem>
+            ) : null}
             <DropdownMenuSeparator />
             {COMPOSER_GEN_ACTIONS.map((action) => (
               <DropdownMenuItem
@@ -209,19 +228,23 @@ export function ComposerAddMenu({
               </DropdownMenuItem>
             ))}
             <DropdownMenuSeparator />
-            <DropdownMenuItem icon={<IconSearch size={16} />} onSelect={() => onResearch?.()}>
-              Research
-            </DropdownMenuItem>
-            <DropdownMenuCheckboxItem
-              checked={webSearch}
-              onCheckedChange={(next) => onWebSearchChange?.(next === true)}
-              onSelect={(event) => event.preventDefault()}
-            >
-              <span className="pd-menu-icon">
-                <IconGlobe size={16} />
-              </span>
-              Web search
-            </DropdownMenuCheckboxItem>
+            {onResearch !== undefined ? (
+              <DropdownMenuItem icon={<IconSearch size={16} />} onSelect={onResearch}>
+                Research
+              </DropdownMenuItem>
+            ) : null}
+            {onWebSearchChange !== undefined ? (
+              <DropdownMenuCheckboxItem
+                checked={webSearch}
+                onCheckedChange={(next) => onWebSearchChange(next === true)}
+                onSelect={(event) => event.preventDefault()}
+              >
+                <span className="pd-menu-icon">
+                  <IconGlobe size={16} />
+                </span>
+                Web search
+              </DropdownMenuCheckboxItem>
+            ) : null}
           </>
         ) : null}
       </DropdownMenuContent>
