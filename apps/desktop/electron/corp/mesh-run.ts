@@ -19,10 +19,63 @@ import type {
   TaskHandle,
   TaskResult,
 } from '@pi-desktop/coordination';
-import { buildCorpRoster, type MeshAgent, type RoleAgentActivity } from '@pi-desktop/harness/corp';
+import {
+  buildCorpRoster,
+  type MeshAgent,
+  makeNodeWorkspaceReadFs,
+  preflightProduct,
+  type RoleAgentActivity,
+  summarizePreflight,
+} from '@pi-desktop/harness/corp';
 import { runCorpMeshTask } from './mesh-host';
 import { type PlanHop, planFromHops } from './mesh-plan';
+import { gateFeedback, runProductGate } from './product-gate';
 import type { CorpModelHandle } from './role-agent';
+
+/**
+ * The manager's account of the work, followed by what the product actually does.
+ *
+ * TWO CHECKS, BOTH OF WHICH EXISTED AND NEITHER OF WHICH RAN HERE.
+ * `preflightProduct` walks the import graph of a web product's entry and reports
+ * proven load-breakers; `runProductGate` finds the team's own executable check
+ * and lets the exit code decide. Both were built to stop narrative
+ * "production-ready" sign-offs, and both were wired only into `runCorp` — the
+ * SOLO path, low and medium effort. The mesh is what high and max run, which is
+ * to say the default, and it handed the manager's own account back with nothing
+ * to contradict it. A run whose entry point throws on load looked exactly like
+ * one that works.
+ *
+ * EVIDENCE, NOT A VETO. The verdict is appended to the reply the CEO reads
+ * rather than used to fail the run. `runProductGate` reports `ran: false` when a
+ * team left no check, and that is a real signal worth carrying, but it is not
+ * grounds for this layer to overrule a delivery on its own.
+ *
+ * Never throws, and silent when there is nothing to say.
+ */
+export async function withProductEvidence(reply: string, cwd: string | undefined): Promise<string> {
+  if (cwd === undefined || cwd === '') return reply;
+  const parts: string[] = [reply];
+  try {
+    const detail = summarizePreflight(preflightProduct(cwd, makeNodeWorkspaceReadFs()));
+    if (detail !== '') parts.push(detail);
+  } catch {
+    // An unreadable workspace is not evidence of anything.
+  }
+  try {
+    const gate = await runProductGate(cwd);
+    if (gate.ran && !gate.ok) {
+      parts.push(gateFeedback(gate));
+    } else if (gate.ran && gate.ok) {
+      parts.push(`The product's own check passes: \`${gate.command}\` exited 0.`);
+    }
+    // `ran: false` — no check to run — is deliberately quiet here. Saying "this
+    // could not be verified" on every run that ships a document or an image
+    // would train the reader to skip the whole block.
+  } catch {
+    // Same.
+  }
+  return parts.join('\n\n');
+}
 
 /** A minimal single-producer/single-consumer async queue — the same shape as the
  * coordination engine's (unexported) PushStream, so the corp:event drain loop consumes
@@ -324,9 +377,12 @@ export function startMeshTask(opts: {
       states.set('manager', 'done');
       emitChart();
       stream.push({ type: 'status', status: 'done' });
-      const taskResult: TaskResult = { outcome: 'completed', summary: result.reply };
-      stream.push({ type: 'done', result: taskResult });
-      stream.end();
+      // The product gate the mesh never had — see {@link withProductEvidence}.
+      void withProductEvidence(result.reply, opts.cwd).then((summary) => {
+        const taskResult: TaskResult = { outcome: 'completed', summary };
+        stream.push({ type: 'done', result: taskResult });
+        stream.end();
+      });
     })
     .catch((err) => {
       if (terminated) return;
