@@ -15,21 +15,15 @@
  * are tuned for AA contrast in both light and dark modes.
  */
 import type { ReactNode } from 'react';
-import type { HfModelHitDTO } from '../../electron/ipc-contract';
 import {
   IconBolt,
   IconCpu,
-  IconCube,
   IconEye,
-  IconFilm,
-  IconImage,
   IconLock,
-  IconMusic,
   IconShield,
   IconSparkle,
   IconWaveform,
 } from './icons';
-import type { ModalityCategory } from './modality-catalog-logic';
 import { type SpecMethod, VARIANT_LABEL } from './model-manager-logic';
 
 /** The attribute a pill represents; drives its colour class + default glyph. */
@@ -97,33 +91,6 @@ export function ModelTag({ kind, children, icon, title, ...rest }: ModelTagProps
   );
 }
 
-/** Icon + label per generation category, for the modality pill. */
-const MODALITY_PILL: Record<ModalityCategory, { label: string; icon: ReactNode }> = {
-  image: { label: 'Image', icon: <IconImage size={12} /> },
-  video: { label: 'Video', icon: <IconFilm size={12} /> },
-  audio: { label: 'Audio', icon: <IconWaveform size={12} /> },
-  music: { label: 'Music', icon: <IconMusic size={12} /> },
-  '3d': { label: '3D', icon: <IconCube size={12} /> },
-  perception: { label: 'Perception', icon: <IconEye size={12} /> },
-};
-
-/** The generation-modality pill (Image / Video / Audio / Music / 3D) — one hue,
- * a per-category glyph, so a modality card's kind reads at a glance. */
-export function ModalityPill({
-  category,
-  ...rest
-}: {
-  category: ModalityCategory;
-  'data-testid'?: string;
-}) {
-  const { label, icon } = MODALITY_PILL[category];
-  return (
-    <ModelTag kind="modality" icon={icon} data-testid={rest['data-testid']}>
-      {label}
-    </ModelTag>
-  );
-}
-
 /** Human-readable title per speed method (hovered on the pill). */
 const SPEC_TITLE: Record<SpecMethod, string> = {
   mtp: 'Multi-token prediction (faster decode)',
@@ -139,23 +106,4 @@ export function SpecPill({ method }: { method: SpecMethod }) {
       {VARIANT_LABEL[method]}
     </ModelTag>
   );
-}
-
-/** Whether an HF hit looks multimodal (vision) from its pipeline/tags. */
-export function hfHasVision(hit: HfModelHitDTO): boolean {
-  const tags = hit.tags.map((t) => t.toLowerCase());
-  return (
-    (hit.pipelineTag ?? '').includes('image') ||
-    tags.some((t) => t.includes('image-text') || t === 'vision' || t.includes('mmproj'))
-  );
-}
-
-/** Whether an HF hit looks like an audio/speech model from its pipeline/tags. */
-export function hfHasAudio(hit: HfModelHitDTO): boolean {
-  const pipe = (hit.pipelineTag ?? '').toLowerCase();
-  if (pipe.includes('audio') || pipe.includes('speech') || pipe.includes('asr')) return true;
-  return hit.tags.some((t) => {
-    const l = t.toLowerCase();
-    return l.includes('audio') || l.includes('speech') || l === 'asr';
-  });
 }
