@@ -85,6 +85,16 @@ import { PROFILE_MENU_ACTIONS } from './profile-menu';
 const SEARCH_DEBOUNCE_MS = 220;
 
 /**
+ * How long a background run has to have taken before finishing is worth an OS
+ * notification.
+ *
+ * A reply that took two seconds is not something to interrupt someone for —
+ * they either saw it or will in a moment. The floor is what separates "your
+ * long job is done" from a notification per message.
+ */
+const NOTIFY_MIN_RUN_MS = 20_000;
+
+/**
  * Bottom-left profile control (round-12 #4). ONE compact button — the avatar
  * (rail) or the full "Bobble · Local" row (expanded) — that opens a DROPUP
  * (side="top") holding Settings and Toggle theme.
@@ -534,13 +544,73 @@ export function SessionSidebar({
   // A background chat finished (bgRun.streaming true→false) → mark ITS row unread so
   // a dot sits there until the user opens it. needs-input is marked when the request
   // arrives (see UiRequestHost), so it isn't downgraded here.
+  const bgStartedAt = useRef<number | null>(null);
   useEffect(() => {
     const streaming = bgRun?.streaming === true;
+    if (streaming && bgStartedAt.current === null) bgStartedAt.current = Date.now();
     if (prevBgStreaming.current && !streaming && bgRun !== null) {
       markUnread(bgRun.sessionFile, 'finished');
+      /*
+       * AND TELL THEM IF THEY ARE NOT HERE.
+       *
+       * The dot is right for "you are looking at the app". This is the other
+       * case, and it is the one background chats exist for: the user went and
+       * did something else. Main decides whether to actually show it (it knows
+       * whether the window has focus; the renderer does not, reliably).
+       *
+       * THE DURATION FLOOR is what keeps it from being noise. A reply that took
+       * two seconds is not something to interrupt someone for — they either
+       * saw it or will in a moment.
+       */
+      const ranFor = Date.now() - (bgStartedAt.current ?? Date.now());
+      if (ranFor >= NOTIFY_MIN_RUN_MS) {
+        void window.piDesktop
+          .invoke('app:notify', {
+            title: bgRun.title ?? 'A background chat finished',
+            body: bgRun.title !== null ? 'It finished while you were away.' : 'It has a reply.',
+            sessionFile: bgRun.sessionFile,
+            kind: 'finished',
+          })
+          .catch(() => undefined);
+      }
+      bgStartedAt.current = null;
     }
     prevBgStreaming.current = streaming;
   }, [bgRun, markUnread]);
+
+  /*
+   * A BACKGROUND CHAT THAT IS BLOCKED, which is the more urgent of the two.
+   *
+   * "Finished" can wait — the reply is there whenever the user comes back. A
+   * chat sitting on `ask_user` is doing NOTHING until they answer, and there is
+   * no duration floor for that: being blocked is worth saying immediately.
+   */
+  const notifiedNeedsInput = useRef<string | null>(null);
+  useEffect(() => {
+    const blocked = Object.entries(unread).find(([, kind]) => kind === 'needs-input');
+    if (blocked === undefined) {
+      notifiedNeedsInput.current = null;
+      return;
+    }
+    const [file] = blocked;
+    if (notifiedNeedsInput.current === file) return;
+    notifiedNeedsInput.current = file;
+    void window.piDesktop
+      .invoke('app:notify', {
+        title: 'A background chat needs you',
+        body: 'It asked a question and is waiting for an answer.',
+        sessionFile: file,
+        kind: 'needs-input',
+      })
+      .catch(() => undefined);
+  }, [unread]);
+
+  /* The dock badge counts chats waiting on the user — the only signal left once
+     the app is hidden entirely, and a count says more than a dot. */
+  const unreadCount = Object.keys(unread).length;
+  useEffect(() => {
+    void window.piDesktop.invoke('app:set-badge', { count: unreadCount }).catch(() => undefined);
+  }, [unreadCount]);
 
   // New chat starts a fresh session in the RUNNING pi (new_session RPC): it
   // resets the thread but does NOT dispose/respawn pi, so no "pi exited" crash
@@ -651,6 +721,20 @@ export function SessionSidebar({
     if (result.truncated) onTruncated();
     refresh();
   };
+
+  /*
+   * Clicking the notification opens the chat it was about, not just the window.
+   *
+   * Declared here rather than beside the other effects because `onOpen` is a
+   * plain function defined above — a ref would work and would only be there to
+   * satisfy the ordering.
+   */
+  useEffect(() => {
+    return window.piDesktop.onEvent('app:notification-click', ({ sessionFile }) => {
+      onEnterChat?.();
+      void onOpen(sessionFile);
+    });
+  });
 
   // Optimistic row: a brand-new chat has no `.jsonl` until its first write, so it
   // wouldn't list. The instant it has content, show it immediately (the user: "appear

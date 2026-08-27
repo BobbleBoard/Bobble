@@ -83,6 +83,29 @@ export interface AppInfo {
  * bridge); both groups compose into the maps below for preload/renderer. */
 export type CoreInvokeMap = {
   'app:get-info': { request: undefined; response: AppInfo };
+  /**
+   * Tell the user a background chat finished or needs them — an OS notification
+   * plus a dock badge.
+   *
+   * ONLY WHEN THE APP IS NOT LOOKED AT. A notification for something happening
+   * on screen is noise, and main is the side that knows whether the window has
+   * focus; the renderer's `document.hasFocus()` is true for a window behind
+   * another app on some platforms.
+   *
+   * `sessionFile` comes back through `app:notification-click` so the click
+   * lands on the chat it was about rather than just raising the window.
+   */
+  'app:notify': {
+    request: {
+      title: string;
+      body: string;
+      sessionFile: string;
+      kind: 'finished' | 'needs-input';
+    };
+    response: { shown: boolean; reason?: string };
+  };
+  /** Set the dock badge to a count of unread chats; 0 clears it. */
+  'app:set-badge': { request: { count: number }; response: { ok: boolean } };
 };
 
 // ---------------------------------------------------------------------------
@@ -802,6 +825,8 @@ export type AppInvokeMap = CoreInvokeMap &
  * the map without listing it here is a compile error. */
 export const APP_INVOKE_CHANNELS = [
   'app:get-info',
+  'app:notify',
+  'app:set-badge',
   ...FS_INVOKE_CHANNELS,
   ...LLM_INVOKE_CHANNELS,
   ...HF_INVOKE_CHANNELS,
@@ -845,6 +870,8 @@ export type AppEventMap = {
    * `close-tab` (⌘W) closes the active canvas tab / current chat — NOT the window
    * (⌘⇧W / the red button close the window). See main.ts installAppMenu. */
   'app:accelerator': { action: 'close-tab' };
+  /** The user clicked an OS notification — open the chat it was about. */
+  'app:notification-click': { sessionFile: string };
   /** Inference supervisor state (server/model/TPS) for the composer footer. */
   'llm:status': LlmStatus;
   /**

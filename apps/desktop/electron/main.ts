@@ -11,6 +11,7 @@ import {
   Menu,
   type MenuItemConstructorOptions,
   type NativeImage,
+  Notification,
   nativeImage,
   screen,
   session,
@@ -503,6 +504,60 @@ function registerAppIpc(): void {
         totalMemoryBytes: os.totalmem(),
         cpuCount: os.cpus().length,
       }),
+
+      /*
+       * TELL THE USER WHEN THEY ARE NOT LOOKING.
+       *
+       * A background chat could finish, or block on a question, with the only
+       * sign being a dot in a sidebar the user is not on — or is not in the app
+       * to see at all. The dot is right for "you are here"; this is for "you
+       * are not".
+       *
+       * MAIN DECIDES WHETHER TO SHOW IT, because main is the side that knows.
+       * `document.hasFocus()` in the renderer is true for a window sitting
+       * behind another application on some platforms, which is exactly the case
+       * a notification is for.
+       *
+       * A notification the OS refuses (permission not granted — and under a
+       * per-checkout dev identity it silently never appears) reports
+       * `shown:false` with the reason rather than pretending.
+       */
+      'app:notify': (req) => {
+        const win = mainWindow;
+        if (win !== null && !win.isDestroyed() && win.isFocused()) {
+          return { shown: false, reason: 'the window is focused' };
+        }
+        if (!Notification.isSupported()) {
+          return { shown: false, reason: 'notifications are unavailable here' };
+        }
+        try {
+          const n = new Notification({ title: req.title, body: req.body });
+          n.on('click', () => {
+            const target = mainWindow;
+            if (target === null || target.isDestroyed()) return;
+            if (target.isMinimized()) target.restore();
+            target.show();
+            target.focus();
+            events.send(target.webContents, 'app:notification-click', {
+              sessionFile: req.sessionFile,
+            });
+          });
+          n.show();
+          return { shown: true };
+        } catch (error) {
+          log.warn('notify failed', { error: String(error) });
+          return { shown: false, reason: String(error) };
+        }
+      },
+
+      /* The dock badge is a COUNT, not a dot: "three chats want you" is worth
+         more than "something wants you", and it is the only signal left once
+         the app is hidden entirely. macOS-only; a no-op elsewhere. */
+      'app:set-badge': (req) => {
+        if (process.platform !== 'darwin' || app.dock === undefined) return { ok: false };
+        app.dock.setBadge(req.count > 0 ? String(req.count) : '');
+        return { ok: true };
+      },
     },
     { allowSender },
   );
