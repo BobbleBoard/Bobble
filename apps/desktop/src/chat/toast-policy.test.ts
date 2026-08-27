@@ -29,4 +29,11 @@ describe('BRIDGE_EXIT_TOAST copy', () => {
     expect(BRIDGE_EXIT_TOAST.title.length).toBeGreaterThan(0);
     expect(BRIDGE_EXIT_TOAST.description).toMatch(/restart/i);
   });
+
+  it('does not claim a restart that has not happened', () => {
+    // It said "The assistant restarted", then told you to restart, then offered
+    // a Restart button — three accounts of one moment, one of them false.
+    // `restartPi` runs only when that button is pressed.
+    expect(BRIDGE_EXIT_TOAST.title).not.toMatch(/restarted/i);
+  });
 });
