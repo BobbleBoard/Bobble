@@ -281,3 +281,38 @@ describe('coerceArgs', () => {
     expect(coerceArgs({ nope: 'x' }, schema)).toEqual({ nope: 'x' });
   });
 });
+
+describe('delegation is reachable from the CLI', () => {
+  const groups = [
+    { name: 'browser', summary: 'Drive the browser.', tools: ['browser_navigate'] },
+    {
+      name: 'team',
+      summary: 'Hand work to a subagent, or to the manager who runs a whole team.',
+      tools: ['spawn_subagent', 'talk_to_manager'],
+    },
+  ];
+  const tools = [
+    { name: 'browser_navigate', description: 'Go to a URL.', parameters: undefined },
+    {
+      name: 'spawn_subagent',
+      description: 'Hand a scoped task to a subagent.',
+      parameters: undefined,
+    },
+    { name: 'talk_to_manager', description: 'Hand work to a manager.', parameters: undefined },
+  ];
+
+  it('gives both delegation tools a short command', () => {
+    // The regression: only `bash` is advertised in CLI mode, and these two
+    // belong to no capability — so at max effort with the CLI on there was no
+    // delegation path at all, while the prompt told the model to delegate.
+    const cli = buildCli(groups, tools);
+    const team = cli.groups.find((g) => g.name === 'team');
+    expect(team?.commands.map((c) => c.path.join(' '))).toEqual(['spawn', 'manager']);
+    expect(resolveCli(cli, ['team', 'spawn', '--task', 'x']).kind).toBe('call');
+  });
+
+  it('drops the group when this build registered neither (a depth-capped child)', () => {
+    const cli = buildCli(groups, [tools[0]]);
+    expect(cli.groups.map((g) => g.name)).toEqual(['browser']);
+  });
+});

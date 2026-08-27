@@ -101,6 +101,11 @@ export function commandNameFor(capability: string): string {
  */
 const COMMAND_PATH_OVERRIDES: Readonly<Record<string, readonly string[]>> = {
   update_plan: ['update'],
+  // `team spawn subagent` and `team talk to manager` — the derivation is
+  // correct and reads like a mouthful. These two are typed often enough to
+  // be worth naming.
+  spawn_subagent: ['spawn'],
+  talk_to_manager: ['manager'],
 };
 
 export function pathFor(group: string, toolName: string): string[] {

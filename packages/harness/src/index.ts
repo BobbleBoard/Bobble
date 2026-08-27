@@ -37,7 +37,7 @@ import {
 import { createClassifierEscalation } from './classify/escalation.js';
 import { modelTierForClass } from './classify/tier.js';
 import { corpToolEnabled, registerCreateHierarchyTool } from './corp/promote-tool.js';
-import { CREATE_PRODUCTION_HIERARCHY } from './corp/promotion.js';
+import { CREATE_PRODUCTION_HIERARCHY, TALK_TO_MANAGER } from './corp/promotion.js';
 import { effortKnobs, isEffortLevel } from './effort/effort.js';
 import { HANDBACK_NUDGE, isChoiceHandback } from './loop/handback.js';
 import { createLoopDetector, type LoopDetector, loopDetectorConfig } from './loop/loop-detector.js';
@@ -89,7 +89,7 @@ import { subagentBridgeRunChildFromEnv } from './subagent/bridge-client.js';
 import { detectBudget } from './subagent/budget.js';
 import { type SchedulerSnapshot, SubagentScheduler } from './subagent/scheduler.js';
 import { specialistFromEnv, specialistToolset } from './subagent/specialist-env.js';
-import { registerSubagentTool } from './subagent/subagent-tool.js';
+import { registerSubagentTool, SPAWN_SUBAGENT_TOOL_NAME } from './subagent/subagent-tool.js';
 import {
   HARNESS_SUBAGENTS_STATUS_KEY,
   type HarnessSubagentsStatus,
@@ -700,9 +700,64 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
       tools: ['ask_user'],
     },
     { name: 'plan', summary: 'Show or update your plan for this task.', tools: ['update_plan'] },
+    /*
+     * DELEGATION IS A COMMAND TOO.
+     *
+     * Turning the CLI on used to remove it entirely: only `bash` is advertised
+     * in this mode, and `spawn_subagent` / `talk_to_manager` belong to no
+     * capability, so they appeared in no group and the CLI had no way to reach
+     * them — while the system prompt went on telling the model to use them. At
+     * max effort, with the CLI on, there was no delegation path at all.
+     *
+     * They are registered either way (subagents below the depth cap, the manager
+     * unconditionally — see corpToolEnabled), so this is only about being
+     * REACHABLE. `buildCli` drops a group whose tools this build did not
+     * register, so a depth-capped child correctly shows no `team spawn`.
+     */
+    {
+      name: 'team',
+      summary: 'Hand work to a subagent, or to the manager who runs a whole team.',
+      tools: [SPAWN_SUBAGENT_TOOL_NAME, TALK_TO_MANAGER],
+    },
   ];
-  /** Every group the CLI offers: the capabilities, plus those two. */
+  /** Every group the CLI offers: the capabilities, plus the extras above. */
   const toolCliGroups = (): CliGroupSpec[] => [...CAPABILITIES, ...TOOL_CLI_EXTRA_GROUPS];
+
+  /**
+   * The tools the CLI may list AND run — one source, used by both the command
+   * surface and the system prompt's command list.
+   *
+   * ONLY WHAT WE CAN ACTUALLY RUN. `pi.getAllTools()` sees every extension, but
+   * commands execute through `toolRegistry`, a monkey-patch of THIS extension's
+   * `registerTool` that therefore holds only the harness's own tools. Listing
+   * from the wider set put `media generate image`, `browser click` and every
+   * connector command in the help, where running them answered "not registered
+   * in this build" — the false-availability bug this mode exists to remove,
+   * reproduced one layer down. pi offers no way to execute another extension's
+   * tool (`ToolInfo` is `Pick<ToolDefinition,'name'|'description'|'parameters'>`
+   * with no `execute`), so the honest surface is the one we can serve.
+   *
+   * A SPECIALIST NARROWS THIS, not the pinned tool list. Only `bash` is
+   * advertised in this mode, so pinning a specialist's toolset onto
+   * `setActiveTools` would say nothing — the narrowing has to happen where the
+   * model actually sees the surface. Without it an image specialist opened the
+   * CLI and found the whole app in it, which is the "goes and reads source
+   * instead of making the picture" failure the pin was built to prevent.
+   */
+  function cliVisibleTools(): ReturnType<typeof pi.getAllTools> {
+    const registered = pi.getAllTools().filter((t) => toolRegistry.get(t.name) !== undefined);
+    const specialist = specialistFromEnv();
+    if (specialist === undefined) return registered;
+    const allowed = new Set(
+      specialistToolset(
+        specialist,
+        registered.map((t) => t.name),
+      ),
+    );
+    // Zero matches means this build registered none of the specialist's tools;
+    // an agent with an empty CLI can do nothing, so leave it whole.
+    return allowed.size > 0 ? registered.filter((t) => allowed.has(t.name)) : registered;
+  }
   const toolCliMode = process.env.PI_DESKTOP_TOOL_CLI === '1';
 
   const toolRegistry = captureRegisteredTools(pi);
@@ -1511,28 +1566,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
   if (toolCliMode) {
     const handle = registerToolCli(
       {
-        /*
-         * ONLY WHAT WE CAN ACTUALLY RUN.
-         *
-         * This advertised from `pi.getAllTools()` — which sees every extension —
-         * and executed through `toolRegistry`, which is a monkey-patch of THIS
-         * extension's `registerTool` and therefore holds only the harness's own
-         * tools. So `media generate image`, `browser click`, `mac snapshot` and
-         * every connector command were listed by `tools`, documented by `--help`,
-         * and answered "not registered in this build" when run.
-         *
-         * The comment three paragraphs above says a CLI that cannot reach those
-         * tools "would be the same false-availability bug in a new costume", and
-         * then the code did exactly that. It is the defect this whole mode exists
-         * to remove, reproduced one layer down, by me, in the fix for it.
-         *
-         * pi offers no way to execute another extension's tool: `ToolInfo` is
-         * `Pick<ToolDefinition, 'name'|'description'|'parameters'>` with no
-         * `execute` (pi-coding-agent types.d.ts:990). So until those commands are
-         * routed through the app's own bridges, the honest surface is the one we
-         * can serve — a short true list beats a long false one.
-         */
-        tools: () => pi.getAllTools().filter((t) => toolRegistry.get(t.name) !== undefined),
+        tools: cliVisibleTools,
         groups: () => toolCliGroups(),
         call: async (name, args) => {
           const target = toolRegistry.get(name);
@@ -1924,7 +1958,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
    * purpose — it rides in every request.
    */
   function toolCliPreamble(): string {
-    const cli = buildCli(toolCliGroups(), pi.getAllTools());
+    const cli = buildCli(toolCliGroups(), cliVisibleTools());
     return [
       'These commands are your abilities. Run them with the `bash` tool.',
       '',
