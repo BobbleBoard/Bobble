@@ -108,9 +108,7 @@ describe('the verification standard reaches the prompts', () => {
 
 describe('the document specialist', () => {
   it('is on the roster and produces artifacts', async () => {
-    const { MESH_SPECIALIST_KINDS, specialistToolsFor, specialistMeshPrompt } = await import(
-      './corp-mesh.js'
-    );
+    const { MESH_SPECIALIST_KINDS, specialistToolsFor } = await import('./corp-mesh.js');
     expect(MESH_SPECIALIST_KINDS).toContain('document');
     const tools = specialistToolsFor('document');
     // bash is the load-bearing one: the RENDERERS write the file, not the model.
