@@ -87,9 +87,64 @@ function normalizeCwd(p: string): string {
   return s;
 }
 
+/**
+ * SEARCH THE WORDS, NOT JUST THE TITLE.
+ *
+ * The sidebar filtered on `displayTitle`, which is the first user message cut
+ * to 80 characters — so the chat you remember by what was SAID in it was
+ * exactly the one you could not find. This loop already reads every byte of
+ * every session and keeps two fields; it now also collects the message text so
+ * a query can be matched against it. No index, no second pass over the disk.
+ *
+ * CACHED BY (path, mtime), because without it every keystroke re-reads every
+ * session file on a synchronous main-process handler. An entry is invalidated
+ * the moment the file is written, which is what an append does.
+ */
+interface SessionCacheEntry {
+  readonly mtimeMs: number;
+  readonly summary: SessionSummary;
+  /** Lowercased message text, for matching. Capped — see SEARCH_TEXT_CAP. */
+  readonly haystack: string;
+}
+
+/**
+ * How much of a conversation is searchable.
+ *
+ * A long corp run can be megabytes, and holding all of it for every session
+ * would trade a disk read for a memory leak. 256 KB is far past any hand-typed
+ * conversation and bounds the cache at a few tens of MB across a large history.
+ */
+const SEARCH_TEXT_CAP = 256 * 1024;
+
+/** Sessions kept in the cache. Oldest-inserted is dropped past this. */
+const SESSION_CACHE_MAX = 400;
+
+const sessionCache = new Map<string, SessionCacheEntry>();
+
+function cacheSession(file: string, entry: SessionCacheEntry): void {
+  sessionCache.delete(file);
+  sessionCache.set(file, entry);
+  if (sessionCache.size > SESSION_CACHE_MAX) {
+    const oldest = sessionCache.keys().next();
+    if (!oldest.done) sessionCache.delete(oldest.value);
+  }
+}
+
+/** A ±80-character window around the first hit, with the edges marked. */
+export function excerptAround(haystack: string, original: string, needle: string): string | null {
+  const at = haystack.indexOf(needle);
+  if (at === -1) return null;
+  const start = Math.max(0, at - 80);
+  const end = Math.min(original.length, at + needle.length + 80);
+  const body = original.slice(start, end).replace(/\s+/g, ' ').trim();
+  return `${start > 0 ? '…' : ''}${body}${end < original.length ? '…' : ''}`;
+}
+
 function readSessionSummary(file: string): SessionSummary | null {
   const st = statSafe(file);
   if (st === null) return null;
+  const cached = sessionCache.get(file);
+  if (cached !== undefined && cached.mtimeMs === st.mtimeMs) return { ...cached.summary };
   const txt = safeRead(file);
   if (txt === null) return null;
 
@@ -98,6 +153,13 @@ function readSessionSummary(file: string): SessionSummary | null {
   let startedAt = '';
   let messageCount = 0;
   let firstUserText: string | null = null;
+  const searchable: string[] = [];
+  let searchableLength = 0;
+  const collect = (value: unknown): void => {
+    if (typeof value !== 'string' || value === '' || searchableLength >= SEARCH_TEXT_CAP) return;
+    searchable.push(value);
+    searchableLength += value.length + 1;
+  };
 
   for (const line of txt.split('\n')) {
     if (!line) continue;
@@ -119,20 +181,25 @@ function readSessionSummary(file: string): SessionSummary | null {
       unknown
     >;
     const role = (msg.role ?? obj.role) as string | undefined;
-    if (role === 'user') {
-      messageCount++;
-      if (firstUserText === null) {
-        const c = msg.content ?? obj.content;
-        if (typeof c === 'string') firstUserText = c;
-        else if (Array.isArray(c)) {
-          const first = c.find((x) => (x as { type?: string })?.type === 'text') as
-            | { text?: string }
-            | undefined;
-          if (typeof first?.text === 'string') firstUserText = first.text;
-        }
+    if (role !== 'user' && role !== 'assistant') continue;
+    messageCount++;
+    const content = msg.content ?? obj.content;
+    // Both sides are searchable — half the value is finding a chat by something
+    // the ASSISTANT said, which no title could ever carry.
+    if (typeof content === 'string') collect(content);
+    else if (Array.isArray(content)) {
+      for (const part of content) {
+        if ((part as { type?: string })?.type === 'text') collect((part as { text?: string }).text);
       }
-    } else if (role === 'assistant') {
-      messageCount++;
+    }
+    if (role === 'user' && firstUserText === null) {
+      if (typeof content === 'string') firstUserText = content;
+      else if (Array.isArray(content)) {
+        const first = content.find((x) => (x as { type?: string })?.type === 'text') as
+          | { text?: string }
+          | undefined;
+        if (typeof first?.text === 'string') firstUserText = first.text;
+      }
     }
   }
 
@@ -140,7 +207,7 @@ function readSessionSummary(file: string): SessionSummary | null {
     ? firstUserText.slice(0, 80).replace(/\s+/g, ' ').trim()
     : 'Untitled session';
 
-  return {
+  const summary: SessionSummary = {
     file,
     id,
     cwd,
@@ -151,9 +218,24 @@ function readSessionSummary(file: string): SessionSummary | null {
     firstUserText,
     title,
   };
+  cacheSession(file, {
+    mtimeMs: st.mtimeMs,
+    summary,
+    haystack: searchable.join('\n'),
+  });
+  return { ...summary };
 }
 
-function listAllSessions(filterCwd?: string): SessionSummary[] {
+/** The searchable body for a session, reading (and caching) it if needed. */
+function sessionHaystack(file: string): string {
+  const cached = sessionCache.get(file);
+  if (cached !== undefined) return cached.haystack;
+  readSessionSummary(file);
+  return sessionCache.get(file)?.haystack ?? '';
+}
+
+function listAllSessions(filterCwd?: string, query?: string): SessionSummary[] {
+  const needle = (query ?? '').trim().toLowerCase();
   const wantCwd = filterCwd ? normalizeCwd(filterCwd) : undefined;
   const out: SessionSummary[] = [];
   for (const p of listDir(SESSIONS_DIR)) {
@@ -167,6 +249,14 @@ function listAllSessions(filterCwd?: string): SessionSummary[] {
       summary.cwd = normalizeCwd(summary.cwd);
       if (!summary.cwdLabel) summary.cwdLabel = summary.cwd.replace(HOME, '~');
       if (wantCwd !== undefined && summary.cwd !== wantCwd) continue;
+      if (needle !== '') {
+        // The title is matched in the RENDERER (it knows about renames, which
+        // main does not), so a title hit is not decided here — only whether the
+        // body contains it, and if so, where.
+        const haystack = sessionHaystack(summary.file);
+        const excerpt = excerptAround(haystack.toLowerCase(), haystack, needle);
+        if (excerpt !== null) summary.match = { excerpt };
+      }
       out.push(summary);
     }
   }
@@ -551,7 +641,7 @@ export const fsHandlers: {
   [K in keyof FsInvokeMap]: (req: FsInvokeMap[K]['request']) => FsInvokeMap[K]['response'];
 } = {
   'fs:list-files': (req) => listFiles(req.cwd ?? '', req.query ?? '', req.limit ?? 30),
-  'fs:list-sessions': (req) => listAllSessions(req?.cwd),
+  'fs:list-sessions': (req) => listAllSessions(req?.cwd, req?.query),
   'fs:read-session': (req) => ({ text: readSession(req.file) }),
   'fs:list-tree': (req) => ({
     root: req.root,

@@ -1107,8 +1107,11 @@ export async function listFiles(cwd: string, query: string, limit = 20) {
   return window.piDesktop.invoke('fs:list-files', { cwd, query, limit });
 }
 
-export async function listSessions(cwd?: string) {
-  return window.piDesktop.invoke('fs:list-sessions', cwd !== undefined ? { cwd } : undefined);
+export async function listSessions(cwd?: string, query?: string) {
+  const req: { cwd?: string; query?: string } = {};
+  if (cwd !== undefined) req.cwd = cwd;
+  if (query !== undefined && query.trim() !== '') req.query = query;
+  return window.piDesktop.invoke('fs:list-sessions', Object.keys(req).length > 0 ? req : undefined);
 }
 
 /**

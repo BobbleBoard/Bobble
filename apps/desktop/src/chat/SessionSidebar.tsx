@@ -76,6 +76,14 @@ import { BobbleMark } from './BobbleMark';
 import { PROFILE_MENU_ACTIONS } from './profile-menu';
 
 /**
+ * How long typing has to settle before main searches session BODIES.
+ *
+ * Title filtering is in-memory and instant; this one walks every session file
+ * on a synchronous main-process handler, so it must not run per keystroke.
+ */
+const SEARCH_DEBOUNCE_MS = 220;
+
+/**
  * Bottom-left profile control (round-12 #4). ONE compact button — the avatar
  * (rail) or the full "Bobble · Local" row (expanded) — that opens a DROPUP
  * (side="top") holding Settings and Toggle theme.
@@ -480,8 +488,19 @@ export function SessionSidebar({
   const [deleteTarget, setDeleteTarget] = useState<SessionSummary | null>(null);
   const [dontAskDelete, setDontAskDelete] = useState(false);
 
+  /*
+   * The query main is currently searching bodies for.
+   *
+   * Debounced, and deliberately separate from `query`: the typed value drives
+   * the title filter (instant, in memory) while this one drives a synchronous
+   * main-process pass over every session file, which must not run per keystroke.
+   */
+  const [contentQuery, setContentQuery] = useState('');
+  const contentQueryRef = useRef('');
+  contentQueryRef.current = contentQuery;
+
   const refresh = useCallback(() => {
-    void listSessions().then((list) => {
+    void listSessions(undefined, contentQueryRef.current).then((list) => {
       setSessions(list);
       // Share it: the composer's project picker derives its list from the SAME
       // sessions, so both surfaces agree on what a project is (the user: nothing in
@@ -489,6 +508,18 @@ export function SessionSidebar({
       publishSessionList(list);
     });
   }, []);
+
+  // Typing settles → ask main to search the bodies too.
+  useEffect(() => {
+    const q = query.trim();
+    const id = setTimeout(() => setContentQuery(q), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(id);
+  }, [query]);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: contentQuery is the trigger
+  useEffect(() => {
+    refresh();
+  }, [contentQuery, refresh]);
 
   // Refresh on mount and whenever pi reports a session change (new turn/switch).
   // biome-ignore lint/correctness/useExhaustiveDependencies: sessionId is a refresh trigger
@@ -682,10 +713,19 @@ export function SessionSidebar({
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
+    /*
+     * A chat matches on its TITLE (which the renderer owns, because it knows
+     * about renames) or on its BODY (which main found while reading the file it
+     * was already reading). Searching titles alone meant the chat you remember
+     * by something that was SAID in it was the one you could not get back to —
+     * the title is just the first message cut to 80 characters.
+     */
     const list =
       q.length === 0
         ? displaySessions
-        : displaySessions.filter((s) => displayTitle(s, org).toLowerCase().includes(q));
+        : displaySessions.filter(
+            (s) => displayTitle(s, org).toLowerCase().includes(q) || s.match !== undefined,
+          );
     return list.slice(0, 50);
   }, [displaySessions, query, org]);
 
@@ -848,6 +888,16 @@ export function SessionSidebar({
               void onOpen(s.file);
             }}
           />
+          {/* WHY THIS ROW MATCHED. Without the excerpt a content hit is a chat
+              whose title has nothing to do with what was typed, which reads as a
+              broken search rather than a found conversation. Shown only when the
+              title does NOT already contain the query — then the row explains
+              itself. */}
+          {s.match !== undefined && !title.toLowerCase().includes(query.trim().toLowerCase()) ? (
+            <div className="pd-chat-excerpt" data-testid={`chat-excerpt-${title}`}>
+              {s.match.excerpt}
+            </div>
+          ) : null}
           {/* Hover-revealed 3-dot menu. A SIBLING of the row button (not nested) so
             it's valid HTML; :focus-within keeps it up while the menu is open. */}
           <div className="pd-chatrow-actions">

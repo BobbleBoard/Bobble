@@ -100,6 +100,17 @@ export interface SessionSummary {
   messageCount: number;
   firstUserText: string | null;
   title: string;
+  /**
+   * Where the search query appears in the conversation, when one was given and
+   * the title did not already contain it.
+   *
+   * Present only for a content match: sidebar search used to compare against
+   * the title alone, which is the first user message truncated to 80
+   * characters — so a phrase from message 40 of a long chat was unfindable, and
+   * the chat you remembered by what was SAID in it was the one you could not
+   * get back to.
+   */
+  match?: { excerpt: string };
 }
 
 /**
@@ -122,7 +133,10 @@ export type FsInvokeMap = {
     response: Array<{ path: string; rel: string }>;
   };
   /** Recent sessions, optionally filtered to one cwd (sidebar). */
-  'fs:list-sessions': { request: { cwd?: string } | undefined; response: SessionSummary[] };
+  'fs:list-sessions': {
+    request: { cwd?: string; query?: string } | undefined;
+    response: SessionSummary[];
+  };
   /** Raw session JSONL text (fenced to the sessions dir) for rehydration. */
   'fs:read-session': { request: { file: string }; response: { text: string | null } };
   /** A bounded directory tree rooted at `root` (the file operation bar's tree

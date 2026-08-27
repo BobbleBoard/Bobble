@@ -401,3 +401,23 @@
   width: calc(18px * var(--pd-sidebar-scale, 1));
   height: calc(18px * var(--pd-sidebar-scale, 1));
 }
+
+/*
+ * WHY A CHAT MATCHED — the excerpt under a content-search hit.
+ *
+ * Sidebar search compares against the title, which is the first user message cut
+ * to 80 characters, and now also against the conversation body. A body hit is a
+ * row whose title has nothing to do with what was typed, so without this it
+ * reads as a broken search rather than a found conversation.
+ */
+.pd-chat-excerpt {
+  margin: 0 8px 4px 34px;
+  overflow: hidden;
+  color: var(--pd-text-muted);
+  font-size: var(--pd-font-size-footnote);
+  line-height: var(--pd-leading-tight, 1.35);
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
