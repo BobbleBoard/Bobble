@@ -39,17 +39,22 @@ export const TopBarTitle = forwardRef<HTMLSpanElement, HTMLAttributes<HTMLSpanEl
   },
 );
 
-export type MainSurfaceProps = HTMLAttributes<HTMLDivElement>;
+export type MainSurfaceProps = HTMLAttributes<HTMLElement>;
 
 /**
  * Content surface next to the sidebar. Codex flavor renders it as the
  * "floating card" (rounded + hairline + soft glow — its structural shell
  * signature, spec-top-bar ADAPTATION); claude stays a flat two-pane split.
  * Both purely via CSS on data-flavor.
+ *
+ * A `<main>`, not a div: it IS the main landmark, and a screen reader's
+ * "jump to main content" is the difference between arriving at the chat and
+ * tabbing through the entire sidebar first. The element carries no styling of
+ * its own, so this changes nothing visually.
  */
-export const MainSurface = forwardRef<HTMLDivElement, MainSurfaceProps>(function MainSurface(
+export const MainSurface = forwardRef<HTMLElement, MainSurfaceProps>(function MainSurface(
   { className, ...rest },
   ref,
 ) {
-  return <div ref={ref} className={clsx('pd-main-surface', className)} {...rest} />;
+  return <main ref={ref} className={clsx('pd-main-surface', className)} {...rest} />;
 });

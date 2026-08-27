@@ -109,3 +109,34 @@
 .pd-composer-send:disabled {
   opacity: 0.5;
 }
+
+/*
+ * "The model was also told this" — the AGENTS.md chip.
+ *
+ * Sits beside the project chip because it is the same fact from a different
+ * angle: that folder, and what the folder says. Quiet by default — this is
+ * reassurance, not a control someone needs to find.
+ */
+.pd-instructions-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 24px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--pd-radius-full);
+  background: transparent;
+  color: var(--pd-text-muted);
+  font: inherit;
+  font-size: var(--pd-font-size-caption);
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    color var(--pd-duration-fast) var(--pd-easing-standard),
+    background var(--pd-duration-fast) var(--pd-easing-standard);
+}
+
+.pd-instructions-chip:hover {
+  background: var(--pd-bg-hover);
+  color: var(--pd-text-secondary);
+}

@@ -58,6 +58,7 @@ import { CorpDebugHud } from './corp/CorpDebugHud';
 import { useHarnessTitleSync } from './harness-title';
 import { InputNeededBanner } from './InputNeededBanner';
 import { SessionSidebar } from './SessionSidebar';
+import { StageAnnouncer } from './StageAnnouncer';
 import { useSiteIcon } from './site-icons';
 import { ToastHost } from './ToastHost';
 import { UiRequestDialogs } from './UiRequestDialogs';
@@ -490,6 +491,11 @@ export function ChatApp({
             collapse so the main surface reclaims the space, and it clips while it
             does. The panel inside slides out on the same curve and unmounts after
             (SessionSidebar's `data-sliding`) — there is no icon rail. */}
+            {/* What a screen reader hears while the model works — stage
+                transitions only, never tokens. Mounted at the SHELL rather than
+                in the thread: a live region that appears at the same moment as
+                the thing it is announcing has already missed it. */}
+            <StageAnnouncer />
             <CommandPalette
               open={paletteOpen}
               onOpenChange={setPaletteOpen}

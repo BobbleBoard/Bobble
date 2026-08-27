@@ -151,3 +151,22 @@
   top: 0;
   bottom: auto;
 }
+
+/*
+ * Present to assistive tech, absent to everyone else.
+ *
+ * The clip-rect recipe rather than `display:none` or `visibility:hidden`, both
+ * of which remove the element from the accessibility tree — the exact opposite
+ * of what a live region needs.
+ */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

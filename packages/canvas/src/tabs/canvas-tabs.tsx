@@ -396,7 +396,26 @@ export function CanvasTabs({
                       <button
                         type="button"
                         role="tab"
+                        id={`pd-canvas-tab-${tab.id}`}
                         aria-selected={active}
+                        aria-controls="pd-canvas-tabpanel"
+                        /*
+                         * ROVING TABINDEX — the half of the tabs pattern that was
+                         * missing. `role="tab"` without it means Tab walks through
+                         * every tab one at a time before reaching the content,
+                         * which is exactly what the pattern exists to avoid: one
+                         * stop for the strip, arrows to move within it.
+                         */
+                        tabIndex={active ? 0 : -1}
+                        onKeyDown={(e) => {
+                          if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+                          e.preventDefault();
+                          const at = canvas.tabs.findIndex((t) => t.id === tab.id);
+                          const next = canvas.tabs[at + (e.key === 'ArrowRight' ? 1 : -1)];
+                          if (next === undefined) return;
+                          canvas.focusTab(next.id);
+                          document.getElementById(`pd-canvas-tab-${next.id}`)?.focus();
+                        }}
                         className="pd-canvas-tab-main"
                         onClick={() => canvas.focusTab(tab.id)}
                       >
@@ -489,7 +508,16 @@ export function CanvasTabs({
           />
         ) : null}
 
-        <div className="pd-canvas-tabpanel" role="tabpanel">
+        <div
+          className="pd-canvas-tabpanel"
+          role="tabpanel"
+          id="pd-canvas-tabpanel"
+          // Named by the tab that selected it, so a screen reader reaching the
+          // panel says which tab's content this is.
+          {...(activeTab !== null && activeTab !== undefined
+            ? { 'aria-labelledby': `pd-canvas-tab-${activeTab.id}` }
+            : {})}
+        >
           {activeTab ? (
             renderSurface ? (
               // Key by tab id so switching tabs remounts the surface (and its
