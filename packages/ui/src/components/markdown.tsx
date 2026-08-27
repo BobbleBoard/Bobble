@@ -6,6 +6,7 @@ import rehypeKatex from 'rehype-katex';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import { CodeBlock } from './code-block.tsx';
+import { useOpenUrl } from './web-search.js';
 
 /*
  * Reusable markdown renderer (round-3 #P4). react-markdown + remark-gfm +
@@ -78,10 +79,51 @@ function TableBlock({ children }: ComponentPropsWithoutRef<'table'> & ExtraProps
   );
 }
 
+/**
+ * A LINK THAT ACTUALLY GOES SOMEWHERE.
+ *
+ * Every hyperlink in every reply was inert: the anchor rendered, the click
+ * scheduled a navigation, and the main process cancelled it — so a model that
+ * cited its sources produced a list of dead text. The app already owns a
+ * browser surface and already installs an opener for search results; this
+ * routes markdown links through the same one, so a citation opens beside the
+ * conversation it came from rather than burying it under a browser session.
+ *
+ * REFUSES `file:` AND `javascript:`. Link text in a reply is model-authored and
+ * can be model-quoted from a web page, so it is untrusted input that reaches a
+ * click handler. Anything that is not http(s) or mailto renders as plain text
+ * rather than as something that looks clickable and does something else.
+ */
+function MarkdownLink({
+  href,
+  children,
+  node: _node,
+  ...rest
+}: ComponentPropsWithoutRef<'a'> & ExtraProps): ReactNode {
+  const openUrl = useOpenUrl();
+  const safe = href !== undefined && /^(https?:|mailto:)/i.test(href.trim());
+  if (!safe) return <span {...rest}>{children}</span>;
+  const url = href.trim();
+  return (
+    <a
+      {...rest}
+      href={url}
+      onClick={(e) => {
+        if (openUrl === undefined) return;
+        e.preventDefault();
+        openUrl(url);
+      }}
+    >
+      {children}
+    </a>
+  );
+}
+
 const MARKDOWN_COMPONENTS: Components = {
   pre: PreBlock,
   code: InlineCode,
   table: TableBlock,
+  a: MarkdownLink,
 };
 
 /** Minimal mdast shape the display-math promotion needs (avoids an @types/mdast dep). */

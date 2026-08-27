@@ -29,6 +29,17 @@ const OpenUrlContext = createContext<((url: string) => void) | undefined>(undefi
 /** Install the app's "open this result" behaviour for every card below. */
 export const OpenUrlProvider = OpenUrlContext.Provider;
 
+/**
+ * The installed opener, for anything that needs to follow a link.
+ *
+ * Exported because markdown links needed exactly this and had nothing: every
+ * hyperlink the model produced was inert — the click scheduled a navigation the
+ * main process then cancelled, so every citation in every reply was dead.
+ */
+export function useOpenUrl(): ((url: string) => void) | undefined {
+  return useContext(OpenUrlContext);
+}
+
 /*
  * Web-search result list (THEME 3, match img13/14). Header = globe + query +
  * "N results" (right); body = a bordered, rounded, scrollable list of result
