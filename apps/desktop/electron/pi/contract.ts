@@ -61,6 +61,22 @@ export type PiInvokeMap = {
     request: { parentSession?: string } | undefined;
     response: PiCommandAck & { cancelled?: boolean };
   };
+  /**
+   * Compact the conversation — summarise the history so the window frees up.
+   *
+   * UNTIMED, deliberately. Every other mutate here has a 30 s cap, which is
+   * right for a synchronous RPC and wrong for this one: compaction is a
+   * GENERATION, and a 4B summarising 30k tokens takes longer than that. With a
+   * cap it would report failure while succeeding, and the renderer would show
+   * an error over a conversation that had just been compacted.
+   *
+   * `compact()` calls `abort()` first, so main refuses while a turn is running
+   * rather than silently killing the reply the user is reading.
+   */
+  'pi:compact': {
+    request: { customInstructions?: string } | undefined;
+    response: PiCommandAck;
+  };
   /** Fork a new branch at a user message's entry (mirrors the `fork` RPC).
    * Returns the forked message's text; pi switches its active session to the
    * new branch (a fresh session file whose leaf is the forked message's
@@ -206,6 +222,7 @@ export const PI_INVOKE_CHANNELS = [
   'pi:get-messages',
   'pi:switch-session',
   'pi:new-session',
+  'pi:compact',
   'pi:fork',
   'pi:get-fork-messages',
   'pi:get-state',

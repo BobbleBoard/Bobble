@@ -172,6 +172,17 @@ export function ThreadStatusIndicator(): ReactElement | null {
     turnHasContent,
   });
 
+  /*
+   * COMPACTION IS VISIBLE NOW.
+   *
+   * `isCompacting` was set by the router from pi's own `compaction_start` /
+   * `compaction_end` and read by nothing, so a compaction — a GENERATION that
+   * takes 30 to 120 seconds on a local model — looked exactly like a frozen
+   * app. It rides the same ring as everything else, with its own label, because
+   * a second progress affordance would be a second thing to learn.
+   */
+  const isCompacting = usePiStore((s) => s.agent.isCompacting);
+
   // Snap to 100% then fade ONLY once the first token lands (processing → false).
   const [fading, setFading] = useState(false);
   const wasProcessing = useRef(false);
@@ -203,6 +214,11 @@ export function ThreadStatusIndicator(): ReactElement | null {
     return () => clearInterval(id);
   }, [processing]);
 
+  if (isCompacting) {
+    // Indeterminate: pi reports no progress through a compaction, and inventing
+    // a percentage for it is the "fake %" this ring already refuses elsewhere.
+    return <ProcessingRing percent={null} label="Compacting" fading={false} elapsedMs={0} />;
+  }
   if (!processing && !fading) return null;
   // Cold model LOAD → indeterminate pulse + "Loading model" (no fake %). Ingesting
   // → the REAL prefill % (parsePrefillPercent caps at 99, so it never falsely

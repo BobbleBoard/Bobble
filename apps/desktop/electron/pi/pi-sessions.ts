@@ -383,6 +383,32 @@ export function createPiSessions<S extends SessionSender>(deps: PiSessionsDeps<S
     // Fresh session in the RUNNING pi (new_session RPC) — the New-chat action.
     // No dispose/respawn (contrast pi:restart), so pi keeps the same pid, emits
     // no _bridge_exit, and spawns nothing new in the dock.
+    /*
+     * COMPACT — UNTIMED, and that is the whole point of it having its own entry.
+     *
+     * Every other mutate here caps at TIMEOUT_MUTATE_MS, which is right for a
+     * synchronous RPC and wrong for this one: compaction is a GENERATION, and a
+     * 4B summarising 30k tokens takes longer than thirty seconds. Capped, it
+     * would report failure while succeeding, and the renderer would show an
+     * error over a conversation that had just been compacted.
+     *
+     * The idle gate lives in the RENDERER, which is the side that knows whether
+     * a turn is streaming — `compact()` calls `abort()` first, so firing it
+     * mid-turn would silently kill the reply the user is reading.
+     */
+    'pi:compact': async (sender, req) => {
+      const bridge = bridgeFor(sender);
+      if (bridge === undefined) return { success: false, error: 'pi is not running' };
+      return ack(
+        bridge.send({
+          type: 'compact',
+          ...(req?.customInstructions !== undefined
+            ? { customInstructions: req.customInstructions }
+            : {}),
+        }),
+      );
+    },
+
     'pi:new-session': async (sender, req) => {
       const bridge = bridgeFor(sender);
       if (bridge === undefined) return { success: false, error: 'pi is not running' };

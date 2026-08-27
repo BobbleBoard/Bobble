@@ -267,6 +267,34 @@ export async function restartPi(
  * instructions for the fresh session's first prompt (round-4 armed this on the
  * old restart path), and points the store at pi's new session.
  */
+/**
+ * Compact the conversation: summarise the history so the window frees up.
+ *
+ * THE IDLE GATE LIVES HERE because this is the side that knows. pi's
+ * `compact()` calls `abort()` first, so firing it mid-turn silently kills the
+ * reply the user is reading — and the user pressing "compact" while a model is
+ * mid-sentence has not asked for that.
+ *
+ * The call is UNTIMED in main (see `pi:compact`): compaction is a generation,
+ * and a small model summarising a full window takes longer than the 30 s every
+ * other mutate is capped at.
+ *
+ * `isCompacting` is set by the router from pi's own `compaction_start` /
+ * `compaction_end`, so the UI has a real state to show for the 30–120 s this
+ * takes rather than looking frozen.
+ */
+export async function compactSession(): Promise<{ ok: boolean; error?: string }> {
+  const store = usePiStore.getState();
+  if (store.agent.isStreaming || store.promptInFlight) {
+    return { ok: false, error: 'wait for the reply to finish, then compact' };
+  }
+  if (store.agent.isCompacting) return { ok: false, error: 'already compacting' };
+  const res = await window.piDesktop
+    .invoke('pi:compact', undefined)
+    .catch((e: unknown) => ({ success: false, error: String(e) }));
+  return res.success ? { ok: true } : { ok: false, error: res.error ?? 'compaction failed' };
+}
+
 export async function newSession(): Promise<{ ok: boolean; cancelled?: boolean; error?: string }> {
   const store = usePiStore.getState();
   const bg = store.bgRun;

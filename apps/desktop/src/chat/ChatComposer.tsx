@@ -25,7 +25,9 @@ import { useCorpStore } from '../state/corp-store';
 import {
   abortPi,
   applyHarnessPreset,
+  compactSession,
   getCommands,
+  newSession,
   pausePi,
   resumePausedChat,
   runBash,
@@ -49,6 +51,7 @@ import { useDropStore } from './composer/drop-store';
 import { type AcToken, EMPTY_TOKEN } from './composer/tokens';
 import { GEN_ACTION_PLANS, type TaskClass } from './composer-gen-actions';
 import { DictationBar } from './DictationBar';
+import { HELP_TEXT, parseSlashCommand } from './slash-commands';
 import { useDictation } from './useDictation';
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
@@ -157,9 +160,9 @@ function isTextFile(file: File): boolean {
 /** Built-in commands shown unconditionally — so `/` always offers something,
  * even before pi's session RPC is live enough to answer `get_commands`. */
 const BUILTIN_COMMANDS: SlashCommand[] = [
-  { name: 'help', description: 'Show help' },
-  { name: 'new', description: 'Start a new session' },
-  { name: 'compact', description: 'Compact the conversation' },
+  { name: 'help', description: 'What you can do here' },
+  { name: 'new', description: 'Start a new chat' },
+  { name: 'compact', description: 'Summarise the history to free up context' },
 ];
 
 async function fileToDataUri(file: File): Promise<string> {
@@ -626,6 +629,41 @@ export function ChatComposer({
     apiRef.current?.focus();
     if (raw.startsWith('!')) {
       await runBash(raw.slice(1).trim());
+      return;
+    }
+    /*
+     * THE THREE SLASH COMMANDS THE MENU HAS ALWAYS OFFERED.
+     *
+     * `/help`, `/new` and `/compact` were listed unconditionally so that `/`
+     * always had something to show, and picking one sent the literal text
+     * "/compact" to the model — which answered as if asked about compaction.
+     * `/compact` in particular is the one that matters on a 32k window.
+     *
+     * Handled here rather than passed to pi: pi's own slash handling would
+     * bypass the app's session bookkeeping (the sidebar, the per-chat
+     * snapshots), and `newSession()` already owns the streaming-safe path.
+     */
+    const slash = parseSlashCommand(raw);
+    if (slash !== null) {
+      if (slash.name === 'help') {
+        usePiStore.getState().appendAssistantText(HELP_TEXT);
+        return;
+      }
+      if (slash.name === 'new') {
+        await newSession();
+        return;
+      }
+      // `/compact` — refused while a reply is streaming (pi aborts first), and
+      // its outcome is SAID, because a silent no-op on a 30–120 s operation is
+      // indistinguishable from a broken command.
+      const res = await compactSession();
+      usePiStore
+        .getState()
+        .appendAssistantText(
+          res.ok
+            ? 'Compacted — the history so far is now a summary.'
+            : `Not compacted: ${res.error ?? 'unknown reason'}.`,
+        );
       return;
     }
     // INSTANT stop button (the user #11): flip to Stop NOW, before the async
