@@ -787,6 +787,31 @@ async function startServerExclusive(
   const file = pickFile(model, quant);
   if (file === undefined) return { success: false, error: `unknown quant for ${modelId}` };
 
+  /*
+   * A MULTI-SHARD MODEL CANNOT START, so say so instead of trying.
+   *
+   * `sharded` marks entries whose quants are split across several files. The
+   * shard-join on download and launch is a follow-up that has not happened, and
+   * until it does the failure is silent and confusing: one shard downloads,
+   * `isDownloaded` sees a file and returns true, the fit guard cannot weigh it
+   * (a sharded entry carries `bytes: 0`, and the guard passes unknown sizes on
+   * purpose — a guard that guesses refuses things that would have worked), and
+   * an 80 GB model launches on a 24 GB Mac and dies inside llama-server on the
+   * shards that were never fetched.
+   *
+   * The flag's only other reader is a display string. This is the first time it
+   * is allowed to decide anything.
+   */
+  if (model.sharded === true) {
+    return {
+      success: false,
+      error:
+        `${model.displayName} is published in multiple shards, and joining them is not ` +
+        'implemented yet — only the first shard would download, and the server would fail ' +
+        'on the rest. Choose a single-file quant of this model, or a different model.',
+    };
+  }
+
   // MLX engine → the mlx_lm.server path (its artifact is not a local GGUF).
   if (modelEngine(model) === 'mlx') return startMlxServer(model, file);
 

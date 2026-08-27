@@ -107,9 +107,19 @@ export function VideoStudio(): JSX.Element {
               onChange={(e) => setModel(e.target.value)}
             >
               <option value="">Recommended</option>
+              {/*
+                A MODEL THAT CANNOT RUN IS SHOWN AS UNAVAILABLE, not offered.
+                `reserved` marks catalogue entries whose backend has not landed
+                — the dropdowns listed them exactly like the rest, so
+                "Recommended" worked and any model you picked by NAME failed.
+                Disabled and labelled is better than hidden: the entry is real,
+                it is coming, and picking it is the one thing that must not
+                quietly fail.
+              */}
               {models.map((m) => (
-                <option key={m.id} value={m.id}>
+                <option key={m.id} value={m.id} disabled={m.reserved === true}>
                   {m.label}
+                  {m.reserved === true ? ' — not available yet' : ''}
                 </option>
               ))}
             </select>

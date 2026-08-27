@@ -134,30 +134,47 @@ export function registerImageTools(
   env: Record<string, string | undefined> = process.env,
 ): void {
   if (bridge === null) return;
-  if (genToolsWillRegister(env)) return;
 
-  pi.registerTool({
-    name: GENERATE_IMAGE_TOOL,
-    label: 'Generate Image',
-    description:
-      'Generate an image from a text prompt, on-device (Mage-Flow-Turbo on Apple-Silicon MLX). ' +
-      'The image is shown INLINE in the chat and the result gives you its path on disk, which ' +
-      'you can pass to edit_image to revise it. Takes roughly 10-20 seconds warm; the first ' +
-      'call of a session also loads the model, which takes longer. Only one generation runs at ' +
-      'a time on this machine.',
-    promptSnippet:
-      'generate_image: make an image from a text prompt (on-device); it renders inline in the chat.',
-    parameters: GenerateParams,
-    async execute(_toolCallId, params, signal): Promise<AgentToolResult<ImageToolDetails>> {
-      const prompt = params.prompt.trim();
-      if (prompt === '') return errorResult(GENERATE_IMAGE_TOOL, 'prompt is empty');
-      return imageToolResult(
-        GENERATE_IMAGE_TOOL,
-        'Generated image saved at',
-        await bridge.generateImage(prompt, signal),
-      );
-    },
-  });
+  /*
+   * SUPPRESS THE DUPLICATED NAME, NOT THE WHOLE MODULE.
+   *
+   * This used to return early and register NEITHER tool when gen-tools is
+   * present. But gen-tools has no image-EDIT tool — it owns `generate_image`
+   * and `generate_video` and nothing else — so turning the experimental
+   * generation flag on silently deleted the only way to edit an image in the
+   * whole app, while `edit_image` stayed listed in the `generation` capability
+   * as something the model could ask for.
+   *
+   * One owner per NAME is the rule that mattered (a duplicate registration made
+   * pi exit at startup and respawn with no extensions at all). `edit_image` has
+   * no second owner, so it has nothing to collide with.
+   */
+  const generateIsTaken = genToolsWillRegister(env);
+
+  if (!generateIsTaken) {
+    pi.registerTool({
+      name: GENERATE_IMAGE_TOOL,
+      label: 'Generate Image',
+      description:
+        'Generate an image from a text prompt, on-device (Mage-Flow-Turbo on Apple-Silicon MLX). ' +
+        'The image is shown INLINE in the chat and the result gives you its path on disk, which ' +
+        'you can pass to edit_image to revise it. Takes roughly 10-20 seconds warm; the first ' +
+        'call of a session also loads the model, which takes longer. Only one generation runs at ' +
+        'a time on this machine.',
+      promptSnippet:
+        'generate_image: make an image from a text prompt (on-device); it renders inline in the chat.',
+      parameters: GenerateParams,
+      async execute(_toolCallId, params, signal): Promise<AgentToolResult<ImageToolDetails>> {
+        const prompt = params.prompt.trim();
+        if (prompt === '') return errorResult(GENERATE_IMAGE_TOOL, 'prompt is empty');
+        return imageToolResult(
+          GENERATE_IMAGE_TOOL,
+          'Generated image saved at',
+          await bridge.generateImage(prompt, signal),
+        );
+      },
+    });
+  }
 
   pi.registerTool({
     name: EDIT_IMAGE_TOOL,

@@ -190,11 +190,24 @@ describe('generation ownership', () => {
     editImage: async () => ({ ok: true as const, images: [] }),
   } as unknown as ImageBridge;
 
-  it('stands aside when gen-tools is present', () => {
+  it('stands aside from generate_image — and ONLY that — when gen-tools is present', () => {
+    /*
+     * This asserted `names` was EMPTY, which is what the code did and not what
+     * it should have done. gen-tools owns `generate_image`; it has no image-EDIT
+     * tool at all. Registering neither meant the experimental generation flag
+     * silently deleted the only way to edit an image in the app, while
+     * `edit_image` stayed listed in the `generation` capability as something the
+     * model could ask for.
+     *
+     * The rule that mattered is one owner per NAME — a duplicate registration
+     * made pi exit at startup and respawn with no extensions at all. Nothing
+     * else owns `edit_image`.
+     */
     const names: string[] = [];
     const pi = { registerTool: (d: { name: string }) => names.push(d.name) } as never;
     registerImageTools(pi, bridge, { PI_GEN_SOCK: '/tmp/gen.sock' });
-    expect(names).toEqual([]);
+    expect(names).not.toContain('generate_image');
+    expect(names).toContain('edit_image');
   });
 
   it('registers normally when gen-tools is absent', () => {
