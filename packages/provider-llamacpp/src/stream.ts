@@ -10,7 +10,7 @@
  * Electron-free; `fetchImpl` is injectable so tests feed fixture SSE without a
  * live server.
  */
-import { appendFileSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import {
   type Api,
   type AssistantMessage,
@@ -487,25 +487,6 @@ export function createLlamaCppStream(deps: LlamaCppStreamDeps = {}): LlamaCppStr
   const doFetch = deps.fetchImpl ?? fetch;
 
   return (model, context, options) => {
-    /* One-line diagnostic: is OUR provider even the one pi calls? Gated on the
-       same env var as the prompt dump, so it costs nothing when unset. */
-    if (process.env.PI_ADV_DEBUG_PROMPT !== undefined && process.env.PI_ADV_DEBUG_PROMPT !== '') {
-      try {
-        appendFileSync(
-          process.env.PI_ADV_DEBUG_PROMPT,
-          `${JSON.stringify({
-            at: Date.now(),
-            pid: process.pid,
-            event: 'stream-entered',
-            api: model.api,
-            hasOnPayload: typeof options?.onPayload === 'function',
-          })}\n`,
-          'utf8',
-        );
-      } catch {
-        /* never break a turn for a diagnostic */
-      }
-    }
     const stream = createAssistantMessageEventStream();
 
     const output: AssistantMessage = {

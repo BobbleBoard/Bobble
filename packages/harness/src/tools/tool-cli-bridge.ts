@@ -30,6 +30,7 @@ import {
   type CliGroupSpec,
   type CliModel,
   type CliTool,
+  commandNameFor,
   resolveCli,
 } from './tool-cli.js';
 
@@ -82,6 +83,24 @@ export function buildShim(execPath: string, dispatcherPath: string, command: str
 }
 
 /**
+ * A shadowed media tool: says what to run instead, and fails.
+ *
+ * Exits non-zero so the model reads it as the failure it is rather than as
+ * output to carry on from, and names the actual command rather than only
+ * refusing — a dead end invites a workaround, a signpost does not.
+ */
+export function buildDecoy(name: string, suggestion: string): string {
+  return [
+    '#!/bin/sh',
+    `# ${name} — shadowed while Bobble's tool commands are on PATH.`,
+    `echo "${name} is not how this app makes media. Use: ${suggestion}" >&2`,
+    `echo "Run \`${suggestion.split(' ')[0]} --help\` to see what it can do." >&2`,
+    'exit 127',
+    '',
+  ].join('\n');
+}
+
+/**
  * The dispatcher: argv → socket → text on stdout.
  *
  * Written as source rather than shipped as a file because it has to live beside
@@ -129,15 +148,61 @@ export function registerToolCli(host: ToolCliHost, opts: ToolCliOptions = {}): T
   fs.writeFileSync(dispatcherPath, buildDispatcherSource(), 'utf8');
 
   /*
-   * A shim per group, written from the CURRENT registry. `tools` always exists,
-   * because a shell whose only discovery command is missing is a shell you
-   * cannot find anything in.
+   * A shim per capability group — named from the GROUPS ALONE, never from the
+   * registry.
+   *
+   * This used to call `host.tools()` here to drop groups whose tools this build
+   * does not register. That was a nicety and it cost the whole extension:
+   * `pi.getAllTools()` is an action method, install runs during `activate()`,
+   * and pi answers action methods at load time by refusing to load the
+   * extension at all — "Extension runtime not initialized". The harness then
+   * never registered anything, every hook it owns went with it, and the app
+   * reported `write EPIPE` on the next message because the child was gone.
+   *
+   * Nothing is lost. `dispatchToolCli` rebuilds the surface from the live
+   * registry on every request, where the call is legal, so a group with no
+   * registered tools answers "no such command" from its own shim instead of
+   * being absent — the same information, one process later.
    */
-  const cli = buildCli(host.groups(), host.tools());
-  const commands = ['tools', ...cli.groups.map((g) => g.name)];
+  const commands = ['tools', ...host.groups().map((g) => commandNameFor(g.name))];
+
+  /*
+   * SIGNPOSTS WHERE THE MODEL ACTUALLY GOES WRONG.
+   *
+   * MEASURED in the app, with `bash` as the only tool: asked for a picture, the
+   * model wrote its own PNG and opened it in Photos; asked for a door slam, it
+   * synthesised "a 0.1-second sharp noise with exponential decay". It never ran
+   * `media`. The preamble tells it not to do this and the preamble is not
+   * enough, because a CLI mode hands the model a REAL Unix box — and a real Unix
+   * box is a competing implementation of every capability we offer. In the
+   * offline eval this failed loudly (no ffmpeg, so it refused); on a machine
+   * that HAS ffmpeg it succeeds badly, which is worse.
+   *
+   * So the temptations answer for themselves, at the moment of the mistake,
+   * which is a far stronger signal than an instruction issued a thousand tokens
+   * earlier. Deliberately narrow: media tools only. `python` and `node` are not
+   * shimmed — they have real work to do here, and a shell that lies about its
+   * own contents would break every legitimate use.
+   */
+  const DECOYS: Readonly<Record<string, string>> = {
+    ffmpeg: 'media',
+    ffplay: 'media',
+    sox: 'media',
+    say: 'media generate speech',
+    afplay: 'media',
+    espeak: 'media generate speech',
+    festival: 'media generate speech',
+    convert: 'media generate image',
+    magick: 'media generate image',
+  };
   for (const command of commands) {
     const p = path.join(shimDir, command);
     fs.writeFileSync(p, buildShim(execPath, dispatcherPath, command), { mode: 0o755 });
+  }
+  for (const [decoy, suggestion] of Object.entries(DECOYS)) {
+    // Only where a real command of that name is not already the point — these
+    // sit FIRST on PATH, so they shadow the system one for this session only.
+    fs.writeFileSync(path.join(shimDir, decoy), buildDecoy(decoy, suggestion), { mode: 0o755 });
   }
 
   try {

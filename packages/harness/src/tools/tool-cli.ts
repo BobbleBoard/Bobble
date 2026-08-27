@@ -92,7 +92,20 @@ export function commandNameFor(capability: string): string {
  * you type `browser browser click`. Nothing here is hand-maintained — a tool
  * added to a capability gets a command by existing.
  */
+/**
+ * Tools whose path is STATED because deriving it reads badly.
+ *
+ * `update_plan` under the `plan` group would derive to `plan update plan`. The
+ * derivation is right for the ninety percent and this is the exception, so it
+ * is written down rather than made into a cleverer rule.
+ */
+const COMMAND_PATH_OVERRIDES: Readonly<Record<string, readonly string[]>> = {
+  update_plan: ['update'],
+};
+
 export function pathFor(group: string, toolName: string): string[] {
+  const override = COMMAND_PATH_OVERRIDES[toolName];
+  if (override !== undefined) return [...override];
   const parts = toolName.split('_').filter((p) => p.length > 0);
   if (parts.length > 1 && (parts[0] === group || parts[0] === `${group}s`)) return parts.slice(1);
   return parts;

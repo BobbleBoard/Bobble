@@ -104,7 +104,7 @@ import { registerPresentTool } from './tools/present.js';
 import { presentBridgeFromEnv } from './tools/present-bridge.js';
 import { withRepeatNotice } from './tools/repeat-notice.js';
 import { registerSandboxFileTools, resolveWorkspaceRoot } from './tools/sandbox-fs.js';
-import { buildCli, renderRootHelp } from './tools/tool-cli.js';
+import { buildCli, type CliGroupSpec, renderRootHelp } from './tools/tool-cli.js';
 import { registerToolCli } from './tools/tool-cli-bridge.js';
 import { truncateToolOutput } from './tools/tool-output-truncate.js';
 import { captureRegisteredTools } from './tools/tool-registry.js';
@@ -669,7 +669,34 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
    * registry is what `use` dispatches through, which is what lets a capability
    * be pure text and cost no re-prefill. See tools/tool-registry.ts.
    */
-  const TOOL_CLI_PINNED = ['bash', 'ask_user', 'update_plan'] as const;
+  /*
+   * ONE TOOL. the user, watching the mode loop on `ask_user` with a mangled
+   * `<parameter=mode>` payload jammed into its question: "everything in this
+   * mode should be cli at this point."
+   *
+   * He is right, and the loop is the argument. Leaving two structured tools
+   * beside `bash` left the model a structured surface to fail on — which is the
+   * one thing this mode exists to remove. Asking a question and updating a plan
+   * are commands now (`ask user "…"`, `plan update "…"`), so there is exactly
+   * one call shape in the whole session.
+   */
+  const TOOL_CLI_PINNED = ['bash'] as const;
+
+  /*
+   * The two harness tools that are not a capability but still have to be
+   * reachable. They get their own single-command groups rather than being
+   * pushed into someone else's.
+   */
+  const TOOL_CLI_EXTRA_GROUPS: readonly CliGroupSpec[] = [
+    {
+      name: 'ask',
+      summary: 'Ask the user a question and wait for their answer.',
+      tools: ['ask_user'],
+    },
+    { name: 'plan', summary: 'Show or update your plan for this task.', tools: ['update_plan'] },
+  ];
+  /** Every group the CLI offers: the capabilities, plus those two. */
+  const toolCliGroups = (): CliGroupSpec[] => [...CAPABILITIES, ...TOOL_CLI_EXTRA_GROUPS];
   const toolCliMode = process.env.PI_DESKTOP_TOOL_CLI === '1';
 
   const toolRegistry = captureRegisteredTools(pi);
@@ -855,7 +882,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
       note('ctx.getSystemPrompt missing');
       return;
     }
-    const canonical = augmentSystemPrompt(ctx.getSystemPrompt());
+    const canonical = canonicalPrompt(ctx.getSystemPrompt());
     if (canonical.trim().length === 0) {
       note('empty system prompt');
       return;
@@ -1477,7 +1504,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
   if (toolCliMode) {
     const handle = registerToolCli({
       tools: () => pi.getAllTools(),
-      groups: () => CAPABILITIES,
+      groups: () => toolCliGroups(),
       call: async (name, args) => {
         const target = toolRegistry.get(name);
         if (target === undefined) {
@@ -1809,6 +1836,32 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
    */
 
   /**
+   * THE SYSTEM PROMPT A TURN ACTUALLY SENDS — one definition, two callers.
+   *
+   * This existed twice, and the copies disagreed. The warm-up froze
+   * `runtime.canonicalSystemPrompt` from `augmentSystemPrompt(...)` alone at
+   * model-select, and the turn read `runtime.canonicalSystemPrompt ?? (mode ?
+   * augmented + preamble : augmented)` — so the `??` short-circuited on a value
+   * computed before the preamble existed, and the bash-CLI instructions were
+   * NEVER on the wire. MEASURED with PI_ADV_DEBUG_PROMPT on a real turn: tools
+   * correctly pinned to [bash, ask_user, update_plan], and not one clause of
+   * the preamble in 16,743 characters of system prompt.
+   *
+   * the user, before any of this was measured: "often the issue is that the
+   * instructions we for whatever reason actually just [are] not appended to the
+   * system prompt."
+   *
+   * The duplication was also a live performance bug. The warm-up exists to
+   * prime the server's KV with the exact prefix the first turn will send;
+   * priming a DIFFERENT string means turn one pays the full cold prefill the
+   * warm-up was added to avoid.
+   */
+  function canonicalPrompt(base: string): string {
+    const augmented = augmentSystemPrompt(base);
+    return toolCliMode ? `${augmented}\n\n${toolCliPreamble()}` : augmented;
+  }
+
+  /**
    * The command list, as the system prompt states it. Built from the registry.
    *
    * TUNED AGAINST MEASURED FAILURES, not taste. Each line answers something a
@@ -1831,7 +1884,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
    * purpose — it rides in every request.
    */
   function toolCliPreamble(): string {
-    const cli = buildCli(CAPABILITIES, pi.getAllTools());
+    const cli = buildCli(toolCliGroups(), pi.getAllTools());
     return [
       'These commands are your abilities. Run them with the `bash` tool.',
       '',
@@ -1843,6 +1896,17 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
       '',
       'If you are unsure of a command’s arguments, run `<command> --help`, then run',
       'the real command. Reading the help is not finishing the task.',
+      '',
+      /*
+       * MEASURED: asked for a picture, the model called `ask_user` about STYLE
+       * seven times in a row, thinking "they keep dismissing my questions" and
+       * asking again. A question is the one action that cannot fail, so a model
+       * unsure of a detail can loop on it forever. Detail choices are the
+       * generator's job and a person who wanted to specify one would have.
+       */
+      'Choose sensible defaults for details the user did not specify — style,',
+      'length, voice, size — and run the command. Ask only when the request',
+      'cannot be carried out at all without an answer, and never ask twice.',
       '',
       'Never tell the user you are unable to do something one of these commands does.',
     ].join('\n');
@@ -2095,10 +2159,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     // built — the freeze below is what made the team section unreachable, because
     // warm-up runs at default effort and the session is raised afterwards.
     const augmentedSystemPrompt =
-      runtime.canonicalSystemPrompt ??
-      (toolCliMode
-        ? `${augmentSystemPrompt(event.systemPrompt)}\n\n${toolCliPreamble()}`
-        : augmentSystemPrompt(event.systemPrompt));
+      runtime.canonicalSystemPrompt ?? canonicalPrompt(event.systemPrompt);
     runtime.canonicalSystemPrompt = augmentedSystemPrompt;
     // Classification REMOVED from the turn path (the user: "we seldom use it at all,
     // let's just completely remove"). The turn-1 {title,class} piggyback cost

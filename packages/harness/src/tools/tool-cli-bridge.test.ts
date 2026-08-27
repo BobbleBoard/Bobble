@@ -15,7 +15,13 @@ import { afterEach, describe, expect, it } from 'vitest';
 const run = promisify(execFile);
 
 import type { CliGroupSpec, CliTool } from './tool-cli';
-import { buildShim, dispatchToolCli, registerToolCli, type ToolCliHost } from './tool-cli-bridge';
+import {
+  buildDecoy,
+  buildShim,
+  dispatchToolCli,
+  registerToolCli,
+  type ToolCliHost,
+} from './tool-cli-bridge';
 
 const TOOLS: CliTool[] = [
   {
@@ -168,6 +174,97 @@ describe('the installed shell', () => {
       expect(stdout).toContain('unauthorized');
     } finally {
       handle.dispose();
+    }
+  });
+});
+
+describe('installing must not touch the live registry', () => {
+  /*
+   * THE REGRESSION THAT COST THE WHOLE EXTENSION.
+   *
+   * `registerToolCli` used to call `host.tools()` while naming its shims, and
+   * in the app that closure is `pi.getAllTools()` — an ACTION METHOD. Install
+   * happens inside `activate()`, and pi refuses to load an extension that calls
+   * one at load time: "Extension runtime not initialized". The harness never
+   * registered, every hook it owns died with it, and the only symptom the user
+   * saw was `write EPIPE` on their next message.
+   *
+   * The command names come from the capability GROUPS, which are static data.
+   */
+  it('never calls tools() during registration', () => {
+    let toolsCalls = 0;
+    const shimDir = mkdtempSync(path.join(tmpdir(), 'toolcli-lazy-'));
+    const env: NodeJS.ProcessEnv = { PATH: '/usr/bin' };
+    const handle = registerToolCli(
+      {
+        tools: () => {
+          toolsCalls += 1;
+          return TOOLS;
+        },
+        groups: () => GROUPS,
+        call: async (name) => ({ text: `${name} ran`, isError: false }),
+      },
+      { shimDir, socketPath: path.join(shimDir, 's.sock'), env },
+    );
+    try {
+      expect(toolsCalls).toBe(0);
+      // …and the shims still exist, named from the groups alone.
+      expect(handle.commands).toEqual(['tools', 'media']);
+    } finally {
+      handle.dispose();
+      rmSync(shimDir, { recursive: true, force: true });
+    }
+  });
+
+  it('a group with nothing registered still answers, from the live registry', async () => {
+    // The filtering that used to happen at install now happens per request,
+    // where asking the registry is legal.
+    const empty: ToolCliHost = {
+      tools: () => [],
+      groups: () => GROUPS,
+      call: async (name) => ({ text: `${name} ran`, isError: false }),
+    };
+    const r = await dispatchToolCli(empty, ['media']);
+    expect(r.isError).toBe(true);
+    expect(r.text).toContain('no such command');
+  });
+});
+
+describe('the shadowed media tools', () => {
+  /*
+   * MEASURED in the app with `bash` as the only tool: asked for a picture the
+   * model wrote its own PNG; asked for a door slam it synthesised a 0.1s noise
+   * burst. It never ran `media`. A CLI mode hands the model a real Unix box, and
+   * a real Unix box is a competing implementation of everything we offer.
+   */
+  it('names the command to use instead, and fails', () => {
+    const s = buildDecoy('ffmpeg', 'media');
+    expect(s).toContain('ffmpeg is not how this app makes media');
+    expect(s).toContain('Use: media');
+    // 127 = "command not found", which is what it effectively is here.
+    expect(s).toContain('exit 127');
+  });
+
+  it('is installed beside the real commands', () => {
+    const shimDir = mkdtempSync(path.join(tmpdir(), 'toolcli-decoy-'));
+    const env: NodeJS.ProcessEnv = { PATH: '/usr/bin' };
+    const handle = registerToolCli(host(), {
+      shimDir,
+      socketPath: path.join(shimDir, 's.sock'),
+      env,
+    });
+    try {
+      const written = readdirSync(shimDir);
+      expect(written).toContain('ffmpeg');
+      expect(written).toContain('say');
+      expect(written).toContain('media');
+      // …but a general-purpose interpreter is NOT shadowed: it has real work to
+      // do, and a shell that lies about its own contents breaks that work.
+      expect(written).not.toContain('python3');
+      expect(written).not.toContain('node');
+    } finally {
+      handle.dispose();
+      rmSync(shimDir, { recursive: true, force: true });
     }
   });
 });
