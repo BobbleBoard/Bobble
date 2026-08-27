@@ -50,7 +50,9 @@ export function wouldHang(command: string, cwd?: string): string | null {
           'entire run, so it was not executed. To CHECK it works, drive it instead: import ' +
           'the module, construct the window, call update() (not mainloop()), invoke the real ' +
           'handlers with real arguments, screenshot it, then destroy it. Or run it under a ' +
-          'timeout so a block is a failed test rather than a dead run.'
+          'timeout so a block is a failed test rather than a dead run. If you actually WANT ' +
+          'it running while you work — a server, a watcher — pass `background: true` and it ' +
+          'starts detached, returning a log path instead of blocking.'
         );
       }
     } catch {
@@ -88,6 +90,7 @@ export function wouldHang(command: string, cwd?: string): string | null {
     'the project manager and wait forever, and `--headless` alone still runs the ' +
     'game loop. It would hang this entire run, so it was not executed. Use a form ' +
     'that exits by itself: `godot --headless --quit --path .` to load and report ' +
-    'every error, or `godot --headless --script build.gd` to run a script.'
+    'every error, or `godot --headless --script build.gd` to run a script. If you want the ' +
+    'editor running alongside you, pass `background: true` instead.'
   );
 }

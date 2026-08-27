@@ -205,15 +205,23 @@ export function registerToolCli(host: ToolCliHost, opts: ToolCliOptions = {}): T
    * own contents would break every legitimate use.
    */
   const DECOYS: Readonly<Record<string, string>> = {
-    ffmpeg: 'media',
-    ffplay: 'media',
-    sox: 'media',
+    /*
+     * ONLY WHERE THERE IS SOMEWHERE TO GO.
+     *
+     * This list used to include ffmpeg, ffplay, sox, afplay, convert and
+     * magick, all pointing at `media`. There is no transcode, trim, concat or
+     * resize command in any registry — so a legitimate ffmpeg job was not
+     * redirected, it was made impossible, and the "use media instead" message
+     * was a signpost pointing at nothing. That is worse than the dead end it
+     * replaced: the model at least knew what a missing binary meant.
+     *
+     * What is left is the exact mappings — a text-to-speech binary really does
+     * have `media generate speech` as its equivalent, so the redirect is true.
+     * The moment a transcode command exists, ffmpeg belongs back here.
+     */
     say: 'media generate speech',
-    afplay: 'media',
     espeak: 'media generate speech',
     festival: 'media generate speech',
-    convert: 'media generate image',
-    magick: 'media generate image',
   };
   for (const command of commands) {
     const p = path.join(shimDir, command);

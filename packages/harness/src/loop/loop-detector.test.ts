@@ -354,3 +354,41 @@ describe('a loop made entirely of prose', () => {
     expect(d.onText(LINE).kind).toBe('none');
   });
 });
+
+describe('exploration, when every call is bash', () => {
+  /*
+   * In the bash-CLI tool interface the tool name is ALWAYS `bash`, which is not
+   * in EXPLORATION_TOOLS — so every call reset the unproductive streak and the
+   * wander guard could never fire. `tools`, `media --help`, `ls`, repeated to
+   * the step cap, looked like productive work to the detector because each one
+   * arrived under the name of a tool that usually does something.
+   */
+  it('reads the command, not just the tool name', () => {
+    expect(isExplorationTool('bash', { command: 'ls -la src' })).toBe(true);
+    expect(isExplorationTool('bash', { command: 'grep -rn foo .' })).toBe(true);
+    expect(isExplorationTool('bash', { command: 'tools search voice' })).toBe(true);
+  });
+
+  it('treats any --help as discovery, whatever the command', () => {
+    expect(isExplorationTool('bash', { command: 'media --help' })).toBe(true);
+    expect(isExplorationTool('bash', { command: 'media generate image --help' })).toBe(true);
+  });
+
+  it('still counts real work as work', () => {
+    // These RESET the streak — a turn doing them is getting somewhere.
+    expect(isExplorationTool('bash', { command: 'media generate image "a fox"' })).toBe(false);
+    expect(isExplorationTool('bash', { command: 'python3 build.py' })).toBe(false);
+    expect(isExplorationTool('bash', { command: 'npm test' })).toBe(false);
+  });
+
+  it('is not fooled by a path or a leading pipe segment', () => {
+    expect(isExplorationTool('bash', { command: '/bin/ls' })).toBe(true);
+    expect(isExplorationTool('bash', { command: 'cat a.txt | wc -l' })).toBe(true);
+  });
+
+  it('leaves non-bash classification exactly as it was', () => {
+    expect(isExplorationTool('read')).toBe(true);
+    expect(isExplorationTool('write')).toBe(false);
+    expect(isExplorationTool('web_search')).toBe(false);
+  });
+});

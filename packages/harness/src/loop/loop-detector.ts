@@ -122,9 +122,50 @@ export const EXPLORATION_TOOLS: ReadonlySet<string> = new Set<string>([
   'update_plan',
 ]);
 
-/** True when a tool call is pure read-only exploration (see {@link EXPLORATION_TOOLS}). */
-export function isExplorationTool(toolName: string): boolean {
-  return EXPLORATION_TOOLS.has(toolName);
+/**
+ * Shell commands that are read-only exploration, by the name they are run under.
+ *
+ * The point of this list is the bash-CLI tool interface, where EVERY call is
+ * `bash` and the tool name says nothing at all about what the turn is doing.
+ */
+const EXPLORATION_COMMANDS: ReadonlySet<string> = new Set<string>([
+  'ls',
+  'cat',
+  'head',
+  'tail',
+  'find',
+  'grep',
+  'rg',
+  'wc',
+  'file',
+  'stat',
+  'tree',
+  'pwd',
+  'which',
+  'tools',
+]);
+
+/**
+ * True when a tool call is pure read-only exploration.
+ *
+ * IN BASH-CLI MODE THE TOOL NAME IS ALWAYS `bash`, which is not in
+ * {@link EXPLORATION_TOOLS} — so every call RESET the unproductive streak and
+ * the wander guard could never fire. `tools`, `media --help`, `ls`, repeated
+ * until the step cap, looked like productive work to the detector because each
+ * one arrived under the name of a tool that usually does something.
+ *
+ * So a bash call is classified by its command instead: the first bare word, or
+ * anything asking for `--help`, which is discovery by definition.
+ */
+export function isExplorationTool(toolName: string, args?: unknown): boolean {
+  if (EXPLORATION_TOOLS.has(toolName)) return true;
+  if (toolName !== 'bash') return false;
+  const command = (args as { command?: unknown } | undefined)?.command;
+  if (typeof command !== 'string') return false;
+  const trimmed = command.trim();
+  if (/(^|\s)(--help|-h)(\s|$)/.test(trimmed)) return true;
+  const head = trimmed.split(/[\s;|&]+/)[0] ?? '';
+  return EXPLORATION_COMMANDS.has(head.split('/').pop() ?? head);
 }
 
 /**
@@ -307,7 +348,7 @@ export function createLoopDetector(config: LoopDetectorConfig): LoopDetector {
 
       // Productivity tracking: a read-only/exploration call climbs the streak; any
       // concrete action (write/edit/bash/answer/connector/gen call …) resets it.
-      unproductiveStreak = isExplorationTool(toolName) ? unproductiveStreak + 1 : 0;
+      unproductiveStreak = isExplorationTool(toolName, args) ? unproductiveStreak + 1 : 0;
 
       // Hard cap wins first: a runaway turn aborts regardless of the streaks.
       if (steps > config.maxSteps) {

@@ -255,9 +255,17 @@ describe('the shadowed media tools', () => {
     });
     try {
       const written = readdirSync(shimDir);
-      expect(written).toContain('ffmpeg');
       expect(written).toContain('say');
       expect(written).toContain('media');
+      /*
+       * ffmpeg is NOT shadowed. It was, pointing at `media` — but no transcode,
+       * trim or concat command exists, so a legitimate ffmpeg job was not
+       * redirected, it was blocked, and the redirect named a command that could
+       * not do the work. A signpost is only better than a dead end when it
+       * points somewhere.
+       */
+      expect(written).not.toContain('ffmpeg');
+      expect(written).not.toContain('convert');
       // …but a general-purpose interpreter is NOT shadowed: it has real work to
       // do, and a shell that lies about its own contents breaks that work.
       expect(written).not.toContain('python3');
