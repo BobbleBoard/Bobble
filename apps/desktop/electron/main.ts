@@ -20,6 +20,7 @@ import {
 } from 'electron';
 import { registerAfmIpc } from './afm/afm-main';
 import { resolveBundledPackageAsset } from './app-paths';
+import { isBackgroundMode, isHiddenMode } from './background-mode';
 import { registerBrowserAgentIpc } from './canvas/browser-agent';
 import { registerBrowserIpc } from './canvas/browser-manager';
 import {
@@ -86,7 +87,7 @@ const events = createIpcEventSender<AppEventMap>();
  * Playwright still drives it normally: its input is synthesised into the
  * webContents over CDP, not routed through the OS focus.
  */
-if (process.platform === 'darwin' && process.env.PI_E2E_BACKGROUND === '1') {
+if (process.platform === 'darwin' && isBackgroundMode()) {
   app.setActivationPolicy?.('accessory');
   app.dock?.hide();
 }
@@ -281,13 +282,17 @@ function createMainWindow(): BrowserWindow {
     trafficLightPosition: { x: 19, y: Math.round((46 - 14) / 2) },
     // Claude-dark bg-base; avoids a white flash before the renderer paints.
     backgroundColor: '#262624',
-    // Under PI_E2E_BACKGROUND the window is created hidden and then raised with
-    // showInactive() below — a window shown the ordinary way asks to become key,
-    // which pulls focus even under the 'accessory' activation policy.
-    ...(process.env.PI_E2E_BACKGROUND === '1' ? { show: false } : {}),
+    // In background mode the window is created hidden. A window shown the
+    // ordinary way asks to become key, which pulls focus even under the
+    // 'accessory' activation policy — and by default it is not shown at all
+    // (see background-mode.ts: a hidden window still renders, animates and
+    // screenshots).
+    ...(isBackgroundMode() ? { show: false } : {}),
     webPreferences: SHARED_WEB_PREFERENCES,
   });
-  if (process.env.PI_E2E_BACKGROUND === '1') {
+  if (isBackgroundMode() && !isHiddenMode()) {
+    // PI_E2E_VISIBLE — someone wants to watch. Inactive, so it still never
+    // takes focus.
     win.once('ready-to-show', () => win.showInactive());
   }
 
@@ -374,7 +379,7 @@ function createMainWindow(): BrowserWindow {
 function openCanvasPopoutWindow(): { webContents: BrowserWindow['webContents']; created: boolean } {
   if (canvasPopoutWindow !== null && !canvasPopoutWindow.isDestroyed()) {
     if (canvasPopoutWindow.isMinimized()) canvasPopoutWindow.restore();
-    canvasPopoutWindow.focus();
+    if (!isBackgroundMode()) canvasPopoutWindow.focus();
     return { webContents: canvasPopoutWindow.webContents, created: false };
   }
   const win = new BrowserWindow({
@@ -523,6 +528,11 @@ function registerAppIpc(): void {
        * `shown:false` with the reason rather than pretending.
        */
       'app:notify': (req) => {
+        /* A test suite must not post banners over the user's screen. This is
+           the most literal form of "taking notice" there is. */
+        if (isBackgroundMode()) {
+          return { shown: false, reason: 'suppressed: background test mode' };
+        }
         const win = mainWindow;
         if (win !== null && !win.isDestroyed() && win.isFocused()) {
           return { shown: false, reason: 'the window is focused' };
@@ -723,8 +733,9 @@ if (!hasSingleInstanceLock) {
       createWindow: createMainWindow,
     });
     // window.focus() alone does not reliably foreground across app
-    // activations on macOS.
-    if (mainWindow !== null) app.focus({ steal: true });
+    // activations on macOS. Never in background mode: stealing focus is the
+    // one thing that mode exists to prevent.
+    if (mainWindow !== null && !isBackgroundMode()) app.focus({ steal: true });
   });
 
   app.on('window-all-closed', () => {

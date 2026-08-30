@@ -21,6 +21,7 @@
 import path from 'node:path';
 import { createLogger } from '@pi-desktop/shared';
 import { app, BrowserWindow } from 'electron';
+import { isBackgroundMode } from '../background-mode';
 import {
   comboLabel,
   type OverlayRect,
@@ -140,6 +141,11 @@ class MacOverlayController {
     // the app-scoping is done by the show/hide visibility rule in #trackTick
     // (overlayShouldShow), and 'floating' keeps the level as low as still lets
     // the phantom read over the controlled window while the model is driving.
+    /* NEVER over a real screen during a test. This window is always-on-top and
+       rides every space including fullscreen — the single most intrusive thing
+       the app can put in front of someone. In background mode it is built and
+       driven but never shown, so a computer-use probe still exercises its
+       geometry and its IPC without appearing. */
     win.setAlwaysOnTop(true, 'floating');
     // Ride along to whatever space the controlled window is on (incl. a
     // fullscreen app); the visibility rule keeps it from intruding elsewhere.
@@ -187,7 +193,7 @@ class MacOverlayController {
     this.#missingSince = null;
     this.#markActivity(); // control() means the model just acted → show
     win.setBounds(overlayBoundsFor(this.#target.rect));
-    if (!win.isVisible()) win.showInactive();
+    if (!win.isVisible() && !isBackgroundMode()) win.showInactive();
     await this.#push({ kind: 'reset' });
     this.#startTracking();
   }
@@ -198,7 +204,7 @@ class MacOverlayController {
     const win = this.#ensureWindow();
     this.#target = { pid: null, rect };
     win.setBounds(overlayBoundsFor(rect));
-    if (!win.isVisible()) win.showInactive();
+    if (!win.isVisible() && !isBackgroundMode()) win.showInactive();
     await this.#push({ kind: 'reset' });
   }
 
@@ -268,7 +274,7 @@ class MacOverlayController {
     const win = this.#win;
     if (win === null || win.isDestroyed()) return;
     if (show) {
-      if (!win.isVisible()) win.showInactive();
+      if (!win.isVisible() && !isBackgroundMode()) win.showInactive();
     } else if (win.isVisible()) {
       win.hide();
     }
