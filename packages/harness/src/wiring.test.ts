@@ -711,3 +711,79 @@ describe("the README's promises reach the model (reachability, not logic)", () =
     expect(rig.sentUserMessages.join('\n')).not.toContain('README IS PART OF THE SPEC');
   });
 });
+
+/**
+ * c1: an unattended run cannot call a forbidden tool, whatever it tries.
+ *
+ * The fence is at `tool_call` on purpose, because that is the ONE place every
+ * dispatch path passes through — an advertised call, the `use` dispatcher, a
+ * bash-CLI command, or a capability the model activates mid-turn. A test that
+ * only checked the advertised list would be testing a suggestion.
+ */
+describe('forbidden tools', () => {
+  /** The refusal from whichever handler produced one, or null. */
+  const blockOf = (results: unknown): { reason?: string } | null => {
+    const list = Array.isArray(results) ? results : [results];
+    const hit = list.find((r) => (r as { block?: boolean })?.block === true);
+    return (hit as { reason?: string } | undefined) ?? null;
+  };
+
+  const withEnv = async (value: string | undefined, fn: () => Promise<void>) => {
+    const prev = process.env.PI_DESKTOP_FORBID_TOOLS;
+    if (value === undefined) delete process.env.PI_DESKTOP_FORBID_TOOLS;
+    else process.env.PI_DESKTOP_FORBID_TOOLS = value;
+    try {
+      await fn();
+    } finally {
+      if (prev === undefined) delete process.env.PI_DESKTOP_FORBID_TOOLS;
+      else process.env.PI_DESKTOP_FORBID_TOOLS = prev;
+    }
+  };
+
+  const sendCall = {
+    type: 'tool_call' as const,
+    toolName: 'messages_send',
+    toolCallId: 'tc-send',
+    input: { to: 'someone', body: 'hi' },
+  };
+
+  it('blocks the call, and says what to do instead', async () => {
+    await withEnv('messages_send', async () => {
+      const rig = makeRig({});
+      await startSession(rig);
+      await startTurn(rig);
+      // `fire` returns one result per registered handler; the question is
+      // whether ANY of them refused.
+      const blocked = blockOf(await rig.fire('tool_call', sendCall));
+      expect(blocked).not.toBeNull();
+      // A model told only "no" tries the same thing another way.
+      expect(String(blocked?.reason)).toMatch(/draft/i);
+    });
+  });
+
+  it('leaves every other tool alone', async () => {
+    await withEnv('messages_send', async () => {
+      const rig = makeRig({});
+      await startSession(rig);
+      await startTurn(rig);
+      const blocked = blockOf(
+        await rig.fire('tool_call', {
+          type: 'tool_call' as const,
+          toolName: 'mail_recent',
+          toolCallId: 'tc-read',
+          input: {},
+        }),
+      );
+      expect(blocked).toBeNull();
+    });
+  });
+
+  it('forbids nothing when the env is unset — this is per-run, not global', async () => {
+    await withEnv(undefined, async () => {
+      const rig = makeRig({});
+      await startSession(rig);
+      await startTurn(rig);
+      expect(blockOf(await rig.fire('tool_call', sendCall))).toBeNull();
+    });
+  });
+});

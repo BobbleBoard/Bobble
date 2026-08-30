@@ -51,6 +51,7 @@ import {
 import { type CallModel, callModelFromEnv } from './model-call/call-model.js';
 import { warmSystemPrompt } from './model-call/warmup.js';
 import { createBashFlagger } from './permissions/flag-bash.js';
+import { forbiddenReason, forbiddenTools } from './permissions/forbidden.js';
 import {
   isPermissionMode,
   type PermissionController,
@@ -792,7 +793,9 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
 
   function cliVisibleTools(): ReturnType<typeof pi.getAllTools> {
     const all = pi.getAllTools();
-    const registered = all.filter((t) => cliRunnable(t.name) !== undefined);
+    const registered = all.filter(
+      (t) => cliRunnable(t.name) !== undefined && !forbidden.has(t.name),
+    );
     /* WHY A COMMAND IS MISSING, in one line: what pi knows, what we can run, and
        what the bus holds. Without all three, "the browser commands are not in
        the help" is a guess between three different causes. */
@@ -822,6 +825,9 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     return allowed.size > 0 ? registered.filter((t) => allowed.has(t.name)) : registered;
   }
   const toolCliMode = process.env.PI_DESKTOP_TOOL_CLI === '1';
+
+  /** Tools this run may not call at all — see permissions/forbidden.ts. */
+  const forbidden = forbiddenTools();
 
   const toolRegistry = captureRegisteredTools(pi);
   const runtime: HarnessRuntime = {
@@ -2145,7 +2151,12 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     }
     // The class preset PLUS any extra tools the caller named. Unioned
     // append-only below so the KV prefix holds.
-    const preset = [...resolvePresetTools(cls, available), ...extraTools];
+    // Forbidden tools are blocked at `tool_call` regardless; dropping them here
+    // as well means the model is never offered one, so it never spends a turn
+    // being refused.
+    const preset = [...resolvePresetTools(cls, available), ...extraTools].filter(
+      (t) => !forbidden.has(t),
+    );
     // The active tool list is rendered at the START of the prompt (chat templates
     // emit tools before the messages), so it is part of the KV-cached prefix. If
     // we blindly re-set it every turn, a NEW user message churns that prefix and
@@ -2582,6 +2593,20 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
   // (before execution) and the consecutive-error streak (after execution).
   pi.on('tool_call', (event, ctx) => {
     runtime.currentCtx = ctx;
+    /*
+     * A TOOL THIS RUN MAY NOT CALL, whatever it thinks.
+     *
+     * FIRST, before anything else in this hook. Not advertising a tool is not a
+     * fence: `use` dispatches by name, the bash CLI dispatches by command, and a
+     * capability activated mid-turn pulls a whole group in. Every one of those
+     * arrives here, so this is the only place a refusal actually holds.
+     *
+     * The case it exists for: an unattended scheduled run must not be able to
+     * send a message on the user's behalf while they are asleep.
+     */
+    if (forbidden.has(event.toolName)) {
+      return { block: true, reason: forbiddenReason(event.toolName) };
+    }
     warnIfSmallModelForCapability(event.toolName, event.input, ctx);
     /*
      * A COMMAND THAT NEVER RETURNS TAKES THE WHOLE TURN WITH IT — in the ORDINARY
@@ -3005,6 +3030,11 @@ export {
   UTILITY_MODEL_ENV,
 } from './model-call/call-model.js';
 export { createBashFlagger, interpretFlagReply } from './permissions/flag-bash.js';
+export {
+  FORBID_TOOLS_ENV,
+  forbiddenReason,
+  forbiddenTools,
+} from './permissions/forbidden.js';
 export {
   type BashFlagger,
   type EvaluateInput,

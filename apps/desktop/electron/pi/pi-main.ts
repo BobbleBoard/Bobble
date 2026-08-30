@@ -10,6 +10,13 @@
 import { readFileSync } from 'node:fs';
 import type { PiBridgeEvent } from '@pi-desktop/engine';
 import { PiBridge } from '@pi-desktop/engine/main';
+// The NAME-ONLY subpath, not the barrel. Importing `@pi-desktop/harness` here
+// drags the whole extension — and pi-coding-agent with it — into this CJS main
+// bundle, where an ESM-only package compiles to `require()` and hangs boot with
+// no window and no visible error. Same trap `loadPi` documents; this module is
+// dependency-free for exactly this reason.
+import { FORBID_TOOLS_ENV } from '@pi-desktop/harness/permissions/forbidden';
+import { MESSAGES_SEND_TOOL } from '@pi-desktop/mac-connectors/tool-names';
 import { createIpcEventSender, createLogger } from '@pi-desktop/shared';
 import { app, type IpcMainInvokeEvent, ipcMain, type WebContents } from 'electron';
 import { resolveBundledPackageAsset } from '../app-paths';
@@ -309,6 +316,16 @@ function createChildBridge(
  * Full base config — same extensions and env as the main chat — because a
  * scheduled run must be able to do anything the user could do by hand.
  */
+/**
+ * What a scheduled run may never call.
+ *
+ * `messages_send` is the only tool in the app that puts something in front of
+ * another person. Creating a calendar event or a reminder is deliberately NOT
+ * here — "remind me to…" is a thing people want a scheduled task to do, and it
+ * only ever writes to the user's own devices.
+ */
+const SCHEDULED_FORBIDDEN_TOOLS = [MESSAGES_SEND_TOOL] as const;
+
 export function createScheduledRunBridge(
   opts: { cwd?: string },
   onEvent: (event: PiBridgeEvent) => void,
@@ -319,7 +336,20 @@ export function createScheduledRunBridge(
   return new PiBridge(
     {
       cwd,
-      env: buildPiEnv(cwd),
+      /*
+       * NOTHING GOES OUT FROM AN UNATTENDED RUN.
+       *
+       * A scheduled task runs at 07:30 with nobody watching. Reading the user's
+       * mail and calendar to write them a brief is the whole point; sending a
+       * message on their behalf while they are asleep is not, and a prompt
+       * saying "do not send" is a request, not a fence. The harness blocks these
+       * at `tool_call`, the one place every dispatch path passes through — an
+       * advertised call, `use`, or a bash-CLI command.
+       */
+      env: {
+        ...buildPiEnv(cwd),
+        [FORBID_TOOLS_ENV]: SCHEDULED_FORBIDDEN_TOOLS.join(','),
+      },
       noSession: true,
       extensionPaths: EXTENSION_PATHS,
       extraArgs: ['--no-extensions', '--no-skills'],

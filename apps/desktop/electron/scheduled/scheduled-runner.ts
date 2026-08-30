@@ -16,6 +16,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import type { PiBridgeEvent } from '@pi-desktop/engine';
 import { createLogger } from '@pi-desktop/shared';
+import { blockedPermission, blockedPermissionError } from './blocked-permission';
 import type { RunArtifact, ScheduledTask, TaskRun } from './scheduled-contract';
 
 const log = createLogger('desktop:scheduled-runner');
@@ -241,7 +242,28 @@ export function createScheduledRunner(deps: ScheduledRunnerDeps): ScheduledRunne
         const e = event as {
           type?: string;
           assistantMessageEvent?: { type?: string; delta?: string; name?: string };
+          toolName?: string;
+          isError?: boolean;
+          result?: { content?: { type?: string; text?: string }[] };
         };
+        /*
+         * macOS SAID NO — that is a failed run, not a successful one.
+         *
+         * Without this a brief whose Calendar consent was never granted records
+         * `ok` every morning with a summary that is an apology, and the user
+         * sees a week of green. A failure that says which permission to grant is
+         * worth more than seven successes that do not.
+         */
+        if (e.type === 'tool_execution_end' && e.isError === true) {
+          const text = (e.result?.content ?? [])
+            .map((c) => (c?.type === 'text' ? (c.text ?? '') : ''))
+            .join(' ');
+          const permission = blockedPermission(text);
+          if (permission !== null) {
+            finish('error', blockedPermissionError(e.toolName ?? 'a tool', permission));
+            return;
+          }
+        }
         if (e.type === 'message_start') summary = '';
         else if (e.type === 'message_update') {
           const a = e.assistantMessageEvent;
