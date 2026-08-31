@@ -58,12 +58,15 @@ export function useEnhancer(onRewrite: (next: string) => void): UseEnhancer {
     }
   }, []);
 
+  // Reads `previous` directly rather than from inside `setPrevious`: a state
+  // updater must be pure, and React is entitled to call it twice — which would
+  // put the old prompt back twice and, worse, is the kind of thing that only
+  // misbehaves in StrictMode or a future concurrent render.
   const undo = useCallback((): void => {
-    setPrevious((prev) => {
-      if (prev !== null) onRewrite(prev);
-      return null;
-    });
-  }, [onRewrite]);
+    if (previous === null) return;
+    onRewrite(previous);
+    setPrevious(null);
+  }, [onRewrite, previous]);
 
   const enhance = useCallback(
     async (kind: EnhanceKind, prompt: string, model?: string): Promise<string> => {

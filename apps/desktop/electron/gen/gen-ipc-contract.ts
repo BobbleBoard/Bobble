@@ -129,6 +129,14 @@ export type GenInvokeMap = {
       /** shared */
       steps?: number;
       seed?: number;
+      /**
+       * Classifier-free guidance — how hard the model is pushed to obey the
+       * prompt. The worker has always accepted it (`worker.py` builds
+       * `--guidance`) and the ComfyUI param map has always mapped it; nothing
+       * in the app ever SET it, so the knob that most changes an image after
+       * step count was reachable only by editing a workflow by hand.
+       */
+      guidance?: number;
     };
     response: {
       jobId: string;

@@ -131,6 +131,7 @@ export function ImageStudio(): JSX.Element {
   const [style, setStyle] = useState<string>('');
   const [count, setCount] = useState(1);
   const [steps, setSteps] = useState<number | ''>('');
+  const [guidance, setGuidance] = useState<number | ''>('');
   const [seed, setSeed] = useState<number | ''>('');
 
   const catalog = useGenStore((s) => s.catalog);
@@ -155,6 +156,7 @@ export function ImageStudio(): JSX.Element {
       n: count,
       ...(model !== '' ? { model } : {}),
       ...(steps !== '' ? { steps } : {}),
+      ...(guidance !== '' ? { guidance } : {}),
       ...(seed !== '' ? { seed } : {}),
     });
   };
@@ -284,6 +286,19 @@ export function ImageStudio(): JSX.Element {
               placeholder="auto"
               value={steps}
               onChange={(e) => setSteps(e.target.value === '' ? '' : Number(e.target.value))}
+            />
+          </Knob>
+          <Knob label="Guidance">
+            <input
+              className="pd-studio-input pd-focusable"
+              data-testid="image-guidance"
+              type="number"
+              min={0}
+              max={20}
+              step={0.5}
+              placeholder="auto"
+              value={guidance}
+              onChange={(e) => setGuidance(e.target.value === '' ? '' : Number(e.target.value))}
             />
           </Knob>
           <Knob label="Seed">

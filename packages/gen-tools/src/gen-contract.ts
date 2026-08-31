@@ -66,6 +66,13 @@ export interface GenerateImageParams {
   readonly n?: number;
   readonly steps?: number;
   readonly seed?: number;
+  /**
+   * Classifier-free guidance — how hard the model is pushed to obey the prompt.
+   * The worker has always built `--guidance` from it and the ComfyUI param map
+   * has always mapped it; nothing ever set it, so the knob that most changes an
+   * image after step count was unreachable.
+   */
+  readonly guidance?: number;
   readonly negativePrompt?: string;
 }
 

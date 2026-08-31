@@ -301,6 +301,9 @@ export function registerGenIpc(opts: GenManagerOptions): void {
     const base = raw.seed ?? randomInt(0, 1_000_000_000);
     const seeds = Array.from({ length: n }, (_, i) => base + i);
     const steps = raw.steps ?? model.defaultSteps;
+    // Only when asked for: absent means the model's own default, which is what
+    // every caller that does not open the gears wants.
+    const guidance = raw.guidance;
 
     const job: GenJob = {
       id: jobId,
@@ -317,6 +320,7 @@ export function registerGenIpc(opts: GenManagerOptions): void {
         steps,
         seeds,
         negativePrompt: raw.negativePrompt,
+        ...(guidance !== undefined ? { guidance } : {}),
         quantize: model.defaultQuantize,
       },
     };

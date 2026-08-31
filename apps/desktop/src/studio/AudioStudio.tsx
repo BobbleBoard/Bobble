@@ -160,8 +160,11 @@ export function AudioStudio(): JSX.Element {
       ...(mode === 'speech' && refAudio !== '' ? { refAudio } : {}),
       ...(mode !== 'speech' ? { seconds: seconds ?? (mode === 'sfx' ? 5 : 20) } : {}),
       ...(mode === 'sfx' ? { n: count } : {}),
-      ...(steps !== '' ? { steps } : {}),
-      ...(seed !== '' ? { seed } : {}),
+      // Not for speech: a reading is not sampled the way a picture is, so
+      // sending a step count and a seed there would be two fields the job
+      // carries and nothing reads.
+      ...(mode !== 'speech' && steps !== '' ? { steps } : {}),
+      ...(mode !== 'speech' && seed !== '' ? { seed } : {}),
     });
   };
 
