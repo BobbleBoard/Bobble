@@ -97,7 +97,20 @@ try {
   if (!winInfo.alwaysOnTop) fail('overlay is not always-on-top');
   if (winInfo.focusable) fail('overlay must be non-focusable (it stole focusability)');
   if (winInfo.focused) fail('overlay took focus — it must never');
-  if (!winInfo.visible) fail('overlay not visible after overlay-show');
+  /*
+   * VISIBILITY IS THE ONE THING THAT FLIPS WITH BACKGROUND MODE.
+   *
+   * This probe launches with PI_E2E=1, which IS background mode — and a
+   * background run must never put an always-on-top overlay over the user's
+   * screen. So the assertion is inverted rather than dropped: hidden is the
+   * REQUIREMENT here, and `engaged` below carries what "the overlay is working"
+   * used to mean. Run with PI_E2E_VISIBLE=1 and the other branch applies.
+   */
+  const shouldShow = process.env.PI_E2E_VISIBLE === '1';
+  if (shouldShow && !winInfo.visible) fail('overlay not visible after overlay-show');
+  if (!shouldShow && winInfo.visible) {
+    fail('overlay is VISIBLE in a background run — it would float over the user');
+  }
   // The window is the tracked rect PLUS a symmetric buffer margin on every side
   // (so the cursor can protrude past the app edge and the pill can render fully).
   const b = winInfo.bounds;
@@ -119,7 +132,12 @@ try {
   console.log(`window checks OK (buffer=${BUFFER}):`, JSON.stringify(winInfo));
 
   const info = await dbg('overlay-info');
-  if (info.result?.visible !== true) fail('overlay-info says not visible');
+  // `engaged`, not `visible`: the overlay is targeted and tracking, which is
+  // true in both modes; whether it is on screen is asserted above.
+  if (info.result?.engaged !== true) fail('overlay-info says the overlay is not engaged');
+  if (info.result?.visible !== shouldShow) {
+    fail(`overlay-info visible=${info.result?.visible}, expected ${shouldShow}`);
+  }
   // overlay-info reports the RAW tracked rect (not the padded window).
   const ib = info.result?.bounds;
   if (!ib || ib.x !== RECT.x || ib.y !== RECT.y || ib.w !== RECT.w || ib.h !== RECT.h) {
@@ -345,9 +363,16 @@ try {
   for (let i = 0; i < 40 && !occludedHidden; i++) {
     await sleep(25);
     const inf = await dbg('overlay-info');
-    occludedHidden = inf.result?.occluded === true && (await winVisible()) === false;
+    // `wantsVisible` is the overlay's own decision, taken BEFORE the
+    // background-mode gate — the only thing that can be asserted here in a run
+    // where the window is deliberately never shown. In a visible run the window
+    // must actually be hidden too, and that is checked as well.
+    occludedHidden =
+      inf.result?.occluded === true &&
+      inf.result?.wantsVisible === false &&
+      (!shouldShow || (await winVisible()) === false);
   }
-  if (!occludedHidden) fail('overlay still visible while the fake source reports occluded');
+  if (!occludedHidden) fail('overlay still showing while the fake source reports occluded');
 
   // Clear again — and explicitly NOT frontmost: occlusion truth must win over
   // the driving/frontmost proxy (cursor lives on the app whenever it is clear).
@@ -355,7 +380,9 @@ try {
   let clearShown = false;
   for (let i = 0; i < 40 && !clearShown; i++) {
     await sleep(25);
-    clearShown = (await winVisible()) === true;
+    const inf = await dbg('overlay-info');
+    clearShown =
+      inf.result?.wantsVisible === true && (!shouldShow || (await winVisible()) === true);
   }
   if (!clearShown) fail('overlay did not re-show after the occluder cleared');
   console.log('occlusion conceal/reveal OK (z-order truth beats the frontmost proxy)');
@@ -364,6 +391,7 @@ try {
   await dbg('overlay-hide');
   const hidden = await dbg('overlay-info');
   if (hidden.result?.visible !== false) fail('overlay still visible after overlay-hide');
+  if (hidden.result?.wantsVisible !== false) fail('overlay still WANTS to show after overlay-hide');
 
   console.log(`mac-overlay-probe OK — shots in ${OUT_DIR}`);
 } finally {

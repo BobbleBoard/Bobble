@@ -101,6 +101,8 @@ class MacOverlayController {
   #lastCursor: { x: number; y: number } | null = null;
   #lastActivityAt: number | null = null;
   #lastOccluded: boolean | null = null;
+  /** What {@link #applyVisibility} last decided, before the background-mode gate. */
+  #wantsVisible = false;
   #revertTimer: ReturnType<typeof setTimeout> | null = null;
   #idleTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -193,7 +195,7 @@ class MacOverlayController {
     this.#missingSince = null;
     this.#markActivity(); // control() means the model just acted → show
     win.setBounds(overlayBoundsFor(this.#target.rect));
-    if (!win.isVisible() && !isBackgroundMode()) win.showInactive();
+    this.#applyVisibility(true);
     await this.#push({ kind: 'reset' });
     this.#startTracking();
   }
@@ -204,7 +206,7 @@ class MacOverlayController {
     const win = this.#ensureWindow();
     this.#target = { pid: null, rect };
     win.setBounds(overlayBoundsFor(rect));
-    if (!win.isVisible() && !isBackgroundMode()) win.showInactive();
+    this.#applyVisibility(true);
     await this.#push({ kind: 'reset' });
   }
 
@@ -273,6 +275,14 @@ class MacOverlayController {
   #applyVisibility(show: boolean): void {
     const win = this.#win;
     if (win === null || win.isDestroyed()) return;
+    /*
+     * The DECISION, recorded before the gate. In background mode the window is
+     * never shown, so `isVisible()` stops being able to tell anyone whether the
+     * overlay's own logic — frontmost, on-screen, driving, occluded — said it
+     * should be. Keeping the answer here is what lets a probe test that logic
+     * without a window ever appearing over someone's work.
+     */
+    this.#wantsVisible = show;
     if (show) {
       if (!win.isVisible() && !isBackgroundMode()) win.showInactive();
     } else if (win.isVisible()) {
@@ -438,6 +448,8 @@ class MacOverlayController {
   /** Info for probes/assertions. */
   info(): {
     visible: boolean;
+    engaged: boolean;
+    wantsVisible: boolean;
     bounds: OverlayRect | null;
     trackingPid: number | null;
     occluded: boolean | null;
@@ -446,6 +458,23 @@ class MacOverlayController {
     const visible = win !== null && !win.isDestroyed() && win.isVisible();
     return {
       visible,
+      /*
+       * ENGAGED ≠ VISIBLE, and the difference is the whole of background mode.
+       *
+       * The overlay is a floating always-on-top window; a test suite that shows
+       * it puts it over whatever the user is reading, so `showInactive()` is
+       * gated on `isBackgroundMode()`. Everything else about it still runs —
+       * it is built, positioned, tracked and rendered on a window nobody sees.
+       *
+       * `visible` alone therefore could not tell a probe whether the overlay was
+       * WORKING or merely hidden on purpose, which is exactly what a probe needs
+       * to know. This says the overlay is targeted at something and would be on
+       * screen if it were allowed to be.
+       */
+      engaged: this.#target !== null,
+      /* What the overlay's own logic decided, before the background-mode gate —
+         the only way to test that logic without showing a window. */
+      wantsVisible: this.#wantsVisible,
       bounds: this.#target?.rect ?? null,
       trackingPid: this.#target?.pid ?? null,
       occluded: this.#lastOccluded,
@@ -462,6 +491,7 @@ class MacOverlayController {
     this.#lastActivityAt = null;
     this.#lastOccluded = null;
     const win = this.#win;
+    this.#wantsVisible = false;
     if (win !== null && !win.isDestroyed() && win.isVisible()) win.hide();
   }
 
