@@ -234,8 +234,12 @@
     var(--pd-effort-pos, 0) *
     (100% - 2 * var(--pd-effort-knob-r))
   );
-  width: calc(var(--pd-effort-knob-r) * 2);
-  height: calc(var(--pd-effort-knob-r) * 2);
+  /* SIZE AND POSITION ARE DIFFERENT VARIABLES, and that is the whole point.
+     They were one: bumping the radius on focus grew the knob AND re-ran its
+     `left` calc, moving its centre 1px off the detent it was sitting on.
+     MEASURED: knob centre 122 against a dot at 123. */
+  width: var(--pd-effort-knob-size, calc(var(--pd-effort-knob-r) * 2));
+  height: var(--pd-effort-knob-size, calc(var(--pd-effort-knob-r) * 2));
   transform: translate(-50%, -50%);
   border-radius: 50%;
   background: var(--pd-bg-raised);
@@ -255,9 +259,9 @@
  * reads as the same colour leak the fill was just cured of. */
 .pd-effort-track:active .pd-effort-knob,
 .pd-effort-track:focus-visible .pd-effort-knob {
-  /* Grows from its own centre, which is why the radius is a variable: bumping
-     the width alone would shift the handle off the detent it is sitting on. */
-  --pd-effort-knob-r: 10px;
+  /* Grows from its own centre: the SIZE variable moves, the POSITION radius
+     stays where the dots are. */
+  --pd-effort-knob-size: 20px;
   box-shadow:
     var(--pd-shadow-md),
     0 0 0 1.5px var(--pd-border-focus);
