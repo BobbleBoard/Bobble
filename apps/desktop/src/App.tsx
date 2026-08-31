@@ -13,7 +13,7 @@ import { OnboardingWizard } from './onboarding/OnboardingWizard';
 import { ScheduledView } from './scheduled/ScheduledView';
 import { startTaskRunner } from './scheduled/tasks-store';
 import { type SettingsSection, SettingsView } from './settings/SettingsView';
-import { useModalityStore } from './state/modality-store';
+import { exitModality, useModalityStore } from './state/modality-store';
 import { applyThemeAttributes, useThemeStore } from './store/theme';
 
 /** First-run gate status: unknown until onboarding:get-state resolves. */
@@ -196,22 +196,6 @@ export function App() {
    * Lazy, because it pulls nothing until someone opens it, and the boot path is
    * exactly where a few hundred kilobytes of unused view would be felt.
    */
-  if (modalityView === 'image' || modalityView === 'video' || modalityView === 'audio') {
-    return (
-      <TooltipProvider delayDuration={200}>
-        <Suspense fallback={null}>
-          {modalityView === 'image' ? (
-            <ImageStudio />
-          ) : modalityView === 'video' ? (
-            <VideoStudio />
-          ) : (
-            <AudioStudio />
-          )}
-        </Suspense>
-      </TooltipProvider>
-    );
-  }
-
   if (IS_TRIPO || modalityView === '3d') {
     return (
       <TooltipProvider delayDuration={200}>
@@ -293,10 +277,43 @@ export function App() {
                 /* Picking a chat takes the content route down. Without this the
                    hub (or Scheduled) stayed on screen while the session changed
                    underneath it — you clicked New chat and kept looking at the
-                   model hub. */
-                onEnterChat={() => setView('chat')}
+                   model hub.
+                   The studios ride the SAME seam now, so they have to come down
+                   with it: opening the sidebar over a studio and picking a chat
+                   has to land you in that chat, not leave you in the studio with
+                   a different conversation loaded behind it. */
+                onEnterChat={() => {
+                  setView('chat');
+                  exitModality();
+                }}
                 contentOverride={
-                  view === 'models' ? (
+                  /*
+                   * THE STUDIOS ARE A CONTENT ROUTE NOW, not a window takeover.
+                   *
+                   * They used to `return` before the chat shell entirely, which
+                   * meant entering one threw away the chat list, the top bar and
+                   * every control on it — and the studio then had to reinvent a
+                   * back button, a title bar and a traffic-light inset it had no
+                   * business owning. the user: they should "just appear in the chat
+                   * area as if they are just replacing the current chat".
+                   *
+                   * Same seam the model hub and Scheduled already use. The
+                   * sidebar auto-collapses on entry (see ChatApp) and slides
+                   * back open to the LEFT of the studio if the user wants it.
+                   */
+                  modalityView === 'image' ? (
+                    <Suspense fallback={null}>
+                      <ImageStudio />
+                    </Suspense>
+                  ) : modalityView === 'video' ? (
+                    <Suspense fallback={null}>
+                      <VideoStudio />
+                    </Suspense>
+                  ) : modalityView === 'audio' ? (
+                    <Suspense fallback={null}>
+                      <AudioStudio />
+                    </Suspense>
+                  ) : view === 'models' ? (
                     <ModelsView />
                   ) : view === 'scheduled' ? (
                     /* Same seam as the model hub: a content route inside the chat

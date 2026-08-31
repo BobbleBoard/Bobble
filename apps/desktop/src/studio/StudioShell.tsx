@@ -8,35 +8,54 @@
  * differ. So the shell owns everything identical and each studio supplies only
  * its own controls and its own result renderer.
  *
- * WHY THE COMPOSER IS DOCKED AT THE BOTTOM.
+ * THE SHAPE IS THE CHAT'S SHAPE, ON PURPOSE.
  *
- * It was at the top, and the argument for that was: a studio is not a
- * conversation, you are iterating on ONE description, so the description must
- * stay put under your hands while the output changes below it.
+ * A studio is not a window of its own any more: it renders where the chat
+ * renders, under the same top bar, with the sidebar sliding in over its left
+ * edge. So it is built out of the same three parts the chat is — a scrolling
+ * body, a docked composer at the bottom, and panels that open from the two
+ * top-right buttons — because the user asked for exactly that ("very clean
+ * minimalist similar styling to the main chat area I like that UI a lot") and
+ * because a person who has learnt the chat has then already learnt this.
  *
- * The premise was right and the conclusion did not follow. Docking the composer
- * to the BOTTOM of the window keeps it just as still — it is outside the scroll
- * container, so it never moves as results grow — while handing the room's whole
- * remaining height to the thing you came here to look at. the user, on the shipped
- * build: "a lot of blank empty space and really oddly the input bar and all is
- * at the top". Both halves of that were one bug: the composer, its four knobs
- * and its button occupied the top 21% of the window, and the 79% below it was
- * empty because the results had been pushed out of the place your eye lands.
+ * WHAT GOES WHERE. The composer carries the description and at most a couple of
+ * knobs you flip between two runs of one idea. The SETTINGS RAIL on the right
+ * carries what the studio is set to — mode, preset, voice, shape, size. The
+ * GEARS carry sampling and steps. Three tiers, and the rule for placing a
+ * control is how often you touch it, not how important it sounds.
  */
-import { Button, IconChevronLeft, ScrollArea, Spinner } from '@pi-desktop/ui';
+import {
+  Button,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  ScrollArea,
+  Spinner,
+} from '@pi-desktop/ui';
 import { type JSX, type ReactNode, useEffect } from 'react';
 import { exitModality } from '../state/modality-store';
+import { useStudioUiStore } from './studio-ui-store';
 
 export interface StudioShellProps {
   readonly title: string;
-  /** The studio's own controls, in the composer beside the run button. */
-  readonly controls: ReactNode;
   /**
-   * Sits in the HEADER, not above the prompt — the audio mode switch is the
-   * room's identity while you are in it, so it belongs where the room is named
-   * rather than as a third thing stacked on top of the composer.
+   * The one or two controls that belong ON the input bar — the things you
+   * change between two runs of the same idea. Everything else lives in the
+   * settings rail; a composer with eight knobs on it is a form, not a prompt.
    */
-  readonly headerAccessory?: ReactNode;
+  readonly controls?: ReactNode;
+  /**
+   * The right-hand SETTINGS RAIL: modes, presets, shape, voice — the common
+   * things a studio is configured with. Opened from the top bar, in the same
+   * place and with the same icon as the canvas.
+   */
+  readonly settings?: ReactNode;
+  /**
+   * The GEARS panel: sampling, steps, seeds. The knobs someone reaches for on
+   * purpose, kept off the surface everyone else uses.
+   */
+  readonly advanced?: ReactNode;
   readonly prompt: string;
   readonly onPrompt: (v: string) => void;
   readonly placeholder: string;
@@ -55,7 +74,8 @@ export interface StudioShellProps {
 export function StudioShell({
   title,
   controls,
-  headerAccessory,
+  settings,
+  advanced,
   prompt,
   onPrompt,
   placeholder,
@@ -69,12 +89,22 @@ export function StudioShell({
   testid = 'studio',
 }: StudioShellProps): JSX.Element {
   const canRun = !busy && blocked === undefined && prompt.trim().length > 0;
+  const settingsOpen = useStudioUiStore((s) => s.settingsOpen);
+  const advancedOpen = useStudioUiStore((s) => s.advancedOpen);
+  const setAdvancedOpen = useStudioUiStore((s) => s.setAdvancedOpen);
+  const resetPanels = useStudioUiStore((s) => s.reset);
+
+  // Leaving closes both. Which panel you had open is a property of the sitting,
+  // not of the app, and arriving to a rail you do not remember opening is worse
+  // than arriving to none.
+  useEffect(() => resetPanels, [resetPanels]);
 
   /*
-   * ESCAPE LEAVES THE ROOM. It is a full-window takeover with one way out — a
-   * pill you have to travel to the top-left corner to press — and every other
-   * takeover on macOS answers Escape. Ignored while a menu or dialog is up, so
-   * this never steals a dismissal that belongs to something in front of it.
+   * ESCAPE GOES BACK TO THE CHAT. The studio no longer takes the window — it
+   * replaces the chat content, and the sidebar is a click away — but Escape is
+   * still the cheapest way out and costs nothing to keep. Ignored while a menu
+   * or dialog is up, so it never steals a dismissal that belongs to something
+   * in front of it.
    */
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
@@ -88,35 +118,27 @@ export function StudioShell({
 
   return (
     <div className="pd-studio" data-testid={testid}>
-      <header className="pd-studio-head">
-        {/* The traffic-light inset, same as every other full-window takeover. */}
-        <div className="pd-studio-head-drag" />
-        <button
-          type="button"
-          className="pd-studio-back pd-focusable"
-          data-testid="studio-back"
-          onClick={exitModality}
-        >
-          <IconChevronLeft size={15} />
-          Chat
-        </button>
-        <h1 className="pd-studio-title">{title}</h1>
-        {headerAccessory !== undefined ? (
-          <div className="pd-studio-head-accessory">{headerAccessory}</div>
-        ) : null}
-      </header>
+      {/*
+        THE WORKING COLUMN — results above, input bar below.
+        The RAIL is its sibling, not its parent's overlay, so opening the rail
+        narrows the results AND the composer together. Nesting the rail inside
+        the scrolling half instead left the composer centred on the window while
+        everything above it had shifted left, which reads as the input bar
+        sliding under the panel.
+      */}
+      <div className="pd-studio-main">
+        <ScrollArea className="pd-studio-canvas">
+          <div className="pd-studio-results" data-testid="studio-results">
+            {children}
+          </div>
+        </ScrollArea>
 
-      {/* THE ROOM'S SUBJECT. Everything the studio made, and the only thing that
-          scrolls — it gets all the height the composer is not using. */}
-      <ScrollArea className="pd-studio-canvas">
-        <div className="pd-studio-results" data-testid="studio-results">
-          {children}
-        </div>
-      </ScrollArea>
-
-      <div className="pd-studio-compose">
-        <div className="pd-studio-composer">
-          <div className="pd-studio-prompt-row">
+        {/* THE INPUT BAR. Docked at the bottom, outside the scroll container, so
+          it never moves as results grow. Styled after the chat composer on
+          purpose — it is the same gesture, and the app should only teach it
+          once. */}
+        <div className="pd-studio-compose">
+          <div className="pd-studio-composer">
             {multiline ? (
               <textarea
                 className="pd-studio-prompt pd-studio-prompt--multi pd-focusable"
@@ -125,19 +147,14 @@ export function StudioShell({
                 placeholder={placeholder}
                 onChange={(e) => onPrompt(e.target.value)}
                 onKeyDown={(e) => {
-                  /*
-                   * ⌘↩ RUNS. The single-line branch has always run on Enter; the
-                   * textarea had no key handling at all, so Speech — the default
-                   * mode of the Audio Studio — could only be run by travelling
-                   * the width of the window to the button. Plain Enter still
-                   * inserts a newline, because here you are typing a paragraph.
-                   */
+                  // ⌘↩ runs; plain Enter is a newline, because here you are
+                  // typing a paragraph.
                   if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && canRun) {
                     e.preventDefault();
                     onRun();
                   }
                 }}
-                rows={3}
+                rows={2}
               />
             ) : (
               <input
@@ -147,41 +164,38 @@ export function StudioShell({
                 placeholder={placeholder}
                 onChange={(e) => onPrompt(e.target.value)}
                 onKeyDown={(e) => {
-                  // Enter runs, because a one-line description is a thing you
-                  // finish typing — not a field you tab out of.
+                  // Enter runs: a one-line description is a thing you finish
+                  // typing, not a field you tab out of.
                   if (e.key === 'Enter' && canRun) onRun();
                 }}
               />
             )}
-          </div>
 
-          <div className="pd-studio-controls">
-            {controls}
-            <div className="flex-1" />
-            {/*
+            <div className="pd-studio-controls">
+              {controls}
+              <div className="flex-1" />
+              {/*
               ACCENT, NOT PRIMARY. `.pd-btn--primary` is `background:
               var(--pd-text-primary)` — a WHITE block on the dark themes — so a
               DISABLED run button was still the brightest object on the screen.
-              The disabled state is neutralised in CSS rather than dimmed: a
-              half-opacity accent fill on a light background reads as a live blue
-              button with unreadable text, not as an inert one.
             */}
-            <Button
-              variant="accent"
-              className="pd-studio-run"
-              data-testid="studio-run"
-              disabled={!canRun}
-              title={blocked}
-              onClick={onRun}
-            >
-              {busy ? (
-                <span className="flex items-center gap-2">
-                  <Spinner size={13} /> Working…
-                </span>
-              ) : (
-                runLabel
-              )}
-            </Button>
+              <Button
+                variant="accent"
+                className="pd-studio-run"
+                data-testid="studio-run"
+                disabled={!canRun}
+                title={blocked}
+                onClick={onRun}
+              >
+                {busy ? (
+                  <span className="flex items-center gap-2">
+                    <Spinner size={13} /> Working…
+                  </span>
+                ) : (
+                  runLabel
+                )}
+              </Button>
+            </div>
           </div>
 
           {blocked !== undefined ? (
@@ -196,7 +210,100 @@ export function StudioShell({
           ) : null}
         </div>
       </div>
+
+      {/*
+        THE SETTINGS RAIL, on the right, opened from the top bar. Narrower than
+        the canvas: these are knobs, not content. The sidebar on the far left
+        and this one on the right frame the work rather than stacking on it.
+      */}
+      {settings !== undefined ? (
+        <div className="pd-studio-rail" data-open={settingsOpen} data-testid="studio-settings">
+          <div className="pd-studio-rail-inner">{settings}</div>
+        </div>
+      ) : null}
+
+      {/* The gears. A dialog rather than a second rail: these are read-and-set,
+          not watched, and two rails open at once is a control panel. */}
+      {advanced !== undefined ? (
+        <Dialog open={advancedOpen} onOpenChange={setAdvancedOpen}>
+          <DialogContent data-testid="studio-advanced" className="max-w-[460px]">
+            <DialogHeader>
+              <DialogTitle>{title} — advanced</DialogTitle>
+            </DialogHeader>
+            {/* `.pd-dialog-body` is where the padding and the scroll live —
+                without it the fields sat against the panel's edges and a long
+                note ran straight out of the bottom. */}
+            <div className="pd-dialog-body pd-studio-advanced">{advanced}</div>
+          </DialogContent>
+        </Dialog>
+      ) : null}
     </div>
+  );
+}
+
+/**
+ * A titled group in the settings rail.
+ *
+ * The rail is a column of unrelated knobs, and unrelated knobs in a column read
+ * as one long form. Two or three headings turn it back into a settings panel you
+ * can skim for the thing you came to change.
+ */
+export function RailGroup({
+  title,
+  children,
+}: {
+  title: string;
+  children: ReactNode;
+}): JSX.Element {
+  return (
+    <div className="flex flex-col gap-2.5">
+      <div className="pd-studio-rail-head">{title}</div>
+      {children}
+    </div>
+  );
+}
+
+/**
+ * An on/off row: label on the left, switch on the right.
+ *
+ * Deliberately NOT a `Knob` with a checkbox in it — a boolean setting is read as
+ * a statement you agree or disagree with, and putting the switch on the far
+ * right of the row makes a column of them scannable in one pass.
+ */
+export function RailToggle({
+  label,
+  hint,
+  checked,
+  onChange,
+  disabled,
+  testid,
+}: {
+  label: string;
+  hint?: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  disabled?: boolean;
+  testid?: string;
+}): JSX.Element {
+  return (
+    <label className="pd-studio-toggle" data-disabled={disabled === true ? 'true' : undefined}>
+      <span className="min-w-0">
+        <span className="pd-studio-toggle-label">{label}</span>
+        {hint !== undefined ? <span className="pd-studio-toggle-hint">{hint}</span> : null}
+      </span>
+      <input
+        type="checkbox"
+        className="pd-studio-switch pd-focusable"
+        role="switch"
+        // A native checkbox already carries its state, but `role="switch"`
+        // replaces the implicit role — so the state has to be restated for it.
+        aria-checked={checked}
+        data-testid={testid}
+        checked={checked}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.checked)}
+      />
+    </label>
   );
 }
 

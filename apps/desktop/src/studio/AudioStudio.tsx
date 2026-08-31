@@ -30,19 +30,26 @@
  *   SOUND EFFECTS MAKE FOUR. The mode whose whole thesis is "several at a time,
  *   keep the one that lands" shipped with its count defaulting to 1.
  */
-import { type JSX, useMemo, useRef, useState } from 'react';
+import { type JSX, useCallback, useMemo, useRef, useState } from 'react';
 import { ThreadMedia } from '../chat/ThreadMedia';
 import { useGenStore } from '../state/gen-store';
 import { RunHeader, StudioJob } from './StudioRun';
-import { Knob, Segmented, StudioEmpty, StudioShell } from './StudioShell';
+import { Knob, RailGroup, RailToggle, Segmented, StudioEmpty, StudioShell } from './StudioShell';
+import { useEnhancer } from './use-enhancer';
 import { useStudio } from './use-studio';
 
 type Mode = 'speech' | 'music' | 'sfx';
 
+/*
+ * "Effects", not "Sound effects": these three sit in a 236px-wide rail, and the
+ * longer label wrapped to two lines and burst its pill. The word costs nothing
+ * here — the room is the Audio Studio and the group is headed MODE, so there is
+ * nothing else "effects" could mean.
+ */
 const MODES: readonly { id: Mode; label: string }[] = [
   { id: 'speech', label: 'Speech' },
   { id: 'music', label: 'Music' },
-  { id: 'sfx', label: 'Sound effects' },
+  { id: 'sfx', label: 'Effects' },
 ];
 
 /*
@@ -106,6 +113,8 @@ export function AudioStudio(): JSX.Element {
   const [seconds, setSeconds] = useState<number | undefined>(undefined);
   const [count, setCount] = useState(4);
   const [refAudio, setRefAudio] = useState('');
+  const [steps, setSteps] = useState<number | ''>('');
+  const [seed, setSeed] = useState<number | ''>('');
   const fileInput = useRef<HTMLInputElement>(null);
 
   const catalog = useGenStore((s) => s.catalog);
@@ -131,17 +140,28 @@ export function AudioStudio(): JSX.Element {
       ? `No ${mode === 'speech' ? 'speech' : 'sound'} models are available.`
       : undefined;
 
-  const onRun = (): void => {
-    void run({
+  const enhancer = useEnhancer(useCallback((next: string) => setPrompt(next), []));
+
+  const onRun = async (): Promise<void> => {
+    /*
+     * SPEECH IS NEVER ENHANCED. The prompt is not a description of the audio —
+     * it IS the audio, read out. Rewriting it would put words in the user's
+     * mouth, so the enhancer refuses this mode on both sides of the IPC and the
+     * toggle is disabled here rather than silently doing nothing.
+     */
+    const text = await enhancer.enhance(mode, prompt, model);
+    await run({
       kind: 'audio',
       audioKind: mode,
-      prompt,
+      prompt: text,
       ...(model !== '' ? { model } : {}),
       ...(mode === 'speech' && voice !== '' ? { voice } : {}),
       ...(mode === 'speech' && speed !== 1 ? { speed } : {}),
       ...(mode === 'speech' && refAudio !== '' ? { refAudio } : {}),
       ...(mode !== 'speech' ? { seconds: seconds ?? (mode === 'sfx' ? 5 : 20) } : {}),
       ...(mode === 'sfx' ? { n: count } : {}),
+      ...(steps !== '' ? { steps } : {}),
+      ...(seed !== '' ? { seed } : {}),
     });
   };
 
@@ -164,41 +184,80 @@ export function AudioStudio(): JSX.Element {
             ? 'Describe a piece — instruments, tempo, mood…'
             : 'Describe a sound…'
       }
-      onRun={onRun}
-      busy={busy}
-      runLabel={mode === 'speech' ? 'Speak' : mode === 'music' ? 'Compose' : 'Generate'}
+      onRun={() => void onRun()}
+      busy={busy || enhancer.enhancing}
+      runLabel={
+        enhancer.enhancing
+          ? 'Enhancing…'
+          : mode === 'speech'
+            ? 'Speak'
+            : mode === 'music'
+              ? 'Compose'
+              : 'Generate'
+      }
       {...(blocked !== undefined ? { blocked } : {})}
       error={error}
-      headerAccessory={
-        <div className="pd-seg" role="tablist" aria-label="Audio mode">
-          {MODES.map((m) => (
-            <button
-              key={m.id}
-              type="button"
-              role="tab"
-              aria-selected={mode === m.id}
-              data-testid={`audio-mode-${m.id}`}
-              className="pd-seg-item pd-focusable"
-              data-on={mode === m.id ? 'true' : undefined}
-              onClick={() => {
-                setMode(m.id);
-                // A model chosen for one mode cannot serve another — Kokoro is
-                // not going to make a door slam — so the pick resets with the
-                // mode rather than silently failing on the next run.
-                setModel('');
-                setSeconds(undefined);
-              }}
-            >
-              {m.label}
-            </button>
-          ))}
-        </div>
-      }
       controls={
+        mode === 'speech' ? (
+          <Knob label="Pace">
+            <Segmented
+              testid="audio-speed"
+              value={speed}
+              onChange={setSpeed}
+              options={SPEEDS.map((s) => ({ value: s.value, label: s.label }))}
+            />
+          </Knob>
+        ) : (
+          <Knob label="Length">
+            <Segmented
+              testid="audio-seconds"
+              value={seconds ?? (mode === 'sfx' ? 5 : 20)}
+              onChange={setSeconds}
+              options={(mode === 'sfx' ? LENGTHS_SFX : LENGTHS_MUSIC).map((l) => ({
+                value: l.value,
+                label: l.label,
+              }))}
+            />
+          </Knob>
+        )
+      }
+      settings={
         <>
+          {/*
+            THE MODE IS THE FIRST THING IN THE RAIL, because it is the room's
+            name: it decides what the composer means, which knobs exist below it,
+            and which models can serve. It used to sit in a header this studio no
+            longer has.
+          */}
+          <RailGroup title="Mode">
+            <div className="pd-seg" role="tablist" aria-label="Audio mode">
+              {MODES.map((m) => (
+                <button
+                  key={m.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={mode === m.id}
+                  data-testid={`audio-mode-${m.id}`}
+                  className="pd-seg-item pd-focusable"
+                  data-on={mode === m.id ? 'true' : undefined}
+                  onClick={() => {
+                    setMode(m.id);
+                    // A model chosen for one mode cannot serve another — Kokoro
+                    // is not going to make a door slam — so the pick resets with
+                    // the mode rather than silently failing on the next run.
+                    setModel('');
+                    setSeconds(undefined);
+                  }}
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
+          </RailGroup>
+
           {mode === 'speech' ? (
-            <>
-              <Knob label="Voice">
+            <RailGroup title="Voice">
+              <Knob label="Preset">
                 <select
                   className="pd-studio-select pd-focusable"
                   data-testid="audio-voice"
@@ -211,14 +270,6 @@ export function AudioStudio(): JSX.Element {
                     </option>
                   ))}
                 </select>
-              </Knob>
-              <Knob label="Pace">
-                <Segmented
-                  testid="audio-speed"
-                  value={speed}
-                  onChange={setSpeed}
-                  options={SPEEDS.map((s) => ({ value: s.value, label: s.label }))}
-                />
               </Knob>
               {/* VOICE CLONING. A file, chosen or dropped — not a path you paste. */}
               <Knob label="Clone a voice">
@@ -265,61 +316,112 @@ export function AudioStudio(): JSX.Element {
                   />
                 </div>
               </Knob>
-            </>
-          ) : (
-            <>
-              <Knob label="Length">
+              <p className="pd-studio-rail-note">
+                A few seconds of someone talking is enough. It is read in that voice on the models
+                that support cloning; the others use the preset above.
+              </p>
+            </RailGroup>
+          ) : null}
+
+          {mode === 'sfx' ? (
+            <RailGroup title="Take">
+              <Knob label="Variations">
                 <Segmented
-                  testid="audio-seconds"
-                  value={seconds ?? (mode === 'sfx' ? 5 : 20)}
-                  onChange={setSeconds}
-                  options={(mode === 'sfx' ? LENGTHS_SFX : LENGTHS_MUSIC).map((l) => ({
-                    value: l.value,
-                    label: l.label,
-                  }))}
+                  testid="audio-count"
+                  value={count}
+                  onChange={setCount}
+                  options={[
+                    { value: 1, label: '1' },
+                    { value: 2, label: '2' },
+                    { value: 4, label: '4' },
+                  ]}
                 />
               </Knob>
-              {mode === 'sfx' ? (
-                <Knob label="Variations">
-                  <Segmented
-                    testid="audio-count"
-                    value={count}
-                    onChange={setCount}
-                    options={[
-                      { value: 1, label: '1' },
-                      { value: 2, label: '2' },
-                      { value: 4, label: '4' },
-                    ]}
-                  />
-                </Knob>
-              ) : null}
-            </>
-          )}
-          <Knob label="Model">
-            <select
-              className="pd-studio-select pd-focusable"
-              data-testid="audio-model"
-              value={model}
-              onChange={(e) => setModel(e.target.value)}
-            >
-              <option value="">Recommended</option>
-              {/*
-                A MODEL THAT CANNOT RUN IS SHOWN AS UNAVAILABLE, not offered.
-                `reserved` marks catalogue entries whose backend has not landed
-                — the dropdowns listed them exactly like the rest, so
-                "Recommended" worked and any model you picked by NAME failed.
-                Disabled and labelled is better than hidden: the entry is real,
-                it is coming, and picking it is the one thing that must not
-                quietly fail.
-              */}
-              {models.map((m) => (
-                <option key={m.id} value={m.id} disabled={m.reserved === true}>
-                  {m.label}
-                  {m.reserved === true ? ' — not available yet' : ''}
-                </option>
-              ))}
-            </select>
+            </RailGroup>
+          ) : null}
+
+          <RailGroup title="Prompt">
+            <RailToggle
+              testid="audio-enhance"
+              label="Prompt enhancer"
+              hint={
+                mode === 'speech'
+                  ? 'Off for speech — this text is read aloud exactly as you typed it.'
+                  : mode === 'music'
+                    ? 'Rewrites your idea as the genre, instrument and tempo tags this model is steered by.'
+                    : 'Rewrites your idea as one literal sound event in a room.'
+              }
+              checked={mode !== 'speech' && enhancer.enabled}
+              disabled={mode === 'speech'}
+              onChange={enhancer.setEnabled}
+            />
+            {enhancer.previous !== null && mode !== 'speech' ? (
+              <button
+                type="button"
+                className="pd-studio-rail-undo pd-focusable"
+                data-testid="audio-enhance-undo"
+                onClick={enhancer.undo}
+              >
+                Undo the rewrite
+              </button>
+            ) : null}
+          </RailGroup>
+
+          <RailGroup title="Model">
+            <Knob label={mode === 'speech' ? 'Speech model' : 'Sound model'}>
+              <select
+                className="pd-studio-select pd-focusable"
+                data-testid="audio-model"
+                value={model}
+                onChange={(e) => setModel(e.target.value)}
+              >
+                <option value="">Recommended</option>
+                {/*
+                  A MODEL THAT CANNOT RUN IS SHOWN AS UNAVAILABLE, not offered.
+                  `reserved` marks catalogue entries whose backend has not landed
+                  — the dropdowns listed them exactly like the rest, so
+                  "Recommended" worked and any model you picked by NAME failed.
+                */}
+                {models.map((m) => (
+                  <option key={m.id} value={m.id} disabled={m.reserved === true}>
+                    {m.label}
+                    {m.reserved === true ? ' — not available yet' : ''}
+                  </option>
+                ))}
+              </select>
+            </Knob>
+          </RailGroup>
+        </>
+      }
+      advanced={
+        <>
+          <Knob label="Steps">
+            <input
+              className="pd-studio-input pd-studio-input--num pd-focusable"
+              data-testid="audio-steps"
+              type="number"
+              min={1}
+              max={200}
+              placeholder="auto"
+              value={steps}
+              onChange={(e) => setSteps(e.target.value === '' ? '' : Number(e.target.value))}
+            />
           </Knob>
+          <Knob label="Seed">
+            <input
+              className="pd-studio-input pd-studio-input--wide pd-focusable"
+              data-testid="audio-seed"
+              type="number"
+              placeholder="random"
+              value={seed}
+              onChange={(e) => setSeed(e.target.value === '' ? '' : Number(e.target.value))}
+            />
+          </Knob>
+          <p className="pd-studio-rail-note">
+            Speech models ignore both — a reading is not sampled the way a picture is. They apply to
+            music and sound effects, where a fixed seed is how you tell a wording change from a
+            lucky take.
+          </p>
         </>
       }
     >

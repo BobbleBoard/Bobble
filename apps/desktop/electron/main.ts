@@ -37,7 +37,7 @@ import { disposeGen, registerGenCatalogIpc, registerGenIpc } from './gen/gen-man
 import { genWorkerCandidates, resolveGenWorkerScript } from './gen/worker-path';
 import { registerGen3dIpc } from './gen3d/gen3d-main';
 import { registerImportIpc } from './import/import-main';
-import { registerLlmIpc, shutdownInference } from './inference/llm-main';
+import { getInferenceUtility, registerLlmIpc, shutdownInference } from './inference/llm-main';
 import type { AppEventMap, CoreInvokeMap, FsInvokeMap } from './ipc-contract';
 import { disposeMacAgent, registerMacAgentIpc } from './mac/mac-agent';
 import { registerStoreIpc } from './model-store/store-main';
@@ -669,6 +669,27 @@ function registerAppIpc(): void {
       sendEvent: (wc, channel, payload) =>
         events.send(wc, channel as keyof AppEventMap & string, payload as never),
       isTrusted: (event) => isTrustedIpcEvent(event),
+      /*
+       * THE PROMPT ENHANCER'S MODEL.
+       *
+       * `PI_DESKTOP_ENHANCER_BASE_URL` first, so a dedicated tiny model can be
+       * pointed at without touching the chat model at all — that is the intended
+       * shape, because the rewrite is a one-second job and the chat model is
+       * often 27B and mid-conversation.
+       *
+       * Falling back to the RUNNING server keeps the feature alive out of the
+       * box rather than dead until someone downloads a second model. The cost is
+       * one short, user-initiated request against a server that is idle at that
+       * moment (the user is looking at a studio, not chatting) — not the
+       * per-turn background call that has repeatedly wrecked TTFT here.
+       */
+      resolveEnhancerEndpoint: () => {
+        const base = process.env.PI_DESKTOP_ENHANCER_BASE_URL;
+        if (base !== undefined && base !== '') {
+          return { baseUrl: base, model: process.env.PI_DESKTOP_ENHANCER_MODEL ?? 'utility' };
+        }
+        return getInferenceUtility();
+      },
     });
     log.info('experimental generation stack wired (gen bridge live)');
   }

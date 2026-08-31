@@ -136,6 +136,23 @@ export type GenInvokeMap = {
       error?: string;
     };
   };
+  /**
+   * REWRITE ONE PROMPT FOR THE MODEL THAT IS ABOUT TO SEE IT.
+   *
+   * Lives here rather than in the renderer because the small model's endpoint is
+   * a main-process fact (the running local server, or a dedicated enhancer
+   * pointed at by env) and because the guidelines are shared with the agent-side
+   * generate tools. Never rejects: `prompt` comes back unchanged if there is
+   * nothing to ask, so the studio can send the answer straight to `gen:generate`.
+   */
+  'gen:enhance': {
+    request: {
+      kind: 'image' | 'video' | 'music' | 'sfx' | 'speech';
+      prompt: string;
+      model?: string;
+    };
+    response: { prompt: string; changed: boolean };
+  };
   'gen:register': { request: { tabId: string }; response: { ok: boolean } };
   'gen:cancel': { request: { jobId: string }; response: { canceled: boolean } };
   /** Record the one-time GPL-3.0 consent (the disclosure modal's Accept). */
@@ -159,6 +176,7 @@ export const GEN_EVENT_CHANNELS = [
 ] as const satisfies readonly (keyof GenEventMap)[];
 export const GEN_INVOKE_CHANNELS = [
   'gen:generate',
+  'gen:enhance',
   'gen:register',
   'gen:cancel',
   'gen:comfy-consent',

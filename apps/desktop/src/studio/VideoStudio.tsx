@@ -19,17 +19,35 @@
  *
  *   SHAPE, NOT PIXELS, for the same reason as the image studio.
  */
-import { type JSX, useMemo, useState } from 'react';
+import { type JSX, useCallback, useMemo, useState } from 'react';
 import { ThreadMedia } from '../chat/ThreadMedia';
 import { useGenStore } from '../state/gen-store';
 import { RunHeader, StudioJob } from './StudioRun';
-import { Knob, Segmented, StudioEmpty, StudioShell } from './StudioShell';
+import { Knob, RailGroup, RailToggle, Segmented, StudioEmpty, StudioShell } from './StudioShell';
+import { useEnhancer } from './use-enhancer';
 import { useStudio } from './use-studio';
 
+/**
+ * SHAPE × SIZE, written out for the same reason as the image studio: computing
+ * a ratio and snapping to a multiple of 64 silently breaks the ratio (16:9 at a
+ * 512 long edge becomes 512×320, which is 16:10).
+ */
 const SHAPES = [
-  { value: 'landscape', label: 'Landscape', size: '768x512' },
-  { value: 'square', label: 'Square', size: '512x512' },
-  { value: 'portrait', label: 'Portrait', size: '576x1024' },
+  { value: 'landscape', label: '16:9', of: (n: number) => `${n}x${(n * 9) / 16}` },
+  { value: 'square', label: '1:1', of: (n: number) => `${n}x${n}` },
+  { value: 'portrait', label: '9:16', of: (n: number) => `${(n * 9) / 16}x${n}` },
+] as const;
+
+/**
+ * The long edge. Far smaller numbers than the image studio's, and that is not
+ * timidity — a clip is this many pixels times twenty-four times the number of
+ * seconds, so the same step costs about two orders of magnitude more here than
+ * it does for one still.
+ */
+const SIZES = [
+  { value: 512, label: 'Draft', hint: 'fastest — for checking the motion' },
+  { value: 768, label: 'Standard', hint: 'near what these models were trained at' },
+  { value: 1024, label: 'Large', hint: 'minutes per clip on this machine' },
 ] as const;
 
 type Shape = (typeof SHAPES)[number]['value'];
@@ -53,12 +71,30 @@ export function VideoStudio(): JSX.Element {
   const [prompt, setPrompt] = useState('');
   const [model, setModel] = useState('');
   const [shape, setShape] = useState<Shape>('landscape');
+  const [long, setLong] = useState<number>(512);
   const [seconds, setSeconds] = useState<number>(4);
+  const [steps, setSteps] = useState<number | ''>('');
+  const [seed, setSeed] = useState<number | ''>('');
 
   const catalog = useGenStore((s) => s.catalog);
   const { busy, error, runs, job, run, cancel } = useStudio('video');
   const models = useMemo(() => catalog.filter((m) => m.modality === 'video'), [catalog]);
-  const size = SHAPES.find((s) => s.value === shape)?.size ?? '768x512';
+  const size = (SHAPES.find((x) => x.value === shape) ?? SHAPES[0]).of(long);
+  const enhancer = useEnhancer(useCallback((next: string) => setPrompt(next), []));
+
+  const onRun = async (): Promise<void> => {
+    const enhanced = await enhancer.enhance('video', prompt, model);
+    await run({
+      kind: 'video',
+      prompt: enhanced,
+      size,
+      seconds,
+      fps: FPS,
+      ...(model !== '' ? { model } : {}),
+      ...(steps !== '' ? { steps } : {}),
+      ...(seed !== '' ? { seed } : {}),
+    });
+  };
 
   return (
     <StudioShell
@@ -67,63 +103,119 @@ export function VideoStudio(): JSX.Element {
       prompt={prompt}
       onPrompt={setPrompt}
       placeholder="Describe a shot…"
-      onRun={() =>
-        void run({
-          kind: 'video',
-          prompt,
-          size,
-          seconds,
-          fps: FPS,
-          ...(model !== '' ? { model } : {}),
-        })
-      }
-      busy={busy}
-      runLabel="Generate"
+      onRun={() => void onRun()}
+      busy={busy || enhancer.enhancing}
+      runLabel={enhancer.enhancing ? 'Enhancing…' : 'Generate'}
       {...(models.length === 0 ? { blocked: 'No video models are available.' } : {})}
       error={error}
       controls={
+        <Knob label="Length">
+          <Segmented
+            testid="video-seconds"
+            value={seconds}
+            onChange={setSeconds}
+            options={LENGTHS.map((l) => ({ value: l.value, label: l.label, hint: l.hint }))}
+          />
+        </Knob>
+      }
+      settings={
         <>
-          <Knob label="Length">
-            <Segmented
-              testid="video-seconds"
-              value={seconds}
-              onChange={setSeconds}
-              options={LENGTHS.map((l) => ({ value: l.value, label: l.label, hint: l.hint }))}
+          <RailGroup title="Shape">
+            <Knob label="Aspect ratio">
+              <Segmented
+                testid="video-shape"
+                value={shape}
+                onChange={setShape}
+                options={SHAPES.map((s) => ({ value: s.value, label: s.label }))}
+              />
+            </Knob>
+            <Knob label="Size">
+              <Segmented
+                testid="video-size"
+                value={long}
+                onChange={setLong}
+                options={SIZES.map((s) => ({ value: s.value, label: s.label, hint: s.hint }))}
+              />
+            </Knob>
+            <p className="pd-studio-rail-note" data-testid="video-pixels">
+              {size.replace('x', ' × ')} px · {FPS} fps · {seconds * FPS} frames
+            </p>
+          </RailGroup>
+
+          <RailGroup title="Prompt">
+            <RailToggle
+              testid="video-enhance"
+              label="Prompt enhancer"
+              hint="Rewrites your line so the MOTION is described first — the difference between a clip and an expensive photograph."
+              checked={enhancer.enabled}
+              onChange={enhancer.setEnabled}
+            />
+            {enhancer.previous !== null ? (
+              <button
+                type="button"
+                className="pd-studio-rail-undo pd-focusable"
+                data-testid="video-enhance-undo"
+                onClick={enhancer.undo}
+              >
+                Undo the rewrite
+              </button>
+            ) : null}
+          </RailGroup>
+
+          <RailGroup title="Model">
+            <Knob label="Video model">
+              <select
+                className="pd-studio-select pd-focusable"
+                data-testid="video-model"
+                value={model}
+                onChange={(e) => setModel(e.target.value)}
+              >
+                <option value="">Recommended</option>
+                {/*
+                  A MODEL THAT CANNOT RUN IS SHOWN AS UNAVAILABLE, not offered.
+                  `reserved` marks catalogue entries whose backend has not landed
+                  — the dropdowns listed them exactly like the rest, so
+                  "Recommended" worked and any model you picked by NAME failed.
+                */}
+                {models.map((m) => (
+                  <option key={m.id} value={m.id} disabled={m.reserved === true}>
+                    {m.label}
+                    {m.reserved === true ? ' — not available yet' : ''}
+                  </option>
+                ))}
+              </select>
+            </Knob>
+          </RailGroup>
+        </>
+      }
+      advanced={
+        <>
+          <Knob label="Steps">
+            <input
+              className="pd-studio-input pd-studio-input--num pd-focusable"
+              data-testid="video-steps"
+              type="number"
+              min={1}
+              max={100}
+              placeholder="auto"
+              value={steps}
+              onChange={(e) => setSteps(e.target.value === '' ? '' : Number(e.target.value))}
             />
           </Knob>
-          <Knob label="Shape">
-            <Segmented
-              testid="video-shape"
-              value={shape}
-              onChange={setShape}
-              options={SHAPES.map((s) => ({ value: s.value, label: s.label }))}
+          <Knob label="Seed">
+            <input
+              className="pd-studio-input pd-studio-input--wide pd-focusable"
+              data-testid="video-seed"
+              type="number"
+              placeholder="random"
+              value={seed}
+              onChange={(e) => setSeed(e.target.value === '' ? '' : Number(e.target.value))}
             />
           </Knob>
-          <Knob label="Model">
-            <select
-              className="pd-studio-select pd-focusable"
-              data-testid="video-model"
-              value={model}
-              onChange={(e) => setModel(e.target.value)}
-            >
-              <option value="">Recommended</option>
-              {/*
-                A MODEL THAT CANNOT RUN IS SHOWN AS UNAVAILABLE, not offered.
-                `reserved` marks catalogue entries whose backend has not landed
-                — the dropdowns listed them exactly like the rest, so
-                "Recommended" worked and any model you picked by NAME failed.
-                Disabled and labelled is better than hidden: the entry is real,
-                it is coming, and picking it is the one thing that must not
-                quietly fail.
-              */}
-              {models.map((m) => (
-                <option key={m.id} value={m.id} disabled={m.reserved === true}>
-                  {m.label}
-                  {m.reserved === true ? ' — not available yet' : ''}
-                </option>
-              ))}
-            </select>
-          </Knob>
+          <p className="pd-studio-rail-note">
+            Steps multiply by every frame here, so a change that costs a second on one picture costs
+            a minute on a clip. Empty means the model's own default.
+          </p>
         </>
       }
     >

@@ -78,6 +78,7 @@ import type {
 } from './gen-ipc-contract';
 import { createStillRenderer } from './hyperframes-still';
 import { openStillWindow } from './hyperframes-window';
+import { canEnhance, type EnhancerEndpoint, enhancePrompt } from './prompt-enhancer';
 import {
   buildVideoJob,
   defaultExtractPosterFrame,
@@ -119,6 +120,15 @@ export interface GenManagerOptions {
    * emits a clear "not installed" error until the aux deps land.
    */
   readonly hyperFramesRender?: HyperFramesRender;
+  /**
+   * Where the PROMPT ENHANCER's small model lives, or null when there is none.
+   *
+   * Injected rather than read here so this module keeps knowing nothing about
+   * the inference supervisor: the app hands it `getInferenceUtility()` (with an
+   * env override for a dedicated tiny model), and a null simply turns the
+   * feature off — `gen:enhance` then returns the prompt it was given.
+   */
+  readonly resolveEnhancerEndpoint?: () => EnhancerEndpoint | null;
   /** Poster-frame extractor for video self-critique. Default: ffmpeg best-effort. */
   readonly extractPosterFrame?: FrameExtractor;
   /**
@@ -400,7 +410,10 @@ export function registerGenIpc(opts: GenManagerOptions): void {
         height,
         seconds,
         fps,
-        steps: model.defaultSteps,
+        // The caller's step count when it sent one — the video studio's gears
+        // offer it, and a knob the pipeline discards is worse than no knob.
+        // Clamped because a stray 400 here is many minutes of frames.
+        steps: raw.steps !== undefined ? clamp(raw.steps, 1, 100) : model.defaultSteps,
         negativePrompt: raw.negativePrompt,
         seed,
       },
@@ -786,6 +799,35 @@ export function registerGenIpc(opts: GenManagerOptions): void {
           error: err instanceof Error ? err.message : String(err),
         };
       }
+    },
+  );
+
+  /*
+   * PROMPT ENHANCEMENT, on the way to the same button.
+   *
+   * Deliberately a separate round trip rather than a flag on `gen:generate`: the
+   * studio shows the rewritten prompt in the composer BEFORE it runs, because a
+   * rewrite you cannot see is a model quietly changing your words, and the whole
+   * feature is only acceptable if you can read it, edit it, or switch it off.
+   */
+  ipcMain.handle(
+    'gen:enhance',
+    async (
+      event,
+      req: GenInvokeMap['gen:enhance']['request'],
+    ): Promise<GenInvokeMap['gen:enhance']['response']> => {
+      guard(event, 'gen:enhance');
+      const endpoint = opts.resolveEnhancerEndpoint?.() ?? null;
+      if (endpoint === null || !canEnhance(req.kind, req.model)) {
+        return { prompt: req.prompt, changed: false };
+      }
+      const prompt = await enhancePrompt({
+        kind: req.kind,
+        prompt: req.prompt,
+        endpoint,
+        ...(req.model !== undefined ? { model: req.model } : {}),
+      });
+      return { prompt, changed: prompt.trim() !== req.prompt.trim() };
     },
   );
 

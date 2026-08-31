@@ -696,6 +696,18 @@ body {
 .pd-chat-title:hover {
   background: var(--pd-bg-hover);
 }
+
+/* A studio's name in the title slot. Same metrics as `.pd-chat-title` minus the
+   affordances of something you can click and rename — because you cannot. */
+.pd-topbar-title {
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 8px;
+  color: var(--pd-text-primary);
+  font-weight: var(--pd-font-weight-body);
+  white-space: nowrap;
+}
 /*
  * WHEN THE SIDEBAR IS CLOSED, THE TITLE HAS TO CLEAR TWO THINGS.
  *
@@ -3067,78 +3079,155 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
  * description you are iterating on must stay under your hands while the output
  * changes below it.
  */
+/*
+ * THE STUDIO IS CONTENT NOW, NOT A WINDOW.
+ *
+ * It used to take the whole window: its own header with a back pill, its own
+ * traffic-light drag inset, `height: 100vh`. the user asked for the opposite —
+ * "just appear in the chat area as if they are just replacing the current chat"
+ * — so it fills its PARENT, wears the app's top bar, and the sidebar slides in
+ * over its left edge exactly as it does for a conversation. Everything the old
+ * header carried is already up there: the title in the top bar, the way out in
+ * the sidebar, the drag region in the shell.
+ */
 .pd-studio {
   display: flex;
-  flex-direction: column;
-  height: 100vh;
+  height: 100%;
+  min-height: 0;
   background: var(--pd-bg-base);
   color: var(--pd-text-primary);
 }
 
-/*
- * THE HEADER SPANS THE WINDOW, NOT THE COLUMN.
- *
- * Centring it with the content put the BACK button 525px from the left edge,
- * floating in the middle of an empty bar — and back is a window-level control
- * that belongs at the window's edge, the way it does in every other takeover
- * here. The title travels with it; only the working column below is centred.
- */
-.pd-studio-head {
+/* The working column: results above, input bar below. The rail is its SIBLING,
+   so opening it narrows both halves at once. */
+.pd-studio-main {
+  flex: 1;
+  min-width: 0;
   display: flex;
-  align-items: center;
-  gap: 14px;
-  /* TOP INSET. This was `0 20px 14px` — no top padding at all — so the title sat
-     flush against the window's top edge, level with the traffic lights and
-     touching the chrome. the user: "there's some text at the top edging on the
-     application window." */
-  padding: 12px 20px;
-  min-height: 56px;
-  flex: none;
-}
-.pd-studio-head-accessory {
-  margin-inline-start: auto;
-  display: flex;
-  align-items: center;
-}
-/* Clears the macOS traffic lights (titleBarStyle: hiddenInset ≈ 78px) and stays
-   draggable, exactly as the other full-window takeovers do. */
-.pd-studio-head-drag {
-  width: 74px;
-  height: 44px;
-  flex: none;
-  -webkit-app-region: drag;
+  flex-direction: column;
 }
 
-.pd-studio-back {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
+/*
+ * THE SETTINGS RAIL. Width animates from 0 on the same curve as the canvas
+ * dock, so the results column gives up the space rather than being covered by
+ * it — the mirror of what the left sidebar does on the other side.
+ *
+ * The inner panel keeps a FIXED width while the outer clips, because a panel
+ * that reflows through every intermediate width reflows its selects and
+ * segmented controls with it, and that reads as a stutter rather than a slide.
+ */
+.pd-studio-rail {
   flex: none;
-  cursor: pointer;
-  border-radius: 999px;
-  padding: 6px 14px 6px 9px;
-  font-size: 0.8125rem;
-  color: var(--pd-text-secondary);
-  background: var(--pd-bg-raised);
-  border: 1px solid color-mix(in oklab, var(--pd-text-primary) 12%, transparent);
-  transition:
-    background var(--pd-duration-fast) var(--pd-easing-standard),
-    color var(--pd-duration-fast) var(--pd-easing-standard);
+  width: var(--pd-studio-rail-w, 268px);
+  overflow: hidden;
+  border-left: 1px solid color-mix(in oklab, var(--pd-text-primary) 10%, transparent);
+  transition: width var(--pd-duration-base, 220ms) var(--pd-easing-standard, ease);
 }
-.pd-studio-back:hover {
-  background: var(--pd-bg-hover);
+.pd-studio-rail[data-open="false"] {
+  width: 0;
+  border-left-color: transparent;
+}
+.pd-studio-rail-inner {
+  width: var(--pd-studio-rail-w, 268px);
+  height: 100%;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px 16px 24px;
+}
+.pd-studio-rail-head {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--pd-text-muted);
+}
+
+/* A fact or a caveat under a group of knobs — the pixel count, what a blank
+   field means. Small, muted, never a control. */
+.pd-studio-rail-note {
+  font-size: 0.6875rem;
+  color: var(--pd-text-muted);
+  line-height: 1.45;
+}
+.pd-studio-rail-undo {
+  align-self: flex-start;
+  font-size: 0.75rem;
+  color: var(--pd-accent-primary);
+  cursor: pointer;
+  border-radius: 6px;
+  padding: 2px 4px;
+  margin-inline-start: -4px;
+}
+.pd-studio-rail-undo:hover {
+  text-decoration: underline;
+}
+
+/* An on/off row in the rail: statement on the left, switch hard right, so a
+   column of them scans in one pass. */
+.pd-studio-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  cursor: pointer;
+}
+.pd-studio-toggle[data-disabled="true"] {
+  opacity: 0.45;
+  cursor: default;
+}
+.pd-studio-toggle-label {
+  display: block;
+  font-size: 0.8125rem;
   color: var(--pd-text-primary);
 }
-
-.pd-studio-title {
-  font-size: 1.0625rem;
-  font-weight: 600;
-  line-height: 1.2;
-}
-.pd-studio-sub {
-  font-size: 0.8125rem;
+.pd-studio-toggle-hint {
+  display: block;
+  font-size: 0.6875rem;
   color: var(--pd-text-muted);
-  margin-top: 1px;
+  margin-top: 2px;
+  line-height: 1.35;
+}
+/* A switch, drawn from a checkbox — the accessible element is the real input,
+   and `appearance: none` is what lets it wear this shape. */
+.pd-studio-switch {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: none;
+  position: relative;
+  width: 34px;
+  height: 20px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--pd-text-primary) 16%, transparent);
+  cursor: pointer;
+  transition: background var(--pd-duration-fast) var(--pd-easing-standard);
+}
+.pd-studio-switch::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background: var(--pd-bg-base);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 30%);
+  transition: transform var(--pd-duration-fast) var(--pd-easing-standard);
+}
+.pd-studio-switch:checked {
+  background: var(--pd-accent-primary);
+}
+.pd-studio-switch:checked::after {
+  transform: translateX(14px);
+}
+.pd-studio-switch:disabled {
+  cursor: default;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pd-studio-rail {
+    transition: none;
+  }
 }
 
 /* ---- the composer ------------------------------------------------------- */
@@ -3248,6 +3337,26 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
 .pd-studio-input--num {
   width: 68px;
 }
+
+/* NO NATIVE STEPPER. macOS draws a two-arrow widget inside the field that
+   ignores this app's palette entirely, and in the gears dialog it was the
+   brightest thing on the panel. Type the number, or leave it empty. */
+.pd-studio-input::-webkit-inner-spin-button,
+.pd-studio-input::-webkit-outer-spin-button {
+  appearance: none;
+  margin: 0;
+}
+
+/* The gears panel: one field per row, full width, so a number and its label do
+   not sit in a 68px box in the middle of a 460px dialog. */
+.pd-studio-advanced {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.pd-studio-advanced .pd-studio-input {
+  width: 100%;
+}
 .pd-studio-input--wide {
   width: 190px;
 }
@@ -3292,6 +3401,30 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
   background: var(--pd-bg-raised);
   color: var(--pd-text-primary);
   box-shadow: 0 1px 2px rgb(0 0 0 / 8%);
+}
+
+/* Stacked, full-width, labels above — a rail is a column of settings, not the
+   composer's row of knobs, and the shared `.pd-studio-knob` is a row-shaped
+   thing by default. */
+.pd-studio-rail-inner .pd-studio-knob {
+  width: 100%;
+}
+.pd-studio-rail-inner .pd-studio-select,
+.pd-studio-rail-inner .pd-studio-input {
+  width: 100%;
+  max-width: none;
+}
+.pd-studio-rail-inner .pd-seg {
+  width: 100%;
+}
+.pd-studio-rail-inner .pd-seg-item {
+  flex: 1;
+  text-align: center;
+  justify-content: center;
+  /* One line, always. A wrapped label here bursts the pill it sits in, and the
+     rail is too narrow for a second line to look like anything but a mistake. */
+  white-space: nowrap;
+  padding-inline: 6px;
 }
 
 /*

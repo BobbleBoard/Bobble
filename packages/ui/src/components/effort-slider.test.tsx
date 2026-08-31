@@ -51,7 +51,10 @@ describe('EffortSlider render', () => {
     expect(html).toContain('role="slider"');
     expect(html).toContain('aria-valuemax="3"');
     expect(html).toContain('aria-valuenow="1"');
-    expect(html).toContain('width:33'); // fill ≈ 33% (the routed position)
+    // The position is ONE number the fill, the knob and the dots all read; a
+    // third of the way along is the routed tier's slot.
+    expect(html).toContain('--pd-effort-pos:0.333');
+    expect(html).toContain('pd-effort-dot'); // the detents are drawn
   });
 
   it('level mode: the header shows the pinned level, the Auto toggle is an inactive reset, the fill is explicit', () => {
@@ -72,6 +75,8 @@ describe('EffortSlider render', () => {
     expect(html).toContain('aria-pressed="false"');
     expect(html).not.toContain('data-active'); // the toggle is not lit
     expect(html).toContain('aria-valuenow="3"');
-    expect(html).toContain('width:100%');
+    expect(html).toContain('--pd-effort-pos:1');
+    // Every dot is behind the knob at Max, so every one is lit.
+    expect(html.match(/data-on=""/g)?.length).toBe(4);
   });
 });

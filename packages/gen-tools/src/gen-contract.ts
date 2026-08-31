@@ -91,6 +91,15 @@ export interface GenerateVideoParams {
   readonly size?: string;
   /** Frames per second. Default per model. */
   readonly fps?: number;
+  /**
+   * Denoising steps. Default per model.
+   *
+   * The image params have always carried this; video did not, so the studio's
+   * advanced panel had a Steps field the pipeline discarded. Cost here is per
+   * FRAME — a change worth a second on one still is worth a minute on a clip —
+   * which is a reason to warn about the knob, not to withhold it.
+   */
+  readonly steps?: number;
   /** Base RNG seed for reproducibility. */
   readonly seed?: number;
   /** What to avoid in the video. */

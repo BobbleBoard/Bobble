@@ -40,12 +40,14 @@ import {
   startCorpTask,
 } from '../state/corp-connect';
 import { useCorpStore } from '../state/corp-store';
+import { useModalityStore } from '../state/modality-store';
 import { getModels, newSession, setSessionName, startPi, syncWorkspace } from '../state/pi-connect';
 import { usePiStore } from '../state/pi-slice';
 import { connectPresent } from '../state/present-store';
 import { useProjectStore } from '../state/project-store';
 import { applySavedHarnessConfig, useUserMode } from '../state/settings-store';
 import { useThemeStore } from '../store/theme';
+import { useStudioUiStore } from '../studio/studio-ui-store';
 import { AdvancedParamsPanel } from './AdvancedParamsPanel';
 import { preloadFastestModel } from './auto-router';
 import { ChatComposer } from './ChatComposer';
@@ -72,6 +74,49 @@ import { WindowDropOverlay } from './WindowDropOverlay';
  * one hides: there is never a duplicate toggle and never a terminal icon here.
  * Rendered INSIDE `<CanvasProvider>` so it can reach the shared open state.
  */
+/**
+ * The studio's two openers, in the two places the app already puts them.
+ *
+ * the user: the settings rail should open from "the same place and icon as canvas",
+ * and the gears from "the same place and icon as advanced settings". So they
+ * are literally that cluster, swapped in while a studio is the content — the
+ * canvas has nothing to show in a studio, and two panel toggles fighting over
+ * one corner would be a coin flip every time.
+ */
+/** The name each studio wears in the top bar. */
+const STUDIO_TITLES: Record<string, string> = {
+  image: 'Image Studio',
+  video: 'Video Studio',
+  audio: 'Audio Studio',
+};
+
+function StudioTopBarControls() {
+  const settingsOpen = useStudioUiStore((s) => s.settingsOpen);
+  const setSettingsOpen = useStudioUiStore((s) => s.setSettingsOpen);
+  const advancedOpen = useStudioUiStore((s) => s.advancedOpen);
+  const setAdvancedOpen = useStudioUiStore((s) => s.setAdvancedOpen);
+  return (
+    <>
+      <IconButton
+        aria-label="Advanced settings"
+        aria-pressed={advancedOpen}
+        data-testid="studio-advanced-toggle"
+        onClick={() => setAdvancedOpen(!advancedOpen)}
+      >
+        <IconGears />
+      </IconButton>
+      <IconButton
+        aria-label={settingsOpen ? 'Close settings' : 'Open settings'}
+        aria-pressed={settingsOpen}
+        data-testid="studio-settings-toggle"
+        onClick={() => setSettingsOpen(!settingsOpen)}
+      >
+        <IconPanelRight />
+      </IconButton>
+    </>
+  );
+}
+
 function CanvasTopBarControls() {
   const canvasOpen = useCanvasStore((s) => s.canvasOpen);
   const toggleCanvasOpen = useCanvasStore((s) => s.toggleCanvasOpen);
@@ -142,6 +187,44 @@ export function ChatApp({
   const flavor = useThemeStore((s) => s.flavor);
   const [piModels, setPiModels] = useState<Model[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  /*
+   * ENTERING A STUDIO CLOSES THE SIDEBAR — once, not permanently.
+   *
+   * A studio is a room you came to work in, and the chat list is not part of
+   * that work; the width it holds is the width the results want. So the sidebar
+   * collapses on the way in, with the SAME animation the collapse control uses,
+   * and the studio simply fills the space.
+   *
+   * ON ARRIVAL ONLY. Reopening the sidebar inside a studio is a thing the user
+   * is allowed to do — it slides back in to the LEFT of the studio and stays.
+   * Collapsing it again on every render would fight them, so this keys off a
+   * CHANGE of modality rather than off being in one.
+   *
+   * On the MODALITY, not on "am I in a studio": reaching the next studio means
+   * opening the sidebar and picking it, so image → video is an arrival with the
+   * sidebar open and has to close it too. Keyed off the boolean it did not —
+   * the studio-layout probe caught exactly that.
+   *
+   * Leaving restores whatever it was before the FIRST studio (the ref is only
+   * written on the way in FROM chat), because the state you return to should be
+   * the state you left, not the collapsed one you passed through.
+   */
+  const modality = useModalityStore((s) => s.view);
+  const inStudio = modality !== 'chat';
+  const lastModality = useRef(modality);
+  const sidebarBeforeStudio = useRef(true);
+  useEffect(() => {
+    const from = lastModality.current;
+    if (modality === from) return;
+    lastModality.current = modality;
+    if (modality !== 'chat') {
+      if (from === 'chat') sidebarBeforeStudio.current = sidebarOpen;
+      setSidebarOpen(false);
+    } else {
+      setSidebarOpen(sidebarBeforeStudio.current);
+    }
+  }, [modality, sidebarOpen]);
 
   /*
    * ⌘K — one way in, instead of a growing table of keys.
@@ -539,10 +622,19 @@ export function ChatApp({
                    * noise, and mine did not route. So the subagent's name simply
                    * becomes the title while you are looking at it.
                    */
-                  <ChatTitle
-                    title={viewedChildId !== null ? (viewedChildTitle ?? 'Subagent') : title}
-                    onRename={(name) => void setSessionName(name)}
-                  />
+                  inStudio ? (
+                    /* A studio's name is fixed, so the title is plain text here
+                       rather than the renameable ChatTitle — the same slot,
+                       saying where you are, with nothing to edit. */
+                    <span className="pd-topbar-title" data-testid="studio-title">
+                      {STUDIO_TITLES[modality]}
+                    </span>
+                  ) : (
+                    <ChatTitle
+                      title={viewedChildId !== null ? (viewedChildTitle ?? 'Subagent') : title}
+                      onRename={(name) => void setSessionName(name)}
+                    />
+                  )
                 }
                 right={
                   // The canvas toggle (round-8 #11/#16) plus, for power users only,
@@ -556,8 +648,17 @@ export function ChatApp({
                   // watched or stopped from the row that started it.
                   <div className="flex items-center gap-2">
                     <TopBarDownloads />
-                    <AdvancedParamsButton />
-                    <CanvasTopBarControls />
+                    {/* In a studio the canvas has nothing to show and the chat's
+                        sampling knobs are not what you are adjusting, so the two
+                        buttons keep their positions and change what they open. */}
+                    {inStudio ? (
+                      <StudioTopBarControls />
+                    ) : (
+                      <>
+                        <AdvancedParamsButton />
+                        <CanvasTopBarControls />
+                      </>
+                    )}
                   </div>
                 }
               />

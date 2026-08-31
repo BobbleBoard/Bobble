@@ -129,17 +129,57 @@
   user-select: none;
 }
 
-/* The track — a slim rounded rail the dithered heat fill grows along. */
+/* The track — a slim rounded rail the fill grows along.
+ *
+ * `--pd-effort-knob-r` is the geometry the whole control is built on: the knob's
+ * centre can only travel between one radius in from each end, so every position
+ * below is `r + fraction * (100% - 2r)`. Placing things at a raw percentage of
+ * the track instead puts the knob half off the end at Max and the last detent
+ * dot under the rounded cap — the two bugs that make a slider look untrustworthy
+ * at exactly the value someone chose on purpose. */
 .pd-effort-track {
+  --pd-effort-knob-r: 9px;
   position: relative;
   flex: 1 1 auto;
-  min-width: 108px;
+  min-width: 132px;
   height: 12px;
   border-radius: var(--pd-radius-full);
   background: var(--pd-bg-track);
   box-shadow: inset 0 0 0 1px var(--pd-border-subtle);
   cursor: pointer;
   touch-action: none;
+}
+
+/* ── The detent dots ──────────────────────────────────────────────────────── */
+
+.pd-effort-dots {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* One per level, centred on the position the knob will land at. Ahead of the
+ * knob they are a quiet notch in the empty rail; behind it they sit on the fill,
+ * so they are drawn in the fill's own foreground colour rather than the track's
+ * — the same dot, legible against either background. */
+.pd-effort-dot {
+  position: absolute;
+  top: 50%;
+  left: calc(
+    var(--pd-effort-knob-r) +
+    var(--pd-effort-dot, 0) *
+    (100% - 2 * var(--pd-effort-knob-r))
+  );
+  width: 3px;
+  height: 3px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--pd-text-primary) 28%, transparent);
+  transition: background var(--pd-duration-base) var(--pd-easing-standard);
+}
+
+.pd-effort-dot[data-on] {
+  background: color-mix(in srgb, white 62%, transparent);
 }
 
 .pd-effort-track:focus-visible {
@@ -160,7 +200,16 @@
 .pd-effort-fill {
   position: absolute;
   inset: 0 auto 0 0;
-  min-width: 20px;
+  /* Ends under the KNOB's centre, not at a raw percentage — so the coloured part
+     is exactly the part behind the handle, and at the lowest level it is the
+     short cap the knob sits on rather than a stub sticking out to its right.
+     The inline `width` is kept as a plain percentage for anything reading the
+     markup; this overrides it with the honest geometry. */
+  width: calc(
+    var(--pd-effort-knob-r) +
+    var(--pd-effort-pos, 0) *
+    (100% - 2 * var(--pd-effort-knob-r))
+  ) !important;
   border-radius: var(--pd-radius-full);
   background: color-mix(
     in srgb,
@@ -180,23 +229,35 @@
 .pd-effort-knob {
   position: absolute;
   top: 50%;
-  right: 1px;
-  width: 16px;
-  height: 16px;
-  transform: translateY(-50%);
+  left: calc(
+    var(--pd-effort-knob-r) +
+    var(--pd-effort-pos, 0) *
+    (100% - 2 * var(--pd-effort-knob-r))
+  );
+  width: calc(var(--pd-effort-knob-r) * 2);
+  height: calc(var(--pd-effort-knob-r) * 2);
+  transform: translate(-50%, -50%);
   border-radius: 50%;
   background: var(--pd-bg-raised);
   box-shadow:
     var(--pd-shadow-md),
     0 0 0 1px var(--pd-border-default);
+  /* The slide itself. `left` animates on the same curve and duration as the
+     fill's width, so the handle and the colour behind it move as one object
+     rather than one chasing the other. */
+  transition:
+    left var(--pd-duration-base) var(--pd-easing-standard),
+    width var(--pd-duration-fast) var(--pd-easing-standard),
+    height var(--pd-duration-fast) var(--pd-easing-standard);
 }
 
 /* Grabbing it: a touch larger and a firmer ring. No halo — a soft spread here
  * reads as the same colour leak the fill was just cured of. */
 .pd-effort-track:active .pd-effort-knob,
 .pd-effort-track:focus-visible .pd-effort-knob {
-  width: 18px;
-  height: 18px;
+  /* Grows from its own centre, which is why the radius is a variable: bumping
+     the width alone would shift the handle off the detent it is sitting on. */
+  --pd-effort-knob-r: 10px;
   box-shadow:
     var(--pd-shadow-md),
     0 0 0 1.5px var(--pd-border-focus);
@@ -283,7 +344,9 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .pd-effort-fill {
+  .pd-effort-fill,
+  .pd-effort-knob,
+  .pd-effort-dot {
     transition: none;
   }
 }

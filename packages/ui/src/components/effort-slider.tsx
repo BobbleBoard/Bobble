@@ -78,7 +78,15 @@ export function EffortSlider({
 }: EffortSliderProps): ReactNode {
   const trackRef = useRef<HTMLDivElement>(null);
   const max = Math.max(1, steps - 1);
-  const pct = `${clamp01(fill) * 100}%`;
+  const frac = clamp01(fill);
+  /*
+   * The knob's CENTRE, as a fraction — CSS turns it into a position inside the
+   * track's usable range (see `--pd-effort-knob-r`). The fill and the knob and
+   * every dot are placed from this one number, which is why they cannot drift
+   * apart: at Max the knob sits ON the last dot rather than half off the end,
+   * which is what a percentage of the RAW width gives you.
+   */
+  const posVar = { ['--pd-effort-pos' as string]: frac } as CSSProperties;
 
   /* Which way the readout should slide. Remembering the previous fill (not
    * `value`, which stays put while Auto tracks a tier) means the word moves the
@@ -192,10 +200,34 @@ export function EffortSlider({
         >
           <div
             className="pd-effort-fill"
-            style={{ width: pct, ['--pd-effort-heat' as string]: clamp01(fill) } as CSSProperties}
-          >
-            <span className="pd-effort-knob" aria-hidden="true" />
-          </div>
+            style={{ ...posVar, ['--pd-effort-heat' as string]: frac } as CSSProperties}
+          />
+          {/*
+            THE DETENTS, DRAWN — after the fill, deliberately. Both are absolutely
+            positioned siblings, so the later one wins: parked before the fill
+            they were painted over by it, and every dot behind the knob simply
+            vanished. the user: "dots for levels aswell." Without them the
+            track says only "somewhere between faster and smarter" — you cannot
+            see that there are four settings, which one you are on, or how far
+            the next one is. They are also where the knob lands, so they double
+            as the proof that the geometry is honest.
+          */}
+          <span className="pd-effort-dots" aria-hidden="true">
+            {Array.from({ length: steps }, (_, i) => (
+              <span
+                // biome-ignore lint/suspicious/noArrayIndexKey: the index IS the detent.
+                key={i}
+                className="pd-effort-dot"
+                data-on={i / max <= frac + 0.001 ? '' : undefined}
+                style={{ ['--pd-effort-dot' as string]: i / max } as CSSProperties}
+              />
+            ))}
+          </span>
+          {/* The knob is the TRACK's child, not the fill's: parented to the fill
+              it inherited the fill's width animation and arrived a beat late,
+              which is the difference between a knob that slides and one that
+              catches up. */}
+          <span className="pd-effort-knob" style={posVar} aria-hidden="true" />
         </div>
         <span className="pd-effort-flank" aria-hidden="true">
           Smarter

@@ -61,3 +61,23 @@ await finish();
 Older probes hand-roll their own `electron.launch`. They are still invisible —
 that comes from the app side, not the probe — but they do not get the focus
 guard or `shot()`. Move one over when you touch it.
+
+## Tuning the prompt enhancer
+
+`tests/enhance/enhance-probe.mjs` is not an e2e probe — it drives ONLY the
+prompt rewrite, against a real llama-server, with generation switched off:
+
+```bash
+llama-server -m <a small gguf> --port 8899 -c 8192 -ngl 99 --jinja
+node tests/enhance/enhance-probe.mjs --base http://127.0.0.1:8899/v1
+```
+
+It grades each rewrite on what a bad one actually does — drops the user's
+subject, comes back shorter than it went in, answers as chat, breaks the target
+model's house style, runs over the word cap — and prints a pass count and the
+average latency. `--case <n>` runs one case, `--json` prints the table for
+diffing two versions of the system prompt.
+
+Doing it this way is the point: a diffusion run would dominate the wall clock
+and tell you almost nothing, because you cannot separate "the prompt got better"
+from "the seed was kind".

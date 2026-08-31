@@ -1,8 +1,14 @@
 /**
  * Which top-level MODALITY the app is showing. Chat is the default; the studios
- * (3D, Image, Video, Audio) are full-window takeovers reached from the sidebar
- * "Modalities" dropdown, each with its own back-to-chat affordance. UI-only
- * routing — no persistence.
+ * (3D, Image, Video, Audio) are reached from the sidebar "Modalities" dropdown.
+ *
+ * They are a CONTENT route, not a window takeover: a studio renders where the
+ * chat renders, under the same top bar, and the sidebar slides in over its left
+ * edge — the user: "just appear in the chat area as if they are just replacing the
+ * current chat". So leaving one is the same gesture as leaving the model hub,
+ * and picking a chat in the sidebar exits here too (App's `onEnterChat`).
+ *
+ * UI-only routing — no persistence.
  */
 import { create } from 'zustand';
 
@@ -24,7 +30,7 @@ export const useModalityStore = create<ModalityState>()((set) => ({
   setView: (view) => set({ view }),
 }));
 
-/** Leave the current modality and return to chat (the studios' back button). */
+/** Leave the current modality and return to chat. */
 export function exitModality(): void {
   useModalityStore.getState().setView('chat');
 }
