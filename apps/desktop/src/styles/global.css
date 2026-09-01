@@ -2972,12 +2972,15 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
  */
 .pd-media-btn {
   position: absolute;
-  z-index: 2;
+  z-index: 3;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  height: 30px;
-  width: 30px;
+  gap: 7px;
+  /* Scaled up on the user's note — at 30px these were smaller than the app's own
+     icon buttons while sitting on top of a picture, which is the one place a
+     control needs to hold its own against what is behind it. */
+  height: 38px;
+  width: 38px;
   justify-content: center;
   border-radius: 9px;
   cursor: pointer;
@@ -2995,8 +2998,8 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
 }
 .pd-media-btn--wide {
   width: auto;
-  padding: 0 11px;
-  font-size: 0.75rem;
+  padding: 0 14px;
+  font-size: 0.8125rem;
   font-weight: 500;
 }
 .pd-media-btn--tl {
@@ -3012,8 +3015,16 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
   bottom: 10px;
   transform: translateY(2px);
 }
+/*
+ * `:has(:focus-visible)`, not `:focus-within`.
+ *
+ * Clicking Play leaves focus inside the frame, so `:focus-within` kept every
+ * control lit over a clip that was already running — the state these exist to
+ * stay out of. `:has(:focus-visible)` is the keyboard half without the mouse
+ * half: tab in and the controls appear, click and they fade with the pointer.
+ */
 .pd-media-frame:hover .pd-media-btn,
-.pd-media-frame:focus-within .pd-media-btn,
+.pd-media-frame:has(:focus-visible) .pd-media-btn,
 .pd-media-stage .pd-media-btn {
   opacity: 1;
   transform: none;
@@ -3100,61 +3111,160 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
   border-radius: 12px;
 }
 
-.pd-media-transport {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 12px;
-  background: color-mix(in srgb, #000 62%, transparent);
-  -webkit-backdrop-filter: blur(12px);
-  backdrop-filter: blur(12px);
-  color: #fff;
-}
-.pd-media-play {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
+/*
+ * THE CENTRED PLAY BUTTON.
+ *
+ * Big, glassy, and — while the clip is PAUSED — on screen whether you are
+ * hovering or not, because a paused clip with no visible control is
+ * indistinguishable from a still. Playing, it steps back and returns as Pause
+ * only when you go near it.
+ */
+.pd-media-bigplay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 62px;
+  height: 62px;
   border-radius: 999px;
   cursor: pointer;
   color: #fff;
-  background: color-mix(in srgb, #fff 14%, transparent);
-  transition: background var(--pd-duration-fast) var(--pd-easing-standard);
+  background: color-mix(in srgb, #000 52%, transparent);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  border: 1px solid color-mix(in srgb, #fff 20%, transparent);
+  transition:
+    opacity var(--pd-duration-fast) var(--pd-easing-standard),
+    background var(--pd-duration-fast) var(--pd-easing-standard),
+    transform var(--pd-duration-fast) var(--pd-easing-standard);
 }
-.pd-media-play:hover {
-  background: color-mix(in srgb, #fff 26%, transparent);
+.pd-media-bigplay[data-playing="true"] {
+  opacity: 0;
+  pointer-events: none;
 }
+/*
+ * `:focus-visible` on the button, NOT `:focus-within` on the frame.
+ *
+ * Clicking Play leaves focus on the button, so a frame-level focus rule kept it
+ * lit over a clip that was already running — the exact thing it is supposed to
+ * get out of the way of. A mouse click does not match `:focus-visible`, so the
+ * button fades after a click and stays visible for anyone who tabbed to it.
+ */
+.pd-media-frame:hover .pd-media-bigplay[data-playing="true"],
+.pd-media-bigplay[data-playing="true"]:focus-visible,
+.pd-media-stage:hover .pd-media-bigplay[data-playing="true"] {
+  opacity: 1;
+  pointer-events: auto;
+}
+.pd-media-bigplay:hover {
+  background: color-mix(in srgb, #000 70%, transparent);
+  transform: translate(-50%, -50%) scale(1.06);
+}
+.pd-media-bigplay:active {
+  transform: translate(-50%, -50%) scale(0.97);
+}
+
+/*
+ * THE FLOATING TIMELINE. No bar, no slab — it lies on the clip near the bottom
+ * and only while you are there, with a short scrim under it so a white scrubber
+ * stays legible over a white frame. It stops clear of the export button in the
+ * corner rather than running underneath it.
+ */
+.pd-media-timeline {
+  position: absolute;
+  left: 14px;
+  right: 62px;
+  bottom: 14px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  opacity: 0;
+  transform: translateY(3px);
+  transition:
+    opacity var(--pd-duration-fast) var(--pd-easing-standard),
+    transform var(--pd-duration-fast) var(--pd-easing-standard);
+}
+.pd-media-frame:hover .pd-media-timeline,
+.pd-media-frame:has(:focus-visible) .pd-media-timeline,
+.pd-media-stage:hover .pd-media-timeline,
+.pd-media-stage:has(:focus-visible) .pd-media-timeline {
+  opacity: 1;
+  transform: none;
+}
+/* The scrim: a soft gradient rather than a filled bar, so the picture keeps
+   going underneath instead of being cut off by a strip of chrome. */
+.pd-media-video::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 92px;
+  pointer-events: none;
+  opacity: 0;
+  background: linear-gradient(to top, rgb(0 0 0 / 55%), transparent);
+  transition: opacity var(--pd-duration-fast) var(--pd-easing-standard);
+}
+.pd-media-frame:hover .pd-media-video::after,
+.pd-media-frame:has(:focus-visible) .pd-media-video::after,
+.pd-media-stage:hover .pd-media-video::after,
+.pd-media-stage:has(:focus-visible) .pd-media-video::after {
+  opacity: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pd-media-bigplay,
+  .pd-media-timeline,
+  .pd-media-video::after {
+    transition: none;
+  }
+}
+
+/*
+ * THE SCRUBBER ITSELF. It went out with the transport bar it used to live in and
+ * had been rendering as a raw macOS slider — which is why the timeline looked
+ * like it stopped a fifth of the way across the clip.
+ *
+ * WHITE PLAYED, DARK REMAINING. This lies ON the picture, and a colour bar's
+ * yellow and cyan swallow a translucent-white track completely. Dark under
+ * white reads against anything a clip can put behind it.
+ */
 .pd-media-scrub {
   flex: 1;
+  min-width: 0;
   appearance: none;
   -webkit-appearance: none;
   height: 4px;
   border-radius: 999px;
   cursor: pointer;
-  /* The played part is drawn with a gradient stop at the value, so the track
-     needs no second element to sit under the thumb. */
   background: linear-gradient(
     to right,
-    var(--pd-accent-primary) var(--pd-media-pct, 0%),
-    color-mix(in srgb, #fff 22%, transparent) var(--pd-media-pct, 0%)
+    #fff var(--pd-media-pct, 0%),
+    rgb(0 0 0 / 48%) var(--pd-media-pct, 0%)
   );
+  box-shadow: 0 1px 2px rgb(0 0 0 / 35%);
 }
 .pd-media-scrub::-webkit-slider-thumb {
   appearance: none;
   -webkit-appearance: none;
-  width: 12px;
-  height: 12px;
+  width: 13px;
+  height: 13px;
   border-radius: 50%;
   background: #fff;
-  box-shadow: 0 1px 3px rgb(0 0 0 / 45%);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 55%);
 }
+.pd-media-scrub:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 4px;
+}
+
 .pd-media-time {
   flex: none;
   font-size: 0.6875rem;
   font-variant-numeric: tabular-nums;
-  color: color-mix(in srgb, #fff 78%, transparent);
+  color: #fff;
+  text-shadow: 0 1px 3px rgb(0 0 0 / 70%);
 }
 
 /* ── 3D ──────────────────────────────────────────────────────────────────── */
@@ -3247,12 +3357,7 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
   width: auto;
   max-width: 100%;
 }
-.pd-media-stage-caption {
-  padding: 9px 14px 11px;
-  font-size: 0.75rem;
-  color: var(--pd-text-muted);
-  text-align: center;
-}
+
 @media (prefers-reduced-motion: reduce) {
   .pd-media-scrim,
   .pd-media-stage {

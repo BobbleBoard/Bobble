@@ -211,9 +211,15 @@ function Expanded({ item, onClose }: { item: ThreadMediaItem; onClose: () => voi
           close it too, without a keyboard shim. */}
       <button type="button" className="pd-media-scrim-hit" aria-label="Close" onClick={onClose} />
       <div className="pd-media-stage" data-kind={item.kind}>
+        {/*
+          NO CAPTION BAR. the user: "no bottom bar for the image 'fox-real.png'
+          bottom bar needs to go". It was a strip of chrome under a picture that
+          had just taken the screen, saying a filename you already knew — and the
+          card you opened it from says the same thing two inches away. The
+          controls float on the media instead.
+        */}
         <Surface item={item} large />
         <Controls item={item} onExpand={undefined} />
-        <div className="pd-media-stage-caption">{item.name}</div>
       </div>
     </div>,
     document.body,

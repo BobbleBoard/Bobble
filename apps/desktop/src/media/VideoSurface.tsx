@@ -152,21 +152,37 @@ export function VideoSurface({ src, large = false, testid }: VideoSurfaceProps):
         tabIndex={0}
         onClick={toggle}
       />
-      <div className="pd-media-transport">
-        <button
-          type="button"
-          className="pd-media-play pd-focusable"
-          data-testid="media-play"
-          aria-label={playing ? 'Pause' : 'Play'}
-          onClick={toggle}
-        >
-          {playing ? <GlyphPause /> : <GlyphPlay />}
-        </button>
-        {/*
-          A range input rather than a drawn bar: scrubbing is a drag with a
-          keyboard equivalent and a screen-reader value, and re-implementing all
-          three to look 4px different is not worth what it costs.
-        */}
+      {/*
+        THE CENTRED PLAY BUTTON, and it does not hide while the clip is paused.
+        the user: "by default just a centered play button that still shows there even
+        on not hover when paused." A paused clip with no visible control is
+        indistinguishable from a still image — the button IS the thing that says
+        this one moves. Once it is running it gets out of the way and comes back
+        as Pause when you go near it.
+      */}
+      <button
+        type="button"
+        className="pd-media-bigplay pd-focusable"
+        data-playing={playing ? 'true' : undefined}
+        data-testid="media-play"
+        aria-label={playing ? 'Pause' : 'Play'}
+        onClick={toggle}
+      >
+        {playing ? <GlyphPause /> : <GlyphPlay />}
+      </button>
+
+      {/*
+        A SINGLE FLOATING TIMELINE — no transport bar under the picture. the user
+        struck the bar out: it was a slab of chrome the width of the card, and
+        everything on it except the scrubber was already somewhere else (play is
+        the button in the middle, fullscreen is the corner). What is left floats
+        over the clip and only while you are there.
+
+        A range input rather than a drawn bar: scrubbing is a drag with a
+        keyboard equivalent and a screen-reader value, and re-implementing all
+        three to look 4px different is not worth what it costs.
+      */}
+      <div className="pd-media-timeline">
         <input
           className="pd-media-scrub pd-focusable"
           data-testid="media-scrub"
@@ -190,21 +206,23 @@ export function VideoSurface({ src, large = false, testid }: VideoSurfaceProps):
   );
 }
 
+/* Nudged right of centre: a right-pointing triangle carries its mass on the
+   left, so centring it geometrically inside a circle reads as sitting left. */
 function GlyphPlay(): JSX.Element {
   return (
-    <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
+    <svg width="22" height="22" viewBox="0 0 16 16" aria-hidden="true">
       <title>Play</title>
-      <path d="M5 3.2l8 4.8-8 4.8z" fill="currentColor" />
+      <path d="M5.4 3.1l8 4.9-8 4.9z" fill="currentColor" />
     </svg>
   );
 }
 
 function GlyphPause(): JSX.Element {
   return (
-    <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
+    <svg width="22" height="22" viewBox="0 0 16 16" aria-hidden="true">
       <title>Pause</title>
-      <rect x="4" y="3.2" width="3" height="9.6" rx="1" fill="currentColor" />
-      <rect x="9" y="3.2" width="3" height="9.6" rx="1" fill="currentColor" />
+      <rect x="4.2" y="3.2" width="3" height="9.6" rx="1.2" fill="currentColor" />
+      <rect x="8.8" y="3.2" width="3" height="9.6" rx="1.2" fill="currentColor" />
     </svg>
   );
 }
