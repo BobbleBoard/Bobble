@@ -34,7 +34,16 @@ import { type JSX, useCallback, useMemo, useRef, useState } from 'react';
 import { ThreadMedia } from '../chat/ThreadMedia';
 import { useGenStore } from '../state/gen-store';
 import { RunHeader, StudioJob } from './StudioRun';
-import { Knob, RailGroup, RailToggle, Segmented, StudioEmpty, StudioShell } from './StudioShell';
+import {
+  Knob,
+  RailGroup,
+  RailToggle,
+  Segmented,
+  StudioEmpty,
+  StudioShell,
+  type StudioStarter,
+} from './StudioShell';
+import { useStudioUiStore } from './studio-ui-store';
 import { useEnhancer } from './use-enhancer';
 import { useStudio } from './use-studio';
 
@@ -141,6 +150,54 @@ export function AudioStudio(): JSX.Element {
       : undefined;
 
   const enhancer = useEnhancer(useCallback((next: string) => setPrompt(next), []));
+  const setSettingsOpen = useStudioUiStore((st) => st.setSettingsOpen);
+
+  /*
+   * The three cards ARE the room's three modes, which is the point: you could
+   * not tell from looking at this studio that it clones voices or writes music
+   * — the mode switch lives in the rail, behind a button, and a first visitor
+   * has no reason to open it. the user asked for exactly this ("these are like
+   * 'Clone a voice'"), and cloning is the one that most needed saying out loud.
+   */
+  const starters: readonly StudioStarter[] = [
+    {
+      id: 'aloud',
+      icon: <GlyphSpeak />,
+      title: 'Read it aloud',
+      hint: 'Paste a line or a paragraph and pick a voice.',
+      onPick: () => {
+        setMode('speech');
+        setModel('');
+        setPrompt(EXAMPLES.speech[0] ?? '');
+      },
+    },
+    {
+      id: 'clone',
+      icon: <GlyphClone />,
+      title: 'Clone a voice',
+      hint: 'A few seconds of someone talking, read back in their voice.',
+      onPick: () => {
+        setMode('speech');
+        setModel('');
+        setPrompt(EXAMPLES.speech[1] ?? '');
+        // Straight to the rail: the clip picker is the point of this one, and
+        // it lives there.
+        setSettingsOpen(true);
+      },
+    },
+    {
+      id: 'music',
+      icon: <GlyphNote />,
+      title: 'Compose music',
+      hint: 'Genre, instruments and a tempo — an instrumental bed.',
+      onPick: () => {
+        setMode('music');
+        setModel('');
+        setSeconds(undefined);
+        setPrompt(EXAMPLES.music[0] ?? '');
+      },
+    },
+  ];
 
   const onRun = async (): Promise<void> => {
     /*
@@ -446,8 +503,7 @@ export function AudioStudio(): JSX.Element {
                 ? 'Describe instruments, tempo and mood. Everything is made on this Mac.'
                 : 'Four takes come back at once. Play them against each other and keep the one that lands.'
           }
-          examples={EXAMPLES[mode]}
-          onPick={setPrompt}
+          starters={starters}
         />
       ) : (
         shown.map((r) => (
@@ -493,6 +549,72 @@ function GlyphAudio(): JSX.Element {
           strokeLinecap="round"
         />
       ))}
+    </svg>
+  );
+}
+
+/* Starter glyphs — same 1.4 stroke and 24-box as the room's own waveform. */
+function GlyphSpeak(): JSX.Element {
+  return (
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <title>Read aloud</title>
+      <path
+        /* `H4z` rather than `v-5z`: the old form walked back up the left edge
+           and THEN closed over the same point, doubling the join. */
+        d="M4 9.5h3l4.5-3.5v12L7 14.5H4z"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M15.5 9a4 4 0 010 6M18 6.5a7.5 7.5 0 010 11"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function GlyphClone(): JSX.Element {
+  return (
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <title>Clone a voice</title>
+      <rect x="9" y="2.5" width="6" height="10" rx="3" stroke="currentColor" strokeWidth="1.4" />
+      {/* The cradle ends where the capsule begins and the stand starts below it;
+          nothing is drawn twice. */}
+      <path
+        d="M6 11.2a6 6 0 0012 0"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+      />
+      <path
+        d="M12 17.6v3.9M9.4 21.5h5.2"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function GlyphNote(): JSX.Element {
+  return (
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <title>Compose music</title>
+      {/* The stems STOP at the note heads instead of running through them — the
+          circles used to sit on top of the stem path, and two strokes over the
+          same pixels is where the drawing went bright. */}
+      <path
+        d="M9 15.6V5.5l10-2v10.1"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinejoin="round"
+      />
+      <path d="M9 8.4l10-2" stroke="currentColor" strokeWidth="1.4" />
+      <circle cx="6.5" cy="17.6" r="2.5" stroke="currentColor" strokeWidth="1.4" />
+      <circle cx="16.5" cy="15.6" r="2.5" stroke="currentColor" strokeWidth="1.4" />
     </svg>
   );
 }

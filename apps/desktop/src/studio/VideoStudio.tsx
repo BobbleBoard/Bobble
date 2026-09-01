@@ -23,7 +23,16 @@ import { type JSX, useCallback, useMemo, useState } from 'react';
 import { ThreadMedia } from '../chat/ThreadMedia';
 import { useGenStore } from '../state/gen-store';
 import { RunHeader, StudioJob } from './StudioRun';
-import { Knob, RailGroup, RailToggle, Segmented, StudioEmpty, StudioShell } from './StudioShell';
+import {
+  Knob,
+  RailGroup,
+  RailToggle,
+  Segmented,
+  StudioEmpty,
+  StudioShell,
+  type StudioStarter,
+} from './StudioShell';
+import { useStudioUiStore } from './studio-ui-store';
 import { useEnhancer } from './use-enhancer';
 import { useStudio } from './use-studio';
 
@@ -81,6 +90,49 @@ export function VideoStudio(): JSX.Element {
   const models = useMemo(() => catalog.filter((m) => m.modality === 'video'), [catalog]);
   const size = (SHAPES.find((x) => x.value === shape) ?? SHAPES[0]).of(long);
   const enhancer = useEnhancer(useCallback((next: string) => setPrompt(next), []));
+  const setSettingsOpen = useStudioUiStore((st) => st.setSettingsOpen);
+
+  /*
+   * Three cards, and every one of them is about COST as much as content —
+   * because in this room that is the decision. A first clip at 8 seconds and
+   * "Large" is several minutes before you learn the prompt was wrong.
+   */
+  const starters: readonly StudioStarter[] = [
+    {
+      id: 'shot',
+      icon: <GlyphClapper />,
+      title: 'Describe a shot',
+      hint: 'One subject, one continuous action, one place.',
+      onPick: () => {
+        setShape('landscape');
+        setSeconds(4);
+        setPrompt(EXAMPLES[0] ?? '');
+      },
+    },
+    {
+      id: 'draft',
+      icon: <GlyphStopwatch />,
+      title: 'Quick draft',
+      hint: 'Two seconds at the smallest size — check the motion first.',
+      onPick: () => {
+        setSeconds(2);
+        setLong(512);
+        setPrompt(EXAMPLES[1] ?? '');
+      },
+    },
+    {
+      id: 'vertical',
+      icon: <GlyphPhone />,
+      title: 'Vertical clip',
+      hint: '9:16, the shape a phone actually plays it in.',
+      onPick: () => {
+        setShape('portrait');
+        setSeconds(4);
+        setPrompt(EXAMPLES[2] ?? '');
+        setSettingsOpen(true);
+      },
+    },
+  ];
 
   const onRun = async (): Promise<void> => {
     const enhanced = await enhancer.enhance('video', prompt, model);
@@ -225,8 +277,7 @@ export function VideoStudio(): JSX.Element {
           glyph={<GlyphVideo />}
           title="Make short clips on this machine"
           body="Every second is another two dozen frames to render, so start short. Nothing leaves your Mac."
-          examples={EXAMPLES}
-          onPick={setPrompt}
+          starters={starters}
         />
       ) : (
         runs.map((r) => (
@@ -253,12 +304,84 @@ function GlyphVideo(): JSX.Element {
         stroke="currentColor"
         strokeWidth="1.4"
       />
+      {/* The lens is an OPEN path with a gap to the body. Closed, its last
+          segment ran straight down the body's right edge — the same line
+          stroked twice, which is the brightest artefact of the set. */}
       <path
-        d="M15.5 10.5l5-3v9l-5-3z"
+        d="M16.4 10.6l4.1-2.6v8l-4.1-2.6"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+/* Starter glyphs — same 1.4 stroke and 24-box as the room's own. */
+function GlyphClapper(): JSX.Element {
+  return (
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <title>Shot</title>
+      {/* The board and the clapper are drawn as two stacked boxes that SHARE an
+          edge rather than as diagonals running into the body — the old version
+          had three strokes crossing the rectangle's top line, and a crossing is
+          the one place a stroke doubles up. */}
+      <rect x="3" y="9.5" width="18" height="11" rx="2" stroke="currentColor" strokeWidth="1.4" />
+      <path
+        d="M3.4 9.5V6.2a1 1 0 01.78-.98l14.4-2.7a1 1 0 011.22.98V9.5"
         stroke="currentColor"
         strokeWidth="1.4"
         strokeLinejoin="round"
       />
+      <path
+        d="M8.7 5.1l1.5 4.1M14.2 4.1l1.5 4.1"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function GlyphStopwatch(): JSX.Element {
+  return (
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <title>Draft</title>
+      <circle cx="12" cy="14" r="7" stroke="currentColor" strokeWidth="1.4" />
+      {/* The hand stops short of the centre and the crown stops short of the
+          dial: nothing crosses anything. */}
+      <path
+        d="M12 10.4v3.6l2.1 2.1"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M9.6 2.6h4.8M12 3.4v3.6"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function GlyphPhone(): JSX.Element {
+  return (
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <title>Vertical</title>
+      <rect
+        x="6.5"
+        y="2.5"
+        width="11"
+        height="19"
+        rx="2.4"
+        stroke="currentColor"
+        strokeWidth="1.4"
+      />
+      <path d="M10.5 5.2h3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
     </svg>
   );
 }

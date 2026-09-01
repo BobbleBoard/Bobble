@@ -182,11 +182,21 @@
   background: color-mix(in srgb, white 62%, transparent);
 }
 
+/*
+ * FOCUS SHOWS ON THE KNOB, NOT THE RAIL.
+ *
+ * This used to ring the whole track in the focus colour and wrap it in a 3px
+ * halo. The popover focuses the track the moment it opens, so that was not an
+ * occasional state — it was how the control always looked: an empty rail
+ * outlined and glowing blue along its entire length, which reads as the rail
+ * being part of the value. the user: "no blue border or glow around the edge of the
+ * slider when unfilled."
+ *
+ * The knob keeps its focus ring (below), so keyboard focus is still visible —
+ * on the thing the arrow keys actually move.
+ */
 .pd-effort-track:focus-visible {
   outline: none;
-  box-shadow:
-    inset 0 0 0 1px var(--pd-border-focus),
-    0 0 0 3px var(--pd-status-info-bg);
 }
 
 /* The fill that grows left→right with effort. BLUE, flat, and contained.

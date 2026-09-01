@@ -377,18 +377,45 @@ export function Segmented<T extends string | number>({
  * — it offers three real prompts you can press. One press and the room has
  * shown you what it does instead of describing it.
  */
+/**
+ * ONE STARTING POINT. Icon, name, and what it is for — the card a studio's empty
+ * room is made of.
+ *
+ * A starter is not a prompt, it is a TASK: pressing "Clone a voice" puts the
+ * room into the shape that task needs (the right mode, the right knobs) and
+ * leaves a first line in the composer for you to replace. The old empty state
+ * offered three example sentences, which taught you what to type and nothing
+ * about what the room could do — you could not tell from looking at the audio
+ * studio that it clones voices at all.
+ */
+export interface StudioStarter {
+  readonly id: string;
+  /** The SVG glyph, drawn in the same weight as the room's own big one. */
+  readonly icon: ReactNode;
+  readonly title: string;
+  readonly hint: string;
+  /** Configure the room for this task. */
+  readonly onPick: () => void;
+}
+
 export function StudioEmpty({
   glyph,
   title,
   body,
-  examples = [],
-  onPick,
+  starters = [],
 }: {
   glyph: ReactNode;
   title: string;
   body: string;
-  examples?: readonly string[];
-  onPick?: (example: string) => void;
+  /**
+   * The three cards. Side by side, centred — the room's own menu.
+   *
+   * These REPLACED a row of example prompt pills. Both at once was two menus
+   * stacked: the pills seeded a sentence, and every card seeds a sentence too,
+   * on top of setting the knobs that sentence needs. Keeping both made the
+   * empty room busier than the full one.
+   */
+  starters?: readonly StudioStarter[];
 }): JSX.Element {
   return (
     <div className="pd-studio-empty" data-testid="studio-empty">
@@ -397,17 +424,21 @@ export function StudioEmpty({
       </div>
       <h2 className="pd-studio-empty-title">{title}</h2>
       <p className="pd-studio-empty-body">{body}</p>
-      {examples.length > 0 && onPick !== undefined ? (
-        <div className="pd-studio-examples">
-          {examples.map((e) => (
+      {starters.length > 0 ? (
+        <div className="pd-studio-starters" data-testid="studio-starters">
+          {starters.map((st) => (
             <button
-              key={e}
+              key={st.id}
               type="button"
-              className="pd-studio-example pd-focusable"
-              data-testid="studio-example"
-              onClick={() => onPick(e)}
+              className="pd-studio-starter pd-focusable"
+              data-testid={`studio-starter-${st.id}`}
+              onClick={st.onPick}
             >
-              {e}
+              <span className="pd-studio-starter-icon" aria-hidden="true">
+                {st.icon}
+              </span>
+              <span className="pd-studio-starter-title">{st.title}</span>
+              <span className="pd-studio-starter-hint">{st.hint}</span>
             </button>
           ))}
         </div>

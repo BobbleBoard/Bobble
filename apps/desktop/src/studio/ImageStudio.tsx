@@ -27,7 +27,16 @@ import { type JSX, useCallback, useMemo, useState } from 'react';
 import { ThreadMedia } from '../chat/ThreadMedia';
 import { useGenStore } from '../state/gen-store';
 import { RunHeader, StudioJob } from './StudioRun';
-import { Knob, RailGroup, RailToggle, Segmented, StudioEmpty, StudioShell } from './StudioShell';
+import {
+  Knob,
+  RailGroup,
+  RailToggle,
+  Segmented,
+  StudioEmpty,
+  StudioShell,
+  type StudioStarter,
+} from './StudioShell';
+import { useStudioUiStore } from './studio-ui-store';
 import { useEnhancer } from './use-enhancer';
 import { useStudio } from './use-studio';
 
@@ -139,6 +148,7 @@ export function ImageStudio(): JSX.Element {
   const models = useMemo(() => catalog.filter((m) => m.modality === 'image'), [catalog]);
   const size = (SHAPES.find((x) => x.value === shape) ?? SHAPES[0]).of(long);
   const enhancer = useEnhancer(useCallback((next: string) => setPrompt(next), []));
+  const setSettingsOpen = useStudioUiStore((st) => st.setSettingsOpen);
 
   /*
    * ENHANCE, THEN STYLE, THEN GENERATE — in that order, and the style suffix is
@@ -146,6 +156,50 @@ export function ImageStudio(): JSX.Element {
    * house style; feeding it back through a rewriter is how "watercolour" comes
    * out as a photograph.
    */
+  /*
+   * WHAT THIS ROOM IS FOR, as three cards.
+   *
+   * Each one puts the studio into the shape that task needs and leaves a line
+   * in the composer to replace — the knobs it sets are the ones you would have
+   * had to find in the rail first, which is the part nobody does on their first
+   * visit.
+   */
+  const starters: readonly StudioStarter[] = [
+    {
+      id: 'describe',
+      icon: <GlyphPencil />,
+      title: 'Describe a picture',
+      hint: 'A sentence is enough — say what, where and in what light.',
+      onPick: () => {
+        setStyle('');
+        setCount(1);
+        setPrompt(EXAMPLES[0] ?? '');
+      },
+    },
+    {
+      id: 'stylize',
+      icon: <GlyphPalette />,
+      title: 'Stylize a picture',
+      hint: 'Same description, a chosen look — watercolour, ink, cinematic.',
+      onPick: () => {
+        setStyle('watercolour');
+        setCount(1);
+        setPrompt(EXAMPLES[2] ?? '');
+        setSettingsOpen(true);
+      },
+    },
+    {
+      id: 'compare',
+      icon: <GlyphGrid />,
+      title: 'Four to compare',
+      hint: 'Four candidates from one description, side by side.',
+      onPick: () => {
+        setCount(4);
+        setPrompt(EXAMPLES[1] ?? '');
+      },
+    },
+  ];
+
   const onRun = async (): Promise<void> => {
     const base = await enhancer.enhance('image', prompt, model);
     const suffix = STYLES.find((x) => x.value === style)?.suffix ?? '';
@@ -323,9 +377,8 @@ export function ImageStudio(): JSX.Element {
         <StudioEmpty
           glyph={<GlyphImage />}
           title="Make pictures on this machine"
-          body="Nothing you type here leaves your Mac. Describe a picture, or start from one of these."
-          examples={EXAMPLES}
-          onPick={setPrompt}
+          body="Nothing you type here leaves your Mac. Pick somewhere to start, or just describe a picture."
+          starters={starters}
         />
       ) : (
         runs.map((r) => (
@@ -350,11 +403,100 @@ function GlyphImage(): JSX.Element {
       <rect x="3" y="5" width="18" height="14" rx="2.5" stroke="currentColor" strokeWidth="1.4" />
       <circle cx="8.5" cy="10" r="1.6" fill="currentColor" />
       <path
-        d="M4 17l4.5-4.5a1.5 1.5 0 012 0L14 16m0 0l2-2a1.5 1.5 0 012 0l2 2"
+        /* One continuous line. The `m0 0` used to restart a subpath on the same
+           point, so two round caps stacked there and made a bright dot. */
+        d="M4 17l4.5-4.5a1.5 1.5 0 012 0L14 16l2-2a1.5 1.5 0 012 0l2 2"
         stroke="currentColor"
         strokeWidth="1.4"
         strokeLinecap="round"
         strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+/* The three starter glyphs. Same 1.4 stroke and 24-box as the room's own, so a
+   card reads as part of the same drawing rather than a borrowed icon set. */
+function GlyphPencil(): JSX.Element {
+  return (
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <title>Describe</title>
+      <path
+        d="M4 20l1-4L16.5 4.5a2.1 2.1 0 013 3L8 19l-4 1z"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+/*
+ * A PALETTE, not a brush.
+ *
+ * The brush redrawn without overlapping strokes came out as a closed blade with
+ * a tip — which is a pencil, and the card next to it already is one. Two cards
+ * side by side with the same glyph is worse than a slightly doubled stroke.
+ * A palette says "a chosen look" and shares nothing with the others: an outline
+ * and four filled wells, none of them touching it.
+ */
+function GlyphPalette(): JSX.Element {
+  return (
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <title>Stylize</title>
+      <path
+        d="M12 3.4a8.6 8.6 0 100 17.2c1.1 0 1.8-.8 1.8-1.7 0-1.5 1.1-2.3 2.4-2.3h1.6a3.4 3.4 0 003.4-3.4c0-5-4.1-9.8-9.2-9.8z"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinejoin="round"
+      />
+      <circle cx="7.6" cy="12.6" r="1.15" fill="currentColor" />
+      <circle cx="9.2" cy="8.2" r="1.15" fill="currentColor" />
+      <circle cx="14" cy="7.4" r="1.15" fill="currentColor" />
+      <circle cx="17.4" cy="10.6" r="1.15" fill="currentColor" />
+    </svg>
+  );
+}
+
+function GlyphGrid(): JSX.Element {
+  return (
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <title>Compare</title>
+      <rect
+        x="3.5"
+        y="3.5"
+        width="7.5"
+        height="7.5"
+        rx="1.6"
+        stroke="currentColor"
+        strokeWidth="1.4"
+      />
+      <rect
+        x="13"
+        y="3.5"
+        width="7.5"
+        height="7.5"
+        rx="1.6"
+        stroke="currentColor"
+        strokeWidth="1.4"
+      />
+      <rect
+        x="3.5"
+        y="13"
+        width="7.5"
+        height="7.5"
+        rx="1.6"
+        stroke="currentColor"
+        strokeWidth="1.4"
+      />
+      <rect
+        x="13"
+        y="13"
+        width="7.5"
+        height="7.5"
+        rx="1.6"
+        stroke="currentColor"
+        strokeWidth="1.4"
       />
     </svg>
   );
