@@ -311,7 +311,8 @@ describe('the hub number formats', () => {
     expect(compactCount(1_900_000)).toBe('1.9M');
     expect(compactCount(84_800)).toBe('84.8K');
     expect(compactCount(45)).toBe('45');
-    expect(compactCount(undefined)).toBe('—');
+    // Empty, not a dash: an absent count renders as nothing at all.
+    expect(compactCount(undefined)).toBe('');
   });
 
   it('drops the decimal on large sizes, keeps it on small', () => {

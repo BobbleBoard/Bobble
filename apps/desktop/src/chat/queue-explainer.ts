@@ -52,14 +52,14 @@ export function queueExplainer(reason: QueueReason | undefined): QueueExplainer 
       return {
         blurb: `This message uses ${targetName(reason)}, but ${loadedName(
           reason,
-        )} is loaded and replying right now. Your computer can hold only one model at a time, so it will finish the current reply, swap models, then send — swapping takes a few seconds.`,
+        )} is loaded and replying right now. Your computer can hold only one model at a time, so it will finish the current reply, swap models, then send. Swapping takes a few seconds.`,
         hint: 'To send it now, pause or stop the running chat below to free up the model.',
       };
     case 'insufficient-ram':
       return {
         blurb: `${targetName(
           reason,
-        )} needs more memory than this computer has free, so it may load slowly or fail. You can still try. It will send once anything running finishes — or pick a lighter model in the model menu.`,
+        )} needs more memory than this computer has free, so it may load slowly or fail. You can still try. It will send once anything running finishes, or pick a lighter model.`,
         hint: 'Pausing or stopping the running chat below frees the most memory for it.',
       };
     default:

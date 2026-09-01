@@ -462,6 +462,25 @@ export function IconGlobe(props: IconProps) {
   );
 }
 
+/*
+ * A BRAIN, for the two places that mean THINKING.
+ *
+ * They were sparkles. the user: "replace the sparkles it's never the only option" —
+ * which is the whole problem with that glyph. A sparkle means "the AI one", and
+ * it was labelling the smartest tier in a list of three tiers and the reasoning
+ * pill in a row of capability pills. In both, the other options are equally
+ * "AI"; what distinguishes this one is that it thinks longer.
+ */
+export function IconBrain(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M6.4 4.4a2.6 2.6 0 0 0-2.5 3.3 2.5 2.5 0 0 0 .3 4.3 2.5 2.5 0 0 0 3.6 2.3" />
+      <path d="M9.6 4.4a2.6 2.6 0 0 1 2.5 3.3 2.5 2.5 0 0 1-.3 4.3 2.5 2.5 0 0 1-3.6 2.3" />
+      <path d="M8 4.2v10.4" />
+    </Icon>
+  );
+}
+
 export function IconSparkles(props: IconProps) {
   return (
     <Icon {...props}>

@@ -15,9 +15,9 @@
 import {
   IconClose,
   IconConnector,
+  IconPencil,
   IconPuzzle,
   IconSearch,
-  IconSparkles,
   IconTerminal,
   ScrollArea,
 } from '@pi-desktop/ui';
@@ -48,7 +48,7 @@ export type SettingsSection =
 
 /** Sections this panel renders. `models` is deliberately absent — it is a view. */
 const NAV: Array<{ id: SettingsSection; label: string; icon: ReactNode }> = [
-  { id: 'personalization', label: 'Custom instructions', icon: <IconSparkles /> },
+  { id: 'personalization', label: 'Custom instructions', icon: <IconPencil /> },
   { id: 'engines', label: 'Engines', icon: <IconCpu /> },
   { id: 'harness', label: 'Harness', icon: <IconTerminal /> },
   { id: 'appearance', label: 'Appearance', icon: <IconSun /> },

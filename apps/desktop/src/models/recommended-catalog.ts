@@ -203,7 +203,7 @@ export const RECOMMENDED_FAMILIES: readonly RecommendedFamily[] = [
     name: 'LFM 2.5',
     org: 'LiquidAI',
     output: 'text',
-    blurb: 'The smallest models here that still hold a conversation — a laptop-class default.',
+    blurb: 'The smallest models here that still hold a conversation. A laptop-class default.',
     fast: true,
     variants: [
       {

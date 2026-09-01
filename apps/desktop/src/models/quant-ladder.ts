@@ -45,7 +45,7 @@ export const TEXT_LADDER: readonly QuantRung[] = [
   { quant: 'Q5_K_M', bpw: 0.73 },
   { quant: 'Q4_K_M', bpw: 0.63, note: 'the standard balance' },
   { quant: 'Q3_K_M', bpw: 0.51 },
-  { quant: 'IQ3_XS', bpw: 0.44, note: 'the floor — below this, use a smaller model' },
+  { quant: 'IQ3_XS', bpw: 0.44, note: 'the floor. Below this, use a smaller model' },
 ];
 
 /** Diffusion rungs. Same shape, higher floor — see the file docstring. */
@@ -53,7 +53,7 @@ export const DIFFUSION_LADDER: readonly QuantRung[] = [
   { quant: 'Q8_0', bpw: 1.06, note: 'visually indistinguishable' },
   { quant: 'Q6_K', bpw: 0.82 },
   { quant: 'Q5_K_M', bpw: 0.73 },
-  { quant: 'Q4_K_M', bpw: 0.63, note: 'the floor for diffusion — artefacts below this' },
+  { quant: 'Q4_K_M', bpw: 0.63, note: 'the floor for diffusion. Artefacts below this' },
 ];
 
 /**

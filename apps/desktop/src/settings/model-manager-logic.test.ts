@@ -78,7 +78,7 @@ describe('formatBytes', () => {
     expect(formatBytes(700e6)).toBe('700 MB');
   });
   it('renders a dash for unknown/zero sizes', () => {
-    expect(formatBytes(0)).toBe('—');
+    expect(formatBytes(0)).toBe('');
   });
 });
 

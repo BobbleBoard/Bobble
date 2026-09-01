@@ -125,14 +125,14 @@ function AssetCard({ asset }: { readonly asset: StudioAsset }): JSX.Element {
               </div>
               <div className="tp-asset-info-row">
                 <span>Version</span>
-                <span>{version?.label ?? '—'}</span>
+                <span>{version?.label ?? 'None'}</span>
               </div>
               <div className="tp-asset-info-row">
                 <span>Faces</span>
                 <span>
                   {version !== undefined && version.faces > 0
                     ? version.faces.toLocaleString()
-                    : '—'}
+                    : 'None'}
                 </span>
               </div>
               <div className="tp-asset-info-row">
@@ -140,12 +140,12 @@ function AssetCard({ asset }: { readonly asset: StudioAsset }): JSX.Element {
                 <span>
                   {version !== undefined && version.vertices > 0
                     ? version.vertices.toLocaleString()
-                    : '—'}
+                    : 'None'}
                 </span>
               </div>
               <div className="tp-asset-info-row">
                 <span>Topology</span>
-                <span>{version?.topology ?? '—'}</span>
+                <span>{version?.topology ?? 'None'}</span>
               </div>
               <div className="tp-asset-info-row">
                 <span>Source</span>

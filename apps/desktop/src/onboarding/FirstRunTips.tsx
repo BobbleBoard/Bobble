@@ -9,7 +9,7 @@
  * Rendered by App over the chat view; self-contained (fetches its own state) so
  * App only mounts it.
  */
-import { Button, IconChevronRight, IconClose, IconSparkles } from '@pi-desktop/ui';
+import { Button, IconChevronRight, IconClose, IconInfo } from '@pi-desktop/ui';
 import { useEffect, useState } from 'react';
 
 const DISMISS_KEY = 'pi.desktop.tips.dismissed';
@@ -86,7 +86,7 @@ export function FirstRunTips() {
         <div className="mb-2 flex items-center justify-between gap-2">
           <span className="flex items-center gap-2 text-body text-text-primary">
             <span className="text-accent-primary">
-              <IconSparkles size={16} />
+              <IconInfo size={16} />
             </span>
             Getting started
           </span>

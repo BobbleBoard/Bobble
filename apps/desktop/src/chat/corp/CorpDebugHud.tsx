@@ -64,7 +64,7 @@ function deriveActivity(blocks: readonly CorpBlock[], nodeState: string | undefi
   if (last === undefined) {
     return {
       label: nodeState === 'working' ? 'working (no output yet)' : 'starting…',
-      canvas: '—',
+      canvas: 'none',
     };
   }
   if (last.kind === 'thinking') {
@@ -86,15 +86,18 @@ function deriveActivity(blocks: readonly CorpBlock[], nodeState: string | undefi
     if (b?.[1] !== undefined) {
       return { label: `EXECUTING ${b[1].trim()}`, canvas: 'terminal' };
     }
-    return { label: last.streaming ? 'STREAMING TEXT' : 'text (settled)', canvas: '—' };
+    return { label: last.streaming ? 'STREAMING TEXT' : 'text (settled)', canvas: 'none' };
   }
   if (last.kind === 'tool') {
     if (last.toolName === 'bash') {
       return { label: `EXECUTING ${last.detail ?? 'bash'}`, canvas: 'terminal' };
     }
-    return { label: `TOOL ${last.toolName ?? '?'}`, canvas: last.path ? `file ${last.path}` : '—' };
+    return {
+      label: `TOOL ${last.toolName ?? '?'}`,
+      canvas: last.path ? `file ${last.path}` : 'none',
+    };
   }
-  if (last.kind === 'briefing') return { label: 'BRIEFED', canvas: '—' };
+  if (last.kind === 'briefing') return { label: 'BRIEFED', canvas: 'none' };
   return { label: `WROTE ${last.path} (+${last.addedLines})`, canvas: `file ${last.path}` };
 }
 
@@ -208,7 +211,7 @@ export function CorpDebugHud(): React.ReactElement | null {
         {clockOf(now)}
       </div>
       <div style={{ opacity: 0.7, marginTop: 2 }}>
-        node: {node?.name ?? '—'} · {node?.state ?? '—'}
+        node: {node?.name ?? 'none'} · {node?.state ?? 'none'}
       </div>
       <div
         style={{

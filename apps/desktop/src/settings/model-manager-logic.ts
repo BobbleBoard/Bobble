@@ -257,7 +257,7 @@ export function recommendedQuant(
 
 /** Human byte size (binary-ish, matches how model files are quoted). */
 export function formatBytes(bytes: number): string {
-  if (bytes <= 0) return '—';
+  if (bytes <= 0) return '';
   const gb = bytes / 1e9;
   if (gb >= 1) return `${gb.toFixed(gb >= 10 ? 0 : 1)} GB`;
   const mb = bytes / 1e6;

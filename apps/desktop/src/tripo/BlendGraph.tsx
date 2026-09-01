@@ -53,7 +53,7 @@ function TransitionEditor({ tr }: { readonly tr: BlendTransition }): JSX.Element
 
   const nameOf = (stateId: string): string => {
     const st = states.find((x) => x.id === stateId);
-    return motions.find((m) => m.id === st?.motionId)?.name ?? '—';
+    return motions.find((m) => m.id === st?.motionId)?.name ?? 'None';
   };
   const param = params.find((p) => p.id === tr.paramId);
   const isBool = param?.type === 'bool';

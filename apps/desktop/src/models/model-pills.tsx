@@ -18,7 +18,7 @@
  * re-theme with everything else; `color-mix` against the surface keeps them
  * legible in both light and dark instead of a fixed pastel that goes muddy.
  */
-import { IconChat, IconEye, IconImage, IconMic, IconSparkles } from '@pi-desktop/ui';
+import { IconBrain, IconChat, IconEye, IconImage, IconMic } from '@pi-desktop/ui';
 import type { ReactNode } from 'react';
 
 export type Capability = 'reasoning' | 'vision' | 'audio' | 'embeddings' | 'image-generation';
@@ -33,7 +33,7 @@ interface CapabilityStyle {
 const STYLES: Record<Capability, CapabilityStyle> = {
   reasoning: {
     label: 'Reasoning',
-    icon: <IconSparkles size={12} />,
+    icon: <IconBrain size={12} />,
     token: '--pd-accent-primary',
   },
   vision: { label: 'Vision', icon: <IconEye size={12} />, token: '--pd-status-info-fg' },
@@ -97,9 +97,10 @@ export function CapabilityPills({
   const shown = max === undefined ? caps : caps.slice(0, max);
   const extra = caps.length - shown.length;
   if (caps.length === 0) {
-    // A dash, not an empty cell: it says "we know, and there are none" rather
-    // than looking like a rendering gap.
-    return <span className="text-footnote text-text-muted">—</span>;
+    // A WORD, not a dash. It used to be an em dash, on the argument that it
+    // says "we know, and there are none" — but a dash is a shrug, and the row
+    // is one line either way.
+    return <span className="text-footnote text-text-muted">Text only</span>;
   }
   return (
     <span className="flex flex-wrap items-center gap-1">

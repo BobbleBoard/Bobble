@@ -430,15 +430,17 @@ export function sortModels(models: readonly HubModel[], sort: ModelSort): HubMod
 
 /** Compact download/like counts, the way a hub shows them: 1.9M, 84.8K, 45. */
 export function compactCount(n: number | undefined): string {
-  if (n === undefined) return '—';
+  // Empty, not a dash: these feed one-word stat chips, and a dash there is a
+  // shrug that still costs a chip's worth of space.
+  if (n === undefined) return '';
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
   return String(n);
 }
 
-/** "21 GB" / "850 GB" / "412 MB" — coarse, for a size chip. */
+/** "21 GB" / "850 GB" / "412 MB". Coarse, for a size chip. */
 export function compactBytes(bytes: number | undefined): string {
-  if (bytes === undefined) return '—';
+  if (bytes === undefined) return '';
   const tb = bytes / 1024 ** 4;
   // Datasets go up here — HF lists several over a petabyte — and "12856 GB" is
   // a number nobody can read at a glance.
@@ -448,9 +450,9 @@ export function compactBytes(bytes: number | undefined): string {
   return `${Math.round(bytes / 1024 ** 2)} MB`;
 }
 
-/** "1d ago" / "2mo ago" — the reference's relative stamps. */
+/** "1d ago" / "2mo ago". Relative stamps. */
 export function relativeAge(at: number | undefined, now: number): string {
-  if (at === undefined) return '—';
+  if (at === undefined) return '';
   const days = Math.max(0, Math.floor((now - at) / 86_400_000));
   if (days < 1) return 'today';
   if (days < 30) return `${days}d ago`;

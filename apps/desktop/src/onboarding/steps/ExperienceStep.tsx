@@ -2,7 +2,7 @@
  * Step 4 — experience gauge. Three levels that set the tutorial flag + the pi
  * permission mode the harness starts in (see mapExperience).
  */
-import { IconGauge, IconSparkles, IconSpeed } from '@pi-desktop/ui';
+import { IconCompass, IconGauge, IconSpeed } from '@pi-desktop/ui';
 import type { ReactNode } from 'react';
 import { type ExperienceLevel, mapExperience } from '../onboarding-logic';
 import { SelectCard } from '../SelectCard';
@@ -18,7 +18,10 @@ const OPTIONS: Array<{
     value: 'new',
     title: "I've never run a local model",
     description: 'Show me the tutorial and review every action before it runs.',
-    icon: <IconSparkles />,
+    /* A compass — this card asks to be guided. Its two siblings are a gauge and
+       a speedometer, so the trio reads as one scale; a sparkle read as "the
+       special one". */
+    icon: <IconCompass />,
   },
   {
     value: 'knows-llamacpp',

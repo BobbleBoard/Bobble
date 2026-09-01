@@ -2,7 +2,7 @@
  * Step 1 — where are you coming from? Auto-detects installed apps and
  * preselects one; the flavor auto-applies live as the choice changes.
  */
-import { IconChat, IconSparkles, IconTerminal } from '@pi-desktop/ui';
+import { IconChat, IconHandoff, IconTerminal } from '@pi-desktop/ui';
 import { SelectCard } from '../SelectCard';
 import { useOnboardingStore } from '../useOnboarding';
 
@@ -18,7 +18,10 @@ export function SourceStep() {
         data-testid="source-claude"
         selected={source === 'claude'}
         onSelect={() => setSource('claude')}
-        icon={<IconSparkles />}
+        // Handoff, not a sparkle: this card is about carrying settings over from
+        // another app, and it sits beside two others equally about where you
+        // are coming from.
+        icon={<IconHandoff />}
         title="Coming from Claude"
         badge={claudeInstalled ? 'Detected' : undefined}
         description="Bring over your MCP servers and appearance, and use the Claude-style theme."

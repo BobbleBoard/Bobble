@@ -248,7 +248,7 @@ function plannedStages(req: {
 
 /** Human size: 16.2 GB / 640 MB. */
 export function formatGb(bytes: number): string {
-  if (bytes <= 0) return '—';
+  if (bytes <= 0) return '';
   const gb = bytes / 1e9;
   return gb >= 1 ? `${gb.toFixed(1)} GB` : `${Math.round(bytes / 1e6)} MB`;
 }

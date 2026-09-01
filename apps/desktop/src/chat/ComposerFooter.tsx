@@ -244,7 +244,7 @@ export function ComposerFooter({
                 <StatRow label="Total" value={fmtInt(usage.totalTokens)} />
               </>
             ) : (
-              <StatRow label="Tokens" value="—" />
+              <StatRow label="Tokens" value="None yet" />
             )}
             <StatRow label="Tool calls" value={String(stats.toolCalls)} />
             {stats.elapsedMs !== undefined ? (

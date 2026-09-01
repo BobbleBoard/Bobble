@@ -19,11 +19,12 @@ import {
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
+  IconBrain,
   IconCheck,
   IconChevronRight,
+  IconCompass,
   IconGauge,
   IconPin,
-  IconSparkles,
   IconSpeed,
 } from '@pi-desktop/ui';
 import type { ReactNode } from 'react';
@@ -43,11 +44,15 @@ import {
   quickMenuRows,
 } from './quick-menu';
 
-/** Leading glyph per capability tier (fast=speed, balanced=gauge, smart=spark). */
+/*
+ * Leading glyph per capability tier: fast = speed, balanced = gauge, intelligent
+ * = a brain. It was a sparkle, which in a list of three tiers said "this is the
+ * AI one" about the one option in three that is no more AI than the others.
+ */
 const TIER_ICON: Record<ModelTier, ReactNode> = {
   fast: <IconSpeed size={14} />,
   balanced: <IconGauge size={14} />,
-  intelligent: <IconSparkles size={14} />,
+  intelligent: <IconBrain size={14} />,
 };
 
 export interface TierPickerMenuProps {
@@ -169,7 +174,9 @@ export function TierPickerMenu({
           onSelect={() => void selectAuto()}
         >
           <span className="flex items-center gap-1.5">
-            <IconSparkles size={14} />
+            {/* A compass: Auto is the app choosing a direction for you. A
+                sparkle here was labelling one entry in a menu of entries. */}
+            <IconCompass size={14} />
             Auto
           </span>
         </DropdownMenuItem>
@@ -240,7 +247,7 @@ export function TierPickerMenu({
             }}
           >
             <span className="flex items-center gap-1.5">
-              {row.tier === undefined ? <IconSparkles size={14} /> : TIER_ICON[row.tier]}
+              {row.tier === undefined ? <IconCompass size={14} /> : TIER_ICON[row.tier]}
               {row.label}
             </span>
           </DropdownMenuItem>

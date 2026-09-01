@@ -41,12 +41,6 @@ export const IcImage = make(
     <path d="M14.5 15.5l2.2-2a1.6 1.6 0 0 1 2.1 0L21 15.5" />
   </>,
 );
-export const IcSparkles = make(
-  <>
-    <path d="M12 3.5l1.7 4.6 4.6 1.7-4.6 1.7L12 16.1l-1.7-4.6-4.6-1.7 4.6-1.7z" />
-    <path d="M18.8 15.5l.8 2.1 2.1.8-2.1.8-.8 2.1-.8-2.1-2.1-.8 2.1-.8z" />
-  </>,
-);
 
 /*
  * MODEL: a cube being made — its own glyph, not the shared sparkle.
@@ -55,8 +49,9 @@ export const IcSparkles = make(
  * every "AI does something" button in every app wears, so it said nothing the
  * other four tools could not also claim. The cube is what this step produces;
  * the spark beside it is what makes it, and it sits clear of the outline so
- * nothing crosses. `IcSparkles` stays as it was — two other places use it for
- * exactly the generic meaning it has.
+ * nothing crosses. The sparkle it replaced is gone from the set entirely: the user,
+ * "replace the sparkles it's never the only option" — every place that used one
+ * was labelling a single entry in a list of equally-AI entries.
  */
 export const IcModel = make(
   <>

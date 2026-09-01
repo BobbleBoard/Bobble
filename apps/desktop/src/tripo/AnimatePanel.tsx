@@ -41,7 +41,7 @@ import type { JSX } from 'react';
 import { ANIM_PREVIEWS } from './assets/anim-previews';
 import { ANIM_MODEL, LEARNED_RIG_MODEL, MEDIAL_MODEL, RIG_MODEL, TEMPLATE_RIG_MODEL } from './data';
 import { useGen3dStore } from './gen3d-client';
-import { IcAnimate, IcBolt, IcInfo, IcPlus, IcRig, IcSearch, IcSparkles, IcTrash } from './icons';
+import { IcAnimate, IcBolt, IcInfo, IcPlus, IcRig, IcSearch, IcTrash } from './icons';
 import { hasPresetMotion } from './preset-motions';
 import { Segmented } from './primitives';
 import { currentVersion, useTripoStore } from './store';
@@ -471,7 +471,7 @@ export function AnimatePanel(): JSX.Element {
               disabled={!motionInstalled || motionBusy || motionPrompt.trim() === ''}
               onClick={() => runMotion()}
             >
-              <IcSparkles size={15} />
+              <IcAnimate size={15} />
               {motionBusy ? 'Generating motion…' : 'Generate Motion'}
             </button>
 

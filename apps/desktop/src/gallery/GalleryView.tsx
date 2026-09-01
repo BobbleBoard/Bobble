@@ -197,7 +197,7 @@ function CanvasGalleryDemo() {
 
 /** QuestionCard in all three modes (choice / free / slider). */
 function QuestionCardDemos() {
-  const [answer, setAnswer] = useState<string>('—');
+  const [answer, setAnswer] = useState<string>('');
   return (
     <div className="flex w-full flex-col gap-3">
       <div className="grid gap-4 md:grid-cols-3">
