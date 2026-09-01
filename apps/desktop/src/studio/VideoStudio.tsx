@@ -152,7 +152,6 @@ export function VideoStudio(): JSX.Element {
   return (
     <StudioShell
       testid="video-studio"
-      title="Video Studio"
       prompt={prompt}
       onPrompt={setPrompt}
       placeholder="Describe a shot…"

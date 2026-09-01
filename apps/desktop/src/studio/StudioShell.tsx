@@ -44,7 +44,9 @@ import { exitModality } from '../state/modality-store';
 import { useStudioUiStore } from './studio-ui-store';
 
 export interface StudioShellProps {
-  readonly title: string;
+  /* No `title`. The room's name is drawn by the app's top bar, from ChatApp's
+     own STUDIO_TITLES — the shell took one too and then had nowhere to put it
+     once the gears dialog started saying plain "Advanced". */
   /**
    * The one or two controls that belong ON the input bar — the things you
    * change between two runs of the same idea. Everything else lives in the
@@ -78,7 +80,6 @@ export interface StudioShellProps {
 }
 
 export function StudioShell({
-  title,
   controls,
   settings,
   advanced,

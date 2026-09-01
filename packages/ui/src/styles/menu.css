@@ -315,6 +315,16 @@
 /* Trailing shortcut hint: bare muted glyphs in menu rows (both flavors). */
 .pd-menu-hint {
   margin-left: auto;
+  /*
+   * CENTRED AGAINST THE WHOLE ROW, whatever the item does with its other
+   * children. A DESCRIPTIVE item sets `align-items: flex-start` so its icon and
+   * title line up with the first line of a two-line body — correct for those,
+   * wrong for this, which is a control (a checkmark, a download button, a
+   * progress bar) belonging to the row rather than to its first line. the user, on
+   * the download bar sitting up against "Intelligent": "blue bar needs
+   * centering vertically as does the download button".
+   */
+  align-self: center;
   padding-left: calc(16px * var(--pd-menu-scale, 1));
   color: var(--pd-text-muted);
   font-size: calc(var(--pd-font-size-caption) * var(--pd-menu-scale, 1));

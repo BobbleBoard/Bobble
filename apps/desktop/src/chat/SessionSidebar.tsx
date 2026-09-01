@@ -330,9 +330,8 @@ function ComposeMark({ size = 16 }: { size?: number }): ReactNode {
   );
 }
 
-/** The 3D Studio's own glyph. Correct on that ROW — it is the row about meshes
- * — and wrong on the section above it, which is why the two are now different
- * icons rather than one used twice. */
+/** The 3D Studio's own glyph, on the 3D Studio's own row. The section header
+ *  above it carries no icon at all. */
 function ModalityCube({ size = 16 }: { size?: number }): ReactNode {
   return (
     <svg
@@ -350,41 +349,6 @@ function ModalityCube({ size = 16 }: { size?: number }): ReactNode {
       <path d="M8 2 13.5 5 8 8 2.5 5Z" />
       <path d="M2.5 5v6l5.5 3 5.5-3V5" />
       <path d="M8 8v6" />
-    </svg>
-  );
-}
-
-/*
- * MODALITIES: a wand.
- *
- * Two goes at this. It was the 3D Studio's own cube, which named one of the four
- * things in the list and made the other three look like they lived inside it.
- * Then it was three loose primitives — a circle, a triangle and a square — which
- * the user did not like, and looking at it beside the other rows he is right: three
- * small shapes floating in a 16px box is a diagram of nothing, and it reads as
- * clutter next to the single clean marks above it.
- *
- * A wand is one shape, it says MAKE rather than naming any medium, and nothing
- * else in the sidebar claims it. (The shared sparkle is taken: Settings uses it
- * for custom instructions and the tier picker uses it for Auto.)
- */
-function ModalityWand({ size = 16 }: { size?: number }): ReactNode {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.5}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="pd-icon"
-      aria-hidden="true"
-    >
-      <path d="M2.4 13.6 10.1 5.9" />
-      <path d="M8.2 4 9.1 6.1l2.1.9-2.1.9-.9 2.1-.9-2.1L5.2 7l2.1-.9z" />
-      <path d="M13 9.6l.5 1.2 1.2.5-1.2.5-.5 1.2-.5-1.2-1.2-.5 1.2-.5z" />
     </svg>
   );
 }
@@ -1333,9 +1297,14 @@ export function SessionSidebar({
             aria-expanded={modalitiesOpen}
             onClick={() => setModalitiesOpen((o) => !o)}
           >
-            <span className="pd-sidebar-row-icon">
-              <ModalityWand size={16} />
-            </span>
+            {/*
+              NO ICON. Three attempts to find one — the 3D cube (which named one
+              of the four things below it), three loose primitives, then a wand —
+              and the user rejected each. The reason they all failed is the same: this
+              row is a DISCLOSURE for four rows that each carry their own icon,
+              so any glyph here is either a fifth medium or a decoration. The
+              chevron already says what the row does.
+            */}
             <span className="pd-sidebar-row-label">Modalities</span>
             <span className="pd-sidebar-row-meta">
               <IconChevronDown size={14} className={modalitiesOpen ? '' : '-rotate-90'} />

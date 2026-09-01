@@ -19,18 +19,15 @@ import {
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
-  IconBrain,
   IconCheck,
   IconChevronRight,
-  IconCompass,
-  IconGauge,
   IconPin,
-  IconSpeed,
 } from '@pi-desktop/ui';
 import type { ReactNode } from 'react';
 import type { ModelTier } from '../../../../packages/harness/src/classify/tier.ts';
+import { DownloadBar } from '../models/DownloadBar';
 import { compactBytes } from '../models/models-layout';
-import { useLlmStore } from '../state/llm-store';
+import { downloadFraction, type LlmDownloadState, useLlmStore } from '../state/llm-store';
 import { selectionTier } from '../state/model-selection';
 import { useModelSelection, useQuickMenu, useSettingsStore } from '../state/settings-store';
 import { selectAuto, selectModel, selectTier } from './auto-router';
@@ -45,15 +42,72 @@ import {
 } from './quick-menu';
 
 /*
- * Leading glyph per capability tier: fast = speed, balanced = gauge, intelligent
- * = a brain. It was a sparkle, which in a list of three tiers said "this is the
- * AI one" about the one option in three that is no more AI than the others.
+ * NO GLYPHS ON THESE ROWS. the user: "model picker doesn't have to have icons."
+ *
+ * He is right and it took three passes to see why: every icon here was a
+ * decoration on a row whose LABEL already said the whole thing. "Fast" does not
+ * need a speedometer; the reason I kept reaching for one is that the row looked
+ * bare without it, which is a want of the designer, not of the reader.
  */
-const TIER_ICON: Record<ModelTier, ReactNode> = {
-  fast: <IconSpeed size={14} />,
-  balanced: <IconGauge size={14} />,
-  intelligent: <IconBrain size={14} />,
-};
+
+/**
+ * THE DOWNLOAD CONTROL FOR ONE MENU ROW — the app's blue button, and the bar it
+ * becomes.
+ *
+ * the user: "instead of the little dot and download put the blue download button
+ * that does the progressbar from the model manager." So this is the same
+ * `DownloadBar` the Model hub uses, behind the same button, rather than a second
+ * download affordance invented for a menu.
+ *
+ * IT MUST NOT SELECT THE ROW, and the row itself is what enforces that: a slot
+ * whose model is not on disk cancels its own `onSelect` (see below), because
+ * picking it would be asking to run something there is nothing to run. That one
+ * rule also keeps the menu OPEN while you press Download, which is what lets you
+ * watch the bar you just started.
+ */
+function RowDownload({
+  modelId,
+  label,
+  download,
+  onStart,
+  onCancel,
+}: {
+  modelId: string | null;
+  label: string;
+  download: LlmDownloadState | null;
+  onStart: (id: string) => Promise<void>;
+  onCancel: () => Promise<void>;
+}): ReactNode {
+  if (modelId === null) return undefined;
+  const mine = download !== null && download.modelId === modelId;
+  if (mine) {
+    return (
+      <span>
+        <DownloadBar
+          fraction={downloadFraction(download)}
+          received={download.jobReceived ?? download.received}
+          total={download.jobTotal ?? download.total}
+          label={`Cancel ${label}`}
+          testid={`tier-progress-${modelId}`}
+          onCancel={() => void onCancel()}
+        />
+      </span>
+    );
+  }
+  return (
+    <button
+      type="button"
+      data-testid={`tier-download-${modelId}`}
+      onClick={() => void onStart(modelId)}
+      /* The app's one download button: blue ground, white text. Same rule the
+         Model hub follows — a user does not care which of two blues matters,
+         only which thing is the button. */
+      className="pd-focusable h-7 shrink-0 rounded-full bg-accent-primary px-3 text-caption font-medium text-text-on-accent transition-opacity hover:opacity-90"
+    >
+      Download
+    </button>
+  );
+}
 
 export interface TierPickerMenuProps {
   /** The trigger element (the footer chip, or a bar `.pd-tier-seg` button). */
@@ -77,6 +131,12 @@ export function TierPickerMenu({
   const recommendation = useLlmStore((s) => s.recommendation);
   const refreshCatalog = useLlmStore((s) => s.refreshCatalog);
   const catalog = useLlmStore((s) => s.catalog);
+  /* The download in flight, and the two actions the row's button drives. One
+     download runs at a time, so a single state is all the menu needs to know
+     whether THIS row is the one transferring. */
+  const download = useLlmStore((s) => s.download);
+  const downloadModel = useLlmStore((s) => s.downloadModel);
+  const cancelDownload = useLlmStore((s) => s.cancelDownload);
   const quickMenu = useQuickMenu();
   const updateSettings = useSettingsStore((s) => s.update);
   const selection = useModelSelection();
@@ -122,6 +182,12 @@ export function TierPickerMenu({
     }),
   );
   const rows = quickMenuRows(quickMenu, menuModels, tierPicks);
+  /* WHICH model a row would fetch. A slot pinned to a model names it directly;
+     one still following the app's choice has to ask the recommendation, because
+     the row itself only knows the tier. */
+  const downloadIdFor = (row: { modelId: string | null; tier?: ModelTier }): string | null =>
+    row.modelId ??
+    (row.tier === undefined ? null : (recommendation?.tierModels?.[row.tier]?.modelId ?? null));
   /*
    * APPLY AGAINST THE LATEST CONFIG, NOT THE RENDERED ONE.
    *
@@ -173,12 +239,7 @@ export function TierPickerMenu({
           hint={isAuto ? <IconCheck size={14} /> : undefined}
           onSelect={() => void selectAuto()}
         >
-          <span className="flex items-center gap-1.5">
-            {/* A compass: Auto is the app choosing a direction for you. A
-                sparkle here was labelling one entry in a menu of entries. */}
-            <IconCompass size={14} />
-            Auto
-          </span>
+          Auto
         </DropdownMenuItem>
 
         <DropdownMenuSeparator />
@@ -219,37 +280,56 @@ export function TierPickerMenu({
           <DropdownMenuItem
             key={row.key}
             data-testid="footer-tier"
-            description={
-              row.secondary === null
-                ? undefined
-                : row.downloaded
-                  ? row.secondary
-                  : `${row.secondary} · download`
-            }
+            /*
+             * The model's name, and nothing else. It used to read
+             * "qwen3.6 27b · download" — a word dressed as a link, in a grey
+             * caption, which is the least button-like place in the row. the user:
+             * "instead of the little dot and download put the blue download
+             * button that does the progressbar from the model manager." The
+             * control moved to the hint slot below, where the checkmark for a
+             * downloaded row already lives.
+             */
+            description={row.secondary ?? undefined}
             // Only a DOWNLOADED row can read as the active model (the user #4): one
             // whose model isn't on disk never shows a selected checkmark —
             // picking it opens the download flow instead of pretending it's
             // active.
             hint={
-              row.downloaded &&
-              (row.modelId !== null
-                ? selection.mode === 'model' && selection.modelId === row.modelId
-                : row.tier !== undefined && activeTier === row.tier) ? (
-                <IconCheck size={14} />
-              ) : undefined
+              row.downloaded ? (
+                (
+                  row.modelId !== null
+                    ? selection.mode === 'model' && selection.modelId === row.modelId
+                    : row.tier !== undefined && activeTier === row.tier
+                ) ? (
+                  <IconCheck size={14} />
+                ) : undefined
+              ) : (
+                <RowDownload
+                  modelId={downloadIdFor(row)}
+                  label={row.secondary ?? row.label}
+                  download={download}
+                  onStart={downloadModel}
+                  onCancel={cancelDownload}
+                />
+              )
             }
             // No preventDefault: the menu MUST close on selection (the user #3). A
             // slot the user pinned to a model selects that model; one still
             // following the app's choice selects the tier, as before.
-            onSelect={() => {
+            onSelect={(e) => {
+              /* A row whose model is not downloaded selects NOTHING and keeps
+                 the menu open — its Download button is the only thing in it
+                 that does anything, and closing the menu on the press would
+                 hide the bar that press just started. */
+              if (!row.downloaded) {
+                e.preventDefault();
+                return;
+              }
               if (row.modelId !== null) void selectModel(row.modelId);
               else if (row.tier !== undefined) void selectTier(row.tier);
             }}
           >
-            <span className="flex items-center gap-1.5">
-              {row.tier === undefined ? <IconCompass size={14} /> : TIER_ICON[row.tier]}
-              {row.label}
-            </span>
+            {row.label}
           </DropdownMenuItem>
         ))}
 

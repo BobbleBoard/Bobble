@@ -234,7 +234,6 @@ export function AudioStudio(): JSX.Element {
   return (
     <StudioShell
       testid="audio-studio"
-      title="Audio Studio"
       multiline={mode === 'speech'}
       prompt={prompt}
       onPrompt={setPrompt}

@@ -219,7 +219,6 @@ export function ImageStudio(): JSX.Element {
   return (
     <StudioShell
       testid="image-studio"
-      title="Image Studio"
       prompt={prompt}
       onPrompt={setPrompt}
       placeholder="Describe a picture…"
