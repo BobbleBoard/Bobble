@@ -14,21 +14,21 @@ describe('queuedLineText', () => {
 
   it('same-model → a plain sequential wait', () => {
     const r: QueueReason = { kind: 'busy-same-model', loadedModelName: 'Qwen 4B' };
-    expect(queuedLineText(r)).toBe('Queued — sends when the current reply finishes');
+    expect(queuedLineText(r)).toBe('Queued. Sends when the current reply finishes');
   });
 
   it('switch-model → names the target when known', () => {
     expect(queuedLineText({ kind: 'busy-switch-model', targetModelName: 'Gemma 12B' })).toBe(
-      'Queued — will switch to Gemma 12B first',
+      'Queued. Switching to Gemma 12B first',
     );
     expect(queuedLineText({ kind: 'busy-switch-model' })).toBe(
-      'Queued — a model switch is needed first',
+      'Queued. A model switch is needed first',
     );
   });
 
   it('insufficient-ram → warns about memory', () => {
     expect(queuedLineText({ kind: 'insufficient-ram', targetModelName: 'Qwen 122B' })).toBe(
-      "Queued — Qwen 122B may not fit this computer's memory",
+      "Queued. Qwen 122B may not fit this computer's memory",
     );
   });
 });

@@ -116,10 +116,21 @@ export function IconArrowUp(props: IconProps) {
   );
 }
 
+/*
+ * A pencil with a BODY, a tip and a ferrule — not a single tapered outline.
+ *
+ * the user: "the pencil icons need to be updated". The old one was one closed path
+ * whose narrow end doubled as the point, so at 16px it read as a bent stick and
+ * the "sharpened" end was indistinguishable from the other. Three strokes fix
+ * it: the barrel, the band across it, and a tip that is its own shape. Nothing
+ * crosses anything.
+ */
 export function IconPencil(props: IconProps) {
   return (
     <Icon {...props}>
-      <path d="M10.5 3l2.5 2.5L6 12.5l-3.2.7.7-3.2L10.5 3z" />
+      <path d="M10.6 2.3 13.7 5.4 6.2 12.9 3.1 9.8z" />
+      <path d="M8.9 4 12 7.1" />
+      <path d="M3.1 9.8 2.1 13.9l4.1-1z" />
     </Icon>
   );
 }

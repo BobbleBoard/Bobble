@@ -147,7 +147,7 @@ export const ENGINES: readonly EngineSpec[] = [
   {
     id: 'llamacpp',
     name: 'llama.cpp',
-    blurb: 'Runs GGUF models everywhere. The safe default — widest model support.',
+    blurb: 'Runs GGUF models everywhere. The safe default, widest model support.',
     role: 'general',
     platforms: ['darwin', 'win32', 'linux'],
     formats: ['gguf'],
@@ -175,7 +175,7 @@ export const ENGINES: readonly EngineSpec[] = [
   {
     id: 'dflash-mlx',
     name: 'MLX DFlash',
-    blurb: 'Fastest for a single chat — around 1.4-1.6x. Needs a draft model.',
+    blurb: 'Fastest for a single chat, around 1.4-1.6x. Needs a draft model.',
     role: 'single-user',
     platforms: ['darwin'],
     formats: ['mlx'],
@@ -206,7 +206,7 @@ export const ENGINES: readonly EngineSpec[] = [
      */
     id: 'comfyui',
     name: 'ComfyUI',
-    blurb: 'Runs image, video and audio models — one runtime for every generation model.',
+    blurb: 'One runtime for every image, video and audio model.',
     role: 'general',
     platforms: ['darwin', 'win32', 'linux'],
     formats: ['gguf', 'safetensors', 'diffusers'],
@@ -238,7 +238,7 @@ export const ENGINES: readonly EngineSpec[] = [
      */
     id: 'ik-llama',
     name: 'ik_llama.cpp',
-    blurb: 'A llama.cpp fork with extra quant types — better when a big model must spill to CPU.',
+    blurb: 'A llama.cpp fork with extra quant types. Better when a big model spills to CPU.',
     role: 'general',
     platforms: ['darwin', 'win32', 'linux'],
     formats: ['gguf'],
@@ -270,7 +270,7 @@ export const ENGINES: readonly EngineSpec[] = [
      */
     id: 'tensorrt-llm',
     name: 'TensorRT-LLM',
-    blurb: "NVIDIA's own runtime — fastest on their cards, but compiles per GPU first.",
+    blurb: "NVIDIA's own runtime. Fastest on their cards, but compiles per GPU first.",
     role: 'concurrency',
     platforms: ['linux', 'win32'],
     formats: ['trt', 'safetensors'],
@@ -304,7 +304,7 @@ export const ENGINES: readonly EngineSpec[] = [
      */
     id: 'onnx-genai',
     name: 'ONNX Runtime GenAI',
-    blurb: 'Runs on a Windows NPU or any DirectML GPU — the Intel and AMD path on Windows.',
+    blurb: 'Windows NPU or any DirectML GPU. The Intel and AMD path on Windows.',
     role: 'npu',
     platforms: ['win32', 'linux'],
     formats: ['onnx'],
@@ -328,7 +328,7 @@ export const ENGINES: readonly EngineSpec[] = [
      */
     id: 'sdcpp',
     name: 'stable-diffusion.cpp',
-    blurb: 'Image and video with no Python at all — CPU, CUDA, Vulkan, Metal or SYCL.',
+    blurb: 'Image and video with no Python. CPU, CUDA, Vulkan, Metal or SYCL.',
     role: 'general',
     platforms: ['darwin', 'win32', 'linux'],
     formats: ['gguf', 'safetensors'],
@@ -344,7 +344,7 @@ export const ENGINES: readonly EngineSpec[] = [
      */
     id: 'nunchaku',
     name: 'Nunchaku',
-    blurb: '4-bit diffusion on NVIDIA — around 8x faster and a third of the memory for FLUX.',
+    blurb: '4-bit diffusion on NVIDIA. Around 8x faster and a third of the memory for FLUX.',
     role: 'single-user',
     platforms: ['linux', 'win32'],
     formats: ['safetensors'],
@@ -363,7 +363,7 @@ export const ENGINES: readonly EngineSpec[] = [
      */
     id: 'mflux',
     name: 'mflux (MLX)',
-    blurb: 'Apple Silicon image generation on MLX — MEASURED 6x faster than the PyTorch path.',
+    blurb: 'Apple Silicon image generation on MLX. Measured 6x faster than PyTorch.',
     role: 'single-user',
     platforms: ['darwin'],
     formats: ['mlx', 'safetensors'],

@@ -14,17 +14,17 @@ import { useSettingsStore } from '../../state/settings-store';
 import { SettingRow, SettingSection } from '../parts';
 
 const PERMISSION_HINT: Record<PermissionMode, string> = {
-  bypass: 'Run every tool call without review — fastest, least safe.',
+  bypass: 'Runs every tool call without review. Fastest, least safe.',
   reviewer:
-    'Flags risky shell commands before they run — regex rules, plus a small model when a local one is running.',
+    'Flags risky shell commands before they run, using regex rules plus a small model when one is loaded.',
   'review-all': 'Approve every tool call yourself.',
 };
 
 const EFFORT_HINT: Record<EffortLevel, string> = {
-  low: 'Fewest repair/review passes — fastest replies.',
+  low: 'Fewest repair passes. Fastest replies.',
   medium: 'Balanced repair + one self-review pass.',
   high: 'More repair attempts, extra review, adversarial checks.',
-  max: 'Maximum reliability passes — slowest.',
+  max: 'Most reliability passes. Slowest.',
 };
 
 export function AgentPanel() {

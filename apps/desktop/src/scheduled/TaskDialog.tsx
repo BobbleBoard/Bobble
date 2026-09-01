@@ -209,8 +209,8 @@ export function TaskDialog({ initial, editingId, onCancel, onSave }: TaskDialogP
             className="pd-focusable resize-none rounded-lg border border-border-default bg-bg-inset px-3 py-2 text-body text-text-primary placeholder:text-text-muted"
           />
           <p className="text-caption text-text-muted">
-            This runs as a normal chat, with your tools and your working folder — so it can read,
-            write and run things.
+            Runs as a normal chat, with your tools and working folder, so it can read, write and run
+            things.
           </p>
         </div>
 

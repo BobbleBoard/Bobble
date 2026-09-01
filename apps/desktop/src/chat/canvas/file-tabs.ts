@@ -150,7 +150,7 @@ export function unreadableFileArtifact(absPath: string): Artifact {
       text:
         `Could not read this file.\n\n${absPath}\n\n` +
         'It may have been written somewhere else, moved, or removed since it was ' +
-        'named. Nothing has been lost from the tab — there was nothing to show.',
+        'named. Nothing has been lost from the tab; there was nothing to show.',
     },
   };
 }
@@ -163,7 +163,7 @@ export function fileArtifact(absPath: string, read: ReadFileResult): Artifact {
       id: fileTabKey(absPath),
       title: filename,
       filename,
-      content: { kind: 'text', text: `Binary file (${read.bytes} bytes) — preview unavailable.` },
+      content: { kind: 'text', text: `Binary file (${read.bytes} bytes). No preview.` },
     };
   }
   if (read.tooLarge) {
@@ -173,7 +173,7 @@ export function fileArtifact(absPath: string, read: ReadFileResult): Artifact {
       filename,
       content: {
         kind: 'text',
-        text: `File is ${read.bytes} bytes — too large to preview live.\nOpen it with an external editor from the Open ▾ menu.`,
+        text: `File is ${read.bytes} bytes. Too large to preview live.\nOpen it with an external editor from the Open ▾ menu.`,
       },
     };
   }

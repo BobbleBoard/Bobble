@@ -413,7 +413,7 @@ export function GalleryView() {
                 <MessageRow kind="assistant">
                   <Prose>
                     <p>
-                      <strong>Qwen3.6-27B at Q4_K_M</strong> — it fits in <code>16.4 GB</code> and
+                      <strong>Qwen3.6-27B at Q4_K_M</strong>: it fits in <code>16.4 GB</code> and
                       MTP decoding adds roughly 40% throughput.
                     </p>
                   </Prose>
@@ -517,7 +517,7 @@ export function GalleryView() {
               </div>
             </Section>
 
-            <Section title="Canvas — live SVG (draw as code streams) + inline↔side">
+            <Section title="Canvas · live SVG (draw as code streams) + inline↔side">
               <CanvasGalleryDemo />
             </Section>
 

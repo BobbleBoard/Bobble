@@ -138,7 +138,7 @@ export function HarnessPanel() {
             ) : null}
             {spec.bin !== undefined && state?.installed !== true ? (
               <p className="mt-1 text-footnote text-text-muted">
-                Not found on this machine — install {spec.bin} to use it.
+                Not found. Install {spec.bin} to use it.
               </p>
             ) : null}
           </div>
@@ -192,7 +192,7 @@ export function HarnessPanel() {
           <div className="mt-2 border-t border-border-default pt-2">
             <p className="text-footnote text-text-secondary">
               Bobble serves your local model on an OpenAI-compatible endpoint. Run these in your
-              terminal to point {spec.name} at it — no internet, no API key.
+              terminal to point {spec.name} at it. No internet, no API key.
             </p>
             <CopyBox
               testid={`harness-script-${spec.id}`}
@@ -200,8 +200,8 @@ export function HarnessPanel() {
             />
             {status?.serverRunning !== true ? (
               <p className="mt-2 text-footnote text-text-muted">
-                The local server isn’t running yet — start a chat (or load a model) first, then
-                these will connect.
+                The local server isn’t running. Start a chat or load a model first, then these will
+                connect.
               </p>
             ) : null}
           </div>
@@ -226,13 +226,13 @@ export function HarnessPanel() {
         <div>
           <h3 className="text-body text-text-primary">Bobble’s own agent</h3>
           <p className="text-footnote text-text-secondary">
-            Drives the chat, its tools and its subagents. Only pi can do this — Bobble speaks its
+            Drives the chat, its tools and its subagents. Only pi can do this: Bobble speaks its
             protocol directly.
           </p>
         </div>
         {embedded.map(renderRow)}
         <p className="text-footnote text-text-muted">
-          A change applies to your next chat — an open conversation keeps the pi it started with.
+          Applies to your next chat. An open conversation keeps the pi it started with.
         </p>
       </section>
 

@@ -241,7 +241,7 @@ export function StudioShell({
         <Dialog open={advancedOpen} onOpenChange={setAdvancedOpen}>
           <DialogContent data-testid="studio-advanced" className="max-w-[460px]">
             <DialogHeader>
-              <DialogTitle>{title} — advanced</DialogTitle>
+              <DialogTitle>Advanced</DialogTitle>
             </DialogHeader>
             {/* `.pd-dialog-body` is where the padding and the scroll live —
                 without it the fields sat against the panel's edges and a long

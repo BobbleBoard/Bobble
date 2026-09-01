@@ -174,16 +174,16 @@ function reasonFor(
   const size = `${choice.needsGB.toFixed(0)} GB of your ${host.totalRamGB} GB`;
   const q = choice.quant === undefined ? '' : ` at ${choice.quant.rung.quant}`;
   if (family.id === 'qwen3.8') {
-    return `The strongest open model that fits here — ${size}${q}.`;
+    return `The strongest open model that fits here. ${size}${q}.`;
   }
   if (family.id === 'mage-flow') {
-    return `Few-step, so it stays quick on any machine — ${size}.`;
+    return `Few-step, so it stays quick on any machine. ${size}.`;
   }
   if (family.id === 'ltx') {
-    return `The fastest good video model, and the difference is hard to see — ${size}.`;
+    return `The fastest good video model, and the difference is hard to see. ${size}.`;
   }
   if (family.fast === true) {
-    return `Unusually fast for its class — ${size}${q}.`;
+    return `Unusually fast for its class. ${size}${q}.`;
   }
   return `${family.blurb} ${size}${q}.`;
 }

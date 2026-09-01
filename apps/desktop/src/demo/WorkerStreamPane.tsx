@@ -57,7 +57,7 @@ export function WorkerStreamPane({
     return (
       <div className="pd-workerpane" data-testid="worker-pane">
         <div className="pd-workerpane-empty">
-          <span>The run is getting started —</span>
+          <span>The run is getting started…</span>
           <span>the live view appears the moment work begins.</span>
         </div>
       </div>

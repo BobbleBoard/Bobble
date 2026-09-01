@@ -104,7 +104,7 @@ export function ThreadImagePlaceholder({
         'aria-label',
         current === undefined
           ? labelRef.current
-          : `${labelRef.current} — ${cap.textContent.toLowerCase()}`,
+          : `${labelRef.current}, ${cap.textContent.toLowerCase()}`,
       );
       root.setAttribute('data-phase', current === undefined ? 'waiting' : 'resolving');
       root.setAttribute('data-frames', String(state.frames.length));

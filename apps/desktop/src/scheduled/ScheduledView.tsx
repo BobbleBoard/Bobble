@@ -121,7 +121,7 @@ export function ScheduledView() {
           <div>
             <h1 className="text-heading text-text-primary">Scheduled tasks</h1>
             <p className="mt-1 text-body text-text-secondary">
-              Work Bobble does on its own — on a schedule, or whenever you run it.
+              Work Bobble does on its own, on a schedule or on demand.
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -170,8 +170,7 @@ export function ScheduledView() {
             className="mt-4 rounded-lg border border-border-default bg-bg-inset px-3 py-2 text-footnote text-text-secondary"
             data-testid="tasks-off-note"
           >
-            Scheduling is off — nothing will run on its own. Your tasks are kept, and you can still
-            run any of them by hand.
+            Scheduling is off. Your tasks are kept, and you can still run any of them by hand.
           </p>
         ) : null}
 

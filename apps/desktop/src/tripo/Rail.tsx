@@ -4,12 +4,12 @@
  * inset groups (they read as misaligned buttons) and no product badges.
  */
 import type { JSX, ReactNode } from 'react';
-import { IcAnimate, IcImage, IcRetopo, IcSegment, IcSparkles, IcTexture } from './icons';
+import { IcAnimate, IcImage, IcModel, IcRetopo, IcSegment, IcTexture } from './icons';
 import { type TripoTool, useTripoStore } from './store';
 
 const ENTRIES: readonly { tool: TripoTool; label: string; icon: ReactNode }[] = [
   { tool: 'image', label: 'Image', icon: <IcImage size={19} /> },
-  { tool: 'model', label: 'Model', icon: <IcSparkles size={19} /> },
+  { tool: 'model', label: 'Model', icon: <IcModel size={19} /> },
   { tool: 'segment', label: 'Segment', icon: <IcSegment size={19} /> },
   { tool: 'retopo', label: 'Retopo', icon: <IcRetopo size={19} /> },
   { tool: 'texture', label: 'Texture', icon: <IcTexture size={19} /> },

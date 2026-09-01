@@ -26,7 +26,7 @@ export function PersonalizationPanel() {
   return (
     <SettingSection
       title="Custom instructions"
-      description="Standing guidance the agent applies to every new chat — tone, formatting, defaults, things to remember."
+      description="Standing guidance for every new chat: tone, formatting, defaults, things to remember."
     >
       <SettingRow
         label="System instructions"
@@ -44,7 +44,7 @@ export function PersonalizationPanel() {
           {/* "Saved" only reflects an ACTUAL persisted instruction — an untouched,
               empty field shows nothing (a non-breaking space holds the row height)
               rather than a misleading "Saved". */}
-          {dirty ? 'Unsaved — click away to save' : saved.length > 0 ? 'Saved' : ' '}
+          {dirty ? 'Unsaved. Click away to save' : saved.length > 0 ? 'Saved' : ' '}
         </div>
       </SettingRow>
     </SettingSection>

@@ -58,11 +58,9 @@ const MODE_OPTIONS: Array<{ value: McpMode; label: string }> = [
 
 /** One-line explanation of each connector run mode, shown under the toggle. */
 const MODE_HINTS: Record<McpMode, string> = {
-  lite: 'Lite — a compact proxy: tools are summarized and fetched on demand, so many connectors fit in a small context.',
-  native:
-    'Native — every connector tool is exposed directly to the model. Most capable, but uses more context.',
-  'bash-cli':
-    'Bash CLI — connectors are driven from the terminal via a discoverable `--help` command surface.',
+  lite: 'Compact proxy. Tools are summarized and fetched on demand, so many connectors fit a small context.',
+  native: 'Every connector tool goes straight to the model. Most capable, uses the most context.',
+  'bash-cli': 'Driven from the terminal through a discoverable `--help` surface.',
 };
 
 export function ConnectorsScreen({ onClose }: { onClose: () => void }) {

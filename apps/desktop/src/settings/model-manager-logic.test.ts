@@ -41,7 +41,7 @@ describe('ramVerdict', () => {
     // 18 total, needs 16 → 2 GB headroom (< 4) → tight.
     expect(ramVerdict(16, 18)).toMatchObject({
       tone: 'warning',
-      label: 'Tight — will swap',
+      label: 'Tight, will swap',
       fits: true,
     });
   });
@@ -59,7 +59,7 @@ describe('ramVerdict', () => {
       quantFit({ modelBytes: 5 * GB, ...M5_PRO_24GB }).label,
       quantFit({ modelBytes: 40 * GB, ...M5_PRO_24GB }).label,
     ]);
-    expect(words).toEqual(new Set(['Fits', 'Tight — will swap', "Won't fit"]));
+    expect(words).toEqual(new Set(['Fits', 'Tight, will swap', "Won't fit"]));
     expect(ramVerdict(16, 32).detail).toMatch(/no file size known yet/);
   });
 

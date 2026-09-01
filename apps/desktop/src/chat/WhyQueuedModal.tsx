@@ -105,7 +105,7 @@ export function WhyQueuedModal() {
               <span className="text-footnote font-medium text-text-muted">Running now</span>
               {running.length === 0 ? (
                 <p className="text-footnote text-text-muted">
-                  Nothing is running right now — your message should send momentarily.
+                  Nothing is running. Your message should send in a moment.
                 </p>
               ) : (
                 running.map((chat) => (

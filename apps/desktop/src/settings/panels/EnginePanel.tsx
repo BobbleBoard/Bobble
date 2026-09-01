@@ -92,7 +92,7 @@ export function EnginePanel() {
     <div className="flex flex-col gap-4" data-testid="engine-panel">
       <p className="text-body text-text-secondary">
         Engines run your models. Bobble picks the best one for this machine, and you can add others
-        for specific jobs — one for many agents at once, one for the fastest single chat.
+        for specific jobs: one for many agents at once, one for the fastest single chat.
       </p>
 
       {error !== null ? (

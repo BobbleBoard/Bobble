@@ -555,9 +555,7 @@ function formatCommArgs(args: Record<string, unknown>): string | undefined {
       if (d === null || typeof d !== 'object') continue;
       const rec = d as Record<string, unknown>;
       const purpose = str(rec.purpose);
-      lines.push(
-        `Division: ${str(rec.name) ?? '?'}${purpose !== undefined ? ` — ${purpose}` : ''}`,
-      );
+      lines.push(`Division: ${str(rec.name) ?? '?'}${purpose !== undefined ? `: ${purpose}` : ''}`);
     }
   }
   // request_test_tools: each kit with the reason it was asked for.
@@ -567,7 +565,7 @@ function formatCommArgs(args: Record<string, unknown>): string | undefined {
       else if (k !== null && typeof k === 'object') {
         const rec = k as Record<string, unknown>;
         const why = str(rec.why);
-        lines.push(`Kit: ${str(rec.kit) ?? '?'}${why !== undefined ? ` — ${why}` : ''}`);
+        lines.push(`Kit: ${str(rec.kit) ?? '?'}${why !== undefined ? `: ${why}` : ''}`);
       }
     }
   }

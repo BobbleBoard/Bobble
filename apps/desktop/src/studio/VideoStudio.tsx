@@ -55,9 +55,9 @@ const SHAPES = [
  * it does for one still.
  */
 const SIZES = [
-  { value: 512, label: 'Draft', hint: 'fastest — for checking the motion' },
-  { value: 768, label: 'Standard', hint: 'near what these models were trained at' },
-  { value: 1024, label: 'Large', hint: 'minutes per clip on this machine' },
+  { value: 512, label: 'Draft', hint: 'Fastest' },
+  { value: 768, label: 'Standard', hint: 'Trained size' },
+  { value: 1024, label: 'Large', hint: 'Minutes per clip' },
 ] as const;
 
 type Shape = (typeof SHAPES)[number]['value'];
@@ -66,9 +66,9 @@ type Shape = (typeof SHAPES)[number]['value'];
 const FPS = 24;
 
 const LENGTHS = [
-  { value: 2, label: '2s', hint: 'about 48 frames' },
-  { value: 4, label: '4s', hint: 'about 96 frames' },
-  { value: 8, label: '8s', hint: 'about 192 frames — the slowest option' },
+  { value: 2, label: '2s', hint: '48 frames' },
+  { value: 4, label: '4s', hint: '96 frames' },
+  { value: 8, label: '8s', hint: '192 frames' },
 ] as const;
 
 const EXAMPLES = [
@@ -103,7 +103,7 @@ export function VideoStudio(): JSX.Element {
       id: 'shot',
       icon: <GlyphFrame />,
       title: 'Describe a shot',
-      hint: 'One subject, one continuous action, one place.',
+      hint: 'One subject, one action, one place.',
       onPick: () => {
         setShape('landscape');
         setSeconds(4);
@@ -114,7 +114,7 @@ export function VideoStudio(): JSX.Element {
       id: 'draft',
       icon: <GlyphStopwatch />,
       title: 'Quick draft',
-      hint: 'Two seconds at the smallest size — check the motion first.',
+      hint: 'Two seconds, smallest size.',
       onPick: () => {
         setSeconds(2);
         setLong(512);
@@ -125,7 +125,7 @@ export function VideoStudio(): JSX.Element {
       id: 'vertical',
       icon: <GlyphPhone />,
       title: 'Vertical clip',
-      hint: '9:16, the shape a phone actually plays it in.',
+      hint: '9:16, for a phone.',
       onPick: () => {
         setShape('portrait');
         setSeconds(4);
@@ -198,7 +198,7 @@ export function VideoStudio(): JSX.Element {
             <RailToggle
               testid="video-enhance"
               label="Prompt enhancer"
-              hint="Rewrites your line so the MOTION is described first — the difference between a clip and an expensive photograph."
+              hint="Describes the motion first, which is what a clip needs."
               checked={enhancer.enabled}
               onChange={enhancer.setEnabled}
             />
@@ -232,7 +232,7 @@ export function VideoStudio(): JSX.Element {
                 {models.map((m) => (
                   <option key={m.id} value={m.id} disabled={m.reserved === true}>
                     {m.label}
-                    {m.reserved === true ? ' — not available yet' : ''}
+                    {m.reserved === true ? ' (not available yet)' : ''}
                   </option>
                 ))}
               </select>
@@ -265,8 +265,7 @@ export function VideoStudio(): JSX.Element {
             />
           </Knob>
           <p className="pd-studio-rail-note">
-            Steps multiply by every frame here, so a change that costs a second on one picture costs
-            a minute on a clip. Empty means the model's own default.
+            Empty uses the model&apos;s default. Steps cost per frame.
           </p>
         </>
       }

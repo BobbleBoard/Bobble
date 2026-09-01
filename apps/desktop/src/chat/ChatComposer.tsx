@@ -702,7 +702,7 @@ export function ChatComposer({
         .getState()
         .appendAssistantText(
           res.ok
-            ? 'Compacted — the history so far is now a summary.'
+            ? 'Compacted. The history so far is a summary.'
             : `Not compacted: ${res.error ?? 'unknown reason'}.`,
         );
       return;
@@ -900,7 +900,7 @@ export function ChatComposer({
   // and faded, inflating the card).
   const placeholder =
     isStreaming && !bgStreaming
-      ? 'Send — it goes right after this reply…'
+      ? 'Send after this reply…'
       : bashMode
         ? 'Run a shell command…'
         : 'Ask anything…';
@@ -1004,7 +1004,7 @@ export function ChatComposer({
               className="px-3 pt-2 text-footnote text-text-muted"
               data-testid="composer-skipped-note"
             >
-              Only images and text files can be attached — skipped {skipped.join(', ')}.
+              Images and text files only. Skipped {skipped.join(', ')}.
             </div>
           ) : null}
 

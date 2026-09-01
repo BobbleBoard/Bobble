@@ -151,7 +151,7 @@ export function SetupStep() {
       {row(
         engine.name,
         engine.autoInstalls === true
-          ? 'Arrives with your first model — nothing to download now.'
+          ? 'Arrives with your first model.'
           : `${engine.blurb}${size !== null ? ` · ${size}` : ''}`,
         engine.autoInstalls === true ? 'done' : enginePhase,
         'setup-engine',
@@ -167,7 +167,7 @@ export function SetupStep() {
           ? `pi, plus ${harnesses.length} agent${harnesses.length === 1 ? '' : 's'} found`
           : 'pi (bundled)',
         harnesses.length > 0
-          ? `Found ${harnesses.map((h) => h.id).join(', ')} — connect them in Settings → Harness.`
+          ? `Found ${harnesses.map((h) => h.id).join(', ')}. Connect them in Settings → Harness.`
           : 'Drives the chat, its tools and its subagents.',
         'done',
         'setup-harness',
@@ -175,7 +175,7 @@ export function SetupStep() {
 
       {error !== null ? (
         <p className="text-footnote text-text-muted" data-testid="setup-error">
-          {error} — you can finish setup later from Settings.
+          {error} You can finish setup later from Settings.
         </p>
       ) : null}
 
@@ -196,7 +196,7 @@ export function SetupStep() {
         </button>
       ) : (
         <p className="text-footnote text-text-muted">
-          Ready. The download continues in the background — you can start chatting.
+          Ready. The download continues in the background.
         </p>
       )}
     </div>

@@ -282,7 +282,7 @@ export const RECOMMENDED_FAMILIES: readonly RecommendedFamily[] = [
     output: 'text',
     fast: true,
     blurb:
-      'A 7.9B MoE that only runs 0.8B of itself per token — small-model speed, ' +
+      'A 7.9B MoE that only runs 0.8B of itself per token: small-model speed, ' +
       'mid-model knowledge.',
     /*
      * READ OUT OF THE GGUF HEADER, not off the model card: architecture
@@ -323,7 +323,7 @@ export const RECOMMENDED_FAMILIES: readonly RecommendedFamily[] = [
     name: 'Gemma 4',
     org: 'unsloth',
     output: 'text',
-    blurb: "Google's open family — the E-series is built for small machines, and 12B reads images.",
+    blurb: "Google's open family. The E-series is built for small machines, and 12B reads images.",
     variants: [
       { repo: 'unsloth/gemma-4-E2B-it-GGUF', label: 'E2B', paramsB: 2, minMemoryGB: 4 },
       { repo: 'unsloth/gemma-4-E4B-it-GGUF', label: 'E4B', paramsB: 4, minMemoryGB: 6 },
@@ -338,7 +338,7 @@ export const RECOMMENDED_FAMILIES: readonly RecommendedFamily[] = [
         repo: 'unsloth/gemma-4-26B-A4B-it-GGUF',
         label: '26B-A4B',
         paramsB: 26,
-        note: 'MoE — 26B of weights, ~4B active.',
+        note: 'MoE. 26B of weights, ~4B active.',
         minMemoryGB: 19,
       },
       { repo: 'unsloth/gemma-4-31B-it-GGUF', label: '31B', paramsB: 31, minMemoryGB: 23 },
@@ -376,14 +376,14 @@ export const RECOMMENDED_FAMILIES: readonly RecommendedFamily[] = [
     name: 'Qwen3.6',
     org: 'unsloth',
     output: 'text',
-    blurb: 'The previous generation — the 35B mixture-of-experts decodes like a 3B.',
+    blurb: 'The previous generation. The 35B mixture-of-experts decodes like a 3B.',
     variants: [
       { repo: 'unsloth/Qwen3.6-27B-MTP-GGUF', label: '27B', paramsB: 27, minMemoryGB: 20 },
       {
         repo: 'unsloth/Qwen3.6-35B-A3B-GGUF',
         label: '35B-A3B',
         paramsB: 35,
-        note: 'MoE — decodes at roughly a 3B model\u2019s speed.',
+        note: 'MoE. Decodes at roughly a 3B model\u2019s speed.',
         minMemoryGB: 25,
       },
     ],
@@ -403,7 +403,7 @@ export const RECOMMENDED_FAMILIES: readonly RecommendedFamily[] = [
     name: 'Nemotron 3.5 Lightning',
     org: 'unsloth',
     output: 'text',
-    blurb: "NVIDIA's throughput-tuned MoE — long context at speed.",
+    blurb: "NVIDIA's throughput-tuned MoE. Long context at speed.",
     variants: [
       {
         repo: 'unsloth/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-GGUF',
@@ -427,7 +427,7 @@ export const RECOMMENDED_FAMILIES: readonly RecommendedFamily[] = [
         repo: 'Qwen/Qwen3-VL-8B-Instruct',
         label: '8B',
         paramsB: 8,
-        note: 'The one worth running if it fits — 17.5 GB of weights.',
+        note: 'The one worth running if it fits. 17.5 GB of weights.',
         minMemoryGB: 20,
       },
     ],
@@ -443,7 +443,7 @@ export const RECOMMENDED_FAMILIES: readonly RecommendedFamily[] = [
         repo: 'Qwen/Qwen3-Omni-30B-A3B-Instruct',
         label: '30B-A3B',
         paramsB: 30,
-        note: '70 GB of weights — a Max or Ultra, or a quantised community build.',
+        note: '70 GB of weights. A Max or Ultra, or a quantised community build.',
         minMemoryGB: 80,
       },
     ],
@@ -458,7 +458,7 @@ export const RECOMMENDED_FAMILIES: readonly RecommendedFamily[] = [
       {
         repo: 'unsloth/DeepSeek-V4-Flash-0731-GGUF',
         label: 'DSpark Q8',
-        note: 'The distilled DSpark build — 10.9 GB, and the way in on a normal machine.',
+        note: 'The distilled DSpark build. 10.9 GB, and the way in on a normal machine.',
         allow: ['dspark-DeepSeek-V4-Flash-0731-Q8_0.gguf'],
         approxBytes: 10_900_000_000,
         minMemoryGB: 14,
@@ -508,7 +508,7 @@ export const RECOMMENDED_FAMILIES: readonly RecommendedFamily[] = [
       {
         repo: 'Comfy-Org/Mage-Flow',
         label: 'Turbo · int8',
-        note: 'Few-step and quantized — the one to start with.',
+        note: 'Few-step and quantized. The one to start with.',
         allow: [
           'diffusion_models/mage_flow_turbo_int8_convrot.safetensors',
           'text_encoders/qwen3vl_4b_bf16.safetensors',
@@ -551,7 +551,7 @@ export const RECOMMENDED_FAMILIES: readonly RecommendedFamily[] = [
     name: 'Z-Image',
     org: 'Tongyi-MAI',
     output: 'image',
-    blurb: 'Eight steps, 16 GB, Apache-2.0 — the cheapest good image model to run.',
+    blurb: 'Eight steps, 16 GB, Apache-2.0. The cheapest good image model to run.',
     fast: true,
     variants: [{ repo: 'Tongyi-MAI/Z-Image-Turbo', label: 'Turbo', paramsB: 6, minMemoryGB: 16 }],
   },
@@ -574,7 +574,7 @@ export const RECOMMENDED_FAMILIES: readonly RecommendedFamily[] = [
         repo: 'black-forest-labs/FLUX.2-dev',
         label: 'dev',
         paramsB: 32,
-        note: 'The full model — 32 GB+ machines.',
+        note: 'The full model. 32 GB+ machines.',
         minMemoryGB: 48,
       },
     ],
@@ -584,7 +584,7 @@ export const RECOMMENDED_FAMILIES: readonly RecommendedFamily[] = [
     name: 'Krea 2',
     org: 'krea',
     output: 'image',
-    blurb: 'Aesthetic-tuned — less of the plastic AI look, with a Turbo for iteration.',
+    blurb: 'Aesthetic-tuned. Less of the plastic AI look, with a Turbo for iteration.',
     variants: [
       { repo: 'krea/Krea-2-Turbo', label: 'Turbo', paramsB: 12.8, minMemoryGB: 24 },
       {
@@ -698,7 +698,7 @@ export const RECOMMENDED_FAMILIES: readonly RecommendedFamily[] = [
     name: 'MiniMax H3',
     org: 'MiniMaxAI',
     output: 'video',
-    blurb: 'Video from keyframes or a reference image — one download per job you want.',
+    blurb: 'Video from keyframes or a reference image. One download per job.',
     fast: true,
     /*
      * THE CLEAREST CASE OF the user's "one per like in-out you want". The repo holds

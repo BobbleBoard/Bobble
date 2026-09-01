@@ -20,15 +20,15 @@ export function queuedLineText(reason: QueueReason | undefined): string {
   switch (reason.kind) {
     case 'busy-switch-model':
       return reason.targetModelName !== undefined
-        ? `Queued — will switch to ${reason.targetModelName} first`
-        : 'Queued — a model switch is needed first';
+        ? `Queued. Switching to ${reason.targetModelName} first`
+        : 'Queued. A model switch is needed first';
     case 'insufficient-ram':
       return reason.targetModelName !== undefined
-        ? `Queued — ${reason.targetModelName} may not fit this computer's memory`
-        : "Queued — the selected model may not fit this computer's memory";
+        ? `Queued. ${reason.targetModelName} may not fit this computer's memory`
+        : "Queued. The selected model may not fit this computer's memory";
     default:
       // busy-same-model / ready / anything else → the plain sequential wait.
-      return 'Queued — sends when the current reply finishes';
+      return 'Queued. Sends when the current reply finishes';
   }
 }
 
@@ -59,7 +59,7 @@ export function queueExplainer(reason: QueueReason | undefined): QueueExplainer 
       return {
         blurb: `${targetName(
           reason,
-        )} needs more memory than this computer has free, so it may load slowly or fail. You can still try — it will send once anything running finishes — or pick a lighter model in the model menu.`,
+        )} needs more memory than this computer has free, so it may load slowly or fail. You can still try. It will send once anything running finishes — or pick a lighter model in the model menu.`,
         hint: 'Pausing or stopping the running chat below frees the most memory for it.',
       };
     default:

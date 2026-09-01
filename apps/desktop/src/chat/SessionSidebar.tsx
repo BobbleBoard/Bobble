@@ -355,21 +355,20 @@ function ModalityCube({ size = 16 }: { size?: number }): ReactNode {
 }
 
 /*
- * WHAT "MODALITIES" ACTUALLY CONTAINS.
+ * MODALITIES: a wand.
  *
- * It was a wireframe cube — the 3D Studio's own glyph, standing for a section
- * that also holds Image, Video and Audio. the user: "replace the modalities icon
- * 'currently 3d studio cube' with something more all encompassing." A cube says
- * one of the four things in the list, which makes the other three look like they
- * are inside it.
+ * Two goes at this. It was the 3D Studio's own cube, which named one of the four
+ * things in the list and made the other three look like they lived inside it.
+ * Then it was three loose primitives — a circle, a triangle and a square — which
+ * the user did not like, and looking at it beside the other rows he is right: three
+ * small shapes floating in a 16px box is a diagram of nothing, and it reads as
+ * clutter next to the single clean marks above it.
  *
- * Three different primitives instead — a circle, a triangle and a rounded square
- * — arranged in a cluster and deliberately NOT touching. Assorted shapes is the
- * oldest mark there is for "different kinds of thing", it commits to none of the
- * four, and at 16px three small distinct silhouettes still read as three while
- * three overlapping outlines would read as a smudge.
+ * A wand is one shape, it says MAKE rather than naming any medium, and nothing
+ * else in the sidebar claims it. (The shared sparkle is taken: Settings uses it
+ * for custom instructions and the tier picker uses it for Auto.)
  */
-function ModalityShapes({ size = 16 }: { size?: number }): ReactNode {
+function ModalityWand({ size = 16 }: { size?: number }): ReactNode {
   return (
     <svg
       width={size}
@@ -377,15 +376,15 @@ function ModalityShapes({ size = 16 }: { size?: number }): ReactNode {
       viewBox="0 0 16 16"
       fill="none"
       stroke="currentColor"
-      strokeWidth={1.4}
+      strokeWidth={1.5}
       strokeLinecap="round"
       strokeLinejoin="round"
       className="pd-icon"
       aria-hidden="true"
     >
-      <circle cx="4.6" cy="4.6" r="2.7" />
-      <path d="M11.4 1.9l2.8 5H8.6z" />
-      <rect x="5.1" y="9.3" width="5.8" height="5.8" rx="1.6" />
+      <path d="M2.4 13.6 10.1 5.9" />
+      <path d="M8.2 4 9.1 6.1l2.1.9-2.1.9-.9 2.1-.9-2.1L5.2 7l2.1-.9z" />
+      <path d="M13 9.6l.5 1.2 1.2.5-1.2.5-.5 1.2-.5-1.2-1.2-.5 1.2-.5z" />
     </svg>
   );
 }
@@ -1335,7 +1334,7 @@ export function SessionSidebar({
             onClick={() => setModalitiesOpen((o) => !o)}
           >
             <span className="pd-sidebar-row-icon">
-              <ModalityShapes size={16} />
+              <ModalityWand size={16} />
             </span>
             <span className="pd-sidebar-row-label">Modalities</span>
             <span className="pd-sidebar-row-meta">
@@ -1358,7 +1357,7 @@ export function SessionSidebar({
                 title={
                   module3d.installed
                     ? '3D Studio'
-                    : `3D Studio — module not installed${
+                    : `3D Studio · module not installed${
                         moduleSize === '' ? '' : ` (${moduleSize})`
                       }`
                 }
@@ -1387,7 +1386,7 @@ export function SessionSidebar({
                 type="button"
                 className="pd-child-row pd-focusable"
                 data-testid="modality-image"
-                title="Image Studio — pictures, generated on this machine"
+                title="Image Studio"
                 onClick={() => setModalityView('image')}
               >
                 <span className="pd-child-row-icon">
@@ -1399,7 +1398,7 @@ export function SessionSidebar({
                 type="button"
                 className="pd-child-row pd-focusable"
                 data-testid="modality-video"
-                title="Video Studio — short clips, generated on this machine"
+                title="Video Studio"
                 onClick={() => setModalityView('video')}
               >
                 <span className="pd-child-row-icon">
@@ -1411,7 +1410,7 @@ export function SessionSidebar({
                 type="button"
                 className="pd-child-row pd-focusable"
                 data-testid="modality-audio"
-                title="Audio Studio — speech, voice cloning, music and sound effects"
+                title="Audio Studio"
                 onClick={() => setModalityView('audio')}
               >
                 <span className="pd-child-row-icon">

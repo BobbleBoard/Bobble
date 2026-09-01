@@ -47,13 +47,29 @@ export const IcSparkles = make(
     <path d="M18.8 15.5l.8 2.1 2.1.8-2.1.8-.8 2.1-.8-2.1-2.1-.8 2.1-.8z" />
   </>,
 );
+
+/*
+ * MODEL: a cube being made — its own glyph, not the shared sparkle.
+ *
+ * The rail tool that BUILDS THE MESH wore the same four-point sparkle that
+ * every "AI does something" button in every app wears, so it said nothing the
+ * other four tools could not also claim. The cube is what this step produces;
+ * the spark beside it is what makes it, and it sits clear of the outline so
+ * nothing crosses. `IcSparkles` stays as it was — two other places use it for
+ * exactly the generic meaning it has.
+ */
+export const IcModel = make(
+  <>
+    <path d="M10.2 4.2 16.8 8v7.6l-6.6 3.8-6.6-3.8V8z" />
+    <path d="M3.6 8l6.6 3.8L16.8 8M10.2 11.8v7.6" />
+    <path d="M19.4 3.2l.85 2.15 2.15.85-2.15.85-.85 2.15-.85-2.15L16.4 6.2l2.15-.85z" />
+  </>,
+);
+
 export const IcSegment = make(
   <>
-    <path d="M12 3l7.5 4.2v3.3" />
-    <path d="M12 3L4.5 7.2v3.3" />
-    <path d="M12 3v5.2" />
-    <path d="M8.8 13.2L4.5 15.6 12 20l-1-4.4z" />
-    <path d="M15.2 13.2l4.3 2.4L12 20l1-4.4z" />
+    <path d="M10.6 4.2H6.2a2 2 0 0 0-2 2v11.6a2 2 0 0 0 2 2h4.4z" />
+    <path d="M13.4 4.2h4.4a2 2 0 0 1 2 2v11.6a2 2 0 0 1-2 2h-4.4z" />
   </>,
 );
 export const IcRetopo = make(
@@ -63,10 +79,21 @@ export const IcRetopo = make(
     <path d="M12 8.2l3.3 1.9v3.8L12 15.8l-3.3-1.9v-3.8z" />
   </>,
 );
+/*
+ * TEXTURE: a sphere with the map running over it.
+ *
+ * It was a box with three diagonal hatch lines — which is the "pattern swatch"
+ * mark, and at this size read as a crossed-out square. Texturing here means
+ * wrapping an image onto a form, so the icon is the form with the wrap drawn on
+ * it: a circle and two curves that follow its surface. The curves stop short of
+ * the outline rather than crossing it.
+ */
 export const IcTexture = make(
   <>
-    <rect x="4" y="4" width="16" height="16" rx="2.5" />
-    <path d="M4.5 14.5l5-5M8 19l8.5-8.5M13 19.5L19.5 13" opacity={0.75} />
+    <circle cx="12" cy="12" r="8.2" />
+    <path d="M4.6 9.4c4.6 2.6 10.2 2.6 14.8 0" />
+    <path d="M4.6 14.6c4.6-2.6 10.2-2.6 14.8 0" />
+    <path d="M12 3.8c-2.5 4.9-2.5 11.5 0 16.4" />
   </>,
 );
 export const IcAnimate = make(
@@ -122,7 +149,15 @@ export const IcGallery = make(
     <path d="M3.5 16.5l3.8-3.6a1.5 1.5 0 0 1 2 0l4.7 4.4" />
   </>,
 );
-export const IcPencil = make(<path d="M4 20l1-4L16.5 4.5a2.1 2.1 0 0 1 3 3L8 19z" />);
+/* Same rework as the shared `IconPencil`: barrel, ferrule, tip — three shapes
+   that read as a pencil at 14px instead of one tapered stick. */
+export const IcPencil = make(
+  <>
+    <path d="M15.6 3.4 20.6 8.4 9.3 19.7 4.3 14.7z" />
+    <path d="M13 6 18 11" />
+    <path d="M4.3 14.7 2.8 21.2l6.5-1.5z" />
+  </>,
+);
 export const IcBulb = make(
   <>
     <path d="M9 18h6M10 21h4" />
@@ -314,12 +349,19 @@ export const IcInfo = make(
     <circle cx="12" cy="7.8" r="0.5" fill="currentColor" />
   </>,
 );
+/*
+ * ASSETS: a thumbnail grid, not four dots. the user: "4 dots not that great 'assets'
+ * icon, something else." Four dots is a drag handle everywhere else in this app
+ * — it is literally the grip on the panel's own resizer — so it read as
+ * something to grab rather than the name of a tab. Four cells is what a library
+ * of models looks like when you open it.
+ */
 export const IcGrid4 = make(
   <>
-    <circle cx="8" cy="8" r="1.7" fill="currentColor" stroke="none" />
-    <circle cx="16" cy="8" r="1.7" fill="currentColor" stroke="none" />
-    <circle cx="8" cy="16" r="1.7" fill="currentColor" stroke="none" />
-    <circle cx="16" cy="16" r="1.7" fill="currentColor" stroke="none" />
+    <rect x="3.6" y="3.6" width="7.4" height="7.4" rx="1.8" />
+    <rect x="13" y="3.6" width="7.4" height="7.4" rx="1.8" />
+    <rect x="3.6" y="13" width="7.4" height="7.4" rx="1.8" />
+    <rect x="13" y="13" width="7.4" height="7.4" rx="1.8" />
   </>,
 );
 export const IcFilter = make(<path d="M4 6h16M7 12h10M10 18h4" />);

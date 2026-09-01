@@ -152,7 +152,7 @@ const ROLE_LABEL: Record<Gen3dRole, string> = {
  * actually cares about (the repo attribution stays as the small print). */
 const ROLE_BLURB: Record<Gen3dRole, string> = {
   geometry: 'Turn an image or a text prompt into a full 3D model.',
-  image: 'Generate images from text — the first hop of text → 3D.',
+  image: 'Generate images from text. The first hop of text → 3D.',
   texture: 'Generate PBR textures and paint them onto a model.',
   segment: 'Split a model into clean, named semantic parts.',
   retopo: 'Rebuild a messy mesh as clean, animation-ready quad topology.',

@@ -216,7 +216,7 @@ export function CorpInlineTurn({
   const terminalLabel = delivered
     ? counted
       ? `Delivered ${progress.total} tasks with ${teamPhrase}`
-      : `Finished with ${teamPhrase} — see what they built below`
+      : `Finished with ${teamPhrase}. See what they built below.`
     : state.status === 'aborted'
       ? counted
         ? `Stopped after ${progress.done} of ${progress.total} tasks`

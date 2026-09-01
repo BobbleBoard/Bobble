@@ -37,7 +37,7 @@ export function SourceStep() {
         selected={source === 'neither'}
         onSelect={() => setSource('neither')}
         icon={<IconChat />}
-        title="Neither — start fresh"
+        title="Start fresh"
         description="Skip importing. You can bring things over later from Settings."
       />
     </div>

@@ -157,7 +157,7 @@ export function TripoWorkspace(): JSX.Element {
           data-testid="tp-gate-restore"
           onClick={() => setViewing(false)}
         >
-          Viewing only — 3D module not installed. Download
+          Viewing only. Download the 3D module
         </button>
       ) : null}
       {dropActive ? (

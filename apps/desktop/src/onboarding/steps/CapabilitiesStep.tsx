@@ -84,7 +84,7 @@ export function CapabilitiesStep() {
       </div>
 
       <p className="text-caption text-text-muted">
-        These download in the background later — nothing is installed now.
+        These download later. Nothing is installed now.
       </p>
 
       {recommended != null ? (

@@ -208,7 +208,7 @@ export function summarisePick(pick: EnginePick): string | undefined {
   if (best === undefined) return undefined;
   const better = pick.bestPossible;
   if (better !== undefined && better.spec.id !== best.spec.id) {
-    return `${best.spec.name} — ${best.reason}. ${better.spec.name} would be faster here, once we support it.`;
+    return `${best.spec.name}: ${best.reason}. ${better.spec.name} would be faster here, once we support it.`;
   }
-  return `${best.spec.name} — ${best.reason}.`;
+  return `${best.spec.name}: ${best.reason}.`;
 }

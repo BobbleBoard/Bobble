@@ -75,7 +75,7 @@ const FIT_PILL: Record<
   tight: {
     tone: 'warning',
     label: 'Tight',
-    why: 'It will load, but with little room left — expect swapping.',
+    why: 'It will load with little room left. Expect swapping.',
   },
   'too-big': {
     tone: 'danger',
@@ -312,7 +312,7 @@ export function FamilyCard({
                 <Pill
                   tone="warning"
                   testid={`fast-${family.id}`}
-                  title="Unusually fast for its class — the reason it works on a modest machine"
+                  title="Unusually fast for its class"
                 >
                   Fast
                 </Pill>

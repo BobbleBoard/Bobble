@@ -30,11 +30,11 @@ export interface ModelVersion {
 
 /** Mesh-generation models (the AI Model dropdown in Generate). */
 export const GEN_MODELS: readonly ModelVersion[] = [
-  { id: 'trellis-2', label: 'TRELLIS-2', hint: 'Image or text to 3D — runs on Metal here' },
+  { id: 'trellis-2', label: 'TRELLIS-2', hint: 'Image or text to 3D. Runs on Metal.' },
   {
     id: 'hunyuan-omni',
     label: 'Hunyuan 3D Omni',
-    hint: 'No Metal/MPS port — unavailable on this Mac',
+    hint: 'No Metal port. Unavailable on this Mac.',
   },
 ];
 

@@ -42,13 +42,13 @@ export const TASK_TEMPLATES: readonly TaskTemplate[] = [
     name: 'Morning brief',
     blurb:
       "Your day, before you start it: today's events, what arrived overnight, what is due. " +
-      'Runs on your Mac — nothing leaves it.',
+      'Runs on your Mac. Nothing leaves it.',
     prompt:
       'Turn on the "personal" capability, then write me a short brief for today.\n\n' +
       'Cover, in this order: what is on my calendar today (times and titles); any mail that arrived ' +
       'since yesterday evening that looks like it needs me, with who it is from and one line on why; ' +
       'and reminders due today or overdue.\n\n' +
-      'Be brief and specific — no preamble, no "here is your brief". If a section has nothing in it, ' +
+      'Be brief and specific. No preamble, no "here is your brief". If a section has nothing in it, ' +
       'say so in one line rather than padding. If you cannot reach Calendar, Mail or Reminders, say ' +
       'which one and stop; do not guess.',
     frequency: 'weekdays',
@@ -76,7 +76,7 @@ export const TASK_TEMPLATES: readonly TaskTemplate[] = [
   {
     id: 'draft-replies',
     icon: '✎',
-    name: 'Draft replies — do not send',
+    name: 'Draft replies, do not send',
     blurb: 'Reads what is waiting and writes the replies for you to review. It cannot send them.',
     prompt:
       'Turn on the "personal" capability. Find mail and messages from the last day that are waiting ' +
@@ -132,7 +132,7 @@ export const TASK_TEMPLATES: readonly TaskTemplate[] = [
     id: 'inbox-folder',
     icon: '⇢',
     name: 'Sort a drop folder',
-    blurb: 'Tidy a folder you dump things into — rename, group, and summarise what arrived.',
+    blurb: 'Tidy a folder you dump things into: rename, group, summarise.',
     prompt:
       'Look at ~/Downloads. Summarise what has arrived since yesterday, group it by kind, ' +
       'and suggest a tidy-up. List the moves you would make before making any of them.',

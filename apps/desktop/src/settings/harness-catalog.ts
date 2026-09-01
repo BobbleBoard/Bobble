@@ -75,7 +75,7 @@ export const HARNESSES: readonly HarnessSpec[] = [
   {
     id: 'pi-custom',
     name: 'Custom pi config',
-    blurb: 'Point pi at your own config file — your presets, tools and prompts.',
+    blurb: 'Point pi at your own config file: presets, tools and prompts.',
     attach: 'embedded',
   },
   {

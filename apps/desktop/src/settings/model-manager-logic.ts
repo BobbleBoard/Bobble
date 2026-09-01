@@ -42,7 +42,7 @@ export function ramVerdict(minRamGB: number, totalRamGB: number): RamVerdict {
   const detail = `this model states ${minRamGB} GB minimum; no file size known yet`;
   if (totalRamGB < minRamGB) return { tone: 'danger', label: "Won't fit", fits: false, detail };
   if (totalRamGB - minRamGB < 4) {
-    return { tone: 'warning', label: 'Tight — will swap', fits: true, detail };
+    return { tone: 'warning', label: 'Tight, will swap', fits: true, detail };
   }
   return { tone: 'success', label: 'Fits', fits: true, detail };
 }
@@ -136,7 +136,7 @@ export function quantFit(input: QuantFitInput): RamVerdict {
     (withVisionGB !== null ? ` (≈${withVisionGB.toFixed(1)} GB with vision on)` : '');
   if (needGB <= budgetGB) return { tone: 'success', label: 'Fits', fits: true, detail };
   if (needGB <= totalRamGB) {
-    return { tone: 'warning', label: 'Tight — will swap', fits: true, detail };
+    return { tone: 'warning', label: 'Tight, will swap', fits: true, detail };
   }
   return { tone: 'danger', label: "Won't fit", fits: false, detail };
 }

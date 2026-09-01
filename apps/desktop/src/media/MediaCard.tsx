@@ -270,7 +270,7 @@ export function MediaCard({ item }: MediaCardProps): JSX.Element {
         className="pd-media-frame"
         draggable
         onDragStart={(e) => startFileDrag(e, item.path)}
-        title={`${item.path} — drag me anywhere`}
+        title={`Drag to save · ${item.path}`}
       >
         <Surface item={item} large={false} />
         <Controls item={item} onExpand={() => setOpen(true)} />
@@ -280,7 +280,7 @@ export function MediaCard({ item }: MediaCardProps): JSX.Element {
           type="button"
           className="pd-media-name pd-focusable"
           data-testid="media-reveal"
-          title={`${item.path} — show in Finder`}
+          title={`Show in Finder · ${item.path}`}
           onClick={() => revealFile(item.path)}
         >
           {item.name}

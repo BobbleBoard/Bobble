@@ -606,7 +606,7 @@ export function Viewport(): JSX.Element {
               projects yet.", "Ask anything…"). Title Case was the one piece of
               marketing voice left over from the reference UI. */}
           <h1>No model yet</h1>
-          <p>Generate from image or text — or drop a .glb/.obj/.stl anywhere</p>
+          <p>Generate from image or text, or drop a .glb/.obj/.stl</p>
         </div>
       )}
 

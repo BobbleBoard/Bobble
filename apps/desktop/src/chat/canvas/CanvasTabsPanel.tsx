@@ -101,10 +101,10 @@ function escapeHtml(text: string): string {
 export function renderPeekHtml(title: string, peek: ProductPeek | null): string {
   const head = `<!doctype html><meta charset="utf-8"><body style="font:13px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace;margin:0;padding:24px;color:#ddd;background:#1a1a1a">`;
   if (peek === null || peek.files.length === 0) {
-    return `${head}<h2 style="font-family:system-ui">${escapeHtml(title)}</h2><p style="color:#999;font-family:system-ui">The build has no files yet — check back in a moment.</p></body>`;
+    return `${head}<h2 style="font-family:system-ui">${escapeHtml(title)}</h2><p style="color:#999;font-family:system-ui">No files in the build yet.</p></body>`;
   }
   const kb = (peek.totalBytes / 1024).toFixed(1);
-  const header = `<h2 style="font-family:system-ui;margin:0 0 4px">${escapeHtml(title)}</h2><p style="color:#999;font-family:system-ui;margin:0 0 20px">${peek.fileCount} file${peek.fileCount === 1 ? '' : 's'} · ${kb} KB — a snapshot of the build so far.</p>`;
+  const header = `<h2 style="font-family:system-ui;margin:0 0 4px">${escapeHtml(title)}</h2><p style="color:#999;font-family:system-ui;margin:0 0 20px">${peek.fileCount} file${peek.fileCount === 1 ? '' : 's'} · ${kb} KB · snapshot of the build so far.</p>`;
   const sections = peek.files
     .map((f) => {
       const body = escapeHtml(f.content) + (f.truncated ? '\n…(truncated)' : '');

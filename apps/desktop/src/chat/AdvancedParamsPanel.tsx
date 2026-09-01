@@ -84,7 +84,7 @@ function GroundTruthView(): ReactNode {
   if (gt === null) {
     return (
       <p className="rounded-xl border border-dashed border-border-default bg-bg-raised px-4 py-6 text-center text-footnote text-text-muted">
-        Send a message — the exact system prompt, tool definitions, and context the model receives
+        Send a message. The exact system prompt, tool definitions, and context the model receives
         will appear here.
       </p>
     );
@@ -116,7 +116,7 @@ function GroundTruthView(): ReactNode {
                 <li key={t.name} className="text-caption">
                   <span className="font-mono text-text-primary">{t.name}</span>
                   {t.description ? (
-                    <span className="text-text-muted"> — {t.description}</span>
+                    <span className="text-text-muted"> · {t.description}</span>
                   ) : null}
                 </li>
               ))}
@@ -168,7 +168,7 @@ export function AdvancedParamsPanel({
           <section className="flex flex-col gap-3">
             <SectionHead
               title="Live context"
-              sub="Ground truth — the exact prompt, tools, and messages of the most recent turn."
+              sub="The exact prompt, tools, and messages of the last turn."
             />
             <GroundTruthView />
           </section>
@@ -177,7 +177,7 @@ export function AdvancedParamsPanel({
           <section className="flex flex-col gap-4">
             <SectionHead
               title="Sampling"
-              sub="Applied to the next request — no restart. Sent with every subsequent turn."
+              sub="Applied to the next request. No restart."
               onReset={() => patchSampling(DEFAULT_ADVANCED.sampling)}
             />
             <ParamSlider
@@ -251,7 +251,7 @@ export function AdvancedParamsPanel({
           <section className="flex flex-col gap-4">
             <SectionHead
               title="Reasoning"
-              sub="Thinking controls — applied on the next server relaunch."
+              sub="Applied on the next server relaunch."
               onReset={() => patchReasoning(DEFAULT_ADVANCED.reasoning)}
             />
             <div className="flex items-center justify-between gap-3">

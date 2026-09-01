@@ -149,7 +149,7 @@ export function useDictation(onText: (text: string) => void): DictationState {
         setPhase('error');
         setError(
           err instanceof DOMException && err.name === 'NotAllowedError'
-            ? 'Microphone access was denied — allow it in System Settings › Privacy.'
+            ? 'Microphone access denied. Allow it in System Settings › Privacy.'
             : 'No microphone available.',
         );
         return;

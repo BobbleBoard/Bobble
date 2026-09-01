@@ -52,7 +52,7 @@ export function SearchPanel() {
     >
       <SettingRow
         label="Brave Search API key"
-        hint="Used when set — otherwise search falls back to DuckDuckGo."
+        hint="Used when set. Otherwise search falls back to DuckDuckGo."
       >
         <Input
           type="password"

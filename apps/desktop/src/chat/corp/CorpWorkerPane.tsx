@@ -51,9 +51,9 @@ function emptyLine(state: OrgNodeView['state']): string {
     case 'working':
       return 'Connecting to the live work…';
     case 'blocked':
-      return 'Waiting — this part of the work is blocked.';
+      return 'Waiting. This part of the work is blocked.';
     case 'done':
-      return 'Finished — nothing was captured for this step.';
+      return 'Finished. Nothing was captured for this step.';
     case 'retired':
       return 'This part of the team has stepped away.';
     default:

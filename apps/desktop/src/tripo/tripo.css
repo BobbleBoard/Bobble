@@ -51,16 +51,23 @@
    * codex-light gave 3.36:1 for Y and 3.62:1 for Z (AA needs 4.5), and
    * claude-dark Y sat on the line at 4.52.
    *
-   * Mixing 24% of --pd-text-primary into each hue pushes the ball AWAY from
+   * Mixing --pd-text-primary into each hue pushes the ball AWAY from
    * --pd-bg-base in whichever direction that theme needs — darker under a light
    * theme, lighter under a dark one — so one rule fixes all six flavors instead
-   * of six overrides. Computed worst case across flavors × modes: 4.93:1.
-   * Lines, balls and the negative-axis rings all draw from these so the gizmo
-   * stays one object.
+   * of six overrides. Lines, balls and the negative-axis rings all draw from
+   * these so the gizmo stays one object.
+   *
+   * THE MIX IS 12%, DOWN FROM 24%. the user: "axes gizmo needs to be brighter" — at
+   * 24% the light themes read as three muddy dark discs rather than an X/Y/Z
+   * you can pick out of a viewport at a glance. Rendered side by side at 24, 12
+   * and 0, the letters stay clearly legible at every step, so the dulling was
+   * buying more contrast than the mark needed: these are 8px graphical labels,
+   * which WCAG rates at 3:1, not the 4.5:1 body-text bar the original number was
+   * chasing.
    */
-  --tp-axis-x: color-mix(in srgb, var(--pd-status-danger-fg) 76%, var(--pd-text-primary));
-  --tp-axis-y: color-mix(in srgb, var(--pd-status-success-fg) 76%, var(--pd-text-primary));
-  --tp-axis-z: color-mix(in srgb, var(--pd-status-info-fg) 76%, var(--pd-text-primary));
+  --tp-axis-x: color-mix(in srgb, var(--pd-status-danger-fg) 88%, var(--pd-text-primary));
+  --tp-axis-y: color-mix(in srgb, var(--pd-status-success-fg) 88%, var(--pd-text-primary));
+  --tp-axis-z: color-mix(in srgb, var(--pd-status-info-fg) 88%, var(--pd-text-primary));
 
   display: flex;
   flex-direction: column;
@@ -130,7 +137,17 @@
  * app's rule: text buttons follow the flavor, and only genuinely circular
  * things (icon buttons, switch tracks, dots, chips) stay fully round.
  */
-.tp {
+.tp,
+/*
+ * …AND ON THE CONTROLS THAT LEFT `.tp`.
+ *
+ * Send To and Export now render in the APP's top bar, outside this subtree — so
+ * `var(--tp-radius-control)` resolved to nothing and both buttons came out with
+ * square corners. the user: "sqare still". A variable is only a token where it is
+ * inherited; the two places that use these controls both have to define it.
+ */
+.tp-topbar-right,
+.tp-standalone-bar {
   --tp-radius-control: min(var(--pd-radius-button), 24px);
   --tp-radius-control-outer: calc(min(var(--pd-radius-button), 24px) + 3px);
 }
@@ -846,12 +863,6 @@
 }
 .tp-dropzone:hover {
   border-color: var(--pd-border-focus);
-}
-.tp-dropzone-bulb {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  color: var(--pd-text-muted);
 }
 .tp-dropzone-title {
   font-weight: var(--pd-font-weight-semibold);

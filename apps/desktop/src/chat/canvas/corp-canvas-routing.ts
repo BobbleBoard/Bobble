@@ -125,7 +125,7 @@ export function activitySpec(blocks: readonly CorpBlock[]): CanvasTabSpec | unde
             file.streaming
               ? '(writing…)'
               : '(the agent wrote this file, but the command did not carry its ' +
-                  'contents — open it from the file tree to read it)',
+                  'contents. Open it from the file tree to read it)',
           ),
         }),
     ...(file.addedLines !== undefined

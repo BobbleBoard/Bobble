@@ -19,7 +19,7 @@ describe('profile dropup contents', () => {
   });
 
   it('userModeBlurb returns the active mode blurb', () => {
-    expect(userModeBlurb('user')).toBe('Simple — automatic model');
+    expect(userModeBlurb('user')).toBe('Simple, automatic model');
     expect(userModeBlurb('power')).toBe('Full model control');
   });
 });

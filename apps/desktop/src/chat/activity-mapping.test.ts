@@ -890,8 +890,8 @@ describe('the corp coordination rows are specific, not generic', () => {
     expect(step.kind).toBe('manager');
     expect(step.label).toBe('Briefed the manager');
     expect(step.argsText).toContain('Why a team: Three separate disciplines.');
-    expect(step.argsText).toContain('Division: 3D Assets — model the movement');
-    expect(step.argsText).toContain('Division: Report — the deck');
+    expect(step.argsText).toContain('Division: 3D Assets: model the movement');
+    expect(step.argsText).toContain('Division: Report: the deck');
     expect(step.argsText).toContain('It must run offline.');
     expect(step.argsText).not.toContain('{');
   });
@@ -942,7 +942,7 @@ describe('the corp coordination rows are specific, not generic', () => {
       false,
     ).data as { kind: string; label: string; detail?: string; argsText?: string };
     expect(step.kind).toBe('toolkit');
-    expect(step.argsText).toContain('Kit: shell — run the deck renderer');
+    expect(step.argsText).toContain('Kit: shell: run the deck renderer');
     expect(step.argsText).toContain('Kit: browser');
     expect(step.argsText).toContain('Testing: the exported pptx');
   });

@@ -154,7 +154,7 @@ function synthBriefing(node: OrgNodeView): WorkerBriefingView {
      * stop, so the label must not name it as the job. */
     roleLine: lead ? 'Lead' : 'Team',
     title: node.name,
-    goal: lead ? 'Answering — forming the plan.' : `Live work by ${node.name}.`,
+    goal: lead ? 'Forming the plan.' : `Live work by ${node.name}.`,
     deliverables: [],
   };
 }

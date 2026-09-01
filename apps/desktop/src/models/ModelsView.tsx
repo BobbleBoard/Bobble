@@ -826,7 +826,7 @@ export function ModelsView() {
           setHits(res.hits);
           setHfError(
             res.rateLimited === true
-              ? 'Hugging Face is rate-limiting us — showing what we have.'
+              ? 'Hugging Face is rate-limiting us. Showing what we have.'
               : (res.error ?? null),
           );
         })
@@ -874,7 +874,7 @@ export function ModelsView() {
           setDatasets(res.hits);
           setHfError(
             res.rateLimited === true
-              ? 'Hugging Face is rate-limiting us — showing what we have.'
+              ? 'Hugging Face is rate-limiting us. Showing what we have.'
               : (res.error ?? null),
           );
         })
@@ -1290,7 +1290,7 @@ export function ModelsView() {
           // saying "could not resolve a file" sends people looking for a bug.
           setError(
             file === undefined && hit !== undefined
-              ? `${id} publishes no GGUF weights — it runs on the generation stack, which fetches it on first use.`
+              ? `${id} publishes no GGUF weights. The generation stack fetches it on first use.`
               : 'Could not resolve a file to download for this model.',
           );
         } else {
@@ -2074,7 +2074,7 @@ export function ModelsView() {
                       ))}
                       {families.length === 0 ? (
                         <p className="py-6 text-body text-text-muted" data-testid="curated-empty">
-                          Nothing recommended makes that yet — switch to All to search the Hub.
+                          Nothing recommended makes that yet. Switch to All to search the Hub.
                         </p>
                       ) : null}
                     </div>
@@ -2424,7 +2424,7 @@ export function ModelsView() {
                             className="mt-2 text-caption text-status-danger-fg"
                             data-testid="detail-gen-install"
                           >
-                            Needs more memory than this computer has — it will download, but not run
+                            Needs more memory than this computer has. It will download, but not run
                             here.
                           </p>
                         ) : null}

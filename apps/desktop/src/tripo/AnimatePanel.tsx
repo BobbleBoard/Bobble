@@ -198,9 +198,9 @@ function HumanoidPrompt({
         ) : (
           <>
             {prompt.reasons.length > 0 ? prompt.reasons.join('; ') : 'no humanoid structure found'}.
-            It can still be rigged: {MEDIAL_MODEL} traces the skeleton down the middle of the shape
-            itself, so a creature gets bones where its body actually is. The animation presets stay
-            hidden either way — {ANIM_MODEL} only generates human motion.
+            It can still be rigged: {MEDIAL_MODEL} traces the skeleton down the middle of the shape,
+            so a creature gets bones where its body is. Presets stay hidden either way;
+            {ANIM_MODEL} only generates human motion.
           </>
         )}
       </p>
@@ -415,8 +415,8 @@ export function AnimatePanel(): JSX.Element {
           <div className="tp-notice" data-testid="tp-rig-alternative">
             <IcInfo size={14} />
             <span>
-              Bones not where you want them? {LEARNED_RIG_MODEL} predicts a rig with a learned model
-              instead of measuring the shape — a different answer, not always a better one.
+              Bones not where you want them? {LEARNED_RIG_MODEL} predicts a rig instead of measuring
+              the shape. A different answer, not always a better one.
               {skinTokensInstalled ? '' : ' Open the download panel to add it (2.5 GB).'}
             </span>
             {skinTokensInstalled ? (
@@ -441,10 +441,7 @@ export function AnimatePanel(): JSX.Element {
             {!motionInstalled ? (
               <div className="tp-notice" data-testid="tp-ardy-unavailable">
                 <IcInfo size={14} />
-                <span>
-                  {ANIM_MODEL} isn't downloaded yet. Open the download panel to add it — most of its
-                  size is a text encoder that runs once per new wording.
-                </span>
+                <span>{ANIM_MODEL} isn&apos;t downloaded. Add it from the download panel.</span>
               </div>
             ) : null}
             <textarea
@@ -503,7 +500,7 @@ export function AnimatePanel(): JSX.Element {
                   data-testid={`tp-motion-${m.id}`}
                   title={
                     m.previewId !== undefined && hasPresetMotion(m.previewId)
-                      ? `${m.name} — plays instantly`
+                      ? `${m.name} · plays instantly`
                       : (m.prompt ?? m.name)
                   }
                   // A BUNDLED preset needs nothing downloaded and no engine, so
@@ -531,8 +528,7 @@ export function AnimatePanel(): JSX.Element {
 
         {rigged && !humanoid ? (
           <p className="tp-select-copy" data-testid="tp-nonhumanoid-note">
-            Animation presets are humanoid clips, so they're hidden for this model — retargeting
-            them onto a non-humanoid skeleton would only produce nonsense.
+            Animation presets are humanoid clips, so they are hidden for this model.
           </p>
         ) : null}
       </div>

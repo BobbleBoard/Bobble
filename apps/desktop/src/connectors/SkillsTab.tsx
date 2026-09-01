@@ -112,7 +112,7 @@ export function SkillsTab() {
     <div className="flex flex-col gap-4" data-testid="connectors-skills">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-footnote text-text-muted">
-          Skills are saved playbooks Pi follows. Enable one to copy it into your agent —
+          Skills are saved playbooks Pi follows. Enable one to copy it into your agent
           {installedCount > 0 ? ` ${installedCount} enabled.` : ' none enabled yet.'}
         </p>
       </div>

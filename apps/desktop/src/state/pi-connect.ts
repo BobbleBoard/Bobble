@@ -570,7 +570,7 @@ export function reportRejectedSend<T extends { success?: boolean; error?: string
   usePiStore
     .getState()
     .appendAssistantText(
-      `That message wasn't sent — the agent refused it (${reason}). Nothing has been lost; send it again. If this keeps happening, check Settings → Models that a model is loaded and there is memory free for it.`,
+      `That message wasn't sent. The agent refused it (${reason}). Nothing has been lost; send it again. If this keeps happening, check Settings → Models that a model is loaded and there is memory free for it.`,
     );
   return ack;
 }

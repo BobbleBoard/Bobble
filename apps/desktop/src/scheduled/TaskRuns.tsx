@@ -197,7 +197,7 @@ export function TaskRuns({ task, onClose }: { task: ScheduledTask; onClose: () =
             </div>
           ) : runs.length === 0 ? (
             <p className="pt-6 text-center text-footnote text-text-muted" data-testid="runs-empty">
-              No runs yet. Use “Run now” to try it — the result appears here, not in a chat.
+              No runs yet. Use “Run now” to try it. Results appear here, not in a chat.
             </p>
           ) : (
             runs.map((run) => <RunCard key={run.id} taskId={task.id} run={run} />)

@@ -20,18 +20,17 @@ import { GEN_MODELS, RETOPO_MODEL, SEGMENT_MODEL, TEXTURE_MODEL } from './data';
 import { CapabilityLoop, DownloadPanel } from './gen-ui';
 import { formatGb, useGen3dStore } from './gen3d-client';
 import {
-  IcBulb,
   IcCaretSmall,
   IcChevronRight,
   IcClose,
   IcCube,
   IcDownload,
   IcImage,
+  IcModel,
   IcPencil,
   IcPlus,
   IcRetopo,
   IcSegment,
-  IcSparkles,
   IcTexture,
   IcUpload,
 } from './icons';
@@ -145,8 +144,8 @@ function StageNeedsModel({
       <div className="tp-needs-body">
         <span className="tp-needs-title">Runs on {model.label}</span>
         <span className="tp-needs-sub">
-          Not installed yet — download{model.sizeBytes > 0 ? ` (${formatGb(model.sizeBytes)})` : ''}{' '}
-          to enable this stage.
+          Download{model.sizeBytes > 0 ? ` (${formatGb(model.sizeBytes)})` : ''} to enable this
+          stage.
         </span>
       </div>
       <IcDownload size={16} />
@@ -229,16 +228,14 @@ function ImagesZone(): JSX.Element {
           data-picked={false}
           onClick={openPicker}
         >
-          <Hint text="Tips: clean background, single subject" side="bottom">
-            <span className="tp-dropzone-bulb">
-              <IcBulb size={15} />
-            </span>
-          </Hint>
+          {/* The tip bulb is gone — the user: "no lightbulb next to the image svg in
+              the 'drag and drop' area". It sat beside the drop zone's own icon
+              as a second, smaller glyph competing with it, to deliver advice
+              ("clean background, single subject") that only appeared if you
+              hovered the thing you were about to click. */}
           <IcImage size={26} />
           <div className="tp-dropzone-title">Choose or drop image(s)</div>
-          <div className="tp-dropzone-sub">
-            One image works — add more views of the same subject to improve accuracy
-          </div>
+          <div className="tp-dropzone-sub">One image works. More views improve accuracy.</div>
         </button>
         {hiddenInput}
       </>
@@ -513,7 +510,7 @@ function ModelPanel(): JSX.Element {
 
   return (
     <>
-      <PanelHeader icon={<IcSparkles size={17} />} title="Generate Model" />
+      <PanelHeader icon={<IcModel size={17} />} title="Generate Model" />
       <div className="tp-panel-scroll pd-scroll">
         <UploadZone />
         <div className="tp-section-title">Settings</div>
@@ -533,7 +530,7 @@ function ModelPanel(): JSX.Element {
                 // that it does not finish in a usable time, and offering it
                 // anyway spends the user's afternoon to find that out.
                 disabled: true,
-                hint: 'Too heavy for this machine — 1536³ needs a datacentre GPU. Use 1024 for the highest detail here.',
+                hint: 'Too heavy for this machine. Use 1024.',
               },
             ]}
             value={genResolution}
@@ -749,10 +746,6 @@ function ImagePanel(): JSX.Element {
                 <IcPencil size={14} />
                 {busy ? 'Working…' : editReady ? 'Apply edit' : 'Get the edit model'}
               </button>
-              <span className="tp-field-hint">
-                Edits land beside the original — step back with Previous and turn whichever one you
-                like into 3D.
-              </span>
             </div>
 
             <div className="tp-image-result-actions">
@@ -1027,8 +1020,7 @@ function StagePanel({
   );
 }
 
-const STAGE_EMPTY =
-  'Nothing in the viewport yet — generate a model, pick one from Assets, or drop a file anywhere.';
+const STAGE_EMPTY = 'Generate a model, pick one from Assets, or drop a file.';
 
 function SegmentPanel(): JSX.Element {
   const parts = useTripoStore((s) => s.segmentParts);

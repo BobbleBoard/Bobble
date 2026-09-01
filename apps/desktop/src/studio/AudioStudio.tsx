@@ -176,7 +176,7 @@ export function AudioStudio(): JSX.Element {
       id: 'clone',
       icon: <GlyphClone />,
       title: 'Clone a voice',
-      hint: 'A few seconds of someone talking, read back in their voice.',
+      hint: 'A few seconds of speech, read back in that voice.',
       onPick: () => {
         setMode('speech');
         setModel('');
@@ -190,7 +190,7 @@ export function AudioStudio(): JSX.Element {
       id: 'music',
       icon: <GlyphNote />,
       title: 'Compose music',
-      hint: 'Genre, instruments and a tempo — an instrumental bed.',
+      hint: 'Genre, instruments, tempo.',
       onPick: () => {
         setMode('music');
         setModel('');
@@ -242,7 +242,7 @@ export function AudioStudio(): JSX.Element {
         mode === 'speech'
           ? 'The text to read aloud…'
           : mode === 'music'
-            ? 'Describe a piece — instruments, tempo, mood…'
+            ? 'Instruments, tempo, mood…'
             : 'Describe a sound…'
       }
       onRun={() => void onRun()}
@@ -375,10 +375,7 @@ export function AudioStudio(): JSX.Element {
                   />
                 </div>
               </Knob>
-              <p className="pd-studio-rail-note">
-                A few seconds of someone talking is enough. It is read in that voice on the models
-                that support cloning; the others use the preset above.
-              </p>
+              <p className="pd-studio-rail-note">A few seconds of speech is enough.</p>
             </RailGroup>
           ) : null}
 
@@ -444,7 +441,7 @@ export function AudioStudio(): JSX.Element {
                 {models.map((m) => (
                   <option key={m.id} value={m.id} disabled={m.reserved === true}>
                     {m.label}
-                    {m.reserved === true ? ' — not available yet' : ''}
+                    {m.reserved === true ? ' (not available yet)' : ''}
                   </option>
                 ))}
               </select>
@@ -476,11 +473,7 @@ export function AudioStudio(): JSX.Element {
               onChange={(e) => setSeed(e.target.value === '' ? '' : Number(e.target.value))}
             />
           </Knob>
-          <p className="pd-studio-rail-note">
-            Speech models ignore both — a reading is not sampled the way a picture is. They apply to
-            music and sound effects, where a fixed seed is how you tell a wording change from a
-            lucky take.
-          </p>
+          <p className="pd-studio-rail-note">Music and sound effects only. Speech ignores both.</p>
         </>
       }
     >

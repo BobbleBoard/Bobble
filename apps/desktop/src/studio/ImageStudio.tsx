@@ -82,9 +82,9 @@ const SHAPES = [
 
 /** The long edge. Named by what it is for, because that is how the choice is made. */
 const SIZES = [
-  { value: 768, label: 'Draft', hint: 'fastest — for finding the idea' },
-  { value: 1024, label: 'Standard', hint: 'the size these models were trained at' },
-  { value: 1536, label: 'Large', hint: 'slowest, and can drift on some models' },
+  { value: 768, label: 'Draft', hint: 'Fastest' },
+  { value: 1024, label: 'Standard', hint: 'Trained size' },
+  { value: 1536, label: 'Large', hint: 'Slowest' },
 ] as const;
 
 /**
@@ -170,7 +170,7 @@ export function ImageStudio(): JSX.Element {
       id: 'describe',
       icon: <GlyphPencil />,
       title: 'Describe a picture',
-      hint: 'A sentence is enough — say what, where and in what light.',
+      hint: 'What, where, and in what light.',
       onPick: () => {
         setStyle('');
         setCount(1);
@@ -181,7 +181,7 @@ export function ImageStudio(): JSX.Element {
       id: 'stylize',
       icon: <GlyphPalette />,
       title: 'Stylize a picture',
-      hint: 'Same description, a chosen look — watercolour, ink, cinematic.',
+      hint: 'Watercolour, ink, cinematic.',
       onPick: () => {
         setStyle('watercolour');
         setCount(1);
@@ -193,7 +193,7 @@ export function ImageStudio(): JSX.Element {
       id: 'compare',
       icon: <GlyphGrid />,
       title: 'Four to compare',
-      hint: 'Four candidates from one description, side by side.',
+      hint: 'Four candidates, side by side.',
       onPick: () => {
         setCount(4);
         setPrompt(EXAMPLES[1] ?? '');
@@ -237,7 +237,7 @@ export function ImageStudio(): JSX.Element {
           options={[
             { value: 1, label: '1 picture' },
             { value: 2, label: '2 pictures' },
-            { value: 4, label: '4 pictures', hint: 'compare candidates side by side' },
+            { value: 4, label: '4 pictures' },
           ]}
         />
       }
@@ -320,7 +320,7 @@ export function ImageStudio(): JSX.Element {
                 {models.map((m) => (
                   <option key={m.id} value={m.id} disabled={m.reserved === true}>
                     {m.label}
-                    {m.reserved === true ? ' — not available yet' : ''}
+                    {m.reserved === true ? ' (not available yet)' : ''}
                   </option>
                 ))}
               </select>
@@ -366,8 +366,7 @@ export function ImageStudio(): JSX.Element {
             />
           </Knob>
           <p className="pd-studio-rail-note">
-            Empty means the model's own default. A fixed seed makes the same prompt produce the same
-            picture, which is how you tell whether a wording change actually helped.
+            Empty uses the model&apos;s default. A fixed seed repeats the same picture.
           </p>
         </>
       }

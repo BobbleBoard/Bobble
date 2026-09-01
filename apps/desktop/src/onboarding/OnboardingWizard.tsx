@@ -22,7 +22,7 @@ const STEP_META: Record<(typeof ONBOARDING_STEPS)[number], { title: string; subt
   import: { title: 'Bring your setup', subtitle: 'Choose what to import from your old app.' },
   theme: {
     title: 'Make it yours',
-    subtitle: 'We matched the look to your app — change it anytime.',
+    subtitle: 'Matched to your app. Change it anytime.',
   },
   experience: {
     title: 'How much guidance?',

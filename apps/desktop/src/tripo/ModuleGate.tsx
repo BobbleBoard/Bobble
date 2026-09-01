@@ -69,21 +69,17 @@ export function ModuleGate({ state, onView }: ModuleGateProps): JSX.Element {
         </h2>
 
         {runtimeMissing ? (
-          <p className="tp-gate-copy">
-            3D generation runs through a local Python engine. Bobble fetches everything it needs —
-            the runtime included — the first time you set it up. Nothing to install by hand.
-          </p>
+          <p className="tp-gate-copy">Runs on a local Python engine. Bobble installs it for you.</p>
         ) : state.status === 'installing' ? (
           <p className="tp-gate-copy" data-testid="tp-gate-progress">
             {inFlight.length > 0
               ? `Fetching ${inFlight.map((m) => m.label).join(', ')}…`
               : 'Starting the download…'}{' '}
-            You can keep using the rest of Bobble while this runs.
+            Bobble keeps working while this runs.
           </p>
         ) : (
           <p className="tp-gate-copy">
-            Generate 3D models from text or an image, retopologise, segment, rig and animate them —
-            all on this Mac, offline once downloaded. The rest of Bobble works without it.
+            Text or image to 3D, then retopologise, segment, rig and animate. All on this Mac.
           </p>
         )}
 

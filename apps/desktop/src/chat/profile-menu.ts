@@ -33,7 +33,7 @@ export interface UserModeOption {
 
 /** The bottom User / Power-user toggle options, in segmented (left→right) order. */
 export const USER_MODE_OPTIONS: readonly UserModeOption[] = [
-  { value: 'user', label: 'User', blurb: 'Simple — automatic model', testid: 'usermode-user' },
+  { value: 'user', label: 'User', blurb: 'Simple, automatic model', testid: 'usermode-user' },
   { value: 'power', label: 'Power user', blurb: 'Full model control', testid: 'usermode-power' },
 ];
 
