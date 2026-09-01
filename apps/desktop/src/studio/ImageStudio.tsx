@@ -417,15 +417,29 @@ function GlyphImage(): JSX.Element {
 
 /* The three starter glyphs. Same 1.4 stroke and 24-box as the room's own, so a
    card reads as part of the same drawing rather than a borrowed icon set. */
+/*
+ * A PENCIL WITH A BODY.
+ *
+ * The old one was a single narrow outline — at 26px it read as a sliver, a
+ * stick with a bent end, and you could not tell what it was without the label
+ * under it. the user: "these could be better."
+ *
+ * Redrawn with the three things that make a pencil legible small: a WIDE enough
+ * body to be a shape rather than a line, a real sharpened point (the tip is its
+ * own facet, not a rounded corner), and a ferrule band across the barrel. The
+ * outline and the band are ONE path so the whole drawing is stroked in a single
+ * operation — no seams where they meet, whatever the ink.
+ */
 function GlyphPencil(): JSX.Element {
   return (
     <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <title>Describe</title>
       <path
-        d="M4 20l1-4L16.5 4.5a2.1 2.1 0 013 3L8 19l-4 1z"
+        d="M4.2 19.8L5.2 15.1L14.4 5.9L18.1 9.6L8.9 18.8ZM11.6 8.8L15.2 12.5"
         stroke="currentColor"
         strokeWidth="1.4"
         strokeLinejoin="round"
+        strokeLinecap="round"
       />
     </svg>
   );

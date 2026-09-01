@@ -100,7 +100,7 @@ export function VideoStudio(): JSX.Element {
   const starters: readonly StudioStarter[] = [
     {
       id: 'shot',
-      icon: <GlyphClapper />,
+      icon: <GlyphFrame />,
       title: 'Describe a shot',
       hint: 'One subject, one continuous action, one place.',
       onPick: () => {
@@ -319,26 +319,38 @@ function GlyphVideo(): JSX.Element {
 }
 
 /* Starter glyphs — same 1.4 stroke and 24-box as the room's own. */
-function GlyphClapper(): JSX.Element {
+/*
+ * A FRAME WITH A PLAY MARK, not a clapperboard.
+ *
+ * The clapper needed a body, a hinged board at an angle, and two stripes inside
+ * it — five features inside 26 pixels. It came out as a squat box with a lump
+ * on top and a couple of scratches, which is what the user was looking at.
+ *
+ * Two bold shapes read at this size where five fine ones do not, and they say
+ * the same thing: this card is about one shot of moving picture. Landscape and
+ * wide, so it does not collide with the tall narrow phone on the third card.
+ */
+function GlyphFrame(): JSX.Element {
   return (
     <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <title>Shot</title>
-      {/* The board and the clapper are drawn as two stacked boxes that SHARE an
-          edge rather than as diagonals running into the body — the old version
-          had three strokes crossing the rectangle's top line, and a crossing is
-          the one place a stroke doubles up. */}
-      <rect x="3" y="9.5" width="18" height="11" rx="2" stroke="currentColor" strokeWidth="1.4" />
+      <rect
+        x="3.5"
+        y="5.5"
+        width="17"
+        height="13"
+        rx="2.6"
+        stroke="currentColor"
+        strokeWidth="1.4"
+      />
       <path
-        d="M3.4 9.5V6.2a1 1 0 01.78-.98l14.4-2.7a1 1 0 011.22.98V9.5"
+        /* Nudged 0.65 right of the frame's true centre and grown a little: a
+           triangle pointing right carries its mass on the left, so geometric
+           centring reads as sitting low-left of the box. */
+        d="M9.9 8.7L15.4 12L9.9 15.3V8.7z"
         stroke="currentColor"
         strokeWidth="1.4"
         strokeLinejoin="round"
-      />
-      <path
-        d="M8.7 5.1l1.5 4.1M14.2 4.1l1.5 4.1"
-        stroke="currentColor"
-        strokeWidth="1.4"
-        strokeLinecap="round"
       />
     </svg>
   );
