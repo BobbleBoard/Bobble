@@ -40,6 +40,7 @@ import {
   RailToggle,
   Segmented,
   StudioEmpty,
+  StudioPicker,
   StudioShell,
   type StudioStarter,
 } from './StudioShell';
@@ -259,26 +260,24 @@ export function AudioStudio(): JSX.Element {
       error={error}
       controls={
         mode === 'speech' ? (
-          <Knob label="Pace">
-            <Segmented
-              testid="audio-speed"
-              value={speed}
-              onChange={setSpeed}
-              options={SPEEDS.map((s) => ({ value: s.value, label: s.label }))}
-            />
-          </Knob>
+          <StudioPicker
+            testid="audio-speed"
+            label="Pace"
+            value={speed}
+            onChange={setSpeed}
+            options={SPEEDS.map((sp) => ({ value: sp.value, label: sp.label }))}
+          />
         ) : (
-          <Knob label="Length">
-            <Segmented
-              testid="audio-seconds"
-              value={seconds ?? (mode === 'sfx' ? 5 : 20)}
-              onChange={setSeconds}
-              options={(mode === 'sfx' ? LENGTHS_SFX : LENGTHS_MUSIC).map((l) => ({
-                value: l.value,
-                label: l.label,
-              }))}
-            />
-          </Knob>
+          <StudioPicker
+            testid="audio-seconds"
+            label="Length"
+            value={seconds ?? (mode === 'sfx' ? 5 : 20)}
+            onChange={setSeconds}
+            options={(mode === 'sfx' ? LENGTHS_SFX : LENGTHS_MUSIC).map((l) => ({
+              value: l.value,
+              label: l.label,
+            }))}
+          />
         )
       }
       settings={

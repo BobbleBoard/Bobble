@@ -725,7 +725,33 @@ body {
  * + 14px  breathing room
  * Expanded, the wide sidebar already clears both, so no inset applies.
  */
+/*
+ * THE INSET HAS TO TRAVEL WITH THE SIDEBAR, not arrive before it.
+ *
+ * The title's left edge is `slot width + this padding`. The slot animates its
+ * width over --pd-duration-slow; the padding below was applied and removed on
+ * the class, which is to say instantly — so opening the sidebar dropped 124px
+ * of padding in one frame while the slot was still 0 wide, and the title darted
+ * LEFT before being carried back out. the user: "the top left text eg. 'image
+ * studio' snaps to the left briefly".
+ *
+ * MEASURED, per frame: 132 → 8 → 280 opening, and 280 → 404 → 132 closing — a
+ * 124px jump the wrong way at the start of both.
+ *
+ * Animating the padding on the SAME curve and duration as the slot's width
+ * makes the two halves of that sum move together, so the title slides straight
+ * from one position to the other: 132 → 280 and back, monotonic.
+ *
+ * Declared on the base selector so it applies in both directions — on the
+ * collapsed rule alone there is nothing to transition FROM on the way out.
+ */
+.pd-topbar-section:first-child {
+  transition: padding-left var(--pd-duration-slow, 320ms) var(--pd-easing-standard, ease);
+}
 .pd-topbar--sidebar-collapsed .pd-topbar-section:first-child {
+  /* = CHROME_LEFT (85) + the toggle's own 32px + 7px of air. Stated here rather
+     than imported because CSS cannot read the module; the probe checks the two
+     agree, which is the part that would otherwise drift. */
   padding-left: 124px;
   /*
    * AND NOT DRAGGABLE. `.pd-topbar` is a drag region; collapsed, it starts at
@@ -3721,51 +3747,130 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
  * were capped at 780px — so the composer and the thing it produced did not even
  * share a left margin. A description is a sentence, not a spreadsheet row; past
  * about 70 characters of width a single-line field stops being easier to read
- * and starts being harder to aim at.
+ * and starts being harder to aim at. The cap lives on the OUTER element now, so
+ * the option row under the box shares it.
+ */
+/*
+ * NO PANEL. the user: "no 'seperate area' for the input bar and settings on the
+ * bottom". This was a filled strip with a hairline above it, holding the field
+ * and a row of labelled pill groups — a settings panel that happened to contain
+ * a prompt, and the tallest thing in every studio. It is now just padding: the
+ * page's own background runs behind the composer and the row under it.
  */
 .pd-studio-compose {
   flex: none;
-  padding: 12px 20px 18px;
-  /* A hairline ABOVE it now — it is the floor of the room, not its ceiling. */
-  border-top: 1px solid color-mix(in oklab, var(--pd-text-primary) 10%, transparent);
-  background: var(--pd-bg-base);
-}
-.pd-studio-composer {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+  padding: 10px 20px 16px;
   width: 100%;
   max-width: var(--pd-studio-col, 860px);
   margin-inline: auto;
 }
 
-/* The scrolling subject of the room: everything the composer is not using. */
+/*
+ * THE BOX IS THE FIELD PLUS ITS BUTTON. Send to the right of the input, inside
+ * the same border — the shape the chat composer uses, and the one the user pointed
+ * at.
+ *
+ * `align-items: flex-end` so a multi-line prompt grows upward past a button that
+ * stays on the last line, rather than centring the button against a paragraph.
+ */
+.pd-studio-composer {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 7px 7px 7px 14px;
+  border-radius: 16px;
+  background: var(--pd-bg-raised);
+  border: 1px solid color-mix(in oklab, var(--pd-text-primary) 14%, transparent);
+  transition: border-color var(--pd-duration-fast) var(--pd-easing-standard);
+}
+.pd-studio-composer:focus-within {
+  border-color: color-mix(in oklab, var(--pd-accent-primary) 60%, transparent);
+}
+
+/*
+ * THE OPTIONS, UNDER THE BOX AND OUT OF THE WAY.
+ *
+ * Small, on the page background, each stating its own value. The row wraps
+ * rather than scrolling: a studio has three or four of these and a wrapped
+ * second line is honest, where a hidden overflow is a control you cannot find.
+ */
+.pd-studio-underbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 4px 0;
+}
+
+.pd-studio-pick {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 8px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 0.75rem;
+  color: var(--pd-text-secondary);
+  background: transparent;
+  border: 1px solid transparent;
+  transition:
+    background var(--pd-duration-fast) var(--pd-easing-standard),
+    border-color var(--pd-duration-fast) var(--pd-easing-standard),
+    color var(--pd-duration-fast) var(--pd-easing-standard);
+}
+.pd-studio-pick:hover,
+.pd-studio-pick[data-state="open"] {
+  background: var(--pd-bg-hover);
+  border-color: color-mix(in oklab, var(--pd-text-primary) 12%, transparent);
+  color: var(--pd-text-primary);
+}
+/* The LABEL is the quiet half and the VALUE is the loud one: you scan this row
+   to find out what things are set to, not what they are called. */
+.pd-studio-pick-label {
+  color: var(--pd-text-muted);
+}
+.pd-studio-pick-value {
+  color: var(--pd-text-primary);
+  font-weight: 500;
+}
+.pd-studio-pick-caret {
+  color: var(--pd-text-muted);
+  margin-inline-start: -1px;
+}
+.pd-studio-pick-hint {
+  font-size: 0.6875rem;
+  color: var(--pd-text-muted);
+}
+
 .pd-studio-canvas {
   flex: 1;
   min-height: 0;
 }
 
+/* The field carries no chrome of its own any more — the BOX around it does, so
+   a border here would draw a second rectangle 7px inside the first. */
 .pd-studio-prompt {
-  width: 100%;
-  border-radius: 12px;
-  border: 1px solid color-mix(in oklab, var(--pd-text-primary) 14%, transparent);
-  background: var(--pd-bg-raised);
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
   color: var(--pd-text-primary);
-  padding: 11px 14px;
+  padding: 6px 0;
   font-size: 0.9375rem;
   font-family: inherit;
-  transition: border-color var(--pd-duration-fast) var(--pd-easing-standard);
 }
 .pd-studio-prompt::placeholder {
   color: var(--pd-text-muted);
 }
+/* The focus ring belongs to the box (`.pd-studio-composer:focus-within`). */
 .pd-studio-prompt:focus {
   outline: none;
-  border-color: var(--pd-accent-primary);
 }
 .pd-studio-prompt--multi {
-  resize: vertical;
-  min-height: 84px;
+  resize: none;
+  min-height: 52px;
+  max-height: 220px;
   line-height: 1.5;
 }
 
@@ -3921,6 +4026,14 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
  * the variables instead of replacing them — the disabled Generate button stayed
  * a saturated blue block with unreadable blue-on-blue text.
  */
+/* Sized to the box it now lives in, not to a row of its own. */
+.pd-studio-run {
+  flex: none;
+  height: 34px;
+  border-radius: 12px;
+  padding: 0 14px;
+  font-size: 0.8125rem;
+}
 .pd-studio-run:disabled {
   opacity: 1;
   --pd-btn-bg: var(--pd-bg-raised);

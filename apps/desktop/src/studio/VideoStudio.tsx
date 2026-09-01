@@ -29,6 +29,7 @@ import {
   RailToggle,
   Segmented,
   StudioEmpty,
+  StudioPicker,
   StudioShell,
   type StudioStarter,
 } from './StudioShell';
@@ -161,14 +162,13 @@ export function VideoStudio(): JSX.Element {
       {...(models.length === 0 ? { blocked: 'No video models are available.' } : {})}
       error={error}
       controls={
-        <Knob label="Length">
-          <Segmented
-            testid="video-seconds"
-            value={seconds}
-            onChange={setSeconds}
-            options={LENGTHS.map((l) => ({ value: l.value, label: l.label, hint: l.hint }))}
-          />
-        </Knob>
+        <StudioPicker
+          testid="video-seconds"
+          label="Length"
+          value={seconds}
+          onChange={setSeconds}
+          options={LENGTHS.map((l) => ({ value: l.value, label: l.label, hint: l.hint }))}
+        />
       }
       settings={
         <>

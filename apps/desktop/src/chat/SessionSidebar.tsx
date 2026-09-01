@@ -297,6 +297,42 @@ function statusTone(label: string): 'done' | 'error' | 'paused' | 'waiting' | un
  * `pd-icon` class as the shared set, so it takes the same stroke token and
  * changes weight with them.
  */
+/*
+ * NEW CHAT: a sheet with a pen at its corner, not a bare pencil.
+ *
+ * the user: "replace the 'new chat' pencil icon with something similarly upgraded."
+ * The shared `IconPencil` is a single diagonal stroke with a nib — it says EDIT,
+ * which is what it is used for elsewhere, and a bare pencil beside "New chat"
+ * reads as renaming the one you are in. Compose is a pencil AND the thing being
+ * written on.
+ *
+ * The sheet is drawn as an open path that stops short of its top-right corner
+ * and the pen sits in that gap, so no two strokes cross — the same rule the
+ * studio starter glyphs follow.
+ */
+function ComposeMark({ size = 16 }: { size?: number }): ReactNode {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.5}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="pd-icon"
+      aria-hidden="true"
+    >
+      <path d="M13.4 8.6v4.1a1.7 1.7 0 0 1-1.7 1.7H3.6a1.7 1.7 0 0 1-1.7-1.7V4.6a1.7 1.7 0 0 1 1.7-1.7h4.2" />
+      <path d="M11.6 1.9 14 4.3l-4.4 4.4-2.9.5.5-2.9z" />
+    </svg>
+  );
+}
+
+/** The 3D Studio's own glyph. Correct on that ROW — it is the row about meshes
+ * — and wrong on the section above it, which is why the two are now different
+ * icons rather than one used twice. */
 function ModalityCube({ size = 16 }: { size?: number }): ReactNode {
   return (
     <svg
@@ -314,6 +350,42 @@ function ModalityCube({ size = 16 }: { size?: number }): ReactNode {
       <path d="M8 2 13.5 5 8 8 2.5 5Z" />
       <path d="M2.5 5v6l5.5 3 5.5-3V5" />
       <path d="M8 8v6" />
+    </svg>
+  );
+}
+
+/*
+ * WHAT "MODALITIES" ACTUALLY CONTAINS.
+ *
+ * It was a wireframe cube — the 3D Studio's own glyph, standing for a section
+ * that also holds Image, Video and Audio. the user: "replace the modalities icon
+ * 'currently 3d studio cube' with something more all encompassing." A cube says
+ * one of the four things in the list, which makes the other three look like they
+ * are inside it.
+ *
+ * Three different primitives instead — a circle, a triangle and a rounded square
+ * — arranged in a cluster and deliberately NOT touching. Assorted shapes is the
+ * oldest mark there is for "different kinds of thing", it commits to none of the
+ * four, and at 16px three small distinct silhouettes still read as three while
+ * three overlapping outlines would read as a smudge.
+ */
+function ModalityShapes({ size = 16 }: { size?: number }): ReactNode {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.4}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="pd-icon"
+      aria-hidden="true"
+    >
+      <circle cx="4.6" cy="4.6" r="2.7" />
+      <path d="M11.4 1.9l2.8 5H8.6z" />
+      <rect x="5.1" y="9.3" width="5.8" height="5.8" rx="1.6" />
     </svg>
   );
 }
@@ -1230,7 +1302,7 @@ export function SessionSidebar({
 
       <SidebarScroll>
         <SidebarRow
-          icon={<IconPencil size={16} />}
+          icon={<ComposeMark size={16} />}
           label="New chat"
           meta={<Kbd keys="⌘N" />}
           onClick={() => void onNewChat()}
@@ -1263,7 +1335,7 @@ export function SessionSidebar({
             onClick={() => setModalitiesOpen((o) => !o)}
           >
             <span className="pd-sidebar-row-icon">
-              <ModalityCube size={16} />
+              <ModalityShapes size={16} />
             </span>
             <span className="pd-sidebar-row-label">Modalities</span>
             <span className="pd-sidebar-row-meta">

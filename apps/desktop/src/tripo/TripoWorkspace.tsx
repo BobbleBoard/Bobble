@@ -18,7 +18,6 @@ import { moduleState } from './module-state';
 import { Rail } from './Rail';
 import { RightPanel } from './RightPanel';
 import { useTripoStore } from './store';
-import { TopBar } from './TopBar';
 import { Viewport } from './Viewport';
 import { addInputImages, importModelFile, isImageFile, isModelFile } from './viewer-io';
 import './tripo.css';
@@ -138,7 +137,9 @@ export function TripoWorkspace(): JSX.Element {
         data-gated={gated}
         {...(gated ? { inert: true } : {})}
       >
-        <TopBar />
+        {/* No top bar of its own any more — the studio renders inside the app's
+            chat surface now, and its two controls (Send To, Export) live in the
+            app's top-right cluster. See TopBar.tsx. */}
         <div className="tp-body">
           <Rail />
           <GenPanel />

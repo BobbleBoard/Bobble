@@ -179,7 +179,6 @@
       .tp-export-cta,
       .tp-export-confirm,
       .tp-pill-btn,
-      .tp-back-btn,
       .tp-iconbtn,
       .tp-segmented,
       .tp-segment,
@@ -212,77 +211,45 @@
 
 /* ═══ top bar ═══════════════════════════════════════════════════════════ */
 
-.tp-topbar {
+/*
+ * The studio's controls now live in the APP's top bar (see TopBar.tsx), so this
+ * is a plain right-aligned group rather than a bar: no height, no background, no
+ * traffic-light inset — the strip around it owns all three.
+ */
+/* The `?tripo=1` dev window's own strip — the product route puts these two
+   buttons in the app top bar instead. */
+.tp-standalone {
   display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+.tp-standalone-bar {
+  flex: none;
+  display: flex;
+  justify-content: flex-end;
   align-items: center;
-  justify-content: space-between;
-  /* MEASURED: this was a hardcoded 52px over --pd-bg-raised while the chat
-   * top bar is 48px (--pd-height-topbar) over --pd-bg-base — so crossing
-   * Chat -> 3D Studio stepped the window chrome 4px taller AND one surface
-   * lighter. Both now ride the same tokens as .pd-topbar. */
   height: var(--pd-height-topbar);
-  /* Left padding clears the macOS traffic lights (hiddenInset window, lights
-   * at x:19 in a ~46px strip) so the Chat button never sits under them. */
-  padding: 0 14px 0 84px;
-  background: var(--pd-bg-base);
-  border-bottom: 1px solid var(--pd-border-subtle);
-  flex-shrink: 0;
-  gap: 12px;
+  padding: 0 16px;
   -webkit-app-region: drag;
 }
-.tp-topbar :where(button, .tp-anchor) {
+.tp-standalone-bar :where(button, .tp-anchor) {
   -webkit-app-region: no-drag;
 }
-.tp-topbar-left,
+
 .tp-topbar-right {
   display: flex;
   align-items: center;
-  gap: 10px;
-  min-width: 0;
+  gap: 8px;
 }
-/* Back-to-chat button (leaves the 3D Studio modality). */
-.tp-back-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  height: 30px;
-  padding: 0 10px 0 6px;
-  border: 0;
-  border-radius: var(--tp-radius-control);
-  background: transparent;
-  color: var(--pd-text-secondary);
-  font: inherit;
-  font-size: var(--pd-font-size-footnote);
-  cursor: pointer;
-}
-.tp-back-btn:hover {
-  background: var(--pd-bg-hover);
-  color: var(--pd-text-primary);
-}
+/* Everything else that lived here went with the bar: the drag-region exemption
+   (there is no drag region to exempt from any more), the left group, the back
+   pill, and the Bobble 3D wordmark and mark.
+
+   The caret STAYS — the download panel has its own Back button, which is a
+   genuine back-within-a-panel rather than the leave-the-studio pill. */
 .tp-back-caret {
   transform: rotate(90deg);
-}
-.tp-logo {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 0 6px;
-  height: 30px;
-  border: 0;
-  background: transparent;
-  cursor: pointer;
-}
-.tp-logo:hover {
-  opacity: 0.82;
-}
-.tp-logomark {
-  color: var(--pd-accent-primary);
-}
-.tp-logo-word {
-  font-weight: var(--pd-font-weight-semibold);
-  letter-spacing: 0.02em;
-  font-size: var(--pd-font-size-body);
-  color: var(--pd-text-primary);
 }
 .tp-workspace-btn {
   display: flex;

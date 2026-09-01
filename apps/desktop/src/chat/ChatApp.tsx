@@ -26,7 +26,8 @@ import {
   TopBar,
 } from '@pi-desktop/ui';
 import type { ReactNode } from 'react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { CHROME_LEFT, TOP_BAR_HEIGHT } from '../../electron/window-chrome';
 import { conversationNameFrom } from '../../electron/workspace/project-dir';
 import { TopBarDownloads } from '../models/TopBarDownloads';
 import type { SettingsSection } from '../settings/SettingsView';
@@ -83,8 +84,18 @@ import { WindowDropOverlay } from './WindowDropOverlay';
  * canvas has nothing to show in a studio, and two panel toggles fighting over
  * one corner would be a coin flip every time.
  */
+/*
+ * The 3D studio's two controls, loaded only when that studio is. Importing them
+ * eagerly would pull the whole tripo chunk into the boot path for a pair of
+ * buttons almost nobody sees.
+ */
+const TripoTopBarControls = lazy(() =>
+  import('../tripo/TopBar').then((m) => ({ default: m.TripoTopBarControls })),
+);
+
 /** The name each studio wears in the top bar. */
 const STUDIO_TITLES: Record<string, string> = {
+  '3d': '3D Studio',
   image: 'Image Studio',
   video: 'Video Studio',
   audio: 'Audio Studio',
@@ -189,42 +200,18 @@ export function ChatApp({
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   /*
-   * ENTERING A STUDIO CLOSES THE SIDEBAR — once, not permanently.
+   * THE SIDEBAR STAYS WHERE YOU LEFT IT.
    *
-   * A studio is a room you came to work in, and the chat list is not part of
-   * that work; the width it holds is the width the results want. So the sidebar
-   * collapses on the way in, with the SAME animation the collapse control uses,
-   * and the studio simply fills the space.
-   *
-   * ON ARRIVAL ONLY. Reopening the sidebar inside a studio is a thing the user
-   * is allowed to do — it slides back in to the LEFT of the studio and stays.
-   * Collapsing it again on every render would fight them, so this keys off a
-   * CHANGE of modality rather than off being in one.
-   *
-   * On the MODALITY, not on "am I in a studio": reaching the next studio means
-   * opening the sidebar and picking it, so image → video is an arrival with the
-   * sidebar open and has to close it too. Keyed off the boolean it did not —
-   * the studio-layout probe caught exactly that.
-   *
-   * Leaving restores whatever it was before the FIRST studio (the ref is only
-   * written on the way in FROM chat), because the state you return to should be
-   * the state you left, not the collapsed one you passed through.
+   * A studio used to close it on arrival — the user asked for that, then asked for
+   * it back: "do not auto close the left sidebar upon studio focusing". The
+   * reason it reads better this way is that the studios are a CONTENT route, not
+   * a takeover: switching from a chat to the Image Studio is the same kind of
+   * move as switching between two chats, and neither should rearrange the
+   * furniture. The sidebar is the user's setting, and closing it for them means
+   * they have to put it back every time they visit.
    */
   const modality = useModalityStore((s) => s.view);
   const inStudio = modality !== 'chat';
-  const lastModality = useRef(modality);
-  const sidebarBeforeStudio = useRef(true);
-  useEffect(() => {
-    const from = lastModality.current;
-    if (modality === from) return;
-    lastModality.current = modality;
-    if (modality !== 'chat') {
-      if (from === 'chat') sidebarBeforeStudio.current = sidebarOpen;
-      setSidebarOpen(false);
-    } else {
-      setSidebarOpen(sidebarBeforeStudio.current);
-    }
-  }, [modality, sidebarOpen]);
 
   /*
    * ⌘K — one way in, instead of a growing table of keys.
@@ -651,7 +638,14 @@ export function ChatApp({
                     {/* In a studio the canvas has nothing to show and the chat's
                         sampling knobs are not what you are adjusting, so the two
                         buttons keep their positions and change what they open. */}
-                    {inStudio ? (
+                    {modality === '3d' ? (
+                      /* The 3D studio brings its own pair — Send To and Export
+                         — which used to sit in a second top bar of its own.
+                         Lazy, like the workspace they belong to. */
+                      <Suspense fallback={null}>
+                        <TripoTopBarControls />
+                      </Suspense>
+                    ) : inStudio ? (
                       <StudioTopBarControls />
                     ) : (
                       <>
@@ -740,8 +734,20 @@ export function ChatApp({
              * toggle sits in its own `no-drag` zone painted after everything so
              * nothing can re-add drag on top of it.
              */}
+            {/*
+              BESIDE THE TRAFFIC LIGHTS, NOT NEAR THEM.
+              `left` and the strip's height come from `window-chrome.ts` — the
+              same module main passes to `trafficLightPosition` — so the toggle
+              tracks the lights instead of a hand-tuned `left-[78px]` that had no
+              relationship to them. Centring the strip on the bar's own height
+              puts the button on the cluster's centre line without anyone having
+              to state that line twice. the user: "vertically raise/align the
+              open/close sidebar button and move it slightly to the right so the
+              hover animation gives breathing room and doesn't overlap".
+            */}
             <div
-              className="[-webkit-app-region:no-drag] absolute top-0 left-[78px] z-40 flex h-12 w-11 items-start pt-2"
+              className="[-webkit-app-region:no-drag] absolute top-0 z-40 flex items-center"
+              style={{ left: CHROME_LEFT, height: TOP_BAR_HEIGHT }}
               data-testid="sidebar-toggle-zone"
             >
               <button

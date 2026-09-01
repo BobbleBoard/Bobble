@@ -30,6 +30,12 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+  IconChevronDown,
   ScrollArea,
   Spinner,
 } from '@pi-desktop/ui';
@@ -133,10 +139,16 @@ export function StudioShell({
           </div>
         </ScrollArea>
 
-        {/* THE INPUT BAR. Docked at the bottom, outside the scroll container, so
-          it never moves as results grow. Styled after the chat composer on
-          purpose — it is the same gesture, and the app should only teach it
-          once. */}
+        {/*
+          THE INPUT BAR — one box, and no panel around it.
+          the user: "no 'seperate area' for the input bar and settings on the
+          bottom, send button to the right of the input bar and fit options
+          below compact and in dropups". It used to be a bordered, filled strip
+          holding a field AND a row of labelled pill groups, which read as a
+          settings panel that happened to contain a prompt. Now the box is the
+          field plus its run button, and the choices sit under it as small
+          value-stating buttons on the page's own background.
+        */}
         <div className="pd-studio-compose">
           <div className="pd-studio-composer">
             {multiline ? (
@@ -170,33 +182,34 @@ export function StudioShell({
                 }}
               />
             )}
-
-            <div className="pd-studio-controls">
-              {controls}
-              <div className="flex-1" />
-              {/*
+            {/*
               ACCENT, NOT PRIMARY. `.pd-btn--primary` is `background:
               var(--pd-text-primary)` — a WHITE block on the dark themes — so a
               DISABLED run button was still the brightest object on the screen.
             */}
-              <Button
-                variant="accent"
-                className="pd-studio-run"
-                data-testid="studio-run"
-                disabled={!canRun}
-                title={blocked}
-                onClick={onRun}
-              >
-                {busy ? (
-                  <span className="flex items-center gap-2">
-                    <Spinner size={13} /> Working…
-                  </span>
-                ) : (
-                  runLabel
-                )}
-              </Button>
-            </div>
+            <Button
+              variant="accent"
+              className="pd-studio-run"
+              data-testid="studio-run"
+              disabled={!canRun}
+              title={blocked}
+              onClick={onRun}
+            >
+              {busy ? (
+                <span className="flex items-center gap-1.5">
+                  <Spinner size={12} /> Working…
+                </span>
+              ) : (
+                runLabel
+              )}
+            </Button>
           </div>
+
+          {controls !== undefined ? (
+            <div className="pd-studio-underbar" data-testid="studio-underbar">
+              {controls}
+            </div>
+          ) : null}
 
           {blocked !== undefined ? (
             <p className="pd-studio-blocked" data-testid="studio-blocked">
@@ -238,6 +251,75 @@ export function StudioShell({
         </Dialog>
       ) : null}
     </div>
+  );
+}
+
+/**
+ * A COMPACT PICKER FOR THE BAR UNDER THE COMPOSER — label, value, and a menu
+ * that opens UPWARD.
+ *
+ * The composer used to carry `Knob` + `Segmented`: a stacked caption over a row
+ * of pills, three or four of them side by side, inside a panel with its own
+ * border and background. That is a settings form sitting under the place you
+ * type, and it made the bottom of every studio taller than the thing it was
+ * attached to. the user, with the Claude composer as the reference: "no 'seperate
+ * area' for the input bar and settings on the bottom, send button to the right
+ * of the input bar and fit options below compact and in dropups or such".
+ *
+ * So each choice collapses to one small button that STATES ITS CURRENT VALUE —
+ * which is the part a form of pills does badly, because you have to find the lit
+ * one to know where you are. Upward, because the bar sits at the bottom of the
+ * window and a menu that drops off the screen has to be flipped by the collision
+ * logic anyway; asking for it directly is steadier.
+ */
+export function StudioPicker<T extends string | number>({
+  label,
+  value,
+  options,
+  onChange,
+  testid,
+}: {
+  label: string;
+  value: T;
+  options: readonly { value: T; label: string; hint?: string }[];
+  onChange: (v: T) => void;
+  testid?: string;
+}): JSX.Element {
+  const current = options.find((o) => o.value === value);
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button type="button" className="pd-studio-pick pd-focusable" data-testid={testid}>
+          <span className="pd-studio-pick-label">{label}</span>
+          <span className="pd-studio-pick-value">{current?.label ?? String(value)}</span>
+          <IconChevronDown size={12} className="pd-studio-pick-caret" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent side="top" align="start" className="min-w-[170px]">
+        <DropdownMenuRadioGroup
+          value={String(value)}
+          onValueChange={(next) => {
+            const picked = options.find((o) => String(o.value) === next);
+            if (picked !== undefined) onChange(picked.value);
+          }}
+        >
+          {options.map((o) => (
+            <DropdownMenuRadioItem
+              key={String(o.value)}
+              value={String(o.value)}
+              data-testid={testid !== undefined ? `${testid}-${o.value}` : undefined}
+            >
+              <span className="flex flex-col">
+                <span>{o.label}</span>
+                {o.hint !== undefined ? (
+                  <span className="pd-studio-pick-hint">{o.hint}</span>
+                ) : null}
+              </span>
+            </DropdownMenuRadioItem>
+          ))}
+        </DropdownMenuRadioGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 

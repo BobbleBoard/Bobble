@@ -35,32 +35,20 @@ check(sidebarBefore !== null && sidebarBefore.w > 100, 'the sidebar should start
 
 for (const modality of ['image', 'video', 'audio']) {
   /*
-   * The sidebar has to be REOPENED to reach the next studio, which is the other
-   * half of what the user asked for: "the user can open the sidebar and it shows and
-   * slides open on the left of the studios." If this click stops working, the
-   * studios have become a room with no way back out except Escape.
+   * The sidebar stays open now, so reaching the next studio is just a click —
+   * which is the point of it staying: no gesture between two studios.
    */
-  if ((await rect('.pd-sidebar-slot'))?.w === 0) {
-    await page.click('[data-testid="expand-sidebar"]');
-    await page.waitForTimeout(600);
-    const reopened = await rect('.pd-sidebar-slot');
-    check(
-      reopened !== null && reopened.w > 100,
-      `[${modality}] the sidebar would not reopen over a studio`,
-    );
-    check(
-      (await rect('[data-testid="studio-results"]')) !== null,
-      `[${modality}] opening the sidebar closed the studio`,
-    );
-  }
   await page.click(`[data-testid="modality-${modality}"]`);
   await page.waitForSelector(`[data-testid="${modality}-studio"]`, { timeout: 10_000 });
   // Past the sidebar's own slide (--pd-duration-slow, 320ms).
   await page.waitForTimeout(700);
 
-  // --- it replaced the chat, and closed the sidebar on the way in ----------
+  // --- it replaced the chat, and LEFT THE SIDEBAR ALONE -------------------
   const sidebar = await rect('.pd-sidebar-slot');
-  check(sidebar?.w === 0, `[${modality}] the sidebar should auto-close, is ${sidebar?.w}px`);
+  check(
+    sidebar !== null && Math.abs(sidebar.w - (sidebarBefore?.w ?? 0)) < 2,
+    `[${modality}] entering a studio moved the sidebar (${sidebarBefore?.w} → ${sidebar?.w}) — the user asked for it to stay put`,
+  );
   check(
     (await rect('.pd-composer')) === null,
     `[${modality}] the chat composer should be gone — the studio replaces the chat`,
@@ -111,10 +99,17 @@ for (const modality of ['image', 'video', 'audio']) {
     rail !== null && narrowed !== null && rail.x >= narrowed.x + narrowed.w - 2,
     `[${modality}] the rail overlaps the results`,
   );
-  const composeNarrowed = await rect('.pd-studio-compose');
+  /*
+   * The composer RE-CENTRES rather than narrowing: it is capped at the room's
+   * reading column (860px) and centred in whatever is left, so on a wide window
+   * opening a 268px rail moves it left by about half that and changes its width
+   * not at all. Asserting the width was asserting the cap.
+   */
+  const composeMoved = await rect('.pd-studio-compose');
+  const centre = (r) => r.x + r.w / 2;
   check(
-    composeNarrowed !== null && compose !== null && composeNarrowed.w < compose.w - 200,
-    `[${modality}] the input bar did not narrow with the rail`,
+    composeMoved !== null && compose !== null && centre(compose) - centre(composeMoved) > 80,
+    `[${modality}] the input bar did not move with the rail (centre ${compose && Math.round(centre(compose))} → ${composeMoved && Math.round(centre(composeMoved))})`,
   );
   await shot(`${modality}-rail`);
 
@@ -127,13 +122,13 @@ for (const modality of ['image', 'video', 'audio']) {
   await page.waitForTimeout(400);
 }
 
-// --- and the sidebar comes back when you leave ------------------------------
+// --- leaving puts the chat back, sidebar still untouched --------------------
 await page.keyboard.press('Escape');
 await page.waitForTimeout(700);
 const sidebarAfter = await rect('.pd-sidebar-slot');
 check(
-  sidebarAfter !== null && sidebarAfter.w > 100,
-  `the sidebar should return on leaving a studio, is ${sidebarAfter?.w}px`,
+  sidebarAfter !== null && Math.abs(sidebarAfter.w - (sidebarBefore?.w ?? 0)) < 2,
+  `leaving a studio moved the sidebar (${sidebarBefore?.w} → ${sidebarAfter?.w})`,
 );
 check((await rect('.pd-composer')) !== null, 'the chat composer should be back');
 await shot('back-in-chat');

@@ -61,6 +61,7 @@ import {
   registerTrustedSender,
   type ValidatableIpcEvent,
 } from './trusted-senders';
+import { TRAFFIC_LIGHTS } from './window-chrome';
 import { resolveRendererTarget, resolveSecondInstanceWindow } from './window-policy';
 
 // dist-electron is bundled to CJS (sandboxed preloads must be CommonJS), so
@@ -271,15 +272,13 @@ function createMainWindow(): BrowserWindow {
     // macOS shows the dock image (set in whenReady); icon is used on win/linux.
     ...(icon !== null ? { icon } : {}),
     titleBarStyle: 'hiddenInset',
-    // Round-10 (#1): VERTICALLY CENTRE the macOS traffic lights inside the 46px
-    // top bar (--pd-height-topbar). ROOT CAUSE of the recurring misalignment:
-    // earlier rounds kept pushing `y` DOWN (…→26) chasing a "sit lower" target,
-    // which parked the ~14px-tall light cluster's centre near y=33 — a full ~10px
-    // BELOW the bar's true vertical centre (46 / 2 = 23). Centring the cluster is
-    // `y = (topbarHeight - clusterHeight) / 2 = (46 - 14) / 2 = 16`, putting the
-    // circles' centre at y≈23 — dead-centre of the bar and the sidebar's matching
-    // 46px top strip. `x` keeps the left inset that clears into the sidebar gutter.
-    trafficLightPosition: { x: 19, y: Math.round((46 - 14) / 2) },
+    /*
+     * The cluster's position comes from `window-chrome.ts`, which the RENDERER
+     * imports too — that shared module is what keeps the sidebar toggle beside
+     * the lights instead of under them. The arithmetic and the reason for it
+     * live there; nothing here should be nudged by feel.
+     */
+    trafficLightPosition: { x: TRAFFIC_LIGHTS.x, y: TRAFFIC_LIGHTS.y },
     // Claude-dark bg-base; avoids a white flash before the renderer paints.
     backgroundColor: '#262624',
     // In background mode the window is created hidden. A window shown the
@@ -294,6 +293,28 @@ function createMainWindow(): BrowserWindow {
     // PI_E2E_VISIBLE — someone wants to watch. Inactive, so it still never
     // takes focus.
     win.once('ready-to-show', () => win.showInactive());
+  }
+
+  /*
+   * DID APPKIT ACTUALLY PUT THEM THERE?
+   *
+   * The renderer positions its top-left chrome from the same constants we asked
+   * for above, so if the platform ever declines the request — a future Electron,
+   * a different title-bar style, a full-screen transition — the two would part
+   * company silently and a control would end up under the zoom button. Reading
+   * the position back is the cheapest way to make that loud instead.
+   *
+   * A warning, not a throw: a misplaced toggle is a cosmetic bug, and refusing
+   * to open the app over one would be worse than the bug.
+   */
+  if (process.platform === 'darwin') {
+    const actual = win.getWindowButtonPosition();
+    if (actual !== null && (actual.x !== TRAFFIC_LIGHTS.x || actual.y !== TRAFFIC_LIGHTS.y)) {
+      log.warn('traffic lights are not where we put them — top-left chrome may overlap', {
+        asked: TRAFFIC_LIGHTS,
+        actual,
+      });
+    }
   }
 
   // Only IPC events from this window's main frame pass the invoke gates

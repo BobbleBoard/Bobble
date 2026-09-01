@@ -32,6 +32,9 @@ const IS_TRIPO = new URLSearchParams(window.location.search).has('tripo');
 const TripoWorkspace = lazy(() =>
   import('./tripo/TripoWorkspace').then((m) => ({ default: m.TripoWorkspace })),
 );
+const TripoTopBarControls = lazy(() =>
+  import('./tripo/TopBar').then((m) => ({ default: m.TripoTopBarControls })),
+);
 /** The ComfyUI-backed image/video Studio. Lazy for the same reason. */
 const ImageStudio = lazy(() =>
   import('./studio/ImageStudio').then((m) => ({ default: m.ImageStudio })),
@@ -188,19 +191,30 @@ export function App() {
     };
   }, []);
 
-  // The 3D Studio modality: reached from the sidebar "Modalities" dropdown (or
-  // the ?tripo=1 dev route). A full-window takeover with its own back-to-chat
-  // button; when active it replaces the chat shell entirely.
   /*
-   * THE IMAGE & VIDEO STUDIO — the same full-surface routing the 3D one uses.
-   * Lazy, because it pulls nothing until someone opens it, and the boot path is
-   * exactly where a few hundred kilobytes of unused view would be felt.
+   * `?tripo=1` — the dev route — is still a full-window takeover, because there
+   * is no chat shell in that window to put it inside. The MODALITY is not: it
+   * goes through `contentOverride` with the other three studios (below), which
+   * is what gives it the sidebar, the toggle beside the traffic lights, and a
+   * way out that is not a back button. the user: "remove the < chat button and
+   * instead still keep the sidebar open/collapse button."
    */
-  if (IS_TRIPO || modalityView === '3d') {
+  if (IS_TRIPO) {
     return (
       <TooltipProvider delayDuration={200}>
         <Suspense fallback={null}>
-          <TripoWorkspace />
+          {/*
+            The dev route has no app top bar to host Send To and Export, so it
+            gets a slim strip of its own. Without it this window could open a
+            model and never get one out — the modality route hands those two
+            buttons to the app's own cluster instead.
+          */}
+          <div className="tp-standalone">
+            <header className="tp-standalone-bar" data-testid="tp-topbar">
+              <TripoTopBarControls />
+            </header>
+            <TripoWorkspace />
+          </div>
         </Suspense>
       </TooltipProvider>
     );
@@ -298,10 +312,14 @@ export function App() {
                    * area as if they are just replacing the current chat".
                    *
                    * Same seam the model hub and Scheduled already use. The
-                   * sidebar auto-collapses on entry (see ChatApp) and slides
-                   * back open to the LEFT of the studio if the user wants it.
+                   * sidebar is left exactly as the user had it — see ChatApp for
+                   * why that changed.
                    */
-                  modalityView === 'image' ? (
+                  modalityView === '3d' ? (
+                    <Suspense fallback={null}>
+                      <TripoWorkspace />
+                    </Suspense>
+                  ) : modalityView === 'image' ? (
                     <Suspense fallback={null}>
                       <ImageStudio />
                     </Suspense>

@@ -33,6 +33,7 @@ import {
   RailToggle,
   Segmented,
   StudioEmpty,
+  StudioPicker,
   StudioShell,
   type StudioStarter,
 } from './StudioShell';
@@ -228,18 +229,17 @@ export function ImageStudio(): JSX.Element {
       {...(models.length === 0 ? { blocked: 'No image models are available.' } : {})}
       error={error}
       controls={
-        <Knob label="Count">
-          <Segmented
-            testid="image-count"
-            value={count}
-            onChange={setCount}
-            options={[
-              { value: 1, label: '1' },
-              { value: 2, label: '2' },
-              { value: 4, label: '4' },
-            ]}
-          />
-        </Knob>
+        <StudioPicker
+          testid="image-count"
+          label="Count"
+          value={count}
+          onChange={setCount}
+          options={[
+            { value: 1, label: '1 picture' },
+            { value: 2, label: '2 pictures' },
+            { value: 4, label: '4 pictures', hint: 'compare candidates side by side' },
+          ]}
+        />
       }
       settings={
         <>

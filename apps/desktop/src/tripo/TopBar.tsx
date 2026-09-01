@@ -1,24 +1,29 @@
 /**
- * Bobble 3D top bar — deliberately minimal (no promos, credits, accounts, or
- * nav ballast): back-to-chat, the Bobble 3D mark, and the two things a local
- * studio actually needs up top — Send To (real DCC app logos, exports a GLB
- * named for the target) and Export (opens the dialog).
+ * The 3D studio's own two controls — Send To and Export.
  *
- * There is no "3D Workspace" caption beside the mark any more. It restated
- * "Bobble 3D" in weaker words and measured 3.33:1 against the bar under
- * bobble-light (AA wants 4.5) — a label that fails contrast to tell you
- * something the logo already said is worth deleting rather than fixing.
+ * THIS USED TO BE A TOP BAR: a back-to-chat pill, a "Bobble 3D" wordmark, and
+ * these two buttons, in a 46px strip above the workspace. the user: "remove the <
+ * chat button and instead still keep the sidebar open/collapse button. remove
+ * 'bobble 3d' with blue cube also."
+ *
+ * With its left half gone there was no bar left to justify, so the studio joined
+ * the content route the other three use and these two moved into the app's own
+ * top-right cluster — beside the sidebar toggle they now share a bar with. One
+ * strip of chrome instead of two, and the way OUT of the studio is the sidebar
+ * rather than a pill that existed only here.
+ *
+ * Everything the old header was careful about still holds: no promos, credits,
+ * accounts or nav ballast — just Send To (real DCC app logos, exports a GLB
+ * named for the target) and Export (opens the dialog).
  */
 import type { JSX } from 'react';
-import { exitModality } from '../state/modality-store';
-import { IcCaretSmall, IcDownload, IcShare } from './icons';
+import { IcDownload, IcShare } from './icons';
 import { DCC_LOGOS, DccLogoIcon } from './logos';
 import { MenuAnchor } from './primitives';
 import { useTripoStore } from './store';
-import { LogoMark } from './thumbs';
 import { requestSendTo } from './viewer-io';
 
-export function TopBar(): JSX.Element {
+export function TripoTopBarControls(): JSX.Element {
   const toggleMenu = useTripoStore((s) => s.toggleMenu);
   const closeMenus = useTripoStore((s) => s.closeMenus);
   const set = useTripoStore((s) => s.set);
@@ -26,80 +31,58 @@ export function TopBar(): JSX.Element {
   const hasModel = loadedAssetId !== null;
 
   return (
-    <header className="tp-topbar" data-testid="tp-topbar">
-      <div className="tp-topbar-left">
-        <button
-          type="button"
-          className="tp-back-btn"
-          data-testid="tp-back"
-          aria-label="Back to chat"
-          title="Back to chat"
-          onClick={() => exitModality()}
-        >
-          <IcCaretSmall size={16} className="tp-back-caret" />
-          Chat
-        </button>
-        <button
-          type="button"
-          className="tp-logo"
-          data-testid="tp-home"
-          onClick={() => exitModality()}
-          title="Bobble 3D"
-        >
-          <LogoMark size={22} />
-          <span className="tp-logo-word">Bobble 3D</span>
-        </button>
-      </div>
-
-      <div className="tp-topbar-right">
-        <MenuAnchor
-          id="sendto"
-          placement="bottom-end"
-          trigger={
-            <button
-              type="button"
-              className="tp-pill-btn"
-              data-testid="tp-sendto-btn"
-              disabled={!hasModel}
-              onClick={() => toggleMenu('sendto')}
-            >
-              <IcShare size={14} />
-              Send To
-              <IcCaretSmall size={12} />
-            </button>
-          }
-          menu={
-            <div className="tp-sendto-menu" data-testid="tp-sendto-menu">
-              {DCC_LOGOS.map((logo) => (
-                <button
-                  key={logo.id}
-                  type="button"
-                  className="tp-menu-item"
-                  data-testid={`tp-sendto-${logo.id}`}
-                  title={`Exports a GLB for ${logo.label}`}
-                  onClick={() => {
-                    requestSendTo(logo.id);
-                    closeMenus();
-                  }}
-                >
-                  <DccLogoIcon logo={logo} size={16} />
-                  <span className="tp-menu-item-label">{logo.label}</span>
-                </button>
-              ))}
-            </div>
-          }
-        />
-        <button
-          type="button"
-          className="tp-export-cta"
-          data-testid="tp-export-btn"
-          disabled={!hasModel}
-          onClick={() => set('modal', 'export')}
-        >
-          <IcDownload size={15} />
-          Export
-        </button>
-      </div>
-    </header>
+    <div className="tp-topbar-right" data-testid="tp-topbar">
+      <MenuAnchor
+        id="sendto"
+        placement="bottom-end"
+        trigger={
+          <button
+            type="button"
+            className="tp-pill-btn"
+            data-testid="tp-sendto-btn"
+            disabled={!hasModel}
+            onClick={() => toggleMenu('sendto')}
+          >
+            <IcShare size={14} />
+            Send To
+            {/*
+              No caret. the user: "remove the little down arrow in the 'send to'
+              button." A pill that opens a menu is found by pointing at it, and
+              the chevron was a third of the control's width spent saying so.
+            */}
+          </button>
+        }
+        menu={
+          <div className="tp-sendto-menu" data-testid="tp-sendto-menu">
+            {DCC_LOGOS.map((logo) => (
+              <button
+                key={logo.id}
+                type="button"
+                className="tp-menu-item"
+                data-testid={`tp-sendto-${logo.id}`}
+                title={`Exports a GLB for ${logo.label}`}
+                onClick={() => {
+                  requestSendTo(logo.id);
+                  closeMenus();
+                }}
+              >
+                <DccLogoIcon logo={logo} size={16} />
+                <span className="tp-menu-item-label">{logo.label}</span>
+              </button>
+            ))}
+          </div>
+        }
+      />
+      <button
+        type="button"
+        className="tp-export-cta"
+        data-testid="tp-export-btn"
+        disabled={!hasModel}
+        onClick={() => set('modal', 'export')}
+      >
+        <IcDownload size={15} />
+        Export
+      </button>
+    </div>
   );
 }
