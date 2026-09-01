@@ -59,6 +59,7 @@ function kindOf(path: string): MediaKind {
   const ext = (path.split('.').pop() ?? '').toLowerCase();
   if (['mp4', 'webm', 'mov'].includes(ext)) return 'video';
   if (['wav', 'mp3', 'flac', 'ogg', 'm4a'].includes(ext)) return 'audio';
+  if (['glb', 'gltf', 'obj', 'ply', 'stl'].includes(ext)) return 'model';
   return 'image';
 }
 

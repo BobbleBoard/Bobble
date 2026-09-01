@@ -30,3 +30,14 @@ export const useStudioRuns = create<StudioRunsState>((set) => ({
     set((s) => ({ runs: { ...s.runs, [modality]: [run, ...s.runs[modality]] } })),
   clear: (modality) => set((s) => ({ runs: { ...s.runs, [modality]: [] } })),
 }));
+
+/*
+ * E2E hook, on the same `?piE2E` opt-in the other stores use: a probe can put a
+ * finished run on screen without spending two minutes of GPU to get one. Looking
+ * at how a result is DRAWN is a different question from whether the generator
+ * works, and tying the two together is what makes visual checks too slow to run.
+ */
+if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('piE2E')) {
+  (window as unknown as { __studio_runs?: () => typeof useStudioRuns }).__studio_runs = () =>
+    useStudioRuns;
+}

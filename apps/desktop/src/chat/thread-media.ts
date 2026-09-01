@@ -30,7 +30,12 @@ export const MEDIA_TOOLS: ReadonlySet<string> = new Set([
   'generate_sfx',
 ]);
 
-export type MediaKind = 'image' | 'video' | 'audio';
+/**
+ * `model` is 3D. It joins the other three because a generated mesh is shown the
+ * same way they are — a card in the thread that made it — and the card is one
+ * component with four surfaces rather than four components.
+ */
+export type MediaKind = 'image' | 'video' | 'audio' | 'model';
 
 export interface ThreadMediaItem {
   /** Absolute path on disk. */
@@ -54,6 +59,11 @@ const EXT: Readonly<Record<string, MediaKind>> = {
   flac: 'audio',
   ogg: 'audio',
   m4a: 'audio',
+  glb: 'model',
+  gltf: 'model',
+  obj: 'model',
+  ply: 'model',
+  stl: 'model',
 };
 
 /*

@@ -2910,6 +2910,356 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
  * with a canvas row showing the same picture; nothing competes with it here, so
  * the only limit is the width of the conversation.
  */
+/* ═══ MEDIA CARDS ══════════════════════════════════════════════════════════
+ *
+ * One card, four surfaces, mounted by the chat thread AND by all three studios
+ * (see `MediaCard.tsx` for why they are the same component). Everything here is
+ * about letting the media be the thing you look at: the frame is a quiet
+ * container, and the controls are not on screen until you go near them.
+ */
+
+.pd-media-card {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-width: 0;
+}
+
+/*
+ * THE FRAME. `isolation: isolate` so the controls stack against this card and
+ * not against whatever else is on the page; `overflow: hidden` so a tall image
+ * is cropped by the rounded corner rather than poking through it.
+ */
+.pd-media-frame {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border-radius: 14px;
+  background: var(--pd-bg-sunken, var(--pd-bg-raised));
+  border: 1px solid color-mix(in oklab, var(--pd-text-primary) 10%, transparent);
+  min-height: 120px;
+  display: flex;
+}
+/* A picture card is TALLER than a wide one is wide: these are generated stills
+   and clips, and 240px is about where you stop squinting at a 1024² render. */
+.pd-media-card[data-kind="image"] .pd-media-frame,
+.pd-media-card[data-kind="video"] .pd-media-frame {
+  min-height: 200px;
+}
+.pd-media-card[data-kind="model"] .pd-media-frame {
+  height: 320px;
+}
+.pd-media-card[data-kind="audio"] .pd-media-frame {
+  min-height: 0;
+  padding: 12px;
+}
+
+.pd-media-image {
+  width: 100%;
+  max-height: 480px;
+  object-fit: contain;
+  display: block;
+  background: color-mix(in oklab, var(--pd-text-primary) 4%, transparent);
+}
+
+/* ── the corner controls ─────────────────────────────────────────────────── */
+
+/*
+ * OFF UNTIL YOU GO NEAR IT. A transcript can hold six of these, and six sets of
+ * permanently-lit buttons is chrome competing with the pictures. `:focus-within`
+ * is not an afterthought: without it the buttons would be pointer-only, which
+ * for Export means the file has no keyboard route out of the app.
+ */
+.pd-media-btn {
+  position: absolute;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  width: 30px;
+  justify-content: center;
+  border-radius: 9px;
+  cursor: pointer;
+  color: #fff;
+  background: color-mix(in srgb, #000 58%, transparent);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  border: 1px solid color-mix(in srgb, #fff 16%, transparent);
+  opacity: 0;
+  transform: translateY(-2px);
+  transition:
+    opacity var(--pd-duration-fast) var(--pd-easing-standard),
+    transform var(--pd-duration-fast) var(--pd-easing-standard),
+    background var(--pd-duration-fast) var(--pd-easing-standard);
+}
+.pd-media-btn--wide {
+  width: auto;
+  padding: 0 11px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+.pd-media-btn--tl {
+  top: 10px;
+  left: 10px;
+}
+.pd-media-btn--br {
+  right: 10px;
+  bottom: 10px;
+}
+.pd-media-btn--bl {
+  left: 10px;
+  bottom: 10px;
+  transform: translateY(2px);
+}
+.pd-media-frame:hover .pd-media-btn,
+.pd-media-frame:focus-within .pd-media-btn,
+.pd-media-stage .pd-media-btn {
+  opacity: 1;
+  transform: none;
+}
+/* And each still answers its OWN hover — a control that appears and then does
+   nothing when you reach it reads as a picture of a control. */
+.pd-media-btn:hover {
+  background: color-mix(in srgb, #000 76%, transparent);
+  transform: translateY(-1px) scale(1.05);
+}
+.pd-media-btn--bl:hover {
+  transform: translateY(-1px) scale(1.05);
+}
+.pd-media-btn:active {
+  transform: scale(0.97);
+}
+@media (prefers-reduced-motion: reduce) {
+  .pd-media-btn,
+  .pd-media-btn:hover,
+  .pd-media-btn:active {
+    transition: none;
+    transform: none;
+  }
+}
+
+/* ── the caption ─────────────────────────────────────────────────────────── */
+
+.pd-media-caption {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  padding-inline: 2px;
+}
+/* The NAME is the reveal control: a file you cannot find again is a file you
+   did not really get, and this is the smallest place to put that. */
+.pd-media-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.8125rem;
+  color: var(--pd-text-secondary);
+  cursor: pointer;
+  border-radius: 5px;
+}
+.pd-media-name:hover {
+  color: var(--pd-text-primary);
+  text-decoration: underline;
+}
+.pd-media-meta {
+  flex: none;
+  font-size: 0.6875rem;
+  color: var(--pd-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+/* ── video ───────────────────────────────────────────────────────────────── */
+
+.pd-media-video {
+  position: relative;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  outline: none;
+}
+.pd-media-video-el {
+  width: 100%;
+  max-height: 460px;
+  display: block;
+  background: #000;
+  cursor: pointer;
+}
+.pd-media-video[data-large="true"] .pd-media-video-el {
+  max-height: min(72vh, 900px);
+}
+/* The ring is drawn around the whole instrument even though the tab stop is the
+   video inside it — the shortcuts act on the player, so the player is what
+   should look focused. */
+.pd-media-video:has(.pd-media-video-el:focus-visible) {
+  outline: 2px solid var(--pd-accent-primary);
+  outline-offset: 2px;
+  border-radius: 12px;
+}
+
+.pd-media-transport {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: color-mix(in srgb, #000 62%, transparent);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  color: #fff;
+}
+.pd-media-play {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  cursor: pointer;
+  color: #fff;
+  background: color-mix(in srgb, #fff 14%, transparent);
+  transition: background var(--pd-duration-fast) var(--pd-easing-standard);
+}
+.pd-media-play:hover {
+  background: color-mix(in srgb, #fff 26%, transparent);
+}
+.pd-media-scrub {
+  flex: 1;
+  appearance: none;
+  -webkit-appearance: none;
+  height: 4px;
+  border-radius: 999px;
+  cursor: pointer;
+  /* The played part is drawn with a gradient stop at the value, so the track
+     needs no second element to sit under the thumb. */
+  background: linear-gradient(
+    to right,
+    var(--pd-accent-primary) var(--pd-media-pct, 0%),
+    color-mix(in srgb, #fff 22%, transparent) var(--pd-media-pct, 0%)
+  );
+}
+.pd-media-scrub::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 45%);
+}
+.pd-media-time {
+  flex: none;
+  font-size: 0.6875rem;
+  font-variant-numeric: tabular-nums;
+  color: color-mix(in srgb, #fff 78%, transparent);
+}
+
+/* ── 3D ──────────────────────────────────────────────────────────────────── */
+
+.pd-media-model {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 240px;
+}
+.pd-media-model-host {
+  width: 100%;
+  height: 100%;
+}
+.pd-media-model-host canvas {
+  display: block;
+  /* Belt and braces on the sizing bug above: whatever the renderer puts in the
+     attributes, the canvas occupies exactly its host. */
+  width: 100%;
+  height: 100%;
+  /* The turntable takes the drag; the CARD's drag-to-Finder would otherwise
+     fight every attempt to rotate. */
+  touch-action: none;
+  cursor: grab;
+}
+.pd-media-model-host canvas:active {
+  cursor: grabbing;
+}
+.pd-media-model-note {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 0.75rem;
+  color: var(--pd-text-muted);
+  pointer-events: none;
+}
+.pd-media-model-note[data-error="true"] {
+  color: var(--pd-status-danger-fg, #e5484d);
+}
+
+/* ── the expanded view ───────────────────────────────────────────────────── */
+
+/*
+ * NOT FULLSCREEN. the user: "large and centered and blurs background like settings
+ * panel". So it borrows the dialog's own scrim tokens rather than inventing a
+ * treatment — the transcript stays visible behind it and this reads as looking
+ * closer, not as leaving the room.
+ */
+.pd-media-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 40px;
+  background: var(--pd-bg-backdrop);
+  -webkit-backdrop-filter: blur(var(--pd-blur-backdrop));
+  backdrop-filter: blur(var(--pd-blur-backdrop));
+  animation: pd-fade-in var(--pd-duration-dialog-in) var(--pd-easing-standard);
+}
+.pd-media-scrim-hit {
+  position: absolute;
+  inset: 0;
+  cursor: zoom-out;
+}
+.pd-media-stage {
+  position: relative;
+  z-index: 1;
+  max-width: min(1100px, 92vw);
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  border-radius: 16px;
+  overflow: hidden;
+  background: var(--pd-bg-raised);
+  box-shadow: var(--pd-shadow-lg);
+  animation: pd-dialog-in var(--pd-duration-dialog-in) var(--pd-easing-enter);
+}
+.pd-media-stage[data-kind="model"] {
+  width: min(1100px, 92vw);
+  height: min(720px, 80vh);
+}
+.pd-media-stage[data-kind="audio"] {
+  width: min(680px, 92vw);
+  padding: 18px;
+}
+.pd-media-stage .pd-media-image {
+  max-height: 78vh;
+  width: auto;
+  max-width: 100%;
+}
+.pd-media-stage-caption {
+  padding: 9px 14px 11px;
+  font-size: 0.75rem;
+  color: var(--pd-text-muted);
+  text-align: center;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pd-media-scrim,
+  .pd-media-stage {
+    animation: none;
+  }
+}
+
 .pd-thread-media {
   display: flex;
   flex-direction: column;
@@ -3915,4 +4265,26 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
   color: var(--pd-text-muted);
   font-size: var(--pd-font-size-body);
   text-align: center;
+}
+
+/*
+ * WHILE A CARD IS EXPANDED, THE ROOM'S CHROME STEPS BACK.
+ *
+ * The scrim already covers everything; what it could not do is stop the top bar
+ * and the input bar being READABLE through the blur, which left them looking
+ * live and clickable under a picture that had taken the screen. Opacity rather
+ * than `display: none` so nothing reflows behind the glass and nothing typed in
+ * the composer is lost — and `pointer-events: none` so a click that lands past
+ * the stage dismisses instead of hitting a button it should not reach.
+ */
+body[data-media-expanded="true"] .pd-topbar,
+/* The sidebar toggle is NOT in the top bar — it is absolutely positioned over
+   the traffic lights — so it survived the first pass as a lone glyph floating
+   in the corner of an otherwise cleared screen. */
+body[data-media-expanded="true"] [data-testid="sidebar-toggle-zone"],
+body[data-media-expanded="true"] .pd-composer-root,
+body[data-media-expanded="true"] .pd-studio-compose {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--pd-duration-dialog-in) var(--pd-easing-standard);
 }
