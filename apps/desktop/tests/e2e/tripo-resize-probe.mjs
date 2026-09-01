@@ -60,6 +60,16 @@ for (const width of WIDTHS) {
     await page.waitForTimeout(250);
 
     const geo = await page.evaluate(() => {
+      /*
+       * IGNORE THE GATE'S ZOOM. With no 3D runtime installed the shell renders
+       * behind the install gate, which blurs it and scales it 1.01 so the blur
+       * has no bright edge to sample. That zoom is presentation on an inert
+       * surface, and measuring it as layout made every width look overflowed by
+       * exactly 1% of itself — 4px at 760. The columns' real geometry is what
+       * this probe is about.
+       */
+      const shell = document.querySelector('.tp-shell');
+      if (shell !== null) shell.style.transform = 'none';
       const pick = (sel) => {
         const el = document.querySelector(sel);
         if (el === null) return null;
@@ -75,6 +85,10 @@ for (const width of WIDTHS) {
         right: pick('.tp-rightpanel'),
         docScrollW: document.documentElement.scrollWidth,
       };
+    });
+    await page.evaluate(() => {
+      const shell = document.querySelector('.tp-shell');
+      if (shell !== null) shell.style.transform = '';
     });
 
     const tag = `${width}x${height}`;

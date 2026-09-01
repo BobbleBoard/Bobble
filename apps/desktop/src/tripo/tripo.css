@@ -571,10 +571,48 @@
 
 /* ═══ body layout ═══════════════════════════════════════════════════════ */
 
+/*
+ * FOUR CARDS, NOT FOUR SLABS.
+ *
+ * the user, on the corner where the right panel met the top bar: "a bunch of sharp
+ * edges and corners here let's fix that." The columns were full-bleed panels
+ * separated by hairlines, so every one of them met the window edge and the top
+ * bar at a right angle — four hard corners in the top-right alone once the tab
+ * strip and its active tab were counted.
+ *
+ * Insetting the row and rounding each column fixes all of them at once, and it
+ * is the language the rest of the app already speaks: the media cards, the
+ * composer and the settings rail are all rounded surfaces on the base
+ * background. The gap replaces the hairline dividers — space separates these
+ * as well as a line did, without drawing anything.
+ */
 .tp-body {
   display: flex;
   flex: 1;
   min-height: 0;
+  gap: 10px;
+  padding: 0 12px 12px;
+  background: var(--pd-bg-base);
+}
+/*
+ * ON A NARROW WINDOW THE INSET IS THE FIRST THING TO GO.
+ *
+ * The four columns' minimums come to 746px and the gap and padding add 42 more,
+ * which is real money at 760. The gap is a nicety and fitting is not, so below
+ * the width where they compete the cards close up and keep only their own
+ * hairlines — which is what separated them before they were cards.
+ */
+@media (max-width: 900px) {
+  .tp-body {
+    gap: 0;
+    padding: 0;
+  }
+}
+.tp-body > * {
+  border-radius: 14px;
+  /* Clips whatever sits in a column's corner — the tab strip's top edge, the
+     viewport's canvas — so nothing has to know it is in a rounded box. */
+  overflow: hidden;
 }
 
 /* ═══ left rail ═════════════════════════════════════════════════════════ */
@@ -588,7 +626,7 @@
   gap: 2px;
   padding: 8px 0;
   background: var(--pd-bg-raised);
-  border-right: 1px solid var(--pd-border-subtle);
+  border: 1px solid var(--pd-border-subtle);
   overflow-y: auto;
 }
 .tp-rail-group[data-open="true"] {
@@ -672,7 +710,7 @@
   display: flex;
   flex-direction: column;
   background: var(--pd-bg-raised);
-  border-right: 1px solid var(--pd-border-subtle);
+  border: 1px solid var(--pd-border-subtle);
   min-height: 0;
 }
 .tp-panel-header {
@@ -1592,6 +1630,7 @@
   flex: 1;
   min-width: 200px;
   overflow: hidden;
+  border: 1px solid var(--pd-border-subtle);
   background: radial-gradient(
     ellipse 90% 75% at 50% 42%,
     color-mix(in srgb, var(--pd-text-primary) 7%, var(--pd-bg-base)),
@@ -1622,6 +1661,12 @@
   align-items: center;
   justify-content: center;
   gap: 6px;
+  /* PADDING, or the caption runs out of the viewport. This column narrowed when
+     the studio joined the chat surface and gained a sidebar beside it; the line
+     is 56 characters and simply ran off the right edge, breaking mid-extension
+     ("drop a .glb/.obj/.s"). It is centred text in a box — it should wrap in the
+     box. */
+  padding-inline: 32px;
   pointer-events: none;
 }
 .tp-empty .tp-logomark {
@@ -1640,6 +1685,9 @@
 }
 .tp-empty p {
   margin: 0;
+  max-width: 42ch;
+  text-align: center;
+  text-wrap: balance;
   font-size: var(--pd-font-size-body);
   color: color-mix(in srgb, var(--pd-text-primary) 30%, transparent);
 }
@@ -2356,13 +2404,28 @@
   display: flex;
   flex-direction: column;
   background: var(--pd-bg-raised);
-  border-left: 1px solid var(--pd-border-subtle);
+  border: 1px solid var(--pd-border-subtle);
   min-height: 0;
 }
+/*
+ * PILLS IN A CLEAR STRIP, not a filled bar with one block lifted out of it.
+ *
+ * The strip was `--pd-bg-inset` with the active tab painted `--pd-bg-raised` on
+ * top — which is a real tab metaphor, and at this size it read as a dark
+ * rectangle with a hard notch cut in one corner. the user: "a bunch of sharp edges
+ * and corners here."
+ *
+ * The app already has a settled answer for "one of these three" — the segmented
+ * control in the chat and the studios — so this borrows it: no strip colour, and
+ * the lit one is a rounded fill. Nothing has a corner to be sharp with.
+ */
 .tp-right-tabs {
   display: flex;
   flex-shrink: 0;
-  background: var(--pd-bg-inset);
+  gap: 2px;
+  padding: 7px;
+  background: transparent;
+  border-bottom: 1px solid var(--pd-border-subtle);
 }
 .tp-right-tab {
   flex: 1;
@@ -2370,16 +2433,22 @@
   align-items: center;
   justify-content: center;
   gap: 7px;
-  height: 42px;
+  height: 30px;
+  border-radius: 9px;
   font-size: var(--pd-font-size-caption);
   font-weight: var(--pd-font-weight-semibold);
   color: var(--pd-text-muted);
-  border-bottom: 1px solid var(--pd-border-subtle);
+  transition:
+    background var(--pd-duration-fast) var(--pd-easing-standard),
+    color var(--pd-duration-fast) var(--pd-easing-standard);
+}
+.tp-right-tab:hover {
+  color: var(--pd-text-secondary);
+  background: var(--pd-bg-hover);
 }
 .tp-right-tab[data-active="true"] {
-  background: var(--pd-bg-raised);
+  background: var(--pd-bg-inset);
   color: var(--pd-text-primary);
-  border-bottom-color: transparent;
 }
 .tp-right-body {
   flex: 1;
