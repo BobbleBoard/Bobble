@@ -52,14 +52,23 @@ function Surface({ item, large }: { item: ThreadMediaItem; large: boolean }): JS
   return <ThreadAudio src={src} name={item.name} />;
 }
 
+/*
+ * TWO ARROWS ON THE ↖↘ DIAGONAL. the user: "a diagonal arrow pointing up left and
+ * down right". The four-corner bracket it replaced is the "crop" mark — it says
+ * frame this, not open this bigger. Arrows pointing away from each other along
+ * one diagonal say the thing is about to grow, which is what the button does.
+ */
 function GlyphExpand(): JSX.Element {
   return (
-    <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <title>Expand</title>
       <path
-        d="M6.2 2.5H2.5v3.7M9.8 2.5h3.7v3.7M13.5 9.8v3.7H9.8M2.5 9.8v3.7h3.7"
+        /* Heads at the TOP-LEFT and BOTTOM-RIGHT — the ↖↘ diagonal the user asked
+           for. Drawn the other way round first, which is the same icon on the
+           other diagonal and reads as a different gesture entirely. */
+        d="M9.6 3.6H3.6V9.6M3.6 3.6L10.3 10.3M14.4 20.4H20.4V14.4M20.4 20.4L13.7 13.7"
         stroke="currentColor"
-        strokeWidth="1.5"
+        strokeWidth="2"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
@@ -69,12 +78,12 @@ function GlyphExpand(): JSX.Element {
 
 function GlyphExport(): JSX.Element {
   return (
-    <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+    <svg width="18" height="18" viewBox="0 0 16 16" fill="none" aria-hidden="true">
       <title>Export</title>
       <path
         d="M8 10.4V2.6M5.2 5.4L8 2.6l2.8 2.8M2.8 10v2.6a.8.8 0 00.8.8h8.8a.8.8 0 00.8-.8V10"
         stroke="currentColor"
-        strokeWidth="1.5"
+        strokeWidth="1.6"
         strokeLinecap="round"
         strokeLinejoin="round"
       />

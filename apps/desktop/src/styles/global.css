@@ -2982,13 +2982,17 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
   height: 38px;
   width: 38px;
   justify-content: center;
-  border-radius: 9px;
+  /*
+   * NO PILL AT REST. the user: "no circle… circle on hover", for the fullscreen
+   * corner as well as the play button. A glyph lying directly on the picture is
+   * quieter than a glyph in a box, and the box was doing legibility work a drop
+   * shadow does just as well — see the filter below.
+   */
+  border-radius: 999px;
   cursor: pointer;
   color: #fff;
-  background: color-mix(in srgb, #000 58%, transparent);
-  -webkit-backdrop-filter: blur(10px);
-  backdrop-filter: blur(10px);
-  border: 1px solid color-mix(in srgb, #fff 16%, transparent);
+  background: transparent;
+  border: 1px solid transparent;
   opacity: 0;
   transform: translateY(-2px);
   transition:
@@ -2996,11 +3000,17 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
     transform var(--pd-duration-fast) var(--pd-easing-standard),
     background var(--pd-duration-fast) var(--pd-easing-standard);
 }
+/* The one that carries a WORD keeps its pill: text on a picture without a
+   background behind it is unreadable in a way a single glyph is not. */
 .pd-media-btn--wide {
   width: auto;
   padding: 0 14px;
   font-size: 0.8125rem;
   font-weight: 500;
+  background: color-mix(in srgb, #000 62%, transparent);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  border-color: color-mix(in srgb, #fff 16%, transparent);
 }
 .pd-media-btn--tl {
   top: 10px;
@@ -3031,8 +3041,18 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
 }
 /* And each still answers its OWN hover — a control that appears and then does
    nothing when you reach it reads as a picture of a control. */
-.pd-media-btn:hover {
-  background: color-mix(in srgb, #000 76%, transparent);
+/* The glyph is legible on its own: a shadow tight enough to read as an edge
+   rather than a glow, which is what lets the pill go away. */
+.pd-media-btn > svg {
+  filter: drop-shadow(0 1px 3px rgb(0 0 0 / 85%)) drop-shadow(0 0 1px rgb(0 0 0 / 65%));
+}
+/* …AND THE CIRCLE ARRIVES WHEN YOU DO. */
+.pd-media-btn:hover,
+.pd-media-btn:focus-visible {
+  background: color-mix(in srgb, #000 72%, transparent);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  border-color: color-mix(in srgb, #fff 18%, transparent);
   transform: translateY(-1px) scale(1.05);
 }
 .pd-media-btn--bl:hover {
@@ -3127,15 +3147,14 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
   z-index: 2;
   display: grid;
   place-items: center;
-  width: 62px;
-  height: 62px;
+  width: 86px;
+  height: 86px;
   border-radius: 999px;
   cursor: pointer;
   color: #fff;
-  background: color-mix(in srgb, #000 52%, transparent);
-  -webkit-backdrop-filter: blur(14px);
-  backdrop-filter: blur(14px);
-  border: 1px solid color-mix(in srgb, #fff 20%, transparent);
+  /* The triangle stands on its own; the circle is the hover state. */
+  background: transparent;
+  border: 1px solid transparent;
   transition:
     opacity var(--pd-duration-fast) var(--pd-easing-standard),
     background var(--pd-duration-fast) var(--pd-easing-standard),
@@ -3159,8 +3178,15 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
   opacity: 1;
   pointer-events: auto;
 }
-.pd-media-bigplay:hover {
-  background: color-mix(in srgb, #000 70%, transparent);
+.pd-media-bigplay > svg {
+  filter: drop-shadow(0 2px 6px rgb(0 0 0 / 75%)) drop-shadow(0 0 2px rgb(0 0 0 / 55%));
+}
+.pd-media-bigplay:hover,
+.pd-media-bigplay:focus-visible {
+  background: color-mix(in srgb, #000 64%, transparent);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  border-color: color-mix(in srgb, #fff 20%, transparent);
   transform: translate(-50%, -50%) scale(1.06);
 }
 .pd-media-bigplay:active {

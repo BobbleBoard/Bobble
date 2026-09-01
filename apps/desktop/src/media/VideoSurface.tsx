@@ -206,23 +206,41 @@ export function VideoSurface({ src, large = false, testid }: VideoSurfaceProps):
   );
 }
 
-/* Nudged right of centre: a right-pointing triangle carries its mass on the
-   left, so centring it geometrically inside a circle reads as sitting left. */
+/*
+ * A BIG ROUNDED TRIANGLE, not a glyph in a circle.
+ *
+ * the user: "no circle, large rounded tip play triangle circle on hover". So the
+ * shape carries itself — the corners are rounded by stroking the same path in
+ * the same colour with a fat round join, which is how you round a filled
+ * triangle without hand-authoring six arc segments.
+ *
+ * Nudged right of centre: a right-pointing triangle carries its mass on the
+ * left, so centring it geometrically reads as sitting left.
+ */
 function GlyphPlay(): JSX.Element {
   return (
-    <svg width="22" height="22" viewBox="0 0 16 16" aria-hidden="true">
+    <svg width="54" height="54" viewBox="0 0 24 24" aria-hidden="true">
       <title>Play</title>
-      <path d="M5.4 3.1l8 4.9-8 4.9z" fill="currentColor" />
+      {/* Nearly the whole box: at a third of it the triangle read as a small
+          mark floating in the middle of a clip rather than the control. */}
+      <path
+        d="M7.6 4.6L19 12L7.6 19.4z"
+        fill="currentColor"
+        stroke="currentColor"
+        strokeWidth="4.4"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
     </svg>
   );
 }
 
 function GlyphPause(): JSX.Element {
   return (
-    <svg width="22" height="22" viewBox="0 0 16 16" aria-hidden="true">
+    <svg width="54" height="54" viewBox="0 0 24 24" aria-hidden="true">
       <title>Pause</title>
-      <rect x="4.2" y="3.2" width="3" height="9.6" rx="1.2" fill="currentColor" />
-      <rect x="8.8" y="3.2" width="3" height="9.6" rx="1.2" fill="currentColor" />
+      <rect x="6.4" y="4.8" width="4.5" height="14.4" rx="2.25" fill="currentColor" />
+      <rect x="13.1" y="4.8" width="4.5" height="14.4" rx="2.25" fill="currentColor" />
     </svg>
   );
 }
