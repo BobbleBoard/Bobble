@@ -3843,6 +3843,36 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
   color: var(--pd-text-muted);
 }
 
+/*
+ * THE RAIL SHAPE OF THE SAME PICKER — full width, opening downward.
+ *
+ * The rail used to hold native `<select>` elements with a chevron drawn on top.
+ * the user: "stylize dropdowns the same as the rest of the app, not macos native,
+ * there's a uniform dropdown style that needs reusing." A native select cannot
+ * be styled past its box — the popup is the platform's, the highlight is the
+ * platform's, and it opens in a different place from every other menu in the
+ * app. This is the same `DropdownMenu` the model picker and everything else
+ * uses; only the trigger changes shape.
+ */
+.pd-studio-pick--block {
+  width: 100%;
+  justify-content: space-between;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 8px;
+  background: var(--pd-bg-raised);
+  border-color: color-mix(in oklab, var(--pd-text-primary) 14%, transparent);
+}
+.pd-studio-pick--block:hover,
+.pd-studio-pick--block[data-state="open"] {
+  border-color: color-mix(in oklab, var(--pd-text-primary) 26%, transparent);
+}
+.pd-studio-pick--block .pd-studio-pick-value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .pd-studio-canvas {
   flex: 1;
   min-height: 0;
@@ -3858,6 +3888,11 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
   color: var(--pd-text-primary);
   padding: 6px 0;
   font-size: 0.9375rem;
+  /* STATED, so the <input> and the <textarea> agree. Left to the browser they
+     differ by a pixel — `normal` against the textarea's 1.5 — and one studio's
+     composer stood a pixel taller than the other two for no reason anyone could
+     name. */
+  line-height: 1.5;
   font-family: inherit;
 }
 .pd-studio-prompt::placeholder {
@@ -3867,11 +3902,24 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
 .pd-studio-prompt:focus {
   outline: none;
 }
+/*
+ * THE SPEECH BOX STARTS THE SAME HEIGHT AS THE OTHERS.
+ *
+ * the user: "why is the input box for audio taller than the rest" — and the honest
+ * answer was that it is a <textarea> with a 52px floor, because speech is the
+ * one studio where you paste a paragraph. But an EMPTY paragraph field is just a
+ * taller empty field: it made the audio composer 73px against everyone else's
+ * 45 before a word was typed, which reads as a different control rather than the
+ * same one that can grow.
+ *
+ * So it starts at one line and grows as you type (`autoGrow` in StudioShell),
+ * capped where a composer stops being a composer.
+ */
 .pd-studio-prompt--multi {
   resize: none;
-  min-height: 52px;
-  max-height: 220px;
-  line-height: 1.5;
+  min-height: 0;
+  max-height: 200px;
+  overflow-y: auto;
 }
 
 .pd-studio-controls {
@@ -3960,15 +4008,66 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
 }
 
 /* The mode switch (audio: Speech / Music / Sound effects). */
+/*
+ * THE SEGMENTED CONTROL — a track with a thumb, not three lights.
+ *
+ * The selected state used to be a background painted on whichever button was
+ * `data-on`, which can only cross-fade. One element that MOVES is what tells
+ * the eye these are positions on a track. See `Segmented` for the measuring;
+ * everything here just has to leave room for it and stay out of its way.
+ *
+ * THE INSET IS EVEN ON ALL FOUR SIDES, which it was not: MEASURED, the gap from
+ * the outer edge to the selected pill was 4px on the left and 2px top and
+ * bottom, because `.pd-seg--inline` pinned the height to 32px and the item did
+ * not fit inside the padding. The height comes from the item now, so the
+ * padding is the gap, all the way round. the user: "ensure the border on the left…
+ * is even all around and the curve is the same on the edge and selection pill".
+ */
 .pd-seg {
+  position: relative;
   display: inline-flex;
+  align-items: center;
   gap: 2px;
   padding: 3px;
   border-radius: 999px;
   background: var(--pd-bg-inset);
   border: 1px solid color-mix(in oklab, var(--pd-text-primary) 10%, transparent);
 }
+
+/*
+ * THE THUMB. Placed from the item's own measured box, so it lands exactly on
+ * whichever label it is under and the corner radii stay concentric: the track
+ * clamps its 999px to half its height, the thumb to half of its own, and the
+ * difference is the padding.
+ */
+.pd-seg-thumb {
+  position: absolute;
+  z-index: 0;
+  border-radius: 999px;
+  background: var(--pd-bg-raised);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 8%);
+  pointer-events: none;
+}
+/* Only once it has been measured in place — a thumb that animates its FIRST
+   position slides in from the left edge on mount. */
+.pd-seg[data-ready="true"] .pd-seg-thumb {
+  transition:
+    left var(--pd-duration-base) var(--pd-easing-standard),
+    width var(--pd-duration-base) var(--pd-easing-standard),
+    opacity var(--pd-duration-fast) var(--pd-easing-standard);
+}
+/* Where the value WOULD go: the same shape, quieter, and it slides too. */
+.pd-seg-thumb--hover {
+  background: color-mix(in oklab, var(--pd-text-primary) 7%, transparent);
+  box-shadow: none;
+}
+
 .pd-seg-item {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: none;
   cursor: pointer;
   border-radius: 999px;
@@ -3976,17 +4075,20 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
   font-size: 0.8125rem;
   color: var(--pd-text-muted);
   background: transparent;
-  transition:
-    background var(--pd-duration-fast) var(--pd-easing-standard),
-    color var(--pd-duration-fast) var(--pd-easing-standard);
+  white-space: nowrap;
+  transition: color var(--pd-duration-fast) var(--pd-easing-standard);
 }
 .pd-seg-item:hover {
   color: var(--pd-text-primary);
 }
 .pd-seg-item[data-on="true"] {
-  background: var(--pd-bg-raised);
   color: var(--pd-text-primary);
-  box-shadow: 0 1px 2px rgb(0 0 0 / 8%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pd-seg[data-ready="true"] .pd-seg-thumb {
+    transition: none;
+  }
 }
 
 /* Stacked, full-width, labels above — a rail is a column of settings, not the
@@ -4053,10 +4155,8 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
  * BOTTOM edge, so a control a few pixels shorter than its neighbour drags its
  * label out of line with every other label in the row.
  */
-.pd-seg--inline {
-  height: 32px;
-  align-items: center;
-}
+/* The composer/rail size. No fixed height — the item sets it, so the padding
+   stays the gap on every side. */
 .pd-seg--inline .pd-seg-item {
   padding: 4px 11px;
 }

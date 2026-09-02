@@ -288,46 +288,37 @@ export function AudioStudio(): JSX.Element {
             longer has.
           */}
           <RailGroup title="Mode">
-            <div className="pd-seg" role="tablist" aria-label="Audio mode">
-              {MODES.map((m) => (
-                <button
-                  key={m.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={mode === m.id}
-                  data-testid={`audio-mode-${m.id}`}
-                  className="pd-seg-item pd-focusable"
-                  data-on={mode === m.id ? 'true' : undefined}
-                  onClick={() => {
-                    setMode(m.id);
-                    // A model chosen for one mode cannot serve another — Kokoro
-                    // is not going to make a door slam — so the pick resets with
-                    // the mode rather than silently failing on the next run.
-                    setModel('');
-                    setSeconds(undefined);
-                  }}
-                >
-                  {m.label}
-                </button>
-              ))}
-            </div>
+            {/* The same `Segmented` as every other choice in the studios, so
+                the mode switch slides like the rest rather than being the one
+                row that blinks. */}
+            <Segmented
+              testid="audio-mode"
+              ariaLabel="Audio mode"
+              value={mode}
+              onChange={(next) => {
+                setMode(next);
+                // A model chosen for one mode cannot serve another — Kokoro is
+                // not going to make a door slam — so the pick resets with the
+                // mode rather than silently failing on the next run.
+                setModel('');
+                setSeconds(undefined);
+              }}
+              options={MODES.map((m) => ({ value: m.id, label: m.label }))}
+            />
           </RailGroup>
 
           {mode === 'speech' ? (
             <RailGroup title="Voice">
               <Knob label="Preset">
-                <select
-                  className="pd-studio-select pd-focusable"
-                  data-testid="audio-voice"
+                <StudioPicker
+                  block
+                  side="bottom"
+                  testid="audio-voice"
+                  label="Preset"
                   value={voice}
-                  onChange={(e) => setVoice(e.target.value)}
-                >
-                  {VOICES.map((v) => (
-                    <option key={v.value} value={v.value}>
-                      {v.label}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setVoice}
+                  options={VOICES.map((v) => ({ value: v.value, label: v.label }))}
+                />
               </Knob>
               {/* VOICE CLONING. A file, chosen or dropped — not a path you paste. */}
               <Knob label="Clone a voice">
@@ -424,26 +415,29 @@ export function AudioStudio(): JSX.Element {
 
           <RailGroup title="Model">
             <Knob label={mode === 'speech' ? 'Speech model' : 'Sound model'}>
-              <select
-                className="pd-studio-select pd-focusable"
-                data-testid="audio-model"
+              <StudioPicker
+                block
+                side="bottom"
+                testid="audio-model"
+                label="Model"
                 value={model}
-                onChange={(e) => setModel(e.target.value)}
-              >
-                <option value="">Recommended</option>
-                {/*
-                  A MODEL THAT CANNOT RUN IS SHOWN AS UNAVAILABLE, not offered.
-                  `reserved` marks catalogue entries whose backend has not landed
-                  — the dropdowns listed them exactly like the rest, so
-                  "Recommended" worked and any model you picked by NAME failed.
-                */}
-                {models.map((m) => (
-                  <option key={m.id} value={m.id} disabled={m.reserved === true}>
-                    {m.label}
-                    {m.reserved === true ? ' (not available yet)' : ''}
-                  </option>
-                ))}
-              </select>
+                onChange={setModel}
+                options={[
+                  { value: '', label: 'Recommended' },
+                  /*
+                    A MODEL THAT CANNOT RUN IS SHOWN AS UNAVAILABLE, not offered.
+                    `reserved` marks catalogue entries whose backend has not
+                    landed. Disabled and labelled is better than hidden: the
+                    entry is real, it is coming, and picking it is the one thing
+                    that must not quietly fail.
+                  */
+                  ...models.map((m) => ({
+                    value: m.id,
+                    label: m.label,
+                    ...(m.reserved === true ? { disabled: true, hint: 'not available yet' } : {}),
+                  })),
+                ]}
+              />
             </Knob>
           </RailGroup>
         </>

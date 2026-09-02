@@ -215,26 +215,29 @@ export function VideoStudio(): JSX.Element {
 
           <RailGroup title="Model">
             <Knob label="Video model">
-              <select
-                className="pd-studio-select pd-focusable"
-                data-testid="video-model"
+              <StudioPicker
+                block
+                side="bottom"
+                testid="video-model"
+                label="Video model"
                 value={model}
-                onChange={(e) => setModel(e.target.value)}
-              >
-                <option value="">Recommended</option>
-                {/*
-                  A MODEL THAT CANNOT RUN IS SHOWN AS UNAVAILABLE, not offered.
-                  `reserved` marks catalogue entries whose backend has not landed
-                  — the dropdowns listed them exactly like the rest, so
-                  "Recommended" worked and any model you picked by NAME failed.
-                */}
-                {models.map((m) => (
-                  <option key={m.id} value={m.id} disabled={m.reserved === true}>
-                    {m.label}
-                    {m.reserved === true ? ' (not available yet)' : ''}
-                  </option>
-                ))}
-              </select>
+                onChange={setModel}
+                options={[
+                  { value: '', label: 'Recommended' },
+                  /*
+                    A MODEL THAT CANNOT RUN IS SHOWN AS UNAVAILABLE, not offered.
+                    `reserved` marks catalogue entries whose backend has not
+                    landed. Disabled and labelled is better than hidden: the
+                    entry is real, it is coming, and picking it is the one thing
+                    that must not quietly fail.
+                  */
+                  ...models.map((m) => ({
+                    value: m.id,
+                    label: m.label,
+                    ...(m.reserved === true ? { disabled: true, hint: 'not available yet' } : {}),
+                  })),
+                ]}
+              />
             </Knob>
           </RailGroup>
         </>

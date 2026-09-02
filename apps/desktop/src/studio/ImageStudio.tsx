@@ -266,18 +266,15 @@ export function ImageStudio(): JSX.Element {
 
           <RailGroup title="Look">
             <Knob label="Style">
-              <select
-                className="pd-studio-select pd-focusable"
-                data-testid="image-style"
+              <StudioPicker
+                block
+                side="bottom"
+                testid="image-style"
+                label="Style"
                 value={style}
-                onChange={(e) => setStyle(e.target.value)}
-              >
-                {STYLES.map((s) => (
-                  <option key={s.value} value={s.value}>
-                    {s.label}
-                  </option>
-                ))}
-              </select>
+                onChange={setStyle}
+                options={STYLES.map((st) => ({ value: st.value, label: st.label }))}
+              />
             </Knob>
             <RailToggle
               testid="image-enhance"
@@ -300,29 +297,29 @@ export function ImageStudio(): JSX.Element {
 
           <RailGroup title="Model">
             <Knob label="Image model">
-              <select
-                className="pd-studio-select pd-focusable"
-                data-testid="image-model"
+              <StudioPicker
+                block
+                side="bottom"
+                testid="image-model"
+                label="Image model"
                 value={model}
-                onChange={(e) => setModel(e.target.value)}
-              >
-                <option value="">Recommended</option>
-                {/*
-                  A MODEL THAT CANNOT RUN IS SHOWN AS UNAVAILABLE, not offered.
-                  `reserved` marks catalogue entries whose backend has not landed
-                  — the dropdowns listed them exactly like the rest, so
-                  "Recommended" worked and any model you picked by NAME failed.
-                  Disabled and labelled is better than hidden: the entry is real,
-                  it is coming, and picking it is the one thing that must not
-                  quietly fail.
-                */}
-                {models.map((m) => (
-                  <option key={m.id} value={m.id} disabled={m.reserved === true}>
-                    {m.label}
-                    {m.reserved === true ? ' (not available yet)' : ''}
-                  </option>
-                ))}
-              </select>
+                onChange={setModel}
+                options={[
+                  { value: '', label: 'Recommended' },
+                  /*
+                    A MODEL THAT CANNOT RUN IS SHOWN AS UNAVAILABLE, not offered.
+                    `reserved` marks catalogue entries whose backend has not
+                    landed. Disabled and labelled is better than hidden: the
+                    entry is real, it is coming, and picking it is the one thing
+                    that must not quietly fail.
+                  */
+                  ...models.map((m) => ({
+                    value: m.id,
+                    label: m.label,
+                    ...(m.reserved === true ? { disabled: true, hint: 'not available yet' } : {}),
+                  })),
+                ]}
+              />
             </Knob>
           </RailGroup>
         </>

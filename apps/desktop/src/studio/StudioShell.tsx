@@ -39,7 +39,17 @@ import {
   ScrollArea,
   Spinner,
 } from '@pi-desktop/ui';
-import { type JSX, type ReactNode, useEffect } from 'react';
+import { clsx } from 'clsx';
+import {
+  type CSSProperties,
+  type JSX,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react';
 import { exitModality } from '../state/modality-store';
 import { useStudioUiStore } from './studio-ui-store';
 
@@ -83,7 +93,10 @@ export function StudioShell({
   controls,
   settings,
   advanced,
-  prompt,
+  /* Aliased because `prompt` is a global (window.prompt), and a prop that
+     shadows one confuses more than the reader: biome resolved this effect's
+     dependency to the GLOBAL and called it invalid. */
+  prompt: promptText,
   onPrompt,
   placeholder,
   multiline = false,
@@ -95,7 +108,24 @@ export function StudioShell({
   children,
   testid = 'studio',
 }: StudioShellProps): JSX.Element {
-  const canRun = !busy && blocked === undefined && prompt.trim().length > 0;
+  const canRun = !busy && blocked === undefined && promptText.trim().length > 0;
+
+  /*
+   * GROW WITH THE TEXT. A textarea has one height and no opinion about its
+   * content, so the only ways to size it are a fixed floor (which made the
+   * empty speech box taller than every other studio's) or this: reset to zero
+   * and take the scroll height back, every time the text changes. The CSS caps
+   * it; past that the field scrolls.
+   */
+  const growRef = useRef<HTMLTextAreaElement>(null);
+  useLayoutEffect(() => {
+    const el = growRef.current;
+    if (el === null) return;
+    el.style.height = '0px';
+    /* Empty goes back to the field's OWN height rather than a measured one, so
+       a cleared composer matches the other studios' to the pixel. */
+    el.style.height = promptText === '' ? '' : `${el.scrollHeight}px`;
+  }, [promptText]);
   const settingsOpen = useStudioUiStore((s) => s.settingsOpen);
   const advancedOpen = useStudioUiStore((s) => s.advancedOpen);
   const setAdvancedOpen = useStudioUiStore((s) => s.setAdvancedOpen);
@@ -154,9 +184,10 @@ export function StudioShell({
           <div className="pd-studio-composer">
             {multiline ? (
               <textarea
+                ref={growRef}
                 className="pd-studio-prompt pd-studio-prompt--multi pd-focusable"
                 data-testid="studio-prompt"
-                value={prompt}
+                value={promptText}
                 placeholder={placeholder}
                 onChange={(e) => onPrompt(e.target.value)}
                 onKeyDown={(e) => {
@@ -167,13 +198,13 @@ export function StudioShell({
                     onRun();
                   }
                 }}
-                rows={2}
+                rows={1}
               />
             ) : (
               <input
                 className="pd-studio-prompt pd-focusable"
                 data-testid="studio-prompt"
-                value={prompt}
+                value={promptText}
                 placeholder={placeholder}
                 onChange={(e) => onPrompt(e.target.value)}
                 onKeyDown={(e) => {
@@ -279,24 +310,36 @@ export function StudioPicker<T extends string | number>({
   options,
   onChange,
   testid,
+  block = false,
+  side = 'top',
 }: {
   label: string;
   value: T;
-  options: readonly { value: T; label: string; hint?: string }[];
+  options: readonly { value: T; label: string; hint?: string; disabled?: boolean }[];
   onChange: (v: T) => void;
   testid?: string;
+  /**
+   * Full width, label above, opening downward — the settings-rail shape. The
+   * default is the compact pill that sits under the composer.
+   */
+  readonly block?: boolean;
+  readonly side?: 'top' | 'bottom';
 }): JSX.Element {
   const current = options.find((o) => o.value === value);
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button type="button" className="pd-studio-pick pd-focusable" data-testid={testid}>
-          <span className="pd-studio-pick-label">{label}</span>
+        <button
+          type="button"
+          className={clsx('pd-studio-pick pd-focusable', block && 'pd-studio-pick--block')}
+          data-testid={testid}
+        >
+          {block ? null : <span className="pd-studio-pick-label">{label}</span>}
           <span className="pd-studio-pick-value">{current?.label ?? String(value)}</span>
           <IconChevronDown size={12} className="pd-studio-pick-caret" />
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent side="top" align="start" className="min-w-[170px]">
+      <DropdownMenuContent side={side} align="start" className="min-w-[190px]">
         <DropdownMenuRadioGroup
           value={String(value)}
           onValueChange={(next) => {
@@ -308,6 +351,7 @@ export function StudioPicker<T extends string | number>({
             <DropdownMenuRadioItem
               key={String(o.value)}
               value={String(o.value)}
+              disabled={o.disabled === true}
               data-testid={testid !== undefined ? `${testid}-${o.value}` : undefined}
             >
               <span className="flex flex-col">
@@ -407,26 +451,94 @@ export function Knob({ label, children }: { label: string; children: ReactNode }
 }
 
 /**
- * A segmented choice — the control that replaced most of the number spinners.
+ * A SEGMENTED CHOICE, WITH A THUMB THAT SLIDES.
  *
  * A person choosing how long a clip runs is not thinking "37 seconds"; they are
  * thinking short, or long. Discrete named choices also let each option carry
  * what it COSTS, which a spinner cannot.
+ *
+ * WHY THE INDICATOR IS ONE ELEMENT AND NOT A BACKGROUND PER ITEM.
+ *
+ * the user: "have the animation actually slide the selected, slide the hover
+ * animation actaully and then just keep the same click one." Painting the
+ * background on whichever button is `data-on` can only ever cross-fade — the
+ * old one dims where it stands and the new one brightens where it stands, and
+ * nothing travels. One element that MOVES is the only way the eye gets told
+ * these are positions on a track rather than three unrelated lights.
+ *
+ * Two thumbs, because they answer different questions: the selected one says
+ * where the value IS, the hover one says where it WOULD GO. Both are measured
+ * from the real item boxes rather than computed from an index, so a row of
+ * uneven labels ("Draft"/"Standard"/"Large") lands exactly, and the inset is
+ * whatever the container's padding actually is — which is what makes the gap
+ * even on all four sides.
  */
 export function Segmented<T extends string | number>({
   value,
   options,
   onChange,
   testid,
+  inline = true,
+  ariaLabel,
 }: {
   value: T;
   options: readonly { value: T; label: string; hint?: string }[];
   onChange: (v: T) => void;
   testid?: string;
+  /** The composer/rail size. `false` gives the roomier default. */
+  inline?: boolean;
+  ariaLabel?: string;
 }): JSX.Element {
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const [hovered, setHovered] = useState<number | null>(null);
+  const [selBox, setSelBox] = useState<Box | null>(null);
+  const [hovBox, setHovBox] = useState<Box | null>(null);
+  /* The first measurement must not animate: a thumb that slides in from the
+     left edge on mount reads as the control setting itself up. */
+  const [ready, setReady] = useState(false);
+  const active = options.findIndex((o) => o.value === value);
+
+  const measure = useCallback((): void => {
+    setSelBox(boxOf(wrapRef.current, itemRefs.current[active] ?? null));
+    setHovBox(hovered === null ? null : boxOf(wrapRef.current, itemRefs.current[hovered] ?? null));
+  }, [active, hovered]);
+
+  useLayoutEffect(() => {
+    measure();
+    // One frame later the thumb is where it belongs, so movement can animate.
+    const id = requestAnimationFrame(() => setReady(true));
+    return () => cancelAnimationFrame(id);
+  }, [measure]);
+
+  /* Labels reflow — the rail narrows, a font loads, the window resizes — and a
+     thumb measured once would sit off its item ever after. */
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (el === null) return;
+    const ro = new ResizeObserver(() => measure());
+    ro.observe(el);
+    for (const item of itemRefs.current) if (item !== null) ro.observe(item);
+    return () => ro.disconnect();
+  }, [measure]);
+
   return (
-    <div className="pd-seg pd-seg--inline" role="radiogroup" data-testid={testid}>
-      {options.map((o) => (
+    <div
+      ref={wrapRef}
+      className={clsx('pd-seg', inline && 'pd-seg--inline')}
+      role="radiogroup"
+      aria-label={ariaLabel}
+      data-testid={testid}
+      data-ready={ready ? 'true' : undefined}
+      onPointerLeave={() => setHovered(null)}
+    >
+      {hovBox !== null && hovered !== active ? (
+        <span className="pd-seg-thumb pd-seg-thumb--hover" style={styleOf(hovBox)} aria-hidden />
+      ) : null}
+      {selBox !== null ? (
+        <span className="pd-seg-thumb" style={styleOf(selBox)} aria-hidden />
+      ) : null}
+      {options.map((o, i) => (
         /* A segmented control is buttons with `role="radio"` inside a
            `role="radiogroup"` — the standard ARIA pattern. `<input
            type="radio">`, which the rule wants, cannot carry this styling and
@@ -435,6 +547,9 @@ export function Segmented<T extends string | number>({
         // biome-ignore lint/a11y/useSemanticElements: radiogroup pattern, styled.
         <button
           key={String(o.value)}
+          ref={(el) => {
+            itemRefs.current[i] = el;
+          }}
           type="button"
           role="radio"
           aria-checked={o.value === value}
@@ -442,6 +557,8 @@ export function Segmented<T extends string | number>({
           data-on={o.value === value ? 'true' : undefined}
           data-testid={testid !== undefined ? `${testid}-${o.value}` : undefined}
           title={o.hint}
+          onPointerEnter={() => setHovered(i)}
+          onFocus={() => setHovered(i)}
           onClick={() => onChange(o.value)}
         >
           {o.label}
@@ -451,25 +568,32 @@ export function Segmented<T extends string | number>({
   );
 }
 
-/**
- * The empty state.
- *
- * It was two lines of grey text in the top-left corner of six hundred points of
- * nothing, and it spent them explaining the controls. It is now the centre of
- * the room, it says what this place MAKES, and — the part that actually teaches
- * — it offers three real prompts you can press. One press and the room has
- * shown you what it does instead of describing it.
- */
+interface Box {
+  readonly left: number;
+  readonly top: number;
+  readonly width: number;
+  readonly height: number;
+}
+
+/** An item's box in its container's coordinates, or null if either is missing. */
+function boxOf(wrap: HTMLElement | null, item: HTMLElement | null): Box | null {
+  if (wrap === null || item === null) return null;
+  const w = wrap.getBoundingClientRect();
+  const r = item.getBoundingClientRect();
+  return { left: r.left - w.left, top: r.top - w.top, width: r.width, height: r.height };
+}
+
+function styleOf(b: Box): CSSProperties {
+  return { left: `${b.left}px`, top: `${b.top}px`, width: `${b.width}px`, height: `${b.height}px` };
+}
+
 /**
  * ONE STARTING POINT. Icon, name, and what it is for — the card a studio's empty
  * room is made of.
  *
  * A starter is not a prompt, it is a TASK: pressing "Clone a voice" puts the
  * room into the shape that task needs (the right mode, the right knobs) and
- * leaves a first line in the composer for you to replace. The old empty state
- * offered three example sentences, which taught you what to type and nothing
- * about what the room could do — you could not tell from looking at the audio
- * studio that it clones voices at all.
+ * leaves a first line in the composer for you to replace.
  */
 export interface StudioStarter {
   readonly id: string;

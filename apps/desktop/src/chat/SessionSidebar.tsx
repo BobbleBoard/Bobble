@@ -298,17 +298,18 @@ function statusTone(label: string): 'done' | 'error' | 'paused' | 'waiting' | un
  * changes weight with them.
  */
 /*
- * NEW CHAT: a sheet with a pen at its corner, not a bare pencil.
+ * NEW CHAT.
  *
- * the user: "replace the 'new chat' pencil icon with something similarly upgraded."
- * The shared `IconPencil` is a single diagonal stroke with a nib — it says EDIT,
- * which is what it is used for elsewhere, and a bare pencil beside "New chat"
- * reads as renaming the one you are in. Compose is a pencil AND the thing being
- * written on.
+ * Third drawing. It was the shared edit pencil (which is what Rename uses two
+ * rows down), then a sheet with a pen at its corner — and the user on that one: "it
+ * feels really primitive and like a placeholder, don't overcomplicate however in
+ * your fix."
  *
- * The sheet is drawn as an open path that stops short of its top-right corner
- * and the pen sits in that gap, so no two strokes cross — the same rule the
- * studio starter glyphs follow.
+ * He is right about the cause: at 16px that pen was four points and a notch,
+ * and a shape that small cannot carry enough detail to read as a PEN, so it read
+ * as a blob on a box. The fix is not a better pen, it is a mark that does not
+ * need detail to work — a bubble and a plus. Two shapes, both geometric, one
+ * meaning: another conversation. Nothing in it gets worse as it gets smaller.
  */
 function ComposeMark({ size = 16 }: { size?: number }): ReactNode {
   return (
@@ -324,8 +325,10 @@ function ComposeMark({ size = 16 }: { size?: number }): ReactNode {
       className="pd-icon"
       aria-hidden="true"
     >
-      <path d="M13.4 8.6v4.1a1.7 1.7 0 0 1-1.7 1.7H3.6a1.7 1.7 0 0 1-1.7-1.7V4.6a1.7 1.7 0 0 1 1.7-1.7h4.2" />
-      <path d="M11.6 1.9 14 4.3l-4.4 4.4-2.9.5.5-2.9z" />
+      {/* The tail is part of the same path as the body, so the join is a corner
+          rather than two strokes meeting. */}
+      <path d="M14 8.6a5.4 5.4 0 0 1-5.4 5.4H5.9L2.6 16v-3.4A5.4 5.4 0 0 1 5.9 2.9h2.7A5.4 5.4 0 0 1 14 8.3z" />
+      <path d="M8.3 6.2v4.4M6.1 8.4h4.4" />
     </svg>
   );
 }
