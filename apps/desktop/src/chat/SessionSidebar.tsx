@@ -298,18 +298,27 @@ function statusTone(label: string): 'done' | 'error' | 'paused' | 'waiting' | un
  * changes weight with them.
  */
 /*
- * NEW CHAT.
+ * NEW CHAT: a pencil, and the line it is about to write.
  *
- * Third drawing. It was the shared edit pencil (which is what Rename uses two
- * rows down), then a sheet with a pen at its corner — and the user on that one: "it
- * feels really primitive and like a placeholder, don't overcomplicate however in
- * your fix."
+ * Fourth drawing, and the user specified this one: "it needs to be a pencil with a
+ * flat _ line below, line is tiny but gets drawn a bit and the pencil moves a
+ * bit as a subtle hover animation, plays in reverse when un-hovered."
  *
- * He is right about the cause: at 16px that pen was four points and a notch,
- * and a shape that small cannot carry enough detail to read as a PEN, so it read
- * as a blob on a box. The fix is not a better pen, it is a mark that does not
- * need detail to work — a bubble and a plus. Two shapes, both geometric, one
- * meaning: another conversation. Nothing in it gets worse as it gets smaller.
+ * WHY IT WORKS WHERE THE OTHER THREE DID NOT. A bare pencil says EDIT, which is
+ * what Rename means two rows down; a sheet-and-pen was too much detail for 16px;
+ * a bubble-and-plus said "conversation" without saying "write". A pencil ABOVE A
+ * LINE says writing something that is not there yet — and the hover makes it
+ * literal: the line grows and the pencil rides along it, so the icon performs
+ * the thing the row does.
+ *
+ * The reverse is free. Both properties are TRANSITIONED rather than keyframed,
+ * so leaving the row runs the same curve backwards from wherever it had reached
+ * — an interrupted hover never snaps and there is no half-finished state to
+ * clean up.
+ *
+ * `pathLength={10}` normalises the dash maths, so "a third of it showing" is
+ * written as 6.5 of 10 rather than as a number derived from the viewBox that
+ * nobody can check.
  */
 function ComposeMark({ size = 16 }: { size?: number }): ReactNode {
   return (
@@ -322,13 +331,14 @@ function ComposeMark({ size = 16 }: { size?: number }): ReactNode {
       strokeWidth={1.5}
       strokeLinecap="round"
       strokeLinejoin="round"
-      className="pd-icon"
+      className="pd-icon pd-compose"
       aria-hidden="true"
     >
-      {/* The tail is part of the same path as the body, so the join is a corner
-          rather than two strokes meeting. */}
-      <path d="M14 8.6a5.4 5.4 0 0 1-5.4 5.4H5.9L2.6 16v-3.4A5.4 5.4 0 0 1 5.9 2.9h2.7A5.4 5.4 0 0 1 14 8.3z" />
-      <path d="M8.3 6.2v4.4M6.1 8.4h4.4" />
+      <g className="pd-compose-pen">
+        <path d="M10.7 2.2 13.1 4.6 7.4 10.3 4.3 11.1 5.1 8z" />
+        <path d="M9.2 3.7 11.6 6.1" />
+      </g>
+      <path className="pd-compose-line" d="M2.8 13.7h7.2" pathLength={10} />
     </svg>
   );
 }
