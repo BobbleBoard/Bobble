@@ -227,25 +227,82 @@ export function ImageStudio(): JSX.Element {
       runLabel={enhancer.enhancing ? 'Enhancing…' : 'Generate'}
       {...(models.length === 0 ? { blocked: 'No image models are available.' } : {})}
       error={error}
+      /*
+       * EVERYTHING CORE IS DOWN HERE. the user: "move a bit more really core
+       * functionality to the bottom bar… you should be able to access all core
+       * functionality and settings without even going into the right sidebar."
+       *
+       * So the bar under the composer carries the whole set — shape, size, look,
+       * count, model, enhancer — and the rail on the right is the same controls
+       * with room to breathe plus the things that need it. The progression is
+       * bar → rail → gears: what you change between two runs, what you set for a
+       * sitting, and what you touch once a month.
+       */
       controls={
-        <StudioPicker
-          testid="image-count"
-          label="Count"
-          value={count}
-          onChange={setCount}
-          options={[
-            { value: 1, label: '1 picture' },
-            { value: 2, label: '2 pictures' },
-            { value: 4, label: '4 pictures' },
-          ]}
-        />
+        <>
+          <StudioPicker
+            testid="image-shape"
+            label="Shape"
+            value={shape}
+            onChange={setShape}
+            options={SHAPES.map((x) => ({ value: x.value, label: x.label }))}
+          />
+          <StudioPicker
+            testid="image-size"
+            label="Size"
+            value={long}
+            onChange={setLong}
+            options={SIZES.map((x) => ({ value: x.value, label: x.label, hint: x.hint }))}
+          />
+          <StudioPicker
+            testid="image-style"
+            label="Style"
+            value={style}
+            onChange={setStyle}
+            options={STYLES.map((x) => ({ value: x.value, label: x.label }))}
+          />
+          <StudioPicker
+            testid="image-count"
+            label="Count"
+            value={count}
+            onChange={setCount}
+            options={[
+              { value: 1, label: '1 picture' },
+              { value: 2, label: '2 pictures' },
+              { value: 4, label: '4 pictures' },
+            ]}
+          />
+          <StudioPicker
+            testid="image-model"
+            label="Model"
+            value={model}
+            onChange={setModel}
+            options={[
+              { value: '', label: 'Recommended' },
+              ...models.map((m) => ({
+                value: m.id,
+                label: m.reserved === true ? `${m.label} (soon)` : m.label,
+              })),
+            ]}
+          />
+          <StudioPicker
+            testid="image-enhance"
+            label="Enhance"
+            value={enhancer.enabled ? 'on' : 'off'}
+            onChange={(v) => enhancer.setEnabled(v === 'on')}
+            options={[
+              { value: 'off', label: 'Off' },
+              { value: 'on', label: 'On', hint: "Rewrites your line in the model's house style" },
+            ]}
+          />
+        </>
       }
       settings={
         <>
           <RailGroup title="Shape">
             <Knob label="Aspect ratio">
               <Segmented
-                testid="image-shape"
+                testid="image-shape-rail"
                 value={shape}
                 onChange={setShape}
                 options={SHAPES.map((s) => ({ value: s.value, label: s.label }))}
@@ -253,13 +310,13 @@ export function ImageStudio(): JSX.Element {
             </Knob>
             <Knob label="Size">
               <Segmented
-                testid="image-size"
+                testid="image-size-rail"
                 value={long}
                 onChange={setLong}
                 options={SIZES.map((s) => ({ value: s.value, label: s.label, hint: s.hint }))}
               />
             </Knob>
-            <p className="pd-studio-rail-note" data-testid="image-pixels">
+            <p className="pd-studio-rail-note" data-testid="image-pixels-rail">
               {size.replace('x', ' × ')} px
             </p>
           </RailGroup>
@@ -269,7 +326,7 @@ export function ImageStudio(): JSX.Element {
               <StudioPicker
                 block
                 side="bottom"
-                testid="image-style"
+                testid="image-style-rail"
                 label="Style"
                 value={style}
                 onChange={setStyle}
@@ -277,7 +334,7 @@ export function ImageStudio(): JSX.Element {
               />
             </Knob>
             <RailToggle
-              testid="image-enhance"
+              testid="image-enhance-rail"
               label="Prompt enhancer"
               hint="A small local model rewrites your description in this model's house style. You see the result before it runs."
               checked={enhancer.enabled}
@@ -300,7 +357,7 @@ export function ImageStudio(): JSX.Element {
               <StudioPicker
                 block
                 side="bottom"
-                testid="image-model"
+                testid="image-model-rail"
                 label="Image model"
                 value={model}
                 onChange={setModel}
@@ -329,7 +386,7 @@ export function ImageStudio(): JSX.Element {
           <Knob label="Steps">
             <input
               className="pd-studio-input pd-studio-input--num pd-focusable"
-              data-testid="image-steps"
+              data-testid="image-steps-rail"
               type="number"
               min={1}
               max={100}
@@ -341,7 +398,7 @@ export function ImageStudio(): JSX.Element {
           <Knob label="Guidance">
             <input
               className="pd-studio-input pd-focusable"
-              data-testid="image-guidance"
+              data-testid="image-guidance-rail"
               type="number"
               min={0}
               max={20}
@@ -354,7 +411,7 @@ export function ImageStudio(): JSX.Element {
           <Knob label="Seed">
             <input
               className="pd-studio-input pd-studio-input--wide pd-focusable"
-              data-testid="image-seed"
+              data-testid="image-seed-rail"
               type="number"
               placeholder="random"
               value={seed}

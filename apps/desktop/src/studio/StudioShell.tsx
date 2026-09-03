@@ -575,12 +575,29 @@ interface Box {
   readonly height: number;
 }
 
-/** An item's box in its container's coordinates, or null if either is missing. */
+/**
+ * An item's box in its container's coordinates, or null if either is missing.
+ *
+ * THE BORDER HAS TO COME OFF. `getBoundingClientRect` measures from the wrap's
+ * BORDER box; an absolutely-positioned `left`/`top` resolves against its PADDING
+ * box. Ignore the difference and the thumb sits one border-width down and right
+ * of where it belongs — MEASURED as a 4px rim on the top and left against 2px on
+ * the bottom, which is exactly the unevenness the user could see: "ensure the border
+ * on the left as shown in the third image of the pill is even all around".
+ */
 function boxOf(wrap: HTMLElement | null, item: HTMLElement | null): Box | null {
   if (wrap === null || item === null) return null;
   const w = wrap.getBoundingClientRect();
   const r = item.getBoundingClientRect();
-  return { left: r.left - w.left, top: r.top - w.top, width: r.width, height: r.height };
+  const cs = getComputedStyle(wrap);
+  const bl = Number.parseFloat(cs.borderLeftWidth) || 0;
+  const bt = Number.parseFloat(cs.borderTopWidth) || 0;
+  return {
+    left: r.left - w.left - bl,
+    top: r.top - w.top - bt,
+    width: r.width,
+    height: r.height,
+  };
 }
 
 function styleOf(b: Box): CSSProperties {

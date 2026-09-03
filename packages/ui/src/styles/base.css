@@ -36,7 +36,21 @@
 .pd-menu-trigger {
   outline: 2px solid transparent;
   outline-offset: 2px;
-  transition: outline-color 200ms var(--pd-easing-standard);
+  /*
+   * NO TRANSITION ON THE RING, and that is the fix for a bug the user could see and
+   * not name: "there's a brief flash of a box… if I click to something else, and
+   * then come back to clicking an element, that's when the box appears".
+   *
+   * It is real and it is per spec. When a window regains focus the browser
+   * restores focus to the element that had it AND restores its focus-visible
+   * state — which is right for a keyboard user returning to the app. The next
+   * mouse click then clears it. That state is legitimately a few frames long,
+   * and a 200ms colour fade IN and OUT is exactly what turns a few frames into
+   * something you notice: 400ms of a box growing and dying under the pointer.
+   *
+   * Painted instantly it is imperceptible when transient and immediate when
+   * real, which is what a focus ring should be in both cases.
+   */
 }
 
 .pd-focusable:focus-visible,

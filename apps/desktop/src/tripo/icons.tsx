@@ -304,10 +304,18 @@ export const IcShare = make(
     <path d="M4 14v4.5A1.5 1.5 0 0 0 5.5 20H17" opacity={0.7} />
   </>,
 );
+/*
+ * JUST THE ARROW. the user: "remove the L shape in the svg and size the arrow up."
+ *
+ * The tray under it is the half-box every download icon draws, and at 15px it
+ * was most of the mark's ink while carrying none of its meaning — the arrow
+ * pointing down is the whole idea. Without the tray the arrow gets the entire
+ * box, which is what makes it read at button size.
+ */
 export const IcDownload = make(
   <>
-    <path d="M12 4v10.5M7.5 10.5L12 15l4.5-4.5" />
-    <path d="M4.5 15.5v2.5a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-2.5" />
+    <path d="M12 3.4v14.2" />
+    <path d="M5.9 11.5 12 17.6l6.1-6.1" />
   </>,
 );
 export const IcSliders = make(

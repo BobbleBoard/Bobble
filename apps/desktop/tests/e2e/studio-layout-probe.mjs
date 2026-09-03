@@ -111,6 +111,36 @@ for (const modality of ['image', 'video', 'audio']) {
     composeMoved !== null && compose !== null && centre(compose) - centre(composeMoved) > 80,
     `[${modality}] the input bar did not move with the rail (centre ${compose && Math.round(centre(compose))} → ${composeMoved && Math.round(centre(composeMoved))})`,
   );
+  /*
+   * THE SELECTED PILL SITS EVENLY IN ITS TRACK.
+   *
+   * The sliding thumb is positioned from measured boxes, and `getBoundingClientRect`
+   * measures the track's BORDER box while `left`/`top` resolve against its PADDING
+   * box — so forgetting the border puts the thumb one pixel down and right. MEASURED
+   * as 4px of rim on the top and left against 2px on the bottom, which is what the user
+   * saw: "ensure the border on the left … is even all around".
+   */
+  const rim = await page.evaluate(() => {
+    const seg = document.querySelector('.pd-seg');
+    const thumb = seg?.querySelector('.pd-seg-thumb:not(.pd-seg-thumb--hover)');
+    if (seg === null || thumb === null || thumb === undefined) return null;
+    const s = seg.getBoundingClientRect();
+    const t = thumb.getBoundingClientRect();
+    const b = Number.parseFloat(getComputedStyle(seg).borderTopWidth) || 0;
+    const round = (n) => Math.round(n * 100) / 100;
+    return {
+      left: round(t.x - (s.x + b)),
+      top: round(t.y - (s.y + b)),
+      bottom: round(s.bottom - b - t.bottom),
+    };
+  });
+  if (rim !== null) {
+    check(
+      Math.abs(rim.top - rim.bottom) < 0.6 && Math.abs(rim.left - rim.top) < 0.6,
+      `[${modality}] the selected pill's rim is uneven: ${JSON.stringify(rim)}`,
+    );
+  }
+
   await shot(`${modality}-rail`);
 
   // --- the gears open a panel, and it is not the rail ----------------------

@@ -119,7 +119,8 @@
   :where(button, input, textarea, [role="switch"], [role="tab"], [role="menuitem"]) {
   outline: 2px solid transparent;
   outline-offset: 2px;
-  transition: outline-color var(--pd-duration-base) var(--pd-easing-standard);
+  /* No fade — see base.css. A ring that animates in makes the browser's
+     restore-focus-visible-on-window-activation read as a flashing box. */
 }
 .tp :where(button, input, textarea, [role="switch"], [role="tab"], [role="menuitem"]):focus-visible,
 .tp-popover-portal
@@ -2137,9 +2138,13 @@
 .tp-export-cta {
   display: flex;
   align-items: center;
-  gap: 7px;
-  height: 34px;
-  padding: 0 16px;
+  gap: 6px;
+  /* Matched to `.tp-pill-btn` beside it — the user: "size export down to the size of
+     send to". Two buttons in one cluster at two heights read as two ranks of
+     control, which these are not: one exports a file, the other hands it to an
+     app. */
+  height: 32px;
+  padding: 0 12px;
   margin-left: 5px;
   border-radius: var(--tp-radius-control);
   background: var(--pd-accent-primary);

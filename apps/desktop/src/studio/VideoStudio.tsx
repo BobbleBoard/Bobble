@@ -160,21 +160,61 @@ export function VideoStudio(): JSX.Element {
       runLabel={enhancer.enhancing ? 'Enhancing…' : 'Generate'}
       {...(models.length === 0 ? { blocked: 'No video models are available.' } : {})}
       error={error}
+      /* The whole core set, in the bar — see ImageStudio for why. */
       controls={
-        <StudioPicker
-          testid="video-seconds"
-          label="Length"
-          value={seconds}
-          onChange={setSeconds}
-          options={LENGTHS.map((l) => ({ value: l.value, label: l.label, hint: l.hint }))}
-        />
+        <>
+          <StudioPicker
+            testid="video-shape"
+            label="Shape"
+            value={shape}
+            onChange={setShape}
+            options={SHAPES.map((x) => ({ value: x.value, label: x.label }))}
+          />
+          <StudioPicker
+            testid="video-size"
+            label="Size"
+            value={long}
+            onChange={setLong}
+            options={SIZES.map((x) => ({ value: x.value, label: x.label, hint: x.hint }))}
+          />
+          <StudioPicker
+            testid="video-seconds"
+            label="Length"
+            value={seconds}
+            onChange={setSeconds}
+            options={LENGTHS.map((l) => ({ value: l.value, label: l.label, hint: l.hint }))}
+          />
+          <StudioPicker
+            testid="video-model"
+            label="Model"
+            value={model}
+            onChange={setModel}
+            options={[
+              { value: '', label: 'Recommended' },
+              ...models.map((m) => ({
+                value: m.id,
+                label: m.reserved === true ? `${m.label} (soon)` : m.label,
+              })),
+            ]}
+          />
+          <StudioPicker
+            testid="video-enhance"
+            label="Enhance"
+            value={enhancer.enabled ? 'on' : 'off'}
+            onChange={(v) => enhancer.setEnabled(v === 'on')}
+            options={[
+              { value: 'off', label: 'Off' },
+              { value: 'on', label: 'On', hint: 'Describes the motion first' },
+            ]}
+          />
+        </>
       }
       settings={
         <>
           <RailGroup title="Shape">
             <Knob label="Aspect ratio">
               <Segmented
-                testid="video-shape"
+                testid="video-shape-rail"
                 value={shape}
                 onChange={setShape}
                 options={SHAPES.map((s) => ({ value: s.value, label: s.label }))}
@@ -182,20 +222,20 @@ export function VideoStudio(): JSX.Element {
             </Knob>
             <Knob label="Size">
               <Segmented
-                testid="video-size"
+                testid="video-size-rail"
                 value={long}
                 onChange={setLong}
                 options={SIZES.map((s) => ({ value: s.value, label: s.label, hint: s.hint }))}
               />
             </Knob>
-            <p className="pd-studio-rail-note" data-testid="video-pixels">
+            <p className="pd-studio-rail-note" data-testid="video-pixels-rail">
               {size.replace('x', ' × ')} px · {FPS} fps · {seconds * FPS} frames
             </p>
           </RailGroup>
 
           <RailGroup title="Prompt">
             <RailToggle
-              testid="video-enhance"
+              testid="video-enhance-rail"
               label="Prompt enhancer"
               hint="Describes the motion first, which is what a clip needs."
               checked={enhancer.enabled}
@@ -218,7 +258,7 @@ export function VideoStudio(): JSX.Element {
               <StudioPicker
                 block
                 side="bottom"
-                testid="video-model"
+                testid="video-model-rail"
                 label="Video model"
                 value={model}
                 onChange={setModel}
@@ -247,7 +287,7 @@ export function VideoStudio(): JSX.Element {
           <Knob label="Steps">
             <input
               className="pd-studio-input pd-studio-input--num pd-focusable"
-              data-testid="video-steps"
+              data-testid="video-steps-rail"
               type="number"
               min={1}
               max={100}
@@ -259,7 +299,7 @@ export function VideoStudio(): JSX.Element {
           <Knob label="Seed">
             <input
               className="pd-studio-input pd-studio-input--wide pd-focusable"
-              data-testid="video-seed"
+              data-testid="video-seed-rail"
               type="number"
               placeholder="random"
               value={seed}

@@ -257,27 +257,91 @@ export function AudioStudio(): JSX.Element {
       }
       {...(blocked !== undefined ? { blocked } : {})}
       error={error}
+      /* The whole core set, in the bar — see ImageStudio for why. The knobs
+         that exist depend on the mode, which is itself the first control. */
       controls={
-        mode === 'speech' ? (
+        <>
           <StudioPicker
-            testid="audio-speed"
-            label="Pace"
-            value={speed}
-            onChange={setSpeed}
-            options={SPEEDS.map((sp) => ({ value: sp.value, label: sp.label }))}
+            testid="audio-mode"
+            label="Mode"
+            value={mode}
+            onChange={(m) => {
+              setMode(m);
+              setModel('');
+              setSeconds(undefined);
+            }}
+            options={MODES.map((m) => ({ value: m.id, label: m.label }))}
           />
-        ) : (
+          {mode === 'speech' ? (
+            <>
+              <StudioPicker
+                testid="audio-voice"
+                label="Voice"
+                value={voice}
+                onChange={setVoice}
+                options={VOICES.map((v) => ({ value: v.value, label: v.label }))}
+              />
+              <StudioPicker
+                testid="audio-speed"
+                label="Pace"
+                value={speed}
+                onChange={setSpeed}
+                options={SPEEDS.map((sp) => ({ value: sp.value, label: sp.label }))}
+              />
+            </>
+          ) : (
+            <>
+              <StudioPicker
+                testid="audio-seconds"
+                label="Length"
+                value={seconds ?? (mode === 'sfx' ? 5 : 20)}
+                onChange={setSeconds}
+                options={(mode === 'sfx' ? LENGTHS_SFX : LENGTHS_MUSIC).map((l) => ({
+                  value: l.value,
+                  label: l.label,
+                }))}
+              />
+              {mode === 'sfx' ? (
+                <StudioPicker
+                  testid="audio-count"
+                  label="Takes"
+                  value={count}
+                  onChange={setCount}
+                  options={[
+                    { value: 1, label: '1' },
+                    { value: 2, label: '2' },
+                    { value: 4, label: '4' },
+                  ]}
+                />
+              ) : null}
+            </>
+          )}
           <StudioPicker
-            testid="audio-seconds"
-            label="Length"
-            value={seconds ?? (mode === 'sfx' ? 5 : 20)}
-            onChange={setSeconds}
-            options={(mode === 'sfx' ? LENGTHS_SFX : LENGTHS_MUSIC).map((l) => ({
-              value: l.value,
-              label: l.label,
-            }))}
+            testid="audio-model"
+            label="Model"
+            value={model}
+            onChange={setModel}
+            options={[
+              { value: '', label: 'Recommended' },
+              ...models.map((m) => ({
+                value: m.id,
+                label: m.reserved === true ? `${m.label} (soon)` : m.label,
+              })),
+            ]}
           />
-        )
+          {mode === 'speech' ? null : (
+            <StudioPicker
+              testid="audio-enhance"
+              label="Enhance"
+              value={enhancer.enabled ? 'on' : 'off'}
+              onChange={(v) => enhancer.setEnabled(v === 'on')}
+              options={[
+                { value: 'off', label: 'Off' },
+                { value: 'on', label: 'On' },
+              ]}
+            />
+          )}
+        </>
       }
       settings={
         <>
@@ -292,7 +356,7 @@ export function AudioStudio(): JSX.Element {
                 the mode switch slides like the rest rather than being the one
                 row that blinks. */}
             <Segmented
-              testid="audio-mode"
+              testid="audio-mode-rail"
               ariaLabel="Audio mode"
               value={mode}
               onChange={(next) => {
@@ -313,7 +377,7 @@ export function AudioStudio(): JSX.Element {
                 <StudioPicker
                   block
                   side="bottom"
-                  testid="audio-voice"
+                  testid="audio-voice-rail"
                   label="Preset"
                   value={voice}
                   onChange={setVoice}
@@ -338,7 +402,7 @@ export function AudioStudio(): JSX.Element {
                   <button
                     type="button"
                     className="pd-studio-drop-btn pd-focusable"
-                    data-testid="audio-refaudio"
+                    data-testid="audio-refaudio-rail"
                     onClick={() => fileInput.current?.click()}
                   >
                     {refAudio !== '' ? baseName(refAudio) : 'Choose a clip…'}
@@ -373,7 +437,7 @@ export function AudioStudio(): JSX.Element {
             <RailGroup title="Take">
               <Knob label="Variations">
                 <Segmented
-                  testid="audio-count"
+                  testid="audio-count-rail"
                   value={count}
                   onChange={setCount}
                   options={[
@@ -388,7 +452,7 @@ export function AudioStudio(): JSX.Element {
 
           <RailGroup title="Prompt">
             <RailToggle
-              testid="audio-enhance"
+              testid="audio-enhance-rail"
               label="Prompt enhancer"
               hint={
                 mode === 'speech'
@@ -418,7 +482,7 @@ export function AudioStudio(): JSX.Element {
               <StudioPicker
                 block
                 side="bottom"
-                testid="audio-model"
+                testid="audio-model-rail"
                 label="Model"
                 value={model}
                 onChange={setModel}
@@ -447,7 +511,7 @@ export function AudioStudio(): JSX.Element {
           <Knob label="Steps">
             <input
               className="pd-studio-input pd-studio-input--num pd-focusable"
-              data-testid="audio-steps"
+              data-testid="audio-steps-rail"
               type="number"
               min={1}
               max={200}
@@ -459,7 +523,7 @@ export function AudioStudio(): JSX.Element {
           <Knob label="Seed">
             <input
               className="pd-studio-input pd-studio-input--wide pd-focusable"
-              data-testid="audio-seed"
+              data-testid="audio-seed-rail"
               type="number"
               placeholder="random"
               value={seed}

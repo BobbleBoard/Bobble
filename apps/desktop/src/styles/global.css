@@ -4045,7 +4045,20 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
   z-index: 0;
   border-radius: 999px;
   background: var(--pd-bg-raised);
-  box-shadow: 0 1px 2px rgb(0 0 0 / 8%);
+  /*
+   * A HAIRLINE, NOT JUST A SHADOW. the user: "more clearness in dark mode on the
+   * selected pill". The fill is `--pd-bg-raised` on `--pd-bg-inset`, which is a
+   * real step in a light theme and almost none in a dark one — and the drop
+   * shadow that carries it in light does nothing against a dark ground.
+   *
+   * A ring drawn in the TEXT colour works in both directions at once: it goes
+   * light on a dark theme and dark on a light one, because that is what the text
+   * colour does. The shadow stays for the light case, where it is the thing that
+   * makes the pill sit above the track rather than in it.
+   */
+  box-shadow:
+    0 0 0 1px color-mix(in oklab, var(--pd-text-primary) 12%, transparent),
+    0 1px 2px rgb(0 0 0 / 8%);
   pointer-events: none;
 }
 /* Only once it has been measured in place — a thumb that animates its FIRST
