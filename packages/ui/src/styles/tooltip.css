@@ -91,6 +91,9 @@
 
 /* A hairline track, not a progress bar: this is a level, not a task finishing. */
 .pd-context-card-track {
+  /* Both of these are <span>s: an inline box ignores height, so the fill drew
+     nothing and the bar read as a flat grey line at every value. */
+  display: block;
   height: 3px;
   border-radius: 999px;
   background: var(--pd-bg-track);
@@ -98,6 +101,7 @@
 }
 
 .pd-context-card-fill {
+  display: block;
   height: 100%;
   border-radius: inherit;
   background: currentColor;
