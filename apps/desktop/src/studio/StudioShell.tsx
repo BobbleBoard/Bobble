@@ -85,6 +85,17 @@ export interface StudioShellProps {
   /** Blocks the run button with a reason, when the studio cannot run at all. */
   readonly blocked?: string;
   readonly error?: string | null;
+  /**
+   * Try the same thing again, offered on the error line.
+   *
+   * the user: the image studio "isn't user-friendly to get working in a few clicks
+   * even when something has gone wrong." A generation fails for reasons that are
+   * usually transient — a runtime still installing, a half-fetched weight, a
+   * model swapped out from under it — and the only recovery was to find the run
+   * button again with the failure still on screen. One click, right where the
+   * bad news is.
+   */
+  readonly onRetry?: () => void;
   readonly children: ReactNode;
   readonly testid?: string;
 }
@@ -105,6 +116,7 @@ export function StudioShell({
   runLabel,
   blocked,
   error,
+  onRetry,
   children,
   testid = 'studio',
 }: StudioShellProps): JSX.Element {
@@ -250,7 +262,17 @@ export function StudioShell({
           ) : null}
           {error !== null && error !== undefined && error !== '' ? (
             <p className="pd-studio-error" data-testid="studio-error">
-              {error}
+              <span>{error}</span>
+              {onRetry !== undefined ? (
+                <button
+                  type="button"
+                  className="pd-studio-error-retry pd-focusable"
+                  data-testid="studio-retry"
+                  onClick={onRetry}
+                >
+                  Try again
+                </button>
+              ) : null}
             </p>
           ) : null}
         </div>

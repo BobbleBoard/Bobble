@@ -227,6 +227,7 @@ export function ImageStudio(): JSX.Element {
       runLabel={enhancer.enhancing ? 'Enhancing…' : 'Generate'}
       {...(models.length === 0 ? { blocked: 'No image models are available.' } : {})}
       error={error}
+      onRetry={() => void onRun()}
       /*
        * EVERYTHING CORE IS DOWN HERE. the user: "move a bit more really core
        * functionality to the bottom bar… you should be able to access all core

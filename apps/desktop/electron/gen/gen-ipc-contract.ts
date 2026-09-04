@@ -34,6 +34,20 @@ export interface GenSurfacePayload {
   readonly progress?: { readonly candidate: number; readonly step: number; readonly total: number };
   readonly status: 'generating' | 'done' | 'error';
   readonly error?: string;
+  /**
+   * The last thing the worker said it was doing.
+   *
+   * the user: "image studio won't work at all and isn't user-friendly to get working
+   * in a few clicks even when something has gone wrong." A cold image run spends
+   * most of its life BEFORE the first diffusion step — uv provisioning a Python
+   * environment (torch is 121 MB on its own), then mflux loading a 4-bit model —
+   * and the room said "Starting…" for all of it. MEASURED on his machine: an
+   * output folder from 23:16 with nothing in it and no explanation anywhere.
+   *
+   * The worker already emits these lines on stderr and the manager was dropping
+   * them on the floor. They are advisory: never parsed, only shown.
+   */
+  readonly note?: string;
 }
 
 /** main→renderer events. Compose into AppEventMap. */

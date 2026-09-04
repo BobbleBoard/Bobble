@@ -143,9 +143,18 @@ def watch_steps(job_id, cand_idx, step_dir, total, stop):
 def drain_output(job_id, stream, keep=None):
     """Drain the merged child output so tqdm never blocks on backpressure, and
     surface a coarse `download` event while weights are fetched. tqdm redraws with
-    \\r, so we split on both \\r and \\n. Shared by every modality's subprocess."""
+    \\r, so we split on both \\r and \\n. Shared by every modality's subprocess.
+
+    It also emits a throttled `log` for OTHER lines. the user reported the image
+    studio as "won't work at all"; MEASURED on his Mac with the weights already
+    cached, 94 seconds pass between pressing Generate and the first diffusion
+    step, and everything the child said in that window was read here and thrown
+    away unless it mentioned a download. The UI showed "Starting…" for all of
+    it, which is indistinguishable from broken. Throttled because tqdm redraws
+    many times a second and the point is a status line, not a terminal."""
     buf = ""
     announced_download = False
+    last_log_at = 0.0
     while True:
         chunk = stream.read(256)
         if chunk == "":
@@ -155,6 +164,12 @@ def drain_output(job_id, stream, keep=None):
         buf = parts.pop()
         for line in parts:
             low = line.lower()
+            if not ("fetching" in low or "downloading" in low):
+                text = line.strip()
+                now = time.time()
+                if text and now - last_log_at >= 0.75:
+                    last_log_at = now
+                    emit({"event": "log", "jobId": job_id, "text": text[:160]})
             if "fetching" in low or "downloading" in low:
                 announced_download = True
                 m = _RATIO_RE.search(line)

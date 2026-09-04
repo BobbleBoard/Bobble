@@ -257,6 +257,7 @@ export function AudioStudio(): JSX.Element {
       }
       {...(blocked !== undefined ? { blocked } : {})}
       error={error}
+      onRetry={() => void onRun()}
       /* The whole core set, in the bar — see ImageStudio for why. The knobs
          that exist depend on the mode, which is itself the first control. */
       controls={

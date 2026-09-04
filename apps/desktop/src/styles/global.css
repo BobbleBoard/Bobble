@@ -4338,7 +4338,24 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
   color: var(--pd-text-muted);
 }
 .pd-studio-error {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
   color: var(--pd-status-danger-fg);
+}
+/* One click back to trying, right where the bad news is (the user). */
+.pd-studio-error-retry {
+  flex: none;
+  padding: 2px 8px;
+  border: 1px solid currentColor;
+  border-radius: var(--pd-radius-sm);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.pd-studio-error-retry:hover {
+  background: var(--pd-status-danger-bg);
 }
 
 /* ---- results ------------------------------------------------------------ */
@@ -4834,4 +4851,68 @@ body[data-media-expanded="true"] .pd-studio-compose {
   .pd-compose-pen {
     transition: none;
   }
+}
+
+/*
+ * THE CRASH SCREEN — what a render throw shows instead of nothing (the user: "total
+ * blank screen"). Deliberately plain: it has to render when the app's own
+ * component tree is the thing that failed, so it leans on tokens and nothing
+ * else.
+ */
+.pd-crash {
+  display: grid;
+  place-items: center;
+  height: 100vh;
+  padding: 32px;
+  background: var(--pd-bg-base);
+  color: var(--pd-text-primary);
+  font-family: var(--pd-font-sans);
+}
+.pd-crash-card {
+  max-width: 520px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.pd-crash-title {
+  margin: 0;
+  font-size: var(--pd-font-size-title);
+  font-weight: var(--pd-font-weight-semibold);
+}
+.pd-crash-copy {
+  margin: 0;
+  color: var(--pd-text-secondary);
+}
+.pd-crash-detail {
+  margin: 0;
+  max-height: 200px;
+  overflow: auto;
+  padding: 12px;
+  border-radius: var(--pd-radius-md);
+  background: var(--pd-bg-inset);
+  color: var(--pd-text-muted);
+  font-family: var(--pd-font-mono);
+  font-size: var(--pd-font-size-caption);
+  white-space: pre-wrap;
+}
+.pd-crash-actions {
+  display: flex;
+  gap: 10px;
+}
+.pd-crash-primary,
+.pd-crash-secondary {
+  padding: 7px 14px;
+  border-radius: var(--pd-radius-control);
+  border: 1px solid var(--pd-border-subtle);
+  font: inherit;
+  cursor: pointer;
+}
+.pd-crash-primary {
+  border-color: transparent;
+  background: var(--pd-accent-primary);
+  color: var(--pd-text-on-accent);
+}
+.pd-crash-secondary {
+  background: transparent;
+  color: var(--pd-text-primary);
 }

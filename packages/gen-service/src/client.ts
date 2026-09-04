@@ -208,7 +208,23 @@ export class GenServiceClient {
         for (const event of parser.push(String(chunk))) handleEvent(event);
       });
       child.stderr?.on('data', (chunk) => {
-        stderrTail = (stderrTail + String(chunk)).slice(-2000);
+        const text = String(chunk);
+        stderrTail = (stderrTail + text).slice(-2000);
+        /*
+         * SAY WHAT IT IS DOING. The protocol has always had a `log` event and
+         * nothing ever produced one: stderr was collected here purely so a
+         * FAILURE could quote it. Everything the worker says while it works —
+         * uv provisioning a Python environment, HuggingFace fetching weights,
+         * mflux loading a model — went into a buffer nobody read until it was
+         * too late.
+         *
+         * MEASURED on the user's Mac with the weights already cached: 94 seconds
+         * between pressing Generate and the first diffusion step, with the room
+         * showing "Starting…" for all of it. He reported the studio as "won't
+         * work at all", and from the outside that is exactly what it looked
+         * like. Advisory only — never parsed, only shown.
+         */
+        handleEvent({ event: 'log', jobId: job.id, text });
       });
       child.on('error', (err) => settle(() => reject(err)));
       child.on('exit', (code) => {

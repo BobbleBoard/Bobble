@@ -160,6 +160,7 @@ export function VideoStudio(): JSX.Element {
       runLabel={enhancer.enhancing ? 'Enhancing…' : 'Generate'}
       {...(models.length === 0 ? { blocked: 'No video models are available.' } : {})}
       error={error}
+      onRetry={() => void onRun()}
       /* The whole core set, in the bar — see ImageStudio for why. */
       controls={
         <>

@@ -1,6 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App';
+import { AppErrorBoundary } from './AppErrorBoundary';
 import { connectChildAgents } from './state/child-agent-store';
 import { connectGen } from './state/gen-store';
 import { connectHf } from './state/hf-store';
@@ -31,6 +32,10 @@ if (rootElement === null) {
 
 createRoot(rootElement).render(
   <StrictMode>
-    <App />
+    {/* A render throw unmounts the whole tree and leaves a blank window (the user:
+        "total blank screen"). This is the only thing that can catch it. */}
+    <AppErrorBoundary>
+      <App />
+    </AppErrorBoundary>
   </StrictMode>,
 );

@@ -286,6 +286,32 @@ export function registerGenIpc(opts: GenManagerOptions): void {
       ? makeComfyAssetGate(opts.comfyInstall, { awaitConsent })
       : undefined);
 
+  /**
+   * The worker's own words, tidied enough to sit in a one-line status.
+   *
+   * These are stderr lines: progress bars, HuggingFace download tickers, mflux's
+   * own logging. The last non-empty line is what the job is doing NOW, which is
+   * the only part worth showing; carriage returns inside a progress bar mean the
+   * "line" can carry several frames, so only the final segment is kept.
+   */
+  function noteFrom(text: string): string | undefined {
+    const last = text
+      .split(/[\r\n]+/)
+      .map((l) => l.trim())
+      .filter((l) => l.length > 0)
+      .pop();
+    if (last === undefined) return undefined;
+    return last.length > 120 ? `${last.slice(0, 119)}…` : last;
+  }
+
+  /** A weights fetch, as a sentence rather than a tqdm frame. */
+  function downloadNote(detail: string | undefined, ratio: number | undefined): string | undefined {
+    const pct = ratio === undefined ? undefined : `${Math.round(ratio * 100)}%`;
+    if (ratio === 1) return 'Weights ready';
+    if (pct !== undefined) return `Fetching model weights · ${pct}`;
+    return detail !== undefined && detail.length > 0 ? noteFrom(detail) : 'Fetching model weights';
+  }
+
   async function handleGenerate(raw: GenerateImageParams): Promise<GenerateImageResult> {
     const model = getModel(raw.model ?? defaultImageModel().id);
     if (model === undefined || model.modality !== 'image' || model.mflux === undefined) {
@@ -333,6 +359,8 @@ export function registerGenIpc(opts: GenManagerOptions): void {
       status: 'pending' as const,
     }));
     let progress: GenSurfacePayload['progress'];
+    // What the worker last said it was doing — see GenSurfacePayload.note.
+    let note: string | undefined;
 
     const payload = (status: GenSurfacePayload['status'], error?: string): GenSurfacePayload => ({
       model: modelInfo,
@@ -341,6 +369,7 @@ export function registerGenIpc(opts: GenManagerOptions): void {
       progress,
       status,
       error,
+      note,
     });
 
     send('gen:open', { tabId, payload: payload('generating') });
@@ -367,6 +396,20 @@ export function registerGenIpc(opts: GenManagerOptions): void {
           };
         }
         send('gen:update', { tabId, payload: payload('generating') });
+      } else if (event.event === 'log' || event.event === 'download') {
+        /*
+         * The pre-first-step phase is MOST of a cold run — MEASURED on the user's
+         * Mac with the weights already cached: 94 seconds before step 1 — and
+         * these are the only events that know what is happening in it. Both were
+         * being dropped, so the room said "Starting…" throughout and he reported
+         * the studio as not working at all.
+         */
+        const line =
+          event.event === 'log' ? noteFrom(event.text) : downloadNote(event.detail, event.ratio);
+        if (line !== undefined && line !== note) {
+          note = line;
+          send('gen:update', { tabId, payload: payload('generating') });
+        }
       }
     };
 

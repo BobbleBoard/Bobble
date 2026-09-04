@@ -79,7 +79,19 @@ export function StudioJob({
           />
         </div>
         <p className="pd-studio-job-meta" data-testid="studio-job-meta">
-          {hasSteps ? `Step ${job.step} of ${job.total}` : 'Starting…'}
+          {/*
+            "Starting…" for four minutes is what "it doesn't work" looks like.
+            Before there are steps to count, say what the engine itself says it
+            is doing — installing its runtime, fetching weights, loading a model
+            (the user). Once steps arrive they are the better answer and win.
+          */}
+          {hasSteps
+            ? `Step ${job.step} of ${job.total}`
+            : /* MEASURED on an M5 Pro with the weights already cached: 94
+                 seconds from pressing Generate to the first step. "Starting…"
+                 for a minute and a half is why the user read this room as broken;
+                 saying how long it takes is the honest version. */
+              (job.note ?? 'Preparing the engine — the first run can take a minute or two')}
           <span className="pd-studio-job-dot">·</span>
           {clock(elapsed)} elapsed
           {remaining !== undefined ? (

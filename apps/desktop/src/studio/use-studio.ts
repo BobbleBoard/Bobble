@@ -37,6 +37,14 @@ export interface StudioJobState {
   /** Step progress, when the backend streams it (image + video do). */
   readonly step?: number;
   readonly total?: number;
+  /**
+   * What the engine last said it was doing, before there are any steps to count.
+   *
+   * the user: the image studio "won't work at all". A cold run spends minutes
+   * provisioning a Python environment and loading weights before step 1, and the
+   * room said "Starting…" through all of it — indistinguishable from broken.
+   */
+  readonly note?: string;
   /** The latest decoded preview frame, when there is one. */
   readonly previewSrc?: string;
   readonly cancellable: boolean;
@@ -112,6 +120,7 @@ export function useStudio(modality: StudioModality): UseStudio {
               ...(latestPreview(payload) !== undefined
                 ? { previewSrc: latestPreview(payload) }
                 : {}),
+              ...(payload.note !== undefined ? { note: payload.note } : {}),
               cancellable: true,
             },
       );
@@ -184,6 +193,7 @@ export function useStudio(modality: StudioModality): UseStudio {
 interface GenPayload {
   readonly candidates?: ReadonlyArray<{ readonly previewSrc?: string; readonly status: string }>;
   readonly progress?: { readonly candidate: number; readonly step: number; readonly total: number };
+  readonly note?: string;
 }
 
 /** The most recent decoded step image across the candidates, if any. */

@@ -185,3 +185,30 @@ describe('GenServiceClient.run', () => {
     expect(spawnFn).not.toHaveBeenCalled();
   });
 });
+
+describe('the worker says what it is doing', () => {
+  /*
+   * the user: the image studio "won't work at all". MEASURED on his Mac with the
+   * weights already cached: 94 seconds between pressing Generate and step 1,
+   * with the room showing "Starting…" throughout. Everything the worker said in
+   * that window went into a buffer that was only read if the job FAILED.
+   */
+  it('emits a log event for each stderr chunk, not just on failure', async () => {
+    const child = new FakeChild();
+    const { client } = clientWith(child);
+    const events: GenEvent[] = [];
+    const p = client.run(IMAGE_JOB, { onEvent: (e) => events.push(e) });
+    await flush();
+
+    child.emitStderr('Fetching 12 files:  30%|###\n');
+    child.emitStderr('Loading model…\n');
+    child.emitStdout(`${JSON.stringify({ event: 'done', jobId: 'job-1', outputs: [] })}\n`);
+    child.emitExit(0);
+    await p;
+
+    const logs = events.filter((e) => e.event === 'log');
+    expect(logs).toHaveLength(2);
+    expect(logs[0]).toMatchObject({ jobId: 'job-1', text: expect.stringContaining('Fetching') });
+    expect(logs[1]).toMatchObject({ text: expect.stringContaining('Loading model') });
+  });
+});

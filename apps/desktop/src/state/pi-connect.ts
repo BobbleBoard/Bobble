@@ -415,94 +415,123 @@ export async function sendPrompt(
   // send (which reorders the echoes ahead of the first assistant turn). Cleared by
   // agent_start / agent_end, and on every early return below.
   usePiStore.setState({ promptInFlight: true });
-  // pi may be parked on a chat that finished streaming in the background — move it
-  // onto the viewed chat (saving the finished bg thread) before we dispatch.
-  await ensurePiOnViewedSession();
-  // Capture the session boundary: the awaits below can hard-restart llama (a vision
-  // relaunch or an Auto tier switch), and if the user switches / starts a new chat
-  // during that window, this prompt must NOT land in the new chat (BUG: sent message
-  // appeared in a freshly-started chat).
-  const epochAtSend = usePiStore.getState().sessionEpoch;
+  /*
+   * A THROW MUST NOT LEAVE THE CHAT IN-FLIGHT FOREVER.
+   *
+   * the user: "sending a message to steer mid-chat, or pause-then-send … often ends
+   * in a never-sending message." This is how. Everything between here and the
+   * dispatch can throw — moving pi onto the viewed session, a vision relaunch,
+   * the Auto router, waiting for the server, and the `pi:prompt` invoke itself —
+   * and `promptInFlight` is otherwise only lowered by `agent_start`/`agent_end`,
+   * neither of which is coming for a turn that never started.
+   *
+   * A store stuck in-flight silently swallows everything after it: the composer
+   * queues each new message (it sees a turn in flight) and the drain refuses to
+   * dispatch (it sees the same), so a message sits as a faded bubble that never
+   * sends — and the queue can never recover on its own. `pausePi` already
+   * documents this exact failure; it just had no equivalent on the error path.
+   *
+   * The flag is lowered only when something WENT WRONG. On the happy path it
+   * stays raised for the turn, which is what it is for.
+   */
+  try {
+    await dispatchPrompt();
+    return;
+  } catch (error) {
+    usePiStore.setState({ promptInFlight: false });
+    throw error;
+  }
 
-  // Did the on-demand vision relaunch fail to give us a model that can SEE? (Only
-  // relevant on an image turn.) If so, we must not dispatch the image — a text-only
-  // llama-server just drops the request → a bare "fetch failed".
-  let visionUnavailable = false;
-  let visionReason: string | undefined;
-  if (messageNeedsVision({ imageDataUris })) {
-    // Round-12 on-demand VISION (ask #3): an image needs a multimodal model. Relaunch
-    // the current model (or a vision-capable pick) BEFORE dispatch — sticky, restart-
-    // based. Gated by the in-flight lock (a vision relaunch is a hard restart, so
-    // an in-flight send is steered into the running turn instead). The result is now
-    // CHECKED (previously ignored, which is why images 'fetch failed' on a text model):
-    // ok:false covers both "no vision model" and "the mmproj download/relaunch failed".
-    if (!agentInFlight()) {
-      const vision = await ensureVisionMode();
-      visionUnavailable = !vision.ok;
-      visionReason = vision.reason;
+  async function dispatchPrompt(): Promise<unknown> {
+    // pi may be parked on a chat that finished streaming in the background — move it
+    // onto the viewed chat (saving the finished bg thread) before we dispatch.
+    await ensurePiOnViewedSession();
+    // Capture the session boundary: the awaits below can hard-restart llama (a vision
+    // relaunch or an Auto tier switch), and if the user switches / starts a new chat
+    // during that window, this prompt must NOT land in the new chat (BUG: sent message
+    // appeared in a freshly-started chat).
+    const epochAtSend = usePiStore.getState().sessionEpoch;
+
+    // Did the on-demand vision relaunch fail to give us a model that can SEE? (Only
+    // relevant on an image turn.) If so, we must not dispatch the image — a text-only
+    // llama-server just drops the request → a bare "fetch failed".
+    let visionUnavailable = false;
+    let visionReason: string | undefined;
+    if (messageNeedsVision({ imageDataUris })) {
+      // Round-12 on-demand VISION (ask #3): an image needs a multimodal model. Relaunch
+      // the current model (or a vision-capable pick) BEFORE dispatch — sticky, restart-
+      // based. Gated by the in-flight lock (a vision relaunch is a hard restart, so
+      // an in-flight send is steered into the running turn instead). The result is now
+      // CHECKED (previously ignored, which is why images 'fetch failed' on a text model):
+      // ok:false covers both "no vision model" and "the mmproj download/relaunch failed".
+      if (!agentInFlight()) {
+        const vision = await ensureVisionMode();
+        visionUnavailable = !vision.ok;
+        visionReason = vision.reason;
+      }
+    } else {
+      // Round-12 Auto router (W3): when the selection is Auto, classify this prompt and
+      // switch the running model to the routed tier BEFORE dispatch. Awaited; no-op
+      // unless mode==='auto'; never throws.
+      await maybeRouteAuto(agentMessage ?? message, { hasImages: false, forcedClass });
+      // Guarantee the selected model's server is up + the model is loaded before we
+      // POST — otherwise pi fetches a dead/loading endpoint → "fetch failed" / 503.
+      // WAITS for a loading server (never restarts it); starts one only if none is
+      // coming up. The echo is already on screen, so this wait is visible as the
+      // model-loading indicator, not a blank pause.
+      await ensureChatServerReady();
     }
-  } else {
-    // Round-12 Auto router (W3): when the selection is Auto, classify this prompt and
-    // switch the running model to the routed tier BEFORE dispatch. Awaited; no-op
-    // unless mode==='auto'; never throws.
-    await maybeRouteAuto(agentMessage ?? message, { hasImages: false, forcedClass });
-    // Guarantee the selected model's server is up + the model is loaded before we
-    // POST — otherwise pi fetches a dead/loading endpoint → "fetch failed" / 503.
-    // WAITS for a loading server (never restarts it); starts one only if none is
-    // coming up. The echo is already on screen, so this wait is visible as the
-    // model-loading indicator, not a blank pause.
-    await ensureChatServerReady();
-  }
 
-  // ONE guard after all the awaits: a session switch raced us → drop this send (the
-  // echo was appended to the now-cleared old session; do NOT dispatch into the new one).
-  if (usePiStore.getState().sessionEpoch !== epochAtSend) {
-    usePiStore.setState({ promptInFlight: false });
-    return;
-  }
+    // ONE guard after all the awaits: a session switch raced us → drop this send (the
+    // echo was appended to the now-cleared old session; do NOT dispatch into the new one).
+    if (usePiStore.getState().sessionEpoch !== epochAtSend) {
+      usePiStore.setState({ promptInFlight: false });
+      return;
+    }
 
-  if (visionUnavailable) {
-    usePiStore.setState({ promptInFlight: false });
-    const detail = visionReason !== undefined && visionReason !== '' ? ` (${visionReason})` : '';
-    usePiStore
-      .getState()
-      .appendAssistantText(
-        `I can't see images right now${detail}. Download a vision-capable model in Settings → Models and resend, or send the message without the image.`,
-      );
-    return;
-  }
+    if (visionUnavailable) {
+      usePiStore.setState({ promptInFlight: false });
+      const detail = visionReason !== undefined && visionReason !== '' ? ` (${visionReason})` : '';
+      usePiStore
+        .getState()
+        .appendAssistantText(
+          `I can't see images right now${detail}. Download a vision-capable model in Settings → Models and resend, or send the message without the image.`,
+        );
+      return;
+    }
 
-  const images = imageDataUris
-    .map(dataUriToImage)
-    .filter((img): img is ImageContent => img !== null);
-  const body = {
-    message: withPendingInstructions(agentMessage ?? message),
-    ...(images.length > 0 ? { images } : {}),
-  };
-  // Re-check RIGHT HERE, not just at the composer's gate: everything above can
-  // await for seconds (a vision relaunch, an Auto tier switch, waiting for the
-  // server), so a turn may have started since this send was accepted. Dispatching
-  // a bare prompt into a busy pi is REJECTED ("Agent is already processing…"),
-  // which stranded the echo as a user bubble with no reply and raised a red toast
-  // (the user's blank-gap repro). See {@link deliveryForSend} for which queue it lands
-  // in and why.
-  const delivery = deliveryForSend(agentInFlight());
-  const ack = await window.piDesktop.invoke('pi:prompt', { ...body, ...delivery.body });
-  // The dispatch, not a turn, has to lower the in-flight bridge for a steer: it
-  // joins a run that ALREADY started, so `agent_start` will not fire again.
-  if (delivery.clearsInFlight) usePiStore.setState({ promptInFlight: false });
-  // Belt and braces for any race the check above still loses (pi's view of busy
-  // is authoritative, ours is a mirror): retry once into the steering queue
-  // instead of surfacing the rejection.
-  if (ack?.success === false && /already processing/i.test(ack.error ?? '')) {
-    const retry = await window.piDesktop.invoke('pi:prompt', {
-      ...body,
-      streamingBehavior: 'steer',
-    });
-    usePiStore.setState({ promptInFlight: false });
-    return reportRejectedSend(retry);
+    const images = imageDataUris
+      .map(dataUriToImage)
+      .filter((img): img is ImageContent => img !== null);
+    const body = {
+      message: withPendingInstructions(agentMessage ?? message),
+      ...(images.length > 0 ? { images } : {}),
+    };
+    // Re-check RIGHT HERE, not just at the composer's gate: everything above can
+    // await for seconds (a vision relaunch, an Auto tier switch, waiting for the
+    // server), so a turn may have started since this send was accepted. Dispatching
+    // a bare prompt into a busy pi is REJECTED ("Agent is already processing…"),
+    // which stranded the echo as a user bubble with no reply and raised a red toast
+    // (the user's blank-gap repro). See {@link deliveryForSend} for which queue it lands
+    // in and why.
+    const delivery = deliveryForSend(agentInFlight());
+    const ack = await window.piDesktop.invoke('pi:prompt', { ...body, ...delivery.body });
+    // The dispatch, not a turn, has to lower the in-flight bridge for a steer: it
+    // joins a run that ALREADY started, so `agent_start` will not fire again.
+    if (delivery.clearsInFlight) usePiStore.setState({ promptInFlight: false });
+    // Belt and braces for any race the check above still loses (pi's view of busy
+    // is authoritative, ours is a mirror): retry once into the steering queue
+    // instead of surfacing the rejection.
+    if (ack?.success === false && /already processing/i.test(ack.error ?? '')) {
+      const retry = await window.piDesktop.invoke('pi:prompt', {
+        ...body,
+        streamingBehavior: 'steer',
+      });
+      usePiStore.setState({ promptInFlight: false });
+      return reportRejectedSend(retry);
+    }
+    return reportRejectedSend(ack);
   }
-  return reportRejectedSend(ack);
 }
 
 /**
