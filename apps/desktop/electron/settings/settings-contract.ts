@@ -50,6 +50,24 @@ export const MCP_MODES = ['lite', 'native', 'bash-cli'] as const satisfies reado
 export const TOOL_INTERFACES = ['schemas', 'bash-cli'] as const satisfies readonly ToolInterface[];
 
 /**
+ * How hard the app may push this machine.
+ *
+ * the user: "ensuring we leave a certain amount of memory available as a buffer so
+ * the user can use computer as normal while generation and such occurs … this
+ * could be dynamic even tracking what the current user memory/cpu/gpu usage is."
+ *
+ *   'auto' — the dynamic one, and the default: watch the machine and ease off
+ *            when it is actually struggling, come back when it is not.
+ *   'full' — never ease off. For a run you are watching and want finished.
+ *   'low'  — always ease off, even on an idle machine.
+ *
+ * What "ease off" MEANS depends on which wall the machine is nearest — see
+ * packages/inference/src/power-policy.ts, which is where that decision lives.
+ */
+export type PowerMode = 'auto' | 'full' | 'low';
+export const POWER_MODES = ['auto', 'full', 'low'] as const satisfies readonly PowerMode[];
+
+/**
  * Preferred local inference engine (round-12 #4 — the Model Manager's "Prefer MLX
  * (experimental)" toggle). `llamacpp` = the default GGUF backend; `mlx` opts into
  * the Apple-Silicon MLX backend (its foundation lands in a later wave — this is
@@ -225,6 +243,15 @@ export interface DesktopSettings {
   mcpMode: McpMode;
   /** How tools are offered to the model (see {@link ToolInterface}). */
   toolInterface: ToolInterface;
+  /** How hard the app may push this machine (see {@link PowerMode}). */
+  powerMode: PowerMode;
+  /**
+   * GB of memory the app promises never to take, so the machine stays usable
+   * while it works. `undefined`/0 ⇒ derived from the machine's size (a quarter,
+   * floored at 2 GB and capped at 8 — see `defaultReserveGB`). A NUMBER rather
+   * than a fraction because that is what people mean by "leave me some room".
+   */
+  powerReserveGB?: number;
   capabilities: GenerationCapabilities;
   /** User system-instructions prepended to the first prompt of each NEW session
    * (see pi-connect's session-instructions seam). Empty = none. */
@@ -299,6 +326,8 @@ export interface DesktopSettingsPatch {
   search?: Partial<SearchKeys>;
   mcpMode?: McpMode;
   toolInterface?: ToolInterface;
+  powerMode?: PowerMode;
+  powerReserveGB?: number;
   capabilities?: Partial<GenerationCapabilities>;
   customInstructions?: string;
   iconStroke?: number;

@@ -25,6 +25,7 @@ import {
   type ModelSelection,
   type ModelSelectionTier,
   type PermissionMode,
+  POWER_MODES,
   type QuickMenuSettings,
   type QuickSlotSettings,
   type ThemeFlavor,
@@ -114,6 +115,7 @@ export const DEFAULT_SETTINGS: DesktopSettings = {
   search: { brave: '', tavily: '' },
   mcpMode: 'lite',
   toolInterface: 'schemas',
+  powerMode: 'auto',
   capabilities: { image: false, video: false, audio: false, threeD: false },
   customInstructions: '',
   iconStroke: ICON_STROKE_DEFAULT,
@@ -269,6 +271,13 @@ export function clampSettings(raw: unknown): DesktopSettings {
     search: { brave: str(search.brave, ''), tavily: str(search.tavily, '') },
     mcpMode: oneOf(o.mcpMode, MCP_MODES, d.mcpMode),
     toolInterface: oneOf(o.toolInterface, TOOL_INTERFACES, d.toolInterface),
+    powerMode: oneOf(o.powerMode, POWER_MODES, d.powerMode),
+    // 0 and negatives mean "derive one from the machine", which is what absent
+    // means too — so they normalise to the same thing rather than to a promise
+    // the app cannot keep.
+    ...(typeof o.powerReserveGB === 'number' && o.powerReserveGB > 0
+      ? { powerReserveGB: Math.min(64, Math.round(o.powerReserveGB)) }
+      : {}),
     capabilities: {
       image: bool(caps.image, d.capabilities.image),
       video: bool(caps.video, d.capabilities.video),

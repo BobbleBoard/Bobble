@@ -8,6 +8,7 @@
  * forked by llm-main.ts. Isolated from Electron main so a wedged download or a
  * crash-looping llama-server never takes the UI process down.
  */
+import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
   createReadStream,
@@ -18,9 +19,10 @@ import {
   statSync,
   writeFileSync,
 } from 'node:fs';
-import { rm, unlink } from 'node:fs/promises';
-import { homedir, totalmem } from 'node:os';
+import { readFile as readFileAsync, rm, unlink } from 'node:fs/promises';
+import { freemem, homedir, loadavg, totalmem } from 'node:os';
 import { dirname, join } from 'node:path';
+import { promisify } from 'node:util';
 import {
   buildMlxProviderBlock,
   buildProviderBlock,
@@ -30,7 +32,9 @@ import {
   chatTemplatePath,
   chooseContextCap,
   chooseServerPerfArgs,
+  classifyBottleneck,
   createMlxSupervisor,
+  createPowerManager,
   detectAccelerators,
   detectHardware,
   downloadModel,
@@ -51,6 +55,7 @@ import {
   mmprojFileFor,
   modelDir,
   modelEngine,
+  powerBudgetGB,
   probeServerFeatures,
   recommend,
   resolveTierModels,
@@ -69,8 +74,10 @@ import type {
   LlmTierPick,
 } from '../ipc-contract';
 import { DownloadCancellation, discardPartials, partialPaths } from './download-cancellation';
+import { dedupeFlags } from './launch-args';
 import { modelFitsInRam } from './model-fit';
 import { fastTextSlotLaunch } from './parallel-launch';
+import { setBackgroundPriority } from './process-priority';
 import type {
   HfListFilesReply,
   HfRegisterReply,
@@ -83,6 +90,9 @@ import type {
 } from './protocol';
 
 const parentPort = (process as unknown as { parentPort: UtilityParentPort }).parentPort;
+
+/** Bounded command runner for the power probes (see `power()`). */
+const execFileAsync = promisify(execFile);
 
 // The launched context is now chosen per-hardware by chooseContextCap (up to
 // ~64k when RAM allows, KV-/slot-aware) — see the launch sites. The footer gauge
@@ -391,6 +401,74 @@ let acceleratorCache: Awaited<ReturnType<typeof detectAccelerators>> | null = nu
 async function accelerators(): Promise<Awaited<ReturnType<typeof detectAccelerators>>> {
   acceleratorCache ??= await detectAccelerators();
   return acceleratorCache;
+}
+
+/*
+ * THE LIVE POWER POLICY, for this process.
+ *
+ * the user: "ensuring we leave a certain amount of memory available as a buffer so
+ * the user can use computer as normal while generation and such occurs … this
+ * could be dynamic even tracking what the current user memory/cpu/gpu usage is",
+ * and then: "you need to handle a range of hardware and a range of situations
+ * and bottlenecks."
+ *
+ * It lives HERE because this is the process that launches servers — the decision
+ * has to be in hand at the moment the args are assembled, and reaching across a
+ * process boundary for it would make the launch wait on a poll.
+ *
+ * Built lazily from the accelerator probe, because which wall this machine is
+ * nearest is the first thing the policy needs and the probe is the only thing
+ * that knows. Sampling starts with it and never blocks a launch: a launch reads
+ * whatever the last reading decided.
+ */
+let powerCache: ReturnType<typeof createPowerManager> | null = null;
+async function power(): Promise<ReturnType<typeof createPowerManager>> {
+  if (powerCache !== null) return powerCache;
+  const acc = await accelerators();
+  const bottleneck = classifyBottleneck(acc);
+  const budgetGB = powerBudgetGB(acc);
+  powerCache = createPowerManager({
+    probes: {
+      run: async (cmd, args) => {
+        try {
+          const { stdout } = await execFileAsync(cmd, [...args], { timeout: 4000 });
+          return stdout;
+        } catch {
+          // No such tool, no permission, or it hung — all the same answer here.
+          return null;
+        }
+      },
+      readFile: async (path) => {
+        try {
+          return await readFileAsync(path, 'utf8');
+        } catch {
+          return null;
+        }
+      },
+      loadAvg: () => loadavg(),
+      cpuCount: acc.cpuCount ?? 1,
+      memory: () => ({ total: totalmem(), free: freemem() }),
+      platform: acc.platform,
+      // Only worth spawning nvidia-smi on a machine that has one.
+      hasNvidia: acc.gpus.some((g) => g.vendor === 'nvidia'),
+    },
+    bottleneck,
+    budgetGB,
+    ...(acc.cpuCount !== undefined ? { cpuCount: acc.cpuCount } : {}),
+    onChange: (decision) => {
+      // eslint-disable-next-line no-console
+      console.log(`[pi-power] ${decision.level}: ${decision.reason}`);
+      // Main gates heavy generation jobs on this — see the 'power' outbound.
+      post({
+        kind: 'power',
+        level: decision.level,
+        allowHeavyJobs: decision.allowHeavyJobs,
+        reason: decision.reason,
+      });
+    },
+  });
+  powerCache.start();
+  return powerCache;
 }
 
 async function listCatalog(): Promise<LlmCatalogReply> {
@@ -1018,11 +1096,34 @@ async function startServerExclusive(
             }
           })()
         : 0;
+    /*
+     * THE POWER POLICY GETS A SAY IN HOW BIG THIS LAUNCH IS.
+     *
+     * `memoryFraction` is the reserve made concrete: the share of the machine a
+     * launch may occupy. At full speed it is 1 − reserve/total; under pressure
+     * the policy hands back more, which steps the context down the ladder and so
+     * shrinks the resident KV — the only lever that moves a unified-memory
+     * machine (MEASURED: no clock knob does, see perf-args.ts).
+     */
+    const powerNow = (await power()).current();
+    /*
+     * THE BUDGET IS THE CARD'S MEMORY WHEN THERE IS A CARD.
+     *
+     * This passed `hw.totalRamGB` unconditionally, which is right on unified
+     * memory and wrong everywhere else: on a machine with an 8 GB GPU and 64 GB
+     * of system RAM it sized the context against 64 GB and handed llama.cpp a KV
+     * cache the card cannot hold — so the server spills to the host and runs an
+     * order of magnitude slower, with nothing in the logs to say why.
+     * `powerBudgetGB` draws the same distinction `usableMemoryGB` already draws
+     * for the recommender; the launch should have been drawing it too.
+     */
+    const budgetGB = powerBudgetGB(await accelerators());
     const contextWindow = chooseContextCap({
       modelBytes: file.bytes + mmprojBytes,
       modelMaxContext: model.contextWindow,
-      totalRamGB: hw.totalRamGB,
+      totalRamGB: budgetGB,
       slots,
+      memoryFraction: powerNow.memoryFraction,
     });
     // OOM-safe fan-out: for a K-slot fast-text launch the server `-c` must be
     // perSlot × K (llama.cpp splits `-c` across `--parallel` slots) so each slot
@@ -1073,7 +1174,33 @@ async function startServerExclusive(
         `[pi-perf] ${perf.rationale.join(' · ')}${perf.args.length > 0 ? ` → ${perf.args.join(' ')}` : ''}`,
       );
     }
-    const launchExtraArgs = [...chatTemplateArgs, ...perf.args];
+    /*
+     * …AND IN WHICH ARGS IT LAUNCHES WITH — the lever chosen for THIS machine's
+     * wall (power-policy.ts explains why they differ):
+     *
+     *   unified   nothing to add beyond the smaller context above and a
+     *             quantised KV; there is no clock knob on Metal.
+     *   discrete  give VRAM back — a quantised KV, and under real pressure the
+     *             whole KV cache moved to system RAM — before the card spills
+     *             WEIGHTS to the host, which is an order of magnitude, not a
+     *             fraction.
+     *   cpu       leave the user some cores.
+     *
+     * `perf.args` may already have asked for a quantised KV under its own
+     * estimate; the flags are deduped below so the two cannot disagree on the
+     * command line.
+     */
+    const powerArgs: string[] = [];
+    if (powerNow.quantizeKv) {
+      powerArgs.push('--cache-type-k', 'q8_0', '--cache-type-v', 'q8_0', '-fa', 'on');
+    }
+    if (powerNow.threads !== undefined) powerArgs.push('-t', String(powerNow.threads));
+    if (powerNow.keepKvOnHost === true) powerArgs.push('--no-kv-offload');
+    if (powerNow.level !== 'full') {
+      // eslint-disable-next-line no-console
+      console.log(`[pi-power] launching ${powerNow.level}: ${powerNow.reason}`);
+    }
+    const launchExtraArgs = dedupeFlags([...chatTemplateArgs, ...perf.args, ...powerArgs]);
 
     const supervisor = new LlamaServerSupervisor({
       serverPath: install.serverPath,
@@ -1128,6 +1255,19 @@ async function startServerExclusive(
 
     const started = await supervisor.start();
     const baseUrl = supervisor.baseUrl;
+    /*
+     * ASK THE SCHEDULER TO PUT THE USER FIRST.
+     *
+     * The cheapest lever there is, and the only one that helps on a machine
+     * whose bottleneck is contention rather than memory: a hint, not a cap, so
+     * under no contention the server still runs flat out and only loses when
+     * something the user is looking at wants the same core.
+     */
+    if (powerNow.backgroundPriority) {
+      const applied = await setBackgroundPriority(started.pid, true);
+      // eslint-disable-next-line no-console
+      console.log(`[pi-power] background priority for pid ${started.pid}: ${applied}`);
+    }
     current = {
       supervisor,
       model,
@@ -1193,6 +1333,21 @@ async function handle(req: LlmRequest): Promise<unknown> {
       return startServer(req.modelId, req.quant, req.launchMode, req.parallel);
     case 'stop-server':
       return stopServer();
+    case 'set-power': {
+      /*
+       * The user's choice, applied from the NEXT launch. A running server keeps
+       * the args it started with — changing them would mean a relaunch, and a
+       * relaunch costs a full cold prefill, which is a worse interruption than
+       * whatever prompted the change.
+       */
+      const manager = await power();
+      await manager.setMode(req.mode);
+      await manager.setReserveGB(req.reserveGB);
+      const d = manager.current();
+      // eslint-disable-next-line no-console
+      console.log(`[pi-power] mode=${req.mode} → ${d.level}: ${d.reason}`);
+      return { success: true };
+    }
     case 'hf-search':
       return hfSearch(req);
     case 'hf-list-files':

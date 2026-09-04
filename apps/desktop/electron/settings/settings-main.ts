@@ -173,8 +173,18 @@ export function generationExperimentEnabled(): boolean {
 const handlers: IpcHandlers<SettingsInvokeMap> = {
   'settings:get': () => readSettings(),
   'settings:set': (req) => {
-    const next = mergeSettingsPatch(readSettings(), req.patch);
+    const before = readSettings();
+    const next = mergeSettingsPatch(before, req.patch);
     writeSettings(next);
+    /*
+     * The power choice lives here but ACTS in the inference worker (it is the
+     * process that launches servers, so the decision must be in hand when the
+     * args are assembled). Pushed on change rather than read on demand, so the
+     * worker never has to reach back across the process boundary mid-launch.
+     */
+    if (next.powerMode !== before.powerMode || next.powerReserveGB !== before.powerReserveGB) {
+      onPowerSettingsChanged?.();
+    }
     log.info('settings updated', {
       keys: Object.keys(req.patch),
       mcpMode: next.mcpMode,
@@ -185,9 +195,18 @@ const handlers: IpcHandlers<SettingsInvokeMap> = {
   },
 };
 
+/**
+ * Told when the power choice changes, so main can forward it to the inference
+ * worker. A callback rather than a direct import because settings must not
+ * depend on inference — the dependency already runs the other way.
+ */
+let onPowerSettingsChanged: (() => void) | undefined;
+
 export function registerSettingsIpc(
   ipcMain: IpcMain,
   allowSender: (event: unknown) => boolean,
+  opts: { onPowerChanged?: () => void } = {},
 ): void {
+  onPowerSettingsChanged = opts.onPowerChanged;
   registerIpcHandlers<SettingsInvokeMap>(ipcMain, handlers, { allowSender });
 }

@@ -31,6 +31,15 @@ export type LlmRequestBody =
       parallel?: number;
     }
   | { type: 'stop-server' }
+  /**
+   * How hard the app may push this machine, and how much memory to hold back.
+   *
+   * The policy lives in the worker (it is the process that launches servers, so
+   * the decision has to be in hand when the args are assembled), but the CHOICE
+   * is the user's and lives in settings — this is how it gets across. Applies
+   * from the next launch; nothing here touches a running turn.
+   */
+  | { type: 'set-power'; mode: 'auto' | 'full' | 'low'; reserveGB?: number }
   | {
       type: 'hf-search';
       query: string;
@@ -113,7 +122,20 @@ export type LlmOutbound =
   | { id: number; kind: 'reply'; result: unknown }
   | { id: number; kind: 'error'; error: string }
   | { kind: 'status'; status: LlmStatus }
-  | { kind: 'download-progress'; progress: LlmDownloadProgress };
+  | { kind: 'download-progress'; progress: LlmDownloadProgress }
+  /**
+   * The power policy changed its mind about how hard to push this machine.
+   *
+   * Pushed rather than polled: admission for a heavy generation job happens on a
+   * hot path in MAIN, and a round-trip to the worker there would stall the
+   * queue. Main caches the last one it heard (`setHeavyJobsAllowed`).
+   */
+  | {
+      kind: 'power';
+      level: 'full' | 'easy' | 'gentle';
+      allowHeavyJobs: boolean;
+      reason: string;
+    };
 
 /** Minimal structural view of Electron's `process.parentPort` in the child. */
 export interface UtilityParentPort {

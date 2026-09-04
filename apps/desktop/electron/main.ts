@@ -37,7 +37,13 @@ import { disposeGen, registerGenCatalogIpc, registerGenIpc } from './gen/gen-man
 import { genWorkerCandidates, resolveGenWorkerScript } from './gen/worker-path';
 import { registerGen3dIpc } from './gen3d/gen3d-main';
 import { registerImportIpc } from './import/import-main';
-import { getInferenceUtility, registerLlmIpc, shutdownInference } from './inference/llm-main';
+import {
+  getInferenceUtility,
+  heavyJobsAllowed,
+  pushPowerSettings,
+  registerLlmIpc,
+  shutdownInference,
+} from './inference/llm-main';
 import type { AppEventMap, CoreInvokeMap, FsInvokeMap } from './ipc-contract';
 import { disposeMacAgent, registerMacAgentIpc } from './mac/mac-agent';
 import { registerStoreIpc } from './model-store/store-main';
@@ -693,6 +699,17 @@ function registerAppIpc(): void {
       });
     }
     registerGenIpc({
+      /*
+       * Hold a heavy generation while the machine is struggling.
+       *
+       * the user: "leave a certain amount of memory available as a buffer so the
+       * user can use computer as normal while generation and such occurs." An
+       * image or video job is gigabytes of extra resident memory beside an
+       * already-resident chat model, and under real pressure it is the single
+       * worst thing to start — so it WAITS rather than being refused, and light
+       * jobs still go through. See packages/inference/src/power-policy.ts.
+       */
+      heavyAllowed: () => heavyJobsAllowed(),
       getWindow: () => (mainWindow !== null ? mainWindow.webContents : null),
       ...(genWorker !== undefined ? { workerScript: genWorker } : {}),
       comfyResolveOrigin: comfyOrigin,
@@ -744,7 +761,11 @@ function registerAppIpc(): void {
   registerMacAgentIpc();
 
   // Desktop settings (theme/permissions/effort/search keys/mcp mode/capabilities).
-  registerSettingsIpc(ipcMain, allowSender);
+  registerSettingsIpc(ipcMain, allowSender, {
+    // The power choice acts in the inference worker; settings is only where it
+    // is kept. See pushPowerSettings.
+    onPowerChanged: () => pushPowerSettings(),
+  });
 
   // Projects (working folders): list/set/new/clear, persisted to projects.json.
   registerProjectIpc(ipcMain, allowSender);

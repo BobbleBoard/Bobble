@@ -110,6 +110,16 @@ export interface GenManagerOptions {
   /** Max concurrent LIGHT jobs (default 2). Heavy models always run alone. */
   readonly maxConcurrent?: number;
   /**
+   * May a HEAVY generation start right now?
+   *
+   * The power policy's answer (packages/inference/src/power-policy.ts). Under
+   * real memory pressure a heavy job is gigabytes of extra resident memory
+   * beside an already-resident chat model, and it is the single worst thing to
+   * begin — so it is HELD until the machine is breathing again, never refused.
+   * Light jobs still go through. Default: always allowed.
+   */
+  readonly heavyAllowed?: () => boolean;
+  /**
    * ComfyUI http origin resolver for `comfyui`-backed video (LTX/Wan) jobs.
    * Default REJECTS (ComfyUI not configured) — the real app starts the supervisor
    * and returns its `http://127.0.0.1:<port>` origin (or a remote host).
@@ -260,6 +270,7 @@ export function registerGenIpc(opts: GenManagerOptions): void {
   const jobQueue = new JobQueue({
     maxConcurrent: opts.maxConcurrent ?? 2,
     runner: makeVideoAwareRunner({ comfy, hyperframes, fallback: client }),
+    ...(opts.heavyAllowed !== undefined ? { heavyAllowed: opts.heavyAllowed } : {}),
   });
 
   const send = <K extends keyof GenEventMap>(channel: K, payload: GenEventMap[K]): void => {

@@ -27,6 +27,7 @@ import type {
   ModelCardInvokeMap,
   OrgAvatarInvokeMap,
 } from '../ipc-contract';
+import { readSettings } from '../settings/settings-main';
 import { searchDatasets } from './dataset-search-main';
 import { installEngine, listEngines, uninstallEngine } from './engines-main';
 import { detectHarnesses } from './harness-main';
@@ -301,6 +302,9 @@ function ensureChild(): UtilityProcess {
   if (child !== null) return child;
   const entry = path.join(__dirname, 'inference-supervisor.js');
   const proc = utilityProcess.fork(entry, [], { serviceName: 'inference-supervisor' });
+  // A fresh worker starts on its own default; tell it what the user chose. Done
+  // on the next tick so `child` is set before the request goes out.
+  setTimeout(() => pushPowerSettings(), 0);
 
   proc.on('message', (message: LlmOutbound) => {
     if (message.kind === 'status') {
@@ -315,6 +319,16 @@ function ensureChild(): UtilityProcess {
       // that started first needs to hear about.
       writeUtilityState();
       broadcast('llm:status', message.status);
+      return;
+    }
+    if (message.kind === 'power') {
+      /*
+       * The worker re-decided. Cache the part MAIN needs synchronously (whether
+       * a heavy generation may start) and say so once, at the level change —
+       * not on every sample, which would be a line every fifteen seconds.
+       */
+      setHeavyJobsAllowed(message.allowHeavyJobs);
+      log.info('power policy', { level: message.level, reason: message.reason });
       return;
     }
     if (message.kind === 'download-progress') {
@@ -367,6 +381,44 @@ export async function shutdownInference(timeoutMs = 1500): Promise<void> {
     t.unref?.();
   });
   await Promise.race([exited, timed]);
+}
+
+/**
+ * Push the user's power choice into the worker.
+ *
+ * Called when the child is (re)created and whenever the setting changes. The
+ * policy itself lives in the worker — that is the process which launches
+ * servers, so the decision has to be in hand when the args are assembled — but
+ * the CHOICE is the user's and lives in settings. Best-effort: a worker that is
+ * still starting will get it on the next call, and its default ('auto') is the
+ * one most people want anyway.
+ */
+export function pushPowerSettings(): void {
+  const s = readSettings();
+  void request<{ success: boolean }>({
+    type: 'set-power',
+    mode: s.powerMode,
+    ...(s.powerReserveGB !== undefined ? { reserveGB: s.powerReserveGB } : {}),
+  }).catch(() => {
+    // The worker is not up yet, or is going down. Neither is an error here.
+  });
+}
+
+/**
+ * May a HEAVY generation start right now?
+ *
+ * Read by the gen manager at admission (gen-manager's `heavyAllowed`). Cached
+ * from the worker's last decision rather than asked synchronously, because
+ * admission happens on a hot path and a round-trip there would stall the queue.
+ * Defaults to true — a machine we have not heard from is not a machine in
+ * trouble.
+ */
+let heavyAllowedCache = true;
+export function heavyJobsAllowed(): boolean {
+  return heavyAllowedCache;
+}
+export function setHeavyJobsAllowed(allowed: boolean): void {
+  heavyAllowedCache = allowed;
 }
 
 function request<T>(req: LlmRequestBody): Promise<T> {

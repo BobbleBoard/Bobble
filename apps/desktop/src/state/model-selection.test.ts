@@ -36,6 +36,7 @@ const base: DesktopSettings = {
   harnessId: 'pi-bundled',
   harnessConfigPath: '',
   toolInterface: 'schemas',
+  powerMode: 'auto',
 };
 
 describe('sliderToLevel / levelToSlider', () => {

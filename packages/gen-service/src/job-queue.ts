@@ -67,6 +67,11 @@ export interface JobQueueOptions {
   readonly maxConcurrent?: number;
   /** The runner (default = a {@link GenServiceClient}). */
   readonly runner?: JobRunner;
+  /**
+   * May a HEAVY job start right now? Consulted at admission, so the answer can
+   * change with the machine. Default: always. See `JobQueue.#heavyAllowed`.
+   */
+  readonly heavyAllowed?: () => boolean;
 }
 
 export class JobQueue {
@@ -78,9 +83,31 @@ export class JobQueue {
   readonly #running = new Set<string>();
   #runningHeavy = false;
 
+  /**
+   * May a HEAVY job start right now?
+   *
+   * The power policy's answer (power-policy.ts): under real memory pressure a
+   * heavy generation is gigabytes of extra resident memory and the single worst
+   * thing to begin. Held, never refused — the job waits in the queue and starts
+   * when the machine is breathing again, which is what somebody who pressed
+   * Generate wants. Defaults to "always", so a caller that does not care behaves
+   * exactly as before.
+   */
+  #heavyAllowed: () => boolean = () => true;
+
   constructor(opts: JobQueueOptions = {}) {
     this.#maxConcurrent = Math.max(1, opts.maxConcurrent ?? 2);
     this.#runner = opts.runner ?? ((job, o) => new GenServiceClient().run(job, o));
+    if (opts.heavyAllowed !== undefined) this.#heavyAllowed = opts.heavyAllowed;
+  }
+
+  /**
+   * Re-ask the admission question. The policy calls this when pressure clears,
+   * so a job held back starts as soon as there is room rather than waiting for
+   * the next unrelated queue event to pump it.
+   */
+  reconsider(): void {
+    this.#pump();
   }
 
   on(listener: JobQueueListener): () => void {
@@ -170,19 +197,40 @@ export class JobQueue {
   /** Whether the entry at the head can start given the memory-budget rule. */
   #canStart(entry: Entry): boolean {
     if (this.#runningHeavy) return false; // a heavy job owns the machine
-    if (entry.heavy) return this.#running.size === 0; // heavy needs an empty machine
+    if (entry.heavy) {
+      // The machine has to be empty AND willing — see `#heavyAllowed`.
+      return this.#running.size === 0 && this.#heavyAllowed();
+    }
     return this.#running.size < this.#maxConcurrent;
   }
 
   #pump(): void {
-    // Start as many head-of-queue jobs as the constraints allow. We only ever
-    // consider the FRONT of the queue so ordering stays FIFO and a heavy job
-    // can't be perpetually skipped by lighter jobs queued behind it.
-    while (this.#queue.length > 0) {
-      const next = this.#queue[0];
+    /*
+     * Start as many head-of-queue jobs as the constraints allow. We only ever
+     * consider the FRONT of the queue so ordering stays FIFO and a heavy job
+     * can't be perpetually skipped by lighter jobs queued behind it.
+     *
+     * ONE EXCEPTION, and it is about who is doing the blocking. A heavy job
+     * waiting for another job to finish is being blocked by the QUEUE, and
+     * letting lighter work past it there is exactly the starvation the FIFO rule
+     * exists to prevent. A heavy job held by the POWER POLICY is being blocked
+     * by the MACHINE — nothing in the queue can clear it, and stalling every
+     * light job behind it would mean a moment of memory pressure freezes all
+     * generation. So that one is stepped over, and it starts on the next
+     * `reconsider()` when the machine is breathing again.
+     */
+    let index = 0;
+    while (index < this.#queue.length) {
+      const next = this.#queue[index];
       if (next === undefined) break;
-      if (!this.#canStart(next)) break;
-      this.#queue.shift();
+      if (!this.#canStart(next)) {
+        if (next.heavy && this.#running.size === 0 && !this.#heavyAllowed()) {
+          index += 1;
+          continue;
+        }
+        break;
+      }
+      this.#queue.splice(index, 1);
       this.#start(next);
     }
   }

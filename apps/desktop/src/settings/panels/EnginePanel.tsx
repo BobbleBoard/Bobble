@@ -15,10 +15,11 @@
  * page mention vLLM and my app doesn't"; showing it with "Linux only" answers
  * that without a support ticket.
  */
-import { Spinner } from '@pi-desktop/ui';
+import { SegmentedControl, Spinner } from '@pi-desktop/ui';
 import { useCallback, useEffect, useState } from 'react';
 import type { EngineState } from '../../../electron/ipc-contract';
 import { cx } from '../../onboarding/cx';
+import { useSettingsStore } from '../../state/settings-store';
 import {
   ENGINES,
   type EngineSpec,
@@ -28,6 +29,7 @@ import {
   orderEnginesForDisplay,
   recommendedEngine,
 } from '../engine-catalog';
+import { SettingRow, SettingSection } from '../parts';
 
 /** Bytes actually measured on disk beat the catalog's estimate once installed. */
 function sizeLabel(spec: EngineSpec, state: EngineState | undefined): string | null {
@@ -94,6 +96,8 @@ export function EnginePanel() {
         Engines run your models. Bobble picks the best one for this machine, and you can add others
         for specific jobs: one for many agents at once, one for the fastest single chat.
       </p>
+
+      <PowerSection />
 
       {error !== null ? (
         <p
@@ -213,6 +217,80 @@ export function EnginePanel() {
       <p className="text-footnote text-text-muted">
         {ENGINES.length} engines known. Sizes are approximate until installed.
       </p>
+    </div>
+  );
+}
+
+/**
+ * HOW HARD BOBBLE MAY PUSH THIS MACHINE.
+ *
+ * the user: "ensuring we leave a certain amount of memory available as a buffer so
+ * the user can use computer as normal while generation and such occurs … this
+ * could be dynamic even tracking what the current user memory/cpu/gpu usage is."
+ *
+ * Two controls, because there are two questions: WHEN to ease off (a mode) and
+ * HOW MUCH to keep back (a number of gigabytes). The reserve is a number rather
+ * than a percentage because that is how people think about it — "leave me 6 GB",
+ * not "leave me 25%" of a total they would have to look up.
+ *
+ * What "ease off" does is deliberately NOT listed here: it depends on which wall
+ * this particular machine is nearest, and the honest summary of that fits in the
+ * hint. The full reasoning is in packages/inference/src/power-policy.ts.
+ */
+function PowerSection() {
+  const mode = useSettingsStore((st) => st.settings.powerMode);
+  const reserve = useSettingsStore((st) => st.settings.powerReserveGB);
+  const update = useSettingsStore((st) => st.update);
+  return (
+    // Wrapped rather than passing a testid through SettingSection: that
+    // component takes no DOM props, and widening it for one probe is a worse
+    // trade than one span.
+    <div data-testid="power-section">
+      <SettingSection title="Power">
+        <SettingRow
+          label="While Bobble works"
+          hint={
+            mode === 'auto'
+              ? 'Watches memory, CPU and (where the driver says) the GPU, and eases off only when this machine is actually struggling.'
+              : mode === 'full'
+                ? 'Never eases off. Fastest, and the machine may get sluggish while a model runs.'
+                : 'Always eases off, even on an idle machine. Slower, and it stays out of your way.'
+          }
+        >
+          <SegmentedControl
+            aria-label="Power mode"
+            data-testid="settings-power-mode"
+            value={mode}
+            onValueChange={(v) => void update({ powerMode: v as 'auto' | 'full' | 'low' })}
+            options={[
+              { value: 'auto', label: 'Adaptive' },
+              { value: 'full', label: 'Full speed' },
+              { value: 'low', label: 'Stay light' },
+            ]}
+          />
+        </SettingRow>
+        <SettingRow
+          label="Keep free for me"
+          hint="Memory Bobble will not take, so your other apps keep theirs. Left alone it picks a quarter of this machine."
+        >
+          <input
+            type="number"
+            min={0}
+            max={64}
+            step={1}
+            className="pd-input w-24"
+            aria-label="Memory to keep free, in GB"
+            data-testid="settings-power-reserve"
+            value={reserve ?? ''}
+            placeholder="auto"
+            onChange={(e) => {
+              const n = Number.parseInt(e.target.value, 10);
+              // Blank / 0 means "you decide" — the same as never having set it.
+              void update({ powerReserveGB: Number.isFinite(n) && n > 0 ? n : undefined });
+            }}
+          />
+        </SettingRow>
+      </SettingSection>
     </div>
   );
 }

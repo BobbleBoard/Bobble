@@ -190,3 +190,45 @@ describe('JobQueue cancel', () => {
     expect(() => q.enqueue(imageJob('dup'))).toThrow(/already in queue/);
   });
 });
+
+describe('a heavy job waits for a machine that can take it', () => {
+  /*
+   * The power policy's answer under real memory pressure (power-policy.ts): a
+   * heavy generation is gigabytes of extra resident memory and the single worst
+   * thing to start. HELD, never refused — somebody who pressed Generate wants
+   * their picture, just not at the cost of their machine.
+   */
+  const tick = (): Promise<void> => new Promise((r) => setTimeout(r, 0));
+
+  it('does not start a heavy job while the policy says no', async () => {
+    let allowed = false;
+    const { runner, started } = controllableRunner();
+    const q = new JobQueue({ runner, heavyAllowed: () => allowed });
+    q.enqueue(imageJob('a'), { heavy: true });
+    await tick();
+    expect(started).toEqual([]);
+
+    // …and starts it the moment the machine is breathing again.
+    allowed = true;
+    q.reconsider();
+    await tick();
+    expect(started).toEqual(['a']);
+  });
+
+  it('lets LIGHT jobs through while a heavy one is held', async () => {
+    const { runner, started } = controllableRunner();
+    const q = new JobQueue({ runner, heavyAllowed: () => false });
+    q.enqueue(imageJob('heavy'), { heavy: true });
+    q.enqueue(imageJob('light'));
+    await tick();
+    expect(started).toEqual(['light']);
+  });
+
+  it('behaves exactly as before when no policy is supplied', async () => {
+    const { runner, started } = controllableRunner();
+    const q = new JobQueue({ runner });
+    q.enqueue(imageJob('a'), { heavy: true });
+    await tick();
+    expect(started).toEqual(['a']);
+  });
+});
