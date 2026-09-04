@@ -22,6 +22,8 @@ import { type TripoOp, useTripoStore } from './store';
 interface Gen3dState {
   loaded: boolean;
   engineReady: boolean;
+  /** The runtime is still booting (not the same as unavailable) — see contract. */
+  engineBooting: boolean;
   models: readonly Gen3dModelInfo[];
   resolutions: Readonly<Record<Gen3dResolution, number>>;
   /** Live download progress by model id. */
@@ -122,6 +124,7 @@ interface Gen3dState {
 export const useGen3dStore = create<Gen3dState>((set, get) => ({
   loaded: false,
   engineReady: false,
+  engineBooting: false,
   models: [],
   resolutions: { low: 512, medium: 1024, high: 1536 },
   downloads: {},
@@ -135,12 +138,13 @@ export const useGen3dStore = create<Gen3dState>((set, get) => ({
   refresh: async () => {
     const res = await window.piDesktop.invoke('gen3d:catalog', undefined).catch(() => null);
     if (res === null) {
-      set({ loaded: true, engineReady: false, models: [] });
+      set({ loaded: true, engineReady: false, engineBooting: false, models: [] });
       return;
     }
     set({
       loaded: true,
       engineReady: res.engineReady,
+      engineBooting: res.engineBooting,
       models: res.models,
       resolutions: res.resolutions,
     });

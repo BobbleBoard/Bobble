@@ -36,6 +36,14 @@ export const CORE_MODULE_MODELS: readonly Gen3dModelId[] = [
 ];
 
 export type ModuleStatus =
+  /**
+   * The runtime is STILL STARTING. the user: "3D studio shows 'runtime is not
+   * available' on every first open of the app even when previously installed."
+   * The first catalog call after launch always finds the sidecar down and kicks
+   * a uv boot off behind itself, so `engineReady:false` on its own could not
+   * tell a cold start from a broken install — and every launch drew the failure.
+   */
+  | 'checking'
   /** The engine runtime itself is missing (no uv/Python sidecar). */
   | 'no-runtime'
   /** Runtime is up but the core models are not all there. */
@@ -63,7 +71,11 @@ export interface ModuleState {
  * telling someone to download 34GB when the real fix is installing uv would
  * waste an hour and their bandwidth.
  */
-export function moduleState(engineReady: boolean, models: readonly Gen3dModelInfo[]): ModuleState {
+export function moduleState(
+  engineReady: boolean,
+  models: readonly Gen3dModelInfo[],
+  engineBooting = false,
+): ModuleState {
   const core = CORE_MODULE_MODELS.map((id) => models.find((m) => m.id === id)).filter(
     (m): m is Gen3dModelInfo => m !== undefined,
   );
@@ -73,7 +85,7 @@ export function moduleState(engineReady: boolean, models: readonly Gen3dModelInf
 
   if (!engineReady) {
     return {
-      status: 'no-runtime',
+      status: engineBooting ? 'checking' : 'no-runtime',
       remainingBytes,
       missing: missing.map((m) => m.id),
       usable: false,
@@ -104,6 +116,8 @@ export function formatModuleSize(bytes: number): string {
 /** One line explaining the state, for the gate panel. */
 export function moduleHeadline(state: ModuleState): string {
   switch (state.status) {
+    case 'checking':
+      return 'Starting the 3D engine…';
     case 'no-runtime':
       return 'The 3D engine runtime is not available';
     case 'installing':

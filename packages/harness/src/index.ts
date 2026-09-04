@@ -50,6 +50,7 @@ import {
 } from './model/model-size.js';
 import { type CallModel, callModelFromEnv } from './model-call/call-model.js';
 import { warmSystemPrompt } from './model-call/warmup.js';
+import { createOfflineLatch, NETWORK_TOOLS, OFFLINE_TOOL_NOTE } from './net/offline.js';
 import { createBashFlagger } from './permissions/flag-bash.js';
 import { forbiddenReason, forbiddenTools } from './permissions/forbidden.js';
 import {
@@ -860,6 +861,12 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     verifyFixesRemaining: 0,
     verifyActive: false,
   };
+
+  /*
+   * NO INTERNET ⇒ NO WEB TOOLS (the user). Latched by their own failures rather than
+   * by a probe — see net/offline.ts for why that is the honest signal here.
+   */
+  const offline = createOfflineLatch();
 
   // Effort-gated REAL verify seams (fix #4). Default to pi.exec + a node:fs probe;
   // tests inject a fake bash runner and a stubbed detector.
@@ -2213,6 +2220,17 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
         /* a diagnostic must never break a turn */
       }
     }
+    /*
+     * THE WEB TOOLS COME OFF THE TABLE WHEN THERE IS NO WEB.
+     *
+     * the user: "model still has search and web tools even when there's no internet,
+     * and gets confused looping in them." Telling it not to would not work —
+     * llama-server pins the emitted tool name to the ADVERTISED list, so a model
+     * that wants to look something up and can see `web_search` will keep calling
+     * `web_search`. Removing it is the only thing that ends the loop; the tool
+     * result that tripped the latch says why (OFFLINE_TOOL_NOTE).
+     */
+    if (offline.offline()) target = target.filter((t) => !NETWORK_TOOLS.has(t));
     if (wantCorp && !target.includes(CREATE_PRODUCTION_HIERARCHY)) {
       target.push(CREATE_PRODUCTION_HIERARCHY);
     } else if (!wantCorp && target.includes(CREATE_PRODUCTION_HIERARCHY)) {
@@ -2313,6 +2331,8 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     // Fresh session → idle stage and cleared per-turn loop/verify state.
     runtime.stage = 'idle';
     runtime.loopDetector = null;
+    // …and a fresh session starts hopeful about the network.
+    offline.reset();
     runtime.touchedFiles = [];
     runtime.checkpoints = [];
     runtime.ranCommands = [];
@@ -2735,6 +2755,28 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
         return {
           content: event.content.map((part, i) =>
             i === 0 && part.type === 'text' ? { ...part, text: `${part.text}\n${note}` } : part,
+          ),
+        };
+      }
+      return;
+    }
+    /*
+     * A WEB TOOL THAT FAILED BECAUSE THERE IS NO NETWORK SAYS SO, ONCE.
+     *
+     * The raw failure is `TypeError: fetch failed` — which reads, to a model, as
+     * something worth retrying. It retried; the user watched it loop. The note names
+     * the real situation and says what to do instead, and the same failure pulls
+     * the tools out of the advertised set (see applyPreset) so the retry it might
+     * still want is not available to make.
+     */
+    if (NETWORK_TOOLS.has(event.toolName)) {
+      const text = event.content.map((part) => (part.type === 'text' ? part.text : '')).join('\n');
+      if (offline.note(event.toolName, event.isError === true, text)) {
+        return {
+          content: event.content.map((part, i) =>
+            i === 0 && part.type === 'text'
+              ? { ...part, text: `${part.text}\n\n${OFFLINE_TOOL_NOTE}` }
+              : part,
           ),
         };
       }

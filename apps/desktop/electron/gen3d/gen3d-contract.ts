@@ -166,6 +166,14 @@ export type Gen3dInvokeMap = {
     request: undefined;
     response: {
       readonly engineReady: boolean;
+      /**
+       * The runtime is STILL STARTING — a uv/Python boot is in flight. Distinct
+       * from `engineReady:false` with no boot, which means it is genuinely not
+       * available. Without this the studio drew "the 3D engine runtime is not
+       * available" on every launch, because the first catalog call always finds
+       * the sidecar down and kicks the boot off behind itself.
+       */
+      readonly engineBooting: boolean;
       readonly models: readonly Gen3dModelInfo[];
       /** Engine-verified resolution presets, e.g. {low:768, medium:1024, high:1536}. */
       readonly resolutions: Readonly<Record<Gen3dResolution, number>>;

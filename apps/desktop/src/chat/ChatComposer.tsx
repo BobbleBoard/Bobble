@@ -19,6 +19,7 @@ import {
   IconClose,
 } from '@pi-desktop/ui';
 import { useEffect, useRef, useState } from 'react';
+import { ExpandedScrim } from '../media/ExpandedScrim';
 import { IconMic, IconPause, IconPlay, IconStop } from '../settings/icons';
 import { abortCorpTask } from '../state/corp-connect';
 import { useCorpStore } from '../state/corp-store';
@@ -37,6 +38,7 @@ import { usePiStore } from '../state/pi-slice';
 import { assessCurrentSend, useQueueExplainer } from '../state/running-chats';
 import { corpForceEnabled, productionHarnessEnabled } from '../state/settings-store';
 import { useThemeStore } from '../store/theme';
+import { AttachedFileCard } from './AttachedFileCard';
 import { ComposerBar } from './ComposerBar';
 import { ComposerFooter } from './ComposerFooter';
 import { type AcItem, Autocomplete } from './composer/Autocomplete';
@@ -189,30 +191,6 @@ function extLabel(name: string): string {
   return (ext || 'file').toUpperCase().slice(0, 4);
 }
 
-/** A large paste, shown as a file-style CARD: a few clamped lines of the pasted
- * text as a preview, with a "PASTED" badge (the user) — so it reads as an uploaded
- * snippet, not the literal words "pasted content". */
-function PastedContentCard({ text, onRemove }: { text?: string; onRemove: () => void }) {
-  // A short prefix is enough for the preview; CSS line-clamps it to a few rows.
-  const preview = (text ?? '').slice(0, 400);
-  return (
-    <div className="pd-pasted" title="Pasted content">
-      <button
-        type="button"
-        className="pd-pasted-remove pd-focusable"
-        aria-label="Remove pasted content"
-        onClick={onRemove}
-      >
-        <IconClose size={12} />
-      </button>
-      <div className="pd-pasted-preview" aria-hidden="true">
-        {preview}
-      </div>
-      <span className="pd-pasted-badge">PASTED</span>
-    </div>
-  );
-}
-
 /** A slight attachment preview (#A8c): image thumbnail, else a filename+ext chip. */
 function AttachmentPreview({
   name,
@@ -224,14 +202,30 @@ function AttachmentPreview({
   onRemove: () => void;
 }) {
   const isImage = (dataUri ?? '').startsWith('data:image/');
+  const [open, setOpen] = useState(false);
   return (
     <div className="pd-attach" title={name}>
       {isImage ? (
-        // biome-ignore lint/a11y/useAltText: decorative attachment thumbnail; name is in the title
-        <img className="pd-attach-thumb" src={dataUri} />
+        // Clickable, like every other piece of media in the app (the user asked for
+        // the expanded view on input media too) — a 20px chip is not a preview.
+        <button
+          type="button"
+          className="pd-attach-thumb-btn pd-focusable"
+          aria-label={`Open ${name}`}
+          onClick={() => setOpen(true)}
+        >
+          {/* biome-ignore lint/a11y/useAltText: the button carries the label */}
+          <img className="pd-attach-thumb" src={dataUri} />
+        </button>
       ) : (
         <span className="pd-attach-ext">{extLabel(name)}</span>
       )}
+      {open && dataUri !== undefined ? (
+        <ExpandedScrim label={name} testid="attachment-expanded" onClose={() => setOpen(false)}>
+          {/* biome-ignore lint/a11y/useAltText: the dialog carries the label */}
+          <img src={dataUri} className="pd-media-image" />
+        </ExpandedScrim>
+      ) : null}
       <span className="pd-attach-name">{name}</span>
       <button
         type="button"
@@ -982,9 +976,10 @@ export function ChatComposer({
             <div className="pd-composer-attachments" data-testid="composer-attachments">
               {attachments.map((a) =>
                 a.pasted === true ? (
-                  <PastedContentCard
+                  <AttachedFileCard
                     key={a.id}
-                    text={a.text}
+                    name={a.name}
+                    text={a.text ?? ''}
                     onRemove={() => setAttachments((prev) => prev.filter((p) => p.id !== a.id))}
                   />
                 ) : (

@@ -242,8 +242,20 @@ function ModelCard({ id }: { readonly id: Gen3dModelId }): JSX.Element | null {
   );
 }
 
+/**
+ * The roles this studio has no use for.
+ *
+ * the user: "audio models are accidentally shown in the 3D studio." The catalog is
+ * shared with the audio studio (text-to-speech, sound effects, transcription all
+ * ride the same Python sidecar), and this panel simply listed everything in it —
+ * so the 3D download list offered voices. They are downloadable from the room
+ * that uses them.
+ */
+const NOT_A_3D_ROLE = new Set(['audio']);
+
 export function DownloadPanel(): JSX.Element {
-  const models = useGen3dStore((s) => s.models);
+  const allModels = useGen3dStore((s) => s.models);
+  const models = allModels.filter((m) => !NOT_A_3D_ROLE.has(m.role));
   const downloads = useGen3dStore((s) => s.downloads);
   const setOpen = useGen3dStore((s) => s.setDownloadPromptOpen);
   const download = useGen3dStore((s) => s.download);

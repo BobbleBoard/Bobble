@@ -45,6 +45,15 @@ export function ModuleGate({ state, onView }: ModuleGateProps): JSX.Element {
 
   const size = formatModuleSize(state.remainingBytes);
   const runtimeMissing = state.status === 'no-runtime';
+  /*
+   * the user: "3D studio shows 'runtime is not available' on every first open of the
+   * app even when previously installed." The engine's first catalog answer after
+   * launch is always "not up yet" — it boots the Python sidecar behind itself —
+   * so this panel offered to SET UP a module that was already installed and
+   * about to work. While that boot is in flight there is nothing to offer and
+   * nothing to warn about: it just says what is happening.
+   */
+  const booting = state.status === 'checking';
 
   const start = () => {
     if (state.missing.length === 0) return;
@@ -68,7 +77,9 @@ export function ModuleGate({ state, onView }: ModuleGateProps): JSX.Element {
           {moduleHeadline(state)}
         </h2>
 
-        {runtimeMissing ? (
+        {booting ? (
+          <p className="tp-gate-copy">The local engine is starting. This takes a few seconds.</p>
+        ) : runtimeMissing ? (
           <p className="tp-gate-copy">Runs on a local Python engine. Bobble installs it for you.</p>
         ) : state.status === 'installing' ? (
           <p className="tp-gate-copy" data-testid="tp-gate-progress">
@@ -90,6 +101,7 @@ export function ModuleGate({ state, onView }: ModuleGateProps): JSX.Element {
         ) : null}
 
         <div className="tp-gate-actions">
+          {/* Nothing to press while the engine is coming up. */}
           {/*
             THE PRIMARY ACTION IS ALWAYS THERE, INCLUDING WITH NO RUNTIME.
             It used to be withheld exactly then, leaving a fresh Mac looking at
@@ -103,6 +115,7 @@ export function ModuleGate({ state, onView }: ModuleGateProps): JSX.Element {
           <button
             type="button"
             className="tp-gate-primary"
+            hidden={booting}
             data-testid="tp-gate-download"
             disabled={state.status === 'installing' || starting}
             onClick={start}

@@ -146,13 +146,27 @@ function audioPaths(): { python: string; worker: string } {
 async function ensureSidecar(): Promise<Gen3dSidecar | null> {
   if (sidecar !== null) return sidecar;
   if (sidecarStarting !== null) return sidecarStarting;
-  sidecarStarting = startSidecar().catch((err) => {
-    log.warn('gen3d sidecar failed to start', {
-      error: err instanceof Error ? err.message : String(err),
+  sidecarStarting = startSidecar()
+    .then((instance) => {
+      // A boot that RESOLVED to nothing has also stopped starting. Without this
+      // the renderer's "Starting the 3D engine…" (see ModuleGate) would be the
+      // last thing it ever heard: the failure paths inside startSidecar return
+      // null rather than throwing.
+      if (instance === null) sidecarStarting = null;
+      return instance;
+    })
+    .catch((err) => {
+      log.warn('gen3d sidecar failed to start', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+      sidecarStarting = null;
+      return null;
+    })
+    .finally(() => {
+      // Tell the UI either way: a boot that finished — up or down — changes the
+      // answer the catalog gives, and nothing else would ask again.
+      broadcast('gen3d:catalog-changed', { at: Date.now() });
     });
-    sidecarStarting = null;
-    return null;
-  });
   return sidecarStarting;
 }
 
@@ -531,6 +545,7 @@ const handlers: IpcHandlers<Gen3dInvokeMap & DictationInvokeMap> = {
           }
           return {
             engineReady: true,
+            engineBooting: false,
             models: composeModels(installed, inFlight),
             resolutions: TRELLIS_RESOLUTIONS,
           };
@@ -544,10 +559,27 @@ const handlers: IpcHandlers<Gen3dInvokeMap & DictationInvokeMap> = {
       // Kick off the boot without awaiting it.
       void ensureSidecar();
     }
+    /*
+     * "STILL STARTING" IS NOT "NOT AVAILABLE".
+     *
+     * the user: "3D studio shows 'runtime is not available' on every first open of
+     * the app even when previously installed." That is this branch: the FIRST
+     * catalog call after launch always finds `sidecar === null`, kicks off a uv
+     * boot that takes seconds, and answers `engineReady:false` straight away so
+     * the model list is not blank. The renderer had no way to tell that apart
+     * from a broken runtime, so it drew the failure wall every single launch and
+     * then quietly corrected itself once `catalog-changed` arrived.
+     *
+     * `engineBooting` is the missing distinction. A boot in flight says wait; a
+     * boot that has actually failed (uv missing, script gone — `sidecarStarting`
+     * is cleared in that catch) still says unavailable, which is the case the
+     * wording was written for.
+     */
     // Immediate honest degraded catalog from stamp files.
     const installed = detectInstalled(existsSync, cacheRoot());
     return {
       engineReady: false,
+      engineBooting: sidecarStarting !== null,
       models: composeModels(installed, downloading),
       resolutions: TRELLIS_RESOLUTIONS,
     };

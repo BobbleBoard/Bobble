@@ -21,6 +21,14 @@ describe('focusComplaint', () => {
     expect(c).toContain('Electron');
   });
 
+  it('ignores the PERSON switching apps — only our own window counts', () => {
+    // Seen live on a green probe: `was "Safari", became "Mail"`, because the user
+    // read his mail while it ran. That is not the app taking the screen.
+    expect(focusComplaint('Safari', 'Mail')).toBeNull();
+    // …but the packaged app coming to the front still is.
+    expect(focusComplaint('Safari', 'Bobble')).toContain('Bobble');
+  });
+
   it('cannot tell on a platform without the reading, so does not fail', () => {
     // Not macOS, or the automation permission withheld. A check that cannot
     // tell must not fail — otherwise the suite is red everywhere else.

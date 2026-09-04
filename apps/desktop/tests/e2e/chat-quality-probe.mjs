@@ -41,6 +41,30 @@ writeFileSync(
   ].join('\n'),
 );
 
+const PASTE =
+  "we're going to work on the chat, the main product of the app now.\nline two\nline three";
+writeFileSync(
+  path.join(sessionsDir, 'beta.jsonl'),
+  [
+    l({ type: 'session', version: 3, id: 'sess-beta', timestamp: 'u', cwd: '/tmp' }),
+    l({
+      type: 'message',
+      id: 'u1',
+      parentId: null,
+      timestamp: 'u',
+      message: {
+        role: 'user',
+        // Exactly what buildAgentMessage folds in — this is pi's copy, which is
+        // what a reopened chat rebuilds its bubbles from.
+        content: [
+          { type: 'text', text: `Attached file \`pasted content\`:\n\`\`\`\n${PASTE}\n\`\`\`` },
+        ],
+        timestamp: 1,
+      },
+    }),
+  ].join('\n'),
+);
+
 const { app, page, shot, check, finish } = await launchApp('chat-quality-probe', {
   env: { HOME: home },
 });
@@ -82,6 +106,51 @@ try {
     const clip = await app.evaluate(({ clipboard }) => clipboard.readText());
     check(clip.includes(REPLY), `copy button did not reach the clipboard (got "${clip}")`);
   }
+
+  /* --------------------------------------------------- #17 the paste card survives */
+  // MEASURED in the user's own sidebar: a chat titled
+  //   Attached file `pasted content`: ``` we're going to work on the chat…
+  // because pi's copy of the message carries the fold, and both the title and a
+  // reopened bubble were built straight from it.
+  const pasteTitle = await page.evaluate(() =>
+    [...document.querySelectorAll('[data-testid^="chat-row-"]')]
+      .map((e) => e.getAttribute('data-testid').replace('chat-row-', ''))
+      .find((t) => t.toLowerCase().includes('going to work') || t.includes('Attached file')),
+  );
+  check(
+    pasteTitle !== undefined && !pasteTitle.includes('Attached file'),
+    `the sidebar still titles a pasted chat by the folded block: ${pasteTitle}`,
+  );
+  await page.click(`[data-testid="chat-row-${pasteTitle}"]`);
+  await page.waitForSelector('[data-testid="user-attachments"]', { timeout: 8000 });
+  const bubbleText = await page.evaluate(
+    () => document.querySelector('.pd-msg--user')?.textContent ?? '',
+  );
+  check(
+    !bubbleText.includes('Attached file'),
+    `the user bubble still shows the raw fold: ${bubbleText.slice(0, 90)}`,
+  );
+  // …and the card opens the whole paste, centred, over a blurred room.
+  await page.click('[data-testid="user-attachments"] .pd-pasted-open');
+  await page.waitForSelector('[data-testid="attached-file-expanded"]', { timeout: 5000 });
+  const expandedText = await page.evaluate(
+    () => document.querySelector('.pd-pasted-stage-body')?.textContent ?? '',
+  );
+  check(expandedText.includes('line three'), 'the expanded card does not show the whole paste');
+  const blurred = await page.evaluate(() => {
+    const el = document.querySelector('[data-testid="attached-file-expanded"]');
+    const cs = el === null ? null : getComputedStyle(el);
+    return cs === null ? null : `${cs.backdropFilter}${cs.webkitBackdropFilter ?? ''}`;
+  });
+  check(blurred?.includes('blur'), `the backdrop is not blurred: ${blurred}`);
+  await shot('paste-card-expanded');
+  await page.keyboard.press('Escape');
+  await page.waitForSelector('[data-testid="attached-file-expanded"]', {
+    state: 'detached',
+    timeout: 5000,
+  });
+  await page.click('text=chat about apples');
+  await page.waitForSelector(`text=${REPLY}`, { timeout: 8000 });
 
   /* ------------------------------------------------ #2 the model switch is visible */
   // MEASURED before the fix: `useModelSelectionStore.switching` was set by one of
@@ -168,8 +237,8 @@ try {
       tipRound: getComputedStyle(tip).borderTopLeftRadius,
     };
   });
-  check(shape !== null && shape.conic, 'the loader tail is not a conic (fading) gradient');
-  check(shape !== null && shape.masked, 'the loader is not masked to a ring');
+  check(shape?.conic, 'the loader tail is not a conic (fading) gradient');
+  check(shape?.masked, 'the loader is not masked to a ring');
   await shot('sidebar-spinner-hovered');
 } finally {
   await finish();

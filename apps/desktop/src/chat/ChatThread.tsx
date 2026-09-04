@@ -43,8 +43,11 @@ import { forkAndReprompt, switchBranch } from '../state/pi-connect';
 import { usePiStore } from '../state/pi-slice';
 import { openPresented, usePresentStore } from '../state/present-store';
 import { AssistantGroup } from './AssistantGroup';
+import { AttachedFileCard } from './AttachedFileCard';
+import { splitAttachedFiles } from './attached-files';
 import { corpChatView } from './corp/corp-thread-view';
 import { HarnessChecklistPanel, ThreadStatusIndicator } from './HarnessStatus';
+import { UserImage } from './UserImage';
 
 /**
  * How far from the bottom counts as "away", for the jump-to-latest control.
@@ -400,6 +403,19 @@ export function ChatThread() {
                   </div>
                 );
               }
+              /*
+               * THE PASTE CARD SURVIVES THE ROUND TRIP.
+               *
+               * the user: "pasted content shows literally as 'pasted content' rather
+               * than the already-designed paste card." Live, the bubble echoes
+               * only what was typed — but pi's copy of the message carries the
+               * attachments folded in as fenced blocks, and a chat REOPENED from
+               * its session file rebuilds its bubbles from that. So the card was
+               * right until you came back to the chat, and then it was a wall of
+               * "Attached file `pasted content`: ```". Unfolding here puts the
+               * cards back wherever the bubble came from.
+               */
+              const attached = splitAttachedFiles(message.text);
               return (
                 <div key={message.id} className="flex flex-col gap-1">
                   <MessageRow
@@ -415,12 +431,18 @@ export function ChatThread() {
                       {message.images !== undefined && message.images.length > 0 ? (
                         <div className="flex flex-wrap gap-2">
                           {message.images.map((src) => (
-                            // biome-ignore lint/a11y/useAltText: user attachment thumbnail
-                            <img key={src} src={src} className="max-h-32 rounded-md" />
+                            <UserImage key={src} src={src} />
                           ))}
                         </div>
                       ) : null}
-                      {message.text.length > 0 ? <ClampedText text={message.text} /> : null}
+                      {attached.files.length > 0 ? (
+                        <div className="flex flex-wrap gap-2" data-testid="user-attachments">
+                          {attached.files.map((f) => (
+                            <AttachedFileCard key={f.id} name={f.name} text={f.text} />
+                          ))}
+                        </div>
+                      ) : null}
+                      {attached.text.length > 0 ? <ClampedText text={attached.text} /> : null}
                     </div>
                   </MessageRow>
                   {switcher}

@@ -542,6 +542,21 @@ body {
   background: var(--pd-bg-surface);
   box-shadow: var(--pd-shadow-hairline);
 }
+/* The card face is the open target (the user: "clickable to show semi-fullscreen").
+   A bare button so it inherits the card's layout rather than imposing its own. */
+.pd-pasted-open {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: zoom-in;
+}
 .pd-pasted-preview {
   display: -webkit-box;
   -webkit-line-clamp: 6;
@@ -585,6 +600,58 @@ body {
 .pd-pasted:hover .pd-pasted-remove {
   opacity: 1;
 }
+/* The composer's attachment thumbnail is an open target too. */
+.pd-attach-thumb-btn {
+  display: inline-flex;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: zoom-in;
+}
+
+/* An attached image in a user bubble: a plain, tappable frame (the user wanted the
+   same "look closer" gesture on input media as on generated cards). */
+.pd-user-image {
+  display: inline-flex;
+  padding: 0;
+  border: 0;
+  border-radius: var(--pd-radius-md);
+  background: none;
+  cursor: zoom-in;
+}
+
+/* The expanded text: the whole paste, scrollable, on the shared media stage. */
+.pd-media-stage[data-kind="text"] {
+  width: min(820px, 92vw);
+  max-height: 82vh;
+}
+.pd-pasted-stage {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+}
+.pd-pasted-stage-title {
+  flex: none;
+  padding: 14px 18px 10px;
+  color: var(--pd-text-secondary);
+  font-size: var(--pd-font-size-caption);
+  font-weight: var(--pd-font-weight-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.pd-pasted-stage-body {
+  min-height: 0;
+  margin: 0;
+  overflow: auto;
+  padding: 0 18px 18px;
+  color: var(--pd-text-primary);
+  font-family: var(--pd-font-mono);
+  font-size: var(--pd-font-size-caption);
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .pd-pasted-remove:hover {
   background: var(--pd-bg-hover);
   color: var(--pd-text-primary);

@@ -83,7 +83,7 @@ function makeRig(
     registerTool: (_def: ToolDefinition) => {},
     registerCommand: () => {},
     getAllTools: (): ToolInfo[] =>
-      ['read', 'bash', 'tool_search'].map((name) => ({
+      ['read', 'bash', 'tool_search', 'web_search', 'web_fetch'].map((name) => ({
         name,
         description: `${name} tool`,
         // biome-ignore lint/suspicious/noExplicitAny: stub schema.
@@ -149,6 +149,7 @@ function makeRig(
     ctx,
     handle,
     fire,
+    activeTools: () => activeTools,
     sentUserMessages,
     steerMessages,
     publishedStages,
@@ -789,5 +790,61 @@ describe('forbidden tools', () => {
       await startTurn(rig);
       expect(blockOf(await rig.fire('tool_call', sendCall))).toBeNull();
     });
+  });
+});
+
+describe('no internet, no web tools (the user)', () => {
+  /*
+   * the user: "model still has search and web tools even when there's no internet,
+   * and gets confused looping in them." Asking it to stop cannot work —
+   * llama-server pins the emitted tool name to the ADVERTISED list, so the fix
+   * has to be that the tool is not there to call.
+   */
+  const webCall = (rig: ReturnType<typeof makeRig>, text: string, isError = true) =>
+    rig.fire('tool_result', {
+      type: 'tool_result',
+      toolName: 'web_search',
+      toolCallId: 'w1',
+      input: { query: 'anything' },
+      content: [{ type: 'text', text }],
+      isError,
+    });
+
+  it('withdraws them after a network failure, and says why exactly once', async () => {
+    const rig = makeRig({ effort: 'medium' });
+    await startSession(rig);
+    await startTurn(rig);
+    expect(rig.activeTools()).toContain('web_search');
+
+    const first = await webCall(rig, 'TypeError: fetch failed');
+    expect(JSON.stringify(first)).toContain('no internet connection');
+    // A second failure inside the window does not repeat the note. (`fire`
+    // returns one entry per handler, so an untouched result is [undefined].)
+    const second = await webCall(rig, 'getaddrinfo ENOTFOUND duckduckgo.com');
+    expect(second).toEqual([undefined]);
+
+    // The next turn is advertised WITHOUT them.
+    await startTurn(rig);
+    expect(rig.activeTools()).not.toContain('web_search');
+    expect(rig.activeTools()).not.toContain('web_fetch');
+  });
+
+  it('leaves them alone when the failure is the SITE, not the network', async () => {
+    const rig = makeRig({ effort: 'medium' });
+    await startSession(rig);
+    await startTurn(rig);
+    await webCall(rig, 'HTTP 404 Not Found');
+    await startTurn(rig);
+    expect(rig.activeTools()).toContain('web_search');
+  });
+
+  it('gives them straight back when a web call succeeds again', async () => {
+    const rig = makeRig({ effort: 'medium' });
+    await startSession(rig);
+    await startTurn(rig);
+    await webCall(rig, 'TypeError: fetch failed');
+    await webCall(rig, 'three results', false);
+    await startTurn(rig);
+    expect(rig.activeTools()).toContain('web_search');
   });
 });

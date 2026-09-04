@@ -84,3 +84,28 @@ describe('formatModuleSize', () => {
     expect(formatModuleSize(0)).toBe('');
   });
 });
+
+describe('a runtime that is still starting is not a runtime that is missing', () => {
+  /*
+   * the user: "3D studio shows 'runtime is not available' on every first open of the
+   * app even when previously installed." The first `gen3d:catalog` call after
+   * launch ALWAYS finds the sidecar down: it kicks off the uv boot and answers
+   * immediately with the disk-derived catalog, so `engineReady:false` arrived on
+   * every single launch and the studio read it as a broken install.
+   */
+  const installed = allCore(true);
+
+  it('says checking while the boot is in flight', () => {
+    const state = moduleState(false, installed, true);
+    expect(state.status).toBe('checking');
+    expect(moduleHeadline(state)).toBe('Starting the 3D engine…');
+  });
+
+  it('still says unavailable when nothing is starting', () => {
+    expect(moduleState(false, installed, false).status).toBe('no-runtime');
+  });
+
+  it('is neither once the engine answers', () => {
+    expect(moduleState(true, installed, false).status).toBe('ready');
+  });
+});

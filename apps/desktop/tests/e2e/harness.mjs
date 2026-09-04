@@ -78,9 +78,26 @@ export function frontmostApp() {
  *
  * Pure, so the rule is testable without moving anyone's focus.
  */
+/**
+ * The apps a probe could steal focus TO. A probe's window is an Electron one in
+ * development and the packaged app when a probe runs against the bundle.
+ */
+const OUR_APPS = new Set(['Electron', 'Bobble']);
+
 export function focusComplaint(before, during) {
   if (before === null || during === null) return null;
   if (before === during) return null;
+  /*
+   * ONLY OUR OWN WINDOW COUNTS.
+   *
+   * The guarantee is "the probe did not take the screen", and it was checked as
+   * "the frontmost app is the same one" — which also fails when the PERSON at
+   * the keyboard switches apps mid-run. Seen live: `was "Safari", became "Mail"`
+   * on a green probe, because the user read his mail while it ran. A guard that
+   * cries wolf on someone using their own computer stops being read, which
+   * costs exactly the thing it was built to protect.
+   */
+  if (!OUR_APPS.has(during)) return null;
   return `focus moved during the run: was "${before}", became "${during}" — a probe must not take the screen`;
 }
 

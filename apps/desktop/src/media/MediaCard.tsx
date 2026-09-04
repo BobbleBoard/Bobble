@@ -24,11 +24,11 @@
  * behind it — so it reads as looking closer at something rather than leaving.
  */
 import { type JSX, useEffect, useState } from 'react';
-import { createPortal } from 'react-dom';
 import { pdFileUrl } from '../chat/canvas/file-preview';
 import { ThreadAudio } from '../chat/ThreadAudio';
 import { humanSize, type ThreadMediaItem } from '../chat/thread-media';
 import { useModalityStore } from '../state/modality-store';
+import { ExpandedScrim } from './ExpandedScrim';
 import { ModelSurface } from './ModelSurface';
 import { exportFile, revealFile, startFileDrag } from './media-actions';
 import { VideoSurface } from './VideoSurface';
@@ -158,80 +158,24 @@ function Controls({
  *
  * Deliberately the same treatment as the settings dialog rather than a bespoke
  * one — it is the app's established "look closer at this" gesture, and Escape
- * and click-outside already mean what people expect there.
+ * and click-outside already mean what people expect there. The scrim itself now
+ * lives in {@link ExpandedScrim}, because the user asked for the same gesture on
+ * INPUT media (an attachment in the composer, a pasted-text card in a user
+ * message) and two near-identical overlays is how they drift apart.
  */
 function Expanded({ item, onClose }: { item: ThreadMediaItem; onClose: () => void }): JSX.Element {
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') {
-        e.stopPropagation();
-        onClose();
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
-
-  /*
-   * THE APP'S CHROME STANDS DOWN WHILE THIS IS UP.
-   *
-   * the user, looking at the first version: "no to this thing at the bottom and no
-   * to the top bar staying here aswell. no input bar here when expanded." A
-   * blurred backdrop still left a recognisable top bar and a composer sitting
-   * under the picture, which reads as the app carrying on behind a pane of
-   * glass rather than getting out of the way.
-   *
-   * Faded rather than unmounted, deliberately: removing the composer would
-   * reflow the surface behind the blur and drop whatever was typed in it. This
-   * is a flag on <body> because the two things to quieten live in completely
-   * different subtrees from this one.
-   */
-  useEffect(() => {
-    document.body.setAttribute('data-media-expanded', 'true');
-    return () => document.body.removeAttribute('data-media-expanded');
-  }, []);
-
-  /*
-   * PORTALLED TO THE BODY, and it has to be.
-   *
-   * The card lives inside the results ScrollArea, and a scroll container that
-   * establishes a stacking context (transform, filter, contain — this one does)
-   * makes `position: fixed` fix to IT rather than to the viewport. MEASURED: the
-   * scrim was clipped at the composer's top edge and the caption under the
-   * picture was simply not on screen. z-index cannot fix that; leaving the
-   * subtree can.
-   */
-  return createPortal(
-    /*
-     * `role="dialog"` + `aria-modal` is not decoration here — it is what stops
-     * Escape from doing TWO things. StudioShell also listens for Escape (it
-     * leaves the room) and skips when a dialog is up, exactly by looking for
-     * this role. Without it, closing an expanded picture also walked you out of
-     * the studio, which is the sort of thing you only find by driving it.
-     */
-    <div
-      className="pd-media-scrim"
-      data-testid="media-expanded"
-      role="dialog"
-      aria-modal="true"
-      aria-label={item.name}
-    >
-      {/* The backdrop dismisses. A button rather than a div so Enter and Space
-          close it too, without a keyboard shim. */}
-      <button type="button" className="pd-media-scrim-hit" aria-label="Close" onClick={onClose} />
-      <div className="pd-media-stage" data-kind={item.kind}>
-        {/*
-          NO CAPTION BAR. the user: "no bottom bar for the image 'fox-real.png'
-          bottom bar needs to go". It was a strip of chrome under a picture that
-          had just taken the screen, saying a filename you already knew — and the
-          card you opened it from says the same thing two inches away. The
-          controls float on the media instead.
-        */}
-        <Surface item={item} large />
-        <Controls item={item} onExpand={undefined} />
-      </div>
-    </div>,
-    document.body,
+  return (
+    <ExpandedScrim label={item.name} onClose={onClose} stageKind={item.kind}>
+      {/*
+        NO CAPTION BAR. the user: "no bottom bar for the image 'fox-real.png'
+        bottom bar needs to go". It was a strip of chrome under a picture that
+        had just taken the screen, saying a filename you already knew — and the
+        card you opened it from says the same thing two inches away. The
+        controls float on the media instead.
+      */}
+      <Surface item={item} large />
+      <Controls item={item} onExpand={undefined} />
+    </ExpandedScrim>
   );
 }
 

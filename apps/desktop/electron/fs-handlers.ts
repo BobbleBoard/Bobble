@@ -142,6 +142,32 @@ export function excerptAround(haystack: string, original: string, needle: string
   return `${start > 0 ? '…' : ''}${body}${end < original.length ? '…' : ''}`;
 }
 
+/** The header + fenced body the composer writes for each text attachment. */
+const ATTACHED_FILE_BLOCK = /^Attached file `([^`\n]*)`:\n```\n([\s\S]*?)\n```(?:\n\n|\n?$)/;
+
+/** A user message with its folded attachments removed, or their names when that
+ * is all it was. Mirrors `src/chat/attached-files.ts` — see the note at the
+ * title, above. */
+function summarizeUserMessage(body: string): string {
+  const blocks: Array<{ name: string; text: string }> = [];
+  let rest = body;
+  for (;;) {
+    const m = ATTACHED_FILE_BLOCK.exec(rest);
+    if (m === null) break;
+    blocks.push({ name: m[1] ?? '', text: m[2] ?? '' });
+    rest = rest.slice(m[0].length);
+  }
+  const typed = rest.trim();
+  if (typed.length > 0) return typed;
+  const first = blocks[0];
+  if (first === undefined) return body.trim();
+  // A NAMED file names the chat; "pasted content" names nothing, so a paste is
+  // summarised by its own first line — which is what the chat is actually about.
+  if (first.name !== 'pasted content') return blocks.map((b) => b.name).join(', ');
+  const line = first.text.split('\n').find((l) => l.trim().length > 0);
+  return line?.trim() ?? first.name;
+}
+
 function readSessionSummary(file: string): SessionSummary | null {
   const st = statSafe(file);
   if (st === null) return null;
@@ -207,8 +233,22 @@ function readSessionSummary(file: string): SessionSummary | null {
     }
   }
 
+  /*
+   * A CHAT IS NAMED BY WHAT WAS TYPED, NOT BY WHAT WAS ATTACHED.
+   *
+   * The composer folds text attachments into pi's copy of the message as fenced
+   * blocks, and pi's copy is what lands in the session file — so a chat that
+   * began with a big paste was titled with the fold. MEASURED in the user's sidebar:
+   *
+   *     Attached file `pasted content`: ``` we're going to work on the chat…
+   *
+   * The unfold is deliberately duplicated rather than imported: this runs in the
+   * main process, and `src/chat/attached-files.ts` is renderer code (its test
+   * covers the same shape). Keep the two in step if the fold ever changes.
+   */
   const title = firstUserText
-    ? firstUserText.slice(0, 80).replace(/\s+/g, ' ').trim()
+    ? summarizeUserMessage(firstUserText).slice(0, 80).replace(/\s+/g, ' ').trim() ||
+      'Untitled session'
     : 'Untitled session';
 
   const summary: SessionSummary = {

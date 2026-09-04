@@ -35,9 +35,18 @@ export function TripoWorkspace(): JSX.Element {
   const catalogLoaded = useGen3dStore((s) => s.loaded);
   const models = useGen3dStore((s) => s.models);
   const [viewing, setViewing] = useState(false);
-  const module3d = moduleState(engineReady, models);
-  // Gate only once the catalog has actually answered — flashing a download wall
-  // during the sidecar's boot would be a lie that corrects itself a second later.
+  const engineBooting = useGen3dStore((s) => s.engineBooting);
+  const module3d = moduleState(engineReady, models, engineBooting);
+  /*
+   * Gate only once the catalog has actually answered — flashing a download wall
+   * during the sidecar's boot would be a lie that corrects itself a second
+   * later. It ANSWERS immediately, though (the honest degraded catalog read off
+   * the install stamps), which is why `catalogLoaded` alone was not enough: the
+   * answer says "the engine is not up YET", and the studio read that as "not
+   * available" on every launch. A boot in flight still holds the studio — it
+   * genuinely cannot run anything yet — but the panel says it is starting rather
+   * than offering to set up something already installed. See ModuleGate.
+   */
   const gated = catalogLoaded && !module3d.usable && !viewing;
 
   // Engine catalog + event wiring (idempotent).
