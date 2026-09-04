@@ -405,7 +405,7 @@ export async function sendPrompt(
   // show it" (the user). Safe because a server-load restart (restartPi) preserves the
   // local thread and does NOT bump the session epoch, so the echo survives the
   // ensureChatServerReady wait below.
-  usePiStore.getState().appendUser(message, imageDataUris);
+  usePiStore.getState().appendUser(message, imageDataUris, agentMessage);
   // The chat's folder is created HERE, on the first send — not when the chat was
   // opened. See ensureChatWorkspace.
   await ensureChatWorkspace(message);
@@ -1122,13 +1122,27 @@ async function forkEntryIdForOrdinal(ordinal: number): Promise<string | null> {
  * available (entry can't be resolved, an extension vetoes the fork, or pi is
  * gone), so Save always does *something* useful.
  */
-export async function forkAndReprompt(messageId: string, editedText: string): Promise<void> {
+/**
+ * Re-send an edited user turn on a new branch.
+ *
+ * `agentMessage` is what pi RECEIVES — the edited text with its attachments
+ * folded back in — while `editedText` is what the bubble shows. They differ
+ * whenever a message carries files, which is why editing one used to drop them:
+ * the fold lives in pi's copy, and only the visible text was ever re-sent, so
+ * fixing a typo silently deleted every attachment on the message.
+ */
+export async function forkAndReprompt(
+  messageId: string,
+  editedText: string,
+  agentMessage?: string,
+): Promise<void> {
   const trimmed = editedText.trim();
-  if (trimmed.length === 0) return;
+  const body = (agentMessage ?? trimmed).trim();
+  if (trimmed.length === 0 && body.length === 0) return;
   const messages = usePiStore.getState().messages;
   const messageIndex = messages.findIndex((m) => m.id === messageId);
   if (messageIndex < 0) {
-    await sendPrompt(trimmed);
+    await sendPrompt(trimmed, [], body === trimmed ? undefined : body);
     return;
   }
   // Ordinal of this user message among all user messages in the thread.
@@ -1137,7 +1151,7 @@ export async function forkAndReprompt(messageId: string, editedText: string): Pr
 
   const entryId = await forkEntryIdForOrdinal(ordinal);
   if (entryId === null) {
-    await sendPrompt(trimmed);
+    await sendPrompt(trimmed, [], body === trimmed ? undefined : body);
     return;
   }
 
@@ -1146,18 +1160,23 @@ export async function forkAndReprompt(messageId: string, editedText: string): Pr
 
   const forked = await window.piDesktop.invoke('pi:fork', { entryId });
   if (!forked.success || forked.cancelled === true) {
-    await sendPrompt(trimmed);
+    await sendPrompt(trimmed, [], body === trimmed ? undefined : body);
     return;
   }
 
   const after = await getPiState();
   const newFile = after.success ? (after.state?.sessionFile ?? null) : null;
 
-  usePiStore
-    .getState()
-    .commitFork(ordinal, { messageIndex, newFile, baseFile, editedText: trimmed });
-  // pi is now on the forked branch; this prompt appends the edited turn there.
-  await window.piDesktop.invoke('pi:prompt', { message: trimmed });
+  usePiStore.getState().commitFork(ordinal, {
+    messageIndex,
+    newFile,
+    baseFile,
+    editedText: trimmed,
+    ...(body !== trimmed ? { agentText: body } : {}),
+  });
+  // pi is now on the forked branch; this prompt appends the edited turn there,
+  // with its attachments folded back in (see `agentMessage`).
+  await window.piDesktop.invoke('pi:prompt', { message: body });
 }
 
 /** Switch the visible transcript to another fork branch and keep pi's active

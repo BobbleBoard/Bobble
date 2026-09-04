@@ -1,0 +1,1523 @@
+{
+  "name": "stress",
+  "state": {
+    "sessionFile": "/tmp/mock-pi/sessions/stress.jsonl",
+    "sessionId": "mock-stress"
+  },
+  "models": [
+    {
+      "id": "gemma-4-12b",
+      "name": "Gemma 4 12B",
+      "provider": "llamacpp",
+      "contextWindow": 32768,
+      "maxTokens": 4096,
+      "input": ["text"],
+      "reasoning": false,
+      "cost": {}
+    },
+    {
+      "id": "qwen3.5-4b-mtp",
+      "name": "Qwen 3.5 4B",
+      "provider": "llamacpp",
+      "contextWindow": 32768,
+      "maxTokens": 4096,
+      "input": ["text"],
+      "reasoning": false,
+      "cost": {}
+    }
+  ],
+  "prompts": [
+    {
+      "steps": [
+        {
+          "emit": {
+            "type": "agent_start"
+          }
+        },
+        {
+          "emit": {
+            "type": "turn_start"
+          }
+        },
+        {
+          "emit": {
+            "type": "message_start",
+            "message": {
+              "role": "assistant",
+              "content": []
+            }
+          }
+        },
+        {
+          "delayMs": 300,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Looking at the shape of this first. "
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "Looking at the shape of this first. ",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Looking at the shape of this first. "
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 300,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Looking at the shape of this first. "
+                },
+                {
+                  "type": "toolCall",
+                  "id": "call_bash_0",
+                  "name": "bash",
+                  "arguments": {
+                    "command": "ls -la"
+                  }
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "toolcall_start",
+              "contentIndex": 1,
+              "toolCall": {
+                "type": "toolCall",
+                "id": "call_bash_0",
+                "name": "bash",
+                "arguments": {
+                  "command": "ls -la"
+                }
+              },
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Looking at the shape of this first. "
+                  },
+                  {
+                    "type": "toolCall",
+                    "id": "call_bash_0",
+                    "name": "bash",
+                    "arguments": {
+                      "command": "ls -la"
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 60,
+          "emit": {
+            "type": "tool_execution_start",
+            "toolCallId": "call_bash_0",
+            "toolName": "bash"
+          }
+        },
+        {
+          "delayMs": 300,
+          "emit": {
+            "type": "tool_execution_end",
+            "toolCallId": "call_bash_0",
+            "toolName": "bash",
+            "result": {
+              "output": "total 24\ndrwxr-xr-x  5 u  s  160 src\n-rw-r--r--  1 u  s  842 README.md"
+            },
+            "isError": false
+          }
+        },
+        {
+          "delayMs": 300,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Looking at the shape of this first. There are three parts that have to line up. "
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "There are three parts that have to line up. ",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Looking at the shape of this first. There are three parts that have to line up. "
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 300,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Looking at the shape of this first. There are three parts that have to line up. "
+                },
+                {
+                  "type": "toolCall",
+                  "id": "call_read_1",
+                  "name": "read",
+                  "arguments": {
+                    "command": "src/index.ts"
+                  }
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "toolcall_start",
+              "contentIndex": 1,
+              "toolCall": {
+                "type": "toolCall",
+                "id": "call_read_1",
+                "name": "read",
+                "arguments": {
+                  "command": "src/index.ts"
+                }
+              },
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Looking at the shape of this first. There are three parts that have to line up. "
+                  },
+                  {
+                    "type": "toolCall",
+                    "id": "call_read_1",
+                    "name": "read",
+                    "arguments": {
+                      "command": "src/index.ts"
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 60,
+          "emit": {
+            "type": "tool_execution_start",
+            "toolCallId": "call_read_1",
+            "toolName": "read"
+          }
+        },
+        {
+          "delayMs": 300,
+          "emit": {
+            "type": "tool_execution_end",
+            "toolCallId": "call_read_1",
+            "toolName": "read",
+            "result": {
+              "output": "export function main() {\n  return 1;\n}"
+            },
+            "isError": false
+          }
+        },
+        {
+          "delayMs": 300,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Looking at the shape of this first. There are three parts that have to line up. The first is where the files actually land. "
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "The first is where the files actually land. ",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Looking at the shape of this first. There are three parts that have to line up. The first is where the files actually land. "
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 300,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Looking at the shape of this first. There are three parts that have to line up. The first is where the files actually land. "
+                },
+                {
+                  "type": "toolCall",
+                  "id": "call_bash_2",
+                  "name": "bash",
+                  "arguments": {
+                    "command": "npm test"
+                  }
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "toolcall_start",
+              "contentIndex": 1,
+              "toolCall": {
+                "type": "toolCall",
+                "id": "call_bash_2",
+                "name": "bash",
+                "arguments": {
+                  "command": "npm test"
+                }
+              },
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Looking at the shape of this first. There are three parts that have to line up. The first is where the files actually land. "
+                  },
+                  {
+                    "type": "toolCall",
+                    "id": "call_bash_2",
+                    "name": "bash",
+                    "arguments": {
+                      "command": "npm test"
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 60,
+          "emit": {
+            "type": "tool_execution_start",
+            "toolCallId": "call_bash_2",
+            "toolName": "bash"
+          }
+        },
+        {
+          "delayMs": 300,
+          "emit": {
+            "type": "tool_execution_end",
+            "toolCallId": "call_bash_2",
+            "toolName": "bash",
+            "result": {
+              "output": "12 passing"
+            },
+            "isError": false
+          }
+        },
+        {
+          "delayMs": 300,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Looking at the shape of this first. There are three parts that have to line up. The first is where the files actually land. The second is what the model is told about them. "
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "The second is what the model is told about them. ",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Looking at the shape of this first. There are three parts that have to line up. The first is where the files actually land. The second is what the model is told about them. "
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 300,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Looking at the shape of this first. There are three parts that have to line up. The first is where the files actually land. The second is what the model is told about them. The third is what happens when one of those is wrong. "
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "The third is what happens when one of those is wrong. ",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Looking at the shape of this first. There are three parts that have to line up. The first is where the files actually land. The second is what the model is told about them. The third is what happens when one of those is wrong. "
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 300,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Looking at the shape of this first. There are three parts that have to line up. The first is where the files actually land. The second is what the model is told about them. The third is what happens when one of those is wrong. Checking each in turn. "
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "Checking each in turn. ",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Looking at the shape of this first. There are three parts that have to line up. The first is where the files actually land. The second is what the model is told about them. The third is what happens when one of those is wrong. Checking each in turn. "
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 300,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Looking at the shape of this first. There are three parts that have to line up. The first is where the files actually land. The second is what the model is told about them. The third is what happens when one of those is wrong. Checking each in turn. That accounts for the behaviour you described. "
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "That accounts for the behaviour you described. ",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Looking at the shape of this first. There are three parts that have to line up. The first is where the files actually land. The second is what the model is told about them. The third is what happens when one of those is wrong. Checking each in turn. That accounts for the behaviour you described. "
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 300,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Looking at the shape of this first. There are three parts that have to line up. The first is where the files actually land. The second is what the model is told about them. The third is what happens when one of those is wrong. Checking each in turn. That accounts for the behaviour you described. Here is what I would change. "
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "Here is what I would change. ",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Looking at the shape of this first. There are three parts that have to line up. The first is where the files actually land. The second is what the model is told about them. The third is what happens when one of those is wrong. Checking each in turn. That accounts for the behaviour you described. Here is what I would change. "
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 300,
+          "emit": {
+            "type": "turn_end"
+          }
+        },
+        {
+          "emit": {
+            "type": "agent_end"
+          }
+        }
+      ],
+      "abortSteps": [
+        {
+          "emit": {
+            "type": "turn_end"
+          }
+        },
+        {
+          "emit": {
+            "type": "agent_end"
+          }
+        }
+      ]
+    },
+    {
+      "steps": [
+        {
+          "emit": {
+            "type": "agent_start"
+          }
+        },
+        {
+          "emit": {
+            "type": "turn_start"
+          }
+        },
+        {
+          "emit": {
+            "type": "message_start",
+            "message": {
+              "role": "assistant",
+              "content": []
+            }
+          }
+        },
+        {
+          "delayMs": 300,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Looking at the shape of this first. "
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "Looking at the shape of this first. ",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Looking at the shape of this first. "
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 300,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Looking at the shape of this first. "
+                },
+                {
+                  "type": "toolCall",
+                  "id": "call_bash_0",
+                  "name": "bash",
+                  "arguments": {
+                    "command": "ls -la"
+                  }
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "toolcall_start",
+              "contentIndex": 1,
+              "toolCall": {
+                "type": "toolCall",
+                "id": "call_bash_0",
+                "name": "bash",
+                "arguments": {
+                  "command": "ls -la"
+                }
+              },
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Looking at the shape of this first. "
+                  },
+                  {
+                    "type": "toolCall",
+                    "id": "call_bash_0",
+                    "name": "bash",
+                    "arguments": {
+                      "command": "ls -la"
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 60,
+          "emit": {
+            "type": "tool_execution_start",
+            "toolCallId": "call_bash_0",
+            "toolName": "bash"
+          }
+        },
+        {
+          "delayMs": 300,
+          "emit": {
+            "type": "tool_execution_end",
+            "toolCallId": "call_bash_0",
+            "toolName": "bash",
+            "result": {
+              "output": "total 24\ndrwxr-xr-x  5 u  s  160 src\n-rw-r--r--  1 u  s  842 README.md"
+            },
+            "isError": false
+          }
+        },
+        {
+          "delayMs": 300,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Looking at the shape of this first. There are three parts that have to line up. "
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "There are three parts that have to line up. ",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Looking at the shape of this first. There are three parts that have to line up. "
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 300,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Looking at the shape of this first. There are three parts that have to line up. "
+                },
+                {
+                  "type": "toolCall",
+                  "id": "call_read_1",
+                  "name": "read",
+                  "arguments": {
+                    "command": "src/index.ts"
+                  }
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "toolcall_start",
+              "contentIndex": 1,
+              "toolCall": {
+                "type": "toolCall",
+                "id": "call_read_1",
+                "name": "read",
+                "arguments": {
+                  "command": "src/index.ts"
+                }
+              },
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Looking at the shape of this first. There are three parts that have to line up. "
+                  },
+                  {
+                    "type": "toolCall",
+                    "id": "call_read_1",
+                    "name": "read",
+                    "arguments": {
+                      "command": "src/index.ts"
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 60,
+          "emit": {
+            "type": "tool_execution_start",
+            "toolCallId": "call_read_1",
+            "toolName": "read"
+          }
+        },
+        {
+          "delayMs": 300,
+          "emit": {
+            "type": "tool_execution_end",
+            "toolCallId": "call_read_1",
+            "toolName": "read",
+            "result": {
+              "output": "export function main() {\n  return 1;\n}"
+            },
+            "isError": false
+          }
+        },
+        {
+          "delayMs": 300,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Looking at the shape of this first. There are three parts that have to line up. The first is where the files actually land. "
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "The first is where the files actually land. ",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Looking at the shape of this first. There are three parts that have to line up. The first is where the files actually land. "
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 300,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Looking at the shape of this first. There are three parts that have to line up. The first is where the files actually land. "
+                },
+                {
+                  "type": "toolCall",
+                  "id": "call_bash_2",
+                  "name": "bash",
+                  "arguments": {
+                    "command": "npm test"
+                  }
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "toolcall_start",
+              "contentIndex": 1,
+              "toolCall": {
+                "type": "toolCall",
+                "id": "call_bash_2",
+                "name": "bash",
+                "arguments": {
+                  "command": "npm test"
+                }
+              },
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Looking at the shape of this first. There are three parts that have to line up. The first is where the files actually land. "
+                  },
+                  {
+                    "type": "toolCall",
+                    "id": "call_bash_2",
+                    "name": "bash",
+                    "arguments": {
+                      "command": "npm test"
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 60,
+          "emit": {
+            "type": "tool_execution_start",
+            "toolCallId": "call_bash_2",
+            "toolName": "bash"
+          }
+        },
+        {
+          "delayMs": 300,
+          "emit": {
+            "type": "tool_execution_end",
+            "toolCallId": "call_bash_2",
+            "toolName": "bash",
+            "result": {
+              "output": "12 passing"
+            },
+            "isError": false
+          }
+        },
+        {
+          "delayMs": 300,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Looking at the shape of this first. There are three parts that have to line up. The first is where the files actually land. The second is what the model is told about them. "
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "The second is what the model is told about them. ",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Looking at the shape of this first. There are three parts that have to line up. The first is where the files actually land. The second is what the model is told about them. "
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 300,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Looking at the shape of this first. There are three parts that have to line up. The first is where the files actually land. The second is what the model is told about them. The third is what happens when one of those is wrong. "
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "The third is what happens when one of those is wrong. ",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Looking at the shape of this first. There are three parts that have to line up. The first is where the files actually land. The second is what the model is told about them. The third is what happens when one of those is wrong. "
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 300,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Looking at the shape of this first. There are three parts that have to line up. The first is where the files actually land. The second is what the model is told about them. The third is what happens when one of those is wrong. Checking each in turn. "
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "Checking each in turn. ",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Looking at the shape of this first. There are three parts that have to line up. The first is where the files actually land. The second is what the model is told about them. The third is what happens when one of those is wrong. Checking each in turn. "
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 300,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Looking at the shape of this first. There are three parts that have to line up. The first is where the files actually land. The second is what the model is told about them. The third is what happens when one of those is wrong. Checking each in turn. That accounts for the behaviour you described. "
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "That accounts for the behaviour you described. ",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Looking at the shape of this first. There are three parts that have to line up. The first is where the files actually land. The second is what the model is told about them. The third is what happens when one of those is wrong. Checking each in turn. That accounts for the behaviour you described. "
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 300,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Looking at the shape of this first. There are three parts that have to line up. The first is where the files actually land. The second is what the model is told about them. The third is what happens when one of those is wrong. Checking each in turn. That accounts for the behaviour you described. Here is what I would change. "
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "Here is what I would change. ",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Looking at the shape of this first. There are three parts that have to line up. The first is where the files actually land. The second is what the model is told about them. The third is what happens when one of those is wrong. Checking each in turn. That accounts for the behaviour you described. Here is what I would change. "
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 300,
+          "emit": {
+            "type": "turn_end"
+          }
+        },
+        {
+          "emit": {
+            "type": "agent_end"
+          }
+        }
+      ],
+      "abortSteps": [
+        {
+          "emit": {
+            "type": "turn_end"
+          }
+        },
+        {
+          "emit": {
+            "type": "agent_end"
+          }
+        }
+      ]
+    },
+    {
+      "steps": [
+        {
+          "emit": {
+            "type": "agent_start"
+          }
+        },
+        {
+          "emit": {
+            "type": "turn_start"
+          }
+        },
+        {
+          "emit": {
+            "type": "message_start",
+            "message": {
+              "role": "assistant",
+              "content": []
+            }
+          }
+        },
+        {
+          "delayMs": 120,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Short answer: yes. "
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "Short answer: yes. ",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Short answer: yes. "
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 120,
+          "emit": {
+            "type": "turn_end"
+          }
+        },
+        {
+          "emit": {
+            "type": "agent_end"
+          }
+        }
+      ]
+    },
+    {
+      "steps": [
+        {
+          "emit": {
+            "type": "agent_start"
+          }
+        },
+        {
+          "emit": {
+            "type": "turn_start"
+          }
+        },
+        {
+          "emit": {
+            "type": "message_start",
+            "message": {
+              "role": "assistant",
+              "content": []
+            }
+          }
+        },
+        {
+          "delayMs": 120,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Second short answer. "
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "Second short answer. ",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Second short answer. "
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 120,
+          "emit": {
+            "type": "turn_end"
+          }
+        },
+        {
+          "emit": {
+            "type": "agent_end"
+          }
+        }
+      ]
+    },
+    {
+      "steps": [
+        {
+          "emit": {
+            "type": "agent_start"
+          }
+        },
+        {
+          "emit": {
+            "type": "turn_start"
+          }
+        },
+        {
+          "emit": {
+            "type": "message_start",
+            "message": {
+              "role": "assistant",
+              "content": []
+            }
+          }
+        },
+        {
+          "delayMs": 120,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Third short answer. "
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "Third short answer. ",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Third short answer. "
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 120,
+          "emit": {
+            "type": "turn_end"
+          }
+        },
+        {
+          "emit": {
+            "type": "agent_end"
+          }
+        }
+      ]
+    },
+    {
+      "steps": [
+        {
+          "emit": {
+            "type": "agent_start"
+          }
+        },
+        {
+          "emit": {
+            "type": "turn_start"
+          }
+        },
+        {
+          "emit": {
+            "type": "message_start",
+            "message": {
+              "role": "assistant",
+              "content": []
+            }
+          }
+        },
+        {
+          "delayMs": 120,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Fourth short answer. "
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "Fourth short answer. ",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Fourth short answer. "
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 120,
+          "emit": {
+            "type": "turn_end"
+          }
+        },
+        {
+          "emit": {
+            "type": "agent_end"
+          }
+        }
+      ]
+    },
+    {
+      "steps": [
+        {
+          "emit": {
+            "type": "agent_start"
+          }
+        },
+        {
+          "emit": {
+            "type": "turn_start"
+          }
+        },
+        {
+          "emit": {
+            "type": "message_start",
+            "message": {
+              "role": "assistant",
+              "content": []
+            }
+          }
+        },
+        {
+          "delayMs": 120,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Fifth short answer. "
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "Fifth short answer. ",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Fifth short answer. "
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 120,
+          "emit": {
+            "type": "turn_end"
+          }
+        },
+        {
+          "emit": {
+            "type": "agent_end"
+          }
+        }
+      ]
+    },
+    {
+      "steps": [
+        {
+          "emit": {
+            "type": "agent_start"
+          }
+        },
+        {
+          "emit": {
+            "type": "turn_start"
+          }
+        },
+        {
+          "emit": {
+            "type": "message_start",
+            "message": {
+              "role": "assistant",
+              "content": []
+            }
+          }
+        },
+        {
+          "delayMs": 120,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Sixth short answer. "
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "Sixth short answer. ",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Sixth short answer. "
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 120,
+          "emit": {
+            "type": "turn_end"
+          }
+        },
+        {
+          "emit": {
+            "type": "agent_end"
+          }
+        }
+      ]
+    },
+    {
+      "steps": [
+        {
+          "emit": {
+            "type": "agent_start"
+          }
+        },
+        {
+          "emit": {
+            "type": "turn_start"
+          }
+        },
+        {
+          "emit": {
+            "type": "message_start",
+            "message": {
+              "role": "assistant",
+              "content": []
+            }
+          }
+        },
+        {
+          "delayMs": 120,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Seventh short answer. "
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "Seventh short answer. ",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Seventh short answer. "
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 120,
+          "emit": {
+            "type": "turn_end"
+          }
+        },
+        {
+          "emit": {
+            "type": "agent_end"
+          }
+        }
+      ]
+    },
+    {
+      "steps": [
+        {
+          "emit": {
+            "type": "agent_start"
+          }
+        },
+        {
+          "emit": {
+            "type": "turn_start"
+          }
+        },
+        {
+          "emit": {
+            "type": "message_start",
+            "message": {
+              "role": "assistant",
+              "content": []
+            }
+          }
+        },
+        {
+          "delayMs": 120,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Eighth short answer. "
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "Eighth short answer. ",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Eighth short answer. "
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 120,
+          "emit": {
+            "type": "turn_end"
+          }
+        },
+        {
+          "emit": {
+            "type": "agent_end"
+          }
+        }
+      ]
+    }
+  ]
+}

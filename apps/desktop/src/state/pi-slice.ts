@@ -186,7 +186,11 @@ interface PiSliceState {
 
   /** Local echo for the composer (the RPC stream has no user-message event).
    * `images` are `data:` URIs, matching UserMsg.images. */
-  appendUser: (text: string, images?: string[]) => void;
+  /**
+   * Echo a user turn. `agentText` is pi's copy when it differs from the visible
+   * text — the same message with its attachments folded in (see UserMsg).
+   */
+  appendUser: (text: string, images?: string[], agentText?: string) => void;
   /** Append a SETTLED assistant reply (a single text block) — used by the corp CEO
    * follow-up Q&A (A1/A4), whose answer arrives whole over IPC, not as a token stream. */
   appendAssistantText: (text: string) => void;
@@ -213,6 +217,14 @@ interface PiSliceState {
       baseFile: string | null;
       editedText: string;
       images?: string[];
+      /**
+       * pi's copy of the edited turn — the text with its attachments folded back
+       * in — when it differs from `editedText`. Without it the forked echo has
+       * no `agentText`, so saving an edit rendered a bubble with no attachment
+       * cards even though the files WERE re-sent: they existed in the model's
+       * context and nowhere on screen.
+       */
+      agentText?: string;
     },
   ) => void;
   /** Swap the visible transcript to another branch at `ordinal` (‹/›). */
@@ -336,7 +348,7 @@ export const usePiStore = create<PiSliceState>((set) => ({
     }));
   },
 
-  commitFork: (ordinal, { messageIndex, newFile, baseFile, editedText, images }) =>
+  commitFork: (ordinal, { messageIndex, newFile, baseFile, editedText, images, agentText }) =>
     set((s) => {
       const live = s.messages;
       const prefix = live.slice(0, messageIndex);
@@ -345,6 +357,7 @@ export const usePiStore = create<PiSliceState>((set) => ({
         id: nextLocalId('u'),
         text: editedText,
         ...(images !== undefined && images.length > 0 ? { images } : {}),
+        ...(agentText !== undefined && agentText !== editedText ? { agentText } : {}),
         timestamp: Date.now(),
       };
       const seed = [...prefix, editedUser];
@@ -392,7 +405,7 @@ export const usePiStore = create<PiSliceState>((set) => ({
       };
     }),
 
-  appendUser: (text, images) =>
+  appendUser: (text, images, agentText) =>
     set((s) => ({
       messages: [
         ...s.messages,
@@ -401,6 +414,7 @@ export const usePiStore = create<PiSliceState>((set) => ({
           id: nextLocalId('u'),
           text,
           ...(images !== undefined && images.length > 0 ? { images } : {}),
+          ...(agentText !== undefined && agentText !== text ? { agentText } : {}),
           timestamp: Date.now(),
         },
       ],

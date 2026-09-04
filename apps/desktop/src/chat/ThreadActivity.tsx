@@ -68,6 +68,7 @@ export function ThreadActivityChain({
   resultForBlock,
   runningToolCalls,
   streaming,
+  turnStreaming,
   turnStartedAt,
   tps,
   onOpenFile,
@@ -77,6 +78,25 @@ export function ThreadActivityChain({
   resultForBlock: Map<string, ToolResultMsg>;
   runningToolCalls: string[];
   streaming: boolean;
+  /**
+   * Is the whole TURN still going — as opposed to this segment being the live
+   * one?
+   *
+   * MEASURED by the stress probe's bounce detector: the assistant's text block
+   * moving 3px and coming back ~97ms later, and behind it the content column
+   * collapsing 156→138px mid-reply. A turn that emits text after a tool call
+   * starts a new segment, so the previous chain stops being `lastSegment`, its
+   * `streaming` goes false, and it ROLLS ITSELF SHUT while the model is still
+   * talking — pulling everything below it up, then pushing it back down at the
+   * next tool call.
+   *
+   * the user has reported this shape twice: "no expanding/closing tool / think
+   * blocks it stays open until it says done." The per-step running state is
+   * rightly scoped to the live segment; whether the chain is DONE is a fact
+   * about the turn. Defaults to `streaming` so a caller that knows no better
+   * behaves as before.
+   */
+  turnStreaming?: boolean;
   /** Wall-clock the owning assistant turn began (for the thinking duration). */
   turnStartedAt?: number;
   /** Live throughput (tok/s) used to estimate a thinking-only run's duration. */
@@ -194,10 +214,10 @@ export function ThreadActivityChain({
       steps={steps.map((s) => s.data)}
       defaultExpanded={false}
       // Expanded + live while this run streams; collapses the moment it's done.
-      active={streaming}
+      active={turnStreaming ?? streaming}
       /* The turn's own answer to "is this over", so Done is never inferred from
          rows going quiet between two tool calls (the user: "done is a final thing"). */
-      complete={!streaming}
+      complete={!(turnStreaming ?? streaming)}
       /*
        * PREFILL, as the chain's last row. A turn that is ingesting a long prompt
        * produces nothing — no running step, no tokens — so the chain looked

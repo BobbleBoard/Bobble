@@ -1051,6 +1051,7 @@ export function ChatComposer({
               accept="image/*,text/*"
               multiple
               hidden
+              data-testid="composer-file-input"
               onChange={(e) => {
                 void addFiles(Array.from(e.target.files ?? []));
                 e.target.value = '';

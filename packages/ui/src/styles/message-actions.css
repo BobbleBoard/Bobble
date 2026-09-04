@@ -110,10 +110,24 @@
   color: var(--pd-user-bubble-fg);
 }
 
+/* The message's files, while it is being edited — see EditableMessage. */
+.pd-editable-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
 .pd-editable-actions {
   display: flex;
+  align-items: center;
   justify-content: flex-end;
   gap: 8px;
+}
+
+/* "Add files" belongs with the content, not with Cancel/Save. */
+.pd-editable-add {
+  margin-right: auto;
 }
 
 /*

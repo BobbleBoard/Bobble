@@ -166,11 +166,38 @@ export function ThreadStatusIndicator(): ReactElement | null {
    * message in the thread makes that structurally true, rather than trusting a
    * flag that has at least one path which never clears.
    */
+  /*
+   * ONCE THIS TURN HAS SPOKEN, THE RING DOES NOT COME BACK.
+   *
+   * MEASURED by the stress probe's flash detector: `[thread-processing]`
+   * mounting and unmounting over and over inside a single turn — 3ms, 8ms,
+   * 65ms, 119ms, 174ms — each time as a 660x34 band in the thread flow, so
+   * everything under it hopped down and back up. Exactly the "button briefly
+   * appearing for a few ms pushing something up then pushing everything back
+   * down again" the user asked me to hunt.
+   *
+   * The cause is that `turnHasContent` is recomputed from the CURRENT message
+   * list every render, and a multi-step turn keeps returning to a state with no
+   * content yet: pi starts a fresh assistant message after each tool result, and
+   * for the frames before its first delta the turn looks like it is prefilling
+   * again. The ring's own comment already says those re-prefills should not show
+   * ("near-instant … showing 'processing' there is noise").
+   *
+   * So the answer is a latch, not a threshold: the first time a turn produces
+   * anything, remember it for the rest of that turn. Keyed on the last USER
+   * message, which is what "this turn" means here — a new user message clears it
+   * and the ring is allowed again.
+   */
+  const turnKey = [...messages].reverse().find((m) => m.kind === 'user')?.id ?? '';
+  const spoken = useRef({ key: '', yes: false });
+  if (spoken.current.key !== turnKey) spoken.current = { key: turnKey, yes: false };
+  if (turnHasContent) spoken.current.yes = true;
+
   const processing = showProcessing({
     hasUserMessage: messages.some((m) => m.kind === 'user'),
     promptInFlight,
     hasStreamingAssistant: streamingAssistant !== undefined,
-    turnHasContent,
+    turnHasContent: turnHasContent || spoken.current.yes,
   });
 
   /*

@@ -29,6 +29,16 @@ export interface UserMsg {
    * same representation the composer pushes for live user messages, so
    * rehydrated and live rows render identically. */
   images?: string[];
+  /**
+   * What pi was actually sent, when that differs from the visible `text`.
+   *
+   * The composer folds text attachments into the model's copy as fenced blocks
+   * and echoes only what was typed. Without this the LIVE bubble knew nothing
+   * about its own files — no cards under the message, and editing it silently
+   * dropped them — while the same message reloaded from disk (where pi's copy
+   * IS the message) rendered them correctly. One field makes the two identical.
+   */
+  agentText?: string;
   timestamp: number;
 }
 

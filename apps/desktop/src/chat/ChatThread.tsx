@@ -44,7 +44,8 @@ import { usePiStore } from '../state/pi-slice';
 import { openPresented, type PresentedRecord, usePresentStore } from '../state/present-store';
 import { AssistantGroup } from './AssistantGroup';
 import { AttachedFileCard } from './AttachedFileCard';
-import { splitAttachedFiles } from './attached-files';
+import { type AttachedFile, splitAttachedFiles } from './attached-files';
+import { buildAgentMessage } from './composer/agent-message';
 import { corpChatView } from './corp/corp-thread-view';
 import { HarnessChecklistPanel, ThreadStatusIndicator } from './HarnessStatus';
 import { UserImage } from './UserImage';
@@ -206,6 +207,49 @@ export function ChatThread() {
   const presented = usePresentStore((st) => st.items);
 
   const [editingId, setEditingId] = useState<string | null>(null);
+  /*
+   * THE FILES ON THE MESSAGE YOU ARE EDITING.
+   *
+   * Editing used to re-send the visible TEXT alone. A message's attachments live
+   * in pi's copy (folded in as fenced blocks), so correcting a typo silently
+   * deleted every file on the turn — and there was no way to add one either,
+   * short of abandoning the edit and typing the whole message again.
+   *
+   * Seeded from the message when the edit opens, mutated by the ✕ on each card
+   * and by "Add files", and folded back into pi's copy on save.
+   */
+  const [editFiles, setEditFiles] = useState<readonly AttachedFile[]>([]);
+  const editFileInput = useRef<HTMLInputElement>(null);
+
+  /** Open the editor on a message, seeded with its current attachments. */
+  const beginEdit = (message: { id: string; text: string; agentText?: string }): void => {
+    setEditFiles(splitAttachedFiles(message.agentText ?? message.text).files);
+    setEditingId(message.id);
+  };
+
+  /** Read chosen files as text attachments (binaries are skipped, as elsewhere). */
+  const addEditFiles = async (files: readonly File[]): Promise<void> => {
+    const read = await Promise.all(
+      files.map(
+        (file) =>
+          new Promise<AttachedFile | null>((resolve) => {
+            const reader = new FileReader();
+            reader.onerror = () => resolve(null);
+            reader.onload = () => {
+              const text = typeof reader.result === 'string' ? reader.result : '';
+              // A NUL byte is the same binary test the read channel uses; a
+              // binary pasted into a prompt is noise, not content.
+              resolve(
+                text.includes('\u0000') ? null : { id: crypto.randomUUID(), name: file.name, text },
+              );
+            };
+            reader.readAsText(file);
+          }),
+      ),
+    );
+    const kept = read.filter((f): f is AttachedFile => f !== null);
+    if (kept.length > 0) setEditFiles((prev) => [...prev, ...kept]);
+  };
 
   /* One card, wherever it is drawn — anchored to its turn or at the foot. */
   const renderPresented = (records: readonly PresentedRecord[]): ReactNode => (
@@ -254,8 +298,14 @@ export function ChatThread() {
   // so the message now carries alternates surfaced by the BranchSwitcher below.
   const saveEdit = (text: string) => {
     const id = editingId;
+    const files = editFiles;
     setEditingId(null);
-    if (id !== null) void forkAndReprompt(id, text);
+    setEditFiles([]);
+    if (id === null) return;
+    // The bubble shows the typed text; pi receives it with the (possibly
+    // edited) attachments folded back in — see forkAndReprompt's `agentMessage`.
+    const body = buildAgentMessage(text, files);
+    void forkAndReprompt(id, text, body === text ? undefined : body);
   };
 
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -395,6 +445,19 @@ export function ChatThread() {
       {/* The live task checklist stays pinned above the scrolling transcript so
           the user watches items flip pending → in_progress → done during a task. */}
       <HarnessChecklistPanel />
+      {/* The file picker "Add files" opens while editing a message. Hidden and
+          always mounted, so the click that opens it stays a user gesture. */}
+      <input
+        ref={editFileInput}
+        type="file"
+        multiple
+        hidden
+        data-testid="edit-file-input"
+        onChange={(e) => {
+          void addEditFiles(Array.from(e.target.files ?? []));
+          e.target.value = '';
+        }}
+      />
       <ScrollArea
         ref={scrollRef}
         onScroll={onScroll}
@@ -461,10 +524,30 @@ export function ChatThread() {
                     <div key={message.id} className="flex flex-col gap-1">
                       <EditableMessage
                         data-testid="editing-message"
-                        value={message.text}
+                        // The TYPED text, without the folded attachments — those
+                        // are cards above the field, not prose to edit around.
+                        value={splitAttachedFiles(message.agentText ?? message.text).text}
                         editing
                         onSave={saveEdit}
-                        onCancel={() => setEditingId(null)}
+                        onCancel={() => {
+                          setEditingId(null);
+                          setEditFiles([]);
+                        }}
+                        onAddFiles={() => editFileInput.current?.click()}
+                        attachments={
+                          editFiles.length > 0
+                            ? editFiles.map((f) => (
+                                <AttachedFileCard
+                                  key={f.id}
+                                  name={f.name}
+                                  text={f.text}
+                                  onRemove={() =>
+                                    setEditFiles((prev) => prev.filter((x) => x.id !== f.id))
+                                  }
+                                />
+                              ))
+                            : undefined
+                        }
                       />
                       {switcher}
                     </div>
@@ -482,7 +565,10 @@ export function ChatThread() {
                  * "Attached file `pasted content`: ```". Unfolding here puts the
                  * cards back wherever the bubble came from.
                  */
-                const attached = splitAttachedFiles(message.text);
+                // pi's copy carries the fold; the visible text does not. Reading
+                // `agentText` first makes a live bubble and a reloaded one show
+                // the same cards (see UserMsg.agentText).
+                const attached = splitAttachedFiles(message.agentText ?? message.text);
                 return (
                   <div key={message.id} className="flex flex-col gap-1">
                     <MessageRow
@@ -490,7 +576,7 @@ export function ChatThread() {
                       actions={
                         <MessageActions
                           onCopy={() => copyText(message.text)}
-                          onEdit={() => setEditingId(message.id)}
+                          onEdit={() => beginEdit(message)}
                         />
                       }
                     >

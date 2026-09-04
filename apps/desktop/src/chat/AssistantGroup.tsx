@@ -184,6 +184,9 @@ export function AssistantGroup({
               resultForBlock={resultForBlock}
               runningToolCalls={runningToolCalls}
               streaming={streaming && seg === lastSegment}
+              // Whether the chain is DONE is a fact about the TURN, not about
+              // this segment still being the last one — see `turnStreaming`.
+              turnStreaming={streaming}
               turnStartedAt={group[0]?.timestamp}
               tps={tps}
               {...(onOpenFile !== undefined ? { onOpenFile } : {})}

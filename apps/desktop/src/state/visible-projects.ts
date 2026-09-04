@@ -22,7 +22,6 @@
 import { useEffect } from 'react';
 import { create } from 'zustand';
 import type { SessionSummary } from '../../electron/ipc-contract';
-import { isSandboxCwd } from '../chat/composer-bar-logic';
 import { AUTO_PROJECT_PREFIX, groupChats, useChatOrg } from './chat-org';
 import { listSessions } from './pi-connect';
 
@@ -67,39 +66,34 @@ export interface VisibleProject {
   readonly auto: boolean;
 }
 
-/** Pure: the projects the sidebar would render, in the sidebar's own order. */
+/**
+ * Pure: the projects the picker offers — the ones in the SIDEBAR, and nothing
+ * else.
+ *
+ * the user: "they shouldn't be there unless they're in the project sidebar on the
+ * left which I should have to make manually."
+ *
+ * This used to add a row per distinct chat cwd, on the reasoning that the picker
+ * "has to offer the folders chats actually live in". That reasoning was wrong in
+ * practice: every chat gets its own working folder, so the list grew one entry
+ * per conversation — MEASURED on his machine, 199 of them named `new-chat-N` —
+ * and not one was a project he had made. A picker nobody can find anything in
+ * offers nothing.
+ *
+ * Pointing a chat somewhere new is still one action: "New project" names one,
+ * which puts it in the sidebar AND here, which is exactly the rule above. The
+ * chip still LABELS the working folder when a chat is in one with no row of its
+ * own (see ComposerBar) — that is a status readout, not a list entry.
+ */
 export function visibleProjectsOf(
   sessions: readonly SessionSummary[],
   org: ReturnType<typeof useChatOrg>,
 ): VisibleProject[] {
-  /*
-   * THE PICKER STILL LISTS FOLDERS; THE SIDEBAR NO LONGER MAKES THEM PROJECTS.
-   *
-   * These used to come from groupChats' auto groups. the user removed those —
-   * "not every working directory folder becomes a project" — but the composer
-   * still has to offer the folders chats actually live in, or there is no way
-   * to point a new chat at one. So the folder entries are derived HERE, from
-   * the sessions, and exist only inside this picker.
-   */
-  const manual = groupChats([...sessions], org).projects.map((g) => ({
+  return groupChats([...sessions], org).projects.map((g) => ({
     id: g.project.id,
     name: g.project.name,
     auto: false,
   }));
-  const byCwd = new Map<string, { name: string; recent: string }>();
-  for (const s of sessions) {
-    const dir = normalizeDir(s.cwd);
-    if (dir === null || isSandboxCwd(s.cwd)) continue;
-    const name = dir.split('/').filter(Boolean).at(-1) ?? dir;
-    const prior = byCwd.get(dir);
-    if (prior === undefined || s.modifiedAt > prior.recent) {
-      byCwd.set(dir, { name, recent: s.modifiedAt });
-    }
-  }
-  const folders = [...byCwd.entries()]
-    .sort((a, b) => b[1].recent.localeCompare(a[1].recent))
-    .map(([dir, g]) => ({ id: `${AUTO_PROJECT_PREFIX}${dir}`, name: g.name, auto: true }));
-  return [...manual, ...folders];
 }
 
 /** One directory, one spelling: trailing slashes off (a lone `/` stays `/`), so
@@ -110,8 +104,15 @@ function normalizeDir(dir: string | null | undefined): string | null {
   return dir.replace(/\/+$/, '') || '/';
 }
 
-/** The working folder behind a directory-derived entry, or null for a project the
- * user made — those are identified by id, and never by a path. */
+/**
+ * The working folder behind a directory-derived entry, or null for a project the
+ * user made — those are identified by id, and never by a path.
+ *
+ * Nothing produces an `auto` entry any more (see {@link visibleProjectsOf}), so
+ * this always answers null today. It is kept because the id SPACE still has two
+ * shapes — a chat-org id and a `cwd:` path — and `activeVisibleProjectId` reads
+ * both; a saved selection from an older build is still decoded correctly.
+ */
 export function autoProjectPath(project: VisibleProject): string | null {
   if (!project.auto || !project.id.startsWith(AUTO_PROJECT_PREFIX)) return null;
   return normalizeDir(project.id.slice(AUTO_PROJECT_PREFIX.length));

@@ -24,6 +24,18 @@ export interface EditableMessageProps
   onCancel?: () => void;
   saveLabel?: ReactNode;
   cancelLabel?: ReactNode;
+  /**
+   * The message's attachments, rendered ABOVE the text while editing.
+   *
+   * Editing a message used to re-send its visible text alone, which silently
+   * dropped every file on it — the attachments live in pi's copy, folded in as
+   * fenced blocks, and nothing in the editor knew about them. They are shown
+   * here so you can see what is going with the edit, remove one, or add another.
+   */
+  attachments?: ReactNode;
+  /** "Add files" in the editor's action row. Omitted ⇒ no button. */
+  onAddFiles?: () => void;
+  addFilesLabel?: ReactNode;
 }
 
 /**
@@ -40,6 +52,9 @@ export const EditableMessage = forwardRef<HTMLDivElement, EditableMessageProps>(
       onCancel,
       saveLabel = 'Save',
       cancelLabel = 'Cancel',
+      attachments,
+      onAddFiles,
+      addFilesLabel = 'Add files',
       className,
       ...rest
     },
@@ -76,6 +91,11 @@ export const EditableMessage = forwardRef<HTMLDivElement, EditableMessageProps>(
       >
         {editing ? (
           <div className="pd-editable-box">
+            {attachments !== undefined ? (
+              <div className="pd-editable-attachments" data-testid="editing-attachments">
+                {attachments}
+              </div>
+            ) : null}
             <TextArea
               ref={textareaRef}
               autoGrow
@@ -87,6 +107,17 @@ export const EditableMessage = forwardRef<HTMLDivElement, EditableMessageProps>(
               aria-label="Edit message"
             />
             <div className="pd-editable-actions">
+              {onAddFiles !== undefined ? (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="pd-editable-add"
+                  data-testid="editing-add-files"
+                  onClick={onAddFiles}
+                >
+                  {addFilesLabel}
+                </Button>
+              ) : null}
               <Button size="sm" variant="ghost" onClick={() => onCancel?.()}>
                 {cancelLabel}
               </Button>
