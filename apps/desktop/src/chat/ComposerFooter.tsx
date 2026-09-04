@@ -1,13 +1,14 @@
 /**
  * Composer footer cluster: current-model chip (with a menu that switches pi
  * models and downloads/starts local ones), the model-download progress bar, and a
- * turn-stats info popover (non-power users only). When nothing is set up it shows
+ * turn-stats info popover. When nothing is set up it shows
  * a tasteful "pick a model" affordance that kicks off a download (full model
  * manager is W10).
  *
  * Round-A: the live tok/s readout moved off the input bar to the per-message
  * action bar (#2); the context-fullness ring moved to the sticking-out ComposerBar
- * (#5); the info popover is hidden in power mode (#1). Blind-test #1: ALL run
+ * (#5). The info popover was once hidden in power mode (#1) and no longer is —
+ * see the note at the popover itself. Blind-test #1: ALL run
  * status (the harness stage/timer/repair cluster, the "switching…" pill) left the
  * footer for the ONE thread indicator, so the input bar shows no run state.
  */

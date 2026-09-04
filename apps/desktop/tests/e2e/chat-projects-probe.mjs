@@ -66,7 +66,16 @@ try {
   await page.waitForSelector('[data-testid="chat-row-fix the bug"]', { timeout: 10000 });
 
   // ── Create a project via the "+" (hover-revealed) → inline rename → "Research".
-  await page.click('[data-testid="new-project"]', { force: true });
+  /*
+   * NOT `{force: true}`. It was added to get past the hover-reveal, and it also
+   * turned off the check that matters here: Playwright's "element is stable"
+   * wait. MEASURED, this probe was red for exactly that — the sidebar animates
+   * in over 300ms (an `@starting-style` translate, global.css), so at the moment
+   * of the click the button sat at x = -36, off the left edge of the window, and
+   * a forced click has nowhere to land. Without `force` the click waits for it
+   * to stop moving, which is what a person does without thinking about it.
+   */
+  await page.click('[data-testid="new-project"]');
   const projInput = page.locator('[data-testid^="project-rename-input-"]');
   await projInput.waitFor({ timeout: 8000 });
   await projInput.fill('Research');

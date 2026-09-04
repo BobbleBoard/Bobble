@@ -15,7 +15,7 @@
  *       ("Auto · <loaded model>", from the resident inference model / pi's active
  *       model — NEVER the routed tier), and the friendly tier LABEL ("Balanced")
  *       when a tier is pinned. The live tok/s readout is gone from the input bar
- *       (#2), and the turn-stats info button is hidden for power users (#1).
+ *       (#2), and the turn-stats info button is always present (#1 was reverted).
  *
  * The gradient / motion FEEL is owner-validated (not asserted). Run `pnpm build`
  * first.
@@ -164,36 +164,49 @@ try {
       `no run-status word ("${word}") may remain in the composer footer, got ${JSON.stringify(footerText)}`,
     );
   }
-  // Not streaming ⇒ the ONE thread indicator is absent.
+  /*
+   * THE ONE LIVE INDICATOR — rewritten for the ring that replaced it.
+   *
+   * This block used to wait on `[data-testid="thread-status"]` and assert it read
+   * "Working · Reviewing". Both were deliberately removed: the indicator became
+   * the ProcessingRing (`thread-processing`), and the label went with it — the user,
+   * on the redesign: the old "Working · Reviewing · Ns" label is gone, the
+   * streamed content and inline tool rows carry the run from there.
+   *
+   * So the probe was red for months against a UI nobody intended to have. What
+   * still MATTERS, and is what it now checks, is the invariant the original was
+   * written for: exactly one live indicator, in the thread, never in the footer,
+   * and gone when the turn is over.
+   */
+  const threadStatus = page.locator('[data-testid="thread-processing"]');
   assert(
-    (await page.locator('[data-testid="thread-status"]').count()) === 0,
+    (await threadStatus.count()) === 0,
     'the thread status indicator only shows while streaming/switching',
   );
-  // Begin a turn ⇒ EXACTLY ONE live indicator appears in the thread, reading
-  // "Working · Reviewing" (the acting stage folded in), never in the footer. Seed
-  // a user message too so the thread (which is gated on a non-empty transcript)
-  // actually mounts.
+  // Begin a turn ⇒ EXACTLY ONE live indicator appears in the thread. Seed a user
+  // message too: the thread is gated on a non-empty transcript, and the ring is
+  // gated on a turn the user actually started.
   await page.evaluate(() =>
     window.__pi_store().setState((s) => ({
       agent: { ...s.agent, isStreaming: true, agentStartedAt: Date.now() },
+      promptInFlight: true,
       messages: [
         { kind: 'user', id: 'probe-status-msg', text: 'status probe', timestamp: Date.now() },
       ],
     })),
   );
-  const threadStatus = page.locator('[data-testid="thread-status"]');
   await threadStatus.waitFor({ timeout: 8000 });
   assert(
-    (await page.locator('[data-testid="thread-status"]').count()) === 1,
+    (await threadStatus.count()) === 1,
     'there must be exactly ONE live status indicator in the thread',
   );
-  const streamingStatus = (await threadStatus.innerText()).trim();
+  // …and it is still not in the footer.
   assert(
-    streamingStatus.includes('Working') && streamingStatus.includes('Reviewing'),
-    `the thread indicator should read "Working · Reviewing" for the reviewing stage, got ${JSON.stringify(streamingStatus)}`,
+    (await page.locator('.pd-composer-footer [data-testid="thread-processing"]').count()) === 0,
+    'the live indicator must not render inside the composer footer',
   );
   // ── #5: classification is surfaced ONLY in Auto — pin a tier + publish a
-  // classify stage and the indicator must NOT say "Classifying".
+  // classify stage and nothing may say "Classifying".
   await page.evaluate(() => {
     window
       .__settings_store()
@@ -206,14 +219,7 @@ try {
       },
     }));
   });
-  await page.waitForFunction(
-    () => {
-      const t = (document.querySelector('[data-testid="thread-status"]')?.textContent ?? '').trim();
-      return t.length > 0 && !t.includes('Classifying');
-    },
-    undefined,
-    { timeout: 8000 },
-  );
+  await page.waitForTimeout(400);
   const pinnedStatus = (await threadStatus.innerText()).trim();
   assert(
     !pinnedStatus.includes('Classifying'),
@@ -225,6 +231,7 @@ try {
   await page.evaluate(() => {
     window.__pi_store().setState((s) => ({
       agent: { ...s.agent, isStreaming: false, agentStartedAt: null },
+      promptInFlight: false,
       messages: [],
       extensionStatus: {
         ...s.extensionStatus,
@@ -281,22 +288,15 @@ try {
     'no "tok/s" text may remain anywhere in the composer footer',
   );
 
-  // ── round-A #1: the turn-stats info button is hidden for POWER users ───────
-  // Visible in the default (user) mode…
-  await page.waitForFunction(
-    () => document.querySelectorAll('[data-testid="footer-info"]').length === 1,
-    undefined,
-    { timeout: 8000 },
-  );
-  // …hidden once the experience mode is power…
-  await page.evaluate(() => window.__settings_store().getState().update({ userMode: 'power' }));
-  await page.waitForFunction(
-    () => document.querySelectorAll('[data-testid="footer-info"]').length === 0,
-    undefined,
-    { timeout: 8000 },
-  );
-  // …and back once it returns to user (restore the shared mode).
-  await page.evaluate(() => window.__settings_store().getState().update({ userMode: 'user' }));
+  /*
+   * The turn-stats info button is ALWAYS there.
+   *
+   * It used to be hidden for power users, and this probe asserted that. The
+   * app deliberately dropped the distinction — ComposerFooter says why: with
+   * the mode toggle gone there are no power users to hide it from, and hiding
+   * the only inline stats readout from everyone is the worse of the two
+   * options. The probe kept asserting the old rule and had been red ever since.
+   */
   await page.waitForFunction(
     () => document.querySelectorAll('[data-testid="footer-info"]').length === 1,
     undefined,
@@ -353,8 +353,8 @@ try {
       'the Effort button reads "Effort · Adaptive" and reveals the slider popover; the footer ' +
       'chip shows "Auto · gemma4 e2b" (the LOADED model, not the tier) under Auto and "Balanced" ' +
       'when a tier is pinned; the tok/s readout is gone from the input bar; the turn-stats ' +
-      'info button is hidden for power users; and (blind-test #1/#5) run status lives in exactly ' +
-      'ONE thread indicator ("Working · Reviewing"), the composer footer shows no run status, and ' +
+      'info button is always present; and (blind-test #1/#5) run status lives in exactly ' +
+      'ONE thread indicator, the composer footer shows no run status, and ' +
       'a pinned tier never shows "Classifying"',
   );
 } finally {
