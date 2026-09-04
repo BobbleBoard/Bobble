@@ -35,13 +35,13 @@ import {
   Thread,
   writeClipboardText,
 } from '@pi-desktop/ui';
-import { useEffect, useRef, useState } from 'react';
+import { Fragment, type ReactNode, useEffect, useRef, useState } from 'react';
 import { IconWarning } from '../settings/icons';
 import { useCorpStore } from '../state/corp-store';
 import { useLlmStore } from '../state/llm-store';
 import { forkAndReprompt, switchBranch } from '../state/pi-connect';
 import { usePiStore } from '../state/pi-slice';
-import { openPresented, usePresentStore } from '../state/present-store';
+import { openPresented, type PresentedRecord, usePresentStore } from '../state/present-store';
 import { AssistantGroup } from './AssistantGroup';
 import { AttachedFileCard } from './AttachedFileCard';
 import { splitAttachedFiles } from './attached-files';
@@ -74,6 +74,17 @@ type RenderItem =
   | { kind: 'orphanTool'; message: ToolResultMsg }
   | { kind: 'notice'; message: NoticeMsg }
   | { kind: 'assistant'; group: AssistantMsg[] };
+
+/**
+ * The id a presented card anchors to for this row: the LAST message it draws,
+ * so a card handed over at the end of an assistant group lands under the whole
+ * group rather than splitting it.
+ */
+function threadItemId(item: RenderItem): string {
+  return item.kind === 'assistant'
+    ? (item.group[item.group.length - 1]?.id ?? '')
+    : item.message.id;
+}
 
 /** Coalesce consecutive assistant messages (no user turn between) into groups. */
 function toRenderItems(messages: ChatMsg[], claimed: Set<string>): RenderItem[] {
@@ -195,6 +206,30 @@ export function ChatThread() {
   const presented = usePresentStore((st) => st.items);
 
   const [editingId, setEditingId] = useState<string | null>(null);
+
+  /* One card, wherever it is drawn — anchored to its turn or at the foot. */
+  const renderPresented = (records: readonly PresentedRecord[]): ReactNode => (
+    <div className="flex flex-col gap-2 px-1 pt-2" data-testid="presented">
+      {records.map((item) => (
+        <PresentCard
+          key={item.path}
+          item={item}
+          /* Body → the canvas. Split button → an application. Two
+           * different verbs, deliberately not sharing a handler. */
+          onActivate={() => void openPresented(canvasController, item)}
+          onOpen={() => {
+            void window.piDesktop.invoke('canvas:open-default', { path: item.path });
+          }}
+          onOpenWith={(_it, appId) => {
+            void window.piDesktop.invoke('canvas:open-with', { path: item.path, appId });
+          }}
+          onReveal={() => {
+            void window.piDesktop.invoke('canvas:reveal', { path: item.path });
+          }}
+        />
+      ))}
+    </div>
+  );
 
   const copyText = (text: string) => {
     void writeClipboardText(text);
@@ -336,6 +371,24 @@ export function ChatThread() {
   }
 
   const items = toRenderItems(messages, claimed);
+  /*
+   * Presented artefacts, bucketed by the row they were handed over after. A
+   * record whose anchor is not in this thread (presented before the first
+   * message, or its turn edited away) has nowhere to sit and falls to the foot.
+   */
+  const anchorIds = new Set(items.map(threadItemId));
+  const presentedByAnchor = new Map<string, PresentedRecord[]>();
+  const orphanPresented: PresentedRecord[] = [];
+  for (const record of presented) {
+    const id = record.afterMessageId;
+    if (id === null || !anchorIds.has(id)) {
+      orphanPresented.push(record);
+      continue;
+    }
+    const bucket = presentedByAnchor.get(id);
+    if (bucket === undefined) presentedByAnchor.set(id, [record]);
+    else bucket.push(record);
+  }
 
   return (
     <div className="relative flex min-h-0 flex-1 flex-col">
@@ -356,176 +409,198 @@ export function ChatThread() {
           ) : null}
 
           {items.map((item) => {
-            if (item.kind === 'notice') {
-              /* The harness saying something the user needs — a model too small
+            /*
+             * A PRESENTED ARTEFACT STAYS WHERE IT WAS HANDED OVER.
+             *
+             * the user: "file presentation cards seem pinned to the bottom of the
+             * chat for some time instead of staying at the position they were
+             * created at." Every card ever presented used to render as one block
+             * after the last message, so the picture from your first question was
+             * still hovering over the composer three questions later. Each record
+             * carries the message it followed (present-store's `afterMessageId`),
+             * and the card is drawn there; anything whose anchor is not in this
+             * thread still falls to the foot, which is where it used to live.
+             */
+            const cards = presentedByAnchor.get(threadItemId(item));
+            const node = ((): ReactNode => {
+              if (item.kind === 'notice') {
+                /* The harness saying something the user needs — a model too small
                  for the work it just reached for, a failed verify, a loop-guard
                  steer. It sits with the turn it describes rather than sliding
                  past as a toast. */
-              return (
-                <div key={item.message.id} className="pd-notice" data-testid="chat-notice">
-                  <IconWarning size={14} className="pd-notice-icon" />
-                  <span>{item.message.text}</span>
-                </div>
-              );
-            }
-            if (item.kind === 'user') {
-              const message = item.message;
-              const ordinal = userOrdinalById.get(message.id) ?? -1;
-              const group = branches[ordinal];
-              // A message with alternates shows a persistent ‹ n / m › switcher
-              // beneath its bubble (kept out of the hover-only action bar so the
-              // alternates are always discoverable).
-              const switcher =
-                group !== undefined && group.files.length > 1 ? (
-                  <div className="flex justify-end">
-                    <BranchSwitcher
-                      data-testid="branch-switcher"
-                      index={group.active}
-                      total={group.files.length}
-                      onPrev={() => void switchBranch(ordinal, group.active - 1)}
-                      onNext={() => void switchBranch(ordinal, group.active + 1)}
-                    />
+                return (
+                  <div key={item.message.id} className="pd-notice" data-testid="chat-notice">
+                    <IconWarning size={14} className="pd-notice-icon" />
+                    <span>{item.message.text}</span>
                   </div>
-                ) : null;
+                );
+              }
+              if (item.kind === 'user') {
+                const message = item.message;
+                const ordinal = userOrdinalById.get(message.id) ?? -1;
+                const group = branches[ordinal];
+                // A message with alternates shows a persistent ‹ n / m › switcher
+                // beneath its bubble (kept out of the hover-only action bar so the
+                // alternates are always discoverable).
+                const switcher =
+                  group !== undefined && group.files.length > 1 ? (
+                    <div className="flex justify-end">
+                      <BranchSwitcher
+                        data-testid="branch-switcher"
+                        index={group.active}
+                        total={group.files.length}
+                        onPrev={() => void switchBranch(ordinal, group.active - 1)}
+                        onNext={() => void switchBranch(ordinal, group.active + 1)}
+                      />
+                    </div>
+                  ) : null;
 
-              // Inline edit mode: the bubble becomes an editable textarea (#A9).
-              if (editingId === message.id) {
+                // Inline edit mode: the bubble becomes an editable textarea (#A9).
+                if (editingId === message.id) {
+                  return (
+                    <div key={message.id} className="flex flex-col gap-1">
+                      <EditableMessage
+                        data-testid="editing-message"
+                        value={message.text}
+                        editing
+                        onSave={saveEdit}
+                        onCancel={() => setEditingId(null)}
+                      />
+                      {switcher}
+                    </div>
+                  );
+                }
+                /*
+                 * THE PASTE CARD SURVIVES THE ROUND TRIP.
+                 *
+                 * the user: "pasted content shows literally as 'pasted content' rather
+                 * than the already-designed paste card." Live, the bubble echoes
+                 * only what was typed — but pi's copy of the message carries the
+                 * attachments folded in as fenced blocks, and a chat REOPENED from
+                 * its session file rebuilds its bubbles from that. So the card was
+                 * right until you came back to the chat, and then it was a wall of
+                 * "Attached file `pasted content`: ```". Unfolding here puts the
+                 * cards back wherever the bubble came from.
+                 */
+                const attached = splitAttachedFiles(message.text);
                 return (
                   <div key={message.id} className="flex flex-col gap-1">
-                    <EditableMessage
-                      data-testid="editing-message"
-                      value={message.text}
-                      editing
-                      onSave={saveEdit}
-                      onCancel={() => setEditingId(null)}
-                    />
+                    <MessageRow
+                      kind="user"
+                      actions={
+                        <MessageActions
+                          onCopy={() => copyText(message.text)}
+                          onEdit={() => setEditingId(message.id)}
+                        />
+                      }
+                    >
+                      <div className="flex flex-col gap-2">
+                        {message.images !== undefined && message.images.length > 0 ? (
+                          <div className="flex flex-wrap gap-2">
+                            {message.images.map((src) => (
+                              <UserImage key={src} src={src} />
+                            ))}
+                          </div>
+                        ) : null}
+                        {attached.files.length > 0 ? (
+                          <div className="flex flex-wrap gap-2" data-testid="user-attachments">
+                            {attached.files.map((f) => (
+                              <AttachedFileCard key={f.id} name={f.name} text={f.text} />
+                            ))}
+                          </div>
+                        ) : null}
+                        {attached.text.length > 0 ? <ClampedText text={attached.text} /> : null}
+                      </div>
+                    </MessageRow>
                     {switcher}
                   </div>
                 );
               }
-              /*
-               * THE PASTE CARD SURVIVES THE ROUND TRIP.
-               *
-               * the user: "pasted content shows literally as 'pasted content' rather
-               * than the already-designed paste card." Live, the bubble echoes
-               * only what was typed — but pi's copy of the message carries the
-               * attachments folded in as fenced blocks, and a chat REOPENED from
-               * its session file rebuilds its bubbles from that. So the card was
-               * right until you came back to the chat, and then it was a wall of
-               * "Attached file `pasted content`: ```". Unfolding here puts the
-               * cards back wherever the bubble came from.
-               */
-              const attached = splitAttachedFiles(message.text);
-              return (
-                <div key={message.id} className="flex flex-col gap-1">
+
+              if (item.kind === 'assistant') {
+                const group = item.group;
+                const first = group[0];
+                if (first === undefined) return null;
+                const _totalTokens = [...group].reverse().find((m) => m.usage !== undefined)
+                  ?.usage?.totalTokens;
+                const streaming = group.some((m) => m.isStreaming === true);
+                // Pre-first-token: an EMPTY streaming assistant would render a bare row
+                // with the copy/retry (+tps) action bar next to the processing ring
+                // (the user: no copy/tps bar by the ring). Skip it — the ProcessingRing IS
+                // this phase; the real row appears the moment a token lands.
+                const groupHasContent = group.some(
+                  (m) =>
+                    m.kind === 'assistant' &&
+                    m.blocks.some((b) =>
+                      b.type === 'text'
+                        ? b.text.length > 0
+                        : b.type === 'thinking'
+                          ? b.thinking.length > 0
+                          : true,
+                    ),
+                );
+                if (!groupHasContent && streaming) return null;
+                return (
                   <MessageRow
-                    kind="user"
+                    key={first.id}
+                    kind="assistant"
                     actions={
                       <MessageActions
-                        onCopy={() => copyText(message.text)}
-                        onEdit={() => setEditingId(message.id)}
-                      />
-                    }
-                  >
-                    <div className="flex flex-col gap-2">
-                      {message.images !== undefined && message.images.length > 0 ? (
-                        <div className="flex flex-wrap gap-2">
-                          {message.images.map((src) => (
-                            <UserImage key={src} src={src} />
-                          ))}
-                        </div>
-                      ) : null}
-                      {attached.files.length > 0 ? (
-                        <div className="flex flex-wrap gap-2" data-testid="user-attachments">
-                          {attached.files.map((f) => (
-                            <AttachedFileCard key={f.id} name={f.name} text={f.text} />
-                          ))}
-                        </div>
-                      ) : null}
-                      {attached.text.length > 0 ? <ClampedText text={attached.text} /> : null}
-                    </div>
-                  </MessageRow>
-                  {switcher}
-                </div>
-              );
-            }
-
-            if (item.kind === 'assistant') {
-              const group = item.group;
-              const first = group[0];
-              if (first === undefined) return null;
-              const _totalTokens = [...group].reverse().find((m) => m.usage !== undefined)
-                ?.usage?.totalTokens;
-              const streaming = group.some((m) => m.isStreaming === true);
-              // Pre-first-token: an EMPTY streaming assistant would render a bare row
-              // with the copy/retry (+tps) action bar next to the processing ring
-              // (the user: no copy/tps bar by the ring). Skip it — the ProcessingRing IS
-              // this phase; the real row appears the moment a token lands.
-              const groupHasContent = group.some(
-                (m) =>
-                  m.kind === 'assistant' &&
-                  m.blocks.some((b) =>
-                    b.type === 'text'
-                      ? b.text.length > 0
-                      : b.type === 'thinking'
-                        ? b.thinking.length > 0
-                        : true,
-                  ),
-              );
-              if (!groupHasContent && streaming) return null;
-              return (
-                <MessageRow
-                  key={first.id}
-                  kind="assistant"
-                  actions={
-                    <MessageActions
-                      onCopy={() => copyText(groupPlainText(group))}
-                      onRetry={() => retryFrom(first.id)}
-                      /* No context chip. the user: "remove the context used one, just
+                        onCopy={() => copyText(groupPlainText(group))}
+                        onRetry={() => retryFrom(first.id)}
+                        /* No context chip. the user: "remove the context used one, just
                          keep the copy reload and toks/s". It was also the least
                          trustworthy number on the row — a whole-conversation
                          total rendered under every individual message. */
-                      tokensPerSecond={streaming ? undefined : plausibleTps(tps)}
+                        tokensPerSecond={streaming ? undefined : plausibleTps(tps)}
+                      />
+                    }
+                  >
+                    <AssistantGroup
+                      group={group}
+                      resultByCallId={resultByCallId}
+                      runningToolCalls={runningToolCalls}
+                      tps={streaming ? undefined : tps}
                     />
-                  }
-                >
-                  <AssistantGroup
-                    group={group}
-                    resultByCallId={resultByCallId}
-                    runningToolCalls={runningToolCalls}
-                    tps={streaming ? undefined : tps}
-                  />
-                </MessageRow>
-              );
-            }
+                  </MessageRow>
+                );
+              }
 
-            if (item.kind === 'bash') {
+              if (item.kind === 'bash') {
+                const message = item.message;
+                return (
+                  <ActivityRow
+                    key={message.id}
+                    icon={<IconTerminal size={14} />}
+                    label={`! ${message.command}`}
+                  >
+                    <pre className="whitespace-pre-wrap pt-1 text-code text-text-secondary">
+                      {message.output || '(no output)'}
+                    </pre>
+                  </ActivityRow>
+                );
+              }
+
+              // Orphan tool result (rehydrated with no matching assistant block).
               const message = item.message;
               return (
                 <ActivityRow
                   key={message.id}
                   icon={<IconTerminal size={14} />}
-                  label={`! ${message.command}`}
+                  label={message.toolName}
                 >
                   <pre className="whitespace-pre-wrap pt-1 text-code text-text-secondary">
-                    {message.output || '(no output)'}
+                    {message.text || '(no output)'}
                   </pre>
                 </ActivityRow>
               );
-            }
-
-            // Orphan tool result (rehydrated with no matching assistant block).
-            const message = item.message;
+            })();
+            if (cards === undefined) return node;
             return (
-              <ActivityRow
-                key={message.id}
-                icon={<IconTerminal size={14} />}
-                label={message.toolName}
-              >
-                <pre className="whitespace-pre-wrap pt-1 text-code text-text-secondary">
-                  {message.text || '(no output)'}
-                </pre>
-              </ActivityRow>
+              <Fragment key={`anchored-${threadItemId(item)}`}>
+                {node}
+                {renderPresented(cards)}
+              </Fragment>
             );
           })}
 
@@ -605,36 +680,12 @@ export function ChatThread() {
             </MessageRow>
           ))}
           {/*
-           * What the model PRESENTED, at the foot of the thread — the finished
-           * artefacts, each openable in the canvas beside the conversation. It
-           * sits last because presenting is the last act of a turn, and the
-           * thing handed over should be the thing nearest the composer.
+           * Anything whose anchor is NOT in this thread — a card presented
+           * before the first message, or one whose turn was edited away. The
+           * foot is where these used to live, and it is still the right place
+           * for an artefact with nowhere else to be.
            */}
-          {presented.length > 0 ? (
-            <div className="flex flex-col gap-2 px-1 pt-2" data-testid="presented">
-              {presented.map((item) => (
-                <PresentCard
-                  key={item.path}
-                  item={item}
-                  /* Body → the canvas. Split button → an application. Two
-                   * different verbs, deliberately not sharing a handler. */
-                  onActivate={() => void openPresented(canvasController, item)}
-                  onOpen={() => {
-                    void window.piDesktop.invoke('canvas:open-default', { path: item.path });
-                  }}
-                  onOpenWith={(_it, appId) => {
-                    void window.piDesktop.invoke('canvas:open-with', {
-                      path: item.path,
-                      appId,
-                    });
-                  }}
-                  onReveal={() => {
-                    void window.piDesktop.invoke('canvas:reveal', { path: item.path });
-                  }}
-                />
-              ))}
-            </div>
-          ) : null}
+          {orphanPresented.length > 0 ? renderPresented(orphanPresented) : null}
           {/* Breathing room so the last message/thought is never jammed against
               the composer — the user can scroll it up clear of the input bar. */}
           <div className="h-28 shrink-0" aria-hidden />

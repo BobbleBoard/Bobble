@@ -240,6 +240,38 @@ try {
   check(shape?.conic, 'the loader tail is not a conic (fading) gradient');
   check(shape?.masked, 'the loader is not masked to a ring');
   await shot('sidebar-spinner-hovered');
+  /* ------------------------------------------------ #7 the full-access mode */
+  // the user: "in projects, add a 'full access' mode — red, with an ! in a circle —
+  // that gives the model full reign and full access … no sandboxing."
+  await page.evaluate(async (dir) => {
+    await window.__pi_project().getState().selectPath(dir);
+  }, home);
+  await page.waitForTimeout(400);
+  await page.click('.pd-project-chip');
+  await page.waitForSelector('[data-testid="project-full-access"]', { timeout: 5000 });
+  const danger = await page.evaluate(() => {
+    const row = document.querySelector('[data-testid="project-full-access"]');
+    return row === null
+      ? null
+      : { color: getComputedStyle(row).color, checked: row.getAttribute('aria-checked') };
+  });
+  check(danger?.checked === 'false', 'full access should start OFF');
+  await shot('full-access-row');
+  await page.click('[data-testid="project-full-access"]');
+  await page.waitForFunction(() => window.__pi_project().getState().fullAccess === true, {
+    timeout: 8000,
+  });
+  // The chip itself goes red for as long as it is on — it must be impossible to
+  // leave this on without noticing.
+  const chipRed = await page.evaluate(
+    () => document.querySelector('.pd-project-picker--fullaccess') !== null,
+  );
+  check(chipRed, 'the project chip does not show the full-access warning colour');
+  await shot('full-access-on');
+  await page.evaluate(async () => {
+    await window.__pi_project().getState().setFullAccess(false);
+  });
+  await page.keyboard.press('Escape');
 } finally {
   await finish();
 }

@@ -14,6 +14,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { dialog } from 'electron';
 import type { FsInvokeMap, FsTreeNode, SessionSummary } from './ipc-contract';
+import { activeProjectFullAccess } from './project/project-main';
 import { sandboxBaseDir } from './sandbox';
 import { renderSessionMarkdown } from './session-export';
 
@@ -262,6 +263,8 @@ function readSessionSummary(file: string): SessionSummary | null {
     firstUserText,
     title,
     parentSession,
+    // Filled in by `keepChainTips`, which is the only place that knows.
+    supersedes: [],
   };
   cacheSession(file, {
     mtimeMs: st.mtimeMs,
@@ -364,8 +367,23 @@ export function keepChainTips(sessions: readonly SessionSummary[]): SessionSumma
       winner.set(root, s);
     }
   }
-  const keep = new Set([...winner.values()].map((s) => s.file));
-  return sessions.filter((s) => keep.has(s.file));
+  // Each winner stands in for the rest of its chain, so the renderer can tell
+  // that the file it is pointing at IS this row (see `supersedes`).
+  const droppedByRoot = new Map<string, string[]>();
+  for (const s of sessions) {
+    const root = rootOf(s);
+    if (winner.get(root)?.file === s.file) continue;
+    const list = droppedByRoot.get(root);
+    if (list === undefined) droppedByRoot.set(root, [s.file]);
+    else list.push(s.file);
+  }
+  const keep = new Map([...winner.entries()].map(([root, s]) => [s.file, root]));
+  return sessions
+    .filter((s) => keep.has(s.file))
+    .map((s) => {
+      const dropped = droppedByRoot.get(keep.get(s.file) ?? '') ?? [];
+      return dropped.length > 0 ? { ...s, supersedes: dropped } : s;
+    });
 }
 
 function fuzzyScore(haystack: string, needle: string): number {
@@ -697,8 +715,16 @@ function sessionCwdRoots(): string[] {
   return out;
 }
 
-/** The union of allowed write roots, normalized + de-duplicated. */
+/**
+ * The union of allowed write roots, normalized + de-duplicated.
+ *
+ * FULL ACCESS (the user) short-circuits this: a project switched into that mode has
+ * asked for "full reign and full access … no sandboxing", and a fence that still
+ * refused the app's own write channel would be a half-measure that only shows up
+ * as a confusing failure. `/` is the honest answer — everything is under it.
+ */
 function allowedWriteRoots(): string[] {
+  if (activeProjectFullAccess()) return [path.parse(HOME).root];
   const roots = new Set<string>();
   for (const p of projectRoots()) roots.add(normalizeRoot(p));
   for (const p of sessionCwdRoots()) roots.add(normalizeRoot(p));

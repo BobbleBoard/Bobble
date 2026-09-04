@@ -136,6 +136,16 @@ export interface SessionSummary {
    */
   parentSession: string | null;
   /**
+   * The session files this row stands in for — its own superseded ancestors.
+   *
+   * The listing keeps only the tip of each resume chain, but the RENDERER may
+   * still be pointing at an ancestor (the store's `sessionFile` is whatever pi
+   * last announced, and a restart forks a new file underneath it). Without this
+   * the sidebar would draw an optimistic row for the old file BESIDE the tip —
+   * two rows for one chat, which is the bug the collapsing exists to fix.
+   */
+  supersedes: readonly string[];
+  /**
    * Where the search query appears in the conversation, when one was given and
    * the title did not already contain it.
    *

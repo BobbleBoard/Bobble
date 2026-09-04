@@ -84,6 +84,17 @@ export interface ProjectPickerProps {
   /** Chip label shown when no project is active. */
   placeholder?: string;
   className?: string;
+  /**
+   * FULL ACCESS, for the project currently selected.
+   *
+   * the user: "in projects, add a 'full access' mode — red, with an ! in a circle —
+   * that gives the model full reign and full access … no sandboxing." It lives
+   * at the foot of this menu because this is where "which project am I in" is
+   * decided, and the mode belongs to that answer. Omit `onToggleFullAccess` and
+   * the row is not offered at all (no project selected ⇒ nothing to grant it to).
+   */
+  fullAccess?: boolean;
+  onToggleFullAccess?: (next: boolean) => void;
 }
 
 /**
@@ -102,6 +113,8 @@ export function ProjectPicker({
   onSearch,
   placeholder = 'No project',
   className,
+  fullAccess = false,
+  onToggleFullAccess,
 }: ProjectPickerProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -298,6 +311,46 @@ export function ProjectPicker({
                   </span>
                 ) : null}
               </button>
+              {/*
+                FULL ACCESS. Deliberately last, deliberately red, and deliberately
+                a switch rather than a row that "does something" — it is a mode you
+                leave on, so it has to read as on. The exclamation in a circle is
+                the user's, and it is the right glyph: this is the one control here
+                that can let a model touch anything on the machine.
+              */}
+              {onToggleFullAccess !== undefined ? (
+                <button
+                  type="button"
+                  role="menuitemcheckbox"
+                  aria-checked={fullAccess}
+                  className={`pd-menu-item pd-menu-item--danger${
+                    fullAccess ? ' pd-menu-item--danger-on' : ''
+                  }`}
+                  data-testid="project-full-access"
+                  onClick={() => onToggleFullAccess(!fullAccess)}
+                >
+                  <span className="pd-menu-icon" aria-hidden="true">
+                    <svg
+                      aria-hidden="true"
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                    >
+                      <circle cx="12" cy="12" r="9" />
+                      <line x1="12" y1="7.5" x2="12" y2="13" />
+                      <line x1="12" y1="16.5" x2="12" y2="16.5" />
+                    </svg>
+                  </span>
+                  <span className="pd-project-name">Full access</span>
+                  <span className="pd-fullaccess-switch" data-on={fullAccess} aria-hidden="true">
+                    <span className="pd-fullaccess-knob" />
+                  </span>
+                </button>
+              ) : null}
             </div>,
             document.body,
           )

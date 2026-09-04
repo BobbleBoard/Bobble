@@ -18,6 +18,7 @@ function chat(file: string, cwd: string, modifiedAt = 't', title = file): Sessio
     firstUserText: title,
     title,
     parentSession: null,
+    supersedes: [],
   };
 }
 

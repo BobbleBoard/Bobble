@@ -31,7 +31,11 @@ import {
   visionStateFilePath,
 } from '../inference/llm-main';
 import type { AppEventMap } from '../ipc-contract';
-import { activeProjectPath, currentWorkspaceDir } from '../project/project-main';
+import {
+  activeProjectFullAccess,
+  activeProjectPath,
+  currentWorkspaceDir,
+} from '../project/project-main';
 import { resolveSessionCwd } from '../sandbox';
 import {
   advancedSamplingFilePath,
@@ -157,7 +161,15 @@ function buildPiEnv(cwd: string | undefined): Record<string, string | undefined>
     // so a RELATIVE path the model writes lands there — never HOME. Set even when
     // `cwd` is undefined (a resumed session restores its own cwd; the override
     // falls back to pi's per-session ctx.cwd, still never HOME).
-    PI_DESKTOP_FS_FENCE: '1',
+    /*
+     * …UNLESS THE USER ASKED FOR FULL ACCESS. the user: "in projects, add a 'full
+     * access' mode — red, with an ! in a circle — that gives the model full
+     * reign and full access … no sandboxing." Off by default and per project,
+     * so it applies only to the folder it was deliberately switched on for; the
+     * composer shows a red warning for as long as it is on. Read at SPAWN, which
+     * is why the renderer restarts pi when it is flipped.
+     */
+    PI_DESKTOP_FS_FENCE: activeProjectFullAccess() ? '0' : '1',
     // The sampling-override sidecar the provider's advanced-params hook reads for
     // live per-request sampling (power-user panel). Pointing at a stable path;
     // the file may not exist yet (default profile) — the hook no-ops then.

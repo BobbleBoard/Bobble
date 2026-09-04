@@ -1837,6 +1837,61 @@ body {
   color: var(--pd-status-warning-fg);
 }
 
+/*
+ * FULL ACCESS — the one mode in the app that can touch anything on the machine.
+ *
+ * the user: "add a 'full access' mode — red, with an ! in a circle — that gives the
+ * model full reign and full access … no sandboxing." Red is the whole point: it
+ * has to be impossible to leave on without noticing, so the chip itself carries
+ * the colour and the warning glyph for as long as it is on, not just the menu
+ * row that switched it.
+ */
+.pd-menu-item--danger {
+  color: var(--pd-status-danger-fg);
+}
+.pd-menu-item--danger:hover {
+  background: var(--pd-status-danger-bg);
+  color: var(--pd-status-danger-fg);
+}
+.pd-menu-item--danger .pd-menu-icon {
+  color: var(--pd-status-danger-fg);
+}
+.pd-fullaccess-switch {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  width: 28px;
+  height: 16px;
+  padding: 2px;
+  border-radius: var(--pd-radius-full);
+  background: var(--pd-bg-track);
+  transition: background var(--pd-duration-base) var(--pd-easing-standard);
+}
+.pd-fullaccess-switch[data-on="true"] {
+  background: var(--pd-status-danger-fg);
+}
+.pd-fullaccess-knob {
+  width: 12px;
+  height: 12px;
+  border-radius: var(--pd-radius-full);
+  background: var(--pd-bg-overlay);
+  box-shadow: var(--pd-shadow-hairline);
+  transition: transform var(--pd-duration-base) var(--pd-easing-spring);
+}
+.pd-fullaccess-switch[data-on="true"] .pd-fullaccess-knob {
+  transform: translateX(12px);
+}
+
+/* The chip, while the mode is on. */
+.pd-project-picker--fullaccess .pd-project-chip,
+.pd-project-picker--fullaccess .pd-project-chip .pd-project-chip-icon {
+  color: var(--pd-status-danger-fg);
+}
+.pd-project-picker--fullaccess .pd-project-chip:hover {
+  background: var(--pd-status-danger-bg);
+  color: var(--pd-status-danger-fg);
+}
+
 /* the user #12 — the subtle shortcut helper line under the empty/home composer. It
  * carries the @ / / / ! affordances demoted out of the (now friendly) placeholder;
  * quiet muted text with small key caps, wrapping + centered under the composer. */

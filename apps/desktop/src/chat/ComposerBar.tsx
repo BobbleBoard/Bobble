@@ -73,6 +73,11 @@ function ProjectRegion() {
   const sessionFile = usePiStore((s) => s.session?.sessionFile);
   const selectProjectPath = useProjectStore((s) => s.selectPath);
   const clearProject = useProjectStore((s) => s.clearProject);
+  // FULL ACCESS (the user): offered only when a real project is selected, because
+  // the mode belongs to a folder — there is nothing to grant it to in a sandbox.
+  const fullAccess = useProjectStore((s) => s.fullAccess);
+  const activeProjectId = useProjectStore((s) => s.activeId);
+  const setFullAccess = useProjectStore((s) => s.setFullAccess);
 
   // When the viewed chat belongs to a sidebar chat-org project, the chip shows
   // that project's NAME (the user: "just named their project name as far as the user
@@ -180,6 +185,9 @@ function ProjectRegion() {
   const className = [
     'pd-project-picker--bar',
     sandbox && orgProjectName === null ? 'pd-project-picker--sandbox' : '',
+    // Red for as long as it is on — the user asked for the mode to be unmissable,
+    // and a switch buried in a menu is exactly the kind of thing left on.
+    fullAccess ? 'pd-project-picker--fullaccess' : '',
   ]
     .filter(Boolean)
     .join(' ');
@@ -231,6 +239,10 @@ function ProjectRegion() {
        * no chats yet is exactly the case where a user most needs to be told
        * where their first message is about to write. */
       placeholder={orgProjectName ?? workingFolderName ?? 'No project'}
+      fullAccess={fullAccess}
+      {...(activeProjectId !== null && !sandbox
+        ? { onToggleFullAccess: (next: boolean) => void setFullAccess(next) }
+        : {})}
     />
   );
 }

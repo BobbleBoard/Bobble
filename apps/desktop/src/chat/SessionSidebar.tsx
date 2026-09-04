@@ -804,6 +804,7 @@ export function SessionSidebar({
       startedAt: now,
       modifiedAt: now,
       parentSession: null,
+      supersedes: [],
       messageCount: file === effectiveCurrentFile ? messageCount : 0,
       firstUserText: file === effectiveCurrentFile ? firstUserText : null,
       title,
@@ -813,16 +814,29 @@ export function SessionSidebar({
     // reply lands — keep it visible + spinning via an optimistic row.
     if (
       bgRun?.streaming &&
-      !list.some((s) => s.file === bgRun.sessionFile) &&
+      !list.some((s) => s.file === bgRun.sessionFile || s.supersedes.includes(bgRun.sessionFile)) &&
       bgRun.sessionFile !== effectiveCurrentFile
     ) {
       list = [optimisticRow(bgRun.sessionFile, bgRun.title ?? 'New chat'), ...list];
     }
-    // Optimistic row for the VIEWED brand-new chat — shows the INSTANT it's the
-    // current session, even before its first message (the user: "instantly in the
-    // sidebar the second we click new chat regardless"). The real disk row
-    // replaces it (same file key) once the chat has content.
-    if (effectiveCurrentFile !== null && !list.some((s) => s.file === effectiveCurrentFile)) {
+    /*
+     * Optimistic row for the VIEWED brand-new chat — shows the INSTANT it's the
+     * current session, even before its first message (the user: "instantly in the
+     * sidebar the second we click new chat regardless"). The real disk row
+     * replaces it (same file key) once the chat has content.
+     *
+     * `supersedes` is the other half of that match. pi forks a NEW session file
+     * whenever it resumes, so after a model switch the store is still pointing at
+     * the file it was told about while the listing shows the chain's tip — and a
+     * row keyed on the old file would appear NEXT to it. Two rows for one chat is
+     * precisely the duplication the chain collapsing exists to remove.
+     */
+    if (
+      effectiveCurrentFile !== null &&
+      !list.some(
+        (s) => s.file === effectiveCurrentFile || s.supersedes.includes(effectiveCurrentFile),
+      )
+    ) {
       list = [
         optimisticRow(effectiveCurrentFile, windowTitle ?? firstUserText ?? 'New chat'),
         ...list,
@@ -924,9 +938,18 @@ export function SessionSidebar({
   /** One chat row: the A4 icon-swap row + its hover 3-dot menu (B2) + the nested
    * agent dropdown (A3/A4). Shared by the project groups and the ungrouped list. */
   const renderChat = (s: SessionSummary): ReactNode => {
+    /*
+     * "Is this row the chat the app is pointing at?" — which is not the same as
+     * "is it the same FILE". pi forks a new session file on every resume, so
+     * after a model switch the store still names the ancestor while this row is
+     * the chain's tip. Matching only on `file` left the selection and the running
+     * spinner on a row that is no longer listed.
+     */
+    const isThisChat = (file: string | null): boolean =>
+      file !== null && (file === s.file || s.supersedes.includes(file));
     const running =
-      (busy && bgRun === null && effectiveCurrentFile === s.file) ||
-      (bgRun?.streaming === true && bgRun.sessionFile === s.file);
+      (busy && bgRun === null && isThisChat(effectiveCurrentFile)) ||
+      (bgRun?.streaming === true && isThisChat(bgRun.sessionFile));
     const unreadKind = unread[s.file];
     const kids = childrenByParent.get(s.file) ?? [];
     /*
@@ -947,7 +970,7 @@ export function SessionSidebar({
      */
     const hasKids = kids.length > 0;
     const expanded = hasKids && !collapsedParents.has(s.file);
-    const isFocused = effectiveCurrentFile === s.file && viewedChildId === null;
+    const isFocused = isThisChat(effectiveCurrentFile) && viewedChildId === null;
     const title = displayTitle(s, org);
     const pinned = org.pinned.includes(s.file);
     const assignedTo = org.assignments[s.file];

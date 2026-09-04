@@ -13,6 +13,21 @@ export interface ProjectEntry {
   name: string;
   /** Absolute path of the working folder. */
   path: string;
+  /**
+   * FULL ACCESS — this project's model runs with no sandboxing at all.
+   *
+   * the user: "in projects, add a 'full access' mode — red, with an ! in a circle —
+   * that gives the model full reign and full access: e.g. if it types in the
+   * terminal it has access to have anything happen as if the user is typing in the
+   * terminal, all homebrew packages, manipulate system stuff etc. No sandboxing."
+   *
+   * So it is exactly that: the write fence is not installed for a spawn in this
+   * project, and the app's own write channel accepts any path. Off unless
+   * deliberately switched on, per project, and the composer says so in red for
+   * as long as it is on — this is not a setting anyone should be able to leave
+   * on by accident.
+   */
+  fullAccess?: boolean;
 }
 
 export type ProjectInvokeMap = {
@@ -65,6 +80,13 @@ export type ProjectInvokeMap = {
     request: undefined;
     response: { projects: ProjectEntry[]; usingSandbox: boolean };
   };
+  /** Turn FULL ACCESS on or off for a project (see `ProjectEntry.fullAccess`).
+   * Takes effect on the next pi spawn, which is why the renderer restarts the
+   * child after flipping it. */
+  'project:set-full-access': {
+    request: { id: string; fullAccess: boolean };
+    response: { projects: ProjectEntry[]; project: ProjectEntry | null };
+  };
   /** Native directory picker that ONLY returns the chosen path — it does NOT touch
    * projects.json (unlike `project:new`). Used to attach a working folder to a
    * sidebar chat-org project. `path` is null when the user cancelled. */
@@ -96,6 +118,7 @@ export const PROJECT_INVOKE_CHANNELS = [
   'project:set',
   'project:new',
   'project:clear',
+  'project:set-full-access',
   'project:pick-folder',
   'project:project-sandbox',
   'project:resolve-workspace',

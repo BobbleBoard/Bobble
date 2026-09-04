@@ -15,6 +15,7 @@ import type { CanvasTabKind } from '@pi-desktop/canvas';
 import type { PresentKind } from '@pi-desktop/ui';
 import { create } from 'zustand';
 import { getCanvasController } from './canvas-store';
+import { usePiStore } from './pi-slice';
 
 export interface PresentedRecord {
   path: string;
@@ -22,6 +23,19 @@ export interface PresentedRecord {
   kind: PresentKind;
   /** Monotonic, so a re-present of the same path moves it to the end. */
   at: number;
+  /**
+   * The message this artefact was handed over AFTER, so the card can sit where
+   * it was made instead of at the foot of the conversation.
+   *
+   * the user: "file presentation cards seem pinned to the bottom of the chat for
+   * some time instead of staying at the position they were created at." They
+   * were rendered as one block after the last message, so every card any turn
+   * had ever produced slid down under whatever you said next — three questions
+   * later, the picture from the first answer was still hovering above the
+   * composer. Null when nothing had been said yet (they lead the thread then,
+   * which is where they were made).
+   */
+  afterMessageId: string | null;
   /** Apps that can open it — hydrated after the record appears. */
   openApps?: readonly OpenWithChoice[];
   defaultApp?: OpenWithChoice;
@@ -73,7 +87,7 @@ export function classifyPresented(p: string): { kind: PresentKind; tab: CanvasTa
 
 interface PresentState {
   items: PresentedRecord[];
-  add: (item: { path: string; note?: string }) => PresentedRecord;
+  add: (item: { path: string; note?: string; afterMessageId?: string | null }) => PresentedRecord;
   /** Attach the apps that can open a presented artefact (async, best-effort). */
   setApps: (path: string, apps: OpenWithChoice[], defaultAppId: string | null) => void;
   clear: () => void;
@@ -81,12 +95,13 @@ interface PresentState {
 
 export const usePresentStore = create<PresentState>((set, get) => ({
   items: [],
-  add: ({ path, note }) => {
+  add: ({ path, note, afterMessageId = null }) => {
     const { kind } = classifyPresented(path);
     const record: PresentedRecord = {
       path,
       kind,
       at: get().items.length + 1,
+      afterMessageId,
       ...(note !== undefined ? { note } : {}),
     };
     // Re-presenting the same artefact REPLACES its row rather than stacking a
@@ -202,9 +217,13 @@ export function connectPresent(): () => void {
     (window as unknown as { __present_store?: unknown }).__present_store = () => usePresentStore;
   }
   return window.piDesktop.onEvent('present:show', ({ path, note }) => {
+    // Anchor it to the turn that produced it — see `afterMessageId`. Read
+    // lazily off the live store so this module keeps no import on the chat.
+    const messages = usePiStore.getState().messages;
+    const anchor = messages[messages.length - 1]?.id ?? null;
     const record = usePresentStore
       .getState()
-      .add({ path, ...(note !== undefined ? { note } : {}) });
+      .add({ path, afterMessageId: anchor, ...(note !== undefined ? { note } : {}) });
     void openPresented(getCanvasController() as never, record);
   });
 }

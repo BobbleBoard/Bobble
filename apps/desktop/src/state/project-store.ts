@@ -38,8 +38,20 @@ interface ProjectState {
    */
   usingSandbox: boolean;
   loaded: boolean;
+  /**
+   * FULL ACCESS is on for the active project — the model runs with no
+   * sandboxing at all (the user). Derived from the active entry's `fullAccess`, so
+   * it follows whichever project is selected.
+   */
+  fullAccess: boolean;
   /** Load the persisted list + active id (no working-folder side effect). */
   load: () => Promise<void>;
+  /**
+   * Turn FULL ACCESS on or off for the ACTIVE project and restart pi, because
+   * the fence is decided at spawn (electron/pi-main buildPiEnv). No-op when no
+   * project is selected: there is nothing to grant it to.
+   */
+  setFullAccess: (next: boolean) => Promise<void>;
   /** Activate an existing project by id. */
   selectProject: (id: string) => Promise<void>;
   /** Activate a project by absolute path (adds it if new). Used by "New project"
@@ -81,6 +93,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   activePath: null,
   projectMissing: false,
   usingSandbox: true,
+  fullAccess: false,
   loaded: false,
 
   load: async () => {
@@ -98,8 +111,24 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       activePath: active?.path ?? null,
       projectMissing: res.activeMissing,
       usingSandbox: res.usingSandbox,
+      fullAccess: active?.fullAccess === true,
       loaded: true,
     });
+  },
+
+  setFullAccess: async (next) => {
+    const id = get().activeId;
+    if (id === null) return;
+    const res = await window.piDesktop
+      .invoke('project:set-full-access', { id, fullAccess: next })
+      .catch(() => null);
+    if (res === null) return;
+    set({ projects: res.projects, fullAccess: res.project?.fullAccess === true });
+    // The fence is installed (or not) when pi SPAWNS, so the running child has
+    // to be replaced for the change to mean anything. Same session, so the
+    // conversation is untouched.
+    const sessionFile = usePiStore.getState().session?.sessionFile;
+    await restartPi(sessionFile !== undefined ? { sessionPath: sessionFile } : undefined);
   },
 
   selectProject: async (id) => {

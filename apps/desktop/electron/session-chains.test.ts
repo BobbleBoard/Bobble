@@ -26,6 +26,7 @@ const s = (
   firstUserText: 'how does spoofdpi work',
   title: 'how does spoofdpi work',
   parentSession,
+  supersedes: [],
 });
 
 const files = (list: readonly SessionSummary[]) => list.map((x) => x.file).sort();
@@ -64,6 +65,23 @@ describe('keepChainTips', () => {
   it('terminates on a corrupted self-referential pointer', () => {
     const list = [s('/s/loop.jsonl', 't1', '/s/loop.jsonl')];
     expect(files(keepChainTips(list))).toEqual(['/s/loop.jsonl']);
+  });
+
+  it('tells the renderer which files the surviving row stands in for', () => {
+    // The store still names the ancestor after a resume (pi forked underneath
+    // it), so without this the sidebar draws a second row for the same chat.
+    const chain = [
+      s('/s/a.jsonl', 't1'),
+      s('/s/b.jsonl', 't2', '/s/a.jsonl'),
+      s('/s/c.jsonl', 't3', '/s/b.jsonl'),
+    ];
+    const kept = keepChainTips(chain);
+    expect(kept).toHaveLength(1);
+    expect([...(kept[0]?.supersedes ?? [])].sort()).toEqual(['/s/a.jsonl', '/s/b.jsonl']);
+  });
+
+  it('leaves `supersedes` empty for a chat that never forked', () => {
+    expect(keepChainTips([s('/s/solo.jsonl', 't1')])[0]?.supersedes).toEqual([]);
   });
 
   it('resolves paths before matching, so `.` segments still link a chain', () => {

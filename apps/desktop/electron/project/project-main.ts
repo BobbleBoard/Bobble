@@ -128,6 +128,21 @@ export function activeProjectPath(): string | null {
   return active.path;
 }
 
+/**
+ * Is the ACTIVE project in full-access mode?
+ *
+ * the user asked for a project mode with "full reign and full access … no
+ * sandboxing". Read at pi spawn (see buildPiEnv), so the answer is whatever the
+ * user last chose for the folder they are working in — and false whenever they
+ * are not in a project at all, which is the sandboxed default.
+ */
+export function activeProjectFullAccess(): boolean {
+  const doc = readDoc();
+  const active = doc.projects.find((p) => p.id === doc.activeId) ?? null;
+  if (active === null || pathMissing(active)) return false;
+  return active.fullAccess === true;
+}
+
 function writeDoc(doc: ProjectsDoc): void {
   try {
     fs.mkdirSync(path.dirname(PROJECTS_PATH), { recursive: true });
@@ -265,6 +280,26 @@ const handlers: IpcHandlers<ProjectInvokeMap> = {
     writeDoc(next);
     // No active project → always the sandbox.
     return { projects: next.projects, usingSandbox: true };
+  },
+
+  /*
+   * FULL ACCESS, per project. the user asked for a mode that "gives the model full
+   * reign and full access … no sandboxing", drawn in red with a ! in a circle.
+   *
+   * Persisted on the project rather than globally, because the whole point is
+   * that it applies to the folder you deliberately turned it on for and nowhere
+   * else. It is read at SPAWN (buildPiEnv decides whether to install the write
+   * fence), so the renderer restarts pi after flipping it.
+   */
+  'project:set-full-access': (req) => {
+    const doc = readDoc();
+    const projects = doc.projects.map((p) =>
+      p.id === req.id ? { ...p, fullAccess: req.fullAccess } : p,
+    );
+    const next: ProjectsDoc = { ...doc, projects };
+    writeDoc(next);
+    log.warn('project full access changed', { id: req.id, fullAccess: req.fullAccess });
+    return { projects, project: projects.find((p) => p.id === req.id) ?? null };
   },
 
   'project:pick-folder': async () => {

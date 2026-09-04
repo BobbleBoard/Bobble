@@ -62,3 +62,28 @@ describe('usePresentStore', () => {
     expect(usePresentStore.getState().items.map((i) => i.path)).toEqual(['/a/1.png', '/a/2.png']);
   });
 });
+
+describe('a presented card remembers where it was handed over', () => {
+  /*
+   * the user: "file presentation cards seem pinned to the bottom of the chat for
+   * some time instead of staying at the position they were created at." The
+   * record now carries the message it followed, and the thread draws it there.
+   */
+  it('keeps the anchor it was added with', () => {
+    const rec = usePresentStore.getState().add({ path: '/a/one.png', afterMessageId: 'm7' });
+    expect(rec.afterMessageId).toBe('m7');
+  });
+
+  it('defaults to the foot when nothing had been said yet', () => {
+    expect(usePresentStore.getState().add({ path: '/a/two.png' }).afterMessageId).toBeNull();
+  });
+
+  it('a RE-present moves the card to the newer turn', () => {
+    const s = usePresentStore.getState();
+    s.add({ path: '/a/logo.png', afterMessageId: 'm1' });
+    s.add({ path: '/a/logo.png', afterMessageId: 'm9' });
+    const items = usePresentStore.getState().items.filter((i) => i.path === '/a/logo.png');
+    expect(items).toHaveLength(1);
+    expect(items[0]?.afterMessageId).toBe('m9');
+  });
+});
