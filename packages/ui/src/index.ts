@@ -102,7 +102,12 @@ export type {
   CopyFeedback,
   UseCopyFeedbackOptions,
 } from './components/copy-button.tsx';
-export { COPY_FEEDBACK_MS, CopyButton, useCopyFeedback } from './components/copy-button.tsx';
+export {
+  COPY_FEEDBACK_MS,
+  CopyButton,
+  useCopyFeedback,
+  writeClipboardText,
+} from './components/copy-button.tsx';
 export type { CurtainProps, DialogContentProps } from './components/dialog.tsx';
 export {
   Curtain,

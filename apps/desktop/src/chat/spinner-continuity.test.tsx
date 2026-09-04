@@ -31,9 +31,11 @@ import { ThreadActivityChain } from './ThreadActivity';
 // React's act() warns unless this flag is set in a test environment.
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 
-/** The pd-loader spin (1100ms) and breathe (1600ms) periods, and their lcm. */
+/** The pd-loader's one period: a single 1100ms spin. The breathing arc it used
+ * to pair with is gone (the user asked for a fading tail instead), so the phase
+ * window is the spin itself rather than lcm(spin, breathe). */
 const SPIN_MS = 1100;
-const LOADER_PERIOD_MS = 17_600;
+const LOADER_PERIOD_MS = SPIN_MS;
 
 interface Mounted {
   container: HTMLElement;
@@ -136,10 +138,13 @@ describe('Bobble loader continuity', () => {
   it('resumes mid-turn after a remount instead of snapping back to 0deg', async () => {
     // A row re-keyed by its changing status text throws the old loader away.
     // Because the delay is clock-derived, the replacement is handed the phase
-    // its predecessor would have had: exactly one spin later, same angle.
+    // its predecessor had — a whole spin later is the SAME angle.
     const before = await mountAt(0, <Spinner />);
     const after = await mountAt(SPIN_MS, <Spinner />);
-    expect(delayMs(before) - delayMs(after)).toBe(SPIN_MS);
+    expect(delayMs(after)).toBe(delayMs(before));
+    // …and a partial spin later it is that much further round, not back at 0.
+    const mid = await mountAt(SPIN_MS + 400, <Spinner />);
+    expect(delayMs(before) - delayMs(mid)).toBe(400);
   });
 
   it('puts every loader on one clock phase, however late it mounts', async () => {

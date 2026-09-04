@@ -2,7 +2,7 @@ import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
 import { Compartment, EditorState, type Extension, Transaction } from '@codemirror/state';
 import { EditorView, keymap, lineNumbers } from '@codemirror/view';
 import { tags as t } from '@lezer/highlight';
-import { IconCheck, IconCopy } from '@pi-desktop/ui';
+import { IconCheck, IconCopy, writeClipboardText } from '@pi-desktop/ui';
 import { useEffect, useRef, useState } from 'react';
 import type { ArtifactContent } from '../model.ts';
 import type { SurfaceProps } from '../registry.ts';
@@ -243,7 +243,7 @@ export function CodeSurface({
 
   const handleCopy = (): void => {
     if (onCopy) onCopy(content.text);
-    else void navigator.clipboard?.writeText(content.text);
+    else void writeClipboardText(content.text);
     setCopied(true);
     clearTimeout(copyTimer.current);
     copyTimer.current = setTimeout(() => setCopied(false), 1500);

@@ -114,7 +114,7 @@ export function renderPeekHtml(title: string, peek: ProductPeek | null): string 
   return `${head}${header}${sections}</body>`;
 }
 
-export function CanvasTabsPanel() {
+export function CanvasTabsPanel({ suppressed = false }: { suppressed?: boolean } = {}) {
   const { controller, tabs, fullscreen } = useCanvasTabs();
   const sideWidth = useCanvasStore((s) => s.sideWidth);
   const setSideWidth = useCanvasStore((s) => s.setSideWidth);
@@ -175,7 +175,17 @@ export function CanvasTabsPanel() {
     prevTabCount.current = tabs.length;
   }, [tabs.length, setCanvasOpen]);
 
-  const open = canvasOpen && !fullscreen;
+  /*
+   * A FULL-SURFACE ROUTE GETS THE WHOLE WINDOW.
+   *
+   * the user: "clicking manage models left the canvas open, showing the interface
+   * all squished." The model hub, Scheduled and the studios render through
+   * `contentOverride` — in the chat's slot, with this rail still beside them
+   * taking its width — so a hub laid out for the window got what was left of it.
+   * `canvasOpen` is deliberately NOT cleared: the canvas is hidden for the
+   * duration and comes back exactly as it was when the user returns to a chat.
+   */
+  const open = canvasOpen && !fullscreen && !suppressed;
 
   // Animate the rail width between 0 (closed) and sideWidth (open) — the slide,
   // subject to the reduced-motion rules in global.css. Fullscreen sizes itself.
@@ -436,6 +446,7 @@ export function CanvasTabsPanel() {
   // transition then paints from that frame and `exiting` takes over from render 2.
   // (A tabbed canvas never hit this — `hasTabs` keeps `shown` true through close.)
   const justClosed = !shown && prevShown.current;
+  if (suppressed) return null;
   if (!shown && !exiting && !justClosed && !fullscreen) return null;
 
   // `onCollapse` closes THIS panel (the app slides it out). `onCopy` defaults to

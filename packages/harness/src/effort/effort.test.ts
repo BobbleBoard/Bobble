@@ -19,7 +19,6 @@ describe('effortKnobs', () => {
       expect(cur.repairAttempts).toBeGreaterThanOrEqual(prev.repairAttempts);
       expect(cur.abortThreshold).toBeGreaterThanOrEqual(prev.abortThreshold);
       expect(cur.reviewPasses).toBeGreaterThanOrEqual(prev.reviewPasses);
-      expect(cur.maxTurnSteps).toBeGreaterThanOrEqual(prev.maxTurnSteps);
       expect(cur.wanderSteerAfter).toBeGreaterThanOrEqual(prev.wanderSteerAfter);
       expect(cur.wanderAbortAfter).toBeGreaterThanOrEqual(prev.wanderAbortAfter);
       expect(cur.verifyFixAttempts).toBeGreaterThanOrEqual(prev.verifyFixAttempts);
@@ -54,9 +53,12 @@ describe('effortKnobs', () => {
     );
   });
 
-  it('scales the hard per-turn step cap with effort', () => {
-    expect(effortKnobs('low').maxTurnSteps).toBeGreaterThan(0);
-    expect(effortKnobs('max').maxTurnSteps).toBeGreaterThan(effortKnobs('low').maxTurnSteps);
+  it('has NO per-turn tool-call cap at any effort', () => {
+    // the user: "remove the tool call cap." A cap can only ever fire on a long job —
+    // a stuck one trips the repeat guard or its wall clock long before the count.
+    for (const level of EFFORT_LEVELS) {
+      expect(effortKnobs(level)).not.toHaveProperty('maxTurnSteps');
+    }
   });
 
   it('scales the unproductive-wandering thresholds with effort, abort always above steer', () => {
@@ -65,9 +67,6 @@ describe('effortKnobs', () => {
       // The abort threshold must sit strictly above the steer nudge so the model
       // always gets ONE "act now" nudge before the turn is aborted.
       expect(k.wanderAbortAfter).toBeGreaterThan(k.wanderSteerAfter);
-      // And well under the hard step cap — wandering is a more specific, earlier
-      // signal than the generous runaway backstop.
-      expect(k.wanderAbortAfter).toBeLessThan(k.maxTurnSteps);
     }
     expect(effortKnobs('max').wanderSteerAfter).toBeGreaterThan(
       effortKnobs('low').wanderSteerAfter,

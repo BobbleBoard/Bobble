@@ -4,6 +4,7 @@ import {
   createLoopDetector,
   DEFAULT_LOOP_ABORT_AFTER,
   DEFAULT_LOOP_STEER_AFTER,
+  DEFAULT_REPEAT_STEER_AFTER,
   DEFAULT_WANDER_ABORT_AFTER,
   DEFAULT_WANDER_STEER_AFTER,
   isExplorationTool,
@@ -12,7 +13,14 @@ import {
   toolCallSignature,
 } from './loop-detector.js';
 
-const CFG: LoopDetectorConfig = { steerAfter: 3, abortAfter: 5, maxSteps: 20 };
+const CFG: LoopDetectorConfig = {
+  steerAfter: 3,
+  abortAfter: 5,
+  // The live default is 75 (the user); these tests exercise the MECHANISM, so they
+  // pin a small threshold and the default is asserted separately below.
+  repeatSteerAfter: 3,
+  maxSteps: 20,
+};
 
 describe('toolCallSignature', () => {
   it('is stable across argument key order', () => {
@@ -128,7 +136,12 @@ describe('hard step cap', () => {
   });
 
   it('the cap takes priority over an identical-call abort', () => {
-    const d = createLoopDetector({ steerAfter: 3, abortAfter: 99, maxSteps: 3 });
+    const d = createLoopDetector({
+      steerAfter: 3,
+      repeatSteerAfter: 3,
+      abortAfter: 99,
+      maxSteps: 3,
+    });
     d.onToolCall('t', { x: 1 });
     d.onToolCall('t', { x: 1 });
     d.onToolCall('t', { x: 1 }); // step 3 (== cap): identical streak=3 → steer
@@ -228,6 +241,7 @@ describe('unproductive-wandering cap (productivity heuristic)', () => {
     // and (the user) it must NEVER abort no matter how many different files are read.
     const d = createLoopDetector({
       steerAfter: 3,
+      repeatSteerAfter: 3,
       abortAfter: 99,
       maxSteps: 50,
       wanderSteerAfter: 4,
@@ -275,14 +289,18 @@ describe('reset', () => {
 });
 
 describe('loopDetectorConfig from effort knobs', () => {
-  it('uses fixed streak thresholds and the effort-scaled step cap', () => {
+  it('uses fixed streak thresholds, a patient repeat guard, and no step cap', () => {
     const low = loopDetectorConfig(effortKnobs('low'));
     const max = loopDetectorConfig(effortKnobs('max'));
     expect(low.steerAfter).toBe(DEFAULT_LOOP_STEER_AFTER);
     expect(low.abortAfter).toBe(DEFAULT_LOOP_ABORT_AFTER);
     expect(max.steerAfter).toBe(DEFAULT_LOOP_STEER_AFTER);
-    expect(low.maxSteps).toBe(effortKnobs('low').maxTurnSteps);
-    expect(max.maxSteps).toBeGreaterThan(low.maxSteps);
+    // No cap is configured at ANY effort (the user: "remove the tool call cap").
+    expect(low.maxSteps).toBeUndefined();
+    expect(max.maxSteps).toBeUndefined();
+    // …and the repeat guard sits at 75, not 3.
+    expect(low.repeatSteerAfter).toBe(DEFAULT_REPEAT_STEER_AFTER);
+    expect(max.repeatSteerAfter).toBe(DEFAULT_REPEAT_STEER_AFTER);
   });
 });
 

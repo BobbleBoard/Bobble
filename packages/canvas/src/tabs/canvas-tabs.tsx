@@ -8,6 +8,7 @@ import {
   IconPlus,
   IconTerminal,
   Spinner,
+  writeClipboardText,
 } from '@pi-desktop/ui';
 import {
   type ComponentType,
@@ -884,7 +885,7 @@ function CopyControl({ text, onCopy }: { text: string; onCopy?: (text: string) =
   useEffect(() => () => clearTimeout(timer.current), []);
   const handleCopy = (): void => {
     if (onCopy) onCopy(text);
-    else void navigator.clipboard?.writeText(text);
+    else void writeClipboardText(text);
     setCopied(true);
     clearTimeout(timer.current);
     timer.current = setTimeout(() => setCopied(false), 2000);

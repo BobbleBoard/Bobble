@@ -24,6 +24,7 @@
 
 import type { LaunchMode } from '@pi-desktop/inference';
 import { useLlmStore } from './llm-store';
+import { useModelSelectionStore } from './model-selection-store';
 import { getModels, restartPi, setModel } from './pi-connect';
 import { usePiStore } from './pi-slice';
 import { applySavedHarnessConfig, useSettingsStore } from './settings-store';
@@ -38,10 +39,92 @@ function engineFor(modelId: string): 'llamacpp' | 'mlx' {
   return useLlmStore.getState().catalog.find((e) => e.id === modelId)?.engine ?? 'llamacpp';
 }
 
+/**
+ * Wait for the conversation to go idle, up to `capMs`.
+ *
+ * the user: changing model mid-conversation "often totally breaks … a brief flash of
+ * 'loading model' then everything completely stops and running halts." That is
+ * literal: switching stops the llama-server the current turn is generating
+ * against and then disposes the pi child, so the reply dies mid-sentence with no
+ * error to show for it.
+ *
+ * A user-initiated switch therefore lets the turn finish first. The cap is a
+ * backstop against a wedged turn holding a switch forever — past it we go ahead,
+ * which is the old behaviour and no worse.
+ */
+function whenTurnIdle(capMs = 5 * 60 * 1000): Promise<void> {
+  const busy = () => {
+    const st = usePiStore.getState();
+    return st.agent.isStreaming || st.promptInFlight;
+  };
+  if (!busy()) return Promise.resolve();
+  return new Promise((resolve) => {
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      unsubscribe();
+      resolve();
+    };
+    const timer = setTimeout(finish, capMs);
+    const unsubscribe = usePiStore.subscribe(() => {
+      if (!busy()) finish();
+    });
+  });
+}
+
+/** Options for {@link activateLocalModel}. */
+export interface ActivateOptions {
+  /**
+   * Let a turn that is already running FINISH before swapping the server out.
+   * Set by the surfaces a person clicks (the model picker, "Use" in the model
+   * hub); NOT set by the in-send paths (vision relaunch, Auto routing), which
+   * run inside `sendPrompt` with `promptInFlight` already raised and would
+   * deadlock waiting for themselves.
+   */
+  readonly waitForIdleTurn?: boolean;
+}
+
 export async function activateLocalModel(
   modelId: string,
   quant?: string,
   launchMode: LaunchMode = 'fast-text',
+  options: ActivateOptions = {},
+): Promise<{ success: boolean; error?: string }> {
+  /*
+   * THE SWITCH IS VISIBLE NOW.
+   *
+   * the user: "changing models mid conversation shows no sign of working … no
+   * 'switching to <model>', no 'processing… n%', no 'loading model'." The banner
+   * state existed (model-selection-store's `switching`) but only ONE of the four
+   * entry points set it, and the component that rendered it had been consolidated
+   * away — so most switches ran completely silently for the ten-to-a-hundred
+   * seconds a model takes to load. Setting it here covers every path at once.
+   *
+   * `owned` keeps a nested call (selectModel already set it) from clearing a
+   * banner it did not raise.
+   */
+  const entry = useLlmStore.getState().catalog.find((e) => e.id === modelId);
+  const owned = useModelSelectionStore.getState().switching === null;
+  if (owned) {
+    useModelSelectionStore.getState().setSwitching({
+      toTier: entry?.tier ?? 'balanced',
+      toName: entry?.displayName ?? modelId,
+    });
+  }
+  try {
+    if (options.waitForIdleTurn === true) await whenTurnIdle();
+    return await activate(modelId, quant, launchMode);
+  } finally {
+    if (owned) useModelSelectionStore.getState().setSwitching(null);
+  }
+}
+
+async function activate(
+  modelId: string,
+  quant: string | undefined,
+  launchMode: LaunchMode,
 ): Promise<{ success: boolean; error?: string }> {
   const store = useLlmStore.getState();
   if (!store.status.downloadedModelIds.includes(modelId)) {

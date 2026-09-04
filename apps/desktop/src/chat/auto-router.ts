@@ -773,7 +773,9 @@ export async function selectModel(modelId: string): Promise<void> {
   const store = useModelSelectionStore.getState();
   store.setSwitching({ toTier: entry?.tier ?? 'balanced', toName: entry?.displayName ?? modelId });
   try {
-    await activateLocalModel(modelId);
+    // A person picked this from the model menu: let a reply that is already
+    // running finish rather than killing it mid-sentence (the user).
+    await activateLocalModel(modelId, undefined, 'fast-text', { waitForIdleTurn: true });
   } catch {
     // Leave the current model in place; the next turn re-derives from live state
     // — the same contract as performSwitch.

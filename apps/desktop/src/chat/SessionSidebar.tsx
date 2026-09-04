@@ -36,6 +36,7 @@ import {
   SidebarScroll,
   SidebarSection,
   Spinner,
+  writeClipboardText,
 } from '@pi-desktop/ui';
 import {
   type ComponentType,
@@ -802,6 +803,7 @@ export function SessionSidebar({
       cwdLabel: '',
       startedAt: now,
       modifiedAt: now,
+      parentSession: null,
       messageCount: file === effectiveCurrentFile ? messageCount : 0,
       firstUserText: file === effectiveCurrentFile ? firstUserText : null,
       title,
@@ -893,7 +895,7 @@ export function SessionSidebar({
       .invoke('fs:export-session', { file: s.file, format, title: displayTitle(s, org), to })
       .catch(() => ({ ok: false }) as { ok: boolean; text?: string });
     if (to === 'clipboard' && res.ok && typeof res.text === 'string') {
-      await navigator.clipboard.writeText(res.text).catch(() => undefined);
+      await writeClipboardText(res.text);
     }
   };
 
@@ -1014,7 +1016,11 @@ export function SessionSidebar({
               unreadKind === 'needs-input' ? (
                 <span className="pd-chat-dot pd-chat-dot--needs-input" />
               ) : running ? (
-                <Spinner size={14} />
+                // Sized + placed to land exactly on the hover 3-dot button
+                // (the user) — see .pd-chatrow-spinner.
+                <span className="pd-chatrow-spinner">
+                  <Spinner size={16} />
+                </span>
               ) : unreadKind === 'finished' ? (
                 <span className="pd-chat-dot pd-chat-dot--finished" />
               ) : pinned ? (

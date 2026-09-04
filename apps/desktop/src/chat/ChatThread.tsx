@@ -33,6 +33,7 @@ import {
   ScrollArea,
   Spinner,
   Thread,
+  writeClipboardText,
 } from '@pi-desktop/ui';
 import { useEffect, useRef, useState } from 'react';
 import { IconWarning } from '../settings/icons';
@@ -193,7 +194,7 @@ export function ChatThread() {
   const [editingId, setEditingId] = useState<string | null>(null);
 
   const copyText = (text: string) => {
-    void navigator.clipboard?.writeText(text);
+    void writeClipboardText(text);
   };
   // Retry: re-run the user turn that preceded this assistant response as a NEW BRANCH
   // — exactly like editing + resending that turn (forkAndReprompt), so the response

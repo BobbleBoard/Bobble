@@ -16,6 +16,35 @@ import { IconCheck, IconCopy } from './icons.tsx';
 export const COPY_FEEDBACK_MS = 2000;
 
 /**
+ * Write text to the system clipboard, reporting whether it actually landed.
+ *
+ * the user: "copy buttons don't actually copy to clipboard." The write itself was
+ * being REJECTED (Electron's permission handler denied `clipboard-sanitized-write`
+ * — fixed in electron/main.ts), but the reason it was invisible for so long is
+ * this shape:
+ *
+ *     void navigator.clipboard?.writeText(text);   // rejection swallowed
+ *
+ * — the promise was discarded, so the button flipped to its check either way and
+ * the UI cheerfully confirmed a copy that never happened. Every copy affordance
+ * goes through here now, and the check only appears when the write resolved.
+ *
+ * A host with no Clipboard API at all (a test renderer) counts as success: it
+ * has nothing to write to, and failing the button there would be noise, not a
+ * signal.
+ */
+export async function writeClipboardText(text: string): Promise<boolean> {
+  const api = typeof navigator === 'undefined' ? undefined : navigator.clipboard;
+  if (api?.writeText === undefined) return true;
+  try {
+    await api.writeText(text);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Schedule the revert-to-idle callback `timeout` ms out; returns a canceller.
  * Framework-agnostic (the hook's only timing primitive) so the "shows a check
  * for ~2s then reverts" behaviour is unit-testable with fake timers.
@@ -55,17 +84,27 @@ export function useCopyFeedback(options: UseCopyFeedbackOptions = {}): CopyFeedb
   const cancel = useRef<(() => void) | undefined>(undefined);
   useEffect(() => () => cancel.current?.(), []);
 
+  const flip = useCallback(() => {
+    setCopied(true);
+    cancel.current?.();
+    cancel.current = scheduleCopyReset(() => setCopied(false), timeout);
+  }, [timeout]);
+
   const copy = useCallback(
     (text?: string) => {
-      if (typeof text === 'string') {
-        void navigator.clipboard?.writeText(text);
-        onCopy?.(text);
+      // No text → the caller already did the copy and only wants the check.
+      if (typeof text !== 'string') {
+        flip();
+        return;
       }
-      setCopied(true);
-      cancel.current?.();
-      cancel.current = scheduleCopyReset(() => setCopied(false), timeout);
+      onCopy?.(text);
+      // Only confirm what actually happened: a rejected write leaves the glyph
+      // alone rather than telling the user their text is on the clipboard.
+      void writeClipboardText(text).then((ok) => {
+        if (ok) flip();
+      });
     },
-    [timeout, onCopy],
+    [flip, onCopy],
   );
 
   const reset = useCallback(() => {

@@ -170,6 +170,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
 
 // E2E hook (same `?piE2E=1` opt-in as __pi_store): lets the round-8 probe drive
 // the working folder without a native folder dialog.
-if (new URLSearchParams(window.location.search).has('piE2E')) {
+// `typeof window` guarded like its siblings: this module is imported by
+// pi-connect, which node-environment unit tests pull in.
+if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('piE2E')) {
   window.__pi_project = () => useProjectStore;
 }

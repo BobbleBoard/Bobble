@@ -26,11 +26,10 @@ import {
   EffortSlider,
   IconGauge,
   Popover,
-  PopoverAnchor,
   PopoverContent,
   PopoverTrigger,
 } from '@pi-desktop/ui';
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useRef } from 'react';
 import { assignChat, createProject, useChatOrg } from '../state/chat-org';
 import { useCorpStore } from '../state/corp-store';
 import { useLlmStore } from '../state/llm-store';
@@ -292,7 +291,7 @@ function ContextRegion() {
       percent={Math.round(gauge.value * 100)}
       usedTokens={gauge.usedTokens}
       totalTokens={contextWindow}
-      note="Pi automatically compacts its context as it fills up."
+      note="Older turns are summarised automatically as this fills."
     >
       <ContextGauge value={gauge.value} tone={gauge.value > 0.85 ? 'warn' : 'muted'} />
     </ContextGaugeTooltip>
@@ -319,33 +318,24 @@ function EffortRegion() {
   };
 
   /*
-   * ANCHOR TO THE WHOLE COMPOSER, NOT THE BUTTON.
+   * IT OPENS RIGHT ABOVE THE BUTTON.
    *
-   * `side="top"` off the trigger opens the popover over the editor directly
-   * above it — measured at 56.63 px of overlap, which is the editor's full
-   * height, across the right 38% of it. You could not read the prompt you were
-   * choosing an effort level for. A fixed `sideOffset` cannot fix it because the
-   * editor grows with the draft.
-   *
-   * Anchoring to `.pd-composer-root` — the card AND the bar — puts "above" above
-   * the whole thing at any height. Resolved from the trigger rather than passed
-   * down so the bar stays a leaf component; a null anchor (a different host,
-   * a test) falls back to the trigger, which is the old behaviour.
+   * the user: "effort bar shows all the way up there rather than right above where
+   * it should be." It was anchored to `.pd-composer-root` — the whole composer
+   * CARD — so "above" meant above the text area too: with a few lines typed, or
+   * an attachment row up, the panel floated a long way from the control that
+   * opened it and read as belonging to nothing. Anchored to the trigger it sits
+   * where a popover is supposed to sit, just over its own button; overlapping
+   * the composer card on the way is what every other menu here already does.
    */
-  const [anchor, setAnchor] = useState<HTMLElement | null>(null);
-  const anchorRef = useRef<HTMLElement | null>(null);
-  anchorRef.current = anchor;
-
   return (
     <Popover>
-      {anchor !== null ? <PopoverAnchor virtualRef={anchorRef as never} /> : null}
       <PopoverTrigger asChild>
         <button
           type="button"
           className="pd-effort-trigger"
           data-testid="composer-effort"
           aria-label="Effort"
-          ref={(el) => setAnchor(el?.closest<HTMLElement>('.pd-composer-root') ?? null)}
         >
           <IconGauge size={14} />
           <span>{view.label}</span>

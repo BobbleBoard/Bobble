@@ -1,5 +1,5 @@
 import type { ReactElement, ReactNode } from 'react';
-import { ContextGauge, ProgressBar } from './indicators.tsx';
+import { ContextGauge } from './indicators.tsx';
 import { Tooltip } from './tooltip.tsx';
 
 /** 73000 -> "73k", 940 -> "940". Compact, no decimals (Aside copy style). */
@@ -29,10 +29,14 @@ export interface ContextGaugeTooltipProps {
 }
 
 /**
- * Context-fullness hover card (the user round-1 feedback #1). On hover of the
- * context gauge it reveals an Aside-style compact card: fullness %, used/total
- * tokens, and an optional compaction note — reusing our Tooltip surface but
- * restyled to the overlay card look via `.pd-context-tooltip`.
+ * Context-fullness hover card on the composer's context ring.
+ *
+ * the user: "the bar at the top and surrounding text don't look great." It led with
+ * a full-width ProgressBar, which reads as a task finishing rather than a level,
+ * and then repeated the number in a sentence. It is a status card now: the label
+ * and the percentage on one row, a hairline track under it, the token count as a
+ * footnote. The surface itself was the other half of that report — see
+ * `.pd-context-tooltip` in tooltip.css.
  */
 export function ContextGaugeTooltip({
   percent,
@@ -47,6 +51,9 @@ export function ContextGaugeTooltip({
   defaultOpen,
 }: ContextGaugeTooltipProps) {
   const rounded = Math.round(percent);
+  // Past 85% the card tints with the ring beside it, so "nearly full" reads
+  // without having to parse the number.
+  const warn = rounded > 85;
   return (
     <Tooltip
       className="pd-context-tooltip"
@@ -56,15 +63,23 @@ export function ContextGaugeTooltip({
       open={open}
       defaultOpen={defaultOpen}
       label={
-        <span className="pd-context-card">
-          <ProgressBar value={rounded} max={100} className="pd-context-card-bar" />
-          <span className="pd-context-card-line">Context window: {rounded}% full</span>
+        <span className={`pd-context-card${warn ? ' pd-context-card--warn' : ''}`}>
+          <span className="pd-context-card-head">
+            <span className="pd-context-card-label">Context used</span>
+            <span className="pd-context-card-value">{rounded}%</span>
+          </span>
+          <span className="pd-context-card-track">
+            <span
+              className="pd-context-card-fill"
+              style={{ width: `${Math.min(100, Math.max(0, rounded))}%` }}
+            />
+          </span>
           {/* Token counts only when the window is known — a percent-only source
            * (pi's own accounting on a remote/AFM model) has no token totals, so
            * the "0 / 0 tokens" line is suppressed rather than shown as a lie. */}
           {totalTokens > 0 ? (
-            <span className="pd-context-card-line pd-context-card-line--muted">
-              {formatTokens(usedTokens)} / {formatTokens(totalTokens)} tokens used
+            <span className="pd-context-card-line">
+              {formatTokens(usedTokens)} of {formatTokens(totalTokens)} tokens
             </span>
           ) : null}
           {note !== undefined ? <span className="pd-context-card-note">{note}</span> : null}

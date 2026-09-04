@@ -13,6 +13,7 @@ import {
 } from '@pi-desktop/engine';
 import type { TaskClass } from '@pi-desktop/harness';
 import { createResumeSplitter, type ResumeEvent } from '@pi-desktop/provider-llamacpp/resume';
+import { conversationNameFrom } from '../../electron/workspace/project-dir';
 import { ensureChatServerReady, maybeRouteAuto } from '../chat/auto-router';
 import { ADVANCED_GROUNDTRUTH_KEY } from './advanced-store';
 import { resetCanvasForNewSession, restoreCanvas, snapshotCanvas } from './canvas-store';
@@ -26,6 +27,7 @@ import {
   type QueuedSend,
   usePiStore,
 } from './pi-slice';
+import { useProjectStore } from './project-store';
 import { useSettingsStore } from './settings-store';
 import { appendOrMergeBlock, mutateAssistant } from './transcript-fold';
 
@@ -404,6 +406,9 @@ export async function sendPrompt(
   // local thread and does NOT bump the session epoch, so the echo survives the
   // ensureChatServerReady wait below.
   usePiStore.getState().appendUser(message, imageDataUris);
+  // The chat's folder is created HERE, on the first send — not when the chat was
+  // opened. See ensureChatWorkspace.
+  await ensureChatWorkspace(message);
   // Mark in-flight the instant we accept the send (before the awaits below, which
   // can be a multi-second vision relaunch). This bridges the dispatch→agent_start
   // gap so a 2nd message sent during it STEERS instead of racing in as a fresh
@@ -1000,6 +1005,36 @@ export async function applyWorkspace(dir: string): Promise<void> {
 let currentWorkspace: string | null = null;
 export function resolvedWorkspace(): string | null {
   return currentWorkspace;
+}
+
+/**
+ * Make this chat's working folder AT THE MOMENT there is work to put in it.
+ *
+ * the user reported "a bunch of project clutter even though there are literally no
+ * projects" and "many duplicate chats … named the same thing". Both came from
+ * the same place: the workspace was resolved (and `mkdir`'d) when a chat OPENED,
+ * so every chat anyone ever clicked into left a folder behind — measured, 199 of
+ * them named `~/Bobble/new-chat-2 … new-chat-199` — and each of those folders is
+ * its own cwd, hence its own sessions directory, hence another "New chat" row.
+ *
+ * Deferring to the first send costs nothing and fixes both: a chat you open and
+ * abandon leaves NOTHING, and a chat you use gets exactly one folder, named from
+ * the message you actually sent. Until then the conversation runs in the sandbox
+ * it already had, which neither the folder picker nor the sidebar treats as a
+ * project.
+ *
+ * A no-op when a project is selected (ChatApp's effect owns that case) or when
+ * this conversation already has a workspace.
+ */
+export async function ensureChatWorkspace(firstMessage: string): Promise<void> {
+  if (currentWorkspace !== null) return;
+  const active = useProjectStore.getState();
+  if (!active.loaded) return;
+  if (active.activePath !== null && active.activePath !== '') return;
+  await syncWorkspace({
+    selected: null,
+    conversationName: conversationNameFrom(firstMessage),
+  });
 }
 
 export async function syncWorkspace(opts: {

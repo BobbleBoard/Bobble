@@ -2,6 +2,7 @@ import { clsx } from 'clsx';
 import type { HTMLAttributes, ReactNode } from 'react';
 import { forwardRef, useEffect, useRef, useState } from 'react';
 import { DiffStat } from './activity.tsx';
+import { writeClipboardText } from './copy-button.tsx';
 import { type DiffFileData, DiffView } from './diff-view.tsx';
 import { IconCheck, IconChevronRight, IconExternal } from './icons.tsx';
 import { ContextGauge } from './indicators.tsx';
@@ -694,7 +695,7 @@ function StepError({ text }: { text: string }) {
             type="button"
             className="pd-chain-error-copy pd-focusable"
             onClick={() => {
-              void navigator.clipboard?.writeText(text);
+              void writeClipboardText(text);
               setCopied(true);
               setTimeout(() => setCopied(false), 1200);
             }}

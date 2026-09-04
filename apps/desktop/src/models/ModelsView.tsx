@@ -39,6 +39,7 @@ import {
   IconRefresh,
   ScrollArea,
   Spinner,
+  writeClipboardText,
 } from '@pi-desktop/ui';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type {
@@ -1210,7 +1211,7 @@ export function ModelsView() {
       .invoke('canvas:open-external', { url: `https://huggingface.co/${path}` })
       .catch(() => undefined);
   };
-  const copyId = (id: string) => void navigator.clipboard?.writeText(id);
+  const copyId = (id: string) => void writeClipboardText(id);
 
   /*
    * WHAT THE ROW'S PRIMARY BUTTON DOES.
@@ -1364,7 +1365,9 @@ export function ModelsView() {
     if (rec.family.output === 'text') {
       const entry = catalog.find((e) => e.hfRepo === rec.variant.repo);
       if (entry !== undefined) {
-        await activateLocalModel(entry.id, rec.quant?.rung.quant);
+        await activateLocalModel(entry.id, rec.quant?.rung.quant, 'fast-text', {
+          waitForIdleTurn: true,
+        });
         return;
       }
     }

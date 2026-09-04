@@ -316,6 +316,26 @@ export function ChatApp({
      * then `project-dropdown`.
      */
     if (!projectsLoaded) return;
+    /*
+     * NOTHING IS CREATED FOR A CHAT NOBODY HAS TYPED IN YET.
+     *
+     * the user: "a bunch of project clutter even though there are literally no
+     * projects", and "many duplicate chats … named the same thing". MEASURED on
+     * his machine: 199 folders named `~/Bobble/new-chat-2 … new-chat-199`, one
+     * per chat he had ever opened, each its own working directory and therefore
+     * its own entry in the folder picker and its own row of "New chat" in the
+     * sidebar. `resolveProjectDir` always mkdir's, and this effect ran the
+     * moment a chat opened — before a single character was typed.
+     *
+     * A projectless chat with no first message keeps the conversation sandbox it
+     * already has (sandbox.ts), which the picker and the sidebar both ignore by
+     * design. The visible `~/Bobble/<name>` folder is made on the first send —
+     * see `ensureChatWorkspace` — which is also the first moment a real name
+     * exists, so the placeholder rename disappears with it.
+     */
+    if ((activeProjectPath === null || activeProjectPath === '') && firstUserText.trim() === '') {
+      return;
+    }
     void syncWorkspace({
       selected: activeProjectPath,
       conversationName:
@@ -762,7 +782,7 @@ export function ChatApp({
               </button>
             </div>
 
-            <CanvasTabsPanel />
+            <CanvasTabsPanel suppressed={contentOverride !== undefined} />
 
             <UiRequestDialogs />
             <InputNeededBanner />

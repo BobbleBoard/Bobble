@@ -180,6 +180,17 @@ function firstRunClaudeBounds(): Pick<
   return out;
 }
 
+/**
+ * Chromium's permission names for writing the clipboard. `writeText` asks for
+ * `clipboard-sanitized-write`; the unsanitised name appears on older builds and
+ * for richer payloads, so both are listed rather than guessing which one this
+ * Electron will send. Granted ONLY to our own windows (see the handler below).
+ */
+const CLIPBOARD_WRITE_PERMISSIONS: ReadonlySet<string> = new Set([
+  'clipboard-sanitized-write',
+  'clipboard-write',
+]);
+
 const SHARED_WEB_PREFERENCES: WebPreferences = {
   preload: path.join(DIST_ELECTRON, 'preload.js'),
   contextIsolation: true,
@@ -809,7 +820,23 @@ if (!hasSingleInstanceLock) {
     // denied, so this widens the app's surface by exactly one capability.
     session.defaultSession.setPermissionRequestHandler(
       (contents, permission, callback, details) => {
-        if (!isTrustedWebContents(contents) || permission !== 'media') {
+        if (!isTrustedWebContents(contents)) {
+          callback(false);
+          return;
+        }
+        // COPY BUTTONS. the user: "copy buttons don't actually copy to clipboard."
+        // MEASURED: navigator.clipboard.writeText rejected with
+        // "NotAllowedError: Write permission denied" in our own window, because
+        // this handler denied every permission that was not 'media' — and every
+        // call site wrote `void navigator.clipboard?.writeText(…)`, so the
+        // rejection was swallowed and the button still flipped to a check.
+        // Writing text the user just asked to copy, from our own UI, is the
+        // whole interaction; it is granted here and nowhere else.
+        if (CLIPBOARD_WRITE_PERMISSIONS.has(permission)) {
+          callback(true);
+          return;
+        }
+        if (permission !== 'media') {
           callback(false);
           return;
         }
@@ -821,7 +848,9 @@ if (!hasSingleInstanceLock) {
       },
     );
     session.defaultSession.setPermissionCheckHandler((contents, permission, _origin, details) => {
-      if (!isTrustedWebContents(contents) || permission !== 'media') return false;
+      if (!isTrustedWebContents(contents)) return false;
+      if (CLIPBOARD_WRITE_PERMISSIONS.has(permission)) return true;
+      if (permission !== 'media') return false;
       const kind = (details as { mediaType?: string }).mediaType;
       return kind === 'audio' || kind === undefined;
     });

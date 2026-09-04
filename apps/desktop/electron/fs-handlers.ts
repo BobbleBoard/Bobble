@@ -153,6 +153,7 @@ function readSessionSummary(file: string): SessionSummary | null {
   let id = '';
   let cwd = '';
   let startedAt = '';
+  let parentSession: string | null = null;
   let messageCount = 0;
   let firstUserText: string | null = null;
   const searchable: string[] = [];
@@ -175,6 +176,7 @@ function readSessionSummary(file: string): SessionSummary | null {
       id = typeof obj.id === 'string' ? obj.id : '';
       cwd = typeof obj.cwd === 'string' ? obj.cwd : '';
       startedAt = typeof obj.timestamp === 'string' ? obj.timestamp : '';
+      parentSession = typeof obj.parentSession === 'string' ? obj.parentSession : null;
       continue;
     }
     // Newer sessions wrap messages: { type: 'message', message: { role, content } }.
@@ -219,6 +221,7 @@ function readSessionSummary(file: string): SessionSummary | null {
     messageCount,
     firstUserText,
     title,
+    parentSession,
   };
   cacheSession(file, {
     mtimeMs: st.mtimeMs,
@@ -263,7 +266,66 @@ function listAllSessions(filterCwd?: string, query?: string): SessionSummary[] {
     }
   }
   out.sort((a, b) => b.modifiedAt.localeCompare(a.modifiedAt));
-  return out;
+  return keepChainTips(out);
+}
+
+/**
+ * ONE ROW PER CONVERSATION.
+ *
+ * the user: "many duplicate chats appear … I made one chat and now have many named
+ * the same thing", and "only ONE chat should appear in the left sidebar with one
+ * clean, up-to-date latest state".
+ *
+ * pi does not append when it resumes: restarting the child on a session writes a
+ * NEW file holding the whole history, with `parentSession` pointing back at the
+ * one it continued. Anything that restarts pi — switching model, applying search
+ * keys, recovering a wedged bridge — therefore minted another sidebar row.
+ * MEASURED in his sessions directory: nine files titled "how does spoofdpi
+ * work", three of them created within seven seconds, in one unbroken chain.
+ *
+ * So the rule is per CHAIN, not per file: follow `parentSession` to the root and
+ * keep only the most recently modified member of each chain. Following it to the
+ * root (rather than just dropping anything with a child) also collapses a chain
+ * that FORKED — his did, twice from the same parent — which "one clean,
+ * up-to-date latest state" says should still be one row.
+ *
+ * Nothing is deleted. The member that wins carries everything its ancestors did,
+ * because that is what the fork copies, so the row the user keeps has its images
+ * and its history intact. A file whose parent is GONE is its own root, so
+ * deleting a chat can never silently merge two unrelated conversations.
+ */
+export function keepChainTips(sessions: readonly SessionSummary[]): SessionSummary[] {
+  const byFile = new Map<string, SessionSummary>();
+  for (const s of sessions) byFile.set(path.resolve(s.file), s);
+
+  /** The oldest ancestor of `file` that is present in this listing. */
+  const rootOf = (start: SessionSummary): string => {
+    let node = start;
+    let key = path.resolve(node.file);
+    // Bounded: a chain cannot be longer than the listing, and the `seen` guard
+    // makes a corrupted self-referential pointer terminate instead of hanging.
+    const seen = new Set<string>([key]);
+    while (node.parentSession !== null) {
+      const parentKey = path.resolve(node.parentSession);
+      const parent = byFile.get(parentKey);
+      if (parent === undefined || seen.has(parentKey)) break;
+      seen.add(parentKey);
+      node = parent;
+      key = parentKey;
+    }
+    return key;
+  };
+
+  const winner = new Map<string, SessionSummary>();
+  for (const s of sessions) {
+    const root = rootOf(s);
+    const held = winner.get(root);
+    if (held === undefined || s.modifiedAt.localeCompare(held.modifiedAt) > 0) {
+      winner.set(root, s);
+    }
+  }
+  const keep = new Set([...winner.values()].map((s) => s.file));
+  return sessions.filter((s) => keep.has(s.file));
 }
 
 function fuzzyScore(haystack: string, needle: string): number {

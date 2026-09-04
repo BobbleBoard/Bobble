@@ -213,13 +213,13 @@
   /* Ends under the KNOB's centre, not at a raw percentage — so the coloured part
      is exactly the part behind the handle, and at the lowest level it is the
      short cap the knob sits on rather than a stub sticking out to its right.
-     The inline `width` is kept as a plain percentage for anything reading the
-     markup; this overrides it with the honest geometry. */
+     (This used to carry `!important` to beat an inline percentage width; the
+     component sets only custom properties now, so the cascade is enough.) */
   width: calc(
     var(--pd-effort-knob-r) +
     var(--pd-effort-pos, 0) *
     (100% - 2 * var(--pd-effort-knob-r))
-  ) !important;
+  );
   border-radius: var(--pd-radius-full);
   background: color-mix(
     in srgb,

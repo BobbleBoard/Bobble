@@ -7,7 +7,9 @@
  * was no max-iteration cap anywhere. This detector closes both gaps:
  *
  *   - identical-call streak: N consecutive tool calls with the same name + args
- *     (a stable signature) → one corrective steer, then abort past a 2nd threshold.
+ *     (a stable signature) → one corrective steer. the user set N to 75: a model
+ *     that calls the same thing three times is usually retrying, not stuck, and
+ *     the yellow "nudging" bar firing that early was noise on real work.
  *   - consecutive-error streak: N consecutive tool executions that ERROR → same
  *     escalation (steer once, then abort).
  *   - unproductive-wandering cap: N consecutive READ-ONLY / exploration calls
@@ -15,8 +17,11 @@
  *     between — the failure the signature streak MISSES, because reading ten
  *     DIFFERENT files is ten different signatures. One "you've explored enough,
  *     act now" steer, then abort past a higher, effort-scaled threshold.
- *   - hard step cap: a generous, effort-scaled per-turn tool-call backstop that
- *     aborts even if none of the streaks trip (a slow, wandering non-loop).
+ * There is NO per-turn tool-call cap. the user: "remove the tool call cap." A cap
+ * cannot tell a long job from a stuck one — it only ever fires on the long job,
+ * because a genuinely stuck turn trips the repeat guard or its wall clock first.
+ * `maxSteps` survives as an explicit opt-in for tests (and mirrors the mesh's
+ * `maxStepsPerMessage`); nothing in the live harness sets it.
  *
  * It is a pure state machine: the wiring (index.ts) feeds it the `tool_call` and
  * `tool_execution_end` events and acts on the returned {@link LoopSignal} (send a
@@ -50,8 +55,13 @@ const REPEAT_TEXT_STEER =
 
 /** Thresholds driving the detector. `abortAfter` must be > `steerAfter`. */
 export interface LoopDetectorConfig {
-  /** Consecutive identical calls / errors that fire the single corrective steer. */
+  /** Consecutive tool ERRORS that fire the single corrective steer. */
   readonly steerAfter: number;
+  /**
+   * Consecutive IDENTICAL calls (same name + args) that fire the repeat guard's
+   * steer — the yellow "nudging" bar. Omitted → {@link DEFAULT_REPEAT_STEER_AFTER}.
+   */
+  readonly repeatSteerAfter?: number;
   /** Consecutive ERRORS that fire the abort. (The identical-call abort is now
    * WALL-CLOCK — see {@link repeatWallMs} — not this count, per the user: a genuine
    * loop is "the same call still repeating minutes later", and a fast burst of a
@@ -66,8 +76,11 @@ export interface LoopDetectorConfig {
   readonly repeatWallMs?: number;
   /** Clock source (injectable for tests). Omitted → {@link Date.now}. */
   readonly now?: () => number;
-  /** Hard per-turn tool-call cap (a generous backstop) that aborts. */
-  readonly maxSteps: number;
+  /**
+   * OPT-IN per-turn tool-call cap. Omitted (the live harness always omits it) →
+   * no cap at all, per the user. Left in the type so a test can still build one.
+   */
+  readonly maxSteps?: number;
   /**
    * Consecutive read-only/exploration calls (no concrete action between them)
    * that fire the single "act now" steer. Omitted → {@link DEFAULT_WANDER_STEER_AFTER}.
@@ -82,9 +95,16 @@ export interface LoopDetectorConfig {
   readonly windowSize?: number;
 }
 
-/** Default streak thresholds (kept constant across effort — a loop is a loop). */
+/** Default ERROR-streak thresholds (kept constant across effort — a loop is a loop). */
 export const DEFAULT_LOOP_STEER_AFTER = 3;
 export const DEFAULT_LOOP_ABORT_AFTER = 5;
+/**
+ * Repeat guard: consecutive IDENTICAL calls before the one "you're repeating
+ * yourself" steer. the user raised this from 5 to 75. Three identical calls is a
+ * retry; seventy-five is a loop — and the wall clock below still catches a slow
+ * one long before the count gets there.
+ */
+export const DEFAULT_REPEAT_STEER_AFTER = 75;
 /** Wall-clock window for the identical-call abort (the user): the SAME call must keep
  * repeating for 3 minutes before it's treated as a stuck loop and aborted. */
 export const DEFAULT_REPEAT_WALL_MS = 3 * 60 * 1000;
@@ -178,7 +198,8 @@ export function loopDetectorConfig(knobs: EffortKnobs): LoopDetectorConfig {
   return {
     steerAfter: DEFAULT_LOOP_STEER_AFTER,
     abortAfter: DEFAULT_LOOP_ABORT_AFTER,
-    maxSteps: knobs.maxTurnSteps,
+    repeatSteerAfter: DEFAULT_REPEAT_STEER_AFTER,
+    // No `maxSteps`: there is no per-turn tool-call cap (the user).
     wanderSteerAfter: knobs.wanderSteerAfter,
     wanderAbortAfter: knobs.wanderAbortAfter,
   };
@@ -280,6 +301,10 @@ function reasonFor(cause: LoopCause, streak: number, aborting: boolean): string 
 export function createLoopDetector(config: LoopDetectorConfig): LoopDetector {
   const windowSize = Math.max(1, config.windowSize ?? 8);
   const wanderSteerAfter = config.wanderSteerAfter ?? DEFAULT_WANDER_STEER_AFTER;
+  const repeatSteerAfter = config.repeatSteerAfter ?? DEFAULT_REPEAT_STEER_AFTER;
+  // Absent → no cap. `Infinity` makes the comparison below a no-op rather than
+  // a branch we have to remember to guard at every call site.
+  const maxSteps = config.maxSteps ?? Number.POSITIVE_INFINITY;
   const repeatWallMs = config.repeatWallMs ?? DEFAULT_REPEAT_WALL_MS;
   const now = config.now ?? Date.now;
   let steps = 0;
@@ -350,18 +375,19 @@ export function createLoopDetector(config: LoopDetectorConfig): LoopDetector {
       // concrete action (write/edit/bash/answer/connector/gen call …) resets it.
       unproductiveStreak = isExplorationTool(toolName, args) ? unproductiveStreak + 1 : 0;
 
-      // Hard cap wins first: a runaway turn aborts regardless of the streaks.
-      if (steps > config.maxSteps) {
+      // Only if a caller explicitly opted into a cap (the live harness never does).
+      if (steps > maxSteps) {
         return {
           kind: 'abort',
           cause: 'cap',
-          reason: `exceeded the per-turn tool-call cap (${config.maxSteps})`,
+          reason: `exceeded the per-turn tool-call cap (${maxSteps})`,
         };
       }
       // Identical-call loop (the user): ABORT only once the SAME call (name + args) has
       // been repeating for the wall-clock window — a fast burst of a few identical
-      // calls is not yet a stuck loop; a call still repeating minutes later is. One
-      // early corrective steer at the count threshold nudges before the timeout.
+      // calls is not yet a stuck loop; a call still repeating minutes later is.
+      // This wall clock, not a count, is what actually catches a stuck turn, which
+      // is why the count-based steer below can afford to sit all the way at 75.
       if (identicalStreak >= 2 && t - identicalStreakStart >= repeatWallMs) {
         return {
           kind: 'abort',
@@ -369,7 +395,7 @@ export function createLoopDetector(config: LoopDetectorConfig): LoopDetector {
           reason: reasonFor('identical', identicalStreak, true),
         };
       }
-      if (identicalStreak >= config.steerAfter && !steered) {
+      if (identicalStreak >= repeatSteerAfter && !steered) {
         steered = true;
         return {
           kind: 'steer',
@@ -380,8 +406,7 @@ export function createLoopDetector(config: LoopDetectorConfig): LoopDetector {
       }
       // Unproductive wandering: many DIFFERENT exploration calls with no action.
       // the user: reading different files must NOT abort — so this only ever STEERS
-      // (one gentle nudge), never aborts (Infinity abort threshold). The hard step
-      // cap above is the runaway backstop.
+      // (one gentle nudge), never aborts (Infinity abort threshold).
       return escalate(
         unproductiveStreak,
         'wander',

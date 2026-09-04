@@ -20,6 +20,7 @@ import {
 } from '@pi-desktop/ui';
 import { type ReactElement, useEffect, useRef, useState } from 'react';
 import { useLlmStore } from '../state/llm-store';
+import { useModelSelectionStore } from '../state/model-selection-store';
 import { usePiStore } from '../state/pi-slice';
 import {
   type PlanItem,
@@ -182,6 +183,8 @@ export function ThreadStatusIndicator(): ReactElement | null {
    * a second progress affordance would be a second thing to learn.
    */
   const isCompacting = usePiStore((s) => s.agent.isCompacting);
+  /** The live "switching to <model>…" banner state — see below. */
+  const switching = useModelSelectionStore((s) => s.switching);
 
   // Snap to 100% then fade ONLY once the first token lands (processing → false).
   const [fading, setFading] = useState(false);
@@ -204,20 +207,50 @@ export function ThreadStatusIndicator(): ReactElement | null {
   // the prefill/TTFT duration stays readable (e.g. "45% processing · 2.3s").
   const [elapsedMs, setElapsedMs] = useState(0);
   const procStart = useRef<number | null>(null);
+  // A model swap and a cold server load are timed too: they are the LONGEST
+  // waits in the app (tens of seconds), and an unmoving indicator over one of
+  // them is what "everything completely stops" looks like from the outside.
+  const timing = processing || switching !== null || serverStarting;
   useEffect(() => {
-    if (!processing) return undefined;
+    if (!timing) return undefined;
     procStart.current = performance.now();
     setElapsedMs(0);
     const id = setInterval(() => {
       if (procStart.current !== null) setElapsedMs(performance.now() - procStart.current);
     }, 100);
     return () => clearInterval(id);
-  }, [processing]);
+  }, [timing]);
 
   if (isCompacting) {
     // Indeterminate: pi reports no progress through a compaction, and inventing
     // a percentage for it is the "fake %" this ring already refuses elsewhere.
     return <ProcessingRing percent={null} label="Compacting" fading={false} elapsedMs={0} />;
+  }
+  /*
+   * A MODEL SWAP IS WORK, EVEN THOUGH NOBODY SENT ANYTHING.
+   *
+   * the user: "changing models mid conversation shows no sign of working … no
+   * 'switching to <model>', no 'processing… n%', no 'loading model'." Both of
+   * those states were already computed and neither could ever reach the screen,
+   * because everything below is gated on `processing` — which requires a turn in
+   * flight, and a switch is precisely the case where there isn't one. So the
+   * ring showed nothing for the ten-to-a-hundred seconds a model takes to load,
+   * and the app looked dead. These two checks sit ABOVE that gate.
+   */
+  if (switching !== null) {
+    return (
+      <ProcessingRing
+        percent={null}
+        label={`Switching to ${switching.toName}`}
+        fading={false}
+        elapsedMs={elapsedMs}
+      />
+    );
+  }
+  if (serverStarting && !processing) {
+    return (
+      <ProcessingRing percent={null} label="Loading model" fading={false} elapsedMs={elapsedMs} />
+    );
   }
   if (!processing && !fading) return null;
   // Cold model LOAD → indeterminate pulse + "Loading model" (no fake %). Ingesting

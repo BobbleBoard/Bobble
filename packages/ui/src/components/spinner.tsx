@@ -8,23 +8,34 @@ export interface SpinnerProps extends HTMLAttributes<HTMLSpanElement> {
 }
 
 /**
- * lcm(1100ms spin, 1600ms breathe) — the two loader periods in indicators.css.
- * A negative delay drawn from this window lands both animations on the same
- * phase they would have if they had been running since the page's time origin.
- * Keep in step with those two durations if either ever changes.
+ * One full turn of the ring (ms). A negative delay drawn from this window lands
+ * the spin on the phase it would have had if it had been running since the
+ * page's time origin. Keep in step with the duration in indicators.css.
  */
-const LOADER_PERIOD_MS = 17_600;
+const LOADER_PERIOD_MS = 1100;
 
 /**
- * The Bobble loader — the app's standard spinner. A rounded arc orbits a faint
- * ring track while its sweep gently BREATHES between short and long (the
- * "bobble": alive, never mechanical). Calm and legible down to 13px.
+ * The Bobble loader — the app's standard spinner. A ring that FADES OUT along
+ * its tail, with a rounded tip leading the way round.
+ *
+ * the user: "made a fading-out spinner with a rounded tip instead of the current
+ * one." The previous loader was a fixed-length arc on a faint track whose sweep
+ * breathed; at the small sizes it is actually used (13-16px in a sidebar row)
+ * the breathing read as flicker and the track read as a smudge. A tail that
+ * fades has direction and speed built into its shape, so it stays legible when
+ * it is barely bigger than a full stop.
+ *
+ * Drawn with a conic gradient masked to a ring rather than SVG strokes: SVG has
+ * no angular gradient, so a fade along an arc would mean stacking segments. The
+ * tip is a small round cap sitting on the ring's centre-line at 12 o'clock,
+ * which is also where the gradient's seam falls — so the cap both rounds the
+ * head and hides the seam.
  *
  * currentColor throughout, so it inherits the surrounding text color.
  * API-compatible with every prior spinner (same props / span ref / role), so
  * all call sites (App boot, ModelManager, ChatThread, connectors…) get it for
  * free. Every loader runs on the same clock phase, so they turn together.
- * Reduced-motion freezes to a static three-quarter arc (indicators.css).
+ * Reduced-motion freezes it to a still ring (indicators.css).
  */
 export const Spinner = forwardRef<HTMLSpanElement, SpinnerProps>(function Spinner(
   { size, className, style, ...rest },
@@ -53,12 +64,9 @@ export const Spinner = forwardRef<HTMLSpanElement, SpinnerProps>(function Spinne
       style={{ ...sizeStyle, ...delay, ...style }}
       {...rest}
     >
-      <svg className="pd-loader-svg" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
-        {/* faint full ring: the track the arc orbits */}
-        <circle className="pd-loader-track" cx="16" cy="16" r="13" pathLength={100} />
-        {/* the breathing arc (pathLength normalizes dasharray to 0-100) */}
-        <circle className="pd-loader-arc" cx="16" cy="16" r="13" pathLength={100} />
-      </svg>
+      <span className="pd-loader-ring" aria-hidden="true">
+        <span className="pd-loader-tip" />
+      </span>
     </span>
   );
 });

@@ -31,6 +31,7 @@ import {
   type VerifyBashRunner,
   wireHarness,
 } from './index.js';
+import { DEFAULT_REPEAT_STEER_AFTER } from './loop/loop-detector.js';
 import type { CallModel } from './model-call/call-model.js';
 import type { ToolSchemaLike } from './repair/rungs.js';
 
@@ -354,15 +355,19 @@ describe('loop detector — live wiring through tool_call / tool_execution_end',
       .filter((e) => e.customType === HARNESS_LOOP_ENTRY)
       .map((e) => e.data as { action?: string; cause?: string });
 
-  it('steers once at the 3rd identical call, but a FAST burst does NOT abort (wall-clock gated)', async () => {
-    const rig = makeRig({ effort: 'medium' }); // steerAfter 3; abort is now wall-clock
+  it('steers only at the 75th identical call, and a FAST burst never aborts (wall-clock gated)', async () => {
+    const rig = makeRig({ effort: 'medium' });
     await startSession(rig);
     await startTurn(rig);
-    const call = () => rig.fire('tool_call', TOOL_CALL({ command: 'ls' }));
+    // A CONCRETE action (not `ls`), so the wander guard can't fire first and spend
+    // the turn's single steer — this test is about the identical-call guard alone.
+    const call = () => rig.fire('tool_call', TOOL_CALL({ command: 'npm run build' }));
 
-    await call();
-    await call();
-    await call(); // 3rd → steer (the one nudge)
+    // the user raised the repeat guard from 5 to 75: a handful of identical calls is
+    // a retry, and the yellow "nudging" bar firing on it was noise.
+    for (let i = 1; i < DEFAULT_REPEAT_STEER_AFTER; i++) await call();
+    expect(rig.steerMessages).toHaveLength(0);
+    await call(); // the 75th → the one nudge
     expect(rig.steerMessages).toHaveLength(1);
     expect(loopEntries(rig)).toContainEqual({
       action: 'steer',
@@ -407,16 +412,15 @@ describe('loop detector — live wiring through tool_call / tool_execution_end',
     const rig = makeRig({ effort: 'medium' });
     await startSession(rig);
     await startTurn(rig);
-    const call = () => rig.fire('tool_call', TOOL_CALL({ command: 'ls' }));
-    await call();
-    await call();
-    await call(); // steer #1
+    const call = () => rig.fire('tool_call', TOOL_CALL({ command: 'npm run build' }));
+    const repeatUntilNudge = async () => {
+      for (let i = 0; i < DEFAULT_REPEAT_STEER_AFTER; i++) await call();
+    };
+    await repeatUntilNudge(); // steer #1
     expect(rig.steerMessages).toHaveLength(1);
 
     await startTurn(rig); // new turn → detector rebuilt, streak + steer cleared
-    await call();
-    await call();
-    await call(); // steer #2 (proves the reset)
+    await repeatUntilNudge(); // steer #2 (proves the reset)
     expect(rig.steerMessages).toHaveLength(2);
     expect(rig.abort).not.toHaveBeenCalled();
   });

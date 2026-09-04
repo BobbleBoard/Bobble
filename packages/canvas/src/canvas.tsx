@@ -7,6 +7,7 @@ import {
   IconFile,
   IconSidebar,
   IconTerminal,
+  writeClipboardText,
 } from '@pi-desktop/ui';
 import { type ReactNode, useMemo, useState } from 'react';
 import { type CanvasConfig, CanvasConfigContext, defaultCanvasConfig } from './context.ts';
@@ -75,7 +76,7 @@ export function Canvas({
 
   const copyText = (text: string): void => {
     if (onCopy) onCopy(text);
-    else void navigator.clipboard?.writeText(text);
+    else void writeClipboardText(text);
   };
   const exportContent = (content: ArtifactContent): void => {
     if (onExport) onExport(content);

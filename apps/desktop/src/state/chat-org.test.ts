@@ -17,6 +17,7 @@ function chat(file: string, cwd: string, modifiedAt = 't', title = file): Sessio
     messageCount: 1,
     firstUserText: title,
     title,
+    parentSession: null,
   };
 }
 

@@ -46,12 +46,12 @@ export interface EffortKnobs {
   /** Whether to run adversarial checks (e.g. try to break the produced output).
    * Off everywhere, for the same reason as {@link reviewPasses}. */
   readonly adversarialChecks: boolean;
-  /**
-   * Hard per-turn tool-call cap — a generous backstop the loop detector aborts
-   * on when a turn burns through this many tool calls without finishing. Scales
-   * with effort so a "max" run is allowed to grind much longer than a "low" one.
+  /*
+   * There is NO `maxTurnSteps` here any more. the user: "remove the tool call cap."
+   * It was the one knob that ended a turn purely for being long, and a long turn
+   * is not a broken one — the loop detector's repeat guard and its wall clock
+   * are what tell a stuck turn from a big one.
    */
-  readonly maxTurnSteps: number;
   /**
    * Unproductive-wandering STEER threshold: consecutive read-only/exploration
    * tool calls (read/ls/grep/tool_search/update_plan …) with NO concrete action
@@ -95,7 +95,6 @@ const KNOBS: Record<EffortLevel, EffortKnobs> = {
     abortThreshold: 2,
     reviewPasses: 0,
     adversarialChecks: false,
-    maxTurnSteps: 24,
     wanderSteerAfter: 5,
     wanderAbortAfter: 8,
     realVerify: false,
@@ -108,7 +107,6 @@ const KNOBS: Record<EffortLevel, EffortKnobs> = {
     abortThreshold: 3,
     reviewPasses: 0,
     adversarialChecks: false,
-    maxTurnSteps: 40,
     wanderSteerAfter: 6,
     wanderAbortAfter: 10,
     realVerify: false,
@@ -121,7 +119,6 @@ const KNOBS: Record<EffortLevel, EffortKnobs> = {
     abortThreshold: 4,
     reviewPasses: 0,
     adversarialChecks: false,
-    maxTurnSteps: 60,
     wanderSteerAfter: 8,
     wanderAbortAfter: 14,
     realVerify: true,
@@ -134,7 +131,6 @@ const KNOBS: Record<EffortLevel, EffortKnobs> = {
     abortThreshold: 6,
     reviewPasses: 0,
     adversarialChecks: false,
-    maxTurnSteps: 100,
     wanderSteerAfter: 10,
     wanderAbortAfter: 18,
     realVerify: true,

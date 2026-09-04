@@ -37,14 +37,19 @@
 }
 
 /*
- * The Bobble loader (Spinner component) — the app's standard spinner. A rounded
- * arc orbits a faint ring track (pd-spin on the svg) while its sweep gently
- * BREATHES between short and long (pd-loader-breathe) — calm, alive, legible at
- * 13px. currentColor throughout so it inherits the surrounding text color.
- * --pd-loader-delay is a negative delay pinned ONCE at mount to the document
- * clock (spinner.tsx), so the phase depends only on wall time: every loader
- * turns in step and a remounted one resumes mid-turn instead of snapping to 0°.
- * Both animations below must therefore read the SAME variable.
+ * The Bobble loader (Spinner component) — the app's standard spinner.
+ *
+ * the user: "a fading-out spinner with a rounded tip instead of the current one."
+ * A ring whose tail fades to nothing, led by a rounded cap. SVG has no angular
+ * gradient, so this is a conic gradient masked down to a ring; the cap is a
+ * small round dot parked on the ring's centre-line at 12 o'clock, where the
+ * gradient's seam also falls — it rounds the head AND hides the seam.
+ *
+ * Everything is expressed as a PERCENTAGE of the box, so one rule serves every
+ * size from a 13px row meta to a 32px boot loader. --pd-loader-delay is a
+ * negative delay pinned ONCE at mount to the document clock (spinner.tsx), so
+ * the phase depends only on wall time: every loader turns in step and a
+ * remounted one resumes mid-turn instead of snapping to 0°.
  */
 .pd-loader {
   display: inline-flex;
@@ -56,42 +61,39 @@
   color: currentColor;
 }
 
-.pd-loader-svg {
+/* Ring thickness as a share of the RADIUS. 20% of the radius is 10% of the
+ * box — the same visual weight as the 3.25/32 stroke this replaces. */
+.pd-loader-ring {
+  position: relative;
   display: block;
   width: 100%;
   height: 100%;
-  overflow: visible;
-  transform-origin: center;
+  border-radius: 50%;
+  /* Transparent at the tail, full at the head (just shy of 12 o'clock). */
+  background: conic-gradient(from 0deg, transparent 0deg, currentColor 330deg, currentColor 360deg);
+  -webkit-mask: radial-gradient(farthest-side, transparent 80%, black 80%);
+  mask: radial-gradient(farthest-side, transparent 80%, black 80%);
   animation: pd-spin 1.1s linear infinite;
   animation-delay: var(--pd-loader-delay, 0ms);
 }
 
-.pd-loader-track {
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 3.25;
-  opacity: 0.16;
+/* The rounded tip: diameter = ring thickness (10% of the box), centred on the
+ * ring's centre-line (90% of the radius → 5% in from the top edge). */
+.pd-loader-tip {
+  position: absolute;
+  top: 0;
+  left: 45%;
+  width: 10%;
+  height: 10%;
+  border-radius: 50%;
+  background: currentColor;
 }
 
-.pd-loader-arc {
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 3.25;
-  stroke-linecap: round;
-  stroke-dasharray: 18 100;
-  animation: pd-loader-breathe 1.6s ease-in-out infinite;
-  animation-delay: var(--pd-loader-delay, 0ms);
-}
-
-/* Reduced motion: freeze to a static three-quarter arc. Infinite animations
- * are disabled by component CSS per the themes emit.ts convention. */
+/* Reduced motion: hold the ring still rather than blanking the affordance —
+ * a paused loader still says "working", a missing one says nothing. */
 @media (prefers-reduced-motion: reduce) {
-  .pd-loader-svg {
+  .pd-loader-ring {
     animation: none;
-  }
-  .pd-loader-arc {
-    animation: none;
-    stroke-dasharray: 75 100;
   }
 }
 

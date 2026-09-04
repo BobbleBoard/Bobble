@@ -124,6 +124,18 @@ export interface SessionSummary {
   firstUserText: string | null;
   title: string;
   /**
+   * The session file this one CONTINUES, when pi forked it from another.
+   *
+   * pi does not append on resume: restarting the child with `--session <file>`
+   * writes a NEW file carrying the whole history and a `parentSession` pointer
+   * back. Every restart therefore used to add another identically-titled row to
+   * the sidebar — measured on the user's machine, one conversation about spoofdpi
+   * had become NINE rows, three of them created within seven seconds of each
+   * other. The pointer is surfaced so the listing can keep only the tip of each
+   * chain (see `listAllSessions`).
+   */
+  parentSession: string | null;
+  /**
    * Where the search query appears in the conversation, when one was given and
    * the title did not already contain it.
    *

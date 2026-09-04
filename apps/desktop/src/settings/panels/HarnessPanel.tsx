@@ -13,7 +13,7 @@
  * serving, so they get the exact shell lines that point them at it. Presenting
  * both as one list of interchangeable options would be the lie worth avoiding.
  */
-import { SegmentedControl, Spinner } from '@pi-desktop/ui';
+import { SegmentedControl, Spinner, writeClipboardText } from '@pi-desktop/ui';
 import { useCallback, useEffect, useState } from 'react';
 import type { HarnessDetected } from '../../../electron/ipc-contract';
 import type { ToolInterface } from '../../../electron/settings/settings-contract';
@@ -49,7 +49,7 @@ function CopyBox({ text, testid }: { text: string; testid: string }) {
       <button
         type="button"
         onClick={() => {
-          void navigator.clipboard?.writeText(text);
+          void writeClipboardText(text);
           setCopied(true);
           setTimeout(() => setCopied(false), 1400);
         }}

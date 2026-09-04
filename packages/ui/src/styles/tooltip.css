@@ -31,15 +31,32 @@
 }
 
 /*
- * Context-fullness hover card (feedback #1). Same tooltip motion/portal, but a
- * theme-surface card instead of the black-glass caption: overlay bg, primary
- * text, roomier. Rules come after .pd-tooltip so they win by source order for
- * the shared element (both are single-class specificity).
+ * CONTEXT CARD — the hover card on the composer's context ring.
+ *
+ * the user: "hovering the context ring … has translucency, apparently only for the
+ * text in the text box under the hover", and "the bar at the top and surrounding
+ * text don't look great."
+ *
+ * Both are one surface. `--pd-bg-overlay` is 85% opaque in the bobble flavor
+ * (#…d9), and this was the ONLY overlay in the app with no backdrop blur behind
+ * it — every menu, dialog, chip and suggestion list already blurs — so the
+ * composer's text read straight through the card. It is painted on an opaque
+ * base here AND blurred, which is the same answer a translucent dropdown got the
+ * last time: readable wherever it opens.
+ *
+ * The layout is a status card now, not a download bar: the number leads on its
+ * own row opposite the label, a hairline track sits under it, and the token
+ * count is a footnote. The old chunky ProgressBar across the top was the "bar at
+ * the top" that did not look right.
  */
 .pd-context-tooltip {
-  max-width: 17rem;
+  max-width: 15rem;
   padding: 10px 12px;
-  background: var(--pd-bg-overlay);
+  /* Opaque: the overlay colour composited over a solid base, so nothing behind
+     the card can be read through it. */
+  background: linear-gradient(var(--pd-bg-overlay), var(--pd-bg-overlay)), var(--pd-bg-raised);
+  -webkit-backdrop-filter: blur(var(--pd-blur-overlay));
+  backdrop-filter: blur(var(--pd-blur-overlay));
   color: var(--pd-text-primary);
   box-shadow: var(--pd-shadow-hairline), var(--pd-shadow-popover);
 }
@@ -47,30 +64,65 @@
 .pd-context-card {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 6px;
 }
 
-.pd-context-card-bar {
-  margin-bottom: 5px;
+/* Label left, the number right — the one value worth reading first. */
+.pd-context-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
 }
 
-.pd-context-card-line {
-  font-size: var(--pd-font-size-footnote);
-  line-height: var(--pd-leading-footnote);
-  font-weight: var(--pd-font-weight-medium);
-}
-
-.pd-context-card-line--muted {
+.pd-context-card-label {
   color: var(--pd-text-muted);
+  font-size: var(--pd-font-size-caption);
+  line-height: var(--pd-leading-caption);
   font-weight: var(--pd-font-weight-regular);
 }
 
+.pd-context-card-value {
+  font-size: var(--pd-font-size-body);
+  line-height: var(--pd-leading-body);
+  font-weight: var(--pd-font-weight-medium);
+  font-variant-numeric: tabular-nums;
+}
+
+/* A hairline track, not a progress bar: this is a level, not a task finishing. */
+.pd-context-card-track {
+  height: 3px;
+  border-radius: 999px;
+  background: var(--pd-bg-track);
+  overflow: hidden;
+}
+
+.pd-context-card-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: currentColor;
+  transition: width var(--pd-duration-base) var(--pd-easing-standard);
+}
+
+.pd-context-card-line {
+  color: var(--pd-text-muted);
+  font-size: var(--pd-font-size-footnote);
+  line-height: var(--pd-leading-footnote);
+  font-variant-numeric: tabular-nums;
+}
+
 .pd-context-card-note {
-  margin-top: 5px;
+  margin-top: 3px;
   padding-top: 6px;
   border-top: 0.5px solid var(--pd-border-subtle);
   color: var(--pd-text-muted);
   font-size: var(--pd-font-size-caption);
   line-height: var(--pd-leading-caption);
   text-wrap: pretty;
+}
+
+/* Past 85% the level itself is the warning — the ring beside it already is. */
+.pd-context-card--warn .pd-context-card-fill,
+.pd-context-card--warn .pd-context-card-value {
+  color: var(--pd-status-warning-fg);
 }

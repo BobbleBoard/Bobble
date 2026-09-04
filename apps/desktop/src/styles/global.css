@@ -1958,11 +1958,17 @@ body {
 .pd-chatrow-main {
   position: relative;
 }
+/* Geometry shared by the hover 3-dot button and the running spinner that stands
+   in its place — one source of truth so they cannot drift apart again. */
+.pd-chatrow-main {
+  --pd-chatrow-action-size: 24px;
+  --pd-chatrow-action-inset: 6px;
+}
 /* The 3-dot menu is a SIBLING overlay of the row button (valid HTML), revealed on
    hover / while its menu is open (:focus-within). It replaces the resting meta. */
 .pd-chatrow-actions {
   position: absolute;
-  right: 6px;
+  right: var(--pd-chatrow-action-inset);
   top: 0;
   bottom: 0;
   display: flex;
@@ -1992,8 +1998,36 @@ body {
   cursor: pointer;
 }
 .pd-chatrow-dots {
-  width: 24px;
-  height: 24px;
+  width: var(--pd-chatrow-action-size);
+  height: var(--pd-chatrow-action-size);
+}
+
+/*
+ * THE RUNNING SPINNER STANDS WHERE THE 3-DOT BUTTON WILL.
+ *
+ * the user: "centered, a bit larger, the exact same size and centering as the
+ * 3-dots button (on hover)." It was a bare 14px glyph in the meta slot, whose
+ * right edge is the row's 8px padding — while the dots overlay sits 6px in. So
+ * the spinner sat 2px left of where the button appeared under the pointer, and
+ * a hovered running row twitched. Same box, and the inset difference is pulled
+ * back out as a negative margin, so the two centres coincide exactly at any
+ * sidebar scale.
+ */
+/* The meta slot is a text span, so an inline child would sit on its BASELINE —
+   measured as a 0.75px vertical offset from the dots button. Make the slot a
+   flex box (and drop its line box) whenever it is holding the spinner. */
+.pd-sidebar-row-meta:has(.pd-chatrow-spinner) {
+  display: inline-flex;
+  align-items: center;
+  line-height: 0;
+}
+.pd-chatrow-spinner {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--pd-chatrow-action-size);
+  height: var(--pd-chatrow-action-size);
+  margin-right: calc(var(--pd-chatrow-action-inset) - 8px * var(--pd-sidebar-scale, 1));
 }
 .pd-section-action {
   width: 20px;
