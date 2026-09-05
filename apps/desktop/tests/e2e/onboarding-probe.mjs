@@ -127,9 +127,22 @@ const commonEnv = {
     await page.click('[data-testid="experience-new"]');
     await page.click('[data-testid="onboarding-next"]');
 
-    // Step 5 — capabilities, then finish.
+    // Step 5 — capabilities.
     await page.waitForSelector('[data-testid="capability-image"]', { timeout: 8000 });
     await page.click('[data-testid="capability-image"]');
+    await page.click('[data-testid="onboarding-next"]');
+
+    /*
+     * Step 6 — SETUP, which this probe predates.
+     *
+     * The wizard grew a sixth step ("Getting you running" — it picks a model for
+     * the machine), so `capabilities` stopped being the last one and stopped
+     * showing Finish. The probe kept clicking a button that had moved a screen
+     * further on, and waited out its full timeout on a wizard that was working.
+     * Nothing here has to DO the setup — that is its own probe's job — only get
+     * past it to the finish.
+     */
+    await page.waitForSelector('[data-testid="onboarding-setup"]', { timeout: 15_000 });
     await page.click('[data-testid="onboarding-finish"]');
 
     // Landed in chat: the composer is the tell.

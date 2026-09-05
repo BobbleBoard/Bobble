@@ -1509,8 +1509,18 @@ export function SessionSidebar({
               return (
                 <div key={project.id}>
                   {/* Auto (directory-derived) folders have no menu — they re-derive
-                      from the working dir. Only user-made projects rename/delete. */}
-                  <div className={auto ? '' : 'pd-chatrow'}>
+                      from the working dir. Only user-made projects rename/delete.
+
+                      `pd-chatrow-main` MATTERS, and its absence was a real bug:
+                      the hover actions are `opacity: 0; pointer-events: none`
+                      until `.pd-chatrow-main:hover`, and a project row put them
+                      OUTSIDE that element — a sibling of the row rather than a
+                      descendant of it. So a project's "+" and its ⋯ could never
+                      be revealed and never be clicked: no rename, no delete, no
+                      working folder, no new chat in a project, from the sidebar
+                      at all. A chat row has always nested them correctly (see
+                      the .pd-chatrow-main above); this now matches it. */}
+                  <div className={auto ? '' : 'pd-chatrow pd-chatrow-main'}>
                     <SidebarRow
                       icon={
                         <span className="pd-chat-icon-swap">

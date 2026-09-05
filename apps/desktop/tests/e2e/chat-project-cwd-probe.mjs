@@ -43,7 +43,33 @@ try {
   await page.waitForSelector('[data-testid="composer-input"]', { timeout: 10000 });
 
   // ── Create a project "Scratchpad" (no working folder) ──────────────────────
-  await page.click('[data-testid="new-project"]', { force: true });
+  /*
+   * SCROLL TO IT AND CLICK IT PROPERLY, rather than forcing.
+   *
+   * `{ force: true }` skips the actionability wait but NOT the viewport
+   * requirement, so this failed with "Element is outside of the viewport" —
+   * against a button that is present, enabled and one scroll away. The same
+   * flag cost chat-projects-probe a click that landed at x = -36 mid-animation.
+   *
+   * The "+" is hover-revealed (opacity 0 until the section is hovered), which
+   * Playwright treats as visible; hovering first is what a person does anyway.
+   */
+  const clickSidebar = async (sel) => {
+    const el = page.locator(sel);
+    await el.scrollIntoViewIfNeeded();
+    /*
+     * Hover the ROW, not the control. A project's ⋯ lives in
+     * `.pd-chatrow-actions`, which is `opacity: 0` until
+     * `.pd-chatrow-main:hover` — hovering the button itself does not satisfy
+     * that selector, so it stayed at opacity 0 and Playwright waited for it to
+     * become "visible and stable" forever.
+     */
+    const row = el.locator('xpath=ancestor-or-self::*[contains(@class,"pd-chatrow-main")][1]');
+    if ((await row.count()) > 0) await row.first().hover();
+    await el.hover();
+    await el.click();
+  };
+  await clickSidebar('[data-testid="new-project"]');
   const projInput = page.locator('[data-testid^="project-rename-input-"]');
   await projInput.waitFor({ timeout: 8000 });
   await projInput.fill('Scratchpad');
@@ -53,7 +79,7 @@ try {
   const projId = (await projectRow.getAttribute('data-testid')).replace('project-row-', '');
 
   // ── The 3-dot menu offers "Set working folder…" (projectless → not "Change") ─
-  await page.click(`[data-testid="project-menu-${projId}"]`, { force: true });
+  await clickSidebar(`[data-testid="project-menu-${projId}"]`);
   await page.waitForSelector('text=Set working folder…', { timeout: 8000 });
   assert(
     (await page.locator('.pd-menu').textContent())?.includes('Set working folder'),
@@ -71,7 +97,7 @@ try {
   assert(existsSync(sb.path), 'project sandbox dir was created on disk');
 
   // ── "+ new chat" in the projectless project → roots at the shared sandbox ────
-  await page.click(`[data-testid="project-new-chat-${projId}"]`, { force: true });
+  await clickSidebar(`[data-testid="project-new-chat-${projId}"]`);
   // The restart+newSession settles; wait for the composer to be interactive again.
   await page.waitForSelector('[data-testid="composer-input"]', { timeout: 10000 });
   await page.waitForTimeout(600);

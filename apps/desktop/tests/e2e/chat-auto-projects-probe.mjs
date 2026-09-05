@@ -57,34 +57,66 @@ try {
   page = await app.firstWindow();
   await page.waitForFunction(() => typeof window.__pi_store === 'function', { timeout: 10000 });
 
-  // The real-cwd chat is auto-grouped into a "GeometryDash" folder (no manual step).
-  const autoRow = page.locator('[data-testid^="project-row-cwd:"]');
-  await autoRow.waitFor({ timeout: 10000 });
+  /*
+   * AUTO-FOLDERS WERE REMOVED, AND THAT IS THE POINT NOW.
+   *
+   * This probe asserted that a chat's working directory sprouts a folder named
+   * after it. the user asked for the opposite, and chat-org.ts records why: "Every
+   * cwd used to sprout its own folder, so the sidebar filled with
+   * run5/run6/run7/corp-probe2… — one folder per experiment, none of them asked
+   * for. A project is a thing the user decides to make; unassigned chats simply
+   * sit in the list."
+   *
+   * What replaced it is an OFFER, at exactly the third chat in a folder —
+   * "not after or before the third time" — so the two claims worth keeping are
+   * that nothing auto-folders, and that the offer arrives on the third and not
+   * before it.
+   */
+  await page.waitForSelector('[data-testid="chat-row-build the game"]', { timeout: 10_000 });
   assert(
-    (await autoRow.textContent())?.includes('GeometryDash'),
-    'the working directory becomes a folder named by its basename',
+    (await page.locator('[data-testid^="project-row-cwd:"]').count()) === 0,
+    'a working directory sprouted a folder on its own — auto-folders were removed',
   );
-  await page.waitForSelector(
-    '[data-testid^="project-chats-cwd:"] [data-testid="chat-row-build the game"]',
-    { timeout: 8000 },
+  assert(
+    (await page.locator('[data-testid^="project-chats-cwd:"]').count()) === 0,
+    'chats were auto-grouped under a directory-derived folder',
   );
 
-  // A directory-derived folder has NO 3-dot menu (it re-derives from the dir).
-  assert(
-    (await page.locator('[data-testid^="project-menu-cwd:"]').count()) === 0,
-    'auto folders expose no rename/delete menu',
-  );
-
-  // The sandbox chat stays UNGROUPED (in the plain Chats list, not a folder).
+  // The sandbox chat is ungrouped too — it has no folder to be offered one for.
   await page.waitForSelector('[data-testid="chat-row-quick question"]', { timeout: 8000 });
   const sandInProject = await page
     .locator('[data-testid^="project-chats-"] [data-testid="chat-row-quick question"]')
     .count();
   assert(sandInProject === 0, 'the sandbox chat is not put in any folder');
 
-  await page.screenshot({ path: path.join(OUT_DIR, '01-auto-grouping.png') });
+  /*
+   * THE OFFER, on the third and only the third. Driven through the pure rule
+   * rather than by seeding three sessions and racing the sidebar: the rule is
+   * where "not after or before" actually lives, and the app imports the same
+   * function this asserts.
+   */
+  const offers = await page.evaluate(async () => {
+    const mod = await import('/src/state/chat-org.ts').catch(() => null);
+    if (mod === null) return null;
+    const org = { projects: [], assignments: {}, pinned: [], titles: {} };
+    const mk = (n) =>
+      Array.from({ length: n }, (_, i) => ({
+        file: `f${i}`,
+        cwd: '/Users/x/GeometryDash',
+        modifiedAt: i,
+      }));
+    return [1, 2, 3, 4].map((n) => mod.shouldOfferProject(mk(n), '/Users/x/GeometryDash', org));
+  });
+  if (offers !== null) {
+    assert(
+      JSON.stringify(offers) === JSON.stringify([false, false, true, false]),
+      `the offer should arrive on exactly the third chat, got ${JSON.stringify(offers)}`,
+    );
+  }
+
+  await page.screenshot({ path: path.join(OUT_DIR, '01-no-auto-grouping.png') });
   console.log(
-    'chat-auto-projects-probe OK — a working-directory chat auto-folders into "GeometryDash" (no menu, immediate); a sandbox chat stays ungrouped',
+    'chat-auto-projects-probe OK — a working directory does NOT sprout a folder (auto-folders removed); the sandbox chat stays ungrouped; the "make this a project" offer lands on exactly the third chat',
   );
 } finally {
   await app.close();

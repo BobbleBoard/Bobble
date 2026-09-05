@@ -263,18 +263,23 @@ try {
     'the Open primary segment should be labelled with the default app',
   );
   // Clicking it opens with the OS default.
-  await page.click(`${opbarFile} .pd-canvas-split-main`);
+  /* `.pd-split-main` / `.pd-split-caret`: the Open control became a SHARED split
+     button (packages/ui split-button.css), so it lost the `pd-canvas-` prefix
+     this probe still used. Nothing about the behaviour changed. */
+  await page.click(`${opbarFile} .pd-split-main`);
   // The ▾ menu lists the OTHER apps (default omitted) + "Open in folder".
-  await page.click(`${opbarFile} .pd-canvas-split-caret`);
-  await page.waitForSelector(`${opbarFile} .pd-canvas-popmenu`, { timeout: 8000 });
-  const menuText = await page.locator(`${opbarFile} .pd-canvas-popmenu`).innerText();
+  await page.click(`${opbarFile} .pd-split-caret`);
+  /* .pd-split-menu: the shared split button owns this menu now. The
+     .pd-canvas-popmenu above is the NEW-TAB menu and is still right. */
+  await page.waitForSelector(`${opbarFile} .pd-split-menu`, { timeout: 8000 });
+  const menuText = await page.locator(`${opbarFile} .pd-split-menu`).innerText();
   assert(/Terminal/.test(menuText) && /Xcode/.test(menuText), 'Open-with menu missing the apps');
   assert(
     !/VS Code Insiders/.test(menuText),
     'Open-with menu must OMIT the default app (VS Code Insiders)',
   );
   assert(/Open in folder/.test(menuText), 'Open-with menu missing "Open in folder"');
-  await page.click(`${opbarFile} .pd-canvas-popmenu button:has-text("Terminal")`);
+  await page.click(`${opbarFile} .pd-split-menu button:has-text("Terminal")`);
 
   const fileCalls = await page.evaluate(() => window.__pi_canvas_ipc ?? []);
   const openDefault = fileCalls.find(

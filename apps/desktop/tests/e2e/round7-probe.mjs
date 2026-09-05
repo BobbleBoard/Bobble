@@ -166,9 +166,15 @@ try {
   // Round-8 #14: the split "Open" primary opens with the DEFAULT app
   // (canvas:open-with { appId: 'default' }); the ▾ caret's menu carries
   // "Open in folder" (canvas:reveal). (The richer app-list is covered in round8.)
-  await page.click(`${opbar('file')} .pd-canvas-split-main`);
-  await page.click(`${opbar('file')} .pd-canvas-split-caret`);
-  await page.click(`${opbar('file')} .pd-canvas-popmenu button:has-text("Open in folder")`);
+  /* `.pd-split-main` / `.pd-split-caret`: the Open control became a SHARED split
+     button (packages/ui split-button.css), so it lost the `pd-canvas-` prefix
+     this probe still used. Nothing about the behaviour changed. */
+  await page.click(`${opbar('file')} .pd-split-main`);
+  await page.click(`${opbar('file')} .pd-split-caret`);
+  /* The ▾ menu belongs to the shared split button now (.pd-split-menu), not to
+     the canvas's own .pd-canvas-popmenu — which still exists and is the NEW-TAB
+     menu, a different control in the same bar. */
+  await page.click(`${opbar('file')} .pd-split-menu button:has-text("Open in folder")`);
 
   const fileCalls = await page.evaluate(() => window.__pi_canvas_ipc ?? []);
   const reveal = fileCalls.find((c) => c.channel === 'canvas:reveal');
