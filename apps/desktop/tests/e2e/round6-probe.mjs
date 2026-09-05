@@ -166,26 +166,48 @@ try {
   await page.waitForSelector('[data-testid="profile-menu"]', { timeout: 8000 });
   await page.click('[data-testid="open-settings"]');
   await page.waitForSelector('[data-testid="settings-view"]', { timeout: 8000 });
-  const settingsClass = await page.getAttribute('[data-testid="settings-view"]', 'class');
-  assert(
-    (settingsClass ?? '').includes('pd-settings-enter'),
-    'settings view has no open transition (missing pd-settings-enter)',
+  /*
+   * The transition class sits on the OUTER wrapper, not on the dialog.
+   * `settings-view` marks the `role="dialog"` panel inside it, and reading the
+   * class off that reported a missing animation on a view that animates
+   * perfectly well — the class simply moved out one level.
+   */
+  const hasEnter = await page.evaluate(
+    () =>
+      document.querySelector('[data-testid="settings-view"]')?.closest('.pd-settings-enter') !==
+      null,
   );
+  assert(hasEnter, 'settings view has no open transition (no .pd-settings-enter ancestor)');
 
   const back = page.locator('[data-testid="settings-back"]');
   await back.waitFor({ timeout: 8000 });
   const tag = await back.evaluate((el) => el.tagName);
   assert(tag === 'BUTTON', `Back-to-chat should be a <button>, got <${tag.toLowerCase()}>`);
+  /*
+   * IT IS A CORNER ✕ ON A CENTRED DIALOG NOW, not a bottom-left "Back to chat".
+   *
+   * These two assertions described a full-screen settings PAGE with a back link
+   * at the foot. Settings became the app's ordinary dialog treatment — centred
+   * panel, blurred room behind, close in the header — so "bottom half" and
+   * "left side" are claims about a layout that was deliberately replaced. What
+   * still has to be true is that the control is reachable, says what it does,
+   * and sits inside the panel it closes.
+   */
   const box = await back.boundingBox();
   const vp = await page.evaluate(() => ({ w: window.innerWidth, h: window.innerHeight }));
-  assert(box !== null, 'Back-to-chat has no bounding box');
+  assert(box !== null, 'the settings close control has no bounding box');
+  const label = await back.getAttribute('aria-label');
   assert(
-    box.y > vp.h * 0.5,
-    `Back-to-chat should sit in the BOTTOM half (y=${Math.round(box.y)} of ${vp.h})`,
+    (label ?? '').toLowerCase().includes('close') || (label ?? '').toLowerCase().includes('back'),
+    `the settings close control should say what it does; aria-label was ${JSON.stringify(label)}`,
   );
+  const insidePanel = await back.evaluate(
+    (el) => el.closest('[data-testid="settings-view"]') !== null,
+  );
+  assert(insidePanel, 'the settings close control is not inside the settings panel');
   assert(
-    box.x < vp.w * 0.4,
-    `Back-to-chat should sit on the LEFT (x=${Math.round(box.x)} of ${vp.w})`,
+    box.x > vp.w * 0.5,
+    `the close ✕ sits in the panel header, on the right (x=${Math.round(box.x)} of ${vp.w})`,
   );
 
   // It returns to chat.
@@ -193,7 +215,7 @@ try {
   await page.waitForSelector('[data-testid="composer-input"]', { timeout: 8000 });
 
   console.log(
-    'round6-probe OK — streaming thought expanded→collapsed on response; thinking-only turn shows chain chrome (clock/line/Done); settings gear cog + open transition; Back-to-chat is a bottom-left button',
+    'round6-probe OK — streaming thought expanded→collapsed on response; thinking-only turn shows chain chrome (clock/line/Done); settings gear cog + open transition; the settings dialog closes from a labelled ✕ in its header',
   );
 } finally {
   await app.close();
