@@ -118,6 +118,7 @@ import { registerToolCli } from './tools/tool-cli-bridge.js';
 import { truncateToolOutput } from './tools/tool-output-truncate.js';
 import { type CapturedTool, captureRegisteredTools } from './tools/tool-registry.js';
 import { registerUseTool } from './tools/use-tool.js';
+import { wouldDestroyWorkspace } from './tools/workspace-guard.js';
 import { type Checkpoint, capture, prune, restore } from './verify/checkpoints.js';
 import { readmeIn, undemonstrated, workRootOf } from './verify/documented.js';
 import {
@@ -2675,6 +2676,23 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
         runtime.ranCommands.push(cmd);
         const hang = wouldHang(cmd, runtime.workspaceRoot ?? undefined);
         if (hang !== null) return { block: true, reason: hang };
+        /*
+         * …AND A COMMAND THAT DELETES THE PLACE THE WORK LIVES.
+         *
+         * The checkpoint below covers `write` and `edit` — that is the whole
+         * "put it back three turns later" safety net — and bash is outside it.
+         * MEASURED on a long run: 24 files written, then over six minutes the
+         * count went 24 → 0 → 13 → 24 → 0, and at the end the working
+         * directory and the home containing it did not exist. Nothing was
+         * there to notice. See workspace-guard.ts for why the rule is only
+         * about the workspace ROOT and lets every ordinary `rm -rf build`
+         * through.
+         */
+        const destroy = wouldDestroyWorkspace(cmd, runtime.workspaceRoot ?? undefined);
+        if (destroy !== null) {
+          pi.appendEntry(HARNESS_LOOP_ENTRY, { action: 'block', cause: 'workspace-delete' });
+          return { block: true, reason: destroy };
+        }
       }
     }
     // Remember files this turn writes/edits (for verify's syntax fallback, fix #4).
