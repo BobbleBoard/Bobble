@@ -3105,6 +3105,12 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
   flex-direction: column;
   gap: 7px;
   min-width: 0;
+  /* LEFT, and only as wide as what it holds. A result is a thing the room made;
+     a full-width card with the thing floating in the middle of it reads as a
+     placeholder. */
+  align-items: flex-start;
+  align-self: flex-start;
+  max-width: 100%;
 }
 
 /*
@@ -3121,6 +3127,10 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
   border: 1px solid color-mix(in oklab, var(--pd-text-primary) 10%, transparent);
   min-height: 120px;
   display: flex;
+  /* Shrink to the media rather than filling the column — the other half of the
+     grey bars. Capped so a very wide render still stops at the column edge. */
+  width: fit-content;
+  max-width: 100%;
 }
 /* A picture card is TALLER than a wide one is wide: these are generated stills
    and clips, and 240px is about where you stop squinting at a 1024² render. */
@@ -3136,12 +3146,24 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
   padding: 12px;
 }
 
+/*
+ * NO LETTERBOX BARS. the user: "no grey bars… (eg. in fox screenshot there's bars)".
+ *
+ * The picture was forced to `width: 100%` and then `object-fit: contain`'d
+ * inside it, so a square render in a full-width frame painted the 4% tint down
+ * both sides. Nothing was wrong with the image; it was being stretched into a
+ * box it did not fill and the box was showing.
+ *
+ * Now it takes its own width up to the column, the frame shrinks to it (see
+ * .pd-media-frame), and the tint is gone with the gap it was filling. `contain`
+ * stays for the max-height case, where it is doing real work.
+ */
 .pd-media-image {
-  width: 100%;
+  width: auto;
+  max-width: 100%;
   max-height: 480px;
   object-fit: contain;
   display: block;
-  background: color-mix(in oklab, var(--pd-text-primary) 4%, transparent);
 }
 
 /* ── the corner controls ─────────────────────────────────────────────────── */
@@ -3595,6 +3617,19 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
 }
 .pd-thread-media[data-layout="grid"] .pd-thread-image-thumb {
   max-height: none;
+  width: 100%;
+}
+/*
+ * A GRID IS THE ONE PLACE THE OLD BEHAVIOUR WAS RIGHT. Four candidates from one
+ * description exist to be COMPARED, and cells that each shrink to their own
+ * content make that harder, not easier — so inside a grid they fill the cell.
+ */
+.pd-thread-media[data-layout="grid"] .pd-media-card,
+.pd-thread-media[data-layout="grid"] .pd-media-frame {
+  width: 100%;
+  align-self: stretch;
+}
+.pd-thread-media[data-layout="grid"] .pd-media-image {
   width: 100%;
 }
 
@@ -4441,14 +4476,36 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
 
 /* ---- a run, and a job in flight ---------------------------------------- */
 
+/*
+ * THE PROMPT READS AS THE MESSAGE THAT ASKED FOR THIS.
+ *
+ * the user: "place the prompt up and right as if this is a chat". It used to be a
+ * flat line of text sharing a row with the model/seed footnote, above a
+ * full-width card — a caption on a slab. A run IS a small conversation: you
+ * asked for something and the room answered, so the ask sits where an ask sits,
+ * and the answer sits under it on the left.
+ *
+ * Same bubble grammar as a real user message (.pd-msg-bubble) rather than a
+ * lookalike, so the two never drift apart.
+ */
 .pd-studio-run-head {
   display: flex;
-  align-items: baseline;
-  gap: 12px;
-  margin-bottom: 8px;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.pd-studio-run-prompt {
+  max-width: min(80%, 40rem);
+  padding: 10px 16px;
+  border-radius: var(--pd-radius-bubble);
+  background: var(--pd-user-bubble-bg);
+  color: var(--pd-user-bubble-fg);
+  font-size: var(--pd-font-size-body);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 .pd-studio-run-meta {
-  margin-inline-start: auto;
   display: flex;
   align-items: baseline;
   gap: 10px;
@@ -4615,15 +4672,11 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
   padding: 2px 4px;
 }
 
-.pd-studio-run-prompt {
-  font-size: 0.8125rem;
-  color: var(--pd-text-muted);
-  margin-bottom: 8px;
-  /* The description that produced this run, quoted — with several takes on
-     screen you need to know which knob each one came from. */
-  border-left: 2px solid color-mix(in oklab, var(--pd-text-primary) 18%, transparent);
-  padding-left: 10px;
-}
+/* The OLD caption treatment lived here — muted text behind a grey rule, which
+   is what "place the prompt up and right as if this is a chat" replaced. The
+   bubble is defined once, up with .pd-studio-run-head. A second rule for the
+   same class later in the file simply won, which is how the first attempt at
+   this changed nothing on screen. */
 
 .pd-studio-empty {
   margin: auto;

@@ -109,9 +109,9 @@ try {
   );
   await page.waitForTimeout(300);
 
-  // "A lot" — the largest change the knob offers, so the difference is not a
+  // "High" — the largest magnitude the knob offers, so the difference is not a
   // question of measurement noise.
-  await page.click('[data-testid="image-strength-rail"] >> text=A lot');
+  await page.click('[data-testid="image-strength-rail"] >> text=High');
   await page.click('[data-testid="image-model-rail"]');
   await page.waitForTimeout(250);
   const picked = await page.evaluate(
@@ -185,7 +185,7 @@ try {
   /*
    * THE ACTUAL CLAIM: the result is DERIVED from the input and DIFFERENT from
    * it. Identical means the input was ignored (a plain text-to-image run);
-   * unrecognisably different at "A lot" is possible but a mean per-channel
+   * unrecognisably different at "High" is possible but a mean per-channel
    * distance near the noise floor is not — that is the inversion having flipped.
    */
   if (files.length > 0) {

@@ -386,15 +386,15 @@ export function ImageStudio(): JSX.Element {
           */}
           {handoff.input !== null ? (
             <RailGroup title="Edit">
-              <Knob label="How much to change">
+              <Knob label="Edit magnitude">
                 <Segmented
                   testid="image-strength-rail"
                   value={strength}
                   onChange={setStrength}
                   options={[
-                    { value: 0.3, label: 'A little', hint: 'Touch it up — same picture' },
-                    { value: 0.6, label: 'Some', hint: 'Clearly reworked, still recognisable' },
-                    { value: 0.85, label: 'A lot', hint: 'Keeps the composition, redraws it' },
+                    { value: 0.3, label: 'Low', hint: 'Touch it up — same picture' },
+                    { value: 0.6, label: 'Medium', hint: 'Clearly reworked, still recognisable' },
+                    { value: 0.85, label: 'High', hint: 'Keeps the composition, redraws it' },
                   ]}
                 />
               </Knob>
