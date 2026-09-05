@@ -46,7 +46,19 @@ const app = await electron.launch({
 });
 try {
   const page = await app.firstWindow();
-  await page.waitForSelector('text=Bobble');
+  /*
+   * WAIT FOR THE APP, NOT FOR A WORD.
+   *
+   * `text=Bobble` matches five things now — the brand mark, the profile row,
+   * and `<title>Bobble</title>` among them — and Playwright takes the first,
+   * which is the title element. A <title> is never "visible", so this waited
+   * thirty seconds and then failed on a perfectly healthy app, taking the whole
+   * e2e chain down with it (this probe runs second).
+   *
+   * The composer is what "the app is up" actually means, and it is what every
+   * other probe in the suite waits for.
+   */
+  await page.waitForSelector('.pd-composer-editor', { timeout: 30_000 });
 
   const themeAttrs = () =>
     page.evaluate(() => ({
