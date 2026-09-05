@@ -43,6 +43,7 @@ import { CREATE_PRODUCTION_HIERARCHY, TALK_TO_MANAGER } from './corp/promotion.j
 import { effortKnobs, isEffortLevel } from './effort/effort.js';
 import { HANDBACK_NUDGE, isChoiceHandback } from './loop/handback.js';
 import { createLoopDetector, type LoopDetector, loopDetectorConfig } from './loop/loop-detector.js';
+import { unfinishedPlan, unfinishedPlanNudge } from './loop/unfinished-plan.js';
 import {
   parseModelParams,
   smallModelCapabilityWarning,
@@ -327,6 +328,8 @@ interface HarnessRuntime {
   warnedSmallModel: boolean;
   /** One-shot: the output-limit steer has already been sent this session. */
   nudgedOutputLimit: boolean;
+  /** One-shot: the model was told its own plan still had steps left in it. */
+  nudgedUnfinished: boolean;
   /** Remaining REAL-verify fix steers allowed in the active verify sequence. */
   verifyFixesRemaining: number;
   /** True while inside a self-triggered verify fix sequence (so the budget isn't reset). */
@@ -858,6 +861,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     warnedSmallModel: false,
     nudgedHandback: false,
     nudgedOutputLimit: false,
+    nudgedUnfinished: false,
     verifyFixesRemaining: 0,
     verifyActive: false,
   };
@@ -2505,6 +2509,32 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
         runtime.nudgedOutputLimit = true;
         pi.appendEntry(HARNESS_LOOP_ENTRY, { action: 'steer', cause: 'output-limit' });
         pi.sendUserMessage?.(OUTPUT_LIMIT_NUDGE);
+      }
+    }
+    /*
+     * A TURN THAT ENDS WITH THE MODEL'S OWN CHECKLIST UNFINISHED.
+     *
+     * the user, round 3: "long running tasks where you can't accept an 'I can't do
+     * this' needs to truly run until completion." The two nudges above catch a
+     * turn that stopped by ASKING and one the decoder cut off; neither catches
+     * the commonest ending — three of eight things done, a good summary of the
+     * three, and a stop. It reads like success, which is why it survives
+     * everything else.
+     *
+     * Built only from what the model itself asserted (see unfinished-plan.ts):
+     * the harness cannot know whether a task is done, but `update_plan` is the
+     * model saying what the task consists of, and a step left pending is its own
+     * statement that something remains.
+     *
+     * Last of the three and gated on both, so one turn can never send two
+     * steers, and once per session like its neighbours.
+     */
+    if (!runtime.nudgedHandback && !runtime.nudgedOutputLimit && !runtime.nudgedUnfinished) {
+      const left = unfinishedPlan(runtime.plan);
+      if (left !== null) {
+        runtime.nudgedUnfinished = true;
+        pi.appendEntry(HARNESS_LOOP_ENTRY, { action: 'steer', cause: 'unfinished-plan' });
+        pi.sendUserMessage?.(unfinishedPlanNudge(left));
       }
     }
     // THE USER OUTRANKS EVERYTHING BEHIND THEM. Naming and the reviewer both run

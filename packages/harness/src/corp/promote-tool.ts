@@ -11,8 +11,10 @@
  * ({@link PROMOTE_STATUS_KEY}); the renderer watches that key and launches the
  * existing corp run (`startCorpTask`), reusing 100% of the wired corp pipeline.
  *
- * Visibility is effort-gated in `applyPreset` (the tool only enters the active set
- * at high/max); this `execute` re-checks the gate as belt-and-braces.
+ * Visibility is NOT effort-gated. It was once (high/max only) and the gate did
+ * more harm than good — see `corpToolEnabled` below for why it was removed and
+ * why the seam is still there. Everything in this file that still speaks of
+ * "high/max only" is describing the past.
  */
 import type { ExtensionAPI } from '@mariozechner/pi-coding-agent';
 import { type Static, Type } from '@sinclair/typebox';
@@ -149,7 +151,9 @@ export interface PromoteSignal {
 }
 
 export interface PromoteToolDeps {
-  /** Current effort — the tool is only usable at high/max. */
+  /** Current effort. Read for reporting, not to decide availability — see
+   *  `corpToolEnabled`, which has answered `true` at every level since the
+   *  gate was removed. */
   readonly getEffort: () => EffortLevel;
   /** Monotonic id source for the promote signal (tests inject a fixed one). */
   readonly nextId?: () => string;
@@ -279,8 +283,16 @@ export function registerCreateHierarchyTool(pi: ExtensionAPI, deps: PromoteToolD
     name: CREATE_PRODUCTION_HIERARCHY,
     label: 'Talk to Manager',
     description: CREATE_PRODUCTION_HIERARCHY_TOOL.function.description,
+    /*
+     * NO EFFORT CLAIM. This said "(high/max effort only)" long after the gate
+     * above stopped existing — `corpToolEnabled` returns true at every level —
+     * so the one sentence the model reads about this tool told it, falsely,
+     * that it could not use the thing sitting in its own tool list. A model
+     * that believes a tool is unavailable does not call it, which is the exact
+     * failure the gate was removed to prevent.
+     */
     promptSnippet:
-      'talk_to_manager: hand a large build to your manager and their team of engineers, who deliver it back for your review (high/max effort only).',
+      'talk_to_manager: hand a large build to your manager and their team of engineers, who deliver it back for your review.',
     promptGuidelines: [
       'Use it for a large, multi-part build that a single pass cannot do well — not for a question, a quick edit, or a one-file task (do those yourself).',
       "Just send the message: say what you want built, in full. You do not need to design divisions — splitting the work is the manager's job.",

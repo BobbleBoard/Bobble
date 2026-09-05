@@ -72,6 +72,7 @@ function makeRig(
   }
   let activeTools: string[] = [];
   const sentUserMessages: string[] = [];
+  const registeredTools = new Map<string, ToolDefinition>();
   const steerMessages: string[] = [];
 
   const pi = {
@@ -80,7 +81,12 @@ function makeRig(
       list.push(h);
       handlers.set(event, list);
     },
-    registerTool: (_def: ToolDefinition) => {},
+    /* Kept, rather than dropped on the floor: a test that needs to exercise a
+       tool the harness registers (update_plan, say) has nowhere else to get
+       its execute from. */
+    registerTool: (def: ToolDefinition) => {
+      registeredTools.set(def.name, def);
+    },
     registerCommand: () => {},
     getAllTools: (): ToolInfo[] =>
       ['read', 'bash', 'tool_search', 'web_search', 'web_fetch'].map((name) => ({
@@ -150,6 +156,7 @@ function makeRig(
     handle,
     fire,
     activeTools: () => activeTools,
+    registeredTools,
     sentUserMessages,
     steerMessages,
     publishedStages,
@@ -846,5 +853,95 @@ describe('no internet, no web tools (the user)', () => {
     await webCall(rig, 'three results', false);
     await startTurn(rig);
     expect(rig.activeTools()).toContain('web_search');
+  });
+});
+
+/**
+ * A TURN THAT ENDS WITH THE MODEL'S OWN CHECKLIST UNFINISHED.
+ *
+ * the user, round 3: "long running tasks where you can't accept an 'I can't do
+ * this' needs to truly run until completion." The unit tests in
+ * loop/unfinished-plan.test.ts pin WHEN this should fire; these pin that the
+ * harness actually sends it, from a plan the model set through the real tool.
+ */
+describe('unfinished-plan steer', () => {
+  /** Drive the real `update_plan` tool the way the model would. */
+  async function setPlan(
+    rig: ReturnType<typeof makeRig>,
+    items: readonly { id: string; text: string; status: string }[],
+  ): Promise<void> {
+    const tool = rig.registeredTools.get('update_plan');
+    expect(tool, 'update_plan was never registered').toBeDefined();
+    // pi's tool signature: (toolCallId, params, signal, onUpdate, ctx).
+    // biome-ignore lint/suspicious/noExplicitAny: the rig's tool stub is untyped.
+    await (tool as any).execute('call-1', { plan: items }, undefined, undefined, rig.ctx);
+  }
+
+  const end = (rig: ReturnType<typeof makeRig>, text = 'I have made good progress.') =>
+    rig.fire('agent_end', { type: 'agent_end', messages: [{ role: 'assistant', content: text }] });
+
+  it('pushes back when the model stops with steps left', async () => {
+    const rig = makeRig();
+    await startSession(rig);
+    await startTurn(rig);
+    await setPlan(rig, [
+      { id: '1', text: 'scaffold the project', status: 'done' },
+      { id: '2', text: 'write the parser', status: 'pending' },
+    ]);
+    await end(rig);
+    expect(rig.sentUserMessages).toHaveLength(1);
+    // It quotes the model's OWN step back, which is the whole point.
+    expect(rig.sentUserMessages[0]).toContain('write the parser');
+  });
+
+  it('says nothing when the plan is complete', async () => {
+    const rig = makeRig();
+    await startSession(rig);
+    await startTurn(rig);
+    await setPlan(rig, [{ id: '1', text: 'scaffold the project', status: 'done' }]);
+    await end(rig);
+    expect(rig.sentUserMessages).toHaveLength(0);
+  });
+
+  it('says nothing when there is no plan at all', async () => {
+    const rig = makeRig();
+    await startSession(rig);
+    await startTurn(rig);
+    await end(rig);
+    expect(rig.sentUserMessages).toHaveLength(0);
+  });
+
+  it('fires ONCE per session, like its two neighbours', async () => {
+    const rig = makeRig();
+    await startSession(rig);
+    await startTurn(rig);
+    await setPlan(rig, [
+      { id: '1', text: 'a', status: 'done' },
+      { id: '2', text: 'b', status: 'pending' },
+    ]);
+    await end(rig);
+    await end(rig);
+    expect(rig.sentUserMessages).toHaveLength(1);
+  });
+
+  it('never sends two steers in one turn — the handback wins', async () => {
+    const rig = makeRig();
+    await startSession(rig);
+    await startTurn(rig);
+    await setPlan(rig, [
+      { id: '1', text: 'a', status: 'done' },
+      { id: '2', text: 'b', status: 'pending' },
+    ]);
+    await end(
+      rig,
+      [
+        'Here is where things stand.',
+        'A) keep going',
+        'B) stop here',
+        'Which would you prefer?',
+      ].join('\n'),
+    );
+    expect(rig.sentUserMessages).toHaveLength(1);
+    expect(rig.sentUserMessages[0]).toContain('Pick the option');
   });
 });
