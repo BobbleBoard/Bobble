@@ -125,7 +125,7 @@
 .tp :where(button, input, textarea, [role="switch"], [role="tab"], [role="menuitem"]):focus-visible,
 .tp-popover-portal
   :where(button, input, textarea, [role="switch"], [role="tab"], [role="menuitem"]):focus-visible {
-  outline-color: var(--pd-border-focus);
+  outline-color: var(--pd-focus-ring);
 }
 
 /*

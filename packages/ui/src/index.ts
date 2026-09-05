@@ -278,3 +278,12 @@ export {
 } from './components/web-search.tsx';
 export type { VariantProps, VariantSelection, VariantsConfig } from './define-variants.ts';
 export { defineVariants } from './define-variants.ts';
+
+/* Focus-ring modality — see focus-ring.ts for why `:focus-visible` alone was
+   not enough, and base.css for the token it drives. */
+export {
+  FOCUS_RING_ATTR,
+  installFocusRingTracking,
+  isNavigationKey,
+  nextFocusRingMode,
+} from './focus-ring.ts';

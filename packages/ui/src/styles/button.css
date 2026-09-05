@@ -42,7 +42,7 @@
 }
 
 .pd-btn:focus-visible {
-  outline-color: var(--pd-border-focus);
+  outline-color: var(--pd-focus-ring);
 }
 
 /* The fill layer. Press dips fast, releases on the flavor spring. */

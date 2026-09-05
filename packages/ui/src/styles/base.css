@@ -53,9 +53,42 @@
    */
 }
 
+/*
+ * THE RING COLOUR, AND THE ONE PLACE THAT TURNS IT OFF.
+ *
+ * the user, twice: a blue box appears around dropdowns and buttons he has only ever
+ * clicked. Every ring here was already gated behind `:focus-visible`, so the
+ * CSS was never the bug — `:focus-visible` itself matches in two cases that are
+ * spec-correct and are not "the user is navigating by keyboard":
+ *
+ *   1. ESCAPE dismissing a menu. Radix returns focus to the trigger, Escape was
+ *      a key, so the ring lights up and STAYS. REPRODUCED: the Video model
+ *      picker painting `solid 2px rgb(41,151,255) @2px` — his screenshot
+ *      exactly. He opened it with the mouse and pressed Escape to get rid of
+ *      it; dismissing something is not navigating to it.
+ *   2. WINDOW REFOCUS. Chromium restores focus AND its focus-visible state, so
+ *      clicking away to another app and back lights the last thing touched —
+ *      which is precisely how he described it: "if I click to something else,
+ *      and then come back to clicking an element, that's when the box appears".
+ *
+ * So the modality is tracked explicitly (see ui/focus-ring.ts): NAVIGATION keys
+ * turn it on, any pointer press turns it off, and Escape and window focus
+ * changes touch neither. `--pd-focus-ring` is what every control ring reads,
+ * and it collapses to transparent when the mode is off. Text inputs are
+ * deliberately NOT gated — they keep their own focus affordance on click,
+ * because a clicked field with no sign it is focused is a worse bug than this
+ * one.
+ */
+:root {
+  --pd-focus-ring: var(--pd-border-focus);
+}
+:root[data-focus-ring="off"] {
+  --pd-focus-ring: transparent;
+}
+
 .pd-focusable:focus-visible,
 .pd-menu-trigger:focus-visible {
-  outline-color: var(--pd-border-focus);
+  outline-color: var(--pd-focus-ring);
 }
 
 /*

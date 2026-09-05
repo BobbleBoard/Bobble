@@ -42,7 +42,7 @@
 }
 
 .pd-dropzone:focus-visible {
-  outline-color: var(--pd-border-focus);
+  outline-color: var(--pd-focus-ring);
 }
 
 .pd-dropzone--active {

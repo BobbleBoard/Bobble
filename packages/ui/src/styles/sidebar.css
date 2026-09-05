@@ -132,7 +132,7 @@
 }
 
 .pd-sidebar-row:focus-visible {
-  outline-color: var(--pd-border-focus);
+  outline-color: var(--pd-focus-ring);
 }
 
 .pd-sidebar-row[data-selected="true"],

@@ -1,3 +1,4 @@
+import { installFocusRingTracking } from '@pi-desktop/ui';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App';
@@ -10,6 +11,14 @@ import { connectPi } from './state/pi-connect';
 import { connectSettings } from './state/settings-store';
 import { connectStoreModels } from './state/store-models';
 import './styles/global.css';
+
+/*
+ * Focus-ring modality, before React mounts so the very first paint is already
+ * correct. See @pi-desktop/ui focus-ring.ts: `:focus-visible` alone lights up
+ * on Escape-dismissal and on window refocus, which is what the user kept seeing as
+ * a blue box around controls he had only clicked.
+ */
+installFocusRingTracking();
 
 // Attach the pi + inference event streams before React mounts so nothing
 // buffered (pre-mount events) is lost, and load settings (theme is applied from

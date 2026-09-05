@@ -76,7 +76,7 @@
 }
 
 .pd-question-option:focus-visible {
-  outline-color: var(--pd-border-focus);
+  outline-color: var(--pd-focus-ring);
 }
 
 .pd-question-option--selected {
