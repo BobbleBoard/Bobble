@@ -10,6 +10,7 @@ import {
   loadToCpu,
   parseAmdBusy,
   parseLinuxBattery,
+  parseMacMemoryLevel,
   parseMacPowerSource,
   parseMacPressureLevel,
   parseMacSwap,
@@ -31,6 +32,17 @@ describe('macOS', () => {
     expect(parseMacPressureLevel('2\n')).toBe('warn');
     expect(parseMacPressureLevel('4\n')).toBe('critical');
     expect(parseMacPressureLevel('nonsense')).toBeUndefined();
+  });
+
+  /*
+   * The coarse verdict has three values and flips late. MEASURED on a 24 GB Mac:
+   * `kern.memorystatus_level` read 76 while the pressure level was still 1 — so
+   * a policy watching only the verdict cannot see pressure BUILDING.
+   */
+  it("reads the OS's own graded free-memory percentage", () => {
+    expect(parseMacMemoryLevel('76\n')).toBeCloseTo(0.76, 2);
+    expect(parseMacMemoryLevel('8')).toBeCloseTo(0.08, 2);
+    expect(parseMacMemoryLevel('')).toBeUndefined();
   });
 
   it('reads swap usage — captured verbatim from this machine', () => {

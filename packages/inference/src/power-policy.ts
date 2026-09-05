@@ -117,6 +117,27 @@ export interface PowerDecision {
 /** Calm readings needed before easing back up. Asymmetric on purpose. */
 export const RECOVERY_READINGS = 4;
 
+/*
+ * SWAP THRESHOLDS, CALIBRATED AGAINST A REAL RAMP.
+ *
+ * MEASURED on a 24 GB M5 Pro while 8 GB of incompressible memory was held
+ * (tests/e2e/power-stress-probe.mjs):
+ *
+ *   idle / background housekeeping   0 – 71 pages/sec
+ *   the machine genuinely thrashing  8,804 – 63,157 pages/sec
+ *
+ * Two orders of magnitude between them, which is the useful part: anywhere in
+ * that gap is a safe place to draw a line. The first version used 100, which sat
+ * right on top of the noise band — and in the ramp it tripped on ordinary
+ * background activity at 1–2 GB held, easing off a machine that was fine and
+ * then taking four calm readings to come back. 500 clears the noise by 7×;
+ * 2,000 still fires four times below the lightest real thrashing seen.
+ */
+/** Enough swap traffic to ease off one step. */
+export const BUSY_PAGES_PER_SEC = 500;
+/** Enough to say the machine is thrashing. */
+export const THRASHING_PAGES_PER_SEC = 2000;
+
 /**
  * The reserve, when the user has not named one.
  *
@@ -154,11 +175,19 @@ export function pressureSeverity(p: SystemPressure, bottleneck: BottleneckClass)
    * feel stuttering. The stock is kept only to corroborate a verdict the OS has
    * already raised — it can sharpen a warning, never manufacture one.
    */
-  if (bottleneck === 'unified' && (p.swapIoPerSec ?? 0) >= 500) return 2;
+  if (bottleneck === 'unified' && (p.swapIoPerSec ?? 0) >= THRASHING_PAGES_PER_SEC) return 2;
   if (p.memory === 'warn') {
-    return (p.swapUsed ?? 0) >= 0.5 || (p.swapIoPerSec ?? 0) >= 100 ? 2 : 1;
+    return (p.swapUsed ?? 0) >= 0.5 || (p.swapIoPerSec ?? 0) >= BUSY_PAGES_PER_SEC ? 2 : 1;
   }
-  if (bottleneck === 'unified' && (p.swapIoPerSec ?? 0) >= 100) return 1;
+  if (bottleneck === 'unified' && (p.swapIoPerSec ?? 0) >= BUSY_PAGES_PER_SEC) return 1;
+  /*
+   * PRESSURE BUILDING, not pressure arrived. The coarse verdict has three values
+   * and flips late; the OS's own free-memory percentage is continuous, so a
+   * machine heading for trouble can be met on the way rather than after. Only
+   * ever worth one step — this is an early warning, not an emergency.
+   */
+  if ((p.memoryFree ?? 1) <= 0.12) return 2;
+  if ((p.memoryFree ?? 1) <= 0.25) return 1;
   // A discrete card that is nearly full is one layer from spilling to the host.
   if (bottleneck === 'discrete' && (p.vram ?? 0) >= 0.9) return 2;
   if (bottleneck === 'discrete' && (p.vram ?? 0) >= 0.75) return 1;

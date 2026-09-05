@@ -61,10 +61,20 @@ describe('what counts as pressure depends on the wall', () => {
     expect(pressureSeverity(idleButSwapped, 'unified')).toBe(0);
   });
 
+  /*
+   * The numbers come from a real ramp, not from taste. MEASURED on a 24 GB Mac
+   * holding 8 GB of incompressible memory: background housekeeping ran 0–71
+   * pages/sec, actual thrashing 8,804–63,157. The thresholds sit in the gap.
+   */
+  it('ignores the background housekeeping every machine does', () => {
+    const idle: SystemPressure = { memory: 'normal', swapIoPerSec: 71, sources: [] };
+    expect(pressureSeverity(idle, 'unified')).toBe(0);
+  });
+
   it('does call actual thrashing pressure', () => {
-    const thrashing: SystemPressure = { memory: 'normal', swapIoPerSec: 800, sources: [] };
+    const thrashing: SystemPressure = { memory: 'normal', swapIoPerSec: 8804, sources: [] };
     expect(pressureSeverity(thrashing, 'unified')).toBe(2);
-    expect(pressureSeverity({ ...thrashing, swapIoPerSec: 150 }, 'unified')).toBe(1);
+    expect(pressureSeverity({ ...thrashing, swapIoPerSec: 600 }, 'unified')).toBe(1);
     // A desktop with a 4090 swapping is not a reason to trim its VRAM.
     expect(pressureSeverity(thrashing, 'discrete')).toBe(0);
   });
@@ -73,6 +83,7 @@ describe('what counts as pressure depends on the wall', () => {
     const warned: SystemPressure = { memory: 'warn', sources: [] };
     expect(pressureSeverity(warned, 'unified')).toBe(1);
     expect(pressureSeverity({ ...warned, swapUsed: 0.6 }, 'unified')).toBe(2);
+    expect(pressureSeverity({ ...warned, swapIoPerSec: 8804 }, 'unified')).toBe(2);
   });
 
   it('treats a nearly-full card as urgent — one layer from spilling to the host', () => {
@@ -87,6 +98,18 @@ describe('what counts as pressure depends on the wall', () => {
 
   it('takes the OS at its word when it is throttling', () => {
     expect(pressureSeverity({ throttled: true, sources: [] }, 'unified')).toBe(1);
+  });
+
+  it('meets a machine heading for trouble on the way, not after', () => {
+    // The OS's own free-memory percentage is continuous, so falling headroom is
+    // visible before the coarse verdict flips.
+    expect(pressureSeverity({ memory: 'normal', memoryFree: 0.76, sources: [] }, 'unified')).toBe(
+      0,
+    );
+    expect(pressureSeverity({ memory: 'normal', memoryFree: 0.2, sources: [] }, 'unified')).toBe(1);
+    expect(pressureSeverity({ memory: 'normal', memoryFree: 0.08, sources: [] }, 'unified')).toBe(
+      2,
+    );
   });
 
   it('says nothing is wrong when nothing answered — absence is not alarm', () => {

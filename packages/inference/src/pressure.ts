@@ -53,6 +53,18 @@ export interface SystemPressure {
    */
   readonly memory?: MemoryVerdict;
   /**
+   * How much memory the OS itself considers free, 0..1 — its own number, not
+   * ours.
+   *
+   * macOS publishes `kern.memorystatus_level` (the percentage jetsam actually
+   * steers by) and Linux has MemAvailable/MemTotal. It matters because the
+   * coarse verdict above has only three values and flips late: MEASURED on a 24
+   * GB Mac, `memorystatus_level` read 76 while the pressure level was still 1,
+   * so a policy watching only the verdict cannot see pressure BUILDING — only
+   * that it has already arrived.
+   */
+  readonly memoryFree?: Load;
+  /**
    * How much of the swap file is in use, 0..1.
    *
    * A WEAK signal, and it took a live run to find out why. MEASURED on a 24 GB
@@ -116,6 +128,12 @@ export function parseMacPressureLevel(out: string): MemoryVerdict | undefined {
   if (n >= 4) return 'critical';
   if (n >= 2) return 'warn';
   return 'normal';
+}
+
+/** `sysctl -n kern.memorystatus_level` → the OS's own free-memory percentage. */
+export function parseMacMemoryLevel(out: string): Load | undefined {
+  const n = Number.parseFloat(out.trim());
+  return Number.isFinite(n) ? clamp01(n / 100) : undefined;
 }
 
 /** `sysctl -n vm.swapusage` → `total = 4096.00M  used = 2675.25M  free = 1420.75M`. */
@@ -319,6 +337,7 @@ export async function samplePressure(probes: PressureProbes): Promise<SystemPres
   const at = (probes.now ?? Date.now)();
   const out: {
     memory?: MemoryVerdict;
+    memoryFree?: Load;
     swapUsed?: Load;
     swapIoPerSec?: number;
     swapCounters?: { ins: number; outs: number; at: number };
@@ -341,6 +360,12 @@ export async function samplePressure(probes: PressureProbes): Promise<SystemPres
     if (verdict !== undefined) {
       out.memory = verdict;
       sources.push('macos-pressure');
+    }
+    const memLevel = await probes.run('sysctl', ['-n', 'kern.memorystatus_level']);
+    const free = memLevel === null ? undefined : parseMacMemoryLevel(memLevel);
+    if (free !== undefined) {
+      out.memoryFree = free;
+      sources.push('macos-memlevel');
     }
     const swap = await probes.run('sysctl', ['-n', 'vm.swapusage']);
     const swapUsed = swap === null ? undefined : parseMacSwap(swap);
@@ -382,6 +407,7 @@ export async function samplePressure(probes: PressureProbes): Promise<SystemPres
       const usedFrac = meminfo === null ? undefined : parseMemInfoAvailable(meminfo);
       if (usedFrac !== undefined) {
         out.memory = usedFrac >= 0.95 ? 'critical' : usedFrac >= 0.85 ? 'warn' : 'normal';
+        out.memoryFree = 1 - usedFrac;
         sources.push('linux-meminfo');
       }
     }
@@ -394,6 +420,11 @@ export async function samplePressure(probes: PressureProbes): Promise<SystemPres
         out.swapIoPerSec = rate;
         sources.push('linux-swap-rate');
       }
+    }
+    if (out.memoryFree === undefined) {
+      const meminfo = await probes.readFile('/proc/meminfo');
+      const usedFrac = meminfo === null ? undefined : parseMemInfoAvailable(meminfo);
+      if (usedFrac !== undefined) out.memoryFree = 1 - usedFrac;
     }
     const amd = await probes.readFile('/sys/class/drm/card0/device/gpu_busy_percent');
     const busy = amd === null ? undefined : parseAmdBusy(amd);
