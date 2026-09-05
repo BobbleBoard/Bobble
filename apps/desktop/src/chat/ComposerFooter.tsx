@@ -144,37 +144,24 @@ export function ComposerFooter({
 
   return (
     <>
-      {/* Anchor for the friendly auto-download card, which floats just above the
-          model chip when Auto resolves to an un-downloaded tier. */}
-      <span className="relative flex items-center">
-        <AutoDownloadPrompt />
-        {/* The shared tier picker (Auto + the three capability tiers, + a power-mode
-            "More models" deep-link). The chip is its trigger. */}
-        <TierPickerMenu
-          align="start"
-          side="top"
-          onOpenManager={onOpenModels}
-          menuTestId="footer-model-menu"
-        >
-          <Button variant="ghost" size="sm" className="gap-1" data-testid="footer-model-chip">
-            <span className="max-w-[180px] truncate">{label}</span>
-            <IconChevronDown size={16} />
-          </Button>
-        </TierPickerMenu>
-      </span>
-
-      {/* Model DOWNLOAD progress stays (it's not run status): a multi-GB pull
-          needs a visible bar. All RUN status — the "switching…" pill, the harness
-          stage/timer/repair cluster — moved OUT of the footer into the ONE thread
-          indicator (the user blind-test #1), so the input bar never shows run state. */}
       {/*
-       * THE DOWNLOAD IS VISIBLE FROM OUTSIDE SETTINGS, which is where the user
-       * actually is while a 13 GB pull runs. A bare bar was not enough to act
-       * on, though: it had no number, no ETA, and no name, so "is this stuck?"
-       * had no answer without navigating back to the manager. It also read
-       * `fraction` (this FILE's), so it snapped backwards when the projector
-       * started. Percent + ETA inline, the rest on hover.
-       */}
+        THE DOWNLOAD SITS TO THE LEFT OF THE CHIP, and that ordering is the whole
+        point rather than a preference.
+
+        `.pd-composer-footer-spacer` is `flex: 1`, so everything after it is
+        RIGHT-aligned: an element's position depends on the total width of
+        everything to its RIGHT. With the download block on the right of the
+        model chip, MEASURED, the chip jumped 152px sideways the moment a
+        download started — a menu trigger sliding out from under the pointer
+        while you aim at it — and then twitched every time the ETA text changed
+        width. On this side the block grows leftwards into the spacer's empty
+        middle, and the chip never moves.
+
+        It stays in the footer at all (rather than only in settings) because
+        that is where the user IS while a 13 GB pull runs; and it carries a
+        percent and an ETA rather than a bare bar, because "is this stuck?" had
+        no answer without navigating back to the manager.
+      */}
       {download !== null ? (
         <Tooltip
           side="top"
@@ -197,21 +184,60 @@ export function ComposerFooter({
             <div className="w-16">
               <ProgressBar value={downloadFraction(download)} />
             </div>
-            <span className="tabular-nums">
+            {/*
+              FIXED SLOTS FOR BOTH READOUTS.
+
+              "9%" -> "10%" -> "100%" and "5s" -> "1m 20s" -> gone are ordinary
+              things for these to say, and every one of them re-laid the block
+              out: MEASURED 29-42px of sideways travel per change, on a bar
+              somebody is watching precisely because it is not moving fast. The
+              slots are as wide as their widest content and the text is
+              right-aligned inside them, so the numbers change and nothing else
+              does.
+            */}
+            <span className="inline-block w-[4ch] whitespace-nowrap text-right tabular-nums">
               {download.paused
-                ? 'Paused'
+                ? ''
                 : percent(downloadFraction(download)) !== null
                   ? `${percent(downloadFraction(download))}%`
                   : '…'}
             </span>
-            {!download.paused && formatEta(downloadEtaSeconds(download)) ? (
-              <span className="hidden tabular-nums sm:inline">
-                {formatEta(downloadEtaSeconds(download))}
-              </span>
-            ) : null}
+            {/*
+              Always rendered, so its absence is a blank slot rather than a
+              reflow. `Paused` borrows it — it is the same piece of news.
+
+              Wide enough for the longest thing it can hold ("1m 20s", "Paused"
+              — both 6 characters) and `whitespace-nowrap` so being wrong about
+              that can never wrap instead. MEASURED at 5.5ch: "Paused" wrapped
+              to two lines, the block became 32px against its 28px siblings, and
+              the whole composer stepped 10px up the screen and back every time
+              a download started or stopped.
+            */}
+            <span className="hidden w-[6.5ch] whitespace-nowrap text-right tabular-nums sm:inline">
+              {download.paused ? 'Paused' : (formatEta(downloadEtaSeconds(download)) ?? '')}
+            </span>
           </div>
         </Tooltip>
       ) : null}
+
+      {/* Anchor for the friendly auto-download card, which floats just above the
+          model chip when Auto resolves to an un-downloaded tier. */}
+      <span className="relative flex items-center">
+        <AutoDownloadPrompt />
+        {/* The shared tier picker (Auto + the three capability tiers, + a power-mode
+            "More models" deep-link). The chip is its trigger. */}
+        <TierPickerMenu
+          align="start"
+          side="top"
+          onOpenManager={onOpenModels}
+          menuTestId="footer-model-menu"
+        >
+          <Button variant="ghost" size="sm" className="gap-1" data-testid="footer-model-chip">
+            <span className="max-w-[180px] truncate">{label}</span>
+            <IconChevronDown size={16} />
+          </Button>
+        </TierPickerMenu>
+      </span>
 
       {/* Info popover: current/last-turn stats. Tokens are real (engine usage);
           the tool-call count is exact; elapsed is derived from message

@@ -1171,7 +1171,29 @@ export function modelEngine(model: CatalogModel): Engine {
   return model.engine ?? 'llamacpp';
 }
 
+/**
+ * WHERE HUGGING FACE IS, for this process.
+ *
+ * `HF_ENDPOINT` is the variable `huggingface_hub` itself honours, so a machine
+ * already pointed at a mirror — an enterprise cache, an air-gapped proxy — is
+ * pointed there once and everything follows, including the Python side of this
+ * app, which has read it all along. It is also the seam a download stress test
+ * needs: driving concurrency, mid-flight cancellation and resume-from-partial
+ * against the real host would mean moving tens of gigabytes to observe seconds
+ * of behaviour.
+ *
+ * Read per call rather than captured, so a probe can set it before launching
+ * the app and a long-lived process is not pinned to whatever was in the
+ * environment at import time. Trailing slashes are trimmed, because a mirror
+ * URL pasted from a browser has one and `//resolve/` 404s on some proxies.
+ */
+export function hfEndpoint(): string {
+  const raw = typeof process === 'undefined' ? undefined : process.env?.HF_ENDPOINT;
+  const base = raw === undefined || raw.trim() === '' ? 'https://huggingface.co' : raw.trim();
+  return base.replace(/\/+$/, '');
+}
+
 /** HF `resolve/main` download URL for a catalog file. */
 export function hfResolveUrl(repo: string, fileName: string): string {
-  return `https://huggingface.co/${repo}/resolve/main/${fileName}`;
+  return `${hfEndpoint()}/${repo}/resolve/main/${fileName}`;
 }

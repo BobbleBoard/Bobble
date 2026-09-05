@@ -1,10 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import {
   CATALOG,
   DEFAULT_RECOMMENDED_AUTHORS,
   GEMMA4_E2B,
   getCatalogFile,
   getCatalogModel,
+  hfEndpoint,
   hfResolveUrl,
   isReliablePublisher,
   MLX_MODELS,
@@ -303,5 +304,47 @@ describe('the reputable-org fan-out selector', () => {
 
   it('respects the cap so one browse cannot fan out to everyone', () => {
     expect(reliableAuthorsForDomains(['text'], 5)).toHaveLength(5);
+  });
+});
+
+describe('hfEndpoint — pointing the app at a mirror', () => {
+  const saved = process.env.HF_ENDPOINT;
+  afterEach(() => {
+    if (saved === undefined) delete process.env.HF_ENDPOINT;
+    else process.env.HF_ENDPOINT = saved;
+  });
+
+  it('defaults to Hugging Face itself', () => {
+    delete process.env.HF_ENDPOINT;
+    expect(hfEndpoint()).toBe('https://huggingface.co');
+    expect(hfResolveUrl('org/repo', 'a.gguf')).toBe(
+      'https://huggingface.co/org/repo/resolve/main/a.gguf',
+    );
+  });
+
+  it('follows HF_ENDPOINT, the variable huggingface_hub itself honours', () => {
+    process.env.HF_ENDPOINT = 'http://127.0.0.1:8080';
+    expect(hfResolveUrl('org/repo', 'a.gguf')).toBe(
+      'http://127.0.0.1:8080/org/repo/resolve/main/a.gguf',
+    );
+  });
+
+  it('trims a trailing slash, which a pasted mirror URL always has', () => {
+    process.env.HF_ENDPOINT = 'https://mirror.internal/hf/';
+    expect(hfResolveUrl('org/repo', 'a.gguf')).toBe(
+      'https://mirror.internal/hf/org/repo/resolve/main/a.gguf',
+    );
+  });
+
+  it('treats an empty value as unset rather than as an empty host', () => {
+    process.env.HF_ENDPOINT = '   ';
+    expect(hfEndpoint()).toBe('https://huggingface.co');
+  });
+
+  it('is read per call, so setting it later still takes', () => {
+    delete process.env.HF_ENDPOINT;
+    const before = hfResolveUrl('o/r', 'f');
+    process.env.HF_ENDPOINT = 'http://localhost:1';
+    expect(hfResolveUrl('o/r', 'f')).not.toBe(before);
   });
 });

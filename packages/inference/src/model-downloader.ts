@@ -9,6 +9,7 @@
 import { join } from 'node:path';
 import { type CatalogFile, type CatalogModel, hfResolveUrl, type LaunchMode } from './catalog.js';
 import { type DownloadProgress, downloadFile } from './download.js';
+import { hfHeadFile } from './hf-search.js';
 import { modelDir } from './paths.js';
 
 /**
@@ -150,17 +151,56 @@ export async function downloadModel(
     plan.push({ kind: 'draft', repo: model.draftRepo ?? model.hfRepo, file: model.draftModel });
   }
 
-  /* Catalog bytes may be 0 (unverified entries), so the job total is only
-     trustworthy when EVERY planned file declares a size. Reporting a partial
-     denominator would be worse than reporting none. */
-  const jobTotal = plan.every((p) => p.file.bytes > 0)
-    ? plan.reduce((sum, p) => sum + p.file.bytes, 0)
+  /*
+   * ASK HOW BIG THE FILES ARE, RATHER THAN GIVING UP ON THE JOB BAR.
+   *
+   * Catalog bytes may be 0 (unverified entries), and the job total is only
+   * trustworthy when EVERY planned file declares a size — reporting a partial
+   * denominator would be worse than reporting none. But "none" is what the user
+   * gets, and 11 of the catalogue's 35 files carry no size while 14 of its 19
+   * models fetch more than one file, so a bar that fills to 100% and restarts
+   * at the projector was the ORDINARY case, not an edge one. MEASURED in the
+   * download stress probe: the reported fraction fell from 1 to 0.86 the moment
+   * the second file began.
+   *
+   * A HEAD per unknown file answers it — one request, before a transfer that is
+   * usually gigabytes. Best-effort in both directions: a HEAD that fails or
+   * answers without a length leaves that file unknown, and the job total goes
+   * back to null exactly as before.
+   */
+  const sizes = new Map<string, number>();
+  const unknown = plan.filter((p) => p.file.bytes <= 0);
+  if (unknown.length > 0) {
+    await Promise.all(
+      unknown.map(async (p) => {
+        const head = await hfHeadFile(p.repo, p.file.name, {
+          ...(opts.hfToken === undefined ? {} : { hfToken: opts.hfToken }),
+          ...(opts.signal === undefined ? {} : { signal: opts.signal }),
+          // Through the caller's fetch, so a test that stubs the transfer is
+          // not quietly making a real network request to size it.
+          ...(opts.fetchImpl === undefined ? {} : { fetchImpl: opts.fetchImpl }),
+        }).catch(() => null);
+        if (head?.sizeBytes !== undefined) sizes.set(p.file.name, head.sizeBytes);
+      }),
+    );
+  }
+  const sizeOf = (p: PlannedFile): number =>
+    p.file.bytes > 0 ? p.file.bytes : (sizes.get(p.file.name) ?? 0);
+  const jobTotal = plan.every((p) => sizeOf(p) > 0)
+    ? plan.reduce((sum, p) => sum + sizeOf(p), 0)
     : null;
 
   const paths: Partial<Record<PlannedFile['kind'], string>> = {};
   let doneBytes = 0;
   for (const [index, planned] of plan.entries()) {
     const report = opts.onProgress;
+    /*
+     * The running total counts what ACTUALLY arrived, not what the catalogue
+     * said would. A declared size that is a little wrong (or a file that was
+     * already on disk and contributed nothing) would otherwise make the job
+     * bar step or overshoot at every file boundary.
+     */
+    let fileReceived = 0;
     paths[planned.kind] = await fetchOne(
       planned.repo,
       planned.file,
@@ -168,16 +208,18 @@ export async function downloadModel(
       opts,
       report === undefined
         ? undefined
-        : (p) =>
+        : (p) => {
+            fileReceived = p.received;
             report(planned.file.name, {
               ...p,
               fileIndex: index,
               fileCount: plan.length,
               jobReceived: doneBytes + p.received,
               jobTotal,
-            }),
+            });
+          },
     );
-    doneBytes += planned.file.bytes;
+    doneBytes += fileReceived > 0 ? fileReceived : sizeOf(planned);
   }
 
   const modelPath = paths.model;

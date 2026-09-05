@@ -27,9 +27,11 @@
  * - Files are xet-backed; `resolve/main` 302-redirects to a signed CDN URL that
  *   honours Range, which the existing streamed downloader already handles.
  */
-import { type CatalogFile, type CatalogModel, hfResolveUrl } from './catalog.js';
+import { type CatalogFile, type CatalogModel, hfEndpoint, hfResolveUrl } from './catalog.js';
 
-const HF_API = 'https://huggingface.co/api/models';
+/** Search + tree listing, on whatever endpoint this process is pointed at.
+ *  A function, not a constant, for the reason {@link hfEndpoint} explains. */
+const hfApi = (): string => `${hfEndpoint()}/api/models`;
 
 /** Sort orders the HF models API accepts. */
 export type HfSort = 'downloads' | 'likes' | 'lastModified' | 'trendingScore';
@@ -183,7 +185,7 @@ export function parseQuant(path: string): string | undefined {
 
 /** Compose the `/api/models` search URL (exported for testing param assembly). */
 export function buildSearchUrl(query: string, opts: HfSearchOptions = {}, author?: string): string {
-  const url = new URL(HF_API);
+  const url = new URL(hfApi());
   const p = url.searchParams;
   if (query.length > 0) p.set('search', query);
   if (author !== undefined && author.length > 0) p.set('author', author);
@@ -398,7 +400,7 @@ export async function listHfRepoFiles(
   opts: HfTreeOptions = {},
 ): Promise<HfRepoFile[]> {
   const doFetch = opts.fetchImpl ?? fetch;
-  let next: string | undefined = `${HF_API}/${repoId}/tree/main?recursive=true`;
+  let next: string | undefined = `${hfApi()}/${repoId}/tree/main?recursive=true`;
   const files: HfRepoFile[] = [];
   for (let page = 0; next !== undefined && page < 40; page++) {
     const res = await doFetch(next, { headers: authHeaders(opts.hfToken), signal: opts.signal });
@@ -427,7 +429,7 @@ export async function listHfGgufFiles(
   opts: HfTreeOptions = {},
 ): Promise<HfGgufFile[]> {
   const doFetch = opts.fetchImpl ?? fetch;
-  let next: string | undefined = `${HF_API}/${repoId}/tree/main?recursive=true`;
+  let next: string | undefined = `${hfApi()}/${repoId}/tree/main?recursive=true`;
   const files: HfGgufFile[] = [];
 
   for (let page = 0; next !== undefined && page < 20; page++) {
@@ -466,8 +468,19 @@ export async function hfHeadFile(
     redirect: 'manual',
     signal: opts.signal,
   });
-  const size = Number(res.headers.get('x-linked-size') ?? '');
-  const etag = (res.headers.get('x-linked-etag') ?? '').replace(/"/g, '').toLowerCase();
+  /*
+   * `x-linked-size` is what huggingface.co reports for an LFS pointer — the
+   * size of the file the pointer RESOLVES to, which is the number anyone cares
+   * about. A mirror or caching proxy (see `hfEndpoint`) serves the bytes
+   * directly and answers with an ordinary `content-length`, so fall back to it
+   * rather than reporting "size unknown" for a perfectly ordinary response.
+   */
+  const linked = Number(res.headers.get('x-linked-size') ?? '');
+  const plain = Number(res.headers.get('content-length') ?? '');
+  const size = Number.isFinite(linked) && linked > 0 ? linked : plain;
+  const etag = (res.headers.get('x-linked-etag') ?? res.headers.get('etag') ?? '')
+    .replace(/"/g, '')
+    .toLowerCase();
   return {
     sizeBytes: Number.isFinite(size) && size > 0 ? size : undefined,
     sha256: /^[0-9a-f]{64}$/.test(etag) ? etag : undefined,
