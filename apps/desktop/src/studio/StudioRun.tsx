@@ -26,6 +26,39 @@ function clock(ms: number): string {
   return m > 0 ? `${m}:${String(s).padStart(2, '0')}` : `${s}s`;
 }
 
+/**
+ * What a running job should SAY it is doing, and how long it should claim is
+ * left. Pure, and separated from the component, because the arithmetic is where
+ * the bug was: `frac` is exactly 1 on the last step, so "about 0s left" sat on
+ * screen for the 45 seconds of VAE decode and file write that follow it.
+ */
+export function jobStage(job: {
+  readonly step?: number;
+  readonly total?: number;
+  readonly note?: string;
+}): 'preparing' | 'stepping' | 'finishing' {
+  const hasSteps = job.total !== undefined && job.total > 0 && job.step !== undefined;
+  if (!hasSteps) return 'preparing';
+  return (job.step ?? 0) >= (job.total ?? 1) ? 'finishing' : 'stepping';
+}
+
+/**
+ * Milliseconds left, or undefined when there is no honest estimate.
+ *
+ * Undefined before two steps have landed (an estimate from one sample is a
+ * guess with a number on it) and undefined once the steps are done (the work
+ * that remains is not measured in steps).
+ */
+export function remainingMs(
+  job: { readonly step?: number; readonly total?: number },
+  elapsed: number,
+): number | undefined {
+  if (jobStage(job) !== 'stepping') return undefined;
+  const frac = Math.min(1, (job.step ?? 0) / (job.total ?? 1));
+  if ((job.step ?? 0) < 2 || frac <= 0) return undefined;
+  return Math.round(elapsed / frac - elapsed);
+}
+
 export function StudioJob({
   job,
   onCancel,
@@ -49,8 +82,14 @@ export function StudioJob({
    * Only shown once a couple of steps have landed, because an estimate from one
    * sample is a guess with a number on it.
    */
-  const remaining =
-    hasSteps && (job.step ?? 0) >= 2 && frac > 0 ? Math.round(elapsed / frac - elapsed) : undefined;
+  /*
+   * THE STEPS ARE NOT THE WHOLE JOB. After the last one the engine still decodes
+   * the latents through the VAE and writes the file, and at 1024² that is not
+   * quick. MEASURED on a real edit run: 45 seconds of "Step 8 of 8 · about 0s
+   * left". See jobStage / remainingMs above.
+   */
+  const stepsDone = jobStage(job) === 'finishing';
+  const remaining = remainingMs(job, elapsed);
 
   return (
     <section className="pd-studio-job" data-testid="studio-job">
@@ -85,13 +124,18 @@ export function StudioJob({
             is doing — installing its runtime, fetching weights, loading a model
             (the user). Once steps arrive they are the better answer and win.
           */}
-          {hasSteps
-            ? `Step ${job.step} of ${job.total}`
-            : /* MEASURED on an M5 Pro with the weights already cached: 94
+          {stepsDone
+            ? /* Whatever the worker last said it was doing, if it said
+                 anything; otherwise name the work that is left, because it is
+                 always the same work. */
+              (job.note ?? 'Finishing — decoding the picture and saving it')
+            : hasSteps
+              ? `Step ${job.step} of ${job.total}`
+              : /* MEASURED on an M5 Pro with the weights already cached: 94
                  seconds from pressing Generate to the first step. "Starting…"
                  for a minute and a half is why the user read this room as broken;
                  saying how long it takes is the honest version. */
-              (job.note ?? 'Preparing the engine — the first run can take a minute or two')}
+                (job.note ?? 'Preparing the engine — the first run can take a minute or two')}
           <span className="pd-studio-job-dot">·</span>
           {clock(elapsed)} elapsed
           {remaining !== undefined ? (
