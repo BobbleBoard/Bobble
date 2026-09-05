@@ -236,6 +236,28 @@ export function suggestWorkspaceRelative(raw: string, root: string): string {
  * capability's "you now have" — a refusal the model cannot act on correctly is a
  * refusal that sends it somewhere worse.
  */
+/**
+ * Places a finished thing gets INSTALLED to, as opposed to written in.
+ *
+ * MEASURED on the LocalConvert benchmark. The task says "a desktop app in my
+ * Applications folder", so the model ran `mkdir -p
+ * /Applications/LocalConvert.app/Contents/MacOS` — which SUCCEEDED, because
+ * bash is not fenced — and then tried to write main.py into it, which was
+ * refused, because the file tools are. It was left with an empty app bundle in
+ * /Applications, a refused write, and a plan at 0/16, and it stopped.
+ *
+ * The refusal was correct and useless. There IS a route to what the user asked
+ * for: build it in the workspace, then install it with a shell copy, which bash
+ * can do. Saying so is the difference between a fence and a dead end — the same
+ * lesson this file already learned once about suggesting a relative path.
+ */
+const INSTALL_DIRS = ['/Applications', '/usr/local/bin', '/opt', '/Library'];
+
+function installDestination(abs: string): string | null {
+  const target = normalizeRoot(abs);
+  return INSTALL_DIRS.find((d) => target === d || target.startsWith(`${d}${path.sep}`)) ?? null;
+}
+
 export function outsideWorkspaceRefusal(
   toolName: string,
   raw: string,
@@ -244,6 +266,19 @@ export function outsideWorkspaceRefusal(
 ): string {
   const suggestion = suggestWorkspaceRelative(raw, root);
   const trap = `${path.basename(normalizeRoot(root))}/${suggestion}`;
+  const install = installDestination(abs);
+  if (install !== null) {
+    return (
+      `Refusing to ${toolName} into ${install}: "${raw}" resolves to ${abs}, and the file ` +
+      `tools only write inside the working folder (${root}). That is not a dead end — ` +
+      `BUILD IT HERE AND THEN INSTALL IT. Write the whole thing under ${root} first ` +
+      `(pass path: "${suggestion}"), get it working, and then copy it into place with a ` +
+      `shell command — \`cp -R "${root}/<the built thing>" "${install}/"\` — which is not ` +
+      `fenced. Do not leave a half-made bundle in ${install}: if you already created ` +
+      `directories there, either finish the install or remove them, and say in your reply ` +
+      `exactly where the finished thing ended up.`
+    );
+  }
   return (
     `Refusing to ${toolName} outside the workspace: "${raw}" resolves to ${abs}. ` +
     `The working folder IS ${root}, and a relative path resolves against it — so pass ` +

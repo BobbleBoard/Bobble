@@ -23,11 +23,19 @@ describe('unfinishedPlan', () => {
     expect(unfinishedPlan([item('1', 'write it', 'done'), item('2', 'run it', 'done')])).toBeNull();
   });
 
-  it('says nothing when NOTHING was ever finished', () => {
-    // A plan written and then abandoned for a better approach, or a turn the
-    // user interrupted. Pushing "carry on" here is as likely to be wrong as
-    // right, so it stays quiet.
-    expect(unfinishedPlan([item('1', 'a', 'pending'), item('2', 'b', 'in_progress')])).toBeNull();
+  it('FIRES when nothing was ever finished — the loudest case, not the quietest', () => {
+    /*
+     * This used to be excluded, on the theory that a plan with no progress was
+     * a plan abandoned for a better approach. MEASURED on the LocalConvert
+     * benchmark: the model wrote SIXTEEN steps, created one directory, had a
+     * file write refused, and stopped at 0/16 with nothing on disk. The
+     * exclusion silenced the nudge on exactly the run it was built for. A plan
+     * genuinely superseded is REPLACED, which looks like a different plan
+     * rather than an ended turn.
+     */
+    const u = unfinishedPlan([item('1', 'a', 'pending'), item('2', 'b', 'in_progress')]);
+    expect(u?.done).toBe(0);
+    expect(u?.remaining).toEqual(['a', 'b']);
   });
 
   it('fires when real progress was made and then stopped', () => {

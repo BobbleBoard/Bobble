@@ -534,6 +534,46 @@ describe('outsideWorkspaceRefusal', () => {
     expect(msg).toContain('/Users/user/evil.txt');
   });
 
+  /*
+   * AN INSTALL DESTINATION IS NOT A DEAD END.
+   *
+   * MEASURED on the LocalConvert benchmark: the task says "a desktop app in my
+   * Applications folder", the model ran `mkdir -p
+   * /Applications/LocalConvert.app/Contents/MacOS` (which SUCCEEDED — bash is
+   * not fenced), then tried to write main.py into it and was refused. It was
+   * left with an empty bundle in /Applications and a plan at 0/16, and it
+   * stopped. The refusal was correct and gave it nowhere to go.
+   */
+  it('tells an /Applications write to build here and install after', () => {
+    const msg = outsideWorkspaceRefusal(
+      'write',
+      '/Applications/LocalConvert.app/Contents/MacOS/main.py',
+      '/Applications/LocalConvert.app/Contents/MacOS/main.py',
+      ROOT,
+    );
+    expect(msg).toContain('/Applications');
+    expect(msg).toMatch(/BUILD IT HERE AND THEN INSTALL IT/);
+    // The achievable route, named: bash can write there even though these cannot.
+    expect(msg).toContain('cp -R');
+    expect(msg).toMatch(/not\s+fenced/);
+    // …and the half-made bundle it may already have created is its problem.
+    expect(msg).toMatch(/half-made bundle/);
+  });
+
+  it('covers the other places a thing gets installed to', () => {
+    for (const dir of ['/usr/local/bin', '/opt', '/Library']) {
+      const msg = outsideWorkspaceRefusal('write', `${dir}/thing`, `${dir}/thing`, ROOT);
+      expect(msg, dir).toMatch(/BUILD IT HERE AND THEN INSTALL IT/);
+    }
+  });
+
+  it('leaves an ordinary outside-the-workspace path on the original message', () => {
+    // The install branch must not swallow the case it was added beside.
+    const msg = outsideWorkspaceRefusal('write', '/tmp/x.txt', '/tmp/x.txt', ROOT);
+    expect(msg).toMatch(/^Refusing to write outside the workspace/);
+    expect(msg).not.toMatch(/BUILD IT HERE/);
+  });
+
   /* Kept from the original: a deliberate write elsewhere must be DECLARED. */
   it('keeps the never-lie-about-the-path instruction', () => {
     const msg = outsideWorkspaceRefusal('write', '/x/y.txt', '/x/y.txt', ROOT);

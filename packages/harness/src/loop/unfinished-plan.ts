@@ -29,10 +29,15 @@
  * - Nothing is pending ⇒ nothing to say. A turn with no plan at all is not
  *   suspicious: most turns do not need one, and the prompt says as much
  *   ("a plan for a single action is noise").
- * - A plan where NOTHING was ever completed is usually a plan written and then
- *   abandoned for a better approach, or a turn the user interrupted — pushing
- *   "carry on" there is as likely to be wrong as right. It fires when real
- *   progress was made and then stopped, which is the shape of giving up.
+ * - A plan with NOTHING done used to be excluded, on the theory that it was
+ *   usually a plan written and then abandoned for a better approach. MEASURED
+ *   on the LocalConvert benchmark, that was exactly backwards: the model wrote a
+ *   SIXTEEN-step plan, created a directory, had one file write refused, and
+ *   stopped — 0/16, nothing on disk, the run idle. A plan at 0/N with the turn
+ *   over is the strongest evidence of giving up there is, not the weakest, and
+ *   the exclusion silenced this on the very case it was built for. A plan
+ *   genuinely superseded is REPLACED, which shows as a different plan rather
+ *   than an ended turn.
  * - Once per session, like its two neighbours. A model that stops again after
  *   being told to continue is telling us something real, and a guard that keeps
  *   overriding the same answer is worse than the stall.
@@ -65,8 +70,6 @@ export function unfinishedPlan(plan: readonly PlanItem[] | null): UnfinishedPlan
   const done = inScope.filter((p) => p.status === 'done').length;
   const remaining = inScope.filter((p) => p.status !== 'done').map((p) => p.text);
   if (remaining.length === 0) return null;
-  // Never started ⇒ not evidence of giving up. See the header.
-  if (done === 0) return null;
   return { done, remaining };
 }
 
@@ -83,8 +86,15 @@ export function unfinishedPlanNudge(u: UnfinishedPlan): string {
   const shown = u.remaining.slice(0, 8);
   const more = u.remaining.length - shown.length;
   const list = shown.map((t) => `- ${t}`).join('\n');
+  /* Nothing done at all reads differently from "some progress, then stopped",
+     and saying "you marked 0 steps done" invites an argument about the marking
+     rather than about the work. */
+  const opening =
+    u.done === 0
+      ? `You wrote a plan with ${u.remaining.length} steps and then stopped without finishing any of them:`
+      : `You marked ${u.done} step${u.done === 1 ? '' : 's'} done and stopped, but your own plan still has ${u.remaining.length} unfinished:`;
   return [
-    `You marked ${u.done} step${u.done === 1 ? '' : 's'} done and stopped, but your own plan still has ${u.remaining.length} unfinished:`,
+    opening,
     list + (more > 0 ? `\n- …and ${more} more` : ''),
     '',
     'Nobody is waiting to reply and there is time left. Continue with the next ' +
