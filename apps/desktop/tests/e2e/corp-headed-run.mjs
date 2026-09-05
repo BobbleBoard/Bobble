@@ -8,7 +8,8 @@
  * actually touches — so a run can be perfect while the thing the user opens does
  * not start a corp at all.
  *
- * This drives Bobble itself: launch the built app with a VISIBLE window, set the
+ * This drives Bobble itself: launch the built app (INVISIBLE by default — see
+ * the env block; `PI_E2E_VISIBLE=1` to watch), set the
  * effort the corporation is gated behind, point the chat at a project directory,
  * type the task into the real composer and press Enter. Then it stays out of the
  * way, screenshotting on a timer, so the situation room can be watched live —
@@ -215,6 +216,17 @@ const app = await electron.launch({
      * Otherwise the model decides, exactly as it does for a real user.
      */
     ...(process.env.FORCE === '1' ? { PI_DESKTOP_CORP_FORCE: '1' } : {}),
+    /*
+     * INVISIBLE BY DEFAULT, like every other probe.
+     *
+     * This one was written to be WATCHED — that is what "headed" meant — and
+     * the standing rule is that a run never takes the user's screen: they are
+     * usually at the machine, and a corp run is hours long. `PI_E2E_VISIBLE=1`
+     * is the one way to watch it, and it flows through `...process.env` above,
+     * so the intent of this file is preserved and its default is no longer to
+     * seize the display for the rest of the afternoon.
+     */
+    ...(process.env.PI_E2E_VISIBLE === '1' ? {} : { PI_E2E_BACKGROUND: '1' }),
   },
 });
 
