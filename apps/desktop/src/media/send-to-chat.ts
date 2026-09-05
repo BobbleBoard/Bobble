@@ -46,10 +46,14 @@ export interface SendToChatItem {
 /**
  * Hand a result to the conversation and go there.
  *
- * Navigates FIRST for the path case so the composer is mounted when the text
- * lands, and LAST for the image case so the fetch has already succeeded — a
- * view change that turns out to carry nothing is the more confusing failure.
- * Returns whether the media went as an attachment (image) or a path.
+ * BOTH cases hand the media over BEFORE changing the view, for the same reason:
+ * the receiving end drains what is waiting for it when it mounts, so anything
+ * pushed after the change races a composer that has already read. The image
+ * case additionally does its fetch first, so a view change never turns out to
+ * carry nothing.
+ *
+ * Returns whether the media went as an attachment (an image the model can see)
+ * or as a path (everything else — see the file header).
  */
 export async function sendToChat(item: SendToChatItem): Promise<'attached' | 'path'> {
   if (item.kind === 'image') {
