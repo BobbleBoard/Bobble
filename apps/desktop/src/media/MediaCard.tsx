@@ -28,9 +28,11 @@ import { pdFileUrl } from '../chat/canvas/file-preview';
 import { ThreadAudio } from '../chat/ThreadAudio';
 import { humanSize, type ThreadMediaItem } from '../chat/thread-media';
 import { useModalityStore } from '../state/modality-store';
+import { studioFor, useStudioHandoff } from '../state/studio-handoff';
 import { ExpandedScrim } from './ExpandedScrim';
 import { ModelSurface } from './ModelSurface';
 import { exportFile, revealFile, startFileDrag } from './media-actions';
+import { sendToChat } from './send-to-chat';
 import { VideoSurface } from './VideoSurface';
 
 /** The media itself, at whatever size the frame around it gives. */
@@ -91,6 +93,28 @@ function GlyphExport(): JSX.Element {
   );
 }
 
+/** Speech bubble with an arrow going INTO it — back to the conversation. */
+function GlyphToChat(): JSX.Element {
+  return (
+    <svg width="18" height="18" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <title>Send to chat</title>
+      <path
+        d="M2.4 5.1a1.6 1.6 0 011.6-1.6h8a1.6 1.6 0 011.6 1.6v4.2a1.6 1.6 0 01-1.6 1.6H7.1L4.2 13.3v-2.4h-.2a1.6 1.6 0 01-1.6-1.6z"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M8 4.6v3.6M6.3 6.7L8 8.4l1.7-1.7"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 function GlyphCube(): JSX.Element {
   return (
     <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
@@ -114,6 +138,19 @@ function Controls({
   onExpand?: (() => void) | undefined;
 }): JSX.Element {
   const setModality = useModalityStore((s) => s.setView);
+  const view = useModalityStore((s) => s.view);
+  const offerToStudio = useStudioHandoff((s) => s.offer);
+  const target = studioFor(item.kind);
+  /*
+   * THE SAME CARD MEANS DIFFERENT THINGS IN DIFFERENT ROOMS.
+   *
+   * In the transcript, the useful move is to take this somewhere it can be
+   * worked on. Standing in that room already, "Open in studio" would be a
+   * button that goes where you are — so it becomes "Use as input", which is the
+   * iterate loop (that, but at sunset — then again), and the trip BACK to the
+   * conversation is offered instead.
+   */
+  const inItsStudio = view === target;
   return (
     <>
       {onExpand !== undefined ? (
@@ -127,17 +164,53 @@ function Controls({
           <GlyphExpand />
         </button>
       ) : null}
-      {item.kind === 'model' ? (
-        /* An inline turntable that cannot escalate is a dead end — this is the
-           way out to the room that can actually retopologise and rig it. */
+      {/*
+        EVERY KIND CAN ESCALATE, AND IT TAKES THE MEDIA WITH IT.
+
+        This was on the MESH alone, and even there it only switched the view —
+        you arrived in an empty 3D studio standing next to the thing you had
+        just been looking at. A picture, a clip and a sound offered nothing at
+        all. the user, round 2: "all types of media handoff into studios and
+        editing." The prompt and seed ride along, because the first thing anyone
+        does with a generated picture is ask for it again slightly differently.
+      */}
+      <button
+        type="button"
+        className="pd-media-btn pd-media-btn--bl pd-media-btn--wide pd-focusable"
+        data-testid="media-open-studio"
+        onClick={() => {
+          offerToStudio(target, {
+            path: item.path,
+            name: item.name,
+            kind: item.kind,
+            ...(item.prompt !== undefined ? { prompt: item.prompt } : {}),
+            ...(item.seed !== undefined ? { seed: item.seed } : {}),
+            ...(item.model !== undefined ? { model: item.model } : {}),
+          });
+          if (!inItsStudio) setModality(target === '3d' ? '3d' : target);
+        }}
+      >
+        {item.kind === 'model' && !inItsStudio ? <GlyphCube /> : null}
+        {inItsStudio ? 'Use as input' : 'Open in studio'}
+      </button>
+      {/*
+        BACK TO THE CONVERSATION. Only offered from inside a studio: in the
+        transcript this result is already there, and a button that sends a thing
+        to where it is teaches people the controls are decorative. A picture
+        goes as an attachment the model can see; anything else goes as its path,
+        which is what the model can actually act on. See send-to-chat.ts.
+      */}
+      {inItsStudio ? (
         <button
           type="button"
-          className="pd-media-btn pd-media-btn--bl pd-media-btn--wide pd-focusable"
-          data-testid="media-open-studio"
-          onClick={() => setModality('3d')}
+          className="pd-media-btn pd-media-btn--tr pd-focusable"
+          data-testid="media-send-chat"
+          aria-label={`Send ${item.name} to the conversation`}
+          onClick={() => {
+            void sendToChat({ path: item.path, name: item.name, kind: item.kind });
+          }}
         >
-          <GlyphCube />
-          Open in studio
+          <GlyphToChat />
         </button>
       ) : null}
       <button

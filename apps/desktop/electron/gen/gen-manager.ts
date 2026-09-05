@@ -358,6 +358,11 @@ export function registerGenIpc(opts: GenManagerOptions): void {
         seeds,
         negativePrompt: raw.negativePrompt,
         ...(guidance !== undefined ? { guidance } : {}),
+        // An edit rather than a fresh generation — see ImageJobSpec.imagePath.
+        ...(raw.inputImage !== undefined && raw.inputImage.length > 0
+          ? { imagePath: raw.inputImage }
+          : {}),
+        ...(raw.strength !== undefined ? { imageStrength: raw.strength } : {}),
         quantize: model.defaultQuantize,
       },
     };

@@ -4044,7 +4044,7 @@
   height: 17px;
   padding: 0 5px;
   border-radius: 9px;
-  background: var(--pd-bg-elevated);
+  background: var(--pd-bg-raised);
   border: 1px solid var(--pd-border-subtle);
   color: var(--pd-text-secondary);
   font-size: var(--tp-font-size-min);
@@ -4116,7 +4116,7 @@
 .tp-ver-branch-tag {
   padding: 0 5px;
   border-radius: 4px;
-  background: var(--pd-bg-elevated);
+  background: var(--pd-bg-raised);
   border: 1px solid var(--pd-border-subtle);
   color: var(--pd-text-muted);
   font-size: var(--tp-font-size-min);
@@ -4143,7 +4143,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--pd-bg-elevated);
+  background: var(--pd-bg-raised);
   color: var(--pd-text-muted);
 }
 .tp-ver-current {
@@ -4158,7 +4158,7 @@
   padding: 3px 8px;
   border-radius: 6px;
   border: 1px solid var(--pd-border-subtle);
-  background: var(--pd-bg-elevated);
+  background: var(--pd-bg-raised);
   color: var(--pd-text-secondary);
   font-size: 11px;
   font-weight: 550;
@@ -4172,9 +4172,9 @@
 .tp-stage-warn {
   margin: 8px 12px;
   padding: 8px 10px;
-  border-radius: var(--pd-radius-card);
+  border-radius: var(--pd-radius-lg);
   border: 1px solid var(--pd-border-subtle);
-  background: var(--pd-bg-elevated);
+  background: var(--pd-bg-raised);
   color: var(--pd-text-secondary);
   font-size: 11.5px;
   line-height: 1.45;
@@ -4187,9 +4187,9 @@
   gap: 8px;
   margin: 8px 12px;
   padding: 9px 10px;
-  border-radius: var(--pd-radius-card);
+  border-radius: var(--pd-radius-lg);
   border: 1px solid var(--pd-border-subtle);
-  background: var(--pd-bg-elevated);
+  background: var(--pd-bg-raised);
   color: var(--pd-text-secondary);
   font-size: 11.5px;
   line-height: 1.45;
@@ -4204,9 +4204,9 @@
 .tp-humanoid-ask {
   margin: 8px 12px;
   padding: 11px 12px;
-  border-radius: var(--pd-radius-card);
+  border-radius: var(--pd-radius-lg);
   border: 1px solid var(--pd-border-strong);
-  background: var(--pd-bg-elevated);
+  background: var(--pd-bg-raised);
 }
 .tp-humanoid-ask-title {
   color: var(--pd-text-primary);
@@ -4233,9 +4233,9 @@
   gap: 8px;
   margin: 8px 12px;
   padding: 9px 10px;
-  border-radius: var(--pd-radius-card);
+  border-radius: var(--pd-radius-lg);
   border: 1px solid var(--pd-border-subtle);
-  background: var(--pd-bg-elevated);
+  background: var(--pd-bg-raised);
   color: var(--pd-text-secondary);
   font-size: 11.5px;
 }
@@ -4401,7 +4401,7 @@
   padding: 4px 12px;
   border-radius: 999px;
   border: 1px solid var(--pd-border-subtle);
-  background: var(--pd-bg-elevated);
+  background: var(--pd-bg-raised);
   color: var(--pd-text-secondary);
   font-size: 11.5px;
   font-weight: 550;
@@ -4575,7 +4575,7 @@
   padding: 7px 10px;
   border-radius: 8px;
   border: 1px solid var(--pd-border-subtle);
-  background: var(--pd-bg-elevated);
+  background: var(--pd-bg-raised);
   color: var(--pd-text-primary);
   font-size: 12.5px;
 }

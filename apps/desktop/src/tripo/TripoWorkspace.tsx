@@ -10,6 +10,8 @@
 
 import type { JSX } from 'react';
 import { useEffect, useState } from 'react';
+import { exitModality } from '../state/modality-store';
+import { useStudioHandoff } from '../state/studio-handoff';
 import { GenPanel } from './GenPanel';
 import { ensureGen3dWired, useGen3dStore } from './gen3d-client';
 import { IcUpload } from './icons';
@@ -19,7 +21,13 @@ import { Rail } from './Rail';
 import { RightPanel } from './RightPanel';
 import { useTripoStore } from './store';
 import { Viewport } from './Viewport';
-import { addInputImages, importModelFile, isImageFile, isModelFile } from './viewer-io';
+import {
+  addInputImages,
+  importModelFile,
+  importModelPath,
+  isImageFile,
+  isModelFile,
+} from './viewer-io';
 import './tripo.css';
 
 export function TripoWorkspace(): JSX.Element {
@@ -54,6 +62,24 @@ export function TripoWorkspace(): JSX.Element {
     ensureGen3dWired();
   }, []);
 
+  /*
+   * A MESH HANDED OVER FROM CHAT LOADS ITSELF.
+   *
+   * "Open in studio" on a 3D result switched the view and stopped there, which
+   * is the emptiest possible version of the gesture. The import path is the one
+   * a drop already uses, so the model lands in the viewport and its card
+   * appears in Assets exactly as a dragged file's would — no second, parallel
+   * "opened from chat" state to keep in step.
+   *
+   * Taken (not peeked) so it fires once: coming back to the studio later should
+   * show what you left, not re-import the last thing you ever sent.
+   */
+  useEffect(() => {
+    const handed = useStudioHandoff.getState().take('3d');
+    if (handed === null) return;
+    void importModelPath(handed.path, handed.name);
+  }, []);
+
   // One global dismiss layer for every popover/dropdown: any pointerdown
   // outside a menu anchor closes the open menu; Escape peels the layers back
   // in stacking order — menu, then modal, then the full-viewport state-machine
@@ -78,6 +104,18 @@ export function TripoWorkspace(): JSX.Element {
         // dismissable layer in the studio that Escape did not reach — you had
         // to find the ✕. Every other overlay in the app closes on Escape.
         s.set('graphOpen', false);
+      } else {
+        /*
+         * NOTHING LEFT TO DISMISS ⇒ LEAVE THE ROOM, like every other studio.
+         *
+         * The three StudioShell rooms have returned to the chat on Escape since
+         * they stopped taking the window; this one peeled its own layers and
+         * then stopped, so the 3D workspace was the one modality you could only
+         * leave with the mouse. Found driving the round-2 handoff probe, which
+         * pressed Escape to get back to the transcript and waited ten seconds
+         * for a composer that was never coming.
+         */
+        exitModality();
       }
     };
     document.addEventListener('pointerdown', onPointerDown);

@@ -113,6 +113,26 @@ def build_mflux_cmd(spec, seed, out_path, step_dir):
         cmd += ["--steps", str(spec["steps"])]
     if spec.get("guidance") is not None:
         cmd += ["--guidance", str(spec["guidance"])]
+    # An existing picture to work FROM: this is an edit, not a fresh generation.
+    # Every mflux console command we spawn accepts these; nothing in the app set
+    # them until round 2.
+    #
+    # AND THE FLAG MEANS THE OPPOSITE OF ITS NAME EVERYWHERE ELSE. Read from
+    # mflux 0.18 source, twice over:
+    #   config.py     init_time_step = max(1, floor(num_steps * image_strength))
+    #   latent_creator.py  sigma = sigmas[init_time_step]; blend(clean, noise, sigma)
+    # Flow-matching sigmas fall 1 -> 0, so a BIGGER image_strength starts later,
+    # adds less noise and lands CLOSER to the original. In diffusers -- and in
+    # what anyone typing a number expects, the agent tool included -- strength is
+    # how far to travel FROM the picture. So `imageStrength` on our wire carries
+    # the ordinary meaning (1 = redraw it, 0 = leave it alone) and the one
+    # inversion in the whole app happens here, against the engine that needs it.
+    if spec.get("imagePath"):
+        cmd += ["--image-path", str(spec["imagePath"])]
+        change = spec.get("imageStrength")
+        if change is not None:
+            keep = max(0.0, min(1.0, 1.0 - float(change)))
+            cmd += ["--image-strength", str(round(keep, 3))]
     cmd += ["--seed", str(seed)]
     cmd += ["--stepwise-image-output-dir", step_dir]
     cmd += ["--output", out_path]

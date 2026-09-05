@@ -46,6 +46,7 @@ import {
 } from './StudioShell';
 import { useStudioUiStore } from './studio-ui-store';
 import { useEnhancer } from './use-enhancer';
+import { useStudioInput } from './use-handoff';
 import { useStudio } from './use-studio';
 
 type Mode = 'speech' | 'music' | 'sfx';
@@ -151,6 +152,15 @@ export function AudioStudio(): JSX.Element {
       : undefined;
 
   const enhancer = useEnhancer(useCallback((next: string) => setPrompt(next), []));
+
+  /* Media handed to this room — from a card in the transcript, or dropped on
+
+     it. Seeds the prompt with whatever made it. See useStudioInput. */
+
+  const handoff = useStudioInput(
+    'audio',
+    useCallback((p: string) => setPrompt(p), []),
+  );
   const setSettingsOpen = useStudioUiStore((st) => st.setSettingsOpen);
 
   /*
@@ -258,6 +268,8 @@ export function AudioStudio(): JSX.Element {
       {...(blocked !== undefined ? { blocked } : {})}
       error={error}
       onRetry={() => void onRun()}
+      {...(handoff.card !== undefined ? { input: handoff.card } : {})}
+      onDropFiles={handoff.acceptFiles}
       /* The whole core set, in the bar — see ImageStudio for why. The knobs
          that exist depend on the mode, which is itself the first control. */
       controls={

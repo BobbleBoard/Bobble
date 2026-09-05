@@ -539,7 +539,7 @@ body {
   padding: 10px 12px;
   border-radius: var(--pd-radius-md);
   border: 1px solid var(--pd-border-subtle);
-  background: var(--pd-bg-surface);
+  background: var(--pd-bg-raised);
   box-shadow: var(--pd-shadow-hairline);
 }
 /* The card face is the open target (the user: "clickable to show semi-fullscreen").
@@ -2171,7 +2171,7 @@ body {
   box-sizing: border-box;
   border: 1px solid var(--pd-border-strong);
   border-radius: var(--pd-radius-md);
-  background: var(--pd-bg-elevated);
+  background: var(--pd-bg-raised);
   color: var(--pd-text-primary);
   font: inherit;
   font-size: var(--pd-font-size-body);
@@ -3202,6 +3202,13 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
   right: 10px;
   bottom: 10px;
 }
+/* Send-to-chat, opposite Expand. The only corner left, and the right one: the
+   two "take this elsewhere" actions sit along the top, the two "do something
+   with the file" actions along the bottom. */
+.pd-media-btn--tr {
+  top: 10px;
+  right: 10px;
+}
 .pd-media-btn--bl {
   left: 10px;
   bottom: 10px;
@@ -3759,6 +3766,9 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
   min-height: 0;
   background: var(--pd-bg-base);
   color: var(--pd-text-primary);
+  /* The drop veil covers THIS box (see .pd-studio-veil), so the room has to be
+     the containing block for it. */
+  position: relative;
 }
 
 /* The working column: results above, input bar below. The rail is its SIBLING,
@@ -4358,6 +4368,62 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
   background: var(--pd-status-danger-bg);
 }
 
+/* The "working from" card, above the composer. Small — it is context for the
+   sentence you are writing, not a result. */
+.pd-studio-from {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--pd-border-subtle);
+  border-radius: var(--pd-radius-md);
+  background: var(--pd-bg-raised);
+}
+.pd-studio-from-thumb {
+  width: 44px;
+  height: 44px;
+  flex: none;
+  border-radius: var(--pd-radius-sm);
+  object-fit: cover;
+  background: var(--pd-bg-inset);
+}
+.pd-studio-from-body {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.pd-studio-from-label {
+  color: var(--pd-text-muted);
+  font-size: var(--pd-font-size-caption);
+}
+.pd-studio-from-name {
+  overflow: hidden;
+  color: var(--pd-text-primary);
+  font-size: var(--pd-font-size-footnote);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pd-studio-from-drop {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: var(--pd-radius-full);
+  background: var(--pd-bg-inset);
+  color: var(--pd-text-muted);
+  cursor: pointer;
+}
+.pd-studio-from-drop:hover {
+  background: var(--pd-bg-hover);
+  color: var(--pd-text-primary);
+}
+
 /* ---- results ------------------------------------------------------------ */
 
 .pd-studio-results {
@@ -4902,7 +4968,7 @@ body[data-media-expanded="true"] .pd-studio-compose {
 .pd-crash-primary,
 .pd-crash-secondary {
   padding: 7px 14px;
-  border-radius: var(--pd-radius-control);
+  border-radius: var(--pd-radius-button);
   border: 1px solid var(--pd-border-subtle);
   font: inherit;
   cursor: pointer;
@@ -4915,4 +4981,56 @@ body[data-media-expanded="true"] .pd-studio-compose {
 .pd-crash-secondary {
   background: transparent;
   color: var(--pd-text-primary);
+}
+
+/*
+ * THE DROP VEIL — a studio saying whether it can take what you are holding.
+ *
+ * Covers the room rather than outlining a target: there is no smaller "drop
+ * here" region, the whole room is the target, and a dashed rectangle around
+ * part of it would suggest otherwise. Refusal is the same veil in the app's
+ * warning colour with the reason spelled out, because a drop that does nothing
+ * reads as a broken app rather than as a wrong file.
+ */
+.pd-studio-veil {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  border-radius: inherit;
+  background: color-mix(in srgb, var(--pd-bg-base) 72%, transparent);
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+  animation: pd-studio-veil-in 140ms ease-out;
+}
+
+.pd-studio-veil > span {
+  padding: 10px 18px;
+  border-radius: var(--pd-radius-md);
+  font-size: var(--pd-font-size-body);
+  font-weight: var(--pd-font-weight-medium);
+  letter-spacing: 0.01em;
+  color: var(--pd-text-primary);
+  background: var(--pd-bg-raised);
+  border: 1px dashed color-mix(in srgb, var(--pd-accent-primary) 60%, transparent);
+  box-shadow: var(--pd-shadow-md);
+}
+
+.pd-studio-veil[data-ok="no"] > span {
+  border-style: solid;
+  border-color: var(--pd-status-danger-border);
+  background: var(--pd-status-danger-bg);
+  color: var(--pd-status-danger-fg);
+}
+
+@keyframes pd-studio-veil-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }

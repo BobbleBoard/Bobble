@@ -683,3 +683,16 @@ export const useTripoStore = create<TripoState>((set, get) => ({
       blendTransitions: s.blendTransitions.filter((t) => t.paramId !== id),
     })),
 }));
+
+/*
+ * E2E hook, on the same `?piE2E=1` opt-in as the other stores.
+ *
+ * The 3D workspace's real state — what has been imported, what is loaded — is
+ * not readable from the DOM: the viewport is a canvas, and an asset card's
+ * thumbnail only appears once the viewer has rendered a frame. A probe checking
+ * that a mesh handed over from chat ACTUALLY arrived has nowhere else to look.
+ */
+if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('piE2E')) {
+  (window as unknown as { __tripo_store?: () => typeof useTripoStore }).__tripo_store = () =>
+    useTripoStore;
+}

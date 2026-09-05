@@ -39,6 +39,7 @@ import {
 } from './StudioShell';
 import { useStudioUiStore } from './studio-ui-store';
 import { useEnhancer } from './use-enhancer';
+import { useStudioInput } from './use-handoff';
 import { useStudio } from './use-studio';
 
 /**
@@ -149,6 +150,18 @@ export function ImageStudio(): JSX.Element {
   const models = useMemo(() => catalog.filter((m) => m.modality === 'image'), [catalog]);
   const size = (SHAPES.find((x) => x.value === shape) ?? SHAPES[0]).of(long);
   const enhancer = useEnhancer(useCallback((next: string) => setPrompt(next), []));
+  /*
+   * HOW FAR AN EDIT MAY TRAVEL from its input picture, 0..1. Only meaningful
+   * with an input, so it is only offered with one — a slider that does nothing
+   * most of the time teaches people to ignore it.
+   */
+  const [strength, setStrength] = useState(0.6);
+  /* Media handed to this room — from a card in the transcript, or dropped on
+     it. Seeds the prompt with whatever made it. See useStudioInput. */
+  const handoff = useStudioInput(
+    'image',
+    useCallback((p: string) => setPrompt(p), []),
+  );
   const setSettingsOpen = useStudioUiStore((st) => st.setSettingsOpen);
 
   /*
@@ -165,6 +178,53 @@ export function ImageStudio(): JSX.Element {
    * had to find in the rail first, which is the part nobody does on their first
    * visit.
    */
+  /*
+   * WITH AN INPUT, THE ROOM IS ABOUT THAT PICTURE.
+   *
+   * The empty state said "Make pictures on this machine … Pick somewhere to
+   * start, or just describe a picture" while the run button next to it said
+   * Edit and a thumbnail of your picture sat under it. Found by LOOKING at a
+   * screenshot of the working handoff: every assertion passed and the room was
+   * still inviting you to start from nothing.
+   *
+   * The starters change with it, because "Describe a picture" is the wrong
+   * offer when a picture is already there — these are the three things people
+   * ask for when handed one.
+   */
+  const editStarters: readonly StudioStarter[] = [
+    {
+      id: 'change',
+      icon: <GlyphPencil />,
+      title: 'Change something',
+      hint: 'Say only what should be different.',
+      onPick: () => {
+        setStrength(0.6);
+        setPrompt('make it golden hour, warm low sun');
+      },
+    },
+    {
+      id: 'restyle',
+      icon: <GlyphPalette />,
+      title: 'Restyle it',
+      hint: 'Same subject, different hand.',
+      onPick: () => {
+        setStrength(0.85);
+        setStyle('watercolour');
+        setPrompt('the same scene as a loose watercolour');
+      },
+    },
+    {
+      id: 'polish',
+      icon: <GlyphGrid />,
+      title: 'Just polish it',
+      hint: 'Keep it, clean it up.',
+      onPick: () => {
+        setStrength(0.3);
+        setPrompt('the same picture, sharper and better lit');
+      },
+    },
+  ];
+
   const starters: readonly StudioStarter[] = [
     {
       id: 'describe',
@@ -204,6 +264,12 @@ export function ImageStudio(): JSX.Element {
   const onRun = async (): Promise<void> => {
     const base = await enhancer.enhance('image', prompt, model);
     const suffix = STYLES.find((x) => x.value === style)?.suffix ?? '';
+    /*
+     * WITH AN INPUT, THIS IS AN EDIT — the model starts from those pixels
+     * instead of from noise. `strength` is how far it may travel: low keeps the
+     * composition and changes the finish, high keeps little but the shape.
+     */
+    const editing = handoff.input !== null && handoff.input.kind === 'image';
     await run({
       kind: 'image',
       prompt: suffix === '' ? base : `${base} ${suffix}`,
@@ -213,6 +279,7 @@ export function ImageStudio(): JSX.Element {
       ...(steps !== '' ? { steps } : {}),
       ...(guidance !== '' ? { guidance } : {}),
       ...(seed !== '' ? { seed } : {}),
+      ...(editing ? { inputImage: handoff.input?.path, strength } : {}),
     });
   };
 
@@ -221,13 +288,15 @@ export function ImageStudio(): JSX.Element {
       testid="image-studio"
       prompt={prompt}
       onPrompt={setPrompt}
-      placeholder="Describe a picture…"
+      placeholder={handoff.input !== null ? 'What should change?…' : 'Describe a picture…'}
       onRun={() => void onRun()}
       busy={busy || enhancer.enhancing}
-      runLabel={enhancer.enhancing ? 'Enhancing…' : 'Generate'}
+      runLabel={enhancer.enhancing ? 'Enhancing…' : handoff.input !== null ? 'Edit' : 'Generate'}
       {...(models.length === 0 ? { blocked: 'No image models are available.' } : {})}
       error={error}
       onRetry={() => void onRun()}
+      {...(handoff.card !== undefined ? { input: handoff.card } : {})}
+      onDropFiles={handoff.acceptFiles}
       /*
        * EVERYTHING CORE IS DOWN HERE. the user: "move a bit more really core
        * functionality to the bottom bar… you should be able to access all core
@@ -300,6 +369,37 @@ export function ImageStudio(): JSX.Element {
       }
       settings={
         <>
+          {/*
+            HOW FAR TO TRAVEL FROM THE PICTURE YOU HANDED IN.
+
+            Only meaningful with an input, so it is only offered with one — a
+            slider that does nothing most of the time teaches people to ignore
+            it. It heads the rail rather than hiding under Advanced because when
+            you arrive here from a picture this is THE control; steps and
+            guidance are still fine print.
+
+            Named amounts, not a raw 0..1: the number is meaningless on its own,
+            and (see worker.py) the engine's own flag runs the other way. What
+            the app carries everywhere is the ordinary reading — bigger means
+            more different.
+          */}
+          {handoff.input !== null ? (
+            <RailGroup title="Edit">
+              <Knob label="How much to change">
+                <Segmented
+                  testid="image-strength-rail"
+                  value={strength}
+                  onChange={setStrength}
+                  options={[
+                    { value: 0.3, label: 'A little', hint: 'Touch it up — same picture' },
+                    { value: 0.6, label: 'Some', hint: 'Clearly reworked, still recognisable' },
+                    { value: 0.85, label: 'A lot', hint: 'Keeps the composition, redraws it' },
+                  ]}
+                />
+              </Knob>
+            </RailGroup>
+          ) : null}
+
           <RailGroup title="Shape">
             <Knob label="Aspect ratio">
               <Segmented
@@ -429,9 +529,15 @@ export function ImageStudio(): JSX.Element {
       {runs.length === 0 && job === null ? (
         <StudioEmpty
           glyph={<GlyphImage />}
-          title="Make pictures on this machine"
-          body="Nothing you type here leaves your Mac. Pick somewhere to start, or just describe a picture."
-          starters={starters}
+          title={
+            handoff.input === null ? 'Make pictures on this machine' : 'Working from your picture'
+          }
+          body={
+            handoff.input === null
+              ? 'Nothing you type here leaves your Mac. Pick somewhere to start, or just describe a picture.'
+              : `Say what should be different about ${handoff.input.name}. Nothing you type here leaves your Mac.`
+          }
+          starters={handoff.input === null ? starters : editStarters}
         />
       ) : (
         runs.map((r) => (

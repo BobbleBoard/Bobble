@@ -194,6 +194,58 @@ class RunAudioTest(unittest.TestCase):
         self.assertIn("prompt", events[0]["message"])
 
 
+class BuildMfluxImg2ImgTest(unittest.TestCase):
+    """The one place in the app where `strength` is turned upside down.
+
+    mflux reads `--image-strength` as the fraction of the denoising schedule to
+    SKIP, so a bigger number lands CLOSER to the original -- the reverse of
+    diffusers, of the agent tool's parameter, and of what anyone typing a number
+    expects. worker.py inverts on the way out (see the comment there). If that
+    inversion is ever dropped, every edit in the app quietly does the opposite of
+    what was asked and still succeeds, which is exactly the kind of bug no
+    end-to-end run catches.
+    """
+
+    BASE = {"mfluxCommand": "mflux-generate", "prompt": "p"}
+
+    def cmd(self, **extra):
+        return worker.build_mflux_cmd({**self.BASE, **extra}, 7, "/out.png", "/steps")
+
+    def test_no_image_means_no_img2img_flags(self):
+        cmd = self.cmd()
+        self.assertNotIn("--image-path", cmd)
+        self.assertNotIn("--image-strength", cmd)
+
+    def test_image_path_is_passed_through(self):
+        cmd = self.cmd(imagePath="/in.png")
+        self.assertEqual(cmd[cmd.index("--image-path") + 1], "/in.png")
+
+    def test_strength_is_inverted_for_mflux(self):
+        # 0.8 = "change it a lot" -> mflux keeps 0.2 of the schedule.
+        cmd = self.cmd(imagePath="/in.png", imageStrength=0.8)
+        self.assertEqual(float(cmd[cmd.index("--image-strength") + 1]), 0.2)
+        # 0.3 = "touch it up" -> mflux keeps 0.7, starting late in the schedule.
+        cmd = self.cmd(imagePath="/in.png", imageStrength=0.3)
+        self.assertEqual(float(cmd[cmd.index("--image-strength") + 1]), 0.7)
+
+    def test_more_change_always_means_a_smaller_mflux_number(self):
+        def keep(change):
+            c = self.cmd(imagePath="/in.png", imageStrength=change)
+            return float(c[c.index("--image-strength") + 1])
+
+        values = [keep(x) for x in (0.1, 0.3, 0.5, 0.7, 0.9)]
+        self.assertEqual(values, sorted(values, reverse=True))
+
+    def test_out_of_range_is_clamped_not_passed_on(self):
+        cmd = self.cmd(imagePath="/in.png", imageStrength=1.7)
+        self.assertEqual(float(cmd[cmd.index("--image-strength") + 1]), 0.0)
+        cmd = self.cmd(imagePath="/in.png", imageStrength=-0.4)
+        self.assertEqual(float(cmd[cmd.index("--image-strength") + 1]), 1.0)
+
+    def test_strength_without_an_image_is_ignored(self):
+        self.assertNotIn("--image-strength", self.cmd(imageStrength=0.5))
+
+
 class BuildAudioCmdTest(unittest.TestCase):
     def test_builds_expected_argv(self):
         spec = {

@@ -35,6 +35,7 @@ import {
 } from './StudioShell';
 import { useStudioUiStore } from './studio-ui-store';
 import { useEnhancer } from './use-enhancer';
+import { useStudioInput } from './use-handoff';
 import { useStudio } from './use-studio';
 
 /**
@@ -91,6 +92,12 @@ export function VideoStudio(): JSX.Element {
   const models = useMemo(() => catalog.filter((m) => m.modality === 'video'), [catalog]);
   const size = (SHAPES.find((x) => x.value === shape) ?? SHAPES[0]).of(long);
   const enhancer = useEnhancer(useCallback((next: string) => setPrompt(next), []));
+  /* Media handed to this room — from a card in the transcript, or dropped on
+     it. Seeds the prompt with whatever made it. See useStudioInput. */
+  const handoff = useStudioInput(
+    'video',
+    useCallback((p: string) => setPrompt(p), []),
+  );
   const setSettingsOpen = useStudioUiStore((st) => st.setSettingsOpen);
 
   /*
@@ -161,6 +168,8 @@ export function VideoStudio(): JSX.Element {
       {...(models.length === 0 ? { blocked: 'No video models are available.' } : {})}
       error={error}
       onRetry={() => void onRun()}
+      {...(handoff.card !== undefined ? { input: handoff.card } : {})}
+      onDropFiles={handoff.acceptFiles}
       /* The whole core set, in the bar — see ImageStudio for why. */
       controls={
         <>

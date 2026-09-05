@@ -42,6 +42,7 @@ import {
 import { clsx } from 'clsx';
 import {
   type CSSProperties,
+  type DragEvent,
   type JSX,
   type ReactNode,
   useCallback,
@@ -52,6 +53,17 @@ import {
 } from 'react';
 import { exitModality } from '../state/modality-store';
 import { useStudioUiStore } from './studio-ui-store';
+
+/**
+ * A drag carrying FILES, as opposed to selected text or an in-app card.
+ *
+ * Checked on every drag event rather than only at the drop: without it the veil
+ * comes up when you drag a word across the room, which is both wrong and
+ * startling.
+ */
+function hasFiles(e: DragEvent<HTMLElement>): boolean {
+  return Array.from(e.dataTransfer.types).includes('Files');
+}
 
 export interface StudioShellProps {
   /* No `title`. The room's name is drawn by the app's top bar, from ChatApp's
@@ -96,6 +108,26 @@ export interface StudioShellProps {
    * bad news is.
    */
   readonly onRetry?: () => void;
+  /**
+   * WHAT THIS RUN IS WORKING FROM — the picture you handed the room, the clip
+   * you dropped on it. Sits directly above the composer, because it is part of
+   * the sentence you are writing: "this, but at sunset" makes no sense without
+   * being able to see what "this" is.
+   *
+   * Absent for a plain text-to-media run, which is most of them.
+   */
+  readonly input?: ReactNode;
+  /**
+   * DROP A FILE ON THE ROOM TO WORK FROM IT.
+   *
+   * The 3D workspace has taken a dropped model since round 8 ("dragging and
+   * dropping any model anywhere automatically puts it into the viewport"); the
+   * other three rooms took nothing at all, so the only way to edit a picture
+   * was to have generated it here first. Returns false when the drop held
+   * nothing this room can use, which the veil says out loud rather than
+   * accepting the file into a run that would fail forty seconds later.
+   */
+  readonly onDropFiles?: (files: readonly File[]) => boolean;
   readonly children: ReactNode;
   readonly testid?: string;
 }
@@ -117,10 +149,26 @@ export function StudioShell({
   blocked,
   error,
   onRetry,
+  input,
+  onDropFiles,
   children,
   testid = 'studio',
 }: StudioShellProps): JSX.Element {
   const canRun = !busy && blocked === undefined && promptText.trim().length > 0;
+
+  /*
+   * `null` = nothing being dragged, `true` = we can take it, `false` = we
+   * cannot. Three states rather than a boolean because refusing SILENTLY is the
+   * failure mode here: a .txt dragged onto the Image studio should say so while
+   * the pointer is still down, not do nothing and leave you wondering whether
+   * the drop registered at all.
+   *
+   * Counted, because dragenter/dragleave fire for every child element the
+   * pointer crosses; a plain flag flickers off the moment the cursor passes
+   * over the composer.
+   */
+  const [dragOk, setDragOk] = useState<boolean | null>(null);
+  const dragDepth = useRef(0);
 
   /*
    * GROW WITH THE TEXT. A textarea has one height and no opinion about its
@@ -165,8 +213,51 @@ export function StudioShell({
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
+  const canDrop = onDropFiles !== undefined;
   return (
-    <div className="pd-studio" data-testid={testid}>
+    <div
+      className="pd-studio"
+      data-testid={testid}
+      {...(canDrop
+        ? {
+            onDragEnter: (e: DragEvent<HTMLDivElement>) => {
+              if (!hasFiles(e)) return;
+              dragDepth.current += 1;
+              /* The name is not readable during a drag (the DataTransfer only
+                 exposes types until the drop), so the veil answers with the
+                 kind — which is all the browser will tell us and enough to say
+                 "not that". */
+              setDragOk(true);
+            },
+            onDragOver: (e: DragEvent<HTMLDivElement>) => {
+              if (!hasFiles(e)) return;
+              e.preventDefault();
+              e.dataTransfer.dropEffect = 'copy';
+            },
+            onDragLeave: () => {
+              dragDepth.current = Math.max(0, dragDepth.current - 1);
+              if (dragDepth.current === 0) setDragOk(null);
+            },
+            onDrop: (e: DragEvent<HTMLDivElement>) => {
+              if (!hasFiles(e)) return;
+              e.preventDefault();
+              dragDepth.current = 0;
+              const ok = onDropFiles(Array.from(e.dataTransfer.files));
+              setDragOk(ok ? null : false);
+              if (!ok) window.setTimeout(() => setDragOk(null), 2200);
+            },
+          }
+        : {})}
+    >
+      {dragOk !== null ? (
+        <div
+          className="pd-studio-veil"
+          data-testid="studio-drop-veil"
+          data-ok={dragOk ? 'yes' : 'no'}
+        >
+          <span>{dragOk ? 'Drop to work from this' : "This room can't use that file"}</span>
+        </div>
+      ) : null}
       {/*
         THE WORKING COLUMN — results above, input bar below.
         The RAIL is its sibling, not its parent's overlay, so opening the rail
@@ -193,6 +284,13 @@ export function StudioShell({
           value-stating buttons on the page's own background.
         */}
         <div className="pd-studio-compose">
+          {/* What this run is working FROM — see the `input` prop. Above the
+              field because it is part of the sentence being written. */}
+          {input !== undefined ? (
+            <div className="pd-studio-from" data-testid="studio-input">
+              {input}
+            </div>
+          ) : null}
           <div className="pd-studio-composer">
             {multiline ? (
               <textarea

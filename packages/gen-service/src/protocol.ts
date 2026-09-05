@@ -73,6 +73,29 @@ export interface ImageJobSpec {
   readonly guidance?: number;
   /** mflux `-q` weight quantization (3|4|5|6|8); omitted → full precision. */
   readonly quantize?: 3 | 4 | 5 | 6 | 8;
+  /**
+   * An existing picture to work FROM — mflux `--image-path`.
+   *
+   * Present ⇒ this is an edit, not a fresh generation: the model starts from
+   * these pixels instead of from noise. The capability was in the engine all
+   * along (`--image-path` / `--image-strength` on every mflux command we spawn)
+   * and nothing in the app ever set it, so "give me that again but at sunset"
+   * meant describing the whole picture from scratch.
+   */
+  readonly imagePath?: string;
+  /**
+   * How far to travel from `imagePath`, 0..1, in the ORDINARY direction: 0
+   * leaves the picture alone, 1 redraws it. Low keeps the composition and
+   * changes the finish; high keeps little but the general shape. Omitted ⇒ the
+   * engine's own default.
+   *
+   * Deliberately NOT mflux's `--image-strength`, which is the same number
+   * upside down (it is the fraction of the schedule SKIPPED, so bigger means
+   * less change). `worker.py` inverts on the way out and documents why; every
+   * other layer — this spec, the IPC request, the agent tool, the studio knob —
+   * reads the way a person would guess.
+   */
+  readonly imageStrength?: number;
 }
 
 /**

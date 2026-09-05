@@ -43,6 +43,15 @@ export interface ThreadMediaItem {
   readonly kind: MediaKind;
   /** File name for the presentation card. */
   readonly name: string;
+  /**
+   * Provenance, when the caller knows it — carried so "Open in studio" can hand
+   * the room something to work FROM rather than an empty composer beside the
+   * picture you were just looking at. Absent for media parsed out of a tool
+   * result, where only the path is available (see the note at the top).
+   */
+  readonly prompt?: string;
+  readonly seed?: number;
+  readonly model?: string;
 }
 
 const EXT: Readonly<Record<string, MediaKind>> = {

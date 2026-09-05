@@ -14,6 +14,7 @@
  * into the right sidebar"; the image lands when the viewer captures its first
  * rendered frame).
  */
+import { pdFileUrl } from '../chat/canvas/file-preview';
 import { importedFormatOf, registerImportedModel } from './asset-registry';
 import type { ExportFormat } from './data';
 import { type StudioAsset, type TripoOp, useTripoStore } from './store';
@@ -271,5 +272,36 @@ export function loadAssetTree(): void {
     if (deduped.length > 0) useTripoStore.setState({ assets: deduped });
   } catch {
     // Corrupt payload — start clean rather than crash the studio.
+  }
+}
+
+/**
+ * IMPORT A MODEL THAT IS ALREADY ON DISK — the chat → 3D studio handoff.
+ *
+ * "Open in studio" on a mesh used to switch the view and nothing else: you
+ * arrived in an empty workspace standing next to the thing you had just been
+ * looking at. Everything needed to load it already existed here; the path
+ * simply had no way in, because {@link importModelFile} takes a `File` from a
+ * drop and {@link importModelBuffer} takes bytes nobody had read yet.
+ *
+ * Goes through the app's own `pd-file://` scheme rather than fs IPC so it is
+ * the same read the media card itself does, and so a path outside the sandbox
+ * fails here exactly as it would there.
+ */
+export async function importModelPath(path: string, name: string): Promise<boolean> {
+  const format = importedFormatOf(name);
+  if (format === null) return false;
+  try {
+    const res = await fetch(pdFileUrl(path));
+    if (!res.ok) return false;
+    const buffer = await res.arrayBuffer();
+    importModelBuffer(name, format, buffer, {
+      source: 'imported',
+      created: 'From chat',
+      diskPath: path,
+    });
+    return true;
+  } catch {
+    return false;
   }
 }

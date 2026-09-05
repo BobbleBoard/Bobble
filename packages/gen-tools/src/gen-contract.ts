@@ -74,6 +74,21 @@ export interface GenerateImageParams {
    */
   readonly guidance?: number;
   readonly negativePrompt?: string;
+  /**
+   * An existing picture to work FROM, and how far to travel from it (0..1).
+   *
+   * Present ⇒ an EDIT rather than a fresh generation: the model starts from
+   * these pixels instead of from noise. Every mflux command the worker spawns
+   * has always accepted `--image-path` / `--image-strength`; nothing in the app
+   * ever set them, so "that again but at sunset" meant describing the whole
+   * picture from scratch. Reachable by the MODEL too, not just the studio — a
+   * tool that can only ever start from nothing cannot iterate either.
+   *
+   * `strength` is 0..1 the way you would guess: 0.2 touches it up, 0.8 redraws
+   * it. (mflux's flag of that name means the reverse; the worker inverts.)
+   */
+  readonly inputImage?: string;
+  readonly strength?: number;
 }
 
 /** Result of a completed `generate`: the job id + every produced output. */

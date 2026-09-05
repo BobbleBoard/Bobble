@@ -151,6 +151,16 @@ export type GenInvokeMap = {
        * step count was reachable only by editing a workflow by hand.
        */
       guidance?: number;
+      /**
+       * IMAGE ONLY — an existing picture to work from, and how far to travel
+       * from it. `strength` is 0..1 in the ordinary direction: 0 leaves the
+       * picture alone, 1 redraws it. (mflux's own `--image-strength` flag runs
+       * the OTHER way; worker.py inverts, and is the only place that knows.)
+       * Present ⇒ an edit rather than a fresh generation. The engine has always
+       * been able to do this; the app never asked.
+       */
+      inputImage?: string;
+      strength?: number;
     };
     response: {
       jobId: string;
