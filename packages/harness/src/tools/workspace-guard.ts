@@ -52,6 +52,7 @@ function args(command: string): string[] {
 
 /** Absolute, `~` and `$HOME` expanded, trailing slash removed. */
 function resolveArg(arg: string, cwd: string, home: string): string | null {
+  if (arg === 'cd') return null;
   if (arg.startsWith('-')) return null;
   let a = arg;
   if (a === '~' || a.startsWith('~/')) a = path.join(home, a.slice(1));
@@ -97,8 +98,22 @@ export function wouldDestroyWorkspace(
   const parsed = args(c).slice(1);
   const candidates = moving && !removing ? parsed.slice(0, -1) : parsed;
 
+  /*
+   * A LEADING `cd` MOVES WHAT A RELATIVE PATH MEANS.
+   *
+   * `cd /tmp/scratch && rm -rf .` is not this rule's business — the dot is
+   * /tmp/scratch, not the workspace — and resolving it against the workspace
+   * would refuse a perfectly ordinary command with a message about a directory
+   * the user never mentioned. Only a leading `cd` is honoured: anything more
+   * needs a shell, and guessing further would be worse than the false positive
+   * it is trying to avoid.
+   */
+  const cd = /^\s*cd\s+("([^"]*)"|'([^']*)'|(\S+))/.exec(c);
+  const cdTo = cd === undefined || cd === null ? undefined : (cd[2] ?? cd[3] ?? cd[4]);
+  const base = cdTo === undefined ? workspace : (resolveArg(cdTo, workspace, home) ?? workspace);
+
   for (const raw of candidates) {
-    const target = resolveArg(raw, workspace, home);
+    const target = resolveArg(raw, base, home);
     if (target === null) continue;
     /*
      * A glob is not resolved here — `rm -rf *` inside the workspace removes its

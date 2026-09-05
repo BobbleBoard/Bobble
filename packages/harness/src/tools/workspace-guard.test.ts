@@ -47,6 +47,15 @@ describe('wouldDestroyWorkspace — what it refuses', () => {
     expect(guard('rm -rf ..')).not.toBeNull();
   });
 
+  it('honours a leading cd, so `cd elsewhere && rm -rf .` is left alone', () => {
+    // The dot is /tmp/scratch there, not the workspace. Refusing it would argue
+    // about a directory the command never mentioned.
+    expect(guard('cd /tmp/scratch && rm -rf .')).toBeNull();
+    expect(guard('cd /tmp/scratch; rm -rf build')).toBeNull();
+    // …and a cd back into the workspace still gets caught.
+    expect(guard('cd /tmp/project && rm -rf .')).not.toBeNull();
+  });
+
   it('refuses MOVING the workspace away — that is deleting it slowly', () => {
     expect(guard('mv /tmp/project /tmp/old')).not.toBeNull();
   });
