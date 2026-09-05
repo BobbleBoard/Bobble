@@ -90,17 +90,44 @@ try {
   await page.waitForSelector('[data-testid="composer-input"]', { timeout: 8000 });
 
   // ── A. SIDEBAR ───────────────────────────────────────────────────────────
-  // A1. collapse toggle is LEFT of the search, on the same row.
+  /*
+   * A1. The toggle is ABOVE the search, in the chrome strip — not beside it.
+   *
+   * This asserted they share a row, with the toggle to the search's left. The
+   * toggle moved OUT of the sidebar entirely: it sits in the shell beside the
+   * macOS traffic lights (ChatApp's `sidebar-toggle-zone`, fixed to
+   * CHROME_LEFT / TOP_BAR_HEIGHT) precisely so it survives the sidebar
+   * unmounting when closed. The search stayed inside the panel, under the
+   * wordmark. They cannot share a row and are not meant to.
+   *
+   * MEASURED before this: `search left=-222` — the panel parked off-screen,
+   * because the old assertion never established that the sidebar was open
+   * before measuring anything inside it.
+   */
+  /* Wait for the PANEL to be on screen, not just for the slot to be wide: the
+     slot's width and the panel's transform animate on the same frame, so a wide
+     slot can still hold a panel parked off the left edge (measured: slot > 100
+     while the search sat at x = -205). */
+  await page.waitForFunction(
+    () => {
+      const el = document.querySelector('[data-testid="sidebar-search"]');
+      return el !== null && el.getBoundingClientRect().x >= 0;
+    },
+    { timeout: 8000 },
+  );
   const collapseBox = await page.locator('[data-testid="collapse-sidebar"]').boundingBox();
   const searchBox = await page.locator('[data-testid="sidebar-search"]').boundingBox();
   assert(collapseBox !== null && searchBox !== null, 'collapse toggle / search missing');
   assert(
-    collapseBox.x + collapseBox.width <= searchBox.x + 8,
-    `collapse toggle should sit LEFT of the search (collapse right=${Math.round(
-      collapseBox.x + collapseBox.width,
-    )}, search left=${Math.round(searchBox.x)})`,
+    searchBox.x >= 0,
+    `the search should be on screen with the sidebar open (left=${Math.round(searchBox.x)})`,
   );
-  assert(Math.abs(collapseBox.y - searchBox.y) < 30, 'collapse toggle + search should share a row');
+  assert(
+    collapseBox.y + collapseBox.height <= searchBox.y + 8,
+    `the toggle sits in the chrome strip ABOVE the search (toggle bottom=${Math.round(
+      collapseBox.y + collapseBox.height,
+    )}, search top=${Math.round(searchBox.y)})`,
+  );
 
   // A2. the search is a CollapsibleSearch: a glass, then click-to-expand → input.
   assert(
