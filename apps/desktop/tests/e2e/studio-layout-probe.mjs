@@ -26,10 +26,24 @@ const rect = (sel) =>
     return { x: b.x, y: b.y, w: b.width, h: b.height };
   }, sel);
 
+/*
+ * POWER MODE FIRST, because half the comparison only exists there.
+ *
+ * `AdvancedParamsButton` returns null unless userMode is 'power', and a fresh
+ * profile is 'user' — so on any clean run the chat's gears button was simply
+ * absent and this probe compared the studio's gears against `undefined`,
+ * failing three times with a message about a position. Found while checking a
+ * different change: it had nothing to do with the studios and everything to do
+ * with which mode the probe's own profile was in.
+ */
+await page.evaluate(() => window.__settings_store?.().getState?.().update?.({ userMode: 'power' }));
+await page.waitForTimeout(400);
+
 // Where the chat's own two top-bar buttons sit, so the studio's can be compared
 // against them rather than against a hard-coded pixel.
 const canvasBtn = await rect('[data-testid="canvas-toggle"]');
 const gearsBtn = await rect('[data-testid="advanced-params-toggle"]');
+check(gearsBtn !== null, 'the chat has no advanced-params button even in power mode');
 const sidebarBefore = await rect('.pd-sidebar-slot');
 check(sidebarBefore !== null && sidebarBefore.w > 100, 'the sidebar should start open');
 
@@ -82,7 +96,7 @@ for (const modality of ['image', 'video', 'audio']) {
   );
   check(
     advancedToggle !== null && gearsBtn !== null && Math.abs(advancedToggle.x - gearsBtn.x) < 2,
-    `[${modality}] the gears button is not where the advanced-params button was`,
+    `[${modality}] the gears button is not where the advanced-params button was (studio x=${advancedToggle?.x}, chat x=${gearsBtn?.x})`,
   );
 
   // --- the rail TAKES width, it does not cover ----------------------------

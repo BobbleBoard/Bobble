@@ -386,6 +386,22 @@ try {
   const readyDeadline = Date.now() + 180_000;
   let modelReady = false;
   let lastPhase = 'unknown';
+  let lastError;
+  /*
+   * A SINGLE `error` READING IS NOT A DEAD MODEL.
+   *
+   * This used to `break` on the first one, and MEASURED that killed three runs
+   * in a row: pinning the model writes settings, the settings write restarts
+   * the server, and a poll landing in that window reads `error` for a second or
+   * two before `starting` and then `ready`. The exact same profile, model and
+   * env reached ready in 3s when nothing bailed early.
+   *
+   * The 180s budget was already allocated for exactly this. So an error is
+   * remembered, not obeyed — it only ends the wait if it is still the answer
+   * several reads later, which is what a genuinely failed load looks like.
+   */
+  let errorStreak = 0;
+  const ERROR_STREAK_LIMIT = 8; // ~16s of nothing but `error`
   while (Date.now() < readyDeadline) {
     const st = await page
       .evaluate(() => window.piDesktop.invoke('llm:get-status', undefined))
@@ -396,12 +412,19 @@ try {
         modelReady = true;
         break;
       }
-      if (st.phase === 'error') break;
+      if (st.phase === 'error') {
+        errorStreak += 1;
+        lastError = st.error ?? st.lastError;
+        if (errorStreak >= ERROR_STREAK_LIMIT) break;
+      } else {
+        errorStreak = 0;
+      }
     }
     await page.waitForTimeout(2000);
   }
   if (!modelReady) {
     console.error(`corp-headed-run: the model never reached "ready" (phase: ${lastPhase}) —`);
+    if (lastError !== undefined) console.error(`  the engine said: ${lastError}`);
     console.error('refusing to send, because a prompt into a loading model just yields');
     console.error('"fetch failed" and proves nothing.');
     await app.close().catch(() => {});
