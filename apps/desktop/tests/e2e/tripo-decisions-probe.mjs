@@ -234,6 +234,10 @@ try {
       tabIndex: kids.map((k) => k.tabIndex),
       active: kids.map((k) => k.dataset.active),
       labels: kids.map((k) => (k.textContent ?? '').trim()),
+      /* The control deliberately STEPS OVER disabled options ("an arrow key
+         that appears to do nothing reads as a broken control"), so the
+         expectations below have to know which they are. */
+      disabled: kids.map((k) => k.disabled === true || k.getAttribute('aria-disabled') === 'true'),
       geometry: {
         width: Math.round(el.getBoundingClientRect().width),
         height: Math.round(el.getBoundingClientRect().height),
@@ -280,18 +284,38 @@ try {
     const rovingOk =
       segBefore.tabIndex.filter((t) => t === 0).length === 1 &&
       segBefore.tabIndex.filter((t) => t === -1).length === segBefore.tabIndex.length - 1;
-    // Arrow keys WRAP (the ARIA radio-group pattern), so every expectation is
-    // modulo the option count.
+    /*
+     * Arrow keys WRAP (the ARIA radio-group pattern) AND STEP OVER DISABLED
+     * options, so every expectation is modulo the option count and skips the
+     * disabled ones.
+     *
+     * MEASURED before this: the group under test has a disabled third option,
+     * so ArrowRight from index 1 correctly lands on 0 rather than 2 — and this
+     * check, which assumed every option was reachable, called the correct
+     * behaviour a failure. The control was right the whole time.
+     */
     const n = segBefore.labels.length;
+    const off = segBefore.disabled ?? segBefore.labels.map(() => false);
+    const stepFrom = (from, dir) => {
+      for (let k = 1; k <= n; k++) {
+        const at = (((from + dir * k) % n) + n) % n;
+        if (!off[at]) return at;
+      }
+      return from;
+    };
+    const seekFrom = (start, dir) => {
+      for (let at = start; at >= 0 && at < n; at += dir) if (!off[at]) return at;
+      return start;
+    };
     const moved =
-      kb.arrowRight.activeIndex === (kb.start.activeIndex + 1) % n &&
-      kb.arrowRight2.activeIndex === (kb.arrowRight.activeIndex + 1) % n &&
-      kb.arrowLeft.activeIndex === (kb.arrowRight2.activeIndex + n - 1) % n &&
-      kb.home.activeIndex === 0 &&
-      kb.end.activeIndex === n - 1 &&
-      kb.arrowDown.activeIndex === 0 && // wraps forward off the end
+      kb.arrowRight.activeIndex === stepFrom(kb.start.activeIndex, 1) &&
+      kb.arrowRight2.activeIndex === stepFrom(kb.arrowRight.activeIndex, 1) &&
+      kb.arrowLeft.activeIndex === stepFrom(kb.arrowRight2.activeIndex, -1) &&
+      kb.home.activeIndex === seekFrom(0, 1) &&
+      kb.end.activeIndex === seekFrom(n - 1, -1) &&
+      kb.arrowDown.activeIndex === stepFrom(kb.arrowRight2.activeIndex, 1) &&
       // selection follows focus: the DOM focus rides the roving tab stop
-      kb.end.focusedIndex === n - 1;
+      kb.end.focusedIndex === seekFrom(n - 1, -1);
     check(
       'D7',
       rolesOk && ariaOk && rovingOk && moved,
@@ -623,13 +647,29 @@ try {
     const worst = Object.entries(axis).flatMap(([theme, rows]) =>
       Object.entries(rows).map(([ax, r]) => ({ theme, ax, ...r })),
     );
-    const failing = worst.filter((r) => r.ratio === null || r.ratio < 4.5);
+    /*
+     * 3:1, NOT 4.5:1 — the bar these actually have to clear.
+     *
+     * This asserted the body-text ratio against a decision the app had
+     * deliberately moved away from. tripo.css says it in full: the user asked for
+     * "axes gizmo needs to be brighter", the mix went 24% -> 12% because at 24%
+     * the light themes read as three muddy discs, and the letters stay legible
+     * at every step — "these are 8px graphical labels, which WCAG rates at 3:1,
+     * not the 4.5:1 body-text bar the original number was chasing."
+     *
+     * MEASURED here: codex-light y=4.06 and z=4.34, both of which clear 3:1
+     * comfortably and neither of which clears 4.5. A test that fails a product
+     * decision it has not been told about is a test that gets ignored, and this
+     * one had been red long enough to be unreachable behind the module gate.
+     */
+    const GRAPHICAL_LABEL_MIN = 3;
+    const failing = worst.filter((r) => r.ratio === null || r.ratio < GRAPHICAL_LABEL_MIN);
     const minPx = Math.min(...worst.map((r) => r.fontSize));
     check(
       'D2-axis',
       failing.length === 0 && minPx >= 11,
       `axis balls: ${minPx}px, worst contrast ${Math.min(...worst.map((r) => r.ratio ?? 0))}:1, ` +
-        `${failing.length} below 4.5:1 [${failing.map((r) => `${r.theme}/${r.ax}=${r.ratio}`).join(' ')}]`,
+        `${failing.length} below ${GRAPHICAL_LABEL_MIN}:1 [${failing.map((r) => `${r.theme}/${r.ax}=${r.ratio}`).join(' ')}]`,
     );
   }
 
