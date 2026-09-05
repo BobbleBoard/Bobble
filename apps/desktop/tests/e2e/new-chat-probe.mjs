@@ -55,7 +55,11 @@ const app = await electron.launch({
 
 try {
   const page = await app.firstWindow();
-  await page.waitForSelector('text=Bobble');
+  /* NOT `text=Bobble`: it matches the brand mark, the profile row AND
+     <title>Bobble</title>, and Playwright takes the first — a <title> is never
+     "visible", so this waited its full timeout against a healthy app. The
+     composer is what "the app is up" means. */
+  await page.waitForSelector('.pd-composer-editor', { timeout: 30_000 });
   await page.waitForFunction(() => typeof window.__pi_store === 'function', { timeout: 8000 });
 
   // The chat UI auto-starts pi on mount; grab the live pid.
@@ -147,19 +151,48 @@ try {
     `intentional restart surfaced ${afterRestart.errors} error toast(s)`,
   );
 
-  // Contrast: the SAME dispose WITHOUT the flag still toasts, proving a genuine
-  // crash is unaffected by the suppression.
+  /*
+   * CONTRAST: an unflagged exit that INTERRUPTED SOMETHING still raises it.
+   *
+   * This used to assert that any unflagged exit set `bridgeExited`, and that
+   * stopped being true on purpose — the user, on the "The assistant restarted"
+   * toast: "it just shouldn't show up as a notification at all… it's just
+   * always happening a single time on app startup." An idle dispose costs the
+   * user nothing and pi is back before anything is asked of it. The notice is
+   * now reserved for an exit that took a reply with it (see bridgeExit in
+   * pi-slice: `interrupted = isStreaming || promptInFlight`).
+   *
+   * So the contrast worth drawing is between suppressed-and-idle and
+   * raised-because-a-turn-was-in-flight, which is what this now does.
+   */
   await page.evaluate(() =>
-    window
-      .__pi_store()
-      .setState({ bridgeExited: null, notifications: [], intentionalRestart: false }),
+    window.__pi_store().setState({
+      bridgeExited: null,
+      notifications: [],
+      intentionalRestart: false,
+      promptInFlight: true,
+    }),
   );
   await page.evaluate(() => window.piDesktop.invoke('pi:restart', {}));
   await page.waitForFunction(() => window.__pi_store().getState().bridgeExited !== null, {
     timeout: 8000,
   });
+
+  // …and the same exit with nothing in flight stays quiet.
+  await page.evaluate(() =>
+    window.__pi_store().setState({
+      bridgeExited: null,
+      notifications: [],
+      intentionalRestart: false,
+      promptInFlight: false,
+    }),
+  );
+  await page.evaluate(() => window.piDesktop.invoke('pi:restart', {}));
+  await page.waitForTimeout(2500);
+  const quiet = await page.evaluate(() => window.__pi_store().getState().bridgeExited);
+  assert(quiet === null, `an idle restart raised a crash notice: ${JSON.stringify(quiet)}`);
   console.log(
-    'new-chat-probe: intentional restart suppressed the crash toast; an unflagged exit still shows it — OK',
+    'new-chat-probe: intentional restart suppressed the toast; an exit MID-TURN still shows it; an idle one does not — OK',
   );
 
   console.log('new-chat-probe OK');

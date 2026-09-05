@@ -48,7 +48,11 @@ const app = await electron.launch({
 
 try {
   const page = await app.firstWindow();
-  await page.waitForSelector('text=Bobble');
+  /* NOT `text=Bobble`: it matches the brand mark, the profile row AND
+     <title>Bobble</title>, and Playwright takes the first — a <title> is never
+     "visible", so this waited its full timeout against a healthy app. The
+     composer is what "the app is up" means. */
+  await page.waitForSelector('.pd-composer-editor', { timeout: 30_000 });
 
   // The pi-connect module installed the store hook at renderer boot.
   await page.waitForFunction(() => typeof window.__pi_store === 'function', { timeout: 5000 });
