@@ -114,11 +114,38 @@ try {
 
   await page.waitForSelector('[data-testid="queued-message"]', { timeout: 8000 });
   await page.waitForSelector('[data-testid="why-queued-link"]', { timeout: 8000 });
+  /*
+   * THE REASON LIVES IN THE MODAL, NOT ON THE ROW.
+   *
+   * This asserted the queued BUBBLE carried "switch to <model>". The design
+   * moved: the row shows the message you typed, faded, and the explanation is
+   * behind "Why isn't my message sending?" — which is the whole reason that
+   * link exists. Asserting it on the row tested a sentence that was
+   * deliberately taken off the row.
+   *
+   * So: the row still shows YOUR TEXT (it is your message), and the modal names
+   * both models and what will happen.
+   */
   const reasonLine = await page.textContent('[data-testid="queued-message"]');
   assert(
-    reasonLine?.includes('switch to Gemma 4 31B'),
-    `queued reason line should name the switch target; got: ${reasonLine}`,
+    reasonLine?.includes('analyse this in depth'),
+    `the queued row should show the message you typed; got: ${reasonLine}`,
   );
+  await page.click('[data-testid="why-queued-link"]');
+  await page.waitForSelector('[data-testid="why-queued-modal"]', { timeout: 8000 });
+  const blurb = await page.textContent('[data-testid="why-queued-modal"]');
+  assert(
+    blurb?.includes('Gemma 4 31B') && blurb?.includes('Gemma 4 12B'),
+    `the modal should name the model you asked for AND the one that is loaded; got: ${blurb?.slice(0, 200)}`,
+  );
+  assert(
+    /swap|one model at a time/i.test(blurb ?? ''),
+    `the modal should say WHY it has to wait; got: ${blurb?.slice(0, 200)}`,
+  );
+  await page.keyboard.press('Escape');
+  await page
+    .waitForSelector('[data-testid="why-queued-modal"]', { state: 'detached', timeout: 5000 })
+    .catch(() => undefined);
   // Composer shows Pause LEFT of Stop while busy.
   await page.waitForSelector('[data-testid="composer-pause"]', { timeout: 8000 });
   await page.waitForSelector('[data-testid="composer-stop"]', { timeout: 8000 });
@@ -175,10 +202,13 @@ try {
       ],
     });
   });
+  /* Same as above: the ROW carries the message, the MODAL carries the reason.
+     This waited for the sequential-wait sentence on the bubble, where it has
+     not been since the explainer moved behind the link. */
   await page.waitForFunction(
     () => {
       const el = document.querySelector('[data-testid="queued-message"]');
-      return el?.textContent.includes('sends when the current reply finishes');
+      return el?.textContent.includes('what colour are they usually');
     },
     { timeout: 8000 },
   );
