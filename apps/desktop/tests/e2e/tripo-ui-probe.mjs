@@ -94,6 +94,29 @@ try {
   page = await app.firstWindow();
   await page.setViewportSize({ width: 1600, height: 1000 });
   await page.waitForSelector('[data-testid="tp-root"]', { timeout: 15000 });
+
+  /*
+   * LIFT THE MODULE GATE BEFORE TOUCHING THE WORKSPACE.
+   *
+   * The gate covers the room and swallows pointer events while the Python
+   * sidecar boots (`status: 'checking'`), which is a few seconds on an idle
+   * machine and much longer on a busy one — so this probe passed or failed
+   * depending on what else was running. MEASURED under load: every click was
+   * "intercepted by <div class=tp-gate data-status=checking>" until the 30s
+   * timeout.
+   *
+   * "View" is the gate's own escape and is offered in every state including
+   * checking — the user: not "gatekeeping the UI from being seen". Pressing it is
+   * both what a person does and what makes this probe about the UI rather than
+   * about sidecar startup time.
+   */
+  const gate = await page.$('[data-testid="tp-gate-view"]');
+  if (gate !== null) {
+    await gate.click();
+    await page
+      .waitForSelector('[data-testid="tp-module-gate"]', { state: 'hidden', timeout: 8000 })
+      .catch(() => undefined);
+  }
   await setTheme('bobble', 'dark');
 
   // ── clean chrome + empty viewport (no placeholder model) ────────────────
@@ -233,7 +256,20 @@ try {
   // engines, by tripo-e2e-pipeline-probe.mjs.
   await page.click('[data-testid="tp-rail-animate"]');
   const animText = await page.textContent('[data-testid="tp-panel-animate"]');
-  assert(animText.includes('SkinTokens'), 'animate panel names its rig engine');
+  /*
+   * NAMES *A* RIG ENGINE, not one particular one.
+   *
+   * This asserted "SkinTokens" verbatim, and the panel deliberately stopped
+   * leading with it: non-humanoids are now rigged from their own medial axis
+   * FIRST, and SkinTokens is offered afterwards as an alternative — the user asked
+   * for medial-first rather than sending people to a 2.5 GB download before
+   * anything has been tried. So the claim worth keeping is that the panel says
+   * WHAT WILL RIG THE MODEL, whichever engine that currently is.
+   */
+  assert(
+    animText.includes('Medial axis') || animText.includes('SkinTokens'),
+    `animate panel names its rig engine (said: ${animText.slice(0, 160)})`,
+  );
   assert(
     (await page.locator('[data-testid="tp-anim-grid"]').count()) === 0,
     'no motion library before the model is rigged',
