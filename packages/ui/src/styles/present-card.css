@@ -16,7 +16,7 @@
   padding: 10px 12px;
   border: 1px solid var(--pd-border-subtle);
   border-radius: var(--pd-radius-lg);
-  background: var(--pd-surface-raised);
+  background: var(--pd-bg-raised);
   transition:
     border-color var(--pd-duration-base) var(--pd-easing-standard),
     background-color var(--pd-duration-base) var(--pd-easing-standard);
@@ -58,7 +58,7 @@
   height: 44px;
   border: 1px solid var(--pd-border-subtle);
   border-radius: var(--pd-radius-md);
-  background: var(--pd-surface-hover);
+  background: var(--pd-bg-hover);
   color: var(--pd-text-secondary);
   overflow: hidden;
 }
@@ -159,12 +159,12 @@
  * with three secondary buttons, so there is nothing to look at first". */
 .pd-present-action--primary {
   border-color: transparent;
-  background: var(--pd-accent);
-  color: var(--pd-accent-contrast);
+  background: var(--pd-accent-primary);
+  color: var(--pd-text-on-accent);
   font-weight: 550;
 }
 
 .pd-present-action--primary:hover {
-  background: var(--pd-accent-hover, var(--pd-accent));
+  background: var(--pd-accent-hover);
   filter: brightness(1.05);
 }

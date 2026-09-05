@@ -17,7 +17,7 @@
  * token for every flavour, so a name absent from it resolves to nothing at
  * runtime no matter which theme is on.
  */
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
@@ -30,10 +30,47 @@ const themesCss = strip(
   readFileSync(path.resolve(here, '../../../../packages/themes/src/generated/themes.css'), 'utf8'),
 );
 
-/** Names DEFINED anywhere: the generated themes, plus any the app declares
- *  itself (a local `--pd-x: …` is a real definition too). */
+/** Every stylesheet the app ships, found rather than listed. */
+function allSheets(): string[] {
+  const roots = [
+    path.resolve(here, '..'), // apps/desktop/src
+    path.resolve(here, '../../../../packages/ui/src'),
+  ];
+  const out: string[] = [];
+  const walk = (dir: string): void => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        if (entry.name !== 'node_modules' && entry.name !== 'dist') walk(full);
+      } else if (entry.name.endsWith('.css')) {
+        out.push(full);
+      }
+    }
+  };
+  for (const r of roots) {
+    try {
+      walk(r);
+    } catch {
+      // A root that has moved is not this test's business.
+    }
+  }
+  return out;
+}
+
+const sheets = allSheets();
+
+/**
+ * Names DEFINED anywhere: the generated themes, plus any a stylesheet declares
+ * for itself.
+ *
+ * A local `--pd-diff-surface: var(--pd-bg-raised)` is a real definition, and a
+ * property a component sets on itself (a knob radius, a scale a script writes)
+ * is too. Collecting only from themes.css and global.css reported eleven of
+ * those as missing — a rule that cries wolf about correct code gets switched
+ * off, which would take the four genuine ones with it.
+ */
 const defined = new Set<string>();
-for (const source of [themesCss, globalCss]) {
+for (const source of [themesCss, globalCss, ...sheets.map((f) => strip(readFileSync(f, 'utf8')))]) {
   for (const m of source.matchAll(/(--pd-[a-z0-9-]+)\s*:/g)) defined.add(m[1] as string);
 }
 
@@ -73,21 +110,11 @@ describe('theme token hygiene', () => {
     expect(missing).toEqual([]);
   });
 
-  it('every --pd-* used in the component stylesheets is defined', () => {
-    // The studio and 3D workspace keep their own sheets; the same trap applies,
-    // and tripo.css in particular states that EVERY colour must resolve from a
-    // pd token — a name that resolves to nothing satisfies the letter of that
-    // and none of the intent.
-    const others = ['../tripo/tripo.css', '../chat/effort-slider.css'];
+  it('every --pd-* used in EVERY stylesheet is defined', () => {
+    expect(sheets.length, 'found no stylesheets to check').toBeGreaterThan(5);
     const missing: string[] = [];
-    for (const rel of others) {
-      const file = path.resolve(here, rel);
-      let text: string;
-      try {
-        text = strip(readFileSync(file, 'utf8'));
-      } catch {
-        continue; // a sheet that has been removed is not a failure
-      }
+    for (const file of sheets) {
+      const text = strip(readFileSync(file, 'utf8'));
       for (const [name, line] of usages(text)) {
         if (!defined.has(name)) missing.push(`${name} (${path.basename(file)}:${line})`);
       }
