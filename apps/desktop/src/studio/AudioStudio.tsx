@@ -47,7 +47,7 @@ import {
 import { useStudioUiStore } from './studio-ui-store';
 import { useEnhancer } from './use-enhancer';
 import { useStudioInput } from './use-handoff';
-import { useStudio } from './use-studio';
+import { studioBlockedReason, useStudio } from './use-studio';
 
 type Mode = 'speech' | 'music' | 'sfx';
 
@@ -146,10 +146,7 @@ export function AudioStudio(): JSX.Element {
    * download-then-continue prompts for a missing weights pack, fetches it, and
    * carries on into the same job.
    */
-  const blocked =
-    models.length === 0
-      ? `No ${mode === 'speech' ? 'speech' : 'sound'} models are available.`
-      : undefined;
+  const blocked = studioBlockedReason(models, mode === 'speech' ? 'speech' : 'sound');
 
   const enhancer = useEnhancer(useCallback((next: string) => setPrompt(next), []));
 

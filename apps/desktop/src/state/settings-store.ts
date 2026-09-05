@@ -40,7 +40,21 @@ const DEFAULTS: DesktopSettings = {
   mcpMode: 'lite',
   toolInterface: 'schemas',
   powerMode: 'auto',
-  capabilities: { image: false, video: false, audio: false, threeD: false },
+  /*
+   * ON BY DEFAULT — and they now MEAN something.
+   *
+   * Found in the round-2 settings stress run: these four were written by the
+   * Capabilities panel AND by a whole onboarding step, persisted to disk, and
+   * read by precisely nobody. Unticking "Video generation" during onboarding
+   * left the Video room in the sidebar, still offering to download models,
+   * still generating. Four checkboxes and a setup screen that did nothing.
+   *
+   * They gate the rooms now (see SessionSidebar). Default true rather than the
+   * old false, because the old value was never read: keeping it would take the
+   * four studios away from everyone who has not been through onboarding, which
+   * is a very loud way to fix a silent bug.
+   */
+  capabilities: { image: true, video: true, audio: true, threeD: true },
   customInstructions: '',
   iconStroke: ICON_STROKE_DEFAULT,
   sidebarScale: 1.0,

@@ -21,6 +21,47 @@ import type { MediaKind, ThreadMediaItem } from '../chat/thread-media';
 import { useGenStore } from '../state/gen-store';
 import { type StudioModality, useStudioRuns } from '../state/studio-runs';
 
+/**
+ * A ROOM IS BLOCKED WHEN NOTHING IN IT CAN ACTUALLY RUN.
+ *
+ * All three studios asked `models.length === 0`, which is a different question:
+ * a catalogue entry marked `reserved` is enumerated and gated — "backend lands
+ * in a later phase" — so it counts towards that length while being unable to
+ * produce anything.
+ *
+ * MEASURED in the round-2 settings run: EVERY video model is reserved today,
+ * so the Video studio drew a live Generate button, three starters and a model
+ * picker reading "Recommended", with nothing anywhere on screen saying that
+ * video cannot run on this machine yet. the user, about the image room in the same
+ * state: it "isn't user-friendly to get working in a few clicks even when
+ * something has gone wrong".
+ *
+ * Shared so the three rooms cannot drift on the answer.
+ */
+export function runnableModels<T extends { readonly reserved?: boolean }>(
+  models: readonly T[],
+): readonly T[] {
+  return models.filter((m) => m.reserved !== true);
+}
+
+/**
+ * Why this room cannot run, or undefined when it can.
+ *
+ * Two different pieces of news, deliberately worded differently: nothing is
+ * catalogued at all (something is wrong, or the engine has not answered), or
+ * everything catalogued is still to come (nothing is wrong; it is not built).
+ */
+export function studioBlockedReason(
+  models: readonly { readonly reserved?: boolean }[],
+  what: string,
+): string | undefined {
+  if (models.length === 0) return `No ${what} models are available.`;
+  if (runnableModels(models).length === 0) {
+    return `${what[0]?.toUpperCase() ?? ''}${what.slice(1)} generation is not available on this machine yet — every model listed is still to come.`;
+  }
+  return undefined;
+}
+
 export interface StudioRun {
   readonly prompt: string;
   readonly items: readonly ThreadMediaItem[];

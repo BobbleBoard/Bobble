@@ -29,7 +29,17 @@ describe('clampSettings', () => {
     expect(s.effort).toBe('max');
     expect(s.search).toEqual({ brave: 'abc', tavily: '' }); // non-string rejected
     expect(s.mcpMode).toBe('native');
-    expect(s.capabilities).toEqual({ image: true, video: false, audio: false, threeD: false });
+    // Per-field fallback: `video: 'yes'` is not a boolean, so it takes the
+    // DEFAULT rather than poisoning the object. Stated against DEFAULT_SETTINGS
+    // rather than against literals — the defaults moved (all four are on now
+    // that something finally reads them) and a literal made this test assert
+    // the old value rather than the rule.
+    expect(s.capabilities).toEqual({
+      image: true,
+      video: DEFAULT_SETTINGS.capabilities.video,
+      audio: DEFAULT_SETTINGS.capabilities.audio,
+      threeD: DEFAULT_SETTINGS.capabilities.threeD,
+    });
   });
 
   it('always stamps version 1', () => {

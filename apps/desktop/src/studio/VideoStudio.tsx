@@ -36,7 +36,7 @@ import {
 import { useStudioUiStore } from './studio-ui-store';
 import { useEnhancer } from './use-enhancer';
 import { useStudioInput } from './use-handoff';
-import { useStudio } from './use-studio';
+import { studioBlockedReason, useStudio } from './use-studio';
 
 /**
  * SHAPE × SIZE, written out for the same reason as the image studio: computing
@@ -90,6 +90,7 @@ export function VideoStudio(): JSX.Element {
   const catalog = useGenStore((s) => s.catalog);
   const { busy, error, runs, job, run, cancel } = useStudio('video');
   const models = useMemo(() => catalog.filter((m) => m.modality === 'video'), [catalog]);
+  const blocked = studioBlockedReason(models, 'video');
   const size = (SHAPES.find((x) => x.value === shape) ?? SHAPES[0]).of(long);
   const enhancer = useEnhancer(useCallback((next: string) => setPrompt(next), []));
   /* Media handed to this room — from a card in the transcript, or dropped on
@@ -165,7 +166,7 @@ export function VideoStudio(): JSX.Element {
       onRun={() => void onRun()}
       busy={busy || enhancer.enhancing}
       runLabel={enhancer.enhancing ? 'Enhancing…' : 'Generate'}
-      {...(models.length === 0 ? { blocked: 'No video models are available.' } : {})}
+      {...(blocked !== undefined ? { blocked } : {})}
       error={error}
       onRetry={() => void onRun()}
       {...(handoff.card !== undefined ? { input: handoff.card } : {})}

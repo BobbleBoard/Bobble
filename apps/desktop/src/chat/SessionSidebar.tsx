@@ -506,6 +506,25 @@ export function SessionSidebar({
   // The "Modalities" dropdown — full-window studios reached from the sidebar.
   const setModalityView = useModalityStore((s) => s.setView);
   const [modalitiesOpen, setModalitiesOpen] = useState(true);
+  /* Which rooms this person wants at all — the Capabilities setting, which the
+     onboarding step also writes. See the rows below for why it is read here. */
+  const caps = useSettingsStore((s) => s.settings.capabilities);
+  /*
+   * TURNING A ROOM OFF WHILE STANDING IN IT PUTS YOU BACK IN THE CHAT.
+   *
+   * Otherwise the studio stays mounted with no way back to it and no row in the
+   * sidebar — a screen you cannot leave and cannot return to, which is a worse
+   * state than the one the setting was trying to create.
+   */
+  const modalityView = useModalityStore((s) => s.view);
+  useEffect(() => {
+    const off =
+      (modalityView === 'image' && !caps.image) ||
+      (modalityView === 'video' && !caps.video) ||
+      (modalityView === 'audio' && !caps.audio) ||
+      (modalityView === '3d' && !caps.threeD);
+    if (off) setModalityView('chat');
+  }, [modalityView, caps, setModalityView]);
   /* Whether the 3D module is on disk, so the row can say so before you click.
      `gen3d:module` is a DISK-ONLY check — asking the full catalog here would
      spawn the uv/Python sidecar for a user who may never open the studio. */
@@ -1355,35 +1374,44 @@ export function SessionSidebar({
           {modalitiesOpen ? (
             <div className="pd-child-rows" data-testid="modality-rows">
               {/*
-               * NOT DISABLED — dimmed. the user wants the studio openable without the
-               * module so its UI can be looked at (the workspace itself carries
-               * the download/View gate); the row only has to SAY that it is not
-               * installed, and how big it is, before you click.
+               * THE CAPABILITIES SETTING DECIDES WHICH ROOMS EXIST.
+               *
+               * Distinct from the module/engine gate below it, and the two are
+               * often confused: "not installed" is a fact about this machine
+               * that the room itself explains and offers to fix, while this is
+               * a CHOICE — someone said in onboarding or in Settings that they
+               * do not want video, and a Video row is then just clutter.
+               *
+               * Found in the round-2 settings stress run: those four checkboxes
+               * were persisted and read by nobody, so unticking one changed
+               * nothing anywhere in the app. See the default in settings-store.
                */}
-              <button
-                type="button"
-                className="pd-child-row pd-focusable"
-                data-testid="modality-3d"
-                data-installed={module3d.installed}
-                title={
-                  module3d.installed
-                    ? '3D Studio'
-                    : `3D Studio · module not installed${
-                        moduleSize === '' ? '' : ` (${moduleSize})`
-                      }`
-                }
-                onClick={() => setModalityView('3d')}
-              >
-                <span className="pd-child-row-icon">
-                  <ModalityCube size={15} />
-                </span>
-                <span className="pd-child-row-label">3D Studio</span>
-                {!module3d.installed && moduleSize !== '' ? (
-                  <span className="pd-child-row-meta" data-testid="modality-3d-size">
-                    {moduleSize}
+              {caps.threeD ? (
+                <button
+                  type="button"
+                  className="pd-child-row pd-focusable"
+                  data-testid="modality-3d"
+                  data-installed={module3d.installed}
+                  title={
+                    module3d.installed
+                      ? '3D Studio'
+                      : `3D Studio · module not installed${
+                          moduleSize === '' ? '' : ` (${moduleSize})`
+                        }`
+                  }
+                  onClick={() => setModalityView('3d')}
+                >
+                  <span className="pd-child-row-icon">
+                    <ModalityCube size={15} />
                   </span>
-                ) : null}
-              </button>
+                  <span className="pd-child-row-label">3D Studio</span>
+                  {!module3d.installed && moduleSize !== '' ? (
+                    <span className="pd-child-row-meta" data-testid="modality-3d-size">
+                      {moduleSize}
+                    </span>
+                  ) : null}
+                </button>
+              ) : null}
               {/*
                * THE THREE STUDIOS. Openable whether or not their engine is
                * installed, for the same reason the 3D row is: the surface itself
@@ -1393,42 +1421,48 @@ export function SessionSidebar({
                * Each names what it MAKES. "Studio" sitting under "3D Studio"
                * read as one thing and its 3D variant rather than separate rooms.
                */}
-              <button
-                type="button"
-                className="pd-child-row pd-focusable"
-                data-testid="modality-image"
-                title="Image Studio"
-                onClick={() => setModalityView('image')}
-              >
-                <span className="pd-child-row-icon">
-                  <IconImage size={15} />
-                </span>
-                <span className="pd-child-row-label">Image</span>
-              </button>
-              <button
-                type="button"
-                className="pd-child-row pd-focusable"
-                data-testid="modality-video"
-                title="Video Studio"
-                onClick={() => setModalityView('video')}
-              >
-                <span className="pd-child-row-icon">
-                  <IconVideo size={15} />
-                </span>
-                <span className="pd-child-row-label">Video</span>
-              </button>
-              <button
-                type="button"
-                className="pd-child-row pd-focusable"
-                data-testid="modality-audio"
-                title="Audio Studio"
-                onClick={() => setModalityView('audio')}
-              >
-                <span className="pd-child-row-icon">
-                  <IconWaveform size={15} />
-                </span>
-                <span className="pd-child-row-label">Audio</span>
-              </button>
+              {caps.image ? (
+                <button
+                  type="button"
+                  className="pd-child-row pd-focusable"
+                  data-testid="modality-image"
+                  title="Image Studio"
+                  onClick={() => setModalityView('image')}
+                >
+                  <span className="pd-child-row-icon">
+                    <IconImage size={15} />
+                  </span>
+                  <span className="pd-child-row-label">Image</span>
+                </button>
+              ) : null}
+              {caps.video ? (
+                <button
+                  type="button"
+                  className="pd-child-row pd-focusable"
+                  data-testid="modality-video"
+                  title="Video Studio"
+                  onClick={() => setModalityView('video')}
+                >
+                  <span className="pd-child-row-icon">
+                    <IconVideo size={15} />
+                  </span>
+                  <span className="pd-child-row-label">Video</span>
+                </button>
+              ) : null}
+              {caps.audio ? (
+                <button
+                  type="button"
+                  className="pd-child-row pd-focusable"
+                  data-testid="modality-audio"
+                  title="Audio Studio"
+                  onClick={() => setModalityView('audio')}
+                >
+                  <span className="pd-child-row-icon">
+                    <IconWaveform size={15} />
+                  </span>
+                  <span className="pd-child-row-label">Audio</span>
+                </button>
+              ) : null}
             </div>
           ) : null}
         </div>

@@ -116,7 +116,7 @@ export const DEFAULT_SETTINGS: DesktopSettings = {
   mcpMode: 'lite',
   toolInterface: 'schemas',
   powerMode: 'auto',
-  capabilities: { image: false, video: false, audio: false, threeD: false },
+  capabilities: { image: true, video: true, audio: true, threeD: true },
   customInstructions: '',
   iconStroke: ICON_STROKE_DEFAULT,
   sidebarScale: UI_SCALE_DEFAULT,

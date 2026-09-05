@@ -40,7 +40,7 @@ import {
 import { useStudioUiStore } from './studio-ui-store';
 import { useEnhancer } from './use-enhancer';
 import { useStudioInput } from './use-handoff';
-import { useStudio } from './use-studio';
+import { studioBlockedReason, useStudio } from './use-studio';
 
 /**
  * SHAPE × SIZE — as explicit pairs, not arithmetic.
@@ -148,6 +148,7 @@ export function ImageStudio(): JSX.Element {
   const catalog = useGenStore((s) => s.catalog);
   const { busy, error, runs, job, run, cancel } = useStudio('image');
   const models = useMemo(() => catalog.filter((m) => m.modality === 'image'), [catalog]);
+  const blocked = studioBlockedReason(models, 'image');
   const size = (SHAPES.find((x) => x.value === shape) ?? SHAPES[0]).of(long);
   const enhancer = useEnhancer(useCallback((next: string) => setPrompt(next), []));
   /*
@@ -292,7 +293,7 @@ export function ImageStudio(): JSX.Element {
       onRun={() => void onRun()}
       busy={busy || enhancer.enhancing}
       runLabel={enhancer.enhancing ? 'Enhancing…' : handoff.input !== null ? 'Edit' : 'Generate'}
-      {...(models.length === 0 ? { blocked: 'No image models are available.' } : {})}
+      {...(blocked !== undefined ? { blocked } : {})}
       error={error}
       onRetry={() => void onRun()}
       {...(handoff.card !== undefined ? { input: handoff.card } : {})}

@@ -382,7 +382,26 @@ export function StudioShell({
         and this one on the right frame the work rather than stacking on it.
       */}
       {settings !== undefined ? (
-        <div className="pd-studio-rail" data-open={settingsOpen} data-testid="studio-settings">
+        <div
+          className="pd-studio-rail"
+          data-open={settingsOpen}
+          data-testid="studio-settings"
+          /*
+           * A CLOSED RAIL IS NOT JUST NARROW.
+           *
+           * It closes to `width: 0; overflow: hidden`, which clips it out of
+           * sight and leaves every control inside it focusable: tabbing through
+           * the studio walked into a panel nobody could see, and a screen
+           * reader read out knobs that were not on screen. `inert` takes the
+           * whole subtree out of the tab order and out of hit-testing without
+           * touching the width transition that animates it away.
+           *
+           * Found in the round-2 settings stress run, where a click on the
+           * model picker inside the closed rail was intercepted by the canvas
+           * covering it — the pointer half of the same bug.
+           */
+          inert={!settingsOpen}
+        >
           <div className="pd-studio-rail-inner">{settings}</div>
         </div>
       ) : null}
