@@ -60,58 +60,73 @@ try {
   const expandedSize = await iconSize(page, '[data-testid="new-chat"]');
   assert(expandedSize === '16', `expanded row icon should be 16px, got ${expandedSize}`);
 
-  // Collapse to the rail.
+  /*
+   * THE COLLAPSED RAIL IS GONE, AND THAT IS THE POINT.
+   *
+   * Everything below this line used to measure `.pd-sidebar[data-open="false"]`
+   * — a collapsed rail card with its own buttons — and that UI was removed
+   * deliberately. `data-open` now stays TRUE for as long as the panel is
+   * mounted (the SLOT owns open/closed), the panel LEAVES the tree once the
+   * slide finishes, and the collapse toggle moved out into the shell beside the
+   * traffic lights precisely so it survives the sidebar unmounting.
+   *
+   * So the probe asserts what replaced it, which is three real claims:
+   *   1. closing keeps the panel in the tree while it slides (the user: "instant
+   *      disappear and then slide left rather than the correct slide in");
+   *   2. once the slide is over the panel is GONE, so a closed sidebar keeps
+   *      no buttons in the tab order;
+   *   3. the toggle is still there to open it again.
+   */
+  const slotWidth = () =>
+    page.evaluate(() => {
+      const el = document.querySelector('.pd-sidebar-slot');
+      return el === null ? -1 : Math.round(el.getBoundingClientRect().width);
+    });
+  const panelPresent = () => page.evaluate(() => document.querySelector('.pd-sidebar') !== null);
+
+  assert((await slotWidth()) > 100, 'the sidebar should start open');
   await page.click('[data-testid="collapse-sidebar"]');
-  await page.waitForSelector('[data-testid="expand-sidebar"]', { timeout: 8000 });
-  // Let the width transition settle so measurements are stable.
+
+  // 1. Mid-slide: the slot is narrowing and the panel is still there.
+  let sawPanelWhileNarrowing = false;
+  for (let i = 0; i < 40; i++) {
+    const w = await slotWidth();
+    if (w < 100 && w > 2 && (await panelPresent())) sawPanelWhileNarrowing = true;
+    if (w <= 2) break;
+    await page.waitForTimeout(15);
+  }
+  assert(
+    sawPanelWhileNarrowing,
+    'the panel left the DOM before the slide finished — the "instant disappear" bug',
+  );
+
+  // 2. Settled: the slot is closed and the panel is out of the tree.
   await page.waitForFunction(
     () => {
       const el = document.querySelector('.pd-sidebar-slot');
-      const w = el ? el.getBoundingClientRect().width : 999;
-      return w > 40 && w < 130;
+      return el !== null && el.getBoundingClientRect().width <= 2;
     },
-    undefined,
-    { timeout: 4000 },
+    { timeout: 8000 },
   );
+  await page.waitForTimeout(400);
+  assert(!(await panelPresent()), 'a closed sidebar left its panel (and its tab stops) mounted');
 
-  // 0. The collapsed rail runs the FULL sidebar height (its TOP is inset by the
-  //    traffic-light strip and the profile button is pinned to the foot) — NOT a
-  //    short content-hugging card floating at the top of the window.
-  const { railH, winH } = await page.evaluate(() => {
-    const el = document.querySelector('.pd-sidebar[data-open="false"]');
-    return { railH: el ? el.getBoundingClientRect().height : 0, winH: window.innerHeight };
-  });
-  assert(railH > 0, 'collapsed rail panel (.pd-sidebar[data-open="false"]) not found');
-  assert(
-    railH > winH - 40,
-    `collapsed rail should run nearly the FULL window height, got ${Math.round(
-      railH,
-    )}px of a ${winH}px window`,
+  // 3. …and the toggle survived the panel it lives outside of.
+  await page.waitForSelector('[data-testid="expand-sidebar"]', { timeout: 8000 });
+  await page.click('[data-testid="expand-sidebar"]');
+  await page.waitForFunction(
+    () => {
+      const el = document.querySelector('.pd-sidebar-slot');
+      return el !== null && el.getBoundingClientRect().width > 100;
+    },
+    { timeout: 8000 },
   );
+  assert(await panelPresent(), 'reopening did not bring the sidebar back');
 
-  // 1. Every rail button wraps its glyph in the .pd-rail-btn-icon centering box.
-  const { total, wrapped } = await page.evaluate(() => {
-    const btns = Array.from(document.querySelectorAll('.pd-rail-btn'));
-    return {
-      total: btns.length,
-      wrapped: btns.filter((b) => b.querySelector(':scope > .pd-rail-btn-icon') !== null).length,
-    };
-  });
-  assert(total > 0, 'no .pd-rail-btn found in the collapsed rail');
-  assert(
-    wrapped === total,
-    `every rail button must wrap its glyph in .pd-rail-btn-icon (${wrapped}/${total})`,
+  console.log(
+    'round14-sidebar-rail-probe OK — 16px row icons; the panel stays mounted through the slide, ' +
+      'leaves the tree once it is closed, and the shell toggle reopens it',
   );
-
-  // 2. The rail glyph size equals the expanded row glyph size (16) — no GROW.
-  const railSize = await iconSize(page, '.pd-rail [data-testid="new-chat"] .pd-rail-btn-icon');
-  assert(railSize === '16', `collapsed rail icon should be 16px, got ${railSize}`);
-  assert(
-    railSize === expandedSize,
-    `rail icon (${railSize}) must equal the expanded row icon (${expandedSize}) — collapse must not resize`,
-  );
-
-  console.log('round14-sidebar-rail-probe: OK');
 } finally {
-  await app.close();
+  await app.close().catch(() => {});
 }

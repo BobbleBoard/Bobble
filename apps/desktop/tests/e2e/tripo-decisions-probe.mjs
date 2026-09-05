@@ -116,6 +116,18 @@ try {
   page = await app.firstWindow();
   await page.setViewportSize({ width: 1600, height: 1000 });
   await page.waitForSelector('[data-testid="tp-root"]', { timeout: 20000 });
+
+  /* Lift the module gate first: it covers the room and swallows pointer events
+     while the Python sidecar boots, so every click below was "intercepted by
+     <div class=tp-gate data-status=checking>" until the timeout. "View" is the
+     gate's own escape and is offered in every state. Same fix as tripo-ui-probe. */
+  const gateView = await page.$('[data-testid="tp-gate-view"]');
+  if (gateView !== null) {
+    await gateView.click();
+    await page
+      .waitForSelector('[data-testid="tp-module-gate"]', { state: 'hidden', timeout: 8000 })
+      .catch(() => undefined);
+  }
   await setTheme('bobble', 'dark');
 
   // ── D3 · "3D Workspace" deleted ─────────────────────────────────────────
