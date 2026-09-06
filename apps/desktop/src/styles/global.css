@@ -5179,6 +5179,8 @@ body[data-media-expanded="true"] .pd-studio-compose {
 .pd-mode-toggle {
   display: inline-flex;
   gap: 2px;
+  margin: 0;
+  border: none;
   padding: 2px;
   border-radius: calc(var(--pd-radius-md) + 2px);
   background: var(--pd-bg-track);

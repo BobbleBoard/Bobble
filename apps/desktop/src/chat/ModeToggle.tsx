@@ -21,13 +21,10 @@ import { setWorkMode, useWorkMode } from '../state/settings-store';
 export function ModeToggle(): React.ReactElement {
   const mode = useWorkMode();
   return (
-    <div
-      className="pd-mode-toggle"
-      role="group"
-      aria-label="Chat or work"
-      data-testid="mode-toggle"
-      data-mode={mode}
-    >
+    /* A fieldset is the semantic version of "these two belong together", so the
+     * label rides a legend rather than an aria-label on a div. */
+    <fieldset className="pd-mode-toggle" data-testid="mode-toggle" data-mode={mode}>
+      <legend className="sr-only">Chat or work</legend>
       <button
         type="button"
         className="pd-mode-seg pd-focusable"
@@ -50,6 +47,6 @@ export function ModeToggle(): React.ReactElement {
       >
         <IconCode size={15} />
       </button>
-    </div>
+    </fieldset>
   );
 }
