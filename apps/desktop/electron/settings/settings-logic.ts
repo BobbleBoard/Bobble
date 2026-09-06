@@ -35,6 +35,7 @@ import {
   UI_SCALE_MAX,
   UI_SCALE_MIN,
   USER_MODES,
+  WORK_MODES,
 } from './settings-contract';
 
 const FLAVORS: readonly ThemeFlavor[] = ['claude', 'codex', 'bobble'];
@@ -115,6 +116,7 @@ export const DEFAULT_SETTINGS: DesktopSettings = {
   search: { brave: '', tavily: '' },
   mcpMode: 'lite',
   toolInterface: 'schemas',
+  workMode: 'chat',
   powerMode: 'auto',
   capabilities: { image: true, video: true, audio: true, threeD: true },
   customInstructions: '',
@@ -271,6 +273,7 @@ export function clampSettings(raw: unknown): DesktopSettings {
     search: { brave: str(search.brave, ''), tavily: str(search.tavily, '') },
     mcpMode: oneOf(o.mcpMode, MCP_MODES, d.mcpMode),
     toolInterface: oneOf(o.toolInterface, TOOL_INTERFACES, d.toolInterface),
+    workMode: oneOf(o.workMode, WORK_MODES, d.workMode),
     powerMode: oneOf(o.powerMode, POWER_MODES, d.powerMode),
     // 0 and negatives mean "derive one from the machine", which is what absent
     // means too — so they normalise to the same thing rather than to a promise

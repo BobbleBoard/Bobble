@@ -5169,3 +5169,88 @@ body[data-media-expanded="true"] .pd-studio-compose {
 .pd-panel-jump:hover {
   opacity: 0.82;
 }
+
+/* ── Chat | Work, beside the traffic lights ───────────────────────────────
+ *
+ * Deliberately the same shape as the sidebar toggle next to it — two 28px
+ * squares in a recessed well — so the top-left corner reads as one cluster of
+ * window controls rather than a control plus a feature.
+ */
+.pd-mode-toggle {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: calc(var(--pd-radius-md) + 2px);
+  background: var(--pd-bg-track);
+  box-shadow: inset 0 0 0 0.5px var(--pd-border-subtle);
+}
+
+.pd-mode-seg {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 24px;
+  border: none;
+  border-radius: var(--pd-radius-md);
+  background: transparent;
+  color: var(--pd-text-muted);
+  cursor: pointer;
+  transition:
+    color var(--pd-duration-base) var(--pd-easing-standard),
+    background-color var(--pd-duration-base) var(--pd-easing-standard),
+    box-shadow var(--pd-duration-base) var(--pd-easing-standard);
+}
+
+.pd-mode-seg:hover {
+  color: var(--pd-text-secondary);
+}
+
+.pd-mode-seg[aria-pressed="true"] {
+  background: var(--pd-bg-raised);
+  color: var(--pd-text-primary);
+  box-shadow: var(--pd-shadow-hairline), var(--pd-shadow-sm);
+}
+
+/* ── The working ledge, sliding ───────────────────────────────────────────
+ *
+ * In chat mode the bar slides UP behind the composer card and stops taking
+ * space; in work mode it protrudes as before. Animating grid-template-rows
+ * rather than height is what lets it move to and from its own natural size
+ * without anyone hardcoding that size — and `interpolate-size` is not needed,
+ * because the row is the thing being interpolated.
+ *
+ * The transform is what makes it read as sliding out from UNDER the card rather
+ * than fading in place, and the negative translate is exactly the distance it
+ * protrudes, so the hidden state is flush.
+ */
+.pd-composer-ledge {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition: grid-template-rows var(--pd-duration-slow, 260ms) var(--pd-easing-standard);
+}
+
+.pd-composer-ledge > * {
+  min-height: 0;
+  overflow: hidden;
+  transition:
+    transform var(--pd-duration-slow, 260ms) var(--pd-easing-standard),
+    opacity var(--pd-duration-base) var(--pd-easing-standard);
+}
+
+.pd-composer-ledge[data-open="false"] {
+  grid-template-rows: 0fr;
+}
+
+.pd-composer-ledge[data-open="false"] > * {
+  transform: translateY(-8px);
+  opacity: 0;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pd-composer-ledge,
+  .pd-composer-ledge > * {
+    transition: none;
+  }
+}

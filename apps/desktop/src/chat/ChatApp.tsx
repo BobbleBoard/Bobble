@@ -59,6 +59,7 @@ import { CanvasTabsPanel } from './canvas/CanvasTabsPanel';
 import { CorpDebugHud } from './corp/CorpDebugHud';
 import { useHarnessTitleSync } from './harness-title';
 import { InputNeededBanner } from './InputNeededBanner';
+import { ModeToggle } from './ModeToggle';
 import { SessionSidebar } from './SessionSidebar';
 import { StageAnnouncer } from './StageAnnouncer';
 import { StarterChips } from './StarterChips';
@@ -841,6 +842,19 @@ export function ChatApp({
               >
                 <IconSidebar size={16} />
               </button>
+              {/*
+                CHAT | WORK, in the corner Claude puts it in.
+
+                the user: "claude has this little thing in the top left that I think
+                we can lift off of … and that toggles that bottom bar popping
+                out, left one being 'chat' and right being 'work'."
+
+                In the same `no-drag` zone as the sidebar toggle, deliberately:
+                that zone exists because macOS eats mouse events inside a drag
+                rect before the renderer sees them, and a second control in the
+                same corner would hit the identical bug on its own.
+              */}
+              <ModeToggle />
             </div>
 
             <CanvasTabsPanel suppressed={contentOverride !== undefined} />

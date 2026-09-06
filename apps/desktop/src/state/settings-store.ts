@@ -20,6 +20,7 @@ import {
   type ModelSelection,
   type ThemeModePref,
   type UserMode,
+  type WorkMode,
 } from '../../electron/settings/settings-contract';
 import { DEFAULT_QUICK_MENU, type QuickMenuConfig } from '../chat/quick-menu';
 import { type ThemeFlavor, useThemeStore } from '../store/theme';
@@ -39,6 +40,7 @@ const DEFAULTS: DesktopSettings = {
   search: { brave: '', tavily: '' },
   mcpMode: 'lite',
   toolInterface: 'schemas',
+  workMode: 'chat',
   powerMode: 'auto',
   /*
    * ON BY DEFAULT — and they now MEAN something.
@@ -324,6 +326,17 @@ export function useQuickMenu(): QuickMenuConfig {
 
 export function useEffortMode(): EffortMode {
   return useSettingsStore(selectEffortMode);
+}
+
+const selectWorkMode = (s: SettingsStoreState): WorkMode => s.settings.workMode;
+/** Chat box, or chat box plus the working ledge. See {@link WorkMode}. */
+export function useWorkMode(): WorkMode {
+  return useSettingsStore(selectWorkMode);
+}
+
+/** Persist the chat/work choice. */
+export async function setWorkMode(workMode: WorkMode): Promise<void> {
+  await useSettingsStore.getState().update({ workMode });
 }
 
 /** Persist the model selection. */

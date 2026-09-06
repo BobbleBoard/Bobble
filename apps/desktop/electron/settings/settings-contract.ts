@@ -43,6 +43,27 @@ export const USER_MODES = ['user', 'power'] as const satisfies readonly UserMode
  */
 export type ToolInterface = 'schemas' | 'bash-cli';
 
+/**
+ * CHAT or WORK — which half of the app is on screen.
+ *
+ * `chat` is a chat box and nothing else. `work` adds the ledge under the
+ * composer: the project folder, the instruction files in effect, how full the
+ * context is, and the effort dial.
+ *
+ * WHY IT EXISTS. A blind tester's rule, which is the best one anybody has given
+ * this project: "if a word on the opening screen needs a sentence of explanation
+ * to me, it isn't on the opening screen." "No project" and "Effort · Adaptive"
+ * both need one. the user's answer was better than hiding them behind a gear — put
+ * them behind a MODE, one click away, with a control that says which of the two
+ * things this app is you are currently doing.
+ *
+ * Default `chat`, because that is what someone opening it for the first time is
+ * here for, and because a control you can see is not the same as a control you
+ * are made to read.
+ */
+export type WorkMode = 'chat' | 'work';
+export const WORK_MODES = ['chat', 'work'] as const satisfies readonly WorkMode[];
+
 export type McpMode = 'lite' | 'native' | 'bash-cli';
 /** Valid MCP modes, in UI order. */
 export const MCP_MODES = ['lite', 'native', 'bash-cli'] as const satisfies readonly McpMode[];
@@ -243,6 +264,8 @@ export interface DesktopSettings {
   mcpMode: McpMode;
   /** How tools are offered to the model (see {@link ToolInterface}). */
   toolInterface: ToolInterface;
+  /** Chat box, or chat box plus the working ledge (see {@link WorkMode}). */
+  workMode: WorkMode;
   /** How hard the app may push this machine (see {@link PowerMode}). */
   powerMode: PowerMode;
   /**
@@ -326,6 +349,7 @@ export interface DesktopSettingsPatch {
   search?: Partial<SearchKeys>;
   mcpMode?: McpMode;
   toolInterface?: ToolInterface;
+  workMode?: WorkMode;
   powerMode?: PowerMode;
   powerReserveGB?: number;
   capabilities?: Partial<GenerationCapabilities>;

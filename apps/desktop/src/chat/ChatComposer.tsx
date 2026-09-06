@@ -36,7 +36,7 @@ import {
 } from '../state/pi-connect';
 import { usePiStore } from '../state/pi-slice';
 import { assessCurrentSend, useQueueExplainer } from '../state/running-chats';
-import { corpForceEnabled, productionHarnessEnabled } from '../state/settings-store';
+import { corpForceEnabled, productionHarnessEnabled, useWorkMode } from '../state/settings-store';
 import { useThemeStore } from '../store/theme';
 import { AttachedFileCard } from './AttachedFileCard';
 import { ComposerBar } from './ComposerBar';
@@ -255,6 +255,8 @@ export function ChatComposer({
    * instead of starting a fresh production. */
   onCorpFollowUp?: (question: string) => void;
 }) {
+  // Which half of the app is on screen — the ledge below the card follows it.
+  const workMode = useWorkMode();
   const flavor = useThemeStore((s) => s.flavor);
   const isStreaming = usePiStore((s) => s.agent.isStreaming);
   // A corp/hierarchy run is live from start to its terminal `done` — its Stop
@@ -1146,7 +1148,25 @@ export function ChatComposer({
         {/* Round-12 W2: the sticking-out bar — fused to the input card's bottom
             edge (the card, z-index 1, overlaps its tucked top) and protruding
             below it: project chip · active tier · effort slider. */}
-        <ComposerBar />
+        {/*
+          THE WORKING LEDGE, WHICH IS NOT ALWAYS THERE.
+
+          the user: "have that bottom bar that has the context model and project
+          slide down and slide up when we want it, by default … slid down."
+          The top-left Chat|Work control owns the choice (ModeToggle); this only
+          renders the slide. It stays MOUNTED in chat mode rather than being
+          removed, so the project picker and the effort dial keep their state
+          across a toggle and the transition has something to animate.
+        */}
+        <div
+          className="pd-composer-ledge"
+          data-open={workMode === 'work'}
+          data-testid="composer-ledge"
+        >
+          <div>
+            <ComposerBar />
+          </div>
+        </div>
       </div>
 
       {/* the user: when a message is queued, a small line UNDER the input — a plain
