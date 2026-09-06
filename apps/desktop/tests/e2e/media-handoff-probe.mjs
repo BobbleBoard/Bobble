@@ -410,7 +410,28 @@ try {
 
   // …and the trip back to the conversation, driven by the real button.
   await page.hover('[data-testid="media-card"]');
-  await page.waitForTimeout(150);
+  /*
+   * WAIT FOR THE BUTTON TO BECOME CLICKABLE, not for 150ms.
+   *
+   * The card's controls are hover-revealed — `opacity: 0; pointer-events: none`
+   * until the card is hovered — and a probe's window is never shown, so its
+   * renderer runs off a timer at roughly 12fps rather than off vsync (MEASURED;
+   * see background-mode.ts). 150ms is one or two frames there, so the transition
+   * was routinely still in flight and the click hit-tested straight through the
+   * transparent button onto `.pd-studio-results` behind it. Playwright then
+   * reports the container "intercepts pointer events", which reads like a
+   * z-index bug and is really a stopwatch that is too short.
+   */
+  await page.waitForFunction(
+    () => {
+      const b = document.querySelector('[data-testid="media-send-chat"]');
+      if (b === null) return false;
+      const cs = getComputedStyle(b);
+      return cs.opacity === '1' && cs.pointerEvents !== 'none';
+    },
+    null,
+    { timeout: 5000 },
+  );
   await page.click('[data-testid="media-send-chat"]');
   await page.waitForSelector('.pd-composer-editor', { timeout: 10_000 });
   const landed = await page

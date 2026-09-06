@@ -17,10 +17,29 @@
  * A fresh profile has no model on disk, which is exactly what makes the prompt
  * appear — so this is the DEFAULT first-run experience, not a corner.
  */
+import { mkdirSync, mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { launchApp } from './harness.mjs';
+import { launchApp, REPO_ROOT } from './harness.mjs';
 
-const { page, shot, check, finish } = await launchApp('dialog-focus-probe');
+/*
+ * A HOME OF ITS OWN, and that is the whole setup.
+ *
+ * The prompt appears because the router found no model on disk for the tier it
+ * picked. The harness isolates the user-data dir but not HOME, so on a machine
+ * with models downloaded the router is satisfied, nothing opens, and this probe
+ * has nothing to test — which is exactly how it failed the first time it ran.
+ * A throwaway home is a first run.
+ */
+const home = mkdtempSync(path.join(tmpdir(), 'pd-dialog-focus-home-'));
+mkdirSync(path.join(home, '.pi', 'agent', 'sessions', 'proj'), { recursive: true });
+
+const { page, shot, check, finish } = await launchApp('dialog-focus-probe', {
+  env: { HOME: home },
+  // A plain streamed reply. The default tool-use fixture routes the turn
+  // differently and the tier never resolves to one that needs downloading.
+  fixture: path.join(REPO_ROOT, 'packages/engine/tools/mock-pi/fixtures/simple-chat.json'),
+});
 
 const focused = () =>
   page.evaluate(() => {
@@ -29,8 +48,42 @@ const focused = () =>
   });
 
 await page.click('[data-testid="composer-input"]');
-await page.keyboard.type('what can you do?');
+await page.keyboard.type('hello there');
 await page.keyboard.press('Enter');
+await page.waitForSelector('text=Hello from mock-pi', { timeout: 15_000 });
+
+/*
+ * PARKING THE DOWNLOAD RATHER THAN WAITING FOR THE ROUTER TO PARK IT.
+ *
+ * The real trigger is the Auto router resolving to a tier that is not on disk,
+ * and reaching that from here would mean pinning a classification out of the
+ * mock harness — a lot of scaffolding for a precondition, and scaffolding that
+ * breaks whenever the routing rules change. round4-probe already drives the
+ * genuine path end to end and asserts the same handover.
+ *
+ * What this probe is for is the LOOK, so it puts the store in exactly the state
+ * the router puts it in (`setPendingDownload`, the one call the router makes at
+ * auto-router.ts:565) and photographs what happens next. Everything after this
+ * line — the dialog mounting, taking focus, unmounting on Escape, and where the
+ * keyboard lands — is the app's own behaviour, untouched.
+ */
+await page.evaluate(() => {
+  window
+    .__model_selection_store()
+    .getState()
+    .setPendingDownload({
+      tier: 'balanced',
+      pick: {
+        modelId: 'qwen3.5-4b-mtp',
+        displayName: 'Qwen3.5 4B',
+        quant: 'Q8_0',
+        launchMode: 'fast-text',
+        vision: false,
+        bytes: 4_800_000_000,
+        downloaded: false,
+      },
+    });
+});
 
 const prompt = page.locator('[data-testid="auto-download-prompt"]');
 await prompt.waitFor({ state: 'visible', timeout: 15_000 });

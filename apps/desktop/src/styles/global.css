@@ -3068,18 +3068,34 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
      grey bars. Capped so a very wide render still stops at the column edge. */
   width: fit-content;
   max-width: 100%;
+  /*
+   * AND A FLOOR, because `fit-content` has nothing to fit until the picture
+   * decodes. An <img> that has not loaded has no intrinsic width, so the frame
+   * collapsed to its border: MEASURED at 10px wide against a 157px card, with
+   * the hover controls — absolutely positioned against this box — landing 76px
+   * OUTSIDE the card, floating in the column beside it. The frame already had a
+   * min-height for the same reason; it simply never had the other half.
+   */
+  min-width: 120px;
 }
 /* A picture card is TALLER than a wide one is wide: these are generated stills
    and clips, and 240px is about where you stop squinting at a 1024² render. */
 .pd-media-card[data-kind="image"] .pd-media-frame,
 .pd-media-card[data-kind="video"] .pd-media-frame {
   min-height: 200px;
+  /* Square-ish while it loads, so the card that appears is the size of the card
+     that arrives. Generated stills are 512px and up, so this only ever applies
+     before the bytes land. */
+  min-width: 200px;
 }
 .pd-media-card[data-kind="model"] .pd-media-frame {
   height: 320px;
 }
 .pd-media-card[data-kind="audio"] .pd-media-frame {
   min-height: 0;
+  /* A transport is as wide as its own controls, and it has them immediately —
+     there is nothing to wait for, so nothing to hold space for. */
+  min-width: 0;
   padding: 12px;
 }
 
