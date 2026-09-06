@@ -914,42 +914,6 @@ body {
 }
 
 /*
- * Round-5 #7: a generated image inline in the thread — a bounded thumbnail that
- * opens a fullscreen lightbox (click anywhere / Escape to dismiss).
- */
-.pd-thread-image {
-  display: inline-flex;
-  width: max-content;
-  max-width: 100%;
-  padding: 0;
-  border: 1px solid var(--pd-border-subtle);
-  border-radius: var(--pd-radius-md);
-  background: var(--pd-bg-inset);
-  cursor: zoom-in;
-  overflow: hidden;
-  /* The finished image takes over from `.pd-denoise`, which has just spent the
-   * generation resolving the same picture. A hard cut there reads as a glitch
-   * even though nothing moved, so the real image comes up over the last preview
-   * frame instead of replacing it in one tick. */
-  animation: pd-thread-image-in 180ms var(--pd-easing-enter) both;
-}
-@keyframes pd-thread-image-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-.pd-thread-image-thumb {
-  display: block;
-  width: auto;
-  height: auto;
-  max-width: min(360px, 100%);
-  max-height: 320px;
-  object-fit: contain;
-}
-/*
  * ---------------------------------------------------------------------------
  * The live denoising placeholder (.pd-denoise)
  *
@@ -964,9 +928,9 @@ body {
  * Everything below is a pure function of those, so the animation is one style
  * write per frame and no React re-render.
  *
- * The card is sized to `.pd-thread-image-thumb`'s bounds (min(360px,100%) wide,
- * 320px tall) so the finished image lands in the SAME box the placeholder
- * occupied — no jump at the swap.
+ * The card is sized to the bounds the finished picture will take (min(360px,
+ * 100%) wide, 320px tall, object-fit: contain) so the image lands in the SAME
+ * box the placeholder occupied — no jump at the swap.
  *
  * Colour comes only from --pd-* tokens, and only from the neutral surface
  * ramp plus the terracotta accent: it has to sit quietly in every flavor, in
@@ -976,10 +940,10 @@ body {
 /*
  * THE WIDTH LIVES HERE, on the block-level root — not on the plate.
  *
- * The size is the SAME box `.pd-thread-image-thumb` will end up in, derived
- * rather than approximated: that thumb is bounded by min(360px,100%) wide and
- * 320px tall with object-fit:contain, so a square image settles at 320x320 and
- * a wide one at 360x270. Folding the height bound into the width
+ * The size is the SAME box the finished picture will end up in, derived rather
+ * than approximated: it is bounded by min(360px,100%) wide and 320px tall with
+ * object-fit:contain, so a square image settles at 320x320 and a wide one at
+ * 360x270. Folding the height bound into the width
  * (320px x aspect) makes this element reach the identical size — a `max-height`
  * alone would let a square card render 360x320, which is not the image's aspect
  * ratio and would make the finished picture jump on arrival.
@@ -994,9 +958,9 @@ body {
  * were MEASURED by the probe's rect recorder, and the first was visible as the
  * card changing size on a denoising step.
  *
- * `.pd-thread-image` gets away with percentages because its `<img>` has an
- * intrinsic size to resolve `max-content` from. This card has no content to
- * measure, so it states its size outright. `max-width` stays a percentage on
+ * A real `<img>` gets away with percentages because it has an intrinsic size to
+ * resolve `max-content` from. This card has no content to measure, so it states
+ * its size outright. `max-width` stays a percentage on
  * purpose: against an indefinite container that computes to no limit (no
  * cycle), and it still clamps once a narrow window gives the column a definite
  * width.
@@ -1375,29 +1339,6 @@ body {
   }
 }
 
-.pd-image-lightbox {
-  position: fixed;
-  inset: 0;
-  z-index: 80;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 32px;
-  border: 0;
-  background: color-mix(in srgb, var(--pd-bg-backdrop, #000) 82%, transparent);
-  -webkit-backdrop-filter: blur(4px);
-  backdrop-filter: blur(4px);
-  cursor: zoom-out;
-  animation: pd-onboard-step-in 140ms var(--pd-easing-enter, ease-out);
-}
-.pd-image-lightbox-img {
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
-  border-radius: var(--pd-radius-md);
-  box-shadow: var(--pd-shadow-lg);
-}
-
 /*
  * Round-5 #3/#8: the composer editor never shows a hard scrollbar (hidden here).
  * A min-height keeps the placeholder + first line from ever scrolling; once the
@@ -1437,10 +1378,6 @@ body {
   .pd-theme-toggle > *,
   .pd-chat-title-crumb {
     transition: none;
-  }
-  .pd-image-lightbox,
-  .pd-thread-image {
-    animation: none;
   }
 }
 
@@ -3614,10 +3551,6 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
-}
-.pd-thread-media[data-layout="grid"] .pd-thread-image-thumb {
-  max-height: none;
-  width: 100%;
 }
 /*
  * A GRID IS THE ONE PLACE THE OLD BEHAVIOUR WAS RIGHT. Four candidates from one

@@ -114,7 +114,22 @@ try {
     'A4: the fold caret is hidden at rest (no arrow by default)',
   );
   await page.locator('.pd-chat-icon-swap').hover();
-  await page.waitForTimeout(220);
+  /*
+   * WAIT FOR THE VALUE, NOT FOR A CLOCK.
+   *
+   * This slept 220ms for a 120ms transition and called that generous. It is not,
+   * on the renderer a probe actually runs against: the window is never shown, so
+   * it is driven by a timer rather than the display's vsync at roughly 12fps
+   * (MEASURED — see background-mode.ts). Hover lands on the next frame, up to
+   * 83ms away, and the interpolated opacity only updates on frames after that,
+   * so 220ms could easily read the transition mid-flight. It went red as a
+   * "hover does not reveal the caret" that a person watching would never see.
+   */
+  await page.waitForFunction(
+    () => getComputedStyle(document.querySelector('.pd-chat-icon-caret')).opacity === '1',
+    null,
+    { timeout: 4000 },
+  );
   assert(
     (await caretOpacity()) === '1',
     'A4: hovering the row reveals the caret (replacing the bubble)',

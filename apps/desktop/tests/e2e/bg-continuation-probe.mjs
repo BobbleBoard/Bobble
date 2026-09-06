@@ -140,13 +140,45 @@ try {
       agent: { ...s.agent, isStreaming: false },
     }));
   }, CONTINUED);
-  await page.waitForSelector('[data-testid="chat-notice"]', { timeout: 8000 });
-  const noticeText = await page.textContent('[data-testid="chat-notice"]');
+  /*
+   * HOW YOU FIND OUT IT FINISHED — a dot on its row, not a line in this thread.
+   *
+   * This waited on a `chat-notice` reading "Response finished in <chat>". That
+   * notice was deliberately removed: it announced chat A's news inside chat B,
+   * which is the thread you are reading and had nothing to do with it. The
+   * redesign put the news where the chat is — a blue unread dot on A's own row,
+   * which survives switching away and stays until you open it — and left an
+   * OS notification for the case where the window isn't focused at all.
+   *
+   * So the assertion moves to the row. Named `.pd-chat-dot--finished` rather
+   * than a testid because that class carries the colour that means "finished"
+   * as opposed to the orange one that means "needs you", and a dot of the wrong
+   * colour is the regression worth catching.
+   */
+  await page.waitForFunction(() => document.querySelector('.pd-chat-dot--finished') !== null, {
+    timeout: 8000,
+  });
+  const dots = await page.evaluate(() => {
+    const row = document.querySelector('.pd-chat-dot--finished')?.closest('.pd-chatrow');
+    return {
+      finished: document.querySelectorAll('.pd-chat-dot--finished').length,
+      needsInput: document.querySelectorAll('.pd-chat-dot--needs-input').length,
+      onRow: row?.textContent ?? '',
+    };
+  });
   assert(
-    noticeText.includes('rivers') && noticeText.includes('Response finished'),
-    `the finished notice should name chat A (rivers); got: ${noticeText}`,
+    dots.onRow.includes('rivers'),
+    `the finished dot should sit on chat A's row (rivers); it is on: ${JSON.stringify(dots.onRow)}`,
   );
-  await page.screenshot({ path: path.join(OUT_DIR, '02-A-finished-notice.png') });
+  assert(
+    dots.needsInput === 0,
+    'a chat that finished on its own must not claim it needs input (orange dot)',
+  );
+  assert(
+    (await page.locator('[data-testid="chat-notice"]').count()) === 0,
+    "chat A's news must not be announced inside chat B's thread",
+  );
+  await page.screenshot({ path: path.join(OUT_DIR, '02-A-finished-dot.png') });
 
   // (3) Return to A → the continued reply is there; bg run cleared.
   await page.click('text=chat about rivers');

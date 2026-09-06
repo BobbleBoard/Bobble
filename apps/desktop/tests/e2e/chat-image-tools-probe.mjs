@@ -13,7 +13,7 @@
  *      its refusal cleanly if the edit weights aren't installed).
  *   B. INLINE RENDER. Feed the tool call + result through the app's OWN chat
  *      store the way the pi event-router does, then assert the transcript shows
- *      a ThreadImage whose <img> ACTUALLY DECODED (naturalWidth > 0) — i.e. the
+ *      a MediaCard whose <img> ACTUALLY DECODED (naturalWidth > 0) — i.e. the
  *      pd-file scheme served it and the CSP allowed it. Screenshot.
  *   C. FULL CHAT. Type a plain-English request into the real composer and let
  *      the real local model decide to call the tool. Screenshot.
@@ -266,18 +266,18 @@ try {
       },
     );
 
-    await page.waitForSelector('[data-testid="thread-image"]', { timeout: 15_000 });
+    await page.waitForSelector('[data-testid="media-card"]', { timeout: 15_000 });
     // The decisive check: the browser DECODED the bytes. A broken src leaves
     // naturalWidth at 0, so this cannot pass on a URL that merely looks right.
     await page.waitForFunction(
       () =>
-        [...document.querySelectorAll('[data-testid="thread-image"] img')].every(
+        [...document.querySelectorAll('[data-testid="media-image"]')].every(
           (i) => i.complete && i.naturalWidth > 0,
         ),
       { timeout: 20_000 },
     );
     const imgs = await page.evaluate(() =>
-      [...document.querySelectorAll('[data-testid="thread-image"] img')].map((i) => ({
+      [...document.querySelectorAll('[data-testid="media-image"]')].map((i) => ({
         src: i.getAttribute('src'),
         w: i.naturalWidth,
         h: i.naturalHeight,
@@ -311,9 +311,11 @@ try {
     );
     await shot('B-inline-images');
 
-    // Click through to the fullscreen lightbox — the interaction the user cares about.
-    await page.click('[data-testid="thread-image"]');
-    await page.waitForSelector('[data-testid="image-lightbox"]', { timeout: 5_000 });
+    // Click through to the expanded view — the interaction the user cares about.
+    // The controls are hover-revealed on the card, so hover before clicking.
+    await page.locator('[data-testid="media-card"]').first().hover();
+    await page.locator('[data-testid="media-expand"]').first().click();
+    await page.waitForSelector('[data-testid="media-expanded"]', { timeout: 5_000 });
     await shot('B-lightbox');
     await page.keyboard.press('Escape');
   }
@@ -391,7 +393,7 @@ if (!SKIP_CHAT) {
           .filter((e) => e.children.length === 0)
           .map((e) => e.textContent?.trim() ?? '')
           .filter((t) => /^(Generating|Generated) an image$/.test(t)),
-        inline: [...document.querySelectorAll('[data-testid="thread-image"] img')].filter(
+        inline: [...document.querySelectorAll('[data-testid="media-image"]')].filter(
           (i) => i.complete && i.naturalWidth > 0,
         ).length,
       }));

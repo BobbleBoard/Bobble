@@ -7,14 +7,14 @@
  *   4. no raw model-id footnote under a response (#11)
  *   5. standalone thoughts default COLLAPSED as a "Thought…" summary and expand
  *      on click (#3; round-6 UNIFY: now via the ActivityChain chrome)
- *   6. a generated image renders INLINE and opens a FULLSCREEN lightbox (#7)
+ *   6. a generated image renders INLINE as a media card and opens LARGE (#7)
  *   7. the canvas panel toggle SLIDES the panel out, and a restore control
  *      slides it back in (#18/#19)
  * Run `pnpm build` first.
  */
-import { existsSync, mkdtempSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { tmpdir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { _electron as electron } from 'playwright-core';
@@ -31,10 +31,6 @@ function assert(condition, message) {
 }
 
 assert(existsSync(path.join(appRoot, 'dist/index.html')), 'app is not built — run `pnpm build`');
-
-// A 1×1 transparent PNG — enough to prove the inline image renders + lightboxes.
-const PNG =
-  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M8AAAMBAQDJ/pLvAAAAAElFTkSuQmCC';
 
 // A padded SVG whose source exceeds the inline budget → routes to a canvas tab.
 const bigPad = '<rect x="0" y="0" width="1" height="1" fill="#000"/>'.repeat(60);
@@ -188,7 +184,37 @@ try {
   // Expanding reveals the chain chrome — a clock-icon thinking step + Done.
   await thought.locator('.pd-chain-step[data-kind="thinking"]').first().waitFor({ timeout: 5000 });
 
-  // ── 6. Inline generated image renders + opens a fullscreen lightbox ───────────
+  /*
+   * ── 6. What a turn MADE is shown in the turn that made it, and opens larger ──
+   *
+   * This used to assert a `ThreadImage`: a data-URL thumbnail under the chain
+   * with its own fullscreen lightbox. That component is gone and its promise is
+   * not — a generated picture still lands inline and still opens large. It is a
+   * `MediaCard` now, the one component the studios and the thread both draw, so
+   * that a picture asked for in conversation and the same picture made in the
+   * Image Studio are one object rather than two that drift.
+   *
+   * Which means the fixture changes too. `ThreadImage` was handed a data URL;
+   * `MediaCard` is handed a PATH, because the tool result is the only thing the
+   * renderer gets and it names files (see thread-media.ts). So this writes a
+   * real PNG where the `pd-file://` fence will serve it, and the assertion that
+   * the picture DECODED — naturalWidth > 0 — is the one that could not be made
+   * against a data URL at all.
+   */
+  const png = await page.evaluate(() => {
+    const c = document.createElement('canvas');
+    c.width = 320;
+    c.height = 200;
+    const g = c.getContext('2d');
+    g.fillStyle = '#2b6cb0';
+    g.fillRect(0, 0, 320, 200);
+    return c.toDataURL('image/png').split(',')[1];
+  });
+  const imgDir = path.join(homedir(), 'Bobble', 'generated', '_round5-probe');
+  mkdirSync(imgDir, { recursive: true });
+  const imgPath = path.join(imgDir, 'round5.png');
+  writeFileSync(imgPath, Buffer.from(png, 'base64'));
+
   await setMessages(page, [
     {
       kind: 'assistant',
@@ -203,22 +229,34 @@ try {
       toolCallId: 'call_img',
       assistantId: 'a-img',
       toolName: 'generate_image',
-      text: PNG,
+      text: `Generated 1 image:\n1. ${imgPath}`,
       isError: false,
       timestamp: Date.now(),
     },
   ]);
-  const thumb = page.locator('[data-testid="thread-image"]');
-  await thumb.waitFor({ state: 'visible', timeout: 6000 });
-  assert(
-    (await page.locator('[data-testid="image-lightbox"]').count()) === 0,
-    'lightbox should be closed until the image is clicked',
-  );
-  await thumb.click();
-  await page.locator('[data-testid="image-lightbox"]').waitFor({ state: 'visible', timeout: 4000 });
-  await page.locator('[data-testid="image-lightbox"]').click();
+  const card = page.locator('[data-testid="media-card"]');
+  await card.waitFor({ state: 'visible', timeout: 6000 });
+  // The decisive one: the browser decoded the bytes. A src that merely looks
+  // right leaves naturalWidth at 0, so this cannot pass on a broken fence.
   await page.waitForFunction(
-    () => document.querySelector('[data-testid="image-lightbox"]') === null,
+    () => {
+      const i = document.querySelector('[data-testid="media-image"]');
+      return i?.complete === true && i.naturalWidth > 0;
+    },
+    null,
+    { timeout: 8000 },
+  );
+  assert(
+    (await page.locator('[data-testid="media-expanded"]').count()) === 0,
+    'the expanded view should be closed until the card is opened',
+  );
+  // The controls only exist on hover, which is the gesture as well as the style.
+  await card.hover();
+  await page.locator('[data-testid="media-expand"]').first().click();
+  await page.locator('[data-testid="media-expanded"]').waitFor({ state: 'visible', timeout: 4000 });
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(
+    () => document.querySelector('[data-testid="media-expanded"]') === null,
     null,
     { timeout: 4000 },
   );
@@ -266,7 +304,7 @@ try {
   );
 
   console.log(
-    'round5-probe OK — workspace nav on top, title rename, info popover, no model footnote, thought collapsed+expands, inline image+lightbox, canvas slide toggle',
+    'round5-probe OK — workspace nav on top, title rename, info popover, no model footnote, thought collapsed+expands, inline image card+expand, canvas slide toggle',
   );
 } finally {
   await app.close();

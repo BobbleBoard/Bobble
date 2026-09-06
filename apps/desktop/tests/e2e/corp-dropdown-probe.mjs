@@ -1,15 +1,20 @@
 /**
- * MP6 — running corp/hierarchy roles surface in the SAME nested sidebar dropdown
- * under the chat hosting the run (SessionSidebar reads corp-store nodes and renders
- * them beside the child-agent rows; clicking one pins the node so corp's inline
- * view shows it).
+ * MP6 — the roles in a running hierarchy are listed somewhere you can click them,
+ * and clicking one pins it so its work is what you are watching.
  *
- * The rows are gated on `effectiveCurrentFile === s.file` (the same gate as chat-row
- * selection). mock-pi doesn't echo a matching sessionFile and clobbers a pinned one on
- * its next event (the "mock-pi can't verify switching" limitation), so we pin the
- * session AND inject the corp run in ONE tick to beat the clobber, with `taskId: null`
- * so corp's INLINE thread view (which needs a full SituationState) doesn't render.
- * Then the corp rows render, and clicking one pins the node. `npm run build` first.
+ * WHERE THEY ARE LISTED MOVED, and this probe was asserting the old address. MP6
+ * put them in the sidebar's nested dropdown as `corp-row-<id>`, beside the child
+ * agent rows. Then subagent/chat parity collapsed the two: a role and a subagent
+ * are the same thing to look at, so they became ONE list of `subagent-row`s in the
+ * situation room behind the Agent activity tab, with the root listed FIRST — the user:
+ * "there's no way back to the CEO, the top of the situation room shows the
+ * manager." Nothing in `src` has rendered `corp-row-*` since, so this waited eight
+ * seconds for an element that could not exist.
+ *
+ * The BEHAVIOUR under test is unchanged and is still worth a probe, so it moves to
+ * the surface that has it. The store is driven directly (a real hierarchy needs a
+ * real model); mock-pi clobbers a pinned session on its next event, so the pin and
+ * the injection happen in ONE tick. `npm run build` first.
  */
 import { mkdirSync, mkdtempSync, realpathSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -81,34 +86,77 @@ try {
     window.__pi_store().setState({
       session: { ...(ps.session ?? {}), sessionFile: listed[0]?.file },
     });
-    window.__corp_store.setState({
-      taskId: null,
-      corpRunning: true,
-      situation: {
-        taskId: 't',
-        chart: {
-          nodes: [
-            { id: 'ceo', role: 'ceo', name: 'CEO', state: 'working' },
-            { id: 'fe', role: 'engineer', name: 'Frontend', parentId: 'ceo', state: 'working' },
-            { id: 'be', role: 'engineer', name: 'Backend', parentId: 'ceo', state: 'done' },
-          ],
-        },
+    const chart = {
+      taskId: 't',
+      nodes: [
+        { id: 'ceo', role: 'ceo', name: 'CEO', state: 'working' },
+        { id: 'fe', role: 'engineer', name: 'Frontend', parentId: 'ceo', state: 'working' },
+        { id: 'be', role: 'engineer', name: 'Backend', parentId: 'ceo', state: 'done' },
+      ],
+      edges: [
+        { from: 'ceo', to: 'fe' },
+        { from: 'ceo', to: 'be' },
+      ],
+    };
+    const corp = window.__corp_store;
+    corp.setState({ taskId: 't', corpRunning: true });
+    corp.getState().foldEvent({ type: 'org-chart', chart });
+    corp.getState().trackChart(chart);
+
+    /*
+     * The room folds its OWN state from the event stream rather than reading the
+     * store, so it gets the same `org-chart` event ChatApp would have handed it
+     * on promotion. The stream then stays open, because a real run's does — a
+     * stream that ends is a finished task and the room renders accordingly.
+     */
+    const events = {
+      async *[Symbol.asyncIterator]() {
+        yield { type: 'org-chart', chart };
+        await new Promise(() => undefined);
       },
+    };
+    window.__pi_canvas().upsertTab('situation:t', {
+      kind: 'situation',
+      title: 'Subagents',
+      situationEvents: events,
+      situationTaskId: 't',
+      situationUserMode: 'power',
     });
   });
 
-  // MP6: the corp roles appear in the SAME nested dropdown under the hosting chat.
-  await page.waitForSelector('[data-testid="corp-row-fe"]', { timeout: 8000 });
-  await page.waitForSelector('[data-testid="corp-row-be"]', { timeout: 8000 });
-  const feText = await page.textContent('[data-testid="corp-row-fe"]');
-  assert(feText.includes('Frontend'), `corp role row shows its name: ${feText}`);
+  // Open the canvas the way a person does, rather than reaching for its store.
+  // The control only exists while the canvas is CLOSED — upserting a tab can
+  // bring the rail up on its own, and then there is nothing to click.
+  const opener = page.locator('[data-testid="canvas-toggle"]');
+  if ((await opener.count()) > 0) await opener.click();
+  await page.waitForSelector('[data-testid="situation-room"]', { timeout: 10_000 });
+  await page.waitForSelector('[data-testid="subagent-row"][data-node-id="fe"]', { timeout: 8000 });
+  await page.waitForSelector('[data-testid="subagent-row"][data-node-id="be"]', { timeout: 8000 });
+
+  const rows = await page.evaluate(() =>
+    [...document.querySelectorAll('[data-testid="subagent-row"]')].map((r) => ({
+      id: r.getAttribute('data-node-id'),
+      text: r.textContent ?? '',
+    })),
+  );
+  assert(
+    rows[0]?.id === 'ceo',
+    `the root must be listed FIRST — "there's no way back to the CEO" — got ${JSON.stringify(rows.map((r) => r.id))}`,
+  );
+  const fe = rows.find((r) => r.id === 'fe');
+  assert(fe?.text.includes('Frontend') === true, `a role row shows its name: ${fe?.text}`);
   await page.screenshot({
-    path: path.join(process.env.CORP_DROPDOWN_OUT ?? tmpdir(), '01-corp-roles-dropdown.png'),
+    path: path.join(process.env.CORP_DROPDOWN_OUT ?? tmpdir(), '01-corp-roles-listed.png'),
   });
 
-  // Clicking a role pins it (corp's inline view then shows that role).
-  await page.click('[data-testid="corp-row-fe"]');
+  // Clicking a role pins it — which is what makes the chat pane show ITS stream.
+  await page.click('[data-testid="subagent-row"][data-node-id="fe"]');
   await page.waitForFunction(() => window.__corp_store.getState().pinnedNode?.id === 'fe', {
+    timeout: 8000,
+  });
+  // And the way back the root row exists for.
+  await page.click('[data-testid="subagent-row"][data-node-id="ceo"]');
+  await page.waitForFunction(() => window.__corp_store.getState().pinnedNode?.id === 'ceo', {
     timeout: 8000,
   });
   await page.screenshot({
@@ -116,7 +164,7 @@ try {
   });
 
   console.log(
-    'corp-dropdown-probe OK — running corp roles listed in the nested dropdown (MP6); clicking a role pins it for viewing',
+    'corp-dropdown-probe OK — a running hierarchy lists every role in the situation room with the CEO first; clicking one pins it for viewing, and the CEO row is the way back',
   );
 } finally {
   await app.close();

@@ -120,14 +120,63 @@ try {
   await page.keyboard.press('Enter');
   // The empty→thread transition remounts the surface; the composer must stay put.
   await page.waitForSelector('text=Hello from mock-pi — streaming works.', { timeout: 10000 });
+  /*
+   * AND THE PROMPT THAT LANDS ON TOP OF IT MUST HAND THE KEYBOARD BACK.
+   *
+   * A fresh profile has no model on disk, so the first send parks a pending
+   * download and the auto-download Dialog opens over the thread. Taking focus is
+   * correct — it's modal. GIVING IT BACK was not happening: Radix returns focus
+   * to the trigger, this dialog has none, so dismissing it left `activeElement`
+   * on <body> and the next keystroke went nowhere. So the assertion is not "the
+   * composer never loses focus", which a modal legitimately breaks; it is "after
+   * the send and after whatever interrupted it, you can keep typing".
+   */
+  const prompt = page.locator('[data-testid="auto-download-prompt"]');
+  if ((await prompt.count()) > 0) {
+    await page.keyboard.press('Escape');
+    await prompt.waitFor({ state: 'detached', timeout: 5000 });
+  }
   await page.waitForFunction(
     () => document.activeElement?.getAttribute('data-testid') === 'composer-input',
     null,
     { timeout: 5000 },
   );
 
-  // ── 6. Tiny window auto-collapses the sidebar ─────────────────────────────────
+  // ── 6. A narrow window doesn't overflow, and a tiny one collapses the sidebar ──
   const win = await app.browserWindow(page);
+
+  /*
+   * FIRST, THE SIZE A USER CAN ACTUALLY REACH.
+   *
+   * This step used to ask for 520px and assert the sidebar collapsed. It stopped
+   * meaning anything the day minWidth went 640 → 760 for the 3D studio's rail +
+   * panel + viewport + assets (746px of hard minimums): Electron clamps the
+   * request, so the window was 760 wide, the renderer's 720px breakpoint never
+   * engaged, and a probe that read "tiny window collapses the sidebar" was
+   * measuring a window that was neither tiny nor collapsed. MEASURED at the
+   * clamp: 760px window, 272px sidebar, 456px composer, ZERO overflow — the
+   * squeeze the auto-collapse was written for cannot happen by dragging any
+   * more, so that is what gets asserted here first.
+   */
+  await win.evaluate((w) => w.setBounds({ width: 760, height: 820 }));
+  await page.waitForTimeout(600);
+  const atMin = await page.evaluate(() => ({
+    open: document.querySelector('.pd-sidebar-slot')?.getAttribute('data-open'),
+    overflow: document.documentElement.scrollWidth - window.innerWidth,
+  }));
+  assert(atMin.open === 'true', 'the sidebar should still be open at the minimum window width');
+  assert(
+    atMin.overflow <= 1,
+    `the narrowest allowed window should not overflow, got ${atMin.overflow}px`,
+  );
+
+  /*
+   * THEN THE BREAKPOINT ITSELF, which is not dead code — a display narrower than
+   * the minimum still gets a clamped-down window, and that is the case the
+   * auto-collapse exists for. Relaxing the minimum is how you stand in for that
+   * display without one; it is put back immediately after.
+   */
+  await win.evaluate((w) => w.setMinimumSize(400, 400));
   await win.evaluate((w) => w.setBounds({ width: 520, height: 820 }));
   await page.waitForFunction(
     () => document.querySelector('.pd-sidebar-slot')?.getAttribute('data-open') === 'false',
@@ -139,10 +188,11 @@ try {
   const overflow = await page.evaluate(
     () => document.documentElement.scrollWidth - window.innerWidth,
   );
+  await win.evaluate((w) => w.setMinimumSize(760, 560));
   assert(overflow <= 1, `tiny window should not overflow horizontally, got ${overflow}px`);
 
   console.log(
-    'round4-probe OK — settings menu from bottom-left, custom instructions + icon-stroke persist, top bar cleaned, composer keeps focus, tiny window collapses the sidebar',
+    'round4-probe OK — settings menu from bottom-left, custom instructions + icon-stroke persist, top bar cleaned, composer keeps focus after a modal interrupts it, narrowest window does not overflow and a tiny one collapses the sidebar',
   );
 } finally {
   await app.close();

@@ -14,9 +14,24 @@
  *
  * The window is created and NEVER SHOWN. That is not a compromise: a hidden
  * BrowserWindow still runs its renderer, still lays out at its configured size,
- * still animates (rAF measured at full rate), Playwright still drives it over
- * CDP, and `capturePage()` still returns a real, complete screenshot. Verified
- * on this app — the screenshots in `tests/e2e` are taken this way.
+ * still animates, Playwright still drives it over CDP, and `capturePage()` still
+ * returns a real, complete screenshot. Verified on this app — the screenshots in
+ * `tests/e2e` are taken this way.
+ *
+ * IT DOES NOT ANIMATE AT FULL RATE, and this used to claim it did. MEASURED on
+ * the same machine in the same minute: 61 animation frames per 500ms with the
+ * window shown, 6 with it hidden. The page is not "hidden" as far as Blink is
+ * concerned (`document.visibilityState` is "visible", so page-visibility
+ * throttling is not the mechanism, and `backgroundThrottling: false` changes
+ * nothing) — a window with no on-screen surface simply is not driven by the
+ * display's vsync, and falls back to a timer at around 12fps.
+ *
+ * That is fine for what probes need and worth knowing before you write one. CSS
+ * animations and transitions are driven by TIME, not by frames, so they still
+ * land where they should; `capturePage()` forces its own frame, so screenshots
+ * are complete. What you must not do is wait on a frame COUNT, or on "a few
+ * frames should be enough for that transition" — wait on the state you actually
+ * care about.
  *
  * Everything else that would surface is suppressed at its own call site, each
  * gated on {@link isBackgroundMode}: OS notifications, the computer-use

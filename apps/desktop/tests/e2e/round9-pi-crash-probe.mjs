@@ -59,15 +59,46 @@ try {
     undefined,
     { timeout: 12000 },
   );
-  await page.waitForSelector('text=Pi stopped', { timeout: 6000 });
+  /*
+   * WHAT THE TOAST HAS TO SAY, rather than the exact words it says it in.
+   *
+   * This waited on the literal string "Pi stopped" and went red the day the copy
+   * did what it was always going to do: the app is Bobble to a user and "pi" is
+   * an internal name, so the toast reads "The assistant stopped" now. A probe
+   * that pins a sentence goes red for a rewording and green for a regression
+   * that keeps the sentence — the wrong way round on both counts.
+   *
+   * The rules in toast-policy.ts are what this is really about: ONE toast, no
+   * raw signal code in front of the user (the router emits "pi exited (143)."
+   * alongside the bridge exit), and a Restart button that is the only thing
+   * claiming to have restarted anything.
+   */
+  const toast = page.locator('.pd-toast').first();
+  await toast.waitFor({ state: 'visible', timeout: 6000 });
   await page.waitForSelector('button:has-text("Restart")', { timeout: 6000 });
+  // The accessible-name prefix Radix adds ("Notification") is chrome, not copy.
+  const said = ((await toast.textContent()) ?? '').replace(/^Notification/, '');
+  assert(
+    !/\bpi\b/i.test(said),
+    `the crash toast still names the internal engine to the user: ${JSON.stringify(said)}`,
+  );
+  assert(
+    !/\(\d+\)|\bSIG[A-Z]+\b|\b143\b/.test(said),
+    `the crash toast leaked a raw exit/signal code: ${JSON.stringify(said)}`,
+  );
+  assert(
+    (await page.locator('.pd-toast').count()) === 1,
+    `the raw "pi exited (…)" line stacked a second toast beside the humanized one: ${JSON.stringify(
+      await page.locator('.pd-toast').allTextContents(),
+    )}`,
+  );
   assert(
     (await page.locator('[data-testid="composer-input"]').count()) === 1,
     'the composer disappeared after pi died (white-screen / hang)',
   );
 
   console.log(
-    'round9-pi-crash-probe OK — killing pi mid-stream surfaced the "Pi stopped" restart affordance (bridgeExited) and left the UI mounted (no white-screen/hang)',
+    `round9-pi-crash-probe OK — killing pi mid-stream surfaced ONE humanized restart toast (${JSON.stringify(said)}), no raw signal code, no internal engine name, and left the UI mounted (no white-screen/hang)`,
   );
 } finally {
   await app.close();

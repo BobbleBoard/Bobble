@@ -1,10 +1,24 @@
 /**
- * b5: does the effort popover still cover the editor?
+ * Where the effort popover opens.
  *
- * The report MEASURED 56.63 px of vertical overlap — the editor's full height,
- * across the right 38% of it. This drives the real app, opens the popover with a
- * multi-line draft in the box (the case a fixed sideOffset cannot handle), and
- * reports the intersection rectangle.
+ * THIS PROBE USED TO ASSERT THE WRONG THING, and it is worth writing down why,
+ * because it was red for months while the app was doing exactly what it was
+ * asked to. An adversarial report (b5) measured 56.63px of the popover sitting
+ * over the editor and called it a defect; this asserted zero overlap. the user then
+ * looked at the alternative — the panel anchored to the composer CARD, so it
+ * cleared the text by floating above the whole thing — and rejected it: "effort
+ * bar shows all the way up there rather than right above where it should be."
+ *
+ * Above the trigger and clear of the editor are mutually exclusive: the trigger
+ * is at the bottom of the composer and the editor is what is above it. the user
+ * picked proximity. So the measurement that matters is not the intersection with
+ * the editor, it is the distance to the BUTTON — the thing that was actually
+ * wrong and the thing that could silently come back if the anchor ever slips
+ * back to `.pd-composer-root`.
+ *
+ * It still opens with a multi-line draft in the box, because that is the case
+ * that made the old anchoring look broken: the taller the draft, the further the
+ * card-anchored panel flew from its own control.
  */
 import { mkdtempSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -42,18 +56,24 @@ await page.waitForTimeout(400);
 const m = await page.evaluate(() => {
   const pop = document.querySelector('.pd-effort-popover');
   const ed = document.querySelector('.pd-composer-editor');
-  if (!pop || !ed) return { missing: { pop: !pop, editor: !ed } };
+  const btn = document.querySelector('[data-testid="composer-effort"]');
+  const card = document.querySelector('.pd-composer-root');
+  if (!pop || !ed || !btn) return { missing: { pop: !pop, editor: !ed, trigger: !btn } };
   const p = pop.getBoundingClientRect();
   const e = ed.getBoundingClientRect();
-  const yOverlap = Math.max(0, Math.min(p.bottom, e.bottom) - Math.max(p.top, e.top));
-  const xOverlap = Math.max(0, Math.min(p.right, e.right) - Math.max(p.left, e.left));
+  const b = btn.getBoundingClientRect();
+  const c = card?.getBoundingClientRect() ?? null;
   return {
-    yOverlap: +yOverlap.toFixed(2),
-    xOverlap: +xOverlap.toFixed(2),
-    editorHeight: +e.height.toFixed(2),
-    editorWidth: +e.width.toFixed(2),
-    popTop: +p.top.toFixed(2),
-    editorTop: +e.top.toFixed(2),
+    // The measurement that matters: how far the panel's bottom edge sits from
+    // the top of its own button, and how far their right edges are apart.
+    gapToTrigger: +(b.top - p.bottom).toFixed(2),
+    rightEdgeSkew: +Math.abs(p.right - b.right).toFixed(2),
+    // Kept for the record — this is the number the old assertion was built on.
+    editorOverlapY: +Math.max(0, Math.min(p.bottom, e.bottom) - Math.max(p.top, e.top)).toFixed(2),
+    // If it ever anchors to the CARD again, this is what gives it away: the
+    // panel would clear the card's top edge instead of hugging the button.
+    aboveCardTop: c !== null ? p.bottom <= c.top + 1 : false,
+    draftHeight: +e.height.toFixed(2),
   };
 });
 console.log('[effort]', JSON.stringify(m));
@@ -63,8 +83,26 @@ if (m === null || m.missing !== undefined) {
   console.error('[effort] FAIL: could not measure', JSON.stringify(m));
   process.exit(1);
 }
-if (m.yOverlap > 0) {
-  console.error(`[effort] FAIL: popover still covers the editor by ${m.yOverlap}px`);
+// `sideOffset={8}`, so 8px is the intended gap. The tolerance is for subpixel
+// layout, not for a second opinion about where the panel belongs.
+if (!(m.gapToTrigger >= 0 && m.gapToTrigger <= 16)) {
+  console.error(
+    `[effort] FAIL: the popover is ${m.gapToTrigger}px from its own button — it should sit just above it (sideOffset 8), not float off with the draft height (${m.draftHeight}px)`,
+  );
   process.exit(1);
 }
-console.log('[effort] OK: zero overlap with the editor rect');
+if (m.aboveCardTop) {
+  console.error(
+    '[effort] FAIL: the popover cleared the whole composer card — it is anchored to the card again, not to the trigger',
+  );
+  process.exit(1);
+}
+if (m.rightEdgeSkew > 4) {
+  console.error(
+    `[effort] FAIL: align="end" should keep the right edges together, off by ${m.rightEdgeSkew}px`,
+  );
+  process.exit(1);
+}
+console.log(
+  `[effort] OK: the popover opens ${m.gapToTrigger}px above its own trigger, right edges aligned to ${m.rightEdgeSkew}px, with a ${m.draftHeight}px draft in the box (it covers ${m.editorOverlapY}px of the editor BY DESIGN — see the header)`,
+);

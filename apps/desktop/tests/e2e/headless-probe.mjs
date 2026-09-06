@@ -44,6 +44,20 @@ if (process.platform === 'darwin') {
 // A hidden window that does not render would make every visual probe useless,
 // so this checks the three things that would silently rot: layout, animation
 // frames, and a real screenshot.
+//
+// THE FRAME THRESHOLD IS "ALIVE", NOT "FAST", and it used to be the other way.
+// It demanded more than 10 frames per 500ms, which is roughly full rate, and a
+// hidden window does not run at full rate: MEASURED on one machine in one
+// minute, 61 frames shown against 6 hidden. It is not throttling in the
+// page-visibility sense (`document.visibilityState` reads "visible" and
+// `backgroundThrottling: false` moves the number not at all) — a window with no
+// on-screen surface just is not driven by the display's vsync. So the old
+// threshold went red for the platform behaving normally, and it went red first,
+// taking the other 84 probes in the chain with it.
+//
+// What this needs to catch is a renderer that has STOPPED. Animations here are
+// time-driven and screenshots force their own frame, so ~12fps costs the suite
+// nothing; zero frames would cost it everything.
 const alive = await page.evaluate(
   () =>
     new Promise((resolve) => {
@@ -61,11 +75,13 @@ const alive = await page.evaluate(
 const rendering =
   check(alive.width > 100, `the composer has no layout (width ${alive.width})`) &&
   check(
-    alive.frames > 10,
-    `only ${alive.frames} animation frames in 500ms — rendering is throttled`,
+    alive.frames > 2,
+    `only ${alive.frames} animation frames in 500ms — the renderer has stopped, not slowed`,
   );
 if (rendering) {
-  console.log(`[headless] OK: laid out (${alive.width}px) and animating (${alive.frames} frames)`);
+  console.log(
+    `[headless] OK: laid out (${alive.width}px) and animating (${alive.frames} frames in 500ms — a hidden window runs off a timer, not vsync)`,
+  );
 }
 
 const file = await shot('hidden-window');
