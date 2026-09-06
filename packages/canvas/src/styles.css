@@ -611,11 +611,25 @@
  * `--pd-segment-*` are the shared knobs, so this shrinks the control without
  * forking the segmented recipe.
  */
+/*
+ * MEASURED, second pass. the user again: "the 'rendered/raw' buttons are pretty big
+ * and could be a bit smaller and more in line, they buldge out a bit much." He
+ * is describing real geometry — the control was 30px tall (24 + 3px of track
+ * either side) in a bar that asks for 36px with 4px of padding, so it did two
+ * things at once: it stood 4px proud of the 26px icon buttons beside it, and it
+ * levered the bar itself open to 38px. "Bulge" is exactly right.
+ *
+ * 22px + 2px of track = 26px, the icon buttons' own height, so the row has ONE
+ * height and the bar closes back to 36px. The caption size and 12px icons take
+ * the width down with it, so it reads as one control among several rather than
+ * the loudest thing in the bar.
+ */
 .pd-canvas-view-toggle {
   flex: 0 0 auto;
-  --pd-segment-height: 24px;
-  --pd-segment-padding-x: 8px;
-  --pd-segment-font-size: var(--pd-font-size-footnote);
+  --pd-segment-height: 22px;
+  --pd-segment-track-padding: 2px;
+  --pd-segment-padding-x: 7px;
+  --pd-segment-font-size: var(--pd-font-size-caption);
 }
 
 /* File-tree popover panel toggled by the two-folders button. */

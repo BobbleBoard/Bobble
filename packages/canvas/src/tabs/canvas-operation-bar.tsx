@@ -221,7 +221,7 @@ function ViewModeToggle({
           value: 'rendered',
           label: (
             <>
-              <IconMarkup size={13} />
+              <IconMarkup size={12} />
               <span>Rendered</span>
             </>
           ),
@@ -230,7 +230,7 @@ function ViewModeToggle({
           value: 'raw',
           label: (
             <>
-              <IconCode size={13} />
+              <IconCode size={12} />
               <span>Raw</span>
             </>
           ),

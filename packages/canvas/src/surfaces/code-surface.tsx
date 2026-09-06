@@ -59,8 +59,29 @@ const codeTheme = EditorView.theme({
     lineHeight: 'var(--pd-leading-code)',
     overflow: 'auto',
   },
+  /*
+   * THE GUTTER IS OPAQUE, and it has to be.
+   *
+   * CodeMirror pins the line-number gutter with `position: sticky; left: 0`, so
+   * on a horizontal scroll the code slides UNDER it. Transparent, the two draw
+   * on top of each other and the line numbers sit in the middle of the source —
+   * the user, looking at a wide file: "the line numbers on the left side seem to
+   * have transparent background and overlap with real text if hscroll occurs."
+   *
+   * The editor's own background is the right fill: it matches at rest, so this
+   * is invisible until the moment it is needed.
+   */
   '.cm-gutters': {
-    backgroundColor: 'transparent',
+    /*
+     * `--pd-code-block-bg` is a TINT (#ffffff0a here), not a fill, so setting it
+     * alone left the gutter 96% see-through — the assertion "not transparent"
+     * went green while the screen still showed code through the digits. The
+     * layer under it is the canvas panel, `--pd-bg-raised`, which is what the
+     * editor root is really sitting on; painting both in that order gives the
+     * gutter the editor's own colour AND full opacity.
+     */
+    background:
+      'linear-gradient(var(--pd-code-block-bg), var(--pd-code-block-bg)), var(--pd-bg-raised)',
     color: 'var(--pd-text-ghost)',
     border: 'none',
   },
