@@ -18,9 +18,13 @@ import {
   cleanErrorText,
   type ToolResultMsg,
 } from '@pi-desktop/engine';
-import type { ReactNode } from 'react';
+import { type ReactNode, useEffect } from 'react';
+import { abortPi } from '../state/pi-connect';
 import { segmentGroup, toolStepKind } from './activity-mapping';
 import { InlineArtifact } from './canvas/InlineArtifacts';
+import { recordJobDuration } from './job-history';
+import { LongJobCard } from './LongJobCard';
+import { type JobKind, jobKindForTool } from './long-job';
 import { Markdown } from './markdown';
 import { ThreadActivityChain } from './ThreadActivity';
 import { ThreadImagePlaceholder } from './ThreadImagePlaceholder';
@@ -48,6 +52,14 @@ function mediaForSegment(
   }
   return out;
 }
+
+/*
+ * Job durations are recorded ONCE per tool call, ever. This component re-renders
+ * on every token of the surrounding turn and remounts on a chat switch, so
+ * without this the same four-minute image would teach the estimator hundreds of
+ * times and drown every other sample it has.
+ */
+const RECORDED = new Set<string>();
 
 export function AssistantGroup({
   group,
@@ -126,6 +138,69 @@ export function AssistantGroup({
     }
   }
 
+  /*
+   * THE JOB THIS GROUP IS WAITING ON — the 293 seconds of silence.
+   *
+   * Same shape as the pending-image scan above and deliberately not merged with
+   * it: that one exists to place the denoise preview in the right box, this one
+   * exists to put words, a clock and a Cancel around ANY long job, including
+   * the ones (video, music, a 3D build) that have no preview to show at all.
+   *
+   * `startedAt` is the owning message's timestamp, which is when pi began the
+   * call. Wall-clock, so it survives a re-render and a component remount — a
+   * timer that restarts at 0:00 halfway through a four-minute wait is worse
+   * than no timer, because it says the opposite of what is true.
+   */
+  let runningJob: {
+    kind: NonNullable<ReturnType<typeof jobKindForTool>>;
+    callId: string;
+    startedAt: number;
+  } | null = null;
+  if (!suppressInlineArtifacts) {
+    for (const m of group) {
+      for (const b of m.blocks) {
+        if (b.type !== 'toolCall' || runningJob !== null) continue;
+        if (!runningToolCalls.includes(b.id) || resultForBlock.has(b.id)) continue;
+        const kind = jobKindForTool(b.name);
+        if (kind === null) continue;
+        runningJob = { kind, callId: b.id, startedAt: m.timestamp };
+      }
+    }
+  }
+
+  /*
+   * LEARNING WHAT THIS MAC ACTUALLY DOES.
+   *
+   * The shipped estimate ranges are a guess about someone else's hardware; the
+   * card starts quoting this machine as soon as it has run the job twice. The
+   * duration is the span from the tool CALL to its RESULT, so a job that was
+   * cancelled — no result — teaches nothing, which is right: a wait the user
+   * cut short is not evidence of how long the work takes.
+   *
+   * In an effect, and guarded by callId, because this component re-renders on
+   * every token of the surrounding turn.
+   */
+  const finished: { kind: JobKind; callId: string; seconds: number }[] = [];
+  for (const m of group) {
+    for (const b of m.blocks) {
+      if (b.type !== 'toolCall') continue;
+      const kind = jobKindForTool(b.name);
+      if (kind === null) continue;
+      const result = resultForBlock.get(b.id);
+      if (result === undefined) continue;
+      finished.push({ kind, callId: b.id, seconds: (result.timestamp - m.timestamp) / 1000 });
+    }
+  }
+  const finishedKey = finished.map((f) => f.callId).join(',');
+  // biome-ignore lint/correctness/useExhaustiveDependencies: keyed on the call ids, which is the identity that matters
+  useEffect(() => {
+    for (const f of finished) {
+      if (RECORDED.has(f.callId)) continue;
+      RECORDED.add(f.callId);
+      recordJobDuration(f.kind, f.seconds);
+    }
+  }, [finishedKey]);
+
   const segments = segmentGroup(group);
   const lastSegment = segments[segments.length - 1];
   const groupId = group[0]?.id ?? 'g';
@@ -177,6 +252,12 @@ export function AssistantGroup({
           pendingImageCallId !== undefined &&
           seg.kind === 'chain' &&
           seg.blocks.some((b) => b.type === 'toolCall' && b.id === pendingImageCallId);
+        const jobHere =
+          runningJob !== null &&
+          seg.kind === 'chain' &&
+          seg.blocks.some((b) => b.type === 'toolCall' && b.id === runningJob?.callId)
+            ? runningJob
+            : null;
         return (
           <div key={`${groupId}-a${activityN++}`} className="flex min-w-0 flex-col gap-2">
             <ThreadActivityChain
@@ -195,7 +276,30 @@ export function AssistantGroup({
                 placeholder subscribes to the frame stream itself and drives its
                 own DOM, so it must MOUNT ONCE per generation. Remounting it
                 would replay its entrance animation mid-run. */}
-            {pendingHere ? <ThreadImagePlaceholder /> : null}
+            {/*
+              THE WAIT, WITH WORDS ON IT.
+
+              The card wraps whatever the job itself can show — for an image
+              that is the live denoise, which is a far better proof of life than
+              any spinner. For a video or a 3D build there is nothing to show,
+              and the card is all there is: the title, "usually N minutes on
+              this Mac", a clock that moves, and a Cancel.
+
+              Same segment test as the image preview so the card sits in the
+              chain that started the work, and the finished result replaces it
+              in place.
+            */}
+            {jobHere !== null ? (
+              <LongJobCard
+                kind={jobHere.kind}
+                startedAt={jobHere.startedAt}
+                onCancel={() => void abortPi()}
+              >
+                {pendingHere ? <ThreadImagePlaceholder /> : undefined}
+              </LongJobCard>
+            ) : pendingHere ? (
+              <ThreadImagePlaceholder />
+            ) : null}
             {/* WHAT THE TURN MADE, under the chain that made it. Generated
                 images used to reach the thread only as a 414px markdown embed
                 and generated audio/video only as a path in prose; the user wants

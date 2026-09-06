@@ -5097,3 +5097,58 @@ body[data-media-expanded="true"] .pd-studio-compose {
   background: var(--pd-bg-hover);
   color: var(--pd-text-primary);
 }
+
+/* ── The long-job card ────────────────────────────────────────────────────
+ *
+ * Quiet chrome around whatever the job itself has to show. It sits in the chat
+ * column under the chain that started the work, so it must read as part of the
+ * conversation rather than a dialog interrupting it.
+ */
+.pd-longjob {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 420px;
+  padding: 10px 12px;
+  border: 1px solid var(--pd-border-subtle);
+  border-radius: var(--pd-radius-lg);
+  background: var(--pd-bg-raised);
+}
+
+.pd-longjob-life {
+  min-width: 0;
+}
+
+.pd-longjob-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pd-longjob-row > .min-w-0 {
+  flex: 1 1 auto;
+}
+
+/* Tabular figures and a fixed slot: a clock whose width changes as it counts
+ * makes everything beside it twitch once a second. */
+.pd-longjob-timer {
+  flex: 0 0 auto;
+  min-width: 4ch;
+  text-align: right;
+  color: var(--pd-text-muted);
+  font-size: var(--pd-font-size-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+.pd-longjob-cancel {
+  flex: 0 0 auto;
+  height: 24px;
+  padding: 0 10px;
+  font-size: var(--pd-font-size-caption);
+}
+
+.pd-longjob-overrun {
+  color: var(--pd-status-warning-fg);
+  font-size: var(--pd-font-size-caption);
+  line-height: var(--pd-leading-caption);
+}

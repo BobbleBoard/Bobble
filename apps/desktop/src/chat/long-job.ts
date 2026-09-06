@@ -1,0 +1,164 @@
+/**
+ * The card for a job you will be waiting on.
+ *
+ * From the blind test, the moment that lost her: an image took 293 seconds and
+ * the app said nothing for any of them. Her three rules, adopted verbatim:
+ *
+ *   (a) anything over ~10s gets a card the instant it starts — with the
+ *       estimate, a moving timer, and a Cancel;
+ *   (b) it must show evidence of life, something that CHANGES;
+ *   (c) if it blows the estimate, say so.
+ *
+ * And the principle underneath them: "cloud apps stream so you never feel the
+ * wait. You can't stream an image. So the honest substitute is the number, up
+ * front. '2–5 minutes' that turns out to be four is fine. Zero information for
+ * 293 seconds is not fine at any duration."
+ *
+ * ON THIS MAC is meant literally. A shipped range is a guess about someone
+ * else's hardware; the range narrows to what this machine has actually done as
+ * soon as it has done it twice. See {@link estimateFor}.
+ *
+ * Pure — no React, no storage. The persistence seam is passed in.
+ */
+
+/** The kinds of work worth putting a card in front of. */
+export type JobKind = 'image' | 'video' | 'music' | 'speech' | 'sfx' | 'model3d' | 'other';
+
+/** Seconds, low to high — the range the card quotes. */
+export interface JobEstimate {
+  lowSec: number;
+  highSec: number;
+  /** True once the range comes from this machine rather than the shipped guess. */
+  measured: boolean;
+}
+
+/**
+ * The shipped ranges: deliberately WIDE, because a narrow guess about unknown
+ * hardware is the 99%-progress-bar mistake in another costume. They are only
+ * ever the answer until this Mac has run the job twice.
+ */
+export const DEFAULT_ESTIMATES: Record<JobKind, [lowSec: number, highSec: number]> = {
+  image: [30, 180],
+  video: [180, 600],
+  music: [60, 300],
+  speech: [10, 60],
+  sfx: [10, 60],
+  model3d: [180, 600],
+  other: [10, 120],
+};
+
+/** The verb on the card. First person, present tense, no tool names. */
+export const JOB_TITLE: Record<JobKind, string> = {
+  image: 'Making your image',
+  video: 'Making your video',
+  music: 'Composing your music',
+  speech: 'Recording the audio',
+  sfx: 'Making the sound',
+  model3d: 'Building your 3D model',
+  other: 'Working on it',
+};
+
+/** Kinds that get a card the INSTANT they start, because they are never quick. */
+const ALWAYS_CARD = new Set<JobKind>(['image', 'video', 'music', 'model3d']);
+
+/** How long a not-known-slow job runs before it earns a card. */
+export const CARD_AFTER_MS = 10_000;
+
+export function shouldShowCard(kind: JobKind, elapsedMs: number): boolean {
+  return ALWAYS_CARD.has(kind) || elapsedMs >= CARD_AFTER_MS;
+}
+
+/**
+ * The range for this kind: the middle 50% of what this machine has actually
+ * done, once there are at least two samples, else the shipped guess.
+ *
+ * Two is a low bar for a statistic and a high one for honesty — it is the point
+ * at which the app is quoting THIS Mac instead of a table, and a range that is
+ * merely rough beats a number that is about someone else's laptop.
+ */
+export function estimateFor(kind: JobKind, samplesSec: readonly number[]): JobEstimate {
+  const usable = samplesSec.filter((s) => Number.isFinite(s) && s > 0).sort((a, b) => a - b);
+  const [lo, hi] = DEFAULT_ESTIMATES[kind];
+  if (usable.length < 2) return { lowSec: lo, highSec: hi, measured: false };
+  const at = (q: number): number =>
+    usable[Math.min(usable.length - 1, Math.floor(q * usable.length))] as number;
+  const low = at(0.25);
+  const high = at(0.75);
+  /*
+   * A range that has collapsed to a point reads as a promise rather than an
+   * estimate — and it is a promise about a local model on a machine that is
+   * also doing other things, so it will be broken. Spread it.
+   *
+   * The trigger is deliberately tight (5%): a genuinely consistent job SHOULD
+   * quote a tight range, and widening one that the machine has earned would
+   * throw away the whole point of measuring.
+   */
+  if (high - low < Math.max(2, low * 0.05)) {
+    return { lowSec: Math.max(1, low * 0.85), highSec: high * 1.15, measured: true };
+  }
+  return { lowSec: low, highSec: high, measured: true };
+}
+
+/** 45 → "45 seconds"; 150 → "2 minutes"; rounded the way a person would say it. */
+function saySeconds(sec: number): string {
+  if (sec < 90) return `${Math.max(1, Math.round(sec / 5) * 5)} seconds`;
+  const mins = Math.round(sec / 60);
+  return `${mins} minute${mins === 1 ? '' : 's'}`;
+}
+
+/** "usually 2–5 minutes on this Mac" — or seconds, when that is the honest unit. */
+export function estimateText(est: JobEstimate): string {
+  const bothMinutes = est.lowSec >= 90 && est.highSec >= 90;
+  const range = bothMinutes
+    ? `${Math.round(est.lowSec / 60)}–${Math.round(est.highSec / 60)} minutes`
+    : `${saySeconds(est.lowSec)} to ${saySeconds(est.highSec)}`;
+  return `usually ${range} on this Mac`;
+}
+
+/** 0 → "0:00"; 154_000 → "2:34". Always mm:ss, so its width never jumps. */
+export function timerText(elapsedMs: number): string {
+  const total = Math.max(0, Math.floor(elapsedMs / 1000));
+  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
+}
+
+/** Everything the card renders, derived in one place so the copy is testable. */
+export interface JobView {
+  title: string;
+  estimate: string;
+  timer: string;
+  /** Past the high end of the estimate — the card says so rather than hoping. */
+  overrun: boolean;
+  /** The line shown once it has overrun; null before that. */
+  overrunText: string | null;
+}
+
+export function jobView(kind: JobKind, elapsedMs: number, est: JobEstimate): JobView {
+  /*
+   * THE OVERRUN LINE IS THE WHOLE POINT OF QUOTING A RANGE.
+   *
+   * A quoted estimate that silently expires is worse than no estimate: the user
+   * now has a number they have watched the app break. Saying it out loud costs
+   * one sentence and buys back the trust the number was supposed to earn.
+   */
+  const overrun = elapsedMs > est.highSec * 1000;
+  return {
+    title: JOB_TITLE[kind],
+    estimate: estimateText(est),
+    timer: timerText(elapsedMs),
+    overrun,
+    overrunText: overrun ? 'Taking longer than usual. You can keep waiting or stop.' : null,
+  };
+}
+
+/** Map a tool name to a job kind (null = not a job worth a card). */
+export function jobKindForTool(name: string | undefined): JobKind | null {
+  const n = (name ?? '').toLowerCase();
+  if (n.length === 0) return null;
+  if (n.includes('image') || n.includes('picture')) return 'image';
+  if (n.includes('video') || n.includes('clip')) return 'video';
+  if (n.includes('music')) return 'music';
+  if (n.includes('speech') || n.includes('voice') || n.includes('tts')) return 'speech';
+  if (n.includes('sfx') || n.includes('sound_effect')) return 'sfx';
+  if (n.includes('3d') || n.includes('mesh') || n.includes('model_gen')) return 'model3d';
+  return null;
+}
