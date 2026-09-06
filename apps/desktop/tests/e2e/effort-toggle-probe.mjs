@@ -24,7 +24,7 @@
 import { mkdirSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { launchApp } from './harness.mjs';
+import { launchApp, openWorkMode } from './harness.mjs';
 
 const home = mkdtempSync(path.join(tmpdir(), 'pd-effort-toggle-home-'));
 mkdirSync(path.join(home, '.pi', 'agent', 'sessions', 'proj'), { recursive: true });
@@ -54,6 +54,10 @@ const state = () =>
     };
   });
 
+// The effort dial, the project chip and the instruction files live on the WORK
+// ledge, which the app now ships collapsed (and `inert`) behind the Chat|Work
+// toggle in the top left. A probe that drives one of them opens it first.
+await openWorkMode(page);
 await page.click('[data-testid="composer-effort"]');
 await page.waitForSelector('.pd-effort-popover');
 await page.waitForTimeout(500);

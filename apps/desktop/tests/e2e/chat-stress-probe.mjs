@@ -26,7 +26,7 @@
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { launchApp, REPO_ROOT } from './harness.mjs';
+import { launchApp, openWorkMode, REPO_ROOT } from './harness.mjs';
 import { armJitter, jitterReport, mark as markPhase, summarizeJitter } from './jitter.mjs';
 
 /**
@@ -424,6 +424,7 @@ try {
     await page.click('[data-testid="collapse-sidebar"], [data-testid="expand-sidebar"]');
     await page.waitForTimeout(600);
   }
+  await openWorkMode(page);
   await page.click('[data-testid="composer-effort"]');
   await page.waitForTimeout(400);
   await page.keyboard.press('Escape');

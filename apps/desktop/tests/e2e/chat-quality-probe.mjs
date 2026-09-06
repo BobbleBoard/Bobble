@@ -12,7 +12,7 @@
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { launchApp } from './harness.mjs';
+import { launchApp, openWorkMode } from './harness.mjs';
 
 // A seeded chat so the sidebar has a row to run, and a message to copy.
 const home = mkdtempSync(path.join(tmpdir(), 'pd-chatq-home-'));
@@ -247,6 +247,9 @@ try {
     await window.__pi_project().getState().selectPath(dir);
   }, home);
   await page.waitForTimeout(400);
+  // The project chip lives on the WORK ledge, which ships collapsed behind the
+  // Chat|Work toggle in the top left.
+  await openWorkMode(page);
   await page.click('.pd-project-chip');
   await page.waitForSelector('[data-testid="project-full-access"]', { timeout: 5000 });
   const danger = await page.evaluate(() => {

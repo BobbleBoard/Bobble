@@ -1162,6 +1162,16 @@ export function ChatComposer({
           className="pd-composer-ledge"
           data-open={workMode === 'work'}
           data-testid="composer-ledge"
+          /*
+           * A CLOSED PANEL MUST NOT KEEP ITS CONTROLS IN THE TAB ORDER.
+           *
+           * It stays mounted so the project picker and effort dial keep their
+           * state across a toggle and the transition has something to animate —
+           * but a control you cannot see and can still tab to is the same defect
+           * the closed settings rail had. `inert` takes the whole subtree out of
+           * focus, hit-testing and the accessibility tree in one attribute.
+           */
+          inert={workMode !== 'work'}
         >
           <div>
             <ComposerBar />

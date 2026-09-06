@@ -26,7 +26,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { _electron as electron } from 'playwright-core';
-import { probeHome } from './harness.mjs';
+import { openWorkMode, probeHome } from './harness.mjs';
 
 /* A throwaway $HOME. The app keeps settings, conversations and generated
    media under it, and `--user-data-dir` isolates none of that (harness.mjs). */
@@ -251,6 +251,10 @@ try {
   await threadStatus.waitFor({ state: 'detached', timeout: 8000 });
 
   // ── #2: the "Effort" button opens the slider in a popover ──────────────────
+  // The effort dial, the project chip and the instruction files live on the WORK
+  // ledge, which the app now ships collapsed (and `inert`) behind the Chat|Work
+  // toggle in the top left. A probe that drives one of them opens it first.
+  await openWorkMode(page);
   const effortBtn = page.locator('[data-testid="composer-effort"]');
   await effortBtn.waitFor({ timeout: 8000 });
   // In the default auto state the button reads the literal "Effort · Adaptive"

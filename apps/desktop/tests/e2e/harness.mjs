@@ -176,6 +176,31 @@ export function focusComplaint(before, during) {
  *   `realCache`  point `PI_DESKTOP_CACHE_DIR` at the real weights (see REAL_CACHE)
  *   `env.HOME`   supply your own home instead of a throwaway one
  */
+/**
+ * Open the WORK half of the app — the ledge under the composer that carries the
+ * project chip, the instruction files, the context ring and the effort dial.
+ *
+ * The app ships in CHAT mode, where that ledge is collapsed and `inert`, so a
+ * probe that drives one of those controls has to ask for it first. This is one
+ * line rather than eight copies of the same click, and it waits for the slide
+ * to finish — the ledge animates over 260ms and a click landing mid-transition
+ * is the "element intercepts pointer events" failure that found this.
+ */
+export async function openWorkMode(page) {
+  const toggle = await page.$('[data-testid="mode-work"]');
+  if (toggle === null) return false;
+  await toggle.click();
+  await page.waitForFunction(
+    () =>
+      document.querySelector('[data-testid="composer-ledge"]')?.getAttribute('data-open') ===
+      'true',
+    undefined,
+    { timeout: 5000 },
+  );
+  await page.waitForTimeout(400);
+  return true;
+}
+
 export async function launchApp(name, options = {}) {
   const {
     fixture = TOOL_USE_FIXTURE,

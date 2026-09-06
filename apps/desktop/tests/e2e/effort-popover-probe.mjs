@@ -26,7 +26,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { _electron as electron } from 'playwright-core';
-import { probeHome } from './harness.mjs';
+import { openWorkMode, probeHome } from './harness.mjs';
 
 /* A throwaway $HOME. The app keeps settings, conversations and generated
    media under it, and `--user-data-dir` isolates none of that (harness.mjs). */
@@ -54,6 +54,10 @@ for (let i = 0; i < 4; i++) {
   await page.keyboard.press('Shift+Enter');
 }
 await page.waitForTimeout(300);
+// The effort dial, the project chip and the instruction files live on the WORK
+// ledge, which the app now ships collapsed (and `inert`) behind the Chat|Work
+// toggle in the top left. A probe that drives one of them opens it first.
+await openWorkMode(page);
 await page.click('[data-testid="composer-effort"]');
 await page.waitForSelector('.pd-effort-popover', { timeout: 5000 });
 await page.waitForTimeout(400);

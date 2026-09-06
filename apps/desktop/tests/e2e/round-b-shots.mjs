@@ -5,6 +5,7 @@ import { homedir, tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { _electron as electron } from 'playwright-core';
+import { openWorkMode } from './harness.mjs';
 
 const require = createRequire(import.meta.url);
 const electronBinary = require('electron');
@@ -68,6 +69,10 @@ for (let i = 0; i < 3; i++) {
   await page.keyboard.type(`line ${i} of a draft you can still read`);
   await page.keyboard.press('Shift+Enter');
 }
+// The effort dial, the project chip and the instruction files live on the WORK
+// ledge, which the app now ships collapsed (and `inert`) behind the Chat|Work
+// toggle in the top left. A probe that drives one of them opens it first.
+await openWorkMode(page);
 await page.click('[data-testid="composer-effort"]');
 await page.waitForTimeout(500);
 await page.screenshot({ path: path.join(OUT, '2-effort-popover.png') });
