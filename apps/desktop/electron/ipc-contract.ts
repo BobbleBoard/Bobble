@@ -293,6 +293,17 @@ export interface LlmStatus {
    * multimodal on the first image to gain a capability it already had.
    */
   visionReady?: boolean;
+  /**
+   * Set while an ENGINE is being compiled rather than a model loaded.
+   *
+   * A model whose architecture the shipped llama.cpp does not have is launched
+   * on a variant built from source (llamacpp-variants.ts), and that is a
+   * multi-minute compile the first time — MEASURED at 3m41s for K2 Horizon on an
+   * M5 Pro. Without this the status is `starting` and the composer says "Loading
+   * model…" for four silent minutes, which is indistinguishable from a hang. The
+   * note says what is actually happening and that it happens once.
+   */
+  engineBuild?: { variantId: string; note: string };
   error?: string;
 }
 

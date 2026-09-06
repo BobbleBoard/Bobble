@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   chatTemplatePath,
+  chatTemplateSupported,
   ensureChatTemplate,
   extractChatTemplate,
   repoSlug,
@@ -192,5 +193,50 @@ describe('ensureChatTemplate', () => {
   it('throws when gated + no token + nothing cached', async () => {
     const { fetchImpl } = mockFetch(() => ({ ok: false, status: 401 }));
     await expect(ensureChatTemplate(REPO, { cacheDir: dir, fetchImpl })).rejects.toThrow();
+  });
+});
+
+describe('chatTemplateSupported', () => {
+  /** A fake llama-server: emits `text` then closes. */
+  const fakeServer = (text: string) => {
+    const stream = {
+      on(_e: 'data', cb: (c: Buffer | string) => void) {
+        setTimeout(() => cb(text), 0);
+      },
+    };
+    return () => ({
+      stderr: stream as never,
+      stdout: null,
+      // The real server exits non-zero here (the model path is deliberately
+      // bogus); the verdict is in what it printed, not in the code.
+      on(_e: 'close', cb: (code: number | null) => void) {
+        setTimeout(() => cb(1), 5);
+      },
+    });
+  };
+
+  it('reports a template llama.cpp cannot parse as unsupported', async () => {
+    // The real message, from IFM/K2-Horizon-0.9B's transformers-flavour template.
+    const ok = await chatTemplateSupported(
+      '/fake/llama-server',
+      '/fake/t.jinja',
+      fakeServer(
+        'common_chat_templates_init: error: parser: Parser Error: Expected %} (Got true)\nerror: the supplied chat template is not supported',
+      ) as never,
+    );
+    expect(ok).toBe(false);
+  });
+
+  it('reports a template it accepts as supported, ignoring the missing-model error', async () => {
+    // The check deliberately points at a model that does not exist — the template
+    // verdict lands first, and this error is expected noise.
+    const ok = await chatTemplateSupported(
+      '/fake/llama-server',
+      '/fake/t.jinja',
+      fakeServer(
+        'gguf_init_from_file: failed to open GGUF file\nerror: unable to load model',
+      ) as never,
+    );
+    expect(ok).toBe(true);
   });
 });

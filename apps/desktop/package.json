@@ -16,7 +16,7 @@
     "e2e:visible": "PI_E2E_VISIBLE=1 pnpm run e2e",
     "rebuild:native": "electron-rebuild -f -w node-pty",
     "e2e:stress": "npx tsx tests/e2e/power-stress-probe.mjs",
-    "e2e:real": "node tests/e2e/effort-probe.mjs && node tests/e2e/long-task-probe.mjs && node tests/e2e/image-edit-real-probe.mjs && node tests/e2e/audio-3d-real-probe.mjs && node tests/e2e/enhance-prefill-probe.mjs"
+    "e2e:real": "node tests/e2e/effort-probe.mjs && node tests/e2e/long-task-probe.mjs && node tests/e2e/image-edit-real-probe.mjs && node tests/e2e/audio-3d-real-probe.mjs && node tests/e2e/enhance-prefill-probe.mjs && node tests/e2e/k2-horizon-real-probe.mjs"
   },
   "dependencies": {
     "@lexical/history": "^0.46.0",

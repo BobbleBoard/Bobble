@@ -8,7 +8,7 @@
  * forked by llm-main.ts. Isolated from Electron main so a wedged download or a
  * crash-looping llama-server never takes the UI process down.
  */
-import { execFile } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
   createReadStream,
@@ -30,6 +30,7 @@ import {
   type CatalogFile,
   type CatalogModel,
   chatTemplatePath,
+  chatTemplateSupported,
   chooseContextCap,
   chooseServerPerfArgs,
   classifyBottleneck,
@@ -39,7 +40,7 @@ import {
   detectHardware,
   downloadModel,
   ensureChatTemplate,
-  ensureLlamaCpp,
+  ensureEngineFor,
   ensureMlx,
   estimateRamGB,
   getCatalogFile,
@@ -142,18 +143,43 @@ function persistedHfToken(): string | undefined {
 async function resolveChatTemplateArgs(
   model: CatalogModel,
   hfToken: string | undefined,
+  serverPath?: string,
 ): Promise<string[]> {
   const baseRepo = model.baseRepo;
   if (baseRepo === undefined) return [];
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), CHAT_TEMPLATE_FETCH_TIMEOUT_MS);
   timer.unref?.();
+
+  /*
+   * A TEMPLATE THE ENGINE CANNOT PARSE IS WORSE THAN NO TEMPLATE.
+   *
+   * These come from the base (transformers) repo and are rendered by llama.cpp's
+   * minja, which is a subset of Jinja. When they disagree llama-server refuses to
+   * START — MEASURED on IFM/K2-Horizon-0.9B, whose 51KB template produces
+   * "Parser Error: Expected %} (Got true)" — and the app's only symptom is
+   * "llama-server never became healthy on port N", with nothing anywhere naming
+   * the template. The GGUF's own embedded template was fine the whole time.
+   *
+   * So the engine is asked first (68ms, no weights read), and a template it
+   * would reject is simply not passed.
+   */
+  const usable = async (templatePath: string): Promise<string[]> => {
+    if (serverPath === undefined) return ['--jinja', '--chat-template-file', templatePath];
+    const ok = await chatTemplateSupported(serverPath, templatePath, spawn).catch(() => true);
+    if (ok) return ['--jinja', '--chat-template-file', templatePath];
+    console.log(
+      `[chat-template] ${model.id}: ${baseRepo}'s template is not valid for this engine — falling back to the GGUF's own`,
+    );
+    return [];
+  };
+
   try {
     const res = await ensureChatTemplate(baseRepo, { hfToken, signal: controller.signal });
-    return ['--jinja', '--chat-template-file', res.path];
+    return await usable(res.path);
   } catch {
     const cached = chatTemplatePath(baseRepo);
-    if (existsSync(cached)) return ['--jinja', '--chat-template-file', cached];
+    if (existsSync(cached)) return await usable(cached);
     return [];
   } finally {
     clearTimeout(timer);
@@ -262,6 +288,8 @@ interface CurrentServer {
 
 let current: CurrentServer | null = null;
 let phase: LlmStatus['phase'] = 'idle';
+/** Set only while an engine VARIANT is compiling — see LlmStatus.engineBuild. */
+let engineBuild: LlmStatus['engineBuild'];
 let lastError: string | undefined;
 let metrics: LlmStatus['metrics'] = null;
 
@@ -335,6 +363,7 @@ function status(): LlmStatus {
       .filter((m) => m.files.some((f) => isDownloaded(m, f)))
       .map((m) => m.id),
     launchMode: current?.launchMode,
+    ...(engineBuild !== undefined ? { engineBuild } : {}),
     /* A projector was attached → the server can read an image, whatever mode it
        was launched in. MLX has no projector path, so it reports false. */
     visionReady: current?.visionReady ?? false,
@@ -1054,7 +1083,30 @@ async function startServerExclusive(
       await current.supervisor.dispose();
       current = null;
     }
-    const install = await ensureLlamaCpp();
+    /*
+     * THE ENGINE IS CHOSEN PER MODEL, not once for the app.
+     *
+     * Almost always that is the pinned release. A model whose GGUF declares an
+     * architecture the pinned binary has never heard of gets the engine variant
+     * declared for it instead (llamacpp-variants.ts) — MEASURED for K2 Horizon:
+     * the pinned b10603 answers `unknown model architecture: 'k2-horizon'` and
+     * refuses to start, which is not something the user can do anything about.
+     * `ensureEngineFor` also asks the pinned binary whether it has caught up, so
+     * the variant stops being used the moment a pin bump makes it unnecessary.
+     */
+    const install = await ensureEngineFor(model, {
+      execFileImpl: execFileAsync,
+      // A compile is not a model load, and the user is watching a spinner either
+      // way — so say which it is, and that it is once.
+      onProgress: (p) => {
+        engineBuild = { variantId: model.architecture ?? 'engine', note: p.note };
+        emitStatus();
+      },
+    });
+    engineBuild = undefined;
+    if (install.variantId !== undefined) {
+      console.log(`[engine] ${model.id} → variant "${install.variantId}" (${install.serverPath})`);
+    }
     const features = await probeServerFeatures(install.serverPath);
     const hw = await getHardware();
     // Per-slot context (the reported/gauge value): a single request/slot sees this.
@@ -1153,7 +1205,11 @@ async function startServerExclusive(
     // routes to the real chat/tool parser instead of the GGUF's stale embedded
     // template. Best-effort + bounded: no baseRepo (or no cached/fetchable
     // template) → `[]`, leaving the launch unchanged. Applies in both modes.
-    const chatTemplateArgs = await resolveChatTemplateArgs(model, persistedHfToken());
+    const chatTemplateArgs = await resolveChatTemplateArgs(
+      model,
+      persistedHfToken(),
+      install.serverPath,
+    );
 
     // Per-hardware performance args. On Apple Silicon with RAM headroom this is
     // intentionally EMPTY — the pinned llama.cpp's auto defaults (-ngl/-fa/-ub/

@@ -144,6 +144,9 @@ export const RELIABLE_PUBLISHER_LIST: readonly ReliablePublisher[] = [
   { handle: 'openbmb', domains: ['text'] },
   { handle: 'internlm', domains: ['text'] },
   { handle: 'NousResearch', domains: ['text'] },
+  // Institute of Foundation Models (MBZUAI) — K2 Horizon, Apache-2.0, weights
+  // and training lifecycle published together.
+  { handle: 'IFM', domains: ['text'] },
   { handle: 'THUDM', domains: ['text', 'video'] },
   { handle: 'BAAI', domains: ['text', 'embeddings'] },
   // Image generation.
@@ -302,6 +305,18 @@ export interface CatalogModel {
   readonly sharded?: boolean;
   /** Human-readable available-quant range (e.g. "Q3–Q8 + UD + IQ"). */
   readonly quantRange?: string;
+  /**
+   * The GGUF's own `general.architecture`, when this model needs an engine the
+   * shipped llama.cpp release does not have.
+   *
+   * Only set it when it MATTERS — it is the routing key for engine variants
+   * (llamacpp-variants.ts), not documentation. A model whose architecture the
+   * pinned release already knows leaves this undefined and launches on the
+   * pinned binary like everything else. Read it out of the file header rather
+   * than guessing from the model's name: they are frequently different, and this
+   * string decides which binary runs.
+   */
+  readonly architecture?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -1128,6 +1143,65 @@ const LING3_TINY: CatalogModel = {
   quantRange: 'Q1–Q8 + UD + IQ',
 };
 
+/**
+ * K2 Horizon 0.9B (IFM) — the first catalog model that cannot run on the
+ * shipped engine.
+ *
+ * Everything about this entry is read from the artefacts rather than the
+ * announcement. The GGUF header says `general.architecture = k2-horizon`, 28
+ * blocks, 1536 embedding, 32 heads over 8 KV heads, 131072 context with YaRN at
+ * factor 16 — and the pinned b10603 libllama has no `k2-horizon` in it at all,
+ * so this loads only on the variant built from IFM's fork
+ * (llamacpp-variants.ts). That is the whole reason `architecture` exists.
+ *
+ * BF16 IS THE ONLY QUANT, and that is not an oversight to fix later: IFM
+ * publishes exactly one file per size, in the original precision. So this is
+ * 2.16GB for a 0.9B model where a Q8 would be under 1GB, and the 7B/32B/36B
+ * members are 14/64/72GB — which is why only this one is here. `quantRange`
+ * says so rather than implying a choice the repo does not offer.
+ *
+ * `baseRepo` carries the authoritative `chat_template.jinja`: the fork added its
+ * own copy of the template, and pointing at the model's own is what keeps tool
+ * calling honest when the two drift.
+ */
+export const K2_HORIZON_0_9B: CatalogModel = {
+  id: 'k2-horizon-0.9b',
+  displayName: 'K2 Horizon 0.9B',
+  hfRepo: 'IFM/K2-Horizon-0.9B-GGUF',
+  /*
+   * NO `baseRepo`, DELIBERATELY — the one case where the base repo's template is
+   * the wrong one to use. IFM's `chat_template.jinja` is 51KB of full-fat Jinja
+   * written for transformers and vLLM, and llama.cpp's minja cannot parse it:
+   * "Parser Error: Expected %} (Got true)", which makes llama-server refuse to
+   * start at all. The GGUF ships a llama.cpp-compatible template of its own (the
+   * fork added `models/templates/k2-horizon.jinja` alongside the conversion
+   * code), so the embedded one is both correct and the only one that works.
+   *
+   * The launcher would now catch this anyway — it asks the engine whether a
+   * template is parseable before passing it — but declaring a base repo whose
+   * template is known to be unusable would be stating something false.
+   */
+  architecture: 'k2-horizon',
+  files: [
+    {
+      name: 'K2-Horizon-1B-BF16.gguf',
+      bytes: 2_159_424_896,
+      quant: 'BF16',
+      sha256: '371010db1807bb07b62e738422ee0de26c1e15a347f31108ed2c6e219095a8b8',
+    },
+  ],
+  license: 'Apache-2.0',
+  // BF16 weights (2.16GB) plus a KV cache the context-cap sizes to the machine.
+  minRamGB: 8,
+  contextWindow: 131_072,
+  input: ['text'],
+  verified: true,
+  engine: 'llamacpp',
+  publisher: { handle: 'IFM', reliable: true },
+  tier: 'fast',
+  quantRange: 'BF16 only (no quants published)',
+};
+
 export const CATALOG: readonly CatalogModel[] = [
   GEMMA4_E2B,
   GEMMA4_E4B,
@@ -1139,6 +1213,7 @@ export const CATALOG: readonly CatalogModel[] = [
   QWEN35_4B_MTP,
   QWEN35_9B_MTP,
   LING3_TINY,
+  K2_HORIZON_0_9B,
   QWEN35_122B_A10B_MTP,
   QWEN36_27B_MTP,
   QWEN36_35B_A3B_MTP,

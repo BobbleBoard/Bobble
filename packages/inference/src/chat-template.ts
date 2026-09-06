@@ -326,3 +326,80 @@ export async function ensureChatTemplate(
     throw err;
   }
 }
+
+/**
+ * WILL THIS ENGINE ACCEPT THIS TEMPLATE?
+ *
+ * A base repo's `chat_template.jinja` is written for transformers or vLLM, and
+ * llama.cpp renders templates with minja — a subset. Most of the time they agree.
+ * When they do not, the failure is as bad as failures get: llama-server refuses
+ * to start, the app reports "llama-server never became healthy on port N", and
+ * nothing anywhere mentions a template.
+ *
+ * MEASURED on IFM/K2-Horizon-0.9B, whose template is 51KB of full-fat Jinja:
+ *   common_chat_templates_init: error: parser: Parser Error: Expected %} (Got true)
+ *   error: the supplied chat template is not supported
+ * — and the model became unlaunchable while its own GGUF carried a perfectly good
+ * llama.cpp-compatible template all along.
+ *
+ * The check is cheap because llama.cpp validates the template BEFORE it loads any
+ * weights: point it at a model path that does not exist and the template verdict
+ * still arrives, in MEASURED 68ms. So the launcher can ask first and simply not
+ * pass a template the engine would reject, letting the GGUF's embedded one stand.
+ */
+export type TemplateCheckSpawn = (
+  cmd: string,
+  args: readonly string[],
+) => {
+  on(e: 'close', cb: (code: number | null) => void): void;
+  stderr: NodeJS.ReadableStream | null;
+  stdout: NodeJS.ReadableStream | null;
+};
+
+/** Text llama.cpp prints when minja cannot parse (or apply) the template. */
+const REJECTION = /chat template is not supported|failed to initialize chat template/i;
+
+export async function chatTemplateSupported(
+  serverPath: string,
+  templatePath: string,
+  spawnImpl: TemplateCheckSpawn,
+  timeoutMs = 10_000,
+): Promise<boolean> {
+  return await new Promise<boolean>((resolve) => {
+    let output = '';
+    let settled = false;
+    const done = (ok: boolean): void => {
+      if (settled) return;
+      settled = true;
+      resolve(ok);
+    };
+    /*
+     * A deliberately absent model. The template is initialised first, so this
+     * gets the verdict without reading gigabytes — and the model error that
+     * follows is expected and ignored.
+     */
+    const child = spawnImpl(serverPath, [
+      '-m',
+      '/pi-desktop-template-check-no-model.gguf',
+      '--jinja',
+      '--chat-template-file',
+      templatePath,
+    ]);
+    const timer = setTimeout(() => done(!REJECTION.test(output)), timeoutMs);
+    timer.unref?.();
+    const collect = (c: Buffer | string): void => {
+      output += String(c);
+      // The verdict is printed early; no need to wait for the process to exit.
+      if (REJECTION.test(output)) {
+        clearTimeout(timer);
+        done(false);
+      }
+    };
+    child.stderr?.on('data', collect);
+    child.stdout?.on('data', collect);
+    child.on('close', () => {
+      clearTimeout(timer);
+      done(!REJECTION.test(output));
+    });
+  });
+}
