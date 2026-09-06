@@ -12,6 +12,11 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { _electron as electron } from 'playwright-core';
+import { probeHome } from './harness.mjs';
+
+/* A throwaway $HOME. The app keeps settings, conversations and generated
+   media under it, and `--user-data-dir` isolates none of that (harness.mjs). */
+const PROBE_HOME = probeHome('mention-probe');
 
 const require = createRequire(import.meta.url);
 const electronBinary = require('electron');
@@ -36,7 +41,7 @@ writeFileSync(path.join(proj, 'zzz-small/notes.md'), `# notes\n\n${MARKER}\n`);
 const app = await electron.launch({
   executablePath: electronBinary,
   args: [appRoot, `--user-data-dir=${mkdtempSync(path.join(tmpdir(), 'pd-men-udd-'))}`],
-  env: { ...process.env, PI_BIN: mockPi, MOCK_PI_FIXTURE: fixture, PI_E2E: '1' },
+  env: { ...process.env, HOME: PROBE_HOME, PI_BIN: mockPi, MOCK_PI_FIXTURE: fixture, PI_E2E: '1' },
 });
 
 try {
@@ -62,8 +67,19 @@ try {
   } else console.log('[mention] OK: found by name');
 
   // --- picking one folds its CONTENTS in ------------------------------------
-  // Whatever this chat's cwd is, `@` offers something from it; picking the first
-  // item is enough to prove the fold, which is what changed.
+  /*
+   * POINT THE CHAT AT THE PROBE'S OWN PROJECT FIRST.
+   *
+   * This used to shrug — "whatever this chat's cwd is, `@` offers something from
+   * it" — which was only ever true because a probe ran in the USER'S home and
+   * there is always something in there. Against a throwaway home the picker had
+   * nothing to offer and the step timed out waiting for an option. The fixture
+   * project two checks above is a better answer anyway: a known file, so the
+   * fold is asserted against content this probe put there.
+   */
+  await page.evaluate((dir) => {
+    window.__pi_store().setState((s) => ({ session: { ...(s.session ?? {}), cwd: dir } }));
+  }, proj);
   await page.click('.pd-composer-editor');
   await page.keyboard.type('@');
   await page.waitForSelector('[data-testid="composer-autocomplete"] [role="option"]', {

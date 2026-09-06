@@ -13,13 +13,23 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { _electron as electron } from 'playwright-core';
+import { probeHome } from './harness.mjs';
+
+/* A throwaway $HOME. The app keeps settings, conversations and generated
+   media under it, and `--user-data-dir` isolates none of that (harness.mjs). */
+const PROBE_HOME = probeHome('round9-pi-crash-probe');
 
 const require = createRequire(import.meta.url);
 const electronBinary = require('electron');
 const appRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const repoRoot = path.resolve(appRoot, '../..');
 const mockPi = path.join(repoRoot, 'packages/engine/tools/mock-pi/mock-pi.mjs');
-const fixture = path.join(repoRoot, 'packages/engine/tools/mock-pi/fixtures/simple-chat.json');
+/* THE SLOW FIXTURE, because the whole probe is about an exit that INTERRUPTS
+   something. simple-chat's turn is over in a few hundred milliseconds, so the
+   kill kept landing on an idle bridge — and an idle exit deliberately raises no
+   notice (pi-slice.ts). `stress` streams long, slow turns, which is the window
+   this needs. */
+const fixture = path.join(repoRoot, 'packages/engine/tools/mock-pi/fixtures/stress.json');
 
 function assert(condition, message) {
   if (!condition) throw new Error(`round9-pi-crash-probe failed: ${message}`);
@@ -31,7 +41,7 @@ const userDataDir = mkdtempSync(path.join(tmpdir(), 'pi-e2e-udd-'));
 const app = await electron.launch({
   executablePath: electronBinary,
   args: [appRoot, `--user-data-dir=${userDataDir}`],
-  env: { ...process.env, PI_BIN: mockPi, MOCK_PI_FIXTURE: fixture, PI_E2E: '1' },
+  env: { ...process.env, HOME: PROBE_HOME, PI_BIN: mockPi, MOCK_PI_FIXTURE: fixture, PI_E2E: '1' },
 });
 
 try {
@@ -43,7 +53,18 @@ try {
   await page.click('[data-testid="composer-input"]');
   await page.keyboard.type('hello there');
   await page.keyboard.press('Enter');
-  await page.waitForTimeout(150);
+  /*
+   * KILL IT WHILE A TURN IS ACTUALLY IN FLIGHT, which is the case under test and
+   * which this used to reach by luck. It slept 150ms and hoped; the day the send
+   * path got faster the kill started landing AFTER the turn had finished, and an
+   * exit that interrupted nothing raises no notice — deliberately, and the user's
+   * words are in pi-slice.ts: an exit nobody was waiting on "just shouldn't show
+   * up as a notification at all". So the probe was reporting a missing crash
+   * affordance for a crash it had not managed to cause.
+   */
+  await page.waitForFunction(() => window.__pi_store().getState().agent?.isStreaming === true, {
+    timeout: 15_000,
+  });
 
   // Kill the mock-pi child (the app spawned it as PI_BIN). SIGKILL so it cannot
   // shut down cleanly — the harshest "process vanished" case.

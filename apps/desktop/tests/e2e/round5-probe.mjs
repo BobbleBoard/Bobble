@@ -14,10 +14,15 @@
  */
 import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { homedir, tmpdir } from 'node:os';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { _electron as electron } from 'playwright-core';
+import { probeHome } from './harness.mjs';
+
+/* A throwaway $HOME. The app keeps settings, conversations and generated
+   media under it, and `--user-data-dir` isolates none of that (harness.mjs). */
+const PROBE_HOME = probeHome('round5-probe');
 
 const require = createRequire(import.meta.url);
 const electronBinary = require('electron');
@@ -40,7 +45,7 @@ const userDataDir = mkdtempSync(path.join(tmpdir(), 'pi-e2e-udd-'));
 const app = await electron.launch({
   executablePath: electronBinary,
   args: [appRoot, `--user-data-dir=${userDataDir}`],
-  env: { ...process.env, PI_BIN: mockPi, MOCK_PI_FIXTURE: fixture, PI_E2E: '1' },
+  env: { ...process.env, HOME: PROBE_HOME, PI_BIN: mockPi, MOCK_PI_FIXTURE: fixture, PI_E2E: '1' },
 });
 
 const setMessages = (page, messages) =>
@@ -210,7 +215,7 @@ try {
     g.fillRect(0, 0, 320, 200);
     return c.toDataURL('image/png').split(',')[1];
   });
-  const imgDir = path.join(homedir(), 'Bobble', 'generated', '_round5-probe');
+  const imgDir = path.join(PROBE_HOME, 'Bobble', 'generated', '_round5-probe');
   mkdirSync(imgDir, { recursive: true });
   const imgPath = path.join(imgDir, 'round5.png');
   writeFileSync(imgPath, Buffer.from(png, 'base64'));

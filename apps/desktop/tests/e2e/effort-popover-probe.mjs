@@ -26,6 +26,11 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { _electron as electron } from 'playwright-core';
+import { probeHome } from './harness.mjs';
+
+/* A throwaway $HOME. The app keeps settings, conversations and generated
+   media under it, and `--user-data-dir` isolates none of that (harness.mjs). */
+const PROBE_HOME = probeHome('effort-popover-probe');
 
 const require = createRequire(import.meta.url);
 const electronBinary = require('electron');
@@ -37,7 +42,7 @@ const fixture = path.join(repoRoot, 'packages/engine/tools/mock-pi/fixtures/tool
 const app = await electron.launch({
   executablePath: electronBinary,
   args: [appRoot, `--user-data-dir=${mkdtempSync(path.join(tmpdir(), 'pd-effort-'))}`],
-  env: { ...process.env, PI_BIN: mockPi, MOCK_PI_FIXTURE: fixture, PI_E2E: '1' },
+  env: { ...process.env, HOME: PROBE_HOME, PI_BIN: mockPi, MOCK_PI_FIXTURE: fixture, PI_E2E: '1' },
 });
 const page = await app.firstWindow();
 await page.waitForSelector('.pd-composer-editor', { timeout: 30_000 });

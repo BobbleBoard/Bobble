@@ -10,10 +10,15 @@
  */
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { homedir, tmpdir } from 'node:os';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { _electron as electron } from 'playwright-core';
+import { probeHome } from './harness.mjs';
+
+/* A throwaway $HOME. The app keeps settings, conversations and generated
+   media under it, and `--user-data-dir` isolates none of that (harness.mjs). */
+const PROBE_HOME = probeHome('session-search-probe');
 
 const require = createRequire(import.meta.url);
 const electronBinary = require('electron');
@@ -29,7 +34,7 @@ const fail = (m) => {
 
 /* A session whose TITLE is unrelated to the phrase, which is the whole point. */
 const PHRASE = 'xylophone calibration ritual';
-const dir = path.join(homedir(), '.pi/agent/sessions', '-tmp-search-probe-');
+const dir = path.join(PROBE_HOME, '.pi/agent/sessions', '-tmp-search-probe-');
 mkdirSync(dir, { recursive: true });
 const file = path.join(dir, `search-probe-${Date.now()}.jsonl`);
 const lines = [
@@ -63,7 +68,7 @@ writeFileSync(file, `${lines.join('\n')}\n`);
 const app = await electron.launch({
   executablePath: electronBinary,
   args: [appRoot, `--user-data-dir=${mkdtempSync(path.join(tmpdir(), 'pd-search-'))}`],
-  env: { ...process.env, PI_BIN: mockPi, MOCK_PI_FIXTURE: fixture, PI_E2E: '1' },
+  env: { ...process.env, HOME: PROBE_HOME, PI_BIN: mockPi, MOCK_PI_FIXTURE: fixture, PI_E2E: '1' },
 });
 
 try {

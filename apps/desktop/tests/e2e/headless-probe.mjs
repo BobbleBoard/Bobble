@@ -9,7 +9,11 @@
  * show itself, a notification escapes, screenshots start coming back blank —
  * this goes red before a window appears over someone's work.
  */
+import { homedir, tmpdir } from 'node:os';
 import { launchApp } from './harness.mjs';
+
+/** The real one, captured before the app is told otherwise. */
+const realHome = homedir();
 
 const { app, page, shot, check, finish } = await launchApp('headless-probe');
 
@@ -38,6 +42,38 @@ if (process.platform === 'darwin') {
   if (check(dockVisible !== true, `the app is in the dock (isVisible: ${dockVisible})`)) {
     console.log('[headless] OK: not in the dock or the ⌘-Tab switcher');
   }
+}
+
+/* --- and running in a home of its own ---------------------------------------
+ *
+ * The same kind of guarantee as the focus one above, and asserted here for the
+ * same reason: it is the sort of thing that regresses silently and is only
+ * noticed afterwards, in someone's real settings. A probe writes conversations,
+ * settings, generated media and gigabytes of weights under `$HOME`, and
+ * `--user-data-dir` covers none of it — MEASURED the hard way when a probe
+ * pressed an arrow key on the effort slider and left the real app pinned to a
+ * level. The app is asked where IT thinks home is, so an env var that failed to
+ * take is caught rather than assumed.
+ *
+ * Read as `$HOME` in the MAIN process, which is what Node's `os.homedir()`
+ * returns on POSIX and therefore what every path in the app is built from.
+ * NOT `app.getPath('home')`: Electron's own resolver reads
+ * the passwd entry and ignores $HOME entirely, so it answers "/Users/user" even
+ * in a fully isolated run. The two places that deliberately use Electron's are
+ * gen3d's engine cache, pinned to the real home on purpose (gen3d-main.ts says
+ * so) because it holds gigabytes that should not follow a test around. */
+const appHome = await app.evaluate(() => process.env.HOME ?? '');
+if (
+  check(
+    appHome !== realHome,
+    `the app is running in the USER'S home (${appHome}) — a probe must not write there`,
+  ) &&
+  check(
+    appHome.startsWith(tmpdir()),
+    `the app's home is neither the user's nor a temporary one: ${appHome}`,
+  )
+) {
+  console.log("[headless] OK: a home of its own, not the user's");
 }
 
 // --- still fully alive -----------------------------------------------------

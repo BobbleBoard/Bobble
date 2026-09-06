@@ -579,16 +579,27 @@ export function createEventRouter(sink: StoreSink, options: EventRouterOptions =
         sink.notify('error', `pi bridge error: ${e.error}`);
         break;
 
-      case '_bridge_exit':
-        // A crash mid-turn must finalize the in-flight row (its isStreaming
-        // flag is only ever cleared by endTurn) and drop per-run bookkeeping,
-        // or the restarted bridge inherits stale dedupe state.
+      case '_bridge_exit': {
+        /*
+         * WHETHER THIS INTERRUPTED ANYTHING IS DECIDED HERE, and passed on.
+         *
+         * A crash mid-turn must finalize the in-flight row (its isStreaming flag
+         * is only ever cleared by endTurn) and drop per-run bookkeeping, or the
+         * restarted bridge inherits stale dedupe state. That teardown is also
+         * what made the answer unknowable downstream: the consumer's rule for
+         * "was a reply lost?" read the streaming flag that these three lines had
+         * just cleared, so a genuine mid-answer crash looked exactly like an idle
+         * one and raised no notice at all. Whether it did is knowable only right
+         * here, before the teardown — `currentAssistantId` IS the in-flight turn.
+         */
+        const interrupted = currentAssistantId !== null;
         if (currentAssistantId !== null) sink.endTurn(currentAssistantId, 'error');
         reset();
         sink.setAgentStatus({ isStreaming: false, agentStartedAt: null, retry: null });
         sink.notify('error', `pi exited (${e.signal ?? e.code}).`);
-        sink.bridgeExit?.({ code: e.code, signal: e.signal });
+        sink.bridgeExit?.({ code: e.code, signal: e.signal, interrupted });
         break;
+      }
 
       default: {
         // Unknown event types: older pi versions emitted config/session

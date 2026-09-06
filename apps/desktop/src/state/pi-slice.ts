@@ -790,8 +790,26 @@ export function createPiSink(
          * gone and will not come back on its own. That is the only case worth
          * interrupting anybody for, so it is the only case that raises the notice.
          */
-        const interrupted = s.agent.isStreaming || s.promptInFlight;
-        return interrupted ? { bridgeExited: info, ...cleared } : cleared;
+        /*
+         * TWO HALVES OF THE SAME QUESTION, and neither side can answer it alone.
+         *
+         * The ROUTER knows whether a reply was streaming, and it has to tell us:
+         * by the time it calls, it has already cleared `isStreaming` as part of
+         * finalizing the dead turn (it must, or the restarted bridge inherits a
+         * half-written row), so reading that flag here answered "idle" for every
+         * crash — including the mid-answer ones this notice exists for.
+         *
+         * The STORE knows about a prompt that was sent and had not produced a
+         * first token yet: no assistant row exists, so the router sees nothing in
+         * flight, and the reply is lost just the same.
+         *
+         * `bridgeExited` keeps only the exit itself. `interrupted` is how we got
+         * here, not part of what happened.
+         */
+        const interrupted = info.interrupted === true || s.agent.isStreaming || s.promptInFlight;
+        return interrupted
+          ? { bridgeExited: { code: info.code, signal: info.signal }, ...cleared }
+          : cleared;
       }),
   };
 }

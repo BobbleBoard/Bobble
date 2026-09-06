@@ -24,6 +24,29 @@
  * app learns to steal focus again, a probe goes red instead of a window
  * appearing over someone's work.
  *
+ * ## A home of its own
+ *
+ * Every probe gets a THROWAWAY `$HOME`, and this is not tidiness — it is the
+ * same class of guarantee as the focus one. The app keeps almost everything a
+ * person owns under their home: `~/.pi/desktop/settings.json`,
+ * `~/.pi/agent/sessions/**` (their actual conversations), `~/Bobble/generated`,
+ * and `~/.cache/pi-desktop` (gigabytes of weights). `--user-data-dir` isolates
+ * none of that; it only covers Electron's own profile.
+ *
+ * What that cost, before this existed:
+ *
+ *  - A probe pressed an arrow key on the effort slider and left the REAL app
+ *    pinned to `level` — the setting persists to the real settings.json.
+ *  - Every run booted whatever model the user had selected, ~7GB, and left the
+ *    llama-server orphaned when Playwright's close raced the app's teardown.
+ *  - A run's generated media landed in the user's own `~/Bobble/generated`.
+ *
+ * A probe that genuinely needs the downloaded weights asks for them by name —
+ * `launchApp(name, { realCache: true })` — which points `PI_DESKTOP_CACHE_DIR`
+ * at the real cache and leaves the rest of the home throwaway. A probe that
+ * needs to WRITE somewhere the app will read back uses the `home` it is handed
+ * rather than `os.homedir()`, which is now a different place entirely.
+ *
  * ## Watching a run
  *
  * `PI_E2E_VISIBLE=1 node tests/e2e/<probe>.mjs` shows the window (still
@@ -33,7 +56,7 @@
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { tmpdir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { _electron as electron } from 'playwright-core';
@@ -47,6 +70,45 @@ export const TOOL_USE_FIXTURE = path.join(
   REPO_ROOT,
   'packages/engine/tools/mock-pi/fixtures/tool-use.json',
 );
+
+/**
+ * The real model cache — downloaded weights, gigabytes of them, shared by every
+ * run because nothing else could be.
+ *
+ * `PI_DESKTOP_CACHE_DIR` is the documented seam that separates it from the rest
+ * of a home (see @pi-desktop/inference paths.ts), which is what lets a probe
+ * have a throwaway profile AND real weights: `launchApp(name, { realCache: true })`.
+ */
+export const REAL_CACHE = path.join(homedir(), '.cache', 'pi-desktop');
+
+/**
+ * A throwaway `$HOME` for a probe, seeded the way a real one always is.
+ *
+ * {@link launchApp} calls this itself, so most probes never need it. It is
+ * exported for the ones that must know the path BEFORE the app starts —
+ * anything writing a fixture the app will read back through `pd-file://`, which
+ * is fenced to the app's own generated-media root and therefore moves with the
+ * home. Pass the result straight through as `env.HOME`.
+ *
+ * `stable: true` returns the SAME directory every run for that name. Reserved
+ * for a probe whose fixture is expensive enough to be worth keeping — a real
+ * generation, say — where a fresh home each time would mean paying for it again
+ * on every run. It is still not the user's home, which is the whole point.
+ */
+export function probeHome(name, { stable = false, router = 'off' } = {}) {
+  const home = stable
+    ? path.join(tmpdir(), `pd-home-${name}`)
+    : mkdtempSync(path.join(tmpdir(), `pd-home-${name}-`));
+  mkdirSync(path.join(home, '.pi', 'agent', 'sessions', 'proj'), { recursive: true });
+  if (router === 'off') {
+    mkdirSync(path.join(home, '.pi', 'desktop'), { recursive: true });
+    writeFileSync(
+      path.join(home, '.pi', 'desktop', 'settings.json'),
+      `${JSON.stringify({ modelSelection: { mode: 'tier', tier: 'balanced' } }, null, 2)}\n`,
+    );
+  }
+  return home;
+}
 
 /**
  * The app the OS considers frontmost.
@@ -104,8 +166,15 @@ export function focusComplaint(before, during) {
 /**
  * Launch the desktop app for a probe.
  *
- * Returns `{ app, page, shot, check, finish }`. `name` is used for the
- * screenshot directory and the failure prefix, so pass the probe's own name.
+ * Returns `{ app, page, shot, check, finish, home, shotDir }`. `name` is used
+ * for the screenshot directory and the failure prefix, so pass the probe's own
+ * name. `home` is the throwaway `$HOME` the app is running in — write anything
+ * the app must read back (a fixture image, a session file) under THAT, never
+ * under `os.homedir()`.
+ *
+ * Options:
+ *   `realCache`  point `PI_DESKTOP_CACHE_DIR` at the real weights (see REAL_CACHE)
+ *   `env.HOME`   supply your own home instead of a throwaway one
  */
 export async function launchApp(name, options = {}) {
   const {
@@ -114,10 +183,22 @@ export async function launchApp(name, options = {}) {
     args = [],
     waitFor = '.pd-composer-editor',
     timeout = 30_000,
+    realCache = false,
   } = options;
 
   const shotDir = process.env.SHOT_DIR ?? path.join(tmpdir(), 'pd-shots', name);
   mkdirSync(shotDir, { recursive: true });
+
+  /*
+   * The throwaway home. Seeded with the sessions directory because the app
+   * expects to find one and every hand-rolled probe was already creating it by
+   * hand — the one piece of structure a real home always has.
+   *
+   * A caller's own `env.HOME` still wins (it is spread last below); this reads
+   * it here only so the value handed back is the one the app actually got.
+   */
+  const home = env.HOME ?? probeHome(name);
+  mkdirSync(path.join(home, '.pi', 'agent', 'sessions', 'proj'), { recursive: true });
 
   const before = frontmostApp();
   const app = await electron.launch({
@@ -125,6 +206,10 @@ export async function launchApp(name, options = {}) {
     args: [APP_ROOT, `--user-data-dir=${mkdtempSync(path.join(tmpdir(), `pd-${name}-`))}`, ...args],
     env: {
       ...process.env,
+      // Before PI_BIN and friends so an explicit `env.HOME` still wins, and
+      // before the cache so `realCache` is not undone by it.
+      HOME: home,
+      ...(realCache ? { PI_DESKTOP_CACHE_DIR: REAL_CACHE } : {}),
       PI_BIN: MOCK_PI,
       MOCK_PI_FIXTURE: fixture,
       PI_E2E: '1',
@@ -177,5 +262,5 @@ export async function launchApp(name, options = {}) {
     return true;
   };
 
-  return { app, page, shot, check, finish, shotDir };
+  return { app, page, shot, check, finish, home, shotDir };
 }

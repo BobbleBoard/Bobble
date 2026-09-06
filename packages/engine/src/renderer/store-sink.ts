@@ -151,5 +151,14 @@ export interface StoreSink {
   /** pi stderr chunks that pass the router's noise filter. */
   stderrText?(text: string): void;
   /** The pi child exited; the bridge must be restarted to continue. */
-  bridgeExit?(info: { code: number | null; signal: string | null }): void;
+  /**
+   * The bridge's child is gone.
+   *
+   * `interrupted` says whether a turn was in flight when it went — and it has to
+   * be told, because it cannot be inferred afterwards: this same event handler
+   * clears `isStreaming` before calling here (it must, or the restarted bridge
+   * inherits a half-finished row), so a consumer reading the store would always
+   * see an idle app and conclude nothing was lost.
+   */
+  bridgeExit?(info: { code: number | null; signal: string | null; interrupted?: boolean }): void;
 }

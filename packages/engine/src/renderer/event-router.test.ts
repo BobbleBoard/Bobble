@@ -597,6 +597,30 @@ describe('event router — notify policy: errors and warnings, never chatter', (
     ]);
     expect(sink.callsFor('bridgeExit')).toHaveLength(1);
   });
+
+  /*
+   * The consumer's rule is "only interrupt someone if a reply was actually
+   * lost", and it cannot work that out for itself: this handler clears the
+   * streaming flag before it calls, so a store reading that flag sees an idle
+   * app for every crash. MEASURED as a mid-answer SIGKILL raising no notice at
+   * all. So the fact travels with the event.
+   */
+  it('says whether the exit interrupted a turn — the one thing only it knows', () => {
+    const idle = makeRouter();
+    idle.route({ type: '_bridge_exit', code: null, signal: 'SIGKILL' });
+    expect(idle.sink.callsFor('bridgeExit')[0]?.[1]).toMatchObject({ interrupted: false });
+
+    const midTurn = makeRouter();
+    midTurn.route({ type: 'agent_start' });
+    midTurn.route({ type: 'turn_start' });
+    midTurn.route({
+      type: 'message_update',
+      message: { role: 'assistant', content: [] },
+      assistantMessageEvent: { type: 'text_delta', contentIndex: 0, delta: 'half an ans' },
+    } as unknown as PiBridgeEvent);
+    midTurn.route({ type: '_bridge_exit', code: null, signal: 'SIGKILL' });
+    expect(midTurn.sink.callsFor('bridgeExit')[0]?.[1]).toMatchObject({ interrupted: true });
+  });
 });
 
 describe('event router — bridge exit finalizes the in-flight turn', () => {

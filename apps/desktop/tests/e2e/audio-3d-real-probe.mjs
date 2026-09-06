@@ -18,17 +18,21 @@
  * Run `npm run build` first.
  */
 import { existsSync, mkdirSync, readdirSync, statSync } from 'node:fs';
-import { homedir } from 'node:os';
 import path from 'node:path';
-import { launchApp } from './harness.mjs';
+import { launchApp, probeHome } from './harness.mjs';
 
 const CAP_MS = Number(process.env.MAX_MIN ?? 15) * 60_000;
-const outRoot = path.join(homedir(), 'Bobble', 'generated');
+/* A throwaway home so a real generation run does not deposit its output in the
+   user's own ~/Bobble/generated — but the REAL cache, because this needs the
+   downloaded weights and those are gigabytes nobody should re-fetch per run. */
+const home = probeHome('audio-3d-real-probe');
+const outRoot = path.join(home, 'Bobble', 'generated');
 mkdirSync(outRoot, { recursive: true });
 const before = new Set(existsSync(outRoot) ? readdirSync(outRoot) : []);
 
 const { page, shot, check, finish, shotDir } = await launchApp('audio-3d-real-probe', {
-  env: { PI_DESKTOP_GEN: '1' },
+  env: { HOME: home, PI_DESKTOP_GEN: '1' },
+  realCache: true,
   args: ['--', '--piE2E=1'],
   timeout: 60_000,
 });

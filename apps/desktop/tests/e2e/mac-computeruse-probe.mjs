@@ -31,6 +31,11 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { _electron as electron } from 'playwright-core';
+import { probeHome } from './harness.mjs';
+
+/* A throwaway $HOME. The app keeps settings, conversations and generated
+   media under it, and `--user-data-dir` isolates none of that (harness.mjs). */
+const PROBE_HOME = probeHome('mac-computeruse-probe');
 
 const require = createRequire(import.meta.url);
 const electronBinary = require('electron');
@@ -66,7 +71,7 @@ const app = await electron.launch({
   args: [appRoot, `--user-data-dir=${mkdtempSync(path.join(tmpdir(), 'pi-e2e-udd-'))}`],
   // Real pi (no PI_BIN) against the real ~/.pi; PI_MAC_PRECONSENT lets the
   // headless run skip the one-time consent dialog (e2e-only seam).
-  env: { ...process.env, PI_E2E: '1', PI_MAC_PRECONSENT: '1' },
+  env: { ...process.env, HOME: PROBE_HOME, PI_E2E: '1', PI_MAC_PRECONSENT: '1' },
 });
 
 let launchedTextEdit = false;

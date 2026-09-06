@@ -18,15 +18,20 @@
  * would put it and inside the `pd-file://` fence that serves it.
  */
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
-import { homedir } from 'node:os';
 import path from 'node:path';
-import { launchApp } from './harness.mjs';
+import { launchApp, probeHome } from './harness.mjs';
 
-const DIR = path.join(homedir(), 'Bobble', 'generated', '_media-card-probe');
+/* THE APP'S generated-media root, not the user's. The fixture has to land
+   inside the `pd-file://` fence to be served, and that fence is scoped to the
+   home the app is running in — which is a throwaway one. Writing to
+   `os.homedir()` here used to drop a probe's leftovers in someone's own
+   ~/Bobble/generated. */
+const home = probeHome('media-card-probe');
+const DIR = path.join(home, 'Bobble', 'generated', '_media-card-probe');
 mkdirSync(DIR, { recursive: true });
 
 const { page, shot, check, finish } = await launchApp('media-card-probe', {
-  env: { PI_DESKTOP_GEN: '1' },
+  env: { HOME: home, PI_DESKTOP_GEN: '1' },
 });
 
 // A real PNG, drawn in the page and written where the protocol will serve it.

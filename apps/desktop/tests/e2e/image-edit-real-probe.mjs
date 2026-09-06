@@ -25,9 +25,8 @@
  * weights. Run `npm run build` first.
  */
 import { existsSync, mkdirSync, readdirSync, statSync, writeFileSync } from 'node:fs';
-import { homedir } from 'node:os';
 import path from 'node:path';
-import { launchApp } from './harness.mjs';
+import { launchApp, probeHome } from './harness.mjs';
 
 const MODEL = process.env.MODEL ?? 'z-image-turbo';
 const CAP_MS = Number(process.env.MAX_MIN ?? 12) * 60_000;
@@ -35,7 +34,15 @@ const CAP_MS = Number(process.env.MAX_MIN ?? 12) * 60_000;
 /* The input lives where generated media lives, because that is where a picture
    handed over from the transcript comes from and the pd-file:// fence is
    scoped to it. */
-const outRoot = path.join(homedir(), 'Bobble', 'generated');
+/*
+ * A STABLE throwaway home, and the "stable" half is load-bearing: the base
+ * picture below is a real generation, and a fresh home every run would mean
+ * paying for it every run. Still not the user's home — the point is that a
+ * probe's output stops landing in someone's own ~/Bobble/generated, not that
+ * the directory has to be new.
+ */
+const home = probeHome('image-edit-real-probe', { stable: true });
+const outRoot = path.join(home, 'Bobble', 'generated');
 const inputDir = path.join(outRoot, 'probe-edit-input');
 mkdirSync(inputDir, { recursive: true });
 const inputPath = path.join(inputDir, 'fox-base.png');
@@ -64,7 +71,8 @@ const { page, shot, check, finish, shotDir } = await launchApp('image-edit-real-
   // `?gen=1` is main.ts's surfacing of PI_DESKTOP_GEN — generation is behind an
   // experimental flag, and a probe should not have to write the user's settings
   // to get at it.
-  env: { PI_DESKTOP_GEN: '1' },
+  env: { HOME: home, PI_DESKTOP_GEN: '1' },
+  realCache: true,
   args: ['--', '--piE2E=1'],
   timeout: 60_000,
 });
