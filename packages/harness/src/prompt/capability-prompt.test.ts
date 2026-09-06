@@ -451,3 +451,39 @@ describe('bash-CLI prompt is about commands, not tools', () => {
     );
   });
 });
+
+describe('answering "what can you do?"', () => {
+  /*
+   * The blind tester asked the model what it could do and was told `ask_user`,
+   * `update_plan`, `spawn_subagent`, `talk_to_manager`: "That's internal
+   * machinery. It's like asking a colleague what they do and being told 'I can
+   * hold meetings and delegate.'"
+   *
+   * The opening screen now answers this question itself (starters.ts), which is
+   * the better fix because the app cannot be wrong about itself. This is the
+   * other half: when the question is TYPED, the model has to answer it in the
+   * user's vocabulary rather than its own.
+   */
+  it('tells the model to answer in things a person might want', () => {
+    expect(CAPABILITY_PROMPT).toContain('ASKED WHAT YOU CAN DO');
+    expect(CAPABILITY_PROMPT).toMatch(/never in tool names/i);
+  });
+
+  it('names the four that are machinery, so they cannot be offered as features', () => {
+    const line = CAPABILITY_PROMPT.split('\n').find((l) => l.includes('ASKED WHAT YOU CAN DO'));
+    expect(line).toBeDefined();
+    for (const t of ['ask_user', 'update_plan', 'spawn_subagent', 'talk_to_manager']) {
+      expect(line).toContain(t);
+    }
+  });
+
+  it('asks for concrete examples rather than a list', () => {
+    const line = CAPABILITY_PROMPT.split('\n').find((l) => l.includes('ASKED WHAT YOU CAN DO'));
+    expect(line).toMatch(/concrete things they could ask for/);
+  });
+
+  it('says the local thing, because that is the answer nothing else gives', () => {
+    const line = CAPABILITY_PROMPT.split('\n').find((l) => l.includes('ASKED WHAT YOU CAN DO'));
+    expect(line).toMatch(/nothing leaves it/);
+  });
+});
