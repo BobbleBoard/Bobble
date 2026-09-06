@@ -47,6 +47,7 @@ import {
 import type { AppEventMap, CoreInvokeMap, FsInvokeMap } from './ipc-contract';
 import { disposeMacAgent, registerMacAgentIpc } from './mac/mac-agent';
 import { registerStoreIpc } from './model-store/store-main';
+import { notifyDecision } from './notify-gate';
 import { registerOfficeIpc } from './office/office-ipc';
 import { createScheduledRunBridge, registerPiIpc } from './pi/pi-main';
 import { registerProjectIpc } from './project/project-main';
@@ -566,18 +567,16 @@ function registerAppIpc(): void {
        * `shown:false` with the reason rather than pretending.
        */
       'app:notify': (req) => {
-        /* A test suite must not post banners over the user's screen. This is
-           the most literal form of "taking notice" there is. */
-        if (isBackgroundMode()) {
-          return { shown: false, reason: 'suppressed: background test mode' };
-        }
+        /* Whether to interrupt is a pure decision (notify-gate.ts) — including
+           the rule that a test suite must never post banners over the user's
+           screen, which is the most literal form of "taking notice" there is. */
         const win = mainWindow;
-        if (win !== null && !win.isDestroyed() && win.isFocused()) {
-          return { shown: false, reason: 'the window is focused' };
-        }
-        if (!Notification.isSupported()) {
-          return { shown: false, reason: 'notifications are unavailable here' };
-        }
+        const decision = notifyDecision({
+          backgroundMode: isBackgroundMode(),
+          windowFocused: win !== null && !win.isDestroyed() && win.isFocused(),
+          supported: Notification.isSupported(),
+        });
+        if (!decision.shown) return decision;
         try {
           const n = new Notification({ title: req.title, body: req.body });
           n.on('click', () => {
