@@ -23,6 +23,7 @@
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { bobbleRootDir } from './workspace/project-dir';
 
 /** Root under which every conversation's private sandbox lives. Added as an
  * allowed write root in fs-handlers so the canvas editor can save into a
@@ -162,14 +163,24 @@ export function resolveSessionCwd(
     const recorded = cwdFromSessionPath(req.sessionPath as string);
     if (!isHomeDir(recorded, home)) return undefined;
   }
-  // No usable cwd anywhere. A conversation id gives this chat its own sandbox;
-  // WITHOUT one we still must not return undefined, because pi's fallback for
-  // "no cwd" is HOME — the exact thing this module exists to prevent. A shared
-  // `default` sandbox is a poor working folder but it is not the user's home.
-  return ensureSandboxDir(
-    typeof req.conversationId === 'string' && req.conversationId.length > 0
-      ? req.conversationId
-      : 'default',
-    home,
-  );
+  /*
+   * No usable cwd anywhere — which, at boot, is every chat that has not been
+   * sent a message yet.
+   *
+   * This used to mint a per-conversation sandbox, and the app worked around that
+   * by resolving a workspace at boot under the literal name "new chat" so pi had
+   * somewhere visible to sit. That workaround is what broke the cold start: the
+   * first message renamed `~/Bobble/new-chat` to its own slug and the next
+   * restart could not resume a session whose recorded directory had moved.
+   *
+   * `~/Bobble` is the answer to both. It exists, it is ONE directory rather than
+   * one per conversation, a user can find it, and — the part that matters here —
+   * nothing ever renames it, so a session recorded against it stays valid for the
+   * life of the chat. The chat's real folder is still made on its first message
+   * and handed to the tools with `/harness workspace`, which needs no respawn.
+   *
+   * Returning undefined is still not an option: pi's own fallback for "no cwd"
+   * is HOME, which is the thing this module exists to prevent.
+   */
+  return bobbleRootDir(home);
 }

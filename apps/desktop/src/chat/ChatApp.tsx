@@ -273,10 +273,29 @@ export function ChatApp({
          * exists to remove.
          */
         const selected = useProjectStore.getState().activePath;
+        /*
+         * A NAMELESS CHAT DOES NOT GET A FOLDER YET.
+         *
+         * This used to resolve a workspace at boot under the literal name
+         * "new chat", which created `~/Bobble/new-chat` and rooted pi there —
+         * undoing `ensureChatWorkspace`, whose entire point is that "a chat you
+         * open and abandon leaves NOTHING". It also broke the cold start:
+         * pi recorded that folder as its session's cwd, the first message
+         * renamed it to the message's own slug, and the model preload's restart
+         * then failed to resume a session whose directory had moved. MEASURED on
+         * a fresh profile — pi exits 1, the app respawns it with ALL EXTENSIONS
+         * DISABLED, and "The assistant stopped" appears 416ms after the user
+         * pressed enter on their first ever message.
+         *
+         * With a project selected the answer is known and nothing is deferred.
+         * Without one, pi starts in `~/Bobble` (main's resolveSessionCwd) and the
+         * chat's own folder is made on its first send, named from what was
+         * actually said.
+         */
         const cwd =
-          (await syncWorkspace({ selected, conversationName: 'new chat' })) ??
-          selected ??
-          undefined;
+          selected !== null && selected !== ''
+            ? ((await syncWorkspace({ selected, conversationName: 'new chat' })) ?? selected)
+            : undefined;
         return startPi(cwd !== undefined && cwd !== null ? { cwd } : {});
       })
       .then(() => applySavedHarnessConfig())

@@ -75,9 +75,31 @@ export const PREFIX_WARM_STATUS = 'harness-prefix-warm';
  * rather than wait forever on a signal that is never coming — the same reason
  * the harness releases the label in `finally` rather than `then`.
  */
+export type ReadyStage = 'loading' | 'preparing' | null;
+
+/**
+ * WHICH of the two waits this is — because they are not the same wait, and
+ * calling them both "Loading model" was a lie the user could see through.
+ *
+ * `loading`   llama-server is coming up and reading weights off disk.
+ * `preparing` the model is UP and the system prompt + tools are being prefilled.
+ *
+ * The second is the longer of the two and used to wear the first one's label.
+ * MEASURED on a cold start: the model was ready at 6.4s and the screen still
+ * read "loading model · 18.6s" while it was already generating an answer. The
+ * hold itself is right — the label's promise is "when this goes, a message is
+ * instant", and `phase === 'ready'` arrives seconds before that is true — so the
+ * fix is the words, not the timing.
+ */
+export function modelReadyStage(phase: string, prefixWarm: string | undefined): ReadyStage {
+  if (phase === 'starting') return 'loading';
+  return phase === 'ready' && prefixWarm === 'warming' ? 'preparing' : null;
+}
+
+/** Whether either wait is in progress. Kept as the boolean the call sites that
+ * only need "is the model not ready yet" already ask for. */
 export function showLoadingModel(phase: string, prefixWarm: string | undefined): boolean {
-  if (phase === 'starting') return true;
-  return phase === 'ready' && prefixWarm === 'warming';
+  return modelReadyStage(phase, prefixWarm) !== null;
 }
 
 /**

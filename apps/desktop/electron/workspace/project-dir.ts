@@ -34,6 +34,35 @@ export function bobbleBaseDir(home: string = os.homedir()): string {
 }
 
 /**
+ * WHERE pi RUNS BEFORE A CHAT HAS EARNED A FOLDER.
+ *
+ * A conversation's folder is named from its first message, so at boot there is
+ * no name yet. Resolving one anyway — with the literal string "new chat" — is
+ * what the app did, and it cost more than clutter: pi spawned in
+ * `~/Bobble/new-chat` and recorded that as its session's working directory, the
+ * first message then RENAMED the folder to the message's own slug, and the next
+ * restart (the model preload) tried to resume a session whose directory no
+ * longer existed. MEASURED on a genuinely fresh profile: pi exits 1 with
+ * "Stored session working directory does not exist", the app recovers by
+ * respawning WITH ALL EXTENSIONS DISABLED, and the user — mid first message —
+ * is told "The assistant stopped", 416ms after pressing enter.
+ *
+ * So before a chat has a name, pi runs in `~/Bobble` itself: it exists, it is
+ * one directory rather than one per conversation, and nothing ever renames it.
+ * The chat's real folder is made on the first send (`ensureChatWorkspace`) and
+ * handed to the tools with `/harness workspace`, which needs no respawn.
+ */
+export function bobbleRootDir(home: string = os.homedir()): string {
+  const dir = bobbleBaseDir(home);
+  try {
+    fs.mkdirSync(dir, { recursive: true });
+  } catch {
+    /* a root we cannot create is one the run will fail on anyway, loudly */
+  }
+  return dir;
+}
+
+/**
  * A conversation name reduced to one safe, readable path segment.
  *
  * Readable is the point — this is the folder the user opens in Finder. Spaces

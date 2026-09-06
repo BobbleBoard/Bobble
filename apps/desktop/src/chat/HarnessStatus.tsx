@@ -23,6 +23,7 @@ import { useLlmStore } from '../state/llm-store';
 import { useModelSelectionStore } from '../state/model-selection-store';
 import { usePiStore } from '../state/pi-slice';
 import {
+  modelReadyStage,
   type PlanItem,
   PREFILL_STATUS_KEY,
   PREFIX_WARM_STATUS,
@@ -114,7 +115,11 @@ export function ThreadStatusIndicator(): ReactElement | null {
    * "Loading model" waiting for a signal that is never coming.
    */
   const prefixWarm = usePiStore((s) => s.extensionStatus[PREFIX_WARM_STATUS]);
-  const serverStarting = useLlmStore((s) => showLoadingModel(s.status.phase, prefixWarm));
+  const readyStage = useLlmStore((s) => modelReadyStage(s.status.phase, prefixWarm));
+  const serverStarting = readyStage !== null;
+  /* The two waits read differently because they ARE different: one is weights
+     coming off disk, the other is the prompt being read. */
+  const readyLabel = readyStage === 'loading' ? 'Loading model' : 'Getting ready';
   const prefillPct = parsePrefillPercent(prefillRaw);
   const messages = usePiStore((s) => s.messages);
 
@@ -276,18 +281,30 @@ export function ThreadStatusIndicator(): ReactElement | null {
   }
   if (serverStarting && !processing) {
     return (
-      <ProcessingRing percent={null} label="Loading model" fading={false} elapsedMs={elapsedMs} />
+      <ProcessingRing
+        percent={readyStage === 'preparing' ? prefillPct : null}
+        label={readyLabel}
+        fading={false}
+        elapsedMs={elapsedMs}
+      />
     );
   }
   if (!processing && !fading) return null;
   // Cold model LOAD → indeterminate pulse + "Loading model" (no fake %). Ingesting
   // → the REAL prefill % (parsePrefillPercent caps at 99, so it never falsely
   // reads 100 mid-prefill). Completion (first token) → 100 before the fade.
-  const percent = processing ? (serverStarting ? null : prefillPct) : 100;
+  /*
+   * The prefill percentage is REAL (llama's own prompt_progress frames), and it
+   * was being thrown away for the whole of the longest wait: `serverStarting`
+   * forced it to null, so the one window where a user most needs to know
+   * something is happening showed an indeterminate pulse. Only a model still
+   * loading off disk has nothing to report.
+   */
+  const percent = processing ? (readyStage === 'loading' ? null : prefillPct) : 100;
   return (
     <ProcessingRing
       percent={percent}
-      label={serverStarting ? 'Loading model' : 'Processing'}
+      label={serverStarting ? readyLabel : 'Processing'}
       fading={fading}
       elapsedMs={elapsedMs}
     />

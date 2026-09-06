@@ -51,7 +51,7 @@ import {
   stickyContextGauge,
   usesSandbox,
 } from './composer-bar-logic';
-import { PREFIX_WARM_STATUS, showLoadingModel, useHarnessStatus } from './harness-status';
+import { modelReadyStage, PREFIX_WARM_STATUS, useHarnessStatus } from './harness-status';
 import { InstructionsChip } from './InstructionsChip';
 
 /** LEFT: the relocated project (working-folder) chip, slimmed for the bar. When
@@ -266,7 +266,7 @@ function ContextRegion() {
   // RESIDENT, not merely until llama-server answers — those are seconds apart and
   // the gap is exactly where a "loaded" model still made you wait.
   const prefixWarm = usePiStore((s) => s.extensionStatus[PREFIX_WARM_STATUS]);
-  const serverLoading = useLlmStore((s) => showLoadingModel(s.status.phase, prefixWarm));
+  const readyStage = useLlmStore((s) => modelReadyStage(s.status.phase, prefixWarm));
   const harnessPercent = useHarnessStatus()?.contextPercent;
   // During a corp run, pi's own harness sits idle — the ring fills from the
   // RUN's real context usage instead (threaded off the live worker transcript).
@@ -290,10 +290,12 @@ function ContextRegion() {
   const gauge = stickyContextGauge(fresh, stickyRef.current.gauge);
   stickyRef.current.gauge = gauge;
 
-  if (serverLoading) {
+  if (readyStage !== null) {
     return (
       <span className="pd-composer-model-loading" data-testid="composer-model-loading">
-        <span className="pd-working-label">Loading model…</span>
+        <span className="pd-working-label">
+          {readyStage === 'loading' ? 'Loading model…' : 'Getting ready…'}
+        </span>
       </span>
     );
   }

@@ -5,8 +5,7 @@ import {
   PROMOTE_STATUS_KEY,
   parsePromoteSignal,
   showLoadingModel,
-  showProcessing,
-} from './harness-status';
+  showProcessing,, modelReadyStage } from './harness-status';
 
 describe('parsePromoteSignal (corp-promote intent from normal chat)', () => {
   it('parses a valid promote signal', () => {
@@ -127,5 +126,32 @@ describe('showLoadingModel — the label waits for the prefix, not just the serv
       expect(showLoadingModel(phase, 'warming')).toBe(false);
       expect(showLoadingModel(phase, undefined)).toBe(false);
     }
+  });
+});
+
+describe('modelReadyStage', () => {
+  /*
+   * The two waits are different things and used to share a label. MEASURED on a
+   * cold start: the model was ready at 6.4s and the screen read "loading model ·
+   * 18.6s" while it was already generating.
+   */
+  it('says LOADING only while the server is still coming up', () => {
+    expect(modelReadyStage('starting', undefined)).toBe('loading');
+    expect(modelReadyStage('starting', 'warming')).toBe('loading');
+  });
+
+  it('says PREPARING once the model is up and the prompt is being read', () => {
+    expect(modelReadyStage('ready', 'warming')).toBe('preparing');
+  });
+
+  it('says nothing once the prefix is resident — the promise is "a message is instant now"', () => {
+    expect(modelReadyStage('ready', 'ready')).toBeNull();
+    expect(modelReadyStage('ready', undefined)).toBeNull();
+  });
+
+  it('keeps the old boolean meaning for callers that only ask "not ready yet"', () => {
+    expect(showLoadingModel('starting', undefined)).toBe(true);
+    expect(showLoadingModel('ready', 'warming')).toBe(true);
+    expect(showLoadingModel('ready', undefined)).toBe(false);
   });
 });
