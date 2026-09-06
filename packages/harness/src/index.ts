@@ -61,7 +61,7 @@ import {
 } from './permissions/modes.js';
 import { CAPABILITIES, capabilityForTool } from './presets/capabilities.js';
 import { resolvePresetTools } from './presets/presets.js';
-import { augmentSystemPrompt, COORDINATE_PROMPT } from './prompt/capability-prompt.js';
+import { augmentSystemPrompt, coordinatePrompt } from './prompt/capability-prompt.js';
 import { connectRepairBridge, type LiveRepairDeps } from './repair/bridge.js';
 import { createToolCallFixer, withRepairAttempts } from './repair/fixer.js';
 import {
@@ -2135,7 +2135,8 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
      * go at the end where a footnote belongs.
      */
     if (toolCliMode) return `${toolCliPreamble()}\n\n${augmented}`;
-    return `${augmented}\n\n${COORDINATE_PROMPT}`;
+    const note = coordinatePrompt(commandFor);
+    return note === '' ? augmented : `${augmented}\n\n${note}`;
   }
 
   /** Tool name → the command line that runs it, straight from the CLI model. */
@@ -3328,7 +3329,7 @@ export {
   augmentSystemPrompt,
   CAPABILITY_PROMPT,
   CAPABILITY_PROMPT_MARKER,
-  COORDINATE_PROMPT,
+  coordinatePrompt,
   TEAM_PROMPT_MARKER,
 } from './prompt/capability-prompt.js';
 export {

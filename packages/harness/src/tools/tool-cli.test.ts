@@ -307,8 +307,11 @@ describe('delegation is reachable from the CLI', () => {
     // delegation path at all, while the prompt told the model to delegate.
     const cli = buildCli(groups, tools);
     const team = cli.groups.find((g) => g.name === 'team');
-    expect(team?.commands.map((c) => c.path.join(' '))).toEqual(['spawn', 'manager']);
-    expect(resolveCli(cli, ['team', 'spawn', '--task', 'x']).kind).toBe('call');
+    // `delegate`, not `spawn`: the tail is named for what the command DOES, now
+    // that these live in `coordinate` alongside ask and plan rather than in a
+    // group already called `team`.
+    expect(team?.commands.map((c) => c.path.join(' '))).toEqual(['delegate', 'manager']);
+    expect(resolveCli(cli, ['team', 'delegate', '--task', 'x']).kind).toBe('call');
   });
 
   it('drops the group when this build registered neither (a depth-capped child)', () => {

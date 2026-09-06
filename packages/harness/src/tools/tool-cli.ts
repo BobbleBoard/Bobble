@@ -100,11 +100,25 @@ export function commandNameFor(capability: string): string {
  * is written down rather than made into a cleverer rule.
  */
 const COMMAND_PATH_OVERRIDES: Readonly<Record<string, readonly string[]>> = {
-  update_plan: ['update'],
-  // `team spawn subagent` and `team talk to manager` — the derivation is
-  // correct and reads like a mouthful. These two are typed often enough to
-  // be worth naming.
-  spawn_subagent: ['spawn'],
+  /*
+   * THE FOUR OF `coordinate`, NAMED FOR THE GROUP THEY ARE NOW IN.
+   *
+   * These were written when each lived in its own one-command group, so
+   * `plan update` and `team spawn` read correctly and `update`/`spawn` were the
+   * right tails. Under one `coordinate` group the same tails read wrong:
+   * "coordinate update" has lost the word plan, and the underived
+   * `ask_user` gives "coordinate ask user", which is a mouthful for the most
+   * ordinary thing here.
+   *
+   * MEASURED against the app, which is how this was caught at all: the system
+   * prompt was hand-written to say `coordinate plan` and `coordinate delegate`,
+   * and `coordinate --help` answered with `coordinate update` and `coordinate
+   * spawn`. A prompt naming commands that do not exist is the same
+   * false-availability failure as naming a tool that is not advertised.
+   */
+  ask_user: ['ask'],
+  update_plan: ['plan'],
+  spawn_subagent: ['delegate'],
   talk_to_manager: ['manager'],
 };
 

@@ -277,6 +277,70 @@ describe('the shadowed media tools', () => {
   });
 });
 
+describe('schemas mode — one group, and no shadowing', () => {
+  /*
+   * THE CLI IS NOT ONLY FOR CLI MODE ANY MORE. In schemas mode it carries
+   * exactly one group, `coordinate`, holding the four tools that cost 8,516
+   * characters of every prefix (MEASURED) and are reached on a small minority
+   * of turns. the user: "don't remove these, but put them under a differently named
+   * cli."
+   *
+   * The decoys must NOT come with it. They shadow real system binaries — `say`
+   * becomes an error pointing at `media generate speech` — and they exist for
+   * the mode where `bash` is the only tool and /usr/bin is a competing
+   * implementation of everything we offer. In schemas mode the model has
+   * `generate_speech` in its list and no reason to go shopping, so taking `say`
+   * away from it there is a side effect nobody asked for.
+   */
+  it('installs the group it was given and shadows nothing', () => {
+    const shimDir = mkdtempSync(path.join(tmpdir(), 'toolcli-schemas-'));
+    const env: NodeJS.ProcessEnv = { PATH: '/usr/bin' };
+    const handle = registerToolCli(
+      {
+        tools: () => [{ name: 'ask_user' }, { name: 'update_plan' }],
+        groups: () => [
+          {
+            name: 'coordinate',
+            summary: 'Ask, plan, delegate.',
+            tools: ['ask_user', 'update_plan'],
+          },
+        ],
+        call: async () => ({ text: '', isError: false }),
+      },
+      { shimDir, socketPath: path.join(shimDir, 's.sock'), env, shadowSystemCommands: false },
+    );
+    try {
+      const written = readdirSync(shimDir);
+      expect(written).toContain('coordinate');
+      expect(written).toContain('tools');
+      expect(written).not.toContain('say');
+      expect(written).not.toContain('espeak');
+      expect(written).not.toContain('festival');
+      // And the shim dir still leads PATH, or `coordinate` is unreachable.
+      expect(env.PATH?.startsWith(shimDir)).toBe(true);
+    } finally {
+      handle.dispose();
+      rmSync(shimDir, { recursive: true, force: true });
+    }
+  });
+
+  it('still shadows by default, so CLI mode is unchanged', () => {
+    const shimDir = mkdtempSync(path.join(tmpdir(), 'toolcli-default-'));
+    const env: NodeJS.ProcessEnv = { PATH: '/usr/bin' };
+    const handle = registerToolCli(host(), {
+      shimDir,
+      socketPath: path.join(shimDir, 's.sock'),
+      env,
+    });
+    try {
+      expect(readdirSync(shimDir)).toContain('say');
+    } finally {
+      handle.dispose();
+      rmSync(shimDir, { recursive: true, force: true });
+    }
+  });
+});
+
 describe('buildShim', () => {
   it('execs the app binary as node against the dispatcher', () => {
     const s = buildShim('/Applications/Bobble.app/Contents/MacOS/Bobble', '/tmp/d.js', 'media');

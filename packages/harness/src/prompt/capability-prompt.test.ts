@@ -3,6 +3,7 @@ import {
   augmentSystemPrompt,
   CAPABILITY_PROMPT,
   CAPABILITY_PROMPT_MARKER,
+  coordinatePrompt,
   MANAGER_PROMPT_MARKER,
   retargetToolNames,
   stripToolCatalog,
@@ -394,8 +395,8 @@ describe('the prompt must not contradict the interface it ships with', () => {
 
 describe('bash-CLI prompt is about commands, not tools', () => {
   const commandFor = new Map([
-    ['update_plan', 'plan update'],
-    ['spawn_subagent', 'team spawn'],
+    ['update_plan', 'coordinate plan'],
+    ['spawn_subagent', 'coordinate delegate'],
     ['edit', 'file edit'],
     ['read', 'file read'],
     ['write', 'file write'],
@@ -413,8 +414,8 @@ describe('bash-CLI prompt is about commands, not tools', () => {
     ].join('\n');
     const out = augmentSystemPrompt(base, { toolInterface: 'bash-cli', commandFor });
     expect(out).toContain('`file edit`');
-    expect(out).toContain('`plan update`');
-    expect(out).toContain('`team spawn`');
+    expect(out).toContain('`coordinate plan`');
+    expect(out).toContain('`coordinate delegate`');
     expect(out).not.toMatch(/\bspawn_subagent\b/);
     expect(out).not.toMatch(/\bupdate_plan\b/);
   });
@@ -449,6 +450,52 @@ describe('bash-CLI prompt is about commands, not tools', () => {
     expect(augmentSystemPrompt(base, { toolInterface: 'schemas', commandFor })).toContain(
       'spawn_subagent',
     );
+  });
+});
+
+describe('the coordinate paragraph', () => {
+  const commandFor = new Map([
+    ['ask_user', 'coordinate ask'],
+    ['update_plan', 'coordinate plan'],
+    ['spawn_subagent', 'coordinate delegate'],
+    ['talk_to_manager', 'coordinate manager'],
+  ]);
+
+  /*
+   * THE COMMANDS ARE RENDERED FROM THE LIVE CLI, NOT TYPED HERE.
+   *
+   * The first version of this paragraph was hand-written and advertised
+   * `coordinate plan` / `coordinate delegate` while `--help` actually answered
+   * `coordinate update` / `coordinate spawn`. Caught only by running the real
+   * command in the real app. A prompt naming a command that does not exist is
+   * the same false-availability failure as naming an unadvertised tool.
+   */
+  it('names exactly the commands the CLI resolves', () => {
+    const out = coordinatePrompt(commandFor);
+    for (const c of commandFor.values()) expect(out).toContain(c);
+    expect(out).toContain('--help');
+  });
+
+  it('leaves out what this build did not register', () => {
+    const out = coordinatePrompt(new Map([['ask_user', 'coordinate ask']]));
+    expect(out).toContain('coordinate ask');
+    expect(out).not.toContain('delegate');
+    expect(out).not.toContain('manager');
+  });
+
+  it('says nothing at all when none of them exist', () => {
+    expect(coordinatePrompt(new Map())).toBe('');
+  });
+
+  /*
+   * "Explore and utilise these anytime they feel appropriate" is what sent a
+   * small model shopping through `say`, `festival` and `ls /usr/bin` for three
+   * turns. The paragraph must name the alternative to searching instead.
+   */
+  it('does not invite the model to go shopping', () => {
+    const out = coordinatePrompt(commandFor);
+    expect(out).not.toMatch(/explore/i);
+    expect(out).toMatch(/say so plainly rather than going looking for it/);
   });
 });
 
