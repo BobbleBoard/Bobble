@@ -75,6 +75,7 @@ import { publishSessionList } from '../state/visible-projects';
 import { useThemeStore } from '../store/theme';
 import { formatModuleSize } from '../tripo/module-state';
 import { BobbleMark } from './BobbleMark';
+import { LocalModelBadge } from './LocalModelBadge';
 import { PROFILE_MENU_ACTIONS } from './profile-menu';
 
 /**
@@ -1318,6 +1319,18 @@ export function SessionSidebar({
         <span className="pd-wordmark text-text-primary">Bobble</span>
       </div>
 
+      {/*
+        WHAT THIS APP IS, said on screen, before anything is typed.
+
+        The blind tester's hardest note: "Nothing on screen says this never
+        leaves my Mac. That's the entire reason to pick it over ChatGPT and it's
+        not mentioned once." Meanwhile the thing that WAS on screen — the raw
+        model id — was the half she could not read. So the sentence leads and
+        the model name is the grey line under it, and the dot says whether it is
+        awake, which is also the ten seconds of warm-up she never knew she had.
+      */}
+      <LocalModelBadge />
+
       <div className="px-2 pb-2">
         <div className="min-w-0 flex-1" data-testid="sidebar-search">
           <CollapsibleSearch placeholder="Search chats" value={query} onChange={setQuery} />
@@ -1614,7 +1627,7 @@ export function SessionSidebar({
         <SidebarSection label="Chats">
           {filtered.length === 0 ? (
             <div className="px-2 py-1.5 text-footnote text-text-muted">
-              {query.trim().length > 0 ? 'No matching chats.' : 'No sessions yet.'}
+              {query.trim().length > 0 ? 'No matching chats.' : 'No chats yet.'}
             </div>
           ) : grouped.ungrouped.length === 0 ? (
             <div className="px-2 py-1.5 text-footnote text-text-muted">
@@ -1674,6 +1687,23 @@ export function SessionSidebar({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/*
+        THE SENTENCE THE WHOLE PRODUCT RESTS ON, said permanently.
+
+        The blind tester, on what would have moved her score most: "That last
+        sentence is the single best thing about this product and it currently
+        appears nowhere. I'd put it permanently in the sidebar." It lives here
+        rather than in the empty-chats slot because that slot is never seen —
+        the current session already occupies the list on a first run — and a
+        claim that only appears when you have nothing is not a claim.
+
+        It is about the DATA; the badge at the top is about the COMPUTE. Two
+        different promises, which is why both are on screen.
+      */}
+      <div className="px-3 pb-1 text-caption text-text-muted" data-testid="privacy-line">
+        Your chats stay on this Mac.
+      </div>
 
       {/* Bottom-left footer: the profile dropup plus a one-click gear. Equal
           inset both sides so the hover wash is a full-width row rather than a

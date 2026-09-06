@@ -5036,3 +5036,64 @@ body[data-media-expanded="true"] .pd-studio-compose {
     opacity: 1;
   }
 }
+
+/* ── The local-model dot ──────────────────────────────────────────────────
+ *
+ * The one moving thing in the sidebar, and it moves for a reason: while a model
+ * is coming up the dot breathes, so "something is happening" is legible from
+ * the corner of the eye without reading a word. It holds still the moment the
+ * model is resident — a pulse that never stops would say "still working" for
+ * the rest of the session.
+ */
+.pd-local-dot--pulse {
+  animation: pd-local-dot-pulse 1.6s var(--pd-easing-standard) infinite;
+}
+
+@keyframes pd-local-dot-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pd-local-dot--pulse {
+    animation: none;
+    opacity: 0.75;
+  }
+}
+
+/* ── Opening-screen starter chips ─────────────────────────────────────────
+ *
+ * Quiet by default and only lit on hover: they are an offer, not a demand. The
+ * greeting above them is the loudest thing on an empty screen and should stay
+ * that way.
+ */
+.pd-starter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--pd-border-subtle);
+  border-radius: var(--pd-radius-full);
+  background: var(--pd-bg-raised);
+  color: var(--pd-text-secondary);
+  font-size: var(--pd-font-size-footnote);
+  line-height: var(--pd-leading-footnote);
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    color var(--pd-duration-base) var(--pd-easing-standard),
+    border-color var(--pd-duration-base) var(--pd-easing-standard),
+    background-color var(--pd-duration-base) var(--pd-easing-standard);
+}
+
+.pd-starter-chip:hover {
+  border-color: var(--pd-border-default);
+  background: var(--pd-bg-hover);
+  color: var(--pd-text-primary);
+}

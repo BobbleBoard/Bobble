@@ -61,6 +61,7 @@ import { useHarnessTitleSync } from './harness-title';
 import { InputNeededBanner } from './InputNeededBanner';
 import { SessionSidebar } from './SessionSidebar';
 import { StageAnnouncer } from './StageAnnouncer';
+import { StarterChips } from './StarterChips';
 import { useSiteIcon } from './site-icons';
 import { ToastHost } from './ToastHost';
 import { UiRequestDialogs } from './UiRequestDialogs';
@@ -734,6 +735,16 @@ export function ChatApp({
                         three moved together.
                       */}
                       <p className="text-body text-text-muted">How can I help you today?</p>
+                      {/*
+                        The app answering "what can you do?" itself — see
+                        starters.ts. Asked of the MODEL, that question came back
+                        as `ask_user`, `update_plan`, `spawn_subagent`,
+                        `talk_to_manager`: the plumbing, in a vocabulary no one
+                        outside this repo can read.
+                      */}
+                      <div className="mt-3 max-w-[720px]">
+                        <StarterChips />
+                      </div>
                     </div>
                   ) : (
                     // The thread is ALWAYS the lead surface — a corp run renders
