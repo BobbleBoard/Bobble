@@ -14,6 +14,8 @@
 import { useEffect, useState } from 'react';
 import { useLlmStore } from '../state/llm-store';
 import { useModelSelectionStore } from '../state/model-selection-store';
+import { usePiStore } from '../state/pi-slice';
+import { PREFIX_WARM_STATUS } from './harness-status';
 import { type LocalDot, localStatusView } from './local-status';
 
 /* Real theme tokens only — an invented `--pd-accent-*` name paints nothing and
@@ -56,14 +58,27 @@ export function LocalModelBadge(): React.ReactElement {
   // so a starting model has something to put in the grey line.
   const switchingTo = useModelSelectionStore((s) => s.switching?.toName ?? null);
   const downloadName = useLlmStore((s) => s.download?.modelId ?? null);
-  const active = phase === 'starting' || phase === 'downloading';
-  const elapsedMs = usePhaseElapsed(phase, active);
+  /*
+   * THE ELEVEN AND A HALF SECONDS AFTER "READY".
+   *
+   * The harness publishes this while it reads the system prompt into the model.
+   * Without it the badge went green at 3.5s and sat there looking resident for
+   * the whole prefill — see LocalStatusInput.prefixWarming. Absent in a build
+   * with no warm-up, which reads as false: behave exactly as before rather than
+   * hold "Getting ready" open waiting for a signal that is never coming.
+   */
+  const prefixWarming = usePiStore((s) => s.extensionStatus[PREFIX_WARM_STATUS]) === 'warming';
+  const active = phase === 'starting' || phase === 'downloading' || prefixWarming;
+  // Keyed on the whole wait, not just `phase`, so the count does not restart
+  // when the server flips to ready halfway through it.
+  const elapsedMs = usePhaseElapsed(`${phase}:${String(prefixWarming)}`, active);
 
   const view = localStatusView({
     phase,
     loadedName: phase === 'ready' ? loadedName : null,
     pendingName: switchingTo ?? loadedName ?? downloadName,
     elapsedMs,
+    prefixWarming,
   });
 
   return (
@@ -71,7 +86,7 @@ export function LocalModelBadge(): React.ReactElement {
       className="flex items-start gap-2 px-3 pb-2"
       data-testid="local-model-badge"
       data-dot={view.dot}
-      title={view.detail ?? undefined}
+      title={view.detail}
     >
       <span
         aria-hidden
@@ -81,11 +96,12 @@ export function LocalModelBadge(): React.ReactElement {
         <div className="truncate text-footnote text-text-secondary" data-testid="local-headline">
           {view.headline}
         </div>
-        {view.detail !== null ? (
-          <div className="truncate text-caption text-text-muted" data-testid="local-detail">
-            {view.detail}
-          </div>
-        ) : null}
+        {/* ALWAYS RENDERED — see LocalStatusView.detail. A line that comes and
+            goes moves everything under it by its own height, which the download
+            stress probe measured at 16px. */}
+        <div className="truncate text-caption text-text-muted" data-testid="local-detail">
+          {view.detail}
+        </div>
       </div>
     </div>
   );

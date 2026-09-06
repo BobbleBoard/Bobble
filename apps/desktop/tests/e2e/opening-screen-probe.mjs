@@ -59,8 +59,10 @@ try {
   );
   check(view.chips.length === 4, `four starter chips (got ${view.chips.length})`);
   check(
-    view.privacy !== null && /stay on this Mac/.test(view.privacy),
-    `the sidebar says where the chats live, permanently (got "${view.privacy}")`,
+    view.privacy !== null &&
+      /leaves this Mac/.test(view.privacy) &&
+      /web searches/.test(view.privacy),
+    `the opening screen says where the words go (got "${view.privacy}")`,
   );
 
   await shot('01-opening');
@@ -124,8 +126,49 @@ try {
   );
   await shot('03-badge-starting');
 
+  /*
+   * THE STATE THAT MATTERS MOST: server up, prompt not yet read.
+   *
+   * MEASURED, the wait this covers: the server is ready at ~3.5s and the system
+   * prompt takes another 11,552ms to become resident. The first cut of this
+   * badge went GREEN for that whole window — "Running on your Mac", calm and
+   * resident, while the app could not have answered a message for another ten
+   * seconds.
+   */
   await page.evaluate(() => {
     window.__model_selection_store().getState().setSwitching(null);
+    window
+      .__llm_store()
+      .getState()
+      .applyStatus({
+        phase: 'ready',
+        serverRunning: true,
+        baseUrl: 'http://127.0.0.1:8080',
+        model: {
+          id: 'qwen3.5-9b-mtp',
+          displayName: 'Qwen3.5 9B (MTP)',
+          quant: 'Q4',
+          contextWindow: 65536,
+        },
+        metrics: null,
+        downloadedModelIds: ['qwen3.5-9b-mtp'],
+      });
+    window.__pi_store().setState({ extensionStatus: { 'harness-prefix-warm': 'warming' } });
+  });
+  const warming = await badge('ready-but-warming');
+  check(
+    warming.dot === 'working',
+    'the dot does NOT go green while the prompt is still being read',
+  );
+  check(
+    /^Getting ready/.test(warming.headline ?? ''),
+    `it says what it is doing (got "${warming.headline}")`,
+  );
+  check(!/Running/.test(warming.headline ?? ''), 'and does not claim to be running');
+  await shot('05-badge-warming');
+
+  await page.evaluate(() => {
+    window.__pi_store().setState({ extensionStatus: { 'harness-prefix-warm': 'ready' } });
     window
       .__llm_store()
       .getState()

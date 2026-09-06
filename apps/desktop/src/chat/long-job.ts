@@ -106,13 +106,24 @@ function saySeconds(sec: number): string {
   return `${mins} minute${mins === 1 ? '' : 's'}`;
 }
 
-/** "usually 2–5 minutes on this Mac" — or seconds, when that is the honest unit. */
+/**
+ * What the card says about how long this will take.
+ *
+ * TWO DIFFERENT SENTENCES, because there are two different truths.
+ *
+ * Before this machine has run the job, we genuinely do not know: the shipped
+ * range is 30 seconds to 3 minutes, a six-fold spread, and the tester read that
+ * for what it is — "a six-fold range reads as *we have no idea*. Which is true!
+ * So say that instead, and it becomes charming rather than evasive." Her line,
+ * kept: it also explains why the second run will be better, which makes the
+ * learning visible instead of silent.
+ *
+ * Once the machine HAS run it, one number with "about" beats a range.
+ */
 export function estimateText(est: JobEstimate): string {
-  const bothMinutes = est.lowSec >= 90 && est.highSec >= 90;
-  const range = bothMinutes
-    ? `${Math.round(est.lowSec / 60)}–${Math.round(est.highSec / 60)} minutes`
-    : `${saySeconds(est.lowSec)} to ${saySeconds(est.highSec)}`;
-  return `usually ${range} on this Mac`;
+  if (!est.measured) return "I haven't done this on your Mac yet, so I'm timing it";
+  const mid = (est.lowSec + est.highSec) / 2;
+  return `about ${saySeconds(mid)} on your Mac`;
 }
 
 /** 0 → "0:00"; 154_000 → "2:34". Always mm:ss, so its width never jumps. */
@@ -141,12 +152,21 @@ export function jobView(kind: JobKind, elapsedMs: number, est: JobEstimate): Job
    * one sentence and buys back the trust the number was supposed to earn.
    */
   const overrun = elapsedMs > est.highSec * 1000;
+  /*
+   * ANSWER THE QUESTION THEY ARE ACTUALLY ASKING. The first cut said "Taking
+   * longer than usual. You can keep waiting or stop." The tester: "The second
+   * sentence is redundant — there's a Cancel button right there — and it's
+   * slightly cold, a shrug. At the moment an estimate blows, my actual thought
+   * is not 'what are my options', it's *is it stuck?*"
+   */
   return {
     title: JOB_TITLE[kind],
     estimate: estimateText(est),
     timer: timerText(elapsedMs),
     overrun,
-    overrunText: overrun ? 'Taking longer than usual. You can keep waiting or stop.' : null,
+    overrunText: overrun
+      ? `Longer than I expected. Still working — nothing has gone wrong. ${timerText(elapsedMs)} so far.`
+      : null,
   };
 }
 

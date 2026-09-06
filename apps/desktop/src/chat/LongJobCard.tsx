@@ -46,10 +46,13 @@ export function LongJobCard({
       {children !== undefined ? <div className="pd-longjob-life">{children}</div> : null}
       <div className="pd-longjob-row">
         <div className="min-w-0">
-          <div className="truncate text-footnote text-text-secondary" data-testid="long-job-title">
+          <div className="text-footnote text-text-secondary" data-testid="long-job-title">
             {view.title}
           </div>
-          <div className="truncate text-caption text-text-muted" data-testid="long-job-estimate">
+          {/* Wraps rather than truncates: this is a sentence now, not a label,
+              and "I haven't done this on your Mac yet, so I'm timin…" is worse
+              than two lines. */}
+          <div className="text-caption text-text-muted" data-testid="long-job-estimate">
             {view.estimate}
           </div>
         </div>

@@ -33,7 +33,19 @@ export const STARTERS: readonly Starter[] = [
     icon: 'write',
   },
   {
-    label: 'Look something up',
+    /*
+     * "on the web" IS THE PAYLOAD, not padding.
+     *
+     * The first cut trimmed both trailing phrases for chip length. The tester,
+     * who wrote them: "Those trailing phrases weren't padding — they were the
+     * entire payload. 'Look something up' tells me nothing; every chatbot looks
+     * things up in its own head. 'Look something up ON THE WEB' tells me this
+     * offline app can reach the internet, which I did not know and which is
+     * genuinely surprising given the 'Running on your Mac' line right next to
+     * it." Same for the disk. Optimising a chip for length threw away the two
+     * facts that separate this app from a text box.
+     */
+    label: 'Look something up on the web',
     prompt: 'Search the web and summarise what changed recently in EU packaging rules.',
     icon: 'search',
   },
@@ -43,7 +55,7 @@ export const STARTERS: readonly Starter[] = [
     icon: 'image',
   },
   {
-    label: 'Work with a file',
+    label: 'Work with a file on my Mac',
     prompt: 'Read a file on my Mac and turn it into a short summary I can send.',
     icon: 'file',
   },

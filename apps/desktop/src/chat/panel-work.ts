@@ -36,10 +36,17 @@ export function panelWorkLine(work: PanelWork | null, turnStreaming: boolean): s
   const name = work.name.trim();
   if (name.length === 0) return null;
   const verb = work.kind === 'image' ? 'Drawing' : 'Writing';
+  /*
+   * NO FILE EXTENSION. The tester: "a file extension is exactly the kind of word
+   * I said doesn't belong on screen, and 'launch-plan' is perfectly clear
+   * without it." Only a trailing dot-extension is trimmed, so a name that
+   * happens to contain a dot keeps everything before its last one.
+   */
+  const shown = name.replace(/\.[A-Za-z0-9]{1,8}$/, '');
   // The arrow is load-bearing: it is the only thing on the line that says WHERE.
   // the user's tester wrote the copy herself — "Writing your launch plan in the
   // panel →" — and the arrow is the half that moves your eye.
-  return `${verb} ${name} in the panel →`;
+  return `${verb} ${shown === '' ? name : shown} in the panel →`;
 }
 
 /**

@@ -76,9 +76,18 @@ try {
   const early = await cardText();
   console.log('   at 1s: ', JSON.stringify(early));
   check(early.title === 'Making your image', `the card names the work (got "${early.title}")`);
+  /*
+   * ON RUN ONE IT DOES NOT KNOW, AND SAYS SO. The shipped range was 30 seconds
+   * to 3 minutes — a six-fold spread, which reads as "we have no idea", which
+   * is true. Admitting it also explains why the second run will be better.
+   */
   check(
-    early.estimate !== null && /on this Mac/.test(early.estimate),
-    `it quotes a range up front (got "${early.estimate}")`,
+    early.estimate !== null && /haven't done this on your Mac yet/.test(early.estimate),
+    `on a first run it admits it does not know (got "${early.estimate}")`,
+  );
+  check(
+    early.estimate !== null && !/\d+ *(seconds|minutes) to/.test(early.estimate),
+    "and does not invent a range about somebody else's hardware",
   );
   check(early.cancel === 'Cancel', 'there is a way out');
   check(early.overrun === null, 'no overrun message while it is inside the estimate');
@@ -103,8 +112,14 @@ try {
   console.log('   at 11m:', JSON.stringify(late));
   check(late.overrunAttr === 'true', 'the card knows it has overrun');
   check(
-    late.overrun !== null && /longer than usual/i.test(late.overrun),
+    late.overrun !== null && /Longer than I expected/.test(late.overrun),
     `it admits the estimate is blown (got "${late.overrun}")`,
+  );
+  // The question at that moment is "is it stuck?", not "what are my options" —
+  // the Cancel button is right there and the sentence should not narrate it.
+  check(
+    late.overrun !== null && /nothing has gone wrong/.test(late.overrun),
+    'and answers the question actually being asked',
   );
   check(late.timer === '11:00', `and the clock is honest about how long (got "${late.timer}")`);
   await shot('02-overrun');

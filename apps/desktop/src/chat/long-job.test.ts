@@ -57,15 +57,27 @@ describe('estimateFor — the range narrows to THIS Mac', () => {
 });
 
 describe('estimateText', () => {
-  it('says minutes when minutes is the honest unit', () => {
-    expect(estimateText({ lowSec: 120, highSec: 300, measured: true })).toBe(
-      'usually 2–5 minutes on this Mac',
+  /*
+   * A six-fold range reads as "we have no idea", which — on run one — is true.
+   * The tester: "say that instead, and it becomes charming rather than evasive."
+   * It also explains why run two will be better, which makes the learning
+   * visible instead of silent.
+   */
+  it('admits it does not know yet, rather than inventing a range', () => {
+    expect(estimateText({ lowSec: 30, highSec: 180, measured: false })).toBe(
+      "I haven't done this on your Mac yet, so I'm timing it",
     );
   });
 
-  it('says seconds for a short job', () => {
-    expect(estimateText({ lowSec: 10, highSec: 45, measured: false })).toBe(
-      'usually 10 seconds to 45 seconds on this Mac',
+  it('quotes ONE number once the machine has actually done it', () => {
+    expect(estimateText({ lowSec: 120, highSec: 300, measured: true })).toBe(
+      'about 4 minutes on your Mac',
+    );
+  });
+
+  it('says seconds when seconds is the honest unit', () => {
+    expect(estimateText({ lowSec: 30, highSec: 50, measured: true })).toBe(
+      'about 40 seconds on your Mac',
     );
   });
 });
@@ -86,7 +98,7 @@ describe('jobView', () => {
     const v = jobView('image', 5_000, est);
     expect(v.title).toBe('Making your image');
     expect(v.title).not.toMatch(/generate|tool|_/);
-    expect(v.estimate).toBe('usually 2–5 minutes on this Mac');
+    expect(v.estimate).toBe('about 4 minutes on your Mac');
     expect(v.timer).toBe('0:05');
     expect(v.overrun).toBe(false);
     expect(v.overrunText).toBeNull();
@@ -96,10 +108,14 @@ describe('jobView', () => {
    * A quoted estimate that silently expires is worse than no estimate: the user
    * now has a number they have watched the app break.
    */
-  it('admits it when the estimate is blown, and offers the way out', () => {
+  it('admits it when the estimate is blown, and says it is not stuck', () => {
     const v = jobView('image', 301_000, est);
     expect(v.overrun).toBe(true);
-    expect(v.overrunText).toBe('Taking longer than usual. You can keep waiting or stop.');
+    expect(v.overrunText).toBe(
+      'Longer than I expected. Still working — nothing has gone wrong. 5:01 so far.',
+    );
+    // The Cancel button is right there; the sentence should not narrate it.
+    expect(v.overrunText).not.toMatch(/stop|cancel/i);
   });
 
   it('does not cry overrun one tick early', () => {

@@ -87,6 +87,26 @@ try {
   console.log(`   column at end:   "${(await columnText()).slice(0, 220)}"`);
   await shot('02-written');
 
+  /*
+   * The arrow has to go somewhere. A streaming write opens the panel by itself,
+   * but nothing stops someone collapsing it mid-write — and an arrow pointing at
+   * a collapsed pane is worse than no arrow.
+   */
+  await streamTo(FULL_ARGS.slice(0, FULL_ARGS.indexOf('## Week 2')));
+  await page.waitForTimeout(600);
+  // Collapse it the way a person would — the panel's own close control.
+  const closeBtn = await page.$('.pd-canvas-tabs [aria-label="Close canvas"]');
+  if (closeBtn !== null) await closeBtn.click();
+  await page.waitForTimeout(400);
+  const panelJump = await page.$('[data-testid="panel-work-jump"]');
+  check(panelJump !== null, 'the panel line is a control, not just text');
+  if (panelJump !== null) {
+    await panelJump.click();
+    await page.waitForTimeout(400);
+    const reopened = await page.evaluate(() => document.querySelector('.pd-canvas-tabs') !== null);
+    check(reopened, 'clicking it brings the panel back');
+  }
+
   /* ── Auto-scroll ────────────────────────────────────────────────────────
    *
    * "And auto-scroll. Not auto-scrolling assumes I'm watching the whole time. I

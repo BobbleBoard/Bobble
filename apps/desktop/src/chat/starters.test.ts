@@ -46,9 +46,23 @@ describe('the opening-screen starters', () => {
 
   it('keeps the chip itself glanceable', () => {
     for (const s of STARTERS) {
-      expect(s.label.split(' ').length).toBeLessThanOrEqual(5);
+      // Seven, not five. The first cut capped this at five and the cap is what
+      // ate "on the web" and "on my Mac" — the two facts that separate this app
+      // from a text box. A chip is allowed to be a phrase.
+      expect(s.label.split(' ').length).toBeLessThanOrEqual(7);
       expect(s.label).not.toMatch(/[.]$/);
     }
+  });
+
+  /*
+   * WHERE, NOT JUST WHAT. Two of the four chips exist to tell a new user
+   * something they cannot guess from "Running on your Mac": that this app can
+   * reach the internet, and that it can touch their own disk.
+   */
+  it('says where the work happens on the two chips that need it', () => {
+    const labels = STARTERS.map((s) => s.label);
+    expect(labels).toContain('Look something up on the web');
+    expect(labels).toContain('Work with a file on my Mac');
   });
 
   it('covers the four things the app is actually for', () => {

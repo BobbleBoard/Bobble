@@ -28,6 +28,25 @@ export interface LocalStatusInput {
   pendingName: string | null;
   /** Milliseconds since this phase began (drives the elapsed count). */
   elapsedMs: number | null;
+  /**
+   * Whether the system prompt is still being read into the model.
+   *
+   * THE WAIT NOBODY WAS COUNTING. The server reaches `ready` in ~3.5s and the
+   * prompt takes another ELEVEN AND A HALF SECONDS to become resident
+   * (MEASURED: warm-up 11,552ms; the cached follow-up message 361ms). For that
+   * whole window the first cut of this badge said "Running on your Mac" with a
+   * green dot — calm, resident, done — while the app could not answer a message
+   * for another ten seconds.
+   *
+   * The tester, on exactly this: "You've added a component whose job is to
+   * reassure me, and it reassures me hardest during the one moment I most doubt
+   * the app. Before this change the silence was ambiguous; now the interface is
+   * actively telling me everything's fine while nothing is happening."
+   *
+   * She is right, and it is worse than the bug it replaced. So `ready` alone is
+   * not "running" — the prompt has to be in too.
+   */
+  prefixWarming: boolean;
 }
 
 export type LocalDot = 'ready' | 'working' | 'off' | 'error';
@@ -35,8 +54,20 @@ export type LocalDot = 'ready' | 'working' | 'off' | 'error';
 export interface LocalStatusView {
   /** The readable line. Never a model id, never a percentage. */
   headline: string;
-  /** The grey line under it: the model, or null when there is nothing to name. */
-  detail: string | null;
+  /**
+   * The grey line under it: the model.
+   *
+   * NEVER NULL, AND THAT IS THE POINT. It was optional in the first cut, and the
+   * download stress probe caught it within the hour: `div#3(1) shifted 16px`,
+   * twice, in the two moments a download goes wrong — a missing file and a
+   * dropped connection. One caption line's worth. The name goes momentarily
+   * unknown, the second line unmounts, and everything under it jumps.
+   *
+   * Which is the exact defect this badge exists to argue against: the app moving
+   * under you while you read it, at the moment you are least sure things are
+   * going well. So the slot always has words in it.
+   */
+  detail: string;
   dot: LocalDot;
 }
 
@@ -55,28 +86,35 @@ export function elapsedClock(ms: number | null): string | null {
  * verb changes: running / starting / downloading.
  */
 export function localStatusView(input: LocalStatusInput): LocalStatusView {
-  const { phase, loadedName, pendingName, elapsedMs } = input;
+  const { phase, loadedName, pendingName, elapsedMs, prefixWarming } = input;
   const name = loadedName ?? pendingName;
+  /** The grey line's words when no model is named — never an empty slot. */
+  const unnamed = name ?? 'No model loaded yet';
   const clock = elapsedClock(elapsedMs);
   const withClock = (s: string): string => (clock === null ? s : `${s} · ${clock}`);
 
-  if (phase === 'ready' && loadedName !== null)
+  if (phase === 'ready' && loadedName !== null && !prefixWarming)
     return { headline: 'Running on your Mac', detail: loadedName, dot: 'ready' };
+  // Up, but not yet able to answer. A different sentence, because it is a
+  // different promise: the model is here, it is reading its instructions.
+  if (phase === 'ready' && prefixWarming)
+    return { headline: withClock('Getting ready'), detail: unnamed, dot: 'working' };
   if (phase === 'starting')
     return {
       headline: withClock('Starting on your Mac'),
       // The model is still the grey line — naming it here would make the
       // headline the thing that moves, and the headline is the promise.
-      detail: name,
+      detail: unnamed,
       dot: 'working',
     };
   if (phase === 'downloading')
-    return { headline: withClock('Downloading to your Mac'), detail: name, dot: 'working' };
-  if (phase === 'error') return { headline: 'Model could not start', detail: name, dot: 'error' };
+    return { headline: withClock('Downloading to your Mac'), detail: unnamed, dot: 'working' };
+  if (phase === 'error')
+    return { headline: 'Model could not start', detail: unnamed, dot: 'error' };
   // idle, or ready with nothing resident: honest and quiet, still local.
   return {
     headline: 'Runs on your Mac',
-    detail: name ?? 'No model loaded yet',
+    detail: unnamed,
     dot: 'off',
   };
 }

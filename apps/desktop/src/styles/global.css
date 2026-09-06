@@ -5108,7 +5108,7 @@ body[data-media-expanded="true"] .pd-studio-compose {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  max-width: 420px;
+  max-width: 460px;
   padding: 10px 12px;
   border: 1px solid var(--pd-border-subtle);
   border-radius: var(--pd-radius-lg);
@@ -5151,4 +5151,21 @@ body[data-media-expanded="true"] .pd-studio-compose {
   color: var(--pd-status-warning-fg);
   font-size: var(--pd-font-size-caption);
   line-height: var(--pd-leading-caption);
+}
+
+/* The panel-work status line is a button — see HarnessStatus. It must look
+ * exactly like the status line it replaced, and only admit to being clickable
+ * on hover, because it is a status first and an affordance second. */
+.pd-panel-jump {
+  display: block;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.pd-panel-jump:hover {
+  opacity: 0.82;
 }

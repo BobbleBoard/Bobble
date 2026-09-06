@@ -745,6 +745,27 @@ export function ChatApp({
                       <div className="mt-3 max-w-[720px]">
                         <StarterChips />
                       </div>
+                      {/*
+                        THE CLAIM, WHERE THE DECISION IS MADE.
+
+                        It was at the foot of the sidebar, and the tester called
+                        that right: "The foot of the sidebar is the legal-footer
+                        position. It's where '© 2026' and 'Terms of Service'
+                        live. Everything down there reads as boilerplate and my
+                        eyes have thirty years of training to skip it." This is
+                        the opening screen, next to the four chips, at the moment
+                        someone is deciding whether the app is worth their time.
+
+                        AND IT ADMITS THE EXCEPTION, which is what makes it worth
+                        believing. "Your chats stay on this Mac" is passive and
+                        can be read as a storage claim — we keep your history
+                        locally — which is a far smaller promise than the one we
+                        can actually make. But web search does send words out.
+                        Her version names both, and is stronger for it.
+                      */}
+                      <p className="mt-3 text-caption text-text-muted" data-testid="privacy-line">
+                        Nothing you type here leaves this Mac. Only web searches do.
+                      </p>
                     </div>
                   ) : (
                     // The thread is ALWAYS the lead surface — a corp run renders

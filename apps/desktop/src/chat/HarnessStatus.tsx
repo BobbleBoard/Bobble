@@ -19,7 +19,7 @@ import {
   type TaskState,
 } from '@pi-desktop/ui';
 import { type ReactElement, useEffect, useRef, useState } from 'react';
-import { useCanvasTabsSafe } from '../state/canvas-store';
+import { getCanvasController, useCanvasStore, useCanvasTabsSafe } from '../state/canvas-store';
 import { useLlmStore } from '../state/llm-store';
 import { useModelSelectionStore } from '../state/model-selection-store';
 import { usePiStore } from '../state/pi-slice';
@@ -58,18 +58,29 @@ function ProcessingRing({
   label,
   fading,
   elapsedMs,
+  sentence,
 }: {
   percent: number | null;
   label: string;
   fading: boolean;
+  /**
+   * Leave the label's capitalisation alone.
+   *
+   * The ring lowercases by default because its labels are fragments of one
+   * running phrase — "45% processing · 2.3s" reads as a status, where "45%
+   * Processing" would read as a heading. But the panel line is a whole sentence
+   * about a named file, and the tester flagged it the moment she saw it:
+   * "capitalise it — it's a sentence, not a log line."
+   */
+  sentence?: boolean;
   /** Live elapsed time in the processing phase — a visible prefill/TTFT timer
    * (the user) so the "processing circle" duration is readable, e.g. "45% processing
    * · 2.3s". */
   elapsedMs?: number;
 }): ReactElement {
   const value = percent === null ? 0 : Math.min(1, Math.max(0, percent / 100));
-  const base =
-    percent === null ? label.toLowerCase() : `${Math.round(percent)}% ${label.toLowerCase()}`;
+  const shown = sentence === true ? label : label.toLowerCase();
+  const base = percent === null ? shown : `${Math.round(percent)}% ${shown}`;
   const timer =
     elapsedMs !== undefined && elapsedMs >= 100 ? ` · ${(elapsedMs / 1000).toFixed(1)}s` : '';
   const text = `${base}${timer}`;
@@ -321,7 +332,37 @@ export function ThreadStatusIndicator(): ReactElement | null {
    * prefilling has its own, better label, and this one should not fight it.
    */
   if (panelLine !== null) {
-    return <ProcessingRing percent={null} label={panelLine} fading={false} elapsedMs={elapsedMs} />;
+    /*
+     * THE ARROW HAS TO GO SOMEWHERE.
+     *
+     * The tester: "make the arrow clickable, and make it open the panel if the
+     * panel is closed. An arrow pointing at a collapsed pane is worse than no
+     * arrow, because now I've been told where to look and there's nothing
+     * there." A streaming write opens the panel by itself, but nothing stops
+     * someone collapsing it mid-write — and that is precisely the moment they
+     * are most likely to.
+     */
+    const showPanel = (): void => {
+      useCanvasStore.getState().setCanvasOpen(true);
+      if (busyTab !== null) getCanvasController()?.focusTab(busyTab.id);
+    };
+    return (
+      <button
+        type="button"
+        className="pd-panel-jump pd-focusable"
+        onClick={showPanel}
+        data-testid="panel-work-jump"
+        title="Show the panel"
+      >
+        <ProcessingRing
+          percent={null}
+          label={panelLine}
+          fading={false}
+          elapsedMs={elapsedMs}
+          sentence
+        />
+      </button>
+    );
   }
   if (!processing && !fading) return null;
   // Cold model LOAD → indeterminate pulse + "Loading model" (no fake %). Ingesting

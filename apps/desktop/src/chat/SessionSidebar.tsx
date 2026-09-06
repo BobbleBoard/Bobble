@@ -1688,23 +1688,6 @@ export function SessionSidebar({
         </DialogContent>
       </Dialog>
 
-      {/*
-        THE SENTENCE THE WHOLE PRODUCT RESTS ON, said permanently.
-
-        The blind tester, on what would have moved her score most: "That last
-        sentence is the single best thing about this product and it currently
-        appears nowhere. I'd put it permanently in the sidebar." It lives here
-        rather than in the empty-chats slot because that slot is never seen —
-        the current session already occupies the list on a first run — and a
-        claim that only appears when you have nothing is not a claim.
-
-        It is about the DATA; the badge at the top is about the COMPUTE. Two
-        different promises, which is why both are on screen.
-      */}
-      <div className="px-3 pb-1 text-caption text-text-muted" data-testid="privacy-line">
-        Your chats stay on this Mac.
-      </div>
-
       {/* Bottom-left footer: the profile dropup plus a one-click gear. Equal
           inset both sides so the hover wash is a full-width row rather than a
           pill floating off-centre. */}
