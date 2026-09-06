@@ -38,6 +38,25 @@ const app = await electron.launch({
 
 const isOpen = (page) =>
   page.evaluate(() => document.querySelector('[data-testid="command-palette"]') !== null);
+
+/**
+ * Wait for the palette to reach a state, instead of sleeping and hoping.
+ *
+ * MEASURED: this probe failed roughly one run in three or four, always on the
+ * same line — Escape, then a fixed 400ms, then "did not close". The palette is a
+ * Radix dialog with an exit animation and a focus restore, and on a loaded
+ * machine that takes longer than the sleep. Nothing was wrong with the app; the
+ * assertion was racing it. A flake like this is worse than no test, because it
+ * teaches everyone to re-run the suite until it goes green.
+ */
+const waitForPalette = async (page, open, timeoutMs = 5000) => {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if ((await isOpen(page)) === open) return true;
+    await page.waitForTimeout(100);
+  }
+  return (await isOpen(page)) === open;
+};
 const rows = (page) =>
   page.evaluate(() =>
     [...document.querySelectorAll('[data-testid="command-palette"] [role="option"]')].map(
@@ -73,8 +92,7 @@ try {
 
   // --- Escape closes ONLY the palette ---------------------------------------
   await page.keyboard.press('Escape');
-  await page.waitForTimeout(300);
-  if (await isOpen(page)) fail('Escape did not close the palette');
+  if (!(await waitForPalette(page, false))) fail('Escape did not close the palette');
   else console.log('[palette] OK: Escape closes it');
 
   // Now the named breakage: open Settings, open the palette over it, Escape once.
@@ -93,8 +111,8 @@ try {
     await page.keyboard.press('Meta+k');
     await page.waitForSelector('[data-testid="command-palette-input"]', { timeout: 5000 });
     await page.keyboard.press('Escape');
-    await page.waitForTimeout(400);
-    if (await isOpen(page)) fail('Escape did not close the palette over Settings');
+    if (!(await waitForPalette(page, false)))
+      fail('Escape did not close the palette over Settings');
     const stillSettings = await page.evaluate(
       () => document.querySelector('[data-testid="settings-view"], [role="dialog"]') !== null,
     );
