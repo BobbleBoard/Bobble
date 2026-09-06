@@ -29,7 +29,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@pi-desktop/ui';
-import { useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { assignChat, createProject, useChatOrg } from '../state/chat-org';
 import { useCorpStore } from '../state/corp-store';
 import { useLlmStore } from '../state/llm-store';
@@ -53,6 +53,7 @@ import {
 } from './composer-bar-logic';
 import { modelReadyStage, PREFIX_WARM_STATUS, useHarnessStatus } from './harness-status';
 import { InstructionsChip } from './InstructionsChip';
+import { localStatusView } from './local-status';
 
 /** LEFT: the relocated project (working-folder) chip, slimmed for the bar. When
  * the selected project folder is MISSING and pi fell back to the conversation
@@ -267,6 +268,16 @@ function ContextRegion() {
   // the gap is exactly where a "loaded" model still made you wait.
   const prefixWarm = usePiStore((s) => s.extensionStatus[PREFIX_WARM_STATUS]);
   const readyStage = useLlmStore((s) => modelReadyStage(s.status.phase, prefixWarm));
+  const loadingName = useLlmStore((s) => s.status.model?.displayName ?? null);
+  const loadingPhase = useLlmStore((s) => s.status.phase);
+  const loadingElapsed = useReadyElapsed(readyStage);
+  const loadingLabel = localStatusView({
+    phase: loadingPhase,
+    loadedName: null,
+    pendingName: loadingName,
+    elapsedMs: loadingElapsed,
+    prefixWarming: readyStage === 'preparing',
+  }).headline;
   const harnessPercent = useHarnessStatus()?.contextPercent;
   // During a corp run, pi's own harness sits idle — the ring fills from the
   // RUN's real context usage instead (threaded off the live worker transcript).
@@ -291,11 +302,21 @@ function ContextRegion() {
   stickyRef.current.gauge = gauge;
 
   if (readyStage !== null) {
+    /*
+     * THE SAME WORDS AS THE SIDEBAR, IN THE PLACE THE EYES ARE.
+     *
+     * The badge in the sidebar says "Starting on your Mac · 0:12"; this said
+     * "Loading model…", with no count, four inches away. The tester: "right
+     * words, wrong location. When I'm waiting for a reply I'm staring at the
+     * composer and the empty space above it. Nothing about a status line in the
+     * left rail reaches me there. Mirror it. Same words, second place."
+     *
+     * Literally the same words — both call `localStatusView` — so the two can
+     * never drift into saying different things about one wait.
+     */
     return (
       <span className="pd-composer-model-loading" data-testid="composer-model-loading">
-        <span className="pd-working-label">
-          {readyStage === 'loading' ? 'Loading model…' : 'Getting ready…'}
-        </span>
+        <span className="pd-working-label">{loadingLabel}</span>
       </span>
     );
   }
@@ -398,6 +419,28 @@ function EffortRegion() {
       </PopoverContent>
     </Popover>
   );
+}
+
+/**
+ * Milliseconds in the current ready stage. Local to the composer rather than
+ * shared with the sidebar badge on purpose: they are two views of one wait, and
+ * a shared clock would have to live in a store just so two labels could agree on
+ * a number that is only ever read to one decimal place.
+ */
+function useReadyElapsed(stage: string | null): number | null {
+  const [since, setSince] = useState(() => Date.now());
+  const [now, setNow] = useState(() => Date.now());
+  // biome-ignore lint/correctness/useExhaustiveDependencies: restart on stage change is the behaviour
+  useEffect(() => {
+    setSince(Date.now());
+    setNow(Date.now());
+  }, [stage]);
+  useEffect(() => {
+    if (stage === null) return;
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [stage]);
+  return stage === null ? null : now - since;
 }
 
 export function ComposerBar() {

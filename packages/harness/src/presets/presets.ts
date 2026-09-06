@@ -100,8 +100,17 @@ export const ALWAYS_BROWSER_TOOLS = BROWSER_TOOL_NAMES;
 export const CORE_FILE_TOOLS: readonly string[] = ['read', 'write', 'edit', 'bash'];
 export const ALWAYS_ACTIVE_TOOLS: readonly string[] = [
   ...CORE_FILE_TOOLS,
-  'update_plan',
-  'ask_user',
+  /*
+   * `update_plan` AND `ask_user` ARE NOT HERE ANY MORE — they moved to the
+   * `coordinate` CLI group (harness index.ts). MEASURED off the real request
+   * body, the two of them cost 2,715 characters of every single prefix,
+   * including a turn that just asks the time, and neither is reachable for
+   * most of them. They are one `coordinate --help` away instead.
+   *
+   * The same move took `spawn_subagent` out of this list (below) and
+   * `talk_to_manager` out of the corp seam. the user: "don't remove these, but put
+   * them under a differently named cli."
+   */
   /*
    * `present` is the LAST act of any task that made something, so it has to be
    * reachable from every class — a page, an image, a script and a game land in
@@ -163,10 +172,11 @@ export const ALWAYS_ACTIVE_TOOLS: readonly string[] = [
    */
   'web_search',
   'web_fetch',
-  // The CONSTANT, not the string it happens to equal: this list and the tool's
-  // own registration have to move together, and a literal lets them drift
-  // silently. The import was already here, unused, for exactly this reason.
-  SPAWN_SUBAGENT_TOOL_NAME,
+  // `spawn_subagent` moved to the `coordinate` CLI group with the other three —
+  // 2,217 characters on every prefix for a tool most turns never reach. The CEO
+  // note above still holds: handing work out is the baseline, not a task class.
+  // It is now baseline through `coordinate delegate` rather than through a
+  // schema every turn pays for.
 ];
 
 /**

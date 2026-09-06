@@ -61,7 +61,7 @@ import {
 } from './permissions/modes.js';
 import { CAPABILITIES, capabilityForTool } from './presets/capabilities.js';
 import { resolvePresetTools } from './presets/presets.js';
-import { augmentSystemPrompt } from './prompt/capability-prompt.js';
+import { augmentSystemPrompt, COORDINATE_PROMPT } from './prompt/capability-prompt.js';
 import { connectRepairBridge, type LiveRepairDeps } from './repair/bridge.js';
 import { createToolCallFixer, withRepairAttempts } from './repair/fixer.js';
 import {
@@ -705,32 +705,40 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
    * reachable. They get their own single-command groups rather than being
    * pushed into someone else's.
    */
+  /**
+   * THE FOUR THAT COST 8,516 CHARACTERS AND ARE NOT CAPABILITIES.
+   *
+   * `ask_user`, `update_plan`, `spawn_subagent` and `talk_to_manager` were four
+   * of the five most expensive schemas in the prompt (3,584 + 2,217 + 1,443 +
+   * 1,272 chars, MEASURED off the real request body) — 42% of the entire tool
+   * budget, riding every single turn including one that just asks the time.
+   *
+   * They are also the four the model answered with when a blind tester asked
+   * what it could do, which is not a coincidence: they were a fifth of what it
+   * had been told about itself. Her words: "That's internal machinery. It's like
+   * asking a colleague what they do and being told 'I can hold meetings and
+   * delegate.'"
+   *
+   * the user, on the proposal to delete them: "don't remove these, but put them
+   * under a differently named cli eg. contract and communicate or something."
+   * Exactly right — they are rarely needed and never the point, which is the
+   * definition of something that should be discoverable rather than resident.
+   *
+   * ONE GROUP, and `coordinate` is the honest word for it: every one of the four
+   * is this agent settling something with somebody else — the user, a subagent,
+   * the manager — or stating what it is about to do. They were three groups
+   * (`ask`, `plan`, `team`) when only bash-CLI mode had them; three one-command
+   * groups is a taxonomy nobody needs to learn.
+   */
+  const TOOL_CLI_COORDINATE_GROUP: CliGroupSpec = {
+    name: 'coordinate',
+    summary:
+      'Ask the user something, publish your plan, hand work to a subagent, or brief the manager.',
+    tools: ['ask_user', 'update_plan', SPAWN_SUBAGENT_TOOL_NAME, TALK_TO_MANAGER],
+  };
+
   const TOOL_CLI_EXTRA_GROUPS: readonly CliGroupSpec[] = [
-    {
-      name: 'ask',
-      summary: 'Ask the user a question and wait for their answer.',
-      tools: ['ask_user'],
-    },
-    { name: 'plan', summary: 'Show or update your plan for this task.', tools: ['update_plan'] },
-    /*
-     * DELEGATION IS A COMMAND TOO.
-     *
-     * Turning the CLI on used to remove it entirely: only `bash` is advertised
-     * in this mode, and `spawn_subagent` / `talk_to_manager` belong to no
-     * capability, so they appeared in no group and the CLI had no way to reach
-     * them — while the system prompt went on telling the model to use them. At
-     * max effort, with the CLI on, there was no delegation path at all.
-     *
-     * They are registered either way (subagents below the depth cap, the manager
-     * unconditionally — see corpToolEnabled), so this is only about being
-     * REACHABLE. `buildCli` drops a group whose tools this build did not
-     * register, so a depth-capped child correctly shows no `team spawn`.
-     */
-    {
-      name: 'team',
-      summary: 'Hand work to a subagent, or to the manager who runs a whole team.',
-      tools: [SPAWN_SUBAGENT_TOOL_NAME, TALK_TO_MANAGER],
-    },
+    TOOL_CLI_COORDINATE_GROUP,
     /*
      * THE FENCED FILE TOOLS, BY NAME.
      *
@@ -1052,14 +1060,16 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
      * never once showed up in a real session.
      */
     const available = pi.getAllTools().map((t) => t.name);
+    /*
+     * `talk_to_manager` IS NO LONGER PART OF THE WARM PREFIX, because it is no
+     * longer part of the turn's prefix — it moved into the `coordinate` CLI
+     * group (see applyPreset). The special case here existed precisely to keep
+     * the two in step: a warm-up that warmed 16 tools while a max-effort turn
+     * asked for 17 reused nothing. They are in step again by both dropping it,
+     * and the effort gate no longer perturbs the prefix at all — which is
+     * strictly better, since raising effort mid-session used to invalidate it.
+     */
     const warmNames = resolvePresetTools(warmClass, available);
-    if (
-      corpToolEnabled(runtime.config.effort) &&
-      available.includes(CREATE_PRODUCTION_HIERARCHY) &&
-      !warmNames.includes(CREATE_PRODUCTION_HIERARCHY)
-    ) {
-      warmNames.push(CREATE_PRODUCTION_HIERARCHY);
-    }
     const warmTools = orderedToolDefs(warmNames);
     /*
      * DEBOUNCE ON THE WHOLE PREFIX, not just the system prompt.
@@ -1647,11 +1657,24 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
    * browser or the mac tools would be the same false-availability bug in a new
    * costume.
    */
-  if (toolCliMode) {
+  /*
+   * THE CLI IS NOT ONLY FOR CLI MODE ANY MORE.
+   *
+   * In bash-CLI mode it carries everything, because `bash` is the only
+   * advertised tool. In SCHEMAS mode it now carries exactly one group —
+   * `coordinate` — because those four tools cost 8,516 characters of every
+   * prefix and are needed on a small minority of turns. Same mechanism, same
+   * `--help`, same dispatcher; only the surface differs.
+   *
+   * Registering it in both modes is what makes the user's instruction possible at
+   * all: "don't remove these, but put them under a differently named cli."
+   * Removed from the schemas, still reachable, at the cost of one `--help`.
+   */
+  {
     const handle = registerToolCli(
       {
         tools: cliVisibleTools,
-        groups: () => toolCliGroups(),
+        groups: () => (toolCliMode ? toolCliGroups() : [TOOL_CLI_COORDINATE_GROUP]),
         call: async (name, args) => {
           const target = cliRunnable(name);
           if (target === undefined) {
@@ -1674,6 +1697,14 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
          * the bash tool uses, so raising one cannot silently strand the other.
          */
         dispatchTimeoutMs: (DEFAULT_BASH_TIMEOUT_S + 120) * 1000,
+        /*
+         * The decoys (`say` → `media generate speech`) shadow real system
+         * binaries, and they exist for the mode where `bash` is the only tool
+         * and /usr/bin is a competing implementation of everything we offer.
+         * In schemas mode the model has `generate_speech` in its list; taking
+         * `say` away from it there would be a side effect nobody asked for.
+         */
+        shadowSystemCommands: toolCliMode,
       },
     );
     /* pi's ExtensionAPI has no shutdown hook, so the disposer rides the process
@@ -2060,12 +2091,25 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
    * warm-up was added to avoid.
    */
   function canonicalPrompt(base: string): string {
+    /*
+     * BOTH MODES RETARGET NOW, they just retarget different amounts.
+     *
+     * In CLI mode pi's own guidance names every tool by its TOOL name, so the
+     * whole map is needed. In schemas mode only the four that moved into
+     * `coordinate` are wrong — everything else is still callable by name — so
+     * the map is exactly those four. Passing the whole map here would rewrite
+     * `read`/`write`/`edit` into commands the model has better tools for.
+     */
+    const commandFor = toolCliMode
+      ? toolCliCommandNames()
+      : new Map(
+          [...toolCliCommandNames()].filter(([name]) =>
+            TOOL_CLI_COORDINATE_GROUP.tools.includes(name),
+          ),
+        );
     const augmented = augmentSystemPrompt(base, {
       toolInterface: toolCliMode ? 'bash-cli' : 'schemas',
-      // In CLI mode, pi's own guidance names tools by their TOOL name — it
-      // renders usage lines for every registered tool, advertised or not — so
-      // it is retargeted onto the commands that actually reach them.
-      ...(toolCliMode ? { commandFor: toolCliCommandNames() } : {}),
+      commandFor,
     });
     /*
      * THE COMMAND LIST GOES FIRST.
@@ -2083,7 +2127,15 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
      *
      * Ordering does not touch the KV prefix — the prompt is frozen per session.
      */
-    return toolCliMode ? `${toolCliPreamble()}\n\n${augmented}` : augmented;
+    /*
+     * The CLI preamble leads in CLI mode (MEASURED: a small model acts on the
+     * framing it read FIRST, and moving the command list to the top took
+     * ling-3.0-tiny from 2/6 to 5/6). In schemas mode the four coordination
+     * commands are a footnote to a prompt that is mostly about tools, so they
+     * go at the end where a footnote belongs.
+     */
+    if (toolCliMode) return `${toolCliPreamble()}\n\n${augmented}`;
+    return `${augmented}\n\n${COORDINATE_PROMPT}`;
   }
 
   /** Tool name → the command line that runs it, straight from the CLI model. */
@@ -2275,6 +2327,9 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     // again. Kept at the END of the list so its presence/absence never disturbs
     // the cached prefix ahead of it.
     const corpRegistered = available.includes(CREATE_PRODUCTION_HIERARCHY);
+    /* Diagnostic only now — the tool is reached through `coordinate`, not
+     * advertised — but still worth printing, because "is a team even possible
+     * in this session" is the first question when one does not appear. */
     const wantCorp = corpToolEnabled(runtime.config.effort) && corpRegistered;
     /*
      * WHY THE TEAM TOOL IS OR IS NOT THERE — the two conditions, separately.
@@ -2324,11 +2379,21 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
      * result that tripped the latch says why (OFFLINE_TOOL_NOTE).
      */
     if (offline.offline()) target = target.filter((t) => !NETWORK_TOOLS.has(t));
-    if (wantCorp && !target.includes(CREATE_PRODUCTION_HIERARCHY)) {
-      target.push(CREATE_PRODUCTION_HIERARCHY);
-    } else if (!wantCorp && target.includes(CREATE_PRODUCTION_HIERARCHY)) {
-      target = target.filter((t) => t !== CREATE_PRODUCTION_HIERARCHY);
-    }
+    /*
+     * `talk_to_manager` IS NEVER ADVERTISED AS A SCHEMA ANY MORE.
+     *
+     * It is the single most expensive one in the prompt — 3,584 characters,
+     * MEASURED, on every request — and it is reached on a tiny minority of
+     * turns. It now lives in the `coordinate` CLI group with the other three
+     * coordination tools, so a turn that needs a team is one `coordinate --help`
+     * away and every turn that does not pays nothing.
+     *
+     * The EFFORT GATE still decides whether it exists at all: `wantCorp` is
+     * false below high effort, and a group whose tools this build did not
+     * register is dropped by `buildCli`. So a low-effort session shows no
+     * `coordinate delegate`/`manager` for the same reason it showed no schema.
+     */
+    target = target.filter((t) => t !== CREATE_PRODUCTION_HIERARCHY);
     runtime.activeClass = cls;
     // Only touch the tool set (and thus the cached prefix) when it actually
     // changed — by length OR membership (the corp tool can be added or removed).
@@ -3263,6 +3328,7 @@ export {
   augmentSystemPrompt,
   CAPABILITY_PROMPT,
   CAPABILITY_PROMPT_MARKER,
+  COORDINATE_PROMPT,
   TEAM_PROMPT_MARKER,
 } from './prompt/capability-prompt.js';
 export {

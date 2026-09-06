@@ -315,25 +315,35 @@ describe('wireHarness', () => {
   });
 
   /*
-   * WAS "only at high/max". Effort is decided per MESSAGE, so this test was
-   * pinning a tool that appeared and vanished between turns of one conversation
-   * — and the tool list is rendered at the START of the prompt, so each flip
-   * threw away the KV prefix. the user: "yes if the talk to tool isn't loaded, load
-   * it." The assertion is now the opposite, and it is the point: the advertised
-   * set does not move when effort does.
+   * THE ASSERTION SURVIVED TWO INVERSIONS AND THIS IS THE THIRD.
+   *
+   * It began as "only at high/max", which pinned a tool that appeared and
+   * vanished between turns of one conversation — and the tool list is rendered
+   * at the START of the prompt, so each flip threw away the KV prefix. It became
+   * "at every effort, never taken away", which fixed the churn by paying 3,584
+   * characters on every request forever.
+   *
+   * Now it is neither, and the invariant underneath both is finally stated
+   * directly: THE ADVERTISED SET DOES NOT MOVE WHEN EFFORT DOES. `talk_to_manager`
+   * is reached through the `coordinate` CLI group, so effort cannot perturb the
+   * prefix — and the prefix does not carry it at all.
    */
-  it('offers talk_to_manager at EVERY effort, and never takes it away', async () => {
+  it('never lets effort move the advertised set, and never advertises talk_to_manager', async () => {
     const f = makeFakePi(['read', 'write', 'edit', 'bash', 'talk_to_manager']);
     const handle = wireHarness(f.pi);
     const { ctx } = makeCtx(f.entries);
     await f.fire('session_start', { type: 'session_start', reason: 'startup' }, ctx);
     const run = (args: string) => f.getCommand()?.handler(args, ctx) ?? Promise.resolve();
 
+    const seen: string[][] = [];
     for (const effort of ['medium', 'high', 'low', 'max'] as const) {
       await run(`effort ${effort}`);
       handle.applyPreset('coding', ctx);
-      expect(f.getActiveTools(), effort).toContain('talk_to_manager');
+      expect(f.getActiveTools(), effort).not.toContain('talk_to_manager');
+      seen.push([...f.getActiveTools()]);
     }
+    // Byte-identical at every effort — the property the KV prefix depends on.
+    for (const set of seen) expect(set).toEqual(seen[0]);
   });
 });
 
