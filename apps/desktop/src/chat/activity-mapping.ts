@@ -418,11 +418,19 @@ export function resolveTool(rawName: string): ToolResolution {
   const exact = TOOL_REGISTRY[n];
   if (exact !== undefined) return exact;
 
-  // Edit/write family (before read-ish, so write_file → edit not read).
+  /*
+   * Edit/write family (before read-ish, so write_file → edit not read).
+   *
+   * WRITING AND EDITING ARE DIFFERENT WORDS and the row used to use the wrong
+   * one: a `write_file` that created a brand-new launch plan announced itself as
+   * "Editing a file", which is the sort of small dishonesty that costs nothing
+   * to say and everything to trust. Same kind (same glyph, same diff view, same
+   * canvas routing) — only the verb splits.
+   */
+  if (n.includes('write') || n === 'create')
+    return { kind: 'edit', label: ['Writing a file', 'Wrote a file'] };
   if (
     n.includes('edit') ||
-    n.includes('write') ||
-    n === 'create' ||
     n === 'update' ||
     n === 'str_replace' ||
     n === 'str_replace_editor' ||

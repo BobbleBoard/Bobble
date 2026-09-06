@@ -169,18 +169,35 @@ describe('formatDuration', () => {
 describe('activitySummary', () => {
   it('reads present-tense while a step is still running', () => {
     const steps: ActivityStepData[] = [
-      { kind: 'bash', label: 'a', status: 'done' },
-      { kind: 'edit', label: 'b', status: 'running' },
+      { kind: 'bash', label: 'Ran a command', status: 'done' },
+      { kind: 'edit', label: 'Editing a file', status: 'running' },
     ];
     expect(activitySummary(steps)).toBe('Editing a file');
   });
 
   it('describes the LAST running step when several run', () => {
     const steps: ActivityStepData[] = [
-      { kind: 'read', label: 'a', status: 'running' },
-      { kind: 'search', label: 'b', status: 'running' },
+      { kind: 'read', label: 'Reading a file', status: 'running' },
+      { kind: 'search', label: 'Searching the web', status: 'running' },
     ];
     expect(activitySummary(steps)).toBe('Searching the web');
+  });
+
+  /*
+   * A write is not an edit. The row said "Writing a file" and the chain header
+   * above it said "Editing a file" — the same frame contradicting itself.
+   */
+  it("uses the step's OWN label when the tool carries a more specific one", () => {
+    const steps: ActivityStepData[] = [
+      { kind: 'edit', label: 'Writing a file', status: 'running' },
+    ];
+    expect(activitySummary(steps)).toBe('Writing a file');
+  });
+
+  it('falls back to the kind phrase for a step with no label of its own', () => {
+    expect(activitySummary([{ kind: 'edit', label: '', status: 'running' }])).toBe(
+      'Editing a file',
+    );
   });
 
   it('flips to the past-tense roll-up once every step is done', () => {

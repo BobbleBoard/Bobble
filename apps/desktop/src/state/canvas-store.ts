@@ -6,6 +6,7 @@
  * here so the rail persists a user's drag independent of the tab set.
  */
 import type { CanvasController, CanvasState } from '@pi-desktop/canvas';
+import { useCallback, useSyncExternalStore } from 'react';
 import { create } from 'zustand';
 
 export const CANVAS_MIN_WIDTH = 320;
@@ -57,6 +58,34 @@ export function registerCanvasController(c: CanvasController | null): void {
 export function getCanvasController(): CanvasController | null {
   return controller;
 }
+
+/**
+ * Subscribe a component to the REGISTERED controller, without needing to be
+ * inside `<CanvasProvider>`.
+ *
+ * `useCanvasTabs` throws when there is no provider above it, which makes it the
+ * wrong tool for a component that must also render in a unit test or before the
+ * shell mounts. This returns an empty tab list in those cases instead — the
+ * caller is asking "is the panel busy?", and "there is no panel" is a perfectly
+ * good answer to that.
+ */
+export function useCanvasTabsSafe(): CanvasState['tabs'] {
+  const subscribe = useCallback((listener: () => void) => {
+    // The controller can be registered AFTER this subscribes (shell mount
+    // order), so re-check on every store change as well as on its own updates.
+    const off = controller?.subscribe(listener);
+    return () => off?.();
+  }, []);
+  return useSyncExternalStore(
+    subscribe,
+    () => controller?.getState().tabs ?? EMPTY_TABS,
+    () => EMPTY_TABS,
+  );
+}
+
+/** One frozen array so the no-controller snapshot is referentially stable —
+ * a fresh `[]` each call makes useSyncExternalStore loop forever. */
+const EMPTY_TABS: CanvasState['tabs'] = [];
 
 /**
  * Reset the canvas for a conversation with no saved state: drop every tab and

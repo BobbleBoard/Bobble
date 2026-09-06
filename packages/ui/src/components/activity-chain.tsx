@@ -534,7 +534,20 @@ export function activitySummary(steps: ActivityStepData[]): string {
   const running = steps.some((s) => s.status === 'running');
   if (!running) return summarizeActivity(steps);
   const current = [...steps].reverse().find((s) => s.status === 'running');
-  return current ? RUNNING_PHRASE[current.kind] : 'Working…';
+  if (current === undefined) return 'Working…';
+  /*
+   * THE HEADER AGREES WITH THE ROW IT SUMMARISES.
+   *
+   * The step's own label IS the present-tense phrase for its kind — the two
+   * tables are copies of each other — except where a tool carries a more
+   * specific one: "Writing a file" for a write (vs. the kind's "Editing a
+   * file"), "Using Linear" for a connector. Reading the label first makes those
+   * agree. It was visibly wrong without this: a write showed a chain headed
+   * "Editing a file" over a row reading "Writing a file", in the same frame.
+   *
+   * RUNNING_PHRASE stays as the fallback for a step with no label of its own.
+   */
+  return current.label.trim().length > 0 ? current.label : RUNNING_PHRASE[current.kind];
 }
 
 /* ------------------------------------------------------------------ */
