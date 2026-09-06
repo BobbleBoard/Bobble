@@ -113,7 +113,7 @@ import { registerPresentTool } from './tools/present.js';
 import { presentBridgeFromEnv } from './tools/present-bridge.js';
 import { withRepeatNotice } from './tools/repeat-notice.js';
 import { registerSandboxFileTools, resolveWorkspaceRoot } from './tools/sandbox-fs.js';
-import { buildCli, type CliGroupSpec, commandNameFor, renderRootHelp } from './tools/tool-cli.js';
+import { buildCli, type CliGroupSpec, commandNameFor } from './tools/tool-cli.js';
 import { registerToolCli } from './tools/tool-cli-bridge.js';
 import { truncateToolOutput } from './tools/tool-output-truncate.js';
 import { type CapturedTool, captureRegisteredTools } from './tools/tool-registry.js';
@@ -1035,8 +1035,10 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     // prefix is [system][tools], so warming is only redundant when BOTH match.
 
     runtime.canonicalSystemPrompt = canonical;
-    const warmClass: TaskClass =
-      runtime.config.preset === 'auto' ? 'coding' : runtime.config.preset;
+    /* 'other', NOT 'coding' — see the turn-time site below. The warm set has to
+       be the turn's set exactly, so these two move together or the prefix they
+       share is worth nothing. */
+    const warmClass: TaskClass = runtime.config.preset === 'auto' ? 'other' : runtime.config.preset;
     // Build the tool list in the SAME ORDER a real turn does (applyPreset unions
     // resolvePresetTools' order), NOT pi.getAllTools() registry order.
     /*
@@ -2078,9 +2080,38 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
   function toolCliPreamble(): string {
     const cli = buildCli(toolCliGroups(), cliVisibleTools());
     return [
+      /*
+       * NAMES ONLY — the command TREE is deliberately not here, and removing it
+       * is the single largest saving anywhere in this prompt.
+       *
+       * It used to paste `renderRootHelp(cli)`: every group, every command,
+       * every summary — the same information the JSON schemas carry, in prose.
+       * MEASURED with tests/e2e/tool-mode-cost-probe.mjs, same model, same
+       * question: 21 tools as schemas cost 10,309 prompt tokens, and the CLI
+       * WITH the tree cost 10,309 as well. Identical. The interface was buying
+       * nothing, because nothing had been left out of it.
+       *
+       * Names alone: 1,506 tokens. 86% smaller, and at the cold prefill rate
+       * this app measures, about 1.7 seconds before a first message instead of
+       * twelve.
+       *
+       * The tree was never what the evaluation justified either: tool-cli-eval's
+       * CLI arms gave the model "one paragraph saying the commands exist and how
+       * to look them up" and scored 86% listed / 94% tuned against 97% for
+       * schemas. The tree was added on top of an arm that had already earned its
+       * number without it.
+       *
+       * the user, proposing exactly this: "you don't preload anything per tool into
+       * context, all bash tools are active and available and parsable, but the
+       * model doesn't know anything but their name until they call them with
+       * --help".
+       *
+       * Every line below the list stays, because every line below the list was
+       * tuned against something a real model actually did.
+       */
       'These commands are your abilities. Run them with the `bash` tool.',
       '',
-      renderRootHelp(cli),
+      `  ${cli.groups.map((g) => g.name).join(', ')}`,
       '',
       'They are the ONLY way to do what they do. Do not look for other programs —',
       'ffmpeg, sox, say, festival, imaging libraries and the like are not how this',
@@ -2432,7 +2463,24 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     // model-load warm-up ('coding') so the KV prefix is reused. Conversation naming is now a
     // post-turn background pass (agent_end) that never blocks the reply. Re-add
     // per-task classify later if the routing proves worth the latency.
-    const cls: TaskClass = runtime.config.preset === 'auto' ? 'coding' : runtime.config.preset;
+    /*
+     * THE DEFAULT CLASS IS NEUTRAL, NOT `coding`.
+     *
+     * Every ordinary turn was classified `coding`, which is why a launch
+     * checklist for a coffee subscription came back saying "deploy to
+     * production", "verify deployment success (health checks)" and "monitor
+     * error rates" — and why the model, asked what it could do, answered
+     * "Hello! I'm a local coding agent". The class also picks the tools, so
+     * `python_run` and the fs trio rode every turn: `ls`, `find` and `grep`,
+     * which CORE_FILE_TOOLS' own comment says `bash` already covers.
+     *
+     * `other` is the existing neutral fallback (preset `[]`), so the model keeps
+     * every always-active tool and loses only the four that said "coder" out
+     * loud. It is a CONSTANT like `coding` was, which is the property that
+     * matters: the class must not vary per message or the KV prefix churns and
+     * every turn pays a fresh prefill.
+     */
+    const cls: TaskClass = runtime.config.preset === 'auto' ? 'other' : runtime.config.preset;
     /*
      * SEMANTIC TOOL PRELOAD IS GONE. the user: "ensure that semantic tool preload is
      * not happening per turn or at all."

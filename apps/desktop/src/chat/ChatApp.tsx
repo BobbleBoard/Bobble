@@ -47,7 +47,6 @@ import { usePiStore } from '../state/pi-slice';
 import { connectPresent } from '../state/present-store';
 import { useProjectStore } from '../state/project-store';
 import { applySavedHarnessConfig, useUserMode } from '../state/settings-store';
-import { useThemeStore } from '../store/theme';
 import { useStudioUiStore } from '../studio/studio-ui-store';
 import { AdvancedParamsPanel } from './AdvancedParamsPanel';
 import { preloadFastestModel } from './auto-router';
@@ -195,7 +194,6 @@ export function ChatApp({
   // Consume the harness's auto-generated conversation title → session title
   // (new chats get a real name; a user rename is never clobbered).
   useHarnessTitleSync();
-  const flavor = useThemeStore((s) => s.flavor);
   const [piModels, setPiModels] = useState<Model[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
@@ -719,11 +717,23 @@ export function ChatApp({
                   {empty ? (
                     <div key="lead" className="flex flex-col items-center gap-2">
                       <h1 className="text-title">Bobble</h1>
-                      <p className="text-body text-text-muted">
-                        {flavor === 'claude'
-                          ? 'How can I help you today?'
-                          : 'What are we building?'}
-                      </p>
+                      {/*
+                        NOT "What are we building?".
+
+                        A tester who writes marketing emails for a living opened
+                        the app, read that line, and wondered whether she had
+                        downloaded a developer tool by mistake. She had, in a
+                        sense: the same assumption was in the copy, in the config
+                        (the per-turn class was hardcoded to `coding`) and in the
+                        model's mouth — it answered "what can you actually do?"
+                        with "Hello! I'm a local coding agent". Her words: "that
+                        greeting, the hardcoded coding preset, and the tool list
+                        are the same mistake in three different layers."
+
+                        Fixing one layer would just have moved the tell, so all
+                        three moved together.
+                      */}
+                      <p className="text-body text-text-muted">How can I help you today?</p>
                     </div>
                   ) : (
                     // The thread is ALWAYS the lead surface — a corp run renders

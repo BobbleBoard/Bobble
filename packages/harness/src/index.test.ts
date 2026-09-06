@@ -142,10 +142,16 @@ describe('wireHarness', () => {
     );
     expect(f.setActiveTools).toHaveBeenCalled();
     const lastCall = f.setActiveTools.mock.calls.at(-1)?.[0] as string[];
-    // coding preset → filesystem + bash + python + the capability tool.
+    /*
+     * The default class is NEUTRAL now, not `coding`. It still carries every
+     * always-active tool — a model must never be unable to read or write a file
+     * — and no longer carries `python_run` or the ls/find/grep trio, which are
+     * what made an ordinary chat sound like a developer tool.
+     */
     expect(lastCall).toContain('bash');
-    expect(lastCall).toContain('python_run');
+    expect(lastCall).toContain('read');
     expect(lastCall).toContain('capability');
+    expect(lastCall).not.toContain('python_run');
   });
 
   it('returns a capability-affirming system prompt from before_agent_start (appended to the base)', async () => {
@@ -193,9 +199,11 @@ describe('wireHarness', () => {
     // starts — the ~2.5s TTFT tax is gone. (Auto-naming now runs post-turn on
     // agent_end; verified live.)
     expect(callModel).not.toHaveBeenCalled();
-    // The fixed default 'coding' preset still gives the coding tools.
+    // The fixed default preset is neutral: the always-active set, and not the
+    // coding extras.
     const tools = f.setActiveTools.mock.calls.at(-1)?.[0] as string[];
-    expect(tools).toContain('python_run');
+    expect(tools).toContain('bash');
+    expect(tools).not.toContain('python_run');
   });
 
   it('agent_end settles the turn WITHOUT awaiting post-turn work', async () => {
