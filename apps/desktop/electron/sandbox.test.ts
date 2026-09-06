@@ -38,7 +38,7 @@ describe('sandbox path derivation', () => {
   });
 
   it('derives distinct folders for distinct conversation ids', () => {
-    expect(sandboxPathFor('a', home)).not.toBe(sandboxPathFor('b', home));
+    expect(sandboxPathFor('a', home)).not.toBe(path.join(home, 'Bobble'));
   });
 
   it('sanitizes ids so they cannot escape the base (no traversal / separators)', () => {
@@ -82,19 +82,30 @@ describe('lazy sandbox creation', () => {
   });
 });
 
-describe('resolveSessionCwd — projectless conversation lands in its sandbox', () => {
-  it('returns (and lazily creates) the sandbox when no project / no session', () => {
+/*
+ * These used to assert a per-conversation sandbox. They assert ~/Bobble now, and
+ * the change is not cosmetic: the sandbox fallback is what pushed the app into
+ * resolving a workspace at boot under the literal name "new chat" so pi had
+ * somewhere visible to sit — and THAT is what broke every cold start, because
+ * the first message renamed the folder out from under pi's own session. One
+ * stable, findable, never-renamed directory removes both problems. The rule that
+ * has not changed, and is the reason this file exists, is that it is never HOME.
+ */
+describe('resolveSessionCwd — a projectless conversation lands in ~/Bobble', () => {
+  it('returns (and lazily creates) ~/Bobble when there is no project and no session', () => {
     const cwd = resolveSessionCwd({ conversationId: 'fresh' }, home);
-    expect(cwd).toBe(sandboxPathFor('fresh', home));
+    expect(cwd).toBe(path.join(home, 'Bobble'));
     // Created on demand so pi (which requires an existing cwd) actually roots here.
     expect(fs.existsSync(cwd as string)).toBe(true);
+    // And NOT a per-conversation sandbox — 455 of those were purged once.
+    expect(fs.existsSync(sandboxPathFor('fresh', home))).toBe(false);
   });
 
   it('lets an explicit project cwd win over the sandbox (existing behavior)', () => {
     const project = path.join(home, 'my-project');
     fs.mkdirSync(project);
     expect(resolveSessionCwd({ cwd: project, conversationId: 'fresh' }, home)).toBe(project);
-    // The sandbox was NOT created — the project path short-circuits.
+    // Nothing else was created — the project path short-circuits.
     expect(fs.existsSync(sandboxPathFor('fresh', home))).toBe(false);
   });
 
@@ -106,7 +117,7 @@ describe('resolveSessionCwd — projectless conversation lands in its sandbox', 
     const cwd = resolveSessionCwd({ cwd: deleted, conversationId: 'wc-9' }, home);
 
     // NOT the dead project path, NOT HOME — the conversation's own sandbox.
-    expect(cwd).toBe(sandboxPathFor('wc-9', home));
+    expect(cwd).toBe(path.join(home, 'Bobble'));
     expect(cwd).not.toBe(deleted);
     expect(cwd).not.toBe(home);
     expect(fs.statSync(cwd as string).isDirectory()).toBe(true);
@@ -120,14 +131,14 @@ describe('resolveSessionCwd — projectless conversation lands in its sandbox', 
       { cwd: deleted, sessionPath: '/some/session.jsonl', conversationId: 'wc-10' },
       home,
     );
-    expect(cwd).toBe(sandboxPathFor('wc-10', home));
+    expect(cwd).toBe(path.join(home, 'Bobble'));
   });
 
   it('rejects a cwd that exists but is a FILE (not a directory) → sandbox', () => {
     const file = path.join(home, 'not-a-dir');
     fs.writeFileSync(file, 'x', 'utf8');
     const cwd = resolveSessionCwd({ cwd: file, conversationId: 'wc-11' }, home);
-    expect(cwd).toBe(sandboxPathFor('wc-11', home));
+    expect(cwd).toBe(path.join(home, 'Bobble'));
   });
 
   it('defers to the resumed session (returns undefined) so pi restores its cwd', () => {
@@ -145,7 +156,7 @@ describe('resolveSessionCwd — projectless conversation lands in its sandbox', 
     // `~` and writes files there. 40 such sessions accumulated on the user's machine
     // and the sidebar grouped every one of them into a folder called `~`.
     const cwd = resolveSessionCwd({}, home);
-    expect(cwd).toBe(path.join(sandboxBaseDir(home), 'default'));
+    expect(cwd).toBe(path.join(home, 'Bobble'));
     expect(cwd?.startsWith(home)).toBe(true);
     expect(cwd).not.toBe(home);
   });
@@ -158,13 +169,13 @@ describe('resolveSessionCwd — projectless conversation lands in its sandbox', 
     expect(isHomeDir('', home)).toBe(false);
   });
 
-  it('refuses an explicit HOME cwd and sandboxes instead', () => {
+  it('refuses an explicit HOME cwd and roots in ~/Bobble instead', () => {
     expect(resolveSessionCwd({ cwd: home, conversationId: 'c1' }, home)).toBe(
-      sandboxPathFor('c1', home),
+      path.join(home, 'Bobble'),
     );
     // Trailing slash is the same directory, and must be refused the same way.
     expect(resolveSessionCwd({ cwd: `${home}/`, conversationId: 'c1' }, home)).toBe(
-      sandboxPathFor('c1', home),
+      path.join(home, 'Bobble'),
     );
   });
 
@@ -179,7 +190,7 @@ describe('resolveSessionCwd — projectless conversation lands in its sandbox', 
     };
     const homeSession = write('sessions/home/s.jsonl', home);
     expect(resolveSessionCwd({ sessionPath: homeSession, conversationId: 'c2' }, home)).toBe(
-      sandboxPathFor('c2', home),
+      path.join(home, 'Bobble'),
     );
 
     // A session recorded in a REAL folder still defers to pi as before — and the
@@ -205,7 +216,7 @@ describe('resolveSessionCwd — projectless conversation lands in its sandbox', 
     };
 
     createBridge({ conversationId: 'wc-7' }); // no project selected
-    expect(spawned[0]?.cwd).toBe(sandboxPathFor('wc-7', home));
+    expect(spawned[0]?.cwd).toBe(path.join(home, 'Bobble'));
     expect(fs.statSync(spawned[0]?.cwd as string).isDirectory()).toBe(true);
   });
 });

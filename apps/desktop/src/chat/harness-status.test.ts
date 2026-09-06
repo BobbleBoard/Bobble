@@ -1,11 +1,13 @@
 import { PREFIX_WARM_STATUS as HARNESS_PREFIX_WARM_STATUS } from '@pi-desktop/harness';
 import { describe, expect, it } from 'vitest';
 import {
+  modelReadyStage,
   PREFIX_WARM_STATUS,
   PROMOTE_STATUS_KEY,
   parsePromoteSignal,
   showLoadingModel,
-  showProcessing,, modelReadyStage } from './harness-status';
+  showProcessing,
+} from './harness-status';
 
 describe('parsePromoteSignal (corp-promote intent from normal chat)', () => {
   it('parses a valid promote signal', () => {

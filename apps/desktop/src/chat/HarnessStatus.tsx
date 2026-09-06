@@ -28,7 +28,6 @@ import {
   PREFILL_STATUS_KEY,
   PREFIX_WARM_STATUS,
   parsePrefillPercent,
-  showLoadingModel,
   showProcessing,
   useHarnessStatus,
 } from './harness-status';
