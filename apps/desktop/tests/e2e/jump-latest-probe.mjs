@@ -90,7 +90,29 @@ if (before === null || !before.scrollable) {
   }
 
   await page.click('[data-testid="chat-jump-latest"]');
-  await page.waitForTimeout(900);
+  /*
+   * WAIT FOR THE SCROLL TO ARRIVE, not for 900ms.
+   *
+   * The jump is a SMOOTH scroll, and a probe's window is never shown, so its
+   * renderer runs off a timer at roughly 12fps instead of the display's vsync
+   * (MEASURED — see background-mode.ts). A smooth scroll animated at 12fps takes
+   * longer than a fixed 900ms, so this read the thread mid-flight and reported
+   * "clicking it left 171px of content below" — a real number describing a
+   * scroll that had not finished rather than one that had stopped short.
+   */
+  await page
+    .waitForFunction(
+      () => {
+        const el = document.querySelector('[data-testid="chat-scroll"]');
+        if (el === null) return false;
+        return el.scrollHeight - el.scrollTop - el.clientHeight <= 24;
+      },
+      null,
+      { timeout: 8000 },
+    )
+    .catch(() => undefined);
+  // Then let the control's own exit transition run before asking if it is gone.
+  await page.waitForTimeout(400);
   const after = await metrics();
   if (after === null || after.distanceFromBottom > 24) {
     fail(`clicking it left ${after?.distanceFromBottom}px of content below`);
