@@ -84,10 +84,15 @@ try {
   check(early.overrun === null, 'no overrun message while it is inside the estimate');
   await shot('01-card');
 
-  // (b) The timer moves.
+  // (b) The timer moves. Polled rather than sampled once: the tick is on a
+  // 1s interval the probe does not share a clock with, so a single read 2.5s
+  // later is a coin-flip away from being flaky for no useful reason.
   const t1 = early.timer;
-  await page.waitForTimeout(2500);
-  const t2 = (await cardText()).timer;
+  let t2 = t1;
+  for (let i = 0; i < 20 && t2 === t1; i++) {
+    await page.waitForTimeout(400);
+    t2 = (await cardText()).timer;
+  }
   console.log(`   timer ${t1} → ${t2}`);
   check(t1 !== t2, `the timer moves (${t1} → ${t2})`);
 

@@ -22,6 +22,7 @@
  * than SLOW_MS (default 1200) — that is the regression this exists to catch.
  */
 import { mkdirSync, mkdtempSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { homedir, tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -49,9 +50,20 @@ mkdirSync(OUT, { recursive: true });
 const results = [];
 
 const background = backgroundLaunch();
+/*
+ * By default this drives the INSTALLED /Applications/Bobble.app, which is the
+ * honest target for a shipped-latency number — and the wrong one when the thing
+ * you are checking is a change you have not shipped yet. `APP_ROOT=…` (usually
+ * apps/desktop) runs the repo build under the dev Electron instead, so a
+ * renderer change can be cleared for re-prefill without a full package pass.
+ */
+const APP_ROOT = process.env.APP_ROOT;
 const app = await electron.launch({
-  executablePath: APP,
-  args: [`--user-data-dir=${mkdtempSync(path.join(tmpdir(), 'pi-ttft-udd-'))}`],
+  executablePath: APP_ROOT === undefined ? APP : createRequire(import.meta.url)('electron'),
+  args: [
+    ...(APP_ROOT === undefined ? [] : [path.resolve(APP_ROOT)]),
+    `--user-data-dir=${mkdtempSync(path.join(tmpdir(), 'pi-ttft-udd-'))}`,
+  ],
   env: {
     ...process.env,
     HOME: homedir(),
