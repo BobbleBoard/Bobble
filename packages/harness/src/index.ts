@@ -1704,11 +1704,53 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     runtime.activeTools = next;
     pi.setActiveTools(next);
   };
+  /* One-shot guard for the tool-cost diagnostic below: it is the same on every
+   * request of a run, and a per-request dump would bury the file. */
+  let toolCostLogged = false;
   pi.on('before_provider_request', (e) => {
     const payload = e.payload;
     if (typeof payload !== 'object' || payload === null) return payload;
     const body = payload as Record<string, unknown>;
     if (!Array.isArray(body.messages)) return body;
+    /*
+     * WHAT EACH ADVERTISED TOOL COSTS, IN BYTES, ON EVERY SINGLE REQUEST.
+     *
+     * The tool-set argument keeps being had in the abstract — "the media tools
+     * ride every turn", "the prompt is too big" — and the number that settles
+     * it was never on the table. This prints it: the system prompt's size and
+     * each tool's serialized schema, largest first, once per run.
+     *
+     * `PI_ADV_DEBUG_TOOLCOST=<file>`. Opt-in, never throws, and reads the body
+     * that is actually about to go over the wire rather than a registry we hope
+     * matches it.
+     */
+    const costPath = process.env.PI_ADV_DEBUG_TOOLCOST;
+    if (!toolCostLogged && costPath !== undefined && costPath.length > 0) {
+      toolCostLogged = true;
+      try {
+        const tools = Array.isArray(body.tools) ? body.tools : [];
+        const rows = tools
+          .map((t) => {
+            const name = (t as { function?: { name?: unknown } }).function?.name;
+            return { name: typeof name === 'string' ? name : '?', bytes: JSON.stringify(t).length };
+          })
+          .sort((a, b) => b.bytes - a.bytes);
+        const system = body.messages.find(
+          (m): m is { role: string; content: unknown } =>
+            typeof m === 'object' && m !== null && (m as { role?: unknown }).role === 'system',
+        );
+        const systemBytes = typeof system?.content === 'string' ? system.content.length : 0;
+        const toolBytes = rows.reduce((n, r) => n + r.bytes, 0);
+        appendFileSync(
+          costPath,
+          `system: ${systemBytes} chars\ntools: ${rows.length} costing ${toolBytes} chars\n` +
+            `${rows.map((r) => `  ${String(r.bytes).padStart(6)}  ${r.name}`).join('\n')}\n` +
+            `TOTAL PREFIX: ${systemBytes + toolBytes} chars\n`,
+        );
+      } catch {
+        /* a diagnostic must never break a turn */
+      }
+    }
     /*
      * WATCH THE PROSE, NOT JUST THE TOOL CALLS. the user watched a turn write
      * "Actually, I'll just present the app.py." about forty times and nothing
