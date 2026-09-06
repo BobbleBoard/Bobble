@@ -37,24 +37,27 @@ describe('EffortSlider render', () => {
         label="Effort · Auto"
         valueText="Effort, Auto"
         onLevelChange={() => {}}
-        onAuto={() => {}}
+        onToggleAuto={() => {}}
         data-testid="fx"
       />,
     );
     expect(html).toContain('pd-effort-name'); // the accent-lit header readout
     expect(html).toContain('Effort · Auto'); // …carrying the label
-    expect(html).toContain('Faster'); // the flank end labels
-    expect(html).toContain('Smarter');
     expect(html).toContain('pd-effort-help'); // the "?" help affordance
-    expect(html).toContain('data-active=""'); // the Auto toggle is lit
-    expect(html).toContain('aria-pressed="true"');
-    expect(html).toContain('role="slider"');
-    expect(html).toContain('aria-valuemax="3"');
-    expect(html).toContain('aria-valuenow="1"');
-    // The position is ONE number the fill, the knob and the dots all read; a
-    // third of the way along is the routed tier's slot.
-    expect(html).toContain('--pd-effort-pos:0.333');
-    expect(html).toContain('pd-effort-dot'); // the detents are drawn
+    expect(html).toContain('data-active=""'); // the switch is on
+    expect(html).toContain('role="switch"');
+    expect(html).toContain('aria-checked="true"');
+    /*
+     * AND NO SLIDER AT ALL. the user: the Auto toggle "just removes the slider while
+     * toggled on". A slider that tracks the routed tier and refuses to be
+     * dragged is a control lying about being one, so in Auto there is none —
+     * which means no track, no thumb, no detents, and no end labels either.
+     */
+    expect(html).not.toContain('role="slider"');
+    expect(html).not.toContain('pd-effort-track');
+    expect(html).not.toContain('pd-effort-dot');
+    expect(html).not.toContain('Faster');
+    expect(html).not.toContain('Smarter');
   });
 
   it('level mode: the header shows the pinned level, the Auto toggle is an inactive reset, the fill is explicit', () => {
@@ -66,14 +69,18 @@ describe('EffortSlider render', () => {
         auto={false}
         label="Effort · Max"
         onLevelChange={() => {}}
-        onAuto={() => {}}
+        onToggleAuto={() => {}}
       />,
     );
     expect(html).toContain('pd-effort-name');
     expect(html).toContain('Effort · Max'); // the pinned level readout
-    expect(html).toContain('>Auto<'); // the reset toggle (autoLabel default)
-    expect(html).toContain('aria-pressed="false"');
-    expect(html).not.toContain('data-active'); // the toggle is not lit
+    expect(html).toContain('>Auto<'); // the switch's label (autoLabel default)
+    expect(html).toContain('aria-checked="false"');
+    expect(html).not.toContain('data-active'); // the switch is off
+    // The slider is back, with its end labels, because there is a level to set.
+    expect(html).toContain('role="slider"');
+    expect(html).toContain('Faster');
+    expect(html).toContain('Smarter');
     expect(html).toContain('aria-valuenow="3"');
     expect(html).toContain('--pd-effort-pos:1');
     // Every dot is behind the knob at Max, so every one is lit.

@@ -325,8 +325,15 @@ function EffortRegion() {
   const onLevelChange = (index: number): void => {
     void useSettingsStore.getState().update({ effortMode: 'level', effort: levelForIndex(index) });
   };
-  const onAuto = (): void => {
-    void useSettingsStore.getState().update({ effortMode: 'auto' });
+  /*
+   * A TOGGLE, both ways. It used to be a one-way "return to Auto", which was
+   * survivable only because the slider stayed on screen in Auto and dragging it
+   * pinned a level. The slider is gone in Auto now (the user), so a one-way control
+   * would be a door that locks behind you.
+   */
+  const onToggleAuto = (): void => {
+    const store = useSettingsStore.getState();
+    void store.update({ effortMode: store.settings.effortMode === 'auto' ? 'level' : 'auto' });
   };
 
   /*
@@ -364,10 +371,14 @@ function EffortRegion() {
         // explicitly for determinism across Radix focus-scope versions.
         onOpenAutoFocus={(e) => {
           const root = e.currentTarget as HTMLElement | null;
-          const slider = root?.querySelector<HTMLElement>('[role="slider"]');
-          if (slider !== null && slider !== undefined) {
+          // The thumb when there is one; the Auto switch when Auto has removed
+          // it — either way, on the control the keyboard can actually work.
+          const target =
+            root?.querySelector<HTMLElement>('[role="slider"]') ??
+            root?.querySelector<HTMLElement>('[role="switch"]');
+          if (target !== null && target !== undefined) {
             e.preventDefault();
-            slider.focus();
+            target.focus();
           }
         }}
       >
@@ -379,7 +390,7 @@ function EffortRegion() {
           label={view.label}
           valueText={view.valueText}
           onLevelChange={onLevelChange}
-          onAuto={onAuto}
+          onToggleAuto={onToggleAuto}
           data-testid="composer-effort-slider"
         />
       </PopoverContent>

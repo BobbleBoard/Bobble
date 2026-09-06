@@ -271,10 +271,30 @@ try {
   await effortBtn.click();
   const slider = page.locator('[data-testid="composer-effort-slider"]');
   await slider.waitFor({ state: 'visible', timeout: 8000 });
+  /*
+   * IN THE DEFAULT AUTO STATE THERE IS NO TRACK, and that is the point of the
+   * control now: Auto is a switch that removes the slider rather than a pill
+   * that lights up beside one (the user). So the popover is checked for the real
+   * component by the switch it always has, and the track is checked where it
+   * belongs — one flip away.
+   */
   assert(
-    (await slider.locator('[role="slider"]').count()) >= 1,
-    'the popover should mount the real EffortSlider (role="slider" track)',
+    (await slider.locator('[role="switch"]').count()) === 1,
+    'the popover should mount the real EffortSlider (its Auto switch)',
   );
+  assert(
+    (await slider.locator('[role="slider"]').count()) === 0,
+    'Auto is on by default, so the popover must not be showing a slider',
+  );
+  await slider.locator('[role="switch"]').click();
+  await page.waitForTimeout(400);
+  assert(
+    (await slider.locator('[role="slider"]').count()) === 1,
+    'turning Auto off should bring the real slider track back',
+  );
+  // Leave the profile as it was found.
+  await slider.locator('[role="switch"]').click();
+  await page.waitForTimeout(400);
   await page.keyboard.press('Escape');
   await slider.waitFor({ state: 'detached', timeout: 8000 });
 

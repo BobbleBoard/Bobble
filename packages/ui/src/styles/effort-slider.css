@@ -124,7 +124,7 @@
 .pd-effort-flank {
   flex: none;
   color: var(--pd-text-muted);
-  font-size: var(--pd-font-size-footnote);
+  font-size: var(--pd-font-size-caption);
   white-space: nowrap;
   user-select: none;
 }
@@ -137,12 +137,18 @@
  * the track instead puts the knob half off the end at Max and the last detent
  * dot under the rounded cap — the two bugs that make a slider look untrustworthy
  * at exactly the value someone chose on purpose. */
+/*
+ * SIZED UP on the user's note. Every number below moves together because the knob
+ * radius IS the geometry: `r` sets the knob, the travel range the fill and dots
+ * are placed in, and half the rail's height. Growing the rail alone would leave
+ * an 18px knob rattling inside it.
+ */
 .pd-effort-track {
-  --pd-effort-knob-r: 9px;
+  --pd-effort-knob-r: 13px;
   position: relative;
   flex: 1 1 auto;
-  min-width: 132px;
-  height: 12px;
+  min-width: 200px;
+  height: 18px;
   border-radius: var(--pd-radius-full);
   background: var(--pd-bg-track);
   box-shadow: inset 0 0 0 1px var(--pd-border-subtle);
@@ -170,8 +176,8 @@
     var(--pd-effort-dot, 0) *
     (100% - 2 * var(--pd-effort-knob-r))
   );
-  width: 3px;
-  height: 3px;
+  width: 4px;
+  height: 4px;
   transform: translate(-50%, -50%);
   border-radius: 50%;
   background: color-mix(in srgb, var(--pd-text-primary) 28%, transparent);
@@ -271,7 +277,7 @@
 .pd-effort-track:focus-visible .pd-effort-knob {
   /* Grows from its own centre: the SIZE variable moves, the POSITION radius
      stays where the dots are. */
-  --pd-effort-knob-size: 20px;
+  --pd-effort-knob-size: 28px;
   box-shadow:
     var(--pd-shadow-md),
     0 0 0 1.5px var(--pd-border-focus);
@@ -283,15 +289,23 @@
   align-items: center;
 }
 
-/* A subtle reset in level mode; an accent-tinted active pill while Auto is on. */
+/*
+ * A SWITCH, because it is now the only control on the panel when Auto is on and
+ * it has to read as something with two states rather than a label that happens
+ * to be tinted. the user: "restyle auto to be a toggle button that just removes the
+ * slider while toggled on."
+ */
 .pd-effort-auto {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--pd-space-sm);
   flex: none;
-  height: 22px;
-  padding: 0 10px;
+  height: 30px;
+  padding: 0 6px 0 12px;
   border: none;
   border-radius: var(--pd-radius-full);
   background: transparent;
-  color: var(--pd-text-muted);
+  color: var(--pd-text-secondary);
   font: inherit;
   font-size: var(--pd-font-size-caption);
   white-space: nowrap;
@@ -303,17 +317,66 @@
 
 .pd-effort-auto:hover {
   background: var(--pd-bg-hover);
-  color: var(--pd-text-secondary);
+  color: var(--pd-text-primary);
 }
 
 .pd-effort-auto[data-active] {
-  background: var(--pd-status-info-bg);
   color: var(--pd-status-info-fg);
 }
 
 .pd-effort-auto:focus-visible {
   outline: none;
   box-shadow: 0 0 0 3px var(--pd-status-info-bg);
+}
+
+.pd-effort-auto-label {
+  line-height: 1;
+}
+
+/* The rail. Off it is the same quiet track the slider uses, so the two controls
+   are visibly the same family; on it takes the accent. */
+.pd-effort-auto-switch {
+  position: relative;
+  display: inline-block;
+  flex: none;
+  width: 36px;
+  height: 20px;
+  border-radius: var(--pd-radius-full);
+  background: var(--pd-bg-track);
+  box-shadow: inset 0 0 0 1px var(--pd-border-subtle);
+  transition: background var(--pd-duration-fast) var(--pd-easing-standard);
+}
+
+.pd-effort-auto[data-active] .pd-effort-auto-switch {
+  background: var(--pd-border-focus);
+  box-shadow: none;
+}
+
+/* The knob travels between the same inset at each end, so it never clips the
+   rail's rounded cap — the same rule the slider's knob follows. */
+.pd-effort-auto-knob {
+  position: absolute;
+  top: 50%;
+  left: 3px;
+  width: 14px;
+  height: 14px;
+  transform: translateY(-50%);
+  border-radius: 50%;
+  background: var(--pd-bg-raised);
+  box-shadow:
+    var(--pd-shadow-sm),
+    0 0 0 1px var(--pd-border-default);
+  transition:
+    left var(--pd-duration-fast) var(--pd-easing-standard),
+    background var(--pd-duration-fast) var(--pd-easing-standard);
+}
+
+.pd-effort-auto[data-active] .pd-effort-auto-knob {
+  left: 19px;
+  /* The keyword, not a hex — styles-hygiene forbids raw hex, and the slider's
+     own lit detents already use plain `white` against the same accent fill. */
+  background: white;
+  box-shadow: var(--pd-shadow-sm);
 }
 
 /* ── Trigger + popover surface ────────────────────────────────────────────── */
@@ -352,14 +415,18 @@
 
 /* The popover surface that hosts the panel (a `.pd-menu`): give it room for the
  * titled layout + a touch of padding so the control isn't cramped. */
+/* Wide enough for the 200px track plus both end labels without the track being
+   squeezed back below its minimum — the flex row would otherwise win. */
 .pd-menu.pd-effort-popover {
-  min-width: 248px;
+  min-width: 330px;
   padding: var(--pd-space-md);
 }
 
 @media (prefers-reduced-motion: reduce) {
   .pd-effort-fill,
   .pd-effort-knob,
+  .pd-effort-auto-knob,
+  .pd-effort-auto-switch,
   .pd-effort-dot {
     transition: none;
   }

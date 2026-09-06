@@ -52,18 +52,22 @@ describe('Popover', () => {
             steps={4}
             value={1}
             fill={1 / 3}
-            auto
+            // Deliberately NOT in Auto: Auto removes the slider, and the point
+            // of this test is that the popover hosts the whole control.
+            auto={false}
             label="Auto · Medium"
             valueText="Auto, medium"
             onLevelChange={() => {}}
-            onAuto={() => {}}
+            onToggleAuto={() => {}}
             data-testid="composer-effort-slider"
           />
         </PopoverContent>
       </Popover>,
     );
-    // The slider (role="slider" + the blue fill pill) mounts inside the open popover.
+    // The slider (role="slider" + the blue fill pill) and the Auto switch both
+    // mount inside the open popover.
     expect(html).toContain('role="slider"');
+    expect(html).toContain('role="switch"');
     expect(html).toContain('pd-effort');
     expect(html).toContain('Auto · Medium');
   });

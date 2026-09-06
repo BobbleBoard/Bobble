@@ -17,8 +17,9 @@ export interface EffortSliderProps {
    * an explicit level it is that level's position. Kept separate from `value`
    * so the app maps Auto ↔ tier without the component knowing about tiers. */
   fill: number;
-  /** Whether Auto is active: lights the "Auto" toggle; a drag flips to a pinned
-   * level. The fill/knob position is always driven by `fill`, not this flag. */
+  /** Whether Auto is on. It is not a highlight any more — it REPLACES the
+   * control: with Auto on there is no slider, because there is no level for the
+   * user to be setting. Off, the slider comes back at `fill`/`value`. */
   auto: boolean;
   /** The header readout shown accent-lit at the top of the panel:
    * "Effort · Auto" (auto) or "Effort · High" (a pinned level). */
@@ -29,8 +30,10 @@ export interface EffortSliderProps {
   autoLabel?: string;
   /** Fired with the detent index the user dragged/keyed to (flips to level). */
   onLevelChange: (index: number) => void;
-  /** Fired when the user activates the leftmost Auto affordance. */
-  onAuto: () => void;
+  /** Fired when the Auto switch is flipped — in EITHER direction. It used to be
+   * a one-way "return to Auto" reset, so the only way out of Auto was to drag a
+   * slider that Auto was covering. */
+  onToggleAuto: () => void;
   className?: string;
   'data-testid'?: string;
 }
@@ -58,7 +61,10 @@ export function pointerToIndex(fraction: number, steps: number): number {
  *
  * Purely presentational + controlled: the app maps detents ↔ effort levels and
  * Auto ↔ the active model tier, passing the resolved `fill`/`label` in and taking
- * `onLevelChange`/`onAuto` out — the value logic is unchanged by the restyle.
+ * `onLevelChange`/`onToggleAuto` out — the value logic is unchanged by the restyle.
+ *
+ * With Auto ON the slider is not rendered at all: the switch is the control, and
+ * the header readout is the answer. See the comment at the scale row.
  *
  * Accessible: the track is a `role="slider"` driven by arrows/Home/End as well
  * as pointer drag; the fill/knob transitions honor reduced-motion (CSS).
@@ -72,7 +78,7 @@ export function EffortSlider({
   valueText,
   autoLabel = 'Auto',
   onLevelChange,
-  onAuto,
+  onToggleAuto,
   className,
   'data-testid': testId,
 }: EffortSliderProps): ReactNode {
@@ -178,73 +184,91 @@ export function EffortSlider({
         </button>
       </div>
 
-      {/* Scale: Faster ── track ── Smarter. */}
-      <div className="pd-effort-scale">
-        <span className="pd-effort-flank" aria-hidden="true">
-          Faster
-        </span>
-        <div
-          ref={trackRef}
-          className="pd-effort-track"
-          role="slider"
-          tabIndex={0}
-          aria-label="Effort level"
-          aria-valuemin={0}
-          aria-valuemax={max}
-          aria-valuenow={value}
-          aria-valuetext={valueText ?? label}
-          onKeyDown={onKeyDown}
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={onPointerUp}
-        >
-          <div
-            className="pd-effort-fill"
-            style={{ ...posVar, ['--pd-effort-heat' as string]: frac } as CSSProperties}
-          />
-          {/*
-            THE DETENTS, DRAWN — after the fill, deliberately. Both are absolutely
-            positioned siblings, so the later one wins: parked before the fill
-            they were painted over by it, and every dot behind the knob simply
-            vanished. the user: "dots for levels aswell." Without them the
-            track says only "somewhere between faster and smarter" — you cannot
-            see that there are four settings, which one you are on, or how far
-            the next one is. They are also where the knob lands, so they double
-            as the proof that the geometry is honest.
-          */}
-          <span className="pd-effort-dots" aria-hidden="true">
-            {Array.from({ length: steps }, (_, i) => (
-              <span
-                // biome-ignore lint/suspicious/noArrayIndexKey: the index IS the detent.
-                key={i}
-                className="pd-effort-dot"
-                data-on={i / max <= frac + 0.001 ? '' : undefined}
-                style={{ ['--pd-effort-dot' as string]: i / max } as CSSProperties}
-              />
-            ))}
+      {/*
+        THE SLIDER ONLY EXISTS WHEN THERE IS A LEVEL TO SET.
+        the user: "restyle auto to be a toggle button that just removes the slider
+        while toggled on." It used to stay on screen in Auto, tracking the routed
+        tier — a control that moved on its own and ignored you if you touched it,
+        which is the worst of both: it looks settable and is not. With Auto on the
+        readout above says what the router chose, and that is the whole truth.
+      */}
+      {auto ? null : (
+        <div className="pd-effort-scale">
+          <span className="pd-effort-flank" aria-hidden="true">
+            Faster
           </span>
-          {/* The knob is the TRACK's child, not the fill's: parented to the fill
-              it inherited the fill's width animation and arrived a beat late,
-              which is the difference between a knob that slides and one that
-              catches up. */}
-          <span className="pd-effort-knob" style={posVar} aria-hidden="true" />
+          <div
+            ref={trackRef}
+            className="pd-effort-track"
+            role="slider"
+            tabIndex={0}
+            aria-label="Effort level"
+            aria-valuemin={0}
+            aria-valuemax={max}
+            aria-valuenow={value}
+            aria-valuetext={valueText ?? label}
+            onKeyDown={onKeyDown}
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={onPointerUp}
+          >
+            <div
+              className="pd-effort-fill"
+              style={{ ...posVar, ['--pd-effort-heat' as string]: frac } as CSSProperties}
+            />
+            {/*
+              THE DETENTS, DRAWN — after the fill, deliberately. Both are absolutely
+              positioned siblings, so the later one wins: parked before the fill
+              they were painted over by it, and every dot behind the knob simply
+              vanished. the user: "dots for levels aswell." Without them the
+              track says only "somewhere between faster and smarter" — you cannot
+              see that there are four settings, which one you are on, or how far
+              the next one is. They are also where the knob lands, so they double
+              as the proof that the geometry is honest.
+            */}
+            <span className="pd-effort-dots" aria-hidden="true">
+              {Array.from({ length: steps }, (_, i) => (
+                <span
+                  // biome-ignore lint/suspicious/noArrayIndexKey: the index IS the detent.
+                  key={i}
+                  className="pd-effort-dot"
+                  data-on={i / max <= frac + 0.001 ? '' : undefined}
+                  style={{ ['--pd-effort-dot' as string]: i / max } as CSSProperties}
+                />
+              ))}
+            </span>
+            {/* The knob is the TRACK's child, not the fill's: parented to the fill
+                it inherited the fill's width animation and arrived a beat late,
+                which is the difference between a knob that slides and one that
+                catches up. */}
+            <span className="pd-effort-knob" style={posVar} aria-hidden="true" />
+          </div>
+          <span className="pd-effort-flank" aria-hidden="true">
+            Smarter
+          </span>
         </div>
-        <span className="pd-effort-flank" aria-hidden="true">
-          Smarter
-        </span>
-      </div>
+      )}
 
-      {/* Footer: the Auto ↔ pinned-level toggle (lit while Auto is active). */}
+      {/*
+        A SWITCH, not a pill that lights up. It is the only control on the panel
+        when Auto is on, and it has to say both what it does and which way it is
+        — `role="switch"` so a screen reader gets the same, and it flips BOTH
+        ways so Auto is escapable without a slider to drag.
+      */}
       <div className="pd-effort-foot">
         <button
           type="button"
           className="pd-effort-auto"
+          role="switch"
+          aria-checked={auto}
           data-active={auto ? '' : undefined}
-          aria-pressed={auto}
-          onClick={onAuto}
+          onClick={onToggleAuto}
           data-testid={testId !== undefined ? `${testId}-auto` : undefined}
         >
-          {autoLabel}
+          <span className="pd-effort-auto-label">{autoLabel}</span>
+          <span className="pd-effort-auto-switch" aria-hidden="true">
+            <span className="pd-effort-auto-knob" />
+          </span>
         </button>
       </div>
     </div>
