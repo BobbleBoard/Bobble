@@ -2111,7 +2111,22 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
        */
       'These commands are your abilities. Run them with the `bash` tool.',
       '',
-      `  ${cli.groups.map((g) => g.name).join(', ')}`,
+      /*
+       * NAME + ONE LINE, not the whole tree and not the bare name.
+       *
+       * Bare names MEASURED a regression on the smallest model: ling-3.0-tiny
+       * went 6/6 with schemas and 3/6 with names alone, and the transcripts show
+       * exactly why — asked for a picture it ran `ls /usr/bin/`, `which python3`
+       * and `import PIL`; asked for a sound effect, `which ffmpeg` and `which
+       * sox`. It reached `media --help` on turn 3 and ran out of turns. The
+       * anti-shopping lines below were already there and did not stop it.
+       *
+       * With the full tree it could SEE `media generate image` and just run it.
+       * The summary is the cheap half of that: enough to know whether a group is
+       * worth opening, without the commands, the arguments or the flags. About
+       * 170 tokens against the tree's ~8,800.
+       */
+      ...cli.groups.map((g) => `  ${g.name} — ${g.summary}`),
       '',
       'They are the ONLY way to do what they do. Do not look for other programs —',
       'ffmpeg, sox, say, festival, imaging libraries and the like are not how this',
