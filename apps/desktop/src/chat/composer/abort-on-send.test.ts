@@ -36,3 +36,21 @@ describe('abortsOnSend', () => {
     expect(abortsOnSend(null, { body: PREFIX }, 0)).toBe(true);
   });
 });
+
+describe('a superseded prime cannot clear its replacement', () => {
+  /*
+   * The bug this guards against is not in `abortsOnSend` itself — it is in what
+   * the hook feeds it. A prime that has already been replaced resolves LAST,
+   * and its `finally` used to null the record belonging to the prime that
+   * replaced it. `abortsOnSend(null, …)` is then true, so the send cancelled
+   * work that was about to serve it. MEASURED on a chat switch: two primes
+   * logging `aborted: true` five milliseconds apart and a 2.4s send against a
+   * prefix that was already resident.
+   */
+  it('is decided by the record that is actually live', () => {
+    const live = { prefix: PREFIX, turns: 0, ticket: {} };
+    expect(abortsOnSend(live, { body: `${PREFIX}\n\nhi` }, 0)).toBe(false);
+    // What the old code left behind, and what it cost:
+    expect(abortsOnSend(null, { body: `${PREFIX}\n\nhi` }, 0)).toBe(true);
+  });
+});

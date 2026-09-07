@@ -282,6 +282,11 @@ try {
     const atSend = await win
       .evaluate(() => ({
         pill: document.querySelector('[data-testid="composer-pill-text"]')?.textContent ?? null,
+        /* What the composer's own prefill has been doing — the other thing that
+         * can hold the slot while a send waits, and one the harness's warm
+         * status knows nothing about. */
+        prefill: (window.__prefill_log ?? []).slice(-4),
+        priming: document.querySelector('[data-testid="composer-pill-text"]') !== null,
         /*
          * ...and whether the app had any way to KNOW this send would be slow.
          * The pill is for waits the app can see coming — a model still loading,
@@ -404,6 +409,7 @@ try {
       turn,
       pillAtSend,
       appKnew,
+      prefill: atSend.prefill,
       samples: samples.length,
     };
     rows.push(row);
@@ -444,7 +450,37 @@ try {
     await win.waitForTimeout(2500);
     const rowsEls = await win.$$('[data-testid^="chat-row-"]');
     if (rowsEls.length > 0) {
-      await rowsEls[0].click();
+      /*
+       * SWITCH TO THE CHAT THAT HAS THE HISTORY, and say how long it took to
+       * come back. The first cut clicked row 0 and waited a flat six seconds:
+       * row 0 is the chat that was just created, so the case could be switching
+       * to an EMPTY chat while claiming to measure a return to a long one — and
+       * a flat wait cannot tell "the restore was instant and the send was slow"
+       * from "the restore was still running when we typed".
+       */
+      const clickedAt = Date.now();
+      let target = rowsEls[rowsEls.length - 1];
+      for (const row of rowsEls) {
+        const label = (await row.textContent()) ?? '';
+        if (!/new chat/i.test(label)) {
+          target = row;
+          break;
+        }
+      }
+      await target.click();
+      let restoredMs = null;
+      const deadline = Date.now() + 30_000;
+      while (Date.now() < deadline) {
+        const n = await win.evaluate(() => window.__pi_store().getState().messages.length);
+        if (n > 0) {
+          restoredMs = Date.now() - clickedAt;
+          break;
+        }
+        await new Promise((r) => setTimeout(r, 50));
+      }
+      console.log(
+        `  (the chat's messages came back ${restoredMs === null ? 'NOT AT ALL in 30s' : `in ${restoredMs}ms`})`,
+      );
       await win.waitForTimeout(6000); // as if reading before typing
       await send('chat-switch-back', 'Summarise this chat in one line.');
     } else {
@@ -591,6 +627,7 @@ if (unforeseen.length > 0) {
     const reused =
       r.turn === null ? '' : `${r.turn.total - r.turn.processed}/${r.turn.total} reused`;
     console.log(`    ${r.case.padEnd(26)}${r.ttft}ms   ${reused}`);
+    for (const e of r.prefill ?? []) console.log(`        prefill ${JSON.stringify(e)}`);
   }
 }
 /*

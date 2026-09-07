@@ -64,6 +64,8 @@ const PREFILL_DEBOUNCE_MS = 200;
 export interface PrimingNow {
   readonly prefix: string;
   readonly turns: number;
+  /** Identity of the request that wrote this, so a superseded one cannot clear it. */
+  readonly ticket?: object;
 }
 
 /**
@@ -276,7 +278,19 @@ export function useAttachmentPrefill(attachmentPrefix: string): {
        * inside this module to see the truth.
        */
       setInFlight(true);
-      priming.current = { prefix: attachmentPrefix, turns: history.length };
+      /*
+       * A TOKEN, so a prime that has already been superseded cannot clear the
+       * record belonging to the one that replaced it.
+       *
+       * MEASURED on a chat switch: two primes in a row, each logging
+       * `aborted: true` within five milliseconds, and the send that followed
+       * took 2.4s against a prefix that should have been resident. A superseded
+       * prime's `finally` runs LAST, after its replacement has already written
+       * its own record — so it nulled a live prime, and the send then read
+       * `priming.current === null` and cancelled work that was about to serve it.
+       */
+      const ticket = {} as const;
+      priming.current = { prefix: attachmentPrefix, turns: history.length, ticket };
       note({
         what: 'prime',
         slotEpoch,
@@ -304,6 +318,7 @@ export function useAttachmentPrefill(attachmentPrefix: string): {
           note({ what: 'failed', error: String(error) });
         })
         .finally(() => {
+          if (priming.current?.ticket !== ticket) return; // superseded — not ours to clear
           priming.current = null;
           setInFlight(false);
         });
