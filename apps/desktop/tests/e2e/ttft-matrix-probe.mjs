@@ -577,6 +577,14 @@ if (broke.length === 0) {
   for (const r of broke) console.log(`    ${r.case.padEnd(26)}${r.ttft}ms`);
   process.exitCode = 1;
 }
+const spoke = rows.filter((r) => (r.ttft ?? 0) > SLOW_MS && (r.pillAtSend ?? '').length > 0);
+if (spoke.length > 0) {
+  console.log('\n  slow, and the screen said so:');
+  for (const r of spoke) {
+    console.log(`    ${r.case.padEnd(26)}${r.ttft}ms — ${JSON.stringify(r.pillAtSend)}`);
+  }
+}
+
 if (unforeseen.length > 0) {
   console.log('\n  slow for a reason nothing in the app models (reported, not a failure):');
   for (const r of unforeseen) {
@@ -585,14 +593,6 @@ if (unforeseen.length > 0) {
     console.log(`    ${r.case.padEnd(26)}${r.ttft}ms   ${reused}`);
   }
 }
-for (const r of rows) {
-  if ((r.ttft ?? 0) > SLOW_MS && (r.pillAtSend ?? '').length > 0) {
-    console.log(
-      `    ${r.case.padEnd(26)}${r.ttft}ms — the screen said ${JSON.stringify(r.pillAtSend)}`,
-    );
-  }
-}
-
 /*
  * ...AND THE SAME RULE READ BACKWARDS. "When I don't see anything I get an
  * instant response" is a promise in both directions: a route that IS instant
