@@ -1116,6 +1116,21 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     }
   }
 
+  /**
+   * Give back the "Getting ready" label.
+   *
+   * It is claimed on the first tick of a wiring, before we know whether a
+   * warm-up is needed, because the alternative — claiming it only once the
+   * warm-up starts — leaves a window where the composer looks ready and a send
+   * queues behind a warm-up that had not begun. The cost of claiming early is
+   * that EVERY path which ends with "no warm-up is coming" has to hand it back,
+   * including the ones that do nothing at all.
+   */
+  function releaseWarmLabel(ctx: ExtensionContext): void {
+    if (ctx.hasUI !== true) return;
+    ctx.ui.setStatus(PREFIX_WARM_STATUS, 'ready');
+  }
+
   function maybeWarmPrefix(ctx: ExtensionContext): void {
     const warmCall = currentCallModel();
     /* Opt-in diagnostic: WHY a warm-up did not happen. Four different silent
@@ -1163,11 +1178,13 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     }
     if (typeof ctx.getSystemPrompt !== 'function') {
       note('ctx.getSystemPrompt missing');
+      releaseWarmLabel(ctx);
       return;
     }
     const fresh = canonicalPrompt(ctx.getSystemPrompt());
     if (fresh.trim().length === 0) {
       note('empty system prompt');
+      releaseWarmLabel(ctx);
       return;
     }
     // NOTE: the debounce key is completed BELOW, once the tool set is known — the
@@ -1316,6 +1333,16 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     }
     if (warmKey === residentPrefix.warmedKey) {
       note('already warmed (same prompt + tools)');
+      /*
+       * AND SAY SO. The label is claimed on the first tick of every wiring —
+       * and pi makes a new wiring for every chat — so a new chat that finds its
+       * prefix already resident claims "Getting ready" and, without this, never
+       * takes it back. MEASURED by a probe that reads the composer pill at the
+       * moment of sending: "Getting ready · 6:56" on a send that took 4.4s,
+       * because the label had been up since seven minutes earlier. A promise
+       * that is always on screen tells the user nothing.
+       */
+      releaseWarmLabel(ctx);
       return;
     }
     residentPrefix.warmedKey = warmKey;

@@ -230,6 +230,42 @@ describe('repair ladder — live wiring through the provider', () => {
     expect(values.at(-1)).toBeGreaterThan(0);
   });
 
+  /*
+   * The composer's "Getting ready" label is a promise about a wait. pi rewires
+   * this extension for every chat, so the label is claimed again in every one —
+   * and a chat whose prefix is already resident does no warm-up at all. Without
+   * a release on that path the label stays up for the life of the session and
+   * stops meaning anything.
+   */
+  it('hands back the "getting ready" label in a chat whose prefix is already resident', async () => {
+    /*
+     * TWO WIRINGS, because that is what a new chat is: pi re-imports this
+     * extension per session, so the label — claimed on the first tick of every
+     * wiring, before it is known whether a warm-up is needed — is claimed again
+     * in a chat that has nothing to warm. The first rig does the warming; the
+     * second is the new chat, and it must give the label back.
+     */
+    const warm = async (rig: ReturnType<typeof makeRig>) => {
+      (rig.ctx as unknown as { getSystemPrompt: () => string }).getSystemPrompt = () =>
+        'You are a helpful assistant.';
+      await startSession(rig);
+      for (let i = 0; i < 6; i += 1) {
+        await rig.fire('model_select', { type: 'model_select', model: { id: 'm', name: 'm' } });
+        await Promise.resolve();
+      }
+      await new Promise((r) => setTimeout(r, 0));
+    };
+
+    const first = makeRig({ effort: 'medium', callModel: vi.fn(async () => 'ok') });
+    await warm(first);
+    const second = makeRig({ effort: 'medium', callModel: vi.fn(async () => 'ok') });
+    await warm(second);
+
+    const labels = second.setStatus.mock.calls.filter((c) => c[0] === 'harness-prefix-warm');
+    expect(labels.length).toBeGreaterThan(0);
+    expect(labels.at(-1)?.[1]).toBe('ready');
+  });
+
   it('rung 5 aborts at the effort abortThreshold and onRepair populates repairFailures', async () => {
     // effort low → abortThreshold 2. No callModel → no fixer → ladder falls to 3–5.
     const rig = makeRig({ effort: 'low' });

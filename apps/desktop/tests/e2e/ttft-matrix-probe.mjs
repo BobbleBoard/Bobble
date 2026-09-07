@@ -279,11 +279,23 @@ try {
      * warm-up, and a send that waits out an attachment prime — are exactly the
      * ones this reads, and a silent slow route is a failure even at 100% reuse.
      */
-    const pillAtSend = await win
-      .evaluate(
-        () => document.querySelector('[data-testid="composer-pill-text"]')?.textContent ?? null,
-      )
-      .catch(() => null);
+    const atSend = await win
+      .evaluate(() => ({
+        pill: document.querySelector('[data-testid="composer-pill-text"]')?.textContent ?? null,
+        /*
+         * ...and whether the app had any way to KNOW this send would be slow.
+         * The pill is for waits the app can see coming — a model still loading,
+         * a prefix still warming. A turn that is slow for a reason nothing in
+         * the app models (the server's weights paged out while the window sat
+         * idle, say) is worth reporting, but it is not the app failing to speak.
+         */
+        knew:
+          window.__pi_store().getState().extensionStatus['harness-prefix-warm'] === 'warming' ||
+          window.__llm_store?.().getState().status.phase === 'starting',
+      }))
+      .catch(() => ({ pill: null, knew: false }));
+    const pillAtSend = atSend.pill;
+    const appKnew = atSend.knew;
     const sentAt = Date.now();
     await win.keyboard.press('Enter');
     /*
@@ -384,7 +396,16 @@ try {
     }
     const turn = [...byTask.values()].reduce((a, b) => (b.total > (a?.total ?? -1) ? b : a), null);
     const dispatchMs = dispatchedAt === null ? null : dispatchedAt - sentAt;
-    const row = { case: name, note, ttft, dispatchMs, turn, pillAtSend, samples: samples.length };
+    const row = {
+      case: name,
+      note,
+      ttft,
+      dispatchMs,
+      turn,
+      pillAtSend,
+      appKnew,
+      samples: samples.length,
+    };
     rows.push(row);
     const reused = turn === null ? null : turn.total - turn.processed;
     console.log(
@@ -544,12 +565,25 @@ for (const r of rows) {
  * with nothing on screen explaining it.
  */
 const SLOW_MS = 1500;
-const silentSlow = rows.filter((r) => (r.ttft ?? 0) > SLOW_MS && (r.pillAtSend ?? '').length === 0);
-if (silentSlow.length === 0) {
-  console.log(`\n  OK: every route over ${SLOW_MS}ms had something on screen saying so.`);
+const quiet = rows.filter((r) => (r.ttft ?? 0) > SLOW_MS && (r.pillAtSend ?? '').length === 0);
+const broke = quiet.filter((r) => r.appKnew === true);
+const unforeseen = quiet.filter((r) => r.appKnew !== true);
+if (broke.length === 0) {
+  console.log(
+    `\n  OK: every route over ${SLOW_MS}ms that the app could SEE coming said so on screen.`,
+  );
 } else {
-  console.log(`\n  SLOW AND SILENT — over ${SLOW_MS}ms with nothing on screen:`);
-  for (const r of silentSlow) console.log(`    ${r.case.padEnd(26)}${r.ttft}ms`);
+  console.log('\n  SLOW AND SILENT — a wait the app knew about, with nothing on screen:');
+  for (const r of broke) console.log(`    ${r.case.padEnd(26)}${r.ttft}ms`);
+  process.exitCode = 1;
+}
+if (unforeseen.length > 0) {
+  console.log('\n  slow for a reason nothing in the app models (reported, not a failure):');
+  for (const r of unforeseen) {
+    const reused =
+      r.turn === null ? '' : `${r.turn.total - r.turn.processed}/${r.turn.total} reused`;
+    console.log(`    ${r.case.padEnd(26)}${r.ttft}ms   ${reused}`);
+  }
 }
 for (const r of rows) {
   if ((r.ttft ?? 0) > SLOW_MS && (r.pillAtSend ?? '').length > 0) {
@@ -557,4 +591,24 @@ for (const r of rows) {
       `    ${r.case.padEnd(26)}${r.ttft}ms — the screen said ${JSON.stringify(r.pillAtSend)}`,
     );
   }
+}
+
+/*
+ * ...AND THE SAME RULE READ BACKWARDS. "When I don't see anything I get an
+ * instant response" is a promise in both directions: a route that IS instant
+ * must have nothing on screen, or the label stops being information. This is
+ * how a label left claimed by a chat that had nothing to warm was found —
+ * "Getting ready · 6:56" on a send that took four seconds.
+ */
+const fastAndTalking = rows.filter(
+  (r) => r.ttft !== null && r.ttft <= SLOW_MS && (r.pillAtSend ?? '').length > 0,
+);
+if (fastAndTalking.length === 0) {
+  console.log(`  OK: every route under ${SLOW_MS}ms had a clear screen.`);
+} else {
+  console.log('\n  FAST BUT STILL TALKING — an instant send with a wait still on screen:');
+  for (const r of fastAndTalking) {
+    console.log(`    ${r.case.padEnd(26)}${r.ttft}ms — ${JSON.stringify(r.pillAtSend)}`);
+  }
+  process.exitCode = 1;
 }
