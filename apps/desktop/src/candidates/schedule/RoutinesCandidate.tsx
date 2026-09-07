@@ -8,8 +8,10 @@
  * works. the user: separate menus for plugins / connectors / skills are confusing;
  * this page never asks you to visit one.
  *
- * A card opens a sheet — the contract, the reach, the runs — and "new" is a
- * dashed card that turns into the editor where it stands.
+ * A card opens a sheet — the contract, the reach, the runs. Since round one
+ * the card leads with the RESULT of its last run (the first sentence of the
+ * report) rather than how long it took, the prompt is one line, and "new" is
+ * a row, not a cell.
  */
 import {
   Button,
@@ -25,15 +27,17 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { describeSchedule, type ScheduledTask } from '../../../electron/scheduled/schedule-logic';
 import type { TaskDraft, TaskRun } from '../../../electron/scheduled/scheduled-contract';
 import { cx } from '../../onboarding/cx';
-import { describeDelta, describeDuration, type TaskState, tally, taskState } from './derive';
+import { describeDelta, describeSoon, headline, type TaskState, tally, taskState } from './derive';
 import { registerCandidateStates } from './hook';
 import { IconPlay, IconRepeat } from './icons';
 import { RunLedger } from './RunLedger';
 import {
-  MachineStrip,
+  describeTemplateSchedule,
+  OffNotice,
   OutcomeGlyph,
   ReachRow,
   SchedulingSwitch,
+  SectionTitle,
   StatePill,
   stateLine,
   TASK_TEMPLATES,
@@ -73,15 +77,15 @@ function matches(task: ScheduledTask, f: Filter): boolean {
 function nextLine(state: TaskState, now: number): string {
   switch (state.kind) {
     case 'running':
-      return `running · ${describeDuration(state.run, now)}`;
+      return ''; // the pill says it
     case 'due':
       return 'due now';
     case 'missed':
-      return `missed · next ${describeDelta(state.nextAt, now)}`;
+      return `next ${describeSoon(state.nextAt, now)}`; // the pill says "Missed"
     case 'scheduled':
-      return `next ${describeDelta(state.nextAt, now)}`;
+      return `next ${describeSoon(state.nextAt, now)}`;
     case 'manual':
-      return 'run it when you like';
+      return '';
     case 'paused':
       return 'paused';
     case 'off':
@@ -121,7 +125,7 @@ function RoutineCard({
             <span className="sc-row-name min-w-0 flex-1">{task.name}</span>
             <StatePill state={state} now={now} />
           </span>
-          <span className="sc-clamp-2 mt-0.5 block text-footnote text-text-secondary">
+          <span className="sc-clamp-1 mt-0.5 block text-footnote text-text-muted">
             {task.prompt}
           </span>
         </span>
@@ -133,16 +137,29 @@ function RoutineCard({
         </span>
         <span className="sc-time shrink-0">{nextLine(state, now)}</span>
       </span>
-      <span className="mt-3 flex items-center justify-between gap-2">
-        <ReachRow task={task} runs={runs} max={3} />
+      {/* What it left behind, last time: the sentence, not the stopwatch. */}
+      <span className="mt-2 flex items-center gap-1.5 text-footnote">
         {last !== undefined ? (
-          <span className="inline-flex shrink-0 items-center gap-1 text-caption text-text-muted">
+          <>
             <OutcomeGlyph run={last} size={13} />
-            {last.status === 'running' ? 'working' : describeDuration(last, now)}
-          </span>
+            <span className="shrink-0 text-text-muted">
+              {last.status === 'running' ? 'working' : describeDelta(last.startedAt, now)}
+            </span>
+            <span
+              className={cx(
+                'sc-clamp-1 min-w-0',
+                last.status === 'error' ? 'text-status-danger-fg' : 'text-text-secondary',
+              )}
+            >
+              {last.status === 'running' ? '' : `— ${headline(last)}`}
+            </span>
+          </>
         ) : (
-          <span className="text-caption text-text-muted">not run yet</span>
+          <span className="text-text-muted">Not run yet</span>
         )}
+      </span>
+      <span className="mt-3">
+        <ReachRow task={task} runs={runs} max={3} />
       </span>
     </button>
   );
@@ -168,17 +185,7 @@ function TemplateCard({ id, onPick }: { id: string; onPick: () => void }) {
         </span>
         <span className="sc-clamp-2 mt-0.5 block text-footnote text-text-secondary">{t.blurb}</span>
         <span className="mt-2 block text-caption text-text-muted">
-          {describeSchedule({
-            id: t.id,
-            name: t.name,
-            prompt: t.prompt,
-            frequency: t.frequency,
-            hour: t.hour,
-            minute: t.minute,
-            weekday: t.weekday,
-            enabled: true,
-            createdAt: 0,
-          })}
+          {describeTemplateSchedule(t)}
         </span>
       </span>
     </button>
@@ -222,7 +229,9 @@ function Sheet({
               <StatePill state={state} now={now} />
             </div>
             <p className="text-footnote text-text-muted">
-              {describeSchedule(task)} · {detail}
+              {describeSchedule(task)}
+              {/* A by-hand task's schedule line already is its state; do not say it twice. */}
+              {state.kind === 'manual' ? '' : ` · ${detail}`}
             </p>
           </div>
           <button
@@ -282,21 +291,18 @@ function Sheet({
                   <ReachRow task={task} runs={runs} />
                 </div>
                 <pre className="sc-prompt">{task.prompt}</pre>
-                <div className="mt-5 flex items-baseline justify-between">
-                  <h3 className="sc-section-title">Runs</h3>
-                  {counts.ok + counts.error > 0 ? (
-                    <span className="text-caption text-text-muted sc-time">
-                      {counts.ok} ok{counts.error > 0 ? ` · ${counts.error} failed` : ''}
-                    </span>
-                  ) : null}
-                </div>
-                <RunLedger
-                  key={task.id}
-                  taskId={task.id}
-                  runs={runs ?? []}
-                  now={now}
-                  open="first"
-                />
+                <SectionTitle
+                  className="mt-5"
+                  count={runs !== undefined && runs.length > 0 ? runs.length : undefined}
+                  aside={
+                    counts.ok + counts.error > 0
+                      ? `${counts.ok} ok${counts.error > 0 ? ` · ${counts.error} failed` : ''}`
+                      : undefined
+                  }
+                >
+                  Runs
+                </SectionTitle>
+                <RunLedger key={task.id} task={task} runs={runs ?? []} now={now} open="first" />
                 <div className="mt-6 flex justify-end">
                   <TwoStepDelete
                     onConfirm={() => {
@@ -361,10 +367,8 @@ export function RoutinesCandidate() {
     >
       <header className="flex flex-wrap items-start justify-between gap-3 px-6 pt-4 pb-3">
         <div>
-          <h1 className="sc-title">Scheduled</h1>
-          <p className="sc-subtitle">
-            Prompts with a clock. Each card says what it has actually reached.
-          </p>
+          <h1 className="sc-title">Scheduled tasks</h1>
+          <p className="sc-subtitle">Prompts with a clock, and what each one reached last time.</p>
         </div>
         <div className="flex items-center gap-3">
           <SchedulingSwitch enabled={enabled} />
@@ -390,48 +394,46 @@ export function RoutinesCandidate() {
           />
         </div>
       </div>
-
-      <div className="px-6 pb-3">
-        <MachineStrip tasks={tasks} runs={runs} now={now} enabled={enabled} compact={narrow} />
-      </div>
+      {!enabled ? (
+        <div className="px-6 pb-3">
+          <OffNotice enabled={enabled} />
+        </div>
+      ) : null}
 
       <ScrollArea className="min-h-0 flex-1">
-        <div className="px-6 pt-2 pb-16">
+        <div className="px-6 pt-1 pb-16">
+          {draft !== null ? (
+            <div className="sc-card mb-3 max-w-[640px] p-4" data-testid="sc-routines-editor">
+              <h2 className="mb-3 text-body font-medium text-text-primary">New routine</h2>
+              <TaskEditor
+                initial={draft}
+                onCancel={() => setDraft(null)}
+                onSave={create}
+                layout="card"
+              />
+            </div>
+          ) : (
+            /* "New" is a row, not a cell: round one gave a button a 175px card. */
+            <button
+              type="button"
+              className="sc-card sc-card--ghost sc-card--clickable mb-3 flex w-full items-center gap-3 px-4 py-2.5 text-left"
+              onClick={() => setDraft({})}
+              data-testid="sc-routines-new-card"
+            >
+              <span style={{ color: 'var(--pd-text-muted)', display: 'inline-flex' }}>
+                <IconPlus size={16} />
+              </span>
+              <span className="text-body font-medium text-text-primary">New routine</span>
+              <span className="text-footnote text-text-muted">
+                — describe it in a sentence, time included, or start from one below
+              </span>
+            </button>
+          )}
           <div
             className="grid gap-3"
             style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))' }}
             data-testid="sc-board"
           >
-            {draft !== null ? (
-              <div
-                className="sc-card p-4"
-                style={{ gridColumn: narrow ? undefined : 'span 2' }}
-                data-testid="sc-routines-editor"
-              >
-                <h2 className="mb-3 text-body font-medium text-text-primary">New routine</h2>
-                <TaskEditor
-                  initial={draft}
-                  onCancel={() => setDraft(null)}
-                  onSave={create}
-                  layout="card"
-                />
-              </div>
-            ) : (
-              <button
-                type="button"
-                className="sc-card sc-card--ghost sc-card--clickable flex min-h-[132px] flex-col items-start justify-center gap-1 p-4 text-left"
-                onClick={() => setDraft({})}
-                data-testid="sc-routines-new-card"
-              >
-                <span className="sc-tile">
-                  <IconPlus size={16} />
-                </span>
-                <span className="mt-2 text-body font-medium text-text-primary">New routine</span>
-                <span className="text-footnote text-text-muted">
-                  Describe it in a sentence, time included. Or pick one below.
-                </span>
-              </button>
-            )}
             {cards.map(({ task, state }) => (
               <RoutineCard
                 key={task.id}
@@ -442,8 +444,8 @@ export function RoutinesCandidate() {
                 onOpen={() => setOpenId(task.id)}
               />
             ))}
-            {/* Nothing scheduled yet: the templates ARE the board, beside "new" —
-                the same cards you will have, drawn dashed until you make them. */}
+            {/* Nothing scheduled yet: the templates ARE the board — the same
+                cards you will have, drawn dashed until you make them. */}
             {boardIsEmpty
               ? TASK_TEMPLATES.map((t) => (
                   <TemplateCard key={t.id} id={t.id} onPick={() => setDraft(templateDraft(t))} />
@@ -456,7 +458,7 @@ export function RoutinesCandidate() {
 
           {!boardIsEmpty ? (
             <>
-              <h3 className="sc-section-title mt-8">Start from</h3>
+              <SectionTitle className="mt-8">Start from</SectionTitle>
               <div
                 className="grid gap-3"
                 style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))' }}

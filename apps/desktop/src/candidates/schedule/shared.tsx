@@ -1,10 +1,15 @@
 /**
  * Pieces every candidate shares: the store hook (with the seed guard), the
- * once-a-minute clock, the honesty strip, status glyphs and pills, reach chips,
- * the week strip, template icons and the two-step delete.
+ * once-a-minute clock, status glyphs and pills, reach chips, template icons,
+ * the section label and the two-step delete.
  *
- * Presentational rules: tokens only, the app's own icon recipe, and nothing
- * that could be read as progress unless it is measured.
+ * Presentational rules: tokens only, the app's own icon recipe, the sibling
+ * screens' conventions (Connectors' section heading, the Model hub's detail
+ * title), and nothing that could be read as progress unless it is measured.
+ *
+ * Gone since round one: the "honesty strip" — three sentences under every
+ * header, two of which never changed. What it said now lives where it changes
+ * something: the subtitle, the editor's consequence line, the empty run list.
  */
 import {
   IconCheck,
@@ -21,7 +26,11 @@ import {
   Switch,
 } from '@pi-desktop/ui';
 import { type ReactNode, type RefObject, useEffect, useRef, useState } from 'react';
-import type { ScheduledTask } from '../../../electron/scheduled/schedule-logic';
+import {
+  describeSchedule,
+  normalizeTask,
+  type ScheduledTask,
+} from '../../../electron/scheduled/schedule-logic';
 import type { TaskRun } from '../../../electron/scheduled/scheduled-contract';
 import { useTasksStore } from '../../scheduled/tasks-store';
 import { TASK_TEMPLATES, type TaskTemplate } from '../../scheduled/templates';
@@ -34,24 +43,19 @@ import {
   type Reach,
   reachFromRuns,
   type TaskState,
-  weekLabels,
-  weekPattern,
 } from './derive';
 import { runsWereSeeded } from './hook';
 import {
   IconAlert,
-  IconArrowRight,
   IconBell,
   IconCalendar,
   IconCheckCircle,
-  IconChip,
   IconDownload,
   IconHand,
   IconMail,
   IconMoon,
   IconPause,
   IconSun,
-  IconTimer,
 } from './icons';
 
 /* ---- data ---------------------------------------------------------------- */
@@ -113,157 +117,145 @@ export function useContainerWidth<T extends HTMLElement>(): [RefObject<T | null>
   return [ref, width];
 }
 
-/* ---- the honesty strip --------------------------------------------------- */
+/**
+ * The one machine fact that changes what happens next: a run cannot start
+ * until a model is loaded, and loading one is the slow part of a first run.
+ * Null when there is nothing to say — which is the common case, and why this
+ * is a sentence in two places rather than a banner on every visit.
+ */
+export function useModelNote(): string | null {
+  const status = useLlmStore((s) => s.status);
+  if (status.phase === 'ready') return null;
+  if (status.phase === 'starting') return 'the model is still loading';
+  if (status.phase === 'downloading') return 'a model is still downloading';
+  return 'no model is loaded yet — the first run loads one';
+}
 
 /**
- * What this Mac can promise right now. Every item is a fact the app already
- * holds: the model phase and name from the llm store, the run in flight from
- * the run records, and the two rules of a local scheduler.
+ * What a run of this task would run ON, as far as the renderer can know it:
+ * the model loaded right now, or the fact that none is. The run record does
+ * not carry a model (NOTES proposes it should), so a PAST run cannot be
+ * named — only what the next one would use. Said once, in the Reach block
+ * and the editor's consequence line, because for a local app the model is
+ * the quality, speed and memory decision.
  */
-export function MachineStrip({
-  tasks,
-  runs,
-  now,
-  enabled,
-  compact = false,
-}: {
-  tasks: readonly ScheduledTask[];
-  runs: Readonly<Record<string, readonly TaskRun[]>>;
-  now: number;
-  enabled: boolean;
-  compact?: boolean;
-}) {
+export function useRunsOn(): string {
   const status = useLlmStore((s) => s.status);
-  const live = tasks.find((t) => runs[t.id]?.[0]?.status === 'running');
-  const liveRun = live === undefined ? undefined : runs[live.id]?.[0];
-  const modelName = status.model?.displayName ?? null;
-  const modelLine =
-    status.phase === 'ready' && modelName !== null
-      ? `${modelName} loaded`
-      : status.phase === 'starting'
-        ? 'Loading the model…'
-        : status.phase === 'downloading'
-          ? 'Downloading a model…'
-          : 'No model loaded — the first run loads it';
+  // Loaded: the name and nothing else. "Gemma 4 12B, the model loaded now"
+  // was a value explaining its own label (round-4 item 3).
+  if (status.phase === 'ready' && status.model !== null) return status.model.displayName;
+  if (status.phase === 'starting') return 'the model that is loading now';
+  if (status.phase === 'downloading') return 'the model that is downloading now';
+  return 'whichever model Bobble loads first — none is loaded yet';
+}
+
+/* ---- notices --------------------------------------------------------------- */
+
+/** Shown only when scheduling is off: the one state where every row's countdown is a lie. */
+export function OffNotice({ enabled }: { enabled: boolean }) {
+  if (enabled) return null;
   return (
-    <div className="sc-machine" data-testid="sc-machine">
-      {!enabled ? (
-        <span className="sc-machine-item" data-tone="warn">
-          <IconPause size={14} /> Scheduling is off — nothing fires until you turn it back on
-        </span>
-      ) : live !== undefined && liveRun !== undefined ? (
-        <span className="sc-machine-item" data-tone="live">
-          <Spinner size={13} /> Running {live.name} · {describeDuration(liveRun, now)}
-        </span>
-      ) : (
-        <span className="sc-machine-item">
-          <IconTimer size={14} /> Runs one task at a time, only while Bobble is open
-        </span>
-      )}
-      <span className="sc-machine-item" data-tone={status.phase === 'ready' ? undefined : 'warn'}>
-        <IconChip size={14} /> {modelLine}
-      </span>
-      {!compact ? (
-        <span className="sc-machine-item">
-          <IconBell size={14} /> Can read your Mac; cannot send anything
-        </span>
-      ) : null}
-    </div>
+    <p className="sc-notice" data-testid="sc-off-notice">
+      <IconPause size={14} />
+      Scheduling is off. Nothing fires until you turn it back on; every task is kept, and you can
+      still run one by hand.
+    </p>
   );
 }
 
 /* ---- status --------------------------------------------------------------- */
-
-export type Tone = 'ok' | 'error' | 'warn' | 'live' | 'muted';
-
-export function toneOf(state: TaskState, runs: readonly TaskRun[] | undefined): Tone {
-  switch (state.kind) {
-    case 'running':
-      return 'live';
-    case 'due':
-      return 'live';
-    case 'missed':
-      return 'warn';
-    case 'paused':
-    case 'off':
-    case 'manual':
-      return runs?.[0]?.status === 'error' ? 'error' : 'muted';
-    case 'scheduled':
-      return runs?.[0]?.status === 'error' ? 'error' : 'ok';
-  }
-}
 
 /** A 16px glyph for a row: what is happening to this task, at a glance. */
 export function StatusGlyph({
   state,
   runs,
   size = 16,
+  muted = false,
 }: {
   state: TaskState;
   runs: readonly TaskRun[] | undefined;
   size?: number;
+  /**
+   * Scheduling is off: the row keeps its own glyph (so the list is not nine
+   * pause marks) but loses its colour — a green tick beside a trailing "off"
+   * was the row saying "fine" and "off" at once (round-4 item 5). The amber
+   * "!" of a missed slot and the red "!" of a failed run stay: those are
+   * facts about the past, and off does not change them.
+   */
+  muted?: boolean;
 }) {
   const last = runs?.[0];
-  if (state.kind === 'running') return <Spinner size={size - 2} />;
   const style = (color: string) => ({ color, display: 'inline-flex' as const });
+  const quiet = 'var(--pd-text-muted)';
+  if (state.kind === 'off')
+    return <StatusGlyph state={state.inner} runs={runs} size={size} muted />;
+  if (state.kind === 'running') return <Spinner size={size - 2} />;
   if (state.kind === 'due')
-    return <IconTimer size={size} style={style('var(--pd-accent-primary)')} />;
+    return <IconClock size={size} style={style(muted ? quiet : 'var(--pd-accent-primary)')} />;
   if (state.kind === 'missed')
     return <IconAlert size={size} style={style('var(--pd-status-warning-fg)')} />;
-  if (state.kind === 'paused' || state.kind === 'off')
-    return <IconPause size={size} style={style('var(--pd-text-muted)')} />;
+  if (state.kind === 'paused') return <IconPause size={size} style={style(quiet)} />;
   if (last?.status === 'error')
     return <IconAlert size={size} style={style('var(--pd-status-danger-fg)')} />;
-  if (state.kind === 'manual')
-    return <IconHand size={size} style={style('var(--pd-text-muted)')} />;
+  if (state.kind === 'manual') return <IconHand size={size} style={style(quiet)} />;
   if (last?.status === 'ok')
-    return <IconCheckCircle size={size} style={style('var(--pd-status-success-fg)')} />;
-  return <IconClock size={size} style={style('var(--pd-text-muted)')} />;
+    return (
+      <IconCheckCircle size={size} style={style(muted ? quiet : 'var(--pd-status-success-fg)')} />
+    );
+  return <IconClock size={size} style={style(quiet)} />;
 }
 
-/** The state as a word, plus the one fact that matters for it. */
+/**
+ * The state as a word, plus the one fact that matters for it. The detail is a
+ * single clause: round one's "next Tomorrow 7:30 AM · in 22h 57m" said one
+ * thing twice, and "missed … — Bobble was not open" claimed a cause the app
+ * cannot know (closed, asleep, or scheduling off at the time all look the same).
+ */
 export function stateLine(state: TaskState, now: number): { word: string; detail: string } {
   switch (state.kind) {
     case 'running':
-      return { word: 'Running', detail: `running · ${describeDuration(state.run, now)}` };
+      return { word: 'Running', detail: `started ${describeDelta(state.run.startedAt, now)}` };
     case 'due':
       return {
         word: 'Due',
-        detail: `due — ${describeMoment(state.slotAt, now)} passed, starts within 30s`,
+        detail: `${describeMoment(state.slotAt, now)} passed · starts within 30s`,
       };
     case 'missed':
       return {
         word: 'Missed',
-        detail: `missed ${describeMoment(state.slotAt, now)} — Bobble was not open · next ${describeMoment(state.nextAt, now)}`,
+        detail: `missed ${describeMoment(state.slotAt, now)} · next ${describeMoment(state.nextAt, now)}`,
       };
     case 'paused':
-      return { word: 'Paused', detail: 'paused — kept, not fired' };
+      return { word: 'Paused', detail: 'kept, not fired' };
     case 'off':
       return { word: 'Off', detail: 'scheduling is off' };
     case 'manual':
-      return { word: 'Manual', detail: 'only when you run it' };
+      return { word: 'By hand', detail: 'only when you run it' };
     case 'scheduled':
-      return {
-        word: 'Next',
-        detail: `next ${describeMoment(state.nextAt, now)} · ${describeDelta(state.nextAt, now)}`,
-      };
+      return { word: 'Next', detail: `next ${describeMoment(state.nextAt, now)}` };
   }
 }
 
+/**
+ * A pill only where the word IS the information: running, due, missed,
+ * paused, by hand. A scheduled task gets no pill — round one gave it a
+ * green "Next", which is colour reporting nothing — and neither does "off":
+ * the header switch, the banner and the subtitle already say it, and a
+ * fourth copy next to a blue per-task switch is the screen arguing with itself.
+ */
 export function StatePill({ state, now }: { state: TaskState; now: number }) {
+  if (state.kind === 'scheduled' || state.kind === 'off') return null;
   const { word } = stateLine(state, now);
   const tone =
     state.kind === 'running' || state.kind === 'due'
       ? 'live'
       : state.kind === 'missed'
         ? 'warn'
-        : state.kind === 'scheduled'
-          ? 'ok'
-          : undefined;
+        : undefined;
   return (
     <span className="sc-pill" data-tone={tone}>
       {state.kind === 'running' ? <Spinner size={10} /> : null}
-      {word}
+      {state.kind === 'running' ? `Running · ${describeDuration(state.run, now)}` : word}
     </span>
   );
 }
@@ -333,6 +325,44 @@ export function ReachRow({
   );
 }
 
+/**
+ * The same facts as label/value rows, under the prompt — Connectors' "Reach"
+ * block ("Touches", "Runs as") and the Claude reference's "Details" both put
+ * the facts BELOW the text. A chip row between the title and the prompt was
+ * an 82px stack before the contract; this is three quiet lines after it, and
+ * "Own folder" stops pretending to be a reach: it is a place, on its own line.
+ */
+export function ReachBlock({
+  task,
+  runs,
+}: {
+  task: ScheduledTask;
+  runs: readonly TaskRun[] | undefined;
+}) {
+  const folder = folderName(task.cwd);
+  const reach = reachFromRuns(runs);
+  const ran = (runs?.length ?? 0) > 0;
+  const runsOn = useRunsOn();
+  return (
+    <dl className="sc-facts" data-testid="sc-reach-block">
+      <dt>Reaches</dt>
+      <dd>
+        {reach.length > 0
+          ? reach.map((r) => r.label).join(' · ')
+          : ran
+            ? 'Nothing outside its folder so far'
+            : 'Nothing yet — it has not run'}
+      </dd>
+      <dt>Runs in</dt>
+      <dd title={task.cwd}>
+        {folder === undefined ? 'A folder of its own, kept per run' : `${folder} — ${task.cwd}`}
+      </dd>
+      <dt>Runs on</dt>
+      <dd>{runsOn}</dd>
+    </dl>
+  );
+}
+
 /** The glyph that stands for a task: its first real reach, else a clock. */
 export function TaskGlyph({
   task,
@@ -350,28 +380,6 @@ export function TaskGlyph({
   }
   if (task.frequency === 'manual') return <IconHand size={size} />;
   return <IconClock size={size} />;
-}
-
-/* ---- week strip ----------------------------------------------------------- */
-
-export function WeekStrip({ task, now }: { task: ScheduledTask; now: number }) {
-  const on = weekPattern(task, now);
-  const labels = weekLabels(now);
-  return (
-    <span
-      className="sc-week"
-      role="img"
-      aria-label={`fires on ${on.filter(Boolean).length} of the next 7 days`}
-    >
-      {on.map((v, i) => (
-        // biome-ignore lint/suspicious/noArrayIndexKey: the strip is positional by design
-        <span key={i} className="sc-week-day" data-on={v}>
-          <span className="sc-week-day-dot" />
-          <span className="sc-week-day-label">{labels[i]}</span>
-        </span>
-      ))}
-    </span>
-  );
 }
 
 /* ---- templates ------------------------------------------------------------ */
@@ -413,7 +421,41 @@ export function templateDraft(t: TaskTemplate): Partial<ScheduledTask> {
   };
 }
 
+/** "Weekdays at 7:30 AM" for a template, through the same words a task gets. */
+export function describeTemplateSchedule(t: TaskTemplate): string {
+  return describeSchedule(normalizeTask({ id: t.id, ...templateDraft(t) }));
+}
+
 export { TASK_TEMPLATES };
+
+/* ---- layout bits ----------------------------------------------------------- */
+
+/**
+ * A section heading in the convention Connectors already uses — body weight,
+ * primary colour, a muted count — with room for a fact on the right. Round one
+ * used uppercase tracked captions, a convention no sibling screen has.
+ */
+export function SectionTitle({
+  children,
+  count,
+  aside,
+  className,
+}: {
+  children: ReactNode;
+  count?: number;
+  aside?: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={className === undefined ? 'sc-section' : `sc-section ${className}`}>
+      <h3 className="sc-section-title">
+        {children}
+        {count !== undefined ? <span className="sc-section-count">{count}</span> : null}
+      </h3>
+      {aside !== undefined ? <span className="sc-section-aside">{aside}</span> : null}
+    </div>
+  );
+}
 
 /* ---- controls ------------------------------------------------------------- */
 
@@ -435,16 +477,17 @@ export function SchedulingSwitch({ enabled }: { enabled: boolean }) {
 /**
  * Delete that asks once, in place. The shipping row deletes on a single click
  * and takes the task's whole history with it; a second click four inches away
- * in a dialog is not the answer either. The button becomes the question.
+ * in a dialog is not the answer either. The button becomes the question —
+ * "Delete for good?" — and disarms itself after four seconds. What deleting
+ * takes with it is said by the footer the button sits in (DeleteFooter), not
+ * repeated here.
  */
 export function TwoStepDelete({
   onConfirm,
   label = 'Delete',
-  compact = false,
 }: {
   onConfirm: () => void;
   label?: string;
-  compact?: boolean;
 }) {
   const [armed, setArmed] = useState(false);
   useEffect(() => {
@@ -465,10 +508,8 @@ export function TwoStepDelete({
     );
   }
   return (
-    <span className="inline-flex items-center gap-1">
-      {!compact ? (
-        <span className="text-caption text-text-muted">Also deletes its past runs.</span>
-      ) : null}
+    <span className="sc-delete-armed" data-testid="sc-delete-armed">
+      <span className="text-footnote text-text-secondary">Delete for good?</span>
       <button
         type="button"
         className="pd-btn pd-btn--danger pd-btn--sm pd-focusable"
@@ -481,6 +522,7 @@ export function TwoStepDelete({
         type="button"
         className="pd-btn pd-btn--ghost pd-btn--sm pd-focusable"
         onClick={() => setArmed(false)}
+        data-testid="sc-delete-keep"
       >
         Keep
       </button>
@@ -488,11 +530,21 @@ export function TwoStepDelete({
   );
 }
 
-export function EmptyHint({ children }: { children: ReactNode }) {
+/**
+ * The end of a detail pane, in Connectors' form: a hairline, one sentence on
+ * what deleting takes with it, and the control. A lone "Delete" at a height
+ * that depended on the ledger's length said nothing about the 5 runs it
+ * would take; this says it before the question is asked.
+ */
+export function DeleteFooter({ runCount, onConfirm }: { runCount: number; onConfirm: () => void }) {
+  const what =
+    runCount === 0
+      ? 'Deleting removes the task. It has no runs to lose.'
+      : `Deleting removes the task and its ${runCount === 1 ? 'one run' : `${runCount} runs`}.`;
   return (
-    <div className="flex items-center gap-2 text-footnote text-text-muted">
-      <IconArrowRight size={14} />
-      {children}
+    <div className="sc-footer" data-testid="sc-delete-footer">
+      <span className="text-footnote text-text-muted">{what}</span>
+      <TwoStepDelete onConfirm={onConfirm} />
     </div>
   );
 }

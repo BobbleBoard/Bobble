@@ -8,6 +8,9 @@
  * same element whatever the specificity. That is why no rule here sets a
  * margin a caller might want to tune with `mt-*` — the first draft did, and
  * every `mt-8` in the candidates silently lost.
+ *
+ * Type sizes are the app's four (12 / 14 / 15 / 22) and nothing in between —
+ * round one's detail title was a calc() that landed on 16.9px.
  */
 
 /* ---- page ---------------------------------------------------------------- */
@@ -54,58 +57,36 @@
   line-height: var(--pd-leading-footnote);
 }
 
-/* A detail pane's title: between a row name (14) and the page title (22). */
+/* A detail pane's title: the Model hub's detail uses the title size; so does this. */
 .sc-detail-title {
-  font-size: calc(var(--pd-font-size-heading) * 1.125);
-  line-height: 1.3;
+  font-size: var(--pd-font-size-title);
+  line-height: var(--pd-leading-title);
   font-weight: var(--pd-font-weight-medium);
   letter-spacing: -0.01em;
 }
 
-/* ---- the honesty strip (what this Mac can promise) ------------------------ */
+/* ---- notices -------------------------------------------------------------- */
 
-.sc-machine {
+/* One line, only when there is something to say (scheduling off). */
+.sc-notice {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: 6px 14px;
-  min-height: 34px;
-  padding: 6px 12px;
+  gap: 8px;
+  padding: 8px 12px;
   border-radius: var(--pd-radius-md);
-  background: var(--pd-bg-inset);
-  box-shadow: var(--pd-shadow-hairline);
-  color: var(--pd-text-secondary);
+  background: var(--pd-status-warning-bg);
+  color: var(--pd-status-warning-fg);
   font-size: var(--pd-font-size-footnote);
   line-height: var(--pd-leading-footnote);
 }
 
-.sc-machine-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-}
-
-.sc-machine-item .pd-icon {
-  color: var(--pd-text-muted);
+.sc-notice .pd-icon {
   flex: none;
-}
-
-.sc-machine-item[data-tone="warn"] {
-  color: var(--pd-status-warning-fg);
-}
-
-.sc-machine-item[data-tone="warn"] .pd-icon {
-  color: inherit;
-}
-
-.sc-machine-item[data-tone="live"] {
-  color: var(--pd-text-primary);
 }
 
 /* ---- status --------------------------------------------------------------- */
 
-/* A state word in a quiet pill: Next / Due / Missed / Paused / Running. */
+/* A state word in a quiet pill: Due / Missed / Paused / Running. */
 .sc-pill {
   display: inline-flex;
   align-items: center;
@@ -119,11 +100,6 @@
   line-height: 1;
   font-weight: var(--pd-font-weight-medium);
   white-space: nowrap;
-}
-
-.sc-pill[data-tone="ok"] {
-  background: var(--pd-status-success-bg);
-  color: var(--pd-status-success-fg);
 }
 
 .sc-pill[data-tone="error"] {
@@ -158,38 +134,6 @@
 
 .sc-chip .pd-icon {
   color: var(--pd-text-muted);
-}
-
-/* Seven days, one dot each: which of them this task fires on. */
-.sc-week {
-  display: inline-flex;
-  gap: 3px;
-  align-items: center;
-}
-
-.sc-week-day {
-  display: inline-flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  width: 10px;
-}
-
-.sc-week-day-dot {
-  width: 5px;
-  height: 5px;
-  border-radius: var(--pd-radius-full);
-  background: var(--pd-border-default);
-}
-
-.sc-week-day[data-on="true"] .sc-week-day-dot {
-  background: var(--pd-text-secondary);
-}
-
-.sc-week-day-label {
-  color: var(--pd-text-muted);
-  font-size: 9px;
-  line-height: 1;
 }
 
 /* ---- list rows (ledger sidebar, agenda) ----------------------------------- */
@@ -227,6 +171,12 @@ button.sc-row {
   background: var(--pd-bg-selected);
 }
 
+/* The app's focus ring, drawn inside the row so a scroll area cannot clip it. */
+.sc-row.pd-focusable,
+.sc-run-head.pd-focusable {
+  outline-offset: -2px;
+}
+
 .sc-row-hit {
   display: flex;
   min-width: 0;
@@ -262,6 +212,23 @@ button.sc-row {
   color: var(--pd-text-muted);
   font-size: var(--pd-font-size-footnote);
   line-height: var(--pd-leading-footnote);
+}
+
+/* The clause that is a warning, inside a meta line that is not. */
+.sc-warn {
+  color: var(--pd-status-warning-fg);
+}
+
+/* A group label inside a list — the sidebar's own convention (sentence case, muted). */
+.sc-list-group {
+  padding: 12px 12px 4px;
+  color: var(--pd-text-muted);
+  font-size: var(--pd-font-size-caption);
+  line-height: var(--pd-leading-caption);
+}
+
+.sc-list-group:first-child {
+  padding-top: 4px;
 }
 
 /* Hover-revealed controls at the row's right end (sidebar-row grammar). */
@@ -305,11 +272,6 @@ button.sc-row {
   transform: translateY(-1px);
 }
 
-.sc-card--selected {
-  border-color: var(--pd-accent-primary);
-  box-shadow: 0 0 0 1px var(--pd-accent-primary);
-}
-
 /* A card you have not made yet: a template, or "new". */
 .sc-card--ghost {
   border-style: dashed;
@@ -345,6 +307,242 @@ button.sc-row {
   width: 40px;
   height: 40px;
   border-radius: var(--pd-radius-md);
+}
+
+/*
+ * A template card's tile swaps to a "+" under the pointer (and under keyboard
+ * focus) — the one thing the reference's hover does that ours did not: it says
+ * the click ADDS. The two faces crossfade in place; the tile keeps its size.
+ */
+.sc-tile--swap {
+  position: relative;
+  overflow: hidden;
+}
+
+.sc-tile-face {
+  position: absolute;
+  inset: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    opacity var(--pd-duration-fast) var(--pd-easing-standard),
+    transform var(--pd-duration-fast) var(--pd-easing-standard);
+}
+
+.sc-tile-face--plus {
+  opacity: 0;
+  transform: scale(0.6);
+  color: var(--pd-text-primary);
+}
+
+.sc-card--clickable:hover .sc-tile-face--icon,
+.sc-card--clickable:focus-visible .sc-tile-face--icon {
+  opacity: 0;
+  transform: scale(0.6);
+}
+
+.sc-card--clickable:hover .sc-tile-face--plus,
+.sc-card--clickable:focus-visible .sc-tile-face--plus {
+  opacity: 1;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sc-tile-face,
+  .sc-tile-face--plus,
+  .sc-card--clickable:hover .sc-tile-face--icon {
+    transition: none;
+    transform: none;
+  }
+}
+
+/* ---- the composer: a sentence with a time in it ---------------------------- */
+
+/*
+ * The CHAT composer's shape — the surface radius, raised, hairline + soft
+ * shadow — not the search bar's pill (round two), which made it the same
+ * control as the list's search field 60px below. The send circle at the right
+ * end is always there: the chat composer's 28px circle, muted while the box is
+ * empty and accent once there is text. Focus is the app's input treatment (a
+ * 1.5px focus-border ring), because a text field with no sign that it is
+ * focused is the bug the focus-ring rules were written to avoid.
+ */
+.sc-composer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  /* The slot's box height (see .sc-strip): border-box, so the hairline is inside it. */
+  min-height: var(--sc-box-height);
+  padding: 6px 7px 6px 16px;
+  border: 1px solid var(--pd-border-default);
+  border-radius: var(--pd-radius-surface);
+  background: var(--pd-bg-raised);
+  box-shadow: var(--pd-shadow-hairline), var(--pd-shadow-sm);
+  transition:
+    border-color var(--pd-duration-fast) var(--pd-easing-standard),
+    box-shadow var(--pd-duration-fast) var(--pd-easing-standard);
+}
+
+.sc-composer:focus-within {
+  border-color: var(--pd-border-focus);
+  box-shadow:
+    0 0 0 1.5px var(--pd-border-focus),
+    var(--pd-shadow-sm);
+}
+
+.sc-composer-input {
+  min-width: 0;
+  flex: 1;
+  padding: 6px 0;
+  border: 0;
+  background: transparent;
+  color: var(--pd-text-primary);
+  font: inherit;
+  font-size: var(--pd-font-size-heading);
+  line-height: var(--pd-leading-heading);
+  outline: none;
+}
+
+.sc-composer-input::placeholder {
+  color: var(--pd-text-placeholder);
+}
+
+/* Idle: a quiet grey circle with a muted arrow, not a half-transparent ghost. */
+.sc-composer .sc-composer-go:disabled {
+  opacity: 1;
+  color: var(--pd-text-muted);
+  cursor: default;
+}
+
+/*
+ * The lane under the composer: fixed height, so the parse chips appear IN it
+ * and nothing under the composer moves as you type (item 8). One line, never
+ * wrapping — the quote truncates, the hint goes first at narrow widths.
+ */
+.sc-lane {
+  display: flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 4px 4px 0;
+}
+
+.sc-parse-hint {
+  flex: none;
+  margin-left: auto;
+  padding-left: 8px;
+  color: var(--pd-text-muted);
+  font-size: var(--pd-font-size-caption);
+}
+
+.sc-narrow .sc-parse-hint {
+  display: none;
+}
+
+/*
+ * THE SLOT: one height, three states. The composer's box and its lane reserve
+ * the same 82px whether the box is the composer, the sentence strip, or the
+ * "New task" / "Editing …" strip — so the list head under it never moves when
+ * an editor opens (round-4 item 2: y=225, then 192, then 144). The box height
+ * is ONE number, `--sc-box-height`, read by the composer and the strip alike:
+ * the first cut let the composer's height fall out of its content (47px) and
+ * gave the strip a min-height of 48, and the probe caught the list head one
+ * pixel lower under every strip.
+ *
+ * The two faces are LAYERS in one grid cell, both always mounted, and the swap
+ * is an opacity transition on each — a true crossfade, out and in at once.
+ * The first cut mounted one face at a time with a fade-in on the newcomer,
+ * which the film (shots/motion) showed for what it was: the composer gone, an
+ * empty slot for a frame, then the strip. The hidden face is also
+ * `visibility: hidden` (after its fade, so it can fade at all) and inert from
+ * the markup, so it has no Tab stop and takes no click. `--sc-slot-duration`
+ * is a seam for the probe to slow the swap.
+ */
+.sc-page {
+  --sc-box-height: 48px;
+}
+
+.sc-slot-stack {
+  display: grid;
+}
+
+.sc-slot-layer {
+  grid-area: 1 / 1;
+  min-width: 0;
+  transition:
+    opacity var(--sc-slot-duration, var(--pd-duration-base)) var(--pd-easing-standard),
+    visibility 0s linear var(--sc-slot-duration, var(--pd-duration-base));
+}
+
+.sc-slot-layer[data-shown="false"] {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.sc-slot-layer[data-shown="true"] {
+  opacity: 1;
+  visibility: visible;
+  transition-delay: 0s, 0s;
+}
+
+/*
+ * What the composer folds to while an editor is on the page: the same footprint
+ * as the box (48px, the surface radius, the full width) but INSET rather than
+ * raised — a thing that reports, beside a box that invites. One line: a glyph,
+ * where the draft came from, and the way back to the composer at the right end.
+ */
+.sc-strip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: var(--sc-box-height);
+  padding: 6px 7px 6px 16px;
+  border-radius: var(--pd-radius-surface);
+  background: var(--pd-bg-inset);
+  box-shadow: var(--pd-shadow-hairline);
+  color: var(--pd-text-muted);
+  font-size: var(--pd-font-size-footnote);
+  line-height: var(--pd-leading-footnote);
+}
+
+.sc-strip > .pd-icon {
+  flex: none;
+}
+
+.sc-strip-text {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sc-strip-text strong {
+  color: var(--pd-text-primary);
+  font-weight: var(--pd-font-weight-regular);
+}
+
+/* ---- the list head: a magnifier that expands into the field in place ------- */
+
+.sc-list-head {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 8px 8px 4px;
+}
+
+/* Collapsed, it is a small ghost button, not a full-width type-here row. */
+.sc-list-head .pd-collapsible-search--collapsed {
+  width: auto;
+  height: 28px;
+  padding: 0 8px;
+  font-size: var(--pd-font-size-footnote);
+  color: var(--pd-text-muted);
+}
+
+.sc-list-head .pd-collapsible-search--collapsed:hover {
+  color: var(--pd-text-secondary);
 }
 
 /* ---- the prompt, shown as the contract it is ------------------------------ */
@@ -410,17 +608,26 @@ button.sc-row {
   color: var(--pd-accent-primary);
 }
 
+/* A run's head opens it; the hover says so, bleeding 8px past the text. */
 .sc-run-head {
   display: flex;
-  width: 100%;
-  align-items: baseline;
+  width: calc(100% + 16px);
+  align-items: center;
   gap: 8px;
+  margin: -3px -8px;
+  padding: 3px 8px;
   border: 0;
+  border-radius: var(--pd-radius-sm);
   background: transparent;
   color: inherit;
   font: inherit;
   text-align: left;
   cursor: pointer;
+  transition: background-color var(--pd-duration-fast) var(--pd-easing-standard);
+}
+
+.sc-run-head:hover {
+  background: var(--pd-bg-hover);
 }
 
 .sc-run-when {
@@ -438,6 +645,25 @@ button.sc-row {
   white-space: nowrap;
 }
 
+/* "by hand" / "1h 42m late": what trigger + slot let the ledger say honestly. */
+.sc-run-tag {
+  flex: none;
+  padding: 1px 6px;
+  border-radius: var(--pd-radius-xs);
+  background: var(--pd-bg-inset);
+  box-shadow: var(--pd-shadow-hairline);
+  color: var(--pd-text-muted);
+  font-size: var(--pd-font-size-caption);
+  line-height: var(--pd-leading-caption);
+  white-space: nowrap;
+}
+
+.sc-run-tag[data-tone="warn"] {
+  background: var(--pd-status-warning-bg);
+  box-shadow: none;
+  color: var(--pd-status-warning-fg);
+}
+
 .sc-run-headline {
   min-width: 0;
   flex: 1;
@@ -451,6 +677,17 @@ button.sc-row {
 
 .sc-run-headline[data-tone="error"] {
   color: var(--pd-status-danger-fg);
+}
+
+/* The picture a run made, on its row — the one artifact worth a glance. */
+.sc-run-thumb {
+  width: 36px;
+  height: 36px;
+  flex: none;
+  border-radius: var(--pd-radius-sm);
+  box-shadow: var(--pd-shadow-hairline);
+  object-fit: cover;
+  background: var(--pd-bg-inset);
 }
 
 .sc-run-body {
@@ -549,17 +786,113 @@ button.sc-row {
   font-weight: var(--pd-font-weight-medium);
 }
 
-/* The parse preview under the agenda composer — chips that appear as you type. */
+/* The parse preview in the composer's lane — chips that appear as you type. */
 .sc-parse {
   display: flex;
-  flex-wrap: wrap;
+  width: 100%;
+  min-width: 0;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 6px;
-  min-height: 24px;
-  padding: 0 4px;
+  overflow: hidden;
   color: var(--pd-text-muted);
   font-size: var(--pd-font-size-footnote);
   animation: sc-in var(--pd-duration-fast) var(--pd-easing-enter);
+}
+
+.sc-parse .sc-chip {
+  flex: none;
+}
+
+/* ---- the reach block: label/value rows, Connectors' form ------------------- */
+
+.sc-facts {
+  display: grid;
+  grid-template-columns: 84px minmax(0, 1fr);
+  row-gap: 6px;
+  column-gap: 12px;
+  margin: 0;
+  font-size: var(--pd-font-size-footnote);
+  line-height: var(--pd-leading-footnote);
+}
+
+.sc-facts dt {
+  color: var(--pd-text-muted);
+}
+
+.sc-facts dd {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--pd-text-secondary);
+}
+
+/* ---- the end of a pane: a hairline, what deleting takes, the control ------- */
+
+.sc-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 28px;
+  padding-top: 12px;
+  border-top: 1px solid var(--pd-border-subtle);
+}
+
+.sc-delete-armed {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  animation: sc-in var(--pd-duration-fast) var(--pd-easing-enter);
+}
+
+/* On, but not firing: the per-task switch while scheduling is off. */
+.sc-dim {
+  opacity: 0.45;
+}
+
+/* Switching tasks crossfades the pane in; the token is a seam for the probe to slow it. */
+.sc-pane-in {
+  animation: sc-pane-in var(--sc-pane-duration, var(--pd-duration-base)) var(--pd-easing-enter);
+}
+
+@keyframes sc-pane-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sc-pane-in,
+  .sc-delete-armed,
+  .sc-parse {
+    animation: none;
+  }
+
+  .sc-slot-layer {
+    transition: none;
+  }
+}
+
+/* Template cards: columns follow the container (1 / 2 / 3), never the viewport. */
+.sc-template-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.sc-template-grid[data-columns="2"] {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.sc-template-grid[data-columns="3"] {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 /* ---- sheet (routines detail) --------------------------------------------- */
@@ -607,20 +940,49 @@ button.sc-row {
   }
 }
 
-/* ---- misc ----------------------------------------------------------------- */
+/* ---- section headings ------------------------------------------------------ */
+
+/* Connectors' convention: body weight, primary colour, a muted count, a fact on the right. */
+.sc-section {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
 
 .sc-section-title {
-  margin-bottom: 8px;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  color: var(--pd-text-primary);
+  font-size: var(--pd-font-size-body);
+  line-height: var(--pd-leading-body);
+  font-weight: var(--pd-font-weight-regular);
+}
+
+.sc-section-count {
+  color: var(--pd-text-muted);
+}
+
+.sc-section-aside {
   color: var(--pd-text-muted);
   font-size: var(--pd-font-size-caption);
   line-height: var(--pd-leading-caption);
-  font-weight: var(--pd-font-weight-medium);
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
+  font-variant-numeric: tabular-nums;
 }
+
+/* ---- misc ----------------------------------------------------------------- */
 
 .sc-time {
   font-variant-numeric: tabular-nums;
+}
+
+.sc-clamp-1 {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
 }
 
 .sc-clamp-2 {
@@ -704,4 +1066,15 @@ button.sc-row {
 
 .sc-narrow .sc-agenda-expand {
   margin-left: 12px;
+}
+
+/* A chevron that turns when its row is open. */
+.sc-disclosure {
+  display: inline-flex;
+  color: var(--pd-text-muted);
+  transition: transform var(--pd-duration-base) var(--pd-easing-standard);
+}
+
+.sc-disclosure[data-open="true"] {
+  transform: rotate(90deg);
 }

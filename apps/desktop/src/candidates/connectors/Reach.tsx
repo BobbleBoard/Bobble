@@ -9,7 +9,7 @@
  * tools split into what looks things up and what changes things. Skills sit
  * at the end as playbooks, framed by the same question: they touch nothing.
  */
-import { Button, IconChevronDown, IconPlus, IconSearch, ScrollArea } from '@pi-desktop/ui';
+import { Button, IconPlus, IconSearch, ScrollArea } from '@pi-desktop/ui';
 import {
   type JSX,
   type ReactNode,
@@ -25,6 +25,7 @@ import {
   type Actions,
   type Item,
   matches,
+  needsConfig,
   REACH_BLURB,
   REACH_TITLE,
   type Reach as ReachKey,
@@ -32,6 +33,7 @@ import {
   reachOf,
   useActions,
   useCatalog,
+  useWarmTools,
 } from './data';
 import {
   AboutSection,
@@ -43,7 +45,10 @@ import {
   SkillBody,
   ToolsSection,
 } from './detail-parts';
-import { ItemMark, OfficialMark, StateControl } from './marks';
+import { ItemMark, StateControl } from './marks';
+
+/** Rows per group before a "Show all" row. Every reference caps; round 1 showed 16 in a pile. */
+const GROUP_CAP = 8;
 
 /** Measured-height expansion: content mounts only while open (so nothing spawns for a closed row). */
 function Expand({ open, children }: { open: boolean; children: ReactNode }): JSX.Element | null {
@@ -115,28 +120,25 @@ function Row({
           <ItemMark item={item} size={36} />
           <span className="flex min-w-0 flex-1 flex-col">
             <span className="flex min-w-0 items-center gap-1.5">
-              <span className="truncate text-body text-text-primary">{item.name}</span>
-              {item.kind === 'connector' &&
-              item.connector.official &&
-              item.connector.firstParty !== true ? (
-                <OfficialMark />
+              <span className="max-w-full shrink-0 truncate text-body text-text-primary">
+                {item.name}
+              </span>
+              {/* A state where the words go, not where the control goes. */}
+              {item.state === 'builtin' ? (
+                <span className="text-caption text-text-muted">· built in</span>
               ) : null}
               {item.kind === 'connector' && item.reason !== undefined ? (
-                <span className="truncate text-caption text-status-success-fg">
+                <span className="min-w-0 truncate text-caption text-status-success-fg">
                   · {item.reason}
                 </span>
               ) : null}
             </span>
             <span className="truncate text-footnote text-text-muted">{line}</span>
           </span>
-          <span
-            className={cx('inline-flex text-text-muted transition-transform', open && 'rotate-180')}
-            style={{ transitionDuration: 'var(--pd-duration-base)' }}
-          >
-            <IconChevronDown size={14} />
-          </span>
+          {/* No chevron: the whole row is the expander, and a second affordance
+              beside the control made every row carry two. */}
         </button>
-        <div className="flex w-[92px] shrink-0 justify-end">
+        <div className="flex shrink-0 justify-end">
           <StateControl item={item} busy={busy} actions={actions} onSetup={onToggle} />
         </div>
       </div>
@@ -151,12 +153,29 @@ function Row({
           ) : (
             <div className="border-border-subtle border-t pt-4">
               <p className="text-footnote text-text-secondary">{item.description}</p>
+              {/* A not-added row's one action, where Shelf+ puts it: under the
+                  description, not only the "+" in the header. "Add it to see
+                  its tools." with nothing to press was the round-2 render. */}
+              {item.kind === 'connector' &&
+              item.state === 'available' &&
+              !needsConfig(item.connector) ? (
+                <Button
+                  variant="accent"
+                  size="sm"
+                  className="mt-3"
+                  disabled={busy}
+                  onClick={() => void actions.add(item)}
+                  data-testid={`cand-add-${item.id}`}
+                >
+                  Add to Bobble
+                </Button>
+              ) : null}
             </div>
           )}
           {item.kind === 'connector' ? (
             <>
               <SetupSection item={item} busy={busy} actions={actions} />
-              <ReachSection item={item} showGroup={false} />
+              <ReachSection item={item} />
               <ToolsSection item={item} actions={actions} split />
               <AboutSection item={item} />
               <RemoveRow item={item} busy={busy} actions={actions} onRemoved={onToggle} />
@@ -188,7 +207,10 @@ function Group({
   items: readonly Item[];
   children: (item: Item) => JSX.Element;
 }): JSX.Element | null {
+  const [all, setAll] = useState(false);
   if (items.length === 0) return null;
+  const shown = all ? items : items.slice(0, GROUP_CAP);
+  const rest = items.length - shown.length;
   return (
     <section data-testid={`cand-reach-group-${id}`}>
       <div className="mb-2 flex flex-col gap-0.5">
@@ -199,7 +221,22 @@ function Group({
         <p className="text-caption text-text-muted">{blurb}</p>
       </div>
       <div className="divide-y divide-border-subtle overflow-hidden rounded-xl border border-border-subtle bg-bg-raised">
-        {items.map(children)}
+        {shown.map(children)}
+        {rest > 0 ? (
+          <button
+            type="button"
+            className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-footnote text-text-secondary hover:bg-bg-hover hover:text-text-primary"
+            onClick={() => setAll(true)}
+            data-testid={`cand-reach-more-${id}`}
+          >
+            Show all {items.length} ·{' '}
+            {items
+              .slice(GROUP_CAP, GROUP_CAP + 2)
+              .map((i) => i.name)
+              .join(', ')}
+            {rest > 2 ? ` and ${rest - 2} more` : ''}
+          </button>
+        ) : null}
       </div>
     </section>
   );
@@ -218,6 +255,7 @@ const STATE_RANK: Record<Item['state'], number> = {
 export function Reach(): JSX.Element {
   const cat = useCatalog();
   const actions = useActions();
+  useWarmTools(cat, actions);
   const [query, setQuery] = useState('');
   const [openId, setOpenId] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
@@ -297,7 +335,9 @@ export function Reach(): JSX.Element {
           </div>
         </div>
       </div>
-      <ScrollArea className="min-h-0 flex-1">
+      {/* cand-reach-list: the container the expansion's indent is measured
+          against (candidates.css), not the viewport. */}
+      <ScrollArea className="cand-reach-list min-h-0 flex-1">
         <div className="mx-auto flex w-full max-w-[920px] flex-col gap-6 px-8 pt-2 pb-8">
           {cat.loaded && visible.length === 0 ? (
             <p className="text-footnote text-text-muted" data-testid="cand-empty">

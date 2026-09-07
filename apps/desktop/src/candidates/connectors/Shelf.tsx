@@ -7,11 +7,28 @@
  * FILTER, not a tab that hides half the shelf. What is on right now is a strip
  * of marks at the top (the one good idea in ChatGPT's Installed row), and a
  * detail slides in beside the list instead of replacing it.
+ *
+ * Round 2 (see CRITIQUE.md): the strip shows what YOU turned on — no
+ * built-ins — and caps at eight with a "+N" tile; the grid's columns follow
+ * the list's width, not the window's; the pills wrap under the search instead
+ * of overlapping it; the empty state says what to clear and clears it. The
+ * slide-over sheet that reflows the list is what Shelf+ replaces.
  */
 import { Button, IconClose, IconPlus, IconSearch, ScrollArea, Tooltip } from '@pi-desktop/ui';
 import { type JSX, useMemo, useState } from 'react';
 import { AddServerDialog } from '../../connectors/AddServerDialog';
-import { type Actions, type Item, matches, shortReason, useActions, useCatalog } from './data';
+import {
+  type Actions,
+  FILTERS,
+  type Item,
+  type KindFilter,
+  matches,
+  passesFilter,
+  shortReason,
+  useActions,
+  useCatalog,
+  useWarmTools,
+} from './data';
 import {
   AboutSection,
   CustomSection,
@@ -23,32 +40,9 @@ import {
   SkillBody,
   ToolsSection,
 } from './detail-parts';
-import { ItemGlyph, ItemMark, OfficialMark, STATE_LABEL, StateControl, StateDot } from './marks';
+import { ItemGlyph, ItemMark, STATE_LABEL, StateControl, StateDot } from './marks';
 
-type Filter = 'all' | 'tools' | 'skills' | 'on' | 'setup';
-
-const FILTERS: Array<{ id: Filter; label: string }> = [
-  { id: 'all', label: 'All' },
-  { id: 'tools', label: 'Tools' },
-  { id: 'skills', label: 'Skills' },
-  { id: 'on', label: 'On' },
-  { id: 'setup', label: 'Needs setup' },
-];
-
-function passes(filter: Filter, item: Item): boolean {
-  switch (filter) {
-    case 'all':
-      return true;
-    case 'tools':
-      return item.kind !== 'skill';
-    case 'skills':
-      return item.kind === 'skill';
-    case 'on':
-      return item.state === 'on' || item.state === 'builtin';
-    case 'setup':
-      return item.state === 'needs-setup';
-  }
-}
+const STRIP_CAP = 8;
 
 function ShelfCard({
   item,
@@ -76,11 +70,6 @@ function ShelfCard({
           <span className="flex min-w-0 items-center gap-1.5">
             {/* The name never yields to the reason: it is what the card is. */}
             <span className="shrink-0 text-body text-text-primary">{item.name}</span>
-            {item.kind === 'connector' &&
-            item.connector.official &&
-            item.connector.firstParty !== true ? (
-              <OfficialMark />
-            ) : null}
             {item.kind === 'connector' &&
             item.reason !== undefined &&
             item.state === 'available' ? (
@@ -122,7 +111,9 @@ function Section({
           <span className="text-caption text-text-muted">· {blurb}</span>
         ) : null}
       </div>
-      <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2">{items.map(children)}</div>
+      {/* Columns follow the LIST's width (a container query), not the window's:
+          `md:grid-cols-2` put two 190px columns beside an open sheet. */}
+      <div className="cand-grid">{items.map(children)}</div>
     </section>
   );
 }
@@ -176,22 +167,27 @@ function Sheet({
   );
 }
 
-/** The strip: everything the agent can use right now, as marks. */
+/**
+ * The strip: what YOU turned on, as marks. Built-ins are not in it — nobody
+ * chose them — and past eight it says "+N" and hands over to the On filter.
+ */
 function OnNow({
   items,
   selectedId,
   onOpen,
+  onMore,
 }: {
   items: readonly Item[];
   selectedId: string | null;
   onOpen: (id: string) => void;
+  onMore: () => void;
 }): JSX.Element | null {
   if (items.length === 0) return null;
-  // Built-ins sit after a hairline: always on, never something you chose.
-  const firstBuiltin = items.findIndex((i) => i.state === 'builtin');
+  const shown = items.slice(0, STRIP_CAP);
+  const more = items.length - shown.length;
   return (
     <div className="flex flex-wrap items-center gap-2" data-testid="cand-on-now">
-      {items.map((item, index) => (
+      {shown.map((item) => (
         <Tooltip key={item.id} label={`${item.name} · ${STATE_LABEL[item.state]}`}>
           <button
             type="button"
@@ -200,14 +196,24 @@ function OnNow({
             aria-pressed={item.id === selectedId}
             onClick={() => onOpen(item.id)}
             data-testid={`cand-tile-${item.id}`}
-            style={index === firstBuiltin && index > 0 ? { marginLeft: 12 } : undefined}
-            data-builtin={item.state === 'builtin' ? 'true' : undefined}
           >
             <ItemGlyph item={item} size={22} />
             <StateDot state={item.state} />
           </button>
         </Tooltip>
       ))}
+      {more > 0 ? (
+        <Tooltip label="Show everything that is on">
+          <button
+            type="button"
+            className="cand-tile cand-tile--more"
+            onClick={onMore}
+            data-testid="cand-tile-more"
+          >
+            +{more}
+          </button>
+        </Tooltip>
+      ) : null}
     </div>
   );
 }
@@ -240,28 +246,27 @@ function orderTools(visible: readonly Item[]): {
 export function Shelf(): JSX.Element {
   const cat = useCatalog();
   const actions = useActions();
+  useWarmTools(cat, actions);
   const [query, setQuery] = useState('');
-  const [filter, setFilter] = useState<Filter>('all');
+  const [filter, setFilter] = useState<KindFilter>('all');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
 
   const selected = cat.items.find((i) => i.id === selectedId) ?? null;
   const onNow = useMemo(
     () =>
-      [...cat.items]
-        .filter((i) => i.state === 'on' || i.state === 'needs-setup' || i.state === 'builtin')
-        .sort((a, b) => (a.state === 'builtin' ? 1 : 0) - (b.state === 'builtin' ? 1 : 0)),
+      cat.items.filter((i) => i.state === 'needs-setup' || i.state === 'on' || i.state === 'off'),
     [cat.items],
   );
   const visible = useMemo(
-    () => cat.items.filter((i) => matches(i, query) && passes(filter, i)),
+    () => cat.items.filter((i) => matches(i, query) && passesFilter(filter, i)),
     [cat.items, query, filter],
   );
   const groups = useMemo(() => orderTools(visible), [visible]);
   const counts = useMemo(() => {
-    const out: Record<Filter, number> = { all: 0, tools: 0, skills: 0, on: 0, setup: 0 };
+    const out: Record<KindFilter, number> = { all: 0, tools: 0, skills: 0, on: 0, setup: 0 };
     for (const i of cat.items) {
-      for (const f of FILTERS) if (passes(f.id, i)) out[f.id] += 1;
+      for (const f of FILTERS) if (passesFilter(f.id, i)) out[f.id] += 1;
     }
     return out;
   }, [cat.items]);
@@ -289,8 +294,6 @@ export function Shelf(): JSX.Element {
                   Tools and skills your agent can use. Everything here runs on this Mac.
                 </p>
               </div>
-              {/* shrink-0: a squeezed button squeezes its icon first — under the
-                  claude flavour's wider type the plus collapsed to a 7px dot. */}
               <Button
                 variant="primary"
                 size="sm"
@@ -302,15 +305,22 @@ export function Shelf(): JSX.Element {
               </Button>
             </div>
 
-            <div className="mt-4 flex flex-col gap-2">
-              <div className="flex items-baseline gap-2">
-                <span className="text-caption text-text-muted">On now</span>
-                <span className="text-caption text-text-muted">{onNow.length}</span>
+            {onNow.length > 0 ? (
+              <div className="mt-4 flex flex-col gap-2">
+                <div className="flex items-baseline gap-2">
+                  <span className="text-caption text-text-muted">Yours</span>
+                  <span className="text-caption text-text-muted">{onNow.length}</span>
+                </div>
+                <OnNow
+                  items={onNow}
+                  selectedId={selectedId}
+                  onOpen={setSelectedId}
+                  onMore={() => setFilter('on')}
+                />
               </div>
-              <OnNow items={onNow} selectedId={selectedId} onOpen={setSelectedId} />
-            </div>
+            ) : null}
 
-            <div className="mt-4 flex items-center gap-2">
+            <div className="candp-controls mt-4">
               <div className="cand-search-wrap">
                 <IconSearch size={15} />
                 <input
@@ -322,7 +332,7 @@ export function Shelf(): JSX.Element {
                   data-testid="cand-search"
                 />
               </div>
-              <div className="flex items-center gap-1">
+              <div className="candp-filters">
                 {FILTERS.map((f) => (
                   <button
                     key={f.id}
@@ -340,14 +350,32 @@ export function Shelf(): JSX.Element {
             </div>
           </div>
 
-          <ScrollArea className="min-h-0 flex-1">
+          <ScrollArea className="candp-list min-h-0 flex-1">
             <div className="mx-auto flex w-full max-w-[1040px] flex-col gap-7 px-8 pt-5 pb-8">
               {!cat.loaded ? (
                 <p className="text-footnote text-text-muted">Loading…</p>
               ) : visible.length === 0 ? (
-                <p className="text-footnote text-text-muted" data-testid="cand-empty">
-                  Nothing matches.
-                </p>
+                <div className="flex flex-col items-start gap-2 py-4" data-testid="cand-empty">
+                  <p className="text-body text-text-primary">
+                    Nothing matches
+                    {query.trim() !== '' ? ` “${query.trim()}”` : ''}
+                    {filter !== 'all'
+                      ? ` in ${FILTERS.find((f) => f.id === filter)?.label ?? ''}`
+                      : ''}
+                    .
+                  </p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setQuery('');
+                      setFilter('all');
+                    }}
+                    data-testid="cand-clear"
+                  >
+                    Clear search and filters
+                  </Button>
+                </div>
               ) : null}
               <Section
                 title="Recommended for you"

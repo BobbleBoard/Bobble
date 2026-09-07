@@ -132,10 +132,17 @@
     background-color var(--pd-duration-base) var(--pd-easing-standard),
     box-shadow var(--pd-duration-base) var(--pd-easing-standard);
 }
+/* Hover: the fill is bg-hover LAYERED OVER bg-raised, not in place of it.
+   --pd-bg-hover is a translucent white/black, so `background: var(--pd-bg-hover)`
+   alone composited it over the page's base — MEASURED in round 4's crop as a
+   five-step lift, (30,30,33) → (35,35,37), "did that change?" at 1×. Layered
+   it is (43,43,46), and the hairline goes to border-strong. */
 .cand-card:hover {
-  background: var(--pd-bg-hover);
+  background: linear-gradient(var(--pd-bg-hover), var(--pd-bg-hover)), var(--pd-bg-raised);
+  box-shadow: 0 0 0 1px var(--pd-border-strong);
 }
-.cand-card[data-selected="true"] {
+.cand-card[data-selected="true"],
+.cand-card[data-selected="true"]:hover {
   box-shadow: 0 0 0 1.5px var(--pd-border-focus);
 }
 
@@ -191,17 +198,77 @@
   }
 }
 
-/* ---- inline expansion (Reach) ---- */
+/* ---- inline expansion (Reach) ----
+   The body indents to the name column (64px) while the LIST is wide enough
+   for that to buy alignment rather than cost width. A container query, not
+   the viewport one this was: the route renders full-window and the shell
+   renders beside a 288px sidebar, so at 900 of content the two disagreed. */
+.cand-reach-list {
+  container-type: inline-size;
+  container-name: cand-reach-list;
+}
 .cand-expand {
   overflow: hidden;
   transition: height var(--pd-duration-slow) var(--pd-easing-standard);
 }
 .cand-expand-body {
-  padding: 4px 12px 16px 64px;
+  padding: 4px 12px 16px 12px;
 }
-@media (max-width: 960px) {
+@container cand-reach-list (min-width: 720px) {
   .cand-expand-body {
-    padding-left: 12px;
+    padding-left: 64px;
+  }
+}
+
+/* ---- Ledger: the category row's fade ----
+   The scrollbar is hidden, so the fade is the only cue that there is more:
+   56px, not scroll.css's 16px, which vanished against the raised chips. And
+   scroll-DRIVEN, with keyframes of its own — the shared ones own --pd-fade-*,
+   so an inline width did nothing, and a static 56px (the first fix) hid the
+   last chip at the end of the row forever. No fade on the left at the start,
+   both while scrolling, none on the right at the end. A row that does not
+   overflow (data-overflow, measured in Ledger.tsx) has no fade at all. */
+.cand-cats {
+  --pd-fade-start: 0px;
+  --pd-fade-end: 56px;
+}
+@supports (animation-timeline: scroll(self)) {
+  .pd-scroll-fade-x.cand-cats {
+    animation: cand-cats-fade linear both;
+    animation-timeline: scroll(self x);
+  }
+  @keyframes cand-cats-fade {
+    0% {
+      --pd-fade-start: 0px;
+      --pd-fade-end: 56px;
+    }
+    12%,
+    88% {
+      --pd-fade-start: 40px;
+      --pd-fade-end: 56px;
+    }
+    100% {
+      --pd-fade-start: 40px;
+      --pd-fade-end: 0px;
+    }
+  }
+}
+.pd-scroll-fade-x.cand-cats[data-overflow="false"] {
+  --pd-fade-start: 0px;
+  --pd-fade-end: 0px;
+  animation: none;
+}
+
+/* ---- Ledger: the directory row drops its category under ~520px ----
+   "Chrome DevTools · … · Ch…" at 640 was three fragments; the reason is the
+   line worth keeping, and the category is one chip away. */
+.cand-dir {
+  container-type: inline-size;
+  container-name: cand-dir;
+}
+@container cand-dir (max-width: 520px) {
+  .cand-dir-cat {
+    display: none;
   }
 }
 
@@ -252,7 +319,15 @@
   margin: 0;
   min-width: 0;
   color: var(--pd-text-primary);
-  overflow-wrap: anywhere;
+  /* break-word, not anywhere: a URL may wrap at a slash, a key only at its
+     <wbr>s (see Key in detail-parts) — never GITHUB_PERSONAL_ACC|ESS_TOKEN. */
+  overflow-wrap: break-word;
+}
+.cand-key {
+  font-family: var(--pd-font-mono);
+  font-size: var(--pd-font-size-caption);
+  color: var(--pd-text-primary);
+  word-break: keep-all;
 }
 
 /* ---- muted mono for commands (never a scrolling code block for one line) ---- */
@@ -294,4 +369,332 @@
 .cand-doc .pd-prose h3,
 .cand-doc .pd-prose :is(h4, h5, h6) {
   font-size: var(--pd-font-size-footnote);
+}
+
+/* ---- the tools list in a detail ---- */
+.cand-tools {
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--pd-radius-lg);
+  box-shadow: 0 0 0 1px var(--pd-border-subtle);
+  overflow: hidden;
+}
+.cand-tool {
+  padding: 7px 12px 8px;
+}
+.cand-tool + .cand-tool {
+  box-shadow: 0 -1px 0 0 var(--pd-border-subtle);
+}
+
+/* ---- a text button: the quiet action beside a title (Refresh, Show all) ---- */
+.cand-textbtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: var(--pd-radius-sm);
+  color: var(--pd-text-secondary);
+  font-family: var(--pd-font-sans);
+  font-size: var(--pd-font-size-footnote);
+  line-height: var(--pd-leading-footnote);
+  cursor: pointer;
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+  transition: color var(--pd-duration-base) var(--pd-easing-standard);
+}
+.cand-textbtn:hover:not(:disabled) {
+  color: var(--pd-text-primary);
+}
+.cand-textbtn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* ---- an inline link in a spec row (the category that searches for itself) ---- */
+.cand-link {
+  border-radius: var(--pd-radius-sm);
+  color: var(--pd-text-link);
+  font: inherit;
+  cursor: pointer;
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+}
+.cand-link:hover {
+  text-decoration: underline;
+}
+
+/* ---- the setup card: the one warm surface on the page ---- */
+.cand-setup {
+  padding: 12px;
+  border-radius: var(--pd-radius-lg);
+  border: 1px solid var(--pd-status-warning-border);
+  background: var(--pd-status-warning-bg);
+}
+
+/* ---- keyboard focus on a card, chip or row: the ring goes on the CONTAINER,
+   not on the inner button, whose box is not what the eye reads as the thing.
+   The open-button has no ring of its own for that reason.
+   An OUTLINE, 2px out — the app's own focus grammar (base.css) — and not a
+   box-shadow: the selection ring is a box-shadow on the card's edge, and round
+   4 measured the two as the same accent at the same pixel, differing by half
+   a pixel of weight. Now they differ in geometry: selection hugs the card,
+   focus stands 2px off it, and a selected card that is also focused wears
+   both. ---- */
+.cand-open {
+  outline: none;
+}
+.cand-card:has(> .cand-open:focus-visible),
+.cand-chip:has(> .cand-open:focus-visible) {
+  outline: 2px solid var(--pd-focus-ring);
+  outline-offset: 2px;
+}
+.cand-row:has(> .cand-open:focus-visible) {
+  box-shadow: inset 0 0 0 2px var(--pd-focus-ring);
+}
+
+/* ═══ Shelf+ — the merged candidate ═══════════════════════════════════════
+   Container queries throughout: the route lives beside a 288px sidebar, so a
+   viewport breakpoint (`md:`) fired two columns into 480px of content. Every
+   width decision here is about the box it is in, not the window. */
+.candp {
+  container-type: inline-size;
+  container-name: candp;
+  /*
+   * THE SECOND LINE IS SMALLER THAN THE NAME — locally. The app's
+   * --pd-font-size-footnote equals --pd-font-size-body (14px), so every card's
+   * description was the name's size and differed only in weight and colour;
+   * the references draw 15/13. This is what a 13px footnote token would look
+   * like, scoped to the candidate so the hub and Scheduled do not move until
+   * the token does (NOTES: the proposal, and what it would touch).
+   */
+  --pd-font-size-footnote: 13px;
+  --pd-leading-footnote: 18px;
+}
+.candp-body {
+  position: relative;
+  display: flex;
+  min-height: 0;
+  flex: 1;
+}
+.candp-list {
+  min-width: 0;
+  flex: 1;
+  container-type: inline-size;
+  container-name: candp-list;
+}
+
+/* ---- the card grid: two columns only when the LIST is wide enough ---- */
+.cand-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+}
+@container candp-list (min-width: 660px) {
+  .cand-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* ---- header rows: the search yields width, never the pills their labels ---- */
+.candp-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 6px;
+}
+.candp-controls > .cand-search-wrap {
+  flex: 1 1 260px;
+  min-width: 220px;
+}
+.candp-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.candp-filters > .cand-pill {
+  flex: none;
+}
+
+/* ---- the pane: pinned beside the list, or an overlay over it ----
+   Pinned it is the hub's detail column — same ground as the page, one hairline
+   stripe, the top of it fading so scrolled content does not hit a hard edge.
+   Overlaid it is a sheet: opaque, shadowed, animated in, with a scrim. Either
+   way the list under it NEVER changes width when something is picked. */
+.candp-pane {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  width: 420px;
+  background: var(--pd-bg-base);
+  box-shadow: -1px 0 0 0 var(--pd-border-default);
+}
+.candp-pane[data-mode="overlay"] {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  width: min(440px, 88%);
+  background: linear-gradient(var(--pd-bg-overlay), var(--pd-bg-overlay)), var(--pd-bg-raised);
+  box-shadow:
+    -1px 0 0 0 var(--pd-border-subtle),
+    var(--pd-shadow-lg);
+  /* Slides in OPAQUE; only the scrim fades. With the fade the sheet's first
+     ~100ms drew "Tools 50" over "Filesystem" (judgement 8, crops G/G2). */
+  animation: candp-sheet-in var(--pd-duration-slow) var(--pd-easing-enter);
+}
+@keyframes candp-sheet-in {
+  from {
+    transform: translateX(24px);
+  }
+  to {
+    transform: none;
+  }
+}
+/* ---- below ~720px of content the pane takes the list's place ----
+   At 640 the overlay left a 200px strip of cut cards behind the scrim —
+   neither list nor context. Here the detail is the whole content width under
+   the same header (title, search, pills stay), with the back link where Ledger
+   puts it. The list keeps its scroll position underneath; it is hidden, not
+   unmounted. */
+.candp-pane[data-mode="full"] {
+  position: relative;
+  flex: 1;
+  width: auto;
+  min-width: 0;
+  background: var(--pd-bg-base);
+  box-shadow: none;
+  animation: candp-swap var(--pd-duration-base) var(--pd-easing-enter);
+}
+.candp-list[data-hidden="true"] {
+  display: none;
+}
+
+/* ---- the pane's content, swapping ledger ↔ detail ----
+   A keyed wrapper, so React remounts it on every swap and the entrance runs
+   again: a short fade with a 4px rise, the hub's family-card feel. Hard-swap
+   was the round-2 render (NOTES: "no transition"). */
+.candp-pane-body {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+  animation: candp-swap var(--pd-duration-slow) var(--pd-easing-enter);
+}
+@keyframes candp-swap {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ---- a group that opens to its measured height ----
+   `grid-template-rows: 0fr → 1fr` is the engine measuring the content for us,
+   which is what the hub's family card does by hand with scrollHeight. */
+.candp-collapse {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--pd-duration-slow) var(--pd-easing-standard);
+}
+.candp-collapse[data-open="true"] {
+  grid-template-rows: 1fr;
+}
+.candp-collapse > div {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.candp-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: color-mix(in oklab, var(--pd-text-primary) 14%, transparent);
+  animation: cand-fade-in var(--pd-duration-base) var(--pd-easing-standard);
+}
+@keyframes cand-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .candp-pane[data-mode="overlay"],
+  .candp-pane[data-mode="full"],
+  .candp-pane-body,
+  .candp-scrim {
+    animation: none;
+  }
+  .candp-collapse {
+    transition: none;
+  }
+}
+
+/* ---- a compact recommendation: mark, name, "+" — Claude's Popular strip ---- */
+.cand-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 38px;
+  padding: 0 4px 0 6px;
+  border-radius: var(--pd-radius-md);
+  background: var(--pd-bg-raised);
+  box-shadow: 0 0 0 1px var(--pd-border-subtle);
+  color: var(--pd-text-primary);
+  font-size: var(--pd-font-size-footnote);
+  transition: background-color var(--pd-duration-base) var(--pd-easing-standard);
+}
+.cand-chip:hover {
+  background: linear-gradient(var(--pd-bg-hover), var(--pd-bg-hover)), var(--pd-bg-raised);
+  box-shadow: 0 0 0 1px var(--pd-border-strong);
+}
+.cand-chip[data-selected="true"] {
+  box-shadow: 0 0 0 1.5px var(--pd-border-focus);
+}
+
+/* ---- "Show all N" — the row every reference has and round 1 did not ---- */
+.cand-showall {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 40px;
+  padding: 6px 12px;
+  border-radius: var(--pd-radius-lg);
+  color: var(--pd-text-secondary);
+  font-size: var(--pd-font-size-footnote);
+  text-align: left;
+  transition:
+    background-color var(--pd-duration-base) var(--pd-easing-standard),
+    color var(--pd-duration-base) var(--pd-easing-standard);
+}
+.cand-showall:hover {
+  background: var(--pd-bg-hover);
+  color: var(--pd-text-primary);
+}
+.cand-cluster {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+}
+.cand-cluster > .cand-mark {
+  margin-left: -8px;
+  box-shadow:
+    inset 0 0 0 1px var(--pd-border-default),
+    0 0 0 2px var(--pd-bg-base);
+}
+.cand-cluster > .cand-mark:first-child {
+  margin-left: 0;
+}
+
+/* ---- the strip of what YOU turned on (Shelf, capped) ---- */
+.cand-tile--more {
+  font-size: var(--pd-font-size-caption);
+  color: var(--pd-text-secondary);
 }

@@ -3,16 +3,18 @@
  *
  * The argument: a schedule is a question about TIME ON THIS MAC. What runs
  * next, what is due right now, what was missed while the laptop was shut —
- * and whether the machine can even run it (Bobble open, a model loaded, one
- * run at a time). So the page is one column, grouped the way a calendar app
- * groups a day: Now / Today / Tomorrow / This week / Later / By hand / Paused,
- * with the exact time on the left of every row and a seven-day strip showing
- * which days it fires.
+ * so the page is one column, grouped the way a calendar app groups a day:
+ * Now / Today / Tomorrow / This week / Later / By hand / Paused, with the
+ * exact time on the left of every row.
  *
- * Creation is the ChatGPT-style sentence, but the parse is shown LIVE under
- * the composer as you type — "Weekdays at 9:00 AM · first run tomorrow" — so
+ * Creation is the sentence box, first thing under the title, with the parse
+ * shown LIVE as you type — "Weekdays at 9:00 AM · first run tomorrow" — so
  * the deterministic parser is a preview, not a surprise, and the confirm step
  * is an inline card rather than a modal.
+ *
+ * Gone since round one: the seven-day dot strip (a picture of the schedule
+ * already written in words on the same row), the second green tick per row,
+ * and "— Bobble was not open", a cause the app cannot know.
  */
 import {
   Button,
@@ -27,13 +29,12 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   describeSchedule,
   formatTime,
-  nextRun,
-  normalizeTask,
   parseTaskDraft,
   type ScheduledTask,
 } from '../../../electron/scheduled/schedule-logic';
 import type { TaskDraft, TaskRun } from '../../../electron/scheduled/scheduled-contract';
 import { cx } from '../../onboarding/cx';
+import { COMPOSER_SAMPLE, Composer } from './Composer';
 import {
   type AgendaBucket,
   agendaBucket,
@@ -45,13 +46,13 @@ import {
   taskState,
 } from './derive';
 import { registerCandidateStates } from './hook';
-import { IconPause, IconPlay, IconRepeat, IconTimer } from './icons';
+import { IconPause, IconPlay } from './icons';
 import { RunLedger } from './RunLedger';
 import {
-  MachineStrip,
-  OutcomeGlyph,
+  OffNotice,
   ReachRow,
   SchedulingSwitch,
+  SectionTitle,
   StatusGlyph,
   TASK_TEMPLATES,
   TemplateIcon,
@@ -60,7 +61,6 @@ import {
   useContainerWidth,
   useNow,
   useSchedule,
-  WeekStrip,
 } from './shared';
 import { TaskEditor } from './TaskEditor';
 
@@ -73,8 +73,6 @@ const BUCKET_ORDER: readonly AgendaBucket[] = [
   'manual',
   'paused',
 ];
-
-const SAMPLE_SENTENCE = 'every weekday at 9am, summarise what changed in my working folder';
 
 function timeCell(
   state: TaskState,
@@ -103,34 +101,11 @@ function timeCell(
   }
 }
 
-function LiveParse({ text, now }: { text: string; now: number }) {
-  const parsed = useMemo(() => parseTaskDraft(text), [text]);
-  const task = normalizeTask({ id: 'p', ...parsed, enabled: true, createdAt: now });
-  const next = nextRun(task, now, true);
-  return (
-    <div className="sc-parse" data-testid="sc-parse">
-      <span className="sc-chip">
-        <IconRepeat size={12} />
-        {describeSchedule(task)}
-      </span>
-      {next !== undefined ? (
-        <span className="sc-chip">
-          <IconTimer size={12} />
-          first run {describeMoment(next, now)}
-        </span>
-      ) : null}
-      <span className="min-w-0 truncate">“{parsed.prompt}”</span>
-      <span className="ml-auto text-caption">↵ to review</span>
-    </div>
-  );
-}
-
 function AgendaRow({
   task,
   runs,
   state,
   now,
-  narrow,
   expanded,
   editing,
   onToggle,
@@ -142,7 +117,6 @@ function AgendaRow({
   runs: readonly TaskRun[] | undefined;
   state: TaskState;
   now: number;
-  narrow: boolean;
   expanded: boolean;
   editing: boolean;
   onToggle: () => void;
@@ -159,14 +133,18 @@ function AgendaRow({
   const last = runs?.[0];
   const { main, sub } = timeCell(state, task, now);
   const muted = state.kind === 'paused' || state.kind === 'off';
-  const meta =
+  // The schedule is never a warning; the clause after it can be.
+  const clause =
     state.kind === 'missed'
-      ? `missed ${describeMoment(state.slotAt, now)} — Bobble was not open`
+      ? { text: `missed ${describeMoment(state.slotAt, now)}`, warn: true }
       : last === undefined
-        ? 'not run yet'
+        ? { text: 'not run yet', warn: false }
         : last.status === 'running'
-          ? `started ${describeDelta(last.startedAt, now)}`
-          : `last ${last.status === 'ok' ? 'ok' : 'failed'} ${describeDelta(last.startedAt, now)}`;
+          ? { text: `started ${describeDelta(last.startedAt, now)}`, warn: false }
+          : {
+              text: `${last.status === 'ok' ? 'ok' : 'failed'} ${describeDelta(last.startedAt, now)}`,
+              warn: false,
+            };
   return (
     <div data-testid={`sc-agenda-row-${task.id}`}>
       <div className="sc-row" data-selected={expanded} data-muted={muted}>
@@ -178,21 +156,14 @@ function AgendaRow({
           <StatusGlyph state={state} runs={runs} />
           <span className="min-w-0 flex-1">
             <span className="sc-row-name block">{task.name}</span>
-            <span
-              className="sc-row-meta block"
-              style={state.kind === 'missed' ? { color: 'var(--pd-status-warning-fg)' } : undefined}
-            >
-              {describeSchedule(task)} · {meta}
+            <span className="sc-row-meta block">
+              {describeSchedule(task)} ·{' '}
+              <span className={clause.warn ? 'sc-warn' : undefined}>{clause.text}</span>
             </span>
           </span>
-          {!narrow ? <WeekStrip task={task} now={now} /> : null}
         </button>
-        <span className="sc-row-trailing inline-flex w-5 justify-center">
-          {last !== undefined ? (
-            <OutcomeGlyph run={last} />
-          ) : (
-            <IconChevronRight size={14} style={{ color: 'var(--pd-text-muted)' }} />
-          )}
+        <span className="sc-row-trailing sc-disclosure w-5 justify-center" data-open={expanded}>
+          <IconChevronRight size={14} />
         </span>
         <span className="sc-row-actions">
           {armed ? (
@@ -279,6 +250,12 @@ function AgendaRow({
                   Edit the prompt
                 </button>
               </div>
+              {state.kind === 'missed' ? (
+                <p className="mt-3 text-footnote text-text-muted">
+                  A slot is missed when nothing is running at the time; the scheduler catches one up
+                  for six hours and then leaves it. Next: {describeMoment(state.nextAt, now)}.
+                </p>
+              ) : null}
               <p
                 className="sc-clamp-3 mt-3 text-footnote text-text-secondary"
                 style={{ whiteSpace: 'pre-wrap' }}
@@ -288,7 +265,7 @@ function AgendaRow({
               <div className="mt-3">
                 <RunLedger
                   key={task.id}
-                  taskId={task.id}
+                  task={task}
                   runs={runs ?? []}
                   now={now}
                   open="first"
@@ -346,8 +323,8 @@ export function AgendaCandidate() {
     () =>
       registerCandidateStates('agenda', ['default', 'typing', 'expanded', 'editor'], (s) => {
         const { tasks: ts, runs: rs } = latest.current;
-        setText(s === 'typing' ? SAMPLE_SENTENCE : '');
-        setDraft(s === 'editor' ? parseTaskDraft(SAMPLE_SENTENCE) : null);
+        setText(s === 'typing' ? COMPOSER_SAMPLE : '');
+        setDraft(s === 'editor' ? parseTaskDraft(COMPOSER_SAMPLE) : null);
         setEditingId(null);
         // Expand the task with the most history — the one that shows the ledger.
         const richest = [...ts].sort(
@@ -375,8 +352,8 @@ export function AgendaCandidate() {
       {/* The header shares the column with the content, so the title and the list share a left edge. */}
       <header className="mx-auto flex w-full max-w-[880px] flex-wrap items-start justify-between gap-3 px-6 pt-4 pb-2">
         <div>
-          <h1 className="sc-title">Scheduled</h1>
-          <p className="sc-subtitle">When things run on this Mac — and whether they can.</p>
+          <h1 className="sc-title">Scheduled tasks</h1>
+          <p className="sc-subtitle">What runs next on this Mac, and what already did.</p>
         </div>
         <div className="flex items-center gap-3">
           <SchedulingSwitch enabled={enabled} />
@@ -396,58 +373,40 @@ export function AgendaCandidate() {
 
       <ScrollArea className="min-h-0 flex-1">
         <div className="mx-auto w-full max-w-[880px] px-6 pt-2 pb-16">
-          <MachineStrip tasks={tasks} runs={runs} now={now} enabled={enabled} compact={narrow} />
-
-          {/* The sentence. */}
-          <div className="mt-4" data-testid="sc-composer">
-            <div className="sc-card flex items-center gap-2 py-1.5 pr-1.5 pl-3">
-              <span style={{ color: 'var(--pd-text-muted)', display: 'inline-flex' }}>
-                <IconPlus size={16} />
-              </span>
-              <input
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') review();
-                }}
-                placeholder={SAMPLE_SENTENCE}
-                className="min-w-0 flex-1 bg-transparent py-1.5 text-body text-text-primary outline-none placeholder:text-text-placeholder"
-                data-testid="sc-composer-input"
+          {/* The sentence, first. */}
+          <Composer
+            value={text}
+            onChange={setText}
+            onSubmit={review}
+            now={now}
+            autoFocus={loaded && tasks.length === 0}
+          />
+          {draft !== null ? (
+            <div className="sc-card mt-3 p-4" data-testid="sc-agenda-editor">
+              <TaskEditor
+                initial={draft}
+                onCancel={() => setDraft(null)}
+                onSave={create}
+                layout="card"
+                autoFocus={Object.keys(draft).length > 0 ? 'name' : 'prompt'}
+                lead={
+                  Object.keys(draft).length > 0
+                    ? 'Read from your sentence. Check the schedule, then put it on the calendar.'
+                    : undefined
+                }
               />
-              <Button
-                variant="primary"
-                size="sm"
-                disabled={text.trim().length === 0}
-                onClick={review}
-                data-testid="sc-composer-go"
-              >
-                Review
-              </Button>
             </div>
-            {text.trim().length > 0 ? (
-              <div className="mt-2">
-                <LiveParse text={text} now={now} />
-              </div>
-            ) : null}
-            {draft !== null ? (
-              <div className="sc-card mt-3 p-4" data-testid="sc-agenda-editor">
-                <p className="mb-3 text-footnote text-text-muted">
-                  Check the schedule before it goes on the calendar.
-                </p>
-                <TaskEditor
-                  initial={draft}
-                  onCancel={() => setDraft(null)}
-                  onSave={create}
-                  layout="card"
-                />
-              </div>
-            ) : null}
-          </div>
+          ) : null}
+          {!enabled ? (
+            <div className="mt-3">
+              <OffNotice enabled={enabled} />
+            </div>
+          ) : null}
 
           {/* The agenda. */}
           {loaded && tasks.length === 0 ? (
             <div className="mt-8" data-testid="sc-agenda-empty">
-              <h3 className="sc-section-title">Start with</h3>
+              <SectionTitle>Start with</SectionTitle>
               <div className="sc-card py-1">
                 {TASK_TEMPLATES.map((t) => (
                   <button
@@ -489,7 +448,9 @@ export function AgendaCandidate() {
                   className="sc-agenda-group"
                   data-testid={`sc-bucket-${bucket}`}
                 >
-                  <h3 className="sc-section-title">{BUCKET_TITLE[bucket]}</h3>
+                  <SectionTitle count={items.length > 1 ? items.length : undefined}>
+                    {BUCKET_TITLE[bucket]}
+                  </SectionTitle>
                   <div className="sc-card py-1">
                     {items.map(({ task, state }) => (
                       <AgendaRow
@@ -498,7 +459,6 @@ export function AgendaCandidate() {
                         runs={runs[task.id]}
                         state={state}
                         now={now}
-                        narrow={narrow}
                         expanded={expandedId === task.id}
                         editing={editingId === task.id}
                         onToggle={() => {

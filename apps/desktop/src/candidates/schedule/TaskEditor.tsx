@@ -1,5 +1,5 @@
 /**
- * The one editor all three candidates share, placed differently by each.
+ * The one editor all candidates share, placed differently by each.
  *
  * Two things the reference dialogs get wrong and this does not:
  *
@@ -9,10 +9,13 @@
  *     schedule; "Today's 7:30 already passed, so it runs as soon as you save"
  *     is the consequence — and it IS what the scheduler does (dueTasks catches
  *     up a slot missed within six hours), so a person should hear it before
- *     the run starts, not after.
+ *     the run starts, not after. If no model is loaded, that is said here too,
+ *     because it is the slow part of the first run.
  *
  * No permissions row: an unattended run has nobody to ask, so the rule is
- * fixed and stated instead — it reads, it cannot send.
+ * fixed and stated instead — it reads, it cannot send. No Active switch
+ * either: round one kept the shipping dialog's, and nobody creates a task
+ * paused; pausing lives on the task once it exists.
  */
 import {
   Button,
@@ -21,7 +24,6 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  Switch,
   TextArea,
 } from '@pi-desktop/ui';
 import { type KeyboardEvent, useEffect, useId, useMemo, useRef, useState } from 'react';
@@ -35,8 +37,10 @@ import {
   type ScheduledTask,
 } from '../../../electron/scheduled/schedule-logic';
 import type { TaskDraft } from '../../../electron/scheduled/scheduled-contract';
+import { useLlmStore } from '../../state/llm-store';
 import { useProjectStore } from '../../state/project-store';
-import { describeDelta, describeMoment, GRACE_MS } from './derive';
+import { describeDelta, describeMoment, GRACE_MS, nameFrom } from './derive';
+import { useModelNote } from './shared';
 
 const FREQUENCY_LABEL: Record<Frequency, string> = {
   manual: 'Only when I run it',
@@ -59,6 +63,8 @@ export interface TaskEditorProps {
   /** `pane`: fills a detail pane. `card`: sits inside a card in a grid/list. */
   readonly layout?: 'pane' | 'card';
   readonly autoFocus?: 'name' | 'prompt';
+  /** A line above the fields, for when the editor is a confirmation of a parse. */
+  readonly lead?: string;
 }
 
 export function TaskEditor({
@@ -68,6 +74,7 @@ export function TaskEditor({
   onSave,
   layout = 'pane',
   autoFocus = 'prompt',
+  lead,
 }: TaskEditorProps) {
   const base = useMemo(() => normalizeTask({ id: 'draft', ...initial }), [initial]);
   const [name, setName] = useState(initial?.name ?? '');
@@ -76,9 +83,13 @@ export function TaskEditor({
   const [hour, setHour] = useState(base.hour);
   const [minute, setMinute] = useState(base.minute);
   const [weekday, setWeekday] = useState(base.weekday);
-  const [enabled, setEnabled] = useState(base.enabled);
   const [cwd, setCwd] = useState(base.cwd ?? '');
+  const enabled = initial?.enabled ?? true;
   const projects = useProjectStore((s) => s.projects);
+  const modelNote = useModelNote();
+  const loadedModel = useLlmStore((s) =>
+    s.status.phase === 'ready' ? (s.status.model?.displayName ?? null) : null,
+  );
   const nameId = useId();
   const promptId = useId();
   const promptRef = useRef<HTMLTextAreaElement>(null);
@@ -114,13 +125,11 @@ export function TaskEditor({
   const save = () => {
     if (!canSave) return;
     onSave({
-      name:
-        name.trim() ||
-        prompt
-          .trim()
-          .split(/[.,\n]/)[0]
-          ?.slice(0, 40) ||
-        'Scheduled task',
+      // derive's nameFrom: a short first clause kept whole, a long one cut at a
+      // conjunction or backed off a dangling word. Round one sliced at 40
+      // characters ("Summarise what changed in my working"); round two took
+      // schedule-logic's six words ("Write up what I worked on").
+      name: name.trim() || nameFrom(prompt.trim()),
       prompt: prompt.trim(),
       frequency,
       hour,
@@ -148,6 +157,7 @@ export function TaskEditor({
       className={layout === 'pane' ? 'flex flex-col gap-4' : 'flex flex-col gap-3'}
       data-testid="sc-editor"
     >
+      {lead !== undefined ? <p className="text-footnote text-text-muted">{lead}</p> : null}
       <div className="flex flex-col gap-1">
         <label htmlFor={promptId} className="sc-field-label">
           What should it do?
@@ -177,71 +187,75 @@ export function TaskEditor({
           value={name}
           onChange={(e) => setName(e.target.value)}
           onKeyDown={onFieldKey}
-          placeholder="Named from the first line if you leave this blank"
+          placeholder={
+            prompt.trim() === ''
+              ? 'Named from the first line if you leave this blank'
+              : nameFrom(prompt)
+          }
         />
       </div>
 
-      <div className="flex flex-col gap-1">
-        <span className="sc-field-label">When</span>
-        <div className="flex flex-wrap items-center gap-2" data-testid="sc-editor-when">
-          <Select value={frequency} onValueChange={(v) => setFrequency(v as Frequency)}>
-            <SelectTrigger className="pd-btn--sm" data-testid="sc-editor-frequency">
-              {FREQUENCY_LABEL[frequency]}
-            </SelectTrigger>
-            <SelectContent>
-              {FREQUENCIES.map((f) => (
-                <SelectItem key={f} value={f}>
-                  {FREQUENCY_LABEL[f]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {frequency === 'weekly' ? (
-            <Select value={String(weekday)} onValueChange={(v) => setWeekday(Number(v))}>
-              <SelectTrigger className="pd-btn--sm" data-testid="sc-editor-weekday">
-                {DAYS[weekday]}
+      <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
+        <div className="flex flex-col gap-1">
+          <span className="sc-field-label">When</span>
+          <div className="flex flex-wrap items-center gap-2" data-testid="sc-editor-when">
+            <Select value={frequency} onValueChange={(v) => setFrequency(v as Frequency)}>
+              <SelectTrigger className="pd-btn--sm" data-testid="sc-editor-frequency">
+                {FREQUENCY_LABEL[frequency]}
               </SelectTrigger>
               <SelectContent>
-                {DAYS.map((d, i) => (
-                  <SelectItem key={d} value={String(i)}>
-                    {d}
+                {FREQUENCIES.map((f) => (
+                  <SelectItem key={f} value={f}>
+                    {FREQUENCY_LABEL[f]}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-          ) : null}
-          {frequency !== 'manual' && frequency !== 'hourly' ? (
-            <Select value={String(hour)} onValueChange={(v) => setHour(Number(v))}>
-              <SelectTrigger className="pd-btn--sm" data-testid="sc-editor-hour">
-                {formatTime(hour, 0).replace(':00', '')}
-              </SelectTrigger>
-              <SelectContent>
-                {HOURS.map((h) => (
-                  <SelectItem key={`h${h}`} value={String(h)}>
-                    {formatTime(h, 0).replace(':00', '')}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          ) : null}
-          {frequency !== 'manual' ? (
-            <Select value={String(minute)} onValueChange={(v) => setMinute(Number(v))}>
-              <SelectTrigger className="pd-btn--sm" data-testid="sc-editor-minute">
-                {frequency === 'hourly' ? 'at ' : ''}:{String(minute).padStart(2, '0')}
-              </SelectTrigger>
-              <SelectContent>
-                {minuteOptions.map((m) => (
-                  <SelectItem key={`m${m}`} value={String(m)}>
-                    {frequency === 'hourly' ? 'at ' : ''}:{String(m).padStart(2, '0')}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          ) : null}
+            {frequency === 'weekly' ? (
+              <Select value={String(weekday)} onValueChange={(v) => setWeekday(Number(v))}>
+                <SelectTrigger className="pd-btn--sm" data-testid="sc-editor-weekday">
+                  {DAYS[weekday]}
+                </SelectTrigger>
+                <SelectContent>
+                  {DAYS.map((d, i) => (
+                    <SelectItem key={d} value={String(i)}>
+                      {d}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : null}
+            {frequency !== 'manual' && frequency !== 'hourly' ? (
+              <Select value={String(hour)} onValueChange={(v) => setHour(Number(v))}>
+                <SelectTrigger className="pd-btn--sm" data-testid="sc-editor-hour">
+                  {formatTime(hour, 0).replace(':00', '')}
+                </SelectTrigger>
+                <SelectContent>
+                  {HOURS.map((h) => (
+                    <SelectItem key={`h${h}`} value={String(h)}>
+                      {formatTime(h, 0).replace(':00', '')}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : null}
+            {frequency !== 'manual' ? (
+              <Select value={String(minute)} onValueChange={(v) => setMinute(Number(v))}>
+                <SelectTrigger className="pd-btn--sm" data-testid="sc-editor-minute">
+                  {frequency === 'hourly' ? 'at ' : ''}:{String(minute).padStart(2, '0')}
+                </SelectTrigger>
+                <SelectContent>
+                  {minuteOptions.map((m) => (
+                    <SelectItem key={`m${m}`} value={String(m)}>
+                      {frequency === 'hourly' ? 'at ' : ''}:{String(m).padStart(2, '0')}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : null}
+          </div>
         </div>
-      </div>
 
-      <div className="flex flex-wrap items-end gap-3">
         <div className="flex flex-col gap-1">
           <span className="sc-field-label">Where it works</span>
           <Select
@@ -266,16 +280,6 @@ export function TaskEditor({
             </SelectContent>
           </Select>
         </div>
-        <span className="flex h-[26px] items-center gap-2 text-footnote text-text-secondary">
-          <Switch
-            size="sm"
-            checked={enabled}
-            onCheckedChange={setEnabled}
-            aria-label="Active"
-            data-testid="sc-editor-enabled"
-          />
-          {enabled ? 'Active' : 'Paused'}
-        </span>
       </div>
 
       {/* The consequence, in words, before the button. */}
@@ -296,6 +300,11 @@ export function TaskEditor({
           </span>
         ) : frequency === 'manual' ? (
           <span>· nothing fires on its own</span>
+        ) : null}
+        {modelNote !== null && enabled ? (
+          <span>· {modelNote}</span>
+        ) : loadedModel !== null && enabled ? (
+          <span>· runs on {loadedModel}</span>
         ) : null}
         <span>· reads your Mac, never sends</span>
       </div>

@@ -14,8 +14,15 @@ import './candidates.css';
 import { Ledger } from './Ledger';
 import { Reach } from './Reach';
 import { Shelf } from './Shelf';
+import { ShelfPlus } from './ShelfPlus';
 
 const ENTRIES: readonly CandidateEntry[] = [
+  {
+    id: 'shelf-plus',
+    name: 'Shelf+',
+    note: 'The merged candidate: Shelf’s one catalog on the model hub’s list-plus-pane idiom, the pane resting as the ledger of what is on, every section capped, tools read as sentences and split by what they change.',
+    render: () => <ShelfPlus />,
+  },
   {
     id: 'shelf',
     name: 'Shelf',

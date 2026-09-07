@@ -1,0 +1,328 @@
+{
+  "name": "chat-task",
+  "_comment": "A scripted pi turn for shots.mjs MODE=chat: the model answers a sentence with a time in it by calling create_scheduled_task (packages/harness/src/scheduled/schedule-tool.ts — the arguments and the result text are that tool's own shapes), then confirms in words. The reference's best moment (12.00.58 AM) is this exchange; this fixture lets the REAL chat render Bobble's version of it, whatever that turns out to be.",
+  "state": {
+    "sessionFile": "/tmp/mock-pi/sessions/chat-task.jsonl",
+    "sessionId": "mock-session-chat-task"
+  },
+  "prompts": [
+    {
+      "response": { "success": true },
+      "steps": [
+        { "emit": { "type": "agent_start" } },
+        { "emit": { "type": "turn_start" } },
+        {
+          "emit": {
+            "type": "message_start",
+            "message": { "role": "assistant", "content": [] }
+          }
+        },
+        {
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                { "type": "text", "text": "I'll set that up as a task that runs on its own." }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "I'll set that up as a task that runs on its own.",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  { "type": "text", "text": "I'll set that up as a task that runs on its own." }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 5,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                { "type": "text", "text": "I'll set that up as a task that runs on its own." },
+                {
+                  "type": "toolCall",
+                  "id": "call_sched_1",
+                  "name": "create_scheduled_task",
+                  "arguments": {}
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "toolcall_start",
+              "contentIndex": 1,
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  { "type": "text", "text": "I'll set that up as a task that runs on its own." },
+                  {
+                    "type": "toolCall",
+                    "id": "call_sched_1",
+                    "name": "create_scheduled_task",
+                    "arguments": {}
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 5,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                { "type": "text", "text": "I'll set that up as a task that runs on its own." },
+                {
+                  "type": "toolCall",
+                  "id": "call_sched_1",
+                  "name": "create_scheduled_task",
+                  "arguments": {
+                    "name": "Weekly write-up",
+                    "prompt": "Write up what I worked on this week: what changed in my working folder, what I was working on across my chats, and what is still open. Keep it short and specific. Save it as weekly-write-up.md.",
+                    "frequency": "weekly",
+                    "weekday": 5,
+                    "hour": 16,
+                    "minute": 0
+                  }
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "toolcall_end",
+              "contentIndex": 1,
+              "toolCall": {
+                "type": "toolCall",
+                "id": "call_sched_1",
+                "name": "create_scheduled_task",
+                "arguments": {
+                  "name": "Weekly write-up",
+                  "prompt": "Write up what I worked on this week: what changed in my working folder, what I was working on across my chats, and what is still open. Keep it short and specific. Save it as weekly-write-up.md.",
+                  "frequency": "weekly",
+                  "weekday": 5,
+                  "hour": 16,
+                  "minute": 0
+                }
+              },
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  { "type": "text", "text": "I'll set that up as a task that runs on its own." },
+                  {
+                    "type": "toolCall",
+                    "id": "call_sched_1",
+                    "name": "create_scheduled_task",
+                    "arguments": {
+                      "name": "Weekly write-up",
+                      "prompt": "Write up what I worked on this week: what changed in my working folder, what I was working on across my chats, and what is still open. Keep it short and specific. Save it as weekly-write-up.md.",
+                      "frequency": "weekly",
+                      "weekday": 5,
+                      "hour": 16,
+                      "minute": 0
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "emit": {
+            "type": "message_end",
+            "message": {
+              "role": "assistant",
+              "content": [
+                { "type": "text", "text": "I'll set that up as a task that runs on its own." },
+                {
+                  "type": "toolCall",
+                  "id": "call_sched_1",
+                  "name": "create_scheduled_task",
+                  "arguments": {
+                    "name": "Weekly write-up",
+                    "prompt": "Write up what I worked on this week: what changed in my working folder, what I was working on across my chats, and what is still open. Keep it short and specific. Save it as weekly-write-up.md.",
+                    "frequency": "weekly",
+                    "weekday": 5,
+                    "hour": 16,
+                    "minute": 0
+                  }
+                }
+              ],
+              "api": "openai-completions",
+              "provider": "llamacpp",
+              "model": "gemma-4-12b",
+              "usage": {
+                "input": 120,
+                "output": 84,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 204,
+                "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0, "total": 0 }
+              },
+              "stopReason": "toolUse",
+              "timestamp": 1770000001000
+            }
+          }
+        },
+        {
+          "emit": {
+            "type": "tool_execution_start",
+            "toolCallId": "call_sched_1",
+            "toolName": "create_scheduled_task",
+            "args": {
+              "name": "Weekly write-up",
+              "prompt": "Write up what I worked on this week: what changed in my working folder, what I was working on across my chats, and what is still open. Keep it short and specific. Save it as weekly-write-up.md.",
+              "frequency": "weekly",
+              "weekday": 5,
+              "hour": 16,
+              "minute": 0
+            }
+          }
+        },
+        {
+          "delayMs": 40,
+          "emit": {
+            "type": "tool_execution_end",
+            "toolCallId": "call_sched_1",
+            "toolName": "create_scheduled_task",
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Scheduled \"Weekly write-up\" — runs every week (day 5) at 16:00. It is in Scheduled tasks, where it can be edited, paused or deleted."
+                }
+              ],
+              "details": { "ok": true, "id": "task_mfz1abcd_k3x9q2", "frequency": "weekly" }
+            },
+            "isError": false
+          }
+        },
+        {
+          "emit": {
+            "type": "turn_end",
+            "message": {
+              "role": "assistant",
+              "content": [
+                { "type": "text", "text": "I'll set that up as a task that runs on its own." },
+                {
+                  "type": "toolCall",
+                  "id": "call_sched_1",
+                  "name": "create_scheduled_task",
+                  "arguments": {
+                    "name": "Weekly write-up",
+                    "prompt": "Write up what I worked on this week: what changed in my working folder, what I was working on across my chats, and what is still open. Keep it short and specific. Save it as weekly-write-up.md.",
+                    "frequency": "weekly",
+                    "weekday": 5,
+                    "hour": 16,
+                    "minute": 0
+                  }
+                }
+              ],
+              "api": "openai-completions",
+              "provider": "llamacpp",
+              "model": "gemma-4-12b",
+              "usage": {
+                "input": 120,
+                "output": 84,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 204,
+                "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0, "total": 0 }
+              },
+              "stopReason": "toolUse",
+              "timestamp": 1770000001000
+            },
+            "toolResults": [
+              {
+                "role": "toolResult",
+                "toolCallId": "call_sched_1",
+                "toolName": "create_scheduled_task",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Scheduled \"Weekly write-up\" — runs every week (day 5) at 16:00. It is in Scheduled tasks, where it can be edited, paused or deleted."
+                  }
+                ],
+                "details": { "ok": true, "id": "task_mfz1abcd_k3x9q2", "frequency": "weekly" },
+                "isError": false,
+                "timestamp": 1770000001200
+              }
+            ]
+          }
+        },
+        { "emit": { "type": "turn_start" } },
+        {
+          "emit": {
+            "type": "message_start",
+            "message": { "role": "assistant", "content": [] }
+          }
+        },
+        {
+          "delayMs": 30,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Done — “Weekly write-up” runs every Friday at 4:00 PM, in a fresh chat of its own, so the prompt stands on its own. It is in Scheduled, where you can edit, pause or delete it."
+                }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "Done — “Weekly write-up” runs every Friday at 4:00 PM, in a fresh chat of its own, so the prompt stands on its own. It is in Scheduled, where you can edit, pause or delete it.",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Done — “Weekly write-up” runs every Friday at 4:00 PM, in a fresh chat of its own, so the prompt stands on its own. It is in Scheduled, where you can edit, pause or delete it."
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "emit": {
+            "type": "turn_end",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Done — “Weekly write-up” runs every Friday at 4:00 PM, in a fresh chat of its own, so the prompt stands on its own. It is in Scheduled, where you can edit, pause or delete it."
+                }
+              ],
+              "api": "openai-completions",
+              "provider": "llamacpp",
+              "model": "gemma-4-12b",
+              "usage": {
+                "input": 260,
+                "output": 48,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 308,
+                "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0, "total": 0 }
+              },
+              "stopReason": "stop",
+              "timestamp": 1770000003000
+            },
+            "toolResults": []
+          }
+        },
+        { "emit": { "type": "agent_end", "messages": [] } }
+      ]
+    }
+  ]
+}

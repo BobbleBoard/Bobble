@@ -10,9 +10,19 @@
  */
 import type { TaskRun } from '../../../electron/scheduled/scheduled-contract';
 import { useTasksStore } from '../../scheduled/tasks-store';
+import { useLlmStore } from '../../state/llm-store';
+
+/**
+ * The states a candidate can be put in — a list, or a function of the moment,
+ * because some states cannot exist on some data: an empty list has nothing
+ * running and nothing late, and a shot named for a state the screen is not in
+ * is worse than no shot (round three had two of those, byte-identical to the
+ * default).
+ */
+type StateList = readonly string[] | (() => readonly string[]);
 
 interface CandidateStates {
-  readonly states: readonly string[];
+  readonly states: StateList;
   readonly set: (state: string) => void;
 }
 
@@ -21,6 +31,13 @@ interface ScheduleCandidatesHook {
   reload: () => Promise<void>;
   states: (candidateId: string) => readonly string[];
   setState: (candidateId: string, state: string) => void;
+  /**
+   * Put a model in the llm store as if `llm:status` had said it was ready —
+   * through the store's own `applyStatus`, the seam main's event uses. The
+   * probe loads no model (there is none in a throwaway home), and without
+   * this every shot of "Runs on" said "none is loaded yet". `null` unloads.
+   */
+  setLoadedModel: (displayName: string | null) => void;
 }
 
 declare global {
@@ -40,13 +57,18 @@ export function runsWereSeeded(): boolean {
 /** A candidate announces the states it can be photographed in. Returns the unregister. */
 export function registerCandidateStates(
   candidateId: string,
-  states: readonly string[],
+  states: StateList,
   set: (state: string) => void,
 ): () => void {
   registry.set(candidateId, { states, set });
   return () => {
     registry.delete(candidateId);
   };
+}
+
+function statesOf(entry: CandidateStates | undefined): readonly string[] {
+  if (entry === undefined) return ['default'];
+  return typeof entry.states === 'function' ? entry.states() : entry.states;
 }
 
 export function installCandidateHook(): void {
@@ -57,7 +79,25 @@ export function installCandidateHook(): void {
       useTasksStore.setState({ runs });
     },
     reload: () => useTasksStore.getState().load(),
-    states: (id) => registry.get(id)?.states ?? ['default'],
+    states: (id) => statesOf(registry.get(id)),
     setState: (id, state) => registry.get(id)?.set(state),
+    setLoadedModel(displayName) {
+      const { status, applyStatus } = useLlmStore.getState();
+      if (displayName === null) {
+        applyStatus({ ...status, phase: 'idle', serverRunning: false, model: null });
+        return;
+      }
+      applyStatus({
+        ...status,
+        phase: 'ready',
+        serverRunning: true,
+        model: {
+          id: displayName.toLowerCase().replace(/\s+/g, '-'),
+          displayName,
+          quant: 'Q4_K_M',
+          contextWindow: 65_536,
+        },
+      });
+    },
   };
 }

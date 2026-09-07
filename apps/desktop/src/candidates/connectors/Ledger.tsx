@@ -10,17 +10,22 @@
  * ledger, both rows in the directory. Adding something moves it left.
  */
 import { Button, IconChevronLeft, IconPlus, IconSearch, ScrollArea } from '@pi-desktop/ui';
-import { type JSX, useMemo, useState } from 'react';
+import { type JSX, type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { AddServerDialog } from '../../connectors/AddServerDialog';
 import { cx } from '../../onboarding/cx';
 import {
   type Actions,
   type Catalog,
+  failing,
+  failureLine,
   type Item,
   matches,
+  needsAttention,
+  reachLine,
   shortReason,
   useActions,
   useCatalog,
+  useWarmTools,
 } from './data';
 import {
   AboutSection,
@@ -35,7 +40,14 @@ import {
   SkillBody,
   ToolsSection,
 } from './detail-parts';
-import { ItemMark, KIND_LABEL, OfficialMark, StateControl, StateDot } from './marks';
+import { ItemMark, StateControl, StateDot } from './marks';
+
+/** What a rail row says under the name: everything in the rail is installed, so the reach line. */
+function railLine(item: Item): string {
+  if (item.kind === 'connector') return reachLine(item.connector, item.server);
+  if (item.kind === 'custom') return `Runs ${item.server.command} · added by you`;
+  return item.description;
+}
 
 function LedgerGroup({
   title,
@@ -77,11 +89,16 @@ function LedgerGroup({
               <ItemMark item={item} size={compact ? 24 : 30} />
               <span className="flex min-w-0 flex-1 flex-col">
                 <span className="truncate text-footnote text-text-primary">{item.name}</span>
+                {/* Not "Tool · Files": a column of near-constant values. What it
+                    touches is the one line worth a second line here. */}
                 {!compact ? (
-                  <span className="truncate text-caption text-text-muted">
-                    {KIND_LABEL[item.kind]}
-                    {item.kind === 'connector' ? ` · ${categoryOf(item)}` : ''}
-                  </span>
+                  failureLine(item) !== null ? (
+                    <span className="truncate text-caption text-status-warning-fg">
+                      {failureLine(item)}
+                    </span>
+                  ) : (
+                    <span className="truncate text-caption text-text-muted">{railLine(item)}</span>
+                  )
                 ) : null}
               </span>
             </button>
@@ -99,6 +116,46 @@ function LedgerGroup({
         ))}
       </div>
     </div>
+  );
+}
+
+/**
+ * The category chips: one row that scrolls sideways, never four rows of pills
+ * (sixteen categories wrapped into a wall at 900px and buried the list). The
+ * scrollbar is hidden, so the fade is the only cue that there is more; the
+ * `.cand-cats` recipe in candidates.css widens it to 56px and drives it from
+ * the scroll position, so it lifts at the end of the row — a static 56px (the
+ * first fix) hid the last chip forever. A row that does not overflow gets no
+ * fade at all; a mask cannot know that, so it is measured here.
+ */
+function CategoryRow({ children }: { children: ReactNode }): JSX.Element {
+  const rowRef = useRef<HTMLDivElement>(null);
+  const trackRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const row = rowRef.current;
+    const track = trackRef.current;
+    if (row === null || track === null) return;
+    const measure = () => {
+      row.dataset.overflow = row.scrollWidth > row.clientWidth + 1 ? 'true' : 'false';
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(row);
+    observer.observe(track);
+    return () => observer.disconnect();
+  }, []);
+  return (
+    <ScrollArea
+      ref={rowRef}
+      axis="x"
+      hideScrollbar
+      className="cand-cats mt-2.5"
+      data-testid="cand-categories"
+    >
+      <div ref={trackRef} className="flex w-max items-center gap-1 pr-6">
+        {children}
+      </div>
+    </ScrollArea>
   );
 }
 
@@ -125,13 +182,17 @@ function DirectoryRow({
         <ItemMark item={item} size={36} />
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="flex min-w-0 items-center gap-1.5">
-            <span className="truncate text-body text-text-primary">{item.name}</span>
-            {item.kind === 'connector' &&
-            item.connector.official &&
-            item.connector.firstParty !== true ? (
-              <OfficialMark />
-            ) : null}
-            <span className="text-caption text-text-muted">· {categoryOf(item)}</span>
+            {/* The NAME never yields: at 640 it read "C." beside a full
+                "· Developer tools". The category and the reason truncate. */}
+            <span className="max-w-full shrink-0 truncate text-body text-text-primary">
+              {item.name}
+            </span>
+            {/* Under ~520px of directory the category goes (cand-dir-cat):
+                "Chrome DevTools · … · Ch…" at 640 was three fragments, and
+                the reason is the one worth the room. */}
+            <span className="cand-dir-cat min-w-0 truncate text-caption text-text-muted">
+              · {categoryOf(item)}
+            </span>
             {item.kind === 'connector' && item.reason !== undefined ? (
               <span className="min-w-0 truncate text-caption text-status-success-fg">
                 · {shortReason(item.reason)}
@@ -250,8 +311,8 @@ function ledgerGroups(cat: Catalog): {
   skills: Item[];
   builtins: Item[];
 } {
-  const running = cat.items.filter((i) => i.kind !== 'skill' && i.state === 'on');
-  const setup = cat.items.filter((i) => i.state === 'needs-setup');
+  const running = cat.items.filter((i) => i.kind !== 'skill' && i.state === 'on' && !failing(i));
+  const setup = cat.items.filter(needsAttention);
   const off = cat.items.filter((i) => i.kind !== 'skill' && i.state === 'off');
   const skills = cat.items.filter((i) => i.kind === 'skill' && i.state === 'on');
   const builtins = cat.items.filter((i) => i.state === 'builtin');
@@ -261,6 +322,7 @@ function ledgerGroups(cat: Catalog): {
 export function Ledger(): JSX.Element {
   const cat = useCatalog();
   const actions = useActions();
+  useWarmTools(cat, actions);
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState<CategoryFilter>('all');
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -315,8 +377,11 @@ export function Ledger(): JSX.Element {
   return (
     <div className="flex h-full bg-bg-base" data-testid="cand-ledger">
       <aside
-        className="flex w-[300px] shrink-0 flex-col"
+        className="flex shrink-0 flex-col"
         style={{
+          // The rail gives way before the directory does: 300 of 640 was half
+          // the window for the shorter list.
+          width: 'clamp(228px, 30%, 300px)',
           background: 'var(--pd-bg-sidebar)',
           boxShadow: 'inset -1px 0 0 0 var(--pd-border-subtle)',
         }}
@@ -387,7 +452,7 @@ export function Ledger(): JSX.Element {
           onBack={() => setSelectedId(null)}
         />
       ) : (
-        <main className="flex min-w-0 flex-1 flex-col" data-testid="cand-directory">
+        <main className="cand-dir flex min-w-0 flex-1 flex-col" data-testid="cand-directory">
           <div className="px-6 pt-5">
             <div className="flex items-center justify-between gap-4">
               <div>
@@ -419,46 +484,68 @@ export function Ledger(): JSX.Element {
                 />
               </div>
             </div>
-            {/* One row that scrolls sideways, never four rows of pills: sixteen
-                categories wrapped into a wall at 900px and buried the list. */}
-            <ScrollArea axis="x" hideScrollbar className="mt-2.5" data-testid="cand-categories">
-              <div className="flex w-max items-center gap-1 pr-6">
+            <CategoryRow>
+              <button
+                type="button"
+                className="cand-pill pd-focusable"
+                aria-pressed={category === 'all'}
+                onClick={() => setCategory('all')}
+              >
+                All
+              </button>
+              <button
+                type="button"
+                className="cand-pill pd-focusable"
+                aria-pressed={category === 'skills'}
+                onClick={() => setCategory('skills')}
+              >
+                Skills
+              </button>
+              {categories.map((c) => (
                 <button
+                  key={c}
                   type="button"
                   className="cand-pill pd-focusable"
-                  aria-pressed={category === 'all'}
-                  onClick={() => setCategory('all')}
+                  aria-pressed={category === c}
+                  onClick={() => setCategory(c)}
                 >
-                  All
+                  {CATEGORY_LABEL[c as keyof typeof CATEGORY_LABEL] ?? c}
                 </button>
-                <button
-                  type="button"
-                  className="cand-pill pd-focusable"
-                  aria-pressed={category === 'skills'}
-                  onClick={() => setCategory('skills')}
-                >
-                  Skills
-                </button>
-                {categories.map((c) => (
-                  <button
-                    key={c}
-                    type="button"
-                    className="cand-pill pd-focusable"
-                    aria-pressed={category === c}
-                    onClick={() => setCategory(c)}
-                  >
-                    {CATEGORY_LABEL[c as keyof typeof CATEGORY_LABEL] ?? c}
-                  </button>
-                ))}
-              </div>
-            </ScrollArea>
+              ))}
+            </CategoryRow>
           </div>
           <ScrollArea className="min-h-0 flex-1">
             <div className="flex flex-col gap-6 px-6 pt-4 pb-8">
               {cat.loaded && visible.length === 0 ? (
-                <p className="text-footnote text-text-muted" data-testid="cand-empty">
-                  Nothing matches.
-                </p>
+                <div className="flex flex-col items-start gap-2 py-4" data-testid="cand-empty">
+                  <p className="text-body text-text-primary">
+                    Nothing matches
+                    {query.trim() !== '' ? ` “${query.trim()}”` : ''}
+                    {category !== 'all'
+                      ? ` in ${
+                          category === 'skills'
+                            ? 'Skills'
+                            : (CATEGORY_LABEL[category as keyof typeof CATEGORY_LABEL] ?? category)
+                        }`
+                      : ''}
+                    .
+                  </p>
+                  <p className="text-footnote text-text-muted">
+                    Try another word, or a server the catalog does not know yet with Add MCP server.
+                  </p>
+                  {/* Shelf+'s empty state is the template: say what to clear, and clear it. */}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setQuery('');
+                      setCategory('all');
+                    }}
+                    data-testid="cand-clear"
+                  >
+                    Clear search and category
+                  </Button>
+                </div>
               ) : null}
               <DirectoryGroup
                 title="Recommended for you"
