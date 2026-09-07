@@ -202,21 +202,35 @@ try {
       } catch {
         tools = ['<unparseable>'];
       }
-      // A cheap stable hash, enough to say "the same text" or "not".
-      let h = 0;
-      for (let i = 0; i < sys.length; i++) h = (h * 31 + sys.charCodeAt(i)) | 0;
-      return { sysLen: sys.length, sysHash: h, tools };
+      // The text itself, so a change can be LOCATED rather than merely noticed —
+      // where the two prompts part company is the whole difference between "the
+      // tail moved" and "everything after token 40 is re-read".
+      return { sys, sysLen: sys.length, tools };
     });
 
   let lastShape = null;
   const reportShapeChange = (name, shape) => {
     if (lastShape !== null) {
-      const sysChanged = shape.sysHash !== lastShape.sysHash || shape.sysLen !== lastShape.sysLen;
+      const sysChanged = shape.sys !== lastShape.sys;
       const added = shape.tools.filter((t) => !lastShape.tools.includes(t));
       const removed = lastShape.tools.filter((t) => !shape.tools.includes(t));
       const reordered =
         added.length === 0 && removed.length === 0 && shape.tools.join() !== lastShape.tools.join();
       if (sysChanged || added.length > 0 || removed.length > 0 || reordered) {
+        if (sysChanged) {
+          let i = 0;
+          while (
+            i < Math.min(lastShape.sys.length, shape.sys.length) &&
+            lastShape.sys[i] === shape.sys[i]
+          )
+            i++;
+          console.log(
+            `      system prompt diverges at char ${i} of ${lastShape.sysLen} ` +
+              `(${Math.round((i / Math.max(1, lastShape.sysLen)) * 100)}% in)`,
+          );
+          console.log(`        was: ${JSON.stringify(lastShape.sys.slice(i, i + 140))}`);
+          console.log(`        now: ${JSON.stringify(shape.sys.slice(i, i + 140))}`);
+        }
         console.log(
           `      PREFIX CHANGED before ${name}:` +
             (sysChanged ? ` system prompt (${lastShape.sysLen}→${shape.sysLen} chars)` : '') +

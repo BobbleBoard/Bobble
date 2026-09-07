@@ -928,6 +928,8 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
   const WARM_CLAIM_GRACE_MS = 20_000;
   // Last-published predictive-prefill context (deduped so a per-turn applyPreset
   // that changed nothing doesn't re-push the ~7k-char system + tool schemas).
+  /** The system prompt seen on the PREVIOUS tick, for the settle rule above. */
+  let pendingCanonicalPrompt: string | null = null;
   let publishedPrefillSystem: string | null = null;
   let publishedPrefillTools: string | null = null;
   /** In-flight post-turn background work (naming, reviewer). Aborted the moment
@@ -1039,15 +1041,52 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
       note('ctx.getSystemPrompt missing');
       return;
     }
-    const canonical = canonicalPrompt(ctx.getSystemPrompt());
-    if (canonical.trim().length === 0) {
+    const fresh = canonicalPrompt(ctx.getSystemPrompt());
+    if (fresh.trim().length === 0) {
       note('empty system prompt');
       return;
     }
     // NOTE: the debounce key is completed BELOW, once the tool set is known — the
     // prefix is [system][tools], so warming is only redundant when BOTH match.
 
-    runtime.canonicalSystemPrompt = canonical;
+    /*
+     * FREEZE MEANS FREEZE — and this line was quietly thawing it every second.
+     *
+     * The turn-time site says why the prompt is frozen: "pi regenerates its
+     * tool-usage guidance non-deterministically per turn (reorders / adds /
+     * drops lines), which shifts the ~7k-char prompt and forces a FULL KV
+     * re-prefill on EVERY message." It then reads
+     * `runtime.canonicalSystemPrompt ?? build()` — a freeze that only works if
+     * nothing else writes that field. This did, on the 1s status tick, with a
+     * freshly built prompt.
+     *
+     * MEASURED with the real model: a conversation's system prompt went
+     * 17,646 → 17,356 characters between two turns, and the second turn came
+     * back `reused 41 of 9,883` — a complete re-read of a prompt that had been
+     * resident. That is a full re-prefill on an ordinary follow-up, from a
+     * change nobody asked for.
+     *
+     * TWO TICKS BEFORE ADOPTING, because pi builds its guidance lazily and the
+     * first tick can catch a half-built prompt — the same reason the tool set
+     * below waits for a tick to settle. Afterwards the frozen value is what gets
+     * warmed, published and sent, so all three agree by construction. A new
+     * session clears it (session_start), which is where a genuinely different
+     * prompt — a new day, another working folder — legitimately arrives.
+     */
+    if (runtime.canonicalSystemPrompt === null) {
+      if (pendingCanonicalPrompt !== fresh) {
+        pendingCanonicalPrompt = fresh;
+        note('waiting a tick for the system prompt to settle');
+        return;
+      }
+      runtime.canonicalSystemPrompt = fresh;
+    } else if (fresh !== runtime.canonicalSystemPrompt) {
+      note(
+        `pi rebuilt its system prompt (${runtime.canonicalSystemPrompt.length}→${fresh.length} chars); ` +
+          'keeping the frozen one so the KV prefix survives',
+      );
+    }
+    const canonical = runtime.canonicalSystemPrompt;
     /* 'other', NOT 'coding' — see the turn-time site below. The warm set has to
        be the turn's set exactly, so these two move together or the prefix they
        share is worth nothing. */
@@ -2478,6 +2517,14 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
      */
     publishedPrefillSystem = null;
     publishedPrefillTools = null;
+    /*
+     * ...and a new session builds its system prompt again. It is frozen for the
+     * life of a session (see maybeWarmPrefix) precisely so it cannot churn under
+     * the KV; a session boundary is where a legitimately different one — a new
+     * day's date, another working folder — is allowed in.
+     */
+    runtime.canonicalSystemPrompt = null;
+    pendingCanonicalPrompt = null;
     runtime.config = restoreConfig(getEntries(ctx));
     runtime.permission.setMode(runtime.config.mode);
     // A new / switched session must NOT inherit the previous session's live
