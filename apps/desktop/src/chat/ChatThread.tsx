@@ -46,8 +46,10 @@ import { AssistantGroup } from './AssistantGroup';
 import { AttachedFileCard } from './AttachedFileCard';
 import { type AttachedFile, splitAttachedFiles } from './attached-files';
 import { buildAgentMessage } from './composer/agent-message';
+import { useDropStore } from './composer/drop-store';
 import { corpChatView } from './corp/corp-thread-view';
 import { HarnessChecklistPanel, ThreadStatusIndicator } from './HarnessStatus';
+import { HistoryPole } from './HistoryPole';
 import { BlindImageNote, UserImage } from './UserImage';
 
 /**
@@ -250,6 +252,21 @@ export function ChatThread() {
     const kept = read.filter((f): f is AttachedFile => f !== null);
     if (kept.length > 0) setEditFiles((prev) => [...prev, ...kept]);
   };
+
+  /*
+   * A DROP LANDS IN THE MESSAGE YOU ARE EDITING. the user: "drag and drop needs to
+   * be able to go into messages being edited."
+   *
+   * The window-level overlay accepts a drop anywhere and hands the files to
+   * whoever is composing. That was always the composer; while an edit is open,
+   * the thing you are composing is this turn. The claim is released when the
+   * edit closes, so the composer gets its drops back with nothing to remember.
+   */
+  // biome-ignore lint/correctness/useExhaustiveDependencies: addEditFiles only calls setState; re-claiming on every render would churn the store
+  useEffect(() => {
+    if (editingId === null) return;
+    return useDropStore.getState().claimDrops((files) => void addEditFiles(files));
+  }, [editingId]);
 
   /* One card, wherever it is drawn — anchored to its turn or at the foot. */
   const renderPresented = (records: readonly PresentedRecord[]): ReactNode => (
@@ -458,6 +475,10 @@ export function ChatThread() {
           e.target.value = '';
         }}
       />
+      {/* The jump-to line down the right edge of a LONG thread. It draws
+          nothing at all until the conversation is long enough to get lost in —
+          see history-pole.ts for what "long enough" means and why. */}
+      <HistoryPole scrollRef={scrollRef} revision={messages.length} />
       <ScrollArea
         ref={scrollRef}
         onScroll={onScroll}
@@ -521,7 +542,11 @@ export function ChatThread() {
                 // Inline edit mode: the bubble becomes an editable textarea (#A9).
                 if (editingId === message.id) {
                   return (
-                    <div key={message.id} className="flex flex-col gap-1">
+                    <div
+                      key={message.id}
+                      className="flex flex-col gap-1"
+                      data-user-turn={message.id}
+                    >
                       <EditableMessage
                         data-testid="editing-message"
                         // The TYPED text, without the folded attachments — those
@@ -570,7 +595,10 @@ export function ChatThread() {
                 // the same cards (see UserMsg.agentText).
                 const attached = splitAttachedFiles(message.agentText ?? message.text);
                 return (
-                  <div key={message.id} className="flex flex-col gap-1">
+                  /* `data-user-turn` marks the thread's landmarks for the
+                     history pole — the one place that knows where each question
+                     is on the page. See history-pole.ts. */
+                  <div key={message.id} className="flex flex-col gap-1" data-user-turn={message.id}>
                     <MessageRow
                       kind="user"
                       actions={

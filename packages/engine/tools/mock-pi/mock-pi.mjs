@@ -27,6 +27,8 @@ if (!fixturePath) {
 const fixture = JSON.parse(readFileSync(fixturePath, 'utf8'));
 
 const logPath = process.env.MOCK_PI_LOG;
+/** Artificial latency for the session RPCs — see `new_session` below. */
+const SLOW_MS = Number.parseInt(process.env.MOCK_PI_SLOW_MS ?? '0', 10) || 0;
 function log(record) {
   if (logPath) {
     try {
@@ -161,7 +163,7 @@ function respond(cmd, extra) {
   writeLine(base);
 }
 
-function handleCommand(cmd) {
+async function handleCommand(cmd) {
   log({ kind: 'command', command: cmd });
 
   if (cmd.type === 'extension_ui_response') {
@@ -256,11 +258,23 @@ function handleCommand(cmd) {
       // Switching to a known branch file re-activates it (branch switching).
       const i = branches.findIndex((b) => b.file === cmd.sessionPath);
       if (i !== -1) activeBranch = i;
+      if (SLOW_MS > 0) await sleep(SLOW_MS);
       respond(cmd, { data: { cancelled: false } });
       return;
     }
     case 'new_session':
     case 'clone':
+      /*
+       * MOCK_PI_SLOW_MS makes the session RPCs take real time.
+       *
+       * The real pi child takes hundreds of milliseconds to a couple of seconds
+       * to create or switch a session; the mock answers instantly, which means
+       * "the UI awaited this before painting" — the exact bug behind the user's
+       * "clicking new chat still takes a few seconds" — is invisible to every
+       * probe. A knob rather than a fixed delay so only the probes that are
+       * about latency pay for it.
+       */
+      if (SLOW_MS > 0) await sleep(SLOW_MS);
       respond(cmd, { data: { cancelled: false } });
       return;
     case 'fork': {
@@ -354,7 +368,7 @@ process.stdin.on('data', (chunk) => {
       });
       continue;
     }
-    handleCommand(cmd);
+    void handleCommand(cmd);
   }
 });
 

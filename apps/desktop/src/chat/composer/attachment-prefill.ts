@@ -33,6 +33,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLlmStore } from '../../state/llm-store';
 import { usePiStore } from '../../state/pi-slice';
+import { recordPrefillRate } from '../prefill-speed';
 
 /** Below this many chars an attachment isn't worth priming — its send already
  * prefills near-instantly against the warm [system][tools]. */
@@ -83,6 +84,9 @@ export function useAttachmentPrefill(attachmentPrefix: string): {
   const system = usePiStore((s) => s.extensionStatus['harness-prefill-system']);
   const toolsJson = usePiStore((s) => s.extensionStatus['harness-prefill-tools']);
   const serverRunning = useLlmStore((s) => s.status.serverRunning);
+  /** The rate is a property of the MODEL as much as the machine, so it is
+   * recorded per model — see prefill-speed.ts. */
+  const modelId = useLlmStore((s) => s.status.model?.id ?? null);
   const busy = usePiStore((s) => s.agent.isStreaming || s.promptInFlight);
   const lastSig = useRef<string | null>(null);
   const [inFlight, setInFlight] = useState(false);
@@ -205,13 +209,24 @@ export function useAttachmentPrefill(attachmentPrefix: string): {
       setInFlight(true);
       void window.piDesktop
         .invoke('pi:prefill', { messages: oaiMessages, ...(tools !== undefined ? { tools } : {}) })
+        .then((res) => {
+          /*
+           * EVERY PREFILL IS ALSO A MEASUREMENT of how fast this machine reads a
+           * prompt under this model — which is the only honest basis for telling
+           * the user that a model switch will cost them eighteen seconds. Free:
+           * the server reports it on the response we were already waiting for.
+           */
+          if (res?.processedN !== undefined && res.processedMs !== undefined) {
+            recordPrefillRate(modelId ?? '', res.processedN, res.processedMs);
+          }
+        })
         .catch(() => {
           // Non-fatal: the send path still works, it just pays the full prefill.
         })
         .finally(() => setInFlight(false));
     }, PREFILL_DEBOUNCE_MS);
     return () => window.clearTimeout(timer);
-  }, [attachmentPrefix, system, toolsJson, serverRunning, busy, messages, focusEpoch]);
+  }, [attachmentPrefix, system, toolsJson, serverRunning, busy, messages, focusEpoch, modelId]);
 
   return { abortPrefill, inFlight };
 }

@@ -385,6 +385,16 @@ function createMainWindow(): BrowserWindow {
   // Tripo 3D workspace preview (UI-only view): PI_DESKTOP_TRIPO=1 surfaces `?tripo=1`.
   if (process.env.PI_DESKTOP_TRIPO === '1') devQuery.tripo = '1';
   /*
+   * Candidate designs for a screen, off to one side of the shipping one:
+   * PI_DESKTOP_CANDIDATES=schedule → `?candidates=schedule`. Dev/probe only —
+   * nothing in the app links to it, so the real Scheduled and Connectors
+   * screens keep working while a replacement is being drawn.
+   */
+  const candidates = process.env.PI_DESKTOP_CANDIDATES;
+  if (candidates === 'schedule' || candidates === 'connectors') devQuery.candidates = candidates;
+  if (process.env.PI_DESKTOP_CANDIDATE_V !== undefined)
+    devQuery.v = process.env.PI_DESKTOP_CANDIDATE_V;
+  /*
    * CLAMP TO THE SCREEN — the DEFAULT size too, not just adopted bounds.
    *
    * MEASURED on the user's machine: work area 1512x868, window created at 1440x940.

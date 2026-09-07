@@ -3,10 +3,10 @@
  * the parent owns the item list, selection index, and pick handler. Anchored
  * above the composer input; sections group files/skills/plugins/commands.
  */
-import { IconFile, IconSearch, IconTerminal, Kbd } from '@pi-desktop/ui';
+import { IconConnector, IconFile, IconSearch, IconTerminal, Kbd } from '@pi-desktop/ui';
 import type { ReactNode } from 'react';
 
-export type AcItemKind = 'file' | 'command' | 'plugin' | 'skill';
+export type AcItemKind = 'file' | 'command' | 'plugin' | 'skill' | 'connector';
 
 export interface AcItem {
   /** The literal text spliced into the editor when picked (e.g. `@src/x.ts`). */
@@ -23,12 +23,32 @@ export interface AcItem {
    * produced it. The picker already knows; it carries it.
    */
   path?: string;
+  /**
+   * A connector's REAL brand mark, inline. the user: "the / should be able to show
+   * installed connectors or reference specific capabilities and show REAL ICONS
+   * to their left." Inline SVG from the in-repo catalog — the app is offline and
+   * its CSP blocks remote images, so a URL would render nothing.
+   */
+  iconSvg?: string;
 }
 
-function iconFor(kind: AcItemKind): ReactNode {
-  switch (kind) {
+function iconFor(item: AcItem): ReactNode {
+  if (item.iconSvg !== undefined && item.iconSvg.length > 0) {
+    return (
+      <span
+        className="pd-ac-brand"
+        aria-hidden
+        data-testid="ac-brand-icon"
+        // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted, self-contained brand SVG from the in-repo connector catalog (no user/network input)
+        dangerouslySetInnerHTML={{ __html: item.iconSvg }}
+      />
+    );
+  }
+  switch (item.kind) {
     case 'command':
       return <IconTerminal size={14} />;
+    case 'connector':
+      return <IconConnector size={14} />;
     case 'skill':
     case 'plugin':
       return <IconSearch size={14} />;
@@ -80,7 +100,7 @@ export function Autocomplete({
                 index === selectedIndex ? 'bg-bg-active' : ''
               }`}
             >
-              <span className="text-text-muted">{iconFor(item.kind)}</span>
+              <span className="text-text-muted">{iconFor(item)}</span>
               <div className="min-w-0 flex-1">
                 <div className="truncate text-footnote text-text-primary">{item.label}</div>
                 {item.subtitle !== undefined ? (

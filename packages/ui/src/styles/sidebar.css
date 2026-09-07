@@ -310,7 +310,11 @@
   align-items: center;
   gap: 4px;
   height: var(--pd-height-topbar);
-  padding: 0 8px;
+  /* Named because the collapsed rule below has to subtract it: the corner
+     controls are measured in WINDOW coordinates and the title is laid out
+     inside this padding, so the two only agree if the offset is stated once. */
+  --pd-topbar-pad: 8px;
+  padding: 0 var(--pd-topbar-pad);
   background: var(--pd-bg-sidebar);
   color: var(--pd-text-primary);
   font-family: var(--pd-font-sans);

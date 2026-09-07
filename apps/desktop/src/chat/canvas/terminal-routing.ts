@@ -40,7 +40,16 @@ function commandOf(block: ToolCallBlock): string | undefined {
 }
 
 /** Detect the interactive bash calls in the thread, newest-state per call id. */
-export function detectBashTerminals(messages: ChatMsg[]): BashTerminalEvent[] {
+export function detectBashTerminals(
+  messages: ChatMsg[],
+  /*
+   * Output streamed by commands that have not returned. A mirror terminal for a
+   * dev server or a `tail -f` is the one surface where waiting for the result is
+   * the same as never showing anything — those commands are chosen for this view
+   * precisely because they do not finish.
+   */
+  partials: Readonly<Record<string, string>> = {},
+): BashTerminalEvent[] {
   const resultByCall = new Map<string, string>();
   for (const m of messages) {
     if (m.kind === 'toolResult') resultByCall.set(m.toolCallId, m.text);
@@ -56,7 +65,7 @@ export function detectBashTerminals(messages: ChatMsg[]): BashTerminalEvent[] {
       events.push({
         callId: block.id,
         command,
-        output: output ?? '',
+        output: output ?? partials[block.id] ?? '',
         running: output === undefined,
       });
     }
@@ -86,10 +95,11 @@ export function useBashTerminalCanvasRouting(): void {
   const cwd = usePiStore((s) => s.session?.cwd) ?? undefined;
   const { controller } = useCanvasTabs();
   const messages = usePiStore((s) => s.messages) as ChatMsg[];
+  const partials = usePiStore((s) => s.toolOutputPartials);
   const opened = useRef<Set<string>>(new Set());
 
   useEffect(() => {
-    for (const ev of detectBashTerminals(messages)) {
+    for (const ev of detectBashTerminals(messages, partials)) {
       const key = terminalTabKey(ev.callId);
       const data: CanvasTab['data'] = { mirror: true, mirrorText: mirrorText(ev, cwd) };
       const existing = controller.getState().tabs.find((t) => t.key === key);
@@ -120,5 +130,5 @@ export function useBashTerminalCanvasRouting(): void {
         controller.updateTab(existing.id, { data });
       }
     }
-  }, [messages, controller, cwd]);
+  }, [messages, partials, controller, cwd]);
 }

@@ -22,7 +22,15 @@ import type { ReactNode } from 'react';
 
 /** Which glyph the pill wears. Kept as a NAME rather than a component so the
  * node stays serializable and the icon set is resolved at render. */
-export type PillIcon = 'file' | 'image' | 'video' | 'motion' | 'search' | 'write' | 'sparkle';
+export type PillIcon =
+  | 'file'
+  | 'image'
+  | 'video'
+  | 'motion'
+  | 'search'
+  | 'write'
+  | 'sparkle'
+  | 'connector';
 
 export interface PillData {
   /** What the pill says. Short — it is a token, not a sentence. */
@@ -30,6 +38,17 @@ export interface PillData {
   /** What the MODEL receives in its place. */
   readonly payload: string;
   readonly icon: PillIcon;
+  /**
+   * A real brand mark, for the things that HAVE one — a connector picked from
+   * `/`. the user: "the / should be able to show installed connectors … and show
+   * REAL ICONS to their left."
+   *
+   * Inline SVG rather than a URL because the app is offline and under a CSP that
+   * blocks remote images; the markup comes from the in-repo connector catalog,
+   * never from the network or from anything a user typed. When absent the
+   * {@link PillIcon} name is used, which is every other pill.
+   */
+  readonly iconSvg?: string;
 }
 
 export type SerializedPillNode = SerializedLexicalNode & PillData;
@@ -105,6 +124,7 @@ export class PillNode extends DecoratorNode<ReactNode> {
       label: typeof json.label === 'string' ? json.label : '',
       payload: typeof json.payload === 'string' ? json.payload : '',
       icon: (typeof json.icon === 'string' ? json.icon : 'file') as PillIcon,
+      ...(typeof json.iconSvg === 'string' ? { iconSvg: json.iconSvg } : {}),
     });
   }
 

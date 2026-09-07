@@ -160,6 +160,19 @@ interface PiSliceState {
   clearUnread: (sessionFile: string) => void;
   /** Tool calls currently executing (spinner state for W3 rows). */
   runningToolCalls: string[];
+  /**
+   * OUTPUT FROM A TOOL THAT HAS NOT FINISHED YET, keyed by tool-call id.
+   *
+   * pi streams `tool_execution_update` the whole time a command runs; this used
+   * to be dropped on the floor behind a note saying live bash rows would land
+   * later. They never did, so a command at 1m 7s could tell you nothing at all.
+   * the user: "nor the live output that I should be able to see."
+   *
+   * Accumulated by the sender, so each frame REPLACES the last rather than
+   * appending. Entries are removed the moment the real result lands — after
+   * that the result is the truth and a stale partial would fight it.
+   */
+  toolOutputPartials: Record<string, string>;
   extensionStatus: Record<string, string>;
   widgets: Record<string, { lines: string[]; placement: 'aboveEditor' | 'belowEditor' }>;
   notifications: PiNotification[];
@@ -277,6 +290,7 @@ export const usePiStore = create<PiSliceState>((set) => ({
       return { unread };
     }),
   runningToolCalls: [],
+  toolOutputPartials: {},
   extensionStatus: {},
   widgets: {},
   notifications: [],
@@ -328,6 +342,7 @@ export const usePiStore = create<PiSliceState>((set) => ({
       // (the resume's own abort/finally clears the streaming marker on return).
       resuming: false,
       runningToolCalls: [],
+      toolOutputPartials: {},
       // Keep session-TAGGED dialog requests across a switch — a background chat's
       // ask_user must survive until the user swaps in to answer it (it's gated to
       // its own chat by UiRequestDialogs). Untagged stragglers are dropped. A
@@ -408,6 +423,7 @@ export const usePiStore = create<PiSliceState>((set) => ({
         branches: { ...s.branches, [ordinal]: { ...group, snapshots, active: targetIndex } },
         // Switching mirrors a session load: drop transient per-run state.
         runningToolCalls: [],
+        toolOutputPartials: {},
         uiRequests: [],
       };
     }),
@@ -544,6 +560,7 @@ export function createPiSink(
         delete extensionStatus['harness-prefill'];
         const patch = {
           runningToolCalls: [],
+          toolOutputPartials: {},
           uiRequests: [],
           promptInFlight: false,
           extensionStatus,
@@ -614,9 +631,15 @@ export function createPiSink(
           : [...s.runningToolCalls, callId],
       })),
 
-    toolExecutionUpdate: () => {
-      // Streaming partial tool output lands in W3 (live bash output rows).
-    },
+    toolExecutionUpdate: (callId, _toolName, partialResult) =>
+      set((s) => {
+        const text = partialResult.content
+          .filter((c): c is { type: 'text'; text: string } => c.type === 'text')
+          .map((c) => c.text)
+          .join('');
+        if (text === s.toolOutputPartials[callId]) return {};
+        return { toolOutputPartials: { ...s.toolOutputPartials, [callId]: text } };
+      }),
 
     upsertToolResult: (result: ToolResultMsg) =>
       set((s) => {
@@ -630,10 +653,18 @@ export function createPiSink(
         const next =
           existing >= 0 ? thread.map((m, i) => (i === existing ? result : m)) : [...thread, result];
         const runningToolCalls = s.runningToolCalls.filter((id) => id !== result.toolCallId);
-        if (bg) return { bgRun: { ...(s.bgRun as BgRun), messages: next }, runningToolCalls };
+        // The real result supersedes anything streamed on the way to it.
+        const { [result.toolCallId]: _done, ...toolOutputPartials } = s.toolOutputPartials;
+        if (bg)
+          return {
+            bgRun: { ...(s.bgRun as BgRun), messages: next },
+            runningToolCalls,
+            toolOutputPartials,
+          };
         return {
           messages: next,
           runningToolCalls,
+          toolOutputPartials,
         };
       }),
 
@@ -777,7 +808,11 @@ export function createPiSink(
 
     bridgeExit: (info) =>
       set((s) => {
-        const cleared: Partial<PiSliceState> = { runningToolCalls: [], uiRequests: [] };
+        const cleared: Partial<PiSliceState> = {
+          runningToolCalls: [],
+          toolOutputPartials: {},
+          uiRequests: [],
+        };
         // Deliberate dispose (restart): consume the flag and drop the notice, but
         // still clear transient run state as a real exit would.
         if (s.intentionalRestart) return { intentionalRestart: false, ...cleared };

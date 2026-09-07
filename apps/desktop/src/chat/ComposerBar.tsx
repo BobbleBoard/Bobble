@@ -29,7 +29,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@pi-desktop/ui';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef } from 'react';
 import { assignChat, createProject, useChatOrg } from '../state/chat-org';
 import { useCorpStore } from '../state/corp-store';
 import { useLlmStore } from '../state/llm-store';
@@ -51,7 +51,7 @@ import {
   stickyContextGauge,
   usesSandbox,
 } from './composer-bar-logic';
-import { modelReadyStage, PREFIX_WARM_STATUS, useHarnessStatus } from './harness-status';
+import { useHarnessStatus } from './harness-status';
 import { InstructionsChip } from './InstructionsChip';
 
 /** LEFT: the relocated project (working-folder) chip, slimmed for the bar. When

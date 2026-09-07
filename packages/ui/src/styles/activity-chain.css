@@ -473,6 +473,34 @@ button.pd-chain-step-row:hover .pd-chain-step-chevron {
   color: var(--pd-text-muted);
   user-select: none;
 }
+/*
+ * THE CARET ON A LIVE COMMAND. A running command that has printed nothing looks
+ * identical to a finished one that printed nothing; a blinking block says which.
+ * `steps` on the animation so it blinks rather than pulses, and reduced motion
+ * leaves it solid — still the right signal, just not moving.
+ */
+.pd-term-caret {
+  display: inline-block;
+  width: 7px;
+  height: 1em;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  background: var(--pd-text-muted);
+  animation: pd-term-blink 1.1s steps(2, jump-none) infinite;
+}
+
+@keyframes pd-term-blink {
+  50% {
+    opacity: 0.15;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pd-term-caret {
+    animation: none;
+  }
+}
+
 .pd-term-cmd {
   color: var(--pd-text-primary);
   font-weight: 600;

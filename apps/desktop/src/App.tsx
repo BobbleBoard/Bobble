@@ -2,6 +2,7 @@ import { CanvasProvider, createCanvasController } from '@pi-desktop/canvas';
 import { Spinner, ToastProvider, TooltipProvider } from '@pi-desktop/ui';
 import { lazy, Suspense, useEffect, useState } from 'react';
 import type { AppInfo } from '../electron/ipc-contract';
+import { CandidatesRoute, candidateSet } from './candidates/CandidatesRoute';
 import { ChatApp } from './chat/ChatApp';
 import { CanvasPopoutView } from './chat/canvas/CanvasPopoutView';
 import { ConnectorsScreen } from './connectors/ConnectorsScreen';
@@ -21,6 +22,14 @@ type GateStatus = 'loading' | 'onboarding' | 'ready';
 
 /** The standalone canvas pop-out window loads with `?canvasPopout=1`. */
 const IS_CANVAS_POPOUT = new URLSearchParams(window.location.search).has('canvasPopout');
+
+/**
+ * Dev-only candidate designs (`?candidates=schedule` / `?candidates=connectors`).
+ * They exist so a new design can be built and LOOKED AT without the shipping
+ * screen changing under anyone — the user: "these UI's are not to immediately
+ * replace anything but keep the current ones safe."
+ */
+const CANDIDATE_SET = candidateSet(window.location.search);
 
 /** Dev/demo route: the situation room driven by the scripted mock corp run. */
 const IS_SITUATION_DEMO = new URLSearchParams(window.location.search).has('situationDemo');
@@ -216,6 +225,16 @@ export function App() {
             <TripoWorkspace />
           </div>
         </Suspense>
+      </TooltipProvider>
+    );
+  }
+
+  if (CANDIDATE_SET !== null) {
+    return (
+      <TooltipProvider delayDuration={200}>
+        <div className="h-full">
+          <CandidatesRoute set={CANDIDATE_SET} />
+        </div>
       </TooltipProvider>
     );
   }

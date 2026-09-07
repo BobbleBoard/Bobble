@@ -19,9 +19,10 @@ import {
   IconClose,
   Spinner,
 } from '@pi-desktop/ui';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ExpandedScrim } from '../media/ExpandedScrim';
 import { IconMic, IconPause, IconPlay, IconStop } from '../settings/icons';
+import { useConnectorsStore } from '../state/connectors-store';
 import { abortCorpTask } from '../state/corp-connect';
 import { useCorpStore } from '../state/corp-store';
 import { useImagesUnsupported } from '../state/local-model';
@@ -45,7 +46,7 @@ import { ComposerBar } from './ComposerBar';
 import { ComposerFooter } from './ComposerFooter';
 import { ComposerPill } from './ComposerPill';
 import { type AcItem, Autocomplete } from './composer/Autocomplete';
-import { buildAgentMessage } from './composer/agent-message';
+import { type ActivatableConnector, buildAgentMessage } from './composer/agent-message';
 import { PREFILL_MIN_CHARS, useAttachmentPrefill } from './composer/attachment-prefill';
 import {
   attachmentMeta,
@@ -107,6 +108,19 @@ interface Attachment {
   /** True for a large paste captured as an attachment — rendered as a text
    * preview card with a "PASTED" badge rather than a filename chip. */
   pasted?: boolean;
+  /**
+   * The `@`-mention token this attachment came from, when it came from one.
+   *
+   * A mentioned file is ALREADY on screen — it is the pill sitting in the
+   * sentence you are writing. the user: "at mentions should appear just the inline,
+   * no attachment shown above." So these carry the file's text into the message
+   * exactly like a dropped file, and draw nothing.
+   *
+   * Storing the token rather than a boolean is what keeps that honest: the pill
+   * is the only visible trace, so when the pill goes, the file has to go with
+   * it, and the token is how the reconcile below recognises its own pill.
+   */
+  mention?: string;
 }
 
 /** Text files we accept + read into the prompt (by MIME or extension). */
@@ -259,6 +273,7 @@ function AttachmentPreview({
   });
   return (
     // biome-ignore lint/a11y/useKeyWithClickEvents: the chip's own buttons are focusable; this is a mouse affordance over them
+    // biome-ignore lint/a11y/noStaticElementInteractions: same — selecting a chip by clicking its body, with every action inside it a real button
     <div
       className="pd-attach"
       data-selected={selected || undefined}
@@ -458,6 +473,33 @@ export function ChatComposer({
   };
   const [token, setToken] = useState<AcToken>(EMPTY_TOKEN);
   const [items, setItems] = useState<AcItem[]>([]);
+  /*
+   * INSTALLED CONNECTORS, AS `/` COMMANDS. the user: "slash commands should just be
+   * able to reference any connector installed, eg. /gmail if a gmail connector
+   * is installed should just change to the blue thing with the icon."
+   *
+   * Only what is actually installed — the catalog supplies the name and the real
+   * brand mark for each one, the registry supplies which of them exist on this
+   * Mac. Loaded lazily, the first time a `/` is typed, so opening a chat does not
+   * pay for a screen the user may never visit.
+   */
+  const registryServers = useConnectorsStore((s) => s.registry.servers);
+  const connectorCatalog = useConnectorsStore((s) => s.catalog);
+  const connectorsLoaded = useConnectorsStore((s) => s.loaded);
+  const installedConnectors = useMemo(() => {
+    const byId = new Map(connectorCatalog.map((c) => [c.id, c]));
+    return registryServers.map((srv) => {
+      const known = byId.get(srv.id);
+      return {
+        slug: srv.id,
+        name: known?.name ?? srv.id,
+        ...(known?.iconSvg !== undefined ? { iconSvg: known.iconSvg } : {}),
+        description: known?.description ?? 'Installed connector',
+        enabled: srv.enabled !== false,
+      };
+    });
+  }, [registryServers, connectorCatalog]);
+
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [skipped, setSkipped] = useState<string[]>([]);
@@ -644,6 +686,11 @@ export function ChatComposer({
     '',
     attachments.filter((a) => a.kind === 'text'),
   );
+  /** The shape `buildAgentMessage` needs — slug + name, nothing about the UI. */
+  const activatable: ActivatableConnector[] = useMemo(
+    () => installedConnectors.map((c) => ({ slug: c.slug, name: c.name })),
+    [installedConnectors],
+  );
   const { abortPrefill, inFlight: prefillInFlight } = useAttachmentPrefill(attachmentPrefix);
   /*
    * WHICH CHIPS SHOW A SPINNER INSTEAD OF A TOKEN COUNT. Only a text attachment
@@ -700,7 +747,7 @@ export function ChatComposer({
    * read it itself; turning a picker click into an error toast would be worse
    * than the turn it saves.
    */
-  const attachMentionedFile = async (absPath: string): Promise<void> => {
+  const attachMentionedFile = async (absPath: string, token: string): Promise<void> => {
     const name = absPath.split('/').pop() ?? absPath;
     if (attachments.some((a) => a.name === name && a.kind === 'text')) return;
     const res = await window.piDesktop
@@ -709,9 +756,32 @@ export function ChatComposer({
     if (res === null || res.binary || res.tooLarge || typeof res.text !== 'string') return;
     setAttachments((prev) => [
       ...prev,
-      { id: crypto.randomUUID(), name, kind: 'text', text: res.text as string },
+      { id: crypto.randomUUID(), name, kind: 'text', text: res.text as string, mention: token },
     ]);
   };
+
+  /*
+   * A MENTION'S FILE LIVES AND DIES WITH ITS PILL.
+   *
+   * The chip above the box used to be the visible trace of a mentioned file, and
+   * removing it removed the file. Now the pill is that trace — so if the pill is
+   * deleted and nothing notices, the file is still riding along inside the next
+   * message, invisibly, and the user has no way to find out. That is a worse bug
+   * than the duplication the user asked me to remove.
+   *
+   * Reconciling against the editor's own text covers every way a pill can leave:
+   * backspace, select-all, undo, a cleared composer. It runs on text change,
+   * which is exactly when the answer can have changed.
+   */
+  useEffect(() => {
+    setAttachments((prev) => {
+      const next = prev.filter((a) => a.mention === undefined || text.includes(a.mention));
+      return next.length === prev.length ? prev : next;
+    });
+  }, [text]);
+
+  /** What the chip row draws: everything except the mentions, which are pills. */
+  const visibleAttachments = attachments.filter((a) => a.mention === undefined);
 
   // A large plain-text paste (the user): rather than dumping a wall of text into the
   // editor, capture it as a "pasted content" text attachment — same model as a
@@ -781,6 +851,10 @@ export function ChatComposer({
    * from memory and stay instant.
    */
   useEffect(() => {
+    if (token.mode === 'slash' && !connectorsLoaded) void useConnectorsStore.getState().load();
+  }, [token.mode, connectorsLoaded]);
+
+  useEffect(() => {
     let cancelled = false;
     setSelectedIndex(0);
     if (token.mode === null) {
@@ -808,23 +882,37 @@ export function ChatComposer({
         );
       } else {
         const q = token.query.toLowerCase();
-        setItems(
-          commands
-            .filter(
-              (c) =>
-                c.name.toLowerCase().includes(q) || (c.description ?? '').toLowerCase().includes(q),
-            )
-            .slice(0, 12)
-            .map(
-              (c): AcItem => ({
-                id: `/${c.name} `,
-                label: `/${c.name}`,
-                subtitle: c.description,
-                section: 'Commands',
-                kind: 'command',
-              }),
-            ),
-        );
+        const commandItems = commands
+          .filter(
+            (c) =>
+              c.name.toLowerCase().includes(q) || (c.description ?? '').toLowerCase().includes(q),
+          )
+          .slice(0, 12)
+          .map(
+            (c): AcItem => ({
+              id: `/${c.name} `,
+              label: `/${c.name}`,
+              subtitle: c.description,
+              section: 'Commands',
+              kind: 'command',
+            }),
+          );
+        // Connectors come FIRST: they are the answer to "what can this thing
+        // reach", which is what a `/` is usually being pressed to find out.
+        const connectorItems = installedConnectors
+          .filter((c) => c.slug.toLowerCase().includes(q) || c.name.toLowerCase().includes(q))
+          .slice(0, 8)
+          .map(
+            (c): AcItem => ({
+              id: `/${c.slug} `,
+              label: `/${c.slug}`,
+              subtitle: c.enabled ? c.description : `${c.description} · off — picking turns it on`,
+              section: 'Connectors',
+              kind: 'connector',
+              ...(c.iconSvg !== undefined ? { iconSvg: c.iconSvg } : {}),
+            }),
+          );
+        setItems([...connectorItems, ...commandItems]);
       }
     };
     // A file walk waits for typing to settle; commands come from memory.
@@ -834,7 +922,7 @@ export function ChatComposer({
       cancelled = true;
       if (timer !== null) clearTimeout(timer);
     };
-  }, [token.mode, token.query, cwd, commands]);
+  }, [token.mode, token.query, cwd, commands, installedConnectors]);
 
   /*
    * What Escape needs, through refs, because the keymap object is stable and
@@ -994,7 +1082,7 @@ export function ChatComposer({
     // path is otherwise images-only); the visible bubble echoes only the typed
     // text (or the filenames when nothing was typed). Shared with predictive
     // prefill so the prefilled draft byte-matches this exact body.
-    const agentMessage = buildAgentMessage(raw, textFiles);
+    const agentMessage = buildAgentMessage(raw, textFiles, activatable);
     const echo =
       raw.length > 0 ? raw : textFiles.length > 0 ? textFiles.map((a) => a.name).join(', ') : raw;
 
@@ -1247,6 +1335,29 @@ export function ChatComposer({
                 payload: item.id,
                 icon: 'file',
               });
+            } else if (item.kind === 'connector') {
+              /*
+               * A CONNECTOR IS A PILL WITH ITS OWN FACE. The payload is the
+               * literal `/gmail` the user meant to type — so it still reads as a
+               * sentence to the model, and `activatedConnectors` can find it
+               * again to append the one activation line (agent-message.ts).
+               */
+              apiRef.current?.replaceTokenWithPill(token.tokenStart, {
+                label: item.label,
+                payload: `${item.id.trim()} `,
+                icon: 'connector',
+                ...(item.iconSvg !== undefined ? { iconSvg: item.iconSvg } : {}),
+              });
+              /*
+               * ...AND IT IS ON. the user asked the pick to "add this cli tool to the
+               * set if not already there": naming a connector you have installed
+               * but switched off should turn it on, not fail silently at the
+               * moment the model reaches for it.
+               */
+              const slug = item.id.trim().replace(/^\//, '');
+              if (installedConnectors.some((c) => c.slug === slug && !c.enabled)) {
+                void useConnectorsStore.getState().setEnabled(slug, true);
+              }
             } else {
               apiRef.current?.insertToken(token.tokenStart, item.id);
             }
@@ -1266,7 +1377,7 @@ export function ChatComposer({
              * file by name, and a chip alone loses which one they meant.
              */
             if (picked === 'mention' && item.path !== undefined) {
-              void attachMentionedFile(item.path);
+              void attachMentionedFile(item.path, item.id);
             }
           }}
           onHover={setSelectedIndex}
@@ -1278,9 +1389,9 @@ export function ChatComposer({
           data-bash={bashMode ? '' : undefined}
           onMouseDown={focusEditorFromBlank}
         >
-          {attachments.length > 0 ? (
+          {visibleAttachments.length > 0 ? (
             <div className="pd-composer-attachments" data-testid="composer-attachments">
-              {attachments.map((a) =>
+              {visibleAttachments.map((a) =>
                 a.pasted === true ? (
                   <AttachedFileCard
                     key={a.id}

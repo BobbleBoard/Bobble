@@ -132,18 +132,29 @@ export function IconPanelRight(props: IconProps) {
 }
 
 /**
- * Pop out to a standalone window — a full rounded window box with a single notch
- * at the top-right corner where the arrow exits. The old glyph left the whole
- * top-right quadrant of the box open (both the top edge past x=7.5 and the right
- * edge above y=8.5), so it read as a half-drawn rectangle; this keeps the box
- * closed except the corner notch, matching the (verified) IconExternal anatomy.
+ * Pop out to a standalone window — TWO window frames, one lifted off the other.
+ *
+ * This used to be a box with an arrow leaving through the top-right corner,
+ * which is the universal "opens outside the app" mark — and `IconExternal`, four
+ * pixels away in the same bar, is that mark and does mean that. the user, with both
+ * of them screenshotted side by side: "why is there two variations of that
+ * button with the square with top right arrow".
+ *
+ * They are not variations, they are two different actions that had drifted into
+ * one drawing: this one opens a SECOND Bobble window, the other hands the URL to
+ * your browser. What tells them apart now is the SILHOUETTE, not the detail —
+ * `IconExternal` is a box with a bite taken out of the corner the arrow escapes
+ * through, and this is a whole closed WINDOW (title bar and all) with the arrow
+ * beside it. Rendered at 16, 20, 28 and 44px against Copy and External before
+ * being chosen: a first attempt drew two stacked frames, which at 16px was
+ * indistinguishable from `IconCopy` four pixels to its left.
  */
 export function IconPopout(props: IconProps) {
   return (
     <Icon {...props}>
-      <path d="M8 3H4.5A1.5 1.5 0 0 0 3 4.5v7A1.5 1.5 0 0 0 4.5 13h7A1.5 1.5 0 0 0 13 11.5V8" />
-      <path d="M9.5 3H13v3.5" />
-      <path d="M13 3 8 8" />
+      <rect x="2.5" y="4.6" width="9" height="8.9" rx="1.6" />
+      <path d="M2.5 7h9" />
+      <path d="M13.5 2.5h-3.2M13.5 2.5v3.2M13.5 2.5 10.6 5.4" />
     </Icon>
   );
 }

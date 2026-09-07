@@ -62,6 +62,10 @@ export function registerPrefillIpc(): void {
         success: true,
         aborted: result.aborted,
         ...(result.promptN !== undefined ? { promptN: result.promptN } : {}),
+        // The server's own prompt-reading rate, passed through so the renderer
+        // can say "about 18s" from a measurement instead of a guess.
+        ...(result.processedN !== undefined ? { processedN: result.processedN } : {}),
+        ...(result.processedMs !== undefined ? { processedMs: result.processedMs } : {}),
       };
     } catch (error) {
       // A real failure (server hiccup) — non-fatal by design; the send path still

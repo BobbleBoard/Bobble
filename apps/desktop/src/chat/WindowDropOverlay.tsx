@@ -62,6 +62,16 @@ export function WindowDropOverlay() {
        * target, because the drop overlay's own edge sits above the sidebar and
        * would otherwise be the target for every move.
        */
+      /*
+       * ...EXCEPT WHILE A MESSAGE IS BEING EDITED. Springing to another chat
+       * mid-edit would throw the edit away to deliver the file somewhere the
+       * user was not looking. The claim that redirects the drop (drop-store) is
+       * also the signal that leaving would cost something.
+       */
+      if (useDropStore.getState().claim !== null) {
+        clearSpring();
+        return;
+      }
       const under = document.elementFromPoint(e.clientX, e.clientY);
       const row =
         under instanceof HTMLElement

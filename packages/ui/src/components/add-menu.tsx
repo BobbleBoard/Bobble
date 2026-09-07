@@ -13,15 +13,27 @@ import type { ReactElement, ReactNode } from 'react';
  * Filtering first makes that unrepresentable rather than merely fixed: there is
  * no arrangement of absent handlers that can produce two rules in a row.
  */
+/** A group's identity: the keys of the rows in it, which React already requires
+ * to be unique and stable. */
+function keyOf(group: readonly ReactNode[] | undefined): string {
+  return (group ?? [])
+    .map((n) => (n !== null && typeof n === 'object' && 'key' in n ? String(n.key) : '?'))
+    .join('|');
+}
+
 export function joinGroups(groups: readonly (ReactNode | null)[][]): ReactNode[] {
   const filled = groups
     .map((g) => g.filter((n): n is ReactNode => n !== null && n !== undefined && n !== false))
     .filter((g) => g.length > 0);
   const out: ReactNode[] = [];
-  filled.forEach((group, i) => {
-    if (i > 0) out.push(<DropdownMenuSeparator key={`sep-${i}`} />);
+  for (const [i, group] of filled.entries()) {
+    /* The separator's identity is the pair of groups it divides, not its
+       position in the array — so adding a group above does not renumber (and
+       remount) every rule below it. */
+    if (i > 0)
+      out.push(<DropdownMenuSeparator key={`sep-${keyOf(filled[i - 1])}-${keyOf(group)}`} />);
     out.push(...group);
-  });
+  }
   return out;
 }
 

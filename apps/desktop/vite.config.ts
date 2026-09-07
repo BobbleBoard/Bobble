@@ -105,7 +105,24 @@ export default defineConfig({
         // ['.', '--no-sandbox']; keep the Chromium sandbox on in dev to match the
         // production security posture.
         entry: 'electron/main.ts',
-        onstart: ({ startup }) => void startup(['.']),
+        /*
+         * `pnpm dev` LAUNCHES THE APP — unless you asked it not to.
+         *
+         * That is right for a person developing, and wrong for anything running
+         * unattended: an agent starting a dev server to take headless
+         * screenshots got a real, visible Bobble window on the user's screen,
+         * signed in to his real profile, spawning a real llama-server, for two
+         * minutes before it noticed. The standing rule here is that a run never
+         * takes his screen, and a dev server that opens a window is a hole in it.
+         *
+         * `PI_DEV_NO_LAUNCH=1` builds and serves and starts nothing; the probe
+         * then launches its own Electron against `VITE_DEV_SERVER_URL` with a
+         * throwaway $HOME, which is what a headless run wanted in the first place.
+         */
+        onstart: ({ startup }) => {
+          if (process.env.PI_DEV_NO_LAUNCH === '1') return;
+          void startup(['.']);
+        },
         vite: {
           build: {
             rollupOptions: { external: electronMainExternal },

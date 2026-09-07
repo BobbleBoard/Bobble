@@ -65,6 +65,18 @@
   background: var(--pd-bg-raised);
   border-radius: var(--pd-radius-surface);
   overflow: hidden;
+  /*
+   * EVERY RULE IN THE CANVAS, FROM ONE PLACE. the user: "need better borders on the
+   * tabs, and across the board in the canvas."
+   *
+   * They were all `--pd-border-subtle` — 8% white in bobble dark — which is the
+   * right weight for a divider inside a quiet list and far too little for the
+   * seams that say where one region of a workspace stops and the next starts.
+   * The tab strip, the operation bar and the active tab are all *structure*, so
+   * they move up a step together. Declared here rather than swapped one by one
+   * so the canvas has a single dial the next person can turn.
+   */
+  --pd-canvas-rule: var(--pd-border-default);
 }
 
 .pd-canvas-tabs--collapsed {
@@ -109,8 +121,8 @@
   background: linear-gradient(
     to right,
     transparent,
-    var(--pd-border-subtle) 12%,
-    var(--pd-border-subtle) 88%,
+    var(--pd-canvas-rule) 4%,
+    var(--pd-canvas-rule) 96%,
     transparent
   );
 }
@@ -173,9 +185,43 @@
 
 /* Each tab is bottom-aligned in the strip so the active one connects to the body. */
 .pd-canvas-tab-slot {
+  position: relative;
   display: inline-flex;
   align-items: flex-end;
   flex: 0 0 auto;
+}
+
+/*
+ * A HAIRLINE BETWEEN QUIET TABS — the other half of "better borders on the
+ * tabs".
+ *
+ * An unselected tab is deliberately a label with no box (see below), which is
+ * right until there are three of them: then two file names sit side by side
+ * with nothing but a 4px gap saying they are separate things. Chrome solves
+ * this with a divider in the gap rather than by giving every tab a box back.
+ *
+ * It disappears wherever a real edge already exists — beside the active tab,
+ * which has its own border, and beside a hovered tab, which has its own fill —
+ * so the strip never shows a divider and a border stacked against each other.
+ */
+.pd-canvas-tab-slot + .pd-canvas-tab-slot::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: calc(var(--pd-space-xs) / -2);
+  width: 1px;
+  height: 14px;
+  transform: translateY(-50%);
+  background: var(--pd-canvas-rule);
+  pointer-events: none;
+  transition: opacity var(--pd-duration-fast) var(--pd-easing-standard);
+}
+
+.pd-canvas-tab-slot:has(.pd-canvas-tab[data-active])::before,
+.pd-canvas-tab-slot:has(.pd-canvas-tab[data-active]) + .pd-canvas-tab-slot::before,
+.pd-canvas-tab-slot:hover::before,
+.pd-canvas-tab-slot:hover + .pd-canvas-tab-slot::before {
+  opacity: 0;
 }
 
 /* The new-tab `+` — now the RIGHTMOST element of the tab strip (a direct child of
@@ -243,7 +289,7 @@
  * / trip a phantom scrollbar; the colour match already carries the connection). */
 .pd-canvas-tab[data-active] {
   background: var(--pd-bg-raised);
-  border-color: var(--pd-border-subtle);
+  border-color: var(--pd-canvas-rule);
   border-bottom-color: transparent;
   color: var(--pd-text-primary);
   /* The selected label carries a touch more weight, so the state survives even
@@ -470,8 +516,8 @@
   background: linear-gradient(
     to right,
     transparent,
-    var(--pd-border-subtle) 12%,
-    var(--pd-border-subtle) 88%,
+    var(--pd-canvas-rule) 4%,
+    var(--pd-canvas-rule) 96%,
     transparent
   );
 }

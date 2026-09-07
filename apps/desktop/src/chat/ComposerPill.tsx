@@ -20,14 +20,10 @@ import { useLlmStore } from '../state/llm-store';
 import { usePiStore } from '../state/pi-slice';
 import { recordBootWait, typicalBootSeconds } from './boot-history';
 import { composerPill, pickPill } from './composer-pill';
-import {
-  modelReadyStage,
-  PREFILL_STATUS_KEY,
-  PREFIX_WARM_STATUS,
-  parsePrefillPercent,
-} from './harness-status';
+import { modelReadyStage, PREFIX_WARM_STATUS } from './harness-status';
 import { IconWarning } from './icons-pill';
 import { usePillStore } from './pill-store';
+import { useRePrefillWarning } from './use-reprefill-warning';
 
 /**
  * Milliseconds in the current wait, and — when it ends — how long it took.
@@ -66,6 +62,13 @@ function useWaitClock(stage: 'loading' | 'preparing' | null): number | null {
 }
 
 export function ComposerPill({ imageOnBlindModel = false }: { imageOnBlindModel?: boolean }) {
+  /*
+   * The one thing in this app that CANNOT be made instant, said out loud before
+   * it costs you. the user: "flagged to the user to my face right there whenever
+   * anything threatens to cause a full re prefill (including model switches) at
+   * over 16k context." It publishes into the slot below like anything else.
+   */
+  useRePrefillWarning();
   const prefixWarm = usePiStore((s) => s.extensionStatus[PREFIX_WARM_STATUS]);
   const readyStage = useLlmStore((s) => modelReadyStage(s.status.phase, prefixWarm));
   const elapsedMs = useWaitClock(readyStage);

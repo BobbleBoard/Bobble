@@ -991,10 +991,22 @@ body {
   transition: padding-left var(--pd-duration-slow, 320ms) var(--pd-easing-standard, ease);
 }
 .pd-topbar--sidebar-collapsed .pd-topbar-section:first-child {
-  /* = CHROME_LEFT (85) + the toggle's own 32px + 7px of air. Stated here rather
-     than imported because CSS cannot read the module; the probe checks the two
-     agree, which is the part that would otherwise drift. */
-  padding-left: 124px;
+  /*
+   * CLEAR WHATEVER IS ACTUALLY IN THE CORNER — measured, not guessed.
+   *
+   * This was `124px`, written as "CHROME_LEFT (85) + the toggle's own 32px +
+   * 7px of air" back when the corner held one button. Then Chat|Work moved in
+   * beside it and the number stayed, so with the sidebar collapsed the chat
+   * title was drawn straight over the toggle: the user, with a screenshot of the
+   * pill with his chat's first letter sitting in it — "the title overlaps with
+   * this chat/work buttons."
+   *
+   * A hand-copied width drifts the moment anything joins that corner, so
+   * ChatApp publishes the zone's real right edge as `--pd-chrome-corner` from a
+   * ResizeObserver on the zone itself. Nothing to keep in sync: put a third
+   * control there tomorrow and the title still clears it.
+   */
+  padding-left: max(0px, calc(var(--pd-chrome-corner, 175px) + 8px - var(--pd-topbar-pad, 8px)));
   /*
    * AND NOT DRAGGABLE. `.pd-topbar` is a drag region; collapsed, it starts at
    * window-x 0 and so covers the sidebar toggle — the same theft `.pd-sidebar-tl`
@@ -5582,6 +5594,42 @@ body[data-media-expanded="true"] .pd-studio-compose {
   text-overflow: ellipsis;
 }
 
+/*
+ * A CONNECTOR WEARS ITS OWN MARK. the user: "show REAL ICONS to their left shown in
+ * gmail example."
+ *
+ * The catalog's SVGs are full-bleed 24×24 marks with no width attribute of their
+ * own, so they are sized here rather than by the markup — the same rule serves
+ * the pill and the `/` menu row, which is the point of having one class each.
+ * `--pd-connector-ink` is the near-black-brand escape hatch the connectors page
+ * already defines (GitHub, Notion): on a dark surface those marks fill with the
+ * surrounding ink instead of vanishing.
+ */
+.pd-pill-brand,
+.pd-ac-brand {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+
+.pd-pill-brand > svg,
+.pd-ac-brand > svg {
+  width: 100%;
+  height: 100%;
+}
+
+.pd-pill-brand {
+  width: 12px;
+  height: 12px;
+  --pd-connector-ink: currentColor;
+}
+
+.pd-ac-brand {
+  width: 14px;
+  height: 14px;
+}
+
 /* The starter chips, under the composer and above the @ / ! hints. */
 .pd-composer-starters {
   display: flex;
@@ -5612,4 +5660,157 @@ body[data-media-expanded="true"] .pd-studio-compose {
   -webkit-backdrop-filter: blur(var(--pd-blur-overlay));
   backdrop-filter: blur(var(--pd-blur-overlay));
   transition: left var(--pd-duration-base) var(--pd-easing-standard);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * THE HISTORY POLE — see src/chat/HistoryPole.tsx.
+ * ────────────────────────────────────────────────────────────────────── */
+
+/*
+ * The hover ZONE, not the pole: a strip down the right edge of the CHAT column
+ * only (it is a child of the thread, so the canvas rail beside it is untouched —
+ * the user: "the right side of the chat area, not the canvas"). Wider than the line
+ * it reveals, because an affordance you have to hit before it appears is one
+ * nobody finds.
+ */
+.pd-pole-zone {
+  position: absolute;
+  top: 12px;
+  right: 0;
+  bottom: 12px;
+  z-index: 5;
+  width: 34px;
+  display: flex;
+  align-items: stretch;
+  justify-content: flex-end;
+  /*
+   * CLEAR OF THE SCROLLBAR. macOS overlay scrollbars appear in the last ~10px of
+   * a scroller when you reach for them, which is exactly where the pole's hit
+   * area was — so a hand going for the scrollbar landed on the pole and jumped
+   * the thread. 16px puts the pole's 16px target entirely inboard of it, and the
+   * two read as what they are: the scrollbar on the edge, the pole beside it.
+   */
+  padding-right: 16px;
+  /* The strip itself is invisible and must not eat clicks meant for the thread;
+     the POLE inside it takes pointer events back. */
+  pointer-events: none;
+}
+
+.pd-pole {
+  position: relative;
+  width: 16px;
+  cursor: pointer;
+  pointer-events: auto;
+  opacity: 0;
+  transform: translateX(6px);
+  transition:
+    opacity var(--pd-duration-base, 220ms) var(--pd-easing-standard, ease),
+    transform var(--pd-duration-base, 220ms) var(--pd-easing-spring, ease);
+}
+
+.pd-pole-zone[data-open="true"] .pd-pole {
+  opacity: 1;
+  transform: none;
+}
+
+/* The line. "Around the thickness of a scrollbar, little thinner" — a macOS
+ * overlay scrollbar is 7px of track with a ~6px thumb, so 3px reads as related
+ * to it and clearly not it. Centred in the 16px hit area. */
+.pd-pole-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 3px;
+  margin-left: -1.5px;
+  border-radius: var(--pd-radius-full);
+  background: var(--pd-border-strong);
+  pointer-events: none;
+}
+
+/* WHERE THE SCREEN IS on the line — not how far you have come. See the note in
+ * HistoryPole's scroll handler: a fill-from-the-top turns the whole pole one
+ * colour at the bottom of a long thread and the dots become decoration on a
+ * scrollbar. A window says where you are AND how little of this you can see. */
+.pd-pole-line--here {
+  bottom: auto;
+  min-height: 10px;
+  background: var(--pd-accent-primary);
+  opacity: 0.75;
+}
+
+/*
+ * A DOT IS A HOLE IN THE LINE. the user: "just like holes on the line of a graph
+ * looking." So the fill is the surface behind it, not a colour of its own — the
+ * line genuinely stops at the dot instead of passing behind a lozenge.
+ */
+.pd-pole-dot {
+  position: absolute;
+  left: 50%;
+  width: 11px;
+  height: 11px;
+  margin: -5.5px 0 0 -5.5px;
+  padding: 0;
+  border: 2px solid var(--pd-border-strong);
+  border-radius: var(--pd-radius-full);
+  background: var(--pd-bg-base);
+  cursor: pointer;
+  transition:
+    transform var(--pd-duration-fast, 140ms) var(--pd-easing-spring, ease),
+    border-color var(--pd-duration-fast, 140ms) var(--pd-easing-standard, ease);
+}
+
+.pd-pole-dot:hover,
+.pd-pole-dot:focus-visible {
+  /* "bulge a bit on hover" */
+  transform: scale(1.45);
+  border-color: var(--pd-accent-primary);
+  outline: none;
+}
+
+/*
+ * The preview, to the LEFT of the pole — over the thread, never off the window
+ * edge. Opaque over its own base for the same reason every floating surface in
+ * this app is: `--pd-bg-overlay` is ~85% in the bobble flavors and text read
+ * through text is not read.
+ */
+.pd-pole-preview {
+  position: absolute;
+  right: 22px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: max-content;
+  max-width: min(320px, 40vw);
+  padding: 7px 10px;
+  border-radius: var(--pd-radius-md);
+  background: linear-gradient(var(--pd-bg-overlay), var(--pd-bg-overlay)), var(--pd-bg-raised);
+  box-shadow: var(--pd-shadow-popover);
+  text-align: left;
+  pointer-events: none;
+}
+
+.pd-pole-preview-meta {
+  color: var(--pd-text-muted);
+  font-size: var(--pd-font-size-caption);
+}
+
+.pd-pole-preview-text {
+  color: var(--pd-text-primary);
+  font-size: var(--pd-font-size-caption);
+  line-height: 1.45;
+  white-space: normal;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pd-pole,
+  .pd-pole-dot {
+    transition: none;
+  }
+  .pd-pole-dot:hover,
+  .pd-pole-dot:focus-visible {
+    transform: none;
+  }
 }

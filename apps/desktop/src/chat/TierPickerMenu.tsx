@@ -29,9 +29,12 @@ import { DownloadBar } from '../models/DownloadBar';
 import { compactBytes } from '../models/models-layout';
 import { downloadFraction, type LlmDownloadState, useLlmStore } from '../state/llm-store';
 import { selectionTier } from '../state/model-selection';
+import { usePiStore } from '../state/pi-slice';
 import { useModelSelection, useQuickMenu, useSettingsStore } from '../state/settings-store';
 import { selectAuto, selectModel, selectTier } from './auto-router';
 import { buildTierRows } from './footer-models';
+import { riskBadge, worthWarning } from './prefill-risk';
+import { prefillSeconds } from './prefill-speed';
 import { QuickMenuPanel } from './QuickMenuPanel';
 import {
   DEFAULT_QUICK_MENU,
@@ -40,6 +43,7 @@ import {
   type QuickMenuConfig,
   quickMenuRows,
 } from './quick-menu';
+import { conversationTokens } from './use-reprefill-warning';
 
 /*
  * NO GLYPHS ON THESE ROWS. the user: "model picker doesn't have to have icons."
@@ -142,6 +146,27 @@ export function TierPickerMenu({
   const selection = useModelSelection();
   const isAuto = selection.mode === 'auto';
   const activeTier = selectionTier(selection);
+  /*
+   * WHAT A SWITCH FROM HERE WOULD COST. `conversationTokens` is the engine's own
+   * prompt count for the last turn, so this is the real size of what a different
+   * model would have to read — not an estimate from message lengths.
+   */
+  const liveModelId = useLlmStore((s) => s.status.model?.id ?? null);
+  const chatTokens = conversationTokens(usePiStore((st) => st.messages));
+  const describeRow = (
+    secondary: string | undefined,
+    rowModelId: string | null,
+  ): string | undefined => {
+    if (rowModelId === null || rowModelId === liveModelId || !worthWarning(chatTokens)) {
+      return secondary;
+    }
+    const badge = riskBadge({
+      tokens: chatTokens,
+      cause: 'model-switch',
+      seconds: prefillSeconds(rowModelId, chatTokens),
+    });
+    return secondary === undefined ? badge : `${secondary} · ${badge}`;
+  };
   /*
    * NO MODE GATE. The User / Power-user toggle is gone (the user), and the honest
    * consequence is that everyone gets what Power showed: leaving the persisted
@@ -289,7 +314,17 @@ export function TierPickerMenu({
              * control moved to the hint slot below, where the checkmark for a
              * downloaded row already lives.
              */
-            description={row.secondary ?? undefined}
+            /*
+             * ...AND WHAT SWITCHING WOULD COST, when it would cost something.
+             *
+             * the user: "flagged to the user to my face right there whenever
+             * anything threatens to cause a full re prefill (including model
+             * switches) at over 16k context." The moment of choice is the
+             * honest place for it — a warning that arrives after the click is
+             * an apology, not a warning. Below the threshold it says nothing,
+             * because at that size the re-read reads as the model thinking.
+             */
+            description={describeRow(row.secondary ?? undefined, row.modelId)}
             // Only a DOWNLOADED row can read as the active model (the user #4): one
             // whose model isn't on disk never shows a selected checkmark —
             // picking it opens the download flow instead of pretending it's

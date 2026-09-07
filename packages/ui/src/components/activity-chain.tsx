@@ -657,18 +657,39 @@ function TerminalBlock({
   command,
   output,
   prompt = '$',
+  live = false,
 }: {
   command?: string;
   output?: string;
   prompt?: string;
+  /** The command is still running, so this block is a tail, not a transcript. */
+  live?: boolean;
 }) {
+  const body = useRef<HTMLPreElement | null>(null);
+  /*
+   * A LIVE BLOCK FOLLOWS THE OUTPUT. Without this the newest line is the one you
+   * cannot see: output arrives at the bottom of a scrolled box and the view
+   * stays parked at the first line the command printed a minute ago. Only while
+   * running — once it settles, the top is the right place to be reading from.
+   */
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `output` is the trigger — it is read through the ref's element, not from the closure
+  useEffect(() => {
+    if (!live) return;
+    const el = body.current;
+    if (el !== null) el.scrollTop = el.scrollHeight;
+  }, [live, output]);
+
   const hasCmd = command !== undefined && command.length > 0;
   const hasOut = output !== undefined && output.length > 0;
   if (!hasCmd && !hasOut) return null;
   return (
     <div className="pd-chain-output pd-chain-termblock">
       <div className="pd-chain-output-frame">
-        <pre className="pd-chain-output-body pd-scroll">
+        <pre
+          className="pd-chain-output-body pd-scroll"
+          ref={body}
+          data-live={live ? '' : undefined}
+        >
           {hasCmd ? (
             <span className="pd-term-cmd">
               <span className="pd-term-prompt">{prompt} </span>
@@ -677,6 +698,10 @@ function TerminalBlock({
           ) : null}
           {hasCmd && hasOut ? '\n' : null}
           {hasOut ? output : null}
+          {/* A caret while it runs — the difference between "printed nothing
+              yet" and "finished with no output", which otherwise look the
+              same. */}
+          {live ? <span className="pd-term-caret" aria-hidden="true" /> : null}
         </pre>
       </div>
     </div>
@@ -752,6 +777,7 @@ function StepContent({ step, live = false }: { step: ActivityStepData; live?: bo
           command={step.command}
           output={step.output}
           prompt={step.kind === 'python' ? '>>>' : '$'}
+          live={step.status === 'running'}
         />
       );
     case 'edit':

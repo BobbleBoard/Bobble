@@ -95,6 +95,25 @@ function canvasShellInvoke(channel: string, req: unknown): void {
   void window.piDesktop.invoke(channel as any, req as any);
 }
 
+/**
+ * Paint a still of a native view into the DOM slot it was covering — or clear it.
+ *
+ * The slot exists precisely to be that view's stand-in for layout purposes, so
+ * it is also the honest place to stand in for it visually while the view is
+ * down. `background-size: 100% auto` pins the still to the slot's width, which
+ * is the dimension that cannot change while a menu is open.
+ */
+function freezeFrame(el: HTMLElement | undefined, dataUrl: string | null): void {
+  if (el === undefined) return;
+  if (dataUrl === null || dataUrl === '') {
+    el.style.background = '';
+    el.removeAttribute('data-frozen');
+    return;
+  }
+  el.style.background = `top left / 100% auto no-repeat url("${dataUrl}")`;
+  el.setAttribute('data-frozen', 'true');
+}
+
 interface BrowserEntry {
   lastBounds: BrowserBounds;
   /** The mounted slot element, kept so bounds can be RE-MEASURED rather than
@@ -455,22 +474,57 @@ export class NativeSurfaces {
     const tab = this.#tab(activeId);
     // Office editors paint above the DOM exactly like browser views do, so a
     // canvas menu opened over one is occluded unless it is lowered too.
-    const channel =
-      tab?.kind === 'browser'
-        ? 'browser:set-bounds'
-        : tab?.kind === 'office'
-          ? 'office:set-bounds'
-          : null;
-    if (channel === null) return;
-    if (tab === undefined) return;
-    const entry = (tab.kind === 'browser' ? this.#browsers : this.#offices).get(tab.id);
+    const kind = tab?.kind === 'browser' ? 'browser' : tab?.kind === 'office' ? 'office' : null;
+    if (kind === null || tab === undefined) return;
+    const entry = (kind === 'browser' ? this.#browsers : this.#offices).get(tab.id);
     if (entry === undefined) return;
-    void window.piDesktop.invoke(channel, {
-      tabId: tab.id,
-      bounds: entry.lastBounds,
-      // Never raise the view while the whole panel is closed.
-      visible: !open && this.#panelOpen,
-    });
+    const setVisible = (visible: boolean) =>
+      void window.piDesktop.invoke(`${kind}:set-bounds`, {
+        tabId: tab.id,
+        bounds: entry.lastBounds,
+        // Never raise the view while the whole panel is closed.
+        visible,
+      });
+
+    if (!open) {
+      freezeFrame(entry.el, null);
+      setVisible(this.#panelOpen);
+      return;
+    }
+
+    /*
+     * A LOWERED VIEW LEAVES A HOLE — so leave the last frame in it.
+     *
+     * the user: "browser tabs go blank when the + button is pressed?" They did, and
+     * for a real reason: a native WebContentsView paints above every DOM element
+     * in the window, so the `+` menu is invisible under the page unless the page
+     * is taken down first. The page coming down is correct; the page coming down
+     * and leaving white is what makes it look like the tab crashed.
+     *
+     * So capture the frame FIRST and paint it into the slot the view was sitting
+     * on, then lower the view. `capturePage` on a view that is still on screen
+     * is a matter of tens of milliseconds; the 180ms timer is there so a capture
+     * that hangs cannot leave the menu stuck behind the page — after that the
+     * view goes down regardless and the old blank is the worst case, not the
+     * default one.
+     */
+    let lowered = false;
+    const lower = () => {
+      if (lowered) return;
+      lowered = true;
+      setVisible(false);
+    };
+    const timer = setTimeout(lower, 180);
+    void window.piDesktop
+      .invoke(`${kind}:capture`, { tabId: tab.id })
+      .then((res) => {
+        freezeFrame(entry.el, (res as { dataUrl?: string | null } | undefined)?.dataUrl ?? null);
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        clearTimeout(timer);
+        lower();
+      });
   }
 
   /**

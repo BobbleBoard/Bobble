@@ -69,6 +69,10 @@ export interface PrefillCompletionResult {
   /** Prompt tokens the server actually prefilled this call (`/completion`
    * `tokens_evaluated`). Telemetry only; the reuse that matters is the later turn. */
   readonly promptN?: number;
+  /** Tokens the server actually had to read (cache hits excluded). */
+  readonly processedN?: number;
+  /** Milliseconds it spent reading them. With {@link processedN}, a rate. */
+  readonly processedMs?: number;
 }
 
 /** Map the neutral tool shape to OpenAI `{type:'function',function:{…}}` — the
@@ -157,10 +161,24 @@ export async function prefillCompletion(
       ...signalInit,
     });
     if (!compRes.ok) throw new Error(`prefill completion: server returned ${compRes.status}`);
-    const j = (await compRes.json()) as { tokens_evaluated?: number };
+    const j = (await compRes.json()) as {
+      tokens_evaluated?: number;
+      timings?: { prompt_n?: number; prompt_ms?: number };
+    };
+    /*
+     * HOW FAST THIS MACHINE READS A PROMPT, straight from the server.
+     *
+     * `timings.prompt_n` is what it actually had to process (cache hits are not
+     * in it) and `prompt_ms` how long that took, so the pair is a real, local
+     * tokens-per-second — the only honest basis for telling someone a switch
+     * will cost them eighteen seconds. Measuring it from wall time here would
+     * count a fully-cached prime as infinitely fast and quote nonsense.
+     */
     return {
       aborted: false,
       ...(typeof j.tokens_evaluated === 'number' ? { promptN: j.tokens_evaluated } : {}),
+      ...(typeof j.timings?.prompt_n === 'number' ? { processedN: j.timings.prompt_n } : {}),
+      ...(typeof j.timings?.prompt_ms === 'number' ? { processedMs: j.timings.prompt_ms } : {}),
     };
   } catch (error) {
     if (isAbort(error, opts.signal)) return { aborted: true };

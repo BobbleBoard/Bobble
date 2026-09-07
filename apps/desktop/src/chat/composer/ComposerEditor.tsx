@@ -17,6 +17,7 @@ import {
   $getRoot,
   $getSelection,
   $isElementNode,
+  $isNodeSelection,
   $isRangeSelection,
   $isTextNode,
   COMMAND_PRIORITY_HIGH,
@@ -25,6 +26,8 @@ import {
   INSERT_LINE_BREAK_COMMAND,
   KEY_ARROW_DOWN_COMMAND,
   KEY_ARROW_UP_COMMAND,
+  KEY_BACKSPACE_COMMAND,
+  KEY_DELETE_COMMAND,
   KEY_ENTER_COMMAND,
   KEY_ESCAPE_COMMAND,
   KEY_TAB_COMMAND,
@@ -33,7 +36,8 @@ import {
 } from 'lexical';
 import { type MutableRefObject, useEffect, useRef } from 'react';
 import { registerPillRenderer } from './PillRenderer';
-import { $createPillNode, type PillData, PillNode } from './pill-node';
+import { deleteAdjacentPill } from './pill-delete';
+import { $createPillNode, $isPillNode, type PillData, PillNode } from './pill-node';
 import { type AcToken, detectToken, EMPTY_TOKEN } from './tokens';
 
 export interface ComposerEditorApi {
@@ -328,6 +332,55 @@ function EditorBridge(props: Omit<ComposerEditorProps, 'placeholder' | 'disabled
           return false;
         },
         COMMAND_PRIORITY_HIGH,
+      ),
+      /*
+       * A PILL DELETES LIKE A CHARACTER (see pill-delete.ts for why).
+       *
+       * The three shapes a caret can have beside a decorator are all here
+       * because Lexical genuinely produces all three: inside a text node at its
+       * edge, directly between two block children, or with the decorator itself
+       * selected. Reading the neighbourhood here and deciding in a pure function
+       * keeps this registration about the editor and the rule about the rule.
+       */
+      ...(['backward', 'forward'] as const).map((direction) =>
+        editor.registerCommand(
+          direction === 'backward' ? KEY_BACKSPACE_COMMAND : KEY_DELETE_COMMAND,
+          () => {
+            let handled = false;
+            editor.update(() => {
+              const selection = $getSelection();
+              if ($isNodeSelection(selection)) {
+                const node = selection.getNodes()[0];
+                handled = deleteAdjacentPill(
+                  { selected: $isPillNode(node) ? node : null },
+                  direction,
+                );
+                return;
+              }
+              if (!$isRangeSelection(selection) || !selection.isCollapsed()) return;
+              const { anchor } = selection;
+              const node = anchor.getNode();
+              let before: unknown = null;
+              let after: unknown = null;
+              if ($isTextNode(node)) {
+                if (anchor.offset === 0) before = node.getPreviousSibling();
+                if (anchor.offset === node.getTextContentSize()) after = node.getNextSibling();
+              } else if ($isElementNode(node)) {
+                before = node.getChildAtIndex(anchor.offset - 1);
+                after = node.getChildAtIndex(anchor.offset);
+              }
+              handled = deleteAdjacentPill(
+                {
+                  before: $isPillNode(before as never) ? (before as PillNode) : null,
+                  after: $isPillNode(after as never) ? (after as PillNode) : null,
+                },
+                direction,
+              );
+            });
+            return handled;
+          },
+          COMMAND_PRIORITY_HIGH,
+        ),
       ),
       // OnChangePlugin ignores selection-only updates; re-detect on caret move.
       editor.registerCommand(

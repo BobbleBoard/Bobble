@@ -1,6 +1,6 @@
 import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
 import { Compartment, EditorState, type Extension, Transaction } from '@codemirror/state';
-import { EditorView, keymap, lineNumbers } from '@codemirror/view';
+import { EditorView, keymap, lineNumbers, ViewPlugin, type ViewUpdate } from '@codemirror/view';
 import { tags as t } from '@lezer/highlight';
 import { IconCheck, IconCopy, writeClipboardText } from '@pi-desktop/ui';
 import { useEffect, useRef, useState } from 'react';
@@ -84,10 +84,76 @@ const codeTheme = EditorView.theme({
       'linear-gradient(var(--pd-code-block-bg), var(--pd-code-block-bg)), var(--pd-bg-raised)',
     color: 'var(--pd-text-ghost)',
     border: 'none',
+    /* Room for the rule to sit in, rather than against the code. */
+    paddingRight: '12px',
+  },
+  /*
+   * THE RULE BESIDE THE NUMBERS — the visible edge of the gutter, and the thing
+   * you actually see when the code slides under it.
+   *
+   * the user: "for line nums, need a vertical line a little to the right connected
+   * from first line to last line not top to bottom of them that acts as the
+   * better border when hscrolling."
+   *
+   * "not top to bottom" is the whole specification. `.cm-gutters` is as tall as
+   * the pane, not as tall as the file, so a plain `border-right` on it draws a
+   * full-height stripe past the end of an eight-line file — a frame around empty
+   * space. The height comes from the document instead (see `gutterRuleHeight`),
+   * so the rule ends where the code does.
+   *
+   * `.cm-gutters` is `position: sticky`, which is a positioned element, so this
+   * hangs off it directly and inherits the horizontal pinning for free.
+   */
+  '.cm-gutters::after': {
+    content: '""',
+    position: 'absolute',
+    top: 'var(--pd-gutter-rule-top, 0px)',
+    right: '7px',
+    width: '1px',
+    height: 'var(--pd-gutter-rule-height, 100%)',
+    background: 'var(--pd-canvas-rule, var(--pd-border-default))',
+    pointerEvents: 'none',
   },
   '.cm-content': { caretColor: 'transparent' },
   '.cm-activeLine, .cm-activeLineGutter': { backgroundColor: 'transparent' },
 });
+
+/**
+ * Publish where the document starts and how tall it is, so the gutter rule can
+ * span the FILE rather than the pane (see `.cm-gutters::after`).
+ *
+ * `contentHeight` is the rendered document height including `.cm-content`'s own
+ * vertical padding, so the padding is read back off and subtracted — that is the
+ * difference between "from the first line to the last" and "from four pixels
+ * above the first line to four pixels below the last".
+ *
+ * Both halves go through `requestMeasure`, which is CodeMirror's own read/write
+ * split: measuring inside `update` would read layout in the middle of a DOM
+ * write and thrash on every keystroke of a streaming file.
+ */
+const gutterRuleHeight = ViewPlugin.fromClass(
+  class {
+    constructor(view: EditorView) {
+      this.measure(view);
+    }
+    update(u: ViewUpdate) {
+      if (u.geometryChanged || u.docChanged) this.measure(u.view);
+    }
+    measure(view: EditorView) {
+      view.requestMeasure({
+        read: (v) => {
+          const pad = Number.parseFloat(getComputedStyle(v.contentDOM).paddingTop);
+          const top = Number.isFinite(pad) ? pad : 0;
+          return { top, height: Math.max(0, v.contentHeight - top * 2) };
+        },
+        write: ({ top, height }, v) => {
+          v.dom.style.setProperty('--pd-gutter-rule-top', `${Math.round(top)}px`);
+          v.dom.style.setProperty('--pd-gutter-rule-height', `${Math.round(height)}px`);
+        },
+      });
+    }
+  },
+);
 
 /** Editable overlay: restore a visible caret + a subtle active-line tint so the
  * raw source reads like an editor, not a static viewer. Applied AFTER codeTheme
@@ -218,6 +284,7 @@ export function CodeSurface({
         doc: content.text,
         extensions: [
           lineNumbers(),
+          gutterRuleHeight,
           syntaxHighlighting(pdHighlight, { fallback: true }),
           langCompartment.of(languageExtension(content.language)),
           codeTheme,

@@ -181,7 +181,17 @@ export type PiInvokeMap = {
       /** The turn's tools, in render order (part of the prefix identity). */
       tools?: Array<{ name: string; description?: string; parameters?: unknown }>;
     };
-    response: { success: boolean; aborted?: boolean; promptN?: number; error?: string };
+    response: {
+      success: boolean;
+      aborted?: boolean;
+      promptN?: number;
+      /** Tokens the server actually READ (cache hits excluded) and how long it
+       * spent on them — a measured local prompt-processing rate, which is what
+       * makes "this switch costs about 18s" a fact rather than a guess. */
+      processedN?: number;
+      processedMs?: number;
+      error?: string;
+    };
   };
   /** Abort an in-flight prefill (the draft changed or the turn was sent). */
   'pi:prefill-abort': { request: undefined; response: { ok: boolean } };

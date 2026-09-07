@@ -114,6 +114,13 @@ let instructionsArmed = false;
  * `pi:new-session` would otherwise dispose the running turn. See newSession +
  * ensurePiOnViewedSession. */
 let pendingNewSession = false;
+/**
+ * The `pi:new-session` call a New chat has already started but not finished.
+ *
+ * The UI does not wait for it (see {@link newSession}); a SEND does, because a
+ * prompt dispatched before pi has moved would land in the previous chat.
+ */
+let pendingNewSessionRpc: Promise<unknown> | null = null;
 
 function armSessionInstructions(): void {
   instructionsArmed = true;
@@ -338,32 +345,61 @@ export async function newSession(): Promise<{ ok: boolean; cancelled?: boolean; 
   invalidateInFlightSend();
   if (agentInFlight()) await abortPi();
   pendingNewSession = false;
-  const res = await window.piDesktop.invoke('pi:new-session', undefined);
-  // Reset the rendered thread + transient run/branch state to the fresh session
-  // (also clears any stale bridgeExited/notifications). Unconditional so New
-  // chat always yields a clean slate, even if the RPC failed.
+
+  /*
+   * PAINT THE EMPTY CHAT, THEN TELL PI. the user: "clicking new chat still takes a
+   * few seconds."
+   *
+   * This used to `await pi:new-session` and `await get_state` before clearing a
+   * single pixel, so pressing New chat left you in the old conversation for as
+   * long as the pi child took to answer — which on a busy machine is the couple
+   * of seconds he is describing. Nothing in the reset needs pi's answer: an
+   * empty thread, a fresh canvas and a cleared pointer are all local facts.
+   *
+   * The RPC still starts immediately (NOT lazily at first send — a new chat's
+   * first message is exactly where latency is most expensive), and the promise
+   * is parked where a send can wait on it. Same shape as a chat switch, which
+   * paints first for the same reason: see `pendingPiSwitch`.
+   */
   usePiStore.getState().setMessagesExternal([]);
   // Session isolation (backlog #2): a new conversation gets its OWN clean canvas
   // — drop the previous chat's accumulated tabs + close the rail so canvases
   // don't pile up across "separate" chats.
   resetCanvasForNewSession();
-  if (!res.success) return { ok: false, error: res.error };
-  if (res.cancelled === true) return { ok: true, cancelled: true };
   // A fresh session adopts the saved custom instructions on its first prompt.
   armSessionInstructions();
-  // Sync the store's session id/file to pi's new session so the sidebar refresh
-  // trigger + selected-row highlight track it (pi emits no session event here).
-  const state = await getPiState();
-  if (state.success && state.state !== undefined) {
-    usePiStore.setState((s) => ({
-      session: {
-        ...s.session,
-        sessionFile: state.state?.sessionFile,
-        sessionId: state.state?.sessionId,
-      },
-    }));
-  }
-  return { ok: true };
+  // Nothing may dispatch into the chat we just left while the RPC is in flight.
+  usePiStore.setState((s) => ({
+    session: { ...(s.session ?? {}), sessionFile: undefined, sessionId: undefined },
+  }));
+
+  /*
+   * ONE promise covering the whole hand-off, so awaiting it leaves the store
+   * fully repointed. Waiting on the create alone would let a send dispatched a
+   * moment later run with no session pointer at all.
+   */
+  const rpc = (async () => {
+    const res = await window.piDesktop.invoke('pi:new-session', undefined);
+    if (!res.success) return { ok: false, error: res.error };
+    if (res.cancelled === true) return { ok: true, cancelled: true };
+    // Sync the store's session id/file to pi's new session so the sidebar refresh
+    // trigger + selected-row highlight track it (pi emits no session event here).
+    const state = await getPiState();
+    if (state.success && state.state !== undefined) {
+      usePiStore.setState((s) => ({
+        session: {
+          ...s.session,
+          sessionFile: state.state?.sessionFile,
+          sessionId: state.state?.sessionId,
+        },
+      }));
+    }
+    return { ok: true };
+  })();
+  pendingNewSessionRpc = rpc;
+  const settled = await rpc;
+  if (pendingNewSessionRpc === rpc) pendingNewSessionRpc = null;
+  return settled;
 }
 
 /** `data:<mime>;base64,<data>` → pi ImageContent. */
@@ -1498,6 +1534,11 @@ async function ensurePiOnViewedSession(): Promise<void> {
   if (pendingPiSwitch !== null) {
     await pendingPiSwitch;
     pendingPiSwitch = null;
+  }
+  // ...and so does a New chat, which paints its empty thread the same way.
+  if (pendingNewSessionRpc !== null) {
+    await pendingNewSessionRpc.catch(() => undefined);
+    pendingNewSessionRpc = null;
   }
   const store = usePiStore.getState();
   const bg = store.bgRun;

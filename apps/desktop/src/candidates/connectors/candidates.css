@@ -1,0 +1,297 @@
+/*
+ * Shared chrome for the connector candidates. Every colour, radius and motion
+ * value is a --pd-* token so all six flavour × mode combinations restyle it;
+ * nothing here is a hex.
+ */
+
+/* ---- the mark tile: one container whatever is inside it ---- */
+.cand-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  border-radius: var(--pd-radius-md);
+  background: var(--pd-bg-inset);
+  box-shadow: inset 0 0 0 1px var(--pd-border-default);
+  color: var(--pd-text-primary);
+}
+
+/* A skill is a document, not a brand: its tile is drawn as a page. */
+.cand-mark--skill {
+  background: var(--pd-bg-raised);
+  color: var(--pd-text-secondary);
+}
+
+/* ---- status dot ---- */
+.cand-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: var(--pd-radius-full);
+  background: var(--pd-text-muted);
+  box-shadow: 0 0 0 2px var(--pd-bg-raised);
+}
+.cand-dot[data-state="on"],
+.cand-dot[data-state="builtin"] {
+  background: var(--pd-status-success-fg);
+}
+.cand-dot[data-state="needs-setup"] {
+  background: var(--pd-status-warning-fg);
+}
+.cand-dot[data-state="off"] {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--pd-text-muted);
+}
+.cand-dot[data-state="available"] {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--pd-border-strong);
+}
+
+/* ---- pill-shaped search, same recipe as the model hub ---- */
+.cand-search {
+  min-width: 0;
+  flex: 1;
+  height: var(--pd-control-md);
+  padding: 0 14px 0 36px;
+  border: 1px solid var(--pd-border-subtle);
+  border-radius: var(--pd-radius-full);
+  background: var(--pd-bg-raised);
+  color: var(--pd-text-primary);
+  font-family: var(--pd-font-sans);
+  font-size: var(--pd-font-size-body);
+  box-shadow: var(--pd-shadow-hairline);
+}
+.cand-search::placeholder {
+  color: var(--pd-text-muted);
+}
+.cand-search::-webkit-search-decoration,
+.cand-search::-webkit-search-cancel-button {
+  appearance: none;
+}
+.cand-search-wrap {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-width: 0;
+}
+.cand-search-wrap > .pd-icon,
+.cand-search-wrap > svg {
+  position: absolute;
+  left: 13px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--pd-text-muted);
+  pointer-events: none;
+}
+
+/* ---- filter pills ---- */
+.cand-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 12px;
+  border: 1px solid var(--pd-border-subtle);
+  border-radius: var(--pd-radius-full);
+  background: var(--pd-bg-raised);
+  color: var(--pd-text-secondary);
+  font-family: var(--pd-font-sans);
+  font-size: var(--pd-font-size-footnote);
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color var(--pd-duration-base) var(--pd-easing-standard),
+    color var(--pd-duration-base) var(--pd-easing-standard);
+}
+.cand-pill:hover {
+  background: var(--pd-bg-hover);
+  color: var(--pd-text-primary);
+}
+.cand-pill[aria-pressed="true"] {
+  background: var(--pd-text-primary);
+  border-color: transparent;
+  color: var(--pd-bg-raised);
+}
+.cand-pill-count {
+  opacity: 0.6;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- a card / row that is the open-details target ---- */
+.cand-card {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 12px 12px 12px;
+  border-radius: var(--pd-radius-lg);
+  background: var(--pd-bg-raised);
+  box-shadow: 0 0 0 1px var(--pd-border-subtle);
+  transition:
+    background-color var(--pd-duration-base) var(--pd-easing-standard),
+    box-shadow var(--pd-duration-base) var(--pd-easing-standard);
+}
+.cand-card:hover {
+  background: var(--pd-bg-hover);
+}
+.cand-card[data-selected="true"] {
+  box-shadow: 0 0 0 1.5px var(--pd-border-focus);
+}
+
+/* ---- list row (ledger / reach) ---- */
+.cand-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 52px;
+  padding: 8px 12px;
+  border-radius: var(--pd-radius-row);
+  color: var(--pd-text-primary);
+  text-align: left;
+  transition: background-color var(--pd-duration-base) var(--pd-easing-standard);
+}
+.cand-row:hover {
+  background: var(--pd-bg-hover);
+}
+.cand-row[data-selected="true"] {
+  background: var(--pd-bg-selected);
+}
+
+/* ---- the slide-over detail sheet (Shelf) ---- */
+.cand-sheet {
+  position: relative;
+  flex: none;
+  width: min(440px, 52%);
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  /* OPAQUE: --pd-bg-overlay is ~85% in the bobble flavours, so it is composited
+     over a solid base — the same fix the menus needed. */
+  background: linear-gradient(var(--pd-bg-overlay), var(--pd-bg-overlay)), var(--pd-bg-raised);
+  box-shadow:
+    -1px 0 0 0 var(--pd-border-subtle),
+    var(--pd-shadow-lg);
+  animation: cand-sheet-in var(--pd-duration-slow) var(--pd-easing-enter);
+}
+@keyframes cand-sheet-in {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cand-sheet {
+    animation: none;
+  }
+}
+
+/* ---- inline expansion (Reach) ---- */
+.cand-expand {
+  overflow: hidden;
+  transition: height var(--pd-duration-slow) var(--pd-easing-standard);
+}
+.cand-expand-body {
+  padding: 4px 12px 16px 64px;
+}
+@media (max-width: 960px) {
+  .cand-expand-body {
+    padding-left: 12px;
+  }
+}
+
+/* ---- the "on now" strip tiles (Shelf) ---- */
+.cand-tile {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--pd-radius-md);
+  background: var(--pd-bg-raised);
+  box-shadow: 0 0 0 1px var(--pd-border-subtle);
+  color: var(--pd-text-primary);
+  cursor: pointer;
+  transition:
+    transform var(--pd-duration-base) var(--pd-easing-spring),
+    box-shadow var(--pd-duration-base) var(--pd-easing-standard);
+}
+.cand-tile:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    0 0 0 1px var(--pd-border-default),
+    var(--pd-shadow-sm);
+}
+.cand-tile > .cand-dot {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 9px;
+  height: 9px;
+}
+
+/* ---- a key/value spec list in details ---- */
+.cand-spec {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr);
+  row-gap: 6px;
+  column-gap: 12px;
+  font-size: var(--pd-font-size-footnote);
+}
+.cand-spec dt {
+  color: var(--pd-text-muted);
+}
+.cand-spec dd {
+  margin: 0;
+  min-width: 0;
+  color: var(--pd-text-primary);
+  overflow-wrap: anywhere;
+}
+
+/* ---- muted mono for commands (never a scrolling code block for one line) ---- */
+.cand-cmd {
+  display: block;
+  padding: 8px 10px;
+  border-radius: var(--pd-radius-sm);
+  background: var(--pd-code-block-bg);
+  box-shadow: inset 0 0 0 1px var(--pd-code-block-border);
+  color: var(--pd-text-secondary);
+  font-family: var(--pd-font-mono);
+  font-size: var(--pd-font-size-caption);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* ---- the group heading with a hairline that fades at its ends ---- */
+.cand-group-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 0 0 8px;
+}
+
+/* ---- a document inside a detail: prose at UI scale, not chat scale ----
+   .pd-prose sizes itself for a chat response (--pd-font-response-size); a
+   SKILL.md read inside a 440px sheet needs body scale and tighter headings. */
+.cand-doc .pd-prose {
+  font-size: var(--pd-font-size-footnote);
+  line-height: var(--pd-leading-footnote);
+}
+.cand-doc .pd-prose h1 {
+  font-size: var(--pd-font-size-heading);
+}
+.cand-doc .pd-prose h2 {
+  font-size: var(--pd-font-size-body);
+}
+.cand-doc .pd-prose h3,
+.cand-doc .pd-prose :is(h4, h5, h6) {
+  font-size: var(--pd-font-size-footnote);
+}

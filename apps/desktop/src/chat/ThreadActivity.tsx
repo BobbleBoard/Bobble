@@ -173,6 +173,8 @@ export function ThreadActivityChain({
    * and not an easing curve — the chain shows exactly what llama reports, or an
    * indeterminate ring when it has not reported yet.
    */
+  /** Output streamed by tools that have not returned yet, keyed by call id. */
+  const partials = usePiStore((st) => st.toolOutputPartials);
   const prefillRaw = usePiStore((st) => st.extensionStatus[PREFILL_STATUS_KEY]);
   const prefillPct = parsePrefillPercent(prefillRaw);
 
@@ -195,7 +197,35 @@ export function ThreadActivityChain({
             running,
             !streaming && i === firstThinkingIdx ? thinkingMs : undefined,
           )
-        : mapToolStep(block, resultForBlock.get(block.id), running);
+        : mapToolStep(
+            block,
+            /*
+             * A RUNNING TOOL SHOWS WHAT IT HAS PRINTED SO FAR.
+             *
+             * pi streams a tool's output while it runs; until now that stream was
+             * discarded, so a command that had been going for a minute could show
+             * you nothing but a spinner. the user, on exactly that row: "nor the live
+             * output that I should be able to see."
+             *
+             * The real result still wins the moment it exists — this only fills
+             * the gap before it, which is the only time it can say anything the
+             * result cannot. Shaped as a ToolResultMsg so `mapToolStep` needs to
+             * know nothing about where the text came from.
+             */
+            resultForBlock.get(block.id) ??
+              (running && partials[block.id] !== undefined
+                ? ({
+                    kind: 'toolResult',
+                    id: `${block.id}:partial`,
+                    toolCallId: block.id,
+                    toolName: block.name,
+                    text: partials[block.id] as string,
+                    isError: false,
+                    timestamp: 0,
+                  } satisfies ToolResultMsg)
+                : undefined),
+            running,
+          );
     // Give each step an identity that outlives its LABEL. ActivityChain keys its
     // rows on `id`, falling back to `kind:label` — and the label flips tense the
     // instant a step settles ("Editing a file" → "Edited a file"), which re-keyed

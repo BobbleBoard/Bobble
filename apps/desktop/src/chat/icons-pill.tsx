@@ -9,7 +9,18 @@
  */
 export function IconWarning({ size = 14 }: { size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" aria-hidden focusable="false">
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 16 16"
+      fill="none"
+      role="img"
+      aria-label="Warning"
+      focusable="false"
+    >
+      {/* Named rather than aria-hidden: this mark is sometimes the ONLY thing
+          saying an attachment will not be read, and a decorative icon beside no
+          text says nothing to a screen reader. */}
       <circle cx="8" cy="8" r="7" fill="currentColor" />
       <path d="M8 4.25v4.4" stroke="var(--pd-bg-base)" strokeWidth="1.6" strokeLinecap="round" />
       <circle cx="8" cy="11.35" r="0.95" fill="var(--pd-bg-base)" />

@@ -1,0 +1,707 @@
+/*
+ * Schedule candidates — shared styles. Every colour, radius, duration and
+ * easing is a --pd-* token so the six flavor × mode combinations restyle it
+ * live; nothing here is a literal colour. Prefixed `sc-` so nothing can
+ * collide with the shipping screen's classes.
+ *
+ * These rules are UNLAYERED, so they beat Tailwind's layered utilities on the
+ * same element whatever the specificity. That is why no rule here sets a
+ * margin a caller might want to tune with `mt-*` — the first draft did, and
+ * every `mt-8` in the candidates silently lost.
+ */
+
+/* ---- page ---------------------------------------------------------------- */
+
+.sc-page {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+  background: var(--pd-bg-base);
+  color: var(--pd-text-primary);
+  font-family: var(--pd-font-sans);
+  animation: sc-in var(--pd-duration-base) var(--pd-easing-enter);
+}
+
+@keyframes sc-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sc-page {
+    animation: none;
+  }
+}
+
+.sc-title {
+  font-size: var(--pd-font-size-title);
+  line-height: var(--pd-leading-title);
+  font-weight: var(--pd-font-weight-medium);
+  letter-spacing: -0.01em;
+}
+
+.sc-subtitle {
+  margin-top: 2px;
+  color: var(--pd-text-muted);
+  font-size: var(--pd-font-size-footnote);
+  line-height: var(--pd-leading-footnote);
+}
+
+/* A detail pane's title: between a row name (14) and the page title (22). */
+.sc-detail-title {
+  font-size: calc(var(--pd-font-size-heading) * 1.125);
+  line-height: 1.3;
+  font-weight: var(--pd-font-weight-medium);
+  letter-spacing: -0.01em;
+}
+
+/* ---- the honesty strip (what this Mac can promise) ------------------------ */
+
+.sc-machine {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  min-height: 34px;
+  padding: 6px 12px;
+  border-radius: var(--pd-radius-md);
+  background: var(--pd-bg-inset);
+  box-shadow: var(--pd-shadow-hairline);
+  color: var(--pd-text-secondary);
+  font-size: var(--pd-font-size-footnote);
+  line-height: var(--pd-leading-footnote);
+}
+
+.sc-machine-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.sc-machine-item .pd-icon {
+  color: var(--pd-text-muted);
+  flex: none;
+}
+
+.sc-machine-item[data-tone="warn"] {
+  color: var(--pd-status-warning-fg);
+}
+
+.sc-machine-item[data-tone="warn"] .pd-icon {
+  color: inherit;
+}
+
+.sc-machine-item[data-tone="live"] {
+  color: var(--pd-text-primary);
+}
+
+/* ---- status --------------------------------------------------------------- */
+
+/* A state word in a quiet pill: Next / Due / Missed / Paused / Running. */
+.sc-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: var(--pd-radius-full);
+  background: var(--pd-bg-hover);
+  color: var(--pd-text-secondary);
+  font-size: var(--pd-font-size-caption);
+  line-height: 1;
+  font-weight: var(--pd-font-weight-medium);
+  white-space: nowrap;
+}
+
+.sc-pill[data-tone="ok"] {
+  background: var(--pd-status-success-bg);
+  color: var(--pd-status-success-fg);
+}
+
+.sc-pill[data-tone="error"] {
+  background: var(--pd-status-danger-bg);
+  color: var(--pd-status-danger-fg);
+}
+
+.sc-pill[data-tone="warn"] {
+  background: var(--pd-status-warning-bg);
+  color: var(--pd-status-warning-fg);
+}
+
+.sc-pill[data-tone="live"] {
+  background: var(--pd-accent-subtle);
+  color: var(--pd-accent-primary);
+}
+
+/* What a task reaches: a hairline chip with a glyph. */
+.sc-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: var(--pd-radius-full);
+  box-shadow: 0 0 0 1px var(--pd-border-default);
+  color: var(--pd-text-secondary);
+  font-size: var(--pd-font-size-caption);
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.sc-chip .pd-icon {
+  color: var(--pd-text-muted);
+}
+
+/* Seven days, one dot each: which of them this task fires on. */
+.sc-week {
+  display: inline-flex;
+  gap: 3px;
+  align-items: center;
+}
+
+.sc-week-day {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  width: 10px;
+}
+
+.sc-week-day-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: var(--pd-radius-full);
+  background: var(--pd-border-default);
+}
+
+.sc-week-day[data-on="true"] .sc-week-day-dot {
+  background: var(--pd-text-secondary);
+}
+
+.sc-week-day-label {
+  color: var(--pd-text-muted);
+  font-size: 9px;
+  line-height: 1;
+}
+
+/* ---- list rows (ledger sidebar, agenda) ----------------------------------- */
+
+/*
+ * A row is either a <button> itself (ledger) or a container whose hit target
+ * is an inner .sc-row-hit <button> with the actions as siblings (agenda) —
+ * nested interactive elements are how a row ends up unreachable by keyboard.
+ */
+.sc-row {
+  position: relative;
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: var(--pd-radius-row);
+  background: transparent;
+  color: var(--pd-text-primary);
+  font: inherit;
+  text-align: left;
+  transition: background-color var(--pd-duration-base) var(--pd-easing-standard);
+}
+
+button.sc-row {
+  cursor: pointer;
+}
+
+.sc-row:hover {
+  background: var(--pd-bg-hover);
+}
+
+.sc-row[data-selected="true"] {
+  background: var(--pd-bg-selected);
+}
+
+.sc-row-hit {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  gap: 12px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sc-row-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--pd-font-size-body);
+  line-height: var(--pd-leading-body);
+  font-weight: var(--pd-font-weight-medium);
+}
+
+.sc-row[data-muted="true"] .sc-row-name {
+  color: var(--pd-text-muted);
+}
+
+.sc-row-meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--pd-text-muted);
+  font-size: var(--pd-font-size-footnote);
+  line-height: var(--pd-leading-footnote);
+}
+
+/* Hover-revealed controls at the row's right end (sidebar-row grammar). */
+.sc-row-actions {
+  display: none;
+  align-items: center;
+  gap: 2px;
+  flex: none;
+}
+
+.sc-row:hover .sc-row-actions,
+.sc-row:focus-within .sc-row-actions {
+  display: inline-flex;
+}
+
+.sc-row:hover .sc-row-trailing,
+.sc-row:focus-within .sc-row-trailing {
+  display: none;
+}
+
+/* ---- cards --------------------------------------------------------------- */
+
+.sc-card {
+  border: 1px solid color-mix(in oklab, var(--pd-text-primary) 12%, var(--pd-bg-raised));
+  border-radius: var(--pd-radius-lg);
+  background: var(--pd-bg-raised);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 6%);
+  transition:
+    border-color var(--pd-duration-fast) var(--pd-easing-standard),
+    box-shadow var(--pd-duration-fast) var(--pd-easing-standard),
+    transform var(--pd-duration-base) var(--pd-easing-spring);
+}
+
+.sc-card--clickable {
+  cursor: pointer;
+}
+
+.sc-card--clickable:hover {
+  border-color: var(--pd-border-strong);
+  box-shadow: 0 2px 6px rgb(0 0 0 / 10%);
+  transform: translateY(-1px);
+}
+
+.sc-card--selected {
+  border-color: var(--pd-accent-primary);
+  box-shadow: 0 0 0 1px var(--pd-accent-primary);
+}
+
+/* A card you have not made yet: a template, or "new". */
+.sc-card--ghost {
+  border-style: dashed;
+  background: transparent;
+  box-shadow: none;
+}
+
+.sc-card--ghost:hover {
+  background: var(--pd-bg-hover);
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sc-card--clickable:hover {
+    transform: none;
+  }
+}
+
+.sc-tile {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--pd-radius-sm);
+  background: var(--pd-bg-inset);
+  box-shadow: var(--pd-shadow-hairline);
+  color: var(--pd-text-secondary);
+  flex: none;
+}
+
+.sc-tile--lg {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--pd-radius-md);
+}
+
+/* ---- the prompt, shown as the contract it is ------------------------------ */
+
+.sc-prompt {
+  padding: 12px 14px;
+  border-radius: var(--pd-radius-md);
+  background: var(--pd-bg-inset);
+  box-shadow: var(--pd-shadow-hairline);
+  color: var(--pd-text-secondary);
+  font-family: var(--pd-font-sans);
+  font-size: var(--pd-font-size-footnote);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
+/* ---- the ledger of runs --------------------------------------------------- */
+
+.sc-run {
+  position: relative;
+  display: grid;
+  grid-template-columns: 16px 1fr;
+  column-gap: 12px;
+  padding: 10px 0;
+}
+
+/* The rail: a hairline joining the dots into a timeline. */
+.sc-run::before {
+  content: "";
+  position: absolute;
+  top: 28px;
+  bottom: -8px;
+  left: 7.5px;
+  width: 1px;
+  background: var(--pd-border-default);
+}
+
+.sc-run:last-child::before {
+  display: none;
+}
+
+.sc-run-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  color: var(--pd-text-muted);
+}
+
+.sc-run-dot[data-tone="ok"] {
+  color: var(--pd-status-success-fg);
+}
+
+.sc-run-dot[data-tone="error"] {
+  color: var(--pd-status-danger-fg);
+}
+
+.sc-run-dot[data-tone="live"] {
+  color: var(--pd-accent-primary);
+}
+
+.sc-run-head {
+  display: flex;
+  width: 100%;
+  align-items: baseline;
+  gap: 8px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sc-run-when {
+  color: var(--pd-text-primary);
+  font-size: var(--pd-font-size-footnote);
+  line-height: var(--pd-leading-footnote);
+  font-weight: var(--pd-font-weight-medium);
+  white-space: nowrap;
+}
+
+.sc-run-took {
+  color: var(--pd-text-muted);
+  font-size: var(--pd-font-size-caption);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.sc-run-headline {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--pd-text-secondary);
+  font-size: var(--pd-font-size-footnote);
+  line-height: var(--pd-leading-footnote);
+}
+
+.sc-run-headline[data-tone="error"] {
+  color: var(--pd-status-danger-fg);
+}
+
+.sc-run-body {
+  margin-top: 6px;
+  color: var(--pd-text-secondary);
+  font-size: var(--pd-font-size-footnote);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
+.sc-run-body[data-tone="error"] {
+  color: var(--pd-status-danger-fg);
+}
+
+.sc-run-trail {
+  color: var(--pd-text-muted);
+  font-size: var(--pd-font-size-caption);
+  line-height: var(--pd-leading-caption);
+}
+
+.sc-artifacts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.sc-artifact {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--pd-radius-sm);
+  background: var(--pd-bg-inset);
+  box-shadow: var(--pd-shadow-hairline);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: box-shadow var(--pd-duration-fast) var(--pd-easing-standard);
+}
+
+.sc-artifact:hover {
+  box-shadow: 0 0 0 1px var(--pd-border-strong);
+}
+
+.sc-artifact-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 84px;
+  color: var(--pd-text-muted);
+  background: var(--pd-bg-inset);
+}
+
+.sc-artifact-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.sc-artifact-name {
+  overflow: hidden;
+  padding: 4px 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--pd-text-secondary);
+  font-size: var(--pd-font-size-caption);
+  line-height: var(--pd-leading-caption);
+}
+
+/* ---- inline editor -------------------------------------------------------- */
+
+.sc-field-label {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--pd-text-muted);
+  font-size: var(--pd-font-size-caption);
+  line-height: var(--pd-leading-caption);
+}
+
+.sc-preview {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  color: var(--pd-text-muted);
+  font-size: var(--pd-font-size-footnote);
+  line-height: var(--pd-leading-footnote);
+}
+
+.sc-preview strong {
+  color: var(--pd-text-primary);
+  font-weight: var(--pd-font-weight-medium);
+}
+
+/* The parse preview under the agenda composer — chips that appear as you type. */
+.sc-parse {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-height: 24px;
+  padding: 0 4px;
+  color: var(--pd-text-muted);
+  font-size: var(--pd-font-size-footnote);
+  animation: sc-in var(--pd-duration-fast) var(--pd-easing-enter);
+}
+
+/* ---- sheet (routines detail) --------------------------------------------- */
+
+.sc-sheet-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  border: 0;
+  background: var(--pd-bg-backdrop);
+  cursor: default;
+  animation: pd-fade-in var(--pd-duration-fast) var(--pd-easing-standard);
+}
+
+.sc-sheet {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 31;
+  display: flex;
+  width: min(520px, 100%);
+  flex-direction: column;
+  /* Opaque: the overlay colour composited on a solid base, the app's own rule. */
+  background: linear-gradient(var(--pd-bg-overlay), var(--pd-bg-overlay)), var(--pd-bg-raised);
+  box-shadow: var(--pd-shadow-hairline), var(--pd-shadow-lg);
+  animation: sc-sheet-in var(--pd-duration-slow) var(--pd-easing-enter);
+}
+
+@keyframes sc-sheet-in {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sc-sheet,
+  .sc-sheet-backdrop {
+    animation: none;
+  }
+}
+
+/* ---- misc ----------------------------------------------------------------- */
+
+.sc-section-title {
+  margin-bottom: 8px;
+  color: var(--pd-text-muted);
+  font-size: var(--pd-font-size-caption);
+  line-height: var(--pd-leading-caption);
+  font-weight: var(--pd-font-weight-medium);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.sc-time {
+  font-variant-numeric: tabular-nums;
+}
+
+.sc-clamp-2 {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.sc-clamp-3 {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.sc-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: var(--pd-radius-sm);
+  background: transparent;
+  color: var(--pd-text-muted);
+  cursor: pointer;
+  transition:
+    background-color var(--pd-duration-base) var(--pd-easing-standard),
+    color var(--pd-duration-base) var(--pd-easing-standard);
+}
+
+.sc-icon-btn:hover {
+  background: var(--pd-bg-hover);
+  color: var(--pd-text-primary);
+}
+
+.sc-icon-btn[data-tone="danger"]:hover {
+  background: var(--pd-status-danger-bg);
+  color: var(--pd-status-danger-fg);
+}
+
+.sc-icon-btn:disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.sc-agenda-time {
+  width: 84px;
+  flex: none;
+  text-align: right;
+}
+
+.sc-agenda-time-main {
+  color: var(--pd-text-primary);
+  font-size: var(--pd-font-size-body);
+  line-height: var(--pd-leading-body);
+  font-weight: var(--pd-font-weight-medium);
+  font-variant-numeric: tabular-nums;
+}
+
+.sc-agenda-time-sub {
+  color: var(--pd-text-muted);
+  font-size: var(--pd-font-size-caption);
+  line-height: var(--pd-leading-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+.sc-agenda-group + .sc-agenda-group {
+  margin-top: 18px;
+}
+
+.sc-agenda-expand {
+  margin: 2px 12px 8px 108px;
+  padding: 12px 14px;
+  border-radius: var(--pd-radius-md);
+  background: var(--pd-bg-inset);
+  box-shadow: var(--pd-shadow-hairline);
+  animation: sc-in var(--pd-duration-fast) var(--pd-easing-enter);
+}
+
+.sc-narrow .sc-agenda-expand {
+  margin-left: 12px;
+}

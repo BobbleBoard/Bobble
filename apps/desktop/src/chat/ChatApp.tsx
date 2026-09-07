@@ -56,6 +56,7 @@ import { ChatTitle } from './ChatTitle';
 import { ChildChatView } from './ChildChatView';
 import { CommandPalette, type PaletteAction } from './CommandPalette';
 import { CanvasTabsPanel } from './canvas/CanvasTabsPanel';
+import { trackChromeCorner } from './chrome-corner';
 import { CorpDebugHud } from './corp/CorpDebugHud';
 import { useHarnessTitleSync } from './harness-title';
 import { InputNeededBanner } from './InputNeededBanner';
@@ -197,6 +198,30 @@ export function ChatApp({
   useHarnessTitleSync();
   const [piModels, setPiModels] = useState<Model[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  /*
+   * The corner beside the traffic lights publishes its own width, so the
+   * collapsed top bar's title starts after whatever is actually in it rather
+   * than after a number somebody typed once. See chrome-corner.ts.
+   */
+  const chromeCornerRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const zone = chromeCornerRef.current;
+    if (zone === null) return;
+    return trackChromeCorner(
+      zone,
+      (px) => document.documentElement.style.setProperty('--pd-chrome-corner', `${px}px`),
+      (cb) => {
+        const ro = new ResizeObserver(cb);
+        ro.observe(zone);
+        window.addEventListener('resize', cb);
+        return () => {
+          ro.disconnect();
+          window.removeEventListener('resize', cb);
+        };
+      },
+    );
+  }, []);
 
   /*
    * THE SIDEBAR STAYS WHERE YOU LEFT IT.
@@ -805,6 +830,7 @@ export function ChatApp({
               hover animation gives breathing room and doesn't overlap".
             */}
             <div
+              ref={chromeCornerRef}
               className="[-webkit-app-region:no-drag] absolute top-0 z-40 flex items-center"
               style={{ left: CHROME_LEFT, height: TOP_BAR_HEIGHT }}
               data-testid="sidebar-toggle-zone"
