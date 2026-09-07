@@ -111,8 +111,33 @@ try {
     await page.keyboard.press('Meta+k');
     await page.waitForSelector('[data-testid="command-palette-input"]', { timeout: 5000 });
     await page.keyboard.press('Escape');
-    if (!(await waitForPalette(page, false)))
+    if (!(await waitForPalette(page, false))) {
+      /*
+       * WHY, not just THAT. This probe shares its HOME with every other probe in
+       * the suite (harness.mjs), so it can inherit a draft, a pinned view or a
+       * focused element from a run twenty probes earlier — and it failed in the
+       * suite while passing alone, which is the signature of exactly that.
+       */
+      const why = await page.evaluate(() => {
+        const el = document.activeElement;
+        return {
+          active:
+            el === null
+              ? null
+              : `${el.tagName}${el.getAttribute('data-testid') ? `[${el.getAttribute('data-testid')}]` : ''}`,
+          dialogs: document.querySelectorAll('[role="dialog"]').length,
+          composerText: (
+            document.querySelector('[data-testid="composer-input"]')?.textContent ?? ''
+          ).slice(0, 80),
+          attachChips: document.querySelectorAll('[data-testid="attach-chip"]').length,
+          pills: [...document.querySelectorAll('[data-testid="composer-pill-text"]')].map(
+            (n) => n.textContent,
+          ),
+        };
+      });
+      console.log(`[palette] state when Escape did nothing: ${JSON.stringify(why)}`);
       fail('Escape did not close the palette over Settings');
+    }
     const stillSettings = await page.evaluate(
       () => document.querySelector('[data-testid="settings-view"], [role="dialog"]') !== null,
     );

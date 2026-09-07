@@ -122,6 +122,7 @@ export function CommandPalette({
   const [selected, setSelected] = useState(0);
   const [commands, setCommands] = useState<Array<{ name: string; description?: string }>>([]);
   const inputRef = useRef<HTMLInputElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
   const sessions = useSessionListStore((s) => s.sessions);
   // Renames live here, not in the session file — the palette must show what the
   // sidebar shows or the same chat has two names.
@@ -139,6 +140,39 @@ export function CommandPalette({
     const t = setTimeout(() => inputRef.current?.focus(), 0);
     return () => clearTimeout(t);
   }, [open]);
+
+  /*
+   * ESCAPE BELONGS TO THE PALETTE, NOT TO ITS INPUT.
+   *
+   * It used to live on the input's `onKeyDown`, which works only while the
+   * caret is in the field — and the caret is not always there. Opening the
+   * palette over Settings hands focus to the field one tick after paint, and a
+   * dialog underneath can take it straight back; clicking a row, or anywhere in
+   * the palette that is not the field, does the same. Escape then reaches
+   * nothing at all and the palette simply will not close.
+   *
+   * MEASURED as a probe that passed on its own and failed inside the suite —
+   * the probes share a HOME, so whether Settings was left in a focus-trapping
+   * state depended on a run forty probes earlier. That is the signature of a
+   * handler that depends on where focus happens to be.
+   *
+   * On `document` in the CAPTURE phase, so it runs before anything underneath,
+   * and only while this palette is the LAST `[data-escape-layer]` in the
+   * document — whatever opens above it owns Escape instead.
+   */
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (event: KeyboardEvent): void => {
+      if (event.key !== 'Escape') return;
+      const layers = document.querySelectorAll('[data-escape-layer]');
+      if (layers[layers.length - 1] !== rootRef.current) return;
+      event.preventDefault();
+      event.stopPropagation();
+      onOpenChange(false);
+    };
+    document.addEventListener('keydown', onKey, true);
+    return () => document.removeEventListener('keydown', onKey, true);
+  }, [open, onOpenChange]);
 
   const rows = useMemo((): Row[] => {
     const out: Row[] = actions.map((a) => ({
@@ -190,6 +224,7 @@ export function CommandPalette({
     // studios — that something is above them and owns Escape.
     // biome-ignore lint/a11y/noStaticElementInteractions: click-outside dismissal; Escape is the keyboard equivalent.
     <div
+      ref={rootRef}
       className="pd-palette-backdrop"
       data-escape-layer
       data-testid="command-palette"
@@ -212,13 +247,6 @@ export function CommandPalette({
               setSelected(0);
             }}
             onKeyDown={(e) => {
-              if (e.key === 'Escape') {
-                // Claimed here so nothing underneath also closes.
-                e.preventDefault();
-                e.stopPropagation();
-                onOpenChange(false);
-                return;
-              }
               if (e.key === 'ArrowDown') {
                 e.preventDefault();
                 setSelected((i) => Math.min(i + 1, Math.max(0, visible.length - 1)));
