@@ -1,8 +1,15 @@
 /**
- * Attachment prefill — prime the model's KV with the FIXED start of the next user
- * message (a large paste / dropped text file) the moment it's attached, so when
- * the turn is sent it reuses that resident prefix and only prefills the short
- * typed tail. There is nothing predictive here: the attachment is known and fixed
+ * Turn prefill — prime the model's KV with everything about the next turn that
+ * is ALREADY FIXED, so that pressing enter only ever prefills what you typed.
+ *
+ * Two things are fixed before you finish typing: the conversation so far (the
+ * moment you open a chat) and any attachment (the moment you add it). the user:
+ * "when I go to an existing chat and take some time, while I'm writing my prompt
+ * or waiting or whatever, it's getting loaded … so no time after pressing send
+ * is wasted on that stuff."
+ *
+ * It began as attachment-only, which is why it is still named for that; the
+ * history was the bigger half all along. There is nothing predictive here: the attachment is known and fixed
  * as soon as it's added; this just moves its (seconds-long) prompt processing off
  * the send path — MEASURED ~3747ms → ~290ms for a ~5k-token paste, holding across
  * the idle while the user finishes typing.
@@ -63,6 +70,10 @@ function historyAsMessages(
  * slot.
  */
 export function useAttachmentPrefill(attachmentPrefix: string): { abortPrefill: () => void } {
+  /*
+   * IT IS NOT ONLY ATTACHMENTS ANY MORE — see the note at the top of the
+   * `useEffect` below.
+   */
   const messages = usePiStore((s) => s.messages);
   const system = usePiStore((s) => s.extensionStatus['harness-prefill-system']);
   const toolsJson = usePiStore((s) => s.extensionStatus['harness-prefill-tools']);
@@ -80,9 +91,30 @@ export function useAttachmentPrefill(attachmentPrefix: string): { abortPrefill: 
     // A turn is using the slot — priming now would contend + get evicted.
     if (busy) return;
     const prefix = attachmentPrefix.trim();
-    if (prefix.length < PREFILL_MIN_CHARS) return;
-
     const history = historyAsMessages(messages);
+
+    /*
+     * THE CONVERSATION IS A FIXED PREFIX TOO, and it was being ignored.
+     *
+     * the user: "when I go to an existing chat and take some time, while I'm writing
+     * my prompt or waiting or whatever, it's getting loaded."
+     *
+     * This hook already primed `[system, …history, attachment]` — but only when
+     * an attachment was there and over 400 characters. Open a 40-turn chat with
+     * nothing attached and none of it was resident until you pressed enter, so
+     * the first message in an old conversation paid a full cold prefill of the
+     * whole thing. The history is every bit as fixed as an attachment and it is
+     * usually far bigger; the only reason it was excluded is that the hook was
+     * written for the attachment case and named after it.
+     *
+     * So the gate is now "is there anything worth priming", which is an
+     * attachment over the threshold OR a conversation with something in it.
+     * A brand-new empty chat still primes nothing here, correctly — its prefix
+     * is `[system][tools]`, which the model-load warm-up already made resident.
+     */
+    const worthPriming = prefix.length >= PREFILL_MIN_CHARS || history.length > 0;
+    if (!worthPriming) return;
+
     // Cheap dedupe key (avoid stringifying the whole prefix each render).
     const sig = `${history.length}|${prefix.length}|${prefix.slice(0, 96)}`;
     if (sig === lastSig.current) return;
@@ -100,8 +132,25 @@ export function useAttachmentPrefill(attachmentPrefix: string): { abortPrefill: 
       const oaiMessages: Array<Record<string, unknown>> = [
         { role: 'system', content: system },
         ...history,
-        { role: 'user', content: attachmentPrefix },
+        // Only when there IS one. An empty user turn would render as an empty
+        // `<|im_start|>user` block that the real turn does not begin with, so
+        // the primed prefix would stop being a prefix of it.
+        ...(prefix.length >= PREFILL_MIN_CHARS
+          ? [{ role: 'user', content: attachmentPrefix }]
+          : []),
       ];
+      /*
+       * WHAT THIS ACTUALLY PRIMES, MEASURED on a 40-turn chat: 9,578 tokens,
+       * where before this widening it primed ZERO — the hook only ever fired for
+       * an attachment over 400 characters, so opening an old conversation primed
+       * nothing at all.
+       *
+       * Worth recording how that was nearly missed: a probe that spied on
+       * `window.piDesktop.invoke` saw no calls and looked like proof the effect
+       * was dead. contextBridge objects are FROZEN, so the spy silently never
+       * installed and the assignment did nothing. The instrumentation had to go
+       * inside this module to see the truth.
+       */
       void window.piDesktop
         .invoke('pi:prefill', { messages: oaiMessages, ...(tools !== undefined ? { tools } : {}) })
         .catch(() => {
