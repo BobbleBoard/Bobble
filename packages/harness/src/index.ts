@@ -62,6 +62,7 @@ import {
 import { CAPABILITIES, capabilityForTool } from './presets/capabilities.js';
 import { resolvePresetTools } from './presets/presets.js';
 import { augmentSystemPrompt } from './prompt/capability-prompt.js';
+import { sameWording } from './prompt/same-wording.js';
 import { connectRepairBridge, type LiveRepairDeps } from './repair/bridge.js';
 import { createToolCallFixer, withRepairAttempts } from './repair/fixer.js';
 import {
@@ -679,6 +680,54 @@ export function cleanChildEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   return out;
 }
 
+/**
+ * WHAT IS ALREADY RESIDENT IN THE MODEL SERVER'S KV — remembered for the PROCESS,
+ * because that is what the KV belongs to.
+ *
+ * pi re-wires this extension for every session: MEASURED with a per-wiring tag,
+ * one pi child answering three new chats produced three different wirings, so
+ * every closure-scoped memory of "we already warmed this prefix" and "this is
+ * the prompt we froze" started empty each time. The visible cost was a full cold
+ * warm-up per new chat (~9.7k tokens, ~8s here) — and worse than the time, that
+ * warm-up lands on the single slot AFTER the composer has primed an attachment
+ * into it, so a prime that had already finished was thrown away and the send
+ * re-read every token of it.
+ *
+ * There is one llama-server behind all of those wirings, so the record of what
+ * it is holding lives beside it, not inside whichever wiring happened to ask.
+ */
+interface ResidentPrefix {
+  canonical: string | null;
+  warmedKey: string | null;
+}
+
+/*
+ * ON globalThis, DELIBERATELY.
+ *
+ * Module scope is not process scope here: pi re-imports this extension for each
+ * session, so a module-level `let` starts empty in every new chat exactly like a
+ * closure variable does (MEASURED: three wirings, three module instances, three
+ * cold warm-ups). The llama-server is the thing that is genuinely per-process,
+ * and a well-known symbol is the only place with that lifetime. Nothing else
+ * belongs here — this is a note about ONE server's KV, not a store.
+ */
+const RESIDENT = Symbol.for('pi-desktop.harness.residentPrefix');
+const processGlobals = globalThis as unknown as Record<symbol, ResidentPrefix | undefined>;
+function processResidentPrefix(): ResidentPrefix {
+  const existing = processGlobals[RESIDENT];
+  if (existing !== undefined) return existing;
+  const fresh: ResidentPrefix = { canonical: null, warmedKey: null };
+  processGlobals[RESIDENT] = fresh;
+  return fresh;
+}
+const residentPrefix = processResidentPrefix();
+
+/** Forget what the server is holding — for tests, and for a genuinely new server. */
+export function forgetResidentPrefix(): void {
+  residentPrefix.canonical = null;
+  residentPrefix.warmedKey = null;
+}
+
 export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}): HarnessHandle {
   /*
    * FIRST, before anything registers: wrap `pi.registerTool` so every tool that
@@ -907,10 +956,80 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
    * `callModelFromEnv` now also reads the app's live endpoint file, so asking
    * again later is what turns a late server into a working one.
    */
-  let resolvedCallModel: CallModel | undefined = options.callModel ?? callModelFromEnv();
+  /*
+   * ── THE SLOT HAS MORE THAN ONE WRITER ──────────────────────────────────
+   *
+   * llama-server holds ONE KV sequence. Four things write to it: the real turn,
+   * the composer's predictive prefill, and — invisibly to the renderer — this
+   * harness's own background calls (the prefix warm-up, post-turn naming, the
+   * reviewer, classifier escalation). Whoever writes last wins, and the
+   * background writers are the ones the user cannot see.
+   *
+   * MEASURED, and it is why this exists: at app open the warm-up takes ~17s on
+   * this machine. Paste an attachment inside that window and the composer primes
+   * it, the warm-up lands afterwards with [system][tools], and the attachment is
+   * gone — the send then re-read every token of it (5542 of 15261) after a prime
+   * that had already finished. From the renderer that is indistinguishable from
+   * "the prime was wrong".
+   *
+   * The fix is deliberately not a lock or a protocol between two processes,
+   * because that is the kind of thing that quietly stops being true. Every call
+   * that lands on the slot bumps an epoch the renderer can see; the composer
+   * treats a bump as "someone else touched it" and primes again. Re-priming an
+   * unchanged prefix is a full cache hit, so the correction is nearly free, and
+   * nothing here has to know WHICH background writer it was — which is what
+   * keeps it working when the next one is added.
+   */
+  let slotEpoch = 0;
+  const announceSlotWrite = (ctx?: ExtensionContext): void => {
+    slotEpoch += 1;
+    const target = ctx ?? runtime.currentCtx;
+    if (target?.hasUI !== true) return;
+    target.ui.setStatus('harness-slot-epoch', String(slotEpoch));
+  };
+  /** Wrap a utility call so finishing it announces that the slot moved. */
+  const watchSlot = (fn: CallModel): CallModel => {
+    return async (req) => {
+      /*
+       * Opt-in trace of every background write, sharing PI_ADV_DEBUG_WARM's
+       * file. A slot number alone cannot say WHICH background caller landed on
+       * the model between a prime and the send it was meant to serve, and that
+       * is exactly the question when a completed prime turns out not to help.
+       */
+      const dbg = process.env.PI_ADV_DEBUG_WARM;
+      const label = (req.prompt ?? req.messages?.at(-1)?.content ?? '').slice(0, 60);
+      const started = Date.now();
+      if (dbg !== undefined && dbg.length > 0) {
+        try {
+          appendFileSync(dbg, `slot: ${started} utility call starts — ${JSON.stringify(label)}\n`);
+        } catch {
+          /* a diagnostic must never break a turn */
+        }
+      }
+      try {
+        return await fn(req);
+      } finally {
+        if (dbg !== undefined && dbg.length > 0) {
+          try {
+            appendFileSync(
+              dbg,
+              `slot: ${Date.now()} utility call done in ${Date.now() - started}ms — ${JSON.stringify(label)}\n`,
+            );
+          } catch {
+            /* a diagnostic must never break a turn */
+          }
+        }
+        announceSlotWrite();
+      }
+    };
+  };
+  const fromOptions = options.callModel ?? callModelFromEnv();
+  let resolvedCallModel: CallModel | undefined =
+    fromOptions === undefined ? undefined : watchSlot(fromOptions);
   const currentCallModel = (): CallModel | undefined => {
     if (resolvedCallModel !== undefined) return resolvedCallModel;
-    resolvedCallModel = callModelFromEnv();
+    const fresh = callModelFromEnv();
+    resolvedCallModel = fresh === undefined ? undefined : watchSlot(fresh);
     return resolvedCallModel;
   };
   const callModel: CallModel | undefined = resolvedCallModel;
@@ -919,11 +1038,13 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
   // fires on BOTH session_start and model_select — a new chat on the same model
   // (no model_select) still needs the prefix resident, and a cwd change (new
   // canonical) must re-warm.
-  let warmedCanonical: string | null = null;
   /** When the warm-up first claimed the "Loading model" label (null = not yet). */
   let warmClaimedAt: number | null = null;
   /** The prefix seen on the PREVIOUS attempt — warm only once it repeats. */
   let pendingWarmKey: string | null = null;
+  /* Identifies THIS wiring, so a repeated note can be told apart from a second
+   * copy of the extension keeping its own state beside the first. */
+  const wireId = Math.random().toString(36).slice(2, 7);
   /** How long to keep claiming it with no endpoint in sight before giving up. */
   const WARM_CLAIM_GRACE_MS = 20_000;
   // Last-published predictive-prefill context (deduped so a per-turn applyPreset
@@ -1003,7 +1124,10 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     const note = (why: string): void => {
       if (dbg === undefined || dbg.length === 0) return;
       try {
-        appendFileSync(dbg, `warm: ${why}\n`);
+        /* The pid matters: a note that repeats "waiting a tick for the system
+         * prompt to settle" every session reads like churn in one process and
+         * like a fresh process each time — and only one of those is a bug. */
+        appendFileSync(dbg, `warm[${process.pid}#${wireId}]: ${why}\n`);
       } catch {
         /* a diagnostic must never break a turn */
       }
@@ -1074,12 +1198,31 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
      * prompt — a new day, another working folder — legitimately arrives.
      */
     if (runtime.canonicalSystemPrompt === null) {
-      if (pendingCanonicalPrompt !== fresh) {
-        pendingCanonicalPrompt = fresh;
-        note('waiting a tick for the system prompt to settle');
-        return;
+      /*
+       * A NEW CHAT IS NOT A NEW PROMPT, usually.
+       *
+       * The session boundary above is where a legitimately different prompt is
+       * allowed in — a new day's date, another working folder. What actually
+       * arrives most of the time is the same prompt again, sometimes with its
+       * lines in another order, and adopting that costs the entire cached
+       * prefix for a difference nobody can read. MEASURED: three new chats in
+       * one run each built 17,646 characters and each re-warmed ~9.7k tokens
+       * from cold. `residentPrefix` remembers what the server is holding across
+       * wirings; `sameWording` decides whether this is really something new.
+       */
+      const resident = residentPrefix.canonical;
+      if (resident !== null && sameWording(fresh, resident)) {
+        note('the same prompt as the one already resident — keeping it, not re-reading it');
+        runtime.canonicalSystemPrompt = resident;
+      } else {
+        if (pendingCanonicalPrompt !== fresh) {
+          pendingCanonicalPrompt = fresh;
+          note('waiting a tick for the system prompt to settle');
+          return;
+        }
+        runtime.canonicalSystemPrompt = fresh;
       }
-      runtime.canonicalSystemPrompt = fresh;
+      residentPrefix.canonical = runtime.canonicalSystemPrompt;
     } else if (fresh !== runtime.canonicalSystemPrompt) {
       note(
         `pi rebuilt its system prompt (${runtime.canonicalSystemPrompt.length}→${fresh.length} chars); ` +
@@ -1123,7 +1266,9 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
      * reported "already warmed" 19 times while the thing they were meant to warm
      * had changed underneath them.
      */
-    const warmKey = `${canonical}\u0000${warmNames.join(',')}`;
+    /* The MODEL is part of the key: switching models starts a different server
+     * with an empty KV, and this memory now outlives the wiring that filled it. */
+    const warmKey = `${runtime.model?.id ?? ''}\u0000${canonical}\u0000${warmNames.join(',')}`;
     /*
      * TELL THE RENDERER WHAT THE PREFIX IS — every tick, and with the tools the
      * TURN will carry rather than the warm-up's guess. Two separate bugs, one
@@ -1169,11 +1314,11 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
       note(`tool set changed (${warmNames.length}) — waiting a tick for it to settle`);
       return;
     }
-    if (warmKey === warmedCanonical) {
+    if (warmKey === residentPrefix.warmedKey) {
       note('already warmed (same prompt + tools)');
       return;
     }
-    warmedCanonical = warmKey;
+    residentPrefix.warmedKey = warmKey;
     /*
      * SAY WHEN THE PREFIX IS ACTUALLY RESIDENT.
      *
@@ -1193,6 +1338,15 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
       `WARMING ${canonical.length} chars, ${warmTools.length} tools ` +
         `[${warmTools.map((t) => t.name).join(',')}], hasUI=${ctx.hasUI}`,
     );
+    /* The prompt itself, so "it warmed again" can be turned into "…and here is
+     * the line that differed". Opt-in, next to the trace it belongs to. */
+    if (dbg !== undefined && dbg.length > 0) {
+      try {
+        appendFileSync(`${dbg}.canonical`, `\n===== WARM ${Date.now()} =====\n${canonical}\n`);
+      } catch {
+        /* a diagnostic must never break a turn */
+      }
+    }
     const warmStartedAt = Date.now();
     void warmSystemPrompt(warmCall, canonical, { tools: warmTools })
       .then((ok) => note(`warm result ok=${ok} in ${Date.now() - warmStartedAt}ms`))
@@ -2621,6 +2775,19 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     runtime.turnIndex += 1;
     runtime.currentCtx = ctx;
     runtime.lastPrompt = event.prompt;
+    /*
+     * WHAT THE TURN ACTUALLY SENDS, for the prefill probes only.
+     *
+     * Predictive prefill primes `[system, …history, {user: attachment}]` and is
+     * only worth anything if the turn's own user message BEGINS with that same
+     * attachment, byte for byte. Nothing in the renderer can see the string pi
+     * finally sends, so a divergence there is invisible — and a prime that
+     * diverges does not merely miss, it evicts the prefix that would have been
+     * reused. Behind an env flag because it is the whole message, every turn.
+     */
+    if (ctx.hasUI === true && (process.env.PI_ADV_DEBUG_PREFILL ?? '').length > 0) {
+      ctx.ui.setStatus('harness-prefill-lastuser', event.prompt);
+    }
     // Fresh agent loop: a new loop detector (effort-scaled cap/streaks) and an
     // empty touched-file set. Reset per turn (fix #3). NOTE: the verify fix budget
     // is deliberately NOT reset here — a self-triggered fix revision is also a new

@@ -1130,15 +1130,18 @@ export function ChatComposer({
     // One-shot: capture + clear the pinned class so only THIS send is forced.
     const pinnedClass = forcedClass;
     setForcedClass(null);
-    // Free the slot for the real turn: cancel any in-flight predictive prefill so
-    // the dispatched turn (which reuses whatever the prefill already made resident)
-    // never queues behind it on the single-slot server.
-    abortPrefill();
     const imageUris = attachments
       .filter((a) => a.kind === 'image')
       .map((a) => a.dataUri)
       .filter((uri): uri is string => uri !== undefined);
     const textFiles = attachments.filter((a) => a.kind === 'text');
+    /*
+     * Hand the prefill the body we are about to send. A prime this turn BEGINS
+     * WITH is left running — the tokens it is reading are the turn's own — and
+     * only a prime for something else (a removed attachment, another chat) is
+     * cancelled so it stops competing for the single slot. See abortPrefill.
+     */
+    abortPrefill({ body: buildAgentMessage(raw, textFiles, activatable) });
     apiRef.current?.clear();
     setAttachments([]);
     setToken(EMPTY_TOKEN);

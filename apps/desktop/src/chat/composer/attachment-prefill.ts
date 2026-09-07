@@ -39,8 +39,64 @@ import { prefillDecision } from './prefill-gate';
 /** Below this many chars an attachment isn't worth priming — its send already
  * prefills near-instantly against the warm [system][tools]. */
 export const PREFILL_MIN_CHARS = 400;
+
+/**
+ * A SMALL RING OF WHAT THIS HOOK ACTUALLY DID, on `window.__prefill_log`.
+ *
+ * Everything here happens between a keystroke and a network call in another
+ * process, and the only externally visible effect is a number on llama-server's
+ * slot — which is the same number for "we primed the wrong prefix", "we primed
+ * nothing", and "we primed and something else overwrote it". Those three want
+ * completely different fixes. Fifty bounded entries is a rounding error next to
+ * a chat transcript, and it turns that guess into a reading.
+ */
+function note(entry: Record<string, unknown>): void {
+  const w = window as Window & { __prefill_log?: Record<string, unknown>[] };
+  if (w.__prefill_log === undefined) w.__prefill_log = [];
+  const log = w.__prefill_log;
+  log.push({ at: Date.now(), ...entry });
+  if (log.length > 50) log.shift();
+}
 /** Small debounce to coalesce a multi-file drop into one prefill. */
 const PREFILL_DEBOUNCE_MS = 200;
+
+/** What a prime in flight is priming: the fixed prefix and the history it saw. */
+export interface PrimingNow {
+  readonly prefix: string;
+  readonly turns: number;
+}
+
+/**
+ * SHOULD DISPATCHING THIS TURN CANCEL THE PRIME THAT IS RUNNING?
+ *
+ * Only when the prime is not part of this turn. A prime renders
+ * `[system, …history, {user: attachment}]` and the turn renders
+ * `[system, …history, {user: attachment + what you typed}]`, so a prime for the
+ * same attachment and the same history is a BYTE-EXACT PREFIX of the turn: every
+ * token it is still reading is a token the turn would otherwise read itself.
+ * Cancelling that either changes nothing or — if the server drops the partial KV
+ * — makes the whole prefix be read again from zero.
+ *
+ * the user's rule is about exactly this: "if the user puts in an attachment that
+ * takes 20 seconds to prefill and then types for 10s, then sends, they should be
+ * waiting 10 seconds for the attachment + however much else they typed, and no
+ * more." Ten seconds of remaining prime is the honest price; twenty is what a
+ * cancel risks charging.
+ *
+ * A prime for something else — an attachment removed inside the debounce window,
+ * or one rendered against a different conversation — really is competing for the
+ * single slot, and goes. Pure.
+ */
+export function abortsOnSend(
+  priming: PrimingNow | null,
+  sending: { readonly body: string } | undefined,
+  turnsNow: number,
+): boolean {
+  if (priming === null) return true;
+  if (sending === undefined) return true;
+  if (priming.turns !== turnsNow) return true;
+  return !sending.body.startsWith(priming.prefix);
+}
 
 /** The live transcript as plain-text OpenAI messages (thinking / tool / image
  * blocks dropped — a text-only approximation that fully matches a plain chat and
@@ -68,11 +124,15 @@ function historyAsMessages(
  * Wire attachment prefill for the given fixed attachment prefix (the exact
  * `buildAgentMessage('', textAttachments)` that will START the sent message).
  * Returns `abortPrefill`, which the composer calls the instant it dispatches a
- * real turn so the send never queues behind an in-flight prefill on the single
- * slot.
+ * real turn — see there for why it usually does NOT abort.
  */
 export function useAttachmentPrefill(attachmentPrefix: string): {
-  abortPrefill: () => void;
+  /**
+   * Called the instant a turn is dispatched. Pass the message body that is being
+   * sent and an in-flight prime that the turn BEGINS WITH is left alone — see
+   * the note on the implementation.
+   */
+  abortPrefill: (sending?: { readonly body: string }) => void;
   /** A prime is in flight — the attachment chips show a spinner where the token
    * count goes, so "is it still working on this?" is answerable by looking. */
   inFlight: boolean;
@@ -84,6 +144,19 @@ export function useAttachmentPrefill(attachmentPrefix: string): {
   const messages = usePiStore((s) => s.messages);
   const system = usePiStore((s) => s.extensionStatus['harness-prefill-system']);
   const toolsJson = usePiStore((s) => s.extensionStatus['harness-prefill-tools']);
+  /*
+   * SOMEONE ELSE TOUCHED THE SLOT.
+   *
+   * The harness bumps this whenever one of its own background calls lands on
+   * the model server — the startup warm-up, post-turn naming, the reviewer.
+   * They all overwrite the single KV sequence, so whatever we primed before one
+   * of them is simply gone, and the send that follows pays full price for a
+   * prime that had already finished (MEASURED at app open: 5542 of 15261 tokens
+   * re-read after a completed prime). Treating a bump like any other change to
+   * the prefix puts our prompt back on the slot, and costs nothing when it was
+   * still there — a re-prime of an unchanged prefix is a complete cache hit.
+   */
+  const slotEpoch = usePiStore((s) => s.extensionStatus['harness-slot-epoch'] ?? '');
   const serverRunning = useLlmStore((s) => s.status.serverRunning);
   /** The rate is a property of the MODEL as much as the machine, so it is
    * recorded per model — see prefill-speed.ts. */
@@ -91,6 +164,14 @@ export function useAttachmentPrefill(attachmentPrefix: string): {
   const busy = usePiStore((s) => s.agent.isStreaming || s.promptInFlight);
   const lastSig = useRef<string | null>(null);
   const [inFlight, setInFlight] = useState(false);
+  /**
+   * WHAT THE IN-FLIGHT PRIME IS PRIMING — the exact attachment prefix and the
+   * number of history turns it rendered — so a send can ask "does the turn I am
+   * dispatching begin with this?" and answer it exactly rather than assuming.
+   */
+  const priming = useRef<PrimingNow | null>(null);
+  /** The live history length, for that same question. */
+  const turnsNow = useRef(0);
 
   /*
    * COMING BACK TO THE WINDOW RE-PRIMES.
@@ -127,15 +208,21 @@ export function useAttachmentPrefill(attachmentPrefix: string): {
     };
   }, []);
 
-  const abortPrefill = useCallback(() => {
+  /* The rule lives in `abortsOnSend` above — read it before changing this. */
+  const abortPrefill = useCallback((sending?: { readonly body: string }) => {
+    const keep = !abortsOnSend(priming.current, sending, turnsNow.current);
     lastSig.current = null;
+    note({ what: keep ? 'kept-on-send' : 'aborted-on-send', had: priming.current !== null });
+    if (keep) return;
     setInFlight(false);
+    priming.current = null;
     void window.piDesktop.invoke('pi:prefill-abort', undefined).catch(() => {});
   }, []);
 
   useEffect(() => {
     const prefix = attachmentPrefix.trim();
     const history = historyAsMessages(messages);
+    turnsNow.current = history.length;
     /*
      * THE DECISION IS NOT MADE HERE — see prefill-gate.ts, and read its header
      * before changing anything about it. The short version: the slot holds ONE
@@ -155,10 +242,13 @@ export function useAttachmentPrefill(attachmentPrefix: string): {
       focusEpoch,
       minPrefixChars: PREFILL_MIN_CHARS,
     });
-    if (!decision.prime) return;
+    if (!decision.prime) {
+      note({ what: 'skipped', because: decision.because, prefixChars: prefix.length });
+      return;
+    }
 
     // Cheap dedupe key (avoid stringifying the whole prefix each render).
-    const sig = `${focusEpoch}|${history.length}|${prefix.length}|${prefix.slice(0, 96)}`;
+    const sig = `${focusEpoch}|${slotEpoch}|${history.length}|${prefix.length}|${prefix.slice(0, 96)}`;
     if (sig === lastSig.current) return;
 
     const timer = window.setTimeout(() => {
@@ -186,9 +276,19 @@ export function useAttachmentPrefill(attachmentPrefix: string): {
        * inside this module to see the truth.
        */
       setInFlight(true);
+      priming.current = { prefix: attachmentPrefix, turns: history.length };
+      note({
+        what: 'prime',
+        slotEpoch,
+        prefixChars: prefix.length,
+        historyTurns: history.length,
+        withUser: oaiMessages.length > 1 + history.length,
+        tools: decision.tools.length,
+      });
       void window.piDesktop
         .invoke('pi:prefill', { messages: oaiMessages, tools: decision.tools })
         .then((res) => {
+          note({ what: 'primed', ...(res as Record<string, unknown>) });
           /*
            * EVERY PREFILL IS ALSO A MEASUREMENT of how fast this machine reads a
            * prompt under this model — which is the only honest basis for telling
@@ -199,13 +299,27 @@ export function useAttachmentPrefill(attachmentPrefix: string): {
             recordPrefillRate(modelId ?? '', res.processedN, res.processedMs);
           }
         })
-        .catch(() => {
+        .catch((error: unknown) => {
           // Non-fatal: the send path still works, it just pays the full prefill.
+          note({ what: 'failed', error: String(error) });
         })
-        .finally(() => setInFlight(false));
+        .finally(() => {
+          priming.current = null;
+          setInFlight(false);
+        });
     }, PREFILL_DEBOUNCE_MS);
     return () => window.clearTimeout(timer);
-  }, [attachmentPrefix, system, toolsJson, serverRunning, busy, messages, focusEpoch, modelId]);
+  }, [
+    attachmentPrefix,
+    system,
+    toolsJson,
+    serverRunning,
+    busy,
+    messages,
+    focusEpoch,
+    slotEpoch,
+    modelId,
+  ]);
 
   return { abortPrefill, inFlight };
 }

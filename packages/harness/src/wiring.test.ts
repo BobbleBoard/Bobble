@@ -202,6 +202,34 @@ describe('repair ladder — live wiring through the provider', () => {
     expect(result.value).toEqual({ path: '/fixed-by-model' });
   });
 
+  /*
+   * The single KV slot has background writers the renderer cannot see. Every
+   * utility call announces that it moved the slot so the composer can put the
+   * user's own prefix back — see the note beside `watchSlot`.
+   */
+  it('announces that the slot moved after a utility call finishes', async () => {
+    const callModel: CallModel = vi.fn(async () => '{"path":"/fixed-by-model"}');
+    const rig = makeRig({ effort: 'medium', callModel });
+    await startSession(rig);
+    await startTurn(rig);
+    const epochsBefore = rig.setStatus.mock.calls.filter((c) => c[0] === 'harness-slot-epoch');
+
+    const deps = rig.handle.buildRepairDeps();
+    await repairToolCallArguments('{"wrong":1}', {
+      toolName: 'read',
+      schema: SCHEMA,
+      fixer: deps.fixer,
+      extraRungs: deps.extraRungs,
+    });
+
+    const epochs = rig.setStatus.mock.calls.filter((c) => c[0] === 'harness-slot-epoch');
+    expect(epochs.length).toBeGreaterThan(epochsBefore.length);
+    // Monotonic, so a renderer can tell "again" from "still".
+    const values = epochs.map((c) => Number(c[1]));
+    expect(values).toEqual([...values].sort((a, b) => a - b));
+    expect(values.at(-1)).toBeGreaterThan(0);
+  });
+
   it('rung 5 aborts at the effort abortThreshold and onRepair populates repairFailures', async () => {
     // effort low → abortThreshold 2. No callModel → no fixer → ladder falls to 3–5.
     const rig = makeRig({ effort: 'low' });
