@@ -472,61 +472,205 @@ body {
   gap: 8px;
   padding: 10px 12px 0;
 }
+/* ── Attachment chips: a box, which opens to the right on hover ───────────
+ *
+ * the user: "no name shown, just a box … a bit bigger, and then slide to the right
+ * open when it's hovered over … this should be less colored in and have a more
+ * visible border."
+ *
+ * The collapsed state carries no words at all, and that is the point: three
+ * attachments used to be three filename chips wide enough to shove the composer
+ * around. Three boxes are three boxes, and the one you point at tells you
+ * everything about itself.
+ */
 .pd-attach {
+  position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  max-width: 200px;
-  padding: 4px 6px 4px 4px;
-  border-radius: var(--pd-radius-sm);
-  background: var(--pd-bg-inset);
-  box-shadow: var(--pd-shadow-hairline);
+  gap: 0;
+  /* Less colored in, more visible border — the box should read as an outline
+   * around the thing, not a filled tile competing with it. */
+  padding: 5px;
+  border: 1px solid var(--pd-border-default);
+  border-radius: var(--pd-radius-md);
+  background: transparent;
+  cursor: default;
+  transition:
+    border-color var(--pd-duration-base) var(--pd-easing-standard),
+    background-color var(--pd-duration-base) var(--pd-easing-standard);
 }
-.pd-attach-thumb {
-  width: 28px;
-  height: 28px;
-  border-radius: calc(var(--pd-radius-sm) - 2px);
-  object-fit: cover;
+
+.pd-attach:hover {
+  border-color: var(--pd-border-strong);
+  background: var(--pd-bg-hover);
+}
+
+/* CLICKED: blue fill, blue border. the user: "clicking a file needs to highlight it
+ * blue and blue border and then allow for user to press ctrl c/x/v or shift
+ * click other files to do so." */
+.pd-attach[data-selected] {
+  border-color: var(--pd-accent-primary);
+  background: var(--pd-accent-subtle);
+}
+
+.pd-attach-thumb,
+.pd-attach-ext {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--pd-radius-sm);
   flex: none;
 }
+
+.pd-attach-thumb {
+  object-fit: cover;
+  display: block;
+}
+
+.pd-attach-thumb-btn {
+  display: block;
+  padding: 0;
+  border: none;
+  background: none;
+  border-radius: var(--pd-radius-sm);
+  cursor: zoom-in;
+}
+
 .pd-attach-ext {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: calc(var(--pd-radius-sm) - 2px);
-  background: var(--pd-bg-active);
+  background: var(--pd-bg-inset);
   color: var(--pd-text-secondary);
-  font-size: 9px;
+  font-size: 10px;
   font-weight: var(--pd-font-weight-semibold);
   letter-spacing: 0.04em;
-  flex: none;
 }
+
+/*
+ * THE SLIDE-OUT. Zero width at rest and animated on the grid track, so it opens
+ * to its own natural width without anyone hardcoding one — the same technique as
+ * the work ledge, for the same reason.
+ */
+.pd-attach-detail {
+  display: grid;
+  grid-template-columns: 0fr;
+  transition: grid-template-columns var(--pd-duration-slow, 250ms) var(--pd-easing-standard);
+}
+
+.pd-attach-detail-inner {
+  min-width: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1px;
+}
+
+.pd-attach:hover .pd-attach-detail,
+.pd-attach:focus-within .pd-attach-detail {
+  grid-template-columns: 1fr;
+}
+
+.pd-attach:hover .pd-attach-detail-inner,
+.pd-attach:focus-within .pd-attach-detail-inner {
+  padding-left: 8px;
+  padding-right: 4px;
+}
+
+/* Name: smaller and higher than the meta line under it, and it truncates rather
+ * than letting one long filename set the width of the whole row. */
 .pd-attach-name {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  max-width: 190px;
+  overflow: hidden;
+  white-space: nowrap;
+  font-size: var(--pd-font-size-caption);
+  line-height: 1.25;
+  color: var(--pd-text-primary);
+}
+
+.pd-attach-name-text {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: var(--pd-font-size-caption);
-  color: var(--pd-text-secondary);
 }
+
+.pd-attach-ext-label {
+  flex: none;
+  color: var(--pd-text-muted);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+}
+
+.pd-attach-dot {
+  flex: none;
+  color: var(--pd-text-ghost, var(--pd-text-muted));
+}
+
+.pd-attach-meta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  font-size: 10px;
+  line-height: 1.3;
+  color: var(--pd-text-muted);
+}
+
+.pd-attach-tokens {
+  display: inline-flex;
+  align-items: center;
+  min-width: 2ch;
+}
+
+/*
+ * ABSOLUTELY POSITIONED, so it costs the resting box no width. the user wants "just
+ * a box" at rest, and an X that reserves 20px makes every box 20px wider than
+ * the thing in it.
+ */
 .pd-attach-remove {
+  position: absolute;
+  top: -6px;
+  right: -6px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 18px;
   height: 18px;
   border: none;
+  box-shadow: 0 0 0 2px var(--pd-bg-raised);
   border-radius: var(--pd-radius-full);
   background: transparent;
   color: var(--pd-text-muted);
   cursor: pointer;
   flex: none;
+  opacity: 0;
+  transition: opacity var(--pd-duration-base) var(--pd-easing-standard);
 }
+
+/* The remove control appears with the detail — a row of boxes should be boxes,
+ * not a row of boxes each wearing an X. */
+.pd-attach:hover .pd-attach-remove,
+.pd-attach:focus-within .pd-attach-remove {
+  opacity: 1;
+}
+
+.pd-attach-remove {
+  background: var(--pd-bg-inset);
+}
+
 .pd-attach-remove:hover {
-  background: var(--pd-bg-hover);
+  background: var(--pd-bg-active);
   color: var(--pd-text-primary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pd-attach-detail {
+    transition: none;
+  }
 }
 
 /* A large paste, shown as a file-style card: clamped preview + "PASTED" badge. */
@@ -660,28 +804,47 @@ body {
 /* #A8b: fullscreen drop-anywhere overlay. The dim is deliberately strong and the
  * card is a solid raised surface so the greeting/composer behind it never bleeds
  * through the (translucent, active) dropzone (adversarial drop-overlay finding). */
-.pd-window-drop {
+/* ── Dragging a file in: a blue edge, not a modal ─────────────────────────
+ *
+ * the user: "it should just highlight the border of the chat area in blue with a
+ * little inward going blue glow." The covering card it replaces answered a
+ * question nobody asked ("where can I drop this?" — anywhere) while hiding the
+ * one thing you were looking at: the chat you are about to drop into.
+ *
+ * `pointer-events: none` is load-bearing — the drag has to keep reaching the
+ * sidebar underneath, or the glow becomes the thing you drop on.
+ */
+.pd-drop-glow {
   position: fixed;
   inset: 0;
   z-index: 60;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 32px;
-  background: color-mix(in srgb, var(--pd-bg-backdrop, #000) 68%, transparent);
-  -webkit-backdrop-filter: blur(4px);
-  backdrop-filter: blur(4px);
-  animation: pd-onboard-step-in 160ms var(--pd-easing-enter, ease-out);
+  pointer-events: none;
+  border: 2px solid var(--pd-accent-primary);
+  border-radius: var(--pd-radius-surface);
+  /* Inward only: an inset shadow, so the glow reads as the window lighting up
+   * at its edge rather than a box drawn on top of it. */
+  box-shadow: inset 0 0 24px -4px var(--pd-accent-primary);
+  animation: pd-drop-glow-in 140ms var(--pd-easing-standard);
 }
-.pd-window-drop-card {
-  width: min(520px, 90%);
-  padding: 16px;
-  border-radius: var(--pd-radius-lg);
-  background: var(--pd-bg-raised);
-  box-shadow: var(--pd-shadow-hairline), var(--pd-shadow-lg);
+
+@keyframes pd-drop-glow-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
+
+/* A sidebar row a file is hovering over: it is about to open, so it looks the
+ * way it looks when you are about to click it, and then some. */
+.pd-sidebar [data-drag-over] {
+  background: var(--pd-accent-subtle);
+  box-shadow: inset 0 0 0 1px var(--pd-accent-primary);
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .pd-window-drop {
+  .pd-drop-glow {
     animation: none;
   }
 }

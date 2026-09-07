@@ -17,6 +17,7 @@ import {
   IconArrowUp,
   IconButton,
   IconClose,
+  Spinner,
 } from '@pi-desktop/ui';
 import { useEffect, useRef, useState } from 'react';
 import { ExpandedScrim } from '../media/ExpandedScrim';
@@ -45,7 +46,14 @@ import { ComposerFooter } from './ComposerFooter';
 import { ComposerPill } from './ComposerPill';
 import { type AcItem, Autocomplete } from './composer/Autocomplete';
 import { buildAgentMessage } from './composer/agent-message';
-import { useAttachmentPrefill } from './composer/attachment-prefill';
+import { PREFILL_MIN_CHARS, useAttachmentPrefill } from './composer/attachment-prefill';
+import {
+  attachmentMeta,
+  EMPTY_SELECTION,
+  pruneSelection,
+  type SelectionState,
+  selectClick,
+} from './composer/attachment-view';
 import {
   ComposerEditor,
   type ComposerEditorApi,
@@ -86,6 +94,9 @@ interface SlashCommand {
 interface Attachment {
   id: string;
   name: string;
+  /** Original file size in bytes — shown on the chip's hover detail. Absent for
+   * a pasted block, which never was a file. */
+  bytes?: number;
   /** Image attachments carry a data URI (sent to pi as ImageContent); text
    * attachments carry their decoded contents (folded into the prompt text). */
   kind: 'image' | 'text';
@@ -194,36 +205,87 @@ function extLabel(name: string): string {
   return (ext || 'file').toUpperCase().slice(0, 4);
 }
 
-/** A slight attachment preview (#A8c): image thumbnail, else a filename+ext chip. */
+/**
+ * An attachment chip: a BOX, which opens to the right when you point at it.
+ *
+ * the user's brief, verbatim: "no name shown, just a box … a bit bigger, and then
+ * slide to the right open when it's hovered over (the individual file/image)
+ * this should be less colored in and have a more visible border … show name a
+ * bit smaller and higher, truncate name if too long, show centered dot, file
+ * extension, then below it, size eg. 10.1 MB <centered dot> N tokens replace n
+ * with a loading spinner if prefilling still while hovered."
+ *
+ * The collapsed state carries no words at all, which is the point: three
+ * attachments used to be three filename chips wide enough to push the composer
+ * around. Three boxes are three boxes, and the one you are pointing at tells you
+ * everything about itself.
+ */
 function AttachmentPreview({
   name,
   dataUri,
+  bytes,
+  text,
+  kind,
   onRemove,
   blind = false,
+  selected = false,
+  prefilling = false,
+  onSelect,
 }: {
   name: string;
   dataUri?: string;
+  bytes?: number;
+  text?: string;
+  kind: 'image' | 'text';
   onRemove: () => void;
   /** The selected model cannot read images — badge this one. */
   blind?: boolean;
+  /** Clicked: blue fill, blue border, and part of a copy/cut selection. */
+  selected?: boolean;
+  /** Its contents are still being primed into the model — the token count is
+   * a spinner until they are. */
+  prefilling?: boolean;
+  onSelect?: (mods: { shift?: boolean; meta?: boolean }) => void;
 }) {
   const isImage = (dataUri ?? '').startsWith('data:image/');
   const [open, setOpen] = useState(false);
+  const meta = attachmentMeta({
+    name,
+    kind,
+    ...(bytes !== undefined ? { bytes } : {}),
+    ...(text !== undefined ? { text } : {}),
+  });
   return (
-    <div className="pd-attach" title={name}>
+    // biome-ignore lint/a11y/useKeyWithClickEvents: the chip's own buttons are focusable; this is a mouse affordance over them
+    <div
+      className="pd-attach"
+      data-selected={selected || undefined}
+      data-testid="attach-chip"
+      onClick={(e) => {
+        // A click on the remove button or the thumbnail is that control's, not
+        // the chip's — selection is the click on everything else.
+        if ((e.target as HTMLElement).closest('button') !== null) return;
+        onSelect?.({ shift: e.shiftKey, meta: e.metaKey || e.ctrlKey });
+      }}
+    >
       {isImage ? (
         // Clickable, like every other piece of media in the app (the user asked for
         // the expanded view on input media too) — a 20px chip is not a preview.
         <span className="pd-blind-host">
-          <button
-            type="button"
-            className="pd-attach-thumb-btn pd-focusable"
-            aria-label={`Open ${name}`}
-            onClick={() => setOpen(true)}
-          >
-            {/* biome-ignore lint/a11y/useAltText: the button carries the label */}
-            <img className="pd-attach-thumb" src={dataUri} />
-          </button>
+          {/*
+            SINGLE CLICK SELECTS, DOUBLE CLICK OPENS.
+            The thumbnail used to be a button whose click opened the expanded
+            view, which made it the one part of the chip you could not select by
+            clicking — and it is the biggest part. The file-list idiom is the
+            right one here: click picks, double-click opens.
+          */}
+          {/* biome-ignore lint/a11y/useAltText: the chip's label describes it */}
+          <img
+            className="pd-attach-thumb"
+            src={dataUri}
+            title={`${name} — double-click to open`}
+            onDoubleClick={() => setOpen(true)}
+          />
           {/* The fact travels WITH the picture, so it is still there when the
               pill has gone. the user: "a yellow circle + ! on images both in chat
               input and when sent". */}
@@ -246,7 +308,34 @@ function AttachmentPreview({
           <img src={dataUri} className="pd-media-image" />
         </ExpandedScrim>
       ) : null}
-      <span className="pd-attach-name">{name}</span>
+      {/* THE SLIDE-OUT. Zero width until hovered (CSS grid 0fr → 1fr), so the
+          row of boxes is the resting state and the detail is on demand. */}
+      <div className="pd-attach-detail" aria-hidden={!open ? undefined : undefined}>
+        <div className="pd-attach-detail-inner">
+          <div className="pd-attach-name" title={name}>
+            {/* The NAME truncates; the dot and the extension never do. They were
+                in the same clipping box at first, so a long filename pushed the
+                extension off the end — which is the one part of that row that is
+                the same width every time and therefore always has room. */}
+            <span className="pd-attach-name-text">{name}</span>
+            <span className="pd-attach-dot">·</span>
+            <span className="pd-attach-ext-label">{meta.ext}</span>
+          </div>
+          <div className="pd-attach-meta">
+            {meta.size !== '' ? <span>{meta.size}</span> : null}
+            {meta.size !== '' && (meta.tokens !== null || prefilling) ? (
+              <span className="pd-attach-dot">·</span>
+            ) : null}
+            {prefilling ? (
+              <span className="pd-attach-tokens" data-testid="attach-prefilling">
+                <Spinner size={10} />
+              </span>
+            ) : meta.tokens !== null ? (
+              <span className="pd-attach-tokens">{meta.tokens}</span>
+            ) : null}
+          </div>
+        </div>
+      </div>
       <button
         type="button"
         className="pd-attach-remove pd-focusable"
@@ -284,6 +373,20 @@ export function ChatComposer({
    * late to matter.
    */
   const blindToImages = useImagesUnsupported();
+  /*
+   * SELECTION, UNDO AND THE CLIPBOARD for attachments — the user: "cmd/ctrl Z needs
+   * to be able to undo accidental file removals, clicking a file needs to
+   * highlight it blue and blue border and then allow for user to press ctrl
+   * c/x/v or shift click other files to do so."
+   *
+   * The rules themselves are pure (composer/attachment-view.ts); this holds the
+   * state and binds the keys.
+   */
+  const [selection, setSelection] = useState<SelectionState>(EMPTY_SELECTION);
+  /** Removed attachments, newest last — the undo stack. Each entry remembers
+   * WHERE it was, so undo puts it back in its place rather than at the end. */
+  const removedRef = useRef<{ at: number; items: Attachment[] }[]>([]);
+  const clipboardRef = useRef<Attachment[]>([]);
   const flavor = useThemeStore((s) => s.flavor);
   const isStreaming = usePiStore((s) => s.agent.isStreaming);
   // A corp/hierarchy run is live from start to its terminal `done` — its Stop
@@ -403,6 +506,106 @@ export function ChatComposer({
     usePiStore.setState({ composerText: '' });
   }, [composerText]);
 
+  /**
+   * Remove attachments and REMEMBER where they were.
+   *
+   * the user: "cmd/ctrl Z needs to be able to undo accidental file removals." An
+   * attachment is often a thing you dragged in from somewhere you have since
+   * closed, so losing one to a mis-click can cost more than the message.
+   */
+  const removeAttachments = (ids: readonly string[]): void => {
+    if (ids.length === 0) return;
+    setAttachments((prev) => {
+      const removed = prev.map((a, i) => ({ a, i })).filter(({ a }) => ids.includes(a.id));
+      if (removed.length === 0) return prev;
+      // The index of the FIRST removed one, so undo restores the group where it
+      // was rather than appending it to the end.
+      removedRef.current = [
+        ...removedRef.current.slice(-9),
+        { at: removed[0]?.i ?? prev.length, items: removed.map(({ a }) => a) },
+      ];
+      return prev.filter((a) => !ids.includes(a.id));
+    });
+    setSelection(EMPTY_SELECTION);
+  };
+
+  const undoRemoval = (): boolean => {
+    const last = removedRef.current.pop();
+    if (last === undefined) return false;
+    setAttachments((prev) => {
+      const next = prev.slice();
+      next.splice(Math.min(last.at, next.length), 0, ...last.items);
+      return next;
+    });
+    return true;
+  };
+
+  /*
+   * THE ATTACHMENT KEYBOARD — undo, copy, cut, paste.
+   *
+   * the user: "cmd/ctrl Z needs to be able to undo accidental file removals,
+   * clicking a file needs to highlight it blue and blue border and then allow
+   * for user to press ctrl c/x/v."
+   *
+   * WHY IT IS ON THE WINDOW AND NOT THE CHIPS. A chip is not focused when you
+   * click it — the editor keeps the caret, which is what you want, because the
+   * next thing you do is almost always keep typing. So the shortcut has to be
+   * heard at the window and then decide whether it is FOR the attachments: it is
+   * only when something is selected (copy/cut) or when there is a removal to
+   * undo AND the editor has no edit of its own to undo, which is why the undo
+   * arm checks the draft is untouched before claiming the key.
+   */
+  const draftEmptyRef = useRef(true);
+  draftEmptyRef.current = text.length === 0;
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const mod = e.metaKey || e.ctrlKey;
+      if (!mod || e.altKey) return;
+      const key = e.key.toLowerCase();
+
+      if (key === 'z' && !e.shiftKey) {
+        // Never steal undo from a draft the user is editing — theirs first.
+        if (!draftEmptyRef.current) return;
+        if (undoRemoval()) e.preventDefault();
+        return;
+      }
+      /*
+       * PASTE IS NOT A SELECTION ACTION. It was behind the same guard as copy
+       * and cut, which made cut-then-paste impossible: cutting clears the
+       * selection, so by the time you press V there is nothing selected and the
+       * handler had already returned.
+       */
+      if (key === 'v' && clipboardRef.current.length > 0) {
+        // New ids: pasting is a COPY, so the original stays where it is and the
+        // two can be removed independently.
+        setAttachments((prev) => [
+          ...prev,
+          ...clipboardRef.current.map((a) => ({ ...a, id: crypto.randomUUID() })),
+        ]);
+        e.preventDefault();
+        return;
+      }
+      if (selection.ids.length === 0) return;
+      if (key === 'c' || key === 'x') {
+        clipboardRef.current = attachments.filter((a) => selection.ids.includes(a.id));
+        if (key === 'x') removeAttachments(selection.ids);
+        e.preventDefault();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
+
+  // A file removed while selected must not stay "selected" in a ghostly way.
+  useEffect(() => {
+    setSelection((prev) =>
+      pruneSelection(
+        prev,
+        attachments.map((a) => a.id),
+      ),
+    );
+  }, [attachments]);
+
   const hasImageAttached = attachments.some((a) => (a.dataUri ?? '').startsWith('data:image/'));
   const canSend = text.trim().length > 0 || attachments.length > 0;
   const bashMode = text.trim().startsWith('!');
@@ -416,7 +619,18 @@ export function ChatComposer({
     '',
     attachments.filter((a) => a.kind === 'text'),
   );
-  const { abortPrefill } = useAttachmentPrefill(attachmentPrefix);
+  const { abortPrefill, inFlight: prefillInFlight } = useAttachmentPrefill(attachmentPrefix);
+  /*
+   * WHICH CHIPS SHOW A SPINNER INSTEAD OF A TOKEN COUNT. Only a text attachment
+   * gets primed, and only one over the threshold — the same rule the prefill
+   * hook applies, read from the one place that owns it so the two cannot say
+   * different things about the same file.
+   */
+  const prefillingIds = prefillInFlight
+    ? attachments
+        .filter((a) => a.kind === 'text' && (a.text ?? '').length >= PREFILL_MIN_CHARS)
+        .map((a) => a.id)
+    : [];
 
   // Accept images (sent to pi as ImageContent) AND text files (read + folded
   // into the prompt text on send). Anything else — binary the prompt can't carry
@@ -427,13 +641,20 @@ export function ChatComposer({
     for (const f of files) {
       if (f.type.startsWith('image/')) {
         added.push({
+          bytes: f.size,
           id: crypto.randomUUID(),
           name: f.name,
           kind: 'image',
           dataUri: await fileToDataUri(f),
         });
       } else if (isTextFile(f) && f.size <= TEXT_MAX_BYTES) {
-        added.push({ id: crypto.randomUUID(), name: f.name, kind: 'text', text: await f.text() });
+        added.push({
+          bytes: f.size,
+          id: crypto.randomUUID(),
+          name: f.name,
+          kind: 'text',
+          text: await f.text(),
+        });
       } else {
         rejected.push(f.name);
       }
@@ -1016,15 +1237,30 @@ export function ChatComposer({
                     key={a.id}
                     name={a.name}
                     text={a.text ?? ''}
-                    onRemove={() => setAttachments((prev) => prev.filter((p) => p.id !== a.id))}
+                    onRemove={() => removeAttachments([a.id])}
                   />
                 ) : (
                   <AttachmentPreview
                     key={a.id}
                     name={a.name}
                     dataUri={a.dataUri}
+                    kind={a.kind}
+                    {...(a.bytes !== undefined ? { bytes: a.bytes } : {})}
+                    {...(a.text !== undefined ? { text: a.text } : {})}
                     blind={blindToImages && (a.dataUri ?? '').startsWith('data:image/')}
-                    onRemove={() => setAttachments((prev) => prev.filter((p) => p.id !== a.id))}
+                    selected={selection.ids.includes(a.id)}
+                    prefilling={prefillingIds.includes(a.id)}
+                    onSelect={(mods) =>
+                      setSelection((prev) =>
+                        selectClick(
+                          prev,
+                          attachments.map((x) => x.id),
+                          a.id,
+                          mods,
+                        ),
+                      )
+                    }
+                    onRemove={() => removeAttachments([a.id])}
                   />
                 ),
               )}

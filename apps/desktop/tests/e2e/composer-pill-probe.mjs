@@ -182,6 +182,69 @@ try {
   check(blind?.tone === 'warn', 'and it is a warning, not a status');
   await shot('03-no-vision');
 
+  /* ── 4. THE SLOT: anything can publish into it ─────────────────────────
+   *
+   * the user: "I like this floating pill idea and would like to extend it a bit. so
+   * let's go for making this modular." So the pill is a slot with one rule —
+   * whatever is most urgent, one at a time — rather than a component that knows
+   * about three specific things.
+   */
+  // Clear the blind-model state first: the image warning is DERIVED and outranks
+  // an ad-hoc publish, which is correct — it is about the message being written.
+  await page.evaluate(() => {
+    window
+      .__llm_store()
+      .getState()
+      .applyStatus({
+        phase: 'ready',
+        serverRunning: true,
+        baseUrl: 'http://127.0.0.1:8080',
+        model: {
+          id: 'qwen3.5-9b-mtp',
+          displayName: 'Qwen3.5 9B (MTP)',
+          quant: 'Q4',
+          contextWindow: 65536,
+        },
+        metrics: null,
+        downloadedModelIds: ['qwen3.5-9b-mtp'],
+        visionReady: true,
+        launchMode: 'multimodal',
+      });
+  });
+  await page.waitForTimeout(400);
+  await page.evaluate(() => {
+    window.__pi_store().setState({ extensionStatus: {} });
+    window.__pill?.().getState().show({
+      id: 'probe',
+      text: 'Reconnecting to the model',
+      tone: 'busy',
+      spinner: true,
+    });
+  });
+  await page.waitForTimeout(400);
+  const adhoc = await pill();
+  console.log('   published:', JSON.stringify(adhoc));
+  check(
+    adhoc?.text === 'Reconnecting to the model',
+    `anything can publish into the pill (got "${adhoc?.text}")`,
+  );
+
+  // …and a wait outranks it, because a model that cannot answer at all is more
+  // urgent than anything about a message it has not been asked yet.
+  await setLlm('starting');
+  await page.waitForTimeout(400);
+  const outranked = await pill();
+  console.log('   with a wait running:', outranked?.text);
+  check(
+    /^Starting up/.test(outranked?.text ?? ''),
+    `the wait outranks a published pill (got "${outranked?.text}")`,
+  );
+
+  await page.evaluate(() => window.__pill?.().getState().dismiss('probe'));
+  await setLlm('ready');
+  await page.waitForTimeout(400);
+  check((await pill()) === null, 'and dismissing clears the slot');
+
   console.log(`\nshots → ${shotDir}`);
 } finally {
   await finish();

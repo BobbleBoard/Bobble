@@ -19,7 +19,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useLlmStore } from '../state/llm-store';
 import { usePiStore } from '../state/pi-slice';
 import { recordBootWait, typicalBootSeconds } from './boot-history';
-import { composerPill } from './composer-pill';
+import { composerPill, pickPill } from './composer-pill';
 import {
   modelReadyStage,
   PREFILL_STATUS_KEY,
@@ -27,6 +27,7 @@ import {
   parsePrefillPercent,
 } from './harness-status';
 import { IconWarning } from './icons-pill';
+import { usePillStore } from './pill-store';
 
 /**
  * Milliseconds in the current wait, and — when it ends — how long it took.
@@ -73,7 +74,34 @@ export function ComposerPill({ imageOnBlindModel = false }: { imageOnBlindModel?
       ? null
       : typicalBootSeconds(readyStage === 'loading' ? 'model-load' : 'prompt-load');
 
-  const view = composerPill({ readyStage, imageOnBlindModel, elapsedMs, typicalSec });
+  const derived = composerPill({ readyStage, imageOnBlindModel, elapsedMs, typicalSec });
+  /*
+   * THE SLOT, NOT A SWITCH. Anything in the app can publish here (pill-store),
+   * and the derived waits are simply candidates with a high priority — a model
+   * that cannot answer outranks anything about a message it has not been asked
+   * yet. See `pickPill` for why there is only ever one.
+   */
+  const published = usePillStore((s) => s.pills);
+  const view = pickPill([
+    ...published.map((p) => ({
+      text: p.text,
+      tone: p.tone,
+      spinner: p.spinner === true,
+      priority: p.priority ?? 50,
+      kind: p.id,
+    })),
+    ...(derived === null
+      ? []
+      : [
+          {
+            text: derived.text,
+            tone: derived.tone,
+            spinner: derived.tone === 'busy',
+            priority: 100,
+            kind: derived.kind,
+          },
+        ]),
+  ]);
   if (view === null) return null;
 
   return (
@@ -83,10 +111,11 @@ export function ComposerPill({ imageOnBlindModel = false }: { imageOnBlindModel?
       data-kind={view.kind}
       data-testid="composer-pill"
     >
-      {/* Always a spinner here now: neither boot wait has a real number, and the
-          turn's own prefill — the one that does — moved back to the thread with
-          the message it belongs to. The honesty is in the clock, not the ring. */}
-      {view.tone === 'warn' ? <IconWarning size={13} /> : <Spinner size={12} />}
+      {/* A spinner for anything in progress; the warning mark otherwise. Neither
+          boot wait has a real number — the turn's own prefill, the one that
+          does, moved back to the thread with the message it belongs to. The
+          honesty is in the clock, not in a ring. */}
+      {view.spinner === true ? <Spinner size={12} /> : <IconWarning size={13} />}
       <span data-testid="composer-pill-text">{view.text}</span>
     </div>
   );

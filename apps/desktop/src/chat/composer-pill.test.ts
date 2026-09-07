@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { composerPill } from './composer-pill';
+import { composerPill, pickPill } from './composer-pill';
 
 const base = {
   readyStage: null,
@@ -100,5 +100,41 @@ describe('composerPill', () => {
     for (const stage of ['loading', 'preparing'] as const) {
       expect(composerPill({ ...base, readyStage: stage, elapsedMs: 5_000 })?.percent).toBeNull();
     }
+  });
+});
+
+describe('pickPill — one slot, most urgent wins', () => {
+  it('is null with nothing to say', () => {
+    expect(pickPill([])).toBeNull();
+  });
+
+  it('prefers the higher priority', () => {
+    const picked = pickPill([
+      { text: 'ad hoc', tone: 'busy' as const, priority: 50 },
+      { text: 'the model is not up', tone: 'busy' as const, priority: 100 },
+    ]);
+    expect(picked?.text).toBe('the model is not up');
+  });
+
+  /*
+   * A tie goes to the LATEST. A source that keeps publishing (a countdown, a
+   * retry) should replace its own stale sentence rather than lose to it.
+   */
+  it('breaks a tie in favour of the newest', () => {
+    expect(
+      pickPill([
+        { text: 'first', tone: 'warn' as const },
+        { text: 'second', tone: 'warn' as const },
+      ])?.text,
+    ).toBe('second');
+  });
+
+  it('treats a missing priority as the middle, not as zero', () => {
+    expect(
+      pickPill([
+        { text: 'default', tone: 'busy' as const },
+        { text: 'explicitly low', tone: 'busy' as const, priority: 10 },
+      ])?.text,
+    ).toBe('default');
   });
 });

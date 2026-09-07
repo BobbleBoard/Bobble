@@ -30,13 +30,13 @@
  * one prefill in flight per window (the main handler supersedes); never while a
  * turn streams; aborted the instant a turn is dispatched.
  */
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLlmStore } from '../../state/llm-store';
 import { usePiStore } from '../../state/pi-slice';
 
 /** Below this many chars an attachment isn't worth priming — its send already
  * prefills near-instantly against the warm [system][tools]. */
-const PREFILL_MIN_CHARS = 400;
+export const PREFILL_MIN_CHARS = 400;
 /** Small debounce to coalesce a multi-file drop into one prefill. */
 const PREFILL_DEBOUNCE_MS = 200;
 
@@ -69,7 +69,12 @@ function historyAsMessages(
  * real turn so the send never queues behind an in-flight prefill on the single
  * slot.
  */
-export function useAttachmentPrefill(attachmentPrefix: string): { abortPrefill: () => void } {
+export function useAttachmentPrefill(attachmentPrefix: string): {
+  abortPrefill: () => void;
+  /** A prime is in flight — the attachment chips show a spinner where the token
+   * count goes, so "is it still working on this?" is answerable by looking. */
+  inFlight: boolean;
+} {
   /*
    * IT IS NOT ONLY ATTACHMENTS ANY MORE — see the note at the top of the
    * `useEffect` below.
@@ -80,9 +85,11 @@ export function useAttachmentPrefill(attachmentPrefix: string): { abortPrefill: 
   const serverRunning = useLlmStore((s) => s.status.serverRunning);
   const busy = usePiStore((s) => s.agent.isStreaming || s.promptInFlight);
   const lastSig = useRef<string | null>(null);
+  const [inFlight, setInFlight] = useState(false);
 
   const abortPrefill = useCallback(() => {
     lastSig.current = null;
+    setInFlight(false);
     void window.piDesktop.invoke('pi:prefill-abort', undefined).catch(() => {});
   }, []);
 
@@ -151,14 +158,16 @@ export function useAttachmentPrefill(attachmentPrefix: string): { abortPrefill: 
        * installed and the assignment did nothing. The instrumentation had to go
        * inside this module to see the truth.
        */
+      setInFlight(true);
       void window.piDesktop
         .invoke('pi:prefill', { messages: oaiMessages, ...(tools !== undefined ? { tools } : {}) })
         .catch(() => {
           // Non-fatal: the send path still works, it just pays the full prefill.
-        });
+        })
+        .finally(() => setInFlight(false));
     }, PREFILL_DEBOUNCE_MS);
     return () => window.clearTimeout(timer);
   }, [attachmentPrefix, system, toolsJson, serverRunning, busy, messages]);
 
-  return { abortPrefill };
+  return { abortPrefill, inFlight };
 }

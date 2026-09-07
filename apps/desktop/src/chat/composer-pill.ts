@@ -56,6 +56,31 @@ function waitText(name: string, elapsedMs: number | null, typicalSec: number | n
   return `${head} · ${clock(elapsedMs)}`;
 }
 
+/** One candidate for the slot — a derived wait or an ad-hoc publish. */
+export interface PillCandidate {
+  readonly text: string;
+  readonly tone: PillTone;
+  readonly spinner?: boolean;
+  readonly priority?: number;
+  readonly kind?: string;
+}
+
+/**
+ * ONE PILL AT A TIME, and it is the most urgent one.
+ *
+ * The slot is deliberately singular: two pills stacked above the composer is a
+ * notification centre, and the thing that makes this readable is that there is
+ * never more than one sentence to read. Ties go to whatever arrived last, so a
+ * fresh message from an equally urgent source replaces a stale one.
+ */
+export function pickPill<T extends PillCandidate>(candidates: readonly T[]): T | null {
+  let best: T | null = null;
+  for (const c of candidates) {
+    if (best === null || (c.priority ?? 50) >= (best.priority ?? 50)) best = c;
+  }
+  return best;
+}
+
 export interface PillView {
   /** What the pill says. */
   text: string;
