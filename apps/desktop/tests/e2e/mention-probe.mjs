@@ -101,9 +101,20 @@ try {
       payload: pill?.getAttribute('title') ?? '',
     };
   });
-  if (state.chips <= beforeChips) {
-    fail('picking a file attached nothing — the mention did not fold the file in');
-  } else console.log('[mention] OK: picking a file attaches its contents');
+  /*
+   * NO CHIP. the user: "at mentions should appear just the inline, no attachment
+   * shown above."
+   *
+   * The file is still folded into pi's copy of the message and still primed by
+   * the predictive prefill — that half is unchanged, and it is checked where it
+   * actually lives (the pill's payload, below, and buildAgentMessage's tests).
+   * What changed is that the mention no longer draws a SECOND representation of
+   * itself above the box: the pill in the sentence IS the file, and the file
+   * leaves with it (see Attachment.mention).
+   */
+  if (state.chips !== beforeChips) {
+    fail(`a mention should draw no chip above the box (chips ${beforeChips} → ${state.chips})`);
+  } else console.log('[mention] OK: the mention is the pill, and nothing above the box');
   /*
    * A MENTION IS A PILL NOW, not a typed path. the user: "add blue pills with icons
    * and X buttons for embedded files and such, not just typing them."

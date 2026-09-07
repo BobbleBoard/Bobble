@@ -272,6 +272,24 @@ try {
     })();
     const sentAt = Date.now();
     await win.keyboard.press('Enter');
+    /*
+     * WHEN THE REQUEST LEFT THE RENDERER, as distinct from when the answer came
+     * back. A turn whose prompt was 100% cached and still took seven seconds is
+     * not a prefill problem, and without this the table cannot say which half of
+     * the pipe it was in.
+     */
+    const dispatchedAt = await (async () => {
+      const deadline = Date.now() + 30_000;
+      while (Date.now() < deadline) {
+        const inFlight = await win.evaluate(() => {
+          const st = window.__pi_store().getState();
+          return st.promptInFlight === true || st.agent.isStreaming === true;
+        });
+        if (inFlight) return Date.now();
+        await new Promise((r) => setTimeout(r, 10));
+      }
+      return null;
+    })();
     let ttft = null;
     const deadline = Date.now() + 180_000;
     while (Date.now() < deadline) {
@@ -351,12 +369,14 @@ try {
       });
     }
     const turn = [...byTask.values()].reduce((a, b) => (b.total > (a?.total ?? -1) ? b : a), null);
-    const row = { case: name, note, ttft, turn, samples: samples.length };
+    const dispatchMs = dispatchedAt === null ? null : dispatchedAt - sentAt;
+    const row = { case: name, note, ttft, dispatchMs, turn, samples: samples.length };
     rows.push(row);
     const reused = turn === null ? null : turn.total - turn.processed;
     console.log(
       `  ${name.padEnd(24)} ${String(ttft ?? '?').padStart(7)}ms   ` +
-        `reused ${String(reused ?? '?').padStart(6)} / ${String(turn?.total ?? '?').padStart(6)} tok`,
+        `reused ${String(reused ?? '?').padStart(6)} / ${String(turn?.total ?? '?').padStart(6)} tok` +
+        `   (dispatch ${String(dispatchMs ?? '?')}ms)`,
     );
     await idle();
     return row;
