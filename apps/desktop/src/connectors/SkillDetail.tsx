@@ -9,6 +9,19 @@ import { useEffect, useState } from 'react';
 import type { SkillListItem } from '../../electron/skills/skills-contract';
 import { useSkillsStore } from '../state/skills-store';
 
+/**
+ * Drop a leading YAML frontmatter block.
+ *
+ * A SKILL.md opens with `---\nname: …\ndescription: …\n---`, which the markdown
+ * renderer has no reason to treat as metadata — so the detail page opened with
+ * "name: code-review description: … license: MIT" as one giant paragraph in
+ * chat-response type. The fields are already shown above it as real rows.
+ */
+function stripFrontmatter(body: string): string {
+  const match = /^---\r?\n[\s\S]*?\r?\n---\r?\n?/.exec(body);
+  return match === null ? body : body.slice(match[0].length).trimStart();
+}
+
 export function SkillDetail({
   skill,
   busy,
@@ -84,7 +97,7 @@ export function SkillDetail({
           {state.error}
         </p>
       ) : (
-        <Markdown data-testid="skill-detail-body">{state.body}</Markdown>
+        <Markdown data-testid="skill-detail-body">{stripFrontmatter(state.body)}</Markdown>
       )}
     </div>
   );

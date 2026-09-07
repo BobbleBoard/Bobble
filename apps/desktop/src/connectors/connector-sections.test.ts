@@ -41,7 +41,7 @@ describe('buildConnectorSections', () => {
   it('titles the sections and drops empty ones', () => {
     const groups = buildConnectorSections(CATALOG, [], '');
     expect(sectionIds(groups)).toEqual(['by-us', 'official', 'popular']);
-    expect(groups.map((g) => g.title)).toEqual(['By us', 'Official', 'Popular']);
+    expect(groups.map((g) => g.title)).toEqual(['By us', 'Official', 'More connectors']);
     // No 'recommended' section because the scan returned nothing.
     expect(sectionIds(groups)).not.toContain('recommended');
   });
@@ -64,7 +64,7 @@ describe('buildConnectorSections', () => {
     expect(new Set(all).size).toBe(all.length);
   });
 
-  it('puts non-official, non-recommended connectors in Popular', () => {
+  it('puts non-official, non-recommended connectors into the fallthrough section', () => {
     const groups = buildConnectorSections(CATALOG, [], '');
     const popular = groups.find((g) => g.id === 'popular');
     expect(popular?.items.map((c) => c.id).sort()).toEqual(['blender', 'postgres']);

@@ -278,8 +278,6 @@ export function App() {
             </div>
           ) : gate === 'onboarding' ? (
             <OnboardingWizard onComplete={() => setGate('ready')} />
-          ) : view === 'connectors' ? (
-            <ConnectorsScreen onClose={() => setView('chat')} />
           ) : view === 'gallery' ? (
             <div className="flex h-full flex-col">
               {/* Left inset clears the macOS traffic lights (titleBarStyle:
@@ -319,6 +317,17 @@ export function App() {
                   setView('chat');
                   exitModality();
                 }}
+                contentTitle={
+                  modalityView === 'chat'
+                    ? view === 'models'
+                      ? 'Model management'
+                      : view === 'scheduled'
+                        ? 'Scheduled'
+                        : view === 'connectors'
+                          ? 'Connectors'
+                          : undefined
+                    : undefined
+                }
                 contentOverride={
                   /*
                    * THE STUDIOS ARE A CONTENT ROUTE NOW, not a window takeover.
@@ -356,6 +365,12 @@ export function App() {
                     /* Same seam as the model hub: a content route inside the chat
                        shell, so the sidebar and top bar stay put. */
                     <ScheduledView />
+                  ) : view === 'connectors' ? (
+                    /* ...and so is this, now. It was the one screen in that
+                       sidebar section that took the window instead, which is why
+                       it needed a back button and a traffic-light inset of its
+                       own. See the note at the top of ConnectorsScreen. */
+                    <ConnectorsScreen />
                   ) : undefined
                 }
               />

@@ -29,11 +29,35 @@ import { useEffect, useState } from 'react';
 import { type ConnectorTool, useConnectorsStore } from '../state/connectors-store';
 import { ConnectorIcon } from './ConnectorIcon';
 
-/** Best-effort developer label: the homepage host, else community. */
+/** The gallery's category enum, in words. It was rendering `dev` / `comms`. */
+const CATEGORY_LABELS: Record<string, string> = {
+  dev: 'Development',
+  comms: 'Communication',
+  docs: 'Documents',
+  data: 'Data',
+  design: 'Design',
+  media: 'Media',
+  system: 'System',
+  productivity: 'Productivity',
+};
+
+/**
+ * Best-effort developer label from the homepage.
+ *
+ * The HOST alone made every server hosted on GitHub read "by github.com" —
+ * including `modelcontextprotocol/servers`, whose developer is the MCP project.
+ * A repository URL names its owner in the first path segment, which is the
+ * answer to "who made this"; anything else falls back to the host it lives on.
+ */
 function developerOf(connector: KnownConnector): string {
   if (connector.homepage !== undefined) {
     try {
-      return new URL(connector.homepage).host.replace(/^www\./, '');
+      const url = new URL(connector.homepage);
+      const host = url.host.replace(/^www\./, '');
+      const owner = url.pathname.split('/').filter(Boolean)[0];
+      const isForge = host === 'github.com' || host === 'gitlab.com';
+      if (isForge && owner !== undefined && owner.length > 0) return owner;
+      return host;
     } catch {
       // fall through
     }
@@ -198,9 +222,17 @@ export function ConnectorDetail({
           <ToolList tools={displayTools} />
         ) : (
           <p className="text-footnote text-text-muted">
-            {isBuiltin || isInstalled
-              ? 'This connector exposes no tools.'
-              : 'Add this connector to discover its tools.'}
+            {/*
+              WHY there is nothing here, which is not always the same reason. A
+              connector that is added but switched OFF was never asked; saying
+              "exposes no tools" about a server with a dozen of them is simply
+              untrue, and it is what GitHub's detail said.
+            */}
+            {isInstalled && !enabled
+              ? 'Turn this on to see what it can do — nothing is fetched while it is off.'
+              : isBuiltin || isInstalled
+                ? 'This connector exposes no tools.'
+                : 'Add this connector to discover its tools.'}
           </p>
         )}
       </section>
@@ -226,7 +258,10 @@ export function ConnectorDetail({
         <h2 className="mb-2 font-medium text-body text-text-primary">Information</h2>
         <div className="rounded-xl border border-border-default px-4">
           <InfoRow label="Developer" value={developerOf(connector)} />
-          <InfoRow label="Category" value={connector.category} />
+          <InfoRow
+            label="Category"
+            value={CATEGORY_LABELS[connector.category] ?? connector.category}
+          />
           {isBuiltin ? (
             <InfoRow label="Type" value="Built-in (preinstalled)" />
           ) : (

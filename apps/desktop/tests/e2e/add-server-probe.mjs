@@ -42,15 +42,17 @@ await page.waitForSelector('[data-testid="nav-connectors"]', { timeout: 30_000 }
 await page.click('[data-testid="nav-connectors"]');
 await page.waitForTimeout(800);
 
-// The Create menu.
-const trigger = page.locator('button', { hasText: 'Create' }).first();
-await trigger.click();
-await page.waitForTimeout(300);
-const rows = await page.evaluate(() =>
-  [...document.querySelectorAll('[role="menuitem"]')].map((n) => n.textContent?.trim() ?? ''),
+/*
+ * The button, not a menu. "Create ▾" listed four rows, three of which described
+ * features that do not exist; once they went there was one row left behind a
+ * chevron, which is a button wearing a costume. This probe used to assert the
+ * menu had exactly one item — now it asserts there is no menu to open.
+ */
+const menus = await page.evaluate(
+  () => document.querySelectorAll('[data-testid="connectors-create-menu"]').length,
 );
-if (rows.length !== 1) fail(`expected one Create row, got ${JSON.stringify(rows)}`);
-else console.log(`[mcp] OK: one row (${JSON.stringify(rows)})`);
+if (menus !== 0) fail('the one-item Create menu is back');
+else console.log('[mcp] OK: adding a server is a button, not a menu of one');
 
 await page.click('[data-testid="connectors-add-server"]');
 await page.waitForSelector('[data-testid="add-server-dialog"]', { timeout: 5000 });

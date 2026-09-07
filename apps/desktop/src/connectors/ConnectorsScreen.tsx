@@ -18,12 +18,6 @@
 import type { KnownConnector, McpMode } from '@pi-desktop/mcp-lite';
 import {
   Button,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  IconChevronDown,
-  IconChevronLeft,
   IconPlus,
   ScrollArea,
   SearchInput,
@@ -63,7 +57,7 @@ const MODE_HINTS: Record<McpMode, string> = {
   'bash-cli': 'Driven from the terminal through a discoverable `--help` surface.',
 };
 
-export function ConnectorsScreen({ onClose }: { onClose: () => void }) {
+export function ConnectorsScreen() {
   const registry = useConnectorsStore((s) => s.registry);
   const upsert = useConnectorsStore((s) => s.upsert);
   const [addOpen, setAddOpen] = useState(false);
@@ -149,19 +143,15 @@ export function ConnectorsScreen({ onClose }: { onClose: () => void }) {
       className="pd-settings-enter flex h-full flex-col bg-bg-base"
       data-testid="connectors-screen"
     >
-      {/* Draggable strip clearing the macOS traffic lights + Back to chat. */}
-      <div className="flex h-10 shrink-0 items-center py-0 pr-3 pl-[80px] [-webkit-app-region:drag]">
-        <button
-          type="button"
-          data-testid="connectors-back"
-          className="inline-flex items-center gap-1 rounded-lg py-1 pr-2 pl-1 text-footnote text-text-secondary [-webkit-app-region:no-drag] hover:bg-bg-hover"
-          onClick={onClose}
-        >
-          <IconChevronLeft size={14} />
-          Back to chat
-        </button>
-      </div>
-
+      {/*
+        NO BACK BUTTON, NO TRAFFIC-LIGHT STRIP.
+        This screen used to take the whole window, so it had to reinvent both —
+        while the Model hub and Scheduled, one row away in the same sidebar
+        section, rendered inside the chat shell and kept it. Three sibling
+        screens, three navigation models; picking one row emptied the sidebar and
+        the other two did not. It is a content route now, like them: the shell
+        owns the chrome, and the way out is the sidebar you never lost.
+      */}
       {selected !== null ? (
         <ScrollArea className="min-h-0 flex-1">
           <ConnectorDetail
@@ -183,32 +173,26 @@ export function ConnectorsScreen({ onClose }: { onClose: () => void }) {
           <div className="mx-auto w-full max-w-[880px] px-8 pt-1">
             <div className="mb-1 flex items-center justify-between gap-3">
               <h1 className="text-title text-text-primary">Connectors</h1>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="primary" size="sm" data-testid="connectors-create-menu">
-                    <IconPlus size={14} /> Create <IconChevronDown size={14} />
-                  </Button>
-                </DropdownMenuTrigger>
-                {/*
-                  ONE ROW THAT WORKS, instead of four that did not.
+              {/*
+                A MENU OF ONE IS A BUTTON.
 
-                  This menu listed "Create plugin", "Add marketplace", "Record a
-                  skill" and "Request a plugin", every one of them
-                  `onSelect={() => undefined}`. The thing people actually want —
-                  point the app at an MCP server it does not know about — already
-                  had its IPC handler, its registry writer and a store action
-                  with zero callers, and no way in. The other three describe
-                  features that do not exist.
-                */}
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem
-                    onSelect={() => setAddOpen(true)}
-                    data-testid="connectors-add-server"
-                  >
-                    Add an MCP server
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+                This was a "Create ▾" dropdown listing "Create plugin", "Add
+                marketplace", "Record a skill" and "Request a plugin", every one
+                of them `onSelect={() => undefined}`. The thing people actually
+                want — point the app at an MCP server it does not know about —
+                already had its IPC handler, its registry writer and a store
+                action with zero callers, and no way in. The other three describe
+                features that do not exist, so once they went there was one row
+                left behind a chevron, which is a button wearing a costume.
+              */}
+              <Button
+                variant="primary"
+                size="sm"
+                data-testid="connectors-add-server"
+                onClick={() => setAddOpen(true)}
+              >
+                <IconPlus size={14} /> Add MCP server
+              </Button>
               <AddServerDialog
                 open={addOpen}
                 onOpenChange={setAddOpen}
@@ -218,8 +202,16 @@ export function ConnectorsScreen({ onClose }: { onClose: () => void }) {
 
             <Tabs value={tab} onValueChange={(v) => setTab(v as 'plugins' | 'skills')}>
               <TabsList className="w-fit">
+                {/*
+                  NOT "Plugins". The title says Connectors, the search says
+                  connectors, the detail says MCP server, and this said plugins —
+                  four names for the same thing on one screen, which is exactly
+                  the confusion the user points at in the apps this is modelled on.
+                  Bobble has tools and skills; there is no third thing, so there
+                  is no third word.
+                */}
                 <TabsTrigger value="plugins" data-testid="connectors-tab-plugins">
-                  Plugins
+                  Tools
                 </TabsTrigger>
                 <TabsTrigger value="skills" data-testid="connectors-tab-skills">
                   Skills
@@ -232,7 +224,7 @@ export function ConnectorsScreen({ onClose }: { onClose: () => void }) {
                 <SearchInput
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search connectors"
+                  placeholder="Search tools"
                   data-testid="connectors-search"
                 />
               </div>

@@ -34,7 +34,10 @@ const SECTION_TITLES: Record<ConnectorSection, string> = {
   'by-us': 'By us',
   recommended: 'Recommended for you',
   official: 'Official',
-  popular: 'Popular',
+  /* NOT "Popular": that section is the fallthrough for everything not caught
+     above, and there is no popularity data anywhere in this app. A label the UI
+     invents is the kind of thing that makes the rest of it less believable. */
+  popular: 'More connectors',
 };
 
 /** Substring match over name / description / category (case-insensitive). */

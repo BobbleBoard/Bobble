@@ -73,10 +73,41 @@ try {
   await win.waitForFunction(() => typeof window.__pi_store === 'function', { timeout: 90_000 });
   await win.waitForSelector('[data-testid="composer-input"]', { timeout: 90_000 });
 
-  /** Bring a model up and point pi at it. Returns once the server says ready. */
-  const loadModel = async (modelId) => {
+  /*
+   * LET THE APP BRING ITS OWN MODEL UP.
+   *
+   * The probe used to drive `pi:start` → `llm:start-server` → `pi:set-model`
+   * itself, which skips the step the app does and the IPC does not: pi captures
+   * the server's base URL from its ENVIRONMENT at spawn, so a child started
+   * before the server has no endpoint and every turn comes back "fetch failed"
+   * with four empty assistant messages. `activateLocalModel` restarts pi for
+   * exactly this reason.
+   *
+   * Rather than reimplement that, the first model is simply the one the app
+   * activates on its own — which is also the path being measured, since it is
+   * the one a person takes. A SWITCH still has to be driven, and then it does
+   * all three steps in the app's order.
+   */
+  const waitForAppModel = async () => {
+    await win
+      .waitForFunction(
+        () => window.__llm_store?.().getState().status.serverRunning === true,
+        undefined,
+        { timeout: 600_000 },
+      )
+      .catch(() => undefined);
+    const st = await win.evaluate(() => window.__llm_store().getState().status);
+    console.log(`  app activated: ${st.model?.id ?? '(none)'} on ${st.baseUrl ?? '?'}`);
+    if (livePort === null) {
+      const m = /:(\d+)\/v1/.exec(st.baseUrl ?? '');
+      livePort = m === null ? null : Number(m[1]);
+    }
+    return st.model?.id ?? null;
+  };
+
+  /** Switch to a DIFFERENT model, in the order the app itself uses. */
+  const switchModel = async (modelId) => {
     await win.evaluate(async (id) => {
-      await window.piDesktop.invoke('pi:start', {});
       await window.piDesktop.invoke('llm:start-server', { modelId: id });
     }, modelId);
     await win.waitForFunction(
@@ -85,17 +116,14 @@ try {
       { timeout: 600_000 },
     );
     await win.evaluate(async (id) => {
+      // The restart is the load-bearing half — see the note above.
+      await window.piDesktop.invoke('pi:restart', {});
       await window.piDesktop.invoke('pi:set-model', { provider: 'llamacpp', modelId: id });
     }, modelId);
-    await win.waitForTimeout(3000);
-    if (livePort === null) {
-      try {
-        const ps = execSync('ps aux | grep llama-server | grep -v grep', { encoding: 'utf8' });
-        livePort = Number(/--port (\d+)/.exec(ps)?.[1] ?? 0) || null;
-      } catch {
-        /* keep null */
-      }
-    }
+    await win.waitForTimeout(4000);
+    const st = await win.evaluate(() => window.__llm_store().getState().status);
+    const m = /:(\d+)\/v1/.exec(st.baseUrl ?? '');
+    if (m !== null) livePort = Number(m[1]);
   };
 
   /** Poll /slots and keep every distinct processing state. */
@@ -243,6 +271,27 @@ try {
     // waiting out a fixed 45s per case turned a ten-case matrix into an hour.
     watchUntil = Math.min(watchUntil, Date.now() + 3000);
     await watching;
+    /*
+     * AN ERRORED TURN IS NOT A SLOW ONE. Without this, "fetch failed" four times
+     * over reads as `?ms` in the table — indistinguishable from a model that is
+     * merely taking its time, which is how a broken run got most of the way
+     * through looking like a latency measurement.
+     */
+    const failure = await win.evaluate(() => {
+      const m = window.__pi_store().getState().messages;
+      for (let i = m.length - 1; i >= 0; i--) {
+        const row = m[i];
+        if (row.kind === 'assistant' && row.stopReason === 'error')
+          return row.errorMessage ?? 'error';
+      }
+      return null;
+    });
+    if (failure !== null) {
+      console.log(`  ${name.padEnd(24)} ERRORED — ${failure}`);
+      rows.push({ case: name, note: `errored: ${failure}`, ttft: null, turn: null });
+      await idle();
+      return null;
+    }
     if (ttft === null) {
       const now = await shape();
       const st = await win.evaluate(() => {
@@ -251,6 +300,15 @@ try {
           streaming: s.agent.isStreaming,
           inFlight: s.promptInFlight,
           rows: s.messages.length,
+          // What the rows actually ARE — a probe that says "no first token"
+          // without saying what came back instead is a probe that cannot be
+          // debugged. (Costly lesson: five rows of "nothing" turned out to be
+          // a shape this reducer did not know how to read.)
+          shape: s.messages.map((m) =>
+            m.kind === 'assistant'
+              ? `assistant[${(m.blocks ?? []).map((b) => `${b.type}:${JSON.stringify(b).length}b`).join(' ')}]`
+              : `${m.kind}:${JSON.stringify(m).slice(0, 60)}`,
+          ),
         };
       });
       console.log(`      (no first token: ${JSON.stringify({ before, now, st })})`);
@@ -291,8 +349,8 @@ try {
 
   const wants = (n) => ONLY.length === 0 || ONLY.includes(n);
 
-  console.log(`\nmodel: ${MODEL}\n`);
-  await loadModel(MODEL);
+  console.log('\nwaiting for the app to bring its own model up…\n');
+  await waitForAppModel();
   if (livePort === null) throw new Error('no llama-server port found');
   console.log(`llama-server on ${livePort}\n`);
 
@@ -376,7 +434,7 @@ try {
 
   // 9. Switching models — the case that CANNOT be free, and so must be warned about.
   if (wants('model-switch')) {
-    await loadModel(MODEL2);
+    await switchModel(MODEL2);
     await send('model-switch', 'Name one fruit.', `switched to ${MODEL2}`);
   }
 

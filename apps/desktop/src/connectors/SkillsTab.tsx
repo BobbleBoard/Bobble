@@ -33,7 +33,9 @@ function SkillRow({
       <button type="button" className="min-w-0 flex-1 text-left" onClick={onOpen}>
         <span className="flex flex-wrap items-center gap-1.5">
           <span className="truncate text-body text-text-primary">{skill.name}</span>
-          <Badge tone={skill.license === 'Apache-2.0' ? 'info' : 'default'}>{skill.license}</Badge>
+          {/* The licence is a fact about the file, not the thing you are choosing
+              between — in blue it drew the eye before the skill's own name. */}
+          <Badge tone="default">{skill.license}</Badge>
           {skill.source === 'anthropics/skills' ? (
             <Badge tone="default">anthropics/skills</Badge>
           ) : null}
@@ -112,8 +114,10 @@ export function SkillsTab() {
     <div className="flex flex-col gap-4" data-testid="connectors-skills">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-footnote text-text-muted">
-          Skills are saved playbooks Pi follows. Enable one to copy it into your agent
-          {installedCount > 0 ? ` ${installedCount} enabled.` : ' none enabled yet.'}
+          {/* "Pi follows" is the pre-rebrand name in user-facing copy, and the
+              sentence had no full stop before its count ran into it. */}
+          Skills are saved playbooks Bobble follows. Enable one to copy it into your agent.
+          {installedCount > 0 ? ` ${installedCount} enabled.` : ' None enabled yet.'}
         </p>
       </div>
 

@@ -171,6 +171,7 @@ function AdvancedParamsButton() {
 
 export function ChatApp({
   contentOverride,
+  contentTitle,
   onOpenSettings,
   onOpenConnectors,
   onOpenScheduled,
@@ -178,6 +179,9 @@ export function ChatApp({
 }: {
   /** Render this INSTEAD of the thread + composer, keeping the shell. */
   contentOverride?: ReactNode;
+  /** What the top bar should call it. A content route owns the title while it is
+   * up; a chat's own (renameable) name comes back when it comes down. */
+  contentTitle?: string;
   onOpenSettings: (section: SettingsSection) => void;
   onOpenConnectors: () => void;
   onOpenScheduled: () => void;
@@ -672,12 +676,15 @@ export function ChatApp({
                    * noise, and mine did not route. So the subagent's name simply
                    * becomes the title while you are looking at it.
                    */
-                  inStudio ? (
-                    /* A studio's name is fixed, so the title is plain text here
-                       rather than the renameable ChatTitle — the same slot,
-                       saying where you are, with nothing to edit. */
+                  inStudio || contentTitle !== undefined ? (
+                    /* A studio's or a content route's name is fixed, so the title
+                       is plain text here rather than the renameable ChatTitle —
+                       the same slot, saying where you are, with nothing to edit.
+                       Without this the top bar said "New chat" over the Model
+                       hub, Scheduled and Connectors: the route was on screen and
+                       the bar was still naming a conversation behind it. */
                     <span className="pd-topbar-title" data-testid="studio-title">
-                      {STUDIO_TITLES[modality]}
+                      {inStudio ? STUDIO_TITLES[modality] : contentTitle}
                     </span>
                   ) : (
                     <ChatTitle

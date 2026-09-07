@@ -121,7 +121,9 @@ export function ScheduledView() {
       <div className="mx-auto w-full max-w-[900px] px-6 pt-6 pb-16">
         <header className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h1 className="text-heading text-text-primary">Scheduled tasks</h1>
+            {/* `text-title` like the Model hub and Connectors beside it — this
+                read as a settings sub-panel next to its own siblings at 16px. */}
+            <h1 className="text-title text-text-primary">Scheduled tasks</h1>
             <p className="mt-1 text-body text-text-secondary">
               Work Bobble does on its own, on a schedule or on demand.
             </p>
