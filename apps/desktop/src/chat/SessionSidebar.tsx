@@ -75,7 +75,6 @@ import { publishSessionList } from '../state/visible-projects';
 import { useThemeStore } from '../store/theme';
 import { formatModuleSize } from '../tripo/module-state';
 import { BobbleMark } from './BobbleMark';
-import { LocalModelBadge } from './LocalModelBadge';
 import { PROFILE_MENU_ACTIONS } from './profile-menu';
 
 /**
@@ -1318,18 +1317,6 @@ export function SessionSidebar({
         <BobbleMark size={28} />
         <span className="pd-wordmark text-text-primary">Bobble</span>
       </div>
-
-      {/*
-        WHAT THIS APP IS, said on screen, before anything is typed.
-
-        The blind tester's hardest note: "Nothing on screen says this never
-        leaves my Mac. That's the entire reason to pick it over ChatGPT and it's
-        not mentioned once." Meanwhile the thing that WAS on screen — the raw
-        model id — was the half she could not read. So the sentence leads and
-        the model name is the grey line under it, and the dot says whether it is
-        awake, which is also the ten seconds of warm-up she never knew she had.
-      */}
-      <LocalModelBadge />
 
       <div className="px-2 pb-2">
         <div className="min-w-0 flex-1" data-testid="sidebar-search">

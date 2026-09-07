@@ -2,11 +2,15 @@
  * The opening screen after the blind test: what the app says about itself
  * before anything is typed.
  *
- *   - the local claim is on screen ("Running on your Mac" / "Runs on your Mac"),
- *     with the model name as the GREY line under it, not the headline;
  *   - four clickable examples, and clicking one FILLS the composer rather than
  *     firing a request the user has not read;
- *   - the empty chat list says where the chats live.
+ *   - the local claim is on screen, next to them, where the decision is made;
+ *   - and the SIDEBAR carries no status badge. It did — "Running on your Mac"
+ *     over the model name with a coloured dot — and the user had it removed: "that
+ *     'model running on your mac' with solid color circle needs to go." The
+ *     model is already named on the composer chip and the mode by the Chat |
+ *     Project toggle; a third place to read the same thing is a third place to
+ *     keep right.
  *
  * Run (build first):
  *   SHOT_DIR=/tmp/opening node apps/desktop/tests/e2e/opening-screen-probe.mjs
@@ -19,26 +23,13 @@ try {
   await page.waitForSelector('[data-testid="starter-chips"]', { timeout: 15_000 });
   // The sidebar slides in over ~300ms (@starting-style translate); a shot taken
   // before it lands photographs a rail, not the panel this probe is about.
-  await page.waitForSelector('[data-testid="local-model-badge"]', { timeout: 10_000 });
+  await page.waitForSelector('[data-testid="sidebar-identity"]', { timeout: 10_000 });
   await page.waitForTimeout(900);
 
   const view = await page.evaluate(() => {
     const q = (sel) => document.querySelector(sel);
-    const badge = q('[data-testid="local-model-badge"]');
-    const headline = q('[data-testid="local-headline"]');
-    const detail = q('[data-testid="local-detail"]');
-    const px = (el) => (el === null ? null : Number.parseFloat(getComputedStyle(el).fontSize));
-    const colour = (el) => (el === null ? null : getComputedStyle(el).color);
     return {
-      badgeDot: badge?.getAttribute('data-dot') ?? null,
-      headline: headline?.textContent ?? null,
-      detail: detail?.textContent ?? null,
-      headlineSize: px(headline),
-      detailSize: px(detail),
-      detailColour: colour(detail),
-      mutedColour: getComputedStyle(document.documentElement)
-        .getPropertyValue('--pd-text-muted')
-        .trim(),
+      badge: q('[data-testid="local-model-badge"]') !== null,
       chips: [...document.querySelectorAll('button[data-testid^="starter-"]')].map(
         (b) => b.textContent,
       ),
@@ -47,17 +38,18 @@ try {
   });
   console.log('  ', JSON.stringify(view, null, 1));
 
-  check(view.headline !== null, 'the sidebar says what the app is');
-  check(
-    view.headline !== null && /on your Mac/i.test(view.headline),
-    `the local claim is on screen (got "${view.headline}")`,
-  );
-  check(view.detail !== null, 'the model name is present as a second line');
-  check(
-    view.detailSize !== null && view.headlineSize !== null && view.detailSize < view.headlineSize,
-    `the model name is SMALLER than the claim above it (${view.detailSize}px vs ${view.headlineSize}px)`,
-  );
+  check(!view.badge, 'the sidebar carries no status badge');
   check(view.chips.length === 4, `four starter chips (got ${view.chips.length})`);
+  /*
+   * WHERE, NOT JUST WHAT. Two of the four exist to tell a new user something
+   * they cannot guess from a program running on their own laptop: that it can
+   * reach the internet, and that it can touch their disk.
+   */
+  check(
+    view.chips.includes('Look something up on the web'),
+    'the web chip keeps the words that carry its payload',
+  );
+  check(view.chips.includes('Work with a file on my Mac'), 'and so does the file chip');
   check(
     view.privacy !== null &&
       /leaves this Mac/.test(view.privacy) &&
@@ -79,118 +71,6 @@ try {
   check(after.text.length > 20, 'clicking a chip fills the composer with a whole request');
   check(after.messages === before, 'clicking a chip does NOT send anything');
   await shot('02-chip-clicked');
-
-  /* ── The three states of the badge, photographed ────────────────────────
-   *
-   * The whole point of this block is that a model coming up LOOKS like a model
-   * coming up. Driven through the stores rather than a real llama-server so it
-   * is deterministic and costs a second, not a minute.
-   */
-  const badge = async (label) => {
-    await page.waitForTimeout(400);
-    const v = await page.evaluate(() => ({
-      dot: document.querySelector('[data-testid="local-model-badge"]')?.getAttribute('data-dot'),
-      headline: document.querySelector('[data-testid="local-headline"]')?.textContent,
-      detail: document.querySelector('[data-testid="local-detail"]')?.textContent,
-    }));
-    console.log(`   ${label}: [${v.dot}] ${v.headline} / ${v.detail}`);
-    return v;
-  };
-
-  await page.evaluate(() => {
-    window
-      .__model_selection_store()
-      .getState()
-      .setSwitching({ toTier: 'balanced', toName: 'Qwen3.5 9B (MTP)' });
-    window.__llm_store().getState().applyStatus({
-      phase: 'starting',
-      serverRunning: false,
-      baseUrl: null,
-      model: null,
-      metrics: null,
-      downloadedModelIds: [],
-    });
-  });
-  const starting = await badge('starting');
-  check(starting.dot === 'working', 'a model coming up shows the working dot');
-  check(
-    /Starting on your Mac/.test(starting.headline ?? '') && !/%/.test(starting.headline ?? ''),
-    `the loading line names the event and never a percentage (got "${starting.headline}")`,
-  );
-  check(starting.detail === 'Qwen3.5 9B (MTP)', 'the model name is the grey line while it starts');
-  await page.waitForTimeout(2200);
-  const ticked = await badge('starting +2s');
-  check(
-    /· \d+:\d\d$/.test(ticked.headline ?? ''),
-    `the count is running (got "${ticked.headline}")`,
-  );
-  await shot('03-badge-starting');
-
-  /*
-   * THE STATE THAT MATTERS MOST: server up, prompt not yet read.
-   *
-   * MEASURED, the wait this covers: the server is ready at ~3.5s and the system
-   * prompt takes another 11,552ms to become resident. The first cut of this
-   * badge went GREEN for that whole window — "Running on your Mac", calm and
-   * resident, while the app could not have answered a message for another ten
-   * seconds.
-   */
-  await page.evaluate(() => {
-    window.__model_selection_store().getState().setSwitching(null);
-    window
-      .__llm_store()
-      .getState()
-      .applyStatus({
-        phase: 'ready',
-        serverRunning: true,
-        baseUrl: 'http://127.0.0.1:8080',
-        model: {
-          id: 'qwen3.5-9b-mtp',
-          displayName: 'Qwen3.5 9B (MTP)',
-          quant: 'Q4',
-          contextWindow: 65536,
-        },
-        metrics: null,
-        downloadedModelIds: ['qwen3.5-9b-mtp'],
-      });
-    window.__pi_store().setState({ extensionStatus: { 'harness-prefix-warm': 'warming' } });
-  });
-  const warming = await badge('ready-but-warming');
-  check(
-    warming.dot === 'working',
-    'the dot does NOT go green while the prompt is still being read',
-  );
-  check(
-    /^Getting ready/.test(warming.headline ?? ''),
-    `it says what it is doing (got "${warming.headline}")`,
-  );
-  check(!/Running/.test(warming.headline ?? ''), 'and does not claim to be running');
-  await shot('05-badge-warming');
-
-  await page.evaluate(() => {
-    window.__pi_store().setState({ extensionStatus: { 'harness-prefix-warm': 'ready' } });
-    window
-      .__llm_store()
-      .getState()
-      .applyStatus({
-        phase: 'ready',
-        serverRunning: true,
-        baseUrl: 'http://127.0.0.1:8080',
-        model: {
-          id: 'qwen3.5-9b-mtp',
-          displayName: 'Qwen3.5 9B (MTP)',
-          quant: 'Q4',
-          contextWindow: 65536,
-        },
-        metrics: null,
-        downloadedModelIds: ['qwen3.5-9b-mtp'],
-      });
-  });
-  const ready = await badge('ready');
-  check(ready.dot === 'ready', 'a resident model shows the ready dot');
-  check(ready.headline === 'Running on your Mac', `the claim settles (got "${ready.headline}")`);
-  check(ready.detail === 'Qwen3.5 9B (MTP)', 'and the model stays the grey line');
-  await shot('04-badge-ready');
 
   console.log(`\nshots → ${shotDir}`);
 } finally {

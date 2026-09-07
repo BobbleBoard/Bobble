@@ -234,13 +234,15 @@
    * Round-3: the per-item entrance stagger was removed. It made the panel read
    * as "populate top-down" (fighting the dropup's bottom-up reveal); the panel's
    * own clip-reveal above is now the single, direction-correct entrance motion.
-   * The highlight wash still transitions (plus the one-shot hover-nudge transform,
-   * values in hover.css) so it fades in and reverses.
+   * The highlight wash still transitions, so it fades in and reverses. There is
+   * no transform channel any more: menu rows used to lean 2px toward the pointer
+   * and the user had it removed — a menu is a list you read DOWN to find something,
+   * and every row you pass shifting under the pointer is motion that helps
+   * nobody. The wash already says which row is live.
    */
   transition:
     background-color var(--pd-duration-base) var(--pd-easing-standard),
-    opacity var(--pd-duration-base) var(--pd-easing-standard),
-    transform var(--pd-duration-base) var(--pd-easing-spring);
+    opacity var(--pd-duration-base) var(--pd-easing-standard);
 }
 
 /* hover / keyboard highlight / listbox selection are one wash (codex measured

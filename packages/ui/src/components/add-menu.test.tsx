@@ -5,6 +5,7 @@ import {
   ComposerAddMenu,
   type GenActionHandlers,
   type GenActionKey,
+  joinGroups,
   selectGenAction,
 } from './add-menu.tsx';
 
@@ -84,5 +85,56 @@ describe('ComposerAddMenu — render smoke', () => {
     // The trigger renders in the document; the portalled content does not on the
     // server, so we only assert the mount succeeded.
     expect(html).toContain('pd-menu-trigger');
+  });
+});
+
+describe('joinGroups — a rule only ever appears BETWEEN two groups', () => {
+  /*
+   * THE BUG THIS EXISTS FOR. Every group in the "+" menu is conditional (a row
+   * renders only when it has a handler) while the separators between them were
+   * not — so a build with no project/GitHub/skills handlers rendered separator,
+   * nothing, separator. the user, looking at the shipped app: "this + menu has so
+   * many double lines and confusion."
+   *
+   * These read as arithmetic because that is what they are: the shapes below are
+   * every way an absent handler can empty a group, and none of them may produce
+   * two rules in a row, a leading rule, or a trailing one.
+   */
+  const isSep = (n: unknown): boolean =>
+    typeof n === 'object' && n !== null && (n as { key?: string }).key?.startsWith('sep-') === true;
+
+  const shape = (groups: (string | null)[][]): string =>
+    joinGroups(groups)
+      .map((n) => (isSep(n) ? '|' : 'x'))
+      .join('');
+
+  it('puts one rule between two full groups', () => {
+    expect(shape([['a'], ['b']])).toBe('x|x');
+    expect(shape([['a', 'b'], ['c']])).toBe('xx|x');
+  });
+
+  it('never puts two rules together, however the middle empties', () => {
+    expect(shape([['a'], [], ['b']])).toBe('x|x');
+    expect(shape([['a'], [null], [null], ['b']])).toBe('x|x');
+    expect(shape([['a'], [], [], [], ['b']])).toBe('x|x');
+  });
+
+  it('never leads or trails with a rule', () => {
+    expect(shape([[], ['a']])).toBe('x');
+    expect(shape([['a'], []])).toBe('x');
+    expect(shape([[], ['a'], []])).toBe('x');
+  });
+
+  it('renders nothing at all when every group is empty', () => {
+    expect(shape([[], [null], []])).toBe('');
+  });
+
+  it('drops the nulls a conditional row leaves behind', () => {
+    expect(
+      shape([
+        ['a', null, 'b'],
+        [null, 'c'],
+      ]),
+    ).toBe('xx|x');
   });
 });

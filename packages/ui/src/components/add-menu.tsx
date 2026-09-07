@@ -1,4 +1,30 @@
 import type { ReactElement, ReactNode } from 'react';
+
+/**
+ * Join menu groups with a rule between them — and only between two that are both
+ * non-empty.
+ *
+ * THE BUG THIS EXISTS FOR: every group in this menu is conditional (a row only
+ * renders when it has a handler) while the `<DropdownMenuSeparator />`s between
+ * them were not. A build with no project/GitHub/skills handlers therefore
+ * rendered separator, nothing, separator — two rules touching, plus one hanging
+ * off the end. the user: "this + menu has so many double lines and confusion."
+ *
+ * Filtering first makes that unrepresentable rather than merely fixed: there is
+ * no arrangement of absent handlers that can produce two rules in a row.
+ */
+export function joinGroups(groups: readonly (ReactNode | null)[][]): ReactNode[] {
+  const filled = groups
+    .map((g) => g.filter((n): n is ReactNode => n !== null && n !== undefined && n !== false))
+    .filter((g) => g.length > 0);
+  const out: ReactNode[] = [];
+  filled.forEach((group, i) => {
+    if (i > 0) out.push(<DropdownMenuSeparator key={`sep-${i}`} />);
+    out.push(...group);
+  });
+  return out;
+}
+
 import { IconButton } from './button.tsx';
 import {
   DropdownMenu,
@@ -175,78 +201,125 @@ export function ComposerAddMenu({
         the handler also means wiring one up makes its row appear — nothing to
         re-add, and no way to ship a dead row again.
       */}
+      {/*
+        GROUPS, NOT A RIBBON OF SEPARATORS.
+        the user, looking at the shipped menu: "this + menu has so many double lines
+        and confusion." He was seeing two rules in a row and one hanging off the
+        end — the separators were UNCONDITIONAL while every group between them
+        was conditional, so a build with no project/GitHub/skills handlers
+        rendered separator, nothing, separator.
+        Building the groups first and joining them means a rule can only ever
+        appear BETWEEN two groups that both have something in them.
+      */}
       <DropdownMenuContent className="pd-menu--instant" side={side} align={align}>
-        <DropdownMenuItem
-          icon={<IconPaperclip size={16} />}
-          hint="⌘U"
-          onSelect={() => onAddFiles?.()}
-        >
-          Add files or photos
-        </DropdownMenuItem>
-        {onTakeScreenshot !== undefined ? (
-          <DropdownMenuItem icon={<IconImage size={16} />} onSelect={onTakeScreenshot}>
-            Take a screenshot
-          </DropdownMenuItem>
-        ) : null}
-        {variant === 'full' ? (
-          <>
-            <DropdownMenuSeparator />
-            {onAddToProject !== undefined ? (
-              <DropdownMenuItem icon={<IconFolderPlus size={16} />} onSelect={onAddToProject}>
-                Add to project
-              </DropdownMenuItem>
-            ) : null}
-            {onAddFromGitHub !== undefined ? (
-              <DropdownMenuItem icon={<IconGithub size={16} />} onSelect={onAddFromGitHub}>
-                Add from GitHub
-              </DropdownMenuItem>
-            ) : null}
-            {onSkills !== undefined ? (
-              <DropdownMenuItem icon={<IconSparkles size={16} />} onSelect={onSkills}>
-                Skills
-              </DropdownMenuItem>
-            ) : null}
-            {onAddConnector !== undefined ? (
-              <DropdownMenuItem icon={<IconConnector size={16} />} onSelect={onAddConnector}>
-                Add connector
-              </DropdownMenuItem>
-            ) : null}
-            {onAddPlugins !== undefined ? (
-              <DropdownMenuItem icon={<IconPuzzle size={16} />} onSelect={onAddPlugins}>
-                Add plugins…
-              </DropdownMenuItem>
-            ) : null}
-            <DropdownMenuSeparator />
-            {COMPOSER_GEN_ACTIONS.map((action) => (
+        {joinGroups([
+          [
+            <DropdownMenuItem
+              key="add-files"
+              icon={<IconPaperclip size={16} />}
+              hint="⌘U"
+              onSelect={() => onAddFiles?.()}
+            >
+              Add files or photos
+            </DropdownMenuItem>,
+            onTakeScreenshot !== undefined ? (
               <DropdownMenuItem
-                key={action.key}
-                data-testid={action.testid}
-                icon={GEN_ACTION_ICON[action.key]}
-                onSelect={() => selectGenAction(action.key, genHandlers)}
+                key="screenshot"
+                icon={<IconImage size={16} />}
+                onSelect={onTakeScreenshot}
               >
-                {action.label}
+                Take a screenshot
               </DropdownMenuItem>
-            ))}
-            <DropdownMenuSeparator />
-            {onResearch !== undefined ? (
-              <DropdownMenuItem icon={<IconSearch size={16} />} onSelect={onResearch}>
-                Research
-              </DropdownMenuItem>
-            ) : null}
-            {onWebSearchChange !== undefined ? (
-              <DropdownMenuCheckboxItem
-                checked={webSearch}
-                onCheckedChange={(next) => onWebSearchChange(next === true)}
-                onSelect={(event) => event.preventDefault()}
-              >
-                <span className="pd-menu-icon">
-                  <IconGlobe size={16} />
-                </span>
-                Web search
-              </DropdownMenuCheckboxItem>
-            ) : null}
-          </>
-        ) : null}
+            ) : null,
+          ],
+          variant !== 'full'
+            ? []
+            : [
+                onAddToProject !== undefined ? (
+                  <DropdownMenuItem
+                    key="add-to-project"
+                    icon={<IconFolderPlus size={16} />}
+                    onSelect={onAddToProject}
+                  >
+                    Add to project
+                  </DropdownMenuItem>
+                ) : null,
+                onAddFromGitHub !== undefined ? (
+                  <DropdownMenuItem
+                    key="github"
+                    icon={<IconGithub size={16} />}
+                    onSelect={onAddFromGitHub}
+                  >
+                    Add from GitHub
+                  </DropdownMenuItem>
+                ) : null,
+                onSkills !== undefined ? (
+                  <DropdownMenuItem
+                    key="skills"
+                    icon={<IconSparkles size={16} />}
+                    onSelect={onSkills}
+                  >
+                    Skills
+                  </DropdownMenuItem>
+                ) : null,
+                onAddConnector !== undefined ? (
+                  <DropdownMenuItem
+                    key="connector"
+                    icon={<IconConnector size={16} />}
+                    onSelect={onAddConnector}
+                  >
+                    Add connector
+                  </DropdownMenuItem>
+                ) : null,
+                onAddPlugins !== undefined ? (
+                  <DropdownMenuItem
+                    key="plugins"
+                    icon={<IconPuzzle size={16} />}
+                    onSelect={onAddPlugins}
+                  >
+                    Add plugins…
+                  </DropdownMenuItem>
+                ) : null,
+              ],
+          variant !== 'full'
+            ? []
+            : COMPOSER_GEN_ACTIONS.map((action) => (
+                <DropdownMenuItem
+                  key={action.key}
+                  data-testid={action.testid}
+                  icon={GEN_ACTION_ICON[action.key]}
+                  onSelect={() => selectGenAction(action.key, genHandlers)}
+                >
+                  {action.label}
+                </DropdownMenuItem>
+              )),
+          variant !== 'full'
+            ? []
+            : [
+                onResearch !== undefined ? (
+                  <DropdownMenuItem
+                    key="research"
+                    icon={<IconSearch size={16} />}
+                    onSelect={onResearch}
+                  >
+                    Research
+                  </DropdownMenuItem>
+                ) : null,
+                onWebSearchChange !== undefined ? (
+                  <DropdownMenuCheckboxItem
+                    key="web-search"
+                    checked={webSearch}
+                    onCheckedChange={(next) => onWebSearchChange(next === true)}
+                    onSelect={(event) => event.preventDefault()}
+                  >
+                    <span className="pd-menu-icon">
+                      <IconGlobe size={16} />
+                    </span>
+                    Web search
+                  </DropdownMenuCheckboxItem>
+                ) : null,
+              ],
+        ])}
       </DropdownMenuContent>
     </DropdownMenu>
   );

@@ -50,12 +50,19 @@ button.pd-chip:active:not(:disabled) {
   transform: translateX(2px);
 }
 
-/* Menu rows: the added transition already fades the highlight wash in/out
- * (previously instant); pointer hover also nudges. data-highlighted (keyboard)
- * deliberately does NOT nudge. */
-.pd-menu-item:hover {
-  transform: translateX(2px);
-}
+/*
+ * MENU ROWS DO NOT NUDGE. the user: "on dropdown menus remove the hover animation
+ * that moves things to the sides, this should be a one quick fix since
+ * dropdown/dropup styling should be universal."
+ *
+ * They did (translateX(2px) on pointer hover), and a nudge is wrong in a menu
+ * for a reason it is right in a sidebar: a menu is a list you are reading down
+ * to FIND something, and every row you pass shifts under the pointer. The
+ * highlight wash already says which row is live, without moving it.
+ *
+ * Deleted rather than parameterised — a sidebar row still nudges above, and one
+ * rule doing it for one surface is the honest amount of machinery here.
+ */
 
 /* Inactive segmented-control tabs pick up a faint wash on hover (they only
  * shifted text color before) — the transition already covers background. */
@@ -68,8 +75,7 @@ button.pd-chip:active:not(:disabled) {
   .pd-btn:active:not(:disabled),
   button.pd-chip:hover:not(:disabled),
   button.pd-chip:active:not(:disabled),
-  .pd-sidebar-row:hover,
-  .pd-menu-item:hover {
+  .pd-sidebar-row:hover {
     transform: none;
   }
 }

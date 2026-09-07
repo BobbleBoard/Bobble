@@ -5397,10 +5397,32 @@ body[data-media-expanded="true"] .pd-studio-compose {
 
 .pd-composer-ledge > * {
   min-height: 0;
+  /*
+   * `overflow: hidden` is what makes the collapse work, and it clips ALL FOUR
+   * sides — including the ledge's own drop shadow and the antialiasing on its
+   * rounded bottom corners. the user, looking at it: "bottom bar is cut off
+   * literally at the bottom, come on." It was: the bar's bottom edge sat exactly
+   * on the clip, so the shadow under it was sliced off and the corners came out
+   * square.
+   *
+   * The padding gives the shadow room INSIDE the clip. It also adds real
+   * breathing space under the ledge, which the 6px of bottom padding on the bar
+   * itself never had.
+   */
   overflow: hidden;
   transition:
     transform var(--pd-duration-slow, 260ms) var(--pd-easing-standard),
     opacity var(--pd-duration-base) var(--pd-easing-standard);
+}
+
+/*
+ * The shadow's room, ONLY WHEN OPEN. Padding inside a `0fr` track is not
+ * compressed by the track, so a constant 10px left the collapsed ledge 10px
+ * tall — visible as a sliver under the composer and, worse, as 10px the chat
+ * lost forever.
+ */
+.pd-composer-ledge[data-open="true"] > * {
+  padding-bottom: 10px;
 }
 
 .pd-composer-ledge[data-open="false"] {
