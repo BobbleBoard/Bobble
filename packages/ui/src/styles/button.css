@@ -41,6 +41,17 @@
     transform var(--pd-duration-base) var(--pd-easing-spring);
 }
 
+/*
+ * AN ICON NEVER SHRINKS. MEASURED: a primary button holding `<IconPlus size={14}/>
+ * Add MCP server` in a flex header rendered the SVG at 6.9px wide — a dot —
+ * because nothing pinned it, so the icon absorbed the shrink before the label
+ * wrapped. Found by a design pass looking at a button I had just added.
+ */
+.pd-btn > .pd-icon,
+.pd-btn > svg {
+  flex: none;
+}
+
 .pd-btn:focus-visible {
   outline-color: var(--pd-focus-ring);
 }
