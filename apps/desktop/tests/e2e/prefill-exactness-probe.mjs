@@ -206,6 +206,18 @@ try {
     })();
     const sentAt = Date.now();
     await win.keyboard.press('Enter');
+    /*
+     * AND DOES THE SCREEN SAY SO? the user's rule is "when I don't see anything I
+     * get an instant response" — which only holds if a send that is waiting out
+     * a prime keeps saying it is waiting. Read the pill just after Enter, while
+     * the wait is happening, not after.
+     */
+    await new Promise((r) => setTimeout(r, 250));
+    const pillDuringSend = await win
+      .evaluate(
+        () => document.querySelector('[data-testid="composer-pill-text"]')?.textContent ?? null,
+      )
+      .catch(() => null);
     let ttft = null;
     const deadline = Date.now() + 90_000;
     while (Date.now() < deadline) {
@@ -259,6 +271,7 @@ try {
       label,
       note,
       ttft,
+      pillDuringSend,
       failure,
       total: turn?.total ?? null,
       processed: turn?.processed ?? null,
@@ -269,6 +282,7 @@ try {
         `${String(row.processed ?? '?').padStart(6)} of ${String(row.total ?? '?').padStart(6)}` +
         (failure === null ? '' : `   ERRORED — ${failure}`),
     );
+    console.log(`      the screen said: ${JSON.stringify(pillDuringSend)}`);
     check(failure === null, `${label}: the turn did not error`);
     /*
      * WHAT THE COMPOSER'S PREFILL DID, in its own words. A slot number alone
@@ -378,6 +392,10 @@ try {
   check(
     half.ttft !== null && cold.ttft !== null && half.ttft <= cold.ttft + 500,
     `and is no slower than not priming at all (${half.ttft}ms vs ${cold.ttft}ms)`,
+  );
+  check(
+    typeof half.pillDuringSend === 'string' && half.pillDuringSend.length > 0,
+    `a send that is waiting out a prime says so on screen (${JSON.stringify(half.pillDuringSend)})`,
   );
   writeFileSync(path.join(OUT, 'exactness.json'), JSON.stringify({ prime, rows }, null, 2));
 } catch (err) {

@@ -205,16 +205,18 @@ try {
   const at = full.lastIndexOf(prefix);
   const primed = at >= 0 ? full.slice(0, at + prefix.length) : full;
   const primedTokens = (await tokenize(primed)).length;
-  const sysOnly = await render([{ role: 'system', content: before.system }], false, false);
-  const sysTokens = (await tokenize(sysOnly)).length;
   const rereadPrime = await probePrefix(primed);
-  console.log(
-    `\n  the prime's prompt is ${primedTokens} tokens (${sysTokens} of them system + tools)`,
-  );
+  console.log(`\n  the prime's prompt is ${primedTokens} tokens`);
   console.log(`  re-priming it right after the app's own prime re-read ${rereadPrime}`);
+  /*
+   * Never exactly zero: llama.cpp always decodes at least the final token of a
+   * prompt, and a few more can fall out of where the last cached batch ended. A
+   * dozen out of eleven thousand means it was still there; hundreds means the
+   * prefix was overwritten by something else between the prime and this read.
+   */
   check(
-    rereadPrime >= 0 && rereadPrime <= 2,
-    `the app's prime left exactly this prompt in the slot (${rereadPrime} tokens re-read, expected ≤2)`,
+    rereadPrime >= 0 && rereadPrime <= 16,
+    `the app's prime is still in the slot (${rereadPrime} of ${primedTokens} tokens re-read)`,
   );
 
   /* ── 3. Now send, and watch what the TURN itself has to read ────────────── */
@@ -282,7 +284,7 @@ try {
 
   writeFileSync(
     path.join(OUT, 'divergence.json'),
-    JSON.stringify({ primedTokens, sysTokens, rereadPrime, ttft, turn: turnSample }, null, 2),
+    JSON.stringify({ primedTokens, rereadPrime, ttft, turn: turnSample }, null, 2),
   );
   writeFileSync(path.join(OUT, 'primed.txt'), primed);
 } catch (err) {

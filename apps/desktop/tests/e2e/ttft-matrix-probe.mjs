@@ -270,6 +270,20 @@ try {
     const watching = (async () => {
       while (Date.now() < watchUntil) await watch(200, samples);
     })();
+    /*
+     * DOES THE SCREEN SAY ANYTHING, at the moment of sending?
+     *
+     * the user's rule is "when I don't see anything I get an instant response", so a
+     * route that is not instant has to be a route that was speaking. The two
+     * that are not instant here — a first message sent into the app's opening
+     * warm-up, and a send that waits out an attachment prime — are exactly the
+     * ones this reads, and a silent slow route is a failure even at 100% reuse.
+     */
+    const pillAtSend = await win
+      .evaluate(
+        () => document.querySelector('[data-testid="composer-pill-text"]')?.textContent ?? null,
+      )
+      .catch(() => null);
     const sentAt = Date.now();
     await win.keyboard.press('Enter');
     /*
@@ -370,7 +384,7 @@ try {
     }
     const turn = [...byTask.values()].reduce((a, b) => (b.total > (a?.total ?? -1) ? b : a), null);
     const dispatchMs = dispatchedAt === null ? null : dispatchedAt - sentAt;
-    const row = { case: name, note, ttft, dispatchMs, turn, samples: samples.length };
+    const row = { case: name, note, ttft, dispatchMs, turn, pillAtSend, samples: samples.length };
     rows.push(row);
     const reused = turn === null ? null : turn.total - turn.processed;
     console.log(
@@ -518,4 +532,29 @@ for (const r of rows) {
       `${String(reused ?? '?').padStart(6)} / ${String(r.turn?.total ?? '?').padStart(6)}` +
       `  ${String(pct ?? '?').padStart(3)}%  ${verdict}${r.note ? `  (${r.note})` : ''}`,
   );
+}
+
+/*
+ * SLOW AND SILENT is the only failure left worth a headline.
+ *
+ * Every route above can be at 100% reuse and still take seconds, because the KV
+ * is not the only thing that has to be ready. the user's rule does not say every
+ * send is instant — it says "when I don't see anything I get an instant
+ * response". So the thing to flag is a route that took long enough to notice
+ * with nothing on screen explaining it.
+ */
+const SLOW_MS = 1500;
+const silentSlow = rows.filter((r) => (r.ttft ?? 0) > SLOW_MS && (r.pillAtSend ?? '').length === 0);
+if (silentSlow.length === 0) {
+  console.log(`\n  OK: every route over ${SLOW_MS}ms had something on screen saying so.`);
+} else {
+  console.log(`\n  SLOW AND SILENT — over ${SLOW_MS}ms with nothing on screen:`);
+  for (const r of silentSlow) console.log(`    ${r.case.padEnd(26)}${r.ttft}ms`);
+}
+for (const r of rows) {
+  if ((r.ttft ?? 0) > SLOW_MS && (r.pillAtSend ?? '').length > 0) {
+    console.log(
+      `    ${r.case.padEnd(26)}${r.ttft}ms — the screen said ${JSON.stringify(r.pillAtSend)}`,
+    );
+  }
 }

@@ -162,6 +162,23 @@ export default defineConfig({
       },
     ]),
   ],
+  server: {
+    watch: {
+      /*
+       * `release/` IS OUTPUT, NOT SOURCE.
+       *
+       * `electron-builder --dir` writes a whole Electron app into
+       * `apps/desktop/release/`, and every file it lays down looks to the dev
+       * server like a change worth a full page reload — including its own
+       * temp copies of Chromium's licence HTML. A headless probe running while
+       * a build is packaging gets reloaded out from under itself: three of nine
+       * launches died at "waiting for navigation to finish" in one measured
+       * session. Nothing in there is ever imported, so nothing is lost by not
+       * watching it.
+       */
+      ignored: ['**/release/**'],
+    },
+  },
   build: {
     /**
      * Keep the dictation AudioWorklet as a REAL FILE.
