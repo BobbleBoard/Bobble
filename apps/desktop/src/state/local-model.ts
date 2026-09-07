@@ -226,6 +226,49 @@ export type VisionDecision =
  * different one is worse than not seeing the image — the image is one turn, and
  * the swap is the rest of the session.
  */
+/**
+ * A reactive hook for {@link imagesUnsupported}, reading the live stores.
+ *
+ * Subscribes to the four fields the decision actually depends on rather than
+ * whole stores, so an unrelated status push does not re-render the composer.
+ */
+export function useImagesUnsupported(): boolean {
+  const launchMode = useLlmStore((s) => s.status.launchMode);
+  const visionReady = useLlmStore((s) => s.status.visionReady);
+  const model = useLlmStore((s) => s.status.model);
+  const catalog = useLlmStore((s) => s.catalog);
+  const tierModels = useLlmStore((s) => s.recommendation?.tierModels);
+  const selection = useSettingsStore((s) => s.settings.modelSelection);
+  // Nothing resident yet ⇒ nothing to warn about; the model is still coming up
+  // and the pill is already saying so.
+  if (model === null) return false;
+  return imagesUnsupported({
+    launchMode,
+    visionReady,
+    model,
+    catalog,
+    pinnedModelId: selection?.mode === 'model' ? selection.modelId : null,
+    tierModels,
+  });
+}
+
+/**
+ * Can an image be seen AT ALL in the current setup — now, or after a relaunch?
+ *
+ * the user: "for images on non visual model, show a yellow circle + ! on images both
+ * in chat input and when sent and then show a quick pill bar … that just simply
+ * says 'selected model does not support images'."
+ *
+ * This is the same question {@link resolveVisionTarget} already answers on the
+ * send path; asking it in the composer just moves the answer to before the
+ * mistake instead of after it. `none` is the honest signal — it covers both a
+ * pinned text-only model (a pin is an instruction, so we will not swap) and a
+ * machine with no vision-capable model downloaded.
+ */
+export function imagesUnsupported(s: VisionState): boolean {
+  return resolveVisionTarget(s).action === 'none';
+}
+
 export function resolveVisionTarget(s: VisionState): VisionDecision {
   // Already able to see: either a projector is attached (the normal case now)
   // or this server was explicitly launched multimodal.

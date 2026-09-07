@@ -130,8 +130,9 @@ export function ThreadStatusIndicator(): ReactElement | null {
   const readyStage = useLlmStore((s) => modelReadyStage(s.status.phase, prefixWarm));
   const serverStarting = readyStage !== null;
   /* The two waits read differently because they ARE different: one is weights
-     coming off disk, the other is the prompt being read. */
-  const readyLabel = readyStage === 'loading' ? 'Loading model' : 'Getting ready';
+     coming off disk, the other is the prompt being read. Both are the PILL's
+     words now (composer-pill.ts) — this component only needs to know that one
+     of them is happening, so it can stand down. */
   const prefillPct = parsePrefillPercent(prefillRaw);
   const messages = usePiStore((s) => s.messages);
 
@@ -305,16 +306,20 @@ export function ThreadStatusIndicator(): ReactElement | null {
       />
     );
   }
-  if (serverStarting && !processing) {
-    return (
-      <ProcessingRing
-        percent={readyStage === 'preparing' ? prefillPct : null}
-        label={readyLabel}
-        fading={false}
-        elapsedMs={elapsedMs}
-      />
-    );
-  }
+  /*
+   * THE TWO READY STATES LEFT THIS INDICATOR — they are the PILL now.
+   *
+   * the user: "moving to a new chat shows this 'getting ready' thing that I'd like
+   * to move to a pill that floats above the input bar." Right: they are not
+   * about a turn, they are about whether the app can answer at all, and they
+   * belong next to the thing you type into rather than in the middle of a
+   * conversation you are reading. See ComposerPill.
+   *
+   * The rest of this component — thinking, the panel line, compaction, a model
+   * swap — still belongs in the thread, because each of those IS about the turn
+   * in front of you.
+   */
+  if (serverStarting && !processing) return null;
   /*
    * THE 70 SECONDS WHERE THE COLUMN WENT QUIET.
    *
@@ -377,12 +382,7 @@ export function ThreadStatusIndicator(): ReactElement | null {
    */
   const percent = processing ? (readyStage === 'loading' ? null : prefillPct) : 100;
   return (
-    <ProcessingRing
-      percent={percent}
-      label={serverStarting ? readyLabel : 'Processing'}
-      fading={fading}
-      elapsedMs={elapsedMs}
-    />
+    <ProcessingRing percent={percent} label="Processing" fading={fading} elapsedMs={elapsedMs} />
   );
 }
 

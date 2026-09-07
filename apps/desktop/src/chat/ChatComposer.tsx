@@ -23,6 +23,7 @@ import { ExpandedScrim } from '../media/ExpandedScrim';
 import { IconMic, IconPause, IconPlay, IconStop } from '../settings/icons';
 import { abortCorpTask } from '../state/corp-connect';
 import { useCorpStore } from '../state/corp-store';
+import { useImagesUnsupported } from '../state/local-model';
 import {
   abortPi,
   applyHarnessPreset,
@@ -41,6 +42,7 @@ import { useThemeStore } from '../store/theme';
 import { AttachedFileCard } from './AttachedFileCard';
 import { ComposerBar } from './ComposerBar';
 import { ComposerFooter } from './ComposerFooter';
+import { ComposerPill } from './ComposerPill';
 import { type AcItem, Autocomplete } from './composer/Autocomplete';
 import { buildAgentMessage } from './composer/agent-message';
 import { useAttachmentPrefill } from './composer/attachment-prefill';
@@ -53,6 +55,7 @@ import { useDropStore } from './composer/drop-store';
 import { type AcToken, EMPTY_TOKEN } from './composer/tokens';
 import { GEN_ACTION_PLANS, type TaskClass } from './composer-gen-actions';
 import { DictationBar } from './DictationBar';
+import { IconWarning } from './icons-pill';
 import { HELP_TEXT, parseSlashCommand } from './slash-commands';
 import { useDictation } from './useDictation';
 
@@ -196,10 +199,13 @@ function AttachmentPreview({
   name,
   dataUri,
   onRemove,
+  blind = false,
 }: {
   name: string;
   dataUri?: string;
   onRemove: () => void;
+  /** The selected model cannot read images — badge this one. */
+  blind?: boolean;
 }) {
   const isImage = (dataUri ?? '').startsWith('data:image/');
   const [open, setOpen] = useState(false);
@@ -208,15 +214,29 @@ function AttachmentPreview({
       {isImage ? (
         // Clickable, like every other piece of media in the app (the user asked for
         // the expanded view on input media too) — a 20px chip is not a preview.
-        <button
-          type="button"
-          className="pd-attach-thumb-btn pd-focusable"
-          aria-label={`Open ${name}`}
-          onClick={() => setOpen(true)}
-        >
-          {/* biome-ignore lint/a11y/useAltText: the button carries the label */}
-          <img className="pd-attach-thumb" src={dataUri} />
-        </button>
+        <span className="pd-blind-host">
+          <button
+            type="button"
+            className="pd-attach-thumb-btn pd-focusable"
+            aria-label={`Open ${name}`}
+            onClick={() => setOpen(true)}
+          >
+            {/* biome-ignore lint/a11y/useAltText: the button carries the label */}
+            <img className="pd-attach-thumb" src={dataUri} />
+          </button>
+          {/* The fact travels WITH the picture, so it is still there when the
+              pill has gone. the user: "a yellow circle + ! on images both in chat
+              input and when sent". */}
+          {blind ? (
+            <span
+              className="pd-blind-badge"
+              data-testid="attach-blind-badge"
+              title="The selected model cannot read images"
+            >
+              <IconWarning size={14} />
+            </span>
+          ) : null}
+        </span>
       ) : (
         <span className="pd-attach-ext">{extLabel(name)}</span>
       )}
@@ -257,6 +277,13 @@ export function ChatComposer({
 }) {
   // Which half of the app is on screen — the ledge below the card follows it.
   const workMode = useWorkMode();
+  /*
+   * CAN THE SELECTED MODEL READ A PICTURE? Asked here so the answer arrives
+   * before the mistake rather than after it — the send path asks the same
+   * question (ensureVisionReady) and could only ever answer once it was too
+   * late to matter.
+   */
+  const blindToImages = useImagesUnsupported();
   const flavor = useThemeStore((s) => s.flavor);
   const isStreaming = usePiStore((s) => s.agent.isStreaming);
   // A corp/hierarchy run is live from start to its terminal `done` — its Stop
@@ -376,6 +403,7 @@ export function ChatComposer({
     usePiStore.setState({ composerText: '' });
   }, [composerText]);
 
+  const hasImageAttached = attachments.some((a) => (a.dataUri ?? '').startsWith('data:image/'));
   const canSend = text.trim().length > 0 || attachments.length > 0;
   const bashMode = text.trim().startsWith('!');
 
@@ -940,6 +968,12 @@ export function ChatComposer({
     // — the whole input bar reads as nudged up to make room for the thin ledge.
     <div className="mx-auto w-full max-w-[700px] pb-1.5">
       <div className="pd-composer-root relative">
+        {/*
+          THE PILL FLOATS ABOVE THE INPUT BAR — see ComposerPill. Inside the
+          relative root so it anchors to the card, and absolutely positioned so
+          appearing never moves the card.
+        */}
+        <ComposerPill imageOnBlindModel={blindToImages && hasImageAttached} />
         <Autocomplete
           items={token.mode !== null ? items : []}
           selectedIndex={selectedIndex}
@@ -989,6 +1023,7 @@ export function ChatComposer({
                     key={a.id}
                     name={a.name}
                     dataUri={a.dataUri}
+                    blind={blindToImages && (a.dataUri ?? '').startsWith('data:image/')}
                     onRemove={() => setAttachments((prev) => prev.filter((p) => p.id !== a.id))}
                   />
                 ),

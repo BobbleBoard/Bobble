@@ -5256,3 +5256,80 @@ body[data-media-expanded="true"] .pd-studio-compose {
     transition: none;
   }
 }
+
+/* ── The pill above the input bar ─────────────────────────────────────────
+ *
+ * ABSOLUTELY POSITIONED, and that is the point: it appears and disappears
+ * without moving the thing you are typing into. Every version of this that took
+ * layout space pushed the composer down and back up on a state change nobody
+ * asked for — which is the jitter the whole round is about.
+ */
+.pd-composer-pill {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  max-width: calc(100% - 24px);
+  padding: 5px 11px;
+  border: 1px solid var(--pd-border-subtle);
+  border-radius: var(--pd-radius-full);
+  background: var(--pd-bg-raised);
+  box-shadow: var(--pd-shadow-hairline), var(--pd-shadow-sm);
+  color: var(--pd-text-secondary);
+  font-size: var(--pd-font-size-caption);
+  line-height: var(--pd-leading-caption);
+  white-space: nowrap;
+  pointer-events: none;
+  animation: pd-pill-in var(--pd-duration-base) var(--pd-easing-standard);
+}
+
+.pd-composer-pill[data-tone="warn"] {
+  color: var(--pd-status-warning-fg);
+  border-color: var(--pd-status-warning-border);
+  background: var(--pd-status-warning-bg);
+}
+
+@keyframes pd-pill-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 4px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pd-composer-pill {
+    animation: none;
+  }
+}
+
+/* ── "This model cannot read that" ────────────────────────────────────────
+ *
+ * A filled yellow disc on the image itself, in the composer and in the sent
+ * message, so the fact travels WITH the picture rather than living only in a
+ * pill that will be gone by the time you scroll back.
+ */
+.pd-blind-badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  z-index: 2;
+  display: inline-flex;
+  color: var(--pd-status-warning-fg);
+  /* A ring in the surface colour so the disc reads over any photograph. */
+  border-radius: var(--pd-radius-full);
+  box-shadow: 0 0 0 2px var(--pd-bg-raised);
+  pointer-events: none;
+}
+
+.pd-blind-host {
+  position: relative;
+  display: inline-flex;
+}
