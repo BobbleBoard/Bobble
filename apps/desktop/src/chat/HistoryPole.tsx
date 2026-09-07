@@ -93,8 +93,16 @@ export function HistoryPole({
     measure();
     const el = scrollRef.current;
     if (el === null) return;
+    /*
+     * BOTH BOXES. The scroller tells us when the WINDOW changed size; its
+     * content tells us when the THREAD did — an answer finishing, a chain
+     * opening, an image loading. Watching only the scroller left the dots
+     * pointing at where the turns used to be, because a scroller's own box does
+     * not change when what is inside it grows.
+     */
     const ro = new ResizeObserver(() => measure());
     ro.observe(el);
+    if (el.firstElementChild !== null) ro.observe(el.firstElementChild);
     return () => ro.disconnect();
   }, [measure, scrollRef, revision]);
 
