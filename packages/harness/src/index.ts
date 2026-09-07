@@ -1086,33 +1086,28 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
      */
     const warmKey = `${canonical}\u0000${warmNames.join(',')}`;
     /*
-     * TELL THE RENDERER WHAT THE PREFIX IS — EVERY TICK, not only when a warm-up
-     * happens.
+     * TELL THE RENDERER WHAT THE PREFIX IS — every tick, and with the tools the
+     * TURN will carry rather than the warm-up's guess. Two separate bugs, one
+     * line, so both are written down here.
      *
-     * This publish used to live at the bottom of this function, after the
-     * "already warmed" early return. So it ran exactly once per distinct prefix
-     * per process — and a session boundary DROPS the renderer's copy (every
-     * `harness*` status key is cleared so a stale checklist cannot leak into a
-     * new chat). Switch chats once and the renderer had no system prompt and no
-     * tool list for the rest of the session, which silently disabled predictive
-     * prefill entirely: nothing logged, nothing wrong on either side alone.
+     * (1) This publish used to sit at the bottom of the function, after the
+     * "already warmed" early return, so it ran once per distinct prefix per
+     * process. A session boundary DROPS the renderer's copy (every `harness*`
+     * status key is cleared so a stale checklist cannot leak into a new chat),
+     * and these two are caught by that net — so switching chats once left the
+     * renderer with no system prompt and no tool list for the rest of the
+     * session, silently disabling predictive prefill entirely. Nothing logged,
+     * nothing wrong on either side alone. Publishing here is free:
+     * `publishPrefillContext` compares before it sends.
      *
-     * Publishing here is free — `publishPrefillContext` compares before sending
-     * — and it means the renderer's copy is restored within a tick of any
-     * session change.
-     */
-    /*
-     * ...WITH THE TOOLS THE TURN WILL ACTUALLY CARRY, which are not always the
-     * warm-up's guess.
-     *
-     * `warmTools` is the preset for the class the warm-up assumes; the turn uses
-     * `runtime.activeTools`, which is that preset UNIONED onto whatever earlier
-     * turns activated and carried across session boundaries on purpose (the set
-     * is append-only so a new class cannot move the tools already in the
-     * prompt). Once a turn has run, the accumulated set is the truth and the
-     * warm guess is not — and chat templates render tools at the START, so
-     * priming the wrong FIRST tool costs the entire prefix. Publishing the guess
-     * every tick would overwrite the accurate list a turn had just published.
+     * (2) `warmTools` is the preset for the class the warm-up ASSUMES. The turn
+     * uses `runtime.activeTools` — that preset unioned onto whatever earlier
+     * turns activated, carried across session boundaries on purpose (the set is
+     * append-only so a new class cannot move tools already in the prompt). Once
+     * a turn has run, the accumulated set is the truth, and chat templates
+     * render tools at the START: priming the wrong FIRST tool costs the entire
+     * prefix. Publishing the guess every tick would overwrite the accurate list
+     * a turn had just published.
      */
     publishPrefillContext(
       ctx,
