@@ -166,8 +166,9 @@ function newRunId(nowMs: number): string {
 }
 
 export interface ScheduledRunner {
-  /** Queue a run; resolves with the runId once queued (not when it finishes). */
-  run(task: ScheduledTask): { runId: string };
+  /** Queue a run; resolves with the runId once queued (not when it finishes).
+   * `trigger` records whether the clock or a person started it — see TaskRun. */
+  run(task: ScheduledTask, trigger?: 'schedule' | 'manual'): { runId: string };
   listRuns: typeof listRuns;
   deleteRun: typeof deleteRun;
   deleteRunsForTask: typeof deleteRunsForTask;
@@ -179,7 +180,7 @@ export function createScheduledRunner(deps: ScheduledRunnerDeps): ScheduledRunne
   let queue: Promise<void> = Promise.resolve();
   let liveBridge: RunBridge | null = null;
 
-  function execute(task: ScheduledTask, runId: string): Promise<void> {
+  function execute(task: ScheduledTask, runId: string, trigger: 'schedule' | 'manual'): Promise<void> {
     const startedAt = deps.now();
     // No cwd on the task → a dedicated per-run output dir, so the deliverables
     // are isolated and cleanly scannable. A named folder is used as-is.
@@ -197,6 +198,7 @@ export function createScheduledRunner(deps: ScheduledRunnerDeps): ScheduledRunne
       id: runId,
       taskId: task.id,
       startedAt,
+      trigger,
       status: 'running',
       summary: '',
       toolCalls: [],
@@ -308,11 +310,11 @@ export function createScheduledRunner(deps: ScheduledRunnerDeps): ScheduledRunne
   }
 
   return {
-    run(task) {
+    run(task, trigger = 'schedule') {
       const runId = newRunId(deps.now());
       // Chain onto the queue so runs never overlap.
       queue = queue
-        .then(() => execute(task, runId))
+        .then(() => execute(task, runId, trigger))
         .catch((error) => {
           log.warn('scheduled run threw', { taskId: task.id, error: String(error) });
         });

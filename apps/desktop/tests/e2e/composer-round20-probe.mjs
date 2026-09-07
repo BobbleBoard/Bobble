@@ -125,6 +125,28 @@ try {
   check(afterPick.chips === 0, 'a connector adds no attachment chip');
   await shot('03-connector-pill');
 
+  /* ── 3b. Clicking a pill and pressing delete removes it ───────────────── */
+  const pillEl = await page.$('[data-testid="composer-pill"]');
+  if (pillEl !== null) {
+    await pillEl.click();
+    await page.waitForTimeout(250);
+    await page.keyboard.press('Delete');
+    await page.waitForTimeout(300);
+    const afterClickDelete = await composerState();
+    console.log('  click + Delete:', afterClickDelete.pills.length);
+    check(
+      afterClickDelete.pills.length === 0,
+      'clicking a pill and pressing delete removes it (the user: "clicking on any and clicking delete should remove them")',
+    );
+    // Put it back for the Backspace case below.
+    await page.click(editor);
+    await page.keyboard.type('/gm');
+    await page.waitForSelector(acPanel, { timeout: 8000 });
+    await page.waitForTimeout(400);
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(400);
+  }
+
   /* ── 4. One Backspace removes it whole ────────────────────────────────── */
   await page.click(editor);
   await page.keyboard.press('End');

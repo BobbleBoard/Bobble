@@ -21,7 +21,6 @@
  * (`n_prompt_tokens_cache` reads 0 regardless — do not trust it.)
  *
  * Env:
- *   MODEL       model id (default qwen3.5-4b-mtp)
  *   MODEL2      the model to switch to for the model-switch case
  *   ONLY        comma-separated case names to run
  *   IDLE_MIN    minutes for the idle case (default 6; set 60 for the user's hour)
@@ -38,7 +37,9 @@ import { _electron as electron } from 'playwright-core';
 import { backgroundLaunch } from './_focus.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const MODEL = process.env.MODEL ?? 'qwen3.5-4b-mtp';
+/* MODEL is no longer forced — the app activates its own (see waitForAppModel),
+ * which is the path a person takes and the one worth measuring. MODEL2 is the
+ * one the model-switch case deliberately moves TO. */
 const MODEL2 = process.env.MODEL2 ?? 'gemma-4-e2b-it';
 const IDLE_MIN = Number(process.env.IDLE_MIN ?? '6');
 const ONLY = (process.env.ONLY ?? '').split(',').filter(Boolean);

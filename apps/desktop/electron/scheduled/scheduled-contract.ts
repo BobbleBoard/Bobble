@@ -31,6 +31,14 @@ export interface TaskRun {
   readonly id: string;
   readonly taskId: string;
   readonly startedAt: number;
+  /**
+   * What started it: the clock, or a person pressing Run now.
+   *
+   * Without this the history cannot say "ran an hour late, caught up after the
+   * Mac woke" without also mislabelling every deliberate Run-now on a morning
+   * task as late. Optional so runs recorded before it stay readable.
+   */
+  readonly trigger?: 'schedule' | 'manual';
   readonly finishedAt?: number;
   readonly status: RunStatus;
   /** The run's final assistant text — what it reports it did. */

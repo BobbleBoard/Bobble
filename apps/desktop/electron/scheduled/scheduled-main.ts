@@ -225,7 +225,7 @@ export function registerScheduledHandlers(
     'tasks:run-now': (req) => {
       const task = load().tasks.find((t) => t.id === req.id);
       if (task === undefined) return { ok: false };
-      const { runId } = activeRunner.run(task);
+      const { runId } = activeRunner.run(task, 'manual');
       return { ok: true, runId };
     },
     'tasks:list-runs': (req) => ({ runs: activeRunner.listRuns(req.taskId) }),
