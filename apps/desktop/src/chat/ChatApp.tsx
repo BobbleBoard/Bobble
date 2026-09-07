@@ -62,7 +62,6 @@ import { InputNeededBanner } from './InputNeededBanner';
 import { ModeToggle } from './ModeToggle';
 import { SessionSidebar } from './SessionSidebar';
 import { StageAnnouncer } from './StageAnnouncer';
-import { StarterChips } from './StarterChips';
 import { useSiteIcon } from './site-icons';
 import { ToastHost } from './ToastHost';
 import { UiRequestDialogs } from './UiRequestDialogs';
@@ -737,42 +736,14 @@ export function ChatApp({
                       */}
                       <p className="text-body text-text-muted">How can I help you today?</p>
                       {/*
-                        The app answering "what can you do?" itself — see
-                        starters.ts. Asked of the MODEL, that question came back
-                        as `ask_user`, `update_plan`, `spawn_subagent`,
-                        `talk_to_manager`: the plumbing, in a vocabulary no one
-                        outside this repo can read.
+                        THE CLAIM, WHERE THE DECISION IS MADE. It admits the
+                        exception, which is what makes it worth believing: "Your
+                        chats stay on this Mac" is passive and can be read as a
+                        storage claim, and web search does send words out.
                       */}
-                      {/*
-                        THE CLAIM, WHERE THE DECISION IS MADE.
-
-                        It was at the foot of the sidebar, and the tester called
-                        that right: "The foot of the sidebar is the legal-footer
-                        position. It's where '© 2026' and 'Terms of Service'
-                        live. Everything down there reads as boilerplate and my
-                        eyes have thirty years of training to skip it." This is
-                        the opening screen, next to the four chips, at the moment
-                        someone is deciding whether the app is worth their time.
-
-                        AND IT ADMITS THE EXCEPTION, which is what makes it worth
-                        believing. "Your chats stay on this Mac" is passive and
-                        can be read as a storage claim — we keep your history
-                        locally — which is a far smaller promise than the one we
-                        can actually make. But web search does send words out.
-                        Her version names both, and is stronger for it.
-                      */}
-                      <p className="mt-2 text-caption text-text-muted" data-testid="privacy-line">
+                      <p className="mt-1 text-caption text-text-muted" data-testid="privacy-line">
                         Nothing you type here leaves this Mac. Only web searches do.
                       </p>
-                      {/*
-                        Extra room under the chips on the EMPTY screen, because
-                        that is where the pill lands and those eleven seconds are
-                        exactly when someone is reading them. The tester: "check
-                        the pill doesn't sit on top of the chips."
-                      */}
-                      <div className="mt-3 mb-6 max-w-[720px]">
-                        <StarterChips />
-                      </div>
                     </div>
                   ) : (
                     // The thread is ALWAYS the lead surface — a corp run renders

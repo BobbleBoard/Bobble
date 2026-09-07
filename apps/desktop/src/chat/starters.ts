@@ -20,15 +20,22 @@
 export interface Starter {
   /** The chip's own words — four or five, readable at a glance. */
   label: string;
-  /** What lands in the composer. A whole request, editable before sending. */
+  /** What the MODEL receives. A whole request, and what the pill stands for. */
   prompt: string;
   /** Which icon the chip carries (resolved in the component). */
   icon: 'write' | 'search' | 'image' | 'file';
+  /**
+   * The pill's own words once it is in the box — shorter than the prompt, since
+   * a pill is a token and the prompt is a sentence. the user: "add blue pills with
+   * icons and X buttons … not just typing them."
+   */
+  pill: string;
 }
 
 export const STARTERS: readonly Starter[] = [
   {
     label: 'Write something',
+    pill: 'Write something',
     prompt: 'Draft a short, friendly announcement email for a product launch.',
     icon: 'write',
   },
@@ -46,16 +53,19 @@ export const STARTERS: readonly Starter[] = [
      * facts that separate this app from a text box.
      */
     label: 'Look something up on the web',
+    pill: 'Look something up',
     prompt: 'Search the web and summarise what changed recently in EU packaging rules.',
     icon: 'search',
   },
   {
     label: 'Make an image',
+    pill: 'Make an image',
     prompt: 'Make an image of a cosy neighbourhood coffee shop at sunrise.',
     icon: 'image',
   },
   {
     label: 'Work with a file on my Mac',
+    pill: 'Work with a file',
     prompt: 'Read a file on my Mac and turn it into a short summary I can send.',
     icon: 'file',
   },

@@ -5518,3 +5518,70 @@ body[data-media-expanded="true"] .pd-studio-compose {
   position: relative;
   display: inline-flex;
 }
+
+/* ── Pills in the input ───────────────────────────────────────────────────
+ *
+ * the user: "add blue pills with icons and X buttons for embedded files and such,
+ * not just typing them, including for buttons in the + menu no raw text."
+ *
+ * Everything inserted rather than typed takes this shape. The point is not
+ * decoration: typed text is indistinguishable from what you wrote yourself, so
+ * it can be half-deleted into nonsense by one backspace and there is nothing to
+ * click to take it back. A pill is one object — one keystroke or one click
+ * removes it, and it cannot be left broken.
+ */
+.pd-pill-host {
+  display: inline-flex;
+  vertical-align: baseline;
+}
+
+.pd-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 22px;
+  padding: 0 4px 0 8px;
+  border: 1px solid var(--pd-accent-primary);
+  border-radius: var(--pd-radius-full);
+  background: var(--pd-accent-subtle);
+  color: var(--pd-accent-primary);
+  font-size: var(--pd-font-size-caption);
+  line-height: 1;
+  white-space: nowrap;
+  /* Sits ON the text baseline rather than pushing the line taller. */
+  vertical-align: -4px;
+  user-select: none;
+}
+
+.pd-pill-label {
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pd-pill-x {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: none;
+  border-radius: var(--pd-radius-full);
+  background: transparent;
+  color: currentcolor;
+  cursor: pointer;
+  opacity: 0.65;
+}
+
+.pd-pill-x:hover {
+  background: color-mix(in srgb, var(--pd-accent-primary) 18%, transparent);
+  opacity: 1;
+}
+
+/* The starter chips, under the composer and above the @ / ! hints. */
+.pd-composer-starters {
+  display: flex;
+  justify-content: center;
+  margin: 12px auto 2px;
+  max-width: 720px;
+}

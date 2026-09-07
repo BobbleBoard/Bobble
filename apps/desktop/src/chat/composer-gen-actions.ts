@@ -26,14 +26,42 @@ export interface GenActionPlan {
    * A tiny prompt scaffold prefilled into the composer editor when the action is
    * chosen. Deliberately plain natural language (NOT a `/slash` lead-in, which
    * would route through pi's command path instead of a normal prompt).
+   *
+   * It is now the PILL'S PAYLOAD rather than typed text — the words still reach
+   * the model exactly as before, but in the box they are one object you can
+   * remove with a click. the user: "including for buttons in the + menu no raw text."
    */
   readonly scaffold: string;
+  /** The pill's own words in the box. Short: it is a token, not a sentence. */
+  readonly pill: string;
+  /** The pill's glyph. */
+  readonly icon: 'image' | 'video' | 'motion' | 'search';
 }
 
 /** One plan per "+" gen row. Keys mirror {@link GenActionKey} exactly. */
 export const GEN_ACTION_PLANS: Record<GenActionKey, GenActionPlan> = {
-  image: { forcedClass: '2d-art', scaffold: 'Generate an image of ' },
-  video: { forcedClass: 'advanced-video', scaffold: 'Generate a video of ' },
-  motion: { forcedClass: 'motion-graphics', scaffold: 'Create a motion-graphics animation of ' },
-  perception: { forcedClass: 'perception', scaffold: 'Find and segment ' },
+  image: {
+    forcedClass: '2d-art',
+    scaffold: 'Generate an image of ',
+    pill: 'Generate image',
+    icon: 'image',
+  },
+  video: {
+    forcedClass: 'advanced-video',
+    scaffold: 'Generate a video of ',
+    pill: 'Generate video',
+    icon: 'video',
+  },
+  motion: {
+    forcedClass: 'motion-graphics',
+    scaffold: 'Create a motion-graphics animation of ',
+    pill: 'Motion graphics',
+    icon: 'motion',
+  },
+  perception: {
+    forcedClass: 'perception',
+    scaffold: 'Find and segment ',
+    pill: 'Find / segment',
+    icon: 'search',
+  },
 };

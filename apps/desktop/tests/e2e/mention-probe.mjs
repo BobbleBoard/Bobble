@@ -91,14 +91,32 @@ try {
   await page.click('[data-testid="composer-autocomplete"] [role="option"]');
   await page.waitForTimeout(900);
 
-  const state = await page.evaluate(() => ({
-    text: document.querySelector('.pd-composer-editor')?.textContent ?? '',
-    chips: document.querySelectorAll('[data-testid="composer-attachments"] *').length,
-  }));
+  const state = await page.evaluate(() => {
+    const pill = document.querySelector('[data-testid="composer-pill"]');
+    return {
+      text: document.querySelector('.pd-composer-editor')?.textContent ?? '',
+      chips: document.querySelectorAll('[data-testid="composer-attachments"] *').length,
+      pills: document.querySelectorAll('[data-testid="composer-pill"]').length,
+      // The pill's title IS its payload — what the model receives in its place.
+      payload: pill?.getAttribute('title') ?? '',
+    };
+  });
   if (state.chips <= beforeChips) {
     fail('picking a file attached nothing — the mention did not fold the file in');
   } else console.log('[mention] OK: picking a file attaches its contents');
-  if (!state.text.includes('@')) {
+  /*
+   * A MENTION IS A PILL NOW, not a typed path. the user: "add blue pills with icons
+   * and X buttons for embedded files and such, not just typing them."
+   *
+   * The invariant this line has always protected is unchanged and is now checked
+   * where it actually lives: the model still receives `@path`, because that is
+   * the pill's PAYLOAD (`getTextContent()`), even though the box shows the file's
+   * name. Asserting on the visible text would have been asserting on the label.
+   */
+  if (state.pills !== 1) {
+    fail(`picking a file should insert exactly one pill (got ${state.pills})`);
+  } else console.log('[mention] OK: it arrives as a pill, not typed text');
+  if (!state.payload.includes('@')) {
     fail('the path left the message — the model no longer knows WHICH file was meant');
   } else console.log('[mention] OK: the path stays in the message too');
 } finally {

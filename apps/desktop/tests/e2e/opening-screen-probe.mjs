@@ -57,20 +57,69 @@ try {
     `the opening screen says where the words go (got "${view.privacy}")`,
   );
 
+  /*
+   * WHERE THE CHIPS SIT. the user: "put that stuff below the input bar but above the
+   * special command instructions." Above the box they were four suggestions in
+   * the way of the thing someone opened the app to use.
+   */
+  const order = await page.evaluate(() => {
+    const y = (sel) => {
+      const el = document.querySelector(sel);
+      return el === null ? null : Math.round(el.getBoundingClientRect().top);
+    };
+    return {
+      composer: y('.pd-composer-root'),
+      chips: y('[data-testid="starter-chips"]'),
+      hints: y('[data-testid="composer-hints"]'),
+    };
+  });
+  console.log('   vertical order:', JSON.stringify(order));
+  check(
+    order.composer !== null && order.chips !== null && order.chips > order.composer,
+    `the chips are BELOW the input bar (${order.composer} → ${order.chips})`,
+  );
+  check(
+    order.hints !== null && order.chips !== null && order.chips < order.hints,
+    `and above the @ / ! hints (${order.chips} → ${order.hints})`,
+  );
   await shot('01-opening');
 
-  // Clicking fills the box; it must NOT send.
+  /*
+   * A CHIP INSERTS A PILL, NOT TYPED TEXT. the user: "add blue pills with icons and
+   * X buttons for embedded files and such, not just typing them."
+   *
+   * The model still receives the whole request — the pill's payload IS the
+   * prompt, and the composer reads the message with `getTextContent()` — so the
+   * text assertion below is checking both halves at once: it is one object on
+   * screen and the same sentence on the wire.
+   */
   const before = await page.evaluate(() => window.__pi_store().getState().messages.length);
   await page.click('[data-testid="starter-image"]');
-  await page.waitForTimeout(500);
+  await page.waitForTimeout(600);
   const after = await page.evaluate(() => ({
     text: document.querySelector('.pd-composer-editor')?.textContent ?? '',
+    pills: document.querySelectorAll('[data-testid="composer-pill"]').length,
+    pillLabel: document.querySelector('.pd-pill-label')?.textContent ?? null,
+    hasX: document.querySelector('.pd-pill-x') !== null,
     messages: window.__pi_store().getState().messages.length,
   }));
-  console.log(`   composer now: "${after.text.slice(0, 60)}"`);
-  check(after.text.length > 20, 'clicking a chip fills the composer with a whole request');
+  console.log('   after the click:', JSON.stringify(after));
+  check(after.pills === 1, `it inserts ONE pill (got ${after.pills})`);
+  check(after.pillLabel === 'Make an image', `with its own short words (${after.pillLabel})`);
+  check(after.hasX, 'and an X to take it back');
   check(after.messages === before, 'clicking a chip does NOT send anything');
   await shot('02-chip-clicked');
+
+  // The X removes the whole thing — no half-deleted sentence left behind.
+  await page.click('.pd-pill-x');
+  await page.waitForTimeout(400);
+  const removed = await page.evaluate(() => ({
+    pills: document.querySelectorAll('[data-testid="composer-pill"]').length,
+    text: (document.querySelector('.pd-composer-editor')?.textContent ?? '').trim(),
+  }));
+  console.log('   after the X:', JSON.stringify(removed));
+  check(removed.pills === 0, 'the X removes it');
+  check(removed.text === '', `and leaves nothing behind (got "${removed.text}")`);
 
   console.log(`\nshots → ${shotDir}`);
 } finally {

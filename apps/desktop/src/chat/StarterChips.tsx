@@ -40,7 +40,17 @@ export function StarterChips(): React.ReactElement {
             className="pd-starter-chip pd-focusable"
             data-testid={`starter-${s.icon}`}
             title={s.prompt}
-            onClick={() => usePiStore.setState({ composerText: s.prompt })}
+            /*
+             * A PILL, NOT TYPED TEXT. the user: "add blue pills with icons and X buttons
+             * … not just typing them." The model still receives the whole request —
+             * the pill's payload IS the prompt — but in the box it is one object
+             * that removes with a click.
+             */
+            onClick={() =>
+              usePiStore.setState({
+                composerPill: { label: s.pill, payload: s.prompt, icon: s.icon },
+              })
+            }
           >
             <Icon size={13} />
             <span>{s.label}</span>

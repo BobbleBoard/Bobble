@@ -166,6 +166,12 @@ interface PiSliceState {
   uiRequests: UiDialogRequest[];
   artifacts: ArtifactCandidate[];
   composerText: string;
+  /**
+   * A PILL to drop at the caret, drained by the composer exactly like
+   * {@link composerText}. Separate because a pill is an object rather than a
+   * string — the user: "add blue pills … not just typing them."
+   */
+  composerPill: { label: string; payload: string; icon: string } | null;
   windowTitle: string | null;
   /**
    * True once the user has explicitly renamed THIS session's title, which pins
@@ -277,6 +283,7 @@ export const usePiStore = create<PiSliceState>((set) => ({
   uiRequests: [],
   artifacts: [],
   composerText: '',
+  composerPill: null,
   windowTitle: null,
   titleLocked: false,
   bridgeExited: null,

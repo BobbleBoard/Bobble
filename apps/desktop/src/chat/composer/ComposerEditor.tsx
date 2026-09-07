@@ -16,6 +16,7 @@ import {
   $createTextNode,
   $getRoot,
   $getSelection,
+  $isElementNode,
   $isRangeSelection,
   $isTextNode,
   COMMAND_PRIORITY_HIGH,
@@ -31,6 +32,8 @@ import {
   SELECTION_CHANGE_COMMAND,
 } from 'lexical';
 import { type MutableRefObject, useEffect, useRef } from 'react';
+import { registerPillRenderer } from './PillRenderer';
+import { $createPillNode, type PillData, PillNode } from './pill-node';
 import { type AcToken, detectToken, EMPTY_TOKEN } from './tokens';
 
 export interface ComposerEditorApi {
@@ -38,6 +41,14 @@ export interface ComposerEditorApi {
   insertToken: (tokenStart: number, value: string) => void;
   /** Replace the whole editor content (suggestion chips, templates). */
   setText: (value: string) => void;
+  /**
+   * Drop a PILL at the caret — the shape everything inserted rather than typed
+   * now takes. the user: "add blue pills with icons and X buttons for embedded files
+   * and such, not just typing them … no raw text."
+   */
+  insertPill: (data: PillData) => void;
+  /** Replace the active `@`/`/` token with a pill — the mention path. */
+  replaceTokenWithPill: (tokenStart: number, data: PillData) => void;
   clear: () => void;
   focus: () => void;
 }
@@ -126,6 +137,50 @@ function EditorBridge(props: Omit<ComposerEditorProps, 'placeholder' | 'disabled
           root.append(paragraph);
           paragraph.selectEnd();
         });
+      },
+      replaceTokenWithPill: (tokenStart, data) => {
+        editor.update(() => {
+          const selection = $getSelection();
+          if (!$isRangeSelection(selection)) return;
+          const node = selection.anchor.getNode();
+          if (!$isTextNode(node)) return;
+          // Cut the typed `@partial` out, then drop the pill where it was.
+          const text = node.getTextContent();
+          const before = text.slice(0, tokenStart);
+          const after = text.slice(selection.anchor.offset);
+          node.setTextContent(before);
+          const pill = $createPillNode(data);
+          node.insertAfter(pill);
+          const tail = $createTextNode(after.length > 0 ? after : ' ');
+          pill.insertAfter(tail);
+          tail.select(0, 0);
+        });
+        editor.focus();
+      },
+      insertPill: (data) => {
+        editor.update(() => {
+          const selection = $getSelection();
+          const pill = $createPillNode(data);
+          if ($isRangeSelection(selection)) {
+            selection.insertNodes([pill]);
+          } else {
+            // No caret yet (the chip was clicked before the box was touched) —
+            // append rather than dropping the insertion on the floor.
+            const root = $getRoot();
+            const last = root.getLastChild();
+            if (last === null) {
+              const p = $createParagraphNode();
+              p.append(pill);
+              root.append(p);
+            } else if ($isElementNode(last)) {
+              last.append(pill);
+            }
+          }
+          // A trailing space so the next thing typed is a word, not glued to it.
+          pill.insertAfter($createTextNode(' '));
+          pill.selectNext();
+        });
+        editor.focus();
       },
       clear: () => {
         editor.update(() => {
@@ -267,6 +322,10 @@ function EditorBridge(props: Omit<ComposerEditorProps, 'placeholder' | 'disabled
   return null;
 }
 
+// Once, at module load: the node draws through this and cannot be created before
+// the composer module has been imported.
+registerPillRenderer();
+
 export function ComposerEditor(props: ComposerEditorProps) {
   const { placeholder, disabled, onTextChange, onTokenChange } = props;
   return (
@@ -274,6 +333,8 @@ export function ComposerEditor(props: ComposerEditorProps) {
       initialConfig={{
         namespace: 'pi-composer',
         editable: disabled !== true,
+        /* Everything inserted rather than typed is a PillNode — see pill-node. */
+        nodes: [PillNode],
         onError: (error) => {
           console.error('[composer] lexical error', error);
         },

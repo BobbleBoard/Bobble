@@ -60,10 +60,12 @@ import {
   type ComposerKeymap,
 } from './composer/ComposerEditor';
 import { useDropStore } from './composer/drop-store';
+import type { PillData } from './composer/pill-node';
 import { type AcToken, EMPTY_TOKEN } from './composer/tokens';
 import { GEN_ACTION_PLANS, type TaskClass } from './composer-gen-actions';
 import { DictationBar } from './DictationBar';
 import { IconWarning } from './icons-pill';
+import { StarterChips } from './StarterChips';
 import { HELP_TEXT, parseSlashCommand } from './slash-commands';
 import { useDictation } from './useDictation';
 
@@ -506,6 +508,18 @@ export function ChatComposer({
     usePiStore.setState({ composerText: '' });
   }, [composerText]);
 
+  // The same drain, for a PILL pushed from outside (a starter chip).
+  const composerPill = usePiStore((s) => s.composerPill);
+  useEffect(() => {
+    if (composerPill === null) return;
+    apiRef.current?.insertPill({
+      label: composerPill.label,
+      payload: composerPill.payload,
+      icon: composerPill.icon as PillData['icon'],
+    });
+    usePiStore.setState({ composerPill: null });
+  }, [composerPill]);
+
   /**
    * Remove attachments and REMEMBER where they were.
    *
@@ -885,8 +899,14 @@ export function ChatComposer({
   // what the user then types.
   const onGenAction = (key: GenActionKey) => {
     const plan = GEN_ACTION_PLANS[key];
-    apiRef.current?.setText(plan.scaffold);
-    apiRef.current?.focus();
+    /*
+     * A PILL, NOT A TYPED SCAFFOLD. the user: "including for buttons in the + menu
+     * no raw text." The words the model receives are the same — the pill's
+     * payload IS the scaffold — but in the box it is one object: it removes with
+     * one click or one backspace, and a stray keystroke cannot leave "Generate
+     * an imag" behind.
+     */
+    apiRef.current?.insertPill({ label: plan.pill, payload: plan.scaffold, icon: plan.icon });
     setForcedClass(plan.forcedClass);
     void applyHarnessPreset(plan.forcedClass);
   };
@@ -1199,8 +1219,26 @@ export function ChatComposer({
           items={token.mode !== null ? items : []}
           selectedIndex={selectedIndex}
           onPick={(item) => {
-            apiRef.current?.insertToken(token.tokenStart, item.id);
             const picked = token.mode;
+            /*
+             * A MENTIONED FILE ARRIVES AS A PILL, not as a typed path. the user:
+             * "add blue pills with icons and X buttons for embedded files and
+             * such, not just typing them."
+             *
+             * The payload is the same path the model always received — the note
+             * below still holds, the user asked about THAT file by name — but a
+             * path typed into the box can be half-deleted into a path that does
+             * not exist, and there is nothing to click to take it back.
+             */
+            if (picked === 'mention' && item.path !== undefined) {
+              apiRef.current?.replaceTokenWithPill(token.tokenStart, {
+                label: item.label ?? item.id,
+                payload: item.id,
+                icon: 'file',
+              });
+            } else {
+              apiRef.current?.insertToken(token.tokenStart, item.id);
+            }
             setToken(EMPTY_TOKEN);
             apiRef.current?.focus();
             /*
@@ -1466,6 +1504,22 @@ export function ChatComposer({
           >
             Why isn't my message sending?
           </button>
+        </div>
+      ) : null}
+
+      {/*
+        THE STARTERS MOVED DOWN HERE. the user: "put that stuff below the input bar
+        but above the special command instructions."
+
+        They were above the composer, between the greeting and the box, which put
+        the app's four suggestions in the way of the thing someone opened it to
+        use. Below the box they read as an offer beside the keyboard shortcuts
+        rather than an obstacle in front of the cursor — and the two rows are the
+        same KIND of thing: here is what you can ask for, here is how to reach it.
+      */}
+      {isHome && !isStreaming ? (
+        <div className="pd-composer-starters">
+          <StarterChips />
         </div>
       ) : null}
 
