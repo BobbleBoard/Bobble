@@ -96,6 +96,16 @@ try {
   const port = Number(/:(\d+)\/v1/.exec(status.baseUrl ?? '')?.[1] ?? 0) || null;
   console.log(`model ${status.model?.id ?? '?'} on ${port}\n`);
   if (port === null) throw new Error('no llama-server port');
+  /*
+   * HOW MUCH ROOM IS THERE, REALLY. A conversation that stops being cached at a
+   * particular size is meeting a ceiling, and the ceiling is per-SLOT:
+   * `--parallel K` divides `-c` by K, so a server started with `-c 32768` and
+   * three slots gives each conversation 10,922 tokens, not 32,768.
+   */
+  {
+    const all = await (await fetch(`http://127.0.0.1:${port}/slots`)).json();
+    console.log(`  ${all.length} slot(s), n_ctx ${all[0]?.n_ctx ?? '?'} each\n`);
+  }
 
   const slot = async () => {
     try {
@@ -210,6 +220,14 @@ try {
       null,
     );
     await idle();
+    /* What the composer's prefill did for THIS turn — the only way to tell
+     * "the turn re-read it" from "our own prime re-read it first". */
+    const prefill = await win.evaluate(() => {
+      const l = window.__prefill_log ?? [];
+      const out = l.slice(-3);
+      window.__prefill_log = [];
+      return out;
+    });
     const thinking = await win.evaluate(() => {
       const m = window.__pi_store().getState().messages;
       return m.some(
