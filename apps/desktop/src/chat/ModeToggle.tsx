@@ -1,5 +1,5 @@
 /**
- * CHAT | WORK — the two-segment control beside the traffic lights.
+ * CHAT | PROJECT — the two-segment control beside the traffic lights.
  *
  * the user: "claude has this little thing in the top left that I think we can lift
  * off of … that toggles that bottom bar popping out, left one being 'chat' and
@@ -24,7 +24,7 @@ export function ModeToggle(): React.ReactElement {
     /* A fieldset is the semantic version of "these two belong together", so the
      * label rides a legend rather than an aria-label on a div. */
     <fieldset className="pd-mode-toggle" data-testid="mode-toggle" data-mode={mode}>
-      <legend className="sr-only">Chat or work</legend>
+      <legend className="sr-only">Chat or project</legend>
       <button
         type="button"
         className="pd-mode-seg pd-focusable"
@@ -40,8 +40,8 @@ export function ModeToggle(): React.ReactElement {
         type="button"
         className="pd-mode-seg pd-focusable"
         aria-pressed={mode === 'work'}
-        title="Work — show the project, context and effort"
-        aria-label="Work"
+        title="Project — a folder on your Mac, with its context and effort"
+        aria-label="Project"
         data-testid="mode-work"
         onClick={() => void setWorkMode('work')}
       >

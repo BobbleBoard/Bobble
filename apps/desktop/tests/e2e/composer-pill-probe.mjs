@@ -85,8 +85,8 @@ try {
   await page.waitForSelector('[data-testid="composer-pill"]', { timeout: 5000 });
   const loading = await pill();
   console.log('   loading:', JSON.stringify(loading));
-  check(loading?.kind === 'loading', `it says the model is loading (${loading?.text})`);
-  check(loading?.text === 'Loading model', `exact words (${loading?.text})`);
+  check(loading?.kind === 'loading', `it says the app is starting (${loading?.text})`);
+  check(/^Starting up/.test(loading?.text ?? ''), `exact words (${loading?.text})`);
   check(!/%/.test(loading?.text ?? ''), 'and no percentage, because none exists');
   check(loading?.position === 'absolute', 'the pill floats');
   check(
@@ -102,19 +102,29 @@ try {
   });
   await page.waitForTimeout(400);
   const preparing = await pill();
-  console.log('   preparing (no %):', JSON.stringify(preparing));
+  console.log('   preparing:', JSON.stringify(preparing));
   check(preparing?.kind === 'preparing', `it says it is getting ready (${preparing?.text})`);
-  check(preparing?.text === 'Getting ready', 'a spinner and no number while none is reported');
+  check(/^Getting ready/.test(preparing?.text ?? ''), `exact words (${preparing?.text})`);
+  /*
+   * TWO WAITS, TWO PHRASES. They said the same words in the first cut, and the
+   * tester: "I will see both of those in my first week. The moment I do, the one
+   * without the number becomes a bug."
+   */
+  check(
+    (preparing?.text ?? '') !== (loading?.text ?? ''),
+    'the two boot waits do not say the same thing',
+  );
 
-  await page.evaluate(() => {
-    window.__pi_store().setState({
-      extensionStatus: { 'harness-prefix-warm': 'warming', 'harness-prefill': '63' },
-    });
-  });
-  await page.waitForTimeout(400);
-  const withPct = await pill();
-  console.log('   preparing (63%):  ', JSON.stringify(withPct));
-  check(/63%/.test(withPct?.text ?? ''), `a REAL number is shown when reported (${withPct?.text})`);
+  /*
+   * THE CLOCK IS WHAT MAKES A SPINNER HONEST. "The spinner isn't what reassures
+   * me. The changing digits are." So the number that matters here is not a
+   * percentage — it is the one going up.
+   */
+  await page.waitForTimeout(2600);
+  const ticked = await pill();
+  console.log('   after 2.6s:', ticked?.text);
+  check(/· \d+:\d\d$/.test(ticked?.text ?? ''), `the clock is running (${ticked?.text})`);
+  check(!/%/.test(ticked?.text ?? ''), 'and still no invented percentage');
   await shot('02-getting-ready');
 
   /* ── 3. An image on a model that cannot read one ──────────────────────── */

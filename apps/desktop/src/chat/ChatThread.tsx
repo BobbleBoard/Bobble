@@ -48,7 +48,7 @@ import { type AttachedFile, splitAttachedFiles } from './attached-files';
 import { buildAgentMessage } from './composer/agent-message';
 import { corpChatView } from './corp/corp-thread-view';
 import { HarnessChecklistPanel, ThreadStatusIndicator } from './HarnessStatus';
-import { UserImage } from './UserImage';
+import { BlindImageNote, UserImage } from './UserImage';
 
 /**
  * How far from the bottom counts as "away", for the jump-to-latest control.
@@ -582,11 +582,23 @@ export function ChatThread() {
                     >
                       <div className="flex flex-col gap-2">
                         {message.images !== undefined && message.images.length > 0 ? (
-                          <div className="flex flex-wrap gap-2">
-                            {message.images.map((src) => (
-                              <UserImage key={src} src={src} />
-                            ))}
-                          </div>
+                          <>
+                            <div className="flex flex-wrap gap-2">
+                              {message.images.map((src) => (
+                                <UserImage key={src} src={src} />
+                              ))}
+                            </div>
+                            {/*
+                              WORDS, NOT ONLY A COLOURED MARK. The tester: "a
+                              coloured mark whose meaning I have to be taught is
+                              the 'No project' chip all over again — right
+                              instinct, and you're one sentence from it being
+                              right." The badge on the picture catches the eye;
+                              this says what it means, permanently, under the
+                              message it belongs to.
+                            */}
+                            <BlindImageNote />
+                          </>
                         ) : null}
                         {attached.files.length > 0 ? (
                           <div className="flex flex-wrap gap-2" data-testid="user-attachments">

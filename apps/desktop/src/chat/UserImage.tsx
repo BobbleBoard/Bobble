@@ -62,3 +62,25 @@ export function UserImage({
     </>
   );
 }
+
+/**
+ * "This model couldn't see the image." — the sentence under a sent picture the
+ * running model cannot read.
+ *
+ * The yellow disc on the picture catches the eye; this says what it means. The
+ * tester, on the badge alone: "a coloured mark whose meaning I have to be taught
+ * is the 'No project' chip all over again — right instinct, and you're one
+ * sentence from it being right."
+ *
+ * Renders nothing when the model CAN see, and re-evaluates live, so switching to
+ * a vision-capable model clears both the badge and this line together.
+ */
+export function BlindImageNote(): ReactNode {
+  const blind = useImagesUnsupported();
+  if (!blind) return null;
+  return (
+    <span className="text-caption text-text-muted" data-testid="blind-image-note">
+      This model couldn’t see the image.
+    </span>
+  );
+}

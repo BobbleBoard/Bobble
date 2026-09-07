@@ -382,7 +382,29 @@ export function ThreadStatusIndicator(): ReactElement | null {
    */
   const percent = processing ? (readyStage === 'loading' ? null : prefillPct) : 100;
   return (
-    <ProcessingRing percent={percent} label="Processing" fading={fading} elapsedMs={elapsedMs} />
+    /*
+     * "READING YOUR CONVERSATION", not "processing".
+     *
+     * This is the prefill of the message you just sent — the ONE wait in the app
+     * with a real, provider-reported percentage — so it stayed in the thread,
+     * with the turn it belongs to, when the two BOOT waits left for the pill.
+     * The tester caught me moving all three on a categorical argument: "the
+     * prefill of the message I just sent absolutely is about that message. You
+     * built one component and then made an argument that happens to justify
+     * putting three unlike things inside it."
+     *
+     * The name is hers, and it earns more than disambiguation: prefill gets
+     * slower as a conversation gets longer, and an unexplained variable delay is
+     * the most alarming kind. Naming the cause makes a long wait stop being
+     * frightening. With no percentage there is no conversation being read yet,
+     * so it says the honest smaller thing instead.
+     */
+    <ProcessingRing
+      percent={percent}
+      label={percent === null ? 'Working' : 'Reading your conversation'}
+      fading={fading}
+      elapsedMs={elapsedMs}
+    />
   );
 }
 

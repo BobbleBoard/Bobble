@@ -180,14 +180,28 @@ try {
     window.__llm_store?.().setState((s) => ({ status: { ...s.status, phase: 'starting' } }));
   });
   await page.waitForTimeout(200);
+  /*
+   * THE MODEL-LOADING WAIT MOVED OUT OF THE THREAD AND ONTO THE PILL above the
+   * input bar (ComposerPill). It is not about a turn — it is about whether the
+   * app can answer at all — so it belongs beside the box you type into rather
+   * than in the middle of a conversation you are reading. The thread keeps the
+   * waits that ARE about the turn in front of you.
+   */
   const loadLabel = (
     await page.evaluate(
-      () => document.querySelector('[data-testid="thread-processing"]')?.textContent ?? '(no ring)',
+      () =>
+        document.querySelector('[data-testid="composer-pill-text"]')?.textContent ?? '(no pill)',
     )
   ).toLowerCase();
   check(
-    loadLabel.includes('loading model'),
-    'no "Loading model" while the server is coming up outside a turn',
+    loadLabel.includes('starting up'),
+    `nothing says the app is starting while the server comes up (saw: ${loadLabel.slice(0, 80)})`,
+  );
+  check(
+    (await page.evaluate(
+      () => document.querySelector('[data-testid="thread-processing"]')?.textContent ?? '',
+    )) === '',
+    'and the thread does not ALSO say it — one live indicator, not two',
   );
   await page.evaluate(() => {
     window.__llm_store?.().setState((s) => ({ status: { ...s.status, phase: 'idle' } }));

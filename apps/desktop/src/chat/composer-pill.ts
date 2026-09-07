@@ -25,6 +25,37 @@
 
 export type PillTone = 'busy' | 'warn';
 
+/** 0:07 — mm:ss so the width never changes under the eye. */
+function clock(ms: number): string {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
+}
+
+/**
+ * "Getting ready — usually about 8s on this Mac · 0:03".
+ *
+ * THE CLOCK IS THE WHOLE POINT, and the first cut left it out. The tester's rule
+ * was never "no numbers": it was "a number going up is more trustworthy than a
+ * number that stops", and she had to say it a second time — "the spinner isn't
+ * what reassures me. The changing digits are. The spinner is just something to
+ * look at while they change." A bare spinner starts reading as stuck at about
+ * four seconds.
+ *
+ * The ESTIMATE is the other half of her original four (name, timer, estimate,
+ * cancel) and it was missing here too. It is not a guess: once this machine has
+ * done the wait twice, how long it took IS a ground truth the app can check —
+ * which by her own principle means the app reports it rather than anyone
+ * guessing. Before that, it says nothing rather than inventing one.
+ */
+function waitText(name: string, elapsedMs: number | null, typicalSec: number | null): string {
+  const head =
+    typicalSec === null ? name : `${name} — usually about ${Math.round(typicalSec)}s on this Mac`;
+  // Under a second there is nothing to say yet, and a "0:00" sitting there reads
+  // as stopped — which is the failure this exists to avoid.
+  if (elapsedMs === null || elapsedMs < 1000) return head;
+  return `${head} · ${clock(elapsedMs)}`;
+}
+
 export interface PillView {
   /** What the pill says. */
   text: string;
@@ -41,10 +72,13 @@ export interface PillView {
 export interface PillInput {
   /** {@link modelReadyStage}: the model is coming up, or the prompt is loading. */
   readyStage: 'loading' | 'preparing' | null;
-  /** Real prefill percentage when one is being reported, else null. */
-  prefillPercent: number | null;
   /** An image is attached (or in the thread) and the model cannot read images. */
   imageOnBlindModel: boolean;
+  /** Milliseconds in the current wait — the number that is going UP. */
+  elapsedMs: number | null;
+  /** How long this wait has typically taken ON THIS MAC, or null before it has
+   * happened twice. */
+  typicalSec: number | null;
 }
 
 /**
@@ -56,16 +90,29 @@ export interface PillInput {
  * which is why it is last.
  */
 export function composerPill(input: PillInput): PillView | null {
-  const { readyStage, prefillPercent, imageOnBlindModel } = input;
+  const { readyStage, imageOnBlindModel, elapsedMs, typicalSec } = input;
+  /*
+   * THREE WAITS, THREE PHRASES. Two of them said the same words in the first
+   * cut, and only one could ever carry a number. The tester: "I will see both of
+   * those in my first week. The moment I do, the one without the number becomes
+   * a bug — because you've proved to me, with the other one, that this app can
+   * count." So the turn's own prefill left this component entirely (it is about
+   * the message you just sent, and it belongs in the thread with it), and the
+   * two that remain are named for what is actually happening.
+   */
   if (readyStage === 'loading') {
-    return { text: 'Loading model', tone: 'busy', percent: null, kind: 'loading' };
+    return {
+      text: waitText('Starting up', elapsedMs, typicalSec),
+      tone: 'busy',
+      percent: null,
+      kind: 'loading',
+    };
   }
   if (readyStage === 'preparing') {
     return {
-      text: 'Getting ready',
+      text: waitText('Getting ready', elapsedMs, typicalSec),
       tone: 'busy',
-      // A real fraction only when the provider is actually reporting one.
-      percent: prefillPercent,
+      percent: null,
       kind: 'preparing',
     };
   }

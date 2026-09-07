@@ -743,9 +743,6 @@ export function ChatApp({
                         `talk_to_manager`: the plumbing, in a vocabulary no one
                         outside this repo can read.
                       */}
-                      <div className="mt-3 max-w-[720px]">
-                        <StarterChips />
-                      </div>
                       {/*
                         THE CLAIM, WHERE THE DECISION IS MADE.
 
@@ -764,9 +761,18 @@ export function ChatApp({
                         can actually make. But web search does send words out.
                         Her version names both, and is stronger for it.
                       */}
-                      <p className="mt-3 text-caption text-text-muted" data-testid="privacy-line">
+                      <p className="mt-2 text-caption text-text-muted" data-testid="privacy-line">
                         Nothing you type here leaves this Mac. Only web searches do.
                       </p>
+                      {/*
+                        Extra room under the chips on the EMPTY screen, because
+                        that is where the pill lands and those eleven seconds are
+                        exactly when someone is reading them. The tester: "check
+                        the pill doesn't sit on top of the chips."
+                      */}
+                      <div className="mt-3 mb-6 max-w-[720px]">
+                        <StarterChips />
+                      </div>
                     </div>
                   ) : (
                     // The thread is ALWAYS the lead surface — a corp run renders

@@ -50,6 +50,15 @@ export type ToolInterface = 'schemas' | 'bash-cli';
  * composer: the project folder, the instruction files in effect, how full the
  * context is, and the effort dial.
  *
+ * THE SECOND SEGMENT IS LABELLED "Project", not "Work" — the stored value keeps
+ * its name so nobody's settings.json changes under them, but the word on screen
+ * does not. The tester, who writes marketing copy for a living: "Chat and Work
+ * aren't opposites. When I ask this thing to draft a launch email, that IS my
+ * work. Sitting in 'Chat' while doing my job quietly tells me I'm messing
+ * about — and it tells the nervous first-time user that the serious mode is the
+ * other one." The actual difference between the two is that one has a folder on
+ * your Mac attached to the conversation, which is what "Project" says.
+ *
  * WHY IT EXISTS. A blind tester's rule, which is the best one anybody has given
  * this project: "if a word on the opening screen needs a sentence of explanation
  * to me, it isn't on the opening screen." "No project" and "Effort · Adaptive"
