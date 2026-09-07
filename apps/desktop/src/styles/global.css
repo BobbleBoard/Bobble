@@ -5576,6 +5576,9 @@ body[data-media-expanded="true"] .pd-studio-compose {
   gap: 5px;
   height: 22px;
   padding: 0 9px;
+  /* A hair of air so the pill never touches the word beside it — invisible at
+     rest, obvious the moment a click fills it in solid. */
+  margin: 0 1px;
   border: none;
   border-radius: var(--pd-radius-full);
   background: var(--pd-accent-subtle);
@@ -5586,6 +5589,14 @@ body[data-media-expanded="true"] .pd-studio-compose {
   /* Sits ON the text baseline rather than pushing the line taller. */
   vertical-align: -4px;
   user-select: none;
+}
+
+/* A clicked pill says it is the thing the next keystroke is about — see the
+   note in PillRenderer. Brighter fill rather than an outline: it is still a word
+   in a sentence, and a border would undo the reason there isn't one. */
+.pd-pill[data-selected] {
+  background: var(--pd-accent-primary);
+  color: var(--pd-text-on-accent, #fff);
 }
 
 .pd-pill-label {

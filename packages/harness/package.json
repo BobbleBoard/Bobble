@@ -15,7 +15,8 @@
     "./tool-search": "./src/tools/tool-search.ts",
     "./tools/hang-guard": "./src/tools/hang-guard.ts",
     "./tools/syntax-check": "./src/tools/syntax-check.ts",
-    "./permissions/forbidden": "./src/permissions/forbidden.ts"
+    "./permissions/forbidden": "./src/permissions/forbidden.ts",
+    "./presets/capabilities": "./src/presets/capabilities.ts"
   },
   "pi": {
     "extensions": [

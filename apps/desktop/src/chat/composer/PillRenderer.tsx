@@ -10,6 +10,7 @@
  * which is the key everybody already presses for a word.
  */
 
+import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
 import {
   IconConnector,
   IconFile,
@@ -19,8 +20,14 @@ import {
   IconSparkles,
   IconVideo,
 } from '@pi-desktop/ui';
-import type { NodeKey } from 'lexical';
-import type { ComponentType } from 'react';
+import {
+  $createNodeSelection,
+  $getSelection,
+  $isNodeSelection,
+  $setSelection,
+  type NodeKey,
+} from 'lexical';
+import { type ComponentType, useEffect, useState } from 'react';
 import { type PillData, type PillIcon, setPillRenderer } from './pill-node';
 
 const ICONS: Record<PillIcon, ComponentType<{ size?: number }>> = {
@@ -34,12 +41,51 @@ const ICONS: Record<PillIcon, ComponentType<{ size?: number }>> = {
   connector: IconConnector,
 };
 
-/** `nodeKey` is accepted and unused: the renderer signature is the node's, and
- * a pill that needed to edit the document would need it back. */
-function Pill({ data }: { data: PillData; nodeKey: NodeKey }) {
+function Pill({ data, nodeKey }: { data: PillData; nodeKey: NodeKey }) {
+  const [editor] = useLexicalComposerContext();
+  const [selected, setSelected] = useState(false);
   const Icon = ICONS[data.icon] ?? IconFile;
+
+  /*
+   * CLICKING A PILL SELECTS IT. the user: "clicking on any and clicking delete
+   * should remove them."
+   *
+   * Lexical does not do this for you: a decorator's DOM swallows the click, so
+   * the editor's selection never moves onto the node and Delete has nothing to
+   * act on — pressing it did precisely nothing. Setting a NodeSelection here is
+   * what makes the pill the thing the next keystroke is about (pill-delete.ts
+   * removes a selected pill on either key), and gives the click something to
+   * show for itself.
+   */
+  useEffect(() => {
+    // The highlight follows the editor's own selection, so clicking elsewhere
+    // clears it without this component having to hear about it.
+    return editor.registerUpdateListener(({ editorState }) => {
+      setSelected(
+        editorState.read(() => {
+          const sel = $getSelection();
+          return $isNodeSelection(sel) && sel.has(nodeKey);
+        }),
+      );
+    });
+  }, [editor, nodeKey]);
+
   return (
-    <span className="pd-pill" data-testid="composer-pill" title={data.payload}>
+    // biome-ignore lint/a11y/noStaticElementInteractions: a pointer affordance on an inline token; the keyboard reaches it with Backspace/Delete beside it
+    // biome-ignore lint/a11y/useKeyWithClickEvents: same — there is no separate keyboard gesture for "select this word"
+    <span
+      className="pd-pill"
+      data-testid="composer-pill"
+      data-selected={selected ? '' : undefined}
+      title={data.payload}
+      onClick={() => {
+        editor.update(() => {
+          const sel = $createNodeSelection();
+          sel.add(nodeKey);
+          $setSelection(sel);
+        });
+      }}
+    >
       {/*
         The REAL mark when the thing has one (a connector), the generic glyph
         otherwise. The SVG is in-repo catalog markup — see PillData.iconSvg.

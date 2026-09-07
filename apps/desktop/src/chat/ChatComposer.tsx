@@ -11,6 +11,7 @@
  * window-level fullscreen overlay (#A8) which feeds files through `useDropStore`.
  */
 import type { Model } from '@pi-desktop/engine';
+import { CAPABILITIES } from '@pi-desktop/harness/presets/capabilities';
 import {
   ComposerAddMenu,
   type GenActionKey,
@@ -915,6 +916,29 @@ export function ChatComposer({
                     kind: 'command',
                   }),
                 );
+        /*
+         * ...AND THE CAPABILITIES. the user: "the / should be able to show installed
+         * connectors or reference specific capabilities."
+         *
+         * A capability is the app's own bundling of tools the way a person asks
+         * for them ("personal" is calendar + mail + reminders + contacts +
+         * messages), so `/personal` is a reference in the same sense `/gmail`
+         * is. The list is the harness's own — imported from the module that
+         * defines it rather than restated here, so it cannot drift.
+         */
+        const capabilityItems = CAPABILITIES.filter(
+          (c) => c.name.toLowerCase().includes(q) || c.summary.toLowerCase().includes(q),
+        )
+          .slice(0, 6)
+          .map(
+            (c): AcItem => ({
+              id: `/${c.name} `,
+              label: `/${c.name}`,
+              subtitle: c.summary,
+              section: 'Capabilities',
+              kind: 'connector',
+            }),
+          );
         // Connectors come FIRST: they are the answer to "what can this thing
         // reach", which is what a `/` is usually being pressed to find out.
         const connectorItems = installedConnectors
@@ -930,7 +954,7 @@ export function ChatComposer({
               ...(c.iconSvg !== undefined ? { iconSvg: c.iconSvg } : {}),
             }),
           );
-        setItems([...connectorItems, ...commandItems]);
+        setItems([...connectorItems, ...capabilityItems, ...commandItems]);
       }
     };
     // A file walk waits for typing to settle; commands come from memory.
