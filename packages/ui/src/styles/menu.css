@@ -49,7 +49,12 @@
    * the blur is kept only for the flavors that lean on it elsewhere. One recipe,
    * so every menu still changes together.
    */
-  background: var(--pd-bg-overlay);
+  /* OPAQUE. `--pd-bg-overlay` is 85% in the bobble flavors, so a bare use lets
+     whatever is behind the panel be read straight through it — the user has now
+     reported this twice ("same transparency issue as there was on the context
+     ring menu earlier"). Compositing the overlay colour over a solid base keeps
+     the intended tint and makes it readable wherever it opens. */
+  background: linear-gradient(var(--pd-bg-overlay), var(--pd-bg-overlay)), var(--pd-bg-raised);
   -webkit-backdrop-filter: blur(var(--pd-blur-overlay));
   backdrop-filter: blur(var(--pd-blur-overlay));
   box-shadow: var(--pd-shadow-hairline), var(--pd-shadow-popover);

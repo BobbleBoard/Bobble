@@ -53,7 +53,7 @@ export function Autocomplete({
   let lastSection: string | undefined;
   return (
     <div
-      className="absolute bottom-full left-0 z-50 mb-2 max-h-72 w-[min(28rem,90vw)] overflow-y-auto rounded-lg border border-border-default bg-bg-overlay p-1 shadow-popover"
+      className="pd-ac-panel absolute bottom-full z-50 mb-2 max-h-72 w-[min(28rem,90vw)] overflow-y-auto rounded-lg border border-border-default p-1 shadow-popover"
       data-testid="composer-autocomplete"
       role="listbox"
     >

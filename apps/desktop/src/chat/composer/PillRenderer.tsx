@@ -48,20 +48,12 @@ function Pill({ data, nodeKey }: { data: PillData; nodeKey: NodeKey }) {
     <span className="pd-pill" data-testid="composer-pill" title={data.payload}>
       <Icon size={12} />
       <span className="pd-pill-label">{data.label}</span>
-      <button
-        type="button"
-        className="pd-pill-x"
-        aria-label={`Remove ${data.label}`}
-        // Mouse-down rather than click: the editor takes focus on mousedown and
-        // would move the caret before a click ever landed.
-        onMouseDown={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          remove();
-        }}
-      >
-        <IconClose size={10} />
-      </button>
+      {/*
+        NO X. the user: "these pills: no border, no X … clicking on any and clicking
+        delete should remove them." A pill is a word in a sentence — an X on each
+        one turns a typed line into a row of controls, and the key that removes a
+        word is the one everybody already presses.
+      */}
     </span>
   );
 }

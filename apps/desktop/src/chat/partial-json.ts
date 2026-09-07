@@ -23,6 +23,17 @@ const JSON_ESCAPES: Record<string, string> = {
 export const PATH_KEYS = ['path', 'file_path', 'filename', 'file', 'target_file'] as const;
 export const CONTENT_KEYS = ['content', 'file_text', 'contents'] as const;
 /**
+ * Candidate keys for a SHELL COMMAND — the same aliases `mapToolStepData`
+ * accepts, so a running `bash` step can show what it is running before its
+ * arguments have finished arriving.
+ *
+ * the user, watching a step sit at "Running a command · 1m 7s": "I want to know what
+ * that is, I can't click to expand and see it, even worse >1m." The row was not
+ * expandable because the step had no command on it, and it had no command
+ * because `block.arguments` is only populated once the call completes.
+ */
+export const COMMAND_KEYS = ['command', 'code', 'script', 'source'] as const;
+/**
  * Candidate keys for a str_replace-style EDIT's replaced / replacement text — the
  * live-diff twin of {@link CONTENT_KEYS}. Deliberately EXCLUDES the whole-file
  * `content`/`file_text` keys: an edit is a hunk (old→new), a write is the whole

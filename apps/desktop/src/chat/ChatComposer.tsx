@@ -529,17 +529,28 @@ export function ChatComposer({
    */
   const removeAttachments = (ids: readonly string[]): void => {
     if (ids.length === 0) return;
-    setAttachments((prev) => {
-      const removed = prev.map((a, i) => ({ a, i })).filter(({ a }) => ids.includes(a.id));
-      if (removed.length === 0) return prev;
-      // The index of the FIRST removed one, so undo restores the group where it
-      // was rather than appending it to the end.
-      removedRef.current = [
-        ...removedRef.current.slice(-9),
-        { at: removed[0]?.i ?? prev.length, items: removed.map(({ a }) => a) },
-      ];
-      return prev.filter((a) => !ids.includes(a.id));
-    });
+    /*
+     * THE UNDO ENTRY IS RECORDED HERE, NOT INSIDE THE UPDATER.
+     *
+     * the user: "cmd z seems to have at some point added a duplicate file when I
+     * removed it initially to test, I don't really know what happened there."
+     * This is what happened: React may invoke a state updater more than once for
+     * the same update — it is required to be pure — so pushing onto the undo
+     * stack from inside one recorded the same removal twice, and a single cmd-z
+     * put the file back twice.
+     *
+     * Reading `attachments` from the closure is right here: this only runs from
+     * a click or a keystroke, both of which render first.
+     */
+    const removed = attachments.map((a, i) => ({ a, i })).filter(({ a }) => ids.includes(a.id));
+    if (removed.length === 0) return;
+    // The index of the FIRST removed one, so undo restores the group where it
+    // was rather than appending it to the end.
+    removedRef.current = [
+      ...removedRef.current.slice(-9),
+      { at: removed[0]?.i ?? attachments.length, items: removed.map(({ a }) => a) },
+    ];
+    setAttachments((prev) => prev.filter((a) => !ids.includes(a.id)));
     setSelection(EMPTY_SELECTION);
   };
 

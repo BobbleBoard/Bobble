@@ -87,6 +87,41 @@ export function useAttachmentPrefill(attachmentPrefix: string): {
   const lastSig = useRef<string | null>(null);
   const [inFlight, setInFlight] = useState(false);
 
+  /*
+   * COMING BACK TO THE WINDOW RE-PRIMES.
+   *
+   * the user: "TTFT is unacceptable, I was idle for like an hour, left this in the
+   * background, and it took on a blank conversation and another essentially
+   * blank one almost 10 seconds each to respond."
+   *
+   * A probe that idles two minutes keeps 100% prefix reuse, so this is not a
+   * timer we own — over a longer background stretch the OS reclaims what it
+   * likes, and the first message afterwards pays a full cold prefill of the
+   * whole system prompt. We cannot stop that from the renderer.
+   *
+   * What we CAN do is move it off the critical path, which is the same trick
+   * that works at app open: prime again the moment the window comes back, while
+   * the user is still reading the screen, so the cost lands before they type
+   * rather than after they press enter. If the prefix WAS still resident it
+   * costs a couple of hundred milliseconds and changes nothing.
+   *
+   * A counter rather than a boolean because the signature below has to change
+   * for the effect to act — the conversation is identical, which is the whole
+   * point.
+   */
+  const [focusEpoch, setFocusEpoch] = useState(0);
+  useEffect(() => {
+    const bump = () => {
+      if (document.visibilityState === 'visible') setFocusEpoch((n) => n + 1);
+    };
+    window.addEventListener('focus', bump);
+    document.addEventListener('visibilitychange', bump);
+    return () => {
+      window.removeEventListener('focus', bump);
+      document.removeEventListener('visibilitychange', bump);
+    };
+  }, []);
+
   const abortPrefill = useCallback(() => {
     lastSig.current = null;
     setInFlight(false);
@@ -119,11 +154,20 @@ export function useAttachmentPrefill(attachmentPrefix: string): {
      * A brand-new empty chat still primes nothing here, correctly — its prefix
      * is `[system][tools]`, which the model-load warm-up already made resident.
      */
-    const worthPriming = prefix.length >= PREFILL_MIN_CHARS || history.length > 0;
+    /*
+     * AN EMPTY CHAT IS WORTH PRIMING TOO, ON A RETURN.
+     *
+     * Its prefix is [system][tools] and nothing else — normally already resident
+     * from the model-load warm-up, so priming it at rest would be pure waste.
+     * But the case the user hit was exactly a BLANK conversation after a long
+     * background stretch, where that prefix is precisely what has gone. So an
+     * empty chat primes on a focus return and at no other time.
+     */
+    const worthPriming = prefix.length >= PREFILL_MIN_CHARS || history.length > 0 || focusEpoch > 0;
     if (!worthPriming) return;
 
     // Cheap dedupe key (avoid stringifying the whole prefix each render).
-    const sig = `${history.length}|${prefix.length}|${prefix.slice(0, 96)}`;
+    const sig = `${focusEpoch}|${history.length}|${prefix.length}|${prefix.slice(0, 96)}`;
     if (sig === lastSig.current) return;
 
     const timer = window.setTimeout(() => {
@@ -167,7 +211,7 @@ export function useAttachmentPrefill(attachmentPrefix: string): {
         .finally(() => setInFlight(false));
     }, PREFILL_DEBOUNCE_MS);
     return () => window.clearTimeout(timer);
-  }, [attachmentPrefix, system, toolsJson, serverRunning, busy, messages]);
+  }, [attachmentPrefix, system, toolsJson, serverRunning, busy, messages, focusEpoch]);
 
   return { abortPrefill, inFlight };
 }

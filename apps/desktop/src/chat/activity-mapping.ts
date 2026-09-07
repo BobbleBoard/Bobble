@@ -25,7 +25,7 @@ import type {
 import { connectorIconSvg } from '../../../../packages/mcp-lite/src/connector-icons.ts';
 import { type DetectedArtifact, segmentMessageText } from './canvas/artifacts';
 import { pdFileUrl } from './canvas/file-preview';
-import { CONTENT_KEYS, PATH_KEYS, partialJsonString } from './partial-json';
+import { COMMAND_KEYS, CONTENT_KEYS, PATH_KEYS, partialJsonString } from './partial-json';
 
 type ToolCallBlock = Extract<ContentBlock, { type: 'toolCall' }>;
 type ThinkingBlock = Extract<ContentBlock, { type: 'thinking' }>;
@@ -938,7 +938,25 @@ function mapToolStepData(
   // The step's PRIMARY arg, surfaced inline next to the verb (the user round-2 #2):
   // "Read a file: <path>", "Ran: <cmd>", "Searched: <query>". The UI shows a
   // path's basename on the collapsed row and the full value in the reveal.
-  const command = str(args.command) ?? str(args.code) ?? str(args.script) ?? str(args.source);
+  /*
+   * THE COMMAND, EVEN WHILE IT IS STILL ARRIVING.
+   *
+   * `block.arguments` is only populated once a tool call completes, so a running
+   * bash step had no `command` — which made the row un-expandable (see
+   * `hasInlineContent`) exactly when someone most wants to know what is taking
+   * so long. the user, on a step at 1m 7s: "I want to know what that is, I can't
+   * click to expand and see it."
+   *
+   * The argument text IS streaming in the meantime, and this file already parses
+   * partial JSON for the live file-write preview. Same treatment: fall back to
+   * the raw buffer, so the command shows the moment the model has written it.
+   */
+  const command =
+    str(args.command) ??
+    str(args.code) ??
+    str(args.script) ??
+    str(args.source) ??
+    partialJsonString(block.argsText ?? '', COMMAND_KEYS)?.value;
   const query = str(args.query) ?? str(args.q);
   const url = str(args.url) ?? str(args.href) ?? str(args.link);
 

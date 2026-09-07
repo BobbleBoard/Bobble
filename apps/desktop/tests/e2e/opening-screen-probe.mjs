@@ -101,24 +101,43 @@ try {
     pills: document.querySelectorAll('[data-testid="composer-pill"]').length,
     pillLabel: document.querySelector('.pd-pill-label')?.textContent ?? null,
     hasX: document.querySelector('.pd-pill-x') !== null,
+    border: (() => {
+      const p = document.querySelector('[data-testid="composer-pill"]');
+      return p === null ? null : getComputedStyle(p).borderStyle;
+    })(),
     messages: window.__pi_store().getState().messages.length,
   }));
   console.log('   after the click:', JSON.stringify(after));
   check(after.pills === 1, `it inserts ONE pill (got ${after.pills})`);
   check(after.pillLabel === 'Make an image', `with its own short words (${after.pillLabel})`);
-  check(after.hasX, 'and an X to take it back');
+  /*
+   * NO BORDER, NO X. the user: "these pills: no border, no X." A bordered pill with
+   * a close button reads as a control you are meant to press; a filled one reads
+   * as a word that happens to be blue, which is what it is. Removal is the key
+   * everyone already presses — see the Delete arm below.
+   */
+  check(!after.hasX, 'no X on the pill');
+  check(after.border === 'none', `and no border (got ${after.border})`);
   check(after.messages === before, 'clicking a chip does NOT send anything');
   await shot('02-chip-clicked');
 
-  // The X removes the whole thing — no half-deleted sentence left behind.
-  await page.click('.pd-pill-x');
+  /*
+   * BACKSPACE REMOVES THE WHOLE THING — no half-deleted sentence left behind,
+   * which is the entire reason an inserted request is an object rather than
+   * typed text.
+   */
+  await page.click('[data-testid="composer-input"]');
+  await page.keyboard.press('End');
+  await page.keyboard.press('Backspace');
+  await page.keyboard.press('Backspace');
   await page.waitForTimeout(400);
   const removed = await page.evaluate(() => ({
     pills: document.querySelectorAll('[data-testid="composer-pill"]').length,
-    text: (document.querySelector('.pd-composer-editor')?.textContent ?? '').trim(),
+    // The editor's own text — the placeholder is a sibling, not content.
+    text: (document.querySelector('[data-testid="composer-input"]')?.textContent ?? '').trim(),
   }));
   console.log('   after the X:', JSON.stringify(removed));
-  check(removed.pills === 0, 'the X removes it');
+  check(removed.pills === 0, 'backspace removes it whole');
   check(removed.text === '', `and leaves nothing behind (got "${removed.text}")`);
 
   console.log(`\nshots → ${shotDir}`);

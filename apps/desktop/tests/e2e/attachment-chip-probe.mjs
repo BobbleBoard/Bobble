@@ -81,15 +81,28 @@ try {
   );
   await shot('01-at-rest');
 
-  /* ── 2. Hovered: it slides open to the right ──────────────────────────── */
+  /* ── 2. CLICKED: it slides open to the right ──────────────────────────── */
+  /*
+   * the user: "not on hover but on click expand them." Hover-to-expand meant that
+   * dragging the pointer across a row of files opened and shut each one in turn,
+   * so the row moved while you were trying to point at something in it.
+   */
   await page.hover('[data-testid="attach-chip"]:first-of-type');
+  await page.waitForTimeout(500);
+  const merelyHovered = await chips();
+  check(
+    merelyHovered.every((c) => c.detailW === 0),
+    `hovering alone does NOT open it (${merelyHovered[0]?.detailW}px)`,
+  );
+
+  await page.click('[data-testid="attach-chip"]:first-of-type');
   await page.waitForTimeout(600);
   const hovered = await chips();
-  console.log('   hovered:', JSON.stringify(hovered[0]));
+  console.log('   clicked:', JSON.stringify(hovered[0]));
   check(hovered[0] !== undefined && hovered[0].detailW > 60, `it opens (${hovered[0]?.detailW}px)`);
   check(
     hovered.slice(1).every((c) => c.detailW === 0),
-    'and only the one being pointed at opens',
+    'and only the one clicked opens',
   );
   const t = hovered[0]?.text ?? '';
   check(/notes\.md/.test(t), `the name (got "${t}")`);
@@ -101,7 +114,6 @@ try {
 
   /* ── 3. Click to select, shift-click to extend ────────────────────────── */
   const all = await page.$$('[data-testid="attach-chip"]');
-  await all[0]?.click();
   await page.waitForTimeout(250);
   let sel = await chips();
   check(sel.filter((c) => c.selected).length === 1, 'a click selects one');
@@ -124,18 +136,28 @@ try {
   check((await chips()).length === 0, 'cut removes the selection');
   await page.keyboard.press('Meta+v');
   await page.waitForTimeout(400);
-  check((await chips()).length === 3, 'paste brings them back');
+  const pasted = (await chips()).length;
+  console.log(`   after paste: ${pasted}`);
+  check(pasted === 3, `paste brings them back (got ${pasted})`);
 
   /* ── 5. Undo an accidental removal ────────────────────────────────────── */
-  await page.hover('[data-testid="attach-chip"]:first-of-type');
+  /*
+   * The real flow now: click the chip to open it, then the X at the top right of
+   * the preview. the user: "put the X just at the top right of the preview shown on
+   * hover only."
+   */
+  const first = (await page.$$('[data-testid="attach-chip"]'))[0];
+  await first?.click();
   await page.waitForTimeout(400);
-  await page.click('[data-testid="attach-chip"]:first-of-type .pd-attach-remove');
-  await page.waitForTimeout(300);
-  check((await chips()).length === 2, 'removing one takes it away');
+  const x = await first?.$('.pd-attach-remove');
+  await x?.click();
+  await page.waitForTimeout(400);
+  const afterRemove = (await chips()).length;
+  check(afterRemove === 2, `removing one takes it away (got ${afterRemove})`);
   await page.keyboard.press('Meta+z');
   await page.waitForTimeout(400);
   const undone = await chips();
-  check(undone.length === 3, `cmd-z brings it back (${undone.length})`);
+  check(undone.length === 3, `cmd-z brings back exactly the one removed (${undone.length})`);
   await shot('04-undone');
 
   console.log(`\nshots → ${shotDir}`);

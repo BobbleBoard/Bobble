@@ -1088,3 +1088,51 @@ describe('a generated image opens a canvas tab that can actually load it', () =>
     expect(step.tabSpec?.mediaSrc).toBe('pd-file://f/tmp/a.png');
   });
 });
+
+describe('a running command says what it is', () => {
+  /*
+   * the user, watching a step sit at "Running a command · 1m 7s": "I want to know
+   * what that is, I can't click to expand and see it, even worse >1m."
+   *
+   * The row was not expandable because the step carried no command, and it
+   * carried none because `block.arguments` is only populated once the call
+   * COMPLETES. The arguments are streaming in the meantime, so the command is
+   * read from the raw buffer until they land.
+   */
+  /** The step, narrowed to the bash shape the assertions read. */
+  const running = (argsText: string) =>
+    mapToolStep(
+      { type: 'toolCall', id: 't1', name: 'bash', arguments: {}, argsText },
+      undefined,
+      true,
+    ).data as { kind: 'bash'; command?: string; detail?: string };
+
+  it('reads the command out of a half-arrived argument buffer', () => {
+    const step = running('{"command":"npm run build && npm test"');
+    expect(step.command).toBe('npm run build && npm test');
+    expect(step.detail).toBe('npm run build && npm test');
+  });
+
+  it('reads it as soon as the string closes, before the object does', () => {
+    expect(running('{"command":"ls -la"').command).toBe('ls -la');
+  });
+
+  it('prefers the real arguments once they land', () => {
+    const step = mapToolStep(
+      {
+        type: 'toolCall',
+        id: 't1',
+        name: 'bash',
+        arguments: { command: 'the real one' },
+        argsText: '{"command":"the streamed one"}',
+      },
+      undefined,
+      false,
+    ).data as { command?: string };
+    expect(step.command).toBe('the real one');
+  });
+
+  it('says nothing when the buffer has not reached the command yet', () => {
+    expect(running('{"cw').command).toBeUndefined();
+  });
+});

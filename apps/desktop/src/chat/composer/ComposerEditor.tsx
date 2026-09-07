@@ -92,6 +92,30 @@ interface ComposerEditorProps {
   onLargePaste?: (text: string) => boolean;
 }
 
+/**
+ * Where the caret is, horizontally, inside the composer — published as
+ * `--pd-ac-x` so the `@` / `/` panel can open under it.
+ *
+ * the user: "@ and / menus should show right above where the user is typing, not
+ * later." A panel pinned to the left edge of the box is a panel you have to look
+ * away to read, and the further right you have typed the further away it is.
+ */
+function publishCaretX(): void {
+  const sel = window.getSelection();
+  if (sel === null || sel.rangeCount === 0) return;
+  const root = document.querySelector('.pd-composer-root');
+  if (!(root instanceof HTMLElement)) return;
+  const rects = sel.getRangeAt(0).getClientRects();
+  const rect = rects.length > 0 ? rects[rects.length - 1] : undefined;
+  // A collapsed caret at the start of an empty line has no rect; leave the last
+  // known position rather than snapping the panel to 0.
+  if (rect === undefined || (rect.width === 0 && rect.height === 0)) return;
+  root.style.setProperty(
+    '--pd-ac-x',
+    `${Math.round(rect.left - root.getBoundingClientRect().left)}px`,
+  );
+}
+
 function readSync(
   editorState: EditorState,
   onTextChange: (text: string) => void,
@@ -99,6 +123,7 @@ function readSync(
 ): void {
   editorState.read(() => {
     onTextChange($getRoot().getTextContent());
+    publishCaretX();
     const selection = $getSelection();
     if ($isRangeSelection(selection) && selection.isCollapsed()) {
       const node = selection.anchor.getNode();

@@ -566,12 +566,23 @@ body {
   gap: 1px;
 }
 
-.pd-attach:hover .pd-attach-detail,
+/*
+ * EXPANDS ON CLICK, NOT HOVER. the user: "i'm actually thinking not on hover but on
+ * click expand them."
+ *
+ * Right, and for a reason the hover version made obvious the moment there were
+ * three of them: dragging the pointer across a row of files opened and shut each
+ * one in turn, so the row moved while you were trying to point at something in
+ * it. Clicking already SELECTS the chip (blue), and selecting a file to look at
+ * it is the same gesture as selecting it to copy or delete it — so it is one
+ * click with one meaning, and the row only moves when you asked it to.
+ */
+.pd-attach[data-selected] .pd-attach-detail,
 .pd-attach:focus-within .pd-attach-detail {
   grid-template-columns: 1fr;
 }
 
-.pd-attach:hover .pd-attach-detail-inner,
+.pd-attach[data-selected] .pd-attach-detail-inner,
 .pd-attach:focus-within .pd-attach-detail-inner {
   padding-left: 8px;
   padding-right: 4px;
@@ -651,8 +662,9 @@ body {
   transition: opacity var(--pd-duration-base) var(--pd-easing-standard);
 }
 
-/* The remove control appears with the detail — a row of boxes should be boxes,
- * not a row of boxes each wearing an X. */
+/* The X is HOVER-ONLY, at the top right — the user: "put the X just at the top right
+ * of the preview shown on hover only". A row of boxes should be boxes, not a row
+ * of boxes each wearing an X. */
 .pd-attach:hover .pd-attach-remove,
 .pd-attach:focus-within .pd-attach-remove {
   opacity: 1;
@@ -1974,7 +1986,8 @@ body {
   width: 12px;
   height: 12px;
   border-radius: var(--pd-radius-full);
-  background: var(--pd-bg-overlay);
+  /* Opaque: a switch knob is a solid object, and the overlay token is only 85%. */
+  background: linear-gradient(var(--pd-bg-overlay), var(--pd-bg-overlay)), var(--pd-bg-raised);
   box-shadow: var(--pd-shadow-hairline);
   transition: transform var(--pd-duration-base) var(--pd-easing-spring);
 }
@@ -4930,7 +4943,12 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
   flex-direction: column;
   overflow: hidden;
   border-radius: var(--pd-radius-popover);
-  background: var(--pd-bg-overlay);
+  /* OPAQUE. `--pd-bg-overlay` is 85% in the bobble flavors, so a bare use lets
+     whatever is behind the panel be read straight through it — the user has now
+     reported this twice ("same transparency issue as there was on the context
+     ring menu earlier"). Compositing the overlay colour over a solid base keeps
+     the intended tint and makes it readable wherever it opens. */
+  background: linear-gradient(var(--pd-bg-overlay), var(--pd-bg-overlay)), var(--pd-bg-raised);
   box-shadow: var(--pd-shadow-hairline), var(--pd-shadow-popover);
 }
 
@@ -5535,13 +5553,18 @@ body[data-media-expanded="true"] .pd-studio-compose {
   vertical-align: baseline;
 }
 
+/*
+ * NO BORDER. the user: "these pills: no border, no X." A bordered pill reads as a
+ * control you are meant to press; a filled one reads as a word that happens to
+ * be blue, which is what it is — the sentence still parses when you read past it.
+ */
 .pd-pill {
   display: inline-flex;
   align-items: center;
   gap: 5px;
   height: 22px;
-  padding: 0 4px 0 8px;
-  border: 1px solid var(--pd-accent-primary);
+  padding: 0 9px;
+  border: none;
   border-radius: var(--pd-radius-full);
   background: var(--pd-accent-subtle);
   color: var(--pd-accent-primary);
@@ -5559,29 +5582,34 @@ body[data-media-expanded="true"] .pd-studio-compose {
   text-overflow: ellipsis;
 }
 
-.pd-pill-x {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 16px;
-  height: 16px;
-  border: none;
-  border-radius: var(--pd-radius-full);
-  background: transparent;
-  color: currentcolor;
-  cursor: pointer;
-  opacity: 0.65;
-}
-
-.pd-pill-x:hover {
-  background: color-mix(in srgb, var(--pd-accent-primary) 18%, transparent);
-  opacity: 1;
-}
-
 /* The starter chips, under the composer and above the @ / ! hints. */
 .pd-composer-starters {
   display: flex;
   justify-content: center;
   margin: 12px auto 2px;
   max-width: 720px;
+}
+
+/* ── The @ / / suggestion panel ───────────────────────────────────────────
+ *
+ * OPAQUE, and anchored NEAR THE CARET.
+ *
+ * It used the `--pd-bg-overlay` token bare, which is 85% in the bobble flavors
+ * and had no blur behind it — so the greeting and the privacy line read straight
+ * through the list. the user, reporting it a second time: "same transparency issue
+ * as there was on the context ring menu earlier." Compositing the overlay colour
+ * over a solid base keeps the intended tint and makes it readable wherever it
+ * opens.
+ *
+ * The horizontal position follows the caret (`--pd-ac-x`, set by the composer)
+ * rather than pinning to the left edge of the box: "@ and / menus should show
+ * right above where the user is typing." Clamped so a caret near the right edge
+ * cannot push the panel off-screen.
+ */
+.pd-ac-panel {
+  left: clamp(0px, var(--pd-ac-x, 0px), calc(100% - min(28rem, 90vw)));
+  background: linear-gradient(var(--pd-bg-overlay), var(--pd-bg-overlay)), var(--pd-bg-raised);
+  -webkit-backdrop-filter: blur(var(--pd-blur-overlay));
+  backdrop-filter: blur(var(--pd-blur-overlay));
+  transition: left var(--pd-duration-base) var(--pd-easing-standard);
 }

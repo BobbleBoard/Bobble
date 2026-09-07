@@ -187,7 +187,12 @@
   width: 100%;
   overflow: hidden;
   border-radius: var(--pd-radius-md);
-  background: var(--pd-bg-overlay);
+  /* OPAQUE. `--pd-bg-overlay` is 85% in the bobble flavors, so a bare use lets
+     whatever is behind the panel be read straight through it — the user has now
+     reported this twice ("same transparency issue as there was on the context
+     ring menu earlier"). Compositing the overlay colour over a solid base keeps
+     the intended tint and makes it readable wherever it opens. */
+  background: linear-gradient(var(--pd-bg-overlay), var(--pd-bg-overlay)), var(--pd-bg-raised);
   box-shadow: var(--pd-shadow-hairline);
   font-family: var(--pd-font-sans);
   font-size: var(--pd-font-size-body);
@@ -361,7 +366,12 @@
   border-radius: var(--pd-radius-full);
   /* The same opaque surface every menu uses — it floats over the thread and has
      to be readable wherever the reader happens to be. */
-  background: var(--pd-bg-overlay);
+  /* OPAQUE. `--pd-bg-overlay` is 85% in the bobble flavors, so a bare use lets
+     whatever is behind the panel be read straight through it — the user has now
+     reported this twice ("same transparency issue as there was on the context
+     ring menu earlier"). Compositing the overlay colour over a solid base keeps
+     the intended tint and makes it readable wherever it opens. */
+  background: linear-gradient(var(--pd-bg-overlay), var(--pd-bg-overlay)), var(--pd-bg-raised);
   color: var(--pd-text-secondary);
   box-shadow: var(--pd-shadow-hairline), var(--pd-shadow-popover);
   cursor: pointer;
