@@ -109,18 +109,14 @@ describe('resolvePresetTools — what every turn can reach', () => {
     'write',
     'edit',
     'bash',
+    'update_plan',
+    'ask_user',
     'present',
     'web_search',
     'web_fetch',
+    'spawn_subagent',
     'capability',
   ];
-
-  /*
-   * THE FOUR THAT LEFT THE PREFIX. `update_plan`, `ask_user`, `spawn_subagent`
-   * and `talk_to_manager` moved to the `coordinate` CLI group — 8,516 characters
-   * of every request, MEASURED, for tools most turns never reach.
-   */
-  const COORDINATION = ['update_plan', 'ask_user', SPAWN_SUBAGENT_TOOL_NAME];
 
   it('gives EVERY class the baseline — search and a way to hand work out', () => {
     for (const cls of Object.keys(PRESET_TOOLS) as TaskClass[]) {
@@ -148,7 +144,7 @@ describe('resolvePresetTools — what every turn can reach', () => {
     }
   });
 
-  it('lets EVERY class hand work out — and charges none of them for it', () => {
+  it('lets EVERY class hand work out', () => {
     /*
      * Handing work out is baseline, not a privilege of certain task classes.
      * It was gated to `SUBAGENT_PRESET_CLASSES` once, which made "can this model
@@ -156,19 +152,12 @@ describe('resolvePresetTools — what every turn can reach', () => {
      * and that is how a CEO told to research and commission specialists ended up
      * able to do neither (MEASURED, runs 10-12).
      *
-     * The fix was to put it in every preset. The better fix is to put it in NO
-     * preset: a CLI group is not class-dependent at all, so "every class can
-     * commission" is now true by construction rather than by a list that has to
-     * be kept right — and no class pays 2,217 characters for the privilege.
-     *
-     * What this test guards is that the gate cannot come back in either
-     * direction: not as a class list, and not as a schema on every turn.
+     * `presets.ts` says all of this in a comment beside the code that fixed it.
+     * Nothing asserted it, so the gate could come back silently.
      */
     for (const cls of TASK_CLASSES) {
       const tools = resolvePresetTools(cls, ALL_TOOLS);
-      for (const t of COORDINATION) {
-        expect(tools, `${cls} is still paying for ${t}`).not.toContain(t);
-      }
+      expect(tools, `${cls} cannot commission anything`).toContain(SPAWN_SUBAGENT_TOOL_NAME);
     }
   });
 

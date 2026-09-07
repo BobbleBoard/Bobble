@@ -58,58 +58,6 @@ export const CAPABILITY_PROMPT_MARKER = '# You are a local agent with real tools
  * `say`, `festival`, `which ffmpeg` and `ls /usr/bin` for three turns. The last
  * sentence closes that door by naming the alternative to searching.
  */
-/**
- * The gloss for each coordination command, keyed by TOOL NAME.
- *
- * The tool name is the stable half; the command word is derived (see
- * `pathFor`), and hand-writing it here is exactly how the first version of this
- * prompt came to advertise `coordinate plan` and `coordinate delegate` while
- * `--help` answered `coordinate update` and `coordinate spawn`. A prompt naming
- * a command that does not exist is the same false-availability failure as
- * naming a tool that is not advertised — MEASURED against the real app, which
- * is the only reason it was caught.
- */
-const COORDINATE_GLOSS: Readonly<Record<string, string>> = {
-  ask_user: 'ask the user something and wait for the answer',
-  update_plan: 'publish or update your plan for this task',
-  spawn_subagent: 'hand a piece of work to a subagent',
-  talk_to_manager: 'brief the manager who runs a whole team',
-};
-
-/**
- * The `coordinate` group, named in one paragraph — the schemas-mode half of
- * moving four tools out of the prefix.
- *
- * WHY IT IS SO SHORT. The whole point of the move is that these four cost 8,516
- * characters of every request (MEASURED) for tools most turns never reach. A
- * long explanation here would buy some of that cost straight back. The command
- * names and where to look is enough — the `--help` is generated from the same
- * schema the tool validates against, so it cannot drift, and the model reads it
- * only on a turn that actually needs it.
- *
- * WHAT IT DELIBERATELY DOES NOT SAY: "explore these whenever they seem useful."
- * That wording, in an earlier draft, is what sent a small model shopping through
- * `say`, `festival`, `which ffmpeg` and `ls /usr/bin` for three turns. The last
- * sentence closes that door by naming the alternative to searching.
- *
- * @param commandFor tool name → the command line that runs it, from the live
- *   CLI model. Anything absent from it is not registered in this build and is
- *   correctly left out.
- */
-export function coordinatePrompt(commandFor: ReadonlyMap<string, string>): string {
-  const lines = Object.entries(COORDINATE_GLOSS)
-    .map(([tool, gloss]) => {
-      const command = commandFor.get(tool);
-      return command === undefined ? null : `  ${command.padEnd(22)}${gloss}`;
-    })
-    .filter((l): l is string => l !== null);
-  if (lines.length === 0) return '';
-  return `A few things are commands rather than tools, because most turns never need them. Run them through bash:
-
-${lines.join('\n')}
-
-Run \`${lines[0]?.trim().split(' ')[0] ?? 'coordinate'} --help\` for the exact arguments before you use one. These are the only things that work this way; everything else you can do is already in your tool list, so if something is in neither place, say so plainly rather than going looking for it.`;
-}
 
 /**
  * THE ONE SENTENCE THAT SAYS A MANAGER EXISTS.
@@ -432,17 +380,6 @@ export function augmentSystemPrompt(
   } = {},
 ): string {
   let trimmed = stripToolCatalog((base ?? '').trim());
-  /*
-   * RETARGETING IS NOT ONLY FOR CLI MODE ANY MORE.
-   *
-   * A prompt that says "write the steps down with update_plan" while
-   * `update_plan` is not in the advertised list is the exact failure this file
-   * keeps meeting from the other direction: naming a tool the model cannot call
-   * is worse than not naming it (llama-server's grammar will coerce the bid onto
-   * whatever advertised name is nearest). Schemas mode now moves four tools into
-   * the `coordinate` CLI group, so its prompt needs the same rewrite — for those
-   * four names and nothing else.
-   */
   if (opts.toolInterface === 'bash-cli') {
     // STRIP BEFORE RETARGETING. These are matched as literals, and retargeting
     // rewrites them first ("Use `read` …" → "Use `file read` …") so the literal
@@ -450,9 +387,9 @@ export function augmentSystemPrompt(
     for (const line of SCHEMA_ONLY_LINES) trimmed = trimmed.replace(line, '').trim();
     // A dropped guideline leaves a hole — "Guidelines:" followed by a blank
     // line, or a gap in the middle of the bullet list.
+    if (opts.commandFor !== undefined) trimmed = retargetToolNames(trimmed, opts.commandFor);
     trimmed = trimmed.replace(/\n{3,}/g, '\n\n').replace(/(:\n)\n+(?=- )/g, '$1');
   }
-  if (opts.commandFor !== undefined) trimmed = retargetToolNames(trimmed, opts.commandFor);
   /*
    * THE CAPABILITY SECTION DESCRIBES THE SCHEMA INTERFACE, AND ONLY THAT ONE.
    *

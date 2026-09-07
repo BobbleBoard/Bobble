@@ -59,19 +59,6 @@ export interface ToolCliOptions {
   readonly onLog?: (m: string) => void;
   /** Must exceed the bash tool's timeout. See DEFAULT_DISPATCH_TIMEOUT_MS. */
   readonly dispatchTimeoutMs?: number;
-  /**
-   * Whether to shadow the system commands the model reaches for INSTEAD of a
-   * tool (`say` → `media generate speech`). Default true.
-   *
-   * It has to be switchable because the CLI is no longer only used in
-   * bash-CLI mode. When most tools are still schemas and the CLI carries a
-   * single group, shadowing `say` would be a side effect nobody asked for —
-   * that build's model has a real `generate_speech` in its list and no reason
-   * to go shopping in /usr/bin. The decoys exist for the mode where `bash` is
-   * the ONLY tool and a real Unix box is a competing implementation of
-   * everything we offer.
-   */
-  readonly shadowSystemCommands?: boolean;
 }
 
 export interface ToolCliHandle {
@@ -240,12 +227,10 @@ export function registerToolCli(host: ToolCliHost, opts: ToolCliOptions = {}): T
     const p = path.join(shimDir, command);
     fs.writeFileSync(p, buildShim(execPath, dispatcherPath, command), { mode: 0o755 });
   }
-  if (opts.shadowSystemCommands !== false) {
-    for (const [decoy, suggestion] of Object.entries(DECOYS)) {
-      // Only where a real command of that name is not already the point — these
-      // sit FIRST on PATH, so they shadow the system one for this session only.
-      fs.writeFileSync(path.join(shimDir, decoy), buildDecoy(decoy, suggestion), { mode: 0o755 });
-    }
+  for (const [decoy, suggestion] of Object.entries(DECOYS)) {
+    // Only where a real command of that name is not already the point — these
+    // sit FIRST on PATH, so they shadow the system one for this session only.
+    fs.writeFileSync(path.join(shimDir, decoy), buildDecoy(decoy, suggestion), { mode: 0o755 });
   }
 
   try {

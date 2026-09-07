@@ -1,9 +1,9 @@
 /**
  * IS `coordinate` ACTUALLY REACHABLE? — the registered/advertised/allowlisted trap.
  *
- * Four tools moved out of the advertised schemas and into a CLI group
- * (`coordinate`), which is only an improvement if the model can still reach
- * them. This repo has been burned by the difference before: a tool can be
+ * In bash-CLI MODE the four coordination tools (ask the user, publish a plan,
+ * delegate, brief the manager) are reachable only as commands, and that is only
+ * an improvement if the model can actually reach them. This repo has been burned by the difference before: a tool can be
  * REGISTERED, not advertised, and not allowlisted, and the three failures look
  * identical from outside — "the model chose not to delegate" is what a
  * completely unreachable tool looks like in a transcript.
@@ -25,7 +25,10 @@ const { page, check, finish } = await launchApp('coordinate-cli', {
 
 try {
   await page.waitForFunction(() => typeof window.__pi_store === 'function', { timeout: 60_000 });
+  // bash-CLI MODE. The CLI is a mode, not a per-tool decision — flip it and
+  // every tool becomes a command; leave it off and every tool is a schema.
   await page.evaluate(async (modelId) => {
+    await window.__settings_store?.().getState?.().update?.({ toolInterface: 'bash-cli' });
     await window.piDesktop.invoke('pi:start', {});
     await window.piDesktop.invoke('llm:start-server', { modelId });
   }, MODEL);
