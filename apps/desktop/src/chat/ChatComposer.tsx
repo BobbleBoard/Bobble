@@ -68,6 +68,7 @@ import { DictationBar } from './DictationBar';
 import { IconWarning } from './icons-pill';
 import { StarterChips } from './StarterChips';
 import { HELP_TEXT, parseSlashCommand } from './slash-commands';
+import { usePrefillPill } from './use-prefill-pill';
 import { useDictation } from './useDictation';
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
@@ -692,6 +693,12 @@ export function ChatComposer({
     [installedConnectors],
   );
   const { abortPrefill, inFlight: prefillInFlight } = useAttachmentPrefill(attachmentPrefix);
+  /*
+   * ...and SAY SO when it takes long enough to matter. the user's rule for all of
+   * this is "when I don't see anything I get an instant response", which only
+   * holds if every window where a send would not be instant says something.
+   */
+  usePrefillPill(prefillInFlight);
   /*
    * WHICH CHIPS SHOW A SPINNER INSTEAD OF A TOKEN COUNT. Only a text attachment
    * gets primed, and only one over the threshold — the same rule the prefill

@@ -46,10 +46,24 @@ describe('prefillDecision', () => {
     }
   });
 
-  it('primes an empty chat only after the window has come back', () => {
+  /*
+   * MEASURED, twice. An empty chat's prefix is [tools][system], which the
+   * harness's own warm-up already made resident through the same request shape a
+   * turn uses. Priming it again from here — over the raw path, with a second
+   * rendering — replaced a good prefix with one that diverged 41 tokens in, and
+   * turned a 200ms send into 7.5 seconds.
+   */
+  it('never primes an empty chat, however many times the window has come back', () => {
     const empty = { ...base, historyTurns: 0 };
     expect(prefillDecision(empty)).toMatchObject({ prime: false });
-    expect(prefillDecision({ ...empty, focusEpoch: 1 })).toMatchObject({ prime: true });
+    expect(prefillDecision({ ...empty, focusEpoch: 1 })).toMatchObject({ prime: false });
+    expect(prefillDecision({ ...empty, focusEpoch: 12 })).toMatchObject({ prime: false });
+  });
+
+  /* ...but a conversation with something in it does, on a return: that is where
+   * the raw path earns its keep and where it measurably reuses. */
+  it('re-primes a conversation with history', () => {
+    expect(prefillDecision({ ...base, focusEpoch: 3 })).toMatchObject({ prime: true });
   });
 
   it('primes for a big attachment even with no history', () => {

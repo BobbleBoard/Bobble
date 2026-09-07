@@ -1101,7 +1101,23 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
      * — and it means the renderer's copy is restored within a tick of any
      * session change.
      */
-    publishPrefillContext(ctx, warmTools);
+    /*
+     * ...WITH THE TOOLS THE TURN WILL ACTUALLY CARRY, which are not always the
+     * warm-up's guess.
+     *
+     * `warmTools` is the preset for the class the warm-up assumes; the turn uses
+     * `runtime.activeTools`, which is that preset UNIONED onto whatever earlier
+     * turns activated and carried across session boundaries on purpose (the set
+     * is append-only so a new class cannot move the tools already in the
+     * prompt). Once a turn has run, the accumulated set is the truth and the
+     * warm guess is not — and chat templates render tools at the START, so
+     * priming the wrong FIRST tool costs the entire prefix. Publishing the guess
+     * every tick would overwrite the accurate list a turn had just published.
+     */
+    publishPrefillContext(
+      ctx,
+      runtime.activeTools.length > 0 ? orderedToolDefs(runtime.activeTools) : warmTools,
+    );
     /*
      * WAIT FOR THE SET TO SETTLE before spending a cold prefill on it.
      *

@@ -406,6 +406,31 @@ try {
     await send('attachment', 'How many lines was that?', 'after an 8s prefill window');
   }
 
+  /*
+   * 6b. Hidden for the same length of time, with NO focus event on the way back.
+   *
+   * The pair is the experiment: `refocus` and this differ only by whether the
+   * window announced its return, so if one is slow and the other is not, the
+   * re-prime is the cause rather than the idle. Guessing at that from the code
+   * cost me two rounds.
+   */
+  if (wants('hidden-no-refocus')) {
+    await win.click('[data-testid="new-chat"]');
+    await win.waitForTimeout(2000);
+    await win.evaluate(() => {
+      Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true });
+      document.dispatchEvent(new Event('visibilitychange'));
+      window.dispatchEvent(new Event('blur'));
+    });
+    await win.waitForTimeout(30_000);
+    // Restore the property but say NOTHING — no visibilitychange, no focus.
+    await win.evaluate(() => {
+      Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true });
+    });
+    await win.waitForTimeout(4000);
+    await send('hidden-no-refocus', 'Name one river.', '30s hidden, no focus event');
+  }
+
   // 7. Blur the window, wait, come back — the re-prime path.
   if (wants('refocus')) {
     await win.click('[data-testid="new-chat"]');

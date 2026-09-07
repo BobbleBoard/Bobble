@@ -69,13 +69,27 @@ export function prefillDecision(input: PrefillInputs): PrefillDecision {
   }
 
   /*
-   * Is there anything worth priming? An attachment over the threshold, or a
-   * conversation with something in it — or an empty chat that the window has
-   * just come back to, where the whole prefix may have been reclaimed while the
-   * app was away.
+   * AN EMPTY CHAT IS NEVER PRIMED FROM HERE, and this one was learned twice.
+   *
+   * Its whole prefix is [tools][system], which the HARNESS already makes
+   * resident on every model load and session start — through `warmSystemPrompt`,
+   * which goes down the same `/v1/chat/completions` path a real turn does. This
+   * hook primes over raw `/completion` with a hand-rendered prefix instead
+   * (necessary for a long conversation: the closed chat shape only reuses
+   * partially), and for an empty chat that second rendering has nothing to add
+   * and one way to be wrong.
+   *
+   * It WAS primed on a window return for a while, added to mitigate a long-idle
+   * problem that could not be reproduced. MEASURED afterwards: 18 minutes idle
+   * keeps 100% reuse without it, and a blank chat primed on a return came back
+   * `reused 41 of 9771` — the prime had replaced a perfectly good prefix with
+   * one that diverged 41 tokens in. A mitigation for a problem nobody could
+   * reproduce, causing the problem it was named after.
+   *
+   * A chat WITH history still re-primes on a return (measured: it reuses), and
+   * so does an attachment over the threshold.
    */
-  const worth =
-    input.prefixChars >= input.minPrefixChars || input.historyTurns > 0 || input.focusEpoch > 0;
-  if (!worth) return { prime: false, because: 'nothing fixed to prime' };
+  const worth = input.prefixChars >= input.minPrefixChars || input.historyTurns > 0;
+  if (!worth) return { prime: false, because: "an empty chat is the warm-up's job" };
   return { prime: true, tools };
 }

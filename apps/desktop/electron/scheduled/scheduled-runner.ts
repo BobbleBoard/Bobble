@@ -180,7 +180,11 @@ export function createScheduledRunner(deps: ScheduledRunnerDeps): ScheduledRunne
   let queue: Promise<void> = Promise.resolve();
   let liveBridge: RunBridge | null = null;
 
-  function execute(task: ScheduledTask, runId: string, trigger: 'schedule' | 'manual'): Promise<void> {
+  function execute(
+    task: ScheduledTask,
+    runId: string,
+    trigger: 'schedule' | 'manual',
+  ): Promise<void> {
     const startedAt = deps.now();
     // No cwd on the task → a dedicated per-run output dir, so the deliverables
     // are isolated and cleanly scannable. A named folder is used as-is.
