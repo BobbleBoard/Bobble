@@ -100,16 +100,27 @@ export function abortsOnSend(
   return !sending.body.startsWith(priming.prefix);
 }
 
-/** The live transcript as plain-text OpenAI messages (thinking / tool / image
- * blocks dropped — a text-only approximation that fully matches a plain chat and
- * degrades gracefully on tool/image turns). */
-function historyAsMessages(
+/**
+ * The live transcript as plain-text OpenAI messages.
+ *
+ * `agentText`, NOT `text`, for a user turn — and this one was expensive. `text`
+ * is the ECHO, what the bubble shows; `agentText` is pi's copy, with any pasted
+ * block or dropped file folded back in. A conversation containing one paste
+ * therefore rendered here MISSING that paste, so the primed prompt diverged from
+ * the real one at the first attachment — and because the slot holds a single
+ * sequence, priming it EVICTED the correct prefix. MEASURED on a transcript with
+ * a 3.2k-token paste in it: the following turn re-read 6,896 tokens, roughly the
+ * paste twice over, on a conversation the server had entirely cached a moment
+ * earlier. Long conversations are exactly the ones with pastes and files in
+ * them, which is why this showed up as "every follow-up re-prefills".
+ */
+export function historyAsMessages(
   messages: ReturnType<typeof usePiStore.getState>['messages'],
 ): Array<Record<string, unknown>> {
   const out: Array<Record<string, unknown>> = [];
   for (const m of messages) {
     if (m.kind === 'user') {
-      const text = m.text.trim();
+      const text = (m.agentText ?? m.text).trim();
       if (text.length > 0) out.push({ role: 'user', content: text });
     } else if (m.kind === 'assistant') {
       const text = m.blocks
@@ -120,6 +131,34 @@ function historyAsMessages(
     }
   }
   return out;
+}
+
+/**
+ * Is this transcript one we can render EXACTLY as the turn will?
+ *
+ * The gate's rule is both halves of the prefix or neither, and it applies to the
+ * conversation as much as to the tools. A turn that called a tool puts the call
+ * and its result in the model's copy; a turn that carried an image puts the
+ * image there. Neither survives the plain-text rendering above, so a prime built
+ * over such a history is not an approximation of the real prompt — it is a
+ * different prompt, and writing it to the slot costs the whole conversation.
+ *
+ * The old comment here said this "degrades gracefully on tool/image turns". It
+ * does not degrade. It evicts.
+ */
+export function historyIsRenderable(
+  messages: ReturnType<typeof usePiStore.getState>['messages'],
+): boolean {
+  for (const m of messages) {
+    if (m.kind === 'user') {
+      if ((m.images ?? []).length > 0) return false;
+    } else if (m.kind === 'assistant') {
+      for (const b of m.blocks ?? []) {
+        if (b.type !== 'text' && b.type !== 'thinking') return false;
+      }
+    }
+  }
+  return true;
 }
 
 /**
@@ -234,6 +273,10 @@ export function useAttachmentPrefill(attachmentPrefix: string): {
      * back `reused 20`, a complete re-read, because the prime rendered without
      * the tool list the turn would carry.
      */
+    if (!historyIsRenderable(messages)) {
+      note({ what: 'skipped', because: 'the transcript has a turn we cannot render exactly' });
+      return;
+    }
     const decision = prefillDecision({
       system,
       toolsJson,

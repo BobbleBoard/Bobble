@@ -599,44 +599,62 @@ export function ChatThread() {
                      history pole — the one place that knows where each question
                      is on the page. See history-pole.ts. */
                   <div key={message.id} className="flex flex-col gap-1" data-user-turn={message.id}>
+                    {/*
+                      WHAT YOU BROUGHT IS NOT WHAT YOU SAID.
+                      A pasted block, a dropped file and a pinned image sit
+                      BESIDE the message, not inside its bubble. the user:
+                      "pastes/images/files … should not be contained in the grey
+                      box." They are already boxes in their own right — a card
+                      inside a bubble is two containers saying the same thing,
+                      and it made a one-line question look like a wall. An `@`
+                      mention is the exception and always was: it is part of the
+                      sentence, so it stays in the sentence.
+                    */}
+                    {message.images !== undefined && message.images.length > 0 ? (
+                      <div className="flex flex-col items-end gap-2">
+                        <div className="flex flex-wrap justify-end gap-2">
+                          {message.images.map((src) => (
+                            <UserImage key={src} src={src} />
+                          ))}
+                        </div>
+                        {/*
+                          WORDS, NOT ONLY A COLOURED MARK. The tester: "a
+                          coloured mark whose meaning I have to be taught is
+                          the 'No project' chip all over again — right
+                          instinct, and you're one sentence from it being
+                          right." The badge on the picture catches the eye;
+                          this says what it means, permanently, under the
+                          message it belongs to.
+                        */}
+                        <BlindImageNote />
+                      </div>
+                    ) : null}
+                    {attached.files.length > 0 ? (
+                      <div
+                        className="flex flex-wrap justify-end gap-2"
+                        data-testid="user-attachments"
+                      >
+                        {attached.files.map((f) => (
+                          <AttachedFileCard key={f.id} name={f.name} text={f.text} />
+                        ))}
+                      </div>
+                    ) : null}
+                    {/*
+                      An attachment sent with nothing typed still needs its copy
+                      and edit controls, so the row is rendered either way — but
+                      with no bubble drawn around an empty string.
+                    */}
                     <MessageRow
-                      kind="user"
+                      kind={attached.text.length > 0 ? 'user' : 'assistant'}
                       actions={
                         <MessageActions
                           onCopy={() => copyText(message.text)}
                           onEdit={() => beginEdit(message)}
                         />
                       }
+                      className={attached.text.length > 0 ? undefined : 'items-end'}
                     >
-                      <div className="flex flex-col gap-2">
-                        {message.images !== undefined && message.images.length > 0 ? (
-                          <>
-                            <div className="flex flex-wrap gap-2">
-                              {message.images.map((src) => (
-                                <UserImage key={src} src={src} />
-                              ))}
-                            </div>
-                            {/*
-                              WORDS, NOT ONLY A COLOURED MARK. The tester: "a
-                              coloured mark whose meaning I have to be taught is
-                              the 'No project' chip all over again — right
-                              instinct, and you're one sentence from it being
-                              right." The badge on the picture catches the eye;
-                              this says what it means, permanently, under the
-                              message it belongs to.
-                            */}
-                            <BlindImageNote />
-                          </>
-                        ) : null}
-                        {attached.files.length > 0 ? (
-                          <div className="flex flex-wrap gap-2" data-testid="user-attachments">
-                            {attached.files.map((f) => (
-                              <AttachedFileCard key={f.id} name={f.name} text={f.text} />
-                            ))}
-                          </div>
-                        ) : null}
-                        {attached.text.length > 0 ? <ClampedText text={attached.text} /> : null}
-                      </div>
+                      {attached.text.length > 0 ? <ClampedText text={attached.text} /> : null}
                     </MessageRow>
                     {switcher}
                   </div>
