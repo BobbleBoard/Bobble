@@ -73,6 +73,8 @@ export function ScheduledView() {
   const [editingId, setEditingId] = useState<string | undefined>(undefined);
   const [quick, setQuick] = useState('');
   const [viewingRuns, setViewingRuns] = useState<string | null>(null);
+  /** The row whose Delete is armed — see the note on the button. */
+  const [confirmingDelete, setConfirmingDelete] = useState<string | null>(null);
   /** Re-render once a minute so "in 4h" stays true without a per-row timer. */
   const [now, setNow] = useState(() => Date.now());
 
@@ -285,7 +287,15 @@ export function ScheduledView() {
                 >
                   {task.enabled ? describeNextRun(next, now) : 'paused'}
                 </span>
-                <div className="flex shrink-0 items-center gap-0.5">
+                {/* Moving the pointer off the row's actions disarms a primed
+                    Delete: an armed destructive button you have walked away
+                    from must not still be armed when you come back. */}
+                {/* biome-ignore lint/a11y/noStaticElementInteractions: leave-to-disarm only; every action inside is a real button and the keyboard path disarms on blur */}
+                <div
+                  className="flex shrink-0 items-center gap-0.5"
+                  onMouseLeave={() => setConfirmingDelete(null)}
+                  onBlur={() => setConfirmingDelete(null)}
+                >
                   <RowMenuButton
                     label={isRunning(runs[task.id]) ? 'Running…' : 'Run now'}
                     testid={`task-run-${task.id}`}
@@ -304,11 +314,27 @@ export function ScheduledView() {
                       setEditingId(task.id);
                     }}
                   />
+                  {/*
+                    DELETE ASKS ONCE. It was a single red click that removed the
+                    task AND every run it had ever produced — the history you
+                    came to this screen to read — with no undo and no dialog. The
+                    second press is the confirmation: the button says what it is
+                    about to do, and moving away or pressing anything else takes
+                    it back. Cheaper than a modal, and it cannot be dismissed by
+                    accident the way a modal's backdrop can.
+                  */}
                   <RowMenuButton
-                    label="Delete"
+                    label={confirmingDelete === task.id ? 'Delete for good?' : 'Delete'}
                     tone="danger"
                     testid={`task-delete-${task.id}`}
-                    onClick={() => void removeTask(task.id)}
+                    onClick={() => {
+                      if (confirmingDelete !== task.id) {
+                        setConfirmingDelete(task.id);
+                        return;
+                      }
+                      setConfirmingDelete(null);
+                      void removeTask(task.id);
+                    }}
                   />
                 </div>
               </div>

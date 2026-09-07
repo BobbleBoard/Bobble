@@ -20,7 +20,7 @@
 import type { KnownConnector } from '@pi-desktop/mcp-lite';
 
 /** The four gallery sections (a different axis from ConnectorCategory). */
-export type ConnectorSection = 'by-us' | 'recommended' | 'official' | 'popular';
+export type ConnectorSection = 'added-by-you' | 'by-us' | 'recommended' | 'official' | 'popular';
 
 /** One rendered section: its id, human title, and the connectors in it. */
 export interface SectionGroup {
@@ -30,6 +30,7 @@ export interface SectionGroup {
 }
 
 const SECTION_TITLES: Record<ConnectorSection, string> = {
+  'added-by-you': 'Added by you',
   'by-us': 'By us',
   recommended: 'Recommended for you',
   official: 'Official',
@@ -59,6 +60,20 @@ export function buildConnectorSections(
   catalog: KnownConnector[],
   recommendedIds: string[],
   query: string,
+  /*
+   * SERVERS THE USER ADDED BY HAND, which the gallery could not see.
+   *
+   * Every section below is built from the CATALOG, so a server added through
+   * "Add MCP server" landed in the registry and then vanished: it ran, its tools
+   * were live, and the only place it existed on screen was a JSON file — which
+   * is also the only place it could be removed from. Found by a design pass
+   * reading this file; it is the same bug shape as an item that saves and does
+   * not appear in the list.
+   *
+   * They come FIRST, because a thing you configured yourself is the thing you
+   * came here to find.
+   */
+  addedByYou: KnownConnector[] = [],
 ): SectionGroup[] {
   const q = query.trim().toLowerCase();
   const byId = new Map(catalog.map((c) => [c.id, c]));
@@ -69,6 +84,10 @@ export function buildConnectorSections(
     used.add(c.id);
     return true;
   };
+
+  // 0. Added by you — claimed first so a hand-added server that happens to
+  //    share an id with a catalog entry shows the user's own configuration.
+  const custom = addedByYou.filter((c) => take(c));
 
   // 1. By us — connectors we authored.
   const byUs = catalog.filter((c) => c.firstParty === true && take(c));
@@ -87,6 +106,7 @@ export function buildConnectorSections(
   const popular = catalog.filter((c) => take(c));
 
   const groups: Array<{ id: ConnectorSection; items: KnownConnector[] }> = [
+    { id: 'added-by-you', items: custom },
     { id: 'by-us', items: byUs },
     { id: 'recommended', items: recommended },
     { id: 'official', items: official },

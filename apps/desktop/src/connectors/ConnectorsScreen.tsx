@@ -104,14 +104,44 @@ export function ConnectorsScreen({ onClose }: { onClose: () => void }) {
   };
 
   const installedIds = new Set(registry.servers.map((s) => s.id));
+  /*
+   * A HAND-ADDED SERVER IS A CONNECTOR TOO. The gallery is built from the
+   * catalog, so anything added through "Add MCP server" was live and invisible —
+   * see the note on `addedByYou` in connector-sections.ts. The catalog's shape is
+   * what the cards render, so a registry entry is dressed as one: what we truly
+   * know is its name and the command that starts it, and that is what it says.
+   */
+  const catalogIds = useMemo(() => new Set(catalog.map((c) => c.id)), [catalog]);
+  const addedByYou = useMemo(
+    () =>
+      registry.servers
+        .filter((srv) => !catalogIds.has(srv.id))
+        .map(
+          (srv): KnownConnector => ({
+            id: srv.id,
+            name: srv.name,
+            icon: srv.icon ?? '🔌',
+            description:
+              srv.description ??
+              `Runs ${[srv.command, ...(srv.args ?? [])].join(' ').slice(0, 90)} · added by you`,
+            category: 'dev',
+            official: false,
+            /* Its own configuration IS the template — re-adding it can only
+               mean "the thing that is already there". */
+            template: { ...srv, enabled: undefined } as KnownConnector['template'],
+          }),
+        ),
+    [registry.servers, catalogIds],
+  );
   const sections = useMemo(
     () =>
       buildConnectorSections(
         catalog,
         recommended.map((r) => r.id),
         query,
+        addedByYou,
       ),
-    [catalog, recommended, query],
+    [catalog, recommended, query, addedByYou],
   );
 
   return (

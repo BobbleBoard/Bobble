@@ -378,8 +378,24 @@ async function capture(tabId: string): Promise<string | null> {
    * user can see. Restored immediately afterwards, in a finally, so an agent
    * screenshot can never strand the view visible.
    */
-  if (image.isEmpty() && !entry.visible) {
+  /*
+   * ...AND A HIDDEN WINDOW CAPTURES NOTHING EITHER.
+   *
+   * This branch was gated on the VIEW being invisible, which covered the agent's
+   * headless browser and nothing else. A visible view inside a window that is
+   * itself hidden — every background/E2E run, and the app while it is behind
+   * another app — also returns an empty image, and that returned null with no
+   * second attempt. Found when the `+` menu's freeze-frame came back blank in a
+   * probe: the still was never the problem, the capture was.
+   *
+   * So the fallback is now about the IMAGE, not about who was hiding: an empty
+   * one gets one off-screen reveal. `wasVisible` rather than a hardcoded false
+   * on the way out — forcing false here would have hidden a view that was on
+   * screen the whole time.
+   */
+  if (image.isEmpty()) {
     const prev = entry.view.getBounds();
+    const wasVisible = entry.visible;
     const width = prev.width > 0 ? prev.width : 1280;
     const height = prev.height > 0 ? prev.height : 800;
     try {
@@ -391,7 +407,7 @@ async function capture(tabId: string): Promise<string | null> {
       await new Promise((resolve) => setTimeout(resolve, 120));
       image = await entry.view.webContents.capturePage();
     } finally {
-      entry.view.setVisible(false);
+      entry.view.setVisible(wasVisible);
       entry.view.setBounds(prev);
     }
   }

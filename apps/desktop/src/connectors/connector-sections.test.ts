@@ -87,3 +87,50 @@ describe('buildConnectorSections', () => {
     expect(rec?.items.map((c) => c.id)).toEqual(['github']);
   });
 });
+
+/*
+ * A SERVER YOU ADDED BY HAND HAS TO APPEAR. Every section is built from the
+ * catalog, so "Add MCP server" wrote a live, running connector into the registry
+ * that the gallery could not draw — and therefore could not be switched off or
+ * removed except by editing JSON.
+ */
+describe('added by you', () => {
+  const custom = (id: string, name = id): KnownConnector => ({
+    id,
+    name,
+    icon: '🔌',
+    description: `Runs ${id}`,
+    category: 'dev',
+    official: false,
+    template: { id, name, command: id },
+  });
+
+  it('puts hand-added servers first, in their own section', () => {
+    const groups = buildConnectorSections(CATALOG, [], '', [custom('mine')]);
+    expect(groups[0]?.id).toBe('added-by-you');
+    expect(groups[0]?.title).toBe('Added by you');
+    expect(groups[0]?.items.map((c) => c.id)).toEqual(['mine']);
+  });
+
+  it('changes nothing when there are none', () => {
+    const withNone = buildConnectorSections(CATALOG, [], '');
+    const withEmpty = buildConnectorSections(CATALOG, [], '', []);
+    expect(withEmpty).toEqual(withNone);
+    expect(withNone.some((g) => g.id === 'added-by-you')).toBe(false);
+  });
+
+  /* The user's own configuration wins over a catalog entry of the same id —
+   * what is on screen should be the thing that is actually running. */
+  it('claims an id before the catalog sections can', () => {
+    const first = CATALOG[0] as KnownConnector;
+    const groups = buildConnectorSections(CATALOG, [], '', [custom(first.id, 'my own build')]);
+    expect(groups[0]?.items[0]?.name).toBe('my own build');
+    const elsewhere = groups.slice(1).flatMap((g) => g.items.map((c) => c.id));
+    expect(elsewhere).not.toContain(first.id);
+  });
+
+  it('is searchable like everything else', () => {
+    const groups = buildConnectorSections(CATALOG, [], 'zzz-nothing', [custom('mine')]);
+    expect(groups.some((g) => g.id === 'added-by-you')).toBe(false);
+  });
+});

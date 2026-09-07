@@ -1086,6 +1086,23 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
      */
     const warmKey = `${canonical}\u0000${warmNames.join(',')}`;
     /*
+     * TELL THE RENDERER WHAT THE PREFIX IS — EVERY TICK, not only when a warm-up
+     * happens.
+     *
+     * This publish used to live at the bottom of this function, after the
+     * "already warmed" early return. So it ran exactly once per distinct prefix
+     * per process — and a session boundary DROPS the renderer's copy (every
+     * `harness*` status key is cleared so a stale checklist cannot leak into a
+     * new chat). Switch chats once and the renderer had no system prompt and no
+     * tool list for the rest of the session, which silently disabled predictive
+     * prefill entirely: nothing logged, nothing wrong on either side alone.
+     *
+     * Publishing here is free — `publishPrefillContext` compares before sending
+     * — and it means the renderer's copy is restored within a tick of any
+     * session change.
+     */
+    publishPrefillContext(ctx, warmTools);
+    /*
      * WAIT FOR THE SET TO SETTLE before spending a cold prefill on it.
      *
      * The app pushes effort AFTER the session comes up, and effort decides
@@ -1132,10 +1149,6 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
       .finally(() => {
         if (ctx.hasUI === true) ctx.ui.setStatus(PREFIX_WARM_STATUS, 'ready');
       });
-    // Seed the renderer's predictive-prefill context with exactly what the warm-up
-    // just made resident ([system][warm preset tools]) — so a first message typed
-    // BEFORE any turn (activeTools still empty) prefills against the real prefix.
-    publishPrefillContext(ctx, warmTools);
   }
 
   // A session-stable per-tool failure counter shared by rungs 4 (bump) and 5
@@ -2437,6 +2450,23 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
   // Restore persisted config + start the status timer on session start.
   pi.on('session_start', (_event, ctx) => {
     runtime.currentCtx = ctx;
+    /*
+     * REPUBLISH THE PREFILL CONTEXT — the renderer just threw its copy away.
+     *
+     * A session boundary drops every `harness*` status key in the renderer (so a
+     * stale checklist cannot leak into a new chat), and `harness-prefill-system`
+     * / `-tools` are caught by that net. These two caches then say "already
+     * sent", so on a switch to a chat with the same system prompt they were
+     * never re-sent — and predictive prefill was DEAD for the rest of the
+     * session after the first chat switch, silently, because nothing on either
+     * side is wrong on its own.
+     *
+     * Clearing them here makes the next publish (the 1s tick below, or the first
+     * turn) a real one. The renderer's own gate refuses to prime while they are
+     * missing, so the window costs a prime rather than a poisoned slot.
+     */
+    publishedPrefillSystem = null;
+    publishedPrefillTools = null;
     runtime.config = restoreConfig(getEntries(ctx));
     runtime.permission.setMode(runtime.config.mode);
     // A new / switched session must NOT inherit the previous session's live

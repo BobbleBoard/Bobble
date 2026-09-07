@@ -33,7 +33,7 @@ mkdirSync(sessions, { recursive: true });
 const seed = (file, id, text) =>
   writeFileSync(
     path.join(sessions, file),
-    [
+    `${[
       JSON.stringify({ type: 'session', version: 3, id, timestamp: 't', cwd: '/tmp' }),
       JSON.stringify({
         type: 'message',
@@ -42,7 +42,7 @@ const seed = (file, id, text) =>
         timestamp: 't',
         message: { role: 'user', content: text, timestamp: 1 },
       }),
-    ].join('\n') + '\n',
+    ].join('\n')}\n`,
   );
 seed('alpha.jsonl', 'sess-alpha', 'the chat about apples');
 seed('beta.jsonl', 'sess-beta', 'the chat about bananas');

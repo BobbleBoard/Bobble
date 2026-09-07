@@ -463,7 +463,17 @@ button.pd-chain-step-row:hover .pd-chain-step-chevron {
   font-size: var(--pd-font-size-code);
   line-height: var(--pd-leading-code);
   white-space: pre;
-  overflow-x: auto;
+  overflow: auto;
+  /*
+   * IT SCROLLS RATHER THAN GROWING. This had no height limit, which was survivable
+   * while the block only ever appeared with a FINISHED command's output in it —
+   * and stops being survivable now that it fills in live: a build log pushes the
+   * thread down a line at a time under the reader while they are trying to read
+   * it, and the composer walks off the bottom of the window. Bounded, the newest
+   * line is always in the same place, which is what makes it followable (the
+   * live block scrolls itself there — see TerminalBlock).
+   */
+  max-height: min(42vh, 360px);
 }
 
 /* One-block terminal reveal: a dimmed `$ ` prompt + the typed command on the

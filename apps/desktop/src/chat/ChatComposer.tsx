@@ -851,7 +851,9 @@ export function ChatComposer({
    * from memory and stay instant.
    */
   useEffect(() => {
-    if (token.mode === 'slash' && !connectorsLoaded) void useConnectorsStore.getState().load();
+    if ((token.mode === 'slash' || token.mode === 'connector') && !connectorsLoaded) {
+      void useConnectorsStore.getState().load();
+    }
   }, [token.mode, connectorsLoaded]);
 
   useEffect(() => {
@@ -882,21 +884,30 @@ export function ChatComposer({
         );
       } else {
         const q = token.query.toLowerCase();
-        const commandItems = commands
-          .filter(
-            (c) =>
-              c.name.toLowerCase().includes(q) || (c.description ?? '').toLowerCase().includes(q),
-          )
-          .slice(0, 12)
-          .map(
-            (c): AcItem => ({
-              id: `/${c.name} `,
-              label: `/${c.name}`,
-              subtitle: c.description,
-              section: 'Commands',
-              kind: 'command',
-            }),
-          );
+        /*
+         * A `/` MID-SENTENCE CAN ONLY MEAN A CONNECTOR. A command owns the whole
+         * message (pi's rule), so offering the command list from inside a
+         * sentence would be a menu of things that cannot run from there.
+         */
+        const commandItems =
+          token.mode === 'connector'
+            ? []
+            : commands
+                .filter(
+                  (c) =>
+                    c.name.toLowerCase().includes(q) ||
+                    (c.description ?? '').toLowerCase().includes(q),
+                )
+                .slice(0, 12)
+                .map(
+                  (c): AcItem => ({
+                    id: `/${c.name} `,
+                    label: `/${c.name}`,
+                    subtitle: c.description,
+                    section: 'Commands',
+                    kind: 'command',
+                  }),
+                );
         // Connectors come FIRST: they are the answer to "what can this thing
         // reach", which is what a `/` is usually being pressed to find out.
         const connectorItems = installedConnectors
@@ -928,6 +939,68 @@ export function ChatComposer({
    * What Escape needs, through refs, because the keymap object is stable and
    * `isBusy` / `stopBusy` are derived further down the component.
    */
+  /**
+   * ACCEPTING A SUGGESTION — one implementation, whichever way you accept it.
+   *
+   * Reads the live token through `tokenRef` rather than the render's `token` so
+   * the keyboard path (which runs from a stable keymap object) and the mouse
+   * path see the same one. `tokenRef` is declared further down; that is fine
+   * because nothing here runs during render — only on an actual pick.
+   */
+  const pickItem = (item: AcItem): void => {
+    const picked = tokenRef.current.mode;
+    const tokenStart = tokenRef.current.tokenStart;
+    /*
+     * A MENTIONED FILE ARRIVES AS A PILL, not as a typed path. the user: "add blue
+     * pills with icons … not just typing them."
+     *
+     * The payload is the same path the model always received, but a path typed
+     * into the box can be half-deleted into one that does not exist.
+     */
+    if (picked === 'mention' && item.path !== undefined) {
+      apiRef.current?.replaceTokenWithPill(tokenStart, {
+        label: item.label ?? item.id,
+        payload: item.id,
+        icon: 'file',
+      });
+    } else if (item.kind === 'connector') {
+      /*
+       * A CONNECTOR IS A PILL WITH ITS OWN FACE. The payload is the literal
+       * `/gmail` the user meant to type — so it still reads as a sentence to the
+       * model, and `activatedConnectors` can find it again to append the one
+       * activation line (agent-message.ts).
+       */
+      apiRef.current?.replaceTokenWithPill(tokenStart, {
+        label: item.label,
+        payload: `${item.id.trim()} `,
+        icon: 'connector',
+        ...(item.iconSvg !== undefined ? { iconSvg: item.iconSvg } : {}),
+      });
+      /*
+       * ...AND IT IS ON. the user asked the pick to "add this cli tool to the set if
+       * not already there": naming a connector you have installed but switched
+       * off should turn it on, not fail silently when the model reaches for it.
+       */
+      const slug = item.id.trim().replace(/^\//, '');
+      if (installedConnectors.some((c) => c.slug === slug && !c.enabled)) {
+        void useConnectorsStore.getState().setEnabled(slug, true);
+      }
+    } else {
+      apiRef.current?.insertToken(tokenStart, item.id);
+    }
+    setToken(EMPTY_TOKEN);
+    apiRef.current?.focus();
+    /*
+     * AN `@` MENTION BRINGS THE FILE WITH IT — folded into pi's copy of the
+     * message and primed by the predictive prefill while the rest is still being
+     * typed, so by the time it is sent the file is already resident. It draws no
+     * chip: the pill in the sentence IS the file (see Attachment.mention).
+     */
+    if (picked === 'mention' && item.path !== undefined) {
+      void attachMentionedFile(item.path, item.id);
+    }
+  };
+
   const busyRef = useRef(false);
   const stopRef = useRef<() => void>(() => {});
   const hasDraftRef = useRef(false);
@@ -950,8 +1023,18 @@ export function ChatComposer({
     acceptAc: () => {
       const item = itemsRef.current[selRef.current];
       if (item === undefined) return false;
-      apiRef.current?.insertToken(tokenRef.current.tokenStart, item.id);
-      setToken(EMPTY_TOKEN);
+      /*
+       * THE SAME PICK THE MOUSE MAKES.
+       *
+       * This used to call `insertToken` on its own, so accepting a suggestion
+       * with Enter or Tab typed the raw text while clicking the row inserted a
+       * pill — and, for an `@` mention, only the click attached the file. Two
+       * ways to accept one suggestion, doing two different things, with the
+       * keyboard (the way anyone actually uses an autocomplete) getting the
+       * worse one. Found by driving Enter in a probe after the mouse path had
+       * been passing for a week.
+       */
+      pickItem(item);
       return true;
     },
     // Suggestion overlay removed (#A7): these keymap hooks are inert no-ops so
@@ -1317,69 +1400,7 @@ export function ChatComposer({
         <Autocomplete
           items={token.mode !== null ? items : []}
           selectedIndex={selectedIndex}
-          onPick={(item) => {
-            const picked = token.mode;
-            /*
-             * A MENTIONED FILE ARRIVES AS A PILL, not as a typed path. the user:
-             * "add blue pills with icons and X buttons for embedded files and
-             * such, not just typing them."
-             *
-             * The payload is the same path the model always received — the note
-             * below still holds, the user asked about THAT file by name — but a
-             * path typed into the box can be half-deleted into a path that does
-             * not exist, and there is nothing to click to take it back.
-             */
-            if (picked === 'mention' && item.path !== undefined) {
-              apiRef.current?.replaceTokenWithPill(token.tokenStart, {
-                label: item.label ?? item.id,
-                payload: item.id,
-                icon: 'file',
-              });
-            } else if (item.kind === 'connector') {
-              /*
-               * A CONNECTOR IS A PILL WITH ITS OWN FACE. The payload is the
-               * literal `/gmail` the user meant to type — so it still reads as a
-               * sentence to the model, and `activatedConnectors` can find it
-               * again to append the one activation line (agent-message.ts).
-               */
-              apiRef.current?.replaceTokenWithPill(token.tokenStart, {
-                label: item.label,
-                payload: `${item.id.trim()} `,
-                icon: 'connector',
-                ...(item.iconSvg !== undefined ? { iconSvg: item.iconSvg } : {}),
-              });
-              /*
-               * ...AND IT IS ON. the user asked the pick to "add this cli tool to the
-               * set if not already there": naming a connector you have installed
-               * but switched off should turn it on, not fail silently at the
-               * moment the model reaches for it.
-               */
-              const slug = item.id.trim().replace(/^\//, '');
-              if (installedConnectors.some((c) => c.slug === slug && !c.enabled)) {
-                void useConnectorsStore.getState().setEnabled(slug, true);
-              }
-            } else {
-              apiRef.current?.insertToken(token.tokenStart, item.id);
-            }
-            setToken(EMPTY_TOKEN);
-            apiRef.current?.focus();
-            /*
-             * AN `@` MENTION BRINGS THE FILE WITH IT.
-             *
-             * It used to insert the path as text and stop, so the model had to
-             * spend a turn reading a file the user had already pointed at.
-             * Resolving it into the SAME attachments array a dropped file uses
-             * means `buildAgentMessage` folds it in and the predictive prefill
-             * primes its tokens while the rest of the message is still being
-             * typed — so by the time it is sent, the file is already resident.
-             *
-             * The path stays in the visible text: the user asked about THAT
-             * file by name, and a chip alone loses which one they meant.
-             */
-            if (picked === 'mention' && item.path !== undefined) {
-              void attachMentionedFile(item.path, item.id);
-            }
-          }}
+          onPick={pickItem}
           onHover={setSelectedIndex}
         />
 

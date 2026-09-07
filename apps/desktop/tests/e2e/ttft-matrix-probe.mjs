@@ -125,14 +125,23 @@ try {
     }
   };
 
+  /*
+   * ALL the assistant text in the thread, not the last message's.
+   *
+   * The first cut read only the LAST row, so a turn that opened with a tool call
+   * left a toolResult at the end and the probe reported "no first token" on a
+   * turn that had answered perfectly well. Counting the whole thread means the
+   * first character is the first moment the total grows, whatever else is in the
+   * way.
+   */
   const shape = () =>
     win.evaluate(() => {
       const m = window.__pi_store().getState().messages;
-      const last = m[m.length - 1];
-      const chars =
-        last?.kind === 'assistant'
-          ? (last.blocks ?? []).reduce((n, b) => n + (b.text ?? b.thinking ?? '').length, 0)
-          : 0;
+      let chars = 0;
+      for (const row of m) {
+        if (row.kind !== 'assistant') continue;
+        for (const b of row.blocks ?? []) chars += (b.text ?? b.thinking ?? '').length;
+      }
       return { rows: m.length, chars };
     });
 
@@ -147,6 +156,49 @@ try {
         { timeout: 240_000 },
       )
       .catch(() => undefined);
+
+  /*
+   * WHAT THE PREFIX IS MADE OF, so a re-prefill can be attributed instead of
+   * guessed at. The harness publishes the exact system prompt and tool list it
+   * renders; a turn that re-reads everything did so because one of these two
+   * changed, and this is the only way to see WHICH.
+   */
+  const prefixShape = () =>
+    win.evaluate(() => {
+      const st = window.__pi_store().getState().extensionStatus;
+      const sys = st['harness-prefill-system'] ?? '';
+      let tools = [];
+      try {
+        tools = JSON.parse(st['harness-prefill-tools'] ?? '[]').map((t) => t.name);
+      } catch {
+        tools = ['<unparseable>'];
+      }
+      // A cheap stable hash, enough to say "the same text" or "not".
+      let h = 0;
+      for (let i = 0; i < sys.length; i++) h = (h * 31 + sys.charCodeAt(i)) | 0;
+      return { sysLen: sys.length, sysHash: h, tools };
+    });
+
+  let lastShape = null;
+  const reportShapeChange = (name, shape) => {
+    if (lastShape !== null) {
+      const sysChanged = shape.sysHash !== lastShape.sysHash || shape.sysLen !== lastShape.sysLen;
+      const added = shape.tools.filter((t) => !lastShape.tools.includes(t));
+      const removed = lastShape.tools.filter((t) => !shape.tools.includes(t));
+      const reordered =
+        added.length === 0 && removed.length === 0 && shape.tools.join() !== lastShape.tools.join();
+      if (sysChanged || added.length > 0 || removed.length > 0 || reordered) {
+        console.log(
+          `      PREFIX CHANGED before ${name}:` +
+            (sysChanged ? ` system prompt (${lastShape.sysLen}→${shape.sysLen} chars)` : '') +
+            (added.length > 0 ? ` +tools[${added.join(',')}]` : '') +
+            (removed.length > 0 ? ` -tools[${removed.join(',')}]` : '') +
+            (reordered ? ' tools reordered' : ''),
+        );
+      }
+    }
+    lastShape = shape;
+  };
 
   /** Type a message, press Enter, and time the first character back. */
   const send = async (name, message, note) => {
@@ -164,6 +216,7 @@ try {
       rows.push({ case: name, note: 'composer never received the text', ttft: null, turn: null });
       return null;
     }
+    reportShapeChange(name, await prefixShape());
     // A beat so any prefill triggered by typing can start — the point of the
     // whole exercise is that this beat is when the work happens. SETTLE_MS lets
     // a run ask the question the user asks: "if I take longer to type than the model
@@ -180,7 +233,7 @@ try {
     const deadline = Date.now() + 180_000;
     while (Date.now() < deadline) {
       const now = await shape();
-      if (now.rows > before.rows && now.chars > 0) {
+      if (now.chars > before.chars) {
         ttft = Date.now() - sentAt;
         break;
       }
@@ -203,15 +256,28 @@ try {
       console.log(`      (no first token: ${JSON.stringify({ before, now, st })})`);
     }
     /*
-     * THE TURN'S OWN SAMPLE, not the warm-up's.
+     * THE TURN'S OWN SAMPLE, and its FINAL processed count.
      *
-     * The warm-up primes [system][tools] — within a few dozen tokens of a short
-     * turn's whole prompt — so "the sample with the biggest total" picked the
-     * warm-up about half the time and reported its full prefill as the turn's.
-     * Only samples taken after Enter can belong to this turn.
+     * Two traps, both hit before this was right. The warm-up primes
+     * [system][tools] — within a few dozen tokens of a short turn's whole prompt
+     * — so "the biggest total" picked the warm-up half the time and reported its
+     * full prefill as the turn's; only samples after Enter can belong to this
+     * turn. And `n_prompt_tokens_processed` CLIMBS from zero during the ingest,
+     * so a single sample can catch it at 0 and read as "reused everything" on a
+     * turn that reused nothing. The answer is the LARGEST processed seen for
+     * that turn's task.
      */
     const mine = samples.filter((x) => x.at >= sentAt);
-    const turn = mine.reduce((a, b) => (b.total > (a?.total ?? -1) ? b : a), null);
+    const byTask = new Map();
+    for (const x of mine) {
+      const prev = byTask.get(x.task);
+      byTask.set(x.task, {
+        task: x.task,
+        total: Math.max(prev?.total ?? 0, x.total),
+        processed: Math.max(prev?.processed ?? 0, x.processed),
+      });
+    }
+    const turn = [...byTask.values()].reduce((a, b) => (b.total > (a?.total ?? -1) ? b : a), null);
     const row = { case: name, note, ttft, turn, samples: samples.length };
     rows.push(row);
     const reused = turn === null ? null : turn.total - turn.processed;

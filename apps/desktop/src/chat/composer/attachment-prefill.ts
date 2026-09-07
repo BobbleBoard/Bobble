@@ -34,6 +34,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLlmStore } from '../../state/llm-store';
 import { usePiStore } from '../../state/pi-slice';
 import { recordPrefillRate } from '../prefill-speed';
+import { prefillDecision } from './prefill-gate';
 
 /** Below this many chars an attachment isn't worth priming — its send already
  * prefills near-instantly against the warm [system][tools]. */
@@ -133,42 +134,28 @@ export function useAttachmentPrefill(attachmentPrefix: string): {
   }, []);
 
   useEffect(() => {
-    if (!serverRunning || typeof system !== 'string' || system.length === 0) return;
-    // A turn is using the slot — priming now would contend + get evicted.
-    if (busy) return;
     const prefix = attachmentPrefix.trim();
     const history = historyAsMessages(messages);
-
     /*
-     * THE CONVERSATION IS A FIXED PREFIX TOO, and it was being ignored.
-     *
-     * the user: "when I go to an existing chat and take some time, while I'm writing
-     * my prompt or waiting or whatever, it's getting loaded."
-     *
-     * This hook already primed `[system, …history, attachment]` — but only when
-     * an attachment was there and over 400 characters. Open a 40-turn chat with
-     * nothing attached and none of it was resident until you pressed enter, so
-     * the first message in an old conversation paid a full cold prefill of the
-     * whole thing. The history is every bit as fixed as an attachment and it is
-     * usually far bigger; the only reason it was excluded is that the hook was
-     * written for the attachment case and named after it.
-     *
-     * So the gate is now "is there anything worth priming", which is an
-     * attachment over the threshold OR a conversation with something in it.
-     * A brand-new empty chat still primes nothing here, correctly — its prefix
-     * is `[system][tools]`, which the model-load warm-up already made resident.
+     * THE DECISION IS NOT MADE HERE — see prefill-gate.ts, and read its header
+     * before changing anything about it. The short version: the slot holds ONE
+     * sequence, so priming a prefix the turn does not begin with does not merely
+     * fail to help, it evicts the prefix that WOULD have been reused. Measured
+     * cost of getting that wrong once: a fully-resident 9,750-token chat came
+     * back `reused 20`, a complete re-read, because the prime rendered without
+     * the tool list the turn would carry.
      */
-    /*
-     * AN EMPTY CHAT IS WORTH PRIMING TOO, ON A RETURN.
-     *
-     * Its prefix is [system][tools] and nothing else — normally already resident
-     * from the model-load warm-up, so priming it at rest would be pure waste.
-     * But the case the user hit was exactly a BLANK conversation after a long
-     * background stretch, where that prefix is precisely what has gone. So an
-     * empty chat primes on a focus return and at no other time.
-     */
-    const worthPriming = prefix.length >= PREFILL_MIN_CHARS || history.length > 0 || focusEpoch > 0;
-    if (!worthPriming) return;
+    const decision = prefillDecision({
+      system,
+      toolsJson,
+      serverRunning,
+      busy,
+      prefixChars: prefix.length,
+      historyTurns: history.length,
+      focusEpoch,
+      minPrefixChars: PREFILL_MIN_CHARS,
+    });
+    if (!decision.prime) return;
 
     // Cheap dedupe key (avoid stringifying the whole prefix each render).
     const sig = `${focusEpoch}|${history.length}|${prefix.length}|${prefix.slice(0, 96)}`;
@@ -176,14 +163,6 @@ export function useAttachmentPrefill(attachmentPrefix: string): {
 
     const timer = window.setTimeout(() => {
       lastSig.current = sig;
-      let tools: Array<{ name: string; description?: string; parameters?: unknown }> | undefined;
-      if (typeof toolsJson === 'string' && toolsJson.length > 0) {
-        try {
-          tools = JSON.parse(toolsJson);
-        } catch {
-          tools = undefined;
-        }
-      }
       const oaiMessages: Array<Record<string, unknown>> = [
         { role: 'system', content: system },
         ...history,
@@ -208,7 +187,7 @@ export function useAttachmentPrefill(attachmentPrefix: string): {
        */
       setInFlight(true);
       void window.piDesktop
-        .invoke('pi:prefill', { messages: oaiMessages, ...(tools !== undefined ? { tools } : {}) })
+        .invoke('pi:prefill', { messages: oaiMessages, tools: decision.tools })
         .then((res) => {
           /*
            * EVERY PREFILL IS ALSO A MEASUREMENT of how fast this machine reads a

@@ -30,6 +30,7 @@ import { useThemeStore } from '../../store/theme';
 import { browserBoundsForPanel, rectToBounds } from './browser-bounds';
 import { setOfficeEditorsAvailable } from './file-preview';
 import { fileArtifactFromText, openFileInCanvas } from './file-tabs';
+import { freezeFrame } from './freeze-frame';
 
 const MONO_STACK =
   'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace';
@@ -93,25 +94,6 @@ function canvasShellInvoke(channel: string, req: unknown): void {
   }
   // biome-ignore lint/suspicious/noExplicitAny: narrowed by the overloads above.
   void window.piDesktop.invoke(channel as any, req as any);
-}
-
-/**
- * Paint a still of a native view into the DOM slot it was covering — or clear it.
- *
- * The slot exists precisely to be that view's stand-in for layout purposes, so
- * it is also the honest place to stand in for it visually while the view is
- * down. `background-size: 100% auto` pins the still to the slot's width, which
- * is the dimension that cannot change while a menu is open.
- */
-function freezeFrame(el: HTMLElement | undefined, dataUrl: string | null): void {
-  if (el === undefined) return;
-  if (dataUrl === null || dataUrl === '') {
-    el.style.background = '';
-    el.removeAttribute('data-frozen');
-    return;
-  }
-  el.style.background = `top left / 100% auto no-repeat url("${dataUrl}")`;
-  el.setAttribute('data-frozen', 'true');
 }
 
 interface BrowserEntry {
