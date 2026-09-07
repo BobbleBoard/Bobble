@@ -34,6 +34,16 @@ export interface CapabilityToolOptions {
   readonly onActivate: (tools: readonly string[]) => void;
   /** Every tool name registered in this build. */
   readonly available: () => readonly string[];
+  /**
+   * The command a capability answers to when the CLI is the interface, or
+   * undefined in schemas mode.
+   *
+   * It changes what the tool SAYS, not what it does: in CLI mode every tool is
+   * already a command on PATH, so there is nothing to wait for and the "not
+   * callable in this reply" paragraph would cost a turn for nothing. See
+   * `capabilityActivated`.
+   */
+  readonly cliCommandFor?: (capability: string) => string;
 }
 
 export function registerCapabilityTool(pi: ExtensionAPI, opts: CapabilityToolOptions): void {
@@ -42,10 +52,14 @@ export function registerCapabilityTool(pi: ExtensionAPI, opts: CapabilityToolOpt
     name: CAPABILITY_TOOL_NAME,
     label: 'Capability',
     description:
-      'Turn on a group of tools you need but do not currently have. Call it with no argument ' +
-      `to see what is available, or with a name to switch that group on: ${names}. The tools ` +
-      'join your list from your NEXT reply onward — they are not callable in the same reply ' +
-      'that turns them on. Turn on only what the task actually needs.',
+      opts.cliCommandFor !== undefined
+        ? 'Look up what a group of commands can do. Call it with no argument to see the ' +
+          `groups, or with a name for that group's guidance: ${names}. Everything is already ` +
+          'on your PATH — this tells you about it, it does not switch anything on.'
+        : 'Turn on a group of tools you need but do not currently have. Call it with no ' +
+          `argument to see what is available, or with a name to switch that group on: ${names}. ` +
+          'The tools join your list from your NEXT reply onward — they are not callable in the ' +
+          'same reply that turns them on. Turn on only what the task actually needs.',
     promptSnippet: 'Turn on a group of tools (browser, computer-use, personal, …)',
     parameters: Type.Object({
       name: Type.Optional(
@@ -78,7 +92,9 @@ export function registerCapabilityTool(pi: ExtensionAPI, opts: CapabilityToolOpt
       // call into nothing, and the message below says so honestly instead.
       if (present.length > 0) opts.onActivate(present);
       return {
-        content: [{ type: 'text', text: capabilityActivated(cap, available) }],
+        content: [
+          { type: 'text', text: capabilityActivated(cap, available, opts.cliCommandFor?.(cap.name)) },
+        ],
         details: undefined,
       };
     },

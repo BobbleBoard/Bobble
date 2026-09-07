@@ -192,13 +192,38 @@ export function capabilityMenu(): string {
  * `available` filters to what is actually registered in THIS build — naming a
  * tool that does not exist would have the model call into nothing.
  */
-export function capabilityActivated(cap: Capability, available: readonly string[]): string {
+export function capabilityActivated(
+  cap: Capability,
+  available: readonly string[],
+  /**
+   * The command this capability answers to when the CLI is the interface.
+   *
+   * IN CLI MODE THERE IS NOTHING TO WAIT FOR. The paragraph below tells the
+   * model its new tools are "NOT callable in this reply" — true when activation
+   * changes the advertised tool array, and false when every tool is already a
+   * command on PATH. Left unchanged it costs a wasted turn: the model stops,
+   * announces what it is about to do, and hands back a reply that could have
+   * done it. Absent ⇒ the schemas wording, which is the existing behaviour.
+   */
+  cliCommand?: string,
+): string {
   const present = cap.tools.filter((t) => available.includes(t));
   if (present.length === 0) {
     return (
       `The "${cap.name}" capability is not available in this build — none of its tools are ` +
       'installed. Say so plainly rather than pretending to use it.'
     );
+  }
+  if (cliCommand !== undefined) {
+    return [
+      `"${cap.name}" is available NOW, as \`${cliCommand}\` — it always was, and it stays. ` +
+        `Run \`${cliCommand} --help\` to see what it does.`,
+      '',
+      'Nothing is pending and nothing changed: these are commands, not a tool list, so use ' +
+        'them in THIS reply rather than stopping to announce them.',
+      '',
+      cap.guidance,
+    ].join('\n');
   }
   return [
     `"${cap.name}" is on, and takes effect on your NEXT reply: ${present.join(', ')}.`,

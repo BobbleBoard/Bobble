@@ -8,7 +8,13 @@
  * always yields the same tools — the property a scored free-text query lacked.
  */
 import { describe, expect, it } from 'vitest';
-import { CAPABILITIES, capabilityActivated, capabilityMenu, findCapability } from './capabilities';
+import {
+  CAPABILITIES,
+  type Capability,
+  capabilityActivated,
+  capabilityMenu,
+  findCapability,
+} from './capabilities';
 
 describe('asking for a capability by name', () => {
   it('finds one however the model spells it', () => {
@@ -106,5 +112,52 @@ describe('what the model is told', () => {
     const text = capabilityActivated(cap, [only]);
     expect(text).toContain(only);
     for (const missing of cap.tools.slice(1)) expect(text).not.toContain(missing);
+  });
+});
+
+/*
+ * IN CLI MODE THERE IS NOTHING TO WAIT FOR.
+ *
+ * the user: "tool being appended mid conversation is fine, but not during cli mode,
+ * because during cli mode a tool happening mid conversation is just a little
+ * tidbit at the end of the message." The advertised set stays `['bash']` and
+ * every tool is already a command on PATH, so the schemas wording — "not
+ * callable in this reply" — is false there, and costs a turn: the model stops
+ * and announces what it is about to do instead of doing it.
+ */
+describe('capabilityActivated in CLI mode', () => {
+  const cap = CAPABILITIES.find((c) => c.name === 'browser') as Capability;
+  const available = [...cap.tools];
+
+  it('says the commands are usable NOW', () => {
+    const text = capabilityActivated(cap, available, 'browser');
+    expect(text).toContain('available NOW');
+    expect(text).toContain('`browser --help`');
+    expect(text).toContain('in THIS reply');
+  });
+
+  it('never tells the model to wait a turn', () => {
+    const text = capabilityActivated(cap, available, 'browser');
+    expect(text).not.toContain('NEXT reply');
+    expect(text).not.toContain('NOT callable');
+  });
+
+  /* The schemas wording is unchanged — there the wait is real, because
+   * activation genuinely changes the advertised tool array. */
+  it('keeps the schemas wording when there is no command', () => {
+    const text = capabilityActivated(cap, available);
+    expect(text).toContain('NEXT reply');
+    expect(text).toContain('NOT callable');
+  });
+
+  it('still refuses to pretend about a capability this build does not have', () => {
+    for (const cli of ['browser', undefined]) {
+      expect(capabilityActivated(cap, [], cli)).toContain('not available in this build');
+    }
+  });
+
+  it('carries the guidance either way', () => {
+    expect(capabilityActivated(cap, available, 'browser')).toContain(cap.guidance);
+    expect(capabilityActivated(cap, available)).toContain(cap.guidance);
   });
 });

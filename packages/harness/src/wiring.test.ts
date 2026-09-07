@@ -945,3 +945,80 @@ describe('unfinished-plan steer', () => {
     expect(rig.sentUserMessages[0]).toContain('Pick the option');
   });
 });
+
+/**
+ * THE CLI IS A MODE, AND ITS ADVERTISED SET NEVER MOVES.
+ *
+ * the user: "tool being appended mid conversation is fine, but not during cli mode,
+ * because during cli mode a tool happening mid conversation is just a little
+ * tidbit at the end of the message saying 'user activated <tools>, these are now
+ * able to be used via bash'."
+ *
+ * The reason this matters is measured, not aesthetic: chat templates render
+ * tools at the START of the prompt, so any change to the advertised array
+ * re-reads the whole conversation. In schemas mode that is the bounded price of
+ * a tool the model genuinely could not call. In CLI mode it buys NOTHING — every
+ * tool is already a command on PATH (`cliVisibleTools` reads `getAllTools`, not
+ * the active set) — so it is a full re-prefill for no capability at all.
+ */
+describe('CLI mode keeps one advertised tool', () => {
+  const OLD = process.env.PI_DESKTOP_TOOL_CLI;
+  afterEach(() => {
+    if (OLD === undefined) delete process.env.PI_DESKTOP_TOOL_CLI;
+    else process.env.PI_DESKTOP_TOOL_CLI = OLD;
+  });
+
+  const activate = async (rig: ReturnType<typeof makeRig>, name: string) => {
+    const tool = rig.registeredTools.get('capability');
+    expect(tool, 'capability was never registered').toBeDefined();
+    // biome-ignore lint/suspicious/noExplicitAny: the rig's tool stub is untyped.
+    return (await (tool as any).execute('c1', { name }, undefined, undefined, rig.ctx)) as {
+      content: { text: string }[];
+    };
+  };
+
+  it('does not grow the tool set when a capability is turned on', async () => {
+    process.env.PI_DESKTOP_TOOL_CLI = '1';
+    const rig = makeRig();
+    await startSession(rig);
+    await startTurn(rig);
+    expect(rig.activeTools()).toEqual(['bash']);
+    await activate(rig, 'web-research');
+    expect(rig.activeTools()).toEqual(['bash']);
+  });
+
+  /* ...and says so honestly: nothing is pending, so do not spend a turn
+   * announcing it. The schemas wording would cost exactly one reply. */
+  it('tells the model the commands are usable in THIS reply', async () => {
+    process.env.PI_DESKTOP_TOOL_CLI = '1';
+    const rig = makeRig();
+    await startSession(rig);
+    await startTurn(rig);
+    const res = await activate(rig, 'web-research');
+    const text = res.content.map((c) => c.text).join('');
+    expect(text).toContain('available NOW');
+    expect(text).not.toContain('NEXT reply');
+  });
+
+  /*
+   * The other half of the contract: in SCHEMAS mode the set is the class preset,
+   * not one pinned tool, and activation reaches the real path — the capability's
+   * tools are advertised afterwards whether they were already there or not.
+   * Append-only, so whatever came before keeps its position and the prefix up to
+   * any addition is still a prefix.
+   */
+  it('advertises the preset, and the capability, in schemas mode', async () => {
+    process.env.PI_DESKTOP_TOOL_CLI = '0';
+    const rig = makeRig();
+    await startSession(rig);
+    await startTurn(rig);
+    const before = rig.activeTools();
+    expect(before).not.toEqual(['bash']);
+    await activate(rig, 'web-research');
+    const after = rig.activeTools();
+    expect(after).toContain('web_search');
+    expect(after).toContain('web_fetch');
+    expect(after.length).toBeGreaterThanOrEqual(before.length);
+    expect(after.slice(0, before.length)).toEqual(before);
+  });
+});

@@ -1698,11 +1698,12 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
      * Costs one re-prefill per activation. Bounded and rare; not free, and not
      * where this ends.
      */
-    onActivate: (added) => {
-      const next = Array.from(new Set([...runtime.activeTools, ...added]));
-      runtime.activeTools = next;
-      pi.setActiveTools(next);
-    },
+    /* Through the one helper, so the CLI-mode rule is stated once — see
+     * `activateCapability` for why activation is a no-op there. */
+    onActivate: (added) => activateCapability(added),
+    /* Present ONLY in CLI mode, which is what tells the tool to describe itself
+     * (and its result) as lookup rather than activation. */
+    ...(toolCliMode ? { cliCommandFor: commandNameFor } : {}),
   });
   registerUseTool(pi, {
     registry: toolRegistry,
@@ -1786,7 +1787,30 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
    * type). The graded nudge the user asked for rides along on top, for the case where
    * the tool IS present and the model is merely wavering.
    */
+  /**
+   * Turn tools on for real — or, in CLI mode, do nothing, on purpose.
+   *
+   * IN CLI MODE THERE IS NOTHING TO ACTIVATE. The advertised set is `['bash']`
+   * and every tool is already a command on PATH (`cliVisibleTools` reads
+   * `pi.getAllTools()`, not the active set), so "activating" one grants exactly
+   * nothing the model could not already run. What it DOES do is replace the
+   * advertised set mid-conversation — and chat templates render tools at the
+   * START of the prompt, so that is a full KV re-prefill bought for no
+   * capability at all. It would also make the mode a lie: the whole argument for
+   * the CLI is that the advertised surface is one tool and stays one tool.
+   *
+   * the user, on exactly this: "tool being appended mid conversation is fine, but
+   * not during cli mode, because during cli mode a tool happening mid
+   * conversation is just a little tidbit at the end of the message saying 'user
+   * activated <tools>, these are now able to be used via bash'." That tidbit is
+   * `connectorActivationLine` on the app side; it costs the tokens of one
+   * sentence at the END of the prompt instead of the whole conversation.
+   *
+   * In SCHEMAS mode the activation is real and still costs one re-prefill,
+   * which is the bounded price of a tool the model genuinely could not call.
+   */
   const activateCapability = (added: readonly string[]): void => {
+    if (toolCliMode) return;
     const next = Array.from(new Set([...runtime.activeTools, ...added]));
     if (next.length === runtime.activeTools.length) return;
     runtime.activeTools = next;
