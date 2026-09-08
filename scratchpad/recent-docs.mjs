@@ -1,0 +1,10 @@
+import { call, done, sleep } from './mac-drive.mjs';
+import { execFile } from 'node:child_process';
+const osa = (s) => new Promise((r) => execFile('osascript', ['-e', s], () => r()));
+await osa('tell application "TextEdit" to launch');
+await sleep(1800);
+const w = await call('windows', { app: 'TextEdit' });
+const items = (await call('menus', { pid: w.pid, path: 'File > Open Recent', levels: 1 })).items ?? [];
+console.log(JSON.stringify(items.map((i) => i.title), null, 0));
+done();
+process.exit(0);

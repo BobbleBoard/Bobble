@@ -244,7 +244,7 @@ describe('each capability carries its own guidance (the user)', () => {
   });
 
   it('names the document-command exception and how to run one', () => {
-    expect(CAPABILITY_PROMPT).toContain('document commands (Save, Bold, Close)');
+    expect(CAPABILITY_PROMPT).toContain('Save, Bold, Close');
     expect(CAPABILITY_PROMPT).toContain('activate:true');
     expect(CAPABILITY_PROMPT).toContain('handed straight back');
   });

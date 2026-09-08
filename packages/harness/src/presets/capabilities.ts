@@ -92,9 +92,9 @@ export const CAPABILITIES: readonly Capability[] = [
       'exposes nothing to Accessibility returns a screenshot automatically; act by x,y then. A ' +
       'save sheet or file picker is part of the app that opened it — same snapshot, same clicks. ' +
       'A third of what an app can do is in its menu bar, which is in no window: mac_click takes ' +
-      'menu:"File > New". It all runs in the background — the app never comes to the front. The ' +
-      'one exception is a document command (Save, Bold, Close), which macOS runs only for the ' +
-      'frontmost app: pass activate:true and the focus is borrowed and handed straight back.',
+      'menu:"File > New". It runs in the background — the app never comes to the front. Document ' +
+      'commands (Save, Bold, Close) are the exception: macOS runs those only for the frontmost ' +
+      'app, so pass activate:true to borrow the focus for one command.',
     tools: [...MAC_COMPUTER_USE_TOOL_NAMES],
   },
   {

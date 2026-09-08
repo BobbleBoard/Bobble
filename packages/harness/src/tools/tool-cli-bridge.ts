@@ -30,9 +30,9 @@ import {
   type CliGroupSpec,
   type CliModel,
   type CliTool,
-  commandNameFor,
   resolveCli,
 } from './tool-cli.js';
+import { toolCliShimCommands } from './tool-cli-groups.js';
 
 export const TOOL_CLI_SOCK_ENV = 'PI_TOOLCLI_SOCK';
 export const TOOL_CLI_TOKEN_ENV = 'PI_TOOLCLI_TOKEN';
@@ -184,7 +184,7 @@ export function registerToolCli(host: ToolCliHost, opts: ToolCliOptions = {}): T
    * registered tools answers "no such command" from its own shim instead of
    * being absent — the same information, one process later.
    */
-  const commands = ['tools', ...host.groups().map((g) => commandNameFor(g.name))];
+  const commands = toolCliShimCommands(host.groups());
 
   /*
    * SIGNPOSTS WHERE THE MODEL ACTUALLY GOES WRONG.
