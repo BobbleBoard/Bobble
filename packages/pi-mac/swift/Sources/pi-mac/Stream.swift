@@ -261,14 +261,22 @@ final class WindowStreamer: NSObject, SCStreamOutput, SCStreamDelegate, @uncheck
     lastEmit = Date()
     seq += 1
     let rect = shape?.rect ?? .zero
-    let mainSize = NSScreen.main?.frame.size ?? CGSize(width: 0, height: 0)
+    // The DISPLAY the window is on, in the same top-left global space as `rect`,
+    // so the monitor can place the window on a stage the size of the real
+    // screen — including on a second display, where "main" would be the wrong
+    // one and the window would land off the stage.
+    var stage = CGRect(origin: .zero, size: NSScreen.screens.first?.frame.size ?? .zero)
+    for id in activeDisplayIDs() where CGDisplayBounds(id).intersects(rect) {
+      stage = CGDisplayBounds(id)
+      break
+    }
     deliver(
       header: [
         "seq": seq, "t": nowMs(),
         "w": cg.width, "h": cg.height,
         "scale": Double(scaleFor(rect: rect)),
         "rect": rectDict(rect),
-        "display": ["w": mainSize.width, "h": mainSize.height],
+        "display": rectDict(stage),
         "windows": windows.map(windowDict),
       ], payload: jpeg)
   }

@@ -57,7 +57,9 @@ header := {
   w, h,                         // pixel size of the JPEG
   scale,                        // backing scale (2 on retina)
   rect: {x,y,w,h},              // union rect in screen POINTS — real size for the canvas
-  display: {w,h},               // main display size in points
+  display: {x,y,w,h},           // the DISPLAY the window is on, same global
+                                //   top-left space as rect — the monitor's
+                                //   "stage" (second monitors included)
   windows: [{ windowId, title, frame, sheet, modal }],
 }
 stdin: {"cmd":"fps","value":8} | {"cmd":"quit"}
@@ -100,6 +102,24 @@ tab is hidden (unsubscribe) — never queue.
 Check `pd-file://` (or whatever scheme media uses) actually serves the
 wallpaper path; wallpapers live under /System/Library/Desktop Pictures or the
 user's Photos library, so the scheme's allowlist probably needs the path.
+
+### Refinements since the first draft (all live in the helper now)
+
+* JPEG has no alpha, so the composite arrives with black where the window is
+  not. Do NOT paint the raw frame edge-to-edge: clip to the union of the
+  windows' own rounded rects (`header.windows[].frame`, radius ~10pt, mapped
+  into canvas space) and drop a soft shadow, so the wallpaper shows through the
+  corners and around a dialog. That is also what makes it read as a real window
+  on a real desktop.
+* A frame can carry `error: "screen-recording-denied" | "no-shareable-window"`
+  with a 0-byte payload. Render the denied case as a real, actionable state
+  (System Settings > Privacy & Security > Screen Recording) — it is the single
+  most likely reason a user sees nothing.
+* New serve methods worth using: `windows`, `wallpaper`, `menus`, `menuClick`,
+  `recordStart`/`recordStop`.
+* `bounds` now returns the UNION of every surface (so the overlay covers
+  dialogs) plus `active`/`dialog`; acts return `opened`/`closed`/`dialog` when
+  the act put a dialog up.
 
 ## Lane B — Node tool layer (packages/mac-computer-use) + prompt
 
