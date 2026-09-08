@@ -63,7 +63,9 @@ describe('dispatchToolCli', () => {
   it('runs the tool a command line names', async () => {
     const calls: { name: string; args: Record<string, unknown> }[] = [];
     const r = await dispatchToolCli(host(calls), ['media', 'generate', 'image', 'a red fox']);
-    expect(r).toEqual({ text: 'generate_image ran', isError: false });
+    // The tool's own name comes back as the COMMAND that reaches it — see the
+    // retargeting note on dispatchToolCli.
+    expect(r).toEqual({ text: '`media generate image` ran', isError: false });
     expect(calls).toEqual([{ name: 'generate_image', args: { prompt: 'a red fox' } }]);
   });
 
@@ -316,7 +318,7 @@ describe('the CLI never advertises what it cannot run', () => {
 
     // The runnable one works…
     expect(await dispatchToolCli(partial, ['media', 'generate', 'image', 'x'])).toEqual({
-      text: 'generate_image ran',
+      text: '`media generate image` ran',
       isError: false,
     });
 
@@ -329,5 +331,60 @@ describe('the CLI never advertises what it cannot run', () => {
     expect(attempted.text).toContain('no such command');
     // It never reached execution, so it never produced "not registered".
     expect(calls).toEqual(['generate_image']);
+  });
+});
+
+describe('a result speaks commands, because that is all the model can run', () => {
+  /*
+   * MEASURED, the Calculator run. `mac launch` returned a perfect indexed
+   * snapshot and the sentence "All mac_* actions now target it automatically" —
+   * a name that is not on the PATH in this mode. The 4B had the app open, the
+   * controls listed and no runnable next step, so it went and edited a
+   * preferences file instead. The prompt had been taught to speak commands; the
+   * results had not, and there are 48 of these names in the mac tools alone.
+   */
+  const macTools = [
+    { name: 'mac_launch', description: 'Open an app.', parameters: { type: 'object' } },
+    { name: 'mac_click', description: 'Click by index.', parameters: { type: 'object' } },
+    { name: 'mac_snapshot', description: 'Look at an app.', parameters: { type: 'object' } },
+    { name: 'read', description: 'Read a file.', parameters: { type: 'object' } },
+  ] as unknown as ToolCliHost extends { tools: () => infer T } ? T : never;
+  const macGroups = [
+    { name: 'mac', summary: 'Computer use.', tools: ['mac_launch', 'mac_click', 'mac_snapshot'] },
+    { name: 'file', summary: 'Files.', tools: ['read'] },
+  ];
+  const hostWith = (text: string): ToolCliHost => ({
+    tools: () => macTools,
+    groups: () => macGroups,
+    call: async () => ({ text, isError: false }),
+  });
+
+  it('renames a tool a result names', async () => {
+    const r = await dispatchToolCli(
+      hostWith('Launched Calculator. All mac_click actions now target it.'),
+      ['mac', 'launch', '--app', 'Calculator'],
+    );
+    expect(r.text).toContain('`mac click`');
+    expect(r.text).not.toMatch(/\bmac_click\b/);
+  });
+
+  it('renames in an error too — a dead end is where it matters most', async () => {
+    const boom: ToolCliHost = {
+      tools: () => macTools,
+      groups: () => macGroups,
+      call: async () => {
+        throw new Error('no snapshot yet — call mac_snapshot first');
+      },
+    };
+    const r = await dispatchToolCli(boom, ['mac', 'click', '--index', '3']);
+    expect(r.isError).toBe(true);
+    expect(r.text).not.toMatch(/\bmac_snapshot\b/);
+  });
+
+  it('leaves a FILE alone — a result that is content is not prose', async () => {
+    // Rewriting a token inside someone's source file is corruption, not help.
+    const body = 'function demo() { /* see mac_click */ }';
+    const r = await dispatchToolCli(hostWith(body), ['file', 'read', '--path', 'a.ts']);
+    expect(r.text).toBe(body);
   });
 });

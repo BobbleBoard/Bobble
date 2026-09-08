@@ -32,6 +32,7 @@ import {
   type CliTool,
   resolveCli,
 } from './tool-cli.js';
+import { retargetToolNames } from '../prompt/capability-prompt.js';
 import { toolCliShimCommands } from './tool-cli-groups.js';
 
 export const TOOL_CLI_SOCK_ENV = 'PI_TOOLCLI_SOCK';
@@ -122,22 +123,62 @@ export function buildOpenWrapper(): string {
   return [
     '#!/bin/sh',
     "# open — wrapped while Bobble's tool commands are on PATH.",
+    /*
+     * TRANSLATE IT, DO NOT ARGUE WITH IT.
+     *
+     * `open -a Foo` is the right intent said with the wrong verb: the model
+     * wants the app open and under its control, and the only thing wrong with
+     * `open -a` is that it throws the app in the user's face. `mac launch` does
+     * exactly what was meant. So run it.
+     *
+     * This started as a refusal with a signpost, and MEASURED twice, the
+     * signpost was not taken. A 4B asked to use Calculator ran `open -a
+     * Calculator`, was told to run `mac launch --app "Calculator"`, ran
+     * `open -a "Calculator"` instead — it read the failure as a quoting problem —
+     * and then answered the arithmetic out of its own head, never touching the
+     * app. Translating removes the decision: the command works, the app opens in
+     * the background, and its window comes back to act on.
+     *
+     * The app name is the argument AFTER the flag, so it is captured as the loop
+     * walks; `--application=Foo` and `-aFoo` count too, since a model that wrote
+     * either would otherwise be redirected to nothing. A bundle id (`-b`) is not
+     * a name, and neither is a bare `-a` with nothing after it, so those still
+     * refuse — with the app named when we know it.
+     */
+    'app=""',
+    'prev=""',
+    'flagged=""',
+    'bundle=""',
     'for arg in "$@"; do',
+    '  case "$prev" in',
+    '    -a|--application) app="$arg" ;;',
+    '    -b) bundle="$arg" ;;',
+    '  esac',
     '  case "$arg" in',
     '    -g|--background) exec /usr/bin/open "$@" ;;',
-    '    -a|--application|-b)',
-    // Single-quoted, and no angle brackets: an unquoted `<name>` in a shell
-    // script is a redirect, not a placeholder, and the message died on it.
-    "      echo 'open with that flag brings the app to the FRONT and takes the screen away from the user.' >&2",
-    '      echo \'Use: mac launch --app "TextEdit" — it opens the app in the BACKGROUND and hands you back its window to act on.\' >&2',
-    '      exit 127',
-    '      ;;',
+    '    --application=*) app="${arg#--application=}"; flagged=1 ;;',
+    '    -a?*) app="${arg#-a}"; flagged=1 ;;',
+    '    -a|--application) flagged=1 ;;',
+    '    -b) flagged=1 ;;',
     '  esac',
+    '  prev="$arg"',
     'done',
-    'exec /usr/bin/open "$@"',
+    '[ -n "$flagged" ] || exec /usr/bin/open "$@"',
+    // The translation. `mac` is on the same PATH this wrapper is on, so a plain
+    // name resolves; guarded anyway, because a wrapper that exec's something
+    // missing is a worse failure than the refusal it replaced.
+    'if [ -n "$app" ] && command -v mac >/dev/null 2>&1; then',
+    '  echo "open -a would take the screen; opening \\"$app\\" in the background instead (mac launch)." >&2',
+    '  exec mac launch --app "$app"',
+    'fi',
+    "    echo 'open with that flag brings the app to the FRONT and takes the screen away from the user.' >&2",
+    '[ -n "$app" ] || app="${bundle:-the app}"',
+    '    echo "Use: mac launch --app \\"$app\\" — it opens $app in the BACKGROUND and hands you back its window to act on. Then mac snapshot --app \\"$app\\" to see its controls. Running open -a again, quoted differently, will not work." >&2',
+    'exit 127',
     '',
   ].join('\n');
 }
+
 
 /**
  * How long a command may take before the shim gives up.
@@ -328,18 +369,64 @@ export function registerToolCli(host: ToolCliHost, opts: ToolCliOptions = {}): T
  * be reachable without restarting the shell, and a tool that went away should
  * stop being listed rather than answering "unknown".
  */
+/**
+ * Tools whose result is CONTENT, not guidance.
+ *
+ * Everything else a tool says is authored prose written for schemas mode, and
+ * retargeting it is the point (below). These return a file, a directory or a
+ * command's output verbatim, and rewriting a token inside someone's file would
+ * be corruption — a source file that happens to mention `mac_click` must reach
+ * the model exactly as it is on disk.
+ */
+const VERBATIM_RESULT_TOOLS = new Set(['read', 'ls', 'bash', 'python_run', 'web_fetch']);
+
+/**
+ * Route one request.
+ *
+ * The CLI is rebuilt from the registry per request rather than captured at
+ * install time: an extension that registers a tool later in the session should
+ * be reachable without restarting the shell, and a tool that went away should
+ * stop being listed rather than answering "unknown".
+ *
+ * RESULTS SPEAK COMMANDS TOO.
+ *
+ * The system prompt was taught to name commands instead of tools; tool RESULTS
+ * were not, and they are full of authored guidance written for schemas mode.
+ * MEASURED, the Calculator run: `mac launch` came back with a perfect indexed
+ * snapshot and the sentence "All mac_* actions now target it automatically" —
+ * naming a thing that is not on the PATH. The model had the app open, the
+ * controls listed, and no runnable next step, so it went off to edit a
+ * preferences file instead. A snapshot the model cannot act on is not a
+ * snapshot.
+ *
+ * One rewrite here covers every tool, which is the only way this stays true: 48
+ * of these names are spread across the mac tools alone, and the next tool to be
+ * written will have its own.
+ */
 export async function dispatchToolCli(
   host: ToolCliHost,
   argv: readonly string[],
 ): Promise<{ text: string; isError: boolean }> {
   const cli: CliModel = buildCli(host.groups(), host.tools());
   const res = resolveCli(cli, argv);
-  if (res.kind === 'text') return { text: res.text, isError: false };
-  if (res.kind === 'error') return { text: res.text, isError: true };
+  const speakCommands = (text: string, tool?: string): string => {
+    if (tool !== undefined && VERBATIM_RESULT_TOOLS.has(tool)) return text;
+    const commandFor = new Map<string, string>();
+    for (const g of cli.groups) {
+      for (const c of g.commands) commandFor.set(c.tool.name, [g.name, ...c.path].join(' '));
+    }
+    return retargetToolNames(text, commandFor);
+  };
+  if (res.kind === 'text') return { text: speakCommands(res.text), isError: false };
+  if (res.kind === 'error') return { text: speakCommands(res.text), isError: true };
   try {
-    return await host.call(res.tool, res.args);
+    const r = await host.call(res.tool, res.args);
+    return { ...r, text: speakCommands(r.text, res.tool) };
   } catch (e) {
-    return { text: `${res.tool}: ${e instanceof Error ? e.message : String(e)}`, isError: true };
+    return {
+      text: speakCommands(`${res.tool}: ${e instanceof Error ? e.message : String(e)}`, res.tool),
+      isError: true,
+    };
   }
 }
 

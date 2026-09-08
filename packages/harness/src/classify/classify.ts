@@ -27,6 +27,7 @@ export type TaskCategory =
   | 'browser-use'
   | 'file-ops'
   | 'coding'
+  | 'computer-use'
   | 'motion-graphics'
   | 'advanced-video'
   | 'video-edit'
@@ -43,6 +44,7 @@ export type TaskClass = TaskTier | TaskCategory;
 export const TASK_TIERS: readonly TaskTier[] = ['simple-QA', 'basic-tools'];
 export const TASK_CATEGORIES: readonly TaskCategory[] = [
   'browser-use',
+  'computer-use',
   'file-ops',
   'coding',
   'motion-graphics',
@@ -160,6 +162,50 @@ interface CategoryRule {
 
 // Category ordering also breaks score ties (earlier wins).
 const CATEGORY_RULES: readonly CategoryRule[] = [
+  /*
+   * COMPUTER USE — driving one of the user's OWN Mac apps.
+   *
+   * This class did not exist, and its absence was the single most expensive hole
+   * in the harness. With no class there is no preset, so the mac tools could only
+   * be reached through `capability` — and a capability activated mid-turn never
+   * lands, because pi's executor resolves a call against the tool array
+   * snapshotted when the run began. MEASURED across four tasks and both tool
+   * interfaces: the model asked for the capability, was told "on … mac_launch,
+   * mac_snapshot, mac_click", and then 34 provider requests carried the same 14
+   * tools with no mac tool among them. It ended up shelling out to `open -a`,
+   * writing a `reminders.json`, and telling the user to press the buttons
+   * themselves.
+   *
+   * FIRST, because ties go to the earlier rule and every pattern here needs a
+   * signal that the work is in a native app — a named Mac application, "the X
+   * app", the menu bar. A page on the web trips none of them, so browser-use
+   * keeps everything it had.
+   */
+  {
+    category: 'computer-use',
+    patterns: [
+      [/\bcomputer[- ]use\b/, 2],
+      [/\bmenu ?bar\b/, 2],
+      // "the Calculator app", "in the Finder app", "using the Preview app".
+      [/\b(the|that|this) [\w.]+ app\b/, 2],
+      // Apps that ship on every Mac, plus the ones people ask for by name. A
+      // bare "notes"/"mail"/"reminders" is deliberately absent — that is the
+      // connector's data, not the app's window (see the connectors rule).
+      [
+        /\b(textedit|finder|preview|calculator|stickies|keynote|numbers app|pages app|system settings|system preferences|activity monitor|font book|disk utility|photo ?booth|quicktime|xcode|photoshop|illustrator|affinity|logic pro|garageband|final cut)\b/,
+        2,
+      ],
+      // "open Safari and …" — a named browser of THEIRS is computer use; the
+      // built-in browser is what an unqualified web request means.
+      [/\b(safari|arc|firefox|brave)\b/, 2],
+      [/\b(open|launch|switch to|bring up) (the )?[\w.]+ (app|application)\b/, 2],
+      [/\bnative (app|application)\b/, 2],
+      [/\bin (that|the) (app|window|dialog)\b/, 2],
+      [/\bon (my|the) (mac|desktop|screen)\b/, 1],
+      [/\bkeyboard shortcut\b/, 1],
+      [/\bdouble[- ]click\b/, 1],
+    ],
+  },
   {
     category: 'browser-use',
     patterns: [

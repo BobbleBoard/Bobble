@@ -61,7 +61,7 @@ import {
   registerPermissions,
 } from './permissions/modes.js';
 import { capabilityForTool } from './presets/capabilities.js';
-import { resolvePresetTools } from './presets/presets.js';
+import { PRESET_TOOLS, resolvePresetTools } from './presets/presets.js';
 import { augmentSystemPrompt } from './prompt/capability-prompt.js';
 import { sameWording } from './prompt/same-wording.js';
 import { shortDescription } from './prompt/short-description.js';
@@ -2034,6 +2034,31 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     if (next.length === runtime.activeTools.length) return;
     runtime.activeTools = next;
     pi.setActiveTools(next);
+    /*
+     * DID IT LAND? Ask, rather than assume.
+     *
+     * `setActiveToolsByName` looks each name up in the session's registry and
+     * SILENTLY IGNORES the ones it does not find, so a capability can report
+     * itself on, this function can run to completion, and the advertised set can
+     * be exactly what it was. MEASURED, and this is the bug it was added to
+     * catch: 34 provider requests after `capability computer-use` came back "on
+     * … mac_launch, mac_snapshot, mac_click", every request carried the same 14
+     * tools and not one mac tool among them.
+     */
+    const landed = pi.getActiveTools();
+    const missing = added.filter((t) => !landed.includes(t));
+    const dbgPath = process.env.PI_ADV_DEBUG_TOOLS;
+    if (dbgPath !== undefined && dbgPath.length > 0) {
+      try {
+        appendFileSync(
+          dbgPath,
+          `activateCapability: asked(${added.length})=${added.join(',')} ` +
+            `landed(${landed.length}) missing(${missing.length})=${missing.join(',')}\n`,
+        );
+      } catch {
+        /* a diagnostic must never break a turn */
+      }
+    }
   };
   /* One-shot guard for the tool-cost diagnostic below: it is the same on every
    * request of a run, and a per-request dump would bury the file. */
@@ -2945,6 +2970,38 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
      * and a role that needs something else can still reach for `tool_search`.
      */
     applyPreset(cls, ctx);
+    /*
+     * COMPUTER USE IS THE ONE THING THE CONSTANT CLASS CANNOT COVER.
+     *
+     * Everything above argues for a class that never varies with the wording of
+     * a message, and it is right: the tool schemas sit in the prompt prefix, so
+     * a set that moves per message is a prefix that is never reused.
+     *
+     * But the mac tools had NO route at all. There is no class for them, and the
+     * `capability` door cannot open mid-turn — pi resolves a tool call against
+     * the array snapshotted when the run began, so a group activated during a
+     * task lands only after the task is over. MEASURED, four tasks, both
+     * interfaces: the model asked for the capability, was told "on … mac_launch,
+     * mac_snapshot, mac_click", and then every one of 34 provider requests
+     * carried the same 14 tools with no mac tool among them. It shelled out to
+     * `open -a`, wrote a `reminders.json`, and finally told the user to press the
+     * buttons themselves.
+     *
+     * So: one cheap deterministic heuristic, HERE — before the run starts, which
+     * is the last moment the tool array can still change for this turn — and only
+     * when the user has actually asked for one of their own apps. No model call,
+     * no latency. It fires once per session: the tools are appended and stay, so
+     * the churn is a single re-prefill on the turn that needed them, which is the
+     * bounded price this file already accepts for a real capability. A session
+     * that never mentions an app never pays it.
+     */
+    if (!runtime.activeTools.includes('mac_snapshot')) {
+      const prompt = String(runtime.lastPrompt ?? '');
+      if (prompt !== '' && classify({ prompt }).class === 'computer-use') {
+        const names = pi.getAllTools().map((t) => t.name);
+        activateCapability(PRESET_TOOLS['computer-use'].filter((t) => names.includes(t)));
+      }
+    }
     pi.appendEntry(HARNESS_CLASSIFY_ENTRY, { class: cls, turnIndex: runtime.turnIndex });
     // Replace the turn's system prompt with the capability-affirming version.
     return { systemPrompt: augmentedSystemPrompt };

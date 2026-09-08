@@ -225,6 +225,20 @@ const VIDEO_EDIT = ['video_edit', 'extract_frames', 'probe'] as const;
 // On-device perception: Falcon-Perception (MLX) + ffmpeg-sampled video locate.
 const PERCEPTION = ['image_segment', 'image_detect', 'video_locate', 'image_ocr'] as const;
 
+/** Driving the user's own Mac apps, plus their own Chrome (see the class note). */
+const MAC_COMPUTER_USE = [
+  'mac_launch',
+  'mac_snapshot',
+  'mac_click',
+  'mac_type',
+  'mac_key',
+  'mac_scroll',
+  'chrome_snapshot',
+  'chrome_click',
+  'chrome_type',
+  'chrome_go',
+] as const;
+
 /**
  * Desired preset tool lists per class. `tool_search` is appended by
  * {@link resolvePresetTools} and omitted here to keep the intent readable.
@@ -241,6 +255,19 @@ export const PRESET_TOOLS: Record<TaskClass, readonly string[]> = {
   // attractive nuisance that a small model grabbed ("Read a file") instead of
   // browsing. Page reading is browser_read; page perception is browser_snapshot.
   'browser-use': [...BROWSER, 'web_fetch'],
+  /*
+   * The whole mac suite, in hand on the FIRST turn.
+   *
+   * Not a subset: `mac_launch` without `mac_snapshot` opens an app the model
+   * cannot see, and a snapshot without `mac_click` is a list it cannot act on.
+   * The capability route cannot supply the rest mid-turn (see the classify.ts
+   * note), so a partial preset is the same dead end with extra steps.
+   *
+   * Chrome rides along because `chrome_snapshot` reads the real DOM of the
+   * user's own browser, and the prompt tells the model to prefer it over pixels
+   * whenever the work is in their Chrome — advice it could not follow.
+   */
+  'computer-use': [...MAC_COMPUTER_USE],
   'motion-graphics': [...MOTION_GEN, ...IMAGE_GEN],
   // advanced-video = GENERATION (text→video). Preset unchanged by the video split.
   'advanced-video': [...VIDEO_GEN, ...IMAGE_GEN],

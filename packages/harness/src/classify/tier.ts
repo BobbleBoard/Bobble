@@ -67,6 +67,8 @@ export function coarseTier(cls: TaskClass): CoarseTier {
       return 'balanced';
     case 'coding':
     case 'browser-use':
+    // Same shape as browser-use: look, act, look again, and check what changed.
+    case 'computer-use':
     case '3d':
     case 'motion-graphics':
     case 'advanced-video':
@@ -144,6 +146,9 @@ export function effortForClass(cls: TaskClass): EffortLevel {
     case 'audio':
     case 'video-edit':
     case 'browser-use':
+    // An errand in an app, not a project — but a chain, and a chain that has to
+    // check what each step actually did.
+    case 'computer-use':
       return 'high';
     // The multi-part builds: a project, not an errand. These are the ones that
     // want the whole apparatus — the team, and the verification that comes with

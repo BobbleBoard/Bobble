@@ -332,6 +332,13 @@ export function registerMacComputerUseTools(
       windowId: snap.windowId,
       visualOnly: isAxOpaque(snap),
       dialogKey: dialogSignature(dialog),
+      // Kept so a later coordinate click can be told when it hit nothing.
+      elements: snap.elements.map((e) => ({
+        index: e.index,
+        name: e.name,
+        role: e.role,
+        ...(e.bbox !== undefined ? { bbox: e.bbox } : {}),
+      })),
     });
     /* A FILTERED OR PAGED LOOK ADDS; A PLAIN ONE REPLACES.
      *
@@ -679,8 +686,11 @@ export function registerMacComputerUseTools(
           );
           await sleep(SETTLE_MS);
           session.noteAct(`clicked at (${params.x}, ${params.y})`);
+          // A point that hit nothing must not read like a point that worked.
+          const miss = session.missAt(params.x, params.y);
           return textResult(
             `Clicked at (${params.x}, ${params.y}).${backgroundNote(ack)}` +
+              (miss === null ? '' : `\n\n${miss}`) +
               describeOpened(ack.dialog, ack.opened),
             {
               action: 'click',
@@ -1078,8 +1088,15 @@ export function registerMacComputerUseTools(
           {
             type: 'text',
             text:
-              `Launched ${ack.app ?? params.app} ${where}. ${control} All mac_* actions now ` +
-              `target it automatically. ${shotNote}\n\n${snapText}`,
+              /*
+               * `mac_*` is a GLOB, so nothing that renames tool names for CLI
+               * mode can match it — the sentence shipped intact into a mode
+               * where those names do not exist. Name the real tools instead,
+               * and they get renamed with everything else.
+               */
+              `Launched ${ack.app ?? params.app} ${where}. ${control} ` +
+              `mac_snapshot, mac_click, mac_type and mac_key all target it now — ` +
+              `you do not have to name it again. ${shotNote}\n\n${snapText}`,
           },
         ];
         if (hasImage && shot !== undefined) {

@@ -121,3 +121,52 @@ describe('the dialog that was open at the last look', () => {
     expect(s.controlled()?.dialogKey).toBe('');
   });
 });
+
+describe('a coordinate that hit nothing', () => {
+  /*
+   * A coordinate click answered "Clicked at (380, 450)." whatever happened, so a
+   * click on empty window read exactly like a click that worked. MEASURED: a 4B
+   * holding a snapshot of Calculator's 25 named buttons clicked (380,450),
+   * (430,450) and (300,450) — none of them a button — and was told each time
+   * that it had clicked. Nothing in the loop could tell it otherwise.
+   */
+  const BUTTONS = [
+    { index: 5, name: '7', role: 'AXButton', bbox: { x: 340, y: 658, w: 48, h: 48 } },
+    { index: 6, name: '8', role: 'AXButton', bbox: { x: 394, y: 658, w: 48, h: 48 } },
+    { index: 20, name: 'Equals', role: 'AXButton', bbox: { x: 502, y: 820, w: 48, h: 48 } },
+  ];
+  const withButtons = () => {
+    const s = createMacSessionState();
+    s.noteSnapshot({ app: 'Calculator', pid: 1, elements: BUTTONS });
+    return s;
+  };
+
+  it('says nothing when the point is inside a control', () => {
+    expect(withButtons().missAt(340, 658)).toBeNull();
+    // and anywhere within its box, not just the centre
+    expect(withButtons().missAt(360, 675)).toBeNull();
+  });
+
+  it('names the nearest controls when the point is on empty window', () => {
+    const note = withButtons().missAt(380, 450);
+    expect(note).toContain('NOTHING IS AT (380, 450)');
+    expect(note).toContain('[5] "7"');
+    expect(note).toContain('mac_snapshot');
+  });
+
+  it('stays quiet for an app that exposes nothing — coordinates are all it has', () => {
+    const s = createMacSessionState();
+    s.noteSnapshot({ app: 'SomeGame', pid: 2, visualOnly: true, elements: [] });
+    expect(s.missAt(10, 10)).toBeNull();
+  });
+
+  it('stays quiet before anything has been looked at', () => {
+    expect(createMacSessionState().missAt(10, 10)).toBeNull();
+  });
+
+  it('keeps the controls across a look that does not re-list them', () => {
+    const s = withButtons();
+    s.noteSnapshot({ app: 'Calculator', pid: 1 });
+    expect(s.missAt(380, 450)).toContain('NOTHING IS AT');
+  });
+});

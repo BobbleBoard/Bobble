@@ -266,3 +266,52 @@ describe('audio requests reach the audio class', () => {
     expect(classify({ prompt: 'Does this code sound correct to you?' }).class).not.toBe('audio');
   });
 });
+
+describe('driving one of the user’s own Mac apps', () => {
+  /*
+   * There was no class for this at all, which meant no preset, which meant the
+   * mac tools could only arrive through `capability` — and a capability
+   * activated mid-turn never lands, because pi resolves a tool call against the
+   * array snapshotted when the run began. Every one of these prompts was
+   * MEASURED classifying as `other`, front-loading nothing, and ending with the
+   * model shelling out to `open -a` or telling the user to click it themselves.
+   */
+  const APP_TASKS = [
+    'Use the Calculator app to work out 37 x 24 — I want the answer showing on the Calculator itself.',
+    'Open TextEdit and type a shopping list into it',
+    'use the Finder app to make a folder on my desktop',
+    'take a look at what is in Preview right now',
+    'open System Settings and turn on dark mode',
+    'in that app, click the Export button',
+    'use the menu bar to save it as a PDF',
+  ];
+
+  it('classifies every one of them as computer-use', () => {
+    for (const p of APP_TASKS) {
+      expect(classify({ prompt: p }).class, p).toBe('computer-use');
+    }
+  });
+
+  it('does not steal work that belongs on the web', () => {
+    for (const p of [
+      'scrape the pricing table off https://example.com',
+      'navigate to the docs and fill out the form',
+      'search the web for the tallest building',
+    ]) {
+      expect(classify({ prompt: p }).class, p).not.toBe('computer-use');
+    }
+  });
+
+  it('leaves the connectors their data, which is not the same as their window', () => {
+    // "What's on my calendar" is the connector; "open the Calendar app" is not.
+    for (const p of ["what's on my calendar today", 'remind me to call the dentist', 'any new email?']) {
+      expect(classify({ prompt: p }).class, p).toBe('connectors');
+    }
+  });
+
+  it('sends the user’s OWN browser to computer use, not the built-in one', () => {
+    // The prompt tells the model to drive their Chrome through chrome_snapshot
+    // and their Safari through computer use; it could not, with neither in hand.
+    expect(classify({ prompt: 'open Safari and go to my bank' }).class).toBe('computer-use');
+  });
+});

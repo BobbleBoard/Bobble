@@ -36,6 +36,8 @@ export interface ControlledApp {
    * it cannot do, and the turn dead-ends.
    */
   readonly visualOnly?: boolean;
+  /** Controls from the last snapshot of THIS app, for the coordinate check. */
+  readonly elements?: readonly SnapElementLike[];
   /**
    * The modal surface that was up at the last look, as a comparable signature
    * ('' for none).
@@ -68,6 +70,17 @@ export interface ControlledSnapshotNote {
   readonly visualOnly?: boolean;
   /** Signature of the modal surface this snapshot saw ('' / absent = none). */
   readonly dialogKey?: string;
+  /** The indexed controls this snapshot listed, kept so a blind coordinate can
+   * be checked against them (see `missAt`). */
+  readonly elements?: readonly SnapElementLike[];
+}
+
+/** The part of a snapshot element a coordinate check needs. */
+export interface SnapElementLike {
+  readonly index: number;
+  readonly name: string;
+  readonly role: string;
+  readonly bbox?: { readonly x: number; readonly y: number; readonly w: number; readonly h: number };
 }
 
 export interface MacSessionState {
@@ -86,6 +99,37 @@ export interface MacSessionState {
   targetParams(): Record<string, unknown>;
   /** One human/model-readable line naming the controlled target ('' if none). */
   describe(): string;
+  /**
+   * What a click at this point ACTUALLY hit, when the answer is "nothing".
+   *
+   * A coordinate click used to answer "Clicked at (380, 450)." whatever happened
+   * — indistinguishable from a click that worked. MEASURED: a 4B handed a
+   * snapshot of Calculator's 25 named buttons clicked (380,450), (430,450),
+   * (300,450) — none of which is a button — and was told each time that it had
+   * clicked. It never learned it was pressing empty window.
+   *
+   * Returns null when the point is inside a known control (or when there is
+   * nothing to check against), and otherwise a line naming the nearest few by
+   * index. The click still happens: a coordinate is the only way to drive an app
+   * that exposes nothing, and correcting the point would break sheets that sit
+   * outside their parent's frame.
+   */
+  missAt(x: number, y: number): string | null;
+}
+
+/** Centre-distance ordering, so "nearest" means what it looks like on screen. */
+function distance(el: SnapElementLike, x: number, y: number): number {
+  const b = el.bbox;
+  if (b === undefined) return Number.POSITIVE_INFINITY;
+  return Math.hypot(b.x - x, b.y - y);
+}
+
+function contains(el: SnapElementLike, x: number, y: number): boolean {
+  const b = el.bbox;
+  if (b === undefined) return false;
+  return (
+    x >= b.x - b.w / 2 && x <= b.x + b.w / 2 && y >= b.y - b.h / 2 && y <= b.y + b.h / 2
+  );
 }
 
 /** Build a fresh session state (one per extension instance / pi session). */
@@ -110,6 +154,7 @@ export function createMacSessionState(): MacSessionState {
          * as important as "a dialog appeared", or a dismissed sheet would keep
          * blocking retries forever. */
         dialogKey: snap.dialogKey ?? '',
+        elements: snap.elements ?? (snap.pid === current?.pid ? current?.elements : undefined),
         /* A LOOK IS NOT AN ACT. Snapshotting must not erase what the model
          * actually did, or the header would say "your last act: looked at it"
          * on the very turn the model needs to remember it pressed Save. Control
@@ -129,6 +174,24 @@ export function createMacSessionState(): MacSessionState {
 
     targetParams(): Record<string, unknown> {
       return current === null ? {} : { pid: current.pid };
+    },
+
+    missAt(x: number, y: number): string | null {
+      const els = current?.elements ?? [];
+      // Nothing to check against, or an app that genuinely has no controls —
+      // coordinates are the right and only way to drive that, so say nothing.
+      if (current === null || current.visualOnly === true || els.length === 0) return null;
+      if (els.some((e) => contains(e, x, y))) return null;
+      const near = [...els]
+        .sort((a, b) => distance(a, x, y) - distance(b, x, y))
+        .slice(0, 3)
+        .map((e) => `[${e.index}] ${e.name !== '' ? `"${e.name}"` : e.role}`)
+        .join(' · ');
+      return (
+        `NOTHING IS AT (${x}, ${y}) — the click landed on empty window. ` +
+        `"${current.app}" lists its controls, so click them by [index] instead of guessing a ` +
+        `point. Nearest to where you aimed: ${near}. mac_snapshot lists them all.`
+      );
     },
 
     describe(): string {

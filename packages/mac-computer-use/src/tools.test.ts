@@ -279,6 +279,24 @@ describe('registerMacComputerUseTools', () => {
     expect(launches[1]).toMatchObject({ method: 'launch', params: { background: false } });
   });
 
+  it('names real tools, never a glob — a glob cannot be renamed for CLI mode', async () => {
+    /*
+     * The launch result said "All mac_* actions now target it automatically".
+     * `mac_*` matches no tool, so the rename that teaches results to speak
+     * commands could not touch it, and it shipped into a mode where none of
+     * those names exist. MEASURED: a 4B launched Calculator, read a perfect
+     * indexed snapshot, and then went off to edit a preferences file — it had
+     * been handed a list and no runnable verb.
+     */
+    const bridge = new FakeBridge().on('launch', () => ({ ok: true, app: 'Calculator' }));
+    const tools = collectTools(bridge);
+    const r = await run(tools, 'mac_launch', { app: 'Calculator' });
+    const text = r.content.map((c) => ('text' in c ? c.text : '')).join('\n');
+    expect(text).not.toContain('mac_*');
+    expect(text).toContain('mac_snapshot');
+    expect(text).toContain('mac_click');
+  });
+
   it('key forwards the combo', async () => {
     const bridge = new FakeBridge().on('key', () => ({ ok: true }));
     const tools = collectTools(bridge);
