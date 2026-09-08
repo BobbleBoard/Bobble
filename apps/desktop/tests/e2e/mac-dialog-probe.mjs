@@ -29,9 +29,15 @@ const check = (ok, what, detail = '') => {
 };
 const osa = (script) => run('osascript', ['-e', script]).catch(() => undefined);
 
-/** A clean TextEdit: no leftover documents, no leftover panels. */
+/** A clean TextEdit: no leftover documents, no leftover panels.
+ *
+ * A save sheet BLOCKS AppleScript quit, so a previous run that left one up
+ * would otherwise poison every run after it — and the failures land on
+ * assertions that have nothing to do with the cause. Escape first. */
+await osa('tell application "TextEdit" to close every document without saving');
+await sleep(400);
 await osa('tell application "TextEdit" to quit saving no');
-await sleep(1200);
+await sleep(1400);
 
 const app = await electron.launch({
   executablePath: path.join(bundle, 'Contents/MacOS/Bobble'),

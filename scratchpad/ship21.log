@@ -1,16 +1,20 @@
+
+> pi-desktop-monorepo@0.0.0 ship:local
+> bash scripts/ship-local.sh
+
 • turbo 2.10.4
 
    • Packages in scope: @pi-desktop/desktop
    • Running build in 1 packages
    • Remote caching disabled
 
-@pi-desktop/desktop:build: cache miss, executing 2e28fe874c21d8cf
+@pi-desktop/desktop:build: cache miss, executing edfcc78e87df2513
 @pi-desktop/desktop:build: $ vite build
 @pi-desktop/desktop:build: vite v8.1.3 building client environment for production...
 @pi-desktop/desktop:build: [plugin rolldown:vite-resolve] Module "node:os" has been externalized for browser compatibility, imported by "/Users/user/Desktop/OSS-harness/apps/desktop/electron/workspace/project-dir.ts". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
 @pi-desktop/desktop:build: [plugin rolldown:vite-resolve] Module "node:fs" has been externalized for browser compatibility, imported by "/Users/user/Desktop/OSS-harness/apps/desktop/electron/workspace/project-dir.ts". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
 @pi-desktop/desktop:build: [plugin rolldown:vite-resolve] Module "node:path" has been externalized for browser compatibility, imported by "/Users/user/Desktop/OSS-harness/apps/desktop/electron/workspace/project-dir.ts". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
-@pi-desktop/desktop:build: [2K@pi-desktop/desktop:build: transforming...✓ 1168 modules transformed.
+@pi-desktop/desktop:build: [2K@pi-desktop/desktop:build: transforming...✓ 1176 modules transformed.
 @pi-desktop/desktop:build: rendering chunks...
 @pi-desktop/desktop:build: computing gzip size...
 @pi-desktop/desktop:build: dist/index.html                                                         1.57 kB │ gzip:   0.58 kB
@@ -107,30 +111,30 @@
 @pi-desktop/desktop:build: dist/assets/schedule-C7oASyPw.css                                      16.30 kB │ gzip:   3.09 kB
 @pi-desktop/desktop:build: dist/assets/src-BI-ZUyP-.css                                           28.48 kB │ gzip:   7.92 kB
 @pi-desktop/desktop:build: dist/assets/TripoWorkspace-Dsc8gury.css                                78.29 kB │ gzip:  12.13 kB
-@pi-desktop/desktop:build: dist/assets/index-CXs8CcJK.css                                        372.38 kB │ gzip:  57.00 kB
+@pi-desktop/desktop:build: dist/assets/index-Biet5Xsg.css                                        372.07 kB │ gzip:  56.80 kB
 @pi-desktop/desktop:build: dist/assets/jsx-runtime-CX7af9U8.js                                     0.42 kB │ gzip:   0.29 kB
 @pi-desktop/desktop:build: dist/assets/react-C_qm9Zyk.js                                           0.64 kB │ gzip:   0.39 kB
 @pi-desktop/desktop:build: dist/assets/preload-helper-DYl5dUZ5.js                                  1.27 kB │ gzip:   0.70 kB
 @pi-desktop/desktop:build: dist/assets/react-dom-CjRP6ryj.js                                       3.53 kB │ gzip:   1.33 kB
-@pi-desktop/desktop:build: dist/assets/preset-motions-C87DlH94.js                                  5.24 kB │ gzip:   1.95 kB
-@pi-desktop/desktop:build: dist/assets/VideoStudio-CscSE40Y.js                                     7.15 kB │ gzip:   2.51 kB
-@pi-desktop/desktop:build: dist/assets/TopBar-DEKb_J23.js                                          8.44 kB │ gzip:   4.05 kB
+@pi-desktop/desktop:build: dist/assets/preset-motions-ZD7FMOOo.js                                  5.24 kB │ gzip:   1.94 kB
+@pi-desktop/desktop:build: dist/assets/VideoStudio-CN8uhvH3.js                                     7.15 kB │ gzip:   2.51 kB
+@pi-desktop/desktop:build: dist/assets/TopBar-s6GyVIDf.js                                          8.44 kB │ gzip:   4.05 kB
 @pi-desktop/desktop:build: dist/assets/react-D2mDMWBM.js                                           8.73 kB │ gzip:   3.41 kB
-@pi-desktop/desktop:build: dist/assets/ImageStudio-AOsnFDgW.js                                    10.23 kB │ gzip:   3.48 kB
-@pi-desktop/desktop:build: dist/assets/AudioStudio-D4RgSGyL.js                                    10.44 kB │ gzip:   3.61 kB
-@pi-desktop/desktop:build: dist/assets/model-surface-DB8cpvdd.js                                  10.62 kB │ gzip:   4.27 kB
-@pi-desktop/desktop:build: dist/assets/STLLoader-Dj2G4yMu.js                                      13.49 kB │ gzip:   4.58 kB
-@pi-desktop/desktop:build: dist/assets/use-studio-DnQUY8xV.js                                     15.88 kB │ gzip:   5.40 kB
-@pi-desktop/desktop:build: dist/assets/viewer-io-1lClL4-w.js                                      24.15 kB │ gzip:   8.21 kB
+@pi-desktop/desktop:build: dist/assets/ImageStudio-BmFq2ZIT.js                                    10.23 kB │ gzip:   3.48 kB
+@pi-desktop/desktop:build: dist/assets/AudioStudio-BWmBXIJD.js                                    10.44 kB │ gzip:   3.61 kB
+@pi-desktop/desktop:build: dist/assets/model-surface-Ly4PcQOt.js                                  10.62 kB │ gzip:   4.27 kB
+@pi-desktop/desktop:build: dist/assets/STLLoader-GVp1T1H3.js                                      13.49 kB │ gzip:   4.58 kB
+@pi-desktop/desktop:build: dist/assets/use-studio-D4V_JSsi.js                                     15.88 kB │ gzip:   5.40 kB
+@pi-desktop/desktop:build: dist/assets/viewer-io-CNMQx831.js                                      24.15 kB │ gzip:   8.21 kB
 @pi-desktop/desktop:build: dist/assets/purify.es-yeT1JqXB.js                                      26.12 kB │ gzip:  10.27 kB
-@pi-desktop/desktop:build: dist/assets/schedule-Bz7lwluG.js                                       59.85 kB │ gzip:  16.38 kB
-@pi-desktop/desktop:build: dist/assets/connectors-Dj0HP9uN.js                                     74.83 kB │ gzip:  17.92 kB
-@pi-desktop/desktop:build: dist/assets/TripoWorkspace-B3xmx0MJ.js                                161.47 kB │ gzip:  65.63 kB
+@pi-desktop/desktop:build: dist/assets/schedule-fxYuaZGi.js                                       59.85 kB │ gzip:  16.38 kB
+@pi-desktop/desktop:build: dist/assets/connectors-DEshQQaY.js                                     74.83 kB │ gzip:  17.92 kB
+@pi-desktop/desktop:build: dist/assets/TripoWorkspace-CFfa3uJP.js                                161.47 kB │ gzip:  65.63 kB
 @pi-desktop/desktop:build: dist/assets/doc-surface-CFF6rLtU.js                                   505.49 kB │ gzip: 128.86 kB
-@pi-desktop/desktop:build: dist/assets/pi-slice-CGDYGnvq.js                                      646.04 kB │ gzip: 223.68 kB
+@pi-desktop/desktop:build: dist/assets/pi-slice-DAWEf_kT.js                                      658.75 kB │ gzip: 228.54 kB
 @pi-desktop/desktop:build: dist/assets/src-K5zICa2T.js                                           664.08 kB │ gzip: 195.03 kB
-@pi-desktop/desktop:build: dist/assets/Viewer3D-CIk79WIe.js                                      844.96 kB │ gzip: 338.73 kB
-@pi-desktop/desktop:build: dist/assets/index-D6FhoO5K.js                                       2,130.33 kB │ gzip: 608.11 kB
+@pi-desktop/desktop:build: dist/assets/Viewer3D-DeyAXAyr.js                                      844.96 kB │ gzip: 338.74 kB
+@pi-desktop/desktop:build: dist/assets/index-63mGFPEA.js                                       2,119.97 kB │ gzip: 606.00 kB
 @pi-desktop/desktop:build: 
 @pi-desktop/desktop:build: [31m[INVALID_ANNOTATION] [0mA comment "/*#__PURE__*/" in "../../node_modules/.pnpm/@lexical+react@0.46.0_react-dom@19.2.7_react@19.2.7__react@19.2.7_typescript@6.0.3_yjs@13.6.31/node_modules/@lexical/react/dist/LexicalErrorBoundary.prod.mjs" contains an annotation that Rolldown cannot interpret due to the position of the comment.
 @pi-desktop/desktop:build:  - comment ignored due to position in ../../node_modules/.pnpm/@lexical+react@0.46.0_react-dom@19.2.7_react@19.2.7__react@19.2.7_typescript@6.0.3_yjs@13.6.31/node_modules/@lexical/react/dist/LexicalErrorBoundary.prod.mjs at 581..594
@@ -151,19 +155,19 @@
 @pi-desktop/desktop:build: 
 @pi-desktop/desktop:build: [33m[INEFFECTIVE_DYNAMIC_IMPORT] [0msrc/chat/auto-router.ts is dynamically imported by src/App.tsx but also statically imported by src/chat/AutoDownloadPrompt.tsx, src/chat/ChatApp.tsx, src/chat/TierPickerMenu.tsx, src/state/pi-connect.ts, dynamic import will not move module into another chunk.
 @pi-desktop/desktop:build: 
-@pi-desktop/desktop:build: ✓ built in 464ms
+@pi-desktop/desktop:build: ✓ built in 504ms
 @pi-desktop/desktop:build: vite v8.1.3 building client environment for production...
-@pi-desktop/desktop:build: [2K@pi-desktop/desktop:build: transforming...✓ 736 modules transformed.
+@pi-desktop/desktop:build: [2K@pi-desktop/desktop:build: transforming...✓ 743 modules transformed.
 @pi-desktop/desktop:build: rendering chunks...
 @pi-desktop/desktop:build: computing gzip size...
-@pi-desktop/desktop:build: dist-electron/main.js  1,233.30 kB │ gzip: 404.88 kB
+@pi-desktop/desktop:build: dist-electron/main.js  1,249.83 kB │ gzip: 410.91 kB
 @pi-desktop/desktop:build: 
-@pi-desktop/desktop:build: ✓ built in 152ms
+@pi-desktop/desktop:build: ✓ built in 148ms
 @pi-desktop/desktop:build: vite v8.1.3 building client environment for production...
-@pi-desktop/desktop:build: [2K@pi-desktop/desktop:build: transforming...✓ 24 modules transformed.
+@pi-desktop/desktop:build: [2K@pi-desktop/desktop:build: transforming...✓ 26 modules transformed.
 @pi-desktop/desktop:build: rendering chunks...
 @pi-desktop/desktop:build: computing gzip size...
-@pi-desktop/desktop:build: dist-electron/preload.js  4.51 kB │ gzip: 1.94 kB
+@pi-desktop/desktop:build: dist-electron/preload.js  4.57 kB │ gzip: 1.97 kB
 @pi-desktop/desktop:build: 
 @pi-desktop/desktop:build: ✓ built in 5ms
 @pi-desktop/desktop:build: vite v8.1.3 building client environment for production...
@@ -176,7 +180,7 @@
 
  Tasks:    1 successful, 1 total
 Cached:    0 cached, 1 total
-  Time:    987ms 
+  Time:    1.038s 
 
 $ swift build -c release --package-path swift
 Building for production...
@@ -186,18 +190,22 @@ Building for production...
 /Users/user/Desktop/OSS-harness/packages/afm/swift/Package.swift: pi-afm-product: ld: warning: search path '/Library/Developer/CommandLineTools/Developer/usr/lib' not found
 /Users/user/Desktop/OSS-harness/packages/afm/swift/Package.swift: pi-afm-product: ld: warning: search path '/Library/Developer/CommandLineTools/Developer/Library/Frameworks' not found
 [5 / 6] pi-afm-product
-[8 / 8] pi-afm-product
-Build complete! (1.53 sec)
+Build complete! (1.15 sec)
 $ swift build -c release --package-path swift
 Building for production...
-Build complete! (0.16 sec)
+[2 / 3] pi-mac-product
+[3 / 4] pi-mac-product
+/Users/user/Desktop/OSS-harness/packages/pi-mac/swift/Package.swift: pi-mac-product: ld: warning: search path '/Library/Developer/CommandLineTools/Developer/usr/lib' not found
+/Users/user/Desktop/OSS-harness/packages/pi-mac/swift/Package.swift: pi-mac-product: ld: warning: search path '/Library/Developer/CommandLineTools/Developer/Library/Frameworks' not found
+[6 / 8] pi-mac-product
+Build complete! (4.18 sec)
   • electron-builder  version=26.15.3 os=27.0.0
   • loaded configuration  file=/Users/user/Desktop/OSS-harness/apps/desktop/electron-builder.yml
   • author is missed in the package.json  appPackageFile=/Users/user/Desktop/OSS-harness/apps/desktop/package.json
   • @electron/rebuild already used by electron-builder, please consider to remove excess dependency from devDependencies
 
 To ensure your native dependencies are always matched electron version, simply add script `"postinstall": "electron-builder install-app-deps" to your `package.json`
-  • packageManager not detected by file, falling back to environment detection  resolvedPackageManager=pnpm detected=/Users/user/Desktop/OSS-harness/apps/desktop
+  • packageManager not detected by file, falling back to environment detection  resolvedPackageManager=pnpm detected=/Users/user/Desktop/OSS-harness
   • detected workspace root for project using packageManager field  pm=pnpm config=pnpm@11.10.0 resolved=/Users/user/Desktop/OSS-harness projectDir=/Users/user/Desktop/OSS-harness/apps/desktop
   • executing @electron/rebuild  electronVersion=43.1.0 arch=arm64 buildFromSource=false workspaceRoot=/Users/user/Desktop/OSS-harness projectDir=./ appDir=./
   • installing native dependencies  arch=arm64
@@ -216,12 +224,14 @@ ship-local: signed pi-afm helper
 apps/desktop/release/mac-arm64/Bobble.app/Contents/Resources/app.asar.unpacked/node_modules/@pi-desktop/pi-mac/swift/.build/release/pi-mac: replacing existing signature
 ship-local: signed pi-mac helper
 apps/desktop/release/mac-arm64/Bobble.app: replacing existing signature
+ship-local: designated => identifier "app.pidesktop.desktop" and certificate leaf = H"95359dbd58454c741691c74478c5f1c4fa084e2a"
 packaged-probe OK — /Applications/Bobble.app boots (bobble/dark, boot event received)
 (a) OK — bundled pi loaded all 3 extensions from the asar (exit 0, 2 RPC ok, clean stderr)
-(b) OK — pi spawned from the bundle (pid 36779, source: 'bundled'); get-models returned 2 model(s)
+(b) OK — pi spawned from the bundle (pid 99316, source: 'bundled'); get-models returned 2 model(s)
 (c) OK — pd-preview harness resolves in the bundle and serves over pd-preview://
 
 packaged-smoke OK (deterministic) — 3 extensions load, pi spawns from bundle, pd-preview serves.
 (model streaming not requested: set SMOKE_MODEL=1)
-ship-local: reaped orphaned llama-server(s) left by the smoke test: 36905 
+ship-local: reaped orphaned llama-server(s) left by the smoke test: 99416 
 ship-local: installed 0.1.0 → /Applications/Bobble.app
+EXIT=0
