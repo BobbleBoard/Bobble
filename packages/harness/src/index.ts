@@ -2534,8 +2534,21 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
       'ffmpeg, sox, say, festival, imaging libraries and the like are not how this',
       'works. Do not check whether anything exists first; just run the command.',
       '',
-      'If you are unsure of a command’s arguments, run `<command> --help`, then run',
-      'the real command. Reading the help is not finishing the task.',
+      /*
+       * FIRST USE, NOT ONLY WHEN UNSURE. the user: "add to the system prompt a
+       * suggested --help before using any initially."
+       *
+       * "If you are unsure" leaves the model to judge its own certainty, and a
+       * model that has never seen a command is rarely uncertain about it — it
+       * guesses a plausible shape. MEASURED, watching one meet `mac`: three
+       * invented argument forms in a row (`--app "TextEdit"`, positional,
+       * `--key app="TextEdit"`), each one read as a syntax error, before it got
+       * anywhere near the help it needed. One `--help` first would have cost a
+       * line and saved the turn.
+       */
+      'The FIRST time you use a command in a session, run `<command> --help` before',
+      'the real call — you have its name and one line, not its arguments. After that',
+      'you know it; just run it. Reading the help is not finishing the task.',
       '',
       /*
        * MEASURED: asked for a picture, the model called `ask_user` about STYLE

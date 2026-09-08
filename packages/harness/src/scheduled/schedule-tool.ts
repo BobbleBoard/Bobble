@@ -21,6 +21,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { ExtensionAPI } from '@mariozechner/pi-coding-agent';
+import { describeScheduleWords, nameFrom } from '@pi-desktop/shared';
 import { type Static, Type } from '@sinclair/typebox';
 
 export const CREATE_SCHEDULED_TASK_TOOL_NAME = 'create_scheduled_task';
@@ -124,8 +125,9 @@ export function registerScheduledTaskTool(pi: ExtensionAPI): void {
 
       const task = {
         id: `task_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
-        name:
-          name.length > 0 ? name : (prompt.split(/[.,\n]/)[0]?.slice(0, 40) ?? 'Scheduled task'),
+        // The same namer as the app's own screen, so a task the model leaves
+        // unnamed is called what the person would have called it.
+        name: name.length > 0 ? name : nameFrom(prompt),
         prompt,
         frequency: params.frequency,
         hour: params.hour ?? 9,
@@ -161,12 +163,11 @@ export function registerScheduledTaskTool(pi: ExtensionAPI): void {
       /* Say what was actually recorded, including the defaults that were filled
          in — the user is about to be told, and a summary that omits "at 9am"
          invites them to discover it at 9am. */
+      const words = describeScheduleWords(task);
       const when =
         task.frequency === 'manual'
-          ? 'only when they run it'
-          : task.frequency === 'hourly'
-            ? `every hour at :${String(task.minute).padStart(2, '0')}`
-            : `${task.frequency === 'weekdays' ? 'weekdays' : task.frequency === 'weekly' ? `every week (day ${task.weekday})` : 'every day'} at ${String(task.hour).padStart(2, '0')}:${String(task.minute).padStart(2, '0')}`;
+          ? 'only when the user runs it by hand'
+          : words.charAt(0).toLowerCase() + words.slice(1);
       const off = next.enabled
         ? ''
         : ' NOTE: scheduling is currently switched off in the app, so it will not fire until that is turned back on.';

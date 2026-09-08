@@ -126,12 +126,16 @@ GOOGLE CHROME (the user's own) — read and click the real page, not pixels.
   Chrome setting the user is asked to approve the first time; if that is declined or
   Chrome has not been restarted, fall back to computer use.
 
-MAC COMPUTER USE — see and control any app on the user's Mac.
-  Reach for this when the work is in one of THEIR applications rather than on the web:
-  Notes, Mail, Finder, Photoshop, a game, a preferences pane. Also use it when the user
-  explicitly asks you to work in one of THEIR OWN browsers — Safari, Chrome, Arc — as
-  opposed to the app's built-in one. If an app exposes no Accessibility elements you get
-  a screenshot of its window automatically; read the picture and act by x,y coordinates.
+COMPUTER USE — see and control any app on the user's Mac.
+  "Use <app>", "open <app> and …", "do it in <app>", "click that", "type it in there":
+  all of those mean this. Reach for it whenever the work is in one of THEIR
+  applications rather than on the web — Notes, Mail, Finder, Photoshop, a game, a
+  preferences pane — and when the user explicitly asks you to work in one of THEIR OWN
+  browsers (Safari, Chrome, Arc) rather than the app's built-in one.
+  It works two ways and you do not have to choose: an app that exposes Accessibility
+  elements gives you a list you can click and type into by name, and an app that does
+  not gives you a screenshot of its window and you act by x,y coordinates. Both come
+  back from the same look, so a snapshot is never a dead end.
 
 CALENDAR, MAIL, REMINDERS, CONTACTS & MESSAGES — the user's own macOS data.
   Read and create events, reminders and contacts; read and send Mail and iMessage.
@@ -224,6 +228,51 @@ Rules:
  * drop it. Anchored on stable substrings; a wording change just no-ops (the
  * catalog stays, no crash).
  */
+/**
+ * Cut the parts of pi's base prompt that are about PI, not about Bobble.
+ *
+ * the user: "there's a bunch about pi, about being a coding assistant all that can
+ * go." He is right on both counts and they cost different things.
+ *
+ * The identity line ("You are an expert coding assistant operating inside pi, a
+ * coding agent harness") tells the model it is a coding tool, and it answers
+ * accordingly — a person asking it to tidy their Downloads folder is talking to
+ * something that has been told its job is editing code.
+ *
+ * The "Pi documentation" block is worse value still: eight lines of absolute
+ * paths into the app bundle, describing how to answer questions about pi's own
+ * SDK, extensions, themes and TUI. Nobody using Bobble asks those questions, and
+ * it is paid for in every prefill of every turn.
+ *
+ * Matched on their own opening words rather than by index, so a base that no
+ * longer contains them is returned untouched. Pure.
+ */
+export function stripPiIdentity(base: string): string {
+  let out = base;
+  /* The first paragraph, up to the blank line before "Guidelines:". */
+  out = out.replace(
+    /^You are an expert coding assistant operating inside pi[^\n]*\n(?:[^\n]*\n)*?\n/,
+    `${BOBBLE_IDENTITY}\n\n`,
+  );
+  /* The pi-docs block: its heading through to the last of its bullets. */
+  const docsStart = out.indexOf('Pi documentation (read only when the user asks about pi itself');
+  if (docsStart >= 0) {
+    const rest = out.slice(docsStart);
+    const blank = rest.search(/\n(?!- )(?! {2})\S/);
+    out = blank >= 0 ? out.slice(0, docsStart) + rest.slice(blank + 1) : out.slice(0, docsStart);
+  }
+  return out.replace(/\n{3,}/g, '\n\n').trim();
+}
+
+/**
+ * What replaces it. Says what this thing IS — a local agent on someone's Mac —
+ * without claiming a speciality it does not have.
+ */
+export const BOBBLE_IDENTITY =
+  "You are Bobble, a local agent running on the user's own Mac. You do real work on " +
+  'this machine: their files, their applications, the web, and anything they can reach ' +
+  'from here. Everything runs locally.';
+
 export function stripToolCatalog(base: string): string {
   const start = base.indexOf('Available tools:');
   if (start < 0) return base;
@@ -379,7 +428,7 @@ export function augmentSystemPrompt(
     commandFor?: ReadonlyMap<string, string>;
   } = {},
 ): string {
-  let trimmed = stripToolCatalog((base ?? '').trim());
+  let trimmed = stripPiIdentity(stripToolCatalog((base ?? '').trim()));
   if (opts.toolInterface === 'bash-cli') {
     // STRIP BEFORE RETARGETING. These are matched as literals, and retargeting
     // rewrites them first ("Use `read` …" → "Use `file read` …") so the literal

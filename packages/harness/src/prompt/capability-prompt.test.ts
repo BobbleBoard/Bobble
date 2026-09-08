@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   augmentSystemPrompt,
+  BOBBLE_IDENTITY,
   CAPABILITY_PROMPT,
   CAPABILITY_PROMPT_MARKER,
   MANAGER_PROMPT_MARKER,
@@ -32,7 +33,8 @@ describe('stripToolCatalog', () => {
     expect(out).not.toContain('calendar_list_events');
     expect(out).not.toContain('messages_send');
     expect(out).not.toContain('In addition to the tools above');
-    // The surrounding prose survives.
+    // The surrounding prose survives — this function only cuts the catalog;
+    // the pi identity is a separate cut (see strip-pi.test.ts).
     expect(out).toContain('You are an expert coding assistant');
     expect(out).toContain('Guidelines:');
     expect(out).toContain('Be concise');
@@ -55,7 +57,9 @@ describe('augmentSystemPrompt', () => {
     const out = augmentSystemPrompt(PI_BASE);
     expect(out).not.toContain('calendar_list_events'); // catalog gone
     expect(out).not.toContain('Available tools:');
-    expect(out).toContain('You are an expert coding assistant'); // base prose kept
+    // …and the pi identity is replaced on the way through (strip-pi.test.ts).
+    expect(out).toContain(BOBBLE_IDENTITY);
+    expect(out).toContain('Guidelines:'); // base prose kept
     expect(out).toContain(CAPABILITY_PROMPT_MARKER); // capability section added
   });
 
@@ -178,7 +182,7 @@ describe('each capability carries its own guidance (the user)', () => {
   });
 
   it('sends computer use at the user’s OWN browsers, and only those', () => {
-    expect(CAPABILITY_PROMPT).toContain('THEIR OWN browsers');
+    expect(CAPABILITY_PROMPT).toContain('THEIR OWN\n  browsers');
     expect(CAPABILITY_PROMPT).toContain('Safari, Chrome, Arc');
   });
 

@@ -80,7 +80,7 @@ describe('create_scheduled_task', () => {
   it('states the time it defaulted to, so nobody discovers it at 9am', async () => {
     const tool = register();
     const res = await tool.execute('c1', { name: 'X', prompt: 'do a thing', frequency: 'daily' });
-    expect(res.content[0]?.text).toContain('09:00');
+    expect(res.content[0]?.text).toContain('every day at 9:00 AM');
   });
 
   it('refuses an empty prompt instead of scheduling nothing', async () => {
