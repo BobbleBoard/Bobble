@@ -94,7 +94,9 @@ export const CAPABILITIES: readonly Capability[] = [
       'A third of what an app can do is in its menu bar, which is in no window: mac_click takes ' +
       'menu:"File > New". It runs in the background — the app never comes to the front. Document ' +
       'commands (Save, Bold, Close) are the exception: macOS runs those only for the frontmost ' +
-      'app, so pass activate:true to borrow the focus for one command.',
+      'app, so pass activate:true to borrow the focus for one command. Open an app with the ' +
+      'launch here, NEVER with `open -a` in a shell — that yanks it in front of whatever the ' +
+      'user is doing.',
     tools: [...MAC_COMPUTER_USE_TOOL_NAMES],
   },
   {

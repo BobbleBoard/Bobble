@@ -141,7 +141,8 @@ COMPUTER USE — see and control any app on the user's Mac.
   so mac_click also takes a menu path. It runs in the background: the app never comes to
   the front and the user keeps working, watching in the Computer use tab. Document
   commands (Save, Bold, Close) are the exception — macOS runs those only for the frontmost
-  app, so pass activate:true and the focus is borrowed and handed straight back.
+  app, so pass activate:true and the focus is borrowed and handed straight back. Open an app
+  with these tools, never with a shell 'open -a': that yanks it in front of the user.
 
 CALENDAR, MAIL, REMINDERS, CONTACTS & MESSAGES — the user's own macOS data.
   Read and create events, reminders and contacts; read and send Mail and iMessage.

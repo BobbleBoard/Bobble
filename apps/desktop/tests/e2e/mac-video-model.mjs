@@ -12,8 +12,16 @@
  * Recorded from Bobble's own window, which needs no capture grant.
  */
 import { execFile } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
+import { homedir, tmpdir } from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import { _electron as electron } from 'playwright-core';
@@ -45,11 +53,22 @@ await sleep(400);
 await osa('tell application "TextEdit" to quit saving no');
 await sleep(1400);
 
+/*
+ * A throwaway HOME keeps settings and conversations out of the user's, but the
+ * downloaded models live in the real cache — without this the run dies on
+ * "model not downloaded" having proved nothing. Link the cache in; everything
+ * else stays isolated.
+ */
+const HOME = probeHome('mac-video-model');
+mkdirSync(path.join(HOME, '.cache'), { recursive: true });
+const realCache = path.join(homedir(), '.cache/pi-desktop');
+if (existsSync(realCache)) symlinkSync(realCache, path.join(HOME, '.cache/pi-desktop'));
+
 const app = await electron.launch({
   executablePath: path.join(BUNDLE, 'Contents/MacOS/Bobble'),
   env: {
     ...process.env,
-    HOME: probeHome('mac-video-model'),
+    HOME,
     PI_E2E: '1',
     PI_E2E_BACKGROUND: '1',
     PI_MAC_PRECONSENT: '1',
@@ -121,16 +140,39 @@ try {
         streaming: ps.agent.isStreaming,
         tools: ps.messages
           .filter((m) => m.kind === 'assistant')
-          .flatMap((m) => m.blocks.filter((b) => b.type === 'toolCall').map((b) => b.name)),
+          .flatMap((m) =>
+            m.blocks
+              .filter((b) => b.type === 'toolCall')
+              .map((b) => `${b.name} ${JSON.stringify(b.args ?? b.arguments ?? {}).slice(0, 160)}`),
+          ),
         results: ps.messages
           .filter((m) => m.kind === 'toolResult')
-          .map((m) => ({ name: m.toolName, isError: m.isError === true })),
+          .map((m) => ({
+            name: m.toolName,
+            isError: m.isError === true,
+            text: String(m.text ?? '').slice(0, 200),
+          })),
         text: ps.messages
           .filter((m) => m.kind === 'assistant')
           .flatMap((m) => m.blocks.filter((b) => b.type === 'text').map((b) => b.text))
           .join(' '),
       };
     });
+
+  /*
+   * THE FOCUS GUARD. the user's whole rule for this feature is that driving an app
+   * never takes his screen, and the last run broke it — the model shelled out
+   * to `open -a`, which activates. Sample continuously and report every moment
+   * TextEdit was in front, rather than claiming it never was.
+   */
+  const frontSamples = [];
+  const watcher = setInterval(async () => {
+    try {
+      frontSamples.push((await dbg('frontmost')).app);
+    } catch {
+      /* helper busy */
+    }
+  }, 500);
 
   const deadline = Date.now() + DEADLINE_MS;
   let seen = 0;
@@ -144,6 +186,11 @@ try {
     if (!last.streaming && last.tools.length > 0 && last.text.trim().length > 0) break;
     await sleep(700);
   }
+  clearInterval(watcher);
+  const stole = frontSamples.filter((a) => /textedit/i.test(String(a)));
+  say(
+    `focus guard: ${frontSamples.length} samples, TextEdit was frontmost ${stole.length} of them`,
+  );
   say(`tool calls: ${JSON.stringify(last.tools)}`);
   say(`tool results: ${JSON.stringify(last.results)}`);
   say(`model said: ${JSON.stringify(last.text.slice(0, 220))}`);

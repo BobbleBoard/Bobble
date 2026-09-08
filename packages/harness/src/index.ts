@@ -114,7 +114,7 @@ import { registerPresentTool } from './tools/present.js';
 import { presentBridgeFromEnv } from './tools/present-bridge.js';
 import { withRepeatNotice } from './tools/repeat-notice.js';
 import { registerSandboxFileTools, resolveWorkspaceRoot } from './tools/sandbox-fs.js';
-import { buildCli, commandNameFor } from './tools/tool-cli.js';
+import { buildCli, commandNameFor, pathFor } from './tools/tool-cli.js';
 import { registerToolCli } from './tools/tool-cli-bridge.js';
 import { toolCliGroups } from './tools/tool-cli-groups.js';
 import { truncateToolOutput } from './tools/tool-output-truncate.js';
@@ -1880,6 +1880,21 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
   registerUseTool(pi, {
     registry: toolRegistry,
     active: () => runtime.activeTools,
+    /*
+     * A tool `use` cannot reach may still be one command away. In CLI mode
+     * every capability tool IS a command, so the one dead end this fallback
+     * can produce becomes a redirect instead — see the note on the option.
+     */
+    cliCommandForTool: toolCliMode
+      ? (toolName: string): string | null => {
+          for (const spec of toolCliGroups()) {
+            if (!spec.tools.includes(toolName)) continue;
+            const group = commandNameFor(spec.name);
+            return [group, ...pathFor(group, toolName)].join(' ');
+          }
+          return null;
+        }
+      : undefined,
   });
 
   /*

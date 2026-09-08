@@ -34,6 +34,19 @@ export interface UseToolOptions {
   readonly registry: ToolRegistry;
   /** Tools the model already has advertised — it should call those directly. */
   readonly active: () => readonly string[];
+  /**
+   * The command line a tool answers to when the CLI is the interface, or null
+   * when it has none.
+   *
+   * This turns the one dead end this tool can produce into a redirect. MEASURED
+   * on a real run: asked for `mac_snapshot` — which belongs to another
+   * extension and so is genuinely unreachable HERE — the model was told to
+   * "use what you already have", gave up on Mac control entirely, and fell back
+   * to `bash open -a "TextEdit"`, which brings the app to the front and takes
+   * the user's screen. The tool it wanted existed the whole time, as
+   * `mac snapshot`.
+   */
+  readonly cliCommandForTool?: (toolName: string) => string | null;
 }
 
 export function registerUseTool(pi: ExtensionAPI, opts: UseToolOptions): void {
@@ -63,6 +76,22 @@ export function registerUseTool(pi: ExtensionAPI, opts: UseToolOptions): void {
       }
       const target = opts.registry.get(name);
       if (target === undefined) {
+        // It may be unreachable HERE and perfectly reachable as a command.
+        const command = opts.cliCommandForTool?.(name) ?? null;
+        if (command !== null) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text:
+                  `"${name}" is not callable this way, but it is right here as a command: run ` +
+                  `\`${command}\` in bash. \`${command.split(' ')[0]} --help\` lists the rest ` +
+                  'of that group.',
+              },
+            ],
+            details: undefined,
+          };
+        }
         // Say what IS reachable — a bare "unknown tool" invites another guess.
         // And do NOT say "turn on the capability that provides it": that advice
         // cannot work inside this reply (see the header), so a model that follows

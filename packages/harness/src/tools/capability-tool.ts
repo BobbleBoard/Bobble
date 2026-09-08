@@ -93,7 +93,10 @@ export function registerCapabilityTool(pi: ExtensionAPI, opts: CapabilityToolOpt
       if (present.length > 0) opts.onActivate(present);
       return {
         content: [
-          { type: 'text', text: capabilityActivated(cap, available, opts.cliCommandFor?.(cap.name)) },
+          {
+            type: 'text',
+            text: capabilityActivated(cap, available, opts.cliCommandFor?.(cap.name)),
+          },
         ],
         details: undefined,
       };

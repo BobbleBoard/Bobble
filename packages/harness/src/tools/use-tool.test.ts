@@ -109,3 +109,39 @@ describe('dispatching', () => {
     expect(execute).not.toHaveBeenCalled();
   });
 });
+
+describe('a tool `use` cannot reach may be one command away', () => {
+  it('names the command instead of telling the model to give up', async () => {
+    // MEASURED on a real run: told "use what you already have", the model
+    // abandoned Mac control and shelled out to `open -a "TextEdit"`, which
+    // brings the app to the front and takes the user's screen. The tool it
+    // wanted was reachable the whole time, as `mac snapshot`.
+    const { pi } = fakePi();
+    const registry = captureRegisteredTools(pi);
+    registerUseTool(pi as never, {
+      registry,
+      active: () => [],
+      cliCommandForTool: (name) => (name === 'mac_snapshot' ? 'mac snapshot' : null),
+    });
+    const use = registry.get(USE_TOOL_NAME);
+    if (use === undefined) throw new Error('use was not registered');
+    // biome-ignore lint/suspicious/noExplicitAny: minimal execute args for tests.
+    const res: any = await use.execute('id-1', { tool: 'mac_snapshot', args: {} });
+    const text = res.content.map((c: { text?: string }) => c.text ?? '').join('\n');
+    expect(text).toContain('mac snapshot');
+    expect(text).toContain('mac --help');
+    expect(text).not.toContain('Use what you already have');
+  });
+
+  it('still says plainly when there is no command either', async () => {
+    const { pi } = fakePi();
+    const registry = captureRegisteredTools(pi);
+    registerUseTool(pi as never, { registry, active: () => [], cliCommandForTool: () => null });
+    const use = registry.get(USE_TOOL_NAME);
+    if (use === undefined) throw new Error('use was not registered');
+    // biome-ignore lint/suspicious/noExplicitAny: minimal execute args for tests.
+    const res: any = await use.execute('id-1', { tool: 'nonesuch', args: {} });
+    const text = res.content.map((c: { text?: string }) => c.text ?? '').join('\n');
+    expect(text).toContain('cannot be called this way');
+  });
+});
