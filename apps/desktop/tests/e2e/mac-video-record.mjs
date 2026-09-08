@@ -102,7 +102,10 @@ try {
           el.style.cssText = [
             'position:fixed',
             'left:0',
-            'right:0',
+            // Only over the chat column: the monitor's own footer and actions
+            // row live at the bottom of the rail, and a caption strip across
+            // the whole window covered the very controls the video is showing.
+            'right:42%',
             'bottom:0',
             'z-index:2147483647',
             'padding:14px 22px',
@@ -231,9 +234,22 @@ try {
     'Typing the filename into the dialog',
   );
 
-  const saveBtn = inSheet.find((e) => /^save$/i.test(String(e.name)));
+  // Re-look before pressing Save: typing into the filename field re-renders the
+  // sheet, and an index read before that can be stale by the time it is used —
+  // which is exactly what the tool layer tells a model to do, so the proof
+  // should do it too.
+  const fresh = await dbg('snapshot', { pid });
+  const freshSheetId = fresh.dialog?.windowId ?? sheetId;
+  const saveBtn = (fresh.elements ?? []).find(
+    (e) => e.win === freshSheetId && /^save$/i.test(String(e.name)),
+  );
   if (saveBtn === undefined) throw new Error('the save dialog exposed no Save button');
-  const clicked = await dbg('click', { pid, index: saveBtn.index });
+  let clicked = await dbg('click', { pid, index: saveBtn.index });
+  if (clicked.found !== true) {
+    const again = await dbg('snapshot', { pid });
+    const retry = (again.elements ?? []).find((e) => /^save$/i.test(String(e.name)));
+    if (retry !== undefined) clicked = await dbg('click', { pid, index: retry.index });
+  }
   say(
     `clicked the dialog's Save button → ${JSON.stringify({ ok: clicked.found, mode: clicked.mode })}`,
     "Clicking the dialog's own Save button",
