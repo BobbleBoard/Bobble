@@ -20,6 +20,51 @@
  */
 import type { ExtensionContext } from '@mariozechner/pi-coding-agent';
 
+/**
+ * What one app being driven can COST, said on the prompt itself.
+ *
+ * The denylist is all-or-nothing: eleven fragments are refused and everything
+ * else gets unrestricted typing. But "let Bobble use TextEdit" and "let Bobble
+ * use Terminal" are not the same question, and the second one is shell access.
+ * A yes/no with no stakes on it is not consent, so the stakes are on it — the
+ * label, not a tier, because refusing to type into an IDE or a terminal would
+ * break real work daily and the user is the right one to make that call.
+ */
+const RISK_LABELS: readonly (readonly [readonly string[], string])[] = [
+  [
+    ['terminal', 'iterm', 'warp', 'ghostty', 'alacritty', 'kitty', 'tmux', 'hyper'],
+    'Anything typed here runs as a shell command.',
+  ],
+  [
+    ['xcode', 'code', 'cursor', 'zed', 'sublime', 'jetbrains', 'intellij', 'pycharm', 'webstorm'],
+    'It can read or write any file this app can, and run its build and test commands.',
+  ],
+  [['finder', 'com.apple.finder'], 'It can move, rename and delete files.'],
+  [
+    ['mail', 'messages', 'slack', 'discord', 'whatsapp', 'telegram', 'com.apple.mail'],
+    'It can read your conversations here and send messages as you.',
+  ],
+  [
+    ['safari', 'chrome', 'firefox', 'arc', 'brave', 'edge'],
+    'It can act on any site you are signed in to here.',
+  ],
+  [
+    ['1password', 'bitwarden', 'dashlane', 'lastpass', 'keeper'],
+    'It can see whatever this app shows, including credentials.',
+  ],
+];
+
+/** The risk sentence for an app, or null when it is an ordinary one. */
+export function riskLabel(app: string | undefined): string | null {
+  const name = app?.trim().toLowerCase() ?? '';
+  if (name === '') return null;
+  for (const [fragments, label] of RISK_LABELS) {
+    // Whole-word-ish: "code" must not match "Xcode"'s neighbours or "Barcode".
+    if (fragments.some((f) => name === f || name.includes(f))) return label;
+  }
+  return null;
+}
+
 /** Case-insensitive app name / bundle-id fragments Pi refuses to drive. */
 export const DEFAULT_MAC_DENYLIST: readonly string[] = [
   'pi desktop',
@@ -82,37 +127,62 @@ const DEFAULT_MESSAGE =
 
 /** The same question when the app is already known, which is the usual case:
  * naming it is the difference between "control my Mac" and "use TextEdit". */
-function consentCopy(app: string | undefined): { title: string; message: string } {
+export function consentCopy(app: string | undefined): { title: string; message: string } {
   const name = app?.trim() ?? '';
   if (name === '') return { title: DEFAULT_TITLE, message: DEFAULT_MESSAGE };
+  const risk = riskLabel(name);
   return {
     title: `Let Bobble use ${name}?`,
     message:
-      `Bobble will click and type in ${name} for you. It works in the background, so you can ` +
-      'keep using your Mac — and you can watch it in the Computer use tab and stop it at any ' +
-      'time. This lasts until you close Bobble.',
+      `Bobble will click and type in ${name} for you.${risk === null ? '' : ` ${risk}`} It works ` +
+      'in the background, so you can keep using your Mac — and you can watch it in the Computer ' +
+      `use tab and stop it at any time. Asked once per app, until you close Bobble.`,
   };
 }
 
 export interface MacConsentGate {
   /** Gate one mac_* action. `targetApp` (when known) is denylist-checked. */
   ensure(ctx: ExtensionContext, targetApp?: string): Promise<ConsentDecision>;
-  /** Current session-consent state (for status/tests). */
+  /** Whether ANY app has been allowed this session (status/tests). */
   isConsented(): boolean;
+  /** The apps allowed so far, lower-cased — what a "granted" chip would list. */
+  allowedApps(): readonly string[];
 }
 
 /** Build a session consent gate. State (the one-time consent) lives in a closure
  * so each pi session gets a fresh gate. */
 export function createMacConsentGate(opts: MacConsentOptions = {}): MacConsentGate {
   const denylist = opts.denylist ?? DEFAULT_MAC_DENYLIST;
-  let consented = opts.preConsented === true;
+  /*
+   * PER APP, NOT PER SESSION.
+   *
+   * One yes used to allow every app on the Mac for the rest of the session — so
+   * agreeing to "let Bobble use TextEdit" silently agreed to Terminal, Mail and
+   * 1Password too. The question names an app now, so the answer is about that
+   * app: a second app asks again. `anyApp` is the pre-consented / already-said-
+   * yes-to-everything escape, which is what the e2e seam and a future explicit
+   * "allow any app" would set.
+   */
+  const allowed = new Set<string>();
+  let anyApp = opts.preConsented === true;
+
+  const key = (app: string | undefined): string | null => {
+    const name = app?.trim().toLowerCase() ?? '';
+    return name === '' ? null : name;
+  };
 
   return {
-    isConsented: () => consented,
+    isConsented: () => anyApp || allowed.size > 0,
+    allowedApps: () => [...allowed],
     async ensure(ctx: ExtensionContext, targetApp?: string): Promise<ConsentDecision> {
       const denied = checkDenylist(targetApp, denylist);
       if (denied !== null) return { ok: false, reason: denied };
-      if (consented) return { ok: true };
+      const app = key(targetApp);
+      if (anyApp) return { ok: true };
+      if (app !== null && allowed.has(app)) return { ok: true };
+      // An act with no app named at all is covered by any grant already given —
+      // it is aimed at the app already under control, which was asked about.
+      if (app === null && allowed.size > 0) return { ok: true };
       // No human to answer (print mode / subagent) → fail safe, never silently act.
       if (!ctx.hasUI) {
         return {
@@ -130,8 +200,17 @@ export function createMacConsentGate(opts: MacConsentOptions = {}): MacConsentGa
       } catch {
         ok = false;
       }
-      if (!ok) return { ok: false, reason: 'user declined Mac control for this session' };
-      consented = true;
+      if (!ok) {
+        return {
+          ok: false,
+          reason:
+            targetApp === undefined
+              ? 'user declined Mac control for this session'
+              : `user declined Mac control for ${targetApp}`,
+        };
+      }
+      if (app === null) anyApp = true;
+      else allowed.add(app);
       return { ok: true };
     },
   };
