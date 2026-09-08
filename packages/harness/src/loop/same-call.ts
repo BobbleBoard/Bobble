@@ -39,10 +39,21 @@ export function callSignature(tool: string, args: unknown, result: string): stri
 export interface SameCallState {
   signature: string | null;
   count: number;
+  /**
+   * The same TOOL giving the same ANSWER, whatever the arguments were.
+   *
+   * A refusal does not repeat verbatim — the model varies the path, the text,
+   * the flags — so an argument-sensitive signature never fires on it. MEASURED:
+   * nineteen `edit` calls, every one with different arguments, every one
+   * answered "edit is not available in this run", and nothing said a word. The
+   * answer is the part that was not changing.
+   */
+  answer: string | null;
+  answerCount: number;
 }
 
 export function newSameCallState(): SameCallState {
-  return { signature: null, count: 0 };
+  return { signature: null, count: 0, answer: null, answerCount: 0 };
 }
 
 /**
@@ -58,18 +69,37 @@ export function noteRepeatedCall(
   args: unknown,
   result: string,
 ): string | null {
+  const answer = `${tool} ${result.trim()}`;
+  if (answer !== state.answer) {
+    state.answer = answer;
+    state.answerCount = 1;
+  } else {
+    state.answerCount += 1;
+  }
+
   const signature = callSignature(tool, args, result);
   if (signature !== state.signature) {
     state.signature = signature;
     state.count = 1;
-    return null;
+  } else {
+    state.count += 1;
   }
-  state.count += 1;
-  if (state.count !== SAME_CALL_LIMIT) return null;
-  return (
-    `\n\n[You have now made this exact \`${tool}\` call ${SAME_CALL_LIMIT} times and got this ` +
-    'exact answer each time. Repeating it will not change it. If this was the work, it is ' +
-    'done — move to the next step or finish. If it was not, the answer is somewhere else: ' +
-    'a different tool, or a different question.]'
-  );
+
+  if (state.count === SAME_CALL_LIMIT) {
+    return (
+      `\n\n[You have now made this exact \`${tool}\` call ${SAME_CALL_LIMIT} times and got this ` +
+      'exact answer each time. Repeating it will not change it. If this was the work, it is ' +
+      'done — move to the next step or finish. If it was not, the answer is somewhere else: ' +
+      'a different tool, or a different question.]'
+    );
+  }
+  if (state.answerCount === SAME_CALL_LIMIT) {
+    return (
+      `\n\n[\`${tool}\` has now answered this the same way ${SAME_CALL_LIMIT} times running, ` +
+      'with different arguments each time. The arguments are not the problem — this answer is ' +
+      'about the tool, not about what you passed it. Changing them again will not help; use a ' +
+      'different tool, or say what you are missing.]'
+    );
+  }
+  return null;
 }

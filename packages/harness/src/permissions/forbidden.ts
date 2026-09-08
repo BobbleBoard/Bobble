@@ -45,5 +45,16 @@ export function forbiddenReason(toolName: string): string {
   if (toolName === 'messages_send') {
     return 'Sending messages is off for an unattended run. Write the draft into your answer instead — the user will send it themselves.';
   }
-  return `${toolName} is not available in this run.`;
+  /*
+   * A "no" with no "instead" is how a refusal becomes a loop — this module's own
+   * opening argument, and MEASURED against it: nineteen `edit` calls in a row,
+   * every one answered "edit is not available in this run", the model varying
+   * the arguments each time because nothing told it the arguments were not the
+   * problem. Say that they are not.
+   */
+  return (
+    `${toolName} is not available in this run, and no arguments will change that. ` +
+    'Do not call it again — do the task with the tools and commands you do have, or say ' +
+    'plainly what you would need.'
+  );
 }

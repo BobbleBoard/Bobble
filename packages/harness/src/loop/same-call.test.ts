@@ -40,11 +40,32 @@ describe('the same call, made again', () => {
     expect(spoke).toBe(true);
   });
 
-  it('resets when anything about the call changes', () => {
+  it('resets the verbatim counter when the arguments change', () => {
     const s = newSameCallState();
-    noteRepeatedCall(s, 'write', { path: 'a' }, 'ok');
-    noteRepeatedCall(s, 'write', { path: 'b' }, 'ok');
-    expect(noteRepeatedCall(s, 'write', { path: 'b' }, 'ok')).toBeNull();
+    noteRepeatedCall(s, 'write', { path: 'a' }, 'wrote a');
+    noteRepeatedCall(s, 'write', { path: 'b' }, 'wrote b');
+    expect(noteRepeatedCall(s, 'write', { path: 'b' }, 'wrote b')).toBeNull();
+  });
+
+  it('catches a REFUSAL, which never repeats verbatim', () => {
+    // MEASURED: nineteen `edit` calls, every one with different arguments,
+    // every one answered "edit is not available in this run". An
+    // argument-sensitive signature never fires on that — the answer was the
+    // part that was not changing.
+    const s = newSameCallState();
+    const refusal = 'edit is not available in this run.';
+    expect(noteRepeatedCall(s, 'edit', { path: 'a.txt' }, refusal)).toBeNull();
+    expect(noteRepeatedCall(s, 'edit', { path: 'b.txt' }, refusal)).toBeNull();
+    const note = noteRepeatedCall(s, 'edit', { path: 'c.txt', text: 'x' }, refusal);
+    expect(note).toContain('arguments are not the problem');
+    expect(note).toContain('edit');
+  });
+
+  it('does not fire on the same answer from DIFFERENT tools', () => {
+    const s = newSameCallState();
+    noteRepeatedCall(s, 'edit', { a: 1 }, 'not available');
+    noteRepeatedCall(s, 'write', { a: 1 }, 'not available');
+    expect(noteRepeatedCall(s, 'read', { a: 1 }, 'not available')).toBeNull();
   });
 
   it('does not care what order the arguments were written in', () => {
