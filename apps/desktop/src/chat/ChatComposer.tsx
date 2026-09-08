@@ -693,13 +693,17 @@ export function ChatComposer({
     () => installedConnectors.map((c) => ({ slug: c.slug, name: c.name })),
     [installedConnectors],
   );
-  const { abortPrefill, inFlight: prefillInFlight } = useAttachmentPrefill(attachmentPrefix);
+  const {
+    abortPrefill,
+    inFlight: prefillInFlight,
+    estimatedMs: prefillEstimateMs,
+  } = useAttachmentPrefill(attachmentPrefix);
   /*
    * ...and SAY SO when it takes long enough to matter. the user's rule for all of
    * this is "when I don't see anything I get an instant response", which only
    * holds if every window where a send would not be instant says something.
    */
-  usePrefillPill(prefillInFlight);
+  usePrefillPill(prefillInFlight, prefillEstimateMs);
   /*
    * WHICH CHIPS SHOW A SPINNER INSTEAD OF A TOKEN COUNT. Only a text attachment
    * gets primed, and only one over the threshold — the same rule the prefill

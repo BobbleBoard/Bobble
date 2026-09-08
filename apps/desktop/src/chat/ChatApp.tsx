@@ -776,6 +776,14 @@ export function ChatApp({
                       <p className="mt-1 text-caption text-text-muted" data-testid="privacy-line">
                         Nothing you type here leaves this Mac. Only web searches do.
                       </p>
+                      {/*
+                        ROOM FOR THE PILL. It floats 8px above the input card and
+                        landed on top of this line — the user drew an arrow at it.
+                        Reserving the space here rather than raising the pill
+                        keeps the rule that it never moves the card when it
+                        appears, and it cannot collide with anything else later.
+                      */}
+                      <div aria-hidden className="h-9" data-testid="pill-gutter" />
                     </div>
                   ) : (
                     // The thread is ALWAYS the lead surface — a corp run renders

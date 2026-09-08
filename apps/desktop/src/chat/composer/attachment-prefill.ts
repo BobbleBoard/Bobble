@@ -33,7 +33,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLlmStore } from '../../state/llm-store';
 import { usePiStore } from '../../state/pi-slice';
-import { recordPrefillRate } from '../prefill-speed';
+import { prefillSeconds, recordPrefillRate } from '../prefill-speed';
 import { prefillDecision } from './prefill-gate';
 
 /** Below this many chars an attachment isn't worth priming — its send already
@@ -177,6 +177,19 @@ export function useAttachmentPrefill(attachmentPrefix: string): {
   /** A prime is in flight — the attachment chips show a spinner where the token
    * count goes, so "is it still working on this?" is answerable by looking. */
   inFlight: boolean;
+  /**
+   * Roughly how long the prime in flight will take on this machine, from the
+   * measured rate for this model, or null before the rate is known.
+   *
+   * the user's rule for the pill is that its ABSENCE is a promise: "if that pill
+   * disappears, that means the entire conversation up to the point I have
+   * started typing and sent in that turn is already prefilled". A fixed delay
+   * before showing breaks that promise for exactly the primes worth knowing
+   * about, so the wait announces itself immediately when it is long enough to
+   * be felt, and stays quiet when it is not — because a prime nobody can
+   * perceive is not a wait the promise is about.
+   */
+  estimatedMs: number | null;
 } {
   /*
    * IT IS NOT ONLY ATTACHMENTS ANY MORE — see the note at the top of the
@@ -205,6 +218,7 @@ export function useAttachmentPrefill(attachmentPrefix: string): {
   const busy = usePiStore((s) => s.agent.isStreaming || s.promptInFlight);
   const lastSig = useRef<string | null>(null);
   const [inFlight, setInFlight] = useState(false);
+  const [estimatedMs, setEstimatedMs] = useState<number | null>(null);
   /**
    * WHAT THE IN-FLIGHT PRIME IS PRIMING — the exact attachment prefix and the
    * number of history turns it rendered — so a send can ask "does the turn I am
@@ -321,6 +335,10 @@ export function useAttachmentPrefill(attachmentPrefix: string): {
        * inside this module to see the truth.
        */
       setInFlight(true);
+      // ~4 chars a token is close enough to decide "will anyone notice this",
+      // and the rate is measured rather than assumed (prefill-speed.ts).
+      const seconds = prefillSeconds(modelId ?? '', Math.round(prefix.length / 4));
+      setEstimatedMs(seconds === null ? null : Math.round(seconds * 1000));
       /*
        * A TOKEN, so a prime that has already been superseded cannot clear the
        * record belonging to the one that replaced it.
@@ -379,5 +397,5 @@ export function useAttachmentPrefill(attachmentPrefix: string): {
     modelId,
   ]);
 
-  return { abortPrefill, inFlight };
+  return { abortPrefill, inFlight, estimatedMs };
 }
