@@ -94,20 +94,28 @@ with a ✕ appearing.*
 - [ ] The moment diffusion steps exist, show them — the image unblurring live as
       soon as it resembles anything at all.
 
-## 6. The "Starting up" pill must mean something
+## 6. The "Starting up" pill must mean something  ◐ MOSTLY DONE
 
 *Screenshot: the new-chat screen — "Bobble / How can I help you today?" — with a
 pill overlapping the subtitle line reading "◌ Starting up — usually about 2s on
 this Mac · 0:01". A hand-drawn red arrow points up at it: move it up.*
 
-- [ ] Move the pill up, off the subtitle, on the new-chat screen.
-- [ ] Make it **true of TTFT**: while it is showing, the conversation is not yet
-      prefilled. When it disappears, everything up to what he has typed so far is
-      already prefilled and will not be prefilled again — the next send only has
-      to prefill the new message plus its attachments.
-- [ ] **Attachments show their own loading** while they are tokenized and
-      prefilled, in the composer, while he is still typing. The spinner can
-      persist past send; it clears when that attachment is prefilled.
+- [x] Moved off the subtitle: the space is reserved above the card, so the pill
+      cannot move the card when it appears and cannot collide with anything
+      added there later.
+- [x] **True of TTFT.** It waited 700ms before saying a prime was running — the
+      exact window a send lands in. It now uses the rate this machine has
+      measured for this model: a prime the numbers say will be FELT announces
+      itself at once; one too short to perceive keeps the anti-flicker delay,
+      and so does an unmeasured one (guessing "slow" would flash a pill on
+      every keystroke).
+- [x] Attachments show their own loading **in the composer** while they are
+      tokenized and prefilled, and it clears when they are.
+- [ ] REMAINING: the spinner does not survive **send** — the chips leave the
+      composer with the message, and the copies rendered in the thread
+      (`ChatThread.tsx`, `data-testid="user-attachments"`) carry no prefill
+      state. the user called this one a "maybe"; the turn's own prefill progress is
+      already shown in the thread, so this is about putting it on the chips.
 
 ## 7. Kill the pinned "Writing svg-icon in the panel" line
 
