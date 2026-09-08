@@ -1,6 +1,6 @@
 /**
  * Generation manager — the Electron-main glue that turns a pi `generate_image`
- * request into a running mflux/MLX job and a live canvas surface.
+ * request into a running mflux/MLX job and a live INLINE surface in the thread.
  *
  * It stands up a token-authed line-delimited JSON-RPC server on a Unix-domain
  * socket (@pi-desktop/gen-tools/contract), publishes the socket path + token on

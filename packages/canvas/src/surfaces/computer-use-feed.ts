@@ -118,6 +118,26 @@ export interface MacMonitorDecodedFrame {
   windows: MacMonitorWindowInfo[];
 }
 
+/**
+ * How the stage places the window. `fit` is the original rule — the whole
+ * window, at real point size, never upscaled. `follow` crops around whatever is
+ * being acted on so the docked rail is not a 45% demo of the fullscreen view.
+ * `auto` picks: fit while the window fits at a readable scale, follow below it.
+ */
+export type MacMonitorViewMode = 'auto' | 'fit' | 'follow';
+
+/** What the surface's actions row can actually do, per host. Absent = absent:
+ * a control the host cannot honour is NOT rendered, rather than rendered and
+ * inert. */
+export interface MacMonitorCapabilities {
+  /** Abort the agent's turn (the composer's own Stop). */
+  stop?: boolean;
+  /** Halt the turn but keep it resumable (the composer's Pause). */
+  pause?: boolean;
+  /** Hand the app back to the user: stand the agent down AND stop watching. */
+  takeOver?: boolean;
+}
+
 export interface MacMonitorFeed {
   getSession(): MacMonitorSessionState;
   /** The newest frame, or null before the first one arrives. */
@@ -135,6 +155,31 @@ export interface MacMonitorFeed {
   subscribe(listener: () => void): () => void;
   /** Tell the feed whether a surface is mounted and visible. */
   setActive(active: boolean): void;
+
+  // ── the actions row (all optional: a host that cannot do a thing does not
+  //    advertise it, and the surface then does not draw a button for it) ─────
+
+  /** Which controls this host can honour. Absent → none of them. */
+  getCapabilities?(): MacMonitorCapabilities;
+  /** Abort the agent's turn. Resolves once the abort has been asked for. */
+  stop?(): void;
+  /** Halt the turn, keeping it resumable. */
+  pause?(): void;
+  /**
+   * The user is taking the app back: stand the agent down and STOP WATCHING.
+   * Stopping the capture is the load-bearing half — the user's next act in that
+   * app is very often typing a password into it.
+   */
+  takeOver?(): void;
+  /** Undo a take-over: start watching again. */
+  handBack?(): void;
+  /** Has the user taken over? While true the surface shows a stated panel and
+   * draws no picture. */
+  isTakenOver?(): boolean;
+
+  /** Remembered stage placement (one monitor tab, so one setting). */
+  getViewMode?(): MacMonitorViewMode;
+  setViewMode?(mode: MacMonitorViewMode): void;
 }
 
 export const IDLE_MAC_MONITOR_SESSION: MacMonitorSessionState = {

@@ -333,10 +333,19 @@ export function registerMacComputerUseTools(
       visualOnly: isAxOpaque(snap),
       dialogKey: dialogSignature(dialog),
     });
-    blocked = blockedIndexes(snap, dialog);
-    /* A filtered/paged look ADDS to the names it knows, matching the helper's
-     * own merge of the index→element map: page two must not forget page one. */
-    if (params.find === undefined && params.from === undefined) names = new Map();
+    /* A FILTERED OR PAGED LOOK ADDS; A PLAIN ONE REPLACES.
+     *
+     * `find` and `from` are continuations of one look at one app — the helper
+     * merges its own index→element map the same way — so page two must not make
+     * page one's knowledge disappear. For names that would mean a click saying
+     * `clicked [7]` instead of `clicked [7] "Save"`; for blocked indices it
+     * would mean losing the refusal that names the dialog (the helper still
+     * refuses, but with less to say). A plain snapshot is a fresh look and
+     * replaces both, which is what keeps a stale index stale. */
+    const isPage = params.find !== undefined || params.from !== undefined;
+    const nowBlocked = blockedIndexes(snap, dialog);
+    blocked = isPage ? [...new Set([...blocked, ...nowBlocked])] : nowBlocked;
+    if (!isPage) names = new Map();
     for (const el of snap.elements) names.set(el.index, el.name);
     return snap;
   }

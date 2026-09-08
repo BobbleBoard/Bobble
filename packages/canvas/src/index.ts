@@ -140,12 +140,14 @@ export type {
   MacMonitorAxElement,
   MacMonitorAxScene,
   MacMonitorAxWindow,
+  MacMonitorCapabilities,
   MacMonitorCursorState,
   MacMonitorDecodedFrame,
   MacMonitorFeed,
   MacMonitorRect,
   MacMonitorSessionState,
   MacMonitorStreamState,
+  MacMonitorViewMode,
   MacMonitorWindowInfo,
 } from './surfaces/computer-use-feed.ts';
 export { IDLE_MAC_MONITOR_SESSION } from './surfaces/computer-use-feed.ts';
@@ -156,7 +158,10 @@ export {
   coverCrop,
   cursorEase,
   fitWindow,
+  followWindow,
   screenToCanvas,
+  stagePadding,
+  visibleRegion,
 } from './surfaces/computer-use-geometry.ts';
 export type { ComputerUseSurfaceProps } from './surfaces/computer-use-surface.tsx';
 export { ComputerUseSurface } from './surfaces/computer-use-surface.tsx';

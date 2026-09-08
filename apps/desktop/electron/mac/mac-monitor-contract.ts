@@ -20,6 +20,17 @@
  * same union rect, plus every element the AX tree reports at its real bbox. The
  * surface draws that instead of an error panel. It is a DRAWING, never a
  * photograph, and the surface says so on its face.
+ *
+ * ── AND TWO PATHS TO THE PIXELS ─────────────────────────────────────────────
+ * macOS keys the Screen Recording grant to the BINARY that calls the capture
+ * API. `pi-mac --stream` is separately signed, so enabling "Bobble" in System
+ * Settings — the only name a user would ever look for — grants a binary that
+ * does no capturing, and the monitor stays blind with no way to work out why.
+ * So the PREFERRED path is Chromium's own window capture, which runs inside
+ * Electron under the app's identity: main publishes `sources` (one Chromium
+ * source id per window, joined to the AX side by CGWindowID) and the renderer
+ * opens them. The helper stream stays as the fallback for a machine where the
+ * helper holds the grant and the app does not.
  */
 
 /** A rect in global macOS screen POINTS, top-left origin. */
@@ -60,14 +71,57 @@ export type MacMonitorStreamState =
   | 'no-window' // streaming, but the app has no on-screen window
   | 'unavailable'; // the helper cannot stream (older build / capture refused)
 
+/** Which binary is producing the pixels — see the header's two-paths note. */
+export type MacMonitorCaptureSource =
+  | 'none' // nothing is capturing (no session, nobody watching, or no grant)
+  | 'electron' // Chromium, under the app's own identity — the preferred path
+  | 'helper'; // pi-mac --stream, the fallback
+
+/** One window Chromium will hand the renderer pixels for. `windowId` is the
+ * CGWindowID, which is how the Accessibility side names the same window — so
+ * the two halves join with no guessing about which picture goes where. */
+export interface MacMonitorWindowSource {
+  /** Chromium's source id (`window:<CGWindowID>:0`), for getUserMedia. */
+  sourceId: string;
+  windowId: number;
+  name: string;
+}
+
+/** How the monitor is being driven right now. The user can take the brake
+ * (`stopped`) or the wheel (`user`); both cut the agent off from the Mac, and
+ * both stop every capture — see mac-agent.ts's `macControl`. */
+export type MacMonitorControl = 'agent' | 'stopped' | 'user';
+
+/**
+ * The Screen Recording explainer, written where the facts are.
+ *
+ * Main is the only side that knows WHICH binary was refused, and whether this
+ * is a first run or macOS's monthly re-ask — so the sentences live here rather
+ * than in the surface, which would have to guess at both.
+ */
+export interface MacMonitorCaptureNotice {
+  title: string;
+  body: string;
+  /** The button. It only ever OPENS the pane; no code can grant anything. */
+  cta: string;
+  /** The part everybody forgets: the grant does not apply until a relaunch. */
+  hint: string;
+}
+
 export interface MacMonitorState {
   /** A computer-use session is controlling an app. */
   active: boolean;
   pid: number | null;
   appName: string;
   stream: MacMonitorStreamState;
-  /** Why the stream is unavailable, when it is (shown quietly, never as a toast). */
+  /**
+   * Why the stream is unavailable, when it is — the RAW reason (a helper exit
+   * code, a status frame's error id). Belongs behind a "Technical detail"
+   * disclosure; `streamMessage` is the sentence to show.
+   */
   streamError: string | null;
+  /** The same fact as a sentence a person can read. Never a process message. */
+  streamMessage: string | null;
   /**
    * The wallpaper's ORIGINAL path (diagnostics only — the renderer cannot load
    * it; see `wallpaperUrl`). Named for the shared contract's `wallpaperPath`.
@@ -92,6 +146,35 @@ export interface MacMonitorState {
    * capture can fail. The surface offers the fix for exactly this one.
    */
   captureDenied: boolean;
+  /**
+   * The grant WAS held earlier in this app run and is gone now. macOS Sequoia
+   * re-asks for Screen Recording about once a month, and a user who misses or
+   * declines that alert lands in the denied state thirty days after everything
+   * was working — which reads as the feature breaking by itself.
+   */
+  captureRevoked: boolean;
+  /** The name the user will actually find in the Screen Recording list. The
+   * whole point of capturing from Electron is that this can say "Bobble". */
+  captureAppName: string;
+  /** The explainer, or null when there is nothing to explain. */
+  captureNotice: MacMonitorCaptureNotice | null;
+  /** Which path is producing the picture right now. */
+  captureSource: MacMonitorCaptureSource;
+  /**
+   * The windows the renderer may open pixel streams for, back-to-front — only
+   * ever non-empty while `captureSource === 'electron'`.
+   */
+  sources: MacMonitorWindowSource[];
+  /** The picture has stopped arriving while the stream still claims to be live
+   * — "slow" and "stuck" must not look the same. */
+  stalled: boolean;
+  /** ms since the last frame or scene arrived; null when nothing has arrived. */
+  lastPictureAgeMs: number | null;
+  /** ms the bubble has been on 'thinking' — a model that has gone quiet must
+   * say so rather than showing the same three dots forever. */
+  thinkingMs: number | null;
+  /** Who has the wheel. */
+  control: MacMonitorControl;
 }
 
 /**
@@ -199,12 +282,27 @@ export type MacMonitorInvokeMap = {
     request: Record<string, never>;
     response: { ok: boolean };
   };
+  /**
+   * Renderer → main: THE BRAKE, and the wheel.
+   *
+   * `stop` cuts the agent off from the Mac immediately — the phantom goes, the
+   * capture stops, and every further `mac_*` act is refused until the user says
+   * otherwise. `takeover` is the same cut plus "you are driving": nothing is
+   * captured while the user types, which is the promise that makes handing the
+   * keyboard back and forth safe. `resume` is the explicit hand-back; nothing
+   * the MODEL does can clear a stop, or the brake would not be one.
+   */
+  'mac:monitor:control': {
+    request: { mode: MacMonitorControl };
+    response: { ok: boolean; control: MacMonitorControl };
+  };
 };
 
 export const MAC_MONITOR_INVOKE_CHANNELS = [
   'mac:monitor:subscribe',
   'mac:monitor:unsubscribe',
   'mac:monitor:request-capture',
+  'mac:monitor:control',
 ] as const satisfies readonly (keyof MacMonitorInvokeMap)[];
 
 export type MacMonitorEventMap = {
@@ -231,6 +329,7 @@ export const EMPTY_MAC_MONITOR_STATE: MacMonitorState = {
   appName: '',
   stream: 'idle',
   streamError: null,
+  streamMessage: null,
   wallpaperPath: null,
   wallpaperUrl: null,
   rect: null,
@@ -240,8 +339,84 @@ export const EMPTY_MAC_MONITOR_STATE: MacMonitorState = {
   cursor: null,
   bubbleVisible: false,
   captureDenied: false,
+  captureRevoked: false,
+  captureAppName: 'Bobble',
+  captureNotice: null,
+  captureSource: 'none',
+  sources: [],
+  stalled: false,
+  lastPictureAgeMs: null,
+  thinkingMs: null,
+  control: 'agent',
 };
 
 /** The helper's status-frame reason for "macOS has not granted this app Screen
  * Recording" — the ONE capture failure that has a fix the user can act on. */
 export const MAC_CAPTURE_DENIED = 'screen-recording-denied';
+
+/** The helper's status-frame reason for "there is nothing on screen to share". */
+export const MAC_CAPTURE_NO_WINDOW = 'no-shareable-window';
+
+/** Where macOS keeps the Screen Recording switch. Opening it is all any app can
+ * do — the grant itself is deliberately unreachable from code. */
+export const MAC_SCREEN_RECORDING_PANE =
+  'x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture';
+
+/** Never say "the app" when we know its name, and never say "" when we don't. */
+function named(appName: string): string {
+  const name = appName.trim();
+  return name === '' ? 'the app' : name;
+}
+
+/**
+ * WHY THE PICTURE IS NOT THERE, IN A SENTENCE.
+ *
+ * What used to reach the screen was `session.streamError` — i.e. literally
+ * `pi-mac --stream exited (1)`, set in a monospace face. Nobody outside this
+ * repo knows what `pi-mac` is, and a process message at the moment something
+ * breaks reads as "an engineer will have to look at this". The raw reason still
+ * travels, as `streamError`, for the disclosure that exists for engineers.
+ */
+export function streamMessageFor(reason: string | null, appName: string): string | null {
+  if (reason === null) return null;
+  const app = named(appName);
+  if (reason === MAC_CAPTURE_DENIED) {
+    return `macOS has not given Bobble permission to record the screen, so it cannot show you ${app}.`;
+  }
+  if (reason === MAC_CAPTURE_NO_WINDOW) return `${app} has nothing on screen to show.`;
+  return `The live view stopped. Bobble is still controlling ${app}.`;
+}
+
+/**
+ * The Screen Recording explainer.
+ *
+ * Two things this has to get right, both learned the hard way. It must name
+ * the binary the user will actually see in the list — the reason the pixels now
+ * come from Electron at all — and it must say that macOS does not apply the
+ * switch until the app is relaunched, because the state a user lands in
+ * otherwise is "I granted it, I double-checked it, and it still does nothing".
+ */
+export function captureNoticeFor(opts: {
+  appName: string;
+  revoked: boolean;
+  captureAppName?: string;
+}): MacMonitorCaptureNotice {
+  const app = named(opts.appName);
+  const me = opts.captureAppName ?? 'Bobble';
+  const hint = `Turn on "${me}" under Screen Recording, then quit and reopen ${me} — macOS only applies the change on relaunch.`;
+  const still = `${me} is still controlling ${app} — clicks and typing work without it; you just cannot watch.`;
+  if (opts.revoked) {
+    return {
+      title: 'macOS asks for this again every month',
+      body: `It just asked, and Screen Recording is off again. ${still}`,
+      cta: 'Open Privacy & Security',
+      hint,
+    };
+  }
+  return {
+    title: `${me} can't see ${app} yet`,
+    body: `Screen Recording lets ${me} show you what it is doing. ${still}`,
+    cta: 'Open Privacy & Security',
+    hint,
+  };
+}

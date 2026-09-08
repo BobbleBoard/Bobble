@@ -7,10 +7,10 @@
  *
  * Two directions:
  *   - main→renderer EVENTS (`gen:open` / `gen:update`): stream a generation job's
- *     live surface data so the renderer upserts + updates a `gen-image` canvas
- *     tab (candidate grid + progress + footnote).
- *   - renderer→main INVOKE (`gen:register` / `gen:cancel`): the renderer confirms
- *     it mounted the tab, and the user can cancel a running job.
+ *     live state — step progress, decoded step previews, the worker's own status
+ *     line, the outputs as they land — to the card the THREAD renders inline.
+ *   - renderer→main INVOKE (`gen:register` / `gen:cancel`): the renderer acks the
+ *     stream, and the user can cancel a running job.
  *
  * The ComfyUI modular-download install manager (see comfy-install.ts) adds a
  * third pair on the SAME maps: a `gen:comfy-install` progress event (forwarded
@@ -19,9 +19,16 @@
  */
 import type { ComfyInstallEvent, ComfyInstallState, ComfyPackLicense } from './comfy-install';
 
-/** Structural mirror of @pi-desktop/gen-canvas `GenImageSurfaceData` — kept as a
- * plain payload so Electron MAIN never imports the React surface package. The
- * renderer feeds it straight into `genImageContent(payload)`. */
+/**
+ * The live state of one running generation, as the renderer needs to draw it.
+ *
+ * A plain payload so Electron MAIN never imports a React component: the renderer
+ * folds it into the live-generation store (src/chat/gen-stream.ts) and the
+ * THREAD renders it, inline, in the box the finished thing will occupy. It used
+ * to be a structural mirror of the `gen-image` canvas surface's props; that
+ * surface no longer has a caller (the user, round 21: generation "gets shown inline,
+ * the large card, same as each studio would show").
+ */
 export interface GenSurfacePayload {
   /**
    * WHICH KIND OF THING IS BEING MADE.
@@ -74,7 +81,7 @@ export interface GenSurfacePayload {
 
 /** main→renderer events. Compose into AppEventMap. */
 export type GenEventMap = {
-  /** Open (or focus) the gen-image canvas tab for a job with initial data. */
+  /** A job has started: its first surface state. `tabId` is the stream's id. */
   'gen:open': { tabId: string; payload: GenSurfacePayload };
   /** Push updated surface data (step preview / candidate done / finished). */
   'gen:update': { tabId: string; payload: GenSurfacePayload };

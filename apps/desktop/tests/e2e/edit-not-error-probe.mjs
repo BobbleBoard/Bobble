@@ -17,15 +17,15 @@
  *   - how many rows are tinted as removals, and
  *   - does anything on screen carry the failure treatment.
  *
- * `LEGACY=1` flips the renderer back to the old block-for-block shape
- * (`window.__pi_legacy_diff`) so the before and after come out of the same run.
+ * The BEFORE of this — nine red rows and nine green ones for a two-line change,
+ * `+9 −9` in the header — was captured the same way against a build carrying
+ * the old shape; the assertions below are what stops it coming back.
  *
  * Invisible (harness.mjs).
  */
 import { launchApp } from './harness.mjs';
 
-const LEGACY = process.env.LEGACY === '1';
-const TAG = LEGACY ? 'before' : 'after';
+const TAG = 'edit';
 
 const OLD = [
   '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16">',
@@ -46,109 +46,97 @@ const NEW = OLD.replace('stroke-width="1.25"', 'stroke-width="1.5"').replace(
 const { page, shot, check, finish } = await launchApp('edit-not-error');
 
 await page.waitForFunction(() => typeof window.__pi_store === 'function', { timeout: 20_000 });
-if (LEGACY) {
-  await page.evaluate(() => {
-    window.__pi_legacy_diff = true;
-  });
-}
 
-/** A completed, SUCCESSFUL `edit` call, exactly as the router shapes one. */
-await page.evaluate(
-  ([oldText, newText]) => {
-    window.__pi_store().setState({
-      messages: [
-        { kind: 'user', id: 'u1', text: 'make the icon stroke a touch heavier', timestamp: 1 },
-        {
-          kind: 'assistant',
-          id: 'a1',
-          timestamp: 2,
-          isStreaming: false,
-          blocks: [
-            {
-              type: 'toolCall',
-              id: 'e1',
-              name: 'edit',
-              arguments: {
-                path: '/tmp/file-icon.svg',
-                old_string: oldText,
-                new_string: newText,
+/**
+ * The edit as it arrives: a LIVE `edit` call, which is the state the user
+ * photographed — the canvas tab open on the file with the hunk drawn into it.
+ */
+const inject = (streaming) =>
+  page.evaluate(
+    ([oldText, newText, live]) => {
+      window.__pi_store().setState({
+        messages: [
+          { kind: 'user', id: 'u1', text: 'make the icon stroke a touch heavier', timestamp: 1 },
+          {
+            kind: 'assistant',
+            id: 'a1',
+            timestamp: 2,
+            isStreaming: live,
+            blocks: [
+              {
+                type: 'toolCall',
+                id: 'e1',
+                name: 'edit',
+                arguments: {
+                  path: '/tmp/file-icon.svg',
+                  old_string: oldText,
+                  new_string: newText,
+                },
               },
-            },
-          ],
-        },
-        {
-          kind: 'toolResult',
-          id: 'tr-a1-e1',
-          assistantId: 'a1',
-          toolCallId: 'e1',
-          toolName: 'edit',
-          text: 'Edited /tmp/file-icon.svg',
-          isError: false,
-          timestamp: 3,
-        },
-      ],
-    });
-  },
-  [OLD, NEW],
-);
-await page.waitForTimeout(900);
+            ],
+          },
+          ...(live
+            ? []
+            : [
+                {
+                  kind: 'toolResult',
+                  id: 'tr-a1-e1',
+                  assistantId: 'a1',
+                  toolCallId: 'e1',
+                  toolName: 'edit',
+                  text: 'Edited /tmp/file-icon.svg',
+                  isError: false,
+                  timestamp: 3,
+                },
+              ]),
+        ],
+      });
+    },
+    [OLD, NEW, streaming],
+  );
 
-// Open the chain row so the diff is on screen.
-const chainRow = await page.$('[data-testid="activity-chain"] .pd-chain-step');
-if (chainRow !== null) await chainRow.click().catch(() => {});
-await page.waitForTimeout(700);
-await shot(`${TAG}-01-thread`);
+await inject(true);
+await page.waitForTimeout(1600);
+await shot(`${TAG}-01-canvas`);
 
-const read = await page.evaluate(() => {
-  const rows = [...document.querySelectorAll('.pd-diff-row')];
-  const stat = document.querySelector('.pd-diff-file-header')?.textContent ?? '';
-  const tint = (el) => getComputedStyle(el).backgroundColor;
-  const failed = document.querySelectorAll('[data-failed="true"]').length;
-  const errBlocks = document.querySelectorAll('.pd-chain-error, .pd-chain-stderr').length;
-  return {
-    total: rows.length,
-    del: rows.filter((r) => r.classList.contains('pd-diff-row--del')).length,
-    add: rows.filter((r) => r.classList.contains('pd-diff-row--add')).length,
-    context: rows.filter((r) => r.classList.contains('pd-diff-row--context')).length,
-    stat: stat.replace(/\s+/g, ' ').trim(),
-    delTint: rows.find((r) => r.classList.contains('pd-diff-row--del'))
-      ? tint(rows.find((r) => r.classList.contains('pd-diff-row--del')))
-      : null,
-    failed,
-    errBlocks,
-    chainLabel: (document.querySelector('[data-testid="activity-chain"]')?.textContent ?? '')
-      .replace(/\s+/g, ' ')
-      .trim()
-      .slice(0, 160),
-  };
-});
-console.log(`[${TAG}] ${JSON.stringify(read, null, 2)}`);
+/** What the CANVAS is showing — the surface in the user's screenshot. */
+const readCanvas = () =>
+  page.evaluate(() => {
+    const panel = document.querySelector('[data-testid="canvas-tabs-panel"]') ?? document;
+    const rows = [...panel.querySelectorAll('.pd-diff-row')];
+    const visible = rows.filter((r) => r.getBoundingClientRect().height > 2);
+    return {
+      rows: visible.length,
+      del: visible.filter((r) => r.classList.contains('pd-diff-row--del')).length,
+      add: visible.filter((r) => r.classList.contains('pd-diff-row--add')).length,
+      context: visible.filter((r) => r.classList.contains('pd-diff-row--context')).length,
+      stat: (panel.querySelector('.pd-diff-file-header')?.textContent ?? '')
+        .replace(/\s+/g, ' ')
+        .trim(),
+      redPixels: visible
+        .filter((r) => r.classList.contains('pd-diff-row--del'))
+        .reduce((n, r) => n + r.getBoundingClientRect().height, 0),
+      failed: document.querySelectorAll('[data-failed="true"]').length,
+      errBlocks: document.querySelectorAll('.pd-chain-error, .pd-chain-stderr').length,
+    };
+  });
 
-// The diff clipped tight, so the red block is measurable rather than described.
-const diff = await page.$('.pd-diff');
-if (diff !== null) {
-  const box = await diff.boundingBox();
-  if (box !== null) {
-    await page.screenshot({
-      path: `${process.env.SHOT_DIR ?? '/tmp'}/${TAG}-02-diff.png`,
-      clip: {
-        x: box.x,
-        y: box.y,
-        width: box.width,
-        height: Math.min(box.height, 420),
-      },
-    });
-  }
-}
+const live = await readCanvas();
+console.log(`[${TAG}] live edit in the canvas: ${JSON.stringify(live)}`);
 
-if (!LEGACY) {
-  // 15 lines quoted, 2 changed. Anything more than a handful of red rows is the
-  // bug this probe exists for.
-  check(read.del <= 3, `a two-line edit drew ${read.del} removal rows`);
-  check(read.context > 0, 'the unchanged lines are not shown as context');
-  check(read.failed === 0, `a successful edit rendered ${read.failed} failed step(s)`);
-  check(read.errBlocks === 0, 'a successful edit rendered an error block');
-  check(/\+2/.test(read.stat) && /2/.test(read.stat), `the ±stat is wrong: "${read.stat}"`);
-}
+// …and once it has landed, nothing anywhere carries the failure treatment.
+await inject(false);
+await page.waitForTimeout(1400);
+await shot(`${TAG}-02-settled`);
+const settled = await readCanvas();
+console.log(`[${TAG}] after it lands: ${JSON.stringify(settled)}`);
+
+// Nine lines quoted, two changed.
+check(live.del <= 3, `a two-line edit drew ${live.del} removal rows in the canvas`);
+check(live.context > 0, 'the unchanged lines are not shown as context');
+check(/\+2/.test(live.stat), `the ±stat is wrong: "${live.stat}"`);
+check(live.redPixels < 60, `${live.redPixels}px of red for a two-line edit`);
+check(settled.failed === 0, `a successful edit rendered ${settled.failed} failed step(s)`);
+check(settled.errBlocks === 0, 'a successful edit rendered an error block');
 
 await finish();

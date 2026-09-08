@@ -1,0 +1,169 @@
+$ vite build
+vite v8.1.3 building client environment for production...
+[2Ktransforming...[plugin rolldown:vite-resolve] Module "node:os" has been externalized for browser compatibility, imported by "/Users/user/Desktop/OSS-harness/apps/desktop/electron/workspace/project-dir.ts". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+[plugin rolldown:vite-resolve] Module "node:fs" has been externalized for browser compatibility, imported by "/Users/user/Desktop/OSS-harness/apps/desktop/electron/workspace/project-dir.ts". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+[plugin rolldown:vite-resolve] Module "node:path" has been externalized for browser compatibility, imported by "/Users/user/Desktop/OSS-harness/apps/desktop/electron/workspace/project-dir.ts". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+✓ 1181 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                                         1.57 kB │ gzip:   0.58 kB
+dist/assets/pcm-worklet-D3-W8sdD.js                                     1.64 kB
+dist/assets/run-DDJp5H9w.jpg                                            4.11 kB
+dist/assets/KaTeX_Size3-Regular-CTq5MqoE.woff                           4.42 kB
+dist/assets/KaTeX_Size4-Regular-Dl5lxZxV.woff2                          4.92 kB
+dist/assets/KaTeX_Size2-Regular-Dy4dx90m.woff2                          5.20 kB
+dist/assets/KaTeX_Size1-Regular-mCD8mA8B.woff2                          5.46 kB
+dist/assets/KaTeX_Size4-Regular-BF-4gkZK.woff                           5.98 kB
+dist/assets/KaTeX_Size2-Regular-oD1tc_U0.woff                           6.18 kB
+dist/assets/KaTeX_Size1-Regular-C195tn64.woff                           6.49 kB
+dist/assets/KaTeX_Caligraphic-Regular-Di6jR-x-.woff2                    6.90 kB
+dist/assets/KaTeX_Caligraphic-Bold-Dq_IR9rO.woff2                       6.91 kB
+dist/assets/KaTeX_Size3-Regular-DgpXs0kz.ttf                            7.58 kB
+dist/assets/KaTeX_Caligraphic-Regular-CTRA-rTL.woff                     7.65 kB
+dist/assets/KaTeX_Caligraphic-Bold-BEiXGLvX.woff                        7.71 kB
+dist/assets/KaTeX_Script-Regular-D3wIWfF6.woff2                         9.64 kB
+dist/assets/inter-vietnamese-wght-normal-CBcvBZtf.woff2                10.25 kB
+dist/assets/KaTeX_SansSerif-Regular-DDBCnlJ7.woff2                     10.34 kB
+dist/assets/KaTeX_Size4-Regular-DWFBv043.ttf                           10.36 kB
+dist/assets/KaTeX_Script-Regular-D5yQViql.woff                         10.58 kB
+dist/assets/inter-greek-ext-wght-normal-DlzME5K_.woff2                 11.23 kB
+dist/assets/KaTeX_Fraktur-Regular-CTYiF6lA.woff2                       11.31 kB
+dist/assets/KaTeX_Fraktur-Bold-CL6g_b3V.woff2                          11.34 kB
+dist/assets/KaTeX_Size2-Regular-B7gKUWhC.ttf                           11.50 kB
+dist/assets/KaTeX_SansSerif-Italic-C3H0VqGB.woff2                      12.02 kB
+dist/assets/KaTeX_SansSerif-Bold-D1sUS0GD.woff2                        12.21 kB
+dist/assets/KaTeX_Size1-Regular-Dbsnue_I.ttf                           12.22 kB
+dist/assets/KaTeX_SansSerif-Regular-CS6fqUqJ.woff                      12.31 kB
+dist/assets/KaTeX_Caligraphic-Regular-wX97UBjC.ttf                     12.34 kB
+dist/assets/KaTeX_Caligraphic-Bold-ATXxdsX0.ttf                        12.36 kB
+dist/assets/KaTeX_Fraktur-Regular-Dxdc4cR9.woff                        13.20 kB
+dist/assets/KaTeX_Fraktur-Bold-BsDP51OF.woff                           13.29 kB
+dist/assets/source-serif-4-vietnamese-wght-normal-D-yuW59g.woff2       13.44 kB
+dist/assets/KaTeX_Typewriter-Regular-CO6r4hn1.woff2                    13.56 kB
+dist/assets/KaTeX_SansSerif-Italic-DN2j7dab.woff                       14.11 kB
+dist/assets/KaTeX_SansSerif-Bold-DbIhKOiC.woff                         14.40 kB
+dist/assets/KaTeX_Typewriter-Regular-C0xS9mPB.woff                     16.02 kB
+dist/assets/KaTeX_Math-BoldItalic-CZnvNsCZ.woff2                       16.40 kB
+dist/assets/KaTeX_Math-Italic-t53AETM-.woff2                           16.44 kB
+dist/assets/KaTeX_Script-Regular-C5JkGWo-.ttf                          16.64 kB
+dist/assets/KaTeX_Main-BoldItalic-DxDJ3AOS.woff2                       16.78 kB
+dist/assets/KaTeX_Main-Italic-NWA7e6Wa.woff2                           16.98 kB
+dist/assets/source-serif-4-cyrillic-ext-wght-normal-cHuGMAiY.woff2     18.06 kB
+dist/assets/KaTeX_Math-BoldItalic-iY-2wyZ7.woff                        18.66 kB
+dist/assets/KaTeX_Math-Italic-DA0__PXp.woff                            18.74 kB
+dist/assets/inter-cyrillic-wght-normal-DqGufNeO.woff2                  18.74 kB
+dist/assets/inter-greek-wght-normal-CkhJZR-_.woff2                     18.99 kB
+dist/assets/KaTeX_Main-BoldItalic-SpSLRI95.woff                        19.41 kB
+dist/assets/KaTeX_SansSerif-Regular-BNo7hRIc.ttf                       19.43 kB
+dist/assets/KaTeX_Fraktur-Regular-CB_wures.ttf                         19.57 kB
+dist/assets/KaTeX_Fraktur-Bold-BdnERNNW.ttf                            19.58 kB
+dist/assets/KaTeX_Main-Italic-BMLOBm91.woff                            19.67 kB
+dist/assets/source-serif-4-greek-wght-normal-ece1310W.woff2            20.22 kB
+dist/assets/idle-n6hxzSFW.webm                                         21.54 kB
+dist/assets/KaTeX_SansSerif-Italic-YYjJ1zSn.ttf                        22.36 kB
+dist/assets/KaTeX_SansSerif-Bold-CFMepnvq.ttf                          24.50 kB
+dist/assets/KaTeX_Main-Bold-Cx986IdX.woff2                             25.32 kB
+dist/assets/inter-cyrillic-ext-wght-normal-BOeWTOD4.woff2              25.96 kB
+dist/assets/KaTeX_Main-Regular-B22Nviop.woff2                          26.27 kB
+dist/assets/sad_01-2VB3rZtm.webm                                       27.29 kB
+dist/assets/KaTeX_Typewriter-Regular-D3Ib7_Hf.ttf                      27.55 kB
+dist/assets/KaTeX_AMS-Regular-BQhdFMY1.woff2                           28.07 kB
+dist/assets/KaTeX_Main-Bold-Jm3AIy58.woff                              29.91 kB
+dist/assets/KaTeX_Main-Regular-Dr94JaBh.woff                           30.77 kB
+dist/assets/KaTeX_Math-BoldItalic-B3XSjfu4.ttf                         31.19 kB
+dist/assets/KaTeX_Math-Italic-flOr_0UB.ttf                             31.30 kB
+dist/assets/KaTeX_Main-BoldItalic-DzxPMmG6.ttf                         32.96 kB
+dist/assets/KaTeX_AMS-Regular-DMm9YOAa.woff                            33.51 kB
+dist/assets/KaTeX_Main-Italic-3WenGoN9.ttf                             33.58 kB
+dist/assets/source-serif-4-cyrillic-wght-normal-DwHjdM4S.woff2         36.46 kB
+dist/assets/source-serif-4-latin-ext-wght-normal-CxNHBx-q.woff2        42.04 kB
+dist/assets/point-bu4UWsF_.webm                                        42.12 kB
+dist/assets/angry_01-fkasp_H2.webm                                     43.78 kB
+dist/assets/angry_02-DDALc2lZ.webm                                     44.20 kB
+dist/assets/agree-DX9UsWdO.webm                                        45.04 kB
+dist/assets/inter-latin-wght-normal-Dx4kXJAl.woff2                     48.25 kB
+dist/assets/source-serif-4-latin-wght-normal-D9elroTD.woff2            50.82 kB
+dist/assets/KaTeX_Main-Bold-waoOVXN0.ttf                               51.33 kB
+dist/assets/KaTeX_Main-Regular-ypZvNtVU.ttf                            53.58 kB
+dist/assets/kick-CcU1CGd9.webm                                         58.92 kB
+dist/assets/KaTeX_AMS-Regular-DRggAlZN.ttf                             63.63 kB
+dist/assets/wave-BetAtzom.webm                                         64.98 kB
+dist/assets/afraid-D8FXPdIe.webm                                       65.93 kB
+dist/assets/clap-cDJUo8mK.webm                                         67.66 kB
+dist/assets/cheer-CO9V2c0v.webm                                        83.41 kB
+dist/assets/jump-DiBHygZV.webm                                         83.84 kB
+dist/assets/inter-latin-ext-wght-normal-DO1Apj_S.woff2                 85.06 kB
+dist/assets/walk-DOlv12rq.webm                                         86.00 kB
+dist/assets/run-DyuOpsFT.webm                                          87.71 kB
+dist/assets/dance_01-BSKBWkmo.webm                                    164.16 kB
+dist/assets/connectors-Owvo2g3p.css                                    11.19 kB │ gzip:   2.47 kB
+dist/assets/schedule-C7oASyPw.css                                      16.30 kB │ gzip:   3.09 kB
+dist/assets/src-BI-ZUyP-.css                                           28.48 kB │ gzip:   7.92 kB
+dist/assets/TripoWorkspace-Dsc8gury.css                                78.29 kB │ gzip:  12.13 kB
+dist/assets/index-vXq8vNFW.css                                        377.36 kB │ gzip:  57.82 kB
+dist/assets/jsx-runtime-CX7af9U8.js                                     0.42 kB │ gzip:   0.29 kB
+dist/assets/react-C_qm9Zyk.js                                           0.64 kB │ gzip:   0.39 kB
+dist/assets/preload-helper-DYl5dUZ5.js                                  1.27 kB │ gzip:   0.70 kB
+dist/assets/react-dom-CjRP6ryj.js                                       3.53 kB │ gzip:   1.33 kB
+dist/assets/preset-motions-iDI-S3Pr.js                                  5.24 kB │ gzip:   1.95 kB
+dist/assets/VideoStudio-B9ArTj3n.js                                     7.15 kB │ gzip:   2.51 kB
+dist/assets/TopBar-De9UVFXL.js                                          8.44 kB │ gzip:   4.05 kB
+dist/assets/react-D2mDMWBM.js                                           8.73 kB │ gzip:   3.41 kB
+dist/assets/ImageStudio-DzjI7bl-.js                                    10.23 kB │ gzip:   3.48 kB
+dist/assets/AudioStudio-2wsukr2n.js                                    10.44 kB │ gzip:   3.61 kB
+dist/assets/model-surface-T2GoMEyc.js                                  10.62 kB │ gzip:   4.27 kB
+dist/assets/STLLoader-B4LN0inY.js                                      13.49 kB │ gzip:   4.58 kB
+dist/assets/use-studio-BFuQOU8_.js                                     15.94 kB │ gzip:   5.42 kB
+dist/assets/viewer-io-DOp09yIa.js                                      24.15 kB │ gzip:   8.21 kB
+dist/assets/purify.es-yeT1JqXB.js                                      26.12 kB │ gzip:  10.27 kB
+dist/assets/schedule-TOTuUduq.js                                       59.85 kB │ gzip:  16.38 kB
+dist/assets/connectors-DwSm2Exz.js                                     74.83 kB │ gzip:  17.93 kB
+dist/assets/TripoWorkspace-C3PPME_h.js                                161.47 kB │ gzip:  65.63 kB
+dist/assets/doc-surface-CFF6rLtU.js                                   505.49 kB │ gzip: 128.86 kB
+dist/assets/src-K5zICa2T.js                                           664.08 kB │ gzip: 195.03 kB
+dist/assets/pi-slice-BPXvhFVx.js                                      668.66 kB │ gzip: 231.77 kB
+dist/assets/Viewer3D-C4FpdY-u.js                                      844.96 kB │ gzip: 338.73 kB
+dist/assets/index-e_fCw_3Y.js                                       2,123.87 kB │ gzip: 607.90 kB
+
+[31m[INVALID_ANNOTATION] [0mA comment "/*#__PURE__*/" in "../../node_modules/.pnpm/@lexical+react@0.46.0_react-dom@19.2.7_react@19.2.7__react@19.2.7_typescript@6.0.3_yjs@13.6.31/node_modules/@lexical/react/dist/LexicalContentEditable.prod.mjs" contains an annotation that Rolldown cannot interpret due to the position of the comment.
+ - comment ignored due to position in ../../node_modules/.pnpm/@lexical+react@0.46.0_react-dom@19.2.7_react@19.2.7__react@19.2.7_typescript@6.0.3_yjs@13.6.31/node_modules/@lexical/react/dist/LexicalContentEditable.prod.mjs at 1889..1902
+ [38;5;240m │[0m 
+ [38;5;240m │[0m [38;5;115mHelp[0m: For more information on how to use pure annotations correctly, check the documentation: https://rolldown.rs/in-depth/dead-code-elimination#pure
+
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+[31m[INVALID_ANNOTATION] [0mA comment "/*#__PURE__*/" in "../../node_modules/.pnpm/@lexical+react@0.46.0_react-dom@19.2.7_react@19.2.7__react@19.2.7_typescript@6.0.3_yjs@13.6.31/node_modules/@lexical/react/dist/LexicalErrorBoundary.prod.mjs" contains an annotation that Rolldown cannot interpret due to the position of the comment.
+ - comment ignored due to position in ../../node_modules/.pnpm/@lexical+react@0.46.0_react-dom@19.2.7_react@19.2.7__react@19.2.7_typescript@6.0.3_yjs@13.6.31/node_modules/@lexical/react/dist/LexicalErrorBoundary.prod.mjs at 581..594
+ [38;5;240m │[0m 
+ [38;5;240m │[0m [38;5;115mHelp[0m: For more information on how to use pure annotations correctly, check the documentation: https://rolldown.rs/in-depth/dead-code-elimination#pure
+
+[33m[INEFFECTIVE_DYNAMIC_IMPORT] [0msrc/state/local-model.ts is dynamically imported by src/state/llm-store.ts but also statically imported by src/chat/ChatComposer.tsx, src/chat/UserImage.tsx, src/chat/auto-router.ts, src/models/ModelsView.tsx, src/state/pi-connect.ts, dynamic import will not move module into another chunk.
+
+[33m[INEFFECTIVE_DYNAMIC_IMPORT] [0msrc/chat/auto-router.ts is dynamically imported by src/App.tsx but also statically imported by src/chat/AutoDownloadPrompt.tsx, src/chat/ChatApp.tsx, src/chat/TierPickerMenu.tsx, src/state/pi-connect.ts, dynamic import will not move module into another chunk.
+
+✓ built in 458ms
+vite v8.1.3 building client environment for production...
+[2Ktransforming...✓ 744 modules transformed.
+rendering chunks...
+computing gzip size...
+dist-electron/main.js  1,257.96 kB │ gzip: 413.32 kB
+
+✓ built in 150ms
+vite v8.1.3 building client environment for production...
+[2Ktransforming...✓ 26 modules transformed.
+rendering chunks...
+computing gzip size...
+dist-electron/preload.js  4.62 kB │ gzip: 1.98 kB
+
+✓ built in 6ms
+vite v8.1.3 building client environment for production...
+[2Ktransforming...✓ 32 modules transformed.
+rendering chunks...
+computing gzip size...
+dist-electron/inference-supervisor.js  81.54 kB │ gzip: 26.75 kB
+
+✓ built in 11ms
+EXIT=0

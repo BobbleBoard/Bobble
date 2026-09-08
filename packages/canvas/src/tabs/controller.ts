@@ -116,9 +116,12 @@ export class CanvasController {
     return existing.id;
   }
 
-  /** Focus an existing tab and un-collapse. No-op if the id is unknown. */
+  /** Focus an existing tab and un-collapse. No-op if the id is unknown — or if
+   * that tab is already the focused one on an open canvas (see {@link updateTab}
+   * for why a no-op change must not notify). */
   focusTab(id: string): void {
     if (!this.#state.tabs.some((tab) => tab.id === id)) return;
+    if (this.#state.activeTabId === id && !this.#state.collapsed) return;
     this.#commit({ ...this.#state, activeTabId: id, collapsed: false });
   }
 
@@ -148,9 +151,30 @@ export class CanvasController {
     if (tabs.length === 0) this.#onEmpty?.();
   }
 
-  /** Merge live state into a tab (browser url/title, media status, subagents…). */
+  /**
+   * Merge live state into a tab (browser url/title, media status, subagents…).
+   *
+   * A PATCH THAT CHANGES NOTHING NOTIFIES NOBODY.
+   *
+   * This used to commit a fresh state object unconditionally, so every "quiet
+   * refresh" — the artifact router re-applying the same text on every stream
+   * tick, the corp feed re-applying the same timings, the monitor re-applying
+   * the same title — re-rendered every subscriber of the canvas for no change
+   * at all. That is not only waste: it is the shape a setState/effect loop is
+   * built out of (React #185), because an effect whose deps are derived from
+   * canvas state can then be woken by its own write. Bailing out on a no-op
+   * makes that impossible to build by accident.
+   *
+   * Shallow by design — a patch value is compared by identity, so a caller
+   * handing over a freshly-built object (a new artifact, a new tree) still
+   * commits, which is right: it may be a different object with the same shape,
+   * and this cannot know.
+   */
   updateTab(id: string, patch: Partial<Omit<CanvasTab, 'id'>>): void {
-    if (!this.#state.tabs.some((tab) => tab.id === id)) return;
+    const current = this.#state.tabs.find((tab) => tab.id === id);
+    if (current === undefined) return;
+    const keys = Object.keys(patch) as Array<keyof typeof patch>;
+    if (keys.every((key) => Object.is(current[key], patch[key]))) return;
     this.#commit({
       ...this.#state,
       tabs: this.#state.tabs.map((tab) => (tab.id === id ? { ...tab, ...patch, id } : tab)),

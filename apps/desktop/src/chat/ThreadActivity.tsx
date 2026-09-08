@@ -276,8 +276,13 @@ export function ThreadActivityChain({
         // did nothing at all — the tab was there, behind a closed drawer
         // (the user: "clicking that focuses the image in the canvas but doesn't
         // slide it open if it's closed"). Every other path that puts something
-        // in the canvas on the user's behalf opens it too (useGen, corp stream,
+        // in the canvas on the user's behalf opens it too (corp stream,
         // subagent routing, browser agent); this one was the exception.
+        //
+        // GENERATED MEDIA NO LONGER ARRIVES HERE AT ALL: an image / video /
+        // audio the app made renders inline as its own card and its row carries
+        // no tabSpec, so this handler is for the media a THIRD-PARTY tool
+        // returns, which has no card to be a second copy of.
         useCanvasStore.getState().setCanvasOpen(true);
       }}
       // A read/edit/skill row's primary click opens that file in the canvas

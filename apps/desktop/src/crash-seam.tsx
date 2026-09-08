@@ -13,9 +13,24 @@
  * renders nothing at all in a normal launch.
  */
 import { useEffect, useState } from 'react';
+import { onSoftReload } from './app-reload';
 
 const listeners = new Set<() => void>();
 let armed = false;
+
+/*
+ * DISARMED BY THE RECOVERY, NOT BY THE THROW.
+ *
+ * The first cut cleared the flag as it threw, and the boundary then never
+ * caught anything: React re-renders a component that throws a second time to
+ * recreate the error, and on that replay the seam was already disarmed, so the
+ * render "succeeded" and the crash card never appeared. Clearing it when the
+ * app is re-mounted instead is both correct and what a probe wants — the throw
+ * survives every replay React makes, and Reload comes up clean.
+ */
+onSoftReload(() => {
+  armed = false;
+});
 
 /** True once a probe has asked for a throw. */
 export function crashArmed(): boolean {
@@ -39,11 +54,6 @@ export function CrashSeam(): null {
       listeners.delete(listener);
     };
   }, []);
-  if (armed) {
-    // Disarmed as it fires, so the re-mount after "Reload" comes up clean —
-    // which is the behaviour being tested.
-    armed = false;
-    throw new Error('Maximum update depth exceeded (test seam)');
-  }
+  if (armed) throw new Error('Maximum update depth exceeded (test seam)');
   return null;
 }

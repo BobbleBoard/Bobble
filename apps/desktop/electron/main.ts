@@ -501,11 +501,16 @@ function installAppMenu(): void {
     label: 'View',
     submenu: [
       {
+        // `id` so a probe can invoke the item itself: a synthetic ⌘R from
+        // Playwright never reaches the native menu, so driving the accelerator
+        // is the only way to test what the accelerator actually does.
+        id: 'safe-reload',
         label: 'Reload',
         accelerator: 'CmdOrCtrl+R',
         click: (_item, win) => softReload(win instanceof BrowserWindow ? win : undefined),
       },
       {
+        id: 'hard-reload',
         label: 'Reload Window',
         accelerator: 'CmdOrCtrl+Shift+R',
         click: (_item, win) => {

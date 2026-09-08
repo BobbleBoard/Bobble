@@ -152,3 +152,61 @@ describe('closing the LAST tab closes the rail', () => {
     expect(c.getState().tabs).toHaveLength(0);
   });
 });
+
+/**
+ * THE LOOP CLASS.
+ *
+ * React #185 ("Maximum update depth exceeded") is built out of writes that
+ * change nothing but notify anyway: an effect keyed on canvas state writes back
+ * to the canvas, the write commits a fresh object, every subscriber re-renders,
+ * and the effect can be woken by its own write. The controller is the one place
+ * that can make that impossible, so a no-op write must be silent.
+ *
+ * These fail on the old controller, which committed unconditionally.
+ */
+describe('a write that changes nothing notifies nobody', () => {
+  it('updateTab with the values a tab already has does not notify', () => {
+    const c = createCanvasController();
+    const id = c.openTab({ kind: 'browser', title: 'Browser', url: 'https://a.test' });
+    let notified = 0;
+    c.subscribe(() => {
+      notified += 1;
+    });
+    c.updateTab(id, { url: 'https://a.test' });
+    c.updateTab(id, { title: 'Browser' });
+    c.updateTab(id, { url: 'https://a.test', title: 'Browser' });
+    expect(notified).toBe(0);
+    // …and a real change still lands.
+    c.updateTab(id, { url: 'https://b.test' });
+    expect(notified).toBe(1);
+    expect(c.getState().tabs[0]?.url).toBe('https://b.test');
+  });
+
+  it('the state object itself is unchanged by a no-op patch', () => {
+    const c = createCanvasController();
+    const id = c.openTab({ kind: 'code', title: 'x.ts' });
+    const before = c.getState();
+    c.updateTab(id, { title: 'x.ts' });
+    expect(c.getState()).toBe(before);
+  });
+
+  it('focusTab on the already-focused tab of an open canvas does not notify', () => {
+    const c = createCanvasController();
+    const a = c.openTab({ kind: 'code', title: 'a' });
+    const b = c.openTab({ kind: 'code', title: 'b' });
+    let notified = 0;
+    c.subscribe(() => {
+      notified += 1;
+    });
+    c.focusTab(b); // already active, canvas already open
+    expect(notified).toBe(0);
+    c.focusTab(a);
+    expect(notified).toBe(1);
+    // …and it still un-collapses when the canvas is closed on the active tab.
+    c.setCollapsed(true);
+    notified = 0;
+    c.focusTab(a);
+    expect(notified).toBe(1);
+    expect(c.getState().collapsed).toBe(false);
+  });
+});

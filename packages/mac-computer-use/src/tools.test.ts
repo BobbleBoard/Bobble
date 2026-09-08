@@ -802,6 +802,36 @@ describe('paging a big app', () => {
     expect('from' in p).toBe(false);
   });
 
+  it('does not forget page one when page two arrives', async () => {
+    // The helper merges its own index->element map for a continuation, so the
+    // tool layer has to as well: a click on something the model can still see in
+    // its own transcript must not come back nameless.
+    const pages: Record<string, unknown[]> = {
+      first: [{ index: 7, role: 'AXButton', name: 'Save' }],
+      second: [{ index: 61, role: 'AXButton', name: 'Bold' }],
+    };
+    const bridge = new FakeBridge()
+      .on('snapshot', (p) => ({
+        ...SNAP((p?.from === 60 ? pages.second : pages.first) as unknown[]),
+        summary: {
+          app: 'TextEdit',
+          window: 'Untitled',
+          elementCount: 812,
+          truncated: true,
+          ...(p?.from === 60 ? { offset: 60 } : {}),
+        },
+      }))
+      .on('click', () => ({ found: true, background: true, mode: 'AXPress' }));
+    const tools = collectTools(bridge);
+    await run(tools, 'mac_snapshot', {});
+    await run(tools, 'mac_snapshot', { from: 60 });
+    await run(tools, 'mac_click', { index: 7 });
+    const r = await run(tools, 'mac_snapshot', {});
+    expect(r.content[0]).toMatchObject({
+      text: expect.stringContaining('your last act: clicked [7] "Save"'),
+    });
+  });
+
   it('does not re-take a filtered-to-nothing look as a screenshot', async () => {
     // An empty PAGE is not an empty app. The old isAxOpaque test (elements
     // empty) would have fired the screenshot retake and recorded the app as

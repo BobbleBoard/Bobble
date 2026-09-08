@@ -90,19 +90,6 @@ export function editDiffLines(
 ): { lines: DiffLine[]; added: number; deleted: number } {
   const a = linesOf(oldText);
   const b = linesOf(newText);
-  // TEMPORARY (before/after capture only): reproduce the OLD block-for-block
-  // shape so the fix can be photographed against it in one run. Removed once
-  // the shots are taken.
-  if ((globalThis as { __pi_legacy_diff?: boolean }).__pi_legacy_diff === true) {
-    return {
-      lines: [
-        ...a.map((text): DiffLine => ({ kind: 'del', text })),
-        ...b.map((text): DiffLine => ({ kind: 'add', text })),
-      ],
-      added: b.length,
-      deleted: a.length,
-    };
-  }
   // One side only (a whole-file write, or an edit whose replacement has not
   // streamed in yet): every line is genuinely new or genuinely gone.
   if (a.length === 0 || b.length === 0 || a.length > LCS_LINE_CAP || b.length > LCS_LINE_CAP) {

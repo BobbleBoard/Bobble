@@ -207,9 +207,19 @@ export function AssistantGroup({
   let textN = 0;
   let activityN = 0;
   return (
-    // min-w-0 so this flex child can shrink below its content's intrinsic width
-    // and the prose reflows when the canvas narrows the column (blindtest #9).
-    <div className="flex min-w-0 flex-col gap-2">
+    /*
+     * min-w-0 so this flex child can shrink below its content's intrinsic width
+     * and the prose reflows when the canvas narrows the column (blindtest #9).
+     *
+     * max-w-full because min-width:0 is only half of that promise. `.pd-msg` is
+     * a flex COLUMN with `align-items: flex-start`, which sizes its children to
+     * their own max-content and does NOT clamp them to itself — so a group whose
+     * widest thing is wider than the message box (a 96-bar waveform; a long
+     * one-line title beside a timer and a Cancel) hung past the right edge and
+     * gave the whole conversation a horizontal scrollbar. MEASURED at a 720px
+     * viewport: the message box 398px, this child 430px.
+     */
+    <div className="flex min-w-0 max-w-full flex-col gap-2">
       {segments.map((seg) => {
         if (seg.kind === 'text') {
           return <Markdown key={`${groupId}-t${textN++}`} text={seg.text} />;

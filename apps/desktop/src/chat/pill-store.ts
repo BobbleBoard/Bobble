@@ -49,7 +49,19 @@ export const usePillStore = create<PillStore>((set) => ({
   // Replacing by id rather than appending: a source that publishes on every tick
   // (a countdown, a retry) should update its pill, not stack a hundred of them.
   show: (spec) => set((s) => ({ pills: [...s.pills.filter((p) => p.id !== spec.id), spec] })),
-  dismiss: (id) => set((s) => ({ pills: s.pills.filter((p) => p.id !== id) })),
+  /*
+   * A DISMISS THAT DISMISSES NOTHING CHANGES NOTHING.
+   *
+   * `filter` hands back a fresh array whether or not it removed anything, so
+   * every "make sure this pill is not showing" — and there are several, on
+   * effects that run on every store tick — replaced the list and re-rendered
+   * the pill for no reason. Harmless on its own and exactly the ingredient a
+   * setState/effect loop is made of, so it bails out instead.
+   */
+  dismiss: (id) =>
+    set((s) =>
+      s.pills.some((p) => p.id === id) ? { pills: s.pills.filter((p) => p.id !== id) } : s,
+    ),
 }));
 
 /* E2E hook, on the same `?piE2E=1` opt-in as the other store accessors: a probe

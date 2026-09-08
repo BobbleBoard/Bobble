@@ -464,8 +464,9 @@ function genEnvOverrideEnabled(): boolean {
 
 /**
  * The EFFECTIVE generation-stack state: the persisted setting OR the dev env
- * override. Consulted by the renderer's `useGen` hook + surface registration so
- * nothing generation-related mounts unless the flag / override is on.
+ * override. It is what decides whether the gen-tools extension is loaded into
+ * pi at all, so with it off the generate tools do not exist and nothing
+ * downstream — the bridge, the JobQueue, the thread's card — is ever reached.
  */
 export function generationEnabled(): boolean {
   return genEnvOverrideEnabled() || useSettingsStore.getState().settings.experimentalGeneration;

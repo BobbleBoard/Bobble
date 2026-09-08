@@ -3944,6 +3944,16 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
   min-width: 0;
   height: 34px;
   cursor: pointer;
+  /*
+   * THE BARS CLIP; THE CARD DOES NOT GROW.
+   *
+   * 96 bars at a 1px floor with 2px gaps have an intrinsic minimum of 286px, so
+   * in a narrow window the waveform pushed its own card 2px past the thread and
+   * gave the whole conversation a horizontal scrollbar (MEASURED at a 720px
+   * viewport). Losing the last bar or two of a 96-bucket picture of a sound is
+   * invisible; a conversation that scrolls sideways is not.
+   */
+  overflow: hidden;
 }
 
 .pd-thread-audio-bar {
@@ -4921,6 +4931,10 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
   object-fit: cover;
 }
 .pd-studio-job-shimmer {
+  /* Holds the mark centred on itself while it drifts underneath — see
+     StudioRun.tsx for why the room and the thread wait the same way. */
+  display: grid;
+  place-items: center;
   background: linear-gradient(
     100deg,
     var(--pd-bg-inset) 30%,

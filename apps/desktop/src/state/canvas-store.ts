@@ -47,11 +47,44 @@ export const useCanvasStore = create<CanvasUiState>((set) => ({
 // switch-away and restored on switch-back) instead of leaking across chats.
 
 let controller: CanvasController | null = null;
+/**
+ * The tab set as it was when the last controller went away.
+ *
+ * A render throw unmounts the whole tree, which unregisters the controller —
+ * so by the time anything asks "what was open?", the answer is gone. That is
+ * exactly when the question matters: the crash card's Reload puts the canvas
+ * back, and without this it came back empty (MEASURED by
+ * tests/e2e/crash-recovery-probe.mjs). Kept here rather than in app-reload
+ * because here is the only place that sees the controller leave.
+ */
+let lastKnown: CanvasState | null = null;
+
+/**
+ * A canvas waiting for a controller to put it back into.
+ *
+ * The app re-mounts from the ROOT on a safe reload, and `ChatApp` — which owns
+ * the controller — is behind the first-run gate, an async IPC round trip. So the
+ * restore is asked for before there is anywhere to restore INTO, and a plain
+ * `controller?.restore()` silently did nothing (MEASURED: the canvas came back
+ * empty from the crash card's Reload). Held here until the controller arrives.
+ */
+let pendingRestore: CanvasState | null = null;
 
 /** App shell → register (or, with `null`, unregister) the live CanvasController.
  * Idempotent; the latest registration wins. */
 export function registerCanvasController(c: CanvasController | null): void {
+  if (c === null && controller !== null) lastKnown = controller.getState();
   controller = c;
+  if (c !== null && pendingRestore !== null) {
+    const state = pendingRestore;
+    pendingRestore = null;
+    restoreCanvas(state);
+  }
+}
+
+/** The live canvas state, or the last one there was — see {@link lastKnown}. */
+export function lastKnownCanvas(): CanvasState | null {
+  return controller?.getState() ?? lastKnown;
 }
 
 /** The app's canvas controller, for code that runs outside React (event wiring). */
@@ -107,4 +140,19 @@ export function snapshotCanvas(): CanvasState | null {
 export function restoreCanvas(state: CanvasState): void {
   controller?.restore(state);
   useCanvasStore.getState().setCanvasOpen(state.tabs.length > 0);
+}
+
+/**
+ * Restore a canvas as soon as there is one to restore into.
+ *
+ * The same as {@link restoreCanvas} when the shell is up; when it is not — the
+ * frames after a safe reload, before `ChatApp` clears the first-run gate — the
+ * state is held and applied by the next {@link registerCanvasController}.
+ */
+export function restoreCanvasWhenReady(state: CanvasState): void {
+  if (controller !== null) {
+    restoreCanvas(state);
+    return;
+  }
+  pendingRestore = state;
 }

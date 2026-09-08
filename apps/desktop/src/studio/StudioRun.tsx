@@ -16,6 +16,7 @@
  */
 import { Button } from '@pi-desktop/ui';
 import { type JSX, useEffect, useState } from 'react';
+import { BobbleTileLoader } from '../chat/BobbleMark';
 import type { StudioJobState, StudioRun } from './use-studio';
 
 /** mm:ss, because "127s" is not how anyone reads a wait. */
@@ -97,9 +98,22 @@ export function StudioJob({
         {job.previewSrc !== undefined ? (
           // The picture as it resolves. Nothing else says "this is working" as
           // convincingly as watching it happen.
+          //
+          // It works now, too: these srcs were `file://` URLs and the renderer's
+          // CSP has never allowed that scheme, so every decoded step this room
+          // waited for was refused before it painted. See gen-manager's toSrc.
           <img className="pd-studio-job-preview" src={job.previewSrc} alt="" />
         ) : (
-          <div className="pd-studio-job-shimmer" aria-hidden="true" />
+          /*
+           * THE SAME WAIT AS THE THREAD'S. A generic shimmer here and the app's
+           * own sliding-tile mark in the chat would be two different answers to
+           * one question, from one engine, three inches apart in the same app —
+           * which is how a studio and a conversation stop looking like the same
+           * product. The shimmer stays as the ground underneath it.
+           */
+          <div className="pd-studio-job-shimmer" aria-hidden="true">
+            <BobbleTileLoader size={40} label="Working" />
+          </div>
         )}
       </div>
       <div className="pd-studio-job-side">
@@ -145,9 +159,11 @@ export function StudioJob({
             </>
           ) : null}
         </p>
-        {/* Only when there is something to stop. The audio path streams no job
-            events, so a Stop rendered there would be a control that is dead by
-            construction — worse than no control. */}
+        {/* Only when there is something to stop — i.e. once a job event has
+            named the job this room is watching. Audio used to stream none (the
+            gen manager built its events and threw them away, because the only
+            consumer was a canvas tab that could not draw a sound), so a Stop
+            here was dead by construction. It streams now, so it is not. */}
         {job.cancellable ? (
           <Button size="sm" variant="secondary" data-testid="studio-cancel" onClick={onCancel}>
             Stop

@@ -65,3 +65,47 @@ describe('AppErrorBoundary', () => {
     expect(el.textContent).toContain('Reload');
   });
 });
+
+/**
+ * THE BUTTONS HAVE TO DO SOMETHING.
+ *
+ * They did not: `window.location.reload()` and `window.location.search = ''`
+ * are renderer-initiated navigations, which main refuses (`will-navigate` →
+ * preventDefault), so the user's only way off this screen was ⌘R. These pin the two
+ * recoveries to the two buttons.
+ */
+describe('AppErrorBoundary recovery', () => {
+  it('Reload asks for a re-mount, not a navigation', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const { onSoftReload } = await import('./app-reload');
+    let asked = 0;
+    const off = onSoftReload(() => {
+      asked += 1;
+    });
+    const el = await mount(
+      <AppErrorBoundary>
+        <Boom />
+      </AppErrorBoundary>,
+    );
+    const button = el.querySelector<HTMLButtonElement>('[data-testid="app-crash-reload"]');
+    expect(button).not.toBeNull();
+    await act(async () => button?.click());
+    expect(asked).toBe(1);
+    off();
+  });
+
+  it('the fresh-window button asks MAIN to reload the document', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const invoke = vi.fn().mockResolvedValue({ ok: true });
+    (globalThis as unknown as { window: { piDesktop: unknown } }).window.piDesktop = { invoke };
+    const el = await mount(
+      <AppErrorBoundary>
+        <Boom />
+      </AppErrorBoundary>,
+    );
+    const button = el.querySelector<HTMLButtonElement>('[data-testid="app-crash-fresh"]');
+    expect(button).not.toBeNull();
+    await act(async () => button?.click());
+    expect(invoke).toHaveBeenCalledWith('app:reload-window', { fresh: true });
+  });
+});

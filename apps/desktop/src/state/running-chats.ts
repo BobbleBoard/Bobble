@@ -131,11 +131,21 @@ export function useRunningChats(): readonly RunningChat[] {
       }
     : null;
 
-  // Stable identity when idle so consumers don't re-render on every store tick.
+  /*
+   * Stable identity so consumers don't re-render on every store tick — and it
+   * has to be keyed on the CONTENT, not on the objects.
+   *
+   * `chat` and `bgChat` are built fresh in the body above, so a memo keyed on
+   * them never held: while anything was running, this returned a brand-new
+   * array on every render, which is the referential churn a React #185 loop is
+   * built from. The signature below is what actually changed.
+   */
+  const signature = JSON.stringify([chat, bgChat]);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `signature` IS the identity of chat/bgChat
   return useMemo(() => {
     const list = [chat, bgChat].filter((c): c is RunningChat => c !== null);
     return list.length === 0 ? EMPTY : list;
-  }, [chat, bgChat]);
+  }, [signature]);
 }
 
 /**

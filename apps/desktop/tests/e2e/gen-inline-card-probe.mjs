@@ -335,8 +335,9 @@ try {
   await page.waitForTimeout(400);
   const early = await page.evaluate(() =>
     Number.parseFloat(
-      getComputedStyle(document.querySelector('[data-testid="thread-image-placeholder"]'))
-        .getPropertyValue('--pd-dn-resolve') || '0',
+      getComputedStyle(
+        document.querySelector('[data-testid="thread-image-placeholder"]'),
+      ).getPropertyValue('--pd-dn-resolve') || '0',
     ),
   );
   check(early > 0 && early < 0.9, `the card is not mid-resolve at step 2/8 (resolve=${early})`);
@@ -528,6 +529,52 @@ try {
     `the thread scrolls sideways (${fit.scrollX} > ${fit.clientX})`,
   );
   await shot('12-audio-generating-narrow-dark');
+
+  // ── 9. THE STUDIO WAITS THE SAME WAY ────────────────────────────────────
+  /*
+   * ONE ANIMATION, NOT TWO. the user asked for the thread's card to be "the same
+   * card its studio would show"; a generic shimmer in the room and the app's own
+   * sliding mark in the conversation would be two answers to one question, from
+   * one engine, in one app.
+   *
+   * The BACKEND is stubbed (a `gen:generate` that never resolves) and nothing
+   * else is: the studio, its composer, its job card and the loader inside it are
+   * the real ones. Weights and a GPU would prove the generator runs, which is a
+   * different question from how the wait is drawn.
+   */
+  await page.setViewportSize({ width: 1440, height: 900 });
+  /*
+   * STUBBED IN MAIN, not in the page. `contextBridge` objects are frozen in the
+   * isolated world, so reassigning `window.piDesktop.invoke` silently does
+   * nothing — the first cut of this looked like it had stubbed the backend and
+   * had in fact started a real generation, which announced itself by downloading
+   * a Python runtime. Replacing the IPC handler is the seam that actually holds.
+   */
+  await app.evaluate(({ ipcMain }) => {
+    ipcMain.removeHandler('gen:generate');
+    ipcMain.handle('gen:generate', () => new Promise(() => {}));
+  });
+  // The Modalities group can start collapsed; the studio itself is a lazy chunk.
+  if ((await page.$('[data-testid="modality-image"]')) === null) {
+    await page.click('text=Modalities');
+    await page.waitForTimeout(300);
+  }
+  await page.click('[data-testid="modality-image"]');
+  await page.waitForSelector('[data-testid="image-studio"], .pd-studio', { timeout: 30_000 });
+  await page.waitForTimeout(800);
+  const prompt = await page.$('[data-testid="studio-prompt"]');
+  if (prompt !== null) {
+    await prompt.click();
+    await page.keyboard.type('a red fox in deep snow');
+    await page.click('[data-testid="studio-run"]');
+    await page.waitForSelector('[data-testid="studio-job"]', { timeout: 15_000 });
+    await page.waitForTimeout(900);
+    const inStudio = await page.$('[data-testid="studio-job"] [data-testid="bobble-tile-loader"]');
+    check(inStudio !== null, 'the studio waits with a different animation from the thread');
+    await shot('13-studio-generating');
+  } else {
+    check(false, 'the image studio never offered a prompt to run');
+  }
 
   // Nothing anywhere in this run should have reached the canvas.
   const canvasEnd = await canvasState();

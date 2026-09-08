@@ -18,7 +18,7 @@
    "name": "Parity review baseline",
    "role": "AXTextArea",
    "value": "Parity review baseline",
-   "win": 37767
+   "win": 38062
   },
   {
    "actions": [
@@ -34,7 +34,7 @@
    "index": 2,
    "name": "bold",
    "role": "AXCheckBox",
-   "win": 37767
+   "win": 38062
   },
   {
    "actions": [
@@ -50,7 +50,7 @@
    "index": 3,
    "name": "italic",
    "role": "AXCheckBox",
-   "win": 37767
+   "win": 38062
   },
   {
    "actions": [
@@ -66,7 +66,7 @@
    "index": 4,
    "name": "underline",
    "role": "AXCheckBox",
-   "win": 37767
+   "win": 38062
   },
   {
    "actions": [
@@ -82,7 +82,7 @@
    "index": 5,
    "name": "strikethrough",
    "role": "AXCheckBox",
-   "win": 37767
+   "win": 38062
   },
   {
    "actions": [
@@ -99,7 +99,7 @@
    "index": 6,
    "name": "text color",
    "role": "AXButton",
-   "win": 37767
+   "win": 38062
   },
   {
    "actions": [
@@ -116,7 +116,7 @@
    "index": 7,
    "name": "text background color",
    "role": "AXButton",
-   "win": 37767
+   "win": 38062
   },
   {
    "actions": [
@@ -133,7 +133,7 @@
    "index": 8,
    "name": "typeface",
    "role": "AXPopUpButton",
-   "win": 37767
+   "win": 38062
   },
   {
    "actions": [
@@ -150,7 +150,7 @@
    "index": 9,
    "name": "style",
    "role": "AXPopUpButton",
-   "win": 37767
+   "win": 38062
   },
   {
    "actions": [
@@ -169,7 +169,7 @@
    "name": "font size",
    "role": "AXComboBox",
    "value": "12",
-   "win": 37767
+   "win": 38062
   },
   {
    "actions": [
@@ -185,7 +185,7 @@
    "index": 11,
    "name": "font size",
    "role": "AXButton",
-   "win": 37767
+   "win": 38062
   },
   {
    "actions": [
@@ -201,7 +201,7 @@
    "index": 12,
    "name": "align left",
    "role": "AXCheckBox",
-   "win": 37767
+   "win": 38062
   },
   {
    "actions": [
@@ -217,7 +217,7 @@
    "index": 13,
    "name": "align center",
    "role": "AXCheckBox",
-   "win": 37767
+   "win": 38062
   },
   {
    "actions": [
@@ -233,7 +233,7 @@
    "index": 14,
    "name": "align right",
    "role": "AXCheckBox",
-   "win": 37767
+   "win": 38062
   },
   {
    "actions": [
@@ -249,7 +249,7 @@
    "index": 15,
    "name": "fully justify",
    "role": "AXCheckBox",
-   "win": 37767
+   "win": 38062
   },
   {
    "actions": [
@@ -266,7 +266,7 @@
    "index": 16,
    "name": "list style",
    "role": "AXMenuButton",
-   "win": 37767
+   "win": 38062
   },
   {
    "actions": [
@@ -283,7 +283,7 @@
    "index": 17,
    "name": "line spacing",
    "role": "AXPopUpButton",
-   "win": 37767
+   "win": 38062
   },
   {
    "actions": [
@@ -299,7 +299,7 @@
    "index": 18,
    "name": "close button",
    "role": "AXButton",
-   "win": 37767
+   "win": 38062
   },
   {
    "actions": [
@@ -317,7 +317,7 @@
    "index": 19,
    "name": "full screen button",
    "role": "AXButton",
-   "win": 37767
+   "win": 38062
   },
   {
    "actions": [
@@ -333,7 +333,7 @@
    "index": 20,
    "name": "minimize button",
    "role": "AXButton",
-   "win": 37767
+   "win": 38062
   },
   {
    "actions": [
@@ -343,14 +343,14 @@
    "bbox": {
     "h": 18,
     "w": 55,
-    "x": 400,
+    "x": 399,
     "y": 118
    },
    "enabled": false,
    "index": 21,
    "name": "Edited",
    "role": "AXMenuButton",
-   "win": 37767
+   "win": 38062
   },
   {
    "actions": [
@@ -365,11 +365,11 @@
    "editable": true,
    "enabled": true,
    "index": 22,
-   "name": "Bobble is driving this window in the background. Screen Recording is off, so the monitor is drawing this window from th…",
+   "name": "Parity review baseline",
    "role": "AXTextArea",
-   "surface": "Screen Recording of Accessibility Tree 7",
-   "value": "Bobble is driving this window in the background. Screen Recording is off, so the monitor is drawing this window from th…",
-   "win": 37765
+   "surface": "Untitled 16",
+   "value": "Parity review baseline",
+   "win": 38060
   },
   {
    "actions": [
@@ -385,8 +385,8 @@
    "index": 23,
    "name": "bold",
    "role": "AXCheckBox",
-   "surface": "Screen Recording of Accessibility Tree 7",
-   "win": 37765
+   "surface": "Untitled 16",
+   "win": 38060
   },
   {
    "actions": [
@@ -402,8 +402,8 @@
    "index": 24,
    "name": "italic",
    "role": "AXCheckBox",
-   "surface": "Screen Recording of Accessibility Tree 7",
-   "win": 37765
+   "surface": "Untitled 16",
+   "win": 38060
   },
   {
    "actions": [
@@ -419,8 +419,8 @@
    "index": 25,
    "name": "underline",
    "role": "AXCheckBox",
-   "surface": "Screen Recording of Accessibility Tree 7",
-   "win": 37765
+   "surface": "Untitled 16",
+   "win": 38060
   },
   {
    "actions": [
@@ -436,8 +436,8 @@
    "index": 26,
    "name": "strikethrough",
    "role": "AXCheckBox",
-   "surface": "Screen Recording of Accessibility Tree 7",
-   "win": 37765
+   "surface": "Untitled 16",
+   "win": 38060
   },
   {
    "actions": [
@@ -454,8 +454,8 @@
    "index": 27,
    "name": "text color",
    "role": "AXButton",
-   "surface": "Screen Recording of Accessibility Tree 7",
-   "win": 37765
+   "surface": "Untitled 16",
+   "win": 38060
   },
   {
    "actions": [
@@ -472,8 +472,8 @@
    "index": 28,
    "name": "text background color",
    "role": "AXButton",
-   "surface": "Screen Recording of Accessibility Tree 7",
-   "win": 37765
+   "surface": "Untitled 16",
+   "win": 38060
   },
   {
    "actions": [
@@ -490,8 +490,8 @@
    "index": 29,
    "name": "typeface",
    "role": "AXPopUpButton",
-   "surface": "Screen Recording of Accessibility Tree 7",
-   "win": 37765
+   "surface": "Untitled 16",
+   "win": 38060
   },
   {
    "actions": [
@@ -508,8 +508,8 @@
    "index": 30,
    "name": "style",
    "role": "AXPopUpButton",
-   "surface": "Screen Recording of Accessibility Tree 7",
-   "win": 37765
+   "surface": "Untitled 16",
+   "win": 38060
   },
   {
    "actions": [
@@ -527,9 +527,9 @@
    "index": 31,
    "name": "font size",
    "role": "AXComboBox",
-   "surface": "Screen Recording of Accessibility Tree 7",
+   "surface": "Untitled 16",
    "value": "12",
-   "win": 37765
+   "win": 38060
   },
   {
    "actions": [
@@ -545,8 +545,8 @@
    "index": 32,
    "name": "font size",
    "role": "AXButton",
-   "surface": "Screen Recording of Accessibility Tree 7",
-   "win": 37765
+   "surface": "Untitled 16",
+   "win": 38060
   },
   {
    "actions": [
@@ -562,8 +562,8 @@
    "index": 33,
    "name": "align left",
    "role": "AXCheckBox",
-   "surface": "Screen Recording of Accessibility Tree 7",
-   "win": 37765
+   "surface": "Untitled 16",
+   "win": 38060
   },
   {
    "actions": [
@@ -579,8 +579,8 @@
    "index": 34,
    "name": "align center",
    "role": "AXCheckBox",
-   "surface": "Screen Recording of Accessibility Tree 7",
-   "win": 37765
+   "surface": "Untitled 16",
+   "win": 38060
   },
   {
    "actions": [
@@ -596,8 +596,8 @@
    "index": 35,
    "name": "align right",
    "role": "AXCheckBox",
-   "surface": "Screen Recording of Accessibility Tree 7",
-   "win": 37765
+   "surface": "Untitled 16",
+   "win": 38060
   },
   {
    "actions": [
@@ -613,8 +613,8 @@
    "index": 36,
    "name": "fully justify",
    "role": "AXCheckBox",
-   "surface": "Screen Recording of Accessibility Tree 7",
-   "win": 37765
+   "surface": "Untitled 16",
+   "win": 38060
   },
   {
    "actions": [
@@ -631,8 +631,8 @@
    "index": 37,
    "name": "list style",
    "role": "AXMenuButton",
-   "surface": "Screen Recording of Accessibility Tree 7",
-   "win": 37765
+   "surface": "Untitled 16",
+   "win": 38060
   },
   {
    "actions": [
@@ -649,8 +649,8 @@
    "index": 38,
    "name": "line spacing",
    "role": "AXPopUpButton",
-   "surface": "Screen Recording of Accessibility Tree 7",
-   "win": 37765
+   "surface": "Untitled 16",
+   "win": 38060
   },
   {
    "actions": [
@@ -666,8 +666,8 @@
    "index": 39,
    "name": "close button",
    "role": "AXButton",
-   "surface": "Screen Recording of Accessibility Tree 7",
-   "win": 37765
+   "surface": "Untitled 16",
+   "win": 38060
   },
   {
    "actions": [
@@ -685,8 +685,8 @@
    "index": 40,
    "name": "full screen button",
    "role": "AXButton",
-   "surface": "Screen Recording of Accessibility Tree 7",
-   "win": 37765
+   "surface": "Untitled 16",
+   "win": 38060
   },
   {
    "actions": [
@@ -702,8 +702,8 @@
    "index": 41,
    "name": "minimize button",
    "role": "AXButton",
-   "surface": "Screen Recording of Accessibility Tree 7",
-   "win": 37765
+   "surface": "Untitled 16",
+   "win": 38060
   },
   {
    "actions": [
@@ -713,15 +713,15 @@
    "bbox": {
     "h": 18,
     "w": 12,
-    "x": 521,
+    "x": 332,
     "y": 89
    },
    "enabled": false,
    "index": 42,
    "name": "document actions",
    "role": "AXMenuButton",
-   "surface": "Screen Recording of Accessibility Tree 7",
-   "win": 37765
+   "surface": "Untitled 16",
+   "win": 38060
   }
  ],
  "menus": [
@@ -738,12 +738,12 @@
   "hint": "macOS has not granted this app Screen Recording. Until it does, apps read as empty and screenshots are blank. Enable them in System Settings > Privacy & Security.",
   "screenRecording": false
  },
- "pid": 32866,
+ "pid": 42659,
  "summary": {
   "app": "TextEdit",
   "elementCount": 42,
   "truncated": false,
-  "window": "Untitled 16"
+  "window": "Untitled 17"
  },
  "union": {
   "h": 534,
@@ -751,14 +751,14 @@
   "x": 152,
   "y": 73
  },
- "window": "Untitled 16",
+ "window": "Untitled 17",
  "windowBounds": {
   "h": 505,
   "w": 603,
   "x": 181,
   "y": 102
  },
- "windowId": 37767,
+ "windowId": 38062,
  "windows": [
   {
    "focused": true,
@@ -768,14 +768,14 @@
     "x": 181,
     "y": 102
    },
-   "hostPid": 32866,
+   "hostPid": 42659,
    "main": true,
    "modal": false,
    "role": "AXWindow",
    "sheet": false,
    "subrole": "AXDialog",
-   "title": "Untitled 16",
-   "windowId": 37767
+   "title": "Untitled 17",
+   "windowId": 38062
   },
   {
    "focused": false,
@@ -785,14 +785,14 @@
     "x": 152,
     "y": 73
    },
-   "hostPid": 32866,
+   "hostPid": 42659,
    "main": false,
    "modal": false,
    "role": "AXWindow",
    "sheet": false,
    "subrole": "AXDialog",
-   "title": "Screen Recording of Accessibility Tree 7",
-   "windowId": 37765
+   "title": "Untitled 16",
+   "windowId": 38060
   }
  ]
 }

@@ -15,7 +15,7 @@
    "index": 2,
    "name": "bold",
    "role": "AXCheckBox",
-   "win": 37829
+   "win": 38125
   },
   {
    "actions": [
@@ -31,8 +31,8 @@
    "index": 23,
    "name": "bold",
    "role": "AXCheckBox",
-   "surface": "Untitled 63",
-   "win": 37828
+   "surface": "Untitled 64",
+   "win": 38124
   },
   {
    "actions": [
@@ -48,8 +48,8 @@
    "index": 44,
    "name": "bold",
    "role": "AXCheckBox",
-   "surface": "Untitled 62",
-   "win": 37827
+   "surface": "Untitled 63",
+   "win": 38123
   },
   {
    "actions": [
@@ -65,8 +65,8 @@
    "index": 65,
    "name": "bold",
    "role": "AXCheckBox",
-   "surface": "Untitled 61",
-   "win": 37826
+   "surface": "Untitled 62",
+   "win": 38122
   },
   {
    "actions": [
@@ -82,8 +82,8 @@
    "index": 86,
    "name": "bold",
    "role": "AXCheckBox",
-   "surface": "Untitled 60",
-   "win": 37825
+   "surface": "Untitled 61",
+   "win": 38121
   },
   {
    "actions": [
@@ -99,8 +99,8 @@
    "index": 107,
    "name": "bold",
    "role": "AXCheckBox",
-   "surface": "Untitled 59",
-   "win": 37824
+   "surface": "Untitled 60",
+   "win": 38120
   },
   {
    "actions": [
@@ -116,8 +116,8 @@
    "index": 128,
    "name": "bold",
    "role": "AXCheckBox",
-   "surface": "Untitled 58",
-   "win": 37823
+   "surface": "Untitled 59",
+   "win": 38119
   },
   {
    "actions": [
@@ -133,8 +133,8 @@
    "index": 149,
    "name": "bold",
    "role": "AXCheckBox",
-   "surface": "Untitled 57",
-   "win": 37822
+   "surface": "Untitled 58",
+   "win": 38118
   },
   {
    "actions": [
@@ -150,8 +150,8 @@
    "index": 170,
    "name": "bold",
    "role": "AXCheckBox",
-   "surface": "Untitled 56",
-   "win": 37821
+   "surface": "Untitled 57",
+   "win": 38117
   },
   {
    "actions": [
@@ -167,8 +167,8 @@
    "index": 191,
    "name": "bold",
    "role": "AXCheckBox",
-   "surface": "Untitled 55",
-   "win": 37820
+   "surface": "Untitled 56",
+   "win": 38116
   },
   {
    "actions": [
@@ -184,8 +184,8 @@
    "index": 212,
    "name": "bold",
    "role": "AXCheckBox",
-   "surface": "Untitled 54",
-   "win": 37819
+   "surface": "Untitled 55",
+   "win": 38115
   },
   {
    "actions": [
@@ -201,8 +201,8 @@
    "index": 233,
    "name": "bold",
    "role": "AXCheckBox",
-   "surface": "Untitled 53",
-   "win": 37818
+   "surface": "Untitled 54",
+   "win": 38114
   },
   {
    "actions": [
@@ -218,8 +218,8 @@
    "index": 254,
    "name": "bold",
    "role": "AXCheckBox",
-   "surface": "Untitled 52",
-   "win": 37817
+   "surface": "Untitled 53",
+   "win": 38113
   },
   {
    "actions": [
@@ -235,8 +235,8 @@
    "index": 275,
    "name": "bold",
    "role": "AXCheckBox",
-   "surface": "Untitled 51",
-   "win": 37816
+   "surface": "Untitled 52",
+   "win": 38112
   },
   {
    "actions": [
@@ -252,8 +252,8 @@
    "index": 296,
    "name": "bold",
    "role": "AXCheckBox",
-   "surface": "Untitled 50",
-   "win": 37815
+   "surface": "Untitled 51",
+   "win": 38111
   },
   {
    "actions": [
@@ -269,8 +269,8 @@
    "index": 317,
    "name": "bold",
    "role": "AXCheckBox",
-   "surface": "Untitled 49",
-   "win": 37814
+   "surface": "Untitled 50",
+   "win": 38110
   },
   {
    "actions": [
@@ -286,8 +286,8 @@
    "index": 338,
    "name": "bold",
    "role": "AXCheckBox",
-   "surface": "Untitled 48",
-   "win": 37813
+   "surface": "Untitled 49",
+   "win": 38109
   },
   {
    "actions": [
@@ -303,8 +303,8 @@
    "index": 359,
    "name": "bold",
    "role": "AXCheckBox",
-   "surface": "Untitled 47",
-   "win": 37812
+   "surface": "Untitled 48",
+   "win": 38108
   },
   {
    "actions": [
@@ -320,8 +320,8 @@
    "index": 380,
    "name": "bold",
    "role": "AXCheckBox",
-   "surface": "Untitled 46",
-   "win": 37811
+   "surface": "Untitled 47",
+   "win": 38107
   },
   {
    "actions": [
@@ -337,8 +337,8 @@
    "index": 401,
    "name": "bold",
    "role": "AXCheckBox",
-   "surface": "Untitled 45",
-   "win": 37810
+   "surface": "Untitled 46",
+   "win": 38106
   },
   {
    "actions": [
@@ -354,8 +354,8 @@
    "index": 422,
    "name": "bold",
    "role": "AXCheckBox",
-   "surface": "Untitled 44",
-   "win": 37809
+   "surface": "Untitled 45",
+   "win": 38105
   },
   {
    "actions": [
@@ -371,8 +371,8 @@
    "index": 443,
    "name": "bold",
    "role": "AXCheckBox",
-   "surface": "Untitled 43",
-   "win": 37808
+   "surface": "Untitled 44",
+   "win": 38104
   },
   {
    "actions": [
@@ -388,8 +388,8 @@
    "index": 464,
    "name": "bold",
    "role": "AXCheckBox",
-   "surface": "Untitled 42",
-   "win": 37807
+   "surface": "Untitled 43",
+   "win": 38103
   },
   {
    "actions": [
@@ -405,8 +405,8 @@
    "index": 485,
    "name": "bold",
    "role": "AXCheckBox",
-   "surface": "Untitled 41",
-   "win": 37806
+   "surface": "Untitled 42",
+   "win": 38102
   },
   {
    "actions": [
@@ -422,8 +422,8 @@
    "index": 506,
    "name": "bold",
    "role": "AXCheckBox",
-   "surface": "Untitled 40",
-   "win": 37805
+   "surface": "Untitled 41",
+   "win": 38101
   },
   {
    "actions": [
@@ -439,8 +439,8 @@
    "index": 527,
    "name": "bold",
    "role": "AXCheckBox",
-   "surface": "Untitled 39",
-   "win": 37804
+   "surface": "Untitled 40",
+   "win": 38100
   },
   {
    "actions": [
@@ -456,8 +456,8 @@
    "index": 548,
    "name": "bold",
    "role": "AXCheckBox",
-   "surface": "Untitled 38",
-   "win": 37803
+   "surface": "Untitled 39",
+   "win": 38099
   },
   {
    "actions": [
@@ -473,8 +473,8 @@
    "index": 569,
    "name": "bold",
    "role": "AXCheckBox",
-   "surface": "Untitled 37",
-   "win": 37802
+   "surface": "Untitled 38",
+   "win": 38098
   },
   {
    "actions": [
@@ -490,8 +490,8 @@
    "index": 590,
    "name": "bold",
    "role": "AXCheckBox",
-   "surface": "Untitled 36",
-   "win": 37801
+   "surface": "Untitled 37",
+   "win": 38097
   },
   {
    "actions": [
@@ -507,8 +507,8 @@
    "index": 611,
    "name": "bold",
    "role": "AXCheckBox",
-   "surface": "Untitled 35",
-   "win": 37800
+   "surface": "Untitled 36",
+   "win": 38096
   },
   {
    "actions": [
@@ -524,8 +524,8 @@
    "index": 632,
    "name": "bold",
    "role": "AXCheckBox",
-   "surface": "Untitled 34",
-   "win": 37799
+   "surface": "Untitled 35",
+   "win": 38095
   },
   {
    "actions": [
@@ -541,8 +541,8 @@
    "index": 653,
    "name": "bold",
    "role": "AXCheckBox",
-   "surface": "Untitled 33",
-   "win": 37798
+   "surface": "Untitled 34",
+   "win": 38094
   },
   {
    "actions": [
@@ -558,8 +558,8 @@
    "index": 674,
    "name": "bold",
    "role": "AXCheckBox",
-   "surface": "Untitled 32",
-   "win": 37797
+   "surface": "Untitled 33",
+   "win": 38093
   },
   {
    "actions": [
@@ -575,8 +575,8 @@
    "index": 695,
    "name": "bold",
    "role": "AXCheckBox",
-   "surface": "Untitled 31",
-   "win": 37796
+   "surface": "Untitled 32",
+   "win": 38092
   },
   {
    "actions": [
@@ -592,8 +592,8 @@
    "index": 716,
    "name": "bold",
    "role": "AXCheckBox",
-   "surface": "Untitled 30",
-   "win": 37795
+   "surface": "Untitled 31",
+   "win": 38091
   },
   {
    "actions": [
@@ -609,8 +609,8 @@
    "index": 737,
    "name": "bold",
    "role": "AXCheckBox",
-   "surface": "Untitled 29",
-   "win": 37794
+   "surface": "Untitled 30",
+   "win": 38090
   },
   {
    "actions": [
@@ -626,8 +626,8 @@
    "index": 758,
    "name": "bold",
    "role": "AXCheckBox",
-   "surface": "Untitled 28",
-   "win": 37793
+   "surface": "Untitled 29",
+   "win": 38089
   },
   {
    "actions": [
@@ -643,8 +643,8 @@
    "index": 779,
    "name": "bold",
    "role": "AXCheckBox",
-   "surface": "Untitled 27",
-   "win": 37792
+   "surface": "Untitled 28",
+   "win": 38088
   },
   {
    "actions": [
@@ -660,8 +660,8 @@
    "index": 800,
    "name": "bold",
    "role": "AXCheckBox",
-   "surface": "Untitled 26",
-   "win": 37791
+   "surface": "Untitled 27",
+   "win": 38087
   },
   {
    "actions": [
@@ -677,8 +677,8 @@
    "index": 821,
    "name": "bold",
    "role": "AXCheckBox",
-   "surface": "Untitled 25",
-   "win": 37788
+   "surface": "Untitled 26",
+   "win": 38086
   },
   {
    "actions": [
@@ -694,8 +694,8 @@
    "index": 842,
    "name": "bold",
    "role": "AXCheckBox",
-   "surface": "Untitled 24",
-   "win": 37787
+   "surface": "Untitled 25",
+   "win": 38083
   },
   {
    "actions": [
@@ -711,8 +711,8 @@
    "index": 863,
    "name": "bold",
    "role": "AXCheckBox",
-   "surface": "Untitled 23",
-   "win": 37786
+   "surface": "Untitled 24",
+   "win": 38082
   },
   {
    "actions": [
@@ -728,8 +728,8 @@
    "index": 884,
    "name": "bold",
    "role": "AXCheckBox",
-   "surface": "Untitled 22",
-   "win": 37785
+   "surface": "Untitled 23",
+   "win": 38081
   },
   {
    "actions": [
@@ -745,8 +745,8 @@
    "index": 905,
    "name": "bold",
    "role": "AXCheckBox",
-   "surface": "Untitled 21",
-   "win": 37784
+   "surface": "Untitled 22",
+   "win": 38080
   },
   {
    "actions": [
@@ -762,8 +762,8 @@
    "index": 926,
    "name": "bold",
    "role": "AXCheckBox",
-   "surface": "Untitled 20",
-   "win": 37783
+   "surface": "Untitled 21",
+   "win": 38079
   },
   {
    "actions": [
@@ -779,8 +779,8 @@
    "index": 947,
    "name": "bold",
    "role": "AXCheckBox",
-   "surface": "Untitled 19",
-   "win": 37782
+   "surface": "Untitled 20",
+   "win": 38078
   },
   {
    "actions": [
@@ -796,8 +796,8 @@
    "index": 968,
    "name": "bold",
    "role": "AXCheckBox",
-   "surface": "Untitled 18",
-   "win": 37781
+   "surface": "Untitled 19",
+   "win": 38077
   },
   {
    "actions": [
@@ -813,8 +813,8 @@
    "index": 990,
    "name": "bold",
    "role": "AXCheckBox",
-   "surface": "Untitled 17",
-   "win": 37780
+   "surface": "Untitled 18",
+   "win": 38076
   },
   {
    "actions": [
@@ -830,8 +830,8 @@
    "index": 1011,
    "name": "bold",
    "role": "AXCheckBox",
-   "surface": "Untitled 16",
-   "win": 37767
+   "surface": "Untitled 17",
+   "win": 38062
   },
   {
    "actions": [
@@ -847,8 +847,8 @@
    "index": 1032,
    "name": "bold",
    "role": "AXCheckBox",
-   "surface": "Screen Recording of Accessibility Tree 7",
-   "win": 37765
+   "surface": "Untitled 16",
+   "win": 38060
   }
  ],
  "menus": [
@@ -865,14 +865,14 @@
   "hint": "macOS has not granted this app Screen Recording. Until it does, apps read as empty and screenshots are blank. Enable them in System Settings > Privacy & Security.",
   "screenRecording": false
  },
- "pid": 32866,
+ "pid": 42659,
  "summary": {
   "app": "TextEdit",
   "elementCount": 1051,
   "find": "bold",
   "matched": 50,
   "truncated": false,
-  "window": "Untitled 64"
+  "window": "Untitled 65"
  },
  "union": {
   "h": 853,
@@ -880,14 +880,14 @@
   "x": 14,
   "y": 47
  },
- "window": "Untitled 64",
+ "window": "Untitled 65",
  "windowBounds": {
   "h": 505,
   "w": 603,
   "x": 652,
   "y": 89
  },
- "windowId": 37829,
+ "windowId": 38125,
  "windows": [
   {
    "focused": true,
@@ -897,14 +897,14 @@
     "x": 652,
     "y": 89
    },
-   "hostPid": 32866,
+   "hostPid": 42659,
    "main": true,
    "modal": false,
    "role": "AXWindow",
    "sheet": false,
    "subrole": "AXStandardWindow",
-   "title": "Untitled 64",
-   "windowId": 37829
+   "title": "Untitled 65",
+   "windowId": 38125
   },
   {
    "focused": false,
@@ -914,14 +914,14 @@
     "x": 623,
     "y": 394
    },
-   "hostPid": 32866,
+   "hostPid": 42659,
    "main": false,
    "modal": false,
    "role": "AXWindow",
    "sheet": false,
    "subrole": "AXStandardWindow",
-   "title": "Untitled 63",
-   "windowId": 37828
+   "title": "Untitled 64",
+   "windowId": 38124
   },
   {
    "focused": false,
@@ -931,14 +931,14 @@
     "x": 594,
     "y": 365
    },
-   "hostPid": 32866,
+   "hostPid": 42659,
    "main": false,
    "modal": false,
    "role": "AXWindow",
    "sheet": false,
    "subrole": "AXStandardWindow",
-   "title": "Untitled 62",
-   "windowId": 37827
+   "title": "Untitled 63",
+   "windowId": 38123
   },
   {
    "focused": false,
@@ -948,14 +948,14 @@
     "x": 565,
     "y": 336
    },
-   "hostPid": 32866,
+   "hostPid": 42659,
    "main": false,
    "modal": false,
    "role": "AXWindow",
    "sheet": false,
    "subrole": "AXStandardWindow",
-   "title": "Untitled 61",
-   "windowId": 37826
+   "title": "Untitled 62",
+   "windowId": 38122
   },
   {
    "focused": false,
@@ -965,14 +965,14 @@
     "x": 536,
     "y": 307
    },
-   "hostPid": 32866,
+   "hostPid": 42659,
    "main": false,
    "modal": false,
    "role": "AXWindow",
    "sheet": false,
    "subrole": "AXStandardWindow",
-   "title": "Untitled 60",
-   "windowId": 37825
+   "title": "Untitled 61",
+   "windowId": 38121
   },
   {
    "focused": false,
@@ -982,14 +982,14 @@
     "x": 507,
     "y": 278
    },
-   "hostPid": 32866,
+   "hostPid": 42659,
    "main": false,
    "modal": false,
    "role": "AXWindow",
    "sheet": false,
    "subrole": "AXStandardWindow",
-   "title": "Untitled 59",
-   "windowId": 37824
+   "title": "Untitled 60",
+   "windowId": 38120
   },
   {
    "focused": false,
@@ -999,14 +999,14 @@
     "x": 478,
     "y": 249
    },
-   "hostPid": 32866,
+   "hostPid": 42659,
    "main": false,
    "modal": false,
    "role": "AXWindow",
    "sheet": false,
    "subrole": "AXStandardWindow",
-   "title": "Untitled 58",
-   "windowId": 37823
+   "title": "Untitled 59",
+   "windowId": 38119
   },
   {
    "focused": false,
@@ -1016,14 +1016,14 @@
     "x": 449,
     "y": 220
    },
-   "hostPid": 32866,
+   "hostPid": 42659,
    "main": false,
    "modal": false,
    "role": "AXWindow",
    "sheet": false,
    "subrole": "AXStandardWindow",
-   "title": "Untitled 57",
-   "windowId": 37822
+   "title": "Untitled 58",
+   "windowId": 38118
   },
   {
    "focused": false,
@@ -1033,14 +1033,14 @@
     "x": 420,
     "y": 191
    },
-   "hostPid": 32866,
+   "hostPid": 42659,
    "main": false,
    "modal": false,
    "role": "AXWindow",
    "sheet": false,
    "subrole": "AXStandardWindow",
-   "title": "Untitled 56",
-   "windowId": 37821
+   "title": "Untitled 57",
+   "windowId": 38117
   },
   {
    "focused": false,
@@ -1050,14 +1050,14 @@
     "x": 391,
     "y": 162
    },
-   "hostPid": 32866,
+   "hostPid": 42659,
    "main": false,
    "modal": false,
    "role": "AXWindow",
    "sheet": false,
    "subrole": "AXStandardWindow",
-   "title": "Untitled 55",
-   "windowId": 37820
+   "title": "Untitled 56",
+   "windowId": 38116
   },
   {
    "focused": false,
@@ -1067,14 +1067,14 @@
     "x": 362,
     "y": 133
    },
-   "hostPid": 32866,
+   "hostPid": 42659,
    "main": false,
    "modal": false,
    "role": "AXWindow",
    "sheet": false,
    "subrole": "AXStandardWindow",
-   "title": "Untitled 54",
-   "windowId": 37819
+   "title": "Untitled 55",
+   "windowId": 38115
   },
   {
    "focused": false,
@@ -1084,14 +1084,14 @@
     "x": 333,
     "y": 104
    },
-   "hostPid": 32866,
+   "hostPid": 42659,
    "main": false,
    "modal": false,
    "role": "AXWindow",
    "sheet": false,
    "subrole": "AXStandardWindow",
-   "title": "Untitled 53",
-   "windowId": 37818
+   "title": "Untitled 54",
+   "windowId": 38114
   },
   {
    "focused": false,
@@ -1101,14 +1101,14 @@
     "x": 304,
     "y": 75
    },
-   "hostPid": 32866,
+   "hostPid": 42659,
    "main": false,
    "modal": false,
    "role": "AXWindow",
    "sheet": false,
    "subrole": "AXStandardWindow",
-   "title": "Untitled 52",
-   "windowId": 37817
+   "title": "Untitled 53",
+   "windowId": 38113
   },
   {
    "focused": false,
@@ -1118,14 +1118,14 @@
     "x": 275,
     "y": 380
    },
-   "hostPid": 32866,
+   "hostPid": 42659,
    "main": false,
    "modal": false,
    "role": "AXWindow",
    "sheet": false,
    "subrole": "AXStandardWindow",
-   "title": "Untitled 51",
-   "windowId": 37816
+   "title": "Untitled 52",
+   "windowId": 38112
   },
   {
    "focused": false,
@@ -1135,14 +1135,14 @@
     "x": 246,
     "y": 351
    },
-   "hostPid": 32866,
+   "hostPid": 42659,
    "main": false,
    "modal": false,
    "role": "AXWindow",
    "sheet": false,
    "subrole": "AXStandardWindow",
-   "title": "Untitled 50",
-   "windowId": 37815
+   "title": "Untitled 51",
+   "windowId": 38111
   },
   {
    "focused": false,
@@ -1152,14 +1152,14 @@
     "x": 217,
     "y": 322
    },
-   "hostPid": 32866,
+   "hostPid": 42659,
    "main": false,
    "modal": false,
    "role": "AXWindow",
    "sheet": false,
    "subrole": "AXStandardWindow",
-   "title": "Untitled 49",
-   "windowId": 37814
+   "title": "Untitled 50",
+   "windowId": 38110
   },
   {
    "focused": false,
@@ -1169,14 +1169,14 @@
     "x": 188,
     "y": 293
    },
-   "hostPid": 32866,
+   "hostPid": 42659,
    "main": false,
    "modal": false,
    "role": "AXWindow",
    "sheet": false,
    "subrole": "AXStandardWindow",
-   "title": "Untitled 48",
-   "windowId": 37813
+   "title": "Untitled 49",
+   "windowId": 38109
   },
   {
    "focused": false,
@@ -1186,14 +1186,14 @@
     "x": 159,
     "y": 264
    },
-   "hostPid": 32866,
+   "hostPid": 42659,
    "main": false,
    "modal": false,
    "role": "AXWindow",
    "sheet": false,
    "subrole": "AXStandardWindow",
-   "title": "Untitled 47",
-   "windowId": 37812
+   "title": "Untitled 48",
+   "windowId": 38108
   },
   {
    "focused": false,
@@ -1203,14 +1203,14 @@
     "x": 130,
     "y": 235
    },
-   "hostPid": 32866,
+   "hostPid": 42659,
    "main": false,
    "modal": false,
    "role": "AXWindow",
    "sheet": false,
    "subrole": "AXStandardWindow",
-   "title": "Untitled 46",
-   "windowId": 37811
+   "title": "Untitled 47",
+   "windowId": 38107
   },
   {
    "focused": false,
@@ -1220,14 +1220,14 @@
     "x": 101,
     "y": 206
    },
-   "hostPid": 32866,
+   "hostPid": 42659,
    "main": false,
    "modal": false,
    "role": "AXWindow",
    "sheet": false,
    "subrole": "AXStandardWindow",
-   "title": "Untitled 45",
-   "windowId": 37810
+   "title": "Untitled 46",
+   "windowId": 38106
   },
   {
    "focused": false,
@@ -1237,14 +1237,14 @@
     "x": 72,
     "y": 177
    },
-   "hostPid": 32866,
+   "hostPid": 42659,
    "main": false,
    "modal": false,
    "role": "AXWindow",
    "sheet": false,
    "subrole": "AXStandardWindow",
-   "title": "Untitled 44",
-   "windowId": 37809
+   "title": "Untitled 45",
+   "windowId": 38105
   },
   {
    "focused": false,
@@ -1254,14 +1254,14 @@
     "x": 43,
     "y": 148
    },
-   "hostPid": 32866,
+   "hostPid": 42659,
    "main": false,
    "modal": false,
    "role": "AXWindow",
    "sheet": false,
    "subrole": "AXStandardWindow",
-   "title": "Untitled 43",
-   "windowId": 37808
+   "title": "Untitled 44",
+   "windowId": 38104
   },
   {
    "focused": false,
@@ -1271,14 +1271,14 @@
     "x": 14,
     "y": 119
    },
-   "hostPid": 32866,
+   "hostPid": 42659,
    "main": false,
    "modal": false,
    "role": "AXWindow",
    "sheet": false,
    "subrole": "AXStandardWindow",
-   "title": "Untitled 42",
-   "windowId": 37807
+   "title": "Untitled 43",
+   "windowId": 38103
   },
   {
    "focused": false,
@@ -1288,14 +1288,14 @@
     "x": 906,
     "y": 90
    },
-   "hostPid": 32866,
+   "hostPid": 42659,
    "main": false,
    "modal": false,
    "role": "AXWindow",
    "sheet": false,
    "subrole": "AXStandardWindow",
-   "title": "Untitled 41",
-   "windowId": 37806
+   "title": "Untitled 42",
+   "windowId": 38102
   },
   {
    "focused": false,
@@ -1305,14 +1305,14 @@
     "x": 877,
     "y": 61
    },
-   "hostPid": 32866,
+   "hostPid": 42659,
    "main": false,
    "modal": false,
    "role": "AXWindow",
    "sheet": false,
    "subrole": "AXStandardWindow",
-   "title": "Untitled 40",
-   "windowId": 37805
+   "title": "Untitled 41",
+   "windowId": 38101
   },
   {
    "focused": false,
@@ -1322,14 +1322,14 @@
     "x": 848,
     "y": 395
    },
-   "hostPid": 32866,
+   "hostPid": 42659,
    "main": false,
    "modal": false,
    "role": "AXWindow",
    "sheet": false,
    "subrole": "AXStandardWindow",
-   "title": "Untitled 39",
-   "windowId": 37804
+   "title": "Untitled 40",
+   "windowId": 38100
   },
   {
    "focused": false,
@@ -1339,14 +1339,14 @@
     "x": 819,
     "y": 366
    },
-   "hostPid": 32866,
+   "hostPid": 42659,
    "main": false,
    "modal": false,
    "role": "AXWindow",
    "sheet": false,
    "subrole": "AXStandardWindow",
-   "title": "Untitled 38",
-   "windowId": 37803
+   "title": "Untitled 39",
+   "windowId": 38099
   },
   {
    "focused": false,
@@ -1356,14 +1356,14 @@
     "x": 790,
     "y": 337
    },
-   "hostPid": 32866,
+   "hostPid": 42659,
    "main": false,
    "modal": false,
    "role": "AXWindow",
    "sheet": false,
    "subrole": "AXStandardWindow",
-   "title": "Untitled 37",
-   "windowId": 37802
+   "title": "Untitled 38",
+   "windowId": 38098
   },
   {
    "focused": false,
@@ -1373,14 +1373,14 @@
     "x": 761,
     "y": 308
    },
-   "hostPid": 32866,
+   "hostPid": 42659,
    "main": false,
    "modal": false,
    "role": "AXWindow",
    "sheet": false,
    "subrole": "AXStandardWindow",
-   "title": "Untitled 36",
-   "windowId": 37801
+   "title": "Untitled 37",
+   "windowId": 38097
   },
   {
    "focused": false,
@@ -1390,14 +1390,14 @@
     "x": 732,
     "y": 279
    },
-   "hostPid": 32866,
+   "hostPid": 42659,
    "main": false,
    "modal": false,
    "role": "AXWindow",
    "sheet": false,
    "subrole": "AXStandardWindow",
-   "title": "Untitled 35",
-   "windowId": 37800
+   "title": "Untitled 36",
+   "windowId": 38096
   },
   {
    "focused": false,
@@ -1407,14 +1407,14 @@
     "x": 703,
     "y": 250
    },
-   "hostPid": 32866,
+   "hostPid": 42659,
    "main": false,
    "modal": false,
    "role": "AXWindow",
    "sheet": false,
    "subrole": "AXStandardWindow",
-   "title": "Untitled 34",
-   "windowId": 37799
+   "title": "Untitled 35",
+   "windowId": 38095
   },
   {
    "focused": false,
@@ -1424,14 +1424,14 @@
     "x": 674,
     "y": 221
    },
-   "hostPid": 32866,
+   "hostPid": 42659,
    "main": false,
    "modal": false,
    "role": "AXWindow",
    "sheet": false,
    "subrole": "AXStandardWindow",
-   "title": "Untitled 33",
-   "windowId": 37798
+   "title": "Untitled 34",
+   "windowId": 38094
   },
   {
    "focused": false,
@@ -1441,14 +1441,14 @@
     "x": 645,
     "y": 192
    },
-   "hostPid": 32866,
+   "hostPid": 42659,
    "main": false,
    "modal": false,
    "role": "AXWindow",
    "sheet": false,
    "subrole": "AXStandardWindow",
-   "title": "Untitled 32",
-   "windowId": 37797
+   "title": "Untitled 33",
+   "windowId": 38093
   },
   {
    "focused": false,
@@ -1458,14 +1458,14 @@
     "x": 616,
     "y": 163
    },
-   "hostPid": 32866,
+   "hostPid": 42659,
    "main": false,
    "modal": false,
    "role": "AXWindow",
    "sheet": false,
    "subrole": "AXStandardWindow",
-   "title": "Untitled 31",
-   "windowId": 37796
+   "title": "Untitled 32",
+   "windowId": 38092
   },
   {
    "focused": false,
@@ -1475,14 +1475,14 @@
     "x": 587,
     "y": 134
    },
-   "hostPid": 32866,
+   "hostPid": 42659,
    "main": false,
    "modal": false,
    "role": "AXWindow",
    "sheet": false,
    "subrole": "AXStandardWindow",
-   "title": "Untitled 30",
-   "windowId": 37795
+   "title": "Untitled 31",
+   "windowId": 38091
   },
   {
    "focused": false,
@@ -1492,14 +1492,14 @@
     "x": 558,
     "y": 105
    },
-   "hostPid": 32866,
+   "hostPid": 42659,
    "main": false,
    "modal": false,
    "role": "AXWindow",
    "sheet": false,
    "subrole": "AXStandardWindow",
-   "title": "Untitled 29",
-   "windowId": 37794
+   "title": "Untitled 30",
+   "windowId": 38090
   },
   {
    "focused": false,
@@ -1509,14 +1509,14 @@
     "x": 529,
     "y": 76
    },
-   "hostPid": 32866,
+   "hostPid": 42659,
    "main": false,
    "modal": false,
    "role": "AXWindow",
    "sheet": false,
    "subrole": "AXStandardWindow",
-   "title": "Untitled 28",
-   "windowId": 37793
+   "title": "Untitled 29",
+   "windowId": 38089
   },
   {
    "focused": false,
@@ -1526,14 +1526,14 @@
     "x": 500,
     "y": 47
    },
-   "hostPid": 32866,
+   "hostPid": 42659,
    "main": false,
    "modal": false,
    "role": "AXWindow",
    "sheet": false,
    "subrole": "AXStandardWindow",
-   "title": "Untitled 27",
-   "windowId": 37792
+   "title": "Untitled 28",
+   "windowId": 38088
   },
   {
    "focused": false,
@@ -1543,14 +1543,14 @@
     "x": 471,
     "y": 392
    },
-   "hostPid": 32866,
+   "hostPid": 42659,
    "main": false,
    "modal": false,
    "role": "AXWindow",
    "sheet": false,
    "subrole": "AXStandardWindow",
-   "title": "Untitled 26",
-   "windowId": 37791
+   "title": "Untitled 27",
+   "windowId": 38087
   },
   {
    "focused": false,
@@ -1560,14 +1560,14 @@
     "x": 442,
     "y": 363
    },
-   "hostPid": 32866,
+   "hostPid": 42659,
    "main": false,
    "modal": false,
    "role": "AXWindow",
    "sheet": false,
    "subrole": "AXStandardWindow",
-   "title": "Untitled 25",
-   "windowId": 37788
+   "title": "Untitled 26",
+   "windowId": 38086
   },
   {
    "focused": false,
@@ -1577,14 +1577,14 @@
     "x": 413,
     "y": 334
    },
-   "hostPid": 32866,
+   "hostPid": 42659,
    "main": false,
    "modal": false,
    "role": "AXWindow",
    "sheet": false,
    "subrole": "AXStandardWindow",
-   "title": "Untitled 24",
-   "windowId": 37787
+   "title": "Untitled 25",
+   "windowId": 38083
   },
   {
    "focused": false,
@@ -1594,14 +1594,14 @@
     "x": 384,
     "y": 305
    },
-   "hostPid": 32866,
+   "hostPid": 42659,
    "main": false,
    "modal": false,
    "role": "AXWindow",
    "sheet": false,
    "subrole": "AXStandardWindow",
-   "title": "Untitled 23",
-   "windowId": 37786
+   "title": "Untitled 24",
+   "windowId": 38082
   },
   {
    "focused": false,
@@ -1611,14 +1611,14 @@
     "x": 355,
     "y": 276
    },
-   "hostPid": 32866,
+   "hostPid": 42659,
    "main": false,
    "modal": false,
    "role": "AXWindow",
    "sheet": false,
    "subrole": "AXStandardWindow",
-   "title": "Untitled 22",
-   "windowId": 37785
+   "title": "Untitled 23",
+   "windowId": 38081
   },
   {
    "focused": false,
@@ -1628,14 +1628,14 @@
     "x": 326,
     "y": 247
    },
-   "hostPid": 32866,
+   "hostPid": 42659,
    "main": false,
    "modal": false,
    "role": "AXWindow",
    "sheet": false,
    "subrole": "AXStandardWindow",
-   "title": "Untitled 21",
-   "windowId": 37784
+   "title": "Untitled 22",
+   "windowId": 38080
   },
   {
    "focused": false,
@@ -1645,14 +1645,14 @@
     "x": 297,
     "y": 218
    },
-   "hostPid": 32866,
+   "hostPid": 42659,
    "main": false,
    "modal": false,
    "role": "AXWindow",
    "sheet": false,
    "subrole": "AXStandardWindow",
-   "title": "Untitled 20",
-   "windowId": 37783
+   "title": "Untitled 21",
+   "windowId": 38079
   },
   {
    "focused": false,
@@ -1662,14 +1662,14 @@
     "x": 268,
     "y": 189
    },
-   "hostPid": 32866,
+   "hostPid": 42659,
    "main": false,
    "modal": false,
    "role": "AXWindow",
    "sheet": false,
    "subrole": "AXStandardWindow",
-   "title": "Untitled 19",
-   "windowId": 37782
+   "title": "Untitled 20",
+   "windowId": 38078
   },
   {
    "focused": false,
@@ -1679,14 +1679,14 @@
     "x": 239,
     "y": 160
    },
-   "hostPid": 32866,
+   "hostPid": 42659,
    "main": false,
    "modal": false,
    "role": "AXWindow",
    "sheet": false,
    "subrole": "AXStandardWindow",
-   "title": "Untitled 18",
-   "windowId": 37781
+   "title": "Untitled 19",
+   "windowId": 38077
   },
   {
    "focused": false,
@@ -1696,14 +1696,14 @@
     "x": 30,
     "y": 202
    },
-   "hostPid": 32866,
+   "hostPid": 42659,
    "main": false,
    "modal": false,
    "role": "AXWindow",
    "sheet": false,
    "subrole": "AXDialog",
    "title": "",
-   "windowId": 37789
+   "windowId": 38084
   },
   {
    "focused": false,
@@ -1713,14 +1713,14 @@
     "x": 210,
     "y": 131
    },
-   "hostPid": 32866,
+   "hostPid": 42659,
    "main": false,
    "modal": false,
    "role": "AXWindow",
    "sheet": false,
    "subrole": "AXStandardWindow",
-   "title": "Untitled 17",
-   "windowId": 37780
+   "title": "Untitled 18",
+   "windowId": 38076
   },
   {
    "focused": false,
@@ -1730,14 +1730,14 @@
     "x": 181,
     "y": 102
    },
-   "hostPid": 32866,
+   "hostPid": 42659,
    "main": false,
    "modal": false,
    "role": "AXWindow",
    "sheet": false,
    "subrole": "AXStandardWindow",
-   "title": "Untitled 16",
-   "windowId": 37767
+   "title": "Untitled 17",
+   "windowId": 38062
   },
   {
    "focused": false,
@@ -1747,14 +1747,14 @@
     "x": 152,
     "y": 73
    },
-   "hostPid": 32866,
+   "hostPid": 42659,
    "main": false,
    "modal": false,
    "role": "AXWindow",
    "sheet": false,
    "subrole": "AXStandardWindow",
-   "title": "Screen Recording of Accessibility Tree 7",
-   "windowId": 37765
+   "title": "Untitled 16",
+   "windowId": 38060
   }
  ]
 }
