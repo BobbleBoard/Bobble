@@ -143,6 +143,17 @@ func writePNG(_ image: CGImage, prefix: String) -> String? {
 /// single-window `screencapture -l` (and then to the whole screen) so a machine
 /// without the Screen Recording grant still gets a usable, non-throwing result.
 func captureAppSurfaces(pid: pid_t, withBase64: Bool, maxWidth: Int? = nil) -> [String: Any]? {
+  // Without the grant every capture path below returns either nothing or a
+  // desktop-coloured rectangle, which looks like a working screenshot of an
+  // empty app. Refusing with a reason is far more useful than a blank picture.
+  guard CGPreflightScreenCaptureAccess() else {
+    return [
+      "error": "screen-recording-denied",
+      "hint":
+        "macOS has not granted this app Screen Recording, so nothing can be captured. "
+        + "Enable it in System Settings > Privacy & Security > Screen Recording.",
+    ]
+  }
   let windows = appWindows(pid: pid)
   let ids = windows.compactMap { $0.windowId }
   guard let rect = unionFrame(windows), !ids.isEmpty else { return nil }

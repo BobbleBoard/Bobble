@@ -71,7 +71,26 @@ private func doSnapshot(_ params: [String: Any]) -> [String: Any]? {
     }
     if shot == nil { shot = captureScreenshot(withBase64: true) }
   }
-  return snapshotResultDict(snap, screenshot: shot)
+  var result = snapshotResultDict(snap, screenshot: shot)
+  // Say WHY a snapshot is empty. A missing grant produces a perfectly
+  // well-formed result with zero elements and no pixels, which reads as "this
+  // app has nothing in it" — the single most misleading thing this surface can
+  // return, and the reason a revoked permission went unnoticed for so long.
+  let tcc = readTccStatus()
+  if !tcc.accessibility || !tcc.screenRecording {
+    result["permissions"] = [
+      "accessibility": tcc.accessibility, "screenRecording": tcc.screenRecording,
+      "hint":
+        "macOS has not granted this app "
+        + [
+          tcc.accessibility ? nil : "Accessibility",
+          tcc.screenRecording ? nil : "Screen Recording",
+        ].compactMap { $0 }.joined(separator: " and ")
+        + ". Until it does, apps read as empty and screenshots are blank. "
+        + "Enable them in System Settings > Privacy & Security.",
+    ]
+  }
+  return result
 }
 
 /// Resolve a snapshot element by index within the caller's app namespace: an
@@ -124,9 +143,44 @@ private func deliveryPid(_ params: [String: Any], at point: CGPoint? = nil) -> p
   return activeSurface(surfaces)?.hostPid ?? base
 }
 
+/// A short settle after an act, then a report of which surfaces appeared or
+/// disappeared.
+///
+/// Pressing Save puts up a sheet a few hundred milliseconds later. Without this
+/// the model gets back "clicked" and has no reason to look again, so it acts
+/// next on a window that is now blocked behind a dialog it never saw. Telling it
+/// in the act's own result costs one settle and saves a wasted turn — and a
+/// wasted turn here means clicking into a dead window, which looks to the user
+/// like the model is broken.
+private func surfaceDelta(pid: pid_t?, before: [AppWindow], settleMs: Int = 220) -> [String: Any] {
+  guard let pid else { return [:] }
+  usleep(UInt32(settleMs) * 1000)
+  let after = appWindows(pid: pid)
+  let beforeIds = Set(before.compactMap { $0.windowId })
+  let afterIds = Set(after.compactMap { $0.windowId })
+  var d: [String: Any] = [:]
+  let opened = after.filter { w in w.windowId.map { !beforeIds.contains($0) } ?? false }
+  let closed = before.filter { w in w.windowId.map { !afterIds.contains($0) } ?? false }
+  if !opened.isEmpty { d["opened"] = opened.map(windowDict) }
+  if !closed.isEmpty { d["closed"] = closed.map(windowDict) }
+  if let dialog = after.first(where: { $0.isModal }) { d["dialog"] = windowDict(dialog) }
+  return d
+}
+
+private func surfacesNow(_ params: [String: Any]) -> (pid: pid_t?, windows: [AppWindow]) {
+  guard let pid = actTargetPid(params) else { return (nil, []) }
+  return (pid, appWindows(pid: pid))
+}
+
 // ── act dispatch (shared) ────────────────────────────────────────────────────
 
 private func doClick(_ params: [String: Any]) -> [String: Any] {
+  let pre = surfacesNow(params)
+  return doClickInner(params).merging(
+    surfaceDelta(pid: pre.pid, before: pre.windows), uniquingKeysWith: { a, _ in a })
+}
+
+private func doClickInner(_ params: [String: Any]) -> [String: Any] {
   // Explicit coordinates (AX-opaque surfaces). With a target pid the click is
   // DELIVERED to that app only (postToPid — background, no focus steal); with
   // no pid it falls back to the legacy shared-cursor foreground click.
@@ -156,6 +210,12 @@ private func doClick(_ params: [String: Any]) -> [String: Any] {
 }
 
 private func doType(_ params: [String: Any]) -> [String: Any] {
+  let pre = surfacesNow(params)
+  return doTypeInner(params).merging(
+    surfaceDelta(pid: pre.pid, before: pre.windows), uniquingKeysWith: { a, _ in a })
+}
+
+private func doTypeInner(_ params: [String: Any]) -> [String: Any] {
   let text = stringOf(params["text"]) ?? ""
   let submit = boolOf(params["submit"])
   // Typing with no index. An app that exposes nothing to Accessibility has no
@@ -218,6 +278,12 @@ private func doType(_ params: [String: Any]) -> [String: Any] {
 }
 
 private func doKey(_ params: [String: Any]) -> [String: Any] {
+  let pre = surfacesNow(params)
+  return doKeyInner(params).merging(
+    surfaceDelta(pid: pre.pid, before: pre.windows), uniquingKeysWith: { a, _ in a })
+}
+
+private func doKeyInner(_ params: [String: Any]) -> [String: Any] {
   guard let combo = stringOf(params["combo"]) ?? stringOf(params["key"]) else {
     return ["ok": false, "error": "key needs a combo"]
   }
@@ -486,12 +552,19 @@ private func doMenuClick(_ params: [String: Any]) -> [String: Any] {
       "ok": false, "error": "\(entry.path.joined(separator: " > ")) is disabled right now",
     ]
   }
+  let before = appWindows(pid: resolved.pid)
   let err = AXUIElementPerformAction(entry.element, kAXPressAction as CFString)
-  return [
+  var result: [String: Any] = [
     "ok": err == .success, "path": entry.path.joined(separator: " > "),
     "background": true,
     "shortcut": entry.shortcut,
   ]
+  // A menu item is the most likely thing in the whole surface to put up a
+  // dialog (Open…, Save As…, Print…), so the settle matters most here.
+  for (k, v) in surfaceDelta(pid: resolved.pid, before: before, settleMs: 350) {
+    result[k] = v
+  }
+  return result
 }
 
 /// `wallpaper` method: the user's desktop picture, which the canvas monitor
