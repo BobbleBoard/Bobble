@@ -225,7 +225,8 @@ export function coerceArgs(
   const props = schema?.properties ?? {};
   const out: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(raw)) {
-    const type = typeof props[key]?.type === 'string' ? (props[key]?.type as string) : undefined;
+    const prop = props[key] as Record<string, unknown> | undefined;
+    const type = typeof prop?.type === 'string' ? (prop.type as string) : unionType(prop);
     if (typeof value === 'boolean' || type === undefined) {
       out[key] = value;
       continue;
@@ -239,13 +240,61 @@ export function coerceArgs(
       try {
         out[key] = JSON.parse(value);
       } catch {
-        out[key] = type === 'array' ? value.split(',').map((s) => s.trim()) : value;
+        /*
+         * The comma fallback is for a list of SCALARS — `--tags a,b,c` is a
+         * shape a model reaches for and a shape that means something. Splitting
+         * anything else invents data: an array of objects becomes ['{"a":1',
+         * '"b":2}'], which the tool then rejects for a reason that has nothing
+         * to do with what the model typed. Hand the raw string over instead and
+         * let the tool's own validation say what it wanted.
+         */
+        out[key] = type === 'array' && scalarItems(prop) ? splitList(value) : value;
       }
     } else {
       out[key] = value;
     }
   }
   return out;
+}
+
+/**
+ * The type of a union that is really one type — `anyOf: [{const:'up'}, …]` is
+ * how a typebox union of literals arrives, and every branch of it is a string.
+ *
+ * Without this a union property has no type at all, so a numeric flag reaches
+ * the tool as the string "3" and is rejected by its own validator. MEASURED on
+ * `mac_scroll --amount`, whose amount is a union.
+ */
+function unionType(prop: Record<string, unknown> | undefined): string | undefined {
+  const branches = (prop?.anyOf ?? prop?.oneOf) as unknown;
+  if (!Array.isArray(branches) || branches.length === 0) return undefined;
+  const types = new Set<string>();
+  for (const branch of branches) {
+    if (branch === null || typeof branch !== 'object') return undefined;
+    const b = branch as Record<string, unknown>;
+    // `integer` is a `number` for the purpose of reading a flag: a union of the
+    // two is still "this takes a number", and treating it as ambiguous is how
+    // `--amount 40` reached a tool as the string "40".
+    const t = typeof b.type === 'string' ? b.type : 'const' in b ? typeof b.const : undefined;
+    if (t === undefined) return undefined;
+    types.add(t === 'integer' ? 'number' : t);
+  }
+  return types.size === 1 ? [...types][0] : undefined;
+}
+
+/** Whether an array's items are scalars, so a comma-separated list means something. */
+function scalarItems(prop: Record<string, unknown> | undefined): boolean {
+  const items = prop?.items as Record<string, unknown> | undefined;
+  if (items === undefined) return true;
+  const t = typeof items.type === 'string' ? items.type : unionType(items);
+  return t !== 'object' && t !== 'array';
+}
+
+/** Split `a,b,c`, honouring quotes so a value containing a comma survives. */
+function splitList(value: string): string[] {
+  return (value.match(/"[^"]*"|'[^']*'|[^,]+/g) ?? [])
+    .map((part) => part.trim().replace(/^["']|["']$/g, ''))
+    .filter((part) => part !== '');
 }
 
 /** The schema properties a positional may fill, in declaration order. */
@@ -435,10 +484,36 @@ export function renderCommandHelp(c: CliCommand): string {
 
 /** `array of string`, `array of object`, or the plain type. */
 function describeType(p: Record<string, unknown>, type: string): string {
+  // The ALLOWED VALUES, when there is a closed set of them. A schema hands the
+  // model `enum: ["up","down"]`; help that says only `<string>` reaches the
+  // same parameter and loses the one thing that makes it usable. A typebox
+  // union of literals arrives as `anyOf: [{const:"up"}, …]`, which has no enum
+  // line at all — measured on `mac_scroll --direction`, whose four values were
+  // documented nowhere.
+  const choices = literalChoices(p);
+  if (choices !== undefined) return choices.join('|');
   if (type !== 'array') return type;
   const items = p.items as Record<string, unknown> | undefined;
+  const innerChoices = literalChoices(items);
+  if (innerChoices !== undefined) return `array of ${innerChoices.join('|')}`;
   const inner = typeof items?.type === 'string' ? items.type : undefined;
   return inner === undefined ? 'array' : `array of ${inner}`;
+}
+
+/** The closed set a property accepts, from `enum` or a union of literals. */
+function literalChoices(p: Record<string, unknown> | undefined): string[] | undefined {
+  if (p === undefined) return undefined;
+  if (Array.isArray(p.enum) && p.enum.length > 0) return p.enum.map((v) => String(v));
+  const branches = (p.anyOf ?? p.oneOf) as unknown;
+  if (!Array.isArray(branches) || branches.length === 0) return undefined;
+  const out: string[] = [];
+  for (const branch of branches) {
+    if (branch === null || typeof branch !== 'object') return undefined;
+    const b = branch as Record<string, unknown>;
+    if (!('const' in b)) return undefined;
+    out.push(String(b.const));
+  }
+  return out;
 }
 
 /**
