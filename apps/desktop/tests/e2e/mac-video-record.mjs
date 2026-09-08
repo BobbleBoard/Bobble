@@ -290,17 +290,13 @@ lines.push(`file '${frames[frames.length - 1].file}'`);
 const list = path.join(OUT, 'frames.txt');
 writeFileSync(list, lines.join('\n'));
 const video = path.join(OUT, 'bobble-drives-textedit.mp4');
-const captions = path.join(OUT, 'captions.srt');
-writeFileSync(captions, srt(log, (frames.at(-1)?.t ?? started) - started));
-// Captions are burned in from the run's own timestamps, so what the video says
-// is what actually happened at that second — not a script written afterwards.
-const style =
-  "force_style='FontName=Helvetica Neue,FontSize=17,PrimaryColour=&HFFFFFF&," +
-  "BackColour=&HB0000000&,BorderStyle=4,Outline=0,Shadow=0,MarginV=28'";
+// The captions are already in the pixels — they were drawn into the page before
+// each frame was taken, because this ffmpeg has neither drawtext nor libass.
+// The .srt is written anyway, as a readable transcript of the run.
+writeFileSync(path.join(OUT, 'captions.srt'), srt(log, (frames.at(-1)?.t ?? started) - started));
 await run('ffmpeg', [
   '-y', '-f', 'concat', '-safe', '0', '-i', list,
-  '-vf',
-  `scale=trunc(iw/2)*2:trunc(ih/2)*2,fps=24,subtitles=${captions.replace(/:/g, '\\:')}:${style}`,
+  '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2,fps=24',
   '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-preset', 'veryfast', '-crf', '20', video,
 ]);
 writeFileSync(path.join(OUT, 'run-log.txt'), log.map((e) => `${(e.at / 1000).toFixed(1)}s  ${e.text}`).join('\n'));
