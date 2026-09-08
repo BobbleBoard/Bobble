@@ -400,6 +400,8 @@ private func dispatch(method: String, params: [String: Any]) -> [String: Any]? {
   case "moveWindow": return doMoveWindow(params)
   case "windows": return doWindows(params)
   case "wallpaper": return doWallpaper(params)
+  case "recordStart": return recordStart(params)
+  case "recordStop": return recordStop()
   default: return nil
   }
 }

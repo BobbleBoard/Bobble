@@ -15,6 +15,12 @@ pnpm --filter @pi-desktop/afm build:swift
 pnpm --filter @pi-desktop/pi-mac build:swift
 pnpm --filter @pi-desktop/desktop exec electron-builder --dir --config electron-builder.yml
 
+# A STABLE signing identity (scripts/signing-identity.sh explains why ad-hoc
+# signing silently revoked computer use on every ship).
+SIGN_ID="$(bash scripts/signing-identity.sh)"
+SIGN_KEYCHAIN="$HOME/Library/Keychains/bobble-signing.keychain-db"
+sign() { codesign --force --keychain "$SIGN_KEYCHAIN" --sign "$SIGN_ID" "$@"; }
+
 APP_SRC="apps/desktop/release/mac-arm64/Bobble.app"
 [ -d "$APP_SRC" ] || APP_SRC="apps/desktop/release/mac/Bobble.app"
 [ -d "$APP_SRC" ] || { echo "ship-local: packaged app not found under apps/desktop/release" >&2; exit 1; }
@@ -24,7 +30,7 @@ APP_SRC="apps/desktop/release/mac-arm64/Bobble.app"
 # (Developer-ID signing + notarizing this helper as a separate mach-o is W11.)
 AFM_HELPER="$APP_SRC/Contents/Resources/app.asar.unpacked/node_modules/@pi-desktop/afm/swift/.build/release/pi-afm"
 if [ -f "$AFM_HELPER" ]; then
-  codesign --force --sign - "$AFM_HELPER"
+  sign "$AFM_HELPER"
   echo "ship-local: signed pi-afm helper"
 else
   echo "ship-local: WARNING pi-afm helper not bundled at $AFM_HELPER" >&2
@@ -35,14 +41,17 @@ fi
 # the signed identity; ad-hoc is fine locally (stable Developer-ID signing is W11).
 MAC_HELPER="$APP_SRC/Contents/Resources/app.asar.unpacked/node_modules/@pi-desktop/pi-mac/swift/.build/release/pi-mac"
 if [ -f "$MAC_HELPER" ]; then
-  codesign --force --sign - "$MAC_HELPER"
+  sign "$MAC_HELPER"
   echo "ship-local: signed pi-mac helper"
 else
   echo "ship-local: WARNING pi-mac helper not bundled at $MAC_HELPER" >&2
 fi
 
-# Ad-hoc signature: required for locally-built binaries on Apple Silicon.
-codesign --force --deep --sign - "$APP_SRC"
+sign --deep "$APP_SRC"
+# Print the requirement the TCC grants attach to. If this ever goes back to
+# reading `cdhash H"…"`, computer-use permissions are about to be revoked by
+# the next build and the cause is right here.
+echo "ship-local: $(codesign -d -r- "$APP_SRC" 2>&1 | grep designated || true)"
 
 DEST="/Applications/Bobble.app"
 rm -rf "$DEST"

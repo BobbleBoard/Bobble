@@ -46,11 +46,34 @@ private func emitFrame(header: [String: Any], payload: Data) {
 private struct StreamShape: Equatable {
   let ids: [CGWindowID]
   let rect: CGRect
-  static func of(pid: pid_t) -> (shape: StreamShape?, windows: [AppWindow]) {
+
+  /// `overlayPid` adds that process's floating windows over the app — in
+  /// practice Pi Desktop's own phantom-cursor overlay, so a recording shows the
+  /// cursor doing the clicking instead of things happening by themselves.
+  /// `fullDisplay` pins the framing to the whole screen so a dialog opening
+  /// anywhere is never clipped and the picture never jumps mid-recording; only
+  /// the app's own windows are ever composited, so nothing else on the user's
+  /// screen can leak into it.
+  static func of(pid: pid_t, overlayPid: pid_t?, fullDisplay: Bool)
+    -> (shape: StreamShape?, windows: [AppWindow])
+  {
     let windows = appWindows(pid: pid)
-    let ids = windows.compactMap { $0.windowId }
-    guard let rect = unionFrame(windows), !ids.isEmpty else { return (nil, windows) }
-    return (StreamShape(ids: ids, rect: rect.integral), windows)
+    var ids = windows.compactMap { $0.windowId }
+    guard let union = unionFrame(windows), !ids.isEmpty else { return (nil, windows) }
+    if let overlayPid {
+      for w in onScreenWindows()
+      where w.ownerPid == overlayPid && w.alpha > 0.02 && w.bounds.intersects(union) {
+        if !ids.contains(w.windowId) { ids.append(w.windowId) }
+      }
+    }
+    var rect = union.integral
+    if fullDisplay {
+      for id in activeDisplayIDs() where CGDisplayBounds(id).intersects(union) {
+        rect = CGDisplayBounds(id)
+        break
+      }
+    }
+    return (StreamShape(ids: ids, rect: rect), windows)
   }
 }
 
@@ -58,6 +81,12 @@ private struct StreamShape: Equatable {
 final class WindowStreamer: NSObject, SCStreamOutput, SCStreamDelegate, @unchecked Sendable {
   private let pid: pid_t
   private let maxWidth: Int
+  private let overlayPid: pid_t?
+  private let fullDisplay: Bool
+  /// Where finished frames go. The default writes the PIMF framing to stdout
+  /// (`--stream`); the recorder swaps in a sink that writes numbered JPEGs to a
+  /// directory, so one capture path serves both the live monitor and a video.
+  var sink: ((_ header: [String: Any], _ jpeg: Data) -> Void)?
   private var fps: Int
   private var stream: SCStream?
   private var shape: StreamShape?
@@ -69,10 +98,14 @@ final class WindowStreamer: NSObject, SCStreamOutput, SCStreamDelegate, @uncheck
   private let ciContext = CIContext(options: [.useSoftwareRenderer: false])
   private let lock = NSLock()
 
-  init(pid: pid_t, fps: Int, maxWidth: Int) {
+  var frameCount: Int { seq }
+
+  init(pid: pid_t, fps: Int, maxWidth: Int, overlayPid: pid_t? = nil, fullDisplay: Bool = false) {
     self.pid = pid
     self.fps = max(1, min(30, fps))
     self.maxWidth = maxWidth
+    self.overlayPid = overlayPid
+    self.fullDisplay = fullDisplay
   }
 
   func start() {
@@ -151,12 +184,13 @@ final class WindowStreamer: NSObject, SCStreamOutput, SCStreamDelegate, @uncheck
   /// it. This is what makes a save sheet appear in the monitor the moment the
   /// model opens it.
   private func repoint(force: Bool) async {
-    let (next, windows) = StreamShape.of(pid: pid)
+    let (next, windows) = StreamShape.of(
+      pid: pid, overlayPid: overlayPid, fullDisplay: fullDisplay)
     guard let next else {
       if !sentEmpty {
         sentEmpty = true
         seq += 1
-        emitFrame(
+        deliver(
           header: ["seq": seq, "t": nowMs(), "windows": [], "empty": true], payload: Data())
       }
       return
@@ -174,7 +208,7 @@ final class WindowStreamer: NSObject, SCStreamOutput, SCStreamDelegate, @uncheck
       if !reportedNoContent {
         reportedNoContent = true
         seq += 1
-        emitFrame(
+        deliver(
           header: [
             "seq": seq, "t": nowMs(), "windows": windows.map(windowDict),
             "error": denied ? "screen-recording-denied" : "no-shareable-window",
@@ -204,6 +238,10 @@ final class WindowStreamer: NSObject, SCStreamOutput, SCStreamDelegate, @uncheck
     }
   }
 
+  private func deliver(header: [String: Any], payload: Data) {
+    if let sink { sink(header, payload) } else { emitFrame(header: header, payload: payload) }
+  }
+
   // MARK: SCStreamOutput
 
   func stream(
@@ -224,7 +262,7 @@ final class WindowStreamer: NSObject, SCStreamOutput, SCStreamDelegate, @uncheck
     seq += 1
     let rect = shape?.rect ?? .zero
     let mainSize = NSScreen.main?.frame.size ?? CGSize(width: 0, height: 0)
-    emitFrame(
+    deliver(
       header: [
         "seq": seq, "t": nowMs(),
         "w": cg.width, "h": cg.height,
@@ -270,6 +308,8 @@ func runStream(_ args: [String]) {
   var appName: String?
   var fps = 12
   var maxWidth = 1400
+  var overlayPid: pid_t?
+  var fullDisplay = false
   var i = 0
   while i < args.count {
     switch args[i] {
@@ -277,6 +317,10 @@ func runStream(_ args: [String]) {
     case "--app": if i + 1 < args.count { appName = args[i + 1] }; i += 1
     case "--fps": if i + 1 < args.count { fps = Int(args[i + 1]) ?? fps }; i += 1
     case "--max-width": if i + 1 < args.count { maxWidth = Int(args[i + 1]) ?? maxWidth }; i += 1
+    case "--overlay-pid":
+      if i + 1 < args.count { overlayPid = pid_t(args[i + 1]) }
+      i += 1
+    case "--full-display": fullDisplay = true
     default: break
     }
     i += 1
@@ -290,7 +334,8 @@ func runStream(_ args: [String]) {
     writeStderr("stream: needs macOS 14+\n")
     exit(2)
   }
-  let streamer = WindowStreamer(pid: pid, fps: fps, maxWidth: maxWidth)
+  let streamer = WindowStreamer(
+    pid: pid, fps: fps, maxWidth: maxWidth, overlayPid: overlayPid, fullDisplay: fullDisplay)
   streamer.start()
 
   // Control channel. Reading stdin on its own thread keeps the run loop free for
@@ -313,4 +358,64 @@ func runStream(_ args: [String]) {
   }
   reader.start()
   RunLoop.main.run()
+}
+
+
+// ── file recorder ────────────────────────────────────────────────────────────
+//
+// `recordStart` / `recordStop` on the serve pipe. The point of recording INSIDE
+// the helper is that the capture grant belongs to the app that spawned it, so
+// this is the only place a recording of the controlled app can be made at all.
+//
+// Only the app's own windows (plus, optionally, the phantom-cursor overlay) are
+// ever composited, so a recording cannot pick up anything else on the user's
+// screen.
+
+@available(macOS 14.0, *)
+private var activeRecorder: WindowStreamer?
+private var activeRecordDir: String?
+private var recordedFrames = 0
+
+func recordStart(_ params: [String: Any]) -> [String: Any] {
+  guard #available(macOS 14.0, *) else { return ["ok": false, "error": "needs macOS 14+"] }
+  if activeRecordDir != nil { return ["ok": false, "error": "a recording is already running"] }
+  let explicitPid = (params["pid"] as? NSNumber).map { pid_t($0.int32Value) }
+  guard
+    let pid = explicitPid
+      ?? (params["app"] as? String).flatMap({ resolveTargetPid(.app($0))?.pid })
+  else { return ["ok": false, "error": "recordStart needs pid or app"] }
+  let dir =
+    (params["dir"] as? String)
+    ?? (NSTemporaryDirectory() as NSString).appendingPathComponent(
+      "pi-mac-rec-\(Int(Date().timeIntervalSince1970))")
+  try? FileManager.default.createDirectory(
+    atPath: dir, withIntermediateDirectories: true)
+  let fps = (params["fps"] as? NSNumber)?.intValue ?? 12
+  let maxWidth = (params["maxWidth"] as? NSNumber)?.intValue ?? 1600
+  let overlayPid = (params["overlayPid"] as? NSNumber).map { pid_t($0.int32Value) }
+  let streamer = WindowStreamer(
+    pid: pid, fps: fps, maxWidth: maxWidth, overlayPid: overlayPid,
+    fullDisplay: (params["fullDisplay"] as? Bool) ?? true)
+  recordedFrames = 0
+  streamer.sink = { (header: [String: Any], jpeg: Data) in
+    guard !jpeg.isEmpty else { return }
+    recordedFrames += 1
+    let name = String(format: "frame-%06d.jpg", recordedFrames)
+    try? jpeg.write(to: URL(fileURLWithPath: (dir as NSString).appendingPathComponent(name)))
+    _ = header
+  }
+  streamer.start()
+  activeRecorder = streamer
+  activeRecordDir = dir
+  return ["ok": true, "dir": dir, "pid": Int(pid), "fps": fps]
+}
+
+func recordStop() -> [String: Any] {
+  guard #available(macOS 14.0, *), let dir = activeRecordDir else {
+    return ["ok": false, "error": "no recording is running"]
+  }
+  activeRecorder?.stop()
+  activeRecorder = nil
+  activeRecordDir = nil
+  return ["ok": true, "dir": dir, "frames": recordedFrames]
 }
