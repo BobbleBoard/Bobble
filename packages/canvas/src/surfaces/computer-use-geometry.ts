@@ -99,10 +99,7 @@ export function followWindow(
   // scale that leaves no letterbox — which on a rail taller than the window is
   // real size, the composition this surface is built on. Clamped by the floor
   // (a huge window still has to be cropped somewhere) and by 1 (never upscale).
-  const cover = Math.max(
-    viewport.w / Math.max(1, content.w),
-    viewport.h / Math.max(1, content.h),
-  );
+  const cover = Math.max(viewport.w / Math.max(1, content.w), viewport.h / Math.max(1, content.h));
   const scale = Math.min(1, Math.max(minScale, cover));
   if (scale <= fit.scale) return fit;
   const w = Math.max(1, content.w) * scale;

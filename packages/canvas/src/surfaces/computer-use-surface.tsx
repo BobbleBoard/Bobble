@@ -798,6 +798,11 @@ export function ComputerUseSurface({ feed, className }: ComputerUseSurfaceProps)
 
   const scrubId = hovered ?? pinned;
   const scrub = scrubId === null ? null : (acts.find((a) => a.id === scrubId) ?? null);
+  // A long run drops its oldest acts; a pin on one of them would otherwise
+  // leave the stage scrubbed to a frame that no longer exists.
+  useEffect(() => {
+    if (pinned !== null && !acts.some((a) => a.id === pinned)) setPinned(null);
+  }, [acts, pinned]);
   const scrubImages = useRef(new Map<number, HTMLImageElement>());
   const scrubImage = useCallback((act: MonitorAct | null): HTMLImageElement | null => {
     if (act === null || act.frame === null) return null;
@@ -1365,9 +1370,9 @@ export function ComputerUseSurface({ feed, className }: ComputerUseSurfaceProps)
               aria-pressed={viewMode === 'fit'}
               onClick={() => chooseMode(viewMode === 'fit' ? 'auto' : 'fit')}
               data-testid="macmon-fit"
-              title="Show the whole window at its real size"
+              title="Fit the whole window in the tab"
             >
-              Fit window
+              Fit
             </button>
             <button
               type="button"

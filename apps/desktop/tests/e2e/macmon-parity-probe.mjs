@@ -245,6 +245,24 @@ try {
   await setTheme('light');
   await snap('E-docked-follow-light');
   await setTheme('dark');
+  // Nothing in the actions row may be clipped by a docked rail.
+  const clipped = await page.evaluate(() => {
+    const row = document.querySelector('.pd-macmon-actions');
+    if (row === null) return null;
+    const box = row.getBoundingClientRect();
+    const over = [...row.querySelectorAll('button')]
+      .filter((b) => {
+        const r = b.getBoundingClientRect();
+        return r.right > box.right + 0.5 || r.left < box.left - 0.5;
+      })
+      .map((b) => (b.textContent ?? '').trim());
+    return { width: Math.round(box.width), height: Math.round(box.height), over };
+  });
+  check(
+    (clipped?.over.length ?? 1) === 0,
+    `the actions row clips ${clipped?.over.join(', ')} at ${clipped?.width}px`,
+  );
+  console.log(`actions row: ${clipped?.width}×${clipped?.height}px, nothing clipped`);
   check(fitScale < 60, `fit in the rail read ${fitScale}%`);
   check(followScale >= 85, `follow in the rail read ${followScale}%`);
   console.log(`docked rail: fit ${fitScale}% → follow ${followScale}%`);

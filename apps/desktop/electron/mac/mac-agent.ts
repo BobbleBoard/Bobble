@@ -78,7 +78,7 @@ let helper: MacHelperClient | null = null;
  * click/type fires (browser-agent's moveCursor-then-act pattern); the ack's
  * echoed x,y covers stale/unknown indices afterwards. Snapshot bbox x,y are
  * element CENTRES (screen points) by the pi-mac wire contract. */
-const elementCenters = new Map<number, Map<number, { x: number; y: number }>>();
+const elementCenters = new Map<number, Map<number, { x: number; y: number; name: string }>>();
 
 let tccCache: { at: number; status: MacTccStatus } | null = null;
 /** PI_E2E-only: a synthetic window frame the overlay's real tracking loop reads
@@ -241,11 +241,23 @@ function centerOf(params: Record<string, unknown>): { x: number; y: number } | n
 
 function cacheSnapshot(snap: MacSnapshot): void {
   if (typeof snap.pid !== 'number') return;
-  const map = new Map<number, { x: number; y: number }>();
+  const map = new Map<number, { x: number; y: number; name: string }>();
   for (const el of snap.elements ?? []) {
-    if (el?.bbox !== undefined) map.set(el.index, { x: el.bbox.x, y: el.bbox.y });
+    if (el?.bbox !== undefined) {
+      // The NAME travels with the centre: it is what turns "Clicking" into
+      // "Clicking Save", and the snapshot that produced the index already had it.
+      map.set(el.index, { x: el.bbox.x, y: el.bbox.y, name: el.name ?? '' });
+    }
   }
   elementCenters.set(snap.pid, map);
+}
+
+/** The name of the control an act names by index, when a look has seen it. */
+function nameOf(params: Record<string, unknown>): string {
+  const pid = typeof params.pid === 'number' ? params.pid : null;
+  const index = typeof params.index === 'number' ? params.index : null;
+  if (pid === null || index === null) return '';
+  return elementCenters.get(pid)?.get(index)?.name ?? '';
 }
 
 async function snapshotWithOverlay(params: Record<string, unknown>): Promise<MacSnapshot> {
@@ -278,7 +290,7 @@ async function clickWithOverlay(params: Record<string, unknown>): Promise<MacAct
   if (ack.found) {
     const at = typeof ack.x === 'number' && typeof ack.y === 'number' ? ack : known;
     if (at !== null && typeof at.x === 'number' && typeof at.y === 'number') {
-      await macOverlay.clickAt(at.x, at.y);
+      await macOverlay.clickAt(at.x, at.y, nameOf(params));
     }
   }
   return ack;

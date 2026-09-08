@@ -583,13 +583,20 @@ class MacOverlayController {
     await sleep(CURSOR_TRAVEL_MS);
   }
 
-  /** Click feedback at a screen point: press dip + expanding ripples. */
-  async clickAt(screenX: number, screenY: number): Promise<void> {
+  /**
+   * Click feedback at a screen point: press dip + expanding ripples.
+   *
+   * `name` is the control's own name, and it is the difference between
+   * "Clicking" and "Clicking Save". The name is already in hand — the snapshot
+   * that produced the index carried it — and a status that never says WHAT is
+   * being clicked was measured as 63% of everything this surface says.
+   */
+  async clickAt(screenX: number, screenY: number, name = ''): Promise<void> {
     const p = this.#local(screenX, screenY);
     if (p === null) return;
     this.#armIdle();
     // overlay.html's 'click' message shows the "Clicking" bubble itself.
-    this.#setStatus('clicking');
+    this.#setStatus('clicking', name);
     this.#emit();
     await this.#push({ kind: 'click', x: p.x, y: p.y });
     this.#revertSoon();

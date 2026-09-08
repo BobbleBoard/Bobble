@@ -4655,10 +4655,11 @@
   z-index: 1;
   flex: 0 0 auto;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 6px;
-  height: 40px;
-  padding: 0 var(--pd-space-md);
+  min-height: 40px;
+  padding: 7px var(--pd-space-md);
 }
 
 .pd-macmon-btn {
@@ -4793,6 +4794,14 @@
 
 .pd-macmon-spacer {
   flex: 1 1 auto;
+}
+
+/* The actions row must never clip a control: a docked rail is ~440px and the
+   six controls only just fit. Wrapping is the safety net; the spacer collapses
+   first so a second line is a last resort rather than the usual case. */
+.pd-macmon-actions .pd-macmon-spacer {
+  flex: 1 1 0;
+  min-width: 0;
 }
 
 /* The cheapest possible signal that what follows is a different KIND of fact. */
