@@ -37,10 +37,17 @@ export interface PimfHeader {
   h: number;
   /** Backing scale (2 on retina) — `w/scale` is the point width. */
   scale: number;
-  /** Union rect of the app's windows in screen POINTS — the real size to draw. */
+  /** Union rect of the app's windows in screen POINTS — the real size to draw.
+   * All zeros on a status frame, which carries no picture. */
   rect: { x: number; y: number; w: number; h: number };
-  /** Main display size in points. */
-  display: { w: number; h: number };
+  /** Why this frame has no picture: "screen-recording-denied" |
+   * "no-shareable-window". Absent on a normal frame. */
+  error?: string;
+  /** The app has no on-screen window right now. */
+  empty?: boolean;
+  /** The display the window is on, in the same global top-left space as `rect` —
+   * the monitor's stage. All zeros on a status frame. */
+  display: { x?: number; y?: number; w: number; h: number };
   windows: PimfWindow[];
 }
 
@@ -62,26 +69,31 @@ const PREFIX_BYTES = MAGIC.length + 8;
 const MAX_HEADER_BYTES = 1 << 20; // 1 MiB
 const MAX_PAYLOAD_BYTES = 64 << 20; // 64 MiB
 
-/** Shape-check a decoded header — a malformed one is dropped, never trusted. */
+/**
+ * Shape-check a decoded header — a malformed one is dropped, never trusted.
+ *
+ * Geometry is NOT required. A frame that carries no picture — "the app has no
+ * window", "Screen Recording is denied" — has no rect to report, and demanding
+ * one threw away the single frame whose whole job is to explain why nothing is
+ * arriving. The monitor then waited for a first frame that had already come and
+ * been discarded. Only `seq` and a window list are structural; the rest is
+ * filled in by `normalize`.
+ */
 function isHeader(value: unknown): value is PimfHeader {
   if (value === null || typeof value !== 'object') return false;
   const h = value as Record<string, unknown>;
-  const rect = h.rect as Record<string, unknown> | undefined;
-  const display = h.display as Record<string, unknown> | undefined;
-  return (
-    typeof h.seq === 'number' &&
-    rect !== undefined &&
-    rect !== null &&
-    typeof rect.x === 'number' &&
-    typeof rect.y === 'number' &&
-    typeof rect.w === 'number' &&
-    typeof rect.h === 'number' &&
-    display !== undefined &&
-    display !== null &&
-    typeof display.w === 'number' &&
-    typeof display.h === 'number' &&
-    Array.isArray(h.windows)
-  );
+  return typeof h.seq === 'number' && Array.isArray(h.windows);
+}
+
+function rectOr(value: unknown, fallback: { x: number; y: number; w: number; h: number }) {
+  if (value === null || typeof value !== 'object') return fallback;
+  const r = value as Record<string, unknown>;
+  return {
+    x: typeof r.x === 'number' ? r.x : fallback.x,
+    y: typeof r.y === 'number' ? r.y : fallback.y,
+    w: typeof r.w === 'number' ? r.w : fallback.w,
+    h: typeof r.h === 'number' ? r.h : fallback.h,
+  };
 }
 
 /** Normalize a decoded header so consumers never have to re-check optionals. */
@@ -110,9 +122,14 @@ function normalize(raw: PimfHeader): PimfHeader {
     w: typeof raw.w === 'number' ? raw.w : 0,
     h: typeof raw.h === 'number' ? raw.h : 0,
     scale: typeof raw.scale === 'number' && raw.scale > 0 ? raw.scale : 1,
-    rect: raw.rect,
-    display: raw.display,
+    rect: rectOr(raw.rect, { x: 0, y: 0, w: 0, h: 0 }),
+    display: rectOr(raw.display, { x: 0, y: 0, w: 0, h: 0 }),
     windows,
+    // A status frame says why there is no picture. Carrying it through is what
+    // turns "waiting for the first frame, forever" into a screen that explains
+    // itself.
+    error: typeof raw.error === 'string' ? raw.error : undefined,
+    empty: raw.empty === true ? true : undefined,
   };
 }
 

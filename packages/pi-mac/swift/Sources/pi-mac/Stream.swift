@@ -188,8 +188,7 @@ final class WindowStreamer: NSObject, SCStreamOutput, SCStreamDelegate, @uncheck
       if !sentEmpty {
         sentEmpty = true
         seq += 1
-        deliver(
-          header: ["seq": seq, "t": nowMs(), "windows": [], "empty": true], payload: Data())
+        deliver(header: statusHeader(reason: nil, empty: true), payload: Data())
       }
       return
     }
@@ -207,10 +206,9 @@ final class WindowStreamer: NSObject, SCStreamOutput, SCStreamDelegate, @uncheck
         reportedNoContent = true
         seq += 1
         deliver(
-          header: [
-            "seq": seq, "t": nowMs(), "windows": windows.map(windowDict),
-            "error": denied ? "screen-recording-denied" : "no-shareable-window",
-          ], payload: Data())
+          header: statusHeader(
+            reason: denied ? "screen-recording-denied" : "no-shareable-window", empty: false),
+          payload: Data())
         writeStderr(
           denied
             ? "stream: Screen Recording is not granted for this app\n"
@@ -234,6 +232,30 @@ final class WindowStreamer: NSObject, SCStreamOutput, SCStreamDelegate, @uncheck
     } catch {
       writeStderr("stream: could not start capture: \(error)\n")
     }
+  }
+
+  /// A frame that carries no picture but still has to be READ.
+  ///
+  /// The consumer shape-checks a header before trusting it, so a status frame
+  /// that omitted rect/display was thrown away as malformed — and the one frame
+  /// whose entire job is to say "Screen Recording is off" became the reason the
+  /// monitor sat on "waiting for the first frame" forever. A frame that explains
+  /// a failure has to survive the same validation as a frame that carries pixels.
+  private func statusHeader(reason: String?, empty: Bool) -> [String: Any] {
+    let rect = shape?.rect ?? .zero
+    var stage = CGRect(origin: .zero, size: NSScreen.screens.first?.frame.size ?? .zero)
+    for id in activeDisplayIDs() where CGDisplayBounds(id).intersects(rect) {
+      stage = CGDisplayBounds(id)
+      break
+    }
+    var header: [String: Any] = [
+      "seq": seq, "t": nowMs(), "w": 0, "h": 0, "scale": 1,
+      "rect": rectDict(rect), "display": rectDict(stage),
+      "windows": windows.map(windowDict),
+    ]
+    if empty { header["empty"] = true }
+    if let reason { header["error"] = reason }
+    return header
   }
 
   private func deliver(header: [String: Any], payload: Data) {

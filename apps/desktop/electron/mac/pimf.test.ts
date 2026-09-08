@@ -145,4 +145,37 @@ describe('PimfParser', () => {
     bytes.fill(0);
     expect(frames[0]?.payload.every((b) => b === 0x11)).toBe(true);
   });
+
+  // The frame whose entire job is to explain why no picture is coming has no
+  // geometry to report. Requiring geometry threw it away, and the monitor then
+  // waited forever for a first frame that had already arrived and been dropped.
+  it('keeps a status frame that carries a reason instead of a picture', () => {
+    const p = new PimfParser();
+    const raw = {
+      seq: 4,
+      t: 1_700_000_000_000,
+      windows: [],
+      error: 'screen-recording-denied',
+    } as unknown as PimfHeader;
+    const frames = p.push(encodePimf(raw, new Uint8Array(0)));
+    expect(frames).toHaveLength(1);
+    expect(frames[0]?.header.error).toBe('screen-recording-denied');
+    expect(frames[0]?.payload).toHaveLength(0);
+    // and geometry is filled in rather than left undefined for every consumer
+    expect(frames[0]?.header.rect).toEqual({ x: 0, y: 0, w: 0, h: 0 });
+  });
+
+  it('keeps the "no window" status frame too', () => {
+    const p = new PimfParser();
+    const raw = { seq: 5, t: 1, windows: [], empty: true } as unknown as PimfHeader;
+    const frames = p.push(encodePimf(raw, new Uint8Array(0)));
+    expect(frames[0]?.header.empty).toBe(true);
+    expect(frames[0]?.header.error).toBeUndefined();
+  });
+
+  it('still refuses a header that is not a frame header at all', () => {
+    const p = new PimfParser();
+    const raw = { hello: 'world' } as unknown as PimfHeader;
+    expect(p.push(encodePimf(raw, new Uint8Array(0)))).toHaveLength(0);
+  });
 });
