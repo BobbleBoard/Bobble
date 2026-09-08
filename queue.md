@@ -4,7 +4,8 @@ Everything here was queued while computer use was being finished. Order below is
 the user's, not mine. He said: "you have a whole night to do it and produce that
 video, you can take your time with all of it."
 
-**Do the video first, then this file.**
+**Do the video first, then this file.** — the video is done and delivered
+(`scratchpad/mac-video/bobble-drives-textedit.mp4`, plus a close-up cut).
 
 Six screenshots came with the message. They could not be written to disk from
 the conversation, so each is described where it belongs — precisely enough to
@@ -14,11 +15,19 @@ act on without them.
 
 ## 0. Immediate, said in the same breath as the video
 
-- [ ] **Do not blur the wallpaper** in the computer-use monitor. It is currently
-      blurred + dimmed behind the window. Show it as it is.
-- [ ] **Always show the fake cursor**, even idle. the user: "looks nice and makes it
-      feel like 'this is the model's computer.'"
-- [ ] **Recording should be available.** He granted the permissions, double
+- [x] **Do not blur the wallpaper** — done. The 4px blur, the 58% wash and the
+      42% vignette are gone. Exposed a real regression (empty state and footer
+      unreadable over a sunlit photo), fixed with a glass card and a scrim
+      rather than by blurring everything again.
+- [x] **Always show the fake cursor**, even idle — done. Drawn whenever there is
+      a window, resting where it last acted, breathing gently.
+- [x] **Recording** — done, by a second route. The monitor now draws the app
+      from Accessibility when it cannot capture pixels, so it works with no
+      capture grant at all; the video was recorded through it. Root cause of the
+      permission trouble found: macOS keys the grant to the binary that CALLS
+      the capture API, which was the separately-signed pi-mac helper — so
+      enabling "Bobble" granted a binary that does no capturing. Capture is
+      moving into Electron so the grant given to Bobble is the one that counts. He granted the permissions, double
       checked, restarted — and Bobble still asks. There are "a lot of permission
       re-popups in bobble even after I totally have provided the permissions".
       Find secondary ways to get the recording; do not make him fight TCC.
@@ -40,16 +49,17 @@ and "Reload with a fresh window". Menu bar reads Bobble · Edit · View · Windo
 - [ ] ⌘R should NOT do that hard clear. Replace it with a safe reload we control
       — one that restores the chat, the canvas tabs and the scroll position.
 
-## 2. Canvas tabs — floating, not connected
+## 2. Canvas tabs — floating, not connected  ✅ DONE
 
 *Two screenshots of a dark tab strip, four "New Tab" items. Today the selected
 tab is joined to the content area by a border that runs up and around and back
 down the other side; hovering an unselected tab draws the same connected shape
 with a ✕ appearing.*
 
-- [ ] Tabs float. Only the selected tab gets a surround, and it does not connect
-      downward into the content border.
-- [ ] Hover shows a floating highlight, not the connecting-downward treatment.
+- [x] Tabs float: rounded on all four corners, centred with air above and below
+      rather than resting on the seam, the selected one carrying a hairline all
+      round plus a shadow. The strip's boundary is one unbroken line again.
+- [x] Hover is a filled floating pill; nothing reaches down into the seam.
 
 ## 3. One "Activity" tab, not tab spam
 
