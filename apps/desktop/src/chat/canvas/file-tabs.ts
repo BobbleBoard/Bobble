@@ -16,13 +16,15 @@ import {
   type CanvasController,
   type CanvasTabKind,
   type CanvasTabSpec,
+  type EditAnimationPlan,
   type FileTreeNode,
   type OpenWithApp,
+  planEditAnimation,
   useCanvasTabs,
 } from '@pi-desktop/canvas';
 import type { ChatMsg } from '@pi-desktop/engine';
 import type { DiffFileData } from '@pi-desktop/ui';
-import { useEffect, useRef } from 'react';
+import { useEffect, useReducer, useRef } from 'react';
 import { usePiStore } from '../../state/pi-slice';
 import { useProjectStore } from '../../state/project-store';
 import { editDiffFile } from '../edit-diff';
@@ -225,6 +227,40 @@ function buildEditDiff(absPath: string, edit: EditHunk): DiffFileData[] {
   return [editDiffFile(basename(absPath), edit.oldText, edit.newText)];
 }
 
+/** How a tab should show an edit: as the motion, or as the fallback diff. */
+export type EditPresentation =
+  | { kind: 'animate'; plan: EditAnimationPlan }
+  | { kind: 'diff'; diff: DiffFileData[] };
+
+/**
+ * DECIDE HOW TO SHOW AN EDIT — the animation whenever it can be played, the old
+ * diff only when it cannot.
+ *
+ * It can be played when we know two things: the file as it stood before the tool
+ * ran, and where in it each hunk goes. The first comes from disk, read the
+ * moment the call appears in the stream — which is while its arguments are still
+ * arriving, so the bytes on disk are still the pre-edit ones. The second is
+ * `planEditAnimation`, which refuses rather than guesses.
+ *
+ * Kept pure and exported so the fallback is a decision with a test, not a
+ * side-effect buried in an effect.
+ */
+export function presentEdit(
+  absPath: string,
+  baseText: string | undefined,
+  hunks: EditHunk[] | undefined,
+  fallback: EditHunk,
+): EditPresentation {
+  if (baseText !== undefined && hunks !== undefined && hunks.length > 0) {
+    const plan = planEditAnimation(
+      baseText,
+      hunks.map((h) => ({ oldText: h.oldText, newText: h.newText })),
+    );
+    if (plan !== null) return { kind: 'animate', plan };
+  }
+  return { kind: 'diff', diff: buildEditDiff(absPath, fallback) };
+}
+
 async function readFile(absPath: string): Promise<ReadFileResult | null> {
   try {
     return await window.piDesktop.invoke('fs:read-file', { path: absPath });
@@ -400,9 +436,11 @@ export async function openFileInCanvas(
   controller.updateTab(tab.id, {
     streaming: false,
     fileTree: tree,
-    // Opening a file explicitly shows its CONTENT — drop any live edit-diff a
-    // mid-stream edit left on this tab so the user sees the file, not the hunk.
+    // Opening a file explicitly shows its CONTENT — drop any live edit a
+    // mid-stream call left on this tab (motion or fallback diff) so the user
+    // sees the file on disk, not a hunk mid-flight.
     diff: undefined,
+    editAnim: undefined,
     /*
      * Only replace content with a read that actually loaded — a missing/raced
      * read must never blank the surface (round-blindtest #10).
@@ -435,39 +473,47 @@ export function useFileWriteCanvasRouting(): void {
 
   const opened = useRef<Set<string>>(new Set());
   const finalized = useRef<Set<string>>(new Set());
-  // Per-edit-call signature of the last diff we pushed, so a stable/older edit
-  // isn't re-applied on every stream tick (mirrors the write path's content
-  // compare). Keyed by callId — a second edit to the SAME path is a new call, so
-  // its diff still lands on the existing tab.
-  const editSig = useRef<Map<string, string>>(new Map());
+  /*
+   * PER-EDIT-CALL BOOKKEEPING for the edit animation.
+   *
+   * `base` is the file as it stood BEFORE the call ran, read from disk the first
+   * time the call is seen — which is while its arguments are still streaming, so
+   * the tool has not touched the file yet. That read is the whole reason the
+   * animation can exist: without the prior text there is no file to delete out
+   * of. `reading` marks it in flight so a failed read falls back to the diff
+   * instead of hanging on a base that will never come; `staged` marks the
+   * motion handed to the tab, so it is planned once and not re-planned (and
+   * therefore not restarted) on every stream tick.
+   */
+  const editBase = useRef<Map<string, string>>(new Map());
+  const editReading = useRef<Set<string>>(new Set());
+  const editStaged = useRef<Set<string>>(new Set());
+  // A base read can land after the LAST stream tick (a call whose result is
+  // already in), and nothing else would re-run this effect to use it.
+  const [, rerun] = useReducer((n: number) => n + 1, 0);
 
   useEffect(() => {
     for (const ev of detectFileWrites(messages, cwd)) {
       const key = fileTabKey(ev.path);
 
-      // ── str_replace-style EDIT → a LIVE DIFF in the file tab ────────────────
-      // Mirrors the whole-file write path (open once per path; a user-closed tab
-      // is not reopened; a later edit refreshes quietly) but shows the edit's
-      // deletions + additions as a diff, following the hunk as its args stream.
-      // On completion it settles from disk to the on-disk file, dropping the diff
-      // — the same finalize the write path does, so the tab stays a normal,
-      // editable file view afterward.
+      // ── str_replace-style EDIT → THE FILE, then the edit played into it ─────
+      // the user: "Editing a file shouldn't show the diff being written in real time
+      // it should show that file and then the text as the negative part of the
+      // diff is written being deleted … and then of course the replace part
+      // writing animation."
+      //
+      // So: open the tab on the FILE while the arguments stream (nothing moves
+      // yet — a half-arrived `old_string` would animate a delete of the wrong
+      // text), and the moment the arguments are complete hand the tab a motion
+      // to play. On completion it settles from disk, the same finalize the write
+      // path does, so the tab stays a normal editable file view afterward.
       if (ev.edit !== undefined) {
         const existing = controller.getState().tabs.find((t) => t.key === key);
-        const diff = buildEditDiff(ev.path, ev.edit);
-        const sig = `${ev.edit.oldText?.length ?? -1}:${ev.edit.newText?.length ?? -1}:${
-          ev.running ? 'r' : 'd'
-        }`;
 
         if (existing === undefined) {
           if (!opened.current.has(key)) {
             opened.current.add(key);
-            editSig.current.set(ev.callId, sig);
-            controller.upsertTab(key, {
-              ...fileTabSpec(ev.path, cwd),
-              streaming: ev.running,
-              diff,
-            });
+            controller.upsertTab(key, { ...fileTabSpec(ev.path, cwd), streaming: ev.running });
             const { root } = treeRootFor(ev.path, cwd);
             void readTree(root).then((tree) => {
               const tab = controller.getState().tabs.find((t) => t.key === key);
@@ -476,22 +522,65 @@ export function useFileWriteCanvasRouting(): void {
             void hydrateOpenApps(controller, key, ev.path);
           }
           // else: the user closed this tab — don't nag it back open.
-        } else if (editSig.current.get(ev.callId) !== sig) {
-          // Live-follow: apply the newest hunk (and running flag) to the tab —
-          // including when the edit lands on a tab opened by an earlier write.
-          editSig.current.set(ev.callId, sig);
-          controller.updateTab(existing.id, { diff, streaming: ev.running });
         }
 
-        // Finalize once from disk when the edit completes: swap the diff for the
-        // authoritative on-disk file and drop `streaming` (retried, since a fresh
-        // edit can lag its result a beat — round-blindtest #10).
+        // Capture the pre-edit text once. A tab that already shows this file
+        // settled has it in hand; otherwise go to disk (still pre-edit).
+        if (!editBase.current.has(ev.callId) && !editReading.current.has(ev.callId)) {
+          const shown = existing?.streaming === true ? undefined : existing?.artifact?.content.text;
+          if (shown !== undefined) {
+            editBase.current.set(ev.callId, shown);
+          } else {
+            editReading.current.add(ev.callId);
+            void readFileSettled(ev.path).then((read) => {
+              if (readHasContent(read) && read.text !== null) {
+                editBase.current.set(ev.callId, read.text);
+              }
+              editReading.current.delete(ev.callId);
+              rerun();
+            });
+          }
+        }
+
+        const base = editBase.current.get(ev.callId);
+        const tab = controller.getState().tabs.find((t) => t.key === key);
+        // Show the file itself while the arguments are still arriving.
+        if (tab !== undefined && base !== undefined && tab.artifact === undefined) {
+          controller.updateTab(tab.id, { artifact: fileArtifactFromText(ev.path, base) });
+        }
+
+        // `hunks` is set only once the call's arguments have finished arriving —
+        // which is exactly when the motion can be planned honestly.
+        const ready = ev.hunks !== undefined && !editReading.current.has(ev.callId);
+        if (tab !== undefined && ready && !editStaged.current.has(ev.callId)) {
+          editStaged.current.add(ev.callId);
+          const shown = presentEdit(ev.path, base, ev.hunks, ev.edit);
+          controller.updateTab(
+            tab.id,
+            shown.kind === 'animate'
+              ? {
+                  // The buffer starts as the file BEFORE the edit; the motion
+                  // takes it from there to after.
+                  artifact: fileArtifactFromText(ev.path, shown.plan.baseText),
+                  editAnim: { id: ev.callId, plan: shown.plan, startedAt: Date.now() },
+                  diff: undefined,
+                  streaming: ev.running,
+                }
+              : { diff: shown.diff, editAnim: undefined, streaming: ev.running },
+          );
+        }
+
+        // Finalize once from disk when the edit completes: the authoritative
+        // on-disk bytes and no `streaming` (retried, since a fresh edit can lag
+        // its result a beat — round-blindtest #10). `editAnim` is deliberately
+        // LEFT in place: it carries its own start clock, so it settles rather
+        // than replays, and clearing it mid-motion would cut the animation off.
         if (!ev.running && !finalized.current.has(ev.callId)) {
           finalized.current.add(ev.callId);
           void readFileSettled(ev.path).then((read) => {
-            const tab = controller.getState().tabs.find((t) => t.key === key);
-            if (tab === undefined) return;
-            controller.updateTab(tab.id, {
+            const settled = controller.getState().tabs.find((t) => t.key === key);
+            if (settled === undefined) return;
+            controller.updateTab(settled.id, {
               streaming: false,
               diff: undefined,
               ...(readHasContent(read) ? { artifact: fileArtifact(ev.path, read) } : {}),
@@ -573,9 +662,11 @@ export function useFileWriteCanvasRouting(): void {
           if (tab === undefined) return;
           controller.updateTab(tab.id, {
             streaming: false,
-            // A whole-file write shows CONTENT — clear any edit-diff a prior edit
-            // to this path left behind, so the written bytes are never masked.
+            // A whole-file write shows CONTENT — clear anything a prior edit to
+            // this path left behind (its motion or its fallback diff), so the
+            // written bytes are never masked.
             diff: undefined,
+            editAnim: undefined,
             ...(readHasContent(read) ? { artifact: fileArtifact(ev.path, read) } : {}),
           });
         });

@@ -20,8 +20,10 @@
  */
 import path from 'node:path';
 import { createLogger } from '@pi-desktop/shared';
-import { app, BrowserWindow } from 'electron';
+import { themes } from '@pi-desktop/themes';
+import { app, BrowserWindow, nativeTheme } from 'electron';
 import { isBackgroundMode } from '../background-mode';
+import { readSettings } from '../settings/settings-main';
 import {
   comboLabel,
   type MacCursorState,
@@ -96,6 +98,39 @@ function overlayHtmlPath(): string {
   return path.join(app.getAppPath(), 'electron', 'mac', 'overlay.html');
 }
 
+/** How long the window may stay mouse-CATCHING before main forces it back to
+ * click-through. The page reports the pointer leaving the bubble, but a page
+ * that never gets that event (the pointer jumps to another space, the window
+ * moves out from under it) must not be able to leave a transparent window
+ * eating the user's clicks. */
+const HIT_WATCHDOG_MS = 4_000;
+
+/**
+ * The bubble's three colours, resolved from whichever theme flavour is on.
+ *
+ * The on-screen phantom and the one in the canvas tab are supposed to be the
+ * same object; they had drifted into two palettes with two justifications, one
+ * of which (a purple that had already been removed) was no longer true. So the
+ * overlay stops carrying its own palette and is told the app's, which also
+ * means the phantom floating over TextEdit belongs to the flavour the user
+ * picked instead of to whatever this file was written with.
+ */
+export function overlayTheme(): { accent: string; pill: string; ink: string } {
+  // Near-black, theme-independent, exactly like the canvas bubble: the pill
+  // floats over the USER'S DESKTOP, which is not light or dark on our terms.
+  const pill = 'rgba(22,24,30,0.92)';
+  const ink = '#ffffff';
+  try {
+    const pref = readSettings().theme;
+    const mode =
+      pref.mode === 'system' ? (nativeTheme.shouldUseDarkColors ? 'dark' : 'light') : pref.mode;
+    const accent = themes[`${pref.flavor}-${mode}`]?.accent.primary;
+    return { accent: accent ?? '#0071e3', pill, ink };
+  } catch {
+    return { accent: '#0071e3', pill, ink };
+  }
+}
+
 class MacOverlayController {
   #win: BrowserWindow | null = null;
   #loaded: Promise<void> | null = null;
@@ -116,10 +151,32 @@ class MacOverlayController {
   #statusText = '';
   #bubbleVisible = false;
   #watchers = new Set<(state: MacOverlayState) => void>();
+  /** What the ✕ inside the bubble does. Injected by mac-agent.ts, which owns
+   * the other half of stopping (refusing the model's next act). */
+  #brake: ((mode: 'stopped' | 'user') => void) | null = null;
+  /** What clicking the bubble body does: bring Bobble forward on its monitor. */
+  #reveal: (() => void) | null = null;
+  /** True while the window is catching the mouse for the bubble (C2). */
+  #catching = false;
+  #hitWatchdog: ReturnType<typeof setTimeout> | null = null;
 
   /** mac-agent injects the helper-backed bounds reader once at registration. */
   setBoundsReader(reader: BoundsReader): void {
     this.#boundsReader = reader;
+  }
+
+  /**
+   * THE BRAKE ON THE ONLY THING THE USER CAN SEE.
+   *
+   * While an app is driven in the background, the phantom and its bubble are
+   * the entire product as far as the user is concerned — and until now they
+   * were decorative, because the whole window is click-through. `stop` is
+   * wired to the ✕ inside the bubble; `reveal` to the bubble body, which brings
+   * Bobble forward on the monitor.
+   */
+  setBrake(stop: (mode: 'stopped' | 'user') => void, reveal?: () => void): void {
+    this.#brake = stop;
+    this.#reveal = reveal ?? null;
   }
 
   // ── published state (monitor.ts's single source of truth) ──────────────
@@ -208,8 +265,28 @@ class MacOverlayController {
     // Ride along to whatever space the controlled window is on (incl. a
     // fullscreen app); the visibility rule keeps it from intruding elsewhere.
     win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
-    // Click-through: the overlay must never eat a real mouse event.
+    // Click-through by default: the overlay must never eat a real mouse event
+    // — except over the bubble itself, which the page asks for by the hit
+    // messages below and which main un-asks for on its own watchdog.
     win.setIgnoreMouseEvents(true, { forward: true });
+    this.#catching = false;
+    /*
+     * THE PAGE'S ONE WAY TO SPEAK.
+     *
+     * overlay.html is deliberately preload-less and sandboxed — main drives it
+     * through executeJavaScript and it has no ipcRenderer. A denied
+     * `window.open('pd-overlay:…')` is a one-way, argument-free signal that
+     * needs no build wiring and can never navigate anything: the handler reads
+     * the verb and returns 'deny'.
+     */
+    win.webContents.setWindowOpenHandler(({ url }) => {
+      this.#fromPage(url);
+      return { action: 'deny' };
+    });
+    // Nothing in this window may ever navigate. It renders one static file.
+    win.webContents.on('will-navigate', (event) => {
+      event.preventDefault();
+    });
     this.#loaded = win.loadFile(overlayHtmlPath()).catch((err) => {
       log.error('overlay.html failed to load', { error: String(err) });
     });
@@ -221,6 +298,67 @@ class MacOverlayController {
     });
     this.#win = win;
     return win;
+  }
+
+  /** One `pd-overlay:<verb>` signal from the page. */
+  #fromPage(url: string): void {
+    if (!url.startsWith('pd-overlay:')) return;
+    const verb = url.slice('pd-overlay:'.length).replace(/[/?#].*$/, '');
+    switch (verb) {
+      case 'hit':
+        this.#setCatching(true);
+        return;
+      case 'unhit':
+        this.#setCatching(false);
+        return;
+      case 'stop':
+        this.#setCatching(false);
+        this.#brake?.('stopped');
+        return;
+      case 'reveal':
+        this.#setCatching(false);
+        this.#reveal?.();
+        return;
+      default:
+        return;
+    }
+  }
+
+  /**
+   * Catch the mouse, or stop catching it.
+   *
+   * The watchdog is not paranoia: a transparent, always-on-top window that got
+   * stuck catching would silently swallow every click over the controlled app,
+   * with nothing on screen to explain why. The page reports the pointer
+   * leaving; main stops believing it after HIT_WATCHDOG_MS regardless.
+   */
+  #setCatching(on: boolean): void {
+    const win = this.#win;
+    if (win === null || win.isDestroyed()) return;
+    if (this.#hitWatchdog !== null) {
+      clearTimeout(this.#hitWatchdog);
+      this.#hitWatchdog = null;
+    }
+    if (on) {
+      if (!this.#catching) {
+        this.#catching = true;
+        win.setIgnoreMouseEvents(false);
+      }
+      this.#hitWatchdog = setTimeout(() => {
+        this.#hitWatchdog = null;
+        this.#setCatching(false);
+      }, HIT_WATCHDOG_MS);
+      this.#hitWatchdog.unref?.();
+      return;
+    }
+    if (!this.#catching) return;
+    this.#catching = false;
+    win.setIgnoreMouseEvents(true, { forward: true });
+  }
+
+  /** Probes: is the overlay currently catching the mouse for its bubble? */
+  catching(): boolean {
+    return this.#catching;
   }
 
   async #push(msg: Record<string, unknown>): Promise<void> {
@@ -253,6 +391,7 @@ class MacOverlayController {
     win.setBounds(overlayBoundsFor(this.#target.rect));
     this.#applyVisibility(true);
     this.#emit();
+    await this.#push({ kind: 'theme', ...overlayTheme() });
     await this.#push({ kind: 'reset' });
     this.#startTracking();
   }
@@ -265,6 +404,7 @@ class MacOverlayController {
     win.setBounds(overlayBoundsFor(rect));
     this.#applyVisibility(true);
     this.#emit();
+    await this.#push({ kind: 'theme', ...overlayTheme() });
     await this.#push({ kind: 'reset' });
   }
 
@@ -474,6 +614,22 @@ class MacOverlayController {
     this.#revertSoon();
   }
 
+  /**
+   * The model is READING the screen — a snapshot, not an act.
+   *
+   * This state existed on both sides and had never fired once, because nothing
+   * called it: a census of 180 samples saw every other state and not this one.
+   * It is wired now (mac-agent's snapshot path), because a snapshot IS the
+   * thing the user most wants named — a bubble that says "Thinking" while the
+   * agent silently reads their screen is the wrong word for that moment.
+   */
+  async reading(): Promise<void> {
+    this.#armIdle();
+    this.#setStatus('reading');
+    this.#emit();
+    await this.#push({ kind: 'status', status: 'reading' });
+  }
+
   async opening(appName: string): Promise<void> {
     this.#armIdle();
     const label = `Opening ${appName}`;
@@ -570,6 +726,7 @@ class MacOverlayController {
     this.#clearRevert();
     this.#clearIdle();
     this.#stopTracking();
+    this.#setCatching(false);
     this.#target = null;
     this.#missingSince = null;
     this.#lastCursor = null;

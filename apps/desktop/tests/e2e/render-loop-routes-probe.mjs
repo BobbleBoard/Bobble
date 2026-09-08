@@ -80,9 +80,7 @@ for (const route of ROUTES) {
   await page.addInitScript(HOOK);
   const url = await page.url();
   const target =
-    route.query === undefined
-      ? url
-      : `${url}${url.includes('?') ? '&' : '?'}${route.query}=1`;
+    route.query === undefined ? url : `${url}${url.includes('?') ? '&' : '?'}${route.query}=1`;
   await page.goto(target, { waitUntil: 'domcontentloaded' }).catch(() => undefined);
   await page.waitForTimeout(3500);
 

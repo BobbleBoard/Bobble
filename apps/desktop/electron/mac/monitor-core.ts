@@ -23,12 +23,17 @@
  * not is worse than no monitor.
  */
 import {
+  captureNoticeFor,
   EMPTY_MAC_MONITOR_STATE,
   MAC_CAPTURE_DENIED,
   type MacMonitorAxScene,
+  type MacMonitorCaptureSource,
+  type MacMonitorControl,
   type MacMonitorFramePayload,
   type MacMonitorState,
   type MacMonitorStreamState,
+  type MacMonitorWindowSource,
+  streamMessageFor,
 } from './mac-monitor-contract';
 import { axSceneFrom, type MacAxSnapshotLike } from './monitor-ax';
 import type { MacOverlayState } from './overlay-geometry';
@@ -60,6 +65,42 @@ export const AX_POLL_MS = 250;
 /** How many elements the fallback asks for. The helper's own default is 60,
  * which is a good list for a MODEL and a thin drawing of a window. */
 const AX_CAP = 220;
+
+/**
+ * THE CALM STATE ALWAYS GETS ON SCREEN FIRST.
+ *
+ * A child can spawn and die inside one tick, which paints "Live view
+ * unavailable" before "Connecting to TextEdit" was ever seen — the exact thing
+ * iPhone Mirroring is mocked for ("that 'connection failed' screen shows up
+ * faster than the app can even crash"). A failure inside this window waits it
+ * out; a failure after it lands immediately, because by then the user has had
+ * the calm state and is owed the truth.
+ */
+export const UNAVAILABLE_FLOOR_MS = 900;
+/**
+ * A live stream with no new picture for this long is STALLED, not slow. Above
+ * the helper's own 400ms window re-resolve and well above a 12fps cadence, so
+ * a hiccup never trips it; short enough that the surface says so before the
+ * user starts wondering.
+ */
+export const STALL_AFTER_MS = 4_000;
+/** Re-enumerate Chromium's window sources at most this often. Enumeration walks
+ * every window on the machine, so it rides the AX poll's coat-tails rather than
+ * running at it: only when the window set changed, or this long has passed. */
+const SOURCE_REFRESH_MS = 2_000;
+/** Chromium refusing to share the windows this many times in a row means the
+ * app's own grant is not usable — fall back to the helper, which may hold one
+ * of its own. */
+const ELECTRON_GIVE_UP = 2;
+
+/** Whether the APP (not the helper) may capture. Injected so the core stays
+ * electron-free; monitor.ts reads systemPreferences. */
+export type CaptureGrantReader = () => 'granted' | 'denied' | 'unknown';
+
+/** Chromium's sources for the given CGWindowIDs, in the order asked for. */
+export type CaptureSourceReader = (
+  windowIds: readonly number[],
+) => Promise<{ windows: MacMonitorWindowSource[]; denied: boolean }>;
 
 /** Injected reader for the helper's `wallpaper` method (mac-agent owns the one
  * long-lived helper pipe; the monitor never opens a second one). */
@@ -102,6 +143,10 @@ export interface MacMonitorCoreOptions {
   wallpaperReader?: WallpaperReader;
   wallpaperResolver?: WallpaperResolver;
   axReader?: AxReader;
+  /** The app's own Screen Recording grant, and Chromium's window sources — the
+   * preferred capture path (see the contract's two-paths note). */
+  captureGrant?: CaptureGrantReader;
+  sourceReader?: CaptureSourceReader;
   /** Injected so tests need no timers of their own. */
   setTimer?: (fn: () => void, ms: number) => unknown;
   clearTimer?: (handle: unknown) => void;
@@ -144,6 +189,29 @@ export class MacMonitorCore {
   #axInFlight = false;
   #axScene: MacMonitorAxScene | null = null;
   #now: () => number = () => Date.now();
+  /** When the current session's calm state began — the floor F9 measures from. */
+  #calmSince = 0;
+  /** A give-up held back by that floor, and its timer. */
+  #pendingGiveUp: string | null = null;
+  #giveUpHandle: unknown = null;
+  /** When the last picture — a real frame OR an AX scene — arrived. */
+  #lastPictureAt = 0;
+  /** When the bubble last went to 'thinking' (null: it is not thinking). */
+  #thinkingSince: number | null = null;
+  /** Who has the wheel. Only the USER can move this off 'stopped'/'user'. */
+  #control: MacMonitorControl = 'agent';
+  /** The app's own capture grant, as last read. */
+  #grant: 'granted' | 'denied' | 'unknown' = 'unknown';
+  /** The app HELD the grant at some point in this run — so losing it is
+   * macOS's monthly re-ask rather than a first run (F8). */
+  #everGranted = false;
+  #source: MacMonitorCaptureSource = 'none';
+  #sources: MacMonitorWindowSource[] = [];
+  /** The window-id set `#sources` was enumerated for, and when. */
+  #sourcesKey = '';
+  #sourcesAt = 0;
+  /** Consecutive enumerations that produced nothing. */
+  #sourceMisses = 0;
 
   readonly #opts: MacMonitorCoreOptions;
 
@@ -170,6 +238,31 @@ export class MacMonitorCore {
     this.reconcile();
   }
 
+  /** Install the preferred (Electron) capture path. */
+  setCaptureSourceReader(grant: CaptureGrantReader, sources: CaptureSourceReader): void {
+    this.#opts.captureGrant = grant;
+    this.#opts.sourceReader = sources;
+    this.#readGrant();
+    this.reconcile();
+  }
+
+  /**
+   * Re-read the app's own grant, remembering whether it was ever held.
+   *
+   * Called whenever a session starts, which is exactly when it matters: macOS
+   * Sequoia re-asks for Screen Recording about once a month, so a run thirty
+   * days after everything worked is the FIRST place the app can notice it was
+   * turned off — and the difference between "you have never granted this" and
+   * "macOS just asked again" is the whole of the copy.
+   */
+  #readGrant(): 'granted' | 'denied' | 'unknown' {
+    const read = this.#opts.captureGrant;
+    const next = read === undefined ? 'unknown' : read();
+    if (next === 'granted') this.#everGranted = true;
+    this.#grant = next;
+    return next;
+  }
+
   /** The installed reader, so a wrapper can delegate to it. */
   axReader(): AxReader | undefined {
     return this.#opts.axReader;
@@ -183,7 +276,16 @@ export class MacMonitorCore {
   // ── the phantom's state, pushed in from the overlay ─────────────────────
 
   setOverlayState(state: MacOverlayState): void {
+    const was = this.#overlay.cursorState;
     this.#overlay = state;
+    // "Thinking" is the one state with no natural end — every other one is
+    // followed by an act. Time it, so a model that has gone quiet can say how
+    // long rather than showing the same three dots forever.
+    if (state.cursorState === 'thinking') {
+      if (was !== 'thinking' || this.#thinkingSince === null) this.#thinkingSince = this.#now();
+    } else {
+      this.#thinkingSince = null;
+    }
     // The overlay dropping its target IS the session ending — the two must not
     // be able to disagree about whether an app is being driven.
     if (!state.engaged && this.#session !== null) this.clearSession();
@@ -208,10 +310,52 @@ export class MacMonitorCore {
     this.#captureDenied = false;
     this.#axScene = null;
     this.#stopChild();
+    this.#clearPendingGiveUp();
     this.#stream = 'idle';
+    this.#calmSince = this.#now();
+    this.#lastPictureAt = 0;
+    this.#sources = [];
+    this.#sourcesKey = '';
+    this.#sourceMisses = 0;
+    this.#source = 'none';
+    // A new session is the moment to look again: the grant may have arrived
+    // since the last one, or macOS may have taken it back (F8).
+    this.#readGrant();
+    // A new act means the agent is driving again; a brake the model could not
+    // clear is the point, but a brand-new session is the user's own doing.
     void this.ensureWallpaper();
     this.reconcile();
     this.broadcastState();
+  }
+
+  /**
+   * THE BRAKE, AND THE WHEEL.
+   *
+   * `stopped` and `user` both cut every capture dead — the difference is only
+   * what the surface says. Take-over in particular has to stop LOOKING, not
+   * just stop acting: the case that most needs it is the user typing a password
+   * into the app the agent opened, and "Bobble isn't watching" has to be true
+   * for that to be a promise rather than a slogan.
+   */
+  setControl(mode: MacMonitorControl): void {
+    if (this.#control === mode) return;
+    this.#control = mode;
+    if (mode === 'agent') {
+      // Coming back from a stop is a fresh look at the picture, not a resume of
+      // a stream that gave up while nobody was allowed to watch.
+      this.#streamError = null;
+      this.#captureDenied = false;
+      this.#clearPendingGiveUp();
+      if (this.#stream === 'unavailable') this.#stream = 'idle';
+      this.#calmSince = this.#now();
+      this.#readGrant();
+    }
+    this.reconcile();
+    this.broadcastState();
+  }
+
+  control(): MacMonitorControl {
+    return this.#control;
   }
 
   /** The session ended (setDriving:false, the window vanished, the app quit). */
@@ -219,12 +363,18 @@ export class MacMonitorCore {
     if (this.#session === null && this.#stream === 'idle') return;
     this.#session = null;
     this.#stopChild();
+    this.#clearPendingGiveUp();
     this.#stream = 'idle';
     this.#streamError = null;
     this.#captureDenied = false;
     this.#frameRect = null;
     this.#frameDisplay = null;
     this.#axScene = null;
+    this.#sources = [];
+    this.#sourcesKey = '';
+    this.#source = 'none';
+    this.#lastPictureAt = 0;
+    this.#thinkingSince = null;
     this.reconcile();
     this.broadcastState();
   }
@@ -260,13 +410,29 @@ export class MacMonitorCore {
   state(): MacMonitorState {
     const session = this.#session;
     const o = this.#overlay;
+    const now = this.#now();
+    // Whole seconds, not milliseconds: these are ages a person reads off the
+    // screen ("no new frames for 12s"), and a value that changes every
+    // millisecond would defeat the identical-state dedupe on every frame.
+    const seconds = (from: number): number => Math.floor((now - from) / 1000) * 1000;
+    const appName = session?.appName ?? '';
+    // "macOS has not granted this" is only worth saying while there is nothing
+    // to look at. The denial is real either way; the SCREEN for it is not.
+    const denied =
+      session !== null && this.#stream === 'unavailable' && this.#control === 'agent'
+        ? this.#captureDenied || this.#grant === 'denied'
+        : false;
+    const revoked = denied && this.#everGranted && this.#grant === 'denied';
     return {
       ...EMPTY_MAC_MONITOR_STATE,
       active: session !== null,
       pid: session?.pid ?? null,
-      appName: session?.appName ?? '',
+      appName,
       stream: this.#stream,
       streamError: this.#streamError,
+      streamMessage: denied
+        ? null // the notice says it better, and says what to do about it
+        : streamMessageFor(this.#streamError, appName),
       wallpaperPath: this.#wallpaper?.path ?? null,
       wallpaperUrl: this.#wallpaper?.url ?? null,
       rect: this.#frameRect ?? (o.rect === null ? null : { ...o.rect }),
@@ -275,7 +441,19 @@ export class MacMonitorCore {
       cursorState: o.cursorState,
       cursor: o.cursor,
       bubbleVisible: o.bubbleVisible,
-      captureDenied: this.#captureDenied,
+      captureDenied: denied,
+      captureRevoked: revoked,
+      captureAppName: EMPTY_MAC_MONITOR_STATE.captureAppName,
+      captureNotice: denied ? captureNoticeFor({ appName, revoked }) : null,
+      captureSource: this.#source,
+      sources: this.#sources.map((s) => ({ ...s })),
+      stalled:
+        this.#stream === 'live' &&
+        this.#lastPictureAt !== 0 &&
+        now - this.#lastPictureAt >= STALL_AFTER_MS,
+      lastPictureAgeMs: this.#lastPictureAt === 0 ? null : seconds(this.#lastPictureAt),
+      thinkingMs: this.#thinkingSince === null ? null : seconds(this.#thinkingSince),
+      control: this.#control,
     };
   }
 
@@ -297,6 +475,17 @@ export class MacMonitorCore {
         /* a dead renderer must never break the stream */
       }
     }
+  }
+
+  /**
+   * Nothing changed, but TIME did — and time is the whole of "stalled" and
+   * "still thinking, 32s". Cheap by construction: the ages are quantised to
+   * whole seconds, so the identical-state dedupe swallows every tick inside the
+   * same second, and a session nobody is watching never gets here at all.
+   */
+  tick(): void {
+    if (this.#session === null || this.#sinks.size === 0) return;
+    this.broadcastState();
   }
 
   #broadcastFrame(payload: MacMonitorFramePayload): void {
@@ -331,13 +520,32 @@ export class MacMonitorCore {
 
   // ── the capture child ──────────────────────────────────────────────────
 
-  /** Should the capture child be running right now? BOTH gates. */
+  /** Should anything be capturing right now? BOTH gates, plus the brake. */
   wanted(): boolean {
     if (this.#session === null) return false;
+    // Stopped, or the user has taken the wheel: nothing looks at their screen.
+    if (this.#control !== 'agent') return false;
     for (const sink of this.#sinks) {
       if (sink.frames && !sink.isGone()) return true;
     }
     return false;
+  }
+
+  /**
+   * Should the pixels come from ELECTRON rather than the helper?
+   *
+   * Yes whenever the app itself holds the grant, because that is the grant the
+   * user can actually give: "Bobble" is the only name they would look for in
+   * the Screen Recording list, and enabling it grants this process. The helper
+   * is a separately-signed binary and therefore its own TCC client — a user who
+   * has done everything right can still have granted the wrong thing.
+   */
+  #prefersElectron(): boolean {
+    return (
+      this.#opts.sourceReader !== undefined &&
+      this.#grant === 'granted' &&
+      this.#sourceMisses < ELECTRON_GIVE_UP
+    );
   }
 
   /**
@@ -348,12 +556,32 @@ export class MacMonitorCore {
    * wasted tree walk four times a second in the case that already works.
    */
   wantsAx(): boolean {
-    return this.wanted() && this.#stream === 'unavailable' && this.#opts.axReader !== undefined;
+    if (!this.wanted() || this.#opts.axReader === undefined) return false;
+    // On the Electron path the tree walk is not a fallback at all: it is where
+    // the geometry comes from, and the window ids it reports are what join
+    // Chromium's pixels to the right window.
+    return this.#stream === 'unavailable' || this.#source === 'electron';
   }
 
   reconcile(): void {
-    if (this.wanted()) this.#startChild();
-    else this.#stopChild();
+    const wanted = this.wanted();
+    if (wanted && this.#prefersElectron()) {
+      // Not merely unnecessary — a second capture of the same window, by a
+      // binary the user never granted anything to.
+      this.#stopChild();
+      if (this.#source !== 'electron') {
+        this.#source = 'electron';
+        this.#stream = 'starting';
+        this.#calmSince = this.#now();
+        this.#clearPendingGiveUp();
+      }
+    } else if (wanted) {
+      this.#source = 'helper';
+      this.#startChild();
+    } else {
+      this.#stopChild();
+      this.#source = 'none';
+    }
     if (this.wantsAx()) this.#startAx();
     else this.#stopAx();
   }
@@ -404,7 +632,19 @@ export class MacMonitorCore {
         });
         if (scene !== null) {
           this.#axScene = scene;
+          this.#lastPictureAt = this.#now();
           this.#broadcastAx(scene);
+          if (this.#source === 'electron') await this.#refreshSources(scene);
+        } else if (this.#source === 'electron') {
+          // Accessibility can see the app and it has no windows. That is the
+          // "no window" state, not a failure — and there is nothing for
+          // Chromium to share either.
+          this.#sources = [];
+          this.#sourcesKey = '';
+          if (this.#stream !== 'no-window') {
+            this.#stream = 'no-window';
+            this.broadcastState();
+          }
         }
       }
     } catch (err) {
@@ -424,12 +664,73 @@ export class MacMonitorCore {
     (this.#axHandle as { unref?: () => void })?.unref?.();
   }
 
+  /**
+   * Join Chromium's window sources to the windows Accessibility just reported.
+   *
+   * Enumeration is the expensive half (it walks every window on the machine),
+   * so it runs only when the window set changed or SOURCE_REFRESH_MS has
+   * passed — a sheet opening is a change, a cursor moving is not.
+   */
+  async #refreshSources(scene: MacMonitorAxScene): Promise<void> {
+    const reader = this.#opts.sourceReader;
+    if (reader === undefined || this.#source !== 'electron') return;
+    const ids = scene.windows.map((w) => w.windowId).filter((id) => id > 0);
+    const key = ids.join(',');
+    if (key === this.#sourcesKey && this.#now() - this.#sourcesAt < SOURCE_REFRESH_MS) return;
+    let res: { windows: MacMonitorWindowSource[]; denied: boolean };
+    try {
+      res = await reader(ids);
+    } catch {
+      res = { windows: [], denied: true };
+    }
+    // The gate can close while an enumeration is in flight.
+    if (this.#source !== 'electron') return;
+    this.#sourcesAt = this.#now();
+    if (res.denied || res.windows.length === 0) {
+      this.#sourceMisses += 1;
+      this.#sources = [];
+      this.#sourcesKey = '';
+      if (res.denied) this.#grant = 'denied';
+      if (this.#sourceMisses >= ELECTRON_GIVE_UP) {
+        // The app's own grant is not usable after all. The helper is signed
+        // separately and may hold one of its own, so try it before giving up.
+        this.#opts.log?.warn('mac monitor: electron capture unusable, trying the helper', {
+          denied: res.denied,
+        });
+        this.#source = 'none';
+        this.reconcile();
+      }
+      this.broadcastState();
+      return;
+    }
+    this.#sourceMisses = 0;
+    this.#sourcesKey = key;
+    this.#sources = res.windows;
+    if (this.#stream !== 'live') {
+      this.#stream = 'live';
+      this.#streamError = null;
+      this.#captureDenied = false;
+    }
+    this.broadcastState();
+  }
+
   #startChild(): void {
     if (this.#child !== null || this.#restartHandle !== null) return;
     const session = this.#session;
     if (session === null) return;
     // Already gave up for this session; a new setSession() clears it.
     if (this.#stream === 'unavailable') return;
+    // A give-up is being held back by the calm-state floor — respawning here
+    // would restart the very child whose death is already being reported.
+    if (this.#pendingGiveUp !== null) return;
+    // Say "connecting" BEFORE trying, not after succeeding: a helper binary
+    // that is missing entirely throws synchronously, and a user who never saw
+    // the calm state reads the failure as an app that did not even try. The
+    // calm state also starts HERE rather than at setSession, so a tab opened
+    // five minutes into a run still gets it.
+    this.#stream = 'starting';
+    this.#calmSince = this.#now();
+    this.broadcastState();
     let child: StreamChild;
     try {
       child = this.#opts.spawn(session.pid, [
@@ -446,10 +747,8 @@ export class MacMonitorCore {
       return;
     }
     this.#child = child;
-    this.#childStartedAt = this.#now();
+    this.#childStartedAt = this.#calmSince;
     this.#parser.reset();
-    this.#stream = 'starting';
-    this.broadcastState();
 
     child.stdout?.on('data', (chunk) => this.#onStdout(chunk));
     child.stderr?.on('data', () => {
@@ -470,6 +769,8 @@ export class MacMonitorCore {
       if (!statusOnly) {
         this.#frameRect = { ...header.rect };
         this.#frameDisplay = { ...header.display };
+        // A real picture arrived. This is the clock the stalled state reads.
+        this.#lastPictureAt = this.#now();
       }
       // A frame that explains itself wins over anything inferred from its
       // shape: "the app has no window" and "macOS will not let us capture" look
@@ -557,11 +858,42 @@ export class MacMonitorCore {
    */
   #giveUp(reason: string): void {
     if (this.#stream === 'unavailable' && this.#streamError === reason) return;
+    // F9: the calm state always gets on screen first. A child can spawn and die
+    // inside a tick, and "Live view unavailable" arriving before "Connecting to
+    // TextEdit" was ever shown reads as an app that did not even try.
+    const wait = UNAVAILABLE_FLOOR_MS - (this.#now() - this.#calmSince);
+    if (wait > 0) {
+      this.#pendingGiveUp = reason;
+      if (this.#giveUpHandle !== null) return;
+      const setTimer = this.#opts.setTimer ?? ((fn, ms) => setTimeout(fn, ms));
+      this.#giveUpHandle = setTimer(() => {
+        this.#giveUpHandle = null;
+        const held = this.#pendingGiveUp;
+        this.#pendingGiveUp = null;
+        if (held !== null && this.#session !== null) this.#applyGiveUp(held);
+      }, wait);
+      (this.#giveUpHandle as { unref?: () => void })?.unref?.();
+      return;
+    }
+    this.#applyGiveUp(reason);
+  }
+
+  #applyGiveUp(reason: string): void {
+    if (this.#stream === 'unavailable' && this.#streamError === reason) return;
     this.#stream = 'unavailable';
     this.#streamError = reason;
     this.#captureDenied = reason === MAC_CAPTURE_DENIED;
     this.#opts.log?.warn('mac monitor stream unavailable', { reason });
+    this.reconcile();
     this.broadcastState();
+  }
+
+  #clearPendingGiveUp(): void {
+    this.#pendingGiveUp = null;
+    if (this.#giveUpHandle === null) return;
+    const clearTimer = this.#opts.clearTimer ?? ((h) => clearTimeout(h as never));
+    clearTimer(this.#giveUpHandle);
+    this.#giveUpHandle = null;
   }
 
   #stopChild(): void {
@@ -619,6 +951,7 @@ export class MacMonitorCore {
   dispose(): void {
     this.#stopChild();
     this.#stopAx();
+    this.#clearPendingGiveUp();
     this.#sinks.clear();
     this.#session = null;
     this.#wallpaper = null;
@@ -626,5 +959,11 @@ export class MacMonitorCore {
     this.#axScene = null;
     this.#captureDenied = false;
     this.#lastSentJson = '';
+    this.#sources = [];
+    this.#sourcesKey = '';
+    this.#source = 'none';
+    this.#lastPictureAt = 0;
+    this.#thinkingSince = null;
+    this.#control = 'agent';
   }
 }

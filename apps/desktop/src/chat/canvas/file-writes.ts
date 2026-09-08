@@ -46,9 +46,17 @@ export interface FileWriteEvent {
    * writes). Absent for str_replace-style edits + bash writes (read from disk). */
   contentHint?: string;
   /** A str_replace-style edit's replaced/replacement text — present ONLY for
-   * hunk edits (not whole-file writes), so the routing hook shows a LIVE DIFF
-   * (deletions + additions) instead of streamed whole-file content. */
+   * hunk edits (not whole-file writes). The FIRST hunk, which is all there is
+   * for the ordinary one-hunk edit tool and all the streaming (still-arriving)
+   * case can know. See {@link hunks} for the whole set. */
   edit?: EditHunk;
+  /**
+   * EVERY hunk this edit applies, in the order the tool listed them — one for a
+   * plain `str_replace`, several for a multi-edit tool that carries an `edits`
+   * array. The canvas plays them as one motion, top of the file down; without
+   * this a three-hunk edit would animate only the first.
+   */
+  hunks?: EditHunk[];
 }
 
 function str(value: unknown): string | undefined {
@@ -82,6 +90,27 @@ function editStrings(args: Record<string, unknown>): EditHunk | undefined {
   const newText = str(args.new_string) ?? str(args.newText) ?? str(args.new) ?? str(args.newStr);
   if (oldText === undefined && newText === undefined) return undefined;
   return { oldText, newText };
+}
+
+/**
+ * EVERY hunk in a parsed edit call: the top-level old/new pair, or the entries
+ * of a multi-edit tool's `edits` array (each read through the same aliases).
+ * Order is the tool's; the canvas re-orders them by position in the file, which
+ * is the order they are watched in.
+ */
+function editHunks(args: Record<string, unknown>): EditHunk[] | undefined {
+  const list = args.edits ?? args.replacements ?? args.changes;
+  if (Array.isArray(list)) {
+    const hunks: EditHunk[] = [];
+    for (const entry of list) {
+      if (entry === null || typeof entry !== 'object') continue;
+      const hunk = editStrings(entry as Record<string, unknown>);
+      if (hunk !== undefined) hunks.push(hunk);
+    }
+    if (hunks.length > 0) return hunks;
+  }
+  const single = editStrings(args);
+  return single === undefined ? undefined : [single];
 }
 
 /** True when `p` is already absolute (posix `/…` or Windows `C:\…`). */
@@ -149,7 +178,7 @@ export function bashRedirectTarget(command: string): string | undefined {
 /** Whether this tool call writes a file, and (path, contentHint | edit) if so. */
 function classifyWrite(
   block: ToolCallBlock,
-): { path: string; contentHint?: string; edit?: EditHunk } | undefined {
+): { path: string; contentHint?: string; edit?: EditHunk; hunks?: EditHunk[] } | undefined {
   const args = block.arguments ?? {};
   const kind = toolStepKind(block.name);
   const finalized = Object.keys(args).length > 0;
@@ -157,10 +186,10 @@ function classifyWrite(
     if (finalized) {
       const path = pickPath(args);
       if (path === undefined) return undefined;
-      // A str_replace-style edit (has old/new strings) → a live DIFF; otherwise a
-      // whole-file write → streamed content. The two are mutually exclusive here.
-      const edit = editStrings(args);
-      if (edit !== undefined) return { path, edit };
+      // A str_replace-style edit (has old/new strings) → the edit ANIMATION;
+      // otherwise a whole-file write → streamed content. Mutually exclusive.
+      const hunks = editHunks(args);
+      if (hunks !== undefined) return { path, edit: hunks[0], hunks };
       return { path, contentHint: wholeFileContent(args) };
     }
     // Still streaming (args haven't parsed yet): read the growing content out of
@@ -219,6 +248,7 @@ export function detectFileWrites(messages: ChatMsg[], cwd: string | undefined): 
         running: !completed.has(block.id),
         contentHint: write.contentHint,
         edit: write.edit,
+        hunks: write.hunks,
       });
     }
   }

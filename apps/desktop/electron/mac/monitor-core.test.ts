@@ -324,8 +324,12 @@ describe('MacMonitorCore — a helper that cannot stream', () => {
     const sink = new FakeSink(true);
     h.core.setSession(4242, 'TextEdit');
     h.core.addSink(sink);
+    // The calm state is on screen first (F9) — the failure lands after it.
+    expect(sink.last?.stream).toBe('starting');
+    h.runTimers();
     expect(sink.last?.stream).toBe('unavailable');
     expect(sink.last?.streamError).toContain('ENOENT');
+    expect(sink.last?.streamMessage).toBe('The live view stopped. Bobble is still controlling TextEdit.');
   });
 
   it('ignores a stale close from a child that was already replaced', () => {
@@ -478,21 +482,37 @@ function makeAxCore(reader: (pid: number, cap: number) => Promise<unknown>) {
 /** Let the poller's awaited reader settle. */
 const settle = (): Promise<void> => new Promise((r) => setTimeout(r, 0));
 
+/**
+ * The helper's "denied" status frame, AND the wait that follows it.
+ *
+ * Giving up is held behind UNAVAILABLE_FLOOR_MS (F9) so the calm "Connecting"
+ * state always reaches the screen before the failure does — so a test that
+ * wants the failure has to let that floor elapse, exactly as the product does.
+ */
+function denyStream(child: FakeChild | undefined, timers: Array<() => void>, seq = 1): void {
+  child?.emit(
+    encodePimf(
+      header({ seq, w: 0, h: 0, windows: [], error: 'screen-recording-denied' }),
+      new Uint8Array(0),
+    ),
+  );
+  for (const fn of timers.splice(0, timers.length)) fn();
+}
+
 describe('MacMonitorCore — the Accessibility fallback', () => {
   it('says WHY when the helper reports the capture grant is missing', () => {
     const h = makeCore();
     const sink = new FakeSink(true);
     h.core.addSink(sink);
     h.core.setSession(4242, 'TextEdit');
-    h.spawned[0]?.emit(
-      encodePimf(
-        header({ w: 0, h: 0, windows: [], error: 'screen-recording-denied' }),
-        new Uint8Array(0),
-      ),
-    );
+    denyStream(h.spawned[0], h.timers);
     expect(sink.last?.stream).toBe('unavailable');
     expect(sink.last?.captureDenied).toBe(true);
     expect(sink.last?.streamError).toBe('screen-recording-denied');
+    // The RAW reason travels for the disclosure; what the panel shows is the
+    // notice, which names the app and says the grant needs a relaunch.
+    expect(sink.last?.captureNotice?.title).toBe("Bobble can't see TextEdit yet");
+    expect(sink.last?.captureNotice?.hint).toContain('quit and reopen Bobble');
   });
 
   it('does not confuse "no window" with "not allowed"', () => {
@@ -534,17 +554,12 @@ describe('MacMonitorCore — the Accessibility fallback', () => {
 
   it('polls and publishes a scene once the stream is unavailable', async () => {
     const reader = vi.fn(async () => snapshot());
-    const { core, spawned } = makeAxCore(reader);
+    const { core, spawned, timers } = makeAxCore(reader);
     const sink = new FakeSink(true);
     core.addSink(sink);
     core.setSession(4242, 'TextEdit');
     expect(reader).not.toHaveBeenCalled(); // pixels are still being tried
-    spawned[0]?.emit(
-      encodePimf(
-        header({ w: 0, h: 0, windows: [], error: 'screen-recording-denied' }),
-        new Uint8Array(0),
-      ),
-    );
+    denyStream(spawned[0], timers);
     await settle();
     expect(reader).toHaveBeenCalledWith(4242, expect.any(Number));
     expect(sink.scenes).toHaveLength(1);
@@ -554,7 +569,7 @@ describe('MacMonitorCore — the Accessibility fallback', () => {
 
   it('never polls while pixels are arriving', async () => {
     const reader = vi.fn(async () => snapshot());
-    const { core, spawned } = makeAxCore(reader);
+    const { core, spawned, timers } = makeAxCore(reader);
     core.addSink(new FakeSink(true));
     core.setSession(4242, 'TextEdit');
     spawned[0]?.emit(encodePimf(header(), new Uint8Array([1, 2, 3])));
@@ -565,16 +580,11 @@ describe('MacMonitorCore — the Accessibility fallback', () => {
 
   it('stops polling when the tab stops watching — the same gate as the capture', async () => {
     const reader = vi.fn(async () => snapshot());
-    const { core, spawned } = makeAxCore(reader);
+    const { core, spawned, timers } = makeAxCore(reader);
     const sink = new FakeSink(true);
     core.addSink(sink);
     core.setSession(4242, 'TextEdit');
-    spawned[0]?.emit(
-      encodePimf(
-        header({ w: 0, h: 0, windows: [], error: 'screen-recording-denied' }),
-        new Uint8Array(0),
-      ),
-    );
+    denyStream(spawned[0], timers);
     await settle();
     expect(core.polling()).toBe(true);
     sink.frames = false;
@@ -586,15 +596,10 @@ describe('MacMonitorCore — the Accessibility fallback', () => {
   });
 
   it('stops polling when the session ends and forgets the scene', async () => {
-    const { core, spawned } = makeAxCore(async () => snapshot());
+    const { core, spawned, timers } = makeAxCore(async () => snapshot());
     core.addSink(new FakeSink(true));
     core.setSession(4242, 'TextEdit');
-    spawned[0]?.emit(
-      encodePimf(
-        header({ w: 0, h: 0, windows: [], error: 'screen-recording-denied' }),
-        new Uint8Array(0),
-      ),
-    );
+    denyStream(spawned[0], timers);
     await settle();
     expect(core.axScene()).not.toBeNull();
     core.clearSession();
@@ -612,12 +617,7 @@ describe('MacMonitorCore — the Accessibility fallback', () => {
     const sink = new FakeSink(true);
     core.addSink(sink);
     core.setSession(4242, 'TextEdit');
-    spawned[0]?.emit(
-      encodePimf(
-        header({ w: 0, h: 0, windows: [], error: 'screen-recording-denied' }),
-        new Uint8Array(0),
-      ),
-    );
+    denyStream(spawned[0], timers);
     await settle();
     expect(sink.scenes).toHaveLength(0);
     for (const fn of timers.splice(0, timers.length)) fn();
@@ -626,34 +626,24 @@ describe('MacMonitorCore — the Accessibility fallback', () => {
   });
 
   it('publishes nothing when Accessibility comes back empty', async () => {
-    const { core, spawned } = makeAxCore(async () => ({ app: 'TextEdit', windows: [] }));
+    const { core, spawned, timers } = makeAxCore(async () => ({ app: 'TextEdit', windows: [] }));
     const sink = new FakeSink(true);
     core.addSink(sink);
     core.setSession(4242, 'TextEdit');
-    spawned[0]?.emit(
-      encodePimf(
-        header({ w: 0, h: 0, windows: [], error: 'screen-recording-denied' }),
-        new Uint8Array(0),
-      ),
-    );
+    denyStream(spawned[0], timers);
     await settle();
     expect(sink.scenes).toHaveLength(0);
     expect(core.axScene()).toBeNull();
   });
 
   it('sends the scene only to sinks that asked for frames', async () => {
-    const { core, spawned } = makeAxCore(async () => snapshot());
+    const { core, spawned, timers } = makeAxCore(async () => snapshot());
     const watcher = new FakeSink(true);
     const listener = new FakeSink(false);
     core.addSink(watcher);
     core.addSink(listener);
     core.setSession(4242, 'TextEdit');
-    spawned[0]?.emit(
-      encodePimf(
-        header({ w: 0, h: 0, windows: [], error: 'screen-recording-denied' }),
-        new Uint8Array(0),
-      ),
-    );
+    denyStream(spawned[0], timers);
     await settle();
     expect(watcher.scenes).toHaveLength(1);
     expect(listener.scenes).toHaveLength(0);
@@ -667,18 +657,13 @@ describe('MacMonitorCore — a grant revoked mid-session', () => {
     // source race — the monitor then shows a window frozen at the moment the
     // capture died, with no sign that anything is wrong.
     const reader = vi.fn(async () => snapshot());
-    const { core, spawned } = makeAxCore(reader);
+    const { core, spawned, timers } = makeAxCore(reader);
     const sink = new FakeSink(true);
     core.addSink(sink);
     core.setSession(4242, 'TextEdit');
     spawned[0]?.emit(encodePimf(header(), new Uint8Array([1, 2, 3])));
     expect(sink.frameList).toHaveLength(1);
-    spawned[0]?.emit(
-      encodePimf(
-        header({ seq: 2, w: 0, h: 0, windows: [], error: 'screen-recording-denied' }),
-        new Uint8Array(0),
-      ),
-    );
+    denyStream(spawned[0], timers, 2);
     expect(sink.frameList).toHaveLength(2);
     expect(sink.frameList[1]?.jpeg).toHaveLength(0);
     expect(sink.last?.captureDenied).toBe(true);

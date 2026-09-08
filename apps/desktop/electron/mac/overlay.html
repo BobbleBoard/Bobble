@@ -14,6 +14,18 @@
   The cursor artwork is the shared Pi agent cursor: keep the SVG in sync with
   apps/desktop/electron/canvas/agent-cursor.ts (the browser-use cursor uses the
   same glyph — one visual identity for "Pi is driving").
+
+  THE BUBBLE IS THE ONLY CONTROL THE USER HAS while an app is driven in the
+  background, so it is the one part of this window that is NOT click-through:
+  hovering it asks main to catch the mouse (setIgnoreMouseEvents(false)), the ✕
+  stops the run, and the body brings Bobble forward. The page has no preload and
+  no ipcRenderer — it speaks by opening a `pd-overlay:<verb>` URL, which
+  overlay-window.ts's window-open handler reads and denies.
+
+  ITS COLOURS ARE PUSHED IN, not written here: main sends { kind:'theme' } with
+  the accent of whichever flavour is on, so the phantom on screen and the
+  phantom in the canvas tab are the same object. (The pill stays near-black in
+  both themes — it floats over the user's desktop, which is neither.)
 -->
 <meta charset="utf-8" />
 <style>

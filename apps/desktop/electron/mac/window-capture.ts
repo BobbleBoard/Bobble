@@ -39,12 +39,50 @@ export function windowIdOfSource(sourceId: string): number | null {
   return Number.isSafeInteger(id) && id > 0 ? id : null;
 }
 
+/**
+ * Whether CHROMIUM — that is, this app, under the name the user sees — has the
+ * Screen Recording grant.
+ *
+ * Three answers, not two: 'unknown' is what a non-macOS build (and any future
+ * Electron that stops answering) gives, and it must not be read as a denial,
+ * because a denial is a screen with a button on it.
+ */
+export function screenCaptureGrant(): 'granted' | 'denied' | 'unknown' {
+  if (process.platform !== 'darwin') return 'unknown';
+  try {
+    const status = systemPreferences.getMediaAccessStatus('screen');
+    if (status === 'granted') return 'granted';
+    if (status === 'denied' || status === 'restricted') return 'denied';
+    return 'unknown';
+  } catch {
+    return 'unknown';
+  }
+}
+
 /** Whether Chromium currently has the Screen Recording grant. */
 export function screenCaptureGranted(): boolean {
+  return screenCaptureGrant() === 'granted';
+}
+
+/**
+ * Put THIS app in the Screen Recording list, so the pane we are about to open
+ * has a switch to show.
+ *
+ * macOS only lists an app once it has attempted a capture, and the attempt is
+ * what registers it — the refusal is the point, not a failure. This is the
+ * difference between "Privacy & Security opens on a list with Bobble in it" and
+ * "Privacy & Security opens on a list the user has to believe us about".
+ */
+export async function registerForScreenRecording(): Promise<void> {
+  if (process.platform !== 'darwin') return;
   try {
-    return systemPreferences.getMediaAccessStatus('screen') === 'granted';
+    await desktopCapturer.getSources({
+      types: ['window'],
+      thumbnailSize: { width: 0, height: 0 },
+      fetchWindowIcons: false,
+    });
   } catch {
-    return false;
+    /* refused — which is exactly what registers the app */
   }
 }
 
