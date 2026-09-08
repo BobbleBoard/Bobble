@@ -229,6 +229,26 @@ export function registerMacComputerUseTools(
    */
   const session = options.session ?? createMacSessionState();
 
+  /*
+   * END THE SESSION WHEN THE TURN ENDS.
+   *
+   * Nothing was ever telling the app that driving had stopped, so the phantom
+   * cursor kept floating over the user's app and the screen capture kept
+   * running — indefinitely, long after the model had finished and the user had
+   * moved on. A "Thinking…" bubble hovering over an app nobody is driving is
+   * the most alarming thing this feature can do, and it costs battery to say it.
+   *
+   * Control resumes by itself: the next look or act takes the app again. So
+   * releasing at the end of a turn is free, and holding on is not.
+   */
+  pi.on?.('agent_end', () => {
+    if (bridge === null || session.controlled() === null) return;
+    session.release?.();
+    void bridge.request('setDriving', { driving: false }).catch(() => {
+      /* the app may already be gone; nothing to release */
+    });
+  });
+
   /**
    * Indices the LAST look put in a window the open dialog is blocking.
    *

@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { MacBridge } from './bridge-client.js';
 import { formatMacSnapshot } from './format.js';
 import { createMacConsentGate } from './permissions.js';
+import { createMacSessionState, type MacSessionState } from './session-state.js';
 import type { MacAgentMethod, MacSnapshot } from './protocol.js';
 import { registerMacComputerUseTools } from './tools.js';
 
@@ -26,11 +27,17 @@ class FakeBridge implements MacBridge {
   }
 }
 
-function toolsOf(bridge: MacBridge): Map<string, ToolDefinition> {
+const handlers = new Map<string, () => void>();
+
+function toolsOf(bridge: MacBridge, session?: MacSessionState): Map<string, ToolDefinition> {
   const tools = new Map<string, ToolDefinition>();
+  handlers.clear();
   registerMacComputerUseTools(
-    { registerTool: (def: ToolDefinition) => tools.set(def.name, def) } as unknown as ExtensionAPI,
-    { bridge, consent: createMacConsentGate({ preConsented: true }) },
+    {
+      registerTool: (def: ToolDefinition) => tools.set(def.name, def),
+      on: (event: string, fn: () => void) => handlers.set(event, fn),
+    } as unknown as ExtensionAPI,
+    { bridge, consent: createMacConsentGate({ preConsented: true }), session },
   );
   return tools;
 }
@@ -182,5 +189,39 @@ describe('an act reports what it opened', () => {
     const text = textOf(await click(bridge, { index: 1 }));
     expect(text).not.toContain('is now open');
     expect(text).not.toContain('A new window opened');
+  });
+});
+
+describe('the end of a turn', () => {
+  it('lets go of the app, so the phantom cursor does not float there forever', async () => {
+    const bridge = new FakeBridge()
+      .on('setDriving', () => ({ ok: true }))
+      .on('snapshot', () => ({
+        app: 'TextEdit',
+        pid: 42,
+        window: 'Untitled',
+        elements: [],
+        summary: { app: 'TextEdit', window: 'Untitled', elementCount: 0, truncated: false },
+      }));
+    const session = createMacSessionState();
+    const tools = toolsOf(bridge, session);
+    const snapshot = tools.get('mac_snapshot');
+    if (snapshot === undefined) throw new Error('missing mac_snapshot');
+    // biome-ignore lint/suspicious/noExplicitAny: minimal execute args for tests.
+    await snapshot.execute('c', {} as any, undefined, undefined, ctx);
+    expect(session.controlled()).not.toBeNull();
+
+    handlers.get('agent_end')?.();
+    await Promise.resolve();
+    expect(bridge.lastParams('setDriving')).toEqual({ driving: false });
+    expect(session.controlled()).toBeNull();
+  });
+
+  it('says nothing when no app was being driven', async () => {
+    const bridge = new FakeBridge().on('setDriving', () => ({ ok: true }));
+    toolsOf(bridge);
+    handlers.get('agent_end')?.();
+    await Promise.resolve();
+    expect(bridge.calls.filter((c) => c.method === 'setDriving')).toHaveLength(0);
   });
 });
