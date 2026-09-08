@@ -229,6 +229,14 @@ export interface ThreadStatusInputs {
    * seconds, and this fills that otherwise-silent gap with "Processing N%".
    */
   readonly promptProgress: number | null;
+  /**
+   * The capability whose tools were just switched on, or null.
+   *
+   * It explains the prefill happening right now: tool schemas render at the
+   * front of the prompt, so turning a group on re-ingests the whole
+   * conversation. Naming it turns an unexplained wait into a sentence.
+   */
+  readonly loadingCapability?: string | null;
 }
 
 /** The single consolidated thread indicator's rendered view, or null when idle. */
@@ -240,7 +248,27 @@ export interface ThreadStatusView {
   readonly detail?: string;
   /** Whether to render the elapsed "· Ns" counter (off during a pre-stream switch). */
   readonly showElapsed: boolean;
+  /** The capability being loaded, when that is what this wait is — so the ring
+   * can wear its colour and glyph rather than the generic one. */
+  readonly capability?: string;
 }
+
+/**
+ * How a capability is NAMED to a person, and what colour it wears.
+ *
+ * The harness's own names are slugs ("web-research", "computer-use"); a status
+ * line reading "Loading computer-use" is a machine talking. The colours are the
+ * ones the tool chips already use for the same kinds of work, so the ring in the
+ * thread and the chips below it are plainly about the same thing.
+ */
+export const CAPABILITY_LABEL: Record<string, string> = {
+  browser: 'the browser',
+  'computer-use': 'computer use',
+  personal: 'your calendar & mail',
+  'web-research': 'web research',
+  generation: 'media generation',
+  connectors: 'connectors',
+};
 
 /**
  * The ONE live status indicator (the user blind-test #1). Reduces the whole
@@ -266,6 +294,22 @@ export function threadStatusView(inp: ThreadStatusInputs): ThreadStatusView | nu
   // streaming yet) so a long cold-cache prefill isn't a silent dead spot.
   if (inp.promptProgress !== null) {
     const pct = Math.round(Math.max(0, Math.min(99, inp.promptProgress)));
+    /*
+     * SAY WHY, when there is a why. the user: "when there's a long prefill because a
+     * capability is being loaded instead of 'processing' on that turn make the
+     * prefill circle show 'loading <capability>'." This IS that prefill — the
+     * tools that just arrived are what moved the prompt's prefix — so the wait
+     * gets named after its cause rather than its mechanism.
+     */
+    const cap = inp.loadingCapability ?? null;
+    if (cap !== null && cap !== '') {
+      return {
+        label: `Loading ${CAPABILITY_LABEL[cap] ?? cap}`,
+        detail: `${pct}%`,
+        showElapsed: true,
+        capability: cap,
+      };
+    }
     return { label: 'Processing', detail: `${pct}%`, showElapsed: true };
   }
 

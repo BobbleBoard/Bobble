@@ -7,6 +7,7 @@ import {
   parsePromoteSignal,
   showLoadingModel,
   showProcessing,
+  threadStatusView,
 } from './harness-status';
 
 describe('parsePromoteSignal (corp-promote intent from normal chat)', () => {
@@ -155,5 +156,65 @@ describe('modelReadyStage', () => {
     expect(showLoadingModel('starting', undefined)).toBe(true);
     expect(showLoadingModel('ready', 'warming')).toBe(true);
     expect(showLoadingModel('ready', undefined)).toBe(false);
+  });
+});
+
+describe('a prefill caused by a capability loading', () => {
+  /*
+   * Turning a capability on appends tool schemas, and those render at the FRONT
+   * of the prompt — so the request right after re-ingests the whole
+   * conversation. That is a long wait with a real cause, and "Reading your
+   * conversation" is actively wrong about it.
+   *
+   * the user: "when there's a long prefill because a capability is being loaded
+   * instead of 'processing' on that turn make the prefill circle show 'loading
+   * <capability>' with of course the color and icon if applicable."
+   */
+  const base = {
+    isStreaming: false,
+    retry: null,
+    stage: null,
+    toolRunning: false,
+    isAuto: true,
+    switchingToTier: null,
+    promptProgress: 42,
+  } as const;
+
+  it('names the capability instead of the mechanism', () => {
+    const v = threadStatusView({ ...base, loadingCapability: 'computer-use' });
+    expect(v?.label).toBe('Loading computer use');
+    expect(v?.detail).toBe('42%');
+    expect(v?.capability).toBe('computer-use');
+  });
+
+  it('says it the way a person would, not the slug', () => {
+    expect(threadStatusView({ ...base, loadingCapability: 'web-research' })?.label).toBe(
+      'Loading web research',
+    );
+    expect(threadStatusView({ ...base, loadingCapability: 'personal' })?.label).toBe(
+      'Loading your calendar & mail',
+    );
+  });
+
+  it('falls back to the raw name for a capability it has no phrasing for', () => {
+    const v = threadStatusView({ ...base, loadingCapability: 'something-new' });
+    expect(v?.label).toBe('Loading something-new');
+  });
+
+  it('is the ordinary processing view when no capability is loading', () => {
+    expect(threadStatusView({ ...base, loadingCapability: null })?.label).toBe('Processing');
+    expect(threadStatusView(base)?.label).toBe('Processing');
+  });
+
+  it('does not claim a capability wait when nothing is prefilling', () => {
+    // The activation outlives the re-prefill it caused; only the prefill window
+    // should wear its name.
+    const v = threadStatusView({
+      ...base,
+      promptProgress: null,
+      isStreaming: true,
+      loadingCapability: 'browser',
+    });
+    expect(v?.label).not.toContain('Loading');
   });
 });

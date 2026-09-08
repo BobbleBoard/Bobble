@@ -262,3 +262,36 @@
   font-size: var(--pd-font-size-footnote);
   line-height: var(--pd-leading-footnote);
 }
+
+/* A CAPABILITY LOADING, rather than a conversation being read.
+   Same ring, same provider-reported percentage, different cause — so it wears
+   the capability's own glyph and tint. the user: "make the prefill circle show
+   'loading <capability>' with of course the color and icon if applicable." */
+.pd-processing-cap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+
+/* The glyph sits INSIDE the arc, so the ring still reads as the same component
+   filling with the same number — it has just been told what it is waiting for. */
+.pd-processing-cap-glyph {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--pd-cap-tint, var(--pd-accent-primary));
+  pointer-events: none;
+}
+
+.pd-processing-ring--cap {
+  color: var(--pd-cap-tint, var(--pd-accent-primary));
+}
+
+/* The label takes the tint too, at text weight — enough to connect it to the
+   mark without turning a status line into a coloured banner. */
+.pd-processing[data-capability] .pd-working-label {
+  color: color-mix(in srgb, var(--pd-cap-tint, var(--pd-accent-primary)) 72%, var(--pd-text-muted));
+}

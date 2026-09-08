@@ -274,6 +274,8 @@ interface HarnessRuntime {
    * resolution is the fallback, never the override.
    */
   workspaceRoot: string | null;
+  /** The capability just switched on, named while its re-prefill runs. */
+  loadingCapability: string | null;
   /** Conversation title, produced by the background titler (computed once). */
   title: string | null;
   /**
@@ -883,6 +885,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     stage: 'idle',
     loopDetector: null,
     touchedFiles: [],
+    loadingCapability: null,
     checkpoints: [],
     ranCommands: [],
     delegatedThisTurn: false,
@@ -1885,7 +1888,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
      */
     /* Through the one helper, so the CLI-mode rule is stated once — see
      * `activateCapability` for why activation is a no-op there. */
-    onActivate: (added) => activateCapability(added),
+    onActivate: (added, capability) => activateCapability(added, capability),
     /* Present ONLY in CLI mode, which is what tells the tool to describe itself
      * (and its result) as lookup rather than activation. */
     ...(toolCliMode ? { cliCommandFor: commandNameFor } : {}),
@@ -2017,7 +2020,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
    * In SCHEMAS mode the activation is real and still costs one re-prefill,
    * which is the bounded price of a tool the model genuinely could not call.
    */
-  const activateCapability = (added: readonly string[]): void => {
+  const activateCapability = (added: readonly string[], capability = ''): void => {
     if (toolCliMode) return;
     const next = Array.from(new Set([...runtime.activeTools, ...added]));
     if (next.length === runtime.activeTools.length) return;
@@ -2034,6 +2037,13 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
      * … mac_launch, mac_snapshot, mac_click", every request carried the same 14
      * tools and not one mac tool among them.
      */
+    /*
+     * NAME THE WAIT THIS JUST CAUSED. Appending tools rewrites the front of the
+     * prompt, so the next request re-ingests the whole conversation; without
+     * this the user gets a long, unexplained "Processing 12%".
+     */
+    runtime.loadingCapability = capability;
+    if (runtime.currentCtx !== null) publishStatus(runtime.currentCtx);
     const landed = pi.getActiveTools();
     const missing = added.filter((t) => !landed.includes(t));
     const dbgPath = process.env.PI_ADV_DEBUG_TOOLS;
@@ -2155,7 +2165,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
         const cap = capabilityForTool(wanted);
         const names = all.map((t) => t.name);
         const group = cap !== undefined ? cap.tools.filter((t) => names.includes(t)) : plan.inject;
-        activateCapability(group.length > 0 ? group : plan.inject);
+        activateCapability(group.length > 0 ? group : plan.inject, cap?.name ?? '');
         /*
          * AND IT IS NOT ADDED TO *THIS* REQUEST ANY MORE.
          *
@@ -2287,6 +2297,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     const usage = ctx.getContextUsage();
     return {
       ...runtime.config,
+      loadingCapability: runtime.loadingCapability,
       title: runtime.title,
       activeTools: runtime.activeTools,
       model: runtime.model?.id ?? null,
@@ -2941,6 +2952,8 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
   pi.on('agent_end', (event, ctx) => {
     runtime.currentCtx = ctx;
     runtime.taskStart = null;
+    // The re-prefill it named is over with the turn.
+    runtime.loadingCapability = null;
     publishStatus(ctx);
     /*
      * A TURN THAT ENDED BY ASKING WHICH OPTION TO TAKE IS A TURN THAT STOPPED.

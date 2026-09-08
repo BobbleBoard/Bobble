@@ -17,12 +17,14 @@ import {
   TaskChecklist,
   type TaskChecklistItem,
   type TaskState,
+  ToolIcon,
 } from '@pi-desktop/ui';
-import { type ReactElement, useEffect, useRef, useState } from 'react';
+import { type CSSProperties, type ReactElement, useEffect, useRef, useState } from 'react';
 import { useLlmStore } from '../state/llm-store';
 import { useModelSelectionStore } from '../state/model-selection-store';
 import { usePiStore } from '../state/pi-slice';
 import {
+  CAPABILITY_LABEL,
   modelReadyStage,
   type PlanItem,
   PREFILL_STATUS_KEY,
@@ -56,16 +58,21 @@ function ProcessingRing({
   label,
   fading,
   elapsedMs,
+  capability,
 }: {
   percent: number | null;
   label: string;
   fading: boolean;
+  /** When this wait is a capability loading, the capability's name — the ring
+   * then wears its colour and glyph instead of the generic arc. */
+  capability?: string;
   /** Live elapsed time in the processing phase — a visible prefill/TTFT timer
    * (the user) so the "processing circle" duration is readable, e.g. "45% processing
    * · 2.3s". */
   elapsedMs?: number;
 }): ReactElement {
   const value = percent === null ? 0 : Math.min(1, Math.max(0, percent / 100));
+  const mark = capability === undefined ? null : CAPABILITY_MARK[capability];
   /* Lowercased because every label here is a fragment of one running phrase —
      "45% processing · 2.3s" reads as a status where "45% Processing" reads as a
      heading. */
@@ -78,17 +85,63 @@ function ProcessingRing({
     <div
       className={`pd-processing${fading ? ' pd-processing--fading' : ''}`}
       data-testid="thread-processing"
+      data-capability={capability ?? undefined}
+      style={
+        mark === undefined || mark === null
+          ? undefined
+          : ({ '--pd-cap-tint': mark.tint } as CSSProperties)
+      }
     >
-      <ContextGauge
-        value={value}
-        size={15}
-        className={`pd-processing-ring${percent === null ? ' pd-processing-ring--indeterminate' : ''}`}
-        label={text}
-      />
+      {mark === undefined || mark === null ? (
+        <ContextGauge
+          value={value}
+          size={15}
+          className={`pd-processing-ring${percent === null ? ' pd-processing-ring--indeterminate' : ''}`}
+          label={text}
+        />
+      ) : (
+        /* The capability's own glyph inside its own ring. A generic arc for
+           "loading computer use" tells you the same nothing the word
+           "processing" did; the mark is what makes the wait legible at a
+           glance. */
+        <span className="pd-processing-cap" aria-label={text}>
+          <ContextGauge
+            value={value}
+            size={19}
+            className={`pd-processing-ring pd-processing-ring--cap${
+              percent === null ? ' pd-processing-ring--indeterminate' : ''
+            }`}
+            label={text}
+          />
+          <span className="pd-processing-cap-glyph" aria-hidden="true">
+            <ToolIcon kind={mark.icon} size={10} />
+          </span>
+        </span>
+      )}
       <span className="pd-working-label">{text}</span>
     </div>
   );
 }
+
+/**
+ * A capability's glyph and tint.
+ *
+ * Reuses the tool-chip icon vocabulary so the ring in the thread and the tool
+ * rows it is about to produce are plainly the same subject; the tints are the
+ * app's own status/accent tokens rather than new colours, because a status
+ * indicator inventing a palette is how a UI starts looking assembled.
+ */
+const CAPABILITY_MARK: Record<
+  string,
+  { icon: Parameters<typeof ToolIcon>[0]['kind']; tint: string }
+> = {
+  browser: { icon: 'browser-navigate', tint: 'var(--pd-accent-primary)' },
+  'computer-use': { icon: 'canvas-open', tint: 'var(--pd-accent-primary)' },
+  personal: { icon: 'connector', tint: 'var(--pd-status-info-fg, var(--pd-accent-primary))' },
+  'web-research': { icon: 'search', tint: 'var(--pd-status-info-fg, var(--pd-accent-primary))' },
+  generation: { icon: 'image', tint: 'var(--pd-status-success-fg, var(--pd-accent-primary))' },
+  connectors: { icon: 'connector', tint: 'var(--pd-accent-primary)' },
+};
 
 /**
  * The ONE live status indicator. During the PROCESSING phase — from the instant
@@ -117,6 +170,9 @@ export function ThreadStatusIndicator(): ReactElement | null {
    * "Loading model" waiting for a signal that is never coming.
    */
   const prefixWarm = usePiStore((s) => s.extensionStatus[PREFIX_WARM_STATUS]);
+  /* Why this prefill is happening, when the harness knows: a capability whose
+     tools just landed at the front of the prompt. */
+  const harness = useHarnessStatus();
   const readyStage = useLlmStore((s) => modelReadyStage(s.status.phase, prefixWarm));
   const serverStarting = readyStage !== null;
   /* The two waits read differently because they ARE different: one is weights
@@ -323,6 +379,29 @@ export function ThreadStatusIndicator(): ReactElement | null {
    * loading off disk has nothing to report.
    */
   const percent = processing ? (readyStage === 'loading' ? null : prefillPct) : 100;
+  /*
+   * A CAPABILITY LOADING IS A DIFFERENT WAIT, so it gets a different sentence.
+   *
+   * Turning a group on appends tool schemas, and those render at the FRONT of
+   * the prompt — so the request right after an activation re-ingests the whole
+   * conversation. Same ring, same percentage, entirely different reason, and
+   * "Reading your conversation" is actively misleading about it. the user: "when
+   * there's a long prefill because a capability is being loaded instead of
+   * 'processing' on that turn make the prefill circle show 'loading
+   * <capability>'."
+   */
+  const loadingCap = harness?.loadingCapability ?? null;
+  if (processing && percent !== null && loadingCap !== null && loadingCap !== '') {
+    return (
+      <ProcessingRing
+        percent={percent}
+        label={`Loading ${CAPABILITY_LABEL[loadingCap] ?? loadingCap}`}
+        fading={fading}
+        elapsedMs={elapsedMs}
+        capability={loadingCap}
+      />
+    );
+  }
   return (
     /*
      * "READING YOUR CONVERSATION", not "processing".

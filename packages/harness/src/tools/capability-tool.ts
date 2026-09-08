@@ -31,7 +31,7 @@ import {
 
 export interface CapabilityToolOptions {
   /** Turn the named tools on. The harness unions them into the active set. */
-  readonly onActivate: (tools: readonly string[]) => void;
+  readonly onActivate: (tools: readonly string[], capability: string) => void;
   /** Every tool name registered in this build. */
   readonly available: () => readonly string[];
   /**
@@ -90,7 +90,7 @@ export function registerCapabilityTool(pi: ExtensionAPI, opts: CapabilityToolOpt
       const present = cap.tools.filter((t) => available.includes(t));
       // Activate only what exists — naming an absent tool would have the model
       // call into nothing, and the message below says so honestly instead.
-      if (present.length > 0) opts.onActivate(present);
+      if (present.length > 0) opts.onActivate(present, cap.name);
       return {
         content: [
           {

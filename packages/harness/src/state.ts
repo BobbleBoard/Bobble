@@ -93,6 +93,21 @@ export const DEFAULT_CONFIG: HarnessConfig = {
 /** The full status object published via `ctx.ui.setStatus('harness', json)`. */
 export interface HarnessStatus extends HarnessConfig {
   /**
+   * The capability whose tools were just turned on, or null.
+   *
+   * Activating one appends tool schemas, and those render at the FRONT of the
+   * prompt — so the very next request re-ingests the whole conversation. That
+   * shows up as a long "Processing 12%" with no explanation, on a turn where the
+   * model has done nothing wrong. the user: "when there's a long prefill because a
+   * capability is being loaded instead of 'processing' on that turn make the
+   * prefill circle show 'loading <capability>'."
+   *
+   * Set when the activation happens, cleared when the turn ends — the renderer
+   * only shows it while a prefill is actually running, so it names the cause of
+   * exactly the wait it caused.
+   */
+  readonly loadingCapability: string | null;
+  /**
    * The conversation title, or null before the background titler runs / when no
    * utility model is configured. The app renders this as the
    * chat title (app-side display is a separate follow-up wave).
