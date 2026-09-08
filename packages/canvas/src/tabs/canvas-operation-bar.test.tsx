@@ -40,6 +40,16 @@ describe('deriveBreadcrumb', () => {
       ),
     ).toEqual(['a', 'b.md']);
   });
+  it('prefers the SUBTITLE to the title when a tab has one', () => {
+    // The "Activity" tab keeps one name all conversation long and says what it
+    // is showing underneath; printing "Activity" again here named nothing.
+    expect(
+      deriveBreadcrumb(tab({ kind: 'browser', title: 'Activity', subtitle: 'ex.com' })),
+    ).toEqual(['ex.com']);
+  });
+  it('still falls back to the title when there is no subtitle', () => {
+    expect(deriveBreadcrumb(tab({ kind: 'browser', title: 'New tab' }))).toEqual(['New tab']);
+  });
 });
 
 describe('CanvasOperationBar — kinds with no bar', () => {

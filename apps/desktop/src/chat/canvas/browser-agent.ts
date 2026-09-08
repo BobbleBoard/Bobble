@@ -15,6 +15,7 @@ import type { CanvasController } from '@pi-desktop/canvas';
 import { useEffect, useRef } from 'react';
 import { useCanvasStore } from '../../state/canvas-store';
 import { usePiStore } from '../../state/pi-slice';
+import { ACTIVITY_TAB_KEY } from './activity-tab';
 
 /** Stable upsert key for the model's browser tab. */
 const AGENT_TAB_KEY = 'pi:agent-browser';
@@ -29,20 +30,31 @@ const HEADLESS_AGENT_TAB_ID = 'pi:agent-headless';
  * Exported for the test — the preference order is the whole behaviour.
  */
 export function pickAgentBrowserTab(
-  tabs: readonly { id: string; kind: string }[],
+  tabs: readonly { id: string; kind: string; key?: string }[],
   activeTabId: string | null,
 ): string | undefined {
   const active = tabs.find((t) => t.id === activeTabId);
   if (active?.kind === 'browser') return active.id;
   const browsers = tabs.filter((t) => t.kind === 'browser');
-  return browsers[browsers.length - 1]?.id;
+  if (browsers.length > 0) return browsers[browsers.length - 1]?.id;
+  /*
+   * THE ACTIVITY TAB IS WHERE BROWSING GOES (queue item 3). the user: "doing
+   * something in the browser, this tab shows that." When there is no browser
+   * tab to adopt, morphing the one Activity tab into the browser is what keeps
+   * this from being the third tab a single turn opens — and because the tab id
+   * is preserved, the WebContentsView survives the tab morphing away to a
+   * terminal and back, page and history intact.
+   */
+  return tabs.find((t) => t.key === ACTIVITY_TAB_KEY)?.id;
 }
 
 function adoptOrOpenBrowserTab(controller: CanvasController): string {
   const state = controller.getState();
   const existing = pickAgentBrowserTab(state.tabs, state.activeTabId);
   if (existing !== undefined) {
-    controller.updateTab(existing, { driving: true });
+    // `kind` matters as much as `driving`: an Activity tab still showing a
+    // terminal has no browser surface to mount the native view into.
+    controller.updateTab(existing, { kind: 'browser', driving: true });
     return existing;
   }
   return controller.upsertTab(AGENT_TAB_KEY, {

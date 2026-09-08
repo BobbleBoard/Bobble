@@ -1,23 +1,32 @@
 /**
- * Round-9 adversarial E2E — LIVE EDIT DIFF (the str_replace twin of the live
- * write, round9-file-write-probe).
+ * Round-9's LIVE EDIT DIFF probe, re-aimed at what an edit is now.
  *
- * A str_replace-style EDIT tool call opens the target file in a canvas file tab
- * and shows a LIVE DIFF — the deletions (old_string) as `−` rows and the
- * additions (new_string) as `+` rows — following the hunk as its args STREAM
- * (old string first, then the new string growing). The shared DiffView / diff.css
- * renders it (`.pd-diff`), exactly like the collapsed activity chain's edit row.
+ * WHAT THIS USED TO GUARD. A str_replace edit opened the file's canvas tab and
+ * drew a LIVE DIFF into it — the deletions as `−` rows and the additions as `+`
+ * rows, growing as the tool's arguments streamed.
  *
- * On completion the tab FINALIZES FROM DISK — it drops the diff and flips to the
- * authoritative on-disk bytes (made to differ from the hunk's new_string via a
- * disk-only marker, so a passing finalize proves the file was actually re-read)
- * and stops streaming. This mirrors the write path's finalize so the tab settles
- * into a normal, editable file view.
+ * WHY IT DOES NOT ANY MORE. the user, round 21: "Editing a file shouldn't show the
+ * diff being written in real time it should show that file and then the text as
+ * the negative part of the diff is written being deleted … and then of course
+ * the replace part writing animation." The diff being typed out is exactly the
+ * thing that was wrong with it. An edit now plays INTO the file: the replaced
+ * text forward-deletes and the replacement types in behind it
+ * (edit-animation-probe.mjs is the probe for that motion, in detail).
  *
- * STREAMING GRANULARITY: pi tool-call args may arrive in chunks or all-at-once.
- * The probe drives the realistic chunked case (path → old_string → partial
- * new_string → full) to prove the live-follow; an all-at-once edit simply shows
- * the full diff for the running window instead. Run `pnpm build` first.
+ * WHAT IS LEFT, AND WHY IT IS STILL WORTH A PROBE. The diff is the FALLBACK, for
+ * an edit with nowhere to play — and this probe's own fixture is exactly that
+ * case, which is why it is the natural home for it: the file on disk is already
+ * the POST-edit state, so the hunk's `old_string` does not occur in it and there
+ * is no position to stand a caret at. The canvas must then fall back to showing
+ * the hunk as a diff rather than animating a delete of text that is not there.
+ *
+ * It also keeps the half that never changed: FINALIZE FROM DISK. The on-disk
+ * file carries a marker that is NOT in the streamed `new_string`, so a tab that
+ * ends up showing it proves the authoritative re-read really happened.
+ *
+ * The tab is found by its `filePath`, not by a tab key: the chat drives ONE
+ * morphing "Activity" tab now, so the key is not the file's. Run `pnpm build`
+ * first.
  */
 import { existsSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -49,7 +58,8 @@ const editPath = path.join(workDir, 'edit-diff.ts');
 // The old text (removed by the edit) + the disk-only finalize marker. The on-disk
 // file is the POST-edit state (what the tool would have written); its marker is
 // NOT in the streamed new_string, so a finalized tab that shows it proves the
-// authoritative disk re-read.
+// authoritative disk re-read — and, because `OLD_LINE` is already gone from it,
+// it is also the "nothing to animate into" case the fallback exists for.
 const OLD_LINE = 'export const answer = 1;';
 const NEW_LINE = 'export const answer = 42;';
 const DISK_MARKER = 'DISK-FINALIZED-c0ffee';
@@ -58,26 +68,33 @@ writeFileSync(editPath, `${NEW_LINE}\n// ${DISK_MARKER}\n`, 'utf8');
 const app = await electron.launch({
   executablePath: electronBinary,
   args: [appRoot, `--user-data-dir=${userDataDir}`],
-  env: { ...process.env, PI_BIN: mockPi, MOCK_PI_FIXTURE: fixture, PI_E2E: '1' },
+  env: {
+    ...process.env,
+    PI_BIN: mockPi,
+    MOCK_PI_FIXTURE: fixture,
+    PI_E2E: '1',
+    PI_E2E_BACKGROUND: '1',
+  },
 });
 
-const tabKey = `file:${editPath}`;
 const PANEL = '[data-testid="canvas-tabs-panel"]';
 
+/** The tab showing this file, whatever its key is (the chat drives one tab). */
 const fileTab = (page) =>
-  page.evaluate((k) => {
+  page.evaluate((p) => {
     const t = window
       .__pi_canvas()
       .getState()
-      .tabs.find((t) => t.key === k);
+      .tabs.find((t) => t.filePath === p);
     if (!t) return null;
     return {
       streaming: t.streaming === true,
       hasDiff: Array.isArray(t.diff) && t.diff.length > 0,
+      hasAnim: t.editAnim !== undefined,
       diffText: (t.diff ?? []).flatMap((f) => f.lines.map((l) => `${l.kind}:${l.text}`)).join('\n'),
       text: t.artifact?.content.text ?? '',
     };
-  }, tabKey);
+  }, editPath);
 
 try {
   const page = await app.firstWindow();
@@ -91,6 +108,7 @@ try {
     page.evaluate(
       ({ argsText, args, withResult }) => {
         const messages = [
+          { kind: 'user', id: 'u1', text: 'set the answer', timestamp: 1 },
           {
             kind: 'assistant',
             id: 'r9-edit',
@@ -124,92 +142,87 @@ try {
       { argsText, args, withResult },
     );
 
-  // Delta 1 — path closed, old_string closed, new_string PARTIAL. The tab opens
-  // with a live diff: the deletion is known, the addition is still arriving.
+  // ── Delta 1: the arguments are still arriving ──────────────────────────────
+  // Path closed, old_string closed, new_string PARTIAL. Nothing may move yet:
+  // half an `old_string` would animate a delete of the wrong text. The tab shows
+  // THE FILE and no diff.
   await editMsg({
     argsText: `{"path":${JSON.stringify(editPath)},"old_string":${JSON.stringify(
       OLD_LINE,
     )},"new_string":"export const answer = 4`,
   });
+  await page.waitForSelector(`${PANEL} .pd-canvas-code .cm-content`, { timeout: 8000 });
   await page.waitForFunction(
-    (k) => {
+    (p) =>
+      (
+        window
+          .__pi_canvas()
+          .getState()
+          .tabs.find((t) => t.filePath === p)?.artifact?.content.text ?? ''
+      ).length > 0,
+    editPath,
+    { timeout: 8000 },
+  );
+  const midStream = await fileTab(page);
+  assert(midStream !== null, 'the edit did not open a tab on the file');
+  assert(midStream.streaming === true, 'edit tab should be streaming while its args arrive');
+  assert(
+    !midStream.hasDiff,
+    `a diff was drawn while the arguments were still arriving:\n${midStream.diffText}`,
+  );
+  assert(
+    midStream.text.includes(NEW_LINE),
+    `the tab should be showing the file itself, got:\n${midStream.text}`,
+  );
+
+  // ── Delta 2: the arguments complete ────────────────────────────────────────
+  // `old_string` does not occur in this file (it is already the post-edit state),
+  // so there is nowhere to play the motion — the FALLBACK diff is drawn instead.
+  await editMsg({
+    args: { path: editPath, old_string: OLD_LINE, new_string: NEW_LINE },
+  });
+  await page.waitForFunction(
+    (p) => {
       const t = window
         .__pi_canvas()
         .getState()
-        .tabs.find((t) => t.key === k);
-      return t !== undefined && t.streaming === true && Array.isArray(t.diff) && t.diff.length > 0;
+        .tabs.find((t) => t.filePath === p);
+      return t !== undefined && Array.isArray(t.diff) && t.diff.length > 0;
     },
-    tabKey,
+    editPath,
     { timeout: 8000 },
   );
-  await page.waitForSelector(PANEL, { timeout: 8000 });
-  // The shared DiffView is on screen with a `−` deletion + a `+` (partial) addition.
   await page.waitForSelector(`${PANEL} .pd-canvas-tabpanel .pd-diff .pd-diff-row--del`, {
     timeout: 8000,
   });
   await page.waitForSelector(`${PANEL} .pd-canvas-tabpanel .pd-diff .pd-diff-row--add`, {
     timeout: 8000,
   });
-
-  const midStream = await fileTab(page);
-  assert(midStream?.streaming === true, 'edit tab should be streaming during the hunk');
-  assert(midStream.hasDiff, 'edit tab should carry a live diff while streaming');
+  const fallback = await fileTab(page);
+  assert(fallback.hasDiff, 'an unplaceable hunk should fall back to the diff');
+  assert(!fallback.hasAnim, 'an unplaceable hunk must not be handed a motion to play');
   assert(
-    midStream.diffText.includes(`del:${OLD_LINE}`),
-    `the diff should show the removed line, got:\n${midStream.diffText}`,
-  );
-  assert(
-    midStream.diffText.includes('add:export const answer = 4'),
-    `the diff should show the (partial) added line, got:\n${midStream.diffText}`,
+    fallback.diffText.includes(`del:${OLD_LINE}`),
+    `the fallback diff should show the removed line, got:\n${fallback.diffText}`,
   );
   assert(
-    !midStream.text.includes(DISK_MARKER),
-    'the disk marker must NOT be present mid-stream (it is only on disk)',
+    fallback.diffText.includes(`add:${NEW_LINE}`),
+    `the fallback diff should show the added line, got:\n${fallback.diffText}`,
   );
 
-  // Delta 2 — the new_string finishes streaming. The addition GROWS to the full
-  // replacement line (the live-follow of additions).
-  await editMsg({
-    argsText: `{"path":${JSON.stringify(editPath)},"old_string":${JSON.stringify(
-      OLD_LINE,
-    )},"new_string":${JSON.stringify(NEW_LINE)}`,
-  });
-  await page.waitForFunction(
-    (k) => {
-      const t = window
-        .__pi_canvas()
-        .getState()
-        .tabs.find((t) => t.key === k);
-      const diffText = (t?.diff ?? []).flatMap((f) => f.lines.map((l) => l.text)).join('\n');
-      return diffText.includes('export const answer = 42;');
-    },
-    tabKey,
-    { timeout: 8000 },
-  );
-
-  // The diff is visible in the actual tab body (not just in state).
-  await page.waitForFunction(
-    (marker) =>
-      (
-        document.querySelector('[data-testid="canvas-tabs-panel"] .pd-canvas-tabpanel .pd-diff')
-          ?.textContent ?? ''
-      ).includes(marker),
-    'answer = 42;',
-    { timeout: 8000 },
-  );
-
-  // Finalize — parsed args + a tool result → settle from disk: the diff is
-  // dropped, the tab flips to the on-disk bytes (DISK_MARKER) and stops streaming.
+  // ── Finalize: settle from disk ─────────────────────────────────────────────
+  // The diff is dropped, the tab flips to the on-disk bytes (DISK_MARKER — which
+  // was never in the streamed new_string) and stops streaming.
   await editMsg({
     args: { path: editPath, old_string: OLD_LINE, new_string: NEW_LINE },
     withResult: true,
   });
   await page.waitForFunction(
-    ({ k, marker }) => {
+    ({ p, marker }) => {
       const t = window
         .__pi_canvas()
         .getState()
-        .tabs.find((t) => t.key === k);
+        .tabs.find((t) => t.filePath === p);
       return (
         t !== undefined &&
         t.streaming !== true &&
@@ -217,7 +230,7 @@ try {
         (t.artifact?.content.text ?? '').includes(marker)
       );
     },
-    { k: tabKey, marker: DISK_MARKER },
+    { p: editPath, marker: DISK_MARKER },
     { timeout: 8000 },
   );
 
@@ -238,7 +251,7 @@ try {
   assert(diffGone, 'the DiffView should be gone after the edit settles to the file');
 
   console.log(
-    'round9-file-edit-diff-probe OK — a str_replace edit opened a live diff (deletions + additions) that followed the streaming hunk, then finalized from disk (dropped the diff, flipped to the authoritative on-disk bytes, and stopped streaming)',
+    'round9-file-edit-diff-probe OK — a streaming edit showed the FILE (no diff); an unplaceable hunk fell back to the diff instead of animating into thin air; and the tab finalized from disk (diff dropped, authoritative bytes, streaming off)',
   );
 } finally {
   await app.close();

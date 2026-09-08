@@ -42,6 +42,7 @@ import { useLlmStore } from '../state/llm-store';
 import { forkAndReprompt, switchBranch } from '../state/pi-connect';
 import { usePiStore } from '../state/pi-slice';
 import { openPresented, type PresentedRecord, usePresentStore } from '../state/present-store';
+import { useTurnPrefilling } from '../state/running-chats';
 import { AssistantGroup } from './AssistantGroup';
 import { AttachedFileCard } from './AttachedFileCard';
 import { type AttachedFile, splitAttachedFiles } from './attached-files';
@@ -50,6 +51,7 @@ import { useDropStore } from './composer/drop-store';
 import { corpChatView } from './corp/corp-thread-view';
 import { HarnessChecklistPanel, ThreadStatusIndicator } from './HarnessStatus';
 import { HistoryPole } from './HistoryPole';
+import { awaitingReplyAfterLatestTurn, sentAttachmentsPrefilling } from './sent-prefill';
 import { BlindImageNote, UserImage } from './UserImage';
 
 /**
@@ -437,6 +439,30 @@ export function ChatThread() {
     for (const m of messages) if (m.kind === 'user') userOrdinalById.set(m.id, ++n);
   }
 
+  /*
+   * THE ATTACHMENT SPINNER SURVIVES SEND.
+   *
+   * the user: "they stop loading maybe even after sent, the loading spinner can
+   * still be on them, it disapears when they are prefilled." The chips leave the
+   * composer with the message and used to arrive here with no prefill state at
+   * all, so the spinner vanished at the exact moment the wait became real.
+   *
+   * The phase is NOT re-derived: `useTurnPrefilling` reads the same
+   * `RunningChat.status === 'prefilling'` the thread's processing ring is built
+   * from, so the ring and these chips can never disagree. See sent-prefill.ts
+   * for the rest of the rule, and for why an unanswered-turn check is what stops
+   * a reopened chat from spinning forever about a question answered days ago.
+   */
+  const turnPrefilling = useTurnPrefilling();
+  const latestUserId = (() => {
+    for (let i = messages.length - 1; i >= 0; i -= 1) {
+      const m = messages[i];
+      if (m?.kind === 'user') return m.id;
+    }
+    return null;
+  })();
+  const awaitingReply = awaitingReplyAfterLatestTurn(messages);
+
   const items = toRenderItems(messages, claimed);
   /*
    * Presented artefacts, bucketed by the row they were handed over after. A
@@ -634,9 +660,22 @@ export function ChatThread() {
                         className="flex flex-wrap justify-end gap-2"
                         data-testid="user-attachments"
                       >
-                        {attached.files.map((f) => (
-                          <AttachedFileCard key={f.id} name={f.name} text={f.text} />
-                        ))}
+                        {(() => {
+                          const stillReading = sentAttachmentsPrefilling({
+                            files: attached.files,
+                            isLatestTurn: message.id === latestUserId,
+                            awaitingReply,
+                            turnPrefilling,
+                          });
+                          return attached.files.map((f) => (
+                            <AttachedFileCard
+                              key={f.id}
+                              name={f.name}
+                              text={f.text}
+                              prefilling={stillReading.has(f.id)}
+                            />
+                          ));
+                        })()}
                       </div>
                     ) : null}
                     {/*

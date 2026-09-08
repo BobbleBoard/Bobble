@@ -2,10 +2,17 @@ import { describe, expect, it } from 'vitest';
 import { MAC_MONITOR_TAB_KEY, macMonitorTabAction } from './mac-monitor';
 
 describe('macMonitorTabAction', () => {
-  it('does nothing while nothing is being controlled', () => {
+  it('opens nothing while nothing is being controlled', () => {
     expect(macMonitorTabAction({ active: false, appName: '' }, undefined)).toBeNull();
+  });
+
+  it('drops the app name from the tab when the session ends', () => {
     expect(
       macMonitorTabAction({ active: false, appName: 'TextEdit' }, { id: 't1', title: 'TextEdit' }),
+    ).toEqual({ kind: 'retitle', id: 't1', title: 'Computer use' });
+    // …and then leaves it alone.
+    expect(
+      macMonitorTabAction({ active: false, appName: '' }, { id: 't1', title: 'Computer use' }),
     ).toBeNull();
   });
 

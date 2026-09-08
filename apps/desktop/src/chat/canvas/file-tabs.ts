@@ -487,11 +487,23 @@ export function useFileWriteCanvasRouting(): void {
    */
   const editBase = useRef<Map<string, string>>(new Map());
   const editReading = useRef<Set<string>>(new Set());
+  /*
+   * ASKED ALREADY — separate from "still asking", and the difference matters.
+   *
+   * With only the in-flight set, a file that CANNOT be read span forever: the
+   * read fails, clears the in-flight mark, nudges this pass, and the pass — not
+   * having a base either — starts the read again. The tab never fell back to the
+   * diff because the "is the base settled?" test was never true for one tick.
+   */
+  const editTried = useRef<Set<string>>(new Set());
   const editStaged = useRef<Set<string>>(new Set());
   // A base read can land after the LAST stream tick (a call whose result is
   // already in), and nothing else would re-run this effect to use it.
-  const [, rerun] = useReducer((n: number) => n + 1, 0);
+  const [baseTick, rerun] = useReducer((n: number) => n + 1, 0);
 
+  // It carries no value; it exists purely to re-run this pass when a pre-edit
+  // disk read lands after the last stream tick.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: baseTick is a nudge.
   useEffect(() => {
     for (const ev of detectFileWrites(messages, cwd)) {
       const key = fileTabKey(ev.path);
@@ -526,7 +538,8 @@ export function useFileWriteCanvasRouting(): void {
 
         // Capture the pre-edit text once. A tab that already shows this file
         // settled has it in hand; otherwise go to disk (still pre-edit).
-        if (!editBase.current.has(ev.callId) && !editReading.current.has(ev.callId)) {
+        if (!editBase.current.has(ev.callId) && !editTried.current.has(ev.callId)) {
+          editTried.current.add(ev.callId);
           const shown = existing?.streaming === true ? undefined : existing?.artifact?.content.text;
           if (shown !== undefined) {
             editBase.current.set(ev.callId, shown);
@@ -672,7 +685,9 @@ export function useFileWriteCanvasRouting(): void {
         });
       }
     }
-  }, [messages, cwd, controller]);
+    // `baseTick` is the pre-edit read landing: it carries no data of its own,
+    // it just re-runs this pass so the base that has now arrived is used.
+  }, [messages, cwd, controller, baseTick]);
 }
 
 /**

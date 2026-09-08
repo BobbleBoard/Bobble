@@ -26,10 +26,11 @@ import {
   TopBar,
 } from '@pi-desktop/ui';
 import type { ReactNode } from 'react';
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CHROME_LEFT, TOP_BAR_HEIGHT } from '../../electron/window-chrome';
 import { conversationNameFrom } from '../../electron/workspace/project-dir';
 import { TopBarDownloads } from '../models/TopBarDownloads';
+import { lazyRoute } from '../RouteBoundary';
 import type { SettingsSection } from '../settings/SettingsView';
 import { registerCanvasController, useCanvasStore } from '../state/canvas-store';
 import { useChildAgentStore } from '../state/child-agent-store';
@@ -90,9 +91,13 @@ import { WindowDropOverlay } from './WindowDropOverlay';
  * eagerly would pull the whole tripo chunk into the boot path for a pair of
  * buttons almost nobody sees.
  */
-const TripoTopBarControls = lazy(() =>
-  import('../tripo/TopBar').then((m) => ({ default: m.TripoTopBarControls })),
-);
+/* `lazyRoute` so a chunk that will not fetch costs the app these two buttons
+ * and nothing else — see RouteBoundary.tsx. `inline` because a card in the top
+ * bar would be a worse failure than the one it is reporting. */
+const TripoTopBarControls = lazyRoute('3D controls', () => import('../tripo/TopBar'), {
+  pick: (m) => m.TripoTopBarControls,
+  variant: 'inline',
+});
 
 /** The name each studio wears in the top bar. */
 const STUDIO_TITLES: Record<string, string> = {
@@ -712,9 +717,7 @@ export function ChatApp({
                       /* The 3D studio brings its own pair — Send To and Export
                          — which used to sit in a second top bar of its own.
                          Lazy, like the workspace they belong to. */
-                      <Suspense fallback={null}>
-                        <TripoTopBarControls />
-                      </Suspense>
+                      <TripoTopBarControls />
                     ) : inStudio ? (
                       <StudioTopBarControls />
                     ) : (

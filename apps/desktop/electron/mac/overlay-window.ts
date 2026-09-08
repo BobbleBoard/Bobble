@@ -361,6 +361,13 @@ class MacOverlayController {
     return this.#catching;
   }
 
+  /** E2E seam: deliver exactly what the bubble's hover/click would send, so a
+   * probe can press the user's brake without a real mouse over a real
+   * always-on-top window. */
+  debugFromPage(verb: string): void {
+    this.#fromPage(`pd-overlay:${verb}`);
+  }
+
   async #push(msg: Record<string, unknown>): Promise<void> {
     const win = this.#win;
     if (win === null || win.isDestroyed()) return;
@@ -694,11 +701,15 @@ class MacOverlayController {
     bounds: OverlayRect | null;
     trackingPid: number | null;
     occluded: boolean | null;
+    catching: boolean;
   } {
     const win = this.#win;
     const visible = win !== null && !win.isDestroyed() && win.isVisible();
     return {
       visible,
+      /* Whether the window is currently NOT click-through, i.e. the pointer is
+         over the bubble and its ✕ can actually be pressed. */
+      catching: this.#catching,
       /*
        * ENGAGED ≠ VISIBLE, and the difference is the whole of background mode.
        *

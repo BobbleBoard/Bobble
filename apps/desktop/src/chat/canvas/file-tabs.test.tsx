@@ -10,7 +10,7 @@
  * wrote it instead of looking at the path.
  */
 import { describe, expect, it } from 'vitest';
-import { fileArtifact, unreadableFileArtifact } from './file-tabs';
+import { fileArtifact, presentEdit, unreadableFileArtifact } from './file-tabs';
 
 describe('unreadableFileArtifact', () => {
   const art = unreadableFileArtifact('/Users/user/bobble-testbed/run/report.md');
@@ -47,5 +47,60 @@ describe('unreadableFileArtifact', () => {
       bytes: 4,
     } as never);
     expect(art.id).toBe(ok.id);
+  });
+});
+
+/**
+ * HOW AN EDIT IS SHOWN — the motion whenever it can be played, the diff only
+ * when it cannot. the user asked for the file with the edit happening in it, not a
+ * diff being typed out; the diff is what is left when there is nowhere to stand
+ * the caret.
+ */
+describe('presentEdit', () => {
+  const base = ['const a = 1;', 'const b = 2;', 'const c = 3;', ''].join('\n');
+  const hunk = { oldText: 'const b = 2;', newText: 'const b = 22;' };
+
+  it('plays the motion when the file and the hunk are both known', () => {
+    const shown = presentEdit('/x/a.ts', base, [hunk], hunk);
+    expect(shown.kind).toBe('animate');
+    if (shown.kind !== 'animate') return;
+    expect(shown.plan.baseText).toBe(base);
+    expect(shown.plan.finalText).toBe(base.replace(hunk.oldText, hunk.newText));
+    expect(shown.plan.hunks).toHaveLength(1);
+  });
+
+  it('orders several hunks down the file, whatever order the tool listed them', () => {
+    const shown = presentEdit(
+      '/x/a.ts',
+      base,
+      [
+        { oldText: 'const c = 3;', newText: 'const c = 30;' },
+        { oldText: 'const a = 1;', newText: 'const a = 10;' },
+      ],
+      { oldText: 'const c = 3;', newText: 'const c = 30;' },
+    );
+    expect(shown.kind).toBe('animate');
+    if (shown.kind !== 'animate') return;
+    expect(shown.plan.hunks.map((h) => h.oldText)).toEqual(['const a = 1;', 'const c = 3;']);
+  });
+
+  it('falls back to a diff when the file could not be read', () => {
+    const shown = presentEdit('/x/a.ts', undefined, [hunk], hunk);
+    expect(shown.kind).toBe('diff');
+    if (shown.kind !== 'diff') return;
+    expect(shown.diff[0]?.path).toBe('a.ts');
+  });
+
+  it('falls back to a diff when the old text is not in the file', () => {
+    const shown = presentEdit('/x/a.ts', base, [{ oldText: 'const nowhere = 9;', newText: 'x' }], {
+      oldText: 'const nowhere = 9;',
+      newText: 'x',
+    });
+    expect(shown.kind).toBe('diff');
+  });
+
+  it('falls back to a diff while the arguments are still arriving (no hunks yet)', () => {
+    const shown = presentEdit('/x/a.ts', base, undefined, hunk);
+    expect(shown.kind).toBe('diff');
   });
 });

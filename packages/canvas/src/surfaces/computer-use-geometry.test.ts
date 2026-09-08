@@ -5,7 +5,10 @@ import {
   coverCrop,
   cursorEase,
   fitWindow,
+  followWindow,
   screenToCanvas,
+  stagePadding,
+  visibleRegion,
 } from './computer-use-geometry.ts';
 
 describe('fitWindow', () => {
@@ -137,11 +140,101 @@ describe('annotationScale', () => {
     expect(annotationScale(3)).toBe(1);
   });
   it('stays legible on a heavily shrunk window', () => {
-    expect(annotationScale(0.2)).toBe(0.78);
+    // The floor is 0.62, not 0.78: at the docked scale of 0.45 the old floor
+    // drew the annotation at 1.7x the window's own scale, which put a bubble
+    // over a dialog's Cancel button. The fix for a too-small window is a bigger
+    // window (followWindow), not a bigger cursor.
+    expect(annotationScale(0.2)).toBe(0.62);
   });
   it('handles a degenerate scale', () => {
-    expect(annotationScale(0)).toBe(0.78);
-    expect(annotationScale(Number.NaN)).toBe(0.78);
+    expect(annotationScale(0)).toBe(0.62);
+    expect(annotationScale(Number.NaN)).toBe(0.62);
+  });
+});
+
+describe('followWindow', () => {
+  const viewport = { w: 440, h: 780 };
+  const rect = { x: 200, y: 120, w: 900, h: 620 };
+
+  it('is exactly fitWindow when the window already fits better than the crop', () => {
+    const big = { w: 1600, h: 1000 };
+    const follow = followWindow(rect, big, { x: 400, y: 300 });
+    expect(follow).toEqual(fitWindow(rect, big));
+  });
+
+  it('COVERS the stage rather than fitting inside it', () => {
+    // fit would give 0.49 — a picture of a window. Cover fills the tall rail,
+    // and on a rail taller than the window that lands on REAL SIZE.
+    expect(fitWindow(rect, viewport).scale).toBeCloseTo(0.489, 3);
+    const follow = followWindow(rect, viewport, { x: 650, y: 430 });
+    expect(follow.scale).toBe(1);
+    expect(follow.h).toBe(620);
+  });
+
+  it('scales to cover, not to the floor, when covering is enough', () => {
+    const wide = { x: 0, y: 0, w: 1440, h: 900 };
+    const follow = followWindow(wide, viewport, { x: 700, y: 450 });
+    expect(follow.scale).toBeCloseTo(780 / 900, 6);
+  });
+
+  it('stops at the floor for a window too big to cover', () => {
+    const huge = { x: 0, y: 0, w: 2560, h: 1600 };
+    expect(followWindow(huge, viewport, { x: 1280, y: 800 }).scale).toBe(0.85);
+  });
+
+  it('centres the focus point, and clamps so no gap opens beside the window', () => {
+    const mid = followWindow(rect, viewport, { x: 650, y: 430 });
+    expect(mid.x + (650 - rect.x) * mid.scale).toBeCloseTo(220, 6);
+    // A focus at the left edge: the window's own left edge stops at 0 rather
+    // than letting wallpaper through where the window could cover it.
+    expect(followWindow(rect, viewport, { x: 205, y: 430 }).x).toBe(0);
+    const right = followWindow(rect, viewport, { x: 1095, y: 430 });
+    expect(right.x).toBeCloseTo(viewport.w - right.w, 6);
+  });
+
+  it('centres an axis that is not cropped, exactly as fit does', () => {
+    const follow = followWindow(rect, viewport, { x: 650, y: 430 });
+    expect(follow.y).toBeCloseTo((780 - 620) / 2, 6);
+  });
+
+  it('never upscales, whatever the floor says', () => {
+    const tiny = { x: 0, y: 0, w: 200, h: 150 };
+    expect(followWindow(tiny, viewport, { x: 100, y: 75 }, 0.85).scale).toBe(1);
+  });
+});
+
+describe('visibleRegion', () => {
+  const rect = { x: 200, y: 120, w: 900, h: 620 };
+  const viewport = { w: 440, h: 780 };
+
+  it('is the whole window when nothing is cropped', () => {
+    const drawn = fitWindow(rect, { w: 1600, h: 1000 });
+    const seen = visibleRegion(rect, { w: 1600, h: 1000 }, drawn);
+    expect(seen.w).toBeCloseTo(900, 6);
+    expect(seen.h).toBeCloseTo(620, 6);
+    expect(seen.x).toBeCloseTo(200, 6);
+  });
+
+  it('is the slice under the viewport when the window is cropped', () => {
+    const drawn = followWindow(rect, viewport, { x: 650, y: 430 });
+    const seen = visibleRegion(rect, viewport, drawn);
+    expect(seen.w).toBeCloseTo(440 / drawn.scale, 6);
+    expect(seen.x + seen.w / 2).toBeCloseTo(650, 6);
+    // Nothing outside the window is ever reported as visible.
+    expect(seen.x).toBeGreaterThanOrEqual(rect.x);
+    expect(seen.x + seen.w).toBeLessThanOrEqual(rect.x + rect.w + 1e-6);
+  });
+});
+
+describe('stagePadding', () => {
+  it('is 18 on a stage with room to spare', () => {
+    expect(stagePadding({ w: 1600, h: 1000 })).toBe(18);
+  });
+  it('tightens on the narrow axis, which is what a docked rail is', () => {
+    expect(stagePadding({ w: 440, h: 960 })).toBe(13);
+  });
+  it('never disappears entirely', () => {
+    expect(stagePadding({ w: 60, h: 60 })).toBe(4);
   });
 });
 

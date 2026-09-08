@@ -4211,12 +4211,26 @@
  *
  * The live view of the Mac app Pi is driving. It is meant to read as an
  * INSTRUMENT PANEL, not a debug view: the picture is the whole surface, the
- * chrome is one quiet line at the bottom, and every "nothing to show" state is
+ * chrome is a few quiet lines beneath it, and every "nothing to show" state is
  * a composed empty state rather than an error.
  *
- * Everything inside the frame is painted on a <canvas> (the wallpaper, the
+ * Everything inside the STAGE is painted on a <canvas> (the wallpaper, the
  * window, the phantom cursor, the bubble) — see computer-use-surface.tsx. What
- * lives here is only the frame, the footer, and the empty states.
+ * lives here is the stage's frame, the three bands under it, and the empty
+ * states.
+ *
+ * ── WHY THE CHROME IS UNDER THE PICTURE AND NOT ON IT ───────────────────────
+ * The whole surface works because it looks like the user's own desk seen
+ * through a window: real point size, their own wallpaper, a real shadow. The
+ * moment a toolbar floats over that, it stops being a window onto their Mac and
+ * becomes a remote-desktop client. So the act strip, the actions and the footer
+ * are BANDS BELOW THE STAGE, differentiated from each other by weight — a
+ * hairline and type, never three stacked cards.
+ *
+ * It also fixes the light-mode failure at the root: the footer used to be a
+ * `--pd-bg-inset` gradient sitting ON a photograph, which in light mode was a
+ * pale scrim fading into a dark picture with muted grey text across the seam.
+ * A band on the app's own ground is correct in both themes by construction.
  */
 .pd-macmon {
   position: relative;
@@ -4228,12 +4242,34 @@
   background: var(--pd-bg-inset);
 }
 
+/* The picture, and nothing else. */
+.pd-macmon-stage {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
 .pd-macmon-canvas {
   position: absolute;
   inset: 0;
   display: block;
   width: 100%;
   height: 100%;
+}
+
+/* Announced, never seen: the narrative is painted into a canvas, which says
+   nothing at all to a screen reader. */
+.pd-macmon-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
 }
 
 /* ── "Drawn from Accessibility" ──────────────────────────────────────────
@@ -4305,7 +4341,7 @@
   font-weight: 500;
   line-height: 15px;
   cursor: pointer;
-  transition: background var(--pd-duration-fast) var(--pd-ease-standard);
+  transition: background var(--pd-duration-fast) var(--pd-easing-standard);
 }
 
 .pd-macmon-source-action:hover {
@@ -4321,12 +4357,12 @@
   outline-offset: 2px;
 }
 
-/* The empty / waiting states. Centred, weightless, and never in the way of the
-   footer — the same panel whether there is no session, no window, or no frame
-   yet, so switching between them does not reflow the surface. */
+/* The empty / waiting states. Centred, weightless, and inside the stage — the
+   same panel whether there is no session, no window, or no frame yet, so
+   switching between them does not reflow the surface. */
 .pd-macmon-state {
   position: absolute;
-  inset: 0 0 34px 0;
+  inset: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -4349,7 +4385,7 @@
   flex-direction: column;
   align-items: center;
   gap: 2px;
-  max-width: 42ch;
+  max-width: 46ch;
   padding: var(--pd-space-lg) var(--pd-space-xl) var(--pd-space-lg);
   border-radius: var(--pd-radius-lg);
   border: 1px solid var(--pd-border-subtle);
@@ -4359,17 +4395,46 @@
   box-shadow: var(--pd-shadow-lg);
 }
 
+/* The mark.
+    It used to be a 62px rounded square with a border and a `--pd-bg-hover`
+    fill — the token for A THING YOU ARE HOVERING, used as a static fill on a
+    decorative glyph, which is exactly the borrowed-token pattern that makes a
+    screen read as unfinished. And it was the same generic monitor on all four
+    states, in a tab that knows perfectly well which app this is about.
+
+    So: no container at all for the glyph, and when the app is known, its
+    monogram instead. (The app's real icon would be better still and is one
+    main-process `getFileIcon` away — see the surface's StateMark.) */
 .pd-macmon-state-mark {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 62px;
-  height: 62px;
+  width: 56px;
+  height: 56px;
   margin-bottom: var(--pd-space-sm);
-  border-radius: var(--pd-radius-lg);
-  border: 1px solid var(--pd-border-subtle);
-  background: var(--pd-bg-hover);
   color: var(--pd-text-secondary);
+}
+
+.pd-macmon-state-mark[data-kind="glyph"] {
+  opacity: 0.55;
+}
+
+.pd-macmon-state-mark[data-kind="app"] {
+  border-radius: 14px;
+  background: linear-gradient(
+    160deg,
+    color-mix(in srgb, var(--pd-accent-primary) 26%, transparent),
+    color-mix(in srgb, var(--pd-accent-primary) 12%, transparent)
+  );
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pd-accent-primary) 24%, transparent);
+  color: var(--pd-text-primary);
+  font-size: 21px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.pd-macmon-state-mark[data-pulse="true"] {
+  animation: pd-macmon-breathe 2.4s ease-in-out infinite;
 }
 
 .pd-macmon-state-title {
@@ -4381,14 +4446,16 @@
 
 .pd-macmon-state-sub {
   margin: 0;
-  max-width: 34ch;
+  /* 34ch forced awkward two-line breaks ("…the view comes back when a / window
+     opens."). */
+  max-width: 46ch;
   font-size: var(--pd-font-size-caption);
   line-height: var(--pd-leading-caption);
+  text-wrap: pretty;
 }
 
 .pd-macmon-state[data-kind="unavailable"] .pd-macmon-state-sub {
   color: var(--pd-text-muted);
-  font-family: var(--pd-font-mono);
   font-size: var(--pd-font-size-caption);
   opacity: 0.85;
 }
@@ -4408,79 +4475,344 @@
   }
 }
 
-/* One quiet line: what is being watched, and whether the picture is alive. */
-.pd-macmon-footer {
+/* ── band 1: the act strip ───────────────────────────────────────────────
+ *
+ * The history the tab did not have. One chip per act, in order, on a
+ * transparent ground with a single hairline above it — the lightest of the
+ * three bands, because it is the one that is usually empty.
+ *
+ * Hover previews, click commits (Playwright's `highlighted || selected`): the
+ * one mechanic that makes a long list scannable. */
+.pd-macmon-strip {
   position: relative;
   z-index: 1;
-  margin-top: auto;
+  flex: 0 0 auto;
   display: flex;
-  align-items: center;
-  gap: var(--pd-space-xs);
-  height: 34px;
-  padding: 0 var(--pd-space-md);
-  font-size: var(--pd-font-size-caption);
-  line-height: var(--pd-leading-caption);
+  align-items: flex-start;
+  gap: 6px;
+  padding: 7px var(--pd-space-md) 6px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  border-top: 1px solid var(--pd-border-subtle);
+  scrollbar-width: none;
+}
+
+.pd-macmon-strip::-webkit-scrollbar {
+  display: none;
+}
+
+.pd-macmon-chip {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 72px;
+  padding: 0;
+  border: 0;
+  background: none;
   color: var(--pd-text-muted);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
 }
 
-/* A scrim that reaches ABOVE the line it carries.
-   With the wallpaper undimmed, a 34px gradient was not enough to keep caption
-   type off a sunlit beach: it has to fade out over a taller run than the row is
-   tall. Drawn behind the footer's own children rather than as its background,
-   so the row can stay 34px for layout while the wash is 56. */
-.pd-macmon-footer::before {
-  content: "";
-  position: absolute;
-  inset: -26px 0 0 0;
-  z-index: -1;
-  pointer-events: none;
-  background: linear-gradient(
-    to top,
-    var(--pd-bg-inset) 34%,
-    color-mix(in srgb, var(--pd-bg-inset) 62%, transparent) 66%,
-    transparent
+.pd-macmon-chip-shot {
+  position: relative;
+  display: block;
+  width: 72px;
+  height: 44px;
+  overflow: hidden;
+  border-radius: var(--pd-radius-xs);
+  background: var(--pd-bg-hover);
+  box-shadow: inset 0 0 0 1px var(--pd-border-subtle);
+}
+
+/* An act whose picture never arrived (the first act of a session lands
+    before the first frame does) is drawn as an empty sheet rather than as a
+    black rectangle — the chip still carries the verb, the object and the
+    duration, which is most of what it is for. */
+.pd-macmon-chip-shot[data-empty="true"] {
+  background: repeating-linear-gradient(
+    -45deg,
+    var(--pd-bg-hover) 0 5px,
+    var(--pd-bg-inset) 5px 10px
   );
+  opacity: 0.7;
 }
 
-.pd-macmon-app {
+.pd-macmon-chip-shot img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* A dialog opening is the beat that matters most — the app is asking a question
+   the agent is about to answer on the user's behalf. It gets a rule. */
+.pd-macmon-chip[data-dialog="true"] .pd-macmon-chip-shot {
+  box-shadow:
+    inset 0 0 0 1px var(--pd-border-subtle),
+    inset 3px 0 0 0 var(--pd-accent-primary);
+}
+
+.pd-macmon-chip[data-on="true"] .pd-macmon-chip-shot {
+  box-shadow: 0 0 0 2px var(--pd-accent-primary);
+}
+
+.pd-macmon-chip:focus-visible {
+  outline: none;
+}
+
+.pd-macmon-chip:focus-visible .pd-macmon-chip-shot {
+  box-shadow: 0 0 0 2px var(--pd-accent-primary);
+}
+
+.pd-macmon-chip-label {
+  display: flex;
+  gap: 4px;
+  min-width: 0;
+  font-size: 10.5px;
+  line-height: 13px;
+  white-space: nowrap;
+}
+
+.pd-macmon-chip-verb {
   flex: 0 0 auto;
   color: var(--pd-text-secondary);
   font-weight: 500;
 }
 
-.pd-macmon-sep {
-  flex: 0 0 auto;
-  width: 3px;
-  height: 3px;
-  border-radius: var(--pd-radius-full);
-  background: currentColor;
-  opacity: 0.5;
+.pd-macmon-chip-object {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.pd-macmon-title {
-  flex: 0 1 auto;
+/* Duration as a state machine: `···` while it runs, `1.2s` when it is done.
+   "Which act is running" then costs no separate badge. It sits ON the picture
+   (the chip's shot is the positioned ancestor), so it costs no row either. */
+.pd-macmon-chip-dur {
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  padding: 0 3px;
+  border-radius: 3px;
+  background: rgb(10 12 16 / 62%);
+  color: rgb(255 255 255 / 88%);
+  font-size: 9.5px;
+  line-height: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* While scrubbed back, say so — and say how much has happened since. Both
+   references get this handoff wrong: Playwright stops following permanently
+   with no way to resume, Cypress bans scrubbing during a run, and neither ever
+   tells you what you missed. */
+.pd-macmon-pinned {
+  position: absolute;
+  left: 50%;
+  bottom: 12px;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transform: translateX(-50%);
+  padding: 5px 6px 5px 12px;
+  border-radius: var(--pd-radius-full);
+  border: 1px solid rgb(255 255 255 / 14%);
+  background: rgb(18 20 25 / 82%);
+  -webkit-backdrop-filter: blur(14px) saturate(150%);
+  backdrop-filter: blur(14px) saturate(150%);
+  color: rgb(255 255 255 / 92%);
+  font-size: var(--pd-font-size-caption);
+  line-height: 16px;
+  white-space: nowrap;
+}
+
+.pd-macmon-pinned-resume {
+  padding: 2px 9px;
+  border-radius: var(--pd-radius-full);
+  border: 1px solid rgb(255 255 255 / 18%);
+  background: rgb(255 255 255 / 12%);
+  color: inherit;
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.pd-macmon-pinned-resume:hover {
+  background: rgb(255 255 255 / 20%);
+}
+
+/* ── band 2: the actions ─────────────────────────────────────────────────
+ *
+ * The surface had `focusableCount: 0` — no stop, no take-over, not one
+ * clickable thing anywhere. Text-labelled controls, always present, never
+ * appearing on hover, and never over the picture. */
+.pd-macmon-actions {
+  position: relative;
+  z-index: 1;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0 var(--pd-space-md);
+}
+
+.pd-macmon-btn {
+  flex: 0 0 auto;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: var(--pd-radius-sm);
+  border: 1px solid var(--pd-border-subtle);
+  background: var(--pd-bg-raised);
+  color: var(--pd-text-secondary);
+  font-size: var(--pd-font-size-caption);
+  font-weight: 500;
+  line-height: 22px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background var(--pd-duration-fast) var(--pd-easing-standard),
+    color var(--pd-duration-fast) var(--pd-easing-standard);
+}
+
+.pd-macmon-btn:hover {
+  background: var(--pd-bg-hover);
+  color: var(--pd-text-primary);
+}
+
+.pd-macmon-btn:focus-visible {
+  outline: 2px solid var(--pd-accent-primary);
+  outline-offset: 2px;
+}
+
+/* The brake. Ghost rather than a filled red button: it is present at all times,
+   and a permanently-red bar reads as an alarm rather than as a promise. */
+.pd-macmon-btn--danger {
+  color: var(--pd-status-danger-fg);
+  border-color: color-mix(in srgb, var(--pd-status-danger-fg) 34%, transparent);
+}
+
+.pd-macmon-btn--danger:hover {
+  background: color-mix(in srgb, var(--pd-status-danger-fg) 12%, transparent);
+  color: var(--pd-status-danger-fg);
+}
+
+.pd-macmon-state-card .pd-macmon-btn {
+  margin-top: var(--pd-space-sm);
+}
+
+/* Apple's own binary — fit in the window vs actual size — with the second
+   option made useful by panning instead of scrollbars. */
+.pd-macmon-seg {
+  flex: 0 0 auto;
+  display: inline-flex;
+  padding: 2px;
+  border-radius: var(--pd-radius-sm);
+  border: 1px solid var(--pd-border-subtle);
+  background: var(--pd-bg-inset);
+}
+
+.pd-macmon-seg-btn {
+  padding: 0 9px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--pd-text-muted);
+  font-size: var(--pd-font-size-caption);
+  font-weight: 500;
+  line-height: 20px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.pd-macmon-seg-btn[data-on="true"] {
+  background: var(--pd-bg-raised);
+  color: var(--pd-text-primary);
+  box-shadow: var(--pd-shadow-sm);
+}
+
+.pd-macmon-seg-btn:focus-visible {
+  outline: 2px solid var(--pd-accent-primary);
+  outline-offset: 1px;
+}
+
+/* ── band 3: the footer ──────────────────────────────────────────────────
+ *
+ * TWO GROUPS AND A RULE, and that is enough for one line of chrome under a
+ * picture. It used to be six runs in four type treatments and three colours —
+ * app name, dot, window title, a bordered pill that looked like a button, a
+ * gap, a green dot, a live word, an fps number — with nothing saying which
+ * belonged with which.
+ *
+ * Left: the IDENTITY of what is being watched, one voice, one size.
+ * Right: the STATE of the connection. Nothing else lives here — the dialog
+ * became a caption under the dialog, and the fps number died. */
+.pd-macmon-footer {
+  position: relative;
+  z-index: 1;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--pd-space-xs);
+  height: 30px;
+  padding: 0 var(--pd-space-md);
+  border-top: 1px solid var(--pd-border-subtle);
+  font-size: var(--pd-font-size-caption);
+  line-height: var(--pd-leading-caption);
+  color: var(--pd-text-muted);
+}
+
+.pd-macmon-ident {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--pd-text-secondary);
+}
+
+.pd-macmon-ident-text {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+/* "Edited" as a Mac title bar says it: a dot before the name, not the word. */
+.pd-macmon-edited {
+  flex: 0 0 auto;
+  width: 5px;
+  height: 5px;
+  border-radius: var(--pd-radius-full);
+  background: currentColor;
+  opacity: 0.55;
+}
+
 .pd-macmon-spacer {
   flex: 1 1 auto;
 }
 
-/* A sheet or dialog is PART of the app, not a different window — so it is a
-   tag beside the window's own name, never a replacement for it. */
-.pd-macmon-dialog {
+/* The cheapest possible signal that what follows is a different KIND of fact. */
+.pd-macmon-rule {
   flex: 0 0 auto;
-  padding: 1px 7px;
-  border-radius: var(--pd-radius-full);
-  border: 1px solid var(--pd-border-subtle);
-  background: var(--pd-bg-hover);
+  width: 1px;
+  height: 14px;
+  margin: 0 var(--pd-space-xs);
+  background: var(--pd-border-subtle);
+}
+
+/* Not "12 fps" — a number nobody asked for, in a unit nobody thinks in, whose
+   value is low enough to be actively worrying. The one number a user cannot
+   otherwise know is how much smaller than life this picture is. It reads in the
+   identity's voice rather than the footer's muted one, because it is a fact
+   about the picture and not a label. */
+.pd-macmon-scale {
+  flex: 0 0 auto;
   color: var(--pd-text-secondary);
-  font-size: var(--pd-font-size-caption);
-  line-height: 16px;
-  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 .pd-macmon-live {
@@ -4499,6 +4831,10 @@
   opacity: 0.4;
 }
 
+/* A STEADY green dot means "connected". A pulsing one means "look at me", which
+   is a small permanent motion cost and a slightly anxious signal for a state
+   that is simply fine. The pulse is reserved for the two states that are
+   genuinely unresolved: connecting, and stalled. */
 .pd-macmon-live[data-live="true"] {
   color: var(--pd-status-success-fg);
 }
@@ -4506,6 +4842,9 @@
 .pd-macmon-live[data-live="true"] .pd-macmon-dot {
   opacity: 1;
   box-shadow: 0 0 6px currentColor;
+}
+
+.pd-macmon-live[data-live="false"][data-drawn="false"] .pd-macmon-dot {
   animation: pd-macmon-pulse 2s ease-in-out infinite;
 }
 
@@ -4521,6 +4860,17 @@
   animation: pd-macmon-pulse 2.6s ease-in-out infinite;
 }
 
+/* No new frames on a stream that says it is live. Amber, and it says for how
+   long, because the whole difference between "slow" and "broken" is a number. */
+.pd-macmon-live[data-stalled="true"] {
+  color: var(--pd-status-warning-fg);
+}
+
+.pd-macmon-live[data-stalled="true"] .pd-macmon-dot {
+  opacity: 1;
+  animation: pd-macmon-pulse 1.4s ease-in-out infinite;
+}
+
 @keyframes pd-macmon-pulse {
   0%,
   100% {
@@ -4531,16 +4881,10 @@
   }
 }
 
-.pd-macmon-fps {
-  flex: 0 0 auto;
-  font-variant-numeric: tabular-nums;
-  opacity: 0.75;
-}
-
 @media (prefers-reduced-motion: reduce) {
   .pd-macmon-glyph-pulse,
-  .pd-macmon-live[data-live="true"] .pd-macmon-dot,
-  .pd-macmon-live[data-drawn="true"] .pd-macmon-dot {
+  .pd-macmon-state-mark[data-pulse="true"],
+  .pd-macmon-live .pd-macmon-dot {
     animation: none;
   }
 }

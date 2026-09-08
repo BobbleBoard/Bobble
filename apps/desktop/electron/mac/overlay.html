@@ -107,20 +107,22 @@
     display: flex;
     align-items: center;
     gap: 7px;
-    padding: 7px 13px;
+    padding: 7px 8px 7px 13px;
     border-radius: 999px;
     font:
       600 12.5px/1.2 -apple-system,
       system-ui,
       sans-serif;
     letter-spacing: 0.01em;
-    color: #fff;
-    background: linear-gradient(135deg, rgba(30, 41, 66, 0.94), rgba(22, 30, 50, 0.94));
-    border: 1px solid rgba(255, 255, 255, 0.28);
+    color: var(--ink, #fff);
+    /* The canvas bubble's treatment, shared (see the header): a near-black
+       pill with the theme accent as its ring, rather than a second palette. */
+    background: var(--pill, rgba(22, 24, 30, 0.92));
+    border: 1.5px solid color-mix(in srgb, var(--accent, #0071e3) 55%, transparent);
     box-shadow:
-      0 4px 18px rgba(18, 22, 76, 0.42),
-      0 0 26px rgba(80, 140, 255, 0.28),
-      inset 0 1px 0 rgba(255, 255, 255, 0.22);
+      0 4px 18px rgba(8, 10, 22, 0.46),
+      0 0 26px color-mix(in srgb, var(--accent, #0071e3) 24%, transparent),
+      inset 0 1px 0 rgba(255, 255, 255, 0.16);
     white-space: nowrap;
     max-width: 340px;
     opacity: 0;
@@ -129,6 +131,36 @@
     transition:
       opacity 0.22s ease,
       transform 0.26s cubic-bezier(0.2, 0.9, 0.3, 1.2);
+    /* The one hit-testable thing in the window (main gates the OS-level
+       click-through; this is only about which element gets the event). */
+    pointer-events: auto;
+  }
+  /* The brake. Small, quiet, and always in the same place — the promise is
+     that it is there, not that it is loud. */
+  #bstop {
+    flex: none;
+    width: 19px;
+    height: 19px;
+    margin-left: 1px;
+    border: 0;
+    padding: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.14);
+    color: var(--ink, #fff);
+    font: 600 11px/1 -apple-system, system-ui, sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.72;
+    cursor: default;
+    pointer-events: auto;
+    transition:
+      opacity 0.15s ease,
+      background 0.15s ease;
+  }
+  #bstop:hover {
+    opacity: 1;
+    background: rgba(255, 90, 80, 0.9);
   }
   #bubble.show {
     opacity: 1;
@@ -156,18 +188,26 @@
     0%,
     100% {
       box-shadow:
-        0 4px 18px rgba(18, 22, 76, 0.42),
-        0 0 22px rgba(80, 140, 255, 0.22),
-        inset 0 1px 0 rgba(255, 255, 255, 0.22);
+        0 4px 18px rgba(8, 10, 22, 0.46),
+        0 0 22px color-mix(in srgb, var(--accent, #0071e3) 20%, transparent),
+        inset 0 1px 0 rgba(255, 255, 255, 0.16);
     }
     50% {
       box-shadow:
-        0 4px 20px rgba(18, 22, 76, 0.48),
-        0 0 34px rgba(80, 140, 255, 0.4),
-        inset 0 1px 0 rgba(255, 255, 255, 0.22);
+        0 4px 20px rgba(8, 10, 22, 0.5),
+        0 0 34px color-mix(in srgb, var(--accent, #0071e3) 38%, transparent),
+        inset 0 1px 0 rgba(255, 255, 255, 0.16);
     }
   }
 
+  /* The label yields, the brake does not: with `nowrap` and no `min-width: 0`
+     a long typing preview overflows the pill and pushes the ✕ off the end —
+     which is the one thing in this window that must always be reachable. */
+  #btext {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
   #btext em {
     font-style: normal;
     opacity: 0.78;
@@ -285,6 +325,7 @@
     <div id="bubble">
       <span id="bdots"><span></span><span></span><span></span></span>
       <span id="btext">Thinking</span>
+      <button id="bstop" type="button" title="Stop" aria-label="Stop">✕</button>
     </div>
   </div>
 </div>
@@ -298,6 +339,7 @@
     var bubble = document.getElementById('bubble');
     var bdots = document.getElementById('bdots');
     var btext = document.getElementById('btext');
+    var bstop = document.getElementById('bstop');
     var reduce = false;
     try {
       reduce = !!window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
@@ -308,6 +350,46 @@
     var cx = -1;
     var cy = -1; // local cursor position (-1 = never placed)
     var placed = false;
+
+    /* ── the page's one way to speak ────────────────────────────────────────
+       No preload, no ipcRenderer (deliberately — see the header). A
+       `pd-overlay:<verb>` window.open is read and DENIED by
+       overlay-window.ts's window-open handler, so it never navigates and
+       never opens anything; the URL is the whole message. */
+    function say(verb) {
+      try {
+        window.open(`pd-overlay:${verb}`, '_blank');
+      } catch {
+        /* the overlay is cosmetic — a failed signal must break nothing */
+      }
+    }
+
+    /* Hovering the bubble is what asks main to stop being click-through, and
+       leaving it is what gives the mouse back. `forward: true` on
+       setIgnoreMouseEvents is what makes these fire at all while the window is
+       still transparent to the mouse.
+       The repeat is not belt-and-braces: main drops the catch on a watchdog, so
+       that a missed 'mouseleave' can never leave a transparent window
+       swallowing the user's clicks — which makes the hold a DEAD MAN'S SWITCH,
+       and a pointer resting on the bubble has to keep pressing it or the ✕
+       stops working after a few seconds of hovering. */
+    var hitBeat = 0;
+    bubble.addEventListener('mouseenter', () => {
+      say('hit');
+      if (hitBeat === 0) hitBeat = setInterval(() => say('hit'), 1500);
+    });
+    bubble.addEventListener('mouseleave', () => {
+      if (hitBeat !== 0) {
+        clearInterval(hitBeat);
+        hitBeat = 0;
+      }
+      say('unhit');
+    });
+    bstop.addEventListener('click', (e) => {
+      e.stopPropagation();
+      say('stop');
+    });
+    bubble.addEventListener('click', () => say('reveal'));
 
     function setCursor(x, y, ms) {
       cx = x;
@@ -387,12 +469,51 @@
       }, 360);
     }
 
+    /* ── "thinking" is the one state with no natural end ────────────────────
+       Every other bubble state is followed by an act; this one can sit there
+       while a model works, and three dots look identical at 2s and at 90s.
+       After STILL_THINKING_MS it starts counting, so a slow turn and a stuck
+       one stop looking the same. Timed in the page: no per-second round-trip
+       to main, and it stops the moment any other status arrives.
+
+       DELIBERATELY BELOW overlay-window.ts's BUBBLE_IDLE_MS (15s), which is
+       the point at which the bubble fades because nothing has happened and the
+       overlay can no longer honestly claim the model is thinking. A counter
+       that started after the fade could never be seen. The canvas tab keeps
+       counting past it — main publishes `thinkingMs` for exactly that — because
+       the tab is where the user goes to ask "is this stuck?". */
+    var STILL_THINKING_MS = 8_000;
+    var thinkingSince = 0;
+    var thinkingTimer = 0;
+
+    function stopThinkingClock() {
+      if (thinkingTimer !== 0) {
+        clearInterval(thinkingTimer);
+        thinkingTimer = 0;
+      }
+      thinkingSince = 0;
+    }
+
+    function tickThinking() {
+      if (thinkingSince === 0) return;
+      var elapsed = Date.now() - thinkingSince;
+      if (elapsed < STILL_THINKING_MS) return;
+      showBubble('Still thinking', { dots: true, pulse: true, sub: `${Math.round(elapsed / 1000)}s` });
+    }
+
+    function startThinkingClock() {
+      if (thinkingSince !== 0) return; // an unbroken think keeps its clock
+      thinkingSince = Date.now();
+      thinkingTimer = setInterval(tickThinking, 1000);
+    }
+
     var STATUS = {
       opening: (msg) => {
         showBubble(msg.text || 'Opening', { dots: true });
       },
       thinking: () => {
         showBubble('Thinking', { dots: true, pulse: true });
+        startThinkingClock();
       },
       clicking: () => {
         showBubble('Clicking', {});
@@ -411,8 +532,20 @@
       },
     };
 
+    /* Colours are the app's, not this file's — one phantom, one palette. */
+    function setTheme(msg) {
+      var root = document.documentElement.style;
+      if (typeof msg.accent === 'string') root.setProperty('--accent', msg.accent);
+      if (typeof msg.pill === 'string') root.setProperty('--pill', msg.pill);
+      if (typeof msg.ink === 'string') root.setProperty('--ink', msg.ink);
+    }
+
     function handle(msg) {
       if (!msg || typeof msg !== 'object') return;
+      if (msg.kind === 'theme') {
+        setTheme(msg);
+        return;
+      }
       if (msg.kind === 'reset') {
         // Window shown / resized: make sure the cursor is inside the view.
         ensurePlaced();
@@ -432,6 +565,7 @@
       }
       if (msg.kind === 'click') {
         ensurePlaced();
+        stopThinkingClock();
         setCursor(msg.x, msg.y, 0);
         press();
         showBubble('Clicking', {});
@@ -441,11 +575,13 @@
       }
       if (msg.kind === 'status') {
         ensurePlaced();
+        if (msg.status !== 'thinking') stopThinkingClock();
         const fn = STATUS[msg.status];
         if (fn) fn(msg);
         return;
       }
       if (msg.kind === 'hide-bubble') {
+        stopThinkingClock();
         bubble.classList.remove('show', 'pulse');
         return;
       }

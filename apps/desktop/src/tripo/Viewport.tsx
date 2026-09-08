@@ -9,7 +9,8 @@
  */
 
 import type { JSX, ReactNode } from 'react';
-import { lazy, Suspense, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
+import { lazyRoute } from '../RouteBoundary';
 import { BlendGraph } from './BlendGraph';
 import { EXPORT_FORMATS, type ExportFormat } from './data';
 import { GenStage } from './GenStage';
@@ -32,7 +33,13 @@ import { type TripoRenderMode, useTripoStore } from './store';
 import { LogoMark } from './thumbs';
 import { requestExport } from './viewer-io';
 
-const Viewer3D = lazy(() => import('./Viewer3D'));
+/* Its own boundary + its own "Preparing viewer…" wait: three.js is the biggest
+ * chunk in the app, and a WebGL viewer that will not load must cost the 3D
+ * workspace its canvas, not the window. See RouteBoundary.tsx. */
+const Viewer3D = lazyRoute('3D viewer', () => import('./Viewer3D'), {
+  pick: (m) => m.default,
+  fallback: <div className="tp-canvas-loading">Preparing viewer…</div>,
+});
 
 // ── axis gizmo ────────────────────────────────────────────────────────────
 /** Static default orientation (matches the resting camera); the live viewer
@@ -577,9 +584,7 @@ export function Viewport(): JSX.Element {
       data-genfoot={job !== null && loadedAssetId !== null}
     >
       {loadedAssetId !== null ? (
-        <Suspense fallback={<div className="tp-canvas-loading">Preparing viewer…</div>}>
-          <Viewer3D gizmoRef={gizmoRef} />
-        </Suspense>
+        <Viewer3D gizmoRef={gizmoRef} />
       ) : imageStageView !== null ? (
         /* The Image stage's picture belongs HERE, not squeezed into a 370px
            panel: it is the thing the user has to judge before spending minutes

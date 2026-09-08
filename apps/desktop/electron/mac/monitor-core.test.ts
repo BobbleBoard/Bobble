@@ -3,6 +3,7 @@ import type {
   MacMonitorAxScene,
   MacMonitorFramePayload,
   MacMonitorState,
+  MacMonitorWindowSource,
 } from './mac-monitor-contract';
 import { MacMonitorCore, type MonitorSink, type StreamChild } from './monitor-core';
 import type { MacOverlayState } from './overlay-geometry';
@@ -329,7 +330,9 @@ describe('MacMonitorCore — a helper that cannot stream', () => {
     h.runTimers();
     expect(sink.last?.stream).toBe('unavailable');
     expect(sink.last?.streamError).toContain('ENOENT');
-    expect(sink.last?.streamMessage).toBe('The live view stopped. Bobble is still controlling TextEdit.');
+    expect(sink.last?.streamMessage).toBe(
+      'The live view stopped. Bobble is still controlling TextEdit.',
+    );
   });
 
   it('ignores a stale close from a child that was already replaced', () => {
@@ -569,7 +572,7 @@ describe('MacMonitorCore — the Accessibility fallback', () => {
 
   it('never polls while pixels are arriving', async () => {
     const reader = vi.fn(async () => snapshot());
-    const { core, spawned, timers } = makeAxCore(reader);
+    const { core, spawned } = makeAxCore(reader);
     core.addSink(new FakeSink(true));
     core.setSession(4242, 'TextEdit');
     spawned[0]?.emit(encodePimf(header(), new Uint8Array([1, 2, 3])));
@@ -669,5 +672,262 @@ describe('MacMonitorCore — a grant revoked mid-session', () => {
     expect(sink.last?.captureDenied).toBe(true);
     await settle();
     expect(sink.scenes).toHaveLength(1);
+  });
+});
+
+// ── the picture comes from ELECTRON when the app itself is allowed to look ───
+
+/**
+ * A core with the Electron capture path installed, a controllable clock, and
+ * the same fake helper child as everywhere else — so a test can watch the
+ * monitor CHOOSE between the two binaries that could take the picture.
+ */
+function makeCaptureCore(opts: {
+  grant?: 'granted' | 'denied' | 'unknown';
+  sources?: () => Promise<{ windows: MacMonitorWindowSource[]; denied: boolean }>;
+}) {
+  const spawned: FakeChild[] = [];
+  const timers: Array<() => void> = [];
+  const now = { value: 50_000 };
+  const grant = { value: opts.grant ?? 'granted' };
+  const sourceCalls: number[][] = [];
+  const core = new MacMonitorCore({
+    spawn: () => {
+      const child = new FakeChild();
+      spawned.push(child);
+      return child;
+    },
+    axReader: (async () => snapshot()) as never,
+    captureGrant: () => grant.value,
+    sourceReader: async (ids) => {
+      sourceCalls.push([...ids]);
+      return opts.sources === undefined
+        ? {
+            windows: ids.map((id) => ({
+              sourceId: `window:${id}:0`,
+              windowId: id,
+              name: 'TextEdit',
+            })),
+            denied: false,
+          }
+        : await opts.sources();
+    },
+    setTimer: (fn) => {
+      timers.push(fn);
+      return timers.length;
+    },
+    clearTimer: () => {},
+  });
+  core.setClock(() => now.value);
+  return { core, spawned, timers, now, grant, sourceCalls };
+}
+
+describe('MacMonitorCore — which binary takes the picture', () => {
+  it('prefers Electron when the APP holds the grant, and spawns no helper at all', async () => {
+    // macOS keys the grant to the binary that captures. The helper is signed
+    // separately, so a user who enabled "Bobble" — the only name they would
+    // look for — granted a binary that does no capturing.
+    const h = makeCaptureCore({});
+    const sink = new FakeSink(true);
+    h.core.addSink(sink);
+    h.core.setSession(4242, 'TextEdit');
+    await settle();
+    expect(h.spawned).toHaveLength(0);
+    expect(h.core.streaming()).toBe(false);
+    expect(sink.last?.captureSource).toBe('electron');
+    expect(sink.last?.stream).toBe('live');
+    // Front-to-back, joined to Accessibility by CGWindowID: the sheet first.
+    expect(sink.last?.sources.map((s) => s.windowId)).toEqual([2, 1]);
+    expect(sink.last?.sources[0]?.sourceId).toBe('window:2:0');
+    expect(sink.scenes).toHaveLength(1); // the geometry it composes onto
+  });
+
+  it('falls back to the helper when the app is not the one holding the grant', () => {
+    const h = makeCaptureCore({ grant: 'denied' });
+    const sink = new FakeSink(true);
+    h.core.addSink(sink);
+    h.core.setSession(4242, 'TextEdit');
+    expect(h.spawned).toHaveLength(1);
+    expect(sink.last?.captureSource).toBe('helper');
+    expect(sink.last?.sources).toEqual([]);
+  });
+
+  it('falls back to the helper when Chromium refuses to share, rather than showing nothing', async () => {
+    const h = makeCaptureCore({ sources: async () => ({ windows: [], denied: true }) });
+    const sink = new FakeSink(true);
+    h.core.addSink(sink);
+    h.core.setSession(4242, 'TextEdit');
+    await settle();
+    h.now.value += 3_000; // past the source refresh throttle
+    for (const fn of h.timers.splice(0, h.timers.length)) fn();
+    await settle();
+    expect(h.spawned.length).toBeGreaterThan(0);
+    expect(h.core.state().captureSource).toBe('helper');
+  });
+
+  it('stops enumerating when the window set has not changed', async () => {
+    const h = makeCaptureCore({});
+    h.core.addSink(new FakeSink(true));
+    h.core.setSession(4242, 'TextEdit');
+    await settle();
+    for (const fn of h.timers.splice(0, h.timers.length)) fn();
+    await settle();
+    expect(h.sourceCalls).toHaveLength(1); // same windows, same list
+  });
+
+  it('re-reads the grant on every session — macOS asks again every month', () => {
+    const h = makeCaptureCore({ grant: 'granted' });
+    const sink = new FakeSink(true);
+    h.core.addSink(sink);
+    h.core.setSession(4242, 'TextEdit');
+    expect(sink.last?.captureSource).toBe('electron');
+    h.grant.value = 'denied';
+    h.core.setSession(99, 'Notes');
+    expect(sink.last?.captureSource).toBe('helper');
+    // …and once the helper cannot see either, the panel says which of the two
+    // stories this is, because they need different first lines.
+    denyStream(h.spawned[h.spawned.length - 1], h.timers);
+    expect(sink.last?.captureDenied).toBe(true);
+    expect(sink.last?.captureRevoked).toBe(true);
+    expect(sink.last?.captureNotice?.title).toBe('macOS asks for this again every month');
+  });
+});
+
+describe('MacMonitorCore — slow is not stuck', () => {
+  it('says stalled when a live stream stops producing, with the age it stopped at', () => {
+    const h = makeCore();
+    const sink = new FakeSink(true);
+    h.core.addSink(sink);
+    h.core.setSession(4242, 'TextEdit');
+    h.spawned[0]?.emit(encodePimf(header(), new Uint8Array([1, 2, 3])));
+    expect(sink.last?.stream).toBe('live');
+    expect(sink.last?.stalled).toBe(false);
+    h.now.value += 12_000;
+    h.core.tick();
+    expect(sink.last?.stalled).toBe(true);
+    expect(sink.last?.lastPictureAgeMs).toBe(12_000);
+  });
+
+  it('times how long the model has been thinking, and forgets it when it acts', () => {
+    const h = makeCore();
+    const sink = new FakeSink(true);
+    h.core.addSink(sink);
+    h.core.setSession(4242, 'TextEdit');
+    h.core.setOverlayState(overlay({ cursorState: 'thinking' }));
+    h.now.value += 32_000;
+    h.core.tick();
+    expect(sink.last?.thinkingMs).toBe(32_000);
+    h.core.setOverlayState(overlay({ cursorState: 'clicking' }));
+    expect(sink.last?.thinkingMs).toBeNull();
+  });
+
+  it('a tick nobody is watching costs nothing', () => {
+    const h = makeCore();
+    h.core.setSession(4242, 'TextEdit');
+    h.core.tick(); // no sinks
+    expect(h.core.state().active).toBe(true);
+  });
+});
+
+describe('MacMonitorCore — the brake and the wheel', () => {
+  it('stops capturing the moment the user stops the run', () => {
+    const h = makeCore();
+    const sink = new FakeSink(true);
+    h.core.addSink(sink);
+    h.core.setSession(4242, 'TextEdit');
+    expect(h.core.streaming()).toBe(true);
+    h.core.setControl('stopped');
+    expect(h.core.streaming()).toBe(false);
+    expect(h.core.wanted()).toBe(false);
+    expect(sink.last?.control).toBe('stopped');
+    // The session is still there — the surface has to be able to say WHICH app
+    // was stopped, and "stopped" must not read as "finished".
+    expect(sink.last?.active).toBe(true);
+  });
+
+  it('stops LOOKING when the user takes over — including the Accessibility poll', async () => {
+    // The case this exists for is the user typing a password into the app the
+    // agent just opened. "Bobble isn't watching" has to be true.
+    const { core, timers } = makeAxCore(async () => snapshot());
+    const sink = new FakeSink(true);
+    core.addSink(sink);
+    core.setSession(4242, 'TextEdit');
+    denyStream(undefined, timers);
+    core.setControl('user');
+    await settle();
+    expect(core.polling()).toBe(false);
+    expect(core.streaming()).toBe(false);
+    expect(sink.last?.control).toBe('user');
+  });
+
+  it('comes back only when control is handed back', () => {
+    const h = makeCore();
+    h.core.addSink(new FakeSink(true));
+    h.core.setSession(4242, 'TextEdit');
+    h.core.setControl('stopped');
+    const spawnedWhileStopped = h.spawned.length;
+    h.core.setSession(4242, 'TextEdit'); // the model carries on asking
+    expect(h.spawned.length).toBe(spawnedWhileStopped);
+    h.core.setControl('agent');
+    expect(h.spawned.length).toBe(spawnedWhileStopped + 1);
+  });
+
+  it('never offers the Screen Recording screen to someone who is driving', () => {
+    const h = makeCore();
+    const sink = new FakeSink(true);
+    h.core.addSink(sink);
+    h.core.setSession(4242, 'TextEdit');
+    denyStream(h.spawned[0], h.timers);
+    expect(sink.last?.captureNotice).not.toBeNull();
+    h.core.setControl('user');
+    expect(sink.last?.captureNotice).toBeNull();
+    expect(sink.last?.captureDenied).toBe(false);
+  });
+});
+
+describe('MacMonitorCore — what it says when it cannot see', () => {
+  it('never puts a process message on screen', () => {
+    const h = makeCore();
+    const sink = new FakeSink(true);
+    h.core.addSink(sink);
+    h.core.setSession(4242, 'TextEdit');
+    for (let i = 0; i < 6; i++) {
+      h.spawned[h.spawned.length - 1]?.exit(1);
+      h.runTimers();
+    }
+    expect(sink.last?.stream).toBe('unavailable');
+    // The raw reason still travels for the disclosure…
+    expect(sink.last?.streamError).toContain('pi-mac --stream exited');
+    // …and never reaches the sentence a person reads.
+    expect(sink.last?.streamMessage).not.toContain('pi-mac');
+    expect(sink.last?.streamMessage).toBe(
+      'The live view stopped. Bobble is still controlling TextEdit.',
+    );
+  });
+
+  it('tells "nothing to show" apart from "not allowed"', () => {
+    const h = makeCore();
+    const sink = new FakeSink(true);
+    h.core.addSink(sink);
+    h.core.setSession(4242, 'TextEdit');
+    h.spawned[0]?.emit(
+      encodePimf(
+        header({ w: 0, h: 0, windows: [], error: 'no-shareable-window' }),
+        new Uint8Array(0),
+      ),
+    );
+    h.runTimers();
+    expect(sink.last?.captureDenied).toBe(false);
+    expect(sink.last?.streamMessage).toBe('TextEdit has nothing on screen to show.');
+  });
+
+  it('reports a late failure at once — the floor is for the FIRST moment only', () => {
+    const h = makeCore();
+    const sink = new FakeSink(true);
+    h.core.addSink(sink);
+    h.core.setSession(4242, 'TextEdit');
+    h.now.value += 60_000; // a stream that ran happily for a minute
+    denyStream(h.spawned[0], []); // no timers run: nothing is being held back
+    expect(sink.last?.stream).toBe('unavailable');
   });
 });

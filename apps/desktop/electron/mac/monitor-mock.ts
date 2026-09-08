@@ -105,6 +105,17 @@ export function startMacMonitorMock(): void {
   if (wallpaper !== null) macMonitor.setWallpaperReader(async () => ({ path: wallpaper }));
 
   macMonitor.setSpawnFn(() => new MockStreamChild());
+  // This mock IS a stubbed helper, so it has to be the helper that gets used:
+  // on a machine where the app holds the Screen Recording grant the preferred
+  // (Electron) path never spawns a child at all, and the mock would sit unused
+  // while the monitor quietly captured the real desktop instead.
+  //
+  // Unless a probe has explicitly asked for the preferred path (which it can
+  // only do under PI_E2E — see window-capture.ts). That is the one case where
+  // being bypassed is the point: it is how the Electron path, the real
+  // Chromium enumeration and the fallback back to this mock get exercised on a
+  // machine that has no capture grant to test them with.
+  if (process.env.PI_MAC_FORCE_CAPTURE_GRANT === undefined) macMonitor.disableElectronCapture();
   // The ACCESSIBILITY half of the same synthetic app, so the fallback path is
   // exercised end to end with no TCC and no real app: same window, same frame,
   // same save sheet on the same 14-second cycle, described the way the helper's

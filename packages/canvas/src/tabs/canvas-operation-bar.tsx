@@ -97,14 +97,21 @@ export function fileViewModeDefault(tab: CanvasTab): FileViewMode {
 
 /**
  * Breadcrumb segments for a file tab: explicit `breadcrumb`, else the path split
- * on separators, else the artifact filename, else the tab title. Exported for
- * unit tests.
+ * on separators, else the artifact filename, else what the tab is showing.
+ *
+ * THE SUBTITLE BEATS THE TITLE for that last fallback, because a tab that has
+ * one has a title that deliberately does not change: the "Activity" tab is
+ * always called Activity and says `ls -la` underneath. Reading the title here
+ * printed "Activity" directly below a tab already labelled Activity — the one
+ * line of chrome that could have named the command, spent saying nothing.
+ * Exported for unit tests.
  */
 export function deriveBreadcrumb(tab: CanvasTab): string[] {
   if (tab.breadcrumb?.length) return tab.breadcrumb;
   const path = tab.filePath ?? tab.artifact?.filename;
   if (path) return path.split(/[/\\]/).filter(Boolean);
-  return tab.title ? [tab.title] : [];
+  const label = tab.subtitle ?? tab.title;
+  return label ? [label] : [];
 }
 
 /**

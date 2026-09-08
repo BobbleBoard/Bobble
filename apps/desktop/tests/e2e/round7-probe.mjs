@@ -54,7 +54,16 @@ const userDataDir = mkdtempSync(path.join(tmpdir(), 'pi-e2e-udd-'));
 const app = await electron.launch({
   executablePath: electronBinary,
   args: [appRoot, `--user-data-dir=${userDataDir}`],
-  env: { ...process.env, HOME: PROBE_HOME, PI_BIN: mockPi, MOCK_PI_FIXTURE: fixture, PI_E2E: '1' },
+  env: {
+    ...process.env,
+    HOME: PROBE_HOME,
+    PI_BIN: mockPi,
+    MOCK_PI_FIXTURE: fixture,
+    PI_E2E: '1',
+    // Invisible by DEFAULT (the user's standing rule) — this probe predates
+    // harness.mjs and was still putting a window on his screen.
+    PI_E2E_BACKGROUND: '1',
+  },
 });
 
 const opbar = (kind) => `[data-testid="canvas-tabs-panel"] .pd-canvas-opbar[data-kind="${kind}"]`;
@@ -263,7 +272,8 @@ try {
     const tab = window
       .__pi_canvas()
       .getState()
-      .tabs.find((t) => t.key === 'file:/tmp/pi-rt7/live.txt');
+      // ONE "Activity" tab now (round 21 item 3) — it used to be `file:<path>`.
+      .tabs.find((t) => t.key === 'pi:activity');
     return {
       found: tab !== undefined,
       streaming: tab?.streaming === true,

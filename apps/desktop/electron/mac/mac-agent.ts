@@ -42,10 +42,16 @@ import {
 } from '@pi-desktop/mac-computer-use/protocol';
 import { MacHelperClient } from '@pi-desktop/pi-mac';
 import { createLogger } from '@pi-desktop/shared';
-import { app, ipcMain } from 'electron';
+import { app, BrowserWindow, globalShortcut, ipcMain } from 'electron';
 import { resolveBundledPackageAsset } from '../app-paths';
+import { isBackgroundMode } from '../background-mode';
 import { isTrustedIpcEvent } from '../trusted-senders';
-import { macMonitor, registerMacMonitorIpc, setCaptureGrantPrompt } from './monitor';
+import {
+  macMonitor,
+  registerMacMonitorIpc,
+  setCaptureGrantPrompt,
+  setMacControlHandler,
+} from './monitor';
 import { macMonitorMockControl, startMacMonitorMock } from './monitor-mock';
 import type { OverlayRect } from './overlay-geometry';
 import { macOverlay } from './overlay-window';
@@ -84,6 +90,12 @@ let e2eFakeBounds:
 /** The system permission dialogs are surfaced at most once per app session
  * (first mac_* use without the grants) — never nag. */
 let promptedTcc = false;
+/** The global Escape brake ignores presses until this moment — see the `key`
+ * case: it is how our own injected Escape cannot stop our own run. */
+let suppressEscUntil = 0;
+const SELF_KEY_QUIET_MS = 400;
+/** Whether the global Escape accelerator is currently held. */
+let escArmed = false;
 
 /**
  * Resolve the packaged `pi-mac` binary to a REAL on-disk path. Like pi-afm it is
@@ -237,6 +249,9 @@ function cacheSnapshot(snap: MacSnapshot): void {
 }
 
 async function snapshotWithOverlay(params: Record<string, unknown>): Promise<MacSnapshot> {
+  // Name the moment: a snapshot is the agent READING the user's screen, and
+  // that is the one thing a bubble saying "Thinking" was actively wrong about.
+  await macOverlay.reading();
   const snap = await getHelper().request<MacSnapshot>('snapshot', params);
   cacheSnapshot(snap);
   if (typeof snap.pid === 'number') {
@@ -281,8 +296,36 @@ async function typeWithOverlay(params: Record<string, unknown>): Promise<MacActA
   return ack;
 }
 
+/**
+ * WHAT "STOP" MEANS, one layer below the UI.
+ *
+ * A brake that only hides a cursor is not a brake. When the user stops the run
+ * — from the surface, from the ✕ on the overlay's own bubble, or with the
+ * global Escape — the agent's hands come off the Mac here: every act and every
+ * LOOK is refused until the user asks for the agent back. Nothing the model
+ * does can clear it, which is the entire point; a model that could talk its way
+ * past the stop button would make the button a decoration.
+ *
+ * Take-over is the same cut with a different sentence, and it carries the
+ * promise that makes handing the keyboard over safe: while the user is driving,
+ * nothing is captured and nothing is read.
+ */
+function controlRefusal(method: MacAgentMethod): string | null {
+  const control = macMonitor.control();
+  if (control === 'agent') return null;
+  if (method === 'check' || method === 'setDriving') return null;
+  const app = macMonitor.state().appName.trim();
+  const named = app === '' ? 'the app' : app;
+  if (control === 'user') {
+    return `The user has taken over ${named}. Bobble is not watching or acting while they drive — do not retry; wait for them to hand it back, and ask before touching ${named} again.`;
+  }
+  return `The user pressed Stop, so Mac control is off. Do not retry: say what you had done to ${named} and ask whether to carry on.`;
+}
+
 async function dispatch(method: MacAgentMethod, params: Record<string, unknown>): Promise<unknown> {
   if (!isSupportedPlatform()) throw new Error('mac computer-use is macOS-only');
+  const refusal = controlRefusal(method);
+  if (refusal !== null) throw new Error(refusal);
   switch (method) {
     case 'check':
       return getHelper().request('check');
@@ -293,6 +336,11 @@ async function dispatch(method: MacAgentMethod, params: Record<string, unknown>)
     case 'type':
       return typeWithOverlay(params);
     case 'key': {
+      // OUR OWN Escape must not press the user's brake. The global hotkey is
+      // deliberately deaf for a beat around every key we inject, which is also
+      // the guard against screen content talking the model into "press Escape"
+      // to dismiss the one control the user has.
+      suppressEscUntil = Date.now() + SELF_KEY_QUIET_MS;
       await macOverlay.keyPress(String(params.combo ?? params.key ?? ''));
       return getHelper().request('key', params);
     }
@@ -407,6 +455,56 @@ function startServer(): void {
 }
 
 /**
+ * Control changing hands, in ONE place.
+ *
+ * The three ways of asking — the surface's button, the ✕ on the overlay's
+ * bubble, and the global Escape — must not be able to do three different
+ * things. Stopping takes the phantom off the screen and the capture off the
+ * GPU immediately; the refusal that keeps the agent's hands off lives in
+ * `controlRefusal`, and it outlives this call.
+ */
+function applyControl(mode: 'agent' | 'stopped' | 'user'): void {
+  macMonitor.setControl(mode);
+  if (mode === 'agent') return;
+  // The phantom is a promise that something is being driven. Nothing is.
+  macOverlay.hide();
+}
+
+/**
+ * A BRAKE THE USER CAN REACH WITHOUT BEING IN BOBBLE.
+ *
+ * The whole feature runs while the user is somewhere else, so the stop has to
+ * exist somewhere else too. Escape is the convention (it is what Claude Code
+ * uses for the same job) and registering it globally CONSUMES it, which is the
+ * property that matters: a page or a document that tells the model to "press
+ * Escape" cannot use the user's own brake against them, because our injected
+ * keys are ignored for a beat either side (see the `key` case).
+ *
+ * Never armed in test mode: eating the Escape key of whoever is using this
+ * machine is exactly the kind of "taking notice" a probe must not do.
+ */
+function armEscBrake(on: boolean): void {
+  if (process.platform !== 'darwin' || isBackgroundMode()) return;
+  if (on === escArmed) return;
+  try {
+    if (on) {
+      escArmed = globalShortcut.register('Escape', () => {
+        if (Date.now() < suppressEscUntil) return; // our own keystroke
+        log.info('mac computer-use stopped by the global Escape');
+        applyControl('stopped');
+      });
+      if (!escArmed) log.warn('could not register the global Escape brake');
+      return;
+    }
+    globalShortcut.unregister('Escape');
+    escArmed = false;
+  } catch (err) {
+    log.warn('global Escape brake failed', { error: String(err) });
+    escArmed = false;
+  }
+}
+
+/**
  * Stand up the mac-agent bridge socket (publishing its env for the pi child) and
  * point the helper at the resolved `pi-mac` binary. Called from main.ts's
  * registerAppIpc on app-ready, BEFORE the first pi spawn, so PI_MAC_SOCK/_TOKEN
@@ -414,8 +512,10 @@ function startServer(): void {
  * (the tools still register but the bridge just reports "macOS-only").
  *
  * Also arms the cursor overlay (its window tracker reads bounds through the
- * helper) and, under PI_E2E=1 only, a renderer-reachable debug channel the
- * probes use (tests/e2e/mac-overlay-probe.mjs / mac-computeruse-probe.mjs).
+ * helper), wires the USER'S BRAKE to its three buttons — the surface's Stop,
+ * the ✕ on the overlay's own bubble, and the global Escape — and, under
+ * PI_E2E=1 only, a renderer-reachable debug channel the probes use
+ * (tests/e2e/mac-overlay-probe.mjs / mac-brake-probe.mjs).
  */
 export function registerMacAgentIpc(): void {
   startServer();
@@ -473,6 +573,22 @@ export function registerMacAgentIpc(): void {
     tccCache = null;
     return getHelper().request('promptGrants');
   });
+  // The brake, wired to all three of its buttons (see applyControl), and to the
+  // overlay's own ✕ — the only control that exists while the user is in another
+  // app. Clicking the bubble body brings Bobble forward on the monitor.
+  setMacControlHandler(applyControl);
+  macOverlay.setBrake(applyControl, () => {
+    const win = BrowserWindow.getAllWindows().find((w) => !w.isDestroyed() && w.isFocusable());
+    if (win !== undefined) {
+      if (win.isMinimized()) win.restore();
+      win.show();
+      win.focus();
+    }
+    macMonitor.reveal();
+  });
+  // An app being driven is exactly when the global Escape brake should exist,
+  // and the overlay's own engagement is the app's single truth for that.
+  macOverlay.watch((state) => armEscBrake(state.engaged));
   registerMacMonitorIpc();
   startMacMonitorMock();
   if (process.env.PI_E2E === '1') registerE2eDebugChannel();
@@ -560,10 +676,27 @@ function registerE2eDebugChannel(): void {
           case 'overlay-status': {
             if (params.status === 'opening') await macOverlay.opening(String(params.text ?? ''));
             else if (params.status === 'scrolling') await macOverlay.scrolling();
+            else if (params.status === 'reading') await macOverlay.reading();
             else await macOverlay.thinking();
             return { ok: true };
           }
           case 'overlay-info':
+            return { ok: true, result: macOverlay.info() };
+          // The brake, from a probe. Same entry point as the surface's button,
+          // the overlay's ✕ and the global Escape — there is only one.
+          case 'mac-control': {
+            const mode = String(params.mode ?? '');
+            if (mode !== 'agent' && mode !== 'stopped' && mode !== 'user') {
+              return { ok: false, error: `unknown control mode: ${mode}` };
+            }
+            applyControl(mode);
+            return { ok: true, result: { control: macMonitor.control() } };
+          }
+          // Exactly what a hover or a click on the overlay's bubble sends, so a
+          // probe can press the brake the user can press without a real mouse
+          // over a real always-on-top window.
+          case 'overlay-page':
+            macOverlay.debugFromPage(String(params.verb ?? ''));
             return { ok: true, result: macOverlay.info() };
           // The computer-use MONITOR's own truth, read-only. A probe cannot use
           // `mac:monitor:subscribe` to look: there is one sink per renderer, so
@@ -671,6 +804,7 @@ function registerE2eDebugChannel(): void {
 
 /** Test/lifecycle hook: close the socket server + kill the helper. */
 export function disposeMacAgent(): void {
+  armEscBrake(false);
   server?.close();
   server = null;
   helper?.dispose();

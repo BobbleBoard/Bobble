@@ -3,11 +3,12 @@ import { Compartment, EditorState, type Extension, Transaction } from '@codemirr
 import { EditorView, keymap, lineNumbers, ViewPlugin, type ViewUpdate } from '@codemirror/view';
 import { tags as t } from '@lezer/highlight';
 import { IconCheck, IconCopy, writeClipboardText } from '@pi-desktop/ui';
-import { useEffect, useRef, useState } from 'react';
+import { type RefObject, useEffect, useRef, useState } from 'react';
 import type { ArtifactContent } from '../model.ts';
 import type { SurfaceProps } from '../registry.ts';
 import { streamingUpdateSpec } from './code-append.ts';
 import { languageExtension } from './languages.ts';
+import type { OffscreenProbe } from './use-edit-animation.ts';
 
 /*
  * SYNTAX COLOURS FOLLOW THE THEME, like everything else here.
@@ -233,6 +234,80 @@ export interface CodeSurfaceProps extends SurfaceProps {
   onChange?: (text: string) => void;
   /** Fired on an explicit save (⌘/Ctrl-S) with the full buffer text. */
   onSave?: (text: string) => void;
+  /**
+   * The offset the buffer is CHANGING at — the head of a live edit's forward
+   * delete, or the growing end of what it is typing. Set only while an edit
+   * animation plays. See {@link useFollowCaret} for what following it means.
+   */
+  caret?: number;
+  /** Follow {@link caret} by scrolling. False leaves the viewport alone. */
+  followCaret?: boolean;
+  /**
+   * A slot the surface fills with "is this offset out of view?", so the edit
+   * driver can ask before it decides to play a motion the reader would not see.
+   * Line heights live in the editor; nobody above it can answer this.
+   */
+  offscreenProbe?: OffscreenProbe;
+}
+
+/** Room to keep between the caret and the edge before we scroll, in px. */
+const CARET_MARGIN = 64;
+
+/**
+ * The screen-space box of the line at `pos`, measured through the editor's
+ * height map so it works for a position far outside what CodeMirror has
+ * actually drawn (an edit 3,000 lines down).
+ */
+function lineBoxAt(view: EditorView, pos: number): { top: number; height: number } {
+  const clamped = Math.max(0, Math.min(pos, view.state.doc.length));
+  const block = view.lineBlockAt(clamped);
+  return { top: view.documentTop + block.top, height: block.height };
+}
+
+/**
+ * KEEP THE EDIT IN VIEW, AS A MOVEMENT THE EYE CAN FOLLOW.
+ *
+ * An edit arriving 400 lines below the fold has to be brought to the reader
+ * before anything is deleted, and the user asked for that arrival to be a movement,
+ * not a jump — so it is a smooth scroll that centres the edit site, and the
+ * plan's `settleMs` is the stillness that lets it land before the first
+ * character disappears.
+ *
+ * It only fires when the caret is actually near an edge, so the long middle of a
+ * typing phase does not drag the viewport a pixel at a time; and it centres,
+ * so a delete that shortens the file cannot walk the text out from under the
+ * reader. Under `prefers-reduced-motion` (where there is no motion to follow
+ * anyway) and in a browser without smooth scrolling it is an instant jump.
+ */
+function useFollowCaret(
+  viewRef: RefObject<EditorView | null>,
+  caret: number | undefined,
+  follow: boolean,
+): void {
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view || caret === undefined || !follow) return;
+    const scroller = view.scrollDOM;
+    const box = scroller.getBoundingClientRect();
+    if (box.height === 0) return;
+    const line = lineBoxAt(view, caret);
+    const above = line.top < box.top + CARET_MARGIN;
+    const below = line.top + line.height > box.bottom - CARET_MARGIN;
+    if (!above && !below) return;
+    const target = box.top + (box.height - line.height) / 2;
+    const reduce =
+      typeof window !== 'undefined' &&
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const top = Math.max(0, scroller.scrollTop + (line.top - target));
+    // `scrollTo` is not implemented in every host (jsdom); the jump is the same
+    // destination, just without the travel.
+    if (typeof scroller.scrollTo === 'function') {
+      scroller.scrollTo({ top, behavior: reduce ? 'auto' : 'smooth' });
+    } else {
+      scroller.scrollTop = top;
+    }
+  }, [viewRef, caret, follow]);
 }
 
 /**
@@ -253,6 +328,9 @@ export function CodeSurface({
   editable = false,
   onChange,
   onSave,
+  caret,
+  followCaret = false,
+  offscreenProbe,
 }: CodeSurfaceProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
@@ -326,6 +404,25 @@ export function CodeSurface({
     if (!view || !compartment) return;
     view.dispatch({ effects: compartment.reconfigure(languageExtension(content.language)) });
   }, [content.language]);
+
+  // Answer "would the reader see an edit at this offset?" for whoever asks. The
+  // height map knows; nothing above this component does.
+  useEffect(() => {
+    if (offscreenProbe === undefined) return;
+    offscreenProbe.current = (pos: number): boolean => {
+      const view = viewRef.current;
+      if (!view) return false;
+      const box = view.scrollDOM.getBoundingClientRect();
+      if (box.height === 0) return true;
+      const line = lineBoxAt(view, pos);
+      return line.top + line.height < box.top || line.top > box.bottom;
+    };
+    return () => {
+      offscreenProbe.current = null;
+    };
+  }, [offscreenProbe]);
+
+  useFollowCaret(viewRef, caret, followCaret);
 
   useEffect(() => () => clearTimeout(copyTimer.current), []);
 

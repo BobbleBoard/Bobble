@@ -41,7 +41,11 @@ import {
 } from './monitor-core';
 import { macOverlay } from './overlay-window';
 import { cacheWallpaper } from './wallpaper';
-import { capturableWindows, registerForScreenRecording, screenCaptureGrant } from './window-capture';
+import {
+  capturableWindows,
+  registerForScreenRecording,
+  screenCaptureGrant,
+} from './window-capture';
 
 const log = createLogger('desktop:mac-monitor');
 const events = createIpcEventSender<AppEventMap>();
@@ -160,6 +164,15 @@ export const macMonitor = {
     core.setSpawn(fn);
   },
 
+  /**
+   * Take the Electron capture path away — for the DEV MOCK only, which stubs
+   * the helper and would otherwise be bypassed entirely on a machine where the
+   * app does hold the grant (the preferred path never spawns a child at all).
+   */
+  disableElectronCapture(): void {
+    core.disableElectronCapture();
+  },
+
   /** How the Accessibility fallback reads the controlled app. Injected from
    * mac-agent.ts, which owns the one long-lived `--serve` helper. */
   setAxReader(reader: AxReader): void {
@@ -183,10 +196,13 @@ export const macMonitor = {
 
   setSession(pid: number, appName: string): void {
     if (process.platform !== 'darwin') return;
-    const had = core.state().active;
+    const before = core.state();
     core.setSession(pid, appName);
     startHeartbeat();
-    if (!had) {
+    // Once per app taken over, not once per snapshot — `setSession` is called
+    // on every one of those. Switching apps mid-run IS worth saying again: it
+    // is the user's own machine reaching into something else.
+    if (!before.active || before.pid !== pid) {
       const app = appName.trim() === '' ? 'an app' : appName.trim();
       notify(`Bobble is using ${app}`, 'Press Esc to stop.');
     }
@@ -209,6 +225,16 @@ export const macMonitor = {
   /** The brake and the wheel — see the contract's `mac:monitor:control`. */
   setControl(mode: MacMonitorControl): void {
     core.setControl(mode);
+  },
+
+  /** The user clicked the phantom's bubble: tell the renderer to show them the
+   * monitor. Main has already brought the window forward. */
+  reveal(): void {
+    const pid = core.state().pid;
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (win.isDestroyed() || !win.isFocusable()) continue;
+      events.send(win.webContents, 'mac:monitor:reveal', { pid });
+    }
   },
 
   control(): MacMonitorControl {

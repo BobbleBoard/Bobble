@@ -1,10 +1,11 @@
 import { type DiffFileData, DiffView, Markdown } from '@pi-desktop/ui';
-import { type ReactNode, type RefObject, useCallback, useEffect, useRef } from 'react';
+import { type ReactNode, type RefObject, useCallback, useEffect, useMemo, useRef } from 'react';
 import type { ArtifactContent } from '../model.ts';
 import type { FileViewMode } from '../tabs/tab-model.ts';
 import { CodeSurface } from './code-surface.tsx';
 import { HtmlSurface } from './html-surface.tsx';
 import { SvgSurface } from './svg-surface.tsx';
+import { type EditAnimationSpec, useEditAnimation } from './use-edit-animation.ts';
 
 /** Content kinds that have a real RENDERED form (vs. raw source) — a file of one
  * of these gets the rendered↔raw toggle and defaults to Rendered (the user). */
@@ -34,6 +35,9 @@ function useStickToBottom(
   bodyRef: RefObject<HTMLDivElement | null>,
   active: boolean,
   deltaKey: unknown,
+  /** Set true the first time the reader moves this scroller by hand — the edit
+   * animation reads it to decide whether an off-screen edit is worth playing. */
+  intentRef?: RefObject<boolean>,
 ): void {
   const pinnedRef = useRef(true);
 
@@ -53,10 +57,17 @@ function useStickToBottom(
     const release = (): void => {
       pinnedRef.current = false;
     };
+    // Any hand on the scroller counts as "I am reading somewhere"; only UPWARD
+    // intent releases the stick-to-bottom pin.
+    const touched = (): void => {
+      if (intentRef !== undefined) intentRef.current = true;
+    };
     const onWheel = (e: WheelEvent): void => {
+      touched();
       if (e.deltaY < 0) release();
     };
     const onKey = (e: KeyboardEvent): void => {
+      touched();
       if (e.key === 'ArrowUp' || e.key === 'PageUp' || e.key === 'Home') release();
     };
     let lastY = 0;
@@ -64,6 +75,7 @@ function useStickToBottom(
       lastY = e.touches[0]?.clientY ?? 0;
     };
     const onTouchMove = (e: TouchEvent): void => {
+      touched();
       const y = e.touches[0]?.clientY ?? 0;
       if (y > lastY + 1) release(); // finger drags down → content moves up
       lastY = y;
@@ -88,7 +100,7 @@ function useStickToBottom(
       body.removeEventListener('touchmove', onTouchMove);
       body.removeEventListener('scroll', onScroll, true);
     };
-  }, [bodyRef]);
+  }, [bodyRef, intentRef]);
 
   // Keep the newest content in view on each delta — ONLY while pinned. Child
   // effects (which apply the code/markdown delta) run before this parent effect,
@@ -145,12 +157,31 @@ export interface FileSurfaceProps {
   addedLines?: number;
   removedLines?: number;
   /**
-   * A LIVE EDIT DIFF (a str_replace-style edit in flight): when present, the
-   * surface renders this diff (deletions + additions) instead of the file's
-   * content, sticking to the newest line as the hunk streams — the edit twin of
-   * streamed whole-file content. Reuses the shared {@link DiffView}/diff.css.
+   * FALLBACK ONLY: a live edit rendered as a diff.
+   *
+   * An edit normally plays as {@link editAnim} — the file itself, with the
+   * replaced text forward-deleting and the replacement typing in after it. This
+   * is what is left when that is impossible: the file could not be read, or the
+   * tool's `old_string` does not occur in it, so there is no place to stand the
+   * caret. Then, and only then, the surface falls back to showing the hunk as a
+   * diff. Reuses the shared {@link DiffView}/diff.css.
    */
   diff?: DiffFileData[];
+  /**
+   * A LIVE EDIT, ANIMATED AS AN EDIT.
+   *
+   * the user: "Editing a file shouldn't show the diff being written in real time it
+   * should show that file and then the text as the negative part of the diff is
+   * written being deleted … and then of course the replace part writing
+   * animation same as when it's writing just in the file wherever it is."
+   *
+   * So the surface shows the FILE and plays the change into it: settle on the
+   * edit site, forward-delete the replaced text, type the replacement from the
+   * offset the delete finished at. The text goes through exactly the pipe a
+   * streaming write goes through, so both feel like one hand. Takes precedence
+   * over {@link diff}.
+   */
+  editAnim?: EditAnimationSpec;
 }
 
 /** Total renderable rows across a diff — the per-delta scroll trigger + the
@@ -196,6 +227,7 @@ export function FileSurface({
   addedLines,
   removedLines,
   diff,
+  editAnim,
 }: FileSurfaceProps) {
   const bodyRef = useRef<HTMLDivElement>(null);
   const view = mode ?? defaultFileViewMode(content);
@@ -206,20 +238,62 @@ export function FileSurface({
   // rendered↔raw toggle markdown already had; images stay always-rendered — they
   // never route here, they open on the media surface.)
   const rendered = view === 'rendered' && isRenderableKind(content.kind);
-  // A live edit-diff (str_replace in flight) takes over the body: the shared
-  // DiffView shows the deletions + additions, following the newest line as the
-  // hunk streams — the edit twin of streamed whole-file content. It settles back
-  // to the file view when the edit completes (the app clears `diff`).
+
+  // ── The live EDIT ─────────────────────────────────────────────────────────
+  // The animation owns the buffer while it plays, so the surface renders the
+  // frame's text rather than `content.text`. Two refs are all it needs from the
+  // DOM: the outer box (is this laid out at all?) and, once CodeMirror is up,
+  // a probe that can say whether a given offset is off screen.
+  const offscreenProbe = useRef<((pos: number) => boolean) | null>(null);
+  const userScrolled = useRef(false);
+  const anim = useEditAnimation(editAnim, {
+    hostRef: bodyRef,
+    offscreenProbe,
+    userScrolledRef: userScrolled,
+  });
+  const animating = anim?.playing === true;
+  /*
+   * WHAT TO SHOW WHEN THE MOTION IS OVER.
+   *
+   * Normally: the tab's own content, which by then is the file re-read from
+   * disk — the same bytes the animation landed on, so the hand-over is
+   * invisible. But the tool result can lag the motion, and in that window
+   * `content.text` is still the file as it was BEFORE the edit. Falling through
+   * to it there would undo the edit on screen and then redo it a beat later. So
+   * while content is still the pre-edit text, hold the text we animated to.
+   */
+  const animText =
+    anim === null
+      ? undefined
+      : anim.playing || content.text === editAnim?.plan.baseText
+        ? anim.text
+        : undefined;
+  const shownContent = useMemo(
+    () => (animText === undefined ? content : { ...content, text: animText }),
+    [content, animText],
+  );
+
+  // A diff is now only the FALLBACK for an edit that cannot be animated (see
+  // `diff` on the props): no base text to stand it in, or an `old_string` that
+  // does not occur. An animation, when there is one, wins.
   const diffLines = diffLineCount(diff);
-  const showDiff = diffLines > 0;
+  const showDiff = diffLines > 0 && editAnim === undefined;
 
   // While diffing, stick to the newest diff row on each delta; otherwise track the
   // content text (a streaming whole-file write). Same free-scroll rules either way.
-  useStickToBottom(bodyRef, streaming, showDiff ? diffLines : content.text);
+  // An edit is the exception: it has its own place to be — the edit site — and
+  // being dragged to the bottom of the file mid-delete is exactly the yank the
+  // free-scroll rules exist to prevent.
+  useStickToBottom(
+    bodyRef,
+    streaming && !animating,
+    showDiff ? diffLines : shownContent.text,
+    userScrolled,
+  );
 
   const rootClass = ['pd-file', className].filter(Boolean).join(' ');
   return (
-    <div className={rootClass}>
+    <div className={rootClass} data-edit-phase={anim?.phase}>
       <FileDiffBadge added={addedLines} removed={removedLines} />
       {showFilename && filename ? <div className="pd-file-name">{filename}</div> : null}
       <div ref={bodyRef} className="pd-file-body">
@@ -229,22 +303,26 @@ export function FileSurface({
           </div>
         ) : rendered ? (
           content.kind === 'html' ? (
-            <HtmlSurface content={content} streaming={streaming} />
+            <HtmlSurface content={shownContent} streaming={streaming} />
           ) : content.kind === 'svg' ? (
-            <SvgSurface content={content} streaming={streaming} />
+            <SvgSurface content={shownContent} streaming={streaming} />
           ) : (
             <div className="pd-canvas-markdown pd-scroll">
-              <Markdown>{content.text}</Markdown>
+              <Markdown>{shownContent.text}</Markdown>
             </div>
           )
         ) : (
           <CodeSurface
-            content={content}
-            streaming={streaming}
+            content={shownContent}
+            streaming={streaming || animating}
             onCopy={onCopy}
-            // Editing is only meaningful on a static buffer — never mid-write.
-            editable={editable && !streaming}
+            // Editing is only meaningful on a static buffer — never mid-write,
+            // and never with the buffer moving under the caret.
+            editable={editable && !streaming && !animating}
             onSave={onSave}
+            caret={anim?.caret}
+            followCaret={animating}
+            offscreenProbe={offscreenProbe}
           />
         )}
       </div>

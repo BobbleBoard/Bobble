@@ -1,4 +1,4 @@
-import { IconClose } from '@pi-desktop/ui';
+import { IconClose, Spinner } from '@pi-desktop/ui';
 import type { ReactNode } from 'react';
 import { useState } from 'react';
 import { ExpandedScrim } from '../media/ExpandedScrim';
@@ -22,11 +22,21 @@ export function AttachedFileCard({
   name,
   text,
   onRemove,
+  prefilling = false,
 }: {
   readonly name: string;
   readonly text: string;
   /** Shown only in the composer — a sent message cannot be un-attached. */
   readonly onRemove?: () => void;
+  /**
+   * Its contents are still being read into the model.
+   *
+   * True in the composer while the prime runs, and — the part that was missing —
+   * still true on the copy in the thread until the sent turn is past prefill.
+   * the user: "the loading spinner can still be on them, it disapears when they are
+   * prefilled." See chat/sent-prefill.ts for what decides it after send.
+   */
+  readonly prefilling?: boolean;
 }): ReactNode {
   const [open, setOpen] = useState(false);
   // A short prefix is enough for the preview; CSS line-clamps it to a few rows.
@@ -55,7 +65,21 @@ export function AttachedFileCard({
           onClick={() => setOpen(true)}
         >
           <span className="pd-pasted-preview">{preview}</span>
-          <span className="pd-pasted-badge">{pasted ? 'PASTED' : name}</span>
+          {/* The badge row carries the state, the way the composer chip's meta
+              row does: the spinner sits beside the name rather than over the
+              preview, so the card does not change size when it clears. */}
+          <span className="pd-pasted-foot">
+            <span className="pd-pasted-badge">{pasted ? 'PASTED' : name}</span>
+            {prefilling ? (
+              <span
+                className="pd-pasted-prefill"
+                data-testid="attach-prefilling"
+                title="Still being read into the model"
+              >
+                <Spinner size={11} />
+              </span>
+            ) : null}
+          </span>
         </button>
       </div>
       {open ? (

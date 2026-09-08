@@ -49,6 +49,16 @@ export function windowIdOfSource(sourceId: string): number | null {
  */
 export function screenCaptureGrant(): 'granted' | 'denied' | 'unknown' {
   if (process.platform !== 'darwin') return 'unknown';
+  /* A grant cannot be arranged in a test — TCC is deliberately unreachable from
+     code — so the only way to exercise the path a GRANTED machine takes is to
+     say so. E2E-only, and it changes the answer to this question alone: what
+     Chromium then does with the request is entirely real, which is the half
+     worth proving (on a denied machine it refuses, and the monitor must fall
+     back to the helper rather than showing nothing). */
+  if (process.env.PI_E2E === '1') {
+    const forced = process.env.PI_MAC_FORCE_CAPTURE_GRANT;
+    if (forced === 'granted' || forced === 'denied' || forced === 'unknown') return forced;
+  }
   try {
     const status = systemPreferences.getMediaAccessStatus('screen');
     if (status === 'granted') return 'granted';

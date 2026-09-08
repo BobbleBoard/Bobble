@@ -252,8 +252,7 @@ function schedule(
     beatMs: i === located.length - 1 ? 0 : o.beatMs,
   }));
 
-  const uncapped =
-    o.settleMs + raw.reduce((n, h) => n + h.deleteMs + h.typeMs + h.beatMs, 0);
+  const uncapped = o.settleMs + raw.reduce((n, h) => n + h.deleteMs + h.typeMs + h.beatMs, 0);
   // Past the total budget every duration shrinks by the same factor, so the
   // motion keeps its shape (a long hunk still reads as the long one) and only
   // gets quicker. A zero stays zero — an empty phase must not become a pause.
@@ -342,7 +341,11 @@ export function planTextTransition(
 }
 
 /** The buffer text with hunks `[0, i)` applied, hunk `i` replaced by `mid`. */
-function compose(plan: EditAnimationPlan, index: number, mid: string): { text: string; head: number } {
+function compose(
+  plan: EditAnimationPlan,
+  index: number,
+  mid: string,
+): { text: string; head: number } {
   let out = '';
   let cursor = 0;
   let head = 0;

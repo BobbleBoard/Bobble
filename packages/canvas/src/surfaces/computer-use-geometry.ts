@@ -68,6 +68,87 @@ export function fitWindow(content: Size, viewport: Size, padding = 0): DrawnWind
 }
 
 /**
+ * The SECOND placement mode: follow the action instead of fitting the window.
+ *
+ * `fitWindow` is right when the tab can hold the window at a readable size. In
+ * the docked rail it cannot — a 900×620pt window in a 440px rail comes out at
+ * 0.45, which is a picture of a window rather than a window, and a real
+ * 1440×900 Safari window comes out at 0.30. Apple's own binary for this is
+ * "fit in the window" vs "actual size with scrolling" (Screen Sharing); this is
+ * the second option with the scrolling done for you.
+ *
+ * So: hold the scale at `minScale` (never upscaling past 1, never going BELOW
+ * what `fitWindow` would give — if the whole window already fits at a better
+ * scale, this returns exactly `fitWindow`'s answer), and slide the window under
+ * the viewport so `focus` — the cursor, or the dialog's centre — stays in view.
+ * The returned rect is the WHOLE window's box, so `x`/`y` are routinely
+ * negative: everything else on this surface maps screen points through
+ * `drawn.x + (p.x - rect.x) * scale`, and that keeps working unchanged whether
+ * the window is letterboxed inside the stage or cropped by it.
+ */
+export function followWindow(
+  content: Rect,
+  viewport: Size,
+  focus: Point,
+  minScale = 0.85,
+  padding = 0,
+): DrawnWindow {
+  const fit = fitWindow(content, viewport, padding);
+  // COVER, not contain: the point of this mode is that the docked rail is full
+  // of the app rather than full of wallpaper, so the target is the smallest
+  // scale that leaves no letterbox — which on a rail taller than the window is
+  // real size, the composition this surface is built on. Clamped by the floor
+  // (a huge window still has to be cropped somewhere) and by 1 (never upscale).
+  const cover = Math.max(
+    viewport.w / Math.max(1, content.w),
+    viewport.h / Math.max(1, content.h),
+  );
+  const scale = Math.min(1, Math.max(minScale, cover));
+  if (scale <= fit.scale) return fit;
+  const w = Math.max(1, content.w) * scale;
+  const h = Math.max(1, content.h) * scale;
+  const axis = (span: number, view: number, at: number): number => {
+    // Smaller than the viewport on this axis → centre it, exactly as fit does.
+    if (span <= view) return (view - span) / 2;
+    // Larger → centre the focus, then clamp so no wallpaper shows through a
+    // gap the window could have covered.
+    return Math.min(0, Math.max(view - span, view / 2 - at * scale));
+  };
+  return {
+    x: axis(w, viewport.w, focus.x - content.x),
+    y: axis(h, viewport.h, focus.y - content.y),
+    w,
+    h,
+    scale,
+  };
+}
+
+/**
+ * The visible slice of the window, in SCREEN POINTS — what the minimap outlines
+ * and what the follow camera's dead zone is measured against.
+ */
+export function visibleRegion(content: Rect, viewport: Size, drawn: DrawnWindow): Rect {
+  const k = drawn.scale <= 0 ? 1 : drawn.scale;
+  const x = content.x + Math.max(0, -drawn.x) / k;
+  const y = content.y + Math.max(0, -drawn.y) / k;
+  const w = Math.min(content.w, viewport.w / k);
+  const h = Math.min(content.h, viewport.h / k);
+  return { x, y, w, h };
+}
+
+/**
+ * Breathing room around a window that has to be scaled down.
+ *
+ * Proportional to the TIGHT axis rather than fixed at 18: in the docked rail
+ * the review measured ~190px of dead wallpaper above the window and ~150 below,
+ * and a fixed pad is a bigger share of a 440px rail than of a 1680px stage.
+ */
+export function stagePadding(viewport: Size): number {
+  const tight = Math.min(viewport.w, viewport.h);
+  return Math.round(Math.min(18, Math.max(4, tight * 0.03)));
+}
+
+/**
  * Map a GLOBAL SCREEN POINT (a phantom-cursor position, an element centre) into
  * canvas CSS pixels, given the window rect that was captured and where it was
  * drawn. Points outside the window map outside the drawn rect — deliberately:
@@ -108,8 +189,14 @@ export function coverCrop(source: Size, viewport: Size): Rect {
  * Tracking the window's scale keeps the cursor reading as part of the picture,
  * and the floor keeps it legible. Clamped, never inverted: the annotation never
  * grows past life size.
+ *
+ * The floor was 0.78, which at the docked scale of 0.45 drew the annotation at
+ * 1.7× the window's own scale — a bubble spanning 28% of the window, over the
+ * dialog's Cancel button. The floor was solving the wrong problem: the fix for
+ * a too-small window is a bigger window ({@link followWindow}), not an
+ * oversized annotation, so it is now 0.62 and the picture carries the rest.
  */
-export function annotationScale(windowScale: number, floor = 0.78): number {
+export function annotationScale(windowScale: number, floor = 0.62): number {
   if (!Number.isFinite(windowScale) || windowScale <= 0) return floor;
   return Math.min(1, Math.max(floor, windowScale));
 }

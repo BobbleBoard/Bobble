@@ -9,7 +9,8 @@
  *
  * Lazy on purpose — nothing here is in the normal bundle.
  */
-import { lazy, Suspense, useState } from 'react';
+import { useState } from 'react';
+import { lazyRoute } from '../RouteBoundary';
 
 export interface CandidateEntry {
   /** URL-stable id, used by `&v=`. */
@@ -21,12 +22,14 @@ export interface CandidateEntry {
   readonly render: () => React.ReactNode;
 }
 
-const ScheduleCandidates = lazy(() =>
-  import('./schedule/index').then((m) => ({ default: m.CandidateGallery })),
-);
-const ConnectorCandidates = lazy(() =>
-  import('./connectors/index').then((m) => ({ default: m.CandidateGallery })),
-);
+/* Their own boundary, like every other lazy route — a candidate gallery that
+ * will not fetch is a dev route failing, not the app. See RouteBoundary.tsx. */
+const ScheduleCandidates = lazyRoute('Schedule candidates', () => import('./schedule/index'), {
+  pick: (m) => m.CandidateGallery,
+});
+const ConnectorCandidates = lazyRoute('Connector candidates', () => import('./connectors/index'), {
+  pick: (m) => m.CandidateGallery,
+});
 
 export const CANDIDATES_PARAM = 'candidates';
 
@@ -80,13 +83,9 @@ export function CandidateShell({
 
 export function CandidatesRoute({ set }: { set: 'schedule' | 'connectors' }) {
   const initial = new URLSearchParams(window.location.search).get('v') ?? undefined;
-  return (
-    <Suspense fallback={null}>
-      {set === 'schedule' ? (
-        <ScheduleCandidates initial={initial} />
-      ) : (
-        <ConnectorCandidates initial={initial} />
-      )}
-    </Suspense>
+  return set === 'schedule' ? (
+    <ScheduleCandidates initial={initial} />
+  ) : (
+    <ConnectorCandidates initial={initial} />
   );
 }

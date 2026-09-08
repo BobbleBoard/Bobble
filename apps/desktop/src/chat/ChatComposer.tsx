@@ -1456,6 +1456,11 @@ export function ChatComposer({
                     key={a.id}
                     name={a.name}
                     text={a.text ?? ''}
+                    /* A large paste is the case that takes SECONDS to prime, and
+                       it was the one chip with nowhere to say so — pasted
+                       content renders as this card, which had no prefill state
+                       at all while the boxes beside it did. */
+                    prefilling={prefillingIds.includes(a.id)}
                     onRemove={() => removeAttachments([a.id])}
                   />
                 ) : (

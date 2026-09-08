@@ -149,6 +149,25 @@ export function useRunningChats(): readonly RunningChat[] {
 }
 
 /**
+ * Is the conversation ON SCREEN still reading its prompt?
+ *
+ * The one question two surfaces now ask — the thread's processing ring and the
+ * spinner on a just-sent message's attachment chips (chat/sent-prefill.ts) — and
+ * it is answered from the row {@link buildActiveRunningChat} already builds
+ * rather than by re-deriving the phase a second time. A background run is
+ * deliberately not it: those rows are not `isActive`, and their prompt is not
+ * the one the viewer is waiting on.
+ */
+export function activeTurnPrefilling(running: readonly RunningChat[]): boolean {
+  return running.some((chat) => chat.isActive && chat.status === 'prefilling');
+}
+
+/** Live {@link activeTurnPrefilling} for the viewed conversation. */
+export function useTurnPrefilling(): boolean {
+  return activeTurnPrefilling(useRunningChats());
+}
+
+/**
  * Open/close state for the "Why isn't my message sending?" modal. A tiny separate
  * store because the trigger (a queued row in ChatThread) and the modal (mounted in
  * ChatApp) are far apart in the tree — passing a prop down would thread through

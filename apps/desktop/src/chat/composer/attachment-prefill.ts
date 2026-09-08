@@ -34,11 +34,11 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLlmStore } from '../../state/llm-store';
 import { usePiStore } from '../../state/pi-slice';
 import { prefillSeconds, recordPrefillRate } from '../prefill-speed';
-import { prefillDecision } from './prefill-gate';
+import { PREFILL_MIN_CHARS, prefillDecision } from './prefill-gate';
 
-/** Below this many chars an attachment isn't worth priming — its send already
- * prefills near-instantly against the warm [system][tools]. */
-export const PREFILL_MIN_CHARS = 400;
+/* Re-exported from its owner (the pure gate) so the existing import sites do
+ * not have to care where the number lives. */
+export { PREFILL_MIN_CHARS };
 
 /**
  * A SMALL RING OF WHAT THIS HOOK ACTUALLY DID, on `window.__prefill_log`.

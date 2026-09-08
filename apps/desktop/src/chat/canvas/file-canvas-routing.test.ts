@@ -81,8 +81,51 @@ describe('detectFileWrites', () => {
     expect(ev?.path).toBe('/x/b.ts');
     expect(ev?.running).toBe(false);
     expect(ev?.contentHint).toBeUndefined();
-    // The hunk drives the LIVE DIFF in the canvas (deletions + additions).
+    // The hunk drives the canvas EDIT MOTION: the old text forward-deletes out
+    // of the file and the new text types in where it stood.
     expect(ev?.edit).toEqual({ oldText: 'a', newText: 'b' });
+    expect(ev?.hunks).toEqual([{ oldText: 'a', newText: 'b' }]);
+  });
+
+  it('detects EVERY hunk of a multi-edit call, in the order the tool listed them', () => {
+    const msgs = [
+      assistant('a1', [
+        call('c1', 'edit', {
+          path: '/x/b.ts',
+          edits: [
+            { old_string: 'one', new_string: '1' },
+            { old_string: 'two', new_string: '2' },
+            { old_string: 'three', new_string: '3' },
+          ],
+        }),
+      ]),
+    ];
+    const [ev] = detectFileWrites(msgs, '/proj');
+    expect(ev?.hunks).toEqual([
+      { oldText: 'one', newText: '1' },
+      { oldText: 'two', newText: '2' },
+      { oldText: 'three', newText: '3' },
+    ]);
+    // `edit` stays the FIRST hunk, so the fallback diff still has something.
+    expect(ev?.edit).toEqual({ oldText: 'one', newText: '1' });
+  });
+
+  it('leaves `hunks` unset while the arguments are still arriving', () => {
+    // The motion cannot be planned from a half-arrived `old_string` — it would
+    // delete the wrong text. `hunks` appearing IS the "arguments are complete"
+    // signal the canvas waits on.
+    const streaming = assistant('a1', [
+      {
+        type: 'toolCall',
+        id: 'c1',
+        name: 'str_replace',
+        arguments: {},
+        argsText: '{"path":"b.ts","old_string":"foo","new_string":"ba',
+      } as ContentBlock,
+    ]);
+    const [ev] = detectFileWrites([streaming], '/proj');
+    expect(ev?.edit).toEqual({ oldText: 'foo', newText: 'ba' });
+    expect(ev?.hunks).toBeUndefined();
   });
 
   it('reads a STREAMING str_replace hunk from argsText (path closed, new_string partial)', () => {

@@ -25,19 +25,27 @@
 import type {
   CanvasController,
   MacMonitorAxScene,
+  MacMonitorCapabilities,
   MacMonitorDecodedFrame,
   MacMonitorFeed,
   MacMonitorSessionState,
+  MacMonitorViewMode,
 } from '@pi-desktop/canvas';
 import { IDLE_MAC_MONITOR_SESSION } from '@pi-desktop/canvas';
 import { useEffect, useRef } from 'react';
 import { useCanvasStore } from '../../state/canvas-store';
+import { abortPi, pausePi } from '../../state/pi-connect';
 
 /** Stable upsert key for the monitor tab — one tab, reused across sessions. */
 export const MAC_MONITOR_TAB_KEY = 'mac-monitor';
 
 /** How many frame arrivals the fps readout averages over. */
 const FPS_WINDOW = 12;
+
+/** Where the stage placement is remembered. There is exactly one monitor tab,
+ * so one setting — and it has to outlive a tab close, because the tab reopens
+ * by itself on the next session. */
+const VIEW_MODE_KEY = 'pd.macmon.view';
 
 interface RawFrame {
   seq: number;
@@ -71,6 +79,18 @@ class MacMonitorFeedImpl implements MacMonitorFeed {
   /** Are we currently asking main for frames? */
   #framesWanted = false;
   #wired = false;
+  /**
+   * The user took the app back.
+   *
+   * Operator's takeover mode carries the load-bearing promise that the agent
+   * "does not collect or screenshot information entered by the user", and for a
+   * panel streaming a real window that is a must-have AND a must-state: the
+   * very next thing a user does in an app the agent just opened is often typing
+   * a password into it. So this does not merely hide the picture — it STOPS THE
+   * CAPTURE CHILD and refuses to restart it until the user hands back.
+   */
+  #takenOver = false;
+  #viewMode: MacMonitorViewMode = readViewMode();
 
   // ── the wire ─────────────────────────────────────────────────────────────
 
@@ -119,6 +139,9 @@ class MacMonitorFeedImpl implements MacMonitorFeed {
     bubbleVisible: boolean;
     captureDenied?: boolean;
   }): void {
+    // A brand-new session is a new story: the user's take-over ended with the
+    // run it interrupted.
+    if (state.active && !this.#session.active) this.#takenOver = false;
     this.#session = {
       active: state.active,
       appName: state.appName,
@@ -256,6 +279,62 @@ class MacMonitorFeedImpl implements MacMonitorFeed {
     return this.#wallpaper;
   }
 
+  // ── the actions row ──────────────────────────────────────────────────────
+
+  getCapabilities(): MacMonitorCapabilities {
+    // Stop and Pause are the composer's own two calls, so the brake in this tab
+    // and the brake under the chat are the same brake. Take over is honest
+    // about what it can do from here: it stands the agent down and stops the
+    // capture. Bringing the app itself to the front needs main's `activate`,
+    // which is one call away in mac-agent's dispatch and not wired yet.
+    return { stop: true, pause: true, takeOver: true };
+  }
+
+  stop(): void {
+    void abortPi();
+  }
+
+  pause(): void {
+    void pausePi();
+  }
+
+  takeOver(): void {
+    if (this.#takenOver) return;
+    this.#takenOver = true;
+    void abortPi();
+    this.#dropFrame();
+    this.#ax = null;
+    // Not `setActive(false)`: that is the surface's own visibility signal and
+    // the surface is still mounted. This unsubscribes for real, which is what
+    // makes main stop the `pi-mac --stream` child.
+    void this.#send(false);
+    this.#notify();
+  }
+
+  handBack(): void {
+    if (!this.#takenOver) return;
+    this.#takenOver = false;
+    void this.#send(this.#framesWanted);
+    this.#notify();
+  }
+
+  isTakenOver(): boolean {
+    return this.#takenOver;
+  }
+
+  getViewMode(): MacMonitorViewMode {
+    return this.#viewMode;
+  }
+
+  setViewMode(mode: MacMonitorViewMode): void {
+    this.#viewMode = mode;
+    try {
+      window.localStorage?.setItem(VIEW_MODE_KEY, mode);
+    } catch {
+      /* private mode / storage disabled — the choice just does not persist */
+    }
+  }
+
   getFps(): number {
     if (this.#arrivals.length < 3) return 0;
     const first = this.#arrivals[0] as number;
@@ -277,6 +356,9 @@ class MacMonitorFeedImpl implements MacMonitorFeed {
   setActive(active: boolean): void {
     if (active === this.#framesWanted) return;
     this.#framesWanted = active;
+    // While the user is driving, nothing starts a capture — not a tab switch,
+    // not the window becoming visible again.
+    if (this.#takenOver) return;
     if (!active) {
       this.#arrivals = [];
       this.#pending = null;
@@ -298,6 +380,16 @@ class MacMonitorFeedImpl implements MacMonitorFeed {
   }
 }
 
+/** The remembered stage placement, or `auto` on a first run. */
+function readViewMode(): MacMonitorViewMode {
+  try {
+    const raw = window.localStorage?.getItem(VIEW_MODE_KEY);
+    return raw === 'fit' || raw === 'follow' || raw === 'auto' ? raw : 'auto';
+  } catch {
+    return 'auto';
+  }
+}
+
 /** The app-wide feed (one controlled app at a time, like the helper itself). */
 export const macMonitorFeed = new MacMonitorFeedImpl();
 
@@ -309,7 +401,15 @@ export function macMonitorTabAction(
   session: { active: boolean; appName: string },
   existing: { id: string; title: string } | undefined,
 ): { kind: 'open'; title: string } | { kind: 'retitle'; id: string; title: string } | null {
-  if (!session.active) return null;
+  // A session that ended leaves a tab titled "TextEdit" over a panel saying
+  // nothing is being controlled — the tab and its contents disagreeing about
+  // what the tab is. Retitle rather than close: a tab that vanishes out from
+  // under someone who was watching it is worse than one that says nothing is
+  // being controlled.
+  if (!session.active) {
+    if (existing === undefined || existing.title === 'Computer use') return null;
+    return { kind: 'retitle', id: existing.id, title: 'Computer use' };
+  }
   const title = session.appName.trim() === '' ? 'Computer use' : session.appName.trim();
   if (existing === undefined) return { kind: 'open', title };
   if (existing.title !== title) return { kind: 'retitle', id: existing.id, title };

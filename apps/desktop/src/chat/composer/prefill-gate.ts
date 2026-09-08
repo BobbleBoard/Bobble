@@ -19,6 +19,17 @@
  * exactly as the turn will render it. Both halves of the prefix, or neither.
  */
 
+/**
+ * Below this many characters an attachment is not worth priming on its own —
+ * its send already prefills near-instantly against the warm [system][tools].
+ *
+ * It lives HERE, in the pure gate, because three surfaces now read it and they
+ * must not disagree: the prefill hook (what to prime), the composer chips
+ * (which show a spinner instead of a token count) and the chips on a message
+ * that has already been sent (sent-prefill.ts).
+ */
+export const PREFILL_MIN_CHARS = 400;
+
 export interface PrefillInputs {
   /** The harness's canonical system prompt, as published. */
   readonly system: unknown;

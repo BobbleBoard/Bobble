@@ -319,6 +319,13 @@ export type MacMonitorEventMap = {
    * mid-session simply starts producing frames again.
    */
   'mac:monitor:ax': MacMonitorAxScene;
+  /**
+   * Main → renderer: the user asked to SEE this, from outside the app — they
+   * clicked the phantom's own bubble while it floated over the app being
+   * driven. Main has already brought the window forward; the tab is the
+   * renderer's half.
+   */
+  'mac:monitor:reveal': { pid: number | null };
 };
 
 /** The idle state, shared by main and the renderer feed so "nothing yet" looks

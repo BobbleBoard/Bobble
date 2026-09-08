@@ -30,6 +30,7 @@ import { useCanvasStore } from '../../state/canvas-store';
 import { useChildAgentStore } from '../../state/child-agent-store';
 import { useCorpStore } from '../../state/corp-store';
 import { usePiStore } from '../../state/pi-slice';
+import { useActivityCanvasRouting } from './activity-routing';
 import { artifactToPayload } from './artifacts';
 import { useBrowserAgent } from './browser-agent';
 import { useCanvasStateReporter } from './canvas-state-report';
@@ -38,13 +39,12 @@ import {
   selectCorpNodeAndFocus,
   useCorpCanvasRouting,
 } from './corp-canvas-routing';
-import { openProjectFileTree, useFileTabRefresh, useFileWriteCanvasRouting } from './file-tabs';
+import { openProjectFileTree, useFileTabRefresh } from './file-tabs';
 import { useMacMonitor } from './mac-monitor';
 import { useNativeSurfaces } from './native-surfaces';
 import { createCanvasDragResize } from './resize-collapse';
 import { useSubagentCanvasRouting } from './subagent-routing';
 import { useArtifactCanvasRouting } from './tabs-routing';
-import { useBashTerminalCanvasRouting } from './terminal-routing';
 
 /** E2E: probes open browser/terminal tabs through the shared controller. Gated
  * on the same `?piE2E=1` opt-in as `window.__pi_store` (see pi-connect.ts). */
@@ -157,16 +157,25 @@ export function CanvasTabsPanel({ suppressed = false }: { suppressed?: boolean }
   // extension status stream (spawn_subagent progress).
   useSubagentCanvasRouting(controller);
 
-  // Keep the canvas in sync with the streamed-artifact detector (THEME 2), the
-  // file-write → live file tab router, and the interactive-bash → terminal
-  // router (round-7). These run even while the panel renders null (no tabs yet),
-  // since it's their job to open the FIRST tab.
+  // Keep the canvas in sync with the streamed-artifact detector (THEME 2). This
+  // runs even while the panel renders null (no tabs yet), since it's its job to
+  // open the FIRST tab.
   useArtifactCanvasRouting();
-  useFileWriteCanvasRouting();
+  /*
+   * ONE "Activity" TAB, not a tab per action (queue item 3). the user: "can't have
+   * tab spam when the model does a lot of actions, so it needs one tab,
+   * 'Activity' that opens and shows what the model is doing at any given
+   * moment." It replaces the two routers that used to sit here — a file tab per
+   * path (`useFileWriteCanvasRouting`) and a mirror terminal per interactive
+   * command (`useBashTerminalCanvasRouting`) — with a single tab that morphs.
+   * Both of those are still exported and still tested; nothing in the ordinary
+   * chat mounts them any more.
+   */
+  useActivityCanvasRouting(controller);
   // Recover a focused file tab that raced its write and rendered blank (round-
   // blindtest #10) — re-reads from disk when an EMPTY file tab gains focus.
+  // Still wanted: the file tree opens files in their own tabs on a user click.
   useFileTabRefresh();
-  useBashTerminalCanvasRouting();
   // Corp (multi-agent) mirror of the two chat routers above: a running task's bash
   // steps → live terminal tabs, its file writes → live file tabs (+N), and a
   // delegation → the situation room. Inert unless a corp task is active.

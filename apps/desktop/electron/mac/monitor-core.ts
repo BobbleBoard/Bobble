@@ -238,6 +238,17 @@ export class MacMonitorCore {
     this.reconcile();
   }
 
+  /** Dev mock only: fall back to the helper path, whatever the app's grant
+   * says — the mock IS a stubbed helper, and the preferred path would never
+   * spawn it on a machine where the grant is present. */
+  disableElectronCapture(): void {
+    this.#opts.sourceReader = undefined;
+    this.#sources = [];
+    this.#sourcesKey = '';
+    if (this.#source === 'electron') this.#source = 'none';
+    this.reconcile();
+  }
+
   /** Install the preferred (Electron) capture path. */
   setCaptureSourceReader(grant: CaptureGrantReader, sources: CaptureSourceReader): void {
     this.#opts.captureGrant = grant;
@@ -287,8 +298,10 @@ export class MacMonitorCore {
       this.#thinkingSince = null;
     }
     // The overlay dropping its target IS the session ending — the two must not
-    // be able to disagree about whether an app is being driven.
-    if (!state.engaged && this.#session !== null) this.clearSession();
+    // be able to disagree about whether an app is being driven. EXCEPT when the
+    // user is the one who put the phantom away: "stopped" has to keep saying
+    // WHICH app was stopped, or the brake reads as the run having finished.
+    if (!state.engaged && this.#session !== null && this.#control === 'agent') this.clearSession();
     else this.broadcastState();
   }
 
@@ -375,6 +388,12 @@ export class MacMonitorCore {
     this.#source = 'none';
     this.#lastPictureAt = 0;
     this.#thinkingSince = null;
+    // The brake is scoped to the run it stopped. Latching it past the end of
+    // the session would leave an invisible refusal waiting for a run somebody
+    // starts hours later, with nothing on screen to explain it — and by this
+    // point the stop has already done its whole job: the agent has stood down,
+    // the phantom is gone and nothing is being captured.
+    this.#control = 'agent';
     this.reconcile();
     this.broadcastState();
   }

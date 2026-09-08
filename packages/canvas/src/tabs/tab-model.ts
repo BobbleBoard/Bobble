@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import type { Artifact } from '../model.ts';
 import type { NodeTiming } from '../situation/situation-model.ts';
 import type { MacMonitorFeed } from '../surfaces/computer-use-feed.ts';
+import type { EditAnimationSpec } from '../surfaces/use-edit-animation.ts';
 
 /**
  * The kinds a canvas tab can host. Each maps to a surface component (browser |
@@ -164,12 +165,22 @@ export interface CanvasTab {
   addedLines?: number;
   removedLines?: number;
   /**
-   * A LIVE EDIT DIFF for a file tab: when set, the file surface renders this
-   * diff (deletions + additions) instead of the file's content, and follows it
-   * as the edit's args stream — the str_replace twin of a streamed whole-file
-   * write. Cleared on completion, when the tab settles to the on-disk file.
+   * FALLBACK for an edit that cannot be animated: the hunk drawn as a diff.
+   *
+   * An edit normally arrives as {@link editAnim} and plays INTO the file. This
+   * is what is left when there is nowhere to play it — the file could not be
+   * read, or the tool's `old_string` does not occur in it. Cleared on
+   * completion, when the tab settles to the on-disk file.
    */
   diff?: DiffFileData[];
+  /**
+   * A LIVE EDIT, as a motion rather than a diff: the replaced text
+   * forward-deletes out of the file and the replacement types in behind it.
+   * Set when the edit's arguments have finished arriving and the file's prior
+   * text is known; carries its own start clock so a tab switched away from
+   * mid-edit settles instead of replaying. Takes precedence over {@link diff}.
+   */
+  editAnim?: EditAnimationSpec;
 
   // browser surface state (app-updated via controller.updateTab)
   url?: string;

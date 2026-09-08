@@ -42,7 +42,16 @@ const PANEL = '[data-testid="canvas-tabs-panel"]';
 const app = await electron.launch({
   executablePath: electronBinary,
   args: [appRoot, `--user-data-dir=${userDataDir}`],
-  env: { ...process.env, HOME: PROBE_HOME, PI_BIN: mockPi, MOCK_PI_FIXTURE: fixture, PI_E2E: '1' },
+  env: {
+    ...process.env,
+    HOME: PROBE_HOME,
+    PI_BIN: mockPi,
+    MOCK_PI_FIXTURE: fixture,
+    PI_E2E: '1',
+    // Invisible by DEFAULT (the user's standing rule) — this probe predates
+    // harness.mjs and was still putting a window on his screen.
+    PI_E2E_BACKGROUND: '1',
+  },
 });
 
 try {
@@ -82,14 +91,18 @@ try {
     });
   });
 
-  // The mirror terminal tab (keyed by the call id) auto-opens.
+  // The mirror terminal auto-opens — in the ONE "Activity" tab (round 21 item 3;
+  // it used to be a tab per call, keyed `term:<callId>`, which is the tab spam
+  // that replaced).
   await page.waitForSelector(`${PANEL} .pd-terminal .xterm-rows`, { timeout: 10000 });
   await page.waitForFunction(
     () =>
       window
         .__pi_canvas()
         .getState()
-        .tabs.some((t) => t.key === 'term:call_mirror' && t.data?.mirror === true),
+        .tabs.some(
+          (t) => t.key === 'pi:activity' && t.kind === 'terminal' && t.data?.mirror === true,
+        ),
     undefined,
     { timeout: 8000 },
   );
@@ -107,7 +120,7 @@ try {
   );
 
   console.log(
-    'round9-terminal-mirror-probe OK — an interactive bash tool call opened a live mirror terminal tab whose xterm rendered the command ($ npm run dev) and its output (VITE ready)',
+    'round9-terminal-mirror-probe OK — a bash tool call turned the one Activity tab into a live mirror terminal whose xterm rendered the command ($ npm run dev) and its output (VITE ready)',
   );
 } finally {
   await app.close();

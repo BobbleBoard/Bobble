@@ -168,6 +168,25 @@ export { ComputerUseSurface } from './surfaces/computer-use-surface.tsx';
 // Content-slot / rect contract (native WebContentsView / PTY mounting)
 export type { ContentSlotOptions } from './surfaces/content-slot.ts';
 export { useContentSlot } from './surfaces/content-slot.ts';
+export type {
+  AnimatedHunk,
+  EditAnimationOptions,
+  EditAnimationPlan,
+  EditFrame,
+  EditHunkInput,
+  EditPhase,
+} from './surfaces/edit-animation.ts';
+export {
+  applyHunks,
+  EDIT_ANIMATION_DEFAULTS,
+  firstEditOffset,
+  frameAt,
+  locateHunks,
+  MAX_ANIMATABLE_CHARS,
+  minimalReplacement,
+  planEditAnimation,
+  planTextTransition,
+} from './surfaces/edit-animation.ts';
 export type { FileSurfaceProps } from './surfaces/file-surface.tsx';
 export { defaultFileViewMode, FileSurface } from './surfaces/file-surface.tsx';
 export type { FrameGate, HtmlSurfaceProps } from './surfaces/html-surface.tsx';
@@ -192,6 +211,12 @@ export { SubagentSurface } from './surfaces/subagent-surface.tsx';
 export { SvgSurface } from './surfaces/svg-surface.tsx';
 export type { TerminalSurfaceProps } from './surfaces/terminal-surface.tsx';
 export { TerminalSurface } from './surfaces/terminal-surface.tsx';
+export type {
+  EditAnimationSpec,
+  EditAnimationState,
+  OffscreenProbe,
+} from './surfaces/use-edit-animation.ts';
+export { useEditAnimation } from './surfaces/use-edit-animation.ts';
 // Canvas-local chrome icons (pdf/subagent/expand/minimize/panel-toggle/download/nav)
 export {
   IconAppGeneric,

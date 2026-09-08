@@ -1,6 +1,6 @@
 import { CanvasProvider, createCanvasController } from '@pi-desktop/canvas';
 import { Spinner, ToastProvider, TooltipProvider } from '@pi-desktop/ui';
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { AppInfo } from '../electron/ipc-contract';
 import { CandidatesRoute, candidateSet } from './candidates/CandidatesRoute';
 import { ChatApp } from './chat/ChatApp';
@@ -12,6 +12,7 @@ import { GalleryView } from './gallery/GalleryView';
 import { ModelsView } from './models/ModelsView';
 import { FirstRunTips, resetFirstRunTips } from './onboarding/FirstRunTips';
 import { OnboardingWizard } from './onboarding/OnboardingWizard';
+import { lazyRoute } from './RouteBoundary';
 import { ScheduledView } from './scheduled/ScheduledView';
 import { startTaskRunner } from './scheduled/tasks-store';
 import { type SettingsSection, SettingsView } from './settings/SettingsView';
@@ -41,22 +42,33 @@ const IS_SITUATION_DEMO = new URLSearchParams(window.location.search).has('situa
  * override PI_DESKTOP_TRIPO=1). Lazy so the workspace stays out of the main
  * bundle for every normal launch. */
 const IS_TRIPO = new URLSearchParams(window.location.search).has('tripo');
-const TripoWorkspace = lazy(() =>
-  import('./tripo/TripoWorkspace').then((m) => ({ default: m.TripoWorkspace })),
-);
-const TripoTopBarControls = lazy(() =>
-  import('./tripo/TopBar').then((m) => ({ default: m.TripoTopBarControls })),
-);
+/*
+ * `lazyRoute`, NOT bare `lazy` — every one of these is a separate file fetched
+ * on first use, and a fetch that fails (a rebuild changed the hash under a
+ * running window) threw straight through to the app-wide boundary and replaced
+ * the whole app with the crash card. Each now carries its own boundary: the
+ * failure stays inside the route's frame and offers to fetch the file again.
+ * See RouteBoundary.tsx.
+ */
+const TripoWorkspace = lazyRoute('3D workspace', () => import('./tripo/TripoWorkspace'), {
+  pick: (m) => m.TripoWorkspace,
+});
+const TripoTopBarControls = lazyRoute('3D controls', () => import('./tripo/TopBar'), {
+  pick: (m) => m.TripoTopBarControls,
+  // A pair of buttons in a title strip: a full card there would be a worse
+  // failure than the one it reports.
+  variant: 'inline',
+});
 /** The ComfyUI-backed image/video Studio. Lazy for the same reason. */
-const ImageStudio = lazy(() =>
-  import('./studio/ImageStudio').then((m) => ({ default: m.ImageStudio })),
-);
-const VideoStudio = lazy(() =>
-  import('./studio/VideoStudio').then((m) => ({ default: m.VideoStudio })),
-);
-const AudioStudio = lazy(() =>
-  import('./studio/AudioStudio').then((m) => ({ default: m.AudioStudio })),
-);
+const ImageStudio = lazyRoute('Image studio', () => import('./studio/ImageStudio'), {
+  pick: (m) => m.ImageStudio,
+});
+const VideoStudio = lazyRoute('Video studio', () => import('./studio/VideoStudio'), {
+  pick: (m) => m.VideoStudio,
+});
+const AudioStudio = lazyRoute('Audio studio', () => import('./studio/AudioStudio'), {
+  pick: (m) => m.AudioStudio,
+});
 
 /**
  * Hidden probe hooks: keep the boot-event / theme / app-info testids the
@@ -219,20 +231,18 @@ export function App() {
   if (IS_TRIPO) {
     return (
       <TooltipProvider delayDuration={200}>
-        <Suspense fallback={null}>
-          {/*
-            The dev route has no app top bar to host Send To and Export, so it
-            gets a slim strip of its own. Without it this window could open a
-            model and never get one out — the modality route hands those two
-            buttons to the app's own cluster instead.
-          */}
-          <div className="tp-standalone">
-            <header className="tp-standalone-bar" data-testid="tp-topbar">
-              <TripoTopBarControls />
-            </header>
-            <TripoWorkspace />
-          </div>
-        </Suspense>
+        {/*
+          The dev route has no app top bar to host Send To and Export, so it
+          gets a slim strip of its own. Without it this window could open a
+          model and never get one out — the modality route hands those two
+          buttons to the app's own cluster instead.
+        */}
+        <div className="tp-standalone">
+          <header className="tp-standalone-bar" data-testid="tp-topbar">
+            <TripoTopBarControls />
+          </header>
+          <TripoWorkspace />
+        </div>
       </TooltipProvider>
     );
   }
@@ -352,21 +362,13 @@ export function App() {
                    * why that changed.
                    */
                   modalityView === '3d' ? (
-                    <Suspense fallback={null}>
-                      <TripoWorkspace />
-                    </Suspense>
+                    <TripoWorkspace />
                   ) : modalityView === 'image' ? (
-                    <Suspense fallback={null}>
-                      <ImageStudio />
-                    </Suspense>
+                    <ImageStudio />
                   ) : modalityView === 'video' ? (
-                    <Suspense fallback={null}>
-                      <VideoStudio />
-                    </Suspense>
+                    <VideoStudio />
                   ) : modalityView === 'audio' ? (
-                    <Suspense fallback={null}>
-                      <AudioStudio />
-                    </Suspense>
+                    <AudioStudio />
                   ) : view === 'models' ? (
                     <ModelsView />
                   ) : view === 'scheduled' ? (

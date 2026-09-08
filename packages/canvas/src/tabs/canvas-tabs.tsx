@@ -696,7 +696,10 @@ function DefaultSurface({
     case 'terminal':
       return (
         <TerminalSurface
-          title={tab.title}
+          // The SUBTITLE when there is one: a tab whose name deliberately never
+          // changes ("Activity") would otherwise print that same word again
+          // directly under itself, where the command could have been.
+          title={tab.subtitle ?? tab.title}
           onMount={(el) => handlers?.onSurfaceMount?.(id, 'terminal', el)}
           onRectChange={(rect) => handlers?.onSurfaceRectChange?.(id, 'terminal', rect)}
         />
@@ -805,8 +808,10 @@ function DefaultSurface({
           // Live +N/−N badge while a corp worker writes the file (unset otherwise).
           addedLines={tab.addedLines}
           removedLines={tab.removedLines}
-          // Live edit-diff (a str_replace in flight) — the surface renders this
-          // instead of the file content and follows the hunk as it streams.
+          // A live EDIT: the file itself, with the replaced text forward-
+          // deleting and the replacement typing in after it. `diff` is only the
+          // fallback for an edit with nowhere to play (see FileSurfaceProps).
+          editAnim={tab.editAnim}
           diff={tab.diff}
         />
       );

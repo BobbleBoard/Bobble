@@ -359,26 +359,35 @@ const MENU_CURRENT: Record<string, string> = {
   codex: '#4a9eff',
 };
 
+/*
+ * NO PURPLE, INCLUDING IN CODE. the user's rule is a rule about the whole product,
+ * and the syntax palette was quietly the largest purple surface in it: keywords
+ * and properties are on almost every line of every file the canvas shows, so a
+ * violet keyword painted more pixels than any component. Keywords are rose now
+ * — a hue the app's own mark already uses — and properties a desaturated blue
+ * that stays clear of the saturated blue functions keep. `theme-no-purple.test`
+ * enforces it so it cannot drift back.
+ */
 const SYNTAX: Record<'light' | 'dark', Record<string, string>> = {
   light: {
-    keyword: '#8b2fa8',
+    keyword: '#a3236b',
     string: '#0a6b3d',
     number: '#9a4600',
     comment: '#5c6370',
     function: '#1a52c4',
     type: '#0f6f7a',
-    property: '#7a3ba8',
+    property: '#4a6fa5',
     punctuation: '#4a5160',
     invalid: '#c0392b',
   },
   dark: {
-    keyword: '#d69bff',
+    keyword: '#ff9ac8',
     string: '#7ee2a8',
     number: '#ffb27a',
     comment: '#8b94a6',
     function: '#82b8ff',
     type: '#6fe0e0',
-    property: '#e0a6ff',
+    property: '#9fbcd8',
     punctuation: '#b8c0d0',
     invalid: '#ff8a80',
   },

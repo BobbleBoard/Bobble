@@ -114,11 +114,28 @@ try {
     );
   }
 
-  // Now back to the docked rail (max 760px), where the window MUST scale down.
+  // Now back to the docked rail, which has TWO placements and needs both
+  // checked. `Fit window` is the original rule — the whole window, scaled down,
+  // never upscaled — and `Follow` is the second mode: crop around the action so
+  // the everyday view is not a 45% demo of the fullscreen one.
   await page.evaluate(() => window.__pi_canvas?.().setFullscreen(false));
   await sleep(800);
+  // The scale the surface says it is drawing at; an empty slot means real size.
+  const scaleReadout = async () => {
+    const text = await page.evaluate(
+      () => document.querySelector('.pd-macmon-scale')?.textContent ?? '',
+    );
+    return text === '' ? 100 : Number.parseInt(text, 10);
+  };
+  const press = async (testid) => {
+    await page.evaluate((id) => {
+      document.querySelector(`[data-testid="${id}"]`)?.click();
+    }, testid);
+    await sleep(700);
+  };
+
+  await press('macmon-fit');
   const small = await measure();
-  const narrow = await shot('02-scaled-down');
   if (small?.found === true && big?.found === true) {
     check(
       small.w < big.w - 40,
@@ -129,8 +146,60 @@ try {
       'aspect ratio changed when the window was scaled down',
     );
     check(Math.abs(small.cx - small.cssW / 2) <= 6, 'scaled-down window is not centred in the tab');
-    console.log(`scaled down: ${small.w.toFixed(1)}×${small.h.toFixed(1)}pt`);
+    console.log(`fit: ${small.w.toFixed(1)}×${small.h.toFixed(1)}pt`);
   }
+  const fitShot = await shot('02b-docked-fit');
+
+  // Follow: the same rail, the same window, drawn big enough to read. The
+  // window is now WIDER than the rail, so what is measurable is the crop — it
+  // must fill the rail rather than float in it.
+  await press('macmon-follow');
+  const followed = await measure();
+  const narrow = await shot('02-scaled-down');
+  if (followed?.found === true && small?.found === true) {
+    check(
+      followed.w >= followed.cssW * 0.9,
+      `the followed crop does not fill the rail (${followed.w.toFixed(1)} of ${followed.cssW.toFixed(0)})`,
+    );
+    console.log(`follow: ${followed.w.toFixed(1)}×${followed.h.toFixed(1)}pt crop`);
+  }
+  // Both modes fill the rail's WIDTH, so what separates them is the scale — and
+  // the scale is the thing the surface now says out loud (A6).
+  const followScale = await scaleReadout();
+  await press('macmon-fit');
+  const fitScale = await scaleReadout();
+  check(
+    fitScale > 0 && fitScale < 60,
+    `fit mode should be well under half size in the rail, read ${fitScale}%`,
+  );
+  check(followScale >= 85, `following should hold at least 85% of real size, read ${followScale}%`);
+  console.log(`scale readout: fit ${fitScale}% · follow ${followScale}%`);
+  await press('macmon-fit'); // back to auto
+
+  // ── 3b. the surface is not inert ───────────────────────────────────────
+  const controls = await page.evaluate(() => {
+    const root = document.querySelector('[data-testid="computer-use-surface"]');
+    if (root === null) return null;
+    const focusable = root.querySelectorAll('button, [tabindex]:not([tabindex="-1"])');
+    return {
+      focusableCount: focusable.length,
+      names: [...focusable].map((b) => (b.textContent ?? '').trim()).filter((t) => t !== ''),
+      liveRegions: root.querySelectorAll('[aria-live]').length,
+      canvasLabel: root.querySelector('canvas')?.getAttribute('aria-label') ?? '',
+      stageOnly: root.querySelector('.pd-macmon-stage button') === null,
+    };
+  });
+  check(
+    (controls?.focusableCount ?? 0) >= 5,
+    `only ${controls?.focusableCount} focusable controls`,
+  );
+  check((controls?.liveRegions ?? 0) >= 1, 'nothing announces state changes to assistive tech');
+  check(
+    controls?.canvasLabel !== 'Controlled app, live view',
+    'the canvas label is still the static string',
+  );
+  console.log(`controls: ${controls?.names.join(' · ')}`);
+  console.log(`canvas label: ${controls?.canvasLabel}`);
 
   // ── 4. the phantom is really painted ───────────────────────────────────
   await page.evaluate(() => window.__pi_canvas?.().setFullscreen(true));
@@ -247,7 +316,18 @@ try {
   const blank = await shot('09-no-window');
 
   console.log('\nSCREENSHOTS');
-  for (const f of [wide, narrow, phantom, typing, pressing, back, empty, connecting, blank]) {
+  for (const f of [
+    wide,
+    fitShot,
+    narrow,
+    phantom,
+    typing,
+    pressing,
+    back,
+    empty,
+    connecting,
+    blank,
+  ]) {
     console.log(`  ${f}`);
   }
   console.log(`  (dir: ${shotDir})`);
