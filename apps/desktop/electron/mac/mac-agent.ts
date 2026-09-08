@@ -42,7 +42,7 @@ import {
 } from '@pi-desktop/mac-computer-use/protocol';
 import { MacHelperClient } from '@pi-desktop/pi-mac';
 import { createLogger } from '@pi-desktop/shared';
-import { app, BrowserWindow, globalShortcut, ipcMain } from 'electron';
+import { app, BrowserWindow, globalShortcut, ipcMain, systemPreferences } from 'electron';
 import { resolveBundledPackageAsset } from '../app-paths';
 import { isBackgroundMode } from '../background-mode';
 import { isTrustedIpcEvent } from '../trusted-senders';
@@ -691,6 +691,31 @@ function registerE2eDebugChannel(): void {
             else if (params.status === 'reading') await macOverlay.reading();
             else await macOverlay.thinking();
             return { ok: true };
+          }
+          /*
+           * WHO IS macOS ACTUALLY ANSWERING?
+           *
+           * The app and the pi-mac helper are separate binaries with separate
+           * code-signing identities, and TCC answers per CLIENT — so "is
+           * Accessibility granted" has two answers and they can disagree. That
+           * disagreement is exactly what made a granted machine look ungranted:
+           * the helper said no while System Settings showed the app switched on.
+           * This reports both, plus the identities, so the question can be
+           * settled by reading rather than by theory.
+           */
+          case 'grants': {
+            const helper = await getHelper().request<Record<string, unknown>>('check');
+            return {
+              ok: true,
+              result: {
+                app: {
+                  accessibility: systemPreferences.isTrustedAccessibilityClient(false),
+                  screen: systemPreferences.getMediaAccessStatus('screen'),
+                  path: app.getPath('exe'),
+                },
+                helper: { ...helper, path: HELPER_PATH },
+              },
+            };
           }
           case 'overlay-info':
             return { ok: true, result: macOverlay.info() };
