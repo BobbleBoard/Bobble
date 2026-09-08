@@ -96,6 +96,26 @@ export const CAPABILITY_PROMPT_MARKER = '# You are a local agent with real tools
 export const MANAGER_PROMPT_MARKER = 'YOU HAVE A MANAGER AND A TEAM';
 
 /** The capability section appended to the base system prompt. */
+/**
+ * HOW TO REACH A CAPABILITY — the one paragraph that differs by interface.
+ *
+ * Everything else in this section is about WHAT the app can do and WHEN to
+ * reach for it, which is true either way. Only this paragraph describes the
+ * mechanism, and it used to be the reason the whole section was dropped in
+ * bash-CLI mode — where every sentence of it is false.
+ *
+ * Dropping it cost far more than it saved. MEASURED on a real CLI-mode run:
+ * with no capability section at all, the model asked to "open TextEdit and type
+ * X" never once reached for the `mac` command that was sitting on its PATH. It
+ * shelled out to `open -a "TextEdit"` — which takes the user's screen — and
+ * then wrote a temp file. It had the tools and no idea they were the answer.
+ */
+export const CAPABILITY_REACH_SCHEMAS =
+  'Only a few tools are in your list at any moment. To reach the rest, call `capability` — with no argument to see what is on offer, or with a name (browser, computer-use, personal, web-research, generation, connectors) to turn that group on. Its tools then appear in your list and you call them normally. A tool you cannot see is one `capability` call away, never a capability you lack. NEVER type a tool name at the shell — `mac_snapshot` is a tool, not a command.';
+
+export const CAPABILITY_REACH_CLI =
+  "Every one of these is a COMMAND already on your PATH — nothing to turn on, nothing to wait for. Run `<command> --help` the first time you use one and it will tell you its verbs and flags. Reach for them rather than improvising with general shell tools: `open -a` hands an app to the user's foreground instead of to you, and a file written and opened is not the same as having used the app.";
+
 export const CAPABILITY_PROMPT = `${CAPABILITY_PROMPT_MARKER}
 
 You run locally on the user's Mac as an autonomous agent, not a passive chatbot. You have real tools that act on THIS machine, and the user expects you to USE them rather than explain what you supposedly cannot do.
@@ -176,7 +196,7 @@ GENERATION — create images, video, motion graphics and 3D models.
   PATH, and the path is what code operates on. Never draw on a blank canvas and call it an
   annotation of something you never captured.
 
-Only a few tools are in your list at any moment. To reach the rest, call \`capability\` — with no argument to see what is on offer, or with a name (browser, computer-use, personal, web-research, generation, connectors) to turn that group on. Its tools then appear in your list and you call them normally. A tool you cannot see is one \`capability\` call away, never a capability you lack. NEVER type a tool name at the shell — \`mac_snapshot\` is a tool, not a command.
+${CAPABILITY_REACH_SCHEMAS}
 
 TURN THE CAPABILITY ON BEFORE YOU DECIDE YOU CANNOT DO SOMETHING. Read the request and ask which of the groups above it lands in; if it lands in one that is not currently in your list, activating it is your FIRST action, not a fallback after something fails. The list you can see is not the list of things you can do, and treating it that way is how a request gets answered with a description instead of the thing itself.
 
@@ -374,6 +394,25 @@ const SCHEMA_ONLY_LINES: readonly RegExp[] = [
  * capability is retargeted by existing rather than by being remembered here.
  * Longest name first: `update_plan` must not be rewritten by a `plan` entry.
  */
+/**
+ * The same capability section, told in commands.
+ *
+ * The section's value is the mapping from what the user asks to what this app
+ * can do — "use <app>" means computer use, a web page means the built-in
+ * browser — and that mapping does not change with the interface. Only the tool
+ * names and the reach paragraph do, and both are mechanical to swap.
+ */
+export function capabilityPromptForCli(commandFor?: ReadonlyMap<string, string>): string {
+  const body = CAPABILITY_PROMPT.replace(CAPABILITY_REACH_SCHEMAS, CAPABILITY_REACH_CLI)
+    // The same mechanism, named once more inside the guidelines. There is no
+    // `capability` call to make here: the way to find out is to ask a command.
+    .replace(
+      'if unsure, call `capability` first, then act',
+      'if unsure, run `<command> --help` first, then act',
+    );
+  return commandFor === undefined ? body : retargetToolNames(body, commandFor);
+}
+
 export function retargetToolNames(text: string, commandFor: ReadonlyMap<string, string>): string {
   const names = [...commandFor.keys()]
     .filter((n) => commandFor.get(n) !== n)
@@ -404,8 +443,15 @@ export function retargetToolNames(text: string, commandFor: ReadonlyMap<string, 
 
   let out = text;
   if (unambiguous.length > 0) {
+    /*
+     * The backtick is NOT in the lookbehind. It used to be, which meant a name
+     * already written as `update_plan` was skipped — and that is how tool names
+     * are written in prose almost everywhere, so the shipped CLI prompt kept
+     * naming tools the model cannot call. Double backticks are collapsed at the
+     * end, which is what the exclusion was really guarding against.
+     */
     out = out.replace(
-      new RegExp(`(?<![\\w.\`])(${unambiguous.join('|')})(?![\\w.[])`, 'g'),
+      new RegExp(`(?<![\\w.])(${unambiguous.join('|')})(?![\\w.[])`, 'g'),
       (_m, name: string) => asCommand(name),
     );
   }
@@ -467,7 +513,9 @@ export function augmentSystemPrompt(
    * so only the capability half is dropped.
    */
   const section =
-    opts.toolInterface === 'bash-cli' ? VERIFY_PROMPT : `${CAPABILITY_PROMPT}\n\n${VERIFY_PROMPT}`;
+    opts.toolInterface === 'bash-cli'
+      ? `${capabilityPromptForCli(opts.commandFor)}\n\n${VERIFY_PROMPT}`
+      : `${CAPABILITY_PROMPT}\n\n${VERIFY_PROMPT}`;
   if (trimmed.includes(CAPABILITY_PROMPT_MARKER)) return trimmed;
   if (trimmed.length === 0) return section;
   return `${trimmed}\n\n${section}`;

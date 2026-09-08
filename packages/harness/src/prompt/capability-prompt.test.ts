@@ -413,10 +413,18 @@ describe('the prompt must not contradict the interface it ships with', () => {
    * behaviour where it reimplemented a capability by hand instead of running
    * the command.
    */
-  it('drops the capability section in bash-CLI mode', () => {
+  it('tells bash-CLI mode how to REACH things, without the schema mechanism', () => {
+    // The section used to be dropped whole, which cost the model the mapping
+    // from "use <app>" to computer use. MEASURED on a real run with it absent:
+    // the model shelled out to `open -a` and never touched the `mac` command
+    // sitting on its PATH. Keep the WHAT, swap only the HOW.
     const cli = augmentSystemPrompt('base', { toolInterface: 'bash-cli' });
     expect(cli).not.toContain('NEVER type a tool name at the shell');
     expect(cli).not.toContain('call `capability`');
+    expect(cli).toContain('already on your PATH');
+    expect(cli).toContain('--help');
+    // and it still carries the thing that matters: what this app can do
+    expect(cli).toContain('COMPUTER USE');
   });
 
   it('keeps it in the schema mode it describes', () => {
