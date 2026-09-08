@@ -400,9 +400,13 @@ func recordStart(_ params: [String: Any]) -> [String: Any] {
   streamer.sink = { (header: [String: Any], jpeg: Data) in
     guard !jpeg.isEmpty else { return }
     recordedFrames += 1
-    let name = String(format: "frame-%06d.jpg", recordedFrames)
+    // The capture only produces a frame when the picture CHANGES, so the wall
+    // clock has to travel with each one or the video would play back as if
+    // everything happened at a uniform rate — a five-second pause and a
+    // sixteenth of a second would look identical.
+    let t = (header["t"] as? Int) ?? Int(Date().timeIntervalSince1970 * 1000)
+    let name = String(format: "frame-%06d-%d.jpg", recordedFrames, t)
     try? jpeg.write(to: URL(fileURLWithPath: (dir as NSString).appendingPathComponent(name)))
-    _ = header
   }
   streamer.start()
   activeRecorder = streamer

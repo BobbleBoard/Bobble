@@ -400,6 +400,8 @@ private func dispatch(method: String, params: [String: Any]) -> [String: Any]? {
   case "moveWindow": return doMoveWindow(params)
   case "windows": return doWindows(params)
   case "wallpaper": return doWallpaper(params)
+  case "menus": return doMenus(params)
+  case "menuClick": return doMenuClick(params)
   case "recordStart": return recordStart(params)
   case "recordStop": return recordStop()
   default: return nil
@@ -441,6 +443,55 @@ private func doWindows(_ params: [String: Any]) -> [String: Any] {
   if let a = activeSurface(windows) { d["active"] = windowDict(a) }
   if let dlg = windows.first(where: { $0.isModal }) { d["dialog"] = windowDict(dlg) }
   return d
+}
+
+/// `menus` method: the app's menu bar. With no `path` it lists the top-level
+/// menus; with one it lists that menu's items. A whole menu bar is hundreds of
+/// entries, so the default is deliberately shallow.
+private func doMenus(_ params: [String: Any]) -> [String: Any] {
+  guard let resolved = resolveTargetPid(targetFrom(params)) else {
+    return ["ok": false, "error": "no such app"]
+  }
+  let path = (stringOf(params["path"]) ?? "").split(separator: ">").map {
+    $0.trimmingCharacters(in: .whitespaces)
+  }.filter { !$0.isEmpty }
+  let depth = intOf(params["depth"]) ?? (path.isEmpty ? 1 : 2)
+  let entries = menuEntries(pid: resolved.pid, under: path, depth: depth)
+  return [
+    "ok": true, "app": resolved.name, "pid": Int(resolved.pid),
+    "path": path.joined(separator: " > "),
+    "items": entries.map(menuEntryDict),
+  ]
+}
+
+/// `menuClick` method: press a menu item by path. Accessibility presses the item
+/// directly, so the menu never opens on screen and the app never has to come to
+/// the front — the same background guarantee every other act keeps.
+private func doMenuClick(_ params: [String: Any]) -> [String: Any] {
+  guard let resolved = resolveTargetPid(targetFrom(params)) else {
+    return ["ok": false, "error": "no such app"]
+  }
+  guard let path = stringOf(params["path"]), !path.isEmpty else {
+    return ["ok": false, "error": "menuClick needs a path like \"File > New\""]
+  }
+  guard let entry = findMenuItem(pid: resolved.pid, path: path) else {
+    let top = menuEntries(pid: resolved.pid, under: [], depth: 1).map { $0.title }
+    return [
+      "ok": false, "error": "no menu item matching \(path)",
+      "menus": top,
+    ]
+  }
+  guard entry.enabled else {
+    return [
+      "ok": false, "error": "\(entry.path.joined(separator: " > ")) is disabled right now",
+    ]
+  }
+  let err = AXUIElementPerformAction(entry.element, kAXPressAction as CFString)
+  return [
+    "ok": err == .success, "path": entry.path.joined(separator: " > "),
+    "background": true,
+    "shortcut": entry.shortcut,
+  ]
 }
 
 /// `wallpaper` method: the user's desktop picture, which the canvas monitor
