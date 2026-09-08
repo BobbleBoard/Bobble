@@ -43,6 +43,7 @@ import { CREATE_PRODUCTION_HIERARCHY } from './corp/promotion.js';
 import { effortKnobs, isEffortLevel } from './effort/effort.js';
 import { HANDBACK_NUDGE, isChoiceHandback } from './loop/handback.js';
 import { createLoopDetector, type LoopDetector, loopDetectorConfig } from './loop/loop-detector.js';
+import { newSameCallState, noteRepeatedCall } from './loop/same-call.js';
 import { unfinishedPlan, unfinishedPlanNudge } from './loop/unfinished-plan.js';
 import {
   parseModelParams,
@@ -846,6 +847,9 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     return allowed.size > 0 ? registered.filter((t) => allowed.has(t.name)) : registered;
   }
   const toolCliMode = process.env.PI_DESKTOP_TOOL_CLI === '1';
+  /** The call in flight, so a result can tell whether it is a verbatim repeat. */
+  let lastCallInput: { tool: string; input: unknown } | null = null;
+  const sameCall = newSameCallState();
   /**
    * How a capability tool is actually invoked in this session: its command line
    * when the CLI is the interface, null when it is called by name.
@@ -3126,6 +3130,9 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
   // (before execution) and the consecutive-error streak (after execution).
   pi.on('tool_call', (event, ctx) => {
     runtime.currentCtx = ctx;
+    // Kept for the result hook: a repeat is only a repeat if the ARGUMENTS
+    // matched too, and the result event does not carry them.
+    lastCallInput = { tool: event.toolName, input: event.input };
     /*
      * A TOOL THIS RUN MAY NOT CALL, whatever it thinks.
      *
@@ -3251,6 +3258,37 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
   /** What the last bash command opened, if anything — consumed by its result. */
   let lastOpened: ReturnType<typeof detectOpenedApp>;
   pi.on('tool_result', (event) => {
+    /*
+     * THE SAME CALL, MADE AGAIN, WITH THE SAME ANSWER.
+     *
+     * The loop detector counts to 75, which is right for circling a task and
+     * far too patient for one call repeated verbatim. MEASURED on three runs
+     * here: twelve `edit` calls returning the same "File not found", then twelve
+     * `write` calls all REPORTING SUCCESS on the same thirteen bytes. Nothing
+     * failed, so nothing complained, and the run spent its budget writing one
+     * file over and over. See ./loop/same-call.ts.
+     */
+    const sameNote =
+      lastCallInput !== null && lastCallInput.tool === event.toolName
+        ? noteRepeatedCall(
+            sameCall,
+            event.toolName,
+            lastCallInput.input,
+            event.content
+              .map((p) => (p.type === 'text' ? p.text : ''))
+              .join('')
+              .slice(0, 4000),
+          )
+        : null;
+    if (sameNote !== null) {
+      const withNote = event.content.map((part, i) =>
+        i === 0 && part.type === 'text' ? { ...part, text: `${part.text}${sameNote}` } : part,
+      );
+      return {
+        content:
+          withNote.length > 0 ? withNote : [{ type: 'text' as const, text: sameNote.trimStart() }],
+      };
+    }
     // The open-an-app note rides on the bash result that caused it (the user: give it
     // the tools and the snapshot immediately, rather than leaving it to guess).
     if (event.toolName === 'bash' && lastOpened !== undefined) {
