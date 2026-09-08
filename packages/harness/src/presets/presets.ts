@@ -12,8 +12,6 @@
  */
 
 import { BROWSER_TOOL_NAMES } from '@pi-desktop/browser-use/tool-names';
-import { MAC_CONNECTOR_TOOLS } from '@pi-desktop/mac-connectors/tool-names';
-import type { TaskClass } from '../classify/classify.js';
 import { SPAWN_SUBAGENT_TOOL_NAME } from '../subagent/types.js';
 
 /** The always-available tool-search tool name. */
@@ -83,7 +81,7 @@ export const ALWAYS_BROWSER_TOOLS = BROWSER_TOOL_NAMES;
  * front-loaded into every preset, so a small model reflexively spawned a child
  * agent for even a "write a doc" / "create 3 files" task (and those children then
  * over-eagerly drove the browser). It is now front-loaded only for genuinely
- * multi-step classes ({@link SUBAGENT_PRESET_CLASSES}); every other class still
+ * multi-step work; a one-answer task still
  * reaches it on demand via `tool_search` (it stays globally registered).
  *
  * read/write/edit/bash are ALSO always-active (the user): the model kept disclaiming
@@ -170,131 +168,23 @@ export const ALWAYS_ACTIVE_TOOLS: readonly string[] = [
 ];
 
 /**
- * Classes whose work is genuinely multi-step / parallelizable enough to warrant
- * front-loading `spawn_subagent`. The trivial tiers and single-artifact create
- * tasks (simple-QA, basic-tools, file-ops, 2d-art, other) deliberately OMIT it so
- * the model doesn't reach for a subagent on a one-file / one-answer task
- * (blind-test item 6). Any class can still pull it in via `tool_search`.
+ * THE BASE SET IS THE WHOLE SET. There is no per-task table any more.
+ *
+ * There used to be a `PRESET_TOOLS: Record<TaskClass, string[]>` — a tool list
+ * per guessed task class — and a keyword classifier choosing between them. Two
+ * things killed it. The classifier was switched off for TTFT (a tool set that
+ * moves with the wording of a message is a prompt prefix that is never reused),
+ * so every turn already resolved to the same neutral entry and the table was
+ * dead code with fourteen branches. And what it was really working around was a
+ * bug: `capability` could not deliver a toolset mid-turn, so anything a task
+ * might need had to be guessed up front. That is fixed in pi now (the agent
+ * loop shares the live tool array), so a capability turned on during a task is
+ * usable during that task — which is the whole reason to have one.
+ *
+ * the user: "in regular mode some base tools are loaded … then there's the
+ * capability tool that loads toolsets needed for tasks … classification has no
+ * place here anymore."
  */
-export const SUBAGENT_PRESET_CLASSES: ReadonlySet<TaskClass> = new Set<TaskClass>([
-  'coding',
-  'browser-use',
-  'motion-graphics',
-  'advanced-video',
-  'video-edit',
-  'perception',
-  '3d',
-]);
-
-// Common tool clusters (built-in pi tools + this repo's web-tools/gen tools).
-const CORE_FS = ['read', 'write', 'edit', 'ls', 'find', 'grep'] as const;
-const WEB = ['web_search', 'web_fetch'] as const;
-const PYTHON = ['python_run'] as const;
-// The browser set is imported from browser-use (single source of truth) so a
-// tool rename is a COMPILE error here, not a silent runtime miss. It leads with
-// browser_navigate then browser_snapshot — the model MUST be able to SEE the
-// page (snapshot) before it can click/type. (Round-10 bug #9: this list had
-// drifted to non-existent `browser_eval`/`browser_screenshot` and omitted
-// `browser_snapshot`/`browser_read`, so browser tasks looped, blind.)
-const BROWSER = BROWSER_TOOL_NAMES;
-// The macOS personal-info connectors (Calendar / Reminders / Contacts / Mail /
-// Messages), imported from the connector package so a rename is a COMPILE error
-// here, not a silent runtime miss (same discipline as BROWSER). These are the
-// tools the model needs for "what's on my calendar", "text mom", "any new mail"
-// — the class of request that was previously routed to a tool-search-only preset
-// and so drew "I can't access your calendar" refusals.
-const MAC_CONNECTORS = MAC_CONNECTOR_TOOLS;
-// The REAL registered names come first: `generate_image` / `edit_image` are the
-// on-device image tools (tools/image-tools.ts, and gen-tools' generate_image).
-// `image_generate` / `image_edit` are legacy placeholders that no tool has ever
-// registered — kept only so an older preset name still resolves if one appears.
-// Without the real names here, an "draw me a …" turn classified as 2d-art front-
-// loaded NOTHING (resolvePresetTools filters to available tools) and the model
-// had to rediscover its own image tools through tool_search.
-const IMAGE_GEN = ['generate_image', 'edit_image', 'image_generate', 'image_edit'] as const;
-const VIDEO_GEN = ['video_generate', 'video_edit'] as const;
-const MOTION_GEN = ['motion_graphics_render'] as const;
-const THREE_D_GEN = ['model_3d_generate', 'model_3d_view'] as const;
-/*
- * The audio generation family. Filtered by `available` like every other group,
- * so a build without gen-tools simply advertises none of them.
- */
-const AUDIO_GEN = ['generate_speech', 'generate_music', 'generate_sfx'] as const;
-// Typed ffmpeg façade (safe argv, no denoise) — the video-edit preset core.
-const VIDEO_EDIT = ['video_edit', 'extract_frames', 'probe'] as const;
-// On-device perception: Falcon-Perception (MLX) + ffmpeg-sampled video locate.
-const PERCEPTION = ['image_segment', 'image_detect', 'video_locate', 'image_ocr'] as const;
-
-/** Driving the user's own Mac apps, plus their own Chrome (see the class note). */
-const MAC_COMPUTER_USE = [
-  'mac_launch',
-  'mac_snapshot',
-  'mac_click',
-  'mac_type',
-  'mac_key',
-  'mac_scroll',
-  'chrome_snapshot',
-  'chrome_click',
-  'chrome_type',
-  'chrome_go',
-] as const;
-
-/**
- * Desired preset tool lists per class. `tool_search` is appended by
- * {@link resolvePresetTools} and omitted here to keep the intent readable.
- */
-export const PRESET_TOOLS: Record<TaskClass, readonly string[]> = {
-  // Tiers.
-  'simple-QA': [],
-  'basic-tools': [...PYTHON, ...WEB],
-  // Categories.
-  // WEB lives in ALWAYS_ACTIVE_TOOLS now — every turn can look something up.
-  coding: [...CORE_FS, 'bash', ...PYTHON],
-  'file-ops': [...CORE_FS, 'bash'],
-  // NOTE: the bare file `read` tool is deliberately NOT here — it was an
-  // attractive nuisance that a small model grabbed ("Read a file") instead of
-  // browsing. Page reading is browser_read; page perception is browser_snapshot.
-  'browser-use': [...BROWSER, 'web_fetch'],
-  /*
-   * The whole mac suite, in hand on the FIRST turn.
-   *
-   * Not a subset: `mac_launch` without `mac_snapshot` opens an app the model
-   * cannot see, and a snapshot without `mac_click` is a list it cannot act on.
-   * The capability route cannot supply the rest mid-turn (see the classify.ts
-   * note), so a partial preset is the same dead end with extra steps.
-   *
-   * Chrome rides along because `chrome_snapshot` reads the real DOM of the
-   * user's own browser, and the prompt tells the model to prefer it over pixels
-   * whenever the work is in their Chrome — advice it could not follow.
-   */
-  'computer-use': [...MAC_COMPUTER_USE],
-  'motion-graphics': [...MOTION_GEN, ...IMAGE_GEN],
-  // advanced-video = GENERATION (text→video). Preset unchanged by the video split.
-  'advanced-video': [...VIDEO_GEN, ...IMAGE_GEN],
-  // video-edit = the ffmpeg façade + fs tools; video_locate bridges to perception.
-  'video-edit': [...VIDEO_EDIT, ...CORE_FS, 'video_locate'],
-  // perception = analysis (segment/detect/locate/ocr); video_edit burns overlays.
-  perception: [...PERCEPTION, 'video_edit'],
-  '3d': [...THREE_D_GEN, ...IMAGE_GEN],
-  '2d-art': [...IMAGE_GEN],
-  // Audio gets its class, for the same reason image and video have theirs: the
-  // tools are in hand on the FIRST turn, rather than after a capability
-  // round-trip the user has to sit through.
-  audio: [...AUDIO_GEN],
-  // A GENUINE macOS personal-app request (calendar/mail/messages/contacts/
-  // reminders keywords → the 'connectors' class, classify.ts). Front-load the
-  // connectors so "what's on my calendar" / "any new mail" / "text mom" has the
-  // tool in hand rather than disclaiming it (the round-* refusal bug). Reached
-  // ONLY by those keywords — never the generic fallback.
-  connectors: [...MAC_CONNECTORS],
-  // 'other' is the GENERIC FALLBACK (no tool signal, no dominant modality) plus
-  // integration/mcp requests (notion/slack/jira/mcp keywords). Tool-search-only:
-  // front-loading nothing keeps a plain "hi" / "list the tools" / open-ended turn
-  // at the minimal set (the always-active file tools + tool_search), instead of
-  // the 10 personal-info connectors it used to drag in on EVERY no-signal query.
-  // Anything genuinely needed is one tool_search away.
-  other: [],
-};
 
 export interface ResolvePresetOptions {
   /**
@@ -314,8 +204,7 @@ export interface ResolvePresetOptions {
  * An empty result (e.g. `simple-QA`, `other`, or a category whose gen tools are
  * absent) collapses to tool-search-only.
  */
-export function resolvePresetTools(
-  cls: TaskClass,
+export function resolveBaseTools(
   availableToolNames: readonly string[],
   opts: ResolvePresetOptions = {},
 ): string[] {
@@ -323,13 +212,6 @@ export function resolvePresetTools(
   const available = new Set(availableToolNames);
   const out: string[] = [];
   const seen = new Set<string>();
-
-  for (const name of PRESET_TOOLS[cls]) {
-    if (available.has(name) && !seen.has(name)) {
-      out.push(name);
-      seen.add(name);
-    }
-  }
   // `capability` and `use` are a PAIR — one names tools, the other calls them.
   // Either alone is broken, so they are added together or not at all.
   if (includeToolSearch) {
@@ -351,7 +233,7 @@ export function resolvePresetTools(
   }
   /*
    * HANDING WORK OUT IS BASELINE, not a privilege of certain task classes.
-   * It used to be gated to SUBAGENT_PRESET_CLASSES, so whether the model could
+   * It used to be gated to a set of task classes, so whether the model could
    * commission anything depended on how a keyword classifier read the prompt —
    * and that is how a CEO told to "research it, commission specialists" ended
    * up with no way to do either (runs 10-12). It is in ALWAYS_ACTIVE_TOOLS now.

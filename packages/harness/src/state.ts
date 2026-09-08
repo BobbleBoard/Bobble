@@ -4,8 +4,6 @@
  * with CLI pi) and restored on `session_start`.
  */
 
-import type { TaskClass } from './classify/classify.js';
-import type { ModelTier } from './classify/tier.js';
 import { type EffortLevel, isEffortLevel } from './effort/effort.js';
 import { isPermissionMode, type PermissionMode } from './permissions/modes.js';
 
@@ -55,9 +53,6 @@ export function isHarnessStage(v: unknown): v is HarnessStage {
   return typeof v === 'string' && (HARNESS_STAGES as readonly string[]).includes(v);
 }
 
-/** Preset selection: a fixed class, or `auto` to let the classifier decide. */
-export type PresetSelection = TaskClass | 'auto';
-
 /** Lifecycle state of a single plan/checklist item. */
 export type PlanItemStatus = 'pending' | 'in_progress' | 'done';
 
@@ -88,33 +83,22 @@ export interface PlanItem {
 export interface HarnessConfig {
   readonly mode: PermissionMode;
   readonly effort: EffortLevel;
-  readonly preset: PresetSelection;
 }
 
 export const DEFAULT_CONFIG: HarnessConfig = {
   mode: 'reviewer',
   effort: 'medium',
-  preset: 'auto',
 };
 
 /** The full status object published via `ctx.ui.setStatus('harness', json)`. */
 export interface HarnessStatus extends HarnessConfig {
-  /** The class chosen for the current/last task (null before first classify). */
-  readonly activeClass: TaskClass | null;
   /**
-   * The user-facing model-capability tier the {@link activeClass} maps to
-   * (`modelTierForClass`), or null before the first classify. This is the ONLY
-   * model-selection field the harness publishes — the app resolves it to a
-   * concrete model + drives the llama-server switch. Model-agnostic by design.
-   */
-  readonly activeTier: ModelTier | null;
-  /**
-   * The conversation title from the classify+title piggyback, or null before it
-   * runs / when no utility model is configured. The app renders this as the
+   * The conversation title, or null before the background titler runs / when no
+   * utility model is configured. The app renders this as the
    * chat title (app-side display is a separate follow-up wave).
    */
   readonly title: string | null;
-  /** Tools currently active after applying the preset. */
+  /** Tools currently advertised to the model. */
   readonly activeTools: readonly string[];
   /** Current model id, if any. */
   readonly model: string | null;
@@ -153,10 +137,6 @@ export interface StoredEntryLike {
   readonly data?: unknown;
 }
 
-function isPresetSelection(v: unknown): v is PresetSelection {
-  return typeof v === 'string';
-}
-
 /**
  * Reconstruct the harness config from session entries (last write wins),
  * validating each field and falling back to {@link DEFAULT_CONFIG}. Pure.
@@ -171,7 +151,6 @@ export function restoreConfig(entries: readonly StoredEntryLike[]): HarnessConfi
     config = {
       mode: typeof d.mode === 'string' && isPermissionMode(d.mode) ? d.mode : config.mode,
       effort: typeof d.effort === 'string' && isEffortLevel(d.effort) ? d.effort : config.effort,
-      preset: isPresetSelection(d.preset) ? d.preset : config.preset,
     };
   }
   return config;
@@ -183,6 +162,5 @@ export function updateConfig(current: HarnessConfig, patch: Partial<HarnessConfi
     mode: patch.mode !== undefined && isPermissionMode(patch.mode) ? patch.mode : current.mode,
     effort:
       patch.effort !== undefined && isEffortLevel(patch.effort) ? patch.effort : current.effort,
-    preset: patch.preset !== undefined ? patch.preset : current.preset,
   };
 }

@@ -427,8 +427,8 @@
       var left = Math.max(m, Math.min(maxLeft, wantLeft));
       var top = Math.max(m, Math.min(maxTop, wantTop));
       // Inline offsets are relative to the cursor wrapper the pill sits in.
-      bubble.style.left = left - cx + 'px';
-      bubble.style.top = top - cy + 'px';
+      bubble.style.left = `${left - cx}px`;
+      bubble.style.top = `${top - cy}px`;
       // The classes now only choose which corner the pill grows from.
       bubble.classList.toggle('flip-x', left < cx);
       bubble.classList.toggle('flip-y', top < cy);

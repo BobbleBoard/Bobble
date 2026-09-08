@@ -1,0 +1,39 @@
+diff --git a/dist/agent.js b/dist/agent.js
+index 6031ab89fe46b0b3f1817ccbd44f3dc279137999..78c6b8bcb91f0c12651d118f9556e50e64c4192b 100644
+--- a/dist/agent.js
++++ b/dist/agent.js
+@@ -34,7 +34,19 @@ function createMutableAgentState(initialState) {
+             return tools;
+         },
+         set tools(nextTools) {
+-            tools = nextTools.slice();
++            // PATCHED (Bobble): mutate in place, never rebind.
++            //
++            // A tool activated mid-turn was unreachable for the whole turn. The
++            // agent loop takes its tool array once at turn start, so rebinding
++            // this closure variable left the running turn pointing at the old
++            // array: `capability` reported "computer-use is on — mac_launch,
++            // mac_snapshot, mac_click", getActiveTools() confirmed 25 tools on
++            // the session, and all 34 provider requests that turn still carried
++            // the same 14. Keeping ONE array for the session's life is what
++            // makes an activation take effect where it was asked for.
++            if (nextTools === tools) return;
++            tools.length = 0;
++            tools.push(...nextTools);
+         },
+         get messages() {
+             return messages;
+@@ -270,7 +282,12 @@ export class Agent {
+         return {
+             systemPrompt: this._state.systemPrompt,
+             messages: this._state.messages.slice(),
+-            tools: this._state.tools.slice(),
++            // PATCHED (Bobble): hand the loop the LIVE array, not a copy — the
++            // other half of the mid-turn activation fix in the `tools` setter
++            // above. runLoop only ever reads it (`tools.find(...)`), so sharing
++            // the reference is safe, and it is the only way a turn can see a
++            // tool that was turned on while it was running.
++            tools: this._state.tools,
+         };
+     }
+     createLoopConfig(options = {}) {

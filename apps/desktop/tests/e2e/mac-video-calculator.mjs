@@ -351,18 +351,23 @@ try {
    */
   try {
     const snap = await dbg('snapshot', { app: 'Calculator' });
+    // Calculator groups thousands ("1,566"), so compare digits to digits — the
+    // separator is presentation, and a probe that reads it as a mismatch reports
+    // NOT PROVEN on a run that plainly worked.
+    const bare = (t) => String(t).replace(/[\u202f\u00a0,\s]/g, '');
     const shown = (snap.text ?? []).join(' | ');
+    const shownBare = bare(shown);
     say(`Calculator display reads: ${JSON.stringify(shown)}`);
     // BOTH halves, because either alone can be satisfied by a display nobody
     // touched: the operands prove it is THIS run's sum, the answer proves it
     // finished.
-    const hasOperands = shown.includes(String(LHS)) && shown.includes(String(RHS));
+    const hasOperands = shownBare.includes(String(LHS)) && shownBare.includes(String(RHS));
     say(`display shows this run's ${LHS} and ${RHS}: ${hasOperands}`);
-    say(`display shows ${ANSWER}: ${shown.includes(ANSWER)}`);
-    say(`model's answer contains ${ANSWER}: ${last.text.includes(ANSWER)}`);
+    say(`display shows ${ANSWER}: ${shownBare.includes(ANSWER)}`);
+    say(`model's answer contains ${ANSWER}: ${bare(last.text).includes(ANSWER)}`);
     say(
       `VERDICT: ${
-        hasOperands && shown.includes(ANSWER) && last.text.includes(ANSWER)
+        hasOperands && shownBare.includes(ANSWER) && bare(last.text).includes(ANSWER)
           ? 'the model drove Calculator and reported what it read'
           : 'NOT PROVEN'
       }`,

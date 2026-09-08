@@ -19,7 +19,7 @@ import {
   MODEL_TIERS,
   type ModelTier,
   TIER_LABEL,
-} from '../../../../packages/harness/src/classify/tier.ts';
+} from '../../../../packages/harness/src/model/tier.ts';
 import type { LlmTierPick } from '../../electron/ipc-contract';
 import type { ModelSelection, UserMode } from '../../electron/settings/settings-contract';
 

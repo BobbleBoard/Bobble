@@ -32,3 +32,6 @@ allowBuilds:
 
 minimumReleaseAgeExclude:
   - electron@43.1.0
+
+patchedDependencies:
+  '@mariozechner/pi-agent-core@0.68.1': patches/@mariozechner__pi-agent-core@0.68.1.patch

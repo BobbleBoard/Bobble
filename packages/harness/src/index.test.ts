@@ -264,7 +264,7 @@ describe('wireHarness', () => {
     const statusCall = setStatus.mock.calls.find((c) => c[0] === 'harness');
     expect(statusCall).toBeDefined();
     const status = JSON.parse(statusCall?.[1] as string);
-    expect(status).toMatchObject({ mode: 'reviewer', effort: 'medium', preset: 'auto' });
+    expect(status).toMatchObject({ mode: 'reviewer', effort: 'medium' });
   });
 
   it('resets the plan on session_start so a new chat does not inherit the old checklist', async () => {
@@ -296,24 +296,6 @@ describe('wireHarness', () => {
     expect(harnessStatus().plan).toBeNull();
   });
 
-  it('warns via model_select when a small model meets an advanced task', async () => {
-    const f = makeFakePi(['read']);
-    const handle = wireHarness(f.pi);
-    const { ctx, notify } = makeCtx(f.entries);
-    await f.fire('session_start', { type: 'session_start', reason: 'startup' }, ctx);
-    // Set an advanced active class first.
-    handle.applyPreset('3d', ctx);
-    await f.fire(
-      'model_select',
-      { type: 'model_select', model: { id: 'gemma4-e2b', name: 'Gemma4 E2B' }, source: 'set' },
-      ctx,
-    );
-    const warned = notify.mock.calls.some(
-      (c) => typeof c[0] === 'string' && c[0].includes('small') && c[1] === 'warning',
-    );
-    expect(warned).toBe(true);
-  });
-
   /*
    * WAS "only at high/max". Effort is decided per MESSAGE, so this test was
    * pinning a tool that appeared and vanished between turns of one conversation
@@ -331,7 +313,7 @@ describe('wireHarness', () => {
 
     for (const effort of ['medium', 'high', 'low', 'max'] as const) {
       await run(`effort ${effort}`);
-      handle.applyPreset('coding', ctx);
+      handle.applyPreset(ctx);
       expect(f.getActiveTools(), effort).toContain('talk_to_manager');
     }
   });
@@ -371,22 +353,6 @@ describe('/harness command protocol', () => {
     await run('effort max');
     expect(handle.getConfig().effort).toBe('max');
     expect(notify).toHaveBeenCalledWith(expect.stringContaining('effort → max'));
-  });
-
-  it('preset auto vs fixed', async () => {
-    const { run, handle, f } = await setup();
-    await run('preset coding');
-    expect(handle.getConfig().preset).toBe('coding');
-    // fixed preset applies immediately.
-    expect(f.setActiveTools).toHaveBeenCalled();
-    await run('preset auto');
-    expect(handle.getConfig().preset).toBe('auto');
-  });
-
-  it('classify is a pure debug helper', async () => {
-    const { run, notify } = await setup();
-    await run('classify draw an illustration of a fox');
-    expect(notify).toHaveBeenCalledWith(expect.stringContaining('class: 2d-art'));
   });
 
   it('status prints and republishes', async () => {

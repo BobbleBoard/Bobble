@@ -126,7 +126,12 @@ function makeRig(
   const ctx = {
     hasUI: true,
     cwd: opts.cwd ?? '/workdir',
-    ui: { notify, confirm, setStatus },
+    /* `input` is how review-all mode asks to allow a tool. A rig without it
+       throws the moment a test fires a tool_call under that mode — which only
+       surfaced once the verify gate started keying off files actually written
+       (it used to key off a guessed task class). Default-allow keeps these
+       tests about verification rather than about permissions. */
+    ui: { notify, confirm, setStatus, input: async () => 'allow' },
     getContextUsage: () => ({ tokens: 1, contextWindow: 100, percent: 1 }),
     sessionManager: { getEntries: () => entries },
     abort,
@@ -551,7 +556,23 @@ describe('effort-gated REAL verify (bounded fix loop)', () => {
     const runBash = failingBash();
     const rig = makeRig({ effort: 'high', verify: { runBash, detectCheck: () => TEST_CHECK } });
     await startSession(rig);
-    rig.handle.applyPreset('coding', rig.ctx);
+    rig.handle.applyPreset(rig.ctx);
+    // The gate keys off files the turn actually WROTE (it used to key off a
+    // guessed task class, which was pinned to a constant and so never true).
+    await rig.fire('tool_call', {
+      type: 'tool_call',
+      toolName: 'write',
+      toolCallId: 'w0',
+      input: { path: 'mod.py', content: 'x=1' },
+    });
+    // ...and EXERCISED, so the separate never-exercised steer stays quiet and
+    // this test still measures only the verify loop.
+    await rig.fire('tool_call', {
+      type: 'tool_call',
+      toolName: 'bash',
+      toolCallId: 'b0',
+      input: { command: 'python3 mod.py' },
+    });
 
     expect(await rig.handle.verifyTurn(rig.ctx)).toBe(true); // fix #1
     expect(rig.sentUserMessages.some((m) => m.includes('npm run test'))).toBe(true);
@@ -569,7 +590,23 @@ describe('effort-gated REAL verify (bounded fix loop)', () => {
     const runBash = failingBash();
     const rig = makeRig({ effort: 'max', verify: { runBash, detectCheck: () => TEST_CHECK } });
     await startSession(rig);
-    rig.handle.applyPreset('file-ops', rig.ctx);
+    rig.handle.applyPreset(rig.ctx);
+    // The gate keys off files the turn actually WROTE (it used to key off a
+    // guessed task class, which was pinned to a constant and so never true).
+    await rig.fire('tool_call', {
+      type: 'tool_call',
+      toolName: 'write',
+      toolCallId: 'w0',
+      input: { path: 'mod.py', content: 'x=1' },
+    });
+    // ...and EXERCISED, so the separate never-exercised steer stays quiet and
+    // this test still measures only the verify loop.
+    await rig.fire('tool_call', {
+      type: 'tool_call',
+      toolName: 'bash',
+      toolCallId: 'b0',
+      input: { command: 'python3 mod.py' },
+    });
     expect(await rig.handle.verifyTurn(rig.ctx)).toBe(true); // fix #1
     expect(await rig.handle.verifyTurn(rig.ctx)).toBe(true); // fix #2
     expect(await rig.handle.verifyTurn(rig.ctx)).toBe(false); // budget exhausted
@@ -580,7 +617,24 @@ describe('effort-gated REAL verify (bounded fix loop)', () => {
     const runBash = passingBash();
     const rig = makeRig({ effort: 'high', verify: { runBash, detectCheck: () => TEST_CHECK } });
     await startSession(rig);
-    rig.handle.applyPreset('coding', rig.ctx);
+    rig.handle.applyPreset(rig.ctx);
+    // The gate keys off files the turn actually WROTE (it used to key off a
+    // guessed task class, which was pinned to a constant and so never true).
+    await rig.fire('tool_call', {
+      type: 'tool_call',
+      toolName: 'write',
+      toolCallId: 'w0',
+      input: { path: 'mod.py', content: 'x=1' },
+    });
+    // ...and EXERCISED, so the separate never-exercised steer stays quiet and
+    // this test still measures only the verify loop.
+    await rig.fire('tool_call', {
+      type: 'tool_call',
+      toolName: 'bash',
+      toolCallId: 'b0',
+      input: { command: 'python3 mod.py' },
+    });
+    // The check RUNS (the turn wrote a file) and PASSES, so nothing is steered.
     expect(await rig.handle.verifyTurn(rig.ctx)).toBe(false);
     expect(rig.sentUserMessages).toHaveLength(0);
     expect(runBash).toHaveBeenCalledOnce();
@@ -590,16 +644,32 @@ describe('effort-gated REAL verify (bounded fix loop)', () => {
     const runBash = failingBash();
     const rig = makeRig({ effort: 'medium', verify: { runBash, detectCheck: () => TEST_CHECK } });
     await startSession(rig);
-    rig.handle.applyPreset('coding', rig.ctx);
+    rig.handle.applyPreset(rig.ctx);
+    // The gate keys off files the turn actually WROTE (it used to key off a
+    // guessed task class, which was pinned to a constant and so never true).
+    await rig.fire('tool_call', {
+      type: 'tool_call',
+      toolName: 'write',
+      toolCallId: 'w0',
+      input: { path: 'mod.py', content: 'x=1' },
+    });
+    // ...and EXERCISED, so the separate never-exercised steer stays quiet and
+    // this test still measures only the verify loop.
+    await rig.fire('tool_call', {
+      type: 'tool_call',
+      toolName: 'bash',
+      toolCallId: 'b0',
+      input: { command: 'python3 mod.py' },
+    });
     expect(await rig.handle.verifyTurn(rig.ctx)).toBe(false);
     expect(runBash).not.toHaveBeenCalled();
   });
 
-  it('does NOT run for non-coding/file-ops classes', async () => {
+  it('does NOT run when the turn wrote nothing', async () => {
     const runBash = failingBash();
     const rig = makeRig({ effort: 'high', verify: { runBash, detectCheck: () => TEST_CHECK } });
     await startSession(rig);
-    rig.handle.applyPreset('simple-QA', rig.ctx);
+    rig.handle.applyPreset(rig.ctx);
     expect(await rig.handle.verifyTurn(rig.ctx)).toBe(false);
     expect(runBash).not.toHaveBeenCalled();
   });
@@ -612,7 +682,23 @@ describe('effort-gated REAL verify (bounded fix loop)', () => {
       verify: { runBash, detectCheck: () => TEST_CHECK },
     });
     await startSession(rig);
-    rig.handle.applyPreset('coding', rig.ctx);
+    rig.handle.applyPreset(rig.ctx);
+    // The gate keys off files the turn actually WROTE (it used to key off a
+    // guessed task class, which was pinned to a constant and so never true).
+    await rig.fire('tool_call', {
+      type: 'tool_call',
+      toolName: 'write',
+      toolCallId: 'w0',
+      input: { path: 'mod.py', content: 'x=1' },
+    });
+    // ...and EXERCISED, so the separate never-exercised steer stays quiet and
+    // this test still measures only the verify loop.
+    await rig.fire('tool_call', {
+      type: 'tool_call',
+      toolName: 'bash',
+      toolCallId: 'b0',
+      input: { command: 'python3 mod.py' },
+    });
     expect(await rig.handle.verifyTurn(rig.ctx)).toBe(false);
     expect(runBash).not.toHaveBeenCalled();
   });
@@ -622,7 +708,23 @@ describe('effort-gated REAL verify (bounded fix loop)', () => {
     const rig = makeRig({ effort: 'high', verify: { runBash, detectCheck: () => null } });
     await startSession(rig);
     await startTurn(rig);
-    rig.handle.applyPreset('coding', rig.ctx);
+    rig.handle.applyPreset(rig.ctx);
+    // The gate keys off files the turn actually WROTE (it used to key off a
+    // guessed task class, which was pinned to a constant and so never true).
+    await rig.fire('tool_call', {
+      type: 'tool_call',
+      toolName: 'write',
+      toolCallId: 'w0',
+      input: { path: 'mod.py', content: 'x=1' },
+    });
+    // ...and EXERCISED, so the separate never-exercised steer stays quiet and
+    // this test still measures only the verify loop.
+    await rig.fire('tool_call', {
+      type: 'tool_call',
+      toolName: 'bash',
+      toolCallId: 'b0',
+      input: { command: 'python3 mod.py' },
+    });
     // A write tool call records the touched file the syntax fallback checks.
     await rig.fire('tool_call', {
       type: 'tool_call',
@@ -676,7 +778,23 @@ describe('HarnessStatus.stage transitions publish at the seams', () => {
       verify: { runBash: passingBash(), detectCheck: () => TEST_CHECK },
     });
     await startSession(rig);
-    rig.handle.applyPreset('coding', rig.ctx);
+    rig.handle.applyPreset(rig.ctx);
+    // The gate keys off files the turn actually WROTE (it used to key off a
+    // guessed task class, which was pinned to a constant and so never true).
+    await rig.fire('tool_call', {
+      type: 'tool_call',
+      toolName: 'write',
+      toolCallId: 'w0',
+      input: { path: 'mod.py', content: 'x=1' },
+    });
+    // ...and EXERCISED, so the separate never-exercised steer stays quiet and
+    // this test still measures only the verify loop.
+    await rig.fire('tool_call', {
+      type: 'tool_call',
+      toolName: 'bash',
+      toolCallId: 'b0',
+      input: { command: 'python3 mod.py' },
+    });
     await rig.handle.verifyTurn(rig.ctx);
     expect(rig.publishedStages()).toContain('verifying');
   });
@@ -755,7 +873,7 @@ describe("the README's promises reach the model (reachability, not logic)", () =
       verify: { runBash: passingBash(), detectCheck: () => null },
     });
     await startSession(rig);
-    rig.handle.applyPreset('coding', rig.ctx);
+    rig.handle.applyPreset(rig.ctx);
     await workedOn(rig, cwd, `python3 ${path.join(cwd, 'notes.py')} add "buy milk"`);
 
     expect(await rig.handle.verifyTurn(rig.ctx)).toBe(true);
@@ -774,7 +892,7 @@ describe("the README's promises reach the model (reachability, not logic)", () =
       verify: { runBash: passingBash(), detectCheck: () => null },
     });
     await startSession(rig);
-    rig.handle.applyPreset('coding', rig.ctx);
+    rig.handle.applyPreset(rig.ctx);
     await workedOn(rig, cwd, `python3 ${path.join(cwd, 'notes.py')} add "buy milk"`);
 
     await rig.handle.verifyTurn(rig.ctx);
@@ -790,7 +908,7 @@ describe("the README's promises reach the model (reachability, not logic)", () =
       verify: { runBash: passingBash(), detectCheck: () => null },
     });
     await startSession(rig);
-    rig.handle.applyPreset('coding', rig.ctx);
+    rig.handle.applyPreset(rig.ctx);
     await workedOn(rig, cwd, `python3 ${path.join(cwd, 'notes.py')} add x`);
 
     expect(await rig.handle.verifyTurn(rig.ctx)).toBe(false);

@@ -100,7 +100,7 @@ describe('effortSliderView', () => {
      * the harness) down to `low`, and the position always agrees with the effort
      * actually running. The third argument is the tier, and it is now inert here.
      */
-    expect(effortSliderView('auto', 'low', 'intelligent')).toMatchObject({
+    expect(effortSliderView('auto', 'low')).toMatchObject({
       auto: true,
       index: 0,
       fill: 0,
@@ -108,7 +108,7 @@ describe('effortSliderView', () => {
       valueText: 'Effort, adaptive',
     });
 
-    const bal = effortSliderView('auto', 'medium', 'fast');
+    const bal = effortSliderView('auto', 'medium');
     expect(bal.auto).toBe(true);
     expect(bal.label).toBe('Effort · Adaptive');
     expect(bal.valueText).toBe('Effort, adaptive');
@@ -117,14 +117,14 @@ describe('effortSliderView', () => {
 
     // max is REACHABLE from Adaptive now — the old tier mapping topped out at
     // 'high', which is the whole reason the corporation went unoffered.
-    const top = effortSliderView('auto', 'max', 'fast');
+    const top = effortSliderView('auto', 'max');
     expect(top.label).toBe('Effort · Adaptive');
     expect(top.index).toBe(3);
     expect(top.fill).toBeCloseTo(1, 5);
   });
 
   it('auto + no tier yet: still reads "Effort · Adaptive", resting the knob on the explicit level', () => {
-    expect(effortSliderView('auto', 'high', null)).toMatchObject({
+    expect(effortSliderView('auto', 'high')).toMatchObject({
       auto: true,
       label: 'Effort · Adaptive',
       valueText: 'Effort, adaptive',
@@ -132,17 +132,17 @@ describe('effortSliderView', () => {
     });
     // Regardless of the resting level, the auto readout is "Adaptive" (the user #12 —
     // a distinct word from the model chip's "Auto").
-    expect(effortSliderView('auto', 'medium', null).label).toBe('Effort · Adaptive');
+    expect(effortSliderView('auto', 'medium').label).toBe('Effort · Adaptive');
   });
 
   it('level mode: pins the explicit level (max reachable), ignoring the tier', () => {
-    expect(effortSliderView('level', 'max', 'fast')).toMatchObject({
+    expect(effortSliderView('level', 'max')).toMatchObject({
       auto: false,
       index: 3,
       fill: 1,
       label: 'Effort · Max',
     });
-    expect(effortSliderView('level', 'low', 'intelligent')).toMatchObject({
+    expect(effortSliderView('level', 'low')).toMatchObject({
       auto: false,
       index: 0,
       fill: 0,

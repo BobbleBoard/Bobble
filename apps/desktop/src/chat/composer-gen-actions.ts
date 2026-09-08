@@ -1,27 +1,20 @@
 /**
- * Composer "+" modality force-actions → harness class + prompt scaffold (spec
- * §3.2). Kept in a pure, React-free module so it unit-tests in the node env and
- * stays the single source of truth mapping the UI's {@link GenActionKey} to the
- * keystone `forcedClass` seam.
+ * Composer "+" modality actions → the prompt scaffold they prefill. Kept in a
+ * pure, React-free module so it unit-tests in the node env and stays the single
+ * source of truth for the UI's {@link GenActionKey}.
  *
- * The `forcedClass` is TYPE-checked against the harness's `TaskClass` via a
- * TYPE-ONLY import (the barrel's value graph is renderer-hostile — see
- * auto-router.ts — but its types erase at build), so a plan can never name a
- * class the classifier doesn't have: it's a compile error, not a silent miss.
+ * These used to also pin a harness TASK CLASS, which loaded a toolset for the
+ * next send. Task classification is gone: there is one base set now and every
+ * other toolset arrives through `capability`, which lands inside the turn that
+ * asks for it. So "Generate an image of …" reaches the generation tools the same
+ * way any other phrasing does, and the button's job is back to what it says on
+ * it — putting the words in the box.
  */
-import type { TaskClass } from '@pi-desktop/harness';
 import type { GenActionKey } from '@pi-desktop/ui';
 
-export type { GenActionKey, TaskClass };
+export type { GenActionKey };
 
 export interface GenActionPlan {
-  /**
-   * The harness task class this force-action pins for the next send. Fed into
-   * both the renderer Auto-route classify (via `forcedClass`) and the
-   * `/harness preset` toolset pin, so "+ → Generate video" deterministically
-   * loads the advanced-video preset no matter how the prompt reads.
-   */
-  readonly forcedClass: TaskClass;
   /**
    * A tiny prompt scaffold prefilled into the composer editor when the action is
    * chosen. Deliberately plain natural language (NOT a `/slash` lead-in, which
@@ -41,25 +34,21 @@ export interface GenActionPlan {
 /** One plan per "+" gen row. Keys mirror {@link GenActionKey} exactly. */
 export const GEN_ACTION_PLANS: Record<GenActionKey, GenActionPlan> = {
   image: {
-    forcedClass: '2d-art',
     scaffold: 'Generate an image of ',
     pill: 'Generate image',
     icon: 'image',
   },
   video: {
-    forcedClass: 'advanced-video',
     scaffold: 'Generate a video of ',
     pill: 'Generate video',
     icon: 'video',
   },
   motion: {
-    forcedClass: 'motion-graphics',
     scaffold: 'Create a motion-graphics animation of ',
     pill: 'Motion graphics',
     icon: 'motion',
   },
   perception: {
-    forcedClass: 'perception',
     scaffold: 'Find and segment ',
     pill: 'Find / segment',
     icon: 'search',

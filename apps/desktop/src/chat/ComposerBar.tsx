@@ -303,15 +303,13 @@ function ContextRegion() {
 
 /** RIGHT: the "Effort" button that opens the effort slider in a popover. */
 function EffortRegion() {
-  const status = useHarnessStatus();
-  const activeTier = status?.activeTier ?? null;
   const effortMode = useEffortMode();
   const effort = useSettingsStore((s) => s.settings.effort);
-  const view = effortSliderView(effortMode, effort, activeTier);
+  const view = effortSliderView(effortMode, effort);
 
   // Dragging/keying to a detent pins an explicit level; the Auto affordance
-  // returns to auto and leaves the level where it is — the next message's
-  // classification moves it. (It used to snap to the active model tier's level,
+  // returns to auto and leaves the level where it is. (It used to snap to the
+  // active model tier's level,
   // which is how choosing a small model quietly capped thinking at `low`.)
   const onLevelChange = (index: number): void => {
     void useSettingsStore.getState().update({ effortMode: 'level', effort: levelForIndex(index) });

@@ -80,7 +80,12 @@ export interface SnapElementLike {
   readonly index: number;
   readonly name: string;
   readonly role: string;
-  readonly bbox?: { readonly x: number; readonly y: number; readonly w: number; readonly h: number };
+  readonly bbox?: {
+    readonly x: number;
+    readonly y: number;
+    readonly w: number;
+    readonly h: number;
+  };
 }
 
 export interface MacSessionState {
@@ -127,9 +132,7 @@ function distance(el: SnapElementLike, x: number, y: number): number {
 function contains(el: SnapElementLike, x: number, y: number): boolean {
   const b = el.bbox;
   if (b === undefined) return false;
-  return (
-    x >= b.x - b.w / 2 && x <= b.x + b.w / 2 && y >= b.y - b.h / 2 && y <= b.y + b.h / 2
-  );
+  return x >= b.x - b.w / 2 && x <= b.x + b.w / 2 && y >= b.y - b.h / 2 && y <= b.y + b.h / 2;
 }
 
 /** Build a fresh session state (one per extension instance / pi session). */

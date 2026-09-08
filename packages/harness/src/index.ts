@@ -28,16 +28,6 @@ import type {
 } from '@mariozechner/pi-coding-agent';
 import { createBashToolDefinition } from '@mariozechner/pi-coding-agent';
 import { sharedTool, sharedToolNames } from '@pi-desktop/tool-bus';
-import {
-  type AsyncClassifier,
-  type ClassifyInput,
-  type ClassifyMessage,
-  classify,
-  TASK_CLASSES,
-  type TaskClass,
-} from './classify/classify.js';
-import { createClassifierEscalation } from './classify/escalation.js';
-import { modelTierForClass } from './classify/tier.js';
 import { corpToolEnabled, registerCreateHierarchyTool } from './corp/promote-tool.js';
 import { CREATE_PRODUCTION_HIERARCHY } from './corp/promotion.js';
 import { effortKnobs, isEffortLevel } from './effort/effort.js';
@@ -45,11 +35,7 @@ import { HANDBACK_NUDGE, isChoiceHandback } from './loop/handback.js';
 import { createLoopDetector, type LoopDetector, loopDetectorConfig } from './loop/loop-detector.js';
 import { newSameCallState, noteRepeatedCall } from './loop/same-call.js';
 import { unfinishedPlan, unfinishedPlanNudge } from './loop/unfinished-plan.js';
-import {
-  parseModelParams,
-  smallModelCapabilityWarning,
-  smallModelWarning,
-} from './model/model-size.js';
+import { parseModelParams, smallModelCapabilityWarning } from './model/model-size.js';
 import { type CallModel, callModelFromEnv } from './model-call/call-model.js';
 import { warmSystemPrompt } from './model-call/warmup.js';
 import { createOfflineLatch, NETWORK_TOOLS, OFFLINE_TOOL_NOTE } from './net/offline.js';
@@ -61,7 +47,7 @@ import {
   registerPermissions,
 } from './permissions/modes.js';
 import { capabilityForTool } from './presets/capabilities.js';
-import { PRESET_TOOLS, resolvePresetTools } from './presets/presets.js';
+import { resolveBaseTools } from './presets/presets.js';
 import { augmentSystemPrompt } from './prompt/capability-prompt.js';
 import { sameWording } from './prompt/same-wording.js';
 import { shortDescription } from './prompt/short-description.js';
@@ -78,7 +64,6 @@ import { registerScheduledTaskTool } from './scheduled/schedule-tool.js';
 import { registerSkillInstructions } from './skills/skill-instructions.js';
 import {
   DEFAULT_CONFIG,
-  HARNESS_CLASSIFY_ENTRY,
   HARNESS_CONFIG_ENTRY,
   HARNESS_LOOP_ENTRY,
   HARNESS_REPAIR_ENTRY,
@@ -104,6 +89,12 @@ import {
   MAX_SUBAGENT_DEPTH,
   readSubagentDepth,
 } from './subagent/types.js';
+import {
+  type ConversationTitler,
+  createConversationTitler,
+  type TitleInput,
+  type TitleMessage,
+} from './title/conversation-title.js';
 import { registerAskUser } from './tools/ask-user.js';
 import { registerCapabilityTool } from './tools/capability-tool.js';
 import { diagnoseEditFailure } from './tools/edit-diagnosis.js';
@@ -283,8 +274,7 @@ interface HarnessRuntime {
    * resolution is the fallback, never the override.
    */
   workspaceRoot: string | null;
-  activeClass: TaskClass | null;
-  /** Conversation title from the classify+title piggyback (computed once). */
+  /** Conversation title, produced by the background titler (computed once). */
   title: string | null;
   /**
    * The STABLE system prompt reused byte-for-byte on every turn (and by the
@@ -373,7 +363,7 @@ export interface HarnessHandle {
   readonly controller: PermissionController;
   getConfig(): HarnessConfig;
   getStatus(ctx: ExtensionContext): HarnessStatus;
-  applyPreset(cls: TaskClass, ctx: ExtensionContext): void;
+  applyPreset(ctx: ExtensionContext): void;
   /** The live repair deps currently pushed to the provider (for tests/telemetry). */
   buildRepairDeps(): LiveRepairDeps;
   /** Run the reviewer/adversarial passes for a finished turn (effort-gated). */
@@ -440,8 +430,8 @@ function buildConversationPrefix(
    * send it twice.
    */
   ensureLastUser = true,
-): ClassifyMessage[] {
-  const messages: ClassifyMessage[] = [];
+): TitleMessage[] {
+  const messages: TitleMessage[] = [];
   if (systemPrompt.trim().length > 0) messages.push({ role: 'system', content: systemPrompt });
   for (const e of entries) {
     if (e.type !== 'message') continue;
@@ -533,8 +523,6 @@ const HELP = [
   '  status                     show + republish the harness status',
   '  set-mode <bypass|reviewer|review-all>',
   '  effort <low|medium|high|max>',
-  `  preset <auto|${TASK_CLASSES.join('|')}>`,
-  '  classify <text>            debug: classify a prompt',
   '  restore [path]             list what this turn changed, or put one file back',
 ].join('\n');
 
@@ -878,7 +866,6 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
   const runtime: HarnessRuntime = {
     config: DEFAULT_CONFIG,
     workspaceRoot: null,
-    activeClass: null,
     title: null,
     canonicalSystemPrompt: null,
     activeTools: [],
@@ -1036,8 +1023,8 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
   let postTurnWork: AbortController | null = null;
   /** Timer for the deliberate pause before post-turn work starts. */
   let postTurnTimer: ReturnType<typeof setTimeout> | null = null;
-  const asyncClassifier: AsyncClassifier | undefined =
-    callModel !== undefined ? createClassifierEscalation(callModel) : undefined;
+  const titler: ConversationTitler | undefined =
+    callModel !== undefined ? createConversationTitler(callModel) : undefined;
 
   /**
    * Fire-and-forget: prime the server's KV with the DETERMINISTIC prefix — the
@@ -1225,12 +1212,8 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
       );
     }
     const canonical = runtime.canonicalSystemPrompt;
-    /* 'other', NOT 'coding' — see the turn-time site below. The warm set has to
-       be the turn's set exactly, so these two move together or the prefix they
-       share is worth nothing. */
-    const warmClass: TaskClass = runtime.config.preset === 'auto' ? 'other' : runtime.config.preset;
     // Build the tool list in the SAME ORDER a real turn does (applyPreset unions
-    // resolvePresetTools' order), NOT pi.getAllTools() registry order.
+    // resolveBaseTools' order), NOT pi.getAllTools() registry order.
     /*
      * THE WARM SET MUST BE THE TURN'S SET, EXACTLY.
      *
@@ -1262,9 +1245,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
      * with the set settled, was 306ms.
      */
     const warmNames =
-      runtime.activeTools.length > 0
-        ? runtime.activeTools.slice()
-        : resolvePresetTools(warmClass, available);
+      runtime.activeTools.length > 0 ? runtime.activeTools.slice() : resolveBaseTools(available);
     if (
       corpToolEnabled(runtime.config.effort) &&
       available.includes(CREATE_PRODUCTION_HIERARCHY) &&
@@ -1603,7 +1584,15 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     if (
       !knobs.realVerify ||
       verifyBash === undefined ||
-      (runtime.activeClass !== 'coding' && runtime.activeClass !== 'file-ops') ||
+      /*
+       * WHAT THE TURN TOUCHED, not what a classifier guessed it would be. The
+       * gate used to read `activeClass === 'coding' || 'file-ops'` — a keyword
+       * guess made before the turn ran, and one that has been pinned to a
+       * constant since the classifier was switched off, so in practice this
+       * whole branch was permanently false. Files actually written is the
+       * signal it always wanted.
+       */
+      runtime.touchedFiles.length === 0 ||
       runtime.config.mode === 'review-all'
     ) {
       runtime.verifyActive = false;
@@ -2298,8 +2287,6 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     const usage = ctx.getContextUsage();
     return {
       ...runtime.config,
-      activeClass: runtime.activeClass,
-      activeTier: runtime.activeClass !== null ? modelTierForClass(runtime.activeClass) : null,
       title: runtime.title,
       activeTools: runtime.activeTools,
       model: runtime.model?.id ?? null,
@@ -2577,11 +2564,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     ].join('\n');
   }
 
-  function applyPreset(
-    cls: TaskClass,
-    ctx: ExtensionContext,
-    extraTools: readonly string[] = [],
-  ): void {
+  function applyPreset(ctx: ExtensionContext, extraTools: readonly string[] = []): void {
     const available = pi.getAllTools().map((t) => t.name);
     /*
      * A SPECIALIST CHILD IS PINNED, not preset. the user: "with just these tools
@@ -2597,7 +2580,6 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     if (toolCliMode) {
       const pinned = TOOL_CLI_PINNED.filter((t) => available.includes(t));
       if (pinned.length > 0) {
-        runtime.activeClass = cls;
         if (
           pinned.length !== runtime.activeTools.length ||
           pinned.some((t, i) => runtime.activeTools[i] !== t)
@@ -2613,7 +2595,6 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     if (specialist !== undefined) {
       const pinned = specialistToolset(specialist, available);
       if (pinned.length > 0) {
-        runtime.activeClass = cls;
         if (
           pinned.length !== runtime.activeTools.length ||
           pinned.some((t, i) => runtime.activeTools[i] !== t)
@@ -2629,9 +2610,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     // Forbidden tools are blocked at `tool_call` regardless; dropping them here
     // as well means the model is never offered one, so it never spends a turn
     // being refused.
-    const preset = [...resolvePresetTools(cls, available), ...extraTools].filter(
-      (t) => !forbidden.has(t),
-    );
+    const preset = [...resolveBaseTools(available), ...extraTools].filter((t) => !forbidden.has(t));
     // The active tool list is rendered at the START of the prompt (chat templates
     // emit tools before the messages), so it is part of the KV-cached prefix. If
     // we blindly re-set it every turn, a NEW user message churns that prefix and
@@ -2680,7 +2659,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
              * all" cannot be answered from outside, and it is the first thing
              * worth knowing.
              */
-            `  cls=${cls} prompt=${JSON.stringify(String(runtime.lastPrompt ?? '').slice(0, 120))}\n` +
+            `  prompt=${JSON.stringify(String(runtime.lastPrompt ?? '').slice(0, 120))}\n` +
             `  available(${available.length}): ${available.join(',')}\n` +
             `  target(${target.length}): ${target.join(',')}\n`,
         );
@@ -2704,7 +2683,6 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     } else if (!wantCorp && target.includes(CREATE_PRODUCTION_HIERARCHY)) {
       target = target.filter((t) => t !== CREATE_PRODUCTION_HIERARCHY);
     }
-    runtime.activeClass = cls;
     // Only touch the tool set (and thus the cached prefix) when it actually
     // changed — by length OR membership (the corp tool can be added or removed).
     const changed =
@@ -2713,11 +2691,6 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     if (changed) {
       pi.setActiveTools(target);
       runtime.activeTools = target;
-    }
-    // Warn if the current model is too small for an advanced task.
-    if (runtime.model !== null) {
-      const warning = smallModelWarning(runtime.model, cls);
-      if (warning !== null && ctx.hasUI) ctx.ui.notify(warning, 'warning');
     }
     // Keep the renderer's predictive-prefill tools in sync with what's now
     // resident on the slot (deduped ⇒ a no-op when the set didn't grow).
@@ -2934,24 +2907,6 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     // post-turn background pass (agent_end) that never blocks the reply. Re-add
     // per-task classify later if the routing proves worth the latency.
     /*
-     * THE DEFAULT CLASS IS NEUTRAL, NOT `coding`.
-     *
-     * Every ordinary turn was classified `coding`, which is why a launch
-     * checklist for a coffee subscription came back saying "deploy to
-     * production", "verify deployment success (health checks)" and "monitor
-     * error rates" — and why the model, asked what it could do, answered
-     * "Hello! I'm a local coding agent". The class also picks the tools, so
-     * `python_run` and the fs trio rode every turn: `ls`, `find` and `grep`,
-     * which CORE_FILE_TOOLS' own comment says `bash` already covers.
-     *
-     * `other` is the existing neutral fallback (preset `[]`), so the model keeps
-     * every always-active tool and loses only the four that said "coder" out
-     * loud. It is a CONSTANT like `coding` was, which is the property that
-     * matters: the class must not vary per message or the KV prefix churns and
-     * every turn pays a fresh prefill.
-     */
-    const cls: TaskClass = runtime.config.preset === 'auto' ? 'other' : runtime.config.preset;
-    /*
      * SEMANTIC TOOL PRELOAD IS GONE. the user: "ensure that semantic tool preload is
      * not happening per turn or at all."
      *
@@ -2969,40 +2924,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
      * The preset alone is deterministic, matches the model-load warm-up prefix,
      * and a role that needs something else can still reach for `tool_search`.
      */
-    applyPreset(cls, ctx);
-    /*
-     * COMPUTER USE IS THE ONE THING THE CONSTANT CLASS CANNOT COVER.
-     *
-     * Everything above argues for a class that never varies with the wording of
-     * a message, and it is right: the tool schemas sit in the prompt prefix, so
-     * a set that moves per message is a prefix that is never reused.
-     *
-     * But the mac tools had NO route at all. There is no class for them, and the
-     * `capability` door cannot open mid-turn — pi resolves a tool call against
-     * the array snapshotted when the run began, so a group activated during a
-     * task lands only after the task is over. MEASURED, four tasks, both
-     * interfaces: the model asked for the capability, was told "on … mac_launch,
-     * mac_snapshot, mac_click", and then every one of 34 provider requests
-     * carried the same 14 tools with no mac tool among them. It shelled out to
-     * `open -a`, wrote a `reminders.json`, and finally told the user to press the
-     * buttons themselves.
-     *
-     * So: one cheap deterministic heuristic, HERE — before the run starts, which
-     * is the last moment the tool array can still change for this turn — and only
-     * when the user has actually asked for one of their own apps. No model call,
-     * no latency. It fires once per session: the tools are appended and stay, so
-     * the churn is a single re-prefill on the turn that needed them, which is the
-     * bounded price this file already accepts for a real capability. A session
-     * that never mentions an app never pays it.
-     */
-    if (!runtime.activeTools.includes('mac_snapshot')) {
-      const prompt = String(runtime.lastPrompt ?? '');
-      if (prompt !== '' && classify({ prompt }).class === 'computer-use') {
-        const names = pi.getAllTools().map((t) => t.name);
-        activateCapability(PRESET_TOOLS['computer-use'].filter((t) => names.includes(t)));
-      }
-    }
-    pi.appendEntry(HARNESS_CLASSIFY_ENTRY, { class: cls, turnIndex: runtime.turnIndex });
+    applyPreset(ctx);
     // Replace the turn's system prompt with the capability-affirming version.
     return { systemPrompt: augmentedSystemPrompt };
   });
@@ -3101,14 +3023,14 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     let nameLater: (() => void) | null = null;
     // Auto-name the conversation after a turn concludes (the user) — now that
     // classification is gone from the turn path, naming is a post-turn background
-    // pass so it NEVER blocks the reply. Reuses the cache-sharing {title,class}
+    // pass so it NEVER blocks the reply. Reuses the cache-sharing title
     // piggyback (the just-run turn's KV is resident, so only the tiny title
-    // instruction + answer are new); we keep only the title. Fire-and-forget.
+    // instruction + answer are new). Fire-and-forget.
     //
     // Gated on the title still being MISSING rather than on turn 1: a fast typist
     // aborts the first attempt, and a chat that never gets a name because the
     // user replied quickly is worse than naming it one turn later.
-    if (runtime.title === null && asyncClassifier !== undefined && runtime.lastPrompt !== null) {
+    if (runtime.title === null && titler !== undefined && runtime.lastPrompt !== null) {
       const namePrompt = runtime.lastPrompt;
       // Use the SAME frozen system prompt the turn ran on so the naming request
       // shares the conversation's resident KV (cheap) instead of re-prefilling.
@@ -3118,7 +3040,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
           typeof ctx.getSystemPrompt === 'function' ? ctx.getSystemPrompt() : '',
           {},
         );
-      const input: ClassifyInput = {
+      const input: TitleInput = {
         prompt: namePrompt,
         turnIndex: 1,
         priorMessages: buildConversationPrefix(getEntries(ctx), sys, namePrompt, false),
@@ -3133,7 +3055,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
         signal: work.signal,
       };
       nameLater = () =>
-        void asyncClassifier(input, classify(input)).then((r) => {
+        void titler(input).then((r) => {
           if (r?.title !== undefined && work.signal.aborted !== true) setTitle(r.title, ctx);
         });
     }
@@ -3430,10 +3352,6 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
   pi.on('model_select', (event, ctx) => {
     runtime.currentCtx = ctx;
     runtime.model = { id: event.model.id, name: event.model.name };
-    if (runtime.activeClass !== null) {
-      const warning = smallModelWarning(runtime.model, runtime.activeClass);
-      if (warning !== null && ctx.hasUI) ctx.ui.notify(warning, 'warning');
-    }
     publishStatus(ctx);
     // Preemptively prime the DETERMINISTIC prefix (canonical system prompt + the
     // initial tool set) BEFORE the user's first message, so it only prefills its
@@ -3447,7 +3365,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
 
   // /harness command protocol.
   pi.registerCommand('harness', {
-    description: 'Configure the harness: set-mode, effort, preset, status, classify, restore.',
+    description: 'Configure the harness: set-mode, effort, status, restore.',
     handler: async (args: string, ctx: ExtensionCommandContext) => {
       const trimmed = args.trim();
       const spaceIdx = trimmed.indexOf(' ');
@@ -3539,7 +3457,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
            * `applyPreset` only touches the active set when it actually changed,
            * so re-applying the SAME class here is free when nothing moved.
            */
-          if (runtime.activeClass !== null) applyPreset(runtime.activeClass, ctx);
+          applyPreset(ctx);
           publishStatus(ctx);
           const k = effortKnobs(rest);
           ctx.ui.notify(
@@ -3569,37 +3487,6 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
           return;
         }
 
-        case 'preset': {
-          const value = rest.toLowerCase();
-          if (value !== 'auto' && !(TASK_CLASSES as readonly string[]).includes(value)) {
-            ctx.ui.notify(
-              `Unknown preset "${rest}". Use auto or: ${TASK_CLASSES.join(', ')}.`,
-              'error',
-            );
-            return;
-          }
-          runtime.config = updateConfig(runtime.config, {
-            preset: value as HarnessConfig['preset'],
-          });
-          persistConfig();
-          if (value !== 'auto') applyPreset(value as TaskClass, ctx);
-          else publishStatus(ctx);
-          ctx.ui.notify(`preset → ${value}`);
-          return;
-        }
-
-        case 'classify': {
-          if (rest.length === 0) {
-            ctx.ui.notify('Usage: /harness classify <text>');
-            return;
-          }
-          const r = classify({ prompt: rest });
-          ctx.ui.notify(
-            `class: ${r.class}\nconfidence: ${r.confidence.toFixed(2)}${r.ambiguous ? ' (ambiguous)' : ''}\nsignals: ${r.signals.join(', ')}`,
-          );
-          return;
-        }
-
         default:
           ctx.ui.notify(`Unknown subcommand "${sub}".\n${HELP}`, 'error');
       }
@@ -3624,34 +3511,6 @@ export default function activate(pi: ExtensionAPI): void {
 
 // --- Public API re-exports -------------------------------------------------
 
-export {
-  type AsyncClassifier,
-  type Attachment,
-  type ClassifyInput,
-  type ClassifyMessage,
-  type ClassifyOptions,
-  type ClassifyResult,
-  classify,
-  TASK_CATEGORIES,
-  TASK_CLASSES,
-  TASK_TIERS,
-  type TaskCategory,
-  type TaskClass,
-  type TaskTier,
-} from './classify/classify.js';
-export { createClassifierEscalation } from './classify/escalation.js';
-export {
-  COARSE_TIERS,
-  COARSE_TO_MODEL,
-  type CoarseTier,
-  coarseTier,
-  isCoarseTier,
-  isModelTier,
-  MODEL_TIERS,
-  type ModelTier,
-  modelTierForClass,
-  TIER_LABEL,
-} from './classify/tier.js';
 export {
   corpToolEnabled,
   PROMOTE_STATUS_KEY,
@@ -3683,16 +3542,19 @@ export {
   toolCallSignature,
 } from './loop/loop-detector.js';
 export {
-  ADVANCED_CLASSES,
   inspectModelSize,
-  isAdvancedClass,
   isSmallModel,
   type ModelLike,
   type ModelSizeInfo,
   parseModelParams,
   SMALL_MODEL_THRESHOLD_B,
-  smallModelWarning,
 } from './model/model-size.js';
+export {
+  isModelTier,
+  MODEL_TIERS,
+  type ModelTier,
+  TIER_LABEL,
+} from './model/tier.js';
 export {
   type CallModel,
   type CallModelRequest,
@@ -3732,10 +3594,8 @@ export {
 export {
   ALWAYS_ACTIVE_TOOLS,
   isToolSearchOnly,
-  PRESET_TOOLS,
   type ResolvePresetOptions,
-  resolvePresetTools,
-  SUBAGENT_PRESET_CLASSES,
+  resolveBaseTools,
   TOOL_SEARCH_TOOL_NAME,
 } from './presets/presets.js';
 export {
@@ -3804,7 +3664,6 @@ export {
   PLAN_ITEM_STATUSES,
   type PlanItem,
   type PlanItemStatus,
-  type PresetSelection,
   restoreConfig,
   type StoredEntryLike,
   updateConfig,

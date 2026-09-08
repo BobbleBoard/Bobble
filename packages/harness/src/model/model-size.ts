@@ -7,24 +7,8 @@
  * harness warns the user that quality may suffer.
  */
 
-import type { TaskClass } from '../classify/classify.js';
-
 /** Models at or below this parameter count (billions) are "small". */
 export const SMALL_MODEL_THRESHOLD_B = 12;
-
-/**
- * Task classes that meaningfully stress a small local model. `other` is
- * included: its tool-search / connector / integration work is open-ended and
- * multi-step, so a ≤12B model warrants the same small-model warning.
- */
-export const ADVANCED_CLASSES: ReadonlySet<TaskClass> = new Set<TaskClass>([
-  'browser-use',
-  'motion-graphics',
-  'advanced-video',
-  '3d',
-  '2d-art',
-  'other',
-]);
 
 /** Minimal structural view of a model (avoids depending on pi-ai's Model<any>). */
 export interface ModelLike {
@@ -78,11 +62,11 @@ export function isSmallModel(
  * Capabilities that stress a small local model, keyed by capability name
  * (`presets/capabilities.ts`) rather than by task class.
  *
- * WHY NOT THE TASK CLASS. `ADVANCED_CLASSES` above is the brief's original
- * framing and it stopped being reachable when per-turn classification was
- * removed: `cls` is now the preset, and under the default Auto that is always
- * `'coding'`, which is deliberately not advanced. So the warning the brief asked
- * for could not fire on the case it was written for — a 4B asked to do 3D work.
+ * WHY NOT THE TASK CLASS. The brief's original framing was a set of "advanced"
+ * task classes, and it was never once reachable: per-turn classification was
+ * removed for TTFT, so the class was a constant and the warning could not fire
+ * on the case it was written for — a 4B asked to do 3D work. Classification is
+ * gone entirely now; this is what replaced it.
  *
  * A capability the model actually REACHES FOR is better evidence than a guess
  * about the prompt anyway: it fires when the risk materialises, it works the
@@ -108,24 +92,4 @@ export function smallModelCapabilityWarning(
   if (!isSmall || !DEMANDING_CAPABILITIES.has(capability)) return null;
   const size = params !== null ? `${params}B` : 'small';
   return `${model.name ?? model.id} (~${size}) is small for ${capability} work — results may be unreliable. Consider a larger model.`;
-}
-
-/** True when the class is one that stresses a small model. */
-export function isAdvancedClass(cls: TaskClass): boolean {
-  return ADVANCED_CLASSES.has(cls);
-}
-
-/**
- * Decide whether to warn: a small model paired with an advanced task class.
- * Returns a ready-to-show message, or null when no warning is warranted.
- */
-export function smallModelWarning(
-  model: ModelLike,
-  cls: TaskClass,
-  thresholdB: number = SMALL_MODEL_THRESHOLD_B,
-): string | null {
-  const { params, isSmall } = inspectModelSize(model, thresholdB);
-  if (!isSmall || !isAdvancedClass(cls)) return null;
-  const size = params !== null ? `${params}B` : 'small';
-  return `${model.name ?? model.id} (~${size}) is small for a "${cls}" task — results may be unreliable. Consider a larger model.`;
 }

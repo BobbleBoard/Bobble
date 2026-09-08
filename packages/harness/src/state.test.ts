@@ -17,15 +17,15 @@ describe('restoreConfig', () => {
       {
         type: 'custom',
         customType: HARNESS_CONFIG_ENTRY,
-        data: { mode: 'bypass', effort: 'low', preset: 'coding' },
+        data: { mode: 'bypass', effort: 'low' },
       },
       {
         type: 'custom',
         customType: HARNESS_CONFIG_ENTRY,
-        data: { mode: 'review-all', effort: 'max', preset: 'auto' },
+        data: { mode: 'review-all', effort: 'max' },
       },
     ];
-    expect(restoreConfig(entries)).toEqual({ mode: 'review-all', effort: 'max', preset: 'auto' });
+    expect(restoreConfig(entries)).toEqual({ mode: 'review-all', effort: 'max' });
   });
 
   it('ignores unrelated and malformed entries', () => {
@@ -42,7 +42,6 @@ describe('restoreConfig', () => {
     expect(restoreConfig(entries)).toEqual({
       mode: DEFAULT_CONFIG.mode,
       effort: 'medium',
-      preset: 'auto',
     });
   });
 });
@@ -50,7 +49,7 @@ describe('restoreConfig', () => {
 describe('updateConfig', () => {
   it('applies valid patches and rejects invalid ones', () => {
     const next = updateConfig(DEFAULT_CONFIG, { mode: 'bypass', effort: 'high' });
-    expect(next).toEqual({ mode: 'bypass', effort: 'high', preset: 'auto' });
+    expect(next).toEqual({ mode: 'bypass', effort: 'high' });
 
     const bad = updateConfig(DEFAULT_CONFIG, {
       // biome-ignore lint/suspicious/noExplicitAny: intentionally invalid input.
@@ -59,9 +58,5 @@ describe('updateConfig', () => {
       effort: 'ultra' as any,
     });
     expect(bad).toEqual(DEFAULT_CONFIG);
-  });
-
-  it('updates the preset selection', () => {
-    expect(updateConfig(DEFAULT_CONFIG, { preset: 'browser-use' }).preset).toBe('browser-use');
   });
 });

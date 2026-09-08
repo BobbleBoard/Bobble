@@ -20,7 +20,7 @@
 // (matches auto-router.ts's source-import fix). Types from the barrel are fine
 // (erased at build).
 import type { ChatMsg } from '@pi-desktop/engine';
-import { type ModelTier, TIER_LABEL } from '../../../../packages/harness/src/classify/tier.ts';
+import { type ModelTier, TIER_LABEL } from '../../../../packages/harness/src/model/tier.ts';
 import type { EffortLevel, EffortMode } from '../../electron/settings/settings-contract';
 import { EFFORT_STEPS, levelToSlider } from '../state/model-selection';
 import { classLabel } from './harness-status';
@@ -134,19 +134,14 @@ export interface EffortSliderView {
  * pins the explicit level and reads "Effort · <Level>" (max is only reachable
  * here, by an explicit drag).
  */
-export function effortSliderView(
-  effortMode: EffortMode,
-  effort: EffortLevel,
-  _activeTier: ModelTier | null,
-): EffortSliderView {
+export function effortSliderView(effortMode: EffortMode, effort: EffortLevel): EffortSliderView {
   if (effortMode === 'auto') {
     // In Auto the readout says "Adaptive" ("Effort · Adaptive"), NOT the resolved
     // level — it means "let routing pick the effort". A distinct word from the
     // model chip's "Auto" (the user #12) so the two never read as duplicate "Auto"s.
-    // The knob rests at the level Adaptive last RESOLVED, which the classifier
-    // writes into `effort` per message. It used to be re-derived from the active
-    // model tier, so the knob could never reach max and disagreed with the level
-    // the harness was actually running.
+    // The knob rests at the level Adaptive last resolved. It used to be
+    // re-derived from the active model tier, so the knob could never reach max
+    // and disagreed with the level the harness was actually running.
     const level = effort;
     const index = Math.max(0, EFFORT_STEPS.indexOf(level));
     const fill = levelToSlider(level);

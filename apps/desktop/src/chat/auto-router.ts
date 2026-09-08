@@ -34,15 +34,12 @@
 // and node/browser-safe, so a direct source import keeps the bundle clean. (A
 // tidier fix would be a renderer-safe `@pi-desktop/harness/classify` subpath
 // export — that's W5's package to touch.)
-import { classify, type TaskClass } from '../../../../packages/harness/src/classify/classify.ts';
 import {
   asksForTheTeam,
-  effortForClass,
   MODEL_TIERS,
   type ModelTier,
-  modelTierForClass,
   TIER_LABEL,
-} from '../../../../packages/harness/src/classify/tier.ts';
+} from '../../../../packages/harness/src/model/tier.ts';
 import type { LlmTierPick } from '../../electron/ipc-contract';
 import type { EffortLevel, ModelSelection } from '../../electron/settings/settings-contract';
 import { useLlmStore } from '../state/llm-store';
@@ -67,45 +64,29 @@ export function tierRank(tier: ModelTier): number {
 
 // --- Pure classification / resolution --------------------------------------
 
-/** Classify a prompt and map it to the capability tier the Auto router targets.
- * A `forcedClass` (from a composer "+" force-action) short-circuits the heuristic
- * so the routed model matches the pinned task class regardless of prompt text.
+/**
+ * AUTO PICKS ONE MODEL AND STAYS THERE.
  *
- * `priorClass` + `turnIndex` thread the SAME conversation-continuity signal the
- * harness's own classifier uses (a terse follow-up like "continue" inherits the
- * prior task's class). Sourcing `priorClass` from the harness's published
- * `activeClass` is how the app router's tier-1 stays in lock-step with the
- * harness's classification for a task (see {@link maybeRouteAuto}) — without it
- * the app would reclassify a bare "continue" from scratch and disagree on the
- * model mid-task. */
-export function classForPrompt(
-  prompt: string,
-  opts: {
-    hasImages?: boolean;
-    forcedClass?: TaskClass;
-    priorClass?: TaskClass;
-    turnIndex?: number;
-  } = {},
-): TaskClass {
-  return classify({
-    prompt,
-    hasImages: opts.hasImages,
-    forcedClass: opts.forcedClass,
-    priorClass: opts.priorClass,
-    turnIndex: opts.turnIndex,
-  }).class;
-}
-
-export function tierForPrompt(
-  prompt: string,
-  opts: {
-    hasImages?: boolean;
-    forcedClass?: TaskClass;
-    priorClass?: TaskClass;
-    turnIndex?: number;
-  } = {},
-): ModelTier {
-  return modelTierForClass(classForPrompt(prompt, opts));
+ * This used to classify every send, map the guessed task class to a tier, and
+ * hard-restart llama-server whenever the tier moved — seconds of dead air in the
+ * middle of a conversation, plus a full re-prefill, decided by which keywords
+ * happened to be in one message. the user: "totally remove task classification, that
+ * should have been a deprecated feature so long ago."
+ *
+ * Auto now means "the best model this machine actually runs": the most capable
+ * tier whose model is on disk. It is resolved from the catalog, not the prompt,
+ * so it does not change mid-conversation and the cached prefix survives.
+ */
+export function autoTier(
+  tierModels: Record<ModelTier, LlmTierPick> | undefined,
+  downloadedModelIds: readonly string[],
+): ModelTier | null {
+  if (tierModels === undefined) return null;
+  // Most capable first — MODEL_TIERS is ordered fast → intelligent.
+  for (const tier of [...MODEL_TIERS].reverse()) {
+    if (downloadedModelIds.includes(tierModels[tier].modelId)) return tier;
+  }
+  return null;
 }
 
 /** The tier whose resolved model matches `modelId` (the currently-running one),
@@ -391,15 +372,10 @@ function tierModels(): Record<ModelTier, LlmTierPick> | undefined {
  * model for a task. Both null before the harness has classified (a fresh task's
  * first turn), where the app's own tier-1 bootstraps the pick.
  */
-function harnessTaskContext(): {
-  priorClass: TaskClass | undefined;
-  activeTier: ModelTier | null;
-} {
-  const status = parseHarnessStatus(usePiStore.getState().extensionStatus.harness);
-  return {
-    priorClass: status?.activeClass ?? undefined,
-    activeTier: status?.activeTier ?? null,
-  };
+function harnessTaskContext(): { activeTier: ModelTier | null } {
+  // The harness no longer publishes a task class or a routed tier — it does not
+  // choose models any more. "Where we are" is simply what is running.
+  return { activeTier: null };
 }
 
 /** Prior user turns in the thread (0-based turn index for the classifier's
@@ -484,7 +460,7 @@ async function performSwitch(tier: ModelTier, pick: LlmTierPick): Promise<void> 
  */
 export async function maybeRouteAuto(
   prompt: string,
-  opts: { hasImages?: boolean; forcedClass?: TaskClass } = {},
+  _opts: { hasImages?: boolean } = {},
 ): Promise<void> {
   try {
     // The model is LOCKED once a turn is in flight — Auto only (re)picks a model
@@ -493,52 +469,33 @@ export async function maybeRouteAuto(
     // stack two llama restarts.
     const inFlight = agentInFlight() || useModelSelectionStore.getState().switching !== null;
 
-    // Agree with the harness (see {@link harnessTaskContext}): feed its authoritative
-    // `activeClass` into our tier-1 as the continuity prior, and anchor the
-    // hysteresis on its published `activeTier`.
-    const { priorClass, activeTier } = harnessTaskContext();
-    // Classify ONCE and use it for both decisions: which model to run, and how
-    // hard to think. They are different questions about the same judgement.
-    const taskClass = classForPrompt(prompt, {
-      hasImages: opts.hasImages,
-      forcedClass: opts.forcedClass,
-      priorClass,
-      turnIndex: priorUserTurns(),
-    });
-
     /*
-     * EFFORT IS DECIDED FOR EVERY SEND, PINNED MODEL OR NOT.
+     * EFFORT IS A SETTING, NOT A GUESS.
      *
-     * Choosing a model and choosing how hard to think are different decisions,
-     * and only the first one is disabled by pinning. This whole function used to
-     * return early when the selection wasn't Auto, so pinning any model froze
-     * Adaptive at whatever level it happened to hold — that plus the old
-     * tier-derived mapping is why "ask the manager to set up a Godot demo"
-     * replied that it had no tool for contacting a manager. It didn't:
-     * talk_to_manager is gated on high/max, and effort was stuck at medium.
-     *
-     * Still only at an idle boundary — never silently mid-stream.
+     * It used to be derived from the guessed task class on every send — a topic
+     * classifier answering a question about SIZE, which is how "ask the manager
+     * to set up a Godot demo" got told there was no tool for contacting a
+     * manager (talk_to_manager is gated on high/max; the class said medium).
+     * With classification gone the user's own effort setting stands, and only
+     * one thing still overrides it: saying so in plain words.
      */
-    /*
-     * An EXPLICIT request for the team overrides the classifier. "Ask the
-     * manager to ..." is not a hint about modality, it is an instruction, and
-     * answering "I don't have a tool for that" because a topic classifier
-     * guessed `basic-tools` is the harness overruling the user.
-     */
-    const level = asksForTheTeam(prompt) ? 'max' : effortForClass(taskClass);
-    if (!inFlight) await pushAutoEffort(level);
+    if (!inFlight && asksForTheTeam(prompt)) await pushAutoEffort('max');
 
     if (useSettingsStore.getState().settings.modelSelection.mode !== 'auto') return;
     const models = tierModels();
     if (models === undefined) return; // catalog not loaded → nothing to route to
 
     const currentModelId = useLlmStore.getState().status.model?.id ?? null;
-    const desiredTier = modelTierForClass(taskClass);
+    /*
+     * The SAME tier every send — the best one this machine has on disk. Auto
+     * used to re-decide per prompt and restart the server whenever the answer
+     * moved, which is seconds of dead air and a full re-prefill mid-conversation.
+     */
+    const desiredTier = autoTier(models, useLlmStore.getState().status.downloadedModelIds ?? []);
+    if (desiredTier === null) return;
+    const currentTier = tierForModelId(models, currentModelId);
 
     const pick = models[desiredTier];
-    // Prefer the harness's authoritative tier for "where we are"; fall back to the
-    // running model's tier before the harness has classified.
-    const currentTier = activeTier ?? tierForModelId(models, currentModelId);
 
     const sel = useModelSelectionStore.getState();
     const decision = decideRoute(

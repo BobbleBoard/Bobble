@@ -9,7 +9,6 @@ import { SegmentedControl } from '@pi-desktop/ui';
 import { useEffect, useState } from 'react';
 import type { EffortLevel, PermissionMode } from '../../../electron/settings/settings-contract';
 import { classLabel, useHarnessStatus } from '../../chat/harness-status';
-import { applyHarnessPreset } from '../../state/pi-connect';
 import { useSettingsStore } from '../../state/settings-store';
 import { SettingRow, SettingSection } from '../parts';
 
@@ -30,27 +29,6 @@ const EFFORT_HINT: Record<EffortLevel, string> = {
 export function AgentPanel() {
   const settings = useSettingsStore((s) => s.settings);
   const update = useSettingsStore((s) => s.update);
-
-  // The preset is owned by the harness session config (surfaced live via its
-  // published status); reflect it here and drive it with a slash command.
-  const harness = useHarnessStatus();
-  const [preset, setPreset] = useState<string>('auto');
-  useEffect(() => {
-    if (harness?.preset !== undefined) setPreset(harness.preset);
-  }, [harness?.preset]);
-
-  const activeClass = classLabel(harness?.activeClass ?? null);
-  const _presetHint =
-    preset === 'auto'
-      ? activeClass !== null
-        ? `The classifier picks a toolset per task. Currently active: ${activeClass}.`
-        : 'The classifier picks the toolset per task automatically.'
-      : 'Pin a fixed toolset for every task instead of auto-classifying.';
-
-  const _onPreset = (value: string) => {
-    setPreset(value);
-    void applyHarnessPreset(value);
-  };
 
   return (
     <SettingSection

@@ -1,24 +1,22 @@
 /**
- * Composer "+" force-action plans (spec §3.2): each modality key pins the right
- * harness class + a clean prompt scaffold. Pure, node-testable.
+ * Composer "+" modality actions: each key prefills a clean prompt scaffold.
+ * Pure, node-testable.
+ *
+ * These used to also pin a harness task class. Classification is gone, so what
+ * is left to assert is the part that was always doing the real work — the words
+ * the button puts in the box.
  */
 import { describe, expect, it } from 'vitest';
-import { CLASS_LABELS } from '../settings/panels/agent-presets';
 import { GEN_ACTION_PLANS, type GenActionKey } from './composer-gen-actions';
 
 const KEYS: GenActionKey[] = ['image', 'video', 'motion', 'perception'];
 
 describe('GEN_ACTION_PLANS', () => {
-  it('pins each "+" action to its harness task class', () => {
-    expect(GEN_ACTION_PLANS.image.forcedClass).toBe('2d-art');
-    expect(GEN_ACTION_PLANS.video.forcedClass).toBe('advanced-video');
-    expect(GEN_ACTION_PLANS.motion.forcedClass).toBe('motion-graphics');
-    expect(GEN_ACTION_PLANS.perception.forcedClass).toBe('perception');
-  });
-
-  it('only pins classes the harness taxonomy actually defines', () => {
+  it('covers every modality key, with a pill and an icon', () => {
     for (const key of KEYS) {
-      expect(GEN_ACTION_PLANS[key].forcedClass in CLASS_LABELS).toBe(true);
+      const plan = GEN_ACTION_PLANS[key];
+      expect(plan.pill.trim().length, key).toBeGreaterThan(0);
+      expect(plan.icon, key).toBeTruthy();
     }
   });
 

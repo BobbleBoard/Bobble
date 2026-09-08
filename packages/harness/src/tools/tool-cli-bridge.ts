@@ -25,6 +25,7 @@ import * as fs from 'node:fs';
 import net from 'node:net';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { retargetToolNames } from '../prompt/capability-prompt.js';
 import {
   buildCli,
   type CliGroupSpec,
@@ -32,7 +33,6 @@ import {
   type CliTool,
   resolveCli,
 } from './tool-cli.js';
-import { retargetToolNames } from '../prompt/capability-prompt.js';
 import { toolCliShimCommands } from './tool-cli-groups.js';
 
 export const TOOL_CLI_SOCK_ENV = 'PI_TOOLCLI_SOCK';
@@ -145,6 +145,8 @@ export function buildOpenWrapper(): string {
      * a name, and neither is a bare `-a` with nothing after it, so those still
      * refuse — with the app named when we know it.
      */
+    // biome-ignore-start lint/suspicious/noTemplateCurlyInString: these are SHELL
+    // parameter expansions inside a /bin/sh script, not JS template literals.
     'app=""',
     'prev=""',
     'flagged=""',
@@ -175,10 +177,10 @@ export function buildOpenWrapper(): string {
     '[ -n "$app" ] || app="${bundle:-the app}"',
     '    echo "Use: mac launch --app \\"$app\\" — it opens $app in the BACKGROUND and hands you back its window to act on. Then mac snapshot --app \\"$app\\" to see its controls. Running open -a again, quoted differently, will not work." >&2',
     'exit 127',
+    // biome-ignore-end lint/suspicious/noTemplateCurlyInString: end of shell script
     '',
   ].join('\n');
 }
-
 
 /**
  * How long a command may take before the shim gives up.

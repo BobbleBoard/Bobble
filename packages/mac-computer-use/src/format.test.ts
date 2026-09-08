@@ -668,7 +668,16 @@ describe('what the app is saying back', () => {
     app: 'Calculator',
     window: 'Calculator',
     elements: [
-      { index: 1, role: 'AXButton', name: 'Equals', x: 502, y: 820, w: 48, h: 48, actions: ['AXPress'] },
+      {
+        index: 1,
+        role: 'AXButton',
+        name: 'Equals',
+        x: 502,
+        y: 820,
+        w: 48,
+        h: 48,
+        actions: ['AXPress'],
+      },
     ],
     summary: { app: 'Calculator', window: 'Calculator', elementCount: 1, truncated: false },
   } as unknown as MacSnapshot;

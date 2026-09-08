@@ -1,13 +1,5 @@
-import { BROWSER_TOOL_NAMES } from '@pi-desktop/browser-use/tool-names';
 import { describe, expect, it } from 'vitest';
-import { TASK_CLASSES, type TaskClass } from '../classify/classify.js';
-import { SPAWN_SUBAGENT_TOOL_NAME } from '../subagent/types.js';
-import {
-  isToolSearchOnly,
-  PRESET_TOOLS,
-  resolvePresetTools,
-  TOOL_SEARCH_TOOL_NAME,
-} from './presets.js';
+import { resolveBaseTools, TOOL_SEARCH_TOOL_NAME } from './presets.js';
 
 /**
  * The WHOLE browser suite is advertised in every class, not just navigate +
@@ -17,7 +9,6 @@ import {
  * browser_click not found", and the model looped on snapshot instead. Imported
  * from browser-use rather than spelled out, so a rename fails to compile here.
  */
-const BROWSER_SUITE = BROWSER_TOOL_NAMES;
 
 // The full v0.1+ tool universe, as it would appear once every workstream lands.
 // The browser_* names are the REAL ones registered by @pi-desktop/browser-use.
@@ -82,15 +73,7 @@ const ALL_TOOLS = [
   TOOL_SEARCH_TOOL_NAME,
 ];
 
-describe('PRESET_TOOLS', () => {
-  it('has an entry for every task class', () => {
-    for (const cls of TASK_CLASSES) {
-      expect(PRESET_TOOLS[cls]).toBeDefined();
-    }
-  });
-});
-
-describe('resolvePresetTools — what every turn can reach', () => {
+describe('the base set — what every turn can reach', () => {
   /*
    * THE BASELINE IS A CEO'S BASELINE. the user: "it should always have the
    * commission tools… clean context ceo… no clutter with browser tools or
@@ -100,9 +83,10 @@ describe('resolvePresetTools — what every turn can reach', () => {
    *
    * MEASURED, runs 10-12: told to close its unknowns before briefing its
    * manager, the CEO delegated immediately every time — it had no web tool and
-   * no subagent tool, because a keyword classifier decided both. These assert
-   * the CONTRACT (what is reachable) rather than an exact array, so adding a
-   * tool to a class stops being a test edit.
+   * no subagent tool, because a keyword classifier decided both. There is no
+   * classifier any more: there is one base set, and everything else arrives
+   * through `capability`, which now actually lands inside the turn that asks
+   * for it.
    */
   const BASELINE = [
     'read',
@@ -118,152 +102,38 @@ describe('resolvePresetTools — what every turn can reach', () => {
     'capability',
   ];
 
-  it('gives EVERY class the baseline — search and a way to hand work out', () => {
-    for (const cls of Object.keys(PRESET_TOOLS) as TaskClass[]) {
-      const tools = resolvePresetTools(cls, ALL_TOOLS);
-      for (const t of BASELINE) {
-        expect(tools, `${cls} is missing ${t}`).toContain(t);
-      }
-    }
+  it('hands every turn the baseline — search, files, and a way to hand work out', () => {
+    const tools = resolveBaseTools(ALL_TOOLS);
+    for (const t of BASELINE) expect(tools, `missing ${t}`).toContain(t);
   });
 
-  it('advertises the WHOLE browser suite to a class that gets it', () => {
-    /*
-     * THE GUARD THIS FILE ALREADY DESCRIBED AND NO LONGER ASSERTED.
-     *
-     * `BROWSER_SUITE` sat here with its measured-cause comment and not one
-     * expectation reading it, so the invariant it documents — all ten names,
-     * not navigate + snapshot — was being carried by a comment. A run's tool
-     * array is snapshotted when the run begins, so a missing name cannot arrive
-     * later: `capability` said "browser is on … browser_click" and the very
-     * next browser_click answered "Tool browser_click not found".
-     */
-    const tools = resolvePresetTools('browser-use', ALL_TOOLS);
-    for (const name of BROWSER_SUITE) {
-      expect(tools, `browser-use was missing ${name}`).toContain(name);
-    }
+  it('is the SAME set every time — a prefix that moves is a prefix never reused', () => {
+    // The whole reason the per-task table went: tool schemas sit at the front of
+    // the prompt, so a set that varies with the wording of a message throws the
+    // KV cache away on every turn.
+    const a = resolveBaseTools(ALL_TOOLS);
+    const b = resolveBaseTools(ALL_TOOLS);
+    expect(a).toEqual(b);
   });
 
-  it('lets EVERY class hand work out', () => {
-    /*
-     * Handing work out is baseline, not a privilege of certain task classes.
-     * It was gated to `SUBAGENT_PRESET_CLASSES` once, which made "can this model
-     * commission anything" depend on how a keyword classifier read the prompt —
-     * and that is how a CEO told to research and commission specialists ended up
-     * able to do neither (MEASURED, runs 10-12).
-     *
-     * `presets.ts` says all of this in a comment beside the code that fixed it.
-     * Nothing asserted it, so the gate could come back silently.
-     */
-    for (const cls of TASK_CLASSES) {
-      const tools = resolvePresetTools(cls, ALL_TOOLS);
-      expect(tools, `${cls} cannot commission anything`).toContain(SPAWN_SUBAGENT_TOOL_NAME);
-    }
-  });
-
-  it('keeps the BROWSER suite out unless the class is about it', () => {
-    for (const cls of ['coding', 'simple-QA', 'other', 'file-ops'] as TaskClass[]) {
-      const tools = resolvePresetTools(cls, ALL_TOOLS);
-      expect(tools, `${cls} dragged in the browser suite`).not.toContain('browser_snapshot');
-    }
-  });
-
-  it('DOES carry the generation tools on every turn', () => {
-    /*
-     * THIS EXPECTATION IS A REVERSAL, and deliberately so. It used to assert the
-     * opposite — "a CEO commissions this work; it does not carry the tools
-     * around" — which was coherent while generation was something you delegated.
-     *
-     * the user: "from the chat interface, these backends should be connected. I
-     * should be able to go to a new chat and ask for any of these types of media
-     * or files, all are delivered." That is the browser argument in reverse: a
-     * suite you occasionally drive stays behind a class, and a verb you might
-     * reach for in ANY conversation has to be in hand.
-     *
-     * They cannot arrive another way. The per-turn class is hardcoded to
-     * 'coding', so no generation preset is ever selected, and `use` cannot
-     * dispatch another extension's tool.
-     */
-    for (const cls of ['coding', 'simple-QA', 'other', 'file-ops'] as TaskClass[]) {
-      const tools = resolvePresetTools(cls, ALL_TOOLS);
-      for (const t of ['generate_image', 'generate_video', 'generate_speech']) {
-        expect(tools, `${cls} could not reach ${t}`).toContain(t);
-      }
-    }
+  it('keeps the browser suite OUT — that is what `capability` is for', () => {
+    const tools = resolveBaseTools(ALL_TOOLS);
+    expect(tools).not.toContain('browser_snapshot');
+    expect(tools).not.toContain('mac_snapshot');
   });
 
   it('lists no generation tool a build has not registered', () => {
     // The filter that keeps this honest: a desktop without gen-tools advertises
-    // none of them rather than five names the grammar can emit and nothing can
-    // answer.
-    const tools = resolvePresetTools('coding', ['read', 'write', 'bash']);
+    // none of them rather than names the grammar can emit and nothing answers.
+    const tools = resolveBaseTools(['read', 'write', 'bash']);
     expect(tools.some((t) => t.startsWith('generate_'))).toBe(false);
   });
 
-  it('still front-loads the browser suite for a turn whose job IS a page', () => {
-    const tools = resolvePresetTools('browser-use', ALL_TOOLS);
-    expect(tools).toContain('browser_navigate');
-    expect(tools).toContain('browser_snapshot');
-    /* Round-10 #9: snapshot must be present and early — the model has to SEE
-       the page before it can click it. */
-    expect(tools.indexOf('browser_snapshot')).toBeLessThan(tools.indexOf('browser_click'));
-  });
-
-  it('front-loads each class its own domain tools', () => {
-    expect(resolvePresetTools('coding', ALL_TOOLS)).toContain('python_run');
-    expect(resolvePresetTools('2d-art', ALL_TOOLS)).toContain('generate_image');
-    expect(resolvePresetTools('perception', ALL_TOOLS)).toContain('image_segment');
-    expect(resolvePresetTools('video-edit', ALL_TOOLS)).toContain('extract_frames');
-    expect(resolvePresetTools('connectors', ALL_TOOLS).length).toBeGreaterThan(BASELINE.length);
-  });
-
   it('never lists a tool that is not registered', () => {
-    const tools = resolvePresetTools('coding', ['read', 'bash']);
+    const tools = resolveBaseTools(['read', 'bash']);
     expect(tools).toEqual(expect.arrayContaining(['read', 'bash']));
     expect(tools).not.toContain('web_search');
     expect(tools).not.toContain('spawn_subagent');
-  });
-});
-
-describe('resolvePresetTools — graceful degradation (v0.1 tool set)', () => {
-  // In v0.1 the generation/browser tools do not exist yet.
-  const V01_TOOLS = [
-    'read',
-    'write',
-    'edit',
-    'ls',
-    'find',
-    'grep',
-    'bash',
-    'python_run',
-    TOOL_SEARCH_TOOL_NAME,
-  ];
-
-  it('a category whose domain tools are absent falls back to file tools + capability', () => {
-    for (const cls of [
-      'motion-graphics',
-      'advanced-video',
-      '3d',
-      '2d-art',
-      'browser-use',
-    ] as const) {
-      // No domain tools registered → the class keeps only the always-active file
-      // tools + capability. It is NO LONGER bare tool-search-only: the user made
-      // read/write/edit/bash globally available so even a stripped class can act.
-      const tools = resolvePresetTools(cls, V01_TOOLS);
-      expect(tools).toEqual(['capability', 'read', 'write', 'edit', 'bash']);
-      expect(isToolSearchOnly(tools)).toBe(false);
-    }
-  });
-
-  it('never returns a tool that is not registered', () => {
-    const tools = resolvePresetTools('coding', V01_TOOLS);
-    for (const t of tools) expect(V01_TOOLS).toContain(t);
-  });
-
-  it('omits capability when it is not registered', () => {
-    const tools = resolvePresetTools('coding', ['read', 'bash']);
-    expect(tools).toEqual(['read', 'bash']);
   });
 });
 
@@ -276,13 +146,13 @@ describe('capability and use travel together', () => {
    */
   it('advertises BOTH, in every preset that gets discovery', () => {
     const universe = ['read', 'write', 'edit', 'bash', 'capability', 'use'];
-    const resolved = resolvePresetTools('coding', universe);
+    const resolved = resolveBaseTools(universe);
     expect(resolved).toContain('capability');
     expect(resolved).toContain('use');
   });
 
   it('adds neither when neither is registered', () => {
-    const resolved = resolvePresetTools('coding', ['read', 'bash']);
+    const resolved = resolveBaseTools(['read', 'bash']);
     expect(resolved).not.toContain('capability');
     expect(resolved).not.toContain('use');
   });
@@ -309,14 +179,12 @@ describe('present is always reachable', () => {
     'browser_snapshot',
   ];
 
-  it('is advertised in every task class', () => {
-    for (const cls of TASK_CLASSES) {
-      expect(resolvePresetTools(cls, withPresent), cls).toContain('present');
-    }
+  it('is advertised in the base set', () => {
+    expect(resolveBaseTools(withPresent)).toContain('present');
   });
 
   it('is omitted when the build never registered it', () => {
     const without = withPresent.filter((t) => t !== 'present');
-    expect(resolvePresetTools('coding', without)).not.toContain('present');
+    expect(resolveBaseTools(without)).not.toContain('present');
   });
 });

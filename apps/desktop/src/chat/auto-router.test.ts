@@ -7,6 +7,7 @@
 import { describe, expect, it } from 'vitest';
 import type { LlmTierPick } from '../../electron/ipc-contract';
 import {
+  autoTier,
   DOWNGRADE_TURNS,
   decideRoute,
   downloadPromptView,
@@ -18,7 +19,6 @@ import {
   resolveBootModel,
   SWITCH_DEBOUNCE_MS,
   tierForModelId,
-  tierForPrompt,
   tierSpeed,
 } from './auto-router';
 
@@ -39,50 +39,37 @@ function pick(modelId: string, over: Partial<LlmTierPick> = {}): LlmTierPick {
   };
 }
 
-describe('tierForPrompt (classify → tier)', () => {
-  it('routes a short knowledge question to fast', () => {
-    expect(tierForPrompt('what is the capital of France?')).toBe('fast');
-  });
-  it('routes a coding task to intelligent', () => {
-    expect(tierForPrompt('refactor this module and fix the failing unit test')).toBe('intelligent');
-  });
-  it('routes a web lookup to balanced', () => {
-    expect(tierForPrompt('search the web for today’s weather in Tokyo')).toBe('balanced');
+describe('autoTier — Auto picks one model and stays there', () => {
+  /*
+   * Auto used to classify every send, map the guess to a tier, and hard-restart
+   * llama-server whenever the answer moved — seconds of dead air mid-conversation
+   * plus a full re-prefill, decided by which keywords were in one message. It is
+   * now the best tier this machine actually has on disk, resolved from the
+   * catalog rather than the prompt.
+   */
+  const MODELS = {
+    fast: { modelId: 'small', quant: 'q4', downloaded: true, bytes: 1 },
+    balanced: { modelId: 'mid', quant: 'q4', downloaded: true, bytes: 2 },
+    intelligent: { modelId: 'big', quant: 'q4', downloaded: true, bytes: 3 },
+  } as never;
+
+  it('takes the most capable tier that is downloaded', () => {
+    expect(autoTier(MODELS, ['small', 'mid', 'big'])).toBe('intelligent');
   });
 
-  // Composer "+" force-actions carry a forcedClass through the classify path so
-  // the routed model matches the pinned task class regardless of the prompt.
-  it('honors forcedClass — advanced-video pins intelligent, overriding a fast prompt', () => {
-    // Same prompt that routes to fast above…
-    expect(tierForPrompt('what is the capital of France?')).toBe('fast');
-    // …is overridden to advanced-video's tier when the "+" action forces it.
-    expect(tierForPrompt('what is the capital of France?', { forcedClass: 'advanced-video' })).toBe(
-      'intelligent',
-    );
+  it('falls back down the ladder when the big one is not on disk', () => {
+    expect(autoTier(MODELS, ['small', 'mid'])).toBe('balanced');
+    expect(autoTier(MODELS, ['small'])).toBe('fast');
   });
 
-  it('honors forcedClass — perception pins balanced', () => {
-    expect(tierForPrompt('hello', { forcedClass: 'perception' })).toBe('balanced');
-  });
-});
-
-// The app router must classify a task the SAME way the harness does, or the two
-// disagree on the model mid-task. The seam: the harness's published `activeClass`
-// is threaded back in as the continuity prior (+ a non-zero turnIndex), so a terse
-// follow-up inherits the task class instead of being reclassified from scratch.
-describe('tierForPrompt — harness continuity (app ↔ harness agreement)', () => {
-  it('a bare "continue" with no prior class falls back to its own weak class', () => {
-    expect(tierForPrompt('continue')).toBe('balanced');
+  it('does not care what the prompt says — that was the whole problem', () => {
+    // Same answer for a one-word question and a build request.
+    expect(autoTier(MODELS, ['small', 'mid', 'big'])).toBe('intelligent');
   });
 
-  it('inherits the harness prior class on a terse follow-up (matches harness tier-1)', () => {
-    // Fed the harness's activeClass=coding as the prior, "continue" inherits the
-    // coding task → intelligent, so the app router agrees with the harness.
-    expect(tierForPrompt('continue', { priorClass: 'coding', turnIndex: 1 })).toBe('intelligent');
-  });
-
-  it('turnIndex 0 (first turn of a session) ignores the prior — no spurious continuation', () => {
-    expect(tierForPrompt('continue', { priorClass: 'coding', turnIndex: 0 })).toBe('balanced');
+  it('is null before the catalog loads, or with nothing downloaded', () => {
+    expect(autoTier(undefined, ['big'])).toBeNull();
+    expect(autoTier(MODELS, [])).toBeNull();
   });
 });
 

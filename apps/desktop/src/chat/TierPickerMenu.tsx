@@ -24,7 +24,7 @@ import {
   IconPin,
 } from '@pi-desktop/ui';
 import type { ReactNode } from 'react';
-import type { ModelTier } from '../../../../packages/harness/src/classify/tier.ts';
+import type { ModelTier } from '../../../../packages/harness/src/model/tier.ts';
 import { DownloadBar } from '../models/DownloadBar';
 import { compactBytes } from '../models/models-layout';
 import { downloadFraction, type LlmDownloadState, useLlmStore } from '../state/llm-store';

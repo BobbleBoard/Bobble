@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { CAPABILITIES } from '../presets/capabilities';
-import { PRESET_TOOLS } from '../presets/presets';
 import { toolCliGroups } from './tool-cli-groups';
 
 /**
@@ -23,10 +22,16 @@ import { toolCliGroups } from './tool-cli-groups';
  * written down; that one sees what is true.
  */
 
-/** Everything schemas mode can put in front of a model, from the static tables. */
+/**
+ * Everything schemas mode can put in front of a model.
+ *
+ * This used to union a per-task tool table with the capabilities. The table is
+ * gone — there is one base set now, and every other toolset arrives through
+ * `capability` — so the capabilities ARE the surface, which is a tighter
+ * statement of the same guard.
+ */
 function schemaReachable(): Set<string> {
   const out = new Set<string>();
-  for (const tools of Object.values(PRESET_TOOLS)) for (const t of tools) out.add(t);
   for (const cap of CAPABILITIES) for (const t of cap.tools) out.add(t);
   return out;
 }

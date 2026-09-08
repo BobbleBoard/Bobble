@@ -29,7 +29,6 @@ import { useCorpStore } from '../state/corp-store';
 import { useImagesUnsupported } from '../state/local-model';
 import {
   abortPi,
-  applyHarnessPreset,
   compactSession,
   getCommands,
   newSession,
@@ -64,7 +63,7 @@ import {
 import { useDropStore } from './composer/drop-store';
 import type { PillData } from './composer/pill-node';
 import { type AcToken, EMPTY_TOKEN } from './composer/tokens';
-import { GEN_ACTION_PLANS, type TaskClass } from './composer-gen-actions';
+import { GEN_ACTION_PLANS } from './composer-gen-actions';
 import { DictationBar } from './DictationBar';
 import { IconWarning } from './icons-pill';
 import { StarterChips } from './StarterChips';
@@ -520,11 +519,6 @@ export function ChatComposer({
    * the harness per message. The menu renders the row again the moment an
    * `onWebSearchChange` handler is passed.
    */
-  // A composer "+" force-action (spec §3.2) pins the harness task class for the
-  // NEXT send; consumed + cleared in submit(). Drives the renderer Auto-route
-  // classify via `forcedClass` (the toolset preset is pinned eagerly on select,
-  // over the `/harness preset` seam).
-  const [forcedClass, setForcedClass] = useState<TaskClass | null>(null);
   // #19: whether the (empty-state) placeholder overflows the visible editor and
   // must fade at the bottom rather than hard-clip. Measured below.
   const [phClipped, setPhClipped] = useState(false);
@@ -1124,16 +1118,11 @@ export function ChatComposer({
      * an imag" behind.
      */
     apiRef.current?.insertPill({ label: plan.pill, payload: plan.scaffold, icon: plan.icon });
-    setForcedClass(plan.forcedClass);
-    void applyHarnessPreset(plan.forcedClass);
   };
 
   const submit = async () => {
     const raw = text.trim();
     if (raw === '' && attachments.length === 0) return;
-    // One-shot: capture + clear the pinned class so only THIS send is forced.
-    const pinnedClass = forcedClass;
-    setForcedClass(null);
     const imageUris = attachments
       .filter((a) => a.kind === 'image')
       .map((a) => a.dataUri)
@@ -1284,12 +1273,11 @@ export function ChatComposer({
         text: echo,
         images: imageUris,
         agentMessage,
-        taskClass: pinnedClass ?? undefined,
         reason,
       });
       return;
     }
-    await sendPrompt(echo, imageUris, agentMessage, pinnedClass ?? undefined);
+    await sendPrompt(echo, imageUris, agentMessage);
   };
 
   // THEME 4 click-target fix: clicking any blank area of the composer focuses

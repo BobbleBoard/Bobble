@@ -11,7 +11,6 @@ import {
   type ImageContent,
   rehydrateSessionJsonl,
 } from '@pi-desktop/engine';
-import type { TaskClass } from '@pi-desktop/harness';
 import { createResumeSplitter, type ResumeEvent } from '@pi-desktop/provider-llamacpp/resume';
 import { conversationNameFrom } from '../../electron/workspace/project-dir';
 import { ensureChatServerReady, maybeRouteAuto } from '../chat/auto-router';
@@ -150,14 +149,7 @@ export function connectPi(): () => void {
   // in pi-slice (`createQueueDrain`) where they are unit-testable; this only binds
   // the dispatcher.
   const unsubscribeQueue = usePiStore.subscribe(
-    createQueueDrain((head) =>
-      sendPrompt(
-        head.text,
-        head.images,
-        head.agentMessage,
-        head.taskClass as TaskClass | undefined,
-      ),
-    ),
+    createQueueDrain((head) => sendPrompt(head.text, head.images, head.agentMessage)),
   );
 
   // Report the viewed chat's session to main so a model-spawned subagent
@@ -420,7 +412,6 @@ export async function sendPrompt(
   message: string,
   imageDataUris: string[] = [],
   agentMessage?: string,
-  forcedClass?: TaskClass,
 ) {
   // A chat is still streaming in the BACKGROUND ⇒ pi is busy on another session.
   // Queue this send for the viewed chat rather than dispatch it into the background
@@ -432,7 +423,6 @@ export async function sendPrompt(
       text: message,
       images: imageDataUris,
       ...(agentMessage !== undefined ? { agentMessage } : {}),
-      ...(forcedClass !== undefined ? { taskClass: forcedClass } : {}),
     });
     return;
   }
@@ -509,7 +499,7 @@ export async function sendPrompt(
       // Round-12 Auto router (W3): when the selection is Auto, classify this prompt and
       // switch the running model to the routed tier BEFORE dispatch. Awaited; no-op
       // unless mode==='auto'; never throws.
-      await maybeRouteAuto(agentMessage ?? message, { hasImages: false, forcedClass });
+      await maybeRouteAuto(agentMessage ?? message, { hasImages: false });
       // Guarantee the selected model's server is up + the model is loaded before we
       // POST — otherwise pi fetches a dead/loading endpoint → "fetch failed" / 503.
       // WAITS for a loading server (never restarts it); starts one only if none is
@@ -1125,12 +1115,6 @@ export async function syncWorkspace(opts: {
     await applyWorkspace(dir);
   }
   return dir;
-}
-
-export async function applyHarnessPreset(preset: string): Promise<void> {
-  await window.piDesktop
-    .invoke('pi:prompt', { message: `/harness preset ${preset}` })
-    .catch(() => {});
 }
 
 export async function getModels() {
