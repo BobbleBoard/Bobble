@@ -25,3 +25,7 @@ vendor/genoffice/embed/out/
 
 # Agent worktrees (each is its own clone; never part of a commit here)
 .claude/worktrees/
+
+# Recorded frames — the video is the artefact, not the thousands of PNGs
+scratchpad/mac-video/frames/
+scratchpad/mac-video/frames.txt
