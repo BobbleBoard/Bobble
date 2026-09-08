@@ -35,7 +35,12 @@ const OUT = process.env.OUT_DIR ?? '/Users/user/Desktop/OSS-harness/scratchpad/m
 const FPS = Number(process.env.FPS ?? 8);
 const MODEL_ID = process.env.MAC_CU_MODEL ?? 'qwen3.5-4b-mtp';
 const MARKER = 'Bobble drove this';
-const PROMPT = `Open TextEdit on my Mac and type "${MARKER}" into a new document.`;
+/*
+ * Phrased the way the prompt claims to understand it. The capability summary
+ * lists exactly these forms — "Use <app>", "open <app> and…", "do it in <app>"
+ * — so this is a test of the mapping the product advertises, not a hint.
+ */
+const PROMPT = process.env.PROMPT ?? `Use TextEdit to write "${MARKER}".`;
 const DEADLINE_MS = Number(process.env.DEADLINE_MS ?? 300_000);
 
 const log = [];

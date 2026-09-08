@@ -55,8 +55,32 @@ function unquote(s: string): string {
  * Deliberately conservative: `open` inside a longer pipeline, or a path that is
  * plainly a directory, is not treated as launching an app to drive.
  */
+/**
+ * Detect AppleScript that drives a Mac app.
+ *
+ * `open -a` is not the only shell route into an application, and blocking it
+ * only moved the model along to the next one. MEASURED, qwen3.5-9b, asked to
+ * use TextEdit: after `open -a` was refused it ran
+ * `osascript -e 'tell application "TextEdit" to activate'` and then set the
+ * document's text by script. It reported success, the text really was there,
+ * and none of it went through the tools this feature exists to provide — while
+ * `activate` did the very thing the refusal was protecting against.
+ *
+ * This is a signpost, not a fence: osascript has legitimate uses and refusing
+ * it would be a dead end. What it earns is the same note `open` gets.
+ */
+export function detectScriptedApp(command: string): OpenedTarget | undefined {
+  const m = /\btell\s+application\s+("[^"]+"|'[^']+'|\S+)/i.exec(command);
+  if (m === null) return undefined;
+  const app = unquote(m[1] ?? '');
+  if (app === '' || /^(system\s+events|finder)$/i.test(app)) return undefined;
+  return { app, chrome: CHROME_NAMES.test(app) };
+}
+
 export function detectOpenedApp(command: string): OpenedTarget | undefined {
   const cmd = command.trim();
+  const scripted = /\bosascript\b/.test(cmd) ? detectScriptedApp(cmd) : undefined;
+  if (scripted !== undefined) return scripted;
   // Only a command that STARTS with open (or a trivial `cd x && open …` tail).
   const openPart = /(?:^|&&\s*|;\s*)open\s+([^\n]*)$/m.exec(cmd);
   if (openPart === null) return undefined;

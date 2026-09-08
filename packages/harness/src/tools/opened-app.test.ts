@@ -115,3 +115,32 @@ describe('a web page opened from the shell with no browser named', () => {
     expect(opened.strayWebPage).toBeUndefined();
   });
 });
+
+describe('AppleScript is the other way into a Mac app', () => {
+  it('recognises `tell application "X"` and treats it like open -a', () => {
+    // MEASURED, qwen3.5-9b: with `open -a` refused, it ran
+    // `osascript -e 'tell application "TextEdit" to activate'` and scripted the
+    // document instead — reporting success while `activate` did exactly the
+    // thing the refusal was protecting against.
+    const t = detectOpenedApp(
+      `osascript -e 'tell application "TextEdit" to set text of document 1 to "hi"'`,
+    );
+    expect(t?.app).toBe('TextEdit');
+    expect(t?.chrome).toBe(false);
+  });
+
+  it('knows when the app it is scripting is Chrome', () => {
+    const t = detectOpenedApp(`osascript -e 'tell application "Google Chrome" to activate'`);
+    expect(t?.chrome).toBe(true);
+  });
+
+  it('leaves System Events and Finder alone — those are the OS, not an app being driven', () => {
+    expect(
+      detectOpenedApp(`osascript -e 'tell application "System Events" to keystroke "a"'`),
+    ).toBeUndefined();
+  });
+
+  it('ignores osascript that is not telling an application anything', () => {
+    expect(detectOpenedApp(`osascript -e 'return 1 + 1'`)).toBeUndefined();
+  });
+});
