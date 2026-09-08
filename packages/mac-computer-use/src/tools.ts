@@ -399,19 +399,23 @@ export function registerMacComputerUseTools(
                 'Accessibility in the background.',
             );
           }
-          if (controlled !== null && controlled.app !== '') {
-            /* Focus it first, or the keystrokes go wherever the user is. */
-            await bridge
-              .request<MacLaunchAck>('launch', { app: controlled.app, background: false })
-              .catch(() => undefined);
-            await sleep(SETTLE_MS);
-          }
-          const ack = await bridge.request<MacActAck>('type', { text, submit });
+
+          /*
+           * STAMPED WITH THE TARGET, so this stays in the background.
+           *
+           * `postToPid` puts keystrokes in one process's own event queue, so a
+           * named app is typed into wherever ITS key window has focus while the
+           * user keeps working in theirs. Without the pid the helper falls back
+           * to the SYSTEM focus, which is the whole reason index-less typing
+           * was dangerous — and the reason it was refused rather than aimed.
+           */
+          const ack = await bridge.request<MacActAck>('type', withTarget({ text, submit }));
           await sleep(SETTLE_MS);
           const where =
             controlled !== null && controlled.visualOnly === true
-              ? `Typed into ${controlled.app || 'the app'} — it has no Accessibility tree, so this ` +
-                'went to its focused field as keystrokes. Snapshot again to see the result.'
+              ? `Typed into ${controlled.app || 'the app'} — it exposes no Accessibility elements, ` +
+                `so this went to its focused field as keystrokes.${backgroundNote(ack)} ` +
+                'Snapshot again to see the result.'
               : `Typed into the focused field.${backgroundNote(ack)}`;
           return textResult(where, {
             action: 'type',

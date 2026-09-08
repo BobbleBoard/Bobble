@@ -27,6 +27,11 @@ class FakeBridge implements MacBridge {
   countOf(method: MacAgentMethod): number {
     return this.calls.filter((c) => c.method === method).length;
   }
+
+  /** The params of the LAST call to `method` — what actually went on the wire. */
+  lastParams(method: MacAgentMethod): Record<string, unknown> | undefined {
+    return this.calls.filter((c) => c.method === method).at(-1)?.params;
+  }
 }
 
 const SNAP = (elements: unknown[] = [], pid = 4242) => ({
@@ -180,18 +185,20 @@ describe('registerMacComputerUseTools', () => {
    * the model to do something impossible. the user: "if an app is not visually
    * controllable … type needs to just type into active field."
    */
-  it('types into an app that exposes no Accessibility, after bringing it forward', async () => {
+  it('types into an app that exposes no Accessibility, in the background', async () => {
     const bridge = new FakeBridge()
       .on('snapshot', () => SNAP([], 555)) // no elements → visual only
-      .on('launch', () => ({ ok: true, app: 'Preview', pid: 555 }))
-      .on('type', () => ({ found: true }));
+      .on('type', () => ({ found: true, background: true, mode: 'keystrokesToPid' }));
     const tools = collectTools(bridge);
     await run(tools, 'mac_snapshot', { app: 'Preview' });
     const r = await run(tools, 'mac_type', { text: 'hello', submit: true });
     expect(details(r).ok).toBe(true);
     expect(bridge.countOf('type')).toBe(1);
-    // Keystrokes follow the system focus, so it has to be frontmost first.
-    expect(bridge.countOf('launch')).toBe(1);
+    /* Stamped with the target's pid, so the helper delivers the keystrokes to
+     * THAT process rather than to whatever the user is looking at — no window
+     * comes forward, nothing is stolen. */
+    expect(bridge.lastParams('type')).toMatchObject({ pid: 555, text: 'hello' });
+    expect(bridge.countOf('launch')).toBe(0);
   });
 
   // --- background/foreground flag (AX-action path) ---------------------------

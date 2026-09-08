@@ -126,9 +126,22 @@ private func doClick(_ params: [String: Any]) -> [String: Any] {
 private func doType(_ params: [String: Any]) -> [String: Any] {
   let text = stringOf(params["text"]) ?? ""
   let submit = boolOf(params["submit"])
-  // Focused typing (no index) is the foreground path: synthetic keystrokes land
-  // in whatever holds the SYSTEM focus.
+  // Typing with no index. An app that exposes nothing to Accessibility has no
+  // index to give, so this is the ONLY path into it — and it does not have to
+  // be the foreground one. `postToPid` puts the keystrokes in one process's own
+  // event queue, so a named target is typed into wherever ITS key window has
+  // focus, while the user keeps whatever they were doing. Only a call with no
+  // target at all falls back to the system focus, which is the genuine
+  // "type into the frontmost field" case.
   guard let index = intOf(params["index"]) else {
+    if let raw = intOf(params["pid"]) {
+      let pid = pid_t(raw)
+      typeTextToPid(pid, text)
+      if submit { postKeyToPid(pid, flags: [], key: 36) }
+      return [
+        "found": true, "mode": "keystrokesToPid", "background": true, "submitted": submit,
+      ]
+    }
     withCoordinateLock {
       typeText(text)
       if submit { postKey(flags: [], key: 36) }
