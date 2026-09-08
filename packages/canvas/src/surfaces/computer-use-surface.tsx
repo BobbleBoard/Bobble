@@ -46,6 +46,7 @@ import {
 } from './computer-use-feed.ts';
 import {
   annotationScale,
+  blendPlacement,
   bubbleAnchor,
   coverCrop,
   cursorEase,
@@ -83,11 +84,26 @@ const RIPPLE_MS = 620;
 /** Corner radius of a macOS window, at real size. */
 const WINDOW_RADIUS = 11;
 /**
- * Below this, `fitWindow` is drawing a picture of a window rather than a
- * window — measured: a 900×620pt window in the docked rail comes out at 0.45
- * and fills 26% of the tab. That is where `auto` switches to following.
+ * WHEN TO STOP FITTING THE WINDOW AND FOLLOW THE ACTION.
+ *
+ * This was 0.6, which is far too eager: a 900x620pt window in the rail fits at
+ * 0.45 and is perfectly readable there. the user watched it flip mid-run and was
+ * blunt about it — "there was no purpouse, the window being used could be seen
+ * absolutely just fine… I don't think there's ever a point aside from a really
+ * large window that literally can't fit on canvas screen without being
+ * comically small".
+ *
+ * So following is now reserved for that case, and the two thresholds are
+ * different on purpose: a single number means a window set that changes size —
+ * an app opening a second window, a sheet appearing — can sit on the boundary
+ * and flip the whole picture back and forth. Enter following only when the
+ * window really is comically small; leave it only once fitting is comfortably
+ * fine again.
  */
-const FIT_IS_TOO_SMALL = 0.6;
+const FOLLOW_ENTER_BELOW = 0.3;
+const FOLLOW_LEAVE_ABOVE = 0.42;
+/** How long a change of placement takes. It is a zoom, so it is animated. */
+const ZOOM_MS = 460;
 /** The smallest the followed crop is allowed to get. */
 const FOLLOW_MIN_SCALE = 0.85;
 /** How long the follow camera takes to pan, on the cursor's own curve. */
@@ -593,6 +609,11 @@ export function ComputerUseSurface({ feed, className }: ComputerUseSurfaceProps)
   /** Where the window was last drawn — what an act's picture is cropped from.
    * `painted` is what stops a chip being a black rectangle: the geometry is
    * known a beat before the first frame lands. */
+  /** Which placement `auto` settled on, and the one it drew last — the two
+   * halves of "do not flip the whole picture back and forth on a boundary". */
+  const autoMode = useRef<'fit' | 'follow'>('fit');
+  const lastMode = useRef<'fit' | 'follow' | null>(null);
+  const zoom = useRef<{ from: DrawnWindow; startedAt: number } | null>(null);
   const lastDrawn = useRef<{ drawn: DrawnWindow; rect: MacMonitorRect; painted: boolean } | null>(
     null,
   );
@@ -936,8 +957,14 @@ export function ComputerUseSurface({ feed, className }: ComputerUseSurfaceProps)
           }
         : (scrubbed?.point ?? screen);
 
-    const mode: 'fit' | 'follow' =
-      viewMode === 'auto' ? (fitted.scale < FIT_IS_TOO_SMALL ? 'follow' : 'fit') : viewMode;
+    if (viewMode === 'auto') {
+      if (autoMode.current === 'fit' && fitted.scale < FOLLOW_ENTER_BELOW) {
+        autoMode.current = 'follow';
+      } else if (autoMode.current === 'follow' && fitted.scale > FOLLOW_LEAVE_ABOVE) {
+        autoMode.current = 'fit';
+      }
+    }
+    const mode: 'fit' | 'follow' = viewMode === 'auto' ? autoMode.current : viewMode;
     let drawn = fitted;
     if (mode === 'follow') {
       // Pan on the cursor's own easing curve, and only when the point of
@@ -973,6 +1000,26 @@ export function ComputerUseSurface({ feed, className }: ComputerUseSurfaceProps)
       if (p < 1) dirty.current = true;
     } else {
       camera.current = null;
+    }
+
+    /*
+     * A CHANGE OF PLACEMENT IS A ZOOM, AND A ZOOM IS ANIMATED.
+     *
+     * Cutting straight from fitting to following moves the picture a long way
+     * on one frame, which reads as the recording jumping rather than as the
+     * view changing. Blend from wherever the last frame drew to wherever this
+     * one wants to, on the cursor's own curve.
+     */
+    const previous = lastDrawn.current?.drawn ?? null;
+    if (lastMode.current !== null && lastMode.current !== mode && previous !== null) {
+      zoom.current = { from: previous, startedAt: now };
+    }
+    lastMode.current = mode;
+    if (zoom.current !== null) {
+      const t = reduced ? 1 : cursorEase(Math.min(1, (now - zoom.current.startedAt) / ZOOM_MS));
+      drawn = blendPlacement(zoom.current.from, drawn, t);
+      if (t < 1) dirty.current = true;
+      else zoom.current = null;
     }
     const radius = WINDOW_RADIUS * drawn.scale;
 

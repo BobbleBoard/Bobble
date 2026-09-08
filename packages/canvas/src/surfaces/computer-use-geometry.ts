@@ -124,6 +124,28 @@ export function followWindow(
  * The visible slice of the window, in SCREEN POINTS — what the minimap outlines
  * and what the follow camera's dead zone is measured against.
  */
+/**
+ * Blend two placements — how a change of mode is ANIMATED rather than cut.
+ *
+ * Switching between fitting the window and following the action moves the
+ * picture a long way, and doing it on one frame reads as the video jumping.
+ * the user, watching it happen: "the zoom needs to be a smooth zoom if it's there
+ * at all". Both placements are the same four numbers plus a scale, so the
+ * blend is a straight interpolation and the scale stays consistent with the
+ * rect because it is interpolated with it.
+ */
+export function blendPlacement(from: DrawnWindow, to: DrawnWindow, t: number): DrawnWindow {
+  const p = Math.max(0, Math.min(1, t));
+  const mix = (a: number, b: number): number => a + (b - a) * p;
+  return {
+    x: mix(from.x, to.x),
+    y: mix(from.y, to.y),
+    w: mix(from.w, to.w),
+    h: mix(from.h, to.h),
+    scale: mix(from.scale, to.scale),
+  };
+}
+
 export function visibleRegion(content: Rect, viewport: Size, drawn: DrawnWindow): Rect {
   const k = drawn.scale <= 0 ? 1 : drawn.scale;
   const x = content.x + Math.max(0, -drawn.x) / k;

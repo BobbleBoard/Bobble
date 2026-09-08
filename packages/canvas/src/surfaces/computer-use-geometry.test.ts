@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   annotationScale,
+  blendPlacement,
   bubbleAnchor,
   coverCrop,
   cursorEase,
@@ -295,5 +296,29 @@ describe('cursorEase', () => {
       expect(v).toBeGreaterThanOrEqual(prev);
       prev = v;
     }
+  });
+});
+
+describe('blendPlacement', () => {
+  const a = { x: 0, y: 0, w: 100, h: 100, scale: 0.4 };
+  const b = { x: 20, y: 40, w: 300, h: 300, scale: 1 };
+
+  it('is the ends at the ends', () => {
+    expect(blendPlacement(a, b, 0)).toEqual(a);
+    expect(blendPlacement(a, b, 1)).toEqual(b);
+  });
+
+  it('keeps the scale consistent with the rect it is interpolated with', () => {
+    // The scale is what every annotation is sized by, so a blend that moved the
+    // rect without moving the scale would draw a cursor and a bubble at the
+    // wrong size for exactly the frames the eye is following.
+    const mid = blendPlacement(a, b, 0.5);
+    expect(mid.w).toBe(200);
+    expect(mid.scale).toBeCloseTo(0.7, 5);
+  });
+
+  it('clamps rather than overshooting', () => {
+    expect(blendPlacement(a, b, -1)).toEqual(a);
+    expect(blendPlacement(a, b, 4)).toEqual(b);
   });
 });

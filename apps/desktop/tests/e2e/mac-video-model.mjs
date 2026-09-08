@@ -1,0 +1,212 @@
+/**
+ * The REAL proof: a prompt typed into Bobble's composer, and a LOCAL MODEL
+ * deciding the Mac control calls that follow.
+ *
+ * The earlier recording drove the tools directly from the probe. That proves
+ * the mechanism and nothing about whether a model can use it, which is the
+ * question worth answering — the user spotted the difference immediately ("you just
+ * had it start in the canvas on its own with a hardcoded I assume invisible
+ * prompt"). Here nothing is scripted after the keystrokes: the probe types,
+ * presses Return, and then only watches and records.
+ *
+ * Recorded from Bobble's own window, which needs no capture grant.
+ */
+import { execFile } from 'node:child_process';
+import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { promisify } from 'node:util';
+import { _electron as electron } from 'playwright-core';
+import { probeHome } from './harness.mjs';
+
+const run = promisify(execFile);
+const osa = (s) => run('osascript', ['-e', s]).catch(() => undefined);
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const BUNDLE = process.env.BOBBLE_APP ?? '/Applications/Bobble.app';
+const OUT = process.env.OUT_DIR ?? '/Users/user/Desktop/OSS-harness/scratchpad/mac-video-model';
+const FPS = Number(process.env.FPS ?? 8);
+const MODEL_ID = process.env.MAC_CU_MODEL ?? 'qwen3.5-4b-mtp';
+const MARKER = 'Bobble drove this';
+const PROMPT = `Open TextEdit on my Mac and type "${MARKER}" into a new document.`;
+const DEADLINE_MS = Number(process.env.DEADLINE_MS ?? 300_000);
+
+const log = [];
+const started = Date.now();
+const say = (m) => {
+  log.push(`${((Date.now() - started) / 1000).toFixed(1)}s  ${m}`);
+  console.log(m);
+};
+
+rmSync(path.join(OUT, 'frames'), { recursive: true, force: true });
+mkdirSync(path.join(OUT, 'frames'), { recursive: true });
+
+await osa('tell application "TextEdit" to close every document without saving');
+await sleep(400);
+await osa('tell application "TextEdit" to quit saving no');
+await sleep(1400);
+
+const app = await electron.launch({
+  executablePath: path.join(BUNDLE, 'Contents/MacOS/Bobble'),
+  env: {
+    ...process.env,
+    HOME: probeHome('mac-video-model'),
+    PI_E2E: '1',
+    PI_E2E_BACKGROUND: '1',
+    PI_MAC_PRECONSENT: '1',
+  },
+  args: [`--user-data-dir=${mkdtempSync(path.join(tmpdir(), 'pi-vmodel-'))}`],
+});
+
+let shooting = true;
+let shot = 0;
+try {
+  const page = await app.firstWindow();
+  await page.waitForFunction(() => typeof window.piDesktop?.invoke === 'function', {
+    timeout: 30_000,
+  });
+  const dbg = async (op, params) => {
+    const res = await page.evaluate((r) => window.piDesktop.invoke('mac:debug', r), { op, params });
+    if (res.ok !== true) throw new Error(`${op}: ${res.error}`);
+    return res.result;
+  };
+
+  const camera = (async () => {
+    while (shooting) {
+      const at = Date.now();
+      try {
+        await page.screenshot({
+          path: path.join(OUT, 'frames', `f-${String(++shot).padStart(5, '0')}-${at}.png`),
+          animations: 'allow',
+        });
+      } catch {
+        /* mid-layout; skip */
+      }
+      await sleep(Math.max(0, 1000 / FPS - (Date.now() - at)));
+    }
+  })();
+
+  say(`grants: ${JSON.stringify(await dbg('check'))}`);
+
+  // ── the model ────────────────────────────────────────────────────────────
+  const startedServer = await page.evaluate(
+    (id) => window.piDesktop.invoke('llm:start-server', { modelId: id }),
+    MODEL_ID,
+  );
+  if (startedServer.success !== true) throw new Error(`llm:start-server: ${startedServer.error}`);
+  say(`model server up: ${MODEL_ID}`);
+  await page.evaluate(() => window.piDesktop.invoke('pi:restart', {}));
+  const models = await page.evaluate(() => window.piDesktop.invoke('pi:get-models', undefined));
+  const target = models.models.find((m) => m.provider === 'llamacpp');
+  if (target === undefined) throw new Error('no llamacpp model registered');
+  await page.evaluate(
+    (t) => window.piDesktop.invoke('pi:set-model', { provider: t.provider, modelId: t.id }),
+    target,
+  );
+  say(`model selected: ${target.id}`);
+  await sleep(2500);
+
+  // ── the prompt, typed like a person types it ─────────────────────────────
+  const editor = page.locator('[contenteditable="true"]').first();
+  await editor.click();
+  await page.keyboard.type(PROMPT, { delay: 45 });
+  await sleep(700);
+  await page.keyboard.press('Enter');
+  say(`sent: ${JSON.stringify(PROMPT)}`);
+
+  // ── watch, do not touch ──────────────────────────────────────────────────
+  const readState = () =>
+    page.evaluate(() => {
+      const ps = window.__pi_store().getState();
+      return {
+        streaming: ps.agent.isStreaming,
+        tools: ps.messages
+          .filter((m) => m.kind === 'assistant')
+          .flatMap((m) => m.blocks.filter((b) => b.type === 'toolCall').map((b) => b.name)),
+        results: ps.messages
+          .filter((m) => m.kind === 'toolResult')
+          .map((m) => ({ name: m.toolName, isError: m.isError === true })),
+        text: ps.messages
+          .filter((m) => m.kind === 'assistant')
+          .flatMap((m) => m.blocks.filter((b) => b.type === 'text').map((b) => b.text))
+          .join(' '),
+      };
+    });
+
+  const deadline = Date.now() + DEADLINE_MS;
+  let seen = 0;
+  let last = await readState();
+  while (Date.now() < deadline) {
+    last = await readState();
+    if (last.tools.length > seen) {
+      for (const name of last.tools.slice(seen)) say(`model called ${name}`);
+      seen = last.tools.length;
+    }
+    if (!last.streaming && last.tools.length > 0 && last.text.trim().length > 0) break;
+    await sleep(700);
+  }
+  say(`tool calls: ${JSON.stringify(last.tools)}`);
+  say(`tool results: ${JSON.stringify(last.results)}`);
+  say(`model said: ${JSON.stringify(last.text.slice(0, 220))}`);
+
+  // ── did it actually happen, on the app's own state ───────────────────────
+  try {
+    const snap = await dbg('snapshot', { app: 'TextEdit' });
+    const area = (snap.elements ?? []).find((e) => e.role === 'AXTextArea');
+    const value = String(area?.value ?? '');
+    say(`TextEdit document reads: ${JSON.stringify(value.slice(0, 80))}`);
+    say(
+      `contains ${JSON.stringify(MARKER)}: ${value.toLowerCase().includes(MARKER.toLowerCase())}`,
+    );
+  } catch (err) {
+    say(`could not read TextEdit back: ${String(err).slice(0, 90)}`);
+  }
+  say(`frontmost at the end: ${(await dbg('frontmost')).app}`);
+  await sleep(1500);
+} finally {
+  shooting = false;
+  await sleep(1000 / FPS + 200);
+  await app.close().catch(() => {});
+  await osa('tell application "TextEdit" to close every document without saving');
+  await osa('tell application "TextEdit" to quit saving no');
+}
+
+const dir = path.join(OUT, 'frames');
+const frames = readdirSync(dir)
+  .filter((f) => f.endsWith('.png'))
+  .sort()
+  .map((f) => ({ file: path.join(dir, f), t: Number(f.split('-')[2]?.replace('.png', '') ?? 0) }));
+if (frames.length === 0) throw new Error('no frames were captured');
+const lines = [];
+for (let i = 0; i < frames.length; i += 1) {
+  const next = frames[i + 1]?.t ?? frames[i].t + 1000 / FPS;
+  lines.push(
+    `file '${frames[i].file}'`,
+    `duration ${Math.min(3, Math.max(0.03, (next - frames[i].t) / 1000)).toFixed(3)}`,
+  );
+}
+lines.push(`file '${frames[frames.length - 1].file}'`);
+const list = path.join(OUT, 'frames.txt');
+writeFileSync(list, lines.join('\n'));
+const video = path.join(OUT, 'bobble-model-drives-textedit.mp4');
+await run('ffmpeg', [
+  '-y',
+  '-f',
+  'concat',
+  '-safe',
+  '0',
+  '-i',
+  list,
+  '-vf',
+  'scale=trunc(iw/2)*2:trunc(ih/2)*2,fps=24',
+  '-c:v',
+  'libx264',
+  '-pix_fmt',
+  'yuv420p',
+  '-preset',
+  'veryfast',
+  '-crf',
+  '20',
+  video,
+]);
+writeFileSync(path.join(OUT, 'run-log.txt'), log.join('\n'));
+console.log(`\n${frames.length} frames → ${video}`);
