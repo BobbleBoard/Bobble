@@ -17,6 +17,7 @@ export const CLASS_LABELS: Record<TaskClass, string> = {
   coding: 'Coding',
   'file-ops': 'File ops',
   'browser-use': 'Browser use',
+  'computer-use': 'Computer use',
   'motion-graphics': 'Motion graphics',
   'advanced-video': 'Advanced video',
   'video-edit': 'Video editing',

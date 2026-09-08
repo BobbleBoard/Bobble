@@ -29,6 +29,12 @@ vendor/genoffice/embed/out/
 # Recorded frames — the video is the artefact, not the thousands of PNGs
 scratchpad/mac-video/frames/
 scratchpad/mac-video/frames.txt
+# Every recording probe writes the same pair. The MP4 is the artefact worth
+# keeping; the hundreds of PNGs it was assembled from are not, and 1173 of them
+# went in on one `git add -A`.
+scratchpad/mac-video-*/frames/
+scratchpad/mac-video-*/frames.txt
+
 
 # Session screenshot dumps. Probes produce hundreds of megabytes of PNGs; the
 # few that are evidence get referenced from a report or a commit message, and

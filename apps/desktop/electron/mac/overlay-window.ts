@@ -22,7 +22,7 @@ import path from 'node:path';
 import { createLogger } from '@pi-desktop/shared';
 import { themes } from '@pi-desktop/themes';
 import { app, BrowserWindow, nativeTheme } from 'electron';
-import { isBackgroundMode } from '../background-mode';
+import { showsMacOverlay } from '../background-mode';
 import { readSettings } from '../settings/settings-main';
 import {
   comboLabel,
@@ -492,7 +492,7 @@ class MacOverlayController {
     this.#wantsVisible = show;
     if (changed) this.#emit();
     if (show) {
-      if (!win.isVisible() && !isBackgroundMode()) win.showInactive();
+      if (!win.isVisible() && showsMacOverlay()) win.showInactive();
     } else if (win.isVisible()) {
       win.hide();
     }
@@ -722,7 +722,8 @@ class MacOverlayController {
        *
        * The overlay is a floating always-on-top window; a test suite that shows
        * it puts it over whatever the user is reading, so `showInactive()` is
-       * gated on `isBackgroundMode()`. Everything else about it still runs —
+       * gated on `showsMacOverlay()` (background mode, unless a recording asked
+       * for it with PI_MAC_OVERLAY=1). Everything else about it still runs —
        * it is built, positioned, tracked and rendered on a window nobody sees.
        *
        * `visible` alone therefore could not tell a probe whether the overlay was

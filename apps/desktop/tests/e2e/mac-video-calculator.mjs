@@ -181,6 +181,17 @@ const app = await electron.launch({
     PI_E2E: '1',
     PI_E2E_BACKGROUND: '1',
     PI_MAC_PRECONSENT: '1',
+    /*
+     * SHOW THE PHANTOM CURSOR AND ITS BUBBLE, for once.
+     *
+     * Background mode hides the overlay window — right for a test suite, and the
+     * reason the user watched a live run and saw none of it: "no fake cursor window
+     * overlay either idling or clicking with the thinking clicking acting.. pill
+     * that was present in the demo video". This recording's whole subject is the
+     * agent driving an app, so the overlay opts back in. It is click-through and
+     * shown with showInactive(), so the focus guard below still has to pass.
+     */
+    PI_MAC_OVERLAY: process.env.PI_MAC_OVERLAY ?? '1',
   },
   args: [`--user-data-dir=${mkdtempSync(path.join(tmpdir(), 'pi-vmodel-'))}`],
 });
@@ -315,6 +326,15 @@ try {
     await sleep(700);
   }
   clearInterval(watcher);
+  try {
+    const ov = await dbg('overlay-info');
+    say(
+      `overlay: visible=${ov.visible} engaged=${ov.engaged} wantsVisible=${ov.wantsVisible} ` +
+        `trackingPid=${ov.trackingPid}`,
+    );
+  } catch (err) {
+    say(`overlay state unavailable: ${String(err).slice(0, 70)}`);
+  }
   const stole = frontSamples.filter((a) => /calculator/i.test(String(a)));
   say(
     `focus guard: ${frontSamples.length} samples, Calculator was frontmost ${stole.length} of them`,

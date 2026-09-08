@@ -7,7 +7,7 @@
  * work sixteen times in a row.
  */
 import { describe, expect, it } from 'vitest';
-import { isBackgroundMode, isHiddenMode } from './background-mode';
+import { isBackgroundMode, isHiddenMode, showsMacOverlay } from './background-mode';
 
 describe('isBackgroundMode', () => {
   it('is on for any test run', () => {
@@ -35,5 +35,27 @@ describe('isHiddenMode', () => {
     expect(isHiddenMode({ PI_E2E: '1' })).toBe(true);
     expect(isHiddenMode({ PI_E2E: '1', PI_E2E_VISIBLE: '1' })).toBe(false);
     expect(isHiddenMode({})).toBe(false);
+  });
+});
+
+describe('the overlay opt-in', () => {
+  /*
+   * the user, watching a live model-driven run: "no fake cursor window overlay
+   * either idling or clicking with the thinking clicking acting.. pill that was
+   * present in the demo video". It was suppressed by background mode — correctly
+   * for a test suite, and wrongly for a recording whose whole subject is the
+   * overlay. Which also meant no probe had ever driven it against a real run.
+   */
+  it('stays hidden in an ordinary test run', () => {
+    expect(showsMacOverlay({ PI_E2E: '1' })).toBe(false);
+    expect(showsMacOverlay({ PI_E2E_BACKGROUND: '1' })).toBe(false);
+  });
+
+  it('shows when a recording asks for it', () => {
+    expect(showsMacOverlay({ PI_E2E: '1', PI_MAC_OVERLAY: '1' })).toBe(true);
+  });
+
+  it('shows normally for a real user, who is not in background mode at all', () => {
+    expect(showsMacOverlay({})).toBe(true);
   });
 });

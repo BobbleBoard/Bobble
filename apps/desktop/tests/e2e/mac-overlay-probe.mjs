@@ -288,6 +288,43 @@ try {
     fail(`pill not clamped inside padded window: ${JSON.stringify(pill)}`);
   }
 
+  /*
+   * A NARROW WINDOW, which is where mirroring stops being enough.
+   *
+   * The case above uses a 900pt window, so flipping the pill to the cursor's
+   * left happens to fit. Calculator is ~305pt wide, and there mirroring puts the
+   * pill's left edge off the window — the user caught it on a live run: the "Still
+   * thinking" pill sheared off mid-word. Reproduce the real geometry.
+   */
+  const NARROW = { x: 900, y: 240, w: 305, h: 470 };
+  await dbg('overlay-show', NARROW);
+  await sleep(250);
+  // Cursor near the narrow window's RIGHT edge: below-right overflows, and the
+  // mirror to the left overflows the other way.
+  await dbg('overlay-cursor', { x: NARROW.x + NARROW.w - 20, y: NARROW.y + 200 });
+  await dbg('overlay-typing', { text: 'Reticulating the edge-anchored pill preview text' });
+  await sleep(350);
+  const narrowPill = await overlay.evaluate(() => {
+    const bub = document.getElementById('bubble');
+    const r = bub.getBoundingClientRect();
+    return {
+      innerW: window.innerWidth,
+      innerH: window.innerHeight,
+      rect: { left: r.left, top: r.top, right: r.right, bottom: r.bottom },
+    };
+  });
+  await overlay.screenshot({ path: path.join(OUT_DIR, '08b-pill-narrow-window.png') });
+  if (
+    narrowPill.rect.left < -1 ||
+    narrowPill.rect.top < -1 ||
+    narrowPill.rect.right > narrowPill.innerW + 1 ||
+    narrowPill.rect.bottom > narrowPill.innerH + 1
+  ) {
+    fail(`pill sheared off a NARROW window: ${JSON.stringify(narrowPill)}`);
+  }
+  await dbg('overlay-show', RECT);
+  await sleep(250);
+
   // ── live tracking: the overlay follows a window move with NO snap lag ──────
   // Drive the REAL tracking loop off a synthetic bounds source (no TCC / real
   // app). The window must reposition to the target rect + buffer.

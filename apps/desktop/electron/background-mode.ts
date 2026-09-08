@@ -78,3 +78,23 @@ export function isBackgroundMode(env: NodeJS.ProcessEnv = process.env): boolean 
 export function isHiddenMode(env: NodeJS.ProcessEnv = process.env): boolean {
   return isBackgroundMode(env);
 }
+
+/**
+ * SHOW THE COMPUTER-USE OVERLAY ANYWAY, in a run that is otherwise invisible.
+ *
+ * Background mode hides the phantom cursor and its bubble, which is right for a
+ * test suite — an always-on-top window over whatever the user is reading is
+ * exactly what "never take the user's screen" forbids. The cost only became clear
+ * when the user watched a live model-driven run and said: "no fake cursor window
+ * overlay either idling or clicking with the thinking clicking acting.. pill
+ * that was present in the demo video". It was suppressed, by this rule — which
+ * also means no probe had ever exercised the overlay against a real run.
+ *
+ * So the suppression stays the default and becomes opt-out-able for the one case
+ * that needs it: a recording made ON PURPOSE, where the overlay IS the subject.
+ * It is safe to show even mid-run — the window is click-through and shown with
+ * `showInactive()`, so it paints without taking focus from anything.
+ */
+export function showsMacOverlay(env: NodeJS.ProcessEnv = process.env): boolean {
+  return !isBackgroundMode(env) || env.PI_MAC_OVERLAY === '1';
+}

@@ -124,7 +124,8 @@
       0 0 26px color-mix(in srgb, var(--accent, #0071e3) 24%, transparent),
       inset 0 1px 0 rgba(255, 255, 255, 0.16);
     white-space: nowrap;
-    max-width: 340px;
+    /* Never wider than the window it has to sit inside. */
+    max-width: min(340px, calc(100vw - 16px));
     opacity: 0;
     transform: translateY(5px) scale(0.9);
     transform-origin: top left;
@@ -166,15 +167,17 @@
     opacity: 1;
     transform: none;
   }
-  /* Edge flips: keep the bubble inside the window near the right/bottom edge. */
+  /* Which corner the pill grows from — POSITION is set inline by placeBubble(),
+     which clamps it into the window. These used to set `right: 14px`, and since
+     the pill is positioned inside a zero-width cursor wrapper that mirrored it
+     to the LEFT of the cursor with nothing checking it fit there. the user caught it
+     on a live run: near a narrow window's left edge the pill was sheared off
+     mid-word. A flip alone cannot fix that — it just chooses which edge to
+     overflow — so the flip is now only the animation's origin. */
   #bubble.flip-x {
-    left: auto;
-    right: 14px;
     transform-origin: top right;
   }
   #bubble.flip-y {
-    top: auto;
-    bottom: 10px;
     transform-origin: bottom left;
   }
   #bubble.flip-x.flip-y {
@@ -400,15 +403,35 @@
       placeBubble();
     }
 
-    /* Flip the bubble to the other side of the cursor near the right/bottom
-       window edge so it never gets clipped. */
+    /* Keep the pill wholly inside the window: prefer below-right of the cursor,
+       mirror it when that overflows, and CLAMP either way.
+
+       Mirroring alone was the bug. The pill lives inside the zero-width cursor
+       wrapper, so `right: 14px` put its right edge at the cursor and its left
+       edge wherever its width landed — off the window, near a narrow window's
+       left edge. MEASURED by the user watching a live run: "ensure no cut off on
+       window". Clamping is what makes it true for every window width, every
+       cursor position and every pill length. */
     function placeBubble() {
       // Guard against a not-yet-laid-out viewport (0×0 would force both flips).
       if (window.innerWidth < 40 || window.innerHeight < 40) return;
       var bw = bubble.offsetWidth || 140;
       var bh = bubble.offsetHeight || 34;
-      bubble.classList.toggle('flip-x', cx + 27 + bw > window.innerWidth - 8);
-      bubble.classList.toggle('flip-y', cy + 40 + bh > window.innerHeight - 6);
+      var m = 8;
+      var maxLeft = Math.max(m, window.innerWidth - bw - m);
+      var maxTop = Math.max(m, window.innerHeight - bh - m);
+      var wantLeft = cx + 27;
+      if (wantLeft > maxLeft) wantLeft = cx - 14 - bw;
+      var wantTop = cy + 40;
+      if (wantTop > maxTop) wantTop = cy - 10 - bh;
+      var left = Math.max(m, Math.min(maxLeft, wantLeft));
+      var top = Math.max(m, Math.min(maxTop, wantTop));
+      // Inline offsets are relative to the cursor wrapper the pill sits in.
+      bubble.style.left = left - cx + 'px';
+      bubble.style.top = top - cy + 'px';
+      // The classes now only choose which corner the pill grows from.
+      bubble.classList.toggle('flip-x', left < cx);
+      bubble.classList.toggle('flip-y', top < cy);
     }
     window.addEventListener('resize', placeBubble);
 
