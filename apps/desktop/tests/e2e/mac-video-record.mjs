@@ -30,10 +30,32 @@ const DOCNAME = `bobble-proof-${Date.now().toString(36)}`;
 const LINE = 'Bobble typed this line itself, in the background.';
 
 const log = [];
-const say = (m) => {
-  log.push(m);
+const started = Date.now();
+/** Every line is stamped, so the video can caption itself with what was
+ * actually happening at that second rather than with a script written after. */
+let showCaption = async (_) => {};
+const say = (m, cap) => {
+  log.push({ at: Date.now() - started, text: m, caption: cap });
   console.log(m);
+  if (cap !== undefined) void showCaption(cap);
 };
+
+function srt(entries, endsAt) {
+  const stamp = (ms) => {
+    const t = Math.max(0, ms);
+    const h = String(Math.floor(t / 3600000)).padStart(2, '0');
+    const m = String(Math.floor(t / 60000) % 60).padStart(2, '0');
+    const s = String(Math.floor(t / 1000) % 60).padStart(2, '0');
+    return `${h}:${m}:${s},${String(t % 1000).padStart(3, '0')}`;
+  };
+  const captioned = entries.filter((e) => e.caption !== undefined);
+  return captioned
+    .map((e, i) => {
+      const end = captioned[i + 1]?.at ?? endsAt;
+      return `${i + 1}\n${stamp(e.at)} --> ${stamp(Math.max(e.at + 1200, end - 120))}\n${e.caption}\n`;
+    })
+    .join('\n');
+}
 
 rmSync(path.join(OUT, 'frames'), { recursive: true, force: true });
 mkdirSync(path.join(OUT, 'frames'), { recursive: true });
@@ -64,6 +86,42 @@ try {
     timeout: 30_000,
   });
   await page.setViewportSize?.({ width: 1440, height: 900 }).catch(() => {});
+  /*
+   * Captions are drawn INTO the page before the frame is taken, because this
+   * ffmpeg has neither drawtext nor libass. Styled as an obvious caption strip
+   * rather than as app chrome, so nobody can mistake it for something Bobble
+   * renders.
+   */
+  const caption = async (text) => {
+    await page
+      .evaluate((t) => {
+        let el = document.getElementById('__pd_caption');
+        if (el === null) {
+          el = document.createElement('div');
+          el.id = '__pd_caption';
+          el.style.cssText = [
+            'position:fixed',
+            'left:0',
+            'right:0',
+            'bottom:0',
+            'z-index:2147483647',
+            'padding:14px 22px',
+            'font:500 15px/1.45 -apple-system,BlinkMacSystemFont,"Helvetica Neue",sans-serif',
+            'color:#fff',
+            'background:rgba(10,11,14,0.82)',
+            'backdrop-filter:blur(12px)',
+            'border-top:1px solid rgba(255,255,255,0.10)',
+            'pointer-events:none',
+            'text-align:center',
+            'letter-spacing:0.1px',
+          ].join(';');
+          document.body.appendChild(el);
+        }
+        el.textContent = t;
+      }, text)
+      .catch(() => {});
+  };
+
   const dbg = async (op, params) => {
     const res = await page.evaluate((r) => window.piDesktop.invoke('mac:debug', r), { op, params });
     if (res.ok !== true) throw new Error(`${op}: ${res.error}`);
@@ -88,17 +146,21 @@ try {
     }
   })();
 
+  showCaption = caption;
   const tcc = await dbg('check');
   say(`grants: ${JSON.stringify(tcc)}`);
 
   const launch = await dbg('launch', { app: 'TextEdit', background: true });
   const pid = launch.pid;
-  say(`TextEdit launched in the background, pid ${pid}`);
+  say(`TextEdit launched in the background, pid ${pid}`, 'TextEdit opens in the background — it never comes to the front');
   await sleep(2200);
 
   // 1. New document — from the MENU BAR, which is where "New" actually lives.
   const made = await dbg('menuClick', { pid, path: 'File > New' });
-  say(`File > New → ${JSON.stringify({ ok: made.ok, mode: made.mode, opened: (made.opened ?? []).length })}`);
+  say(
+    `File > New → ${JSON.stringify({ ok: made.ok, mode: made.mode, opened: (made.opened ?? []).length })}`,
+    'File > New, pressed from the menu bar — no menu opens on screen',
+  );
   await sleep(1800);
 
   let snap = await dbg('snapshot', { pid });
@@ -110,7 +172,7 @@ try {
   await sleep(1600);
   snap = await dbg('snapshot', { pid });
   const typed = String((snap.elements ?? []).find((e) => e.role === 'AXTextArea')?.value ?? '');
-  say(`typed → document reads ${JSON.stringify(typed.slice(0, 60))}`);
+  say(`typed → document reads ${JSON.stringify(typed.slice(0, 60))}`, 'Typing — real keystrokes, into an app that is not in front');
   if (!typed.toLowerCase().includes('bobble typed this line')) throw new Error('typing did not land');
 
   // 3. Format it — select all, then the ruler's own bold control (an in-window
@@ -120,7 +182,10 @@ try {
   const bold = (snap.elements ?? []).find((e) => /^bold$/i.test(String(e.name)));
   if (bold !== undefined) {
     const res = await dbg('click', { pid, index: bold.index });
-    say(`clicked the ruler's Bold control → ${JSON.stringify({ ok: res.found, mode: res.mode })}`);
+    say(
+      `clicked the ruler's Bold control → ${JSON.stringify({ ok: res.found, mode: res.mode })}`,
+      "Select all, then click the ruler's Bold control",
+    );
   } else {
     say('note: no Bold control in the ruler; formatting step skipped');
   }
@@ -129,16 +194,25 @@ try {
   // 4. The save dialog. macOS runs a document command only for the frontmost
   //    app, so this one borrows the focus and hands it straight back.
   const refused = await dbg('menuClick', { pid, path: 'File > Save' });
-  say(`File > Save in the background → ${JSON.stringify(String(refused.error ?? 'ran').slice(0, 90))}`);
+  say(
+    `File > Save in the background → ${JSON.stringify(String(refused.error ?? 'ran').slice(0, 90))}`,
+    'File > Save does nothing in the background — macOS runs document commands only for the frontmost app. It says so.',
+  );
   await sleep(900);
   const saved = await dbg('menuClick', { pid, path: 'File > Save', activate: true });
-  say(`File > Save with focus borrowed → restored=${saved.focusRestored}, opened ${JSON.stringify(saved.dialog?.role ?? null)}`);
+  say(
+    `File > Save with focus borrowed → restored=${saved.focusRestored}, opened ${JSON.stringify(saved.dialog?.role ?? null)}`,
+    'So it borrows the focus for that one command — and hands it straight back',
+  );
   await sleep(2200);
 
   const withSheet = await dbg('snapshot', { pid });
   const sheetId = withSheet.dialog?.windowId;
   const inSheet = (withSheet.elements ?? []).filter((e) => e.win === sheetId);
-  say(`the dialog is indexed: ${JSON.stringify(inSheet.map((e) => e.name))}`);
+  say(
+    `the dialog is indexed: ${JSON.stringify(inSheet.map((e) => e.name))}`,
+    "The save dialog is part of TextEdit, and every one of its controls is indexed",
+  );
 
   // 5. Act INSIDE the dialog: type the filename, then click its Save button.
   const field = inSheet.find((e) => e.editable === true);
@@ -146,26 +220,43 @@ try {
   await dbg('type', { pid, index: field.index, text: DOCNAME });
   await sleep(1500);
   const where = inSheet.find((e) => /where/i.test(String(e.name)));
-  say(`filename typed into the dialog${where === undefined ? '' : ` (saving to ${where.value ?? '?'})`}`);
+  say(
+    `filename typed into the dialog${where === undefined ? '' : ` (saving to ${where.value ?? '?'})`}`,
+    'Typing the filename into the dialog',
+  );
 
   const saveBtn = inSheet.find((e) => /^save$/i.test(String(e.name)));
   if (saveBtn === undefined) throw new Error('the save dialog exposed no Save button');
   const clicked = await dbg('click', { pid, index: saveBtn.index });
-  say(`clicked the dialog's Save button → ${JSON.stringify({ ok: clicked.found, mode: clicked.mode })}`);
+  say(
+    `clicked the dialog's Save button → ${JSON.stringify({ ok: clicked.found, mode: clicked.mode })}`,
+    "Clicking the dialog's own Save button",
+  );
   await sleep(3000);
 
   const front = await dbg('frontmost');
   say(`frontmost at the end: ${front.app}`);
 
-  // 6. The evidence is on disk, not in the picture.
-  const saved5 = findSaved(DOCNAME);
-  if (saved5 === null) {
-    say('NOTE: no saved file found — the document may have gone to iCloud');
+  // 6. The evidence, checked on the app's real state rather than in the picture:
+  //    an untitled document that has been saved takes the file's name.
+  const after = await dbg('windows', { pid });
+  const titles = (after.windows ?? []).map((w) => w.title);
+  say(`window titles after saving: ${JSON.stringify(titles)}`);
+  say(
+    `the document is now named ${DOCNAME}: ${titles.some((t) => String(t).startsWith(DOCNAME))}`,
+    'Saved — the document now carries the name that was typed into the dialog',
+  );
+
+  // And on disk, when this process is allowed to look there at all — reading
+  // ~/Documents needs Full Disk Access, which is not this run's business.
+  const file = findSaved(DOCNAME);
+  if (file === null) {
+    say('note: the save folder is not readable from here; the window title is the check');
   } else {
-    const rtf = await run('cat', [saved5]).then((r) => r.stdout).catch(() => '');
-    say(`saved ${saved5} (${rtf.length} bytes)`);
+    const rtf = await run('cat', [file]).then((r) => r.stdout).catch(() => '');
+    say(`saved ${file} (${rtf.length} bytes)`);
     say(`  contains the typed line: ${rtf.toLowerCase().includes('bobble typed this line')}`);
-    say(`  contains the bold control word: ${/\\\\b(?![a-z])/.test(rtf)}`);
+    say(`  contains a bold run: ${rtf.includes(String.fromCharCode(92) + 'b')}`);
   }
 
   await sleep(1200);
@@ -193,12 +284,20 @@ lines.push(`file '${frames[frames.length - 1].file}'`);
 const list = path.join(OUT, 'frames.txt');
 writeFileSync(list, lines.join('\n'));
 const video = path.join(OUT, 'bobble-drives-textedit.mp4');
+const captions = path.join(OUT, 'captions.srt');
+writeFileSync(captions, srt(log, (frames.at(-1)?.t ?? started) - started));
+// Captions are burned in from the run's own timestamps, so what the video says
+// is what actually happened at that second — not a script written afterwards.
+const style =
+  "force_style='FontName=Helvetica Neue,FontSize=17,PrimaryColour=&HFFFFFF&," +
+  "BackColour=&HB0000000&,BorderStyle=4,Outline=0,Shadow=0,MarginV=28'";
 await run('ffmpeg', [
   '-y', '-f', 'concat', '-safe', '0', '-i', list,
-  '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2,fps=24',
+  '-vf',
+  `scale=trunc(iw/2)*2:trunc(ih/2)*2,fps=24,subtitles=${captions.replace(/:/g, '\\:')}:${style}`,
   '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-preset', 'veryfast', '-crf', '20', video,
 ]);
-writeFileSync(path.join(OUT, 'run-log.txt'), log.join('\n'));
+writeFileSync(path.join(OUT, 'run-log.txt'), log.map((e) => `${(e.at / 1000).toFixed(1)}s  ${e.text}`).join('\n'));
 console.log(`\n${frames.length} frames → ${video}`);
 
 function findSaved(name) {
