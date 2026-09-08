@@ -2667,6 +2667,27 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
      * result that tripped the latch says why (OFFLINE_TOOL_NOTE).
      */
     if (offline.offline()) target = target.filter((t) => !NETWORK_TOOLS.has(t));
+    /*
+     * IN CLI MODE, A TOOL THAT IS ALSO A COMMAND IS NOT ADVERTISED.
+     *
+     * The preamble opens "These commands are your abilities" and the shim dir
+     * puts every capability on PATH — and then the same tools were ALSO shipped
+     * as schemas. MEASURED: 14 advertised tools in bash-CLI mode, including
+     * read, write and edit. A model with `write` in its list and `file write` in
+     * a paragraph uses the one in its list, every time, so it never learns the
+     * commands exist. Four runs died on that: asked to drive a Mac app, the
+     * model wrote a text file instead, and when the file tools were forbidden it
+     * called them nineteen more times rather than reach for `mac`.
+     *
+     * llama-server pins the emitted tool name to the advertised list, which is
+     * the same lever the offline filter above relies on: removing a tool is the
+     * only thing that actually redirects a model. So anything reachable as a
+     * command comes off the list, and `bash` — which is how a command is run —
+     * stays on it.
+     */
+    if (toolCliMode && cliCommandForTool !== undefined) {
+      target = target.filter((t) => t === 'bash' || cliCommandForTool(t) === null);
+    }
     if (wantCorp && !target.includes(CREATE_PRODUCTION_HIERARCHY)) {
       target.push(CREATE_PRODUCTION_HIERARCHY);
     } else if (!wantCorp && target.includes(CREATE_PRODUCTION_HIERARCHY)) {
