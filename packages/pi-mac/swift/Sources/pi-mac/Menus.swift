@@ -113,6 +113,55 @@ func findMenuItem(pid: pid_t, path: String) -> MenuEntry? {
   }
 }
 
+// ── what is NOT on offer ─────────────────────────────────────────────────────
+//
+// The Apple menu belongs to macOS, not to the app being driven, and every
+// snapshot was handing the model a resolvable path to "Shut Down…", "Restart…"
+// and "Log Out…" with nothing standing between them and an AXPress. Two fences,
+// because one of them is copy and copy is not a control:
+//
+//   1. it is not LISTED — `listableMenuTitles` drops it, so the model is never
+//      shown a menu it has no business in;
+//   2. the items that end the user's session or destroy data are not PRESSED
+//      without an explicit confirmation flag, which only the tool layer sets and
+//      only after the user has said yes in their own words.
+//
+// Deliberately NOT guarded: Edit > Delete and Finder's Move to Trash. Delete is
+// the most ordinary editing verb on the Mac and it undoes; Move to Trash is
+// recoverable by definition. Refusing them would break real work every day to
+// prevent something the user can put straight back.
+
+/// The system menu, whose AXTitle is "Apple".
+let APPLE_MENU_TITLE = "Apple"
+
+/// Leaf titles that end the user's session or destroy something they cannot get
+/// back. Matched case-insensitively against the leaf, ignoring a trailing "…"
+/// and any "…" the app spells with three dots.
+private let DESTRUCTIVE_LEAVES: Set<String> = [
+  "shut down", "restart", "log out", "sleep", "lock screen", "empty trash",
+  "erase all content and settings", "erase assistant", "erase",
+]
+
+private func normalizedLeaf(_ title: String) -> String {
+  var t = title.lowercased().trimmingCharacters(in: .whitespaces)
+  for suffix in ["…", "..."] where t.hasSuffix(suffix) { t = String(t.dropLast(suffix.count)) }
+  // "Log Out the user…" / "Shut Down…" — the user's short name rides along.
+  for stem in DESTRUCTIVE_LEAVES where t.hasPrefix(stem) { return stem }
+  return t.trimmingCharacters(in: .whitespaces)
+}
+
+/// True when pressing this path would end the session or destroy data.
+func isDestructiveMenuPath(_ path: [String]) -> Bool {
+  guard let leaf = path.last else { return false }
+  return DESTRUCTIVE_LEAVES.contains(normalizedLeaf(leaf))
+}
+
+/// The top-level menus worth telling a model about: the app's own, never the
+/// system's.
+func listableMenuTitles(pid: pid_t) -> [String] {
+  menuEntries(pid: pid, under: [], levels: 1).map { $0.title }.filter { $0 != APPLE_MENU_TITLE }
+}
+
 func menuEntryDict(_ e: MenuEntry) -> [String: Any] {
   var d: [String: Any] = ["path": e.path.joined(separator: " > "), "title": e.title]
   if !e.enabled { d["enabled"] = false }

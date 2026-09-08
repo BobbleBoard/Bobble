@@ -11,8 +11,10 @@ import {
 } from './long-job';
 
 describe('when a card appears', () => {
-  it('is there from the first frame for work that is never quick', () => {
-    for (const kind of ['image', 'video', 'music', 'model3d'] as const) {
+  it('is there from the first frame for anything that produces a result', () => {
+    // Every generated modality, including the quick ones: the card is the box
+    // the result lands in, so it has to exist before the result does.
+    for (const kind of ['image', 'video', 'music', 'speech', 'sfx', 'model3d'] as const) {
       expect(shouldShowCard(kind, 0)).toBe(true);
     }
   });

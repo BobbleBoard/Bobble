@@ -111,6 +111,23 @@ export type CoreInvokeMap = {
   };
   /** Set the dock badge to a count of unread chats; 0 clears it. */
   'app:set-badge': { request: { count: number }; response: { ok: boolean } };
+  /**
+   * RELOAD THE DOCUMENT — the hard one, and the only one that works.
+   *
+   * `window.location.reload()` from the renderer is a renderer-initiated
+   * navigation, and main blocks every one of those (`will-navigate` →
+   * preventDefault, main.ts). That is right — the app must never navigate — but
+   * it also made the crash card's two buttons inert: the user, on the render-error
+   * screen, "the reload buttons do not work", and he had to reach for ⌘R.
+   *
+   * So the reload asks MAIN to do it, where it is a programmatic
+   * `webContents.reload()` rather than a navigation to be refused.
+   *
+   * `fresh: true` reloads from the entry point with no query at all — the
+   * "fresh window" the crash card offers, which drops any dev/route params the
+   * window was carrying along with every scrap of renderer state.
+   */
+  'app:reload-window': { request: { fresh?: boolean }; response: { ok: boolean } };
 };
 
 // ---------------------------------------------------------------------------
@@ -884,6 +901,7 @@ export const APP_INVOKE_CHANNELS = [
   'app:get-info',
   'app:notify',
   'app:set-badge',
+  'app:reload-window',
   ...FS_INVOKE_CHANNELS,
   ...LLM_INVOKE_CHANNELS,
   ...HF_INVOKE_CHANNELS,
@@ -924,10 +942,23 @@ export type AppEventMap = {
   /** Pushed by main on did-finish-load — typically before React mounts, which
    * exercises the pre-mount event buffer end to end. */
   'app:boot': { sentAt: number };
-  /** A menu accelerator that the RENDERER must action (main has no view state).
+  /**
+   * A menu accelerator that the RENDERER must action (main has no view state).
+   *
    * `close-tab` (⌘W) closes the active canvas tab / current chat — NOT the window
-   * (⌘⇧W / the red button close the window). See main.ts installAppMenu. */
-  'app:accelerator': { action: 'close-tab' };
+   * (⌘⇧W / the red button close the window).
+   *
+   * `soft-reload` (⌘R) RE-MOUNTS the React tree and puts back what the user was
+   * looking at. Electron's stock `reload` role reloads the DOCUMENT, which
+   * throws away the thread, the canvas tabs and the scroll position — the user:
+   * "⌘R clears really everything". Almost none of that is the document's to
+   * lose: the chat lives in the pi child and on disk, and the stores are module
+   * state that a remount keeps. So ⌘R now rebuilds the view and restores the
+   * canvas + scroll, and ⌘⇧R stays the real, everything-goes reload.
+   *
+   * See main.ts installAppMenu and src/app-reload.ts.
+   */
+  'app:accelerator': { action: 'close-tab' | 'soft-reload' };
   /** The user clicked an OS notification — open the chat it was about. */
   'app:notification-click': { sessionFile: string };
   /** Inference supervisor state (server/model/TPS) for the composer footer. */

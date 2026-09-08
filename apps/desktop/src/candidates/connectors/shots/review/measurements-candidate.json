@@ -241,14 +241,8 @@
   {
     "key": "card hover (light) bg/shadow",
     "value": {
-      "before": [
-        "rgb(255, 255, 255)",
-        "rgba(0, 0, 0, 0.06) 0px 0px 0px 1px"
-      ],
-      "after": [
-        "rgb(255, 255, 255)",
-        "rgba(0, 0, 0, 0.22) 0px 0px 0px 1px"
-      ]
+      "before": ["rgb(255, 255, 255)", "rgba(0, 0, 0, 0.06) 0px 0px 0px 1px"],
+      "after": ["rgb(255, 255, 255)", "rgba(0, 0, 0, 0.22) 0px 0px 0px 1px"]
     }
   },
   {

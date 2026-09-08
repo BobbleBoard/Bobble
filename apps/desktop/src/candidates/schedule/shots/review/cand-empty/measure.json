@@ -148,12 +148,7 @@
   },
   "film:cand-template-hover": {
     "frames": 15,
-    "picked": [
-      0,
-      231,
-      271,
-      302
-    ]
+    "picked": [0, 231, 271, 302]
   },
   "tab-order:cand-empty": [
     {

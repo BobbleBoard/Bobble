@@ -66,8 +66,16 @@ try {
   await shot('01-mid-write');
 
   check(mid.length > 0, 'the chat column is not empty while the panel fills');
+  /*
+   * The chain row is what names it now. The dedicated "Writing <file> in the
+   * panel →" status line is gone (the user, round 21: it pinned itself to the foot
+   * of the thread, its clock reset on every file, and it said nothing the row
+   * above it and the open canvas were not already saying) — so the assertion is
+   * on the file being named SOMEWHERE in the column, which is the thing the
+   * blind tester actually asked for.
+   */
   check(
-    /launch-plan|panel|writing/i.test(mid),
+    /launch-plan|writing|editing/i.test(mid),
     `the column names what is happening (got "${mid.slice(0, 120)}")`,
   );
 
@@ -88,24 +96,16 @@ try {
   await shot('02-written');
 
   /*
-   * The arrow has to go somewhere. A streaming write opens the panel by itself,
-   * but nothing stops someone collapsing it mid-write — and an arrow pointing at
-   * a collapsed pane is worse than no arrow.
+   * NOTHING IS PINNED TO THE FOOT OF THE THREAD any more. The panel-jump line
+   * that used to live here is deleted (round 21); this asserts it stays gone,
+   * because it is the kind of thing that grows back.
    */
   await streamTo(FULL_ARGS.slice(0, FULL_ARGS.indexOf('## Week 2')));
   await page.waitForTimeout(600);
-  // Collapse it the way a person would — the panel's own close control.
-  const closeBtn = await page.$('.pd-canvas-tabs [aria-label="Close canvas"]');
-  if (closeBtn !== null) await closeBtn.click();
-  await page.waitForTimeout(400);
-  const panelJump = await page.$('[data-testid="panel-work-jump"]');
-  check(panelJump !== null, 'the panel line is a control, not just text');
-  if (panelJump !== null) {
-    await panelJump.click();
-    await page.waitForTimeout(400);
-    const reopened = await page.evaluate(() => document.querySelector('.pd-canvas-tabs') !== null);
-    check(reopened, 'clicking it brings the panel back');
-  }
+  check(
+    (await page.$('[data-testid="panel-work-jump"]')) === null,
+    'the pinned "Writing … in the panel →" line is gone',
+  );
 
   /* ── Auto-scroll ────────────────────────────────────────────────────────
    *

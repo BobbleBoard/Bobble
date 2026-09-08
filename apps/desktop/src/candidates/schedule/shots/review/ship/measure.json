@@ -915,35 +915,15 @@
   "ship-dialog:quick-input-after-close": "",
   "film:ship-dialog-open": {
     "frames": 12,
-    "picked": [
-      0,
-      223,
-      230,
-      284,
-      335,
-      389
-    ]
+    "picked": [0, 223, 230, 284, 335, 389]
   },
   "film:ship-dialog-close": {
     "frames": 12,
-    "picked": [
-      0,
-      207,
-      219,
-      270,
-      312
-    ]
+    "picked": [0, 207, 219, 270, 312]
   },
   "film:ship-template-hover": {
     "frames": 13,
-    "picked": [
-      0,
-      93,
-      135,
-      176,
-      218,
-      234
-    ]
+    "picked": [0, 93, 135, 176, 218, 234]
   },
   "ship-dialog-template:focused": "tasks-template-morning-brief",
   "ship-dialog-new:focused": "tasks-new",
@@ -951,11 +931,7 @@
   "ship-dialog:cmd-enter-saves": false,
   "film:ship-create": {
     "frames": 3,
-    "picked": [
-      0,
-      218,
-      227
-    ]
+    "picked": [0, 218, 227]
   },
   "ship-one-task:focus-after-create": "BODY",
   "ship-one-task:name": "Run the test suite and tell me only what",
@@ -1596,10 +1572,7 @@
   ],
   "film:ship-pause": {
     "frames": 2,
-    "picked": [
-      0,
-      217
-    ]
+    "picked": [0, 217]
   },
   "ship-off:list-moved-by": 52,
   "ship-off": {
@@ -1681,13 +1654,7 @@
   "ship-delete:disarmed-on-leave": true,
   "film:ship-delete": {
     "frames": 12,
-    "picked": [
-      0,
-      197,
-      235,
-      285,
-      335
-    ]
+    "picked": [0, 197, 235, 285, 335]
   },
   "ship-delete:row-gone": true,
   "ship-dialog-edit:focused": "task-edit-task_mtrugdla_sk81sn",
@@ -1843,12 +1810,7 @@
   },
   "film:ship-run-now": {
     "frames": 13,
-    "picked": [
-      0,
-      216,
-      347,
-      371
-    ]
+    "picked": [0, 216, 347, 371]
   },
   "ship-run-now:finished": true,
   "ship-run-now:drawer-cards": [

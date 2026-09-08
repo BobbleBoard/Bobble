@@ -1,0 +1,231 @@
+
+==============================================================================
+== big-contacts.json  (2232 chars, 73 lines)
+==============================================================================
+App: "Contacts" — window "Contacts"
+
+A DIALOG IS OPEN — untitled (dialog). It belongs to "Contacts", not to another
+app, and you drive it exactly like the app itself. Act on ITS controls; the
+window behind it is blocked until the dialog is closed or confirmed.
+
+The dialog's controls (act by index):
+[1] AXButton "Siri Waveform Orb"
+
+Behind it — window "Contacts" (blocked while the dialog is open):
+[2] AXRow "outline row"
+[3] AXCell "cell" (focused)
+[4] AXRow "outline row"
+[5] AXCell "cell" (focused)
+[6] AXRow "outline row"
+[7] AXCell "cell" (focused)
+[8] AXRow "outline row"
+[9] AXCell "cell" (focused)
+[10] AXRow "outline row"
+[11] AXCell "cell" (focused)
+[12] AXRow "outline row"
+[13] AXCell "cell" (focused)
+[14] AXRow "outline row"
+[15] AXCell "cell" (focused)
+[16] AXRow "outline row"
+[17] AXCell "cell" (focused)
+[18] AXRow "outline row"
+[19] AXCell "cell" (focused)
+[20] AXRow "outline row"
+[21] AXCell "cell" (focused)
+[22] AXRow "outline row"
+[23] AXCell "cell" (focused)
+[24] AXRow "outline row"
+[25] AXCell "cell" (focused)
+[26] AXRow "outline row"
+[27] AXCell "cell" (focused)
+[28] AXRow "outline row"
+[29] AXCell "cell" (focused)
+[30] AXRow "outline row"
+[31] AXCell "cell" (focused)
+[32] AXButton "increment page button"
+[33] AXButton "decrement page button"
+[34] AXTextField "Search" (editable)
+[35] AXButton "Search"
+[36] AXGroup "group"
+[37] AXGroup "group"
+[38] AXGenericElement "A"
+[39] AXGroup "group"
+[40] AXGroup "group"
+[41] AXGroup "group"
+[42] AXGroup "group"
+[43] AXMenuButton "Message"
+[44] AXMenuButton "Call"
+[45] AXMenuButton "Video"
+[46] AXButton "phone, Call"
+[47] AXTextArea "text entry area" (editable)
+[48] AXButton "Share Contact"
+[49] AXButton "Block Contact"
+[50] AXButton "increment page button"
+[51] AXButton "Sidebar"
+[52] AXMenuButton "add"
+[53] AXButton "Edit"
+[54] AXButton "close button"
+[55] AXButton "full screen button"
+[56] AXButton "minimize button"
+[57] AXRow "outline row"
+[58] AXCell "cell" (focused)
+[59] AXRow "outline row"
+[60] AXCell "cell" (focused)
+
+Menus: Apple, Contacts, File, Edit, View, Card, Window, Help — mac_click with menu:"File > New" presses one, or name a menu to list what is inside it.
+
+(60 of 308 elements shown; narrow the app or re-snapshot for more)
+
+==============================================================================
+== plain-textedit.json  (2589 chars, 73 lines)
+==============================================================================
+App: "TextEdit" — window "Untitled 15"
+
+A DIALOG IS OPEN — "Untitled 15" (dialog). It belongs to "TextEdit", not to
+another app, and you drive it exactly like the app itself. Act on ITS controls;
+the window behind it is blocked until the dialog is closed or confirmed.
+
+The dialog's controls (act by index):
+[1] AXTextArea "Parity review baseline" (editable, focused)
+[2] AXCheckBox "bold"
+[3] AXCheckBox "italic"
+[4] AXCheckBox "underline"
+[5] AXCheckBox "strikethrough"
+[6] AXButton "text color"
+[7] AXButton "text background color"
+[8] AXPopUpButton "typeface"
+[9] AXPopUpButton "style"
+[10] AXComboBox "font size" = "12" (editable)
+[11] AXButton "font size"
+[12] AXCheckBox "align left"
+[13] AXCheckBox "align center"
+[14] AXCheckBox "align right"
+[15] AXCheckBox "fully justify"
+[16] AXMenuButton "list style"
+[17] AXPopUpButton "line spacing"
+[18] AXButton "close button"
+[19] AXButton "full screen button"
+[20] AXButton "minimize button"
+[21] AXMenuButton "Edited" (disabled)
+
+Behind it — window "Untitled 15" (blocked while the dialog is open):
+[22] AXTextArea "Bobble is driving this window. The monitor is drawing it from Accessibility." (editable)
+[23] AXCheckBox "bold"
+[24] AXCheckBox "italic"
+[25] AXCheckBox "underline"
+[26] AXCheckBox "strikethrough"
+[27] AXButton "text color"
+[28] AXButton "text background color"
+[29] AXPopUpButton "typeface"
+[30] AXPopUpButton "style"
+[31] AXComboBox "font size" = "12" (editable)
+[32] AXButton "font size"
+[33] AXCheckBox "align left"
+[34] AXCheckBox "align center"
+[35] AXCheckBox "align right"
+[36] AXCheckBox "fully justify"
+[37] AXMenuButton "list style"
+[38] AXPopUpButton "line spacing"
+[39] AXButton "close button"
+[40] AXButton "full screen button"
+[41] AXButton "minimize button"
+[42] AXMenuButton "document actions" (disabled)
+[43] AXTextArea "Bobble computer-use probethe" (editable)
+[44] AXCheckBox "bold"
+[45] AXCheckBox "italic"
+[46] AXCheckBox "underline"
+[47] AXCheckBox "strikethrough"
+[48] AXButton "text color"
+[49] AXButton "text background color"
+[50] AXPopUpButton "typeface"
+[51] AXPopUpButton "style"
+[52] AXComboBox "font size" = "12" (editable)
+[53] AXButton "font size"
+[54] AXCheckBox "align left"
+[55] AXCheckBox "align center"
+[56] AXCheckBox "align right"
+[57] AXCheckBox "fully justify"
+[58] AXMenuButton "list style"
+[59] AXPopUpButton "line spacing"
+[60] AXButton "close button"
+
+Menus: Apple, TextEdit, File, Edit, Format, View, Window, Help — mac_click with menu:"File > New" presses one, or name a menu to list what is inside it.
+
+(60 of 315 elements shown; narrow the app or re-snapshot for more)
+
+==============================================================================
+== save-sheet.json  (2577 chars, 73 lines)
+==============================================================================
+App: "TextEdit"
+
+A DIALOG IS OPEN — untitled (sheet). It belongs to "TextEdit", not to another
+app, and you drive it exactly like the app itself. Act on ITS controls; the
+window behind it is blocked until the sheet is closed or confirmed.
+
+The dialog's controls (act by index):
+[1] AXPopUpButton "Where:"
+[2] AXDisclosureTriangle "show more options"
+[3] AXTextField "Untitled 15" (editable, focused)
+[4] AXTextField "tag editor" (editable)
+[5] AXPopUpButton "Rich Text Document"
+[6] AXButton "Cancel"
+[7] AXButton "Save"
+
+Behind it — window "" (blocked while the dialog is open):
+[8] AXTextArea "Parity review baseline" (editable)
+[9] AXCheckBox "bold"
+[10] AXCheckBox "italic"
+[11] AXCheckBox "underline"
+[12] AXCheckBox "strikethrough"
+[13] AXButton "text color"
+[14] AXButton "text background color"
+[15] AXPopUpButton "typeface"
+[16] AXPopUpButton "style"
+[17] AXComboBox "font size" = "12" (editable)
+[18] AXButton "font size"
+[19] AXCheckBox "align left"
+[20] AXCheckBox "align center"
+[21] AXCheckBox "align right"
+[22] AXCheckBox "fully justify"
+[23] AXMenuButton "list style"
+[24] AXPopUpButton "line spacing"
+[25] AXButton "close button" (disabled)
+[26] AXButton "zoom button"
+[27] AXButton "minimize button"
+[28] AXMenuButton "Edited" (disabled)
+[29] AXTextArea "Bobble is driving this window. The monitor is drawing it from Accessibility." (editable)
+[30] AXCheckBox "bold"
+[31] AXCheckBox "italic"
+[32] AXCheckBox "underline"
+[33] AXCheckBox "strikethrough"
+[34] AXButton "text color"
+[35] AXButton "text background color"
+[36] AXPopUpButton "typeface"
+[37] AXPopUpButton "style"
+[38] AXComboBox "font size" = "12" (editable)
+[39] AXButton "font size"
+[40] AXCheckBox "align left"
+[41] AXCheckBox "align center"
+[42] AXCheckBox "align right"
+[43] AXCheckBox "fully justify"
+[44] AXMenuButton "list style"
+[45] AXPopUpButton "line spacing"
+[46] AXButton "close button"
+[47] AXButton "full screen button"
+[48] AXButton "minimize button"
+[49] AXMenuButton "document actions" (disabled)
+[50] AXTextArea "Bobble computer-use probethe" (editable)
+[51] AXCheckBox "bold"
+[52] AXCheckBox "italic"
+[53] AXCheckBox "underline"
+[54] AXCheckBox "strikethrough"
+[55] AXButton "text color"
+[56] AXButton "text background color"
+[57] AXPopUpButton "typeface"
+[58] AXPopUpButton "style"
+[59] AXComboBox "font size" = "12" (editable)
+[60] AXButton "font size"
+
+Menus: Apple, TextEdit, File, Edit, Format, View, Window, Help — mac_click with menu:"File > New" presses one, or name a menu to list what is inside it.
+
+(60 of 322 elements shown; narrow the app or re-snapshot for more)

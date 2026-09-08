@@ -21,10 +21,11 @@ import {
   useCanvasTabs,
 } from '@pi-desktop/canvas';
 import type { ChatMsg } from '@pi-desktop/engine';
-import type { DiffFileData, DiffLine } from '@pi-desktop/ui';
+import type { DiffFileData } from '@pi-desktop/ui';
 import { useEffect, useRef } from 'react';
 import { usePiStore } from '../../state/pi-slice';
 import { useProjectStore } from '../../state/project-store';
+import { editDiffFile } from '../edit-diff';
 import { pdFileUrl, previewKindForExt } from './file-preview';
 import { basename, detectFileWrites, dirname, type EditHunk } from './file-writes';
 
@@ -208,27 +209,20 @@ function hintArtifact(absPath: string, text: string): Artifact {
 }
 
 /**
- * A single-file {@link DiffFileData} from a str_replace edit's old/new strings —
- * the deletions (old_string) as `−` rows, then the additions (new_string) as `+`
- * rows, exactly mirroring `activity-mapping`'s inline `editDiff` so the canvas
- * diff and the chain-step diff are identical. Empty/absent sides contribute no
- * rows, so a hunk mid-stream (old known, new still arriving) draws just the
- * deletions, then grows the additions — the live-follow. The header shows the
- * filename (the operation-bar breadcrumb already carries the full path).
+ * A single-file {@link DiffFileData} from a str_replace edit's old/new strings,
+ * through the SAME {@link editDiffFile} the chain row uses so the canvas diff
+ * and the chain-step diff can never disagree.
+ *
+ * It used to lay every line of `old_string` in as a deletion and every line of
+ * `new_string` in as an addition, which made a one-word change look like a
+ * wholesale destruction — see edit-diff.ts for why that read as a failure.
+ * Absent sides still contribute nothing, so a hunk mid-stream (old known, new
+ * still arriving) draws just the deletions and then grows the additions — the
+ * live-follow. The header shows the filename (the operation-bar breadcrumb
+ * already carries the full path).
  */
 function buildEditDiff(absPath: string, edit: EditHunk): DiffFileData[] {
-  const { oldText, newText } = edit;
-  const lines: DiffLine[] = [];
-  if (oldText) for (const l of oldText.split('\n')) lines.push({ kind: 'del', text: l });
-  if (newText) for (const l of newText.split('\n')) lines.push({ kind: 'add', text: l });
-  return [
-    {
-      path: basename(absPath),
-      added: newText ? newText.split('\n').length : 0,
-      deleted: oldText ? oldText.split('\n').length : 0,
-      lines,
-    },
-  ];
+  return [editDiffFile(basename(absPath), edit.oldText, edit.newText)];
 }
 
 async function readFile(absPath: string): Promise<ReadFileResult | null> {

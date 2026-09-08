@@ -45,7 +45,7 @@ import { createLogger } from '@pi-desktop/shared';
 import { app, ipcMain } from 'electron';
 import { resolveBundledPackageAsset } from '../app-paths';
 import { isTrustedIpcEvent } from '../trusted-senders';
-import { macMonitor, registerMacMonitorIpc } from './monitor';
+import { macMonitor, registerMacMonitorIpc, setCaptureGrantPrompt } from './monitor';
 import { macMonitorMockControl, startMacMonitorMock } from './monitor-mock';
 import type { OverlayRect } from './overlay-geometry';
 import { macOverlay } from './overlay-window';
@@ -450,6 +450,29 @@ export function registerMacAgentIpc(): void {
       return existsSync(FALLBACK_WALLPAPER) ? { path: FALLBACK_WALLPAPER } : null;
     }
   });
+  /*
+   * The ACCESSIBILITY fallback's eyes.
+   *
+   * Screen Recording is a grant the app may simply not have — on a fresh Mac it
+   * never does — while Accessibility is the one computer-use cannot work
+   * without at all. So when the pixels do not come, the monitor draws the same
+   * window from the same tree the model itself is acting on. It goes through
+   * THIS module's single long-lived helper (never a second pipe), and
+   * deliberately not through `snapshotWithOverlay`: a poll four times a second
+   * must not re-target the overlay, re-open the session, or overwrite the
+   * index→element map the model's own last snapshot left behind.
+   */
+  macMonitor.setAxReader(async (pid, cap) => {
+    try {
+      return await getHelper().request<MacSnapshot>('snapshot', { pid, cap });
+    } catch {
+      return null;
+    }
+  });
+  setCaptureGrantPrompt(async () => {
+    tccCache = null;
+    return getHelper().request('promptGrants');
+  });
   registerMacMonitorIpc();
   startMacMonitorMock();
   if (process.env.PI_E2E === '1') registerE2eDebugChannel();
@@ -476,36 +499,38 @@ function registerE2eDebugChannel(): void {
       const params = req.params ?? {};
       try {
         switch (req.op) {
+          /*
+           * THE SAME PATH THE MODEL TAKES.
+           *
+           * These ops used to call the helper directly, side-stepping
+           * `dispatch` — so a probe drove the app while the overlay never
+           * engaged and the monitor never got a session. Every probe was
+           * therefore verifying something the product does not do, and a
+           * recorded run showed an empty chat. Anything `dispatch` handles now
+           * goes through `dispatch`.
+           */
           case 'check':
-          case 'promptGrants':
           case 'frontmost':
           case 'bounds':
           case 'snapshot':
           case 'screenshot':
-          // Live-fix probes (mac-live-fixes-probe.mjs): real acts + the
-          // deterministic AX "drag" — still PI_E2E-gated, trusted senders only.
           case 'click':
           case 'type':
           case 'key':
           case 'scroll':
-          case 'moveWindow':
-          // Surface + menu reads, and the recorder that proves a run happened.
-          // Recording composites only the controlled app's own windows, so it
-          // cannot pick up anything else on the user's screen.
+          case 'launch':
+          case 'menuClick':
           case 'windows':
+          case 'setDriving':
+            return { ok: true, result: await dispatch(req.op as MacAgentMethod, params) };
+          // Helper-only reads and the recorder, which `dispatch` has no part in.
+          case 'promptGrants':
+          case 'moveWindow':
           case 'wallpaper':
           case 'menus':
-          case 'menuClick':
           case 'recordStart':
           case 'recordStop':
             return { ok: true, result: await getHelper().request(req.op, params) };
-          case 'launch': {
-            const ack = await launchApp(String(params.app ?? ''), params.background !== false);
-            if (ack.ok && typeof ack.pid === 'number' && ack.bounds !== undefined) {
-              await macOverlay.control(ack.pid, rectOf(ack.bounds));
-            }
-            return { ok: true, result: ack };
-          }
           case 'overlay-show': {
             await macOverlay.debugShow({
               x: Number(params.x ?? 0),
@@ -551,13 +576,34 @@ function registerE2eDebugChannel(): void {
               windows: typeof params.windows === 'boolean' ? params.windows : undefined,
               restart: params.restart === true,
               delayMs: typeof params.delayMs === 'number' ? params.delayMs : undefined,
+              deny: typeof params.deny === 'boolean' ? params.deny : undefined,
             });
             return { ok: true };
+          }
+          // Point the monitor at a REAL app the probe already launched, and put
+          // the overlay on it — the two things `snapshot`/`launch` do for the
+          // model, which the debug channel's passthrough deliberately does not.
+          // Without this a probe cannot look at the monitor drawing a real
+          // window at all: it can drive TextEdit and it can read the surface,
+          // but nothing joins them.
+          case 'monitor-session': {
+            const pid = Number(params.pid ?? 0);
+            if (!Number.isFinite(pid) || pid <= 0) return { ok: false, error: 'needs a pid' };
+            const b = await readBounds({ pid });
+            await macOverlay.control(pid, b === null ? null : rectOf(b));
+            macMonitor.setSession(pid, String(params.app ?? b?.app ?? ''));
+            await macOverlay.thinking();
+            return { ok: true, result: macMonitor.state() };
           }
           case 'monitor-info':
             return {
               ok: true,
-              result: { ...macMonitor.state(), capturing: macMonitor.streaming() },
+              result: {
+                ...macMonitor.state(),
+                capturing: macMonitor.streaming(),
+                polling: macMonitor.polling(),
+                ax: macMonitor.axScene(),
+              },
             };
           case 'overlay-retarget': {
             // Prompt reposition to a new frame (the tracker's move path) — proves

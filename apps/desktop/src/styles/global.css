@@ -1526,6 +1526,119 @@ body {
   }
 }
 
+/* ---------------------------------------------------------------------------
+ * THE MARK AS A SLIDING-TILE PUZZLE (.pd-bobble-loader)
+ *
+ * the user: "show the bobble logo as a loader with the squares sliding clockwise
+ * like a sliding tile puzzle, until there is a diffusion step ready."
+ *
+ * The board is the app icon's own 2x2 grid with the top-left cell empty, and the
+ * three tiles are the icon's own three squares (BobbleMark.tsx owns the
+ * geometry, and both the still mark and this read it). The rule of the puzzle is
+ * obeyed literally: only the tile beside the hole may move, one moves per beat,
+ * and the hole walks counter-clockwise while the tiles walk clockwise. Twelve
+ * beats returns every tile to where it began, so the loop closes on the mark.
+ *
+ * ONE ANIMATION FOR ALL THREE. Every tile's lap is the same shape — four cells,
+ * clockwise — so the keyframes below name the cells as custom properties and
+ * each tile supplies its own four (as deltas from where it rests) plus its own
+ * beat as a delay. Nothing here is per-tile except numbers.
+ * ------------------------------------------------------------------------- */
+.pd-bobble-loader {
+  --pd-bt-beat: 340ms;
+  display: block;
+  overflow: visible;
+}
+.pd-bobble-tile {
+  /*
+   * A tile SLIDES: it travels the 14 units to the next cell and stops dead,
+   * because a tile in a wooden frame has nowhere to overshoot to. The ease is
+   * quick out of the cell and firm into the next one, with no bounce — a bounce
+   * would be the one motion this object physically cannot make.
+   */
+  animation: pd-bobble-slide calc(var(--pd-bt-beat) * 12) cubic-bezier(0.32, 0, 0.15, 1) infinite
+    both;
+}
+/* The four cells arrive as inline custom properties from BobbleTileLoader, as
+   deltas from where the tile is authored. The 0px fallbacks are the whole point
+   of expressing them that way: with no vars at all the keyframes collapse to the
+   still mark, which is exactly what a tile that is not being animated should be. */
+@keyframes pd-bobble-slide {
+  0%,
+  8.333% {
+    transform: translate(var(--pd-bt-x0, 0px), var(--pd-bt-y0, 0px));
+  }
+  11.667%,
+  33.333% {
+    transform: translate(var(--pd-bt-x1, 0px), var(--pd-bt-y1, 0px));
+  }
+  36.667%,
+  58.333% {
+    transform: translate(var(--pd-bt-x2, 0px), var(--pd-bt-y2, 0px));
+  }
+  61.667%,
+  83.333% {
+    transform: translate(var(--pd-bt-x3, 0px), var(--pd-bt-y3, 0px));
+  }
+  86.667%,
+  100% {
+    transform: translate(var(--pd-bt-x0, 0px), var(--pd-bt-y0, 0px));
+  }
+}
+
+/*
+ * WHERE IT SITS: centred on the empty plate, and gone the moment the picture
+ * starts arriving. `data-phase` flips to `resolving` on the first decoded frame
+ * (ThreadImagePlaceholder), so the fade-out and the first unravel overlap — the
+ * loader is never a thing the picture has to be seen through.
+ *
+ * `pointer-events: none` because it is scenery: the card underneath keeps its
+ * own behaviour.
+ */
+.pd-denoise-idle {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  opacity: 1;
+  transition:
+    opacity 420ms var(--pd-easing-exit, ease),
+    scale 420ms var(--pd-easing-exit, ease);
+  /* A whisper of a shadow so the tiles read as objects on the plate rather than
+     as flat colour printed on it. Neutral, never coloured. */
+  filter: drop-shadow(0 2px 6px rgb(0 0 0 / 18%));
+}
+/*
+ * SIZED TO THE CARD, not to a number. The plate is anywhere from ~200px wide in
+ * a narrow column to 360px at full width, and a fixed mark is either lost in the
+ * big one or crowding the small one. A fifth of the card reads as the same
+ * object at every size the thread renders it at.
+ */
+.pd-denoise-idle .pd-bobble-loader {
+  width: clamp(38px, 20%, 74px);
+  height: auto;
+}
+.pd-denoise[data-phase="resolving"] .pd-denoise-idle {
+  opacity: 0;
+  scale: 0.94;
+}
+
+/*
+ * Reduced motion: nothing loops. The tiles hold the mark and the card around
+ * them still carries a clock that moves, which is the honest minimum. (The
+ * waveform's half of this rule lives beside the waveform — see
+ * .pd-audio-pending — so the cascade stays in ascending specificity.)
+ */
+@media (prefers-reduced-motion: reduce) {
+  .pd-bobble-tile {
+    animation: none;
+  }
+  .pd-denoise-idle {
+    transition: none;
+  }
+}
+
 /*
  * Round-5 #3/#8: the composer editor never shows a hard scrollbar (hidden here).
  * A min-height keeps the placeholder + first line from ever scrolling; once the
@@ -3860,6 +3973,123 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
   font-variant-numeric: tabular-nums;
 }
 
+/* ---------------------------------------------------------------------------
+ * A SOUND BEING MADE (.pd-audio-pending)
+ *
+ * the user: "for audio you can show some pulsing waveforms that eventually at the
+ * end form into a real waveform that's playable."
+ *
+ * It wears `.pd-thread-audio`'s own classes on purpose — same bar count, same
+ * gap, same box — so the only thing that changes when the real transport takes
+ * over is the height of bars that never move. See ThreadAudioPlaceholder.tsx.
+ * ------------------------------------------------------------------------- */
+
+/*
+ * The amplitude of the swell, as a registered property so it can be TRANSITIONED
+ * to zero. That is what makes the resolve a resolve: the keyframes below are
+ * re-resolved against this value on every frame, so as the bars travel to their
+ * real peaks the pulse damps out underneath them instead of being switched off.
+ */
+@property --pd-wv-amp {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 1;
+}
+
+.pd-audio-pending {
+  /* The placeholder is never interactive — there is nothing yet to play or
+     seek — and saying so here keeps the cursor honest. */
+  cursor: default;
+  --pd-wv-amp: 1;
+  transition: --pd-wv-amp 620ms var(--pd-easing-standard, ease);
+}
+.pd-audio-pending .pd-thread-audio-wave {
+  cursor: default;
+}
+/*
+ * The play button's SPACE, held open and empty. A disabled control that looks
+ * ready would be a lie; an absent one would let the waveform beside it slide
+ * 44px left and back when the real card arrives.
+ */
+.pd-audio-pending-play {
+  background: color-mix(in oklab, var(--pd-text-primary) 12%, transparent);
+  animation: pd-audio-pending-breathe 2200ms ease-in-out infinite;
+}
+@keyframes pd-audio-pending-breathe {
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 0.95;
+  }
+}
+.pd-audio-pending-bar {
+  transform-origin: center;
+  /* Quieter than a played bar and warmer than an unplayed one: it is neither,
+     and it should not be mistaken for either. */
+  background: color-mix(in oklab, var(--pd-accent-primary) 42%, transparent);
+  animation: pd-wave-swell 1500ms ease-in-out infinite;
+  /*
+   * The swell TRAVELS. A negative step per bar staggers the phase along the row,
+   * and ~16ms x 96 bars is one full period across the whole waveform — so what
+   * you see is a single wave moving through it, not 96 bars breathing together.
+   */
+  animation-delay: calc(var(--pd-wv-i, 0) * -16ms);
+  transition:
+    height 620ms var(--pd-easing-standard, ease),
+    background 620ms var(--pd-easing-standard, ease);
+}
+@keyframes pd-wave-swell {
+  0%,
+  100% {
+    transform: scaleY(calc(1 - 0.58 * var(--pd-wv-amp)));
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+/* RESOLVED: the amplitude goes to zero (the swell damps out rather than
+   stopping) while the heights travel to the decoded peaks, and the colour
+   arrives at the one the real transport draws unplayed bars in. */
+.pd-media-card[data-state="resolved"] .pd-audio-pending {
+  --pd-wv-amp: 0;
+}
+.pd-media-card[data-state="resolved"] .pd-audio-pending-bar {
+  background: color-mix(in oklab, var(--pd-text-primary) 22%, transparent);
+}
+
+/*
+ * THE HANDOFF. The finished transport mounts where the placeholder stood, so its
+ * bars GROW into place from the middle rather than appearing at full height —
+ * one gesture continued, not one card swapped for another.
+ */
+.pd-thread-audio-wave[data-settle="true"] .pd-thread-audio-bar {
+  animation: pd-wave-settle 420ms var(--pd-easing-enter, ease) both;
+}
+@keyframes pd-wave-settle {
+  from {
+    transform: scaleY(0.55);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
+/*
+ * Reduced motion: the swell stops and the bars hold their stand-in shape. The
+ * RESOLVE is kept — bars travelling to their real peaks is content arriving, not
+ * decoration, and a reader who has asked for less motion still deserves to see
+ * that the sound is finished.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .pd-audio-pending-play,
+  .pd-audio-pending-bar,
+  .pd-thread-audio-wave[data-settle="true"] .pd-thread-audio-bar {
+    animation: none;
+  }
+}
+
 /* ---- the file presentation card ----------------------------------------- */
 
 .pd-file-card {
@@ -5301,7 +5531,15 @@ body[data-media-expanded="true"] .pd-studio-compose {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  max-width: 460px;
+  /*
+   * AND NEVER WIDER THAN THE COLUMN. `max-width: 460px` alone is a fixed width
+   * in a narrow window: MEASURED at a 720px viewport, the card ran past the
+   * right edge of the thread and put a horizontal scrollbar under the whole
+   * conversation. It only showed once the card started holding something as
+   * wide as it is allowed to be — a 96-bar waveform — which is why a rule that
+   * has been here for rounds is being fixed now.
+   */
+  max-width: min(460px, 100%);
   padding: 10px 12px;
   border: 1px solid var(--pd-border-subtle);
   border-radius: var(--pd-radius-lg);
@@ -5344,23 +5582,6 @@ body[data-media-expanded="true"] .pd-studio-compose {
   color: var(--pd-status-warning-fg);
   font-size: var(--pd-font-size-caption);
   line-height: var(--pd-leading-caption);
-}
-
-/* The panel-work status line is a button — see HarnessStatus. It must look
- * exactly like the status line it replaced, and only admit to being clickable
- * on hover, because it is a status first and an affordance second. */
-.pd-panel-jump {
-  display: block;
-  margin: 0;
-  padding: 0;
-  border: none;
-  background: none;
-  text-align: left;
-  cursor: pointer;
-}
-
-.pd-panel-jump:hover {
-  opacity: 0.82;
 }
 
 /* ── Chat | Work, beside the traffic lights ───────────────────────────────

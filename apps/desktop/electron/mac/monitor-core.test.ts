@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { MacMonitorFramePayload, MacMonitorState } from './mac-monitor-contract';
+import type {
+  MacMonitorAxScene,
+  MacMonitorFramePayload,
+  MacMonitorState,
+} from './mac-monitor-contract';
 import { MacMonitorCore, type MonitorSink, type StreamChild } from './monitor-core';
 import type { MacOverlayState } from './overlay-geometry';
 import { encodePimf, type PimfHeader } from './pimf';
@@ -41,6 +45,7 @@ class FakeChild implements StreamChild {
 class FakeSink implements MonitorSink {
   states: MacMonitorState[] = [];
   frameList: MacMonitorFramePayload[] = [];
+  scenes: MacMonitorAxScene[] = [];
   gone = false;
   constructor(public frames = true) {}
   sendState(state: MacMonitorState): void {
@@ -48,6 +53,9 @@ class FakeSink implements MonitorSink {
   }
   sendFrame(frame: MacMonitorFramePayload): void {
     this.frameList.push(frame);
+  }
+  sendAx(scene: MacMonitorAxScene): void {
+    this.scenes.push(scene);
   }
   isGone(): boolean {
     return this.gone;
@@ -412,5 +420,269 @@ describe('MacMonitorCore — wallpaper', () => {
     core.addSink(sink);
     await expect(core.ensureWallpaper()).resolves.toBeUndefined();
     expect(core.state().wallpaperUrl).toBeNull();
+  });
+});
+
+// ── the Accessibility fallback ──────────────────────────────────────────────
+
+/** The reply a real `pi-mac snapshot` gives for a TextEdit with a save sheet. */
+function snapshot(): Record<string, unknown> {
+  return {
+    app: 'TextEdit',
+    pid: 4242,
+    windows: [
+      {
+        role: 'AXSheet',
+        subrole: '',
+        title: '',
+        frame: { x: 200, y: 140, w: 390, h: 218 },
+        windowId: 2,
+        modal: true,
+        sheet: true,
+      },
+      {
+        role: 'AXWindow',
+        subrole: 'AXStandardWindow',
+        title: 'Untitled',
+        frame: { x: 100, y: 100, w: 800, h: 600 },
+        windowId: 1,
+        main: true,
+      },
+    ],
+    elements: [
+      { index: 1, role: 'AXButton', name: 'Save', bbox: { x: 520, y: 330, w: 81, h: 26 }, win: 2 },
+    ],
+  };
+}
+
+/** A core with an injected AX reader and controllable timers. */
+function makeAxCore(reader: (pid: number, cap: number) => Promise<unknown>) {
+  const spawned: FakeChild[] = [];
+  const timers: Array<() => void> = [];
+  const core = new MacMonitorCore({
+    spawn: () => {
+      const child = new FakeChild();
+      spawned.push(child);
+      return child;
+    },
+    axReader: reader as never,
+    setTimer: (fn) => {
+      timers.push(fn);
+      return timers.length;
+    },
+    clearTimer: () => {},
+  });
+  return { core, spawned, timers };
+}
+
+/** Let the poller's awaited reader settle. */
+const settle = (): Promise<void> => new Promise((r) => setTimeout(r, 0));
+
+describe('MacMonitorCore — the Accessibility fallback', () => {
+  it('says WHY when the helper reports the capture grant is missing', () => {
+    const h = makeCore();
+    const sink = new FakeSink(true);
+    h.core.addSink(sink);
+    h.core.setSession(4242, 'TextEdit');
+    h.spawned[0]?.emit(
+      encodePimf(
+        header({ w: 0, h: 0, windows: [], error: 'screen-recording-denied' }),
+        new Uint8Array(0),
+      ),
+    );
+    expect(sink.last?.stream).toBe('unavailable');
+    expect(sink.last?.captureDenied).toBe(true);
+    expect(sink.last?.streamError).toBe('screen-recording-denied');
+  });
+
+  it('does not confuse "no window" with "not allowed"', () => {
+    const h = makeCore();
+    const sink = new FakeSink(true);
+    h.core.addSink(sink);
+    h.core.setSession(4242, 'TextEdit');
+    h.spawned[0]?.emit(
+      encodePimf(header({ w: 0, h: 0, windows: [], empty: true }), new Uint8Array(0)),
+    );
+    expect(sink.last?.stream).toBe('no-window');
+    expect(sink.last?.captureDenied).toBe(false);
+  });
+
+  it('keeps the last real geometry when a status frame arrives with none', () => {
+    // A status frame's rect is all zeros. Adopting it would collapse the stage
+    // to a zero-size rect at the origin at exactly the moment the surface
+    // switches to drawing the window.
+    const h = makeCore();
+    const sink = new FakeSink(true);
+    h.core.addSink(sink);
+    h.core.setSession(4242, 'TextEdit');
+    h.spawned[0]?.emit(encodePimf(header(), new Uint8Array([1, 2, 3])));
+    h.spawned[0]?.emit(
+      encodePimf(
+        header({
+          seq: 2,
+          w: 0,
+          h: 0,
+          rect: { x: 0, y: 0, w: 0, h: 0 },
+          windows: [],
+          error: 'screen-recording-denied',
+        }),
+        new Uint8Array(0),
+      ),
+    );
+    expect(sink.last?.rect).toEqual({ x: 100, y: 100, w: 800, h: 600 });
+  });
+
+  it('polls and publishes a scene once the stream is unavailable', async () => {
+    const reader = vi.fn(async () => snapshot());
+    const { core, spawned } = makeAxCore(reader);
+    const sink = new FakeSink(true);
+    core.addSink(sink);
+    core.setSession(4242, 'TextEdit');
+    expect(reader).not.toHaveBeenCalled(); // pixels are still being tried
+    spawned[0]?.emit(
+      encodePimf(
+        header({ w: 0, h: 0, windows: [], error: 'screen-recording-denied' }),
+        new Uint8Array(0),
+      ),
+    );
+    await settle();
+    expect(reader).toHaveBeenCalledWith(4242, expect.any(Number));
+    expect(sink.scenes).toHaveLength(1);
+    expect(sink.scenes[0]?.windows.map((w) => w.windowId)).toEqual([2, 1]);
+    expect(sink.scenes[0]?.rect).toEqual({ x: 100, y: 100, w: 800, h: 600 });
+  });
+
+  it('never polls while pixels are arriving', async () => {
+    const reader = vi.fn(async () => snapshot());
+    const { core, spawned } = makeAxCore(reader);
+    core.addSink(new FakeSink(true));
+    core.setSession(4242, 'TextEdit');
+    spawned[0]?.emit(encodePimf(header(), new Uint8Array([1, 2, 3])));
+    await settle();
+    expect(core.polling()).toBe(false);
+    expect(reader).not.toHaveBeenCalled();
+  });
+
+  it('stops polling when the tab stops watching — the same gate as the capture', async () => {
+    const reader = vi.fn(async () => snapshot());
+    const { core, spawned } = makeAxCore(reader);
+    const sink = new FakeSink(true);
+    core.addSink(sink);
+    core.setSession(4242, 'TextEdit');
+    spawned[0]?.emit(
+      encodePimf(
+        header({ w: 0, h: 0, windows: [], error: 'screen-recording-denied' }),
+        new Uint8Array(0),
+      ),
+    );
+    await settle();
+    expect(core.polling()).toBe(true);
+    sink.frames = false;
+    core.addSink(sink); // re-subscribe state-only, as the surface does when hidden
+    expect(core.polling()).toBe(false);
+    const seen = reader.mock.calls.length;
+    await settle();
+    expect(reader.mock.calls.length).toBe(seen);
+  });
+
+  it('stops polling when the session ends and forgets the scene', async () => {
+    const { core, spawned } = makeAxCore(async () => snapshot());
+    core.addSink(new FakeSink(true));
+    core.setSession(4242, 'TextEdit');
+    spawned[0]?.emit(
+      encodePimf(
+        header({ w: 0, h: 0, windows: [], error: 'screen-recording-denied' }),
+        new Uint8Array(0),
+      ),
+    );
+    await settle();
+    expect(core.axScene()).not.toBeNull();
+    core.clearSession();
+    expect(core.polling()).toBe(false);
+    expect(core.axScene()).toBeNull();
+  });
+
+  it('survives a reader that throws, and keeps polling', async () => {
+    let calls = 0;
+    const { core, spawned, timers } = makeAxCore(async () => {
+      calls += 1;
+      if (calls === 1) throw new Error('helper busy');
+      return snapshot();
+    });
+    const sink = new FakeSink(true);
+    core.addSink(sink);
+    core.setSession(4242, 'TextEdit');
+    spawned[0]?.emit(
+      encodePimf(
+        header({ w: 0, h: 0, windows: [], error: 'screen-recording-denied' }),
+        new Uint8Array(0),
+      ),
+    );
+    await settle();
+    expect(sink.scenes).toHaveLength(0);
+    for (const fn of timers.splice(0, timers.length)) fn();
+    await settle();
+    expect(sink.scenes).toHaveLength(1);
+  });
+
+  it('publishes nothing when Accessibility comes back empty', async () => {
+    const { core, spawned } = makeAxCore(async () => ({ app: 'TextEdit', windows: [] }));
+    const sink = new FakeSink(true);
+    core.addSink(sink);
+    core.setSession(4242, 'TextEdit');
+    spawned[0]?.emit(
+      encodePimf(
+        header({ w: 0, h: 0, windows: [], error: 'screen-recording-denied' }),
+        new Uint8Array(0),
+      ),
+    );
+    await settle();
+    expect(sink.scenes).toHaveLength(0);
+    expect(core.axScene()).toBeNull();
+  });
+
+  it('sends the scene only to sinks that asked for frames', async () => {
+    const { core, spawned } = makeAxCore(async () => snapshot());
+    const watcher = new FakeSink(true);
+    const listener = new FakeSink(false);
+    core.addSink(watcher);
+    core.addSink(listener);
+    core.setSession(4242, 'TextEdit');
+    spawned[0]?.emit(
+      encodePimf(
+        header({ w: 0, h: 0, windows: [], error: 'screen-recording-denied' }),
+        new Uint8Array(0),
+      ),
+    );
+    await settle();
+    expect(watcher.scenes).toHaveLength(1);
+    expect(listener.scenes).toHaveLength(0);
+  });
+});
+
+describe('MacMonitorCore — a grant revoked mid-session', () => {
+  it('forwards the status frame so the renderer drops the picture it is holding', async () => {
+    // Without this the last good frame stays on screen under a surface that has
+    // switched to drawing from Accessibility, and the stale PHOTOGRAPH wins the
+    // source race — the monitor then shows a window frozen at the moment the
+    // capture died, with no sign that anything is wrong.
+    const reader = vi.fn(async () => snapshot());
+    const { core, spawned } = makeAxCore(reader);
+    const sink = new FakeSink(true);
+    core.addSink(sink);
+    core.setSession(4242, 'TextEdit');
+    spawned[0]?.emit(encodePimf(header(), new Uint8Array([1, 2, 3])));
+    expect(sink.frameList).toHaveLength(1);
+    spawned[0]?.emit(
+      encodePimf(
+        header({ seq: 2, w: 0, h: 0, windows: [], error: 'screen-recording-denied' }),
+        new Uint8Array(0),
+      ),
+    );
+    expect(sink.frameList).toHaveLength(2);
+    expect(sink.frameList[1]?.jpeg).toHaveLength(0);
+    expect(sink.last?.captureDenied).toBe(true);
+    await settle();
+    expect(sink.scenes).toHaveLength(1);
   });
 });

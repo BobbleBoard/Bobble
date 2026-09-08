@@ -54,6 +54,14 @@ export function macMonitorMockEnabled(): boolean {
 let windowsPresent = true;
 /** Hold the first frame back this long, so the "waiting" state can be SEEN. */
 let firstFrameDelayMs = 0;
+/**
+ * Pretend macOS has not granted Screen Recording — the state a fresh Mac is in
+ * by default, and the one this mock cannot otherwise reach on a machine where
+ * the grant IS present. Flips the synthetic helper to emitting the contract's
+ * `screen-recording-denied` status frame, which is what puts the surface onto
+ * the Accessibility fallback below.
+ */
+let captureDenied = false;
 
 /**
  * Dev-only control over the synthetic source, reachable from the E2E debug
@@ -66,9 +74,11 @@ export function macMonitorMockControl(params: {
   windows?: boolean;
   restart?: boolean;
   delayMs?: number;
+  deny?: boolean;
 }): void {
   if (!macMonitorMockEnabled()) return;
   if (typeof params.windows === 'boolean') windowsPresent = params.windows;
+  if (typeof params.deny === 'boolean') captureDenied = params.deny;
   if (typeof params.delayMs === 'number') firstFrameDelayMs = Math.max(0, params.delayMs);
   if (params.restart === true) {
     macOverlay.hide();
@@ -95,6 +105,19 @@ export function startMacMonitorMock(): void {
   if (wallpaper !== null) macMonitor.setWallpaperReader(async () => ({ path: wallpaper }));
 
   macMonitor.setSpawnFn(() => new MockStreamChild());
+  // The ACCESSIBILITY half of the same synthetic app, so the fallback path is
+  // exercised end to end with no TCC and no real app: same window, same frame,
+  // same save sheet on the same 14-second cycle, described the way the helper's
+  // `snapshot` describes a real one.
+  //
+  // Scoped to the SYNTHETIC PID and delegating everything else to the real
+  // reader: a mock that answered for every pid would quietly serve made-up
+  // furniture for a real app someone was actually driving — which is how a
+  // probe ends up screenshotting the mock and calling it a live TextEdit.
+  const realAx = macMonitor.axReader();
+  macMonitor.setAxReader(async (pid, cap) =>
+    pid === MOCK_PID ? mockAxSnapshot() : ((await realAx?.(pid, cap)) ?? null),
+  );
   // Engage the REAL overlay controller over the synthetic frame: everything the
   // monitor publishes about the phantom then comes from production code.
   void (async () => {
@@ -172,6 +195,7 @@ class MockStreamChild implements StreamChild {
   #alive = true;
   #startedAt = 0;
   #sentNoWindow = false;
+  #sentDenied = false;
 
   readonly stdout = {
     on: (_event: 'data', cb: (chunk: Buffer) => void): void => {
@@ -204,6 +228,31 @@ class MockStreamChild implements StreamChild {
     const cb = this.#dataCb;
     if (cb === null) return;
     if (firstFrameDelayMs > 0 && Date.now() - this.#startedAt < firstFrameDelayMs) return;
+    // "Screen Recording is off": the contract's status frame — a header that
+    // carries a REASON and no picture. Sent once, like the helper does.
+    if (captureDenied) {
+      if (this.#sentDenied) return;
+      this.#sentDenied = true;
+      this.#seq += 1;
+      cb(
+        encodePimf(
+          {
+            seq: this.#seq,
+            t: Date.now(),
+            w: 0,
+            h: 0,
+            scale: 1,
+            rect: { x: 0, y: 0, w: 0, h: 0 },
+            display: { x: 0, y: 0, w: 0, h: 0 },
+            windows: [],
+            error: 'screen-recording-denied',
+          },
+          new Uint8Array(0),
+        ),
+      );
+      return;
+    }
+    this.#sentDenied = false;
     // "No window": the contract's once-only zero-payload frame with an empty
     // window list. Sent ONCE, exactly as the helper does — a stream of them
     // would let a consumer paper over the fact that it is a single event.
@@ -286,6 +335,188 @@ class MockStreamChild implements StreamChild {
     }
     this.#closeCb?.(0);
   }
+}
+
+// ── the synthetic ACCESSIBILITY tree ────────────────────────────────────────
+
+/** Title bar height of the synthetic window, in points (matches the raster). */
+const TITLE_H = 38;
+/** How far into the 14s cycle the save sheet is up. Shared with the raster so
+ * the two sources of the same app agree about what is on screen. */
+function sheetPhase(now = Date.now()): number {
+  const phase = (now / 1000) % 14;
+  return phase > 9 ? Math.min(1, (phase - 9) / 0.35) : 0;
+}
+
+/** `bbox` in the pi-mac wire's space: x,y are the element's CENTRE. */
+function box(
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+): { x: number; y: number; w: number; h: number } {
+  return { x: Math.round(x + w / 2), y: Math.round(y + h / 2), w, h };
+}
+
+/**
+ * The synthetic app as Accessibility would describe it — the same shape the
+ * helper's `snapshot` returns, so `axSceneFrom` and the surface's renderer are
+ * exercised on a real reply rather than on a shape written to please them.
+ */
+function mockAxSnapshot(): Record<string, unknown> {
+  const sheetUp = sheetPhase() > 0;
+  const win = { x: WINDOW.x, y: WINDOW.y, w: WINDOW.w, h: WINDOW.h };
+  const sheet = { x: WINDOW.x + WINDOW.w / 2 - 230, y: WINDOW.y + TITLE_H + 20, w: 460, h: 260 };
+  const bodyTop = WINDOW.y + TITLE_H + 26;
+  const elements: Record<string, unknown>[] = [
+    {
+      index: 1,
+      role: 'AXTextArea',
+      name: 'document',
+      bbox: box(WINDOW.x + 30, bodyTop + 14, WINDOW.w - 60, WINDOW.h - (TITLE_H + 26) - 34),
+      editable: true,
+      focused: !sheetUp,
+      enabled: true,
+      value:
+        'The quick brown fox jumps over the lazy dog.\n\n' +
+        'Bobble is driving this window. Screen Recording is off, so the monitor is ' +
+        'drawing it from the Accessibility tree instead of from pixels — the same ' +
+        'tree the model itself is reading and acting on.\n\n' +
+        'Everything here is something Accessibility reported: the window frame, the ' +
+        'title, the controls, and this text.',
+      win: 4242,
+    },
+    {
+      index: 2,
+      role: 'AXCheckBox',
+      name: 'bold',
+      bbox: box(WINDOW.x + 40, WINDOW.y + TITLE_H + 4, 22, 20),
+      enabled: true,
+      win: 4242,
+    },
+    {
+      index: 3,
+      role: 'AXCheckBox',
+      name: 'italic',
+      bbox: box(WINDOW.x + 64, WINDOW.y + TITLE_H + 4, 22, 20),
+      enabled: true,
+      win: 4242,
+    },
+    {
+      index: 4,
+      role: 'AXCheckBox',
+      name: 'underline',
+      bbox: box(WINDOW.x + 88, WINDOW.y + TITLE_H + 4, 22, 20),
+      enabled: true,
+      win: 4242,
+    },
+    {
+      index: 5,
+      role: 'AXPopUpButton',
+      name: 'Helvetica',
+      bbox: box(WINDOW.x + 128, WINDOW.y + TITLE_H + 3, 130, 22),
+      enabled: true,
+      win: 4242,
+    },
+    {
+      index: 6,
+      role: 'AXComboBox',
+      name: 'font size',
+      bbox: box(WINDOW.x + 268, WINDOW.y + TITLE_H + 3, 56, 22),
+      editable: true,
+      enabled: true,
+      value: '12',
+      win: 4242,
+    },
+    {
+      index: 7,
+      role: 'AXButton',
+      name: 'text color',
+      bbox: box(WINDOW.x + 336, WINDOW.y + TITLE_H + 3, 22, 22),
+      enabled: true,
+      win: 4242,
+    },
+  ];
+  const windows: Record<string, unknown>[] = [
+    {
+      windowId: 4242,
+      role: 'AXWindow',
+      subrole: 'AXStandardWindow',
+      title: 'Untitled 2 — Edited',
+      frame: win,
+      main: true,
+      focused: !sheetUp,
+      sheet: false,
+      modal: false,
+    },
+  ];
+  if (sheetUp) {
+    windows.unshift({
+      windowId: 4243,
+      role: 'AXSheet',
+      subrole: '',
+      title: '',
+      frame: sheet,
+      main: false,
+      focused: true,
+      sheet: true,
+      modal: true,
+    });
+    elements.push(
+      {
+        index: 8,
+        role: 'AXTextField',
+        name: 'Save As:',
+        bbox: box(sheet.x + 130, sheet.y + 54, 250, 26),
+        editable: true,
+        focused: true,
+        enabled: true,
+        value: 'Untitled 2',
+        win: 4243,
+      },
+      {
+        index: 9,
+        role: 'AXPopUpButton',
+        name: 'Documents',
+        bbox: box(sheet.x + 130, sheet.y + 96, 250, 26),
+        enabled: true,
+        win: 4243,
+      },
+      {
+        index: 10,
+        role: 'AXPopUpButton',
+        name: 'Rich Text Document',
+        bbox: box(sheet.x + 130, sheet.y + 136, 250, 26),
+        enabled: true,
+        win: 4243,
+      },
+      {
+        index: 11,
+        role: 'AXButton',
+        name: 'Cancel',
+        bbox: box(sheet.x + 248, sheet.y + 200, 88, 26),
+        enabled: true,
+        win: 4243,
+      },
+      {
+        index: 12,
+        role: 'AXButton',
+        name: 'Save',
+        bbox: box(sheet.x + 344, sheet.y + 200, 88, 26),
+        enabled: true,
+        win: 4243,
+      },
+    );
+  }
+  return {
+    app: MOCK_APP,
+    pid: MOCK_PID,
+    window: 'Untitled 2 — Edited',
+    windowId: sheetUp ? 4243 : 4242,
+    windowBounds: sheetUp ? sheet : win,
+    windows,
+    elements,
+  };
 }
 
 // ── the synthetic window raster ─────────────────────────────────────────────

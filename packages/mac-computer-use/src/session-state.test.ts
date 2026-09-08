@@ -15,7 +15,12 @@ describe('createMacSessionState (controlled-app state machine)', () => {
     /* No `visualOnly` yet: a launch has not looked at the app. mac_launch takes
      * a snapshot immediately afterwards, and that is what records which kind of
      * app it is. */
-    expect(s.controlled()).toEqual({ pid: 4242, app: 'TextEdit', windowId: 99 });
+    expect(s.controlled()).toEqual({
+      pid: 4242,
+      app: 'TextEdit',
+      windowId: 99,
+      lastAct: 'opened TextEdit',
+    });
     expect(s.targetParams()).toEqual({ pid: 4242 });
     expect(s.describe()).toContain('"TextEdit"');
     expect(s.describe()).toContain('4242');
@@ -45,6 +50,9 @@ describe('createMacSessionState (controlled-app state machine)', () => {
       windowId: 99,
       visualOnly: false,
       dialogKey: '',
+      /* A LOOK IS NOT AN ACT: snapshotting must not overwrite what the model
+       * actually did, or the snapshot header would report the snapshot. */
+      lastAct: 'opened TextEdit',
     });
   });
 

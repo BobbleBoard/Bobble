@@ -1,0 +1,798 @@
+{
+ "app": "TextEdit",
+ "elements": [
+  {
+   "actions": [
+    "AXShowMenu"
+   ],
+   "bbox": {
+    "h": 382,
+    "w": 586,
+    "x": 474,
+    "y": 393
+   },
+   "editable": true,
+   "enabled": true,
+   "focused": true,
+   "index": 1,
+   "name": "Parity review baseline",
+   "role": "AXTextArea",
+   "value": "Parity review baseline",
+   "win": 37767
+  },
+  {
+   "actions": [
+    "AXPress"
+   ],
+   "bbox": {
+    "h": 20,
+    "w": 22,
+    "x": 200,
+    "y": 153
+   },
+   "enabled": true,
+   "index": 2,
+   "name": "bold",
+   "role": "AXCheckBox",
+   "win": 37767
+  },
+  {
+   "actions": [
+    "AXPress"
+   ],
+   "bbox": {
+    "h": 20,
+    "w": 22,
+    "x": 222,
+    "y": 153
+   },
+   "enabled": true,
+   "index": 3,
+   "name": "italic",
+   "role": "AXCheckBox",
+   "win": 37767
+  },
+  {
+   "actions": [
+    "AXPress"
+   ],
+   "bbox": {
+    "h": 20,
+    "w": 22,
+    "x": 243,
+    "y": 153
+   },
+   "enabled": true,
+   "index": 4,
+   "name": "underline",
+   "role": "AXCheckBox",
+   "win": 37767
+  },
+  {
+   "actions": [
+    "AXPress"
+   ],
+   "bbox": {
+    "h": 20,
+    "w": 23,
+    "x": 265,
+    "y": 153
+   },
+   "enabled": true,
+   "index": 5,
+   "name": "strikethrough",
+   "role": "AXCheckBox",
+   "win": 37767
+  },
+  {
+   "actions": [
+    "AXPress",
+    "Name:Show color panel\nTarget:0x0\nSelector:(null)"
+   ],
+   "bbox": {
+    "h": 22,
+    "w": 22,
+    "x": 290,
+    "y": 152
+   },
+   "enabled": true,
+   "index": 6,
+   "name": "text color",
+   "role": "AXButton",
+   "win": 37767
+  },
+  {
+   "actions": [
+    "AXPress",
+    "Name:Show color panel\nTarget:0x0\nSelector:(null)"
+   ],
+   "bbox": {
+    "h": 22,
+    "w": 22,
+    "x": 315,
+    "y": 152
+   },
+   "enabled": true,
+   "index": 7,
+   "name": "text background color",
+   "role": "AXButton",
+   "win": 37767
+  },
+  {
+   "actions": [
+    "AXShowMenu",
+    "AXPress"
+   ],
+   "bbox": {
+    "h": 22,
+    "w": 82,
+    "x": 370,
+    "y": 152
+   },
+   "enabled": true,
+   "index": 8,
+   "name": "typeface",
+   "role": "AXPopUpButton",
+   "win": 37767
+  },
+  {
+   "actions": [
+    "AXShowMenu",
+    "AXPress"
+   ],
+   "bbox": {
+    "h": 22,
+    "w": 82,
+    "x": 455,
+    "y": 152
+   },
+   "enabled": true,
+   "index": 9,
+   "name": "style",
+   "role": "AXPopUpButton",
+   "win": 37767
+  },
+  {
+   "actions": [
+    "AXShowMenu",
+    "AXConfirm"
+   ],
+   "bbox": {
+    "h": 22,
+    "w": 52,
+    "x": 525,
+    "y": 152
+   },
+   "editable": true,
+   "enabled": true,
+   "index": 10,
+   "name": "font size",
+   "role": "AXComboBox",
+   "value": "12",
+   "win": 37767
+  },
+  {
+   "actions": [
+    "AXPress"
+   ],
+   "bbox": {
+    "h": 14,
+    "w": 20,
+    "x": 537,
+    "y": 152
+   },
+   "enabled": true,
+   "index": 11,
+   "name": "font size",
+   "role": "AXButton",
+   "win": 37767
+  },
+  {
+   "actions": [
+    "AXPress"
+   ],
+   "bbox": {
+    "h": 20,
+    "w": 25,
+    "x": 567,
+    "y": 153
+   },
+   "enabled": true,
+   "index": 12,
+   "name": "align left",
+   "role": "AXCheckBox",
+   "win": 37767
+  },
+  {
+   "actions": [
+    "AXPress"
+   ],
+   "bbox": {
+    "h": 20,
+    "w": 25,
+    "x": 591,
+    "y": 153
+   },
+   "enabled": true,
+   "index": 13,
+   "name": "align center",
+   "role": "AXCheckBox",
+   "win": 37767
+  },
+  {
+   "actions": [
+    "AXPress"
+   ],
+   "bbox": {
+    "h": 20,
+    "w": 25,
+    "x": 616,
+    "y": 153
+   },
+   "enabled": true,
+   "index": 14,
+   "name": "align right",
+   "role": "AXCheckBox",
+   "win": 37767
+  },
+  {
+   "actions": [
+    "AXPress"
+   ],
+   "bbox": {
+    "h": 20,
+    "w": 25,
+    "x": 640,
+    "y": 153
+   },
+   "enabled": true,
+   "index": 15,
+   "name": "fully justify",
+   "role": "AXCheckBox",
+   "win": 37767
+  },
+  {
+   "actions": [
+    "AXShowMenu",
+    "AXPress"
+   ],
+   "bbox": {
+    "h": 22,
+    "w": 48,
+    "x": 679,
+    "y": 152
+   },
+   "enabled": true,
+   "index": 16,
+   "name": "list style",
+   "role": "AXMenuButton",
+   "win": 37767
+  },
+  {
+   "actions": [
+    "AXShowMenu",
+    "AXPress"
+   ],
+   "bbox": {
+    "h": 22,
+    "w": 53,
+    "x": 732,
+    "y": 152
+   },
+   "enabled": true,
+   "index": 17,
+   "name": "line spacing",
+   "role": "AXPopUpButton",
+   "win": 37767
+  },
+  {
+   "actions": [
+    "AXPress"
+   ],
+   "bbox": {
+    "h": 16,
+    "w": 16,
+    "x": 197,
+    "y": 118
+   },
+   "enabled": true,
+   "index": 18,
+   "name": "close button",
+   "role": "AXButton",
+   "win": 37767
+  },
+  {
+   "actions": [
+    "AXPress",
+    "AXZoomWindow",
+    "AXShowMenu"
+   ],
+   "bbox": {
+    "h": 16,
+    "w": 16,
+    "x": 243,
+    "y": 118
+   },
+   "enabled": true,
+   "index": 19,
+   "name": "full screen button",
+   "role": "AXButton",
+   "win": 37767
+  },
+  {
+   "actions": [
+    "AXPress"
+   ],
+   "bbox": {
+    "h": 16,
+    "w": 16,
+    "x": 220,
+    "y": 118
+   },
+   "enabled": true,
+   "index": 20,
+   "name": "minimize button",
+   "role": "AXButton",
+   "win": 37767
+  },
+  {
+   "actions": [
+    "AXPress",
+    "AXShowMenu"
+   ],
+   "bbox": {
+    "h": 18,
+    "w": 55,
+    "x": 400,
+    "y": 118
+   },
+   "enabled": false,
+   "index": 21,
+   "name": "Edited",
+   "role": "AXMenuButton",
+   "win": 37767
+  },
+  {
+   "actions": [
+    "AXShowMenu"
+   ],
+   "bbox": {
+    "h": 382,
+    "w": 586,
+    "x": 445,
+    "y": 364
+   },
+   "editable": true,
+   "enabled": true,
+   "index": 22,
+   "name": "Bobble is driving this window in the background. Screen Recording is off, so the monitor is drawing this window from th…",
+   "role": "AXTextArea",
+   "surface": "Screen Recording of Accessibility Tree 7",
+   "value": "Bobble is driving this window in the background. Screen Recording is off, so the monitor is drawing this window from th…",
+   "win": 37765
+  },
+  {
+   "actions": [
+    "AXPress"
+   ],
+   "bbox": {
+    "h": 20,
+    "w": 22,
+    "x": 171,
+    "y": 124
+   },
+   "enabled": true,
+   "index": 23,
+   "name": "bold",
+   "role": "AXCheckBox",
+   "surface": "Screen Recording of Accessibility Tree 7",
+   "win": 37765
+  },
+  {
+   "actions": [
+    "AXPress"
+   ],
+   "bbox": {
+    "h": 20,
+    "w": 22,
+    "x": 193,
+    "y": 124
+   },
+   "enabled": true,
+   "index": 24,
+   "name": "italic",
+   "role": "AXCheckBox",
+   "surface": "Screen Recording of Accessibility Tree 7",
+   "win": 37765
+  },
+  {
+   "actions": [
+    "AXPress"
+   ],
+   "bbox": {
+    "h": 20,
+    "w": 22,
+    "x": 214,
+    "y": 124
+   },
+   "enabled": true,
+   "index": 25,
+   "name": "underline",
+   "role": "AXCheckBox",
+   "surface": "Screen Recording of Accessibility Tree 7",
+   "win": 37765
+  },
+  {
+   "actions": [
+    "AXPress"
+   ],
+   "bbox": {
+    "h": 20,
+    "w": 23,
+    "x": 236,
+    "y": 124
+   },
+   "enabled": true,
+   "index": 26,
+   "name": "strikethrough",
+   "role": "AXCheckBox",
+   "surface": "Screen Recording of Accessibility Tree 7",
+   "win": 37765
+  },
+  {
+   "actions": [
+    "AXPress",
+    "Name:Show color panel\nTarget:0x0\nSelector:(null)"
+   ],
+   "bbox": {
+    "h": 22,
+    "w": 22,
+    "x": 261,
+    "y": 123
+   },
+   "enabled": true,
+   "index": 27,
+   "name": "text color",
+   "role": "AXButton",
+   "surface": "Screen Recording of Accessibility Tree 7",
+   "win": 37765
+  },
+  {
+   "actions": [
+    "AXPress",
+    "Name:Show color panel\nTarget:0x0\nSelector:(null)"
+   ],
+   "bbox": {
+    "h": 22,
+    "w": 22,
+    "x": 286,
+    "y": 123
+   },
+   "enabled": true,
+   "index": 28,
+   "name": "text background color",
+   "role": "AXButton",
+   "surface": "Screen Recording of Accessibility Tree 7",
+   "win": 37765
+  },
+  {
+   "actions": [
+    "AXShowMenu",
+    "AXPress"
+   ],
+   "bbox": {
+    "h": 22,
+    "w": 82,
+    "x": 341,
+    "y": 123
+   },
+   "enabled": true,
+   "index": 29,
+   "name": "typeface",
+   "role": "AXPopUpButton",
+   "surface": "Screen Recording of Accessibility Tree 7",
+   "win": 37765
+  },
+  {
+   "actions": [
+    "AXShowMenu",
+    "AXPress"
+   ],
+   "bbox": {
+    "h": 22,
+    "w": 82,
+    "x": 426,
+    "y": 123
+   },
+   "enabled": true,
+   "index": 30,
+   "name": "style",
+   "role": "AXPopUpButton",
+   "surface": "Screen Recording of Accessibility Tree 7",
+   "win": 37765
+  },
+  {
+   "actions": [
+    "AXShowMenu",
+    "AXConfirm"
+   ],
+   "bbox": {
+    "h": 22,
+    "w": 52,
+    "x": 496,
+    "y": 123
+   },
+   "editable": true,
+   "enabled": true,
+   "index": 31,
+   "name": "font size",
+   "role": "AXComboBox",
+   "surface": "Screen Recording of Accessibility Tree 7",
+   "value": "12",
+   "win": 37765
+  },
+  {
+   "actions": [
+    "AXPress"
+   ],
+   "bbox": {
+    "h": 14,
+    "w": 20,
+    "x": 508,
+    "y": 123
+   },
+   "enabled": true,
+   "index": 32,
+   "name": "font size",
+   "role": "AXButton",
+   "surface": "Screen Recording of Accessibility Tree 7",
+   "win": 37765
+  },
+  {
+   "actions": [
+    "AXPress"
+   ],
+   "bbox": {
+    "h": 20,
+    "w": 25,
+    "x": 538,
+    "y": 124
+   },
+   "enabled": true,
+   "index": 33,
+   "name": "align left",
+   "role": "AXCheckBox",
+   "surface": "Screen Recording of Accessibility Tree 7",
+   "win": 37765
+  },
+  {
+   "actions": [
+    "AXPress"
+   ],
+   "bbox": {
+    "h": 20,
+    "w": 25,
+    "x": 562,
+    "y": 124
+   },
+   "enabled": true,
+   "index": 34,
+   "name": "align center",
+   "role": "AXCheckBox",
+   "surface": "Screen Recording of Accessibility Tree 7",
+   "win": 37765
+  },
+  {
+   "actions": [
+    "AXPress"
+   ],
+   "bbox": {
+    "h": 20,
+    "w": 25,
+    "x": 587,
+    "y": 124
+   },
+   "enabled": true,
+   "index": 35,
+   "name": "align right",
+   "role": "AXCheckBox",
+   "surface": "Screen Recording of Accessibility Tree 7",
+   "win": 37765
+  },
+  {
+   "actions": [
+    "AXPress"
+   ],
+   "bbox": {
+    "h": 20,
+    "w": 25,
+    "x": 611,
+    "y": 124
+   },
+   "enabled": true,
+   "index": 36,
+   "name": "fully justify",
+   "role": "AXCheckBox",
+   "surface": "Screen Recording of Accessibility Tree 7",
+   "win": 37765
+  },
+  {
+   "actions": [
+    "AXShowMenu",
+    "AXPress"
+   ],
+   "bbox": {
+    "h": 22,
+    "w": 48,
+    "x": 650,
+    "y": 123
+   },
+   "enabled": true,
+   "index": 37,
+   "name": "list style",
+   "role": "AXMenuButton",
+   "surface": "Screen Recording of Accessibility Tree 7",
+   "win": 37765
+  },
+  {
+   "actions": [
+    "AXShowMenu",
+    "AXPress"
+   ],
+   "bbox": {
+    "h": 22,
+    "w": 53,
+    "x": 703,
+    "y": 123
+   },
+   "enabled": true,
+   "index": 38,
+   "name": "line spacing",
+   "role": "AXPopUpButton",
+   "surface": "Screen Recording of Accessibility Tree 7",
+   "win": 37765
+  },
+  {
+   "actions": [
+    "AXPress"
+   ],
+   "bbox": {
+    "h": 16,
+    "w": 16,
+    "x": 168,
+    "y": 89
+   },
+   "enabled": true,
+   "index": 39,
+   "name": "close button",
+   "role": "AXButton",
+   "surface": "Screen Recording of Accessibility Tree 7",
+   "win": 37765
+  },
+  {
+   "actions": [
+    "AXPress",
+    "AXZoomWindow",
+    "AXShowMenu"
+   ],
+   "bbox": {
+    "h": 16,
+    "w": 16,
+    "x": 214,
+    "y": 89
+   },
+   "enabled": true,
+   "index": 40,
+   "name": "full screen button",
+   "role": "AXButton",
+   "surface": "Screen Recording of Accessibility Tree 7",
+   "win": 37765
+  },
+  {
+   "actions": [
+    "AXPress"
+   ],
+   "bbox": {
+    "h": 16,
+    "w": 16,
+    "x": 191,
+    "y": 89
+   },
+   "enabled": true,
+   "index": 41,
+   "name": "minimize button",
+   "role": "AXButton",
+   "surface": "Screen Recording of Accessibility Tree 7",
+   "win": 37765
+  },
+  {
+   "actions": [
+    "AXPress",
+    "AXShowMenu"
+   ],
+   "bbox": {
+    "h": 18,
+    "w": 12,
+    "x": 521,
+    "y": 89
+   },
+   "enabled": false,
+   "index": 42,
+   "name": "document actions",
+   "role": "AXMenuButton",
+   "surface": "Screen Recording of Accessibility Tree 7",
+   "win": 37765
+  }
+ ],
+ "menus": [
+  "TextEdit",
+  "File",
+  "Edit",
+  "Format",
+  "View",
+  "Window",
+  "Help"
+ ],
+ "permissions": {
+  "accessibility": true,
+  "hint": "macOS has not granted this app Screen Recording. Until it does, apps read as empty and screenshots are blank. Enable them in System Settings > Privacy & Security.",
+  "screenRecording": false
+ },
+ "pid": 32866,
+ "summary": {
+  "app": "TextEdit",
+  "elementCount": 42,
+  "truncated": false,
+  "window": "Untitled 16"
+ },
+ "union": {
+  "h": 534,
+  "w": 632,
+  "x": 152,
+  "y": 73
+ },
+ "window": "Untitled 16",
+ "windowBounds": {
+  "h": 505,
+  "w": 603,
+  "x": 181,
+  "y": 102
+ },
+ "windowId": 37767,
+ "windows": [
+  {
+   "focused": true,
+   "frame": {
+    "h": 505,
+    "w": 603,
+    "x": 181,
+    "y": 102
+   },
+   "hostPid": 32866,
+   "main": true,
+   "modal": false,
+   "role": "AXWindow",
+   "sheet": false,
+   "subrole": "AXDialog",
+   "title": "Untitled 16",
+   "windowId": 37767
+  },
+  {
+   "focused": false,
+   "frame": {
+    "h": 505,
+    "w": 603,
+    "x": 152,
+    "y": 73
+   },
+   "hostPid": 32866,
+   "main": false,
+   "modal": false,
+   "role": "AXWindow",
+   "sheet": false,
+   "subrole": "AXDialog",
+   "title": "Screen Recording of Accessibility Tree 7",
+   "windowId": 37765
+  }
+ ]
+}

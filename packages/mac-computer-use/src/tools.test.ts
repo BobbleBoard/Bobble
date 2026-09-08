@@ -91,7 +91,10 @@ describe('registerMacComputerUseTools', () => {
     const tools = collectTools(null);
     const r = await run(tools, 'mac_snapshot', {});
     expect(details(r).ok).toBe(false);
-    expect(details(r).error).toContain('bridge unavailable');
+    /* The model quotes its errors back to the user, so this string is user
+     * copy: it names neither the internal codename nor the extension. */
+    expect(details(r).error).toBe("Mac control isn't available in this session.");
+    expect(details(r).error).not.toMatch(/Pi Desktop|extension|bridge/i);
   });
 
   it('snapshot formats the indexed element list and passes app/cap', async () => {
@@ -772,5 +775,191 @@ describe('registerMacComputerUseTools', () => {
     expect(details(r).ok).toBe(false);
     expect(details(r).error).toContain('no window appeared');
     expect(bridge.countOf('snapshot')).toBe(0); // no phantom snapshot attempt
+  });
+});
+
+/*
+ * W3, at the tool layer. The truncation line now promises `find` and `from`;
+ * those have to actually reach the helper, and a filtered look that matches
+ * nothing must not be mistaken for an app with no Accessibility tree.
+ */
+describe('paging a big app', () => {
+  it('sends find and from on the wire', async () => {
+    const bridge = new FakeBridge().on('snapshot', () => SNAP([]));
+    const tools = collectTools(bridge);
+    await run(tools, 'mac_snapshot', { find: 'save', from: 60 });
+    expect(bridge.lastParams('snapshot')).toMatchObject({ find: 'save', from: 60 });
+  });
+
+  it('leaves them off entirely when they were not asked for', async () => {
+    const bridge = new FakeBridge().on('snapshot', () =>
+      SNAP([{ index: 1, role: 'AXButton', name: 'Save' }]),
+    );
+    const tools = collectTools(bridge);
+    await run(tools, 'mac_snapshot', {});
+    const p = bridge.lastParams('snapshot') ?? {};
+    expect('find' in p).toBe(false);
+    expect('from' in p).toBe(false);
+  });
+
+  it('does not re-take a filtered-to-nothing look as a screenshot', async () => {
+    // An empty PAGE is not an empty app. The old isAxOpaque test (elements
+    // empty) would have fired the screenshot retake and recorded the app as
+    // visual-only for the rest of the session, because a search missed.
+    const bridge = new FakeBridge().on('snapshot', () => ({
+      ...SNAP([]),
+      summary: {
+        app: 'TextEdit',
+        window: 'Untitled',
+        elementCount: 812,
+        truncated: false,
+        find: 'zzz',
+        matched: 0,
+      },
+    }));
+    const tools = collectTools(bridge);
+    const r = await run(tools, 'mac_snapshot', { find: 'zzz' });
+    expect(bridge.countOf('snapshot')).toBe(1);
+    expect(details(r).visualOnly).toBe(false);
+  });
+});
+
+/*
+ * S3. The Apple menu's items — Shut Down…, Restart…, Log Out… — resolved like
+ * any other path, guarded by nothing but a session consent the user gave to
+ * "control your Mac". The helper refuses them outright; this is the only door
+ * through, and it opens on the user's word, not the model's.
+ */
+describe('menu items that end the session', () => {
+  const refusing = () =>
+    new FakeBridge().on('menuClick', (p) =>
+      p?.confirmDestructive === true
+        ? { ok: true, path: 'Apple > Shut Down…' }
+        : {
+            ok: false,
+            destructive: true,
+            item: 'Apple > Shut Down…',
+            error: 'ends the session',
+          },
+    );
+
+  it('asks the user in their own UI, and presses only after a yes', async () => {
+    const bridge = refusing();
+    const ctx = ctxStub(true, true);
+    const r = await run(tools2(bridge), 'mac_click', { menu: 'Apple > Shut Down…' }, ctx);
+    expect(ctx.ui.confirm).toHaveBeenCalledWith(
+      'Let Bobble use "Apple > Shut Down…"?',
+      expect.stringContaining('cannot get back'),
+    );
+    expect(bridge.lastParams('menuClick')).toMatchObject({ confirmDestructive: true });
+    expect(details(r).ok).toBe(true);
+  });
+
+  it('refuses on a no, and tells the model to hand it back to the user', async () => {
+    const bridge = refusing();
+    const r = await run(tools2(bridge), 'mac_click', { menu: 'Shut Down' }, ctxStub(true, false));
+    expect(details(r).ok).toBe(false);
+    expect(bridge.calls.filter((c) => c.params?.confirmDestructive === true)).toHaveLength(0);
+    expect(details(r).error).toContain('have not asked for it');
+  });
+
+  it('has no door at all where there is no user to ask', async () => {
+    // Print mode / a spawned subagent: fail safe, exactly like the consent gate.
+    const bridge = refusing();
+    const r = await run(tools2(bridge), 'mac_click', { menu: 'Shut Down' }, ctxStub(false));
+    expect(details(r).ok).toBe(false);
+    expect(bridge.calls.filter((c) => c.params?.confirmDestructive === true)).toHaveLength(0);
+  });
+
+  it('leaves an ordinary menu item alone', async () => {
+    const bridge = new FakeBridge().on('menuClick', () => ({ ok: true, path: 'File > New' }));
+    const ctx = ctxStub(true, true);
+    const r = await run(tools2(bridge), 'mac_click', { menu: 'File > New' }, ctx);
+    expect(details(r).ok).toBe(true);
+    expect(ctx.ui.confirm).not.toHaveBeenCalled();
+  });
+});
+
+function tools2(bridge: MacBridge) {
+  return collectTools(bridge);
+}
+
+/*
+ * A7. The header reads the model its own last act back. It is written by the
+ * tool that did the thing, so it has to survive a look and it has to name the
+ * element rather than only its number.
+ */
+describe('what the snapshot header says the model just did', () => {
+  it('names the element a click landed on, and survives the next look', async () => {
+    const bridge = new FakeBridge()
+      .on('snapshot', () => SNAP([{ index: 7, role: 'AXButton', name: 'Save' }]))
+      .on('click', () => ({ found: true, background: true, mode: 'AXPress' }));
+    const tools = collectTools(bridge);
+    await run(tools, 'mac_snapshot', {});
+    await run(tools, 'mac_click', { index: 7 });
+    const r = await run(tools, 'mac_snapshot', {});
+    expect(r.content[0]).toMatchObject({
+      text: expect.stringContaining('your last act: clicked [7] "Save"'),
+    });
+  });
+
+  it('says nothing before the model has done anything', async () => {
+    const bridge = new FakeBridge().on('snapshot', () =>
+      SNAP([{ index: 1, role: 'AXButton', name: 'Save' }]),
+    );
+    const r = await run(collectTools(bridge), 'mac_snapshot', {});
+    expect(r.content[0]).toMatchObject({ text: expect.not.stringContaining('your last act') });
+  });
+
+  it('records a key press and a menu press too', async () => {
+    const bridge = new FakeBridge()
+      .on('snapshot', () => SNAP([{ index: 1, role: 'AXButton', name: 'Save' }]))
+      .on('key', () => ({ ok: true, background: true }));
+    const tools = collectTools(bridge);
+    await run(tools, 'mac_snapshot', {});
+    await run(tools, 'mac_key', { combo: 'cmd+s' });
+    const r = await run(tools, 'mac_snapshot', {});
+    expect(r.content[0]).toMatchObject({
+      text: expect.stringContaining('your last act: pressed cmd+s'),
+    });
+  });
+});
+
+/*
+ * W6 + S2 + H4. The tool descriptions are the only place a model reliably reads
+ * before its first call, so the rules that cost turns belong in them — and the
+ * one honest hazard (index-less typing with nothing under control) has to be
+ * stated rather than described as safe.
+ */
+describe('what the tool descriptions promise', () => {
+  const tools = collectTools(new FakeBridge());
+  const desc = (n: string) => tools.get(n)?.description ?? '';
+
+  it('puts the document-command rule in mac_click itself, not only in a parameter', () => {
+    const head = desc('mac_click').split('\n').slice(0, 3).join('\n');
+    expect(head).toContain('DOCUMENT COMMANDS');
+    expect(head).toContain('activate:true');
+  });
+
+  it('tells mac_snapshot readers how to get past the cap', () => {
+    expect(desc('mac_snapshot')).toContain('find:"save"');
+    expect(desc('mac_snapshot')).toContain('from:60');
+  });
+
+  it('does not describe index-less typing as safe when nothing is controlled', () => {
+    // With an app under control the keystrokes are pid-delivered and really are
+    // background; with none there is nothing to aim at and they follow the
+    // SYSTEM focus into whatever the user is doing. Both facts, plainly.
+    const d = desc('mac_type');
+    expect(d).toContain('SYSTEM focus');
+    expect(d).toContain('snapshot or launch something first');
+  });
+
+  it('uses one kind of apostrophe', () => {
+    for (const name of tools.keys()) {
+      const t = tools.get(name);
+      const blob = JSON.stringify([t?.description, t?.parameters, t?.promptSnippet]);
+      expect(blob).not.toContain('’');
+    }
   });
 });

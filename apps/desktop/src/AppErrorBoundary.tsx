@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
+import { hardReload, softReload } from './app-reload';
 
 /**
  * THE LAST THING BETWEEN A RENDER THROW AND A BLANK WINDOW.
@@ -47,21 +48,32 @@ export class AppErrorBoundary extends Component<{ children: ReactNode }, State> 
           </p>
           <pre className="pd-crash-detail">{error.message || String(error)}</pre>
           <div className="pd-crash-actions">
+            {/*
+              BOTH OF THESE USED TO DO NOTHING.
+
+              They were `window.location.reload()` and `window.location.search =
+              ''` — a renderer-initiated navigation and, when the search was
+              already empty, not even that. main refuses renderer navigations by
+              design (`will-navigate` → preventDefault), so the one screen whose
+              whole job is escape had two dead buttons and the user was left pressing
+              ⌘R. See app-reload.ts.
+            */}
             <button
               type="button"
               className="pd-crash-primary"
-              onClick={() => window.location.reload()}
+              data-testid="app-crash-reload"
+              onClick={softReload}
             >
               Reload
             </button>
-            {/* A thread that cannot render is the likeliest cause, and it is
-                what survives a reload — so offer the way past it. */}
+            {/* The document reload, for a tree that breaks again on re-mount:
+                a fresh window, no query, nothing carried over. The chats are on
+                disk and come back with it. */}
             <button
               type="button"
               className="pd-crash-secondary"
-              onClick={() => {
-                window.location.search = '';
-              }}
+              data-testid="app-crash-fresh"
+              onClick={() => hardReload({ fresh: true })}
             >
               Reload with a fresh window
             </button>

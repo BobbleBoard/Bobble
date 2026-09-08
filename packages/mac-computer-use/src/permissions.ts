@@ -63,10 +63,36 @@ export interface MacConsentOptions {
   readonly promptMessage?: string;
 }
 
-const DEFAULT_TITLE = 'Allow Pi to control your Mac?';
+/*
+ * THE MOST IMPORTANT MOMENT IN THE FEATURE, AND IT USED TO GET THREE THINGS WRONG.
+ *
+ * It said "Pi" (a codename the user has never seen), it said "synthetic
+ * clicks/keystrokes via Accessibility" (engineer voice, at the exact moment the
+ * user is deciding whether to trust this), and it said the product would act on
+ * "whatever app is in front" — which stopped being true the moment this round
+ * made it drive one named app in the BACKGROUND. The user should be told what
+ * happens, in their words: which app, that they keep their computer, where to
+ * watch, and how long the answer lasts.
+ */
+const DEFAULT_TITLE = 'Let Bobble use your Mac?';
 const DEFAULT_MESSAGE =
-  'Pi is about to read another app’s screen and send synthetic clicks/keystrokes ' +
-  'via Accessibility. It can see and act on whatever app is in front. Allow for this session?';
+  'Bobble will click and type in the app for you. It works in the background, so you can ' +
+  'keep using your Mac — and you can watch it in the Computer use tab and stop it at any ' +
+  'time. This lasts until you close Bobble.';
+
+/** The same question when the app is already known, which is the usual case:
+ * naming it is the difference between "control my Mac" and "use TextEdit". */
+function consentCopy(app: string | undefined): { title: string; message: string } {
+  const name = app?.trim() ?? '';
+  if (name === '') return { title: DEFAULT_TITLE, message: DEFAULT_MESSAGE };
+  return {
+    title: `Let Bobble use ${name}?`,
+    message:
+      `Bobble will click and type in ${name} for you. It works in the background, so you can ` +
+      'keep using your Mac — and you can watch it in the Computer use tab and stop it at any ' +
+      'time. This lasts until you close Bobble.',
+  };
+}
 
 export interface MacConsentGate {
   /** Gate one mac_* action. `targetApp` (when known) is denylist-checked. */
@@ -94,11 +120,12 @@ export function createMacConsentGate(opts: MacConsentOptions = {}): MacConsentGa
           reason: 'Mac control needs a one-time consent, but there is no UI to confirm it here.',
         };
       }
+      const copy = consentCopy(targetApp);
       let ok = false;
       try {
         ok = await ctx.ui.confirm(
-          opts.promptTitle ?? DEFAULT_TITLE,
-          opts.promptMessage ?? DEFAULT_MESSAGE,
+          opts.promptTitle ?? copy.title,
+          opts.promptMessage ?? copy.message,
         );
       } catch {
         ok = false;

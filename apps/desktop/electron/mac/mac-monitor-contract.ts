@@ -11,6 +11,15 @@
  * The stream child runs ONLY while both halves are true — a session is
  * controlling an app AND at least one renderer is subscribed — so a monitor tab
  * nobody is looking at costs nothing.
+ *
+ * ── TWO SOURCES FOR ONE PICTURE ─────────────────────────────────────────────
+ * Pixels need the Screen Recording grant. Accessibility does not, and it is the
+ * grant computer-use already cannot work without. So when the capture stream is
+ * unavailable — the grant is off, or the helper cannot share the window — main
+ * ALSO publishes a `MacMonitorAxScene`: the same windows, the same frames, the
+ * same union rect, plus every element the AX tree reports at its real bbox. The
+ * surface draws that instead of an error panel. It is a DRAWING, never a
+ * photograph, and the surface says so on its face.
  */
 
 /** A rect in global macOS screen POINTS, top-left origin. */
@@ -77,6 +86,67 @@ export interface MacMonitorState {
   cursor: { x: number; y: number } | null;
   /** ADDITIVE: the overlay's bubble fades after an idle spell; mirror that. */
   bubbleVisible: boolean;
+  /**
+   * ADDITIVE: the stream is unavailable specifically because macOS has not
+   * granted this app Screen Recording — as opposed to any other reason a
+   * capture can fail. The surface offers the fix for exactly this one.
+   */
+  captureDenied: boolean;
+}
+
+/**
+ * One element of the controlled app, as Accessibility reports it.
+ *
+ * `bbox` is the pi-mac wire contract's: x,y are the element's CENTRE in global
+ * screen points, w,h its size. Kept in that space (rather than converted to a
+ * top-left rect here) so it stays byte-comparable with what the model's own
+ * snapshot sees — one number transformed in one place, in the renderer.
+ */
+export interface MacMonitorAxElement {
+  index: number;
+  role: string;
+  name: string;
+  bbox: { x: number; y: number; w: number; h: number };
+  /** Only ever what AX returned. Never a placeholder. */
+  value?: string;
+  editable?: boolean;
+  focused?: boolean;
+  enabled?: boolean;
+  /** CGWindowID of the surface this element lives in. */
+  win?: number;
+}
+
+/** One window/sheet/dialog in an AX scene. Front-to-back, like the helper. */
+export interface MacMonitorAxWindow {
+  windowId: number;
+  title: string;
+  role: string;
+  subrole: string;
+  frame: MacMonitorRect;
+  main: boolean;
+  focused: boolean;
+  sheet: boolean;
+  modal: boolean;
+}
+
+/**
+ * The controlled app as Accessibility sees it — everything needed to DRAW it
+ * without a single captured pixel.
+ *
+ * `rect` is the union of every window, exactly as the capture path's header
+ * rect is, so a surface switching between the two sources does not move.
+ */
+export interface MacMonitorAxScene {
+  /** ms epoch of the poll that produced it. */
+  t: number;
+  pid: number;
+  appName: string;
+  /** Union of every window in `windows`, in screen points. */
+  rect: MacMonitorRect;
+  display: { w: number; h: number } | null;
+  /** Front-to-back, like the helper's own ordering. */
+  windows: MacMonitorAxWindow[];
+  elements: MacMonitorAxElement[];
 }
 
 export interface MacMonitorFramePayload {
@@ -117,11 +187,24 @@ export type MacMonitorInvokeMap = {
     request: Record<string, never>;
     response: { ok: boolean };
   };
+  /**
+   * Renderer → main: show the user where to turn Screen Recording on.
+   *
+   * It OPENS the pane; it never toggles anything. macOS deliberately makes the
+   * grant unreachable from code, and the honest version of "turn it on" is
+   * therefore "put you in front of the switch" — plus a best-effort nudge that
+   * registers this app in the list so there is a switch to find.
+   */
+  'mac:monitor:request-capture': {
+    request: Record<string, never>;
+    response: { ok: boolean };
+  };
 };
 
 export const MAC_MONITOR_INVOKE_CHANNELS = [
   'mac:monitor:subscribe',
   'mac:monitor:unsubscribe',
+  'mac:monitor:request-capture',
 ] as const satisfies readonly (keyof MacMonitorInvokeMap)[];
 
 export type MacMonitorEventMap = {
@@ -130,6 +213,14 @@ export type MacMonitorEventMap = {
   /** Main → renderer: one captured frame. Never queued — the renderer decodes
    * the newest and drops anything it could not keep up with. */
   'mac:monitor:frame': MacMonitorFramePayload;
+  /**
+   * Main → renderer: the controlled app as Accessibility sees it, ~4Hz, sent
+   * ONLY while the pixel stream is unavailable and someone is watching. It rides
+   * beside `mac:monitor:frame` rather than replacing it so the surface picks a
+   * source instead of main deciding for it — and so a capture grant arriving
+   * mid-session simply starts producing frames again.
+   */
+  'mac:monitor:ax': MacMonitorAxScene;
 };
 
 /** The idle state, shared by main and the renderer feed so "nothing yet" looks
@@ -148,4 +239,9 @@ export const EMPTY_MAC_MONITOR_STATE: MacMonitorState = {
   cursorState: 'idle',
   cursor: null,
   bubbleVisible: false,
+  captureDenied: false,
 };
+
+/** The helper's status-frame reason for "macOS has not granted this app Screen
+ * Recording" — the ONE capture failure that has a fix the user can act on. */
+export const MAC_CAPTURE_DENIED = 'screen-recording-denied';

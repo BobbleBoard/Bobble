@@ -16,12 +16,28 @@ export function LongJobCard({
   kind,
   startedAt,
   onCancel,
+  note,
   children,
 }: {
   kind: JobKind;
   /** performance-clock-independent epoch ms the job started. */
   startedAt: number;
   onCancel: () => void;
+  /**
+   * WHAT THE ENGINE SAYS IT IS DOING RIGHT NOW, when it says anything.
+   *
+   * MEASURED on the user's Mac with the weights already cached: 94 seconds from
+   * pressing Generate to the first diffusion step — uv provisioning a Python
+   * environment, then the model loading. The worker narrates all of it and the
+   * studio has shown that line for rounds; the thread showed the shipped
+   * estimate and nothing else, which is a card that cannot distinguish a slow
+   * start from a hang.
+   *
+   * It REPLACES the estimate rather than joining it: a live fact about this run
+   * beats a range about this machine, and two lines of small print under a title
+   * is where a card stops being read.
+   */
+  note?: string;
   children?: React.ReactNode;
 }): React.ReactElement | null {
   // One tick a second: the timer is the proof of life for a job with nothing
@@ -53,7 +69,7 @@ export function LongJobCard({
               and "I haven't done this on your Mac yet, so I'm timin…" is worse
               than two lines. */}
           <div className="text-caption text-text-muted" data-testid="long-job-estimate">
-            {view.estimate}
+            {note !== undefined && note !== '' ? note : view.estimate}
           </div>
         </div>
         <span className="pd-longjob-timer" data-testid="long-job-timer">

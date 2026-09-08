@@ -2,85 +2,41 @@
   "devicePixelRatio": 2,
   "film:ship-template-hover": {
     "frames": 16,
-    "picked": [
-      0,
-      51,
-      91,
-      134,
-      167,
-      217
-    ]
+    "picked": [0, 51, 91, 134, 167, 217]
   },
   "film:ship-dialog-open": {
     "frames": 3,
-    "picked": [
-      0,
-      219,
-      295
-    ]
+    "picked": [0, 219, 295]
   },
   "film:ship-dialog-close": {
     "frames": 3,
-    "picked": [
-      0,
-      192,
-      198
-    ]
+    "picked": [0, 192, 198]
   },
   "film:ship-create": {
     "frames": 2,
-    "picked": [
-      0,
-      223
-    ]
+    "picked": [0, 223]
   },
   "film:ship-run-now": {
     "frames": 15,
-    "picked": [
-      0,
-      318,
-      423
-    ]
+    "picked": [0, 318, 423]
   },
   "film:ship-drawer-open": {
     "frames": 10,
-    "picked": [
-      0,
-      212,
-      222,
-      285,
-      336
-    ]
+    "picked": [0, 212, 222, 285, 336]
   },
   "film:ship-drawer-close": {
     "frames": 11,
-    "picked": [
-      0,
-      216,
-      268,
-      300
-    ]
+    "picked": [0, 216, 268, 300]
   },
   "film:ship-pause-list": {
     "frames": 3,
-    "picked": [
-      0,
-      226,
-      376
-    ]
+    "picked": [0, 226, 376]
   },
   "ship-pause:row-moved-by": 252,
   "ship-resume:row-back-at": 0,
   "film:ship-off": {
     "frames": 12,
-    "picked": [
-      0,
-      220,
-      228,
-      285,
-      342,
-      375
-    ]
+    "picked": [0, 220, 228, 285, 342, 375]
   },
   "ship-off:order-before": [
     "What changed today",
@@ -109,23 +65,11 @@
   "ship-off:reordered": true,
   "film:ship-on": {
     "frames": 12,
-    "picked": [
-      0,
-      225,
-      228,
-      284,
-      342,
-      388
-    ]
+    "picked": [0, 225, 228, 284, 342, 388]
   },
   "film:ship-delete-arm": {
     "frames": 12,
-    "picked": [
-      0,
-      214,
-      263,
-      296
-    ]
+    "picked": [0, 214, 263, 296]
   },
   "ship-delete-arm:run-now-moved-by": -61,
   "ship-dialog-over-list:list-moved-by": 0,

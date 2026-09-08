@@ -446,9 +446,16 @@ describe('mapToolStep', () => {
     if (step.kind === 'browser-read') expect(step.preview).toBe('the page body');
   });
 
-  it('image opens in canvas and yields a media tab spec', () => {
+  /*
+   * A PICTURE FROM A THIRD-PARTY IMAGE TOOL still opens in the canvas. The rule
+   * the user set is about what THIS APP generates — those results also arrive as a
+   * media card in the thread, so the rail would be a second copy of them. An
+   * arbitrary tool that returns an image has no card, so the canvas is the only
+   * place it can be looked at.
+   */
+  it('a third-party image tool opens in canvas and yields a media tab spec', () => {
     const mapped = mapToolStep(
-      call('c1', 'generate_image', {}),
+      call('c1', 'render_image', {}),
       result('c1', 'data:image/png;base64,AAAA'),
       false,
     );
@@ -501,7 +508,11 @@ describe('on-device image tools (generate_image / edit_image)', () => {
     expect(generatedImageSrc(block, result('c2', editText))).toBe('pd-file://f/tmp/edited.png');
     const mapped = mapToolStep(block, result('c2', editText), false);
     expect(mapped.data).toMatchObject({ kind: 'image', label: 'Edited an image' });
-    expect(mapped.tabSpec?.mediaSrc).toBe('pd-file://f/tmp/edited.png');
+    // The row names the file it MADE, not the one it was given — and it names
+    // it as a path, which is the line a person copies.
+    if (mapped.data.kind !== 'image') throw new Error('expected image');
+    expect(mapped.data.src).toBe('/tmp/edited.png');
+    expect(mapped.data.filename).toBe('edited.png');
   });
 
   it('a FAILED image tool renders no inline image (the arg path is not a picture)', () => {
@@ -1055,37 +1066,53 @@ describe('reportedOutputPath does not mine a path out of a URL', () => {
   });
 });
 
-describe('a generated image opens a canvas tab that can actually load it', () => {
+describe('a generated image does NOT open a canvas tab', () => {
   /*
-   * MEASURED in the app: clicking the "Generated an image" row opened a tab
-   * titled "PNG · PNG" reading "Failed to load file content", while the picture
-   * itself sat correctly in the thread. `generate_image` takes no path argument
-   * and its result names the file in prose, so the tab got neither a src nor a
-   * name.
+   * the user, round 21: "image/video/audio/media generation tools DO NOT GET SHOWN
+   * IN THE CANVAS…. they get shown inline, the large card, same as each studio
+   * would show."
+   *
+   * Video, speech, music and sfx already obeyed that. `generate_image` and
+   * `edit_image` did not: the row carried `opensInCanvas` and a tab spec, so
+   * clicking it slid the conversation sideways to show a second copy of a
+   * picture already mounted in the thread. What the row keeps is what it can say
+   * about itself — the name and the path of the file it made.
    */
   const RESULT =
     'Generated 1 image on the canvas:\n  1. /Users/user/Bobble/generated/fox/cand0_seed115173204.png (seed 115173204)\nModel: FLUX.2 klein (4B)';
 
-  it('gives the tab the file URL and the file name', () => {
+  it('routes nowhere, and names the file it made', () => {
     const step = mapToolStep(
       call('c1', 'generate_image', { prompt: 'a fox' }),
       result('c1', RESULT),
       false,
     );
-    expect(step.tabSpec?.title).toBe('cand0_seed115173204.png');
-    expect(step.tabSpec?.mediaSrc).toBe(
-      'pd-file://f/Users/user/Bobble/generated/fox/cand0_seed115173204.png',
-    );
+    expect(step.tabSpec).toBeUndefined();
+    if (step.data.kind !== 'image') throw new Error('expected image');
+    expect(step.data.opensInCanvas).toBeUndefined();
+    expect(step.data.src).toBe('/Users/user/Bobble/generated/fox/cand0_seed115173204.png');
     expect(step.data.filename).toBe('cand0_seed115173204.png');
   });
 
-  it('still prefers a pd-file URL the tool returned itself', () => {
+  it('prefers the plain path over the app URL for the same file', () => {
     const step = mapToolStep(
       call('c1', 'generate_image', { prompt: 'a fox' }),
       result('c1', 'pd-file://f/tmp/a.png\nSaved to /tmp/a.png'),
       false,
     );
-    expect(step.tabSpec?.mediaSrc).toBe('pd-file://f/tmp/a.png');
+    expect(step.tabSpec).toBeUndefined();
+    if (step.data.kind !== 'image') throw new Error('expected image');
+    expect(step.data.src).toBe('/tmp/a.png');
+  });
+
+  it('falls back to the app URL when the tool names nothing else', () => {
+    const step = mapToolStep(
+      call('c1', 'generate_image', { prompt: 'a fox' }),
+      result('c1', 'pd-file://f/tmp/a.png'),
+      false,
+    );
+    if (step.data.kind !== 'image') throw new Error('expected image');
+    expect(step.data.src).toBe('pd-file://f/tmp/a.png');
   });
 });
 

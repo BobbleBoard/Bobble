@@ -20,6 +20,7 @@
  *
  * Artifacts → $TMPDIR/pd-shots/mac-monitor (override with SHOT_DIR).
  */
+import { measureDrawnWindow } from './_macmon-measure.mjs';
 import { launchApp } from './harness.mjs';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -76,53 +77,30 @@ try {
   const wide = await shot('01-real-size');
 
   // ── 3. real size when it fits, scaled down when it does not ────────────
-  const measure = async () =>
-    page.evaluate(() => {
-      const root = document.querySelector('[data-testid="computer-use-surface"]');
-      const canvas = root?.querySelector('canvas');
-      if (canvas === null || canvas === undefined) return null;
-      const ctx = canvas.getContext('2d');
-      const dpr = canvas.width / canvas.clientWidth;
-      const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      // Find the drawn window by brightness. The threshold is 160 on every
-      // channel, not "near-white": the mock's document body DIMS while its save
-      // sheet is up, so a 235 threshold measured a different region depending
-      // on which second the screenshot landed on. The dimmed, blurred wallpaper
-      // never gets near 160, so this is stable whatever the app is doing.
-      let minX = canvas.width;
-      let minY = canvas.height;
-      let maxX = -1;
-      let maxY = -1;
-      const d = img.data;
-      for (let y = 0; y < canvas.height; y += 2) {
-        for (let x = 0; x < canvas.width; x += 2) {
-          const i = (y * canvas.width + x) * 4;
-          if (d[i] > 160 && d[i + 1] > 160 && d[i + 2] > 160) {
-            if (x < minX) minX = x;
-            if (y < minY) minY = y;
-            if (x > maxX) maxX = x;
-            if (y > maxY) maxY = y;
-          }
-        }
-      }
-      if (maxX < 0) return { found: false, dpr, cssW: canvas.clientWidth };
-      return {
-        found: true,
-        dpr,
-        cssW: canvas.clientWidth,
-        cssH: canvas.clientHeight,
-        w: (maxX - minX) / dpr,
-        h: (maxY - minY) / dpr,
-        cx: (minX + maxX) / 2 / dpr,
-        cy: (minY + maxY) / 2 / dpr,
-      };
-    });
+  // The window is located by COVERAGE, not by brightness — see
+  // _macmon-measure.mjs. The wallpaper is no longer dimmed or blurred, so
+  // "bright" now describes half the sky and every whitecap as well as the
+  // window, and this measurement quietly grew to fit the whole tab.
+  const measure = async () => {
+    const box = await page.evaluate(measureDrawnWindow);
+    if (box === null) return { found: false };
+    return {
+      found: true,
+      dpr: box.dpr,
+      cssW: box.cssW,
+      cssH: box.cssH,
+      w: box.w / box.dpr,
+      h: box.h / box.dpr,
+      cx: (box.x + box.w / 2) / box.dpr,
+      cy: (box.y + box.h / 2) / box.dpr,
+    };
+  };
 
   const big = await measure();
   check(big?.found === true, 'no window was drawn on the canvas at all');
   if (big?.found === true) {
-    // The mock window is 900×620pt. The bright region is the document body,
-    // which is the window minus its ~38pt title bar and a hair of chrome.
+    // The mock window is 900×620pt, and the located region is the whole
+    // window — title bar included, since it is neutral chrome like the body.
     check(
       Math.abs(big.w - 900) <= 6 && Math.abs(big.h - 620) <= 6,
       `window drawn ${big.w.toFixed(1)}×${big.h.toFixed(1)}pt at real size, expected 900×620`,
@@ -225,22 +203,19 @@ try {
   await sleep(600);
   // The picture must be GONE, not sitting under the empty state: a frame that
   // was mid-decode when control ended used to be installed afterwards.
-  const stale = await page.evaluate(() => {
-    const canvas = document
-      .querySelector('[data-testid="computer-use-surface"]')
-      ?.querySelector('canvas');
-    if (canvas == null) return null;
-    const ctx = canvas.getContext('2d');
-    const d = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
-    let bright = 0;
-    for (let i = 0; i < d.length; i += 4 * 97) {
-      if (d[i] > 160 && d[i + 1] > 160 && d[i + 2] > 160) bright += 1;
-    }
-    return bright;
-  });
+  // "The window is gone", not "nothing bright is left": the wallpaper is drawn
+  // as it is now, so a sunlit stretch of sky is a legitimate large pale region.
+  // The mock window is 900x620 and centred, so what must not be there is a
+  // window-sized region in the middle of the tab.
+  const stale = await measure();
+  const staleWindow =
+    stale.found === true &&
+    stale.w > 400 &&
+    stale.h > 300 &&
+    Math.abs(stale.cx - stale.cssW / 2) < 80;
   check(
-    stale !== null && stale < 20,
-    `a stale window was still painted under the idle state (${String(stale)} bright samples)`,
+    !staleWindow,
+    `a stale window was still painted under the idle state (${stale.w?.toFixed(0)}x${stale.h?.toFixed(0)} at ${stale.cx?.toFixed(0)})`,
   );
   const empty = await shot('07-idle-empty-state');
 

@@ -12,11 +12,16 @@
  */
 import { spawn } from 'node:child_process';
 import { createIpcEventSender, createLogger } from '@pi-desktop/shared';
-import { type IpcMainInvokeEvent, ipcMain, type WebContents } from 'electron';
+import { type IpcMainInvokeEvent, ipcMain, shell, type WebContents } from 'electron';
 import type { AppEventMap } from '../ipc-contract';
 import { isTrustedIpcEvent } from '../trusted-senders';
-import type { MacMonitorFramePayload, MacMonitorState } from './mac-monitor-contract';
+import type {
+  MacMonitorAxScene,
+  MacMonitorFramePayload,
+  MacMonitorState,
+} from './mac-monitor-contract';
 import {
+  type AxReader,
   MacMonitorCore,
   type MonitorSink,
   type StreamChild,
@@ -29,7 +34,12 @@ import { cacheWallpaper } from './wallpaper';
 const log = createLogger('desktop:mac-monitor');
 const events = createIpcEventSender<AppEventMap>();
 
-export type { StreamChild, StreamSpawnFn, WallpaperReader } from './monitor-core';
+export type { AxReader, StreamChild, StreamSpawnFn, WallpaperReader } from './monitor-core';
+
+/** Where macOS keeps the Screen Recording switch. Opening it is all any app can
+ * do — the grant itself is deliberately unreachable from code. */
+const SCREEN_RECORDING_PANE =
+  'x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture';
 
 /** One watching renderer. */
 class WebContentsSink implements MonitorSink {
@@ -45,6 +55,9 @@ class WebContentsSink implements MonitorSink {
   }
   sendFrame(frame: MacMonitorFramePayload): void {
     events.send(this.wc, 'mac:monitor:frame', frame);
+  }
+  sendAx(scene: MacMonitorAxScene): void {
+    events.send(this.wc, 'mac:monitor:ax', scene);
   }
   isGone(): boolean {
     return this.wc.isDestroyed();
@@ -80,6 +93,18 @@ export const macMonitor = {
   /** Override how the capture child is created (the dev mock source). */
   setSpawnFn(fn: StreamSpawnFn): void {
     core.setSpawn(fn);
+  },
+
+  /** How the Accessibility fallback reads the controlled app. Injected from
+   * mac-agent.ts, which owns the one long-lived `--serve` helper. */
+  setAxReader(reader: AxReader): void {
+    core.setAxReader(reader);
+  },
+
+  /** The reader currently installed, so the dev mock can answer for its own
+   * synthetic app and hand every REAL pid straight through to the helper. */
+  axReader(): AxReader | undefined {
+    return core.axReader();
   },
 
   /** Mirror the overlay controller's published state into the monitor. The
@@ -134,6 +159,16 @@ export const macMonitor = {
     return core.streaming();
   },
 
+  /** Diagnostics/tests: is the Accessibility fallback polling right now? */
+  polling(): boolean {
+    return core.polling();
+  },
+
+  /** Diagnostics/tests: the last Accessibility scene published. */
+  axScene(): ReturnType<typeof core.axScene> {
+    return core.axScene();
+  },
+
   dispose(): void {
     core.dispose();
   },
@@ -157,4 +192,32 @@ export function registerMacMonitorIpc(): void {
     macMonitor.unsubscribe(event.sender);
     return { ok: true };
   });
+  /**
+   * "Turn it on" — which means OPEN THE PANE, and nothing else.
+   *
+   * Two steps, and both are needed. `promptGrants` asks macOS to register this
+   * app under Screen Recording (an app that has never tried to capture is not
+   * in the list at all, so the pane opens on a switch that does not exist yet),
+   * then the pane opens on it. The user does the toggling; no code can.
+   */
+  ipcMain.handle('mac:monitor:request-capture', async (event: IpcMainInvokeEvent) => {
+    if (!isTrustedIpcEvent(event)) throw new Error('[mac-monitor] rejected request-capture');
+    if (process.platform !== 'darwin') return { ok: false };
+    await promptCaptureGrant?.().catch(() => undefined);
+    try {
+      await shell.openExternal(SCREEN_RECORDING_PANE);
+      return { ok: true };
+    } catch (err) {
+      log.warn('could not open the Screen Recording pane', { error: String(err) });
+      return { ok: false };
+    }
+  });
+}
+
+/** Injected by mac-agent.ts (which owns the helper): ask macOS to register this
+ * app under the capture grants, so the pane has a switch to show. */
+let promptCaptureGrant: (() => Promise<unknown>) | null = null;
+
+export function setCaptureGrantPrompt(fn: () => Promise<unknown>): void {
+  promptCaptureGrant = fn;
 }

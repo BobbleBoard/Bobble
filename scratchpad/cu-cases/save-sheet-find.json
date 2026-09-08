@@ -1,0 +1,129 @@
+{
+ "app": "TextEdit",
+ "dialog": {
+  "focused": true,
+  "frame": {
+   "h": 218,
+   "w": 390,
+   "x": 288,
+   "y": 245
+  },
+  "hostPid": 32866,
+  "main": false,
+  "modal": true,
+  "role": "AXSheet",
+  "sheet": true,
+  "subrole": "",
+  "title": "",
+  "windowId": 37778
+ },
+ "elements": [
+  {
+   "actions": [
+    "AXPress"
+   ],
+   "bbox": {
+    "h": 26,
+    "w": 81,
+    "x": 618,
+    "y": 431
+   },
+   "enabled": true,
+   "index": 7,
+   "name": "Save",
+   "role": "AXButton",
+   "surface": "sheet",
+   "win": 37778
+  }
+ ],
+ "menus": [
+  "TextEdit",
+  "File",
+  "Edit",
+  "Format",
+  "View",
+  "Window",
+  "Help"
+ ],
+ "permissions": {
+  "accessibility": true,
+  "hint": "macOS has not granted this app Screen Recording. Until it does, apps read as empty and screenshots are blank. Enable them in System Settings > Privacy & Security.",
+  "screenRecording": false
+ },
+ "pid": 32866,
+ "summary": {
+  "app": "TextEdit",
+  "elementCount": 49,
+  "find": "save",
+  "matched": 1,
+  "truncated": false,
+  "window": ""
+ },
+ "union": {
+  "h": 534,
+  "w": 632,
+  "x": 152,
+  "y": 73
+ },
+ "window": "",
+ "windowBounds": {
+  "h": 218,
+  "w": 390,
+  "x": 288,
+  "y": 245
+ },
+ "windowId": 37778,
+ "windows": [
+  {
+   "focused": true,
+   "frame": {
+    "h": 218,
+    "w": 390,
+    "x": 288,
+    "y": 245
+   },
+   "hostPid": 32866,
+   "main": false,
+   "modal": true,
+   "role": "AXSheet",
+   "sheet": true,
+   "subrole": "",
+   "title": "",
+   "windowId": 37778
+  },
+  {
+   "focused": false,
+   "frame": {
+    "h": 505,
+    "w": 603,
+    "x": 181,
+    "y": 102
+   },
+   "hostPid": 32866,
+   "main": true,
+   "modal": false,
+   "role": "AXWindow",
+   "sheet": false,
+   "subrole": "AXStandardWindow",
+   "title": "Untitled 16",
+   "windowId": 37767
+  },
+  {
+   "focused": false,
+   "frame": {
+    "h": 505,
+    "w": 603,
+    "x": 152,
+    "y": 73
+   },
+   "hostPid": 32866,
+   "main": false,
+   "modal": false,
+   "role": "AXWindow",
+   "sheet": false,
+   "subrole": "AXStandardWindow",
+   "title": "Screen Recording of Accessibility Tree 7",
+   "windowId": 37765
+  }
+ ]
+}

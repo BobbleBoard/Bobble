@@ -478,6 +478,50 @@ function installAppMenu(): void {
     accelerator: 'CmdOrCtrl+Shift+W',
     role: 'close',
   };
+  /*
+   * ⌘R IS NOT A DOCUMENT RELOAD ANY MORE.
+   *
+   * the user: "⌘R clears really everything." It does — Electron's stock `reload`
+   * role throws the document away, and with it the thread on screen, the canvas
+   * tabs and where you were scrolled to. Almost none of that is the document's
+   * to lose: the conversation lives in the pi child and on disk, and the app's
+   * stores are module state a re-mount keeps. Only the React tree is broken
+   * when someone reaches for ⌘R, so only the React tree needs rebuilding.
+   *
+   * So ⌘R asks the renderer to RE-MOUNT and put back what was on screen
+   * (src/app-reload.ts), and ⌘⇧R remains the real, nothing-survives reload for
+   * when the renderer is too far gone to answer.
+   */
+  const softReload = (win: BrowserWindow | undefined): void => {
+    const target = win ?? mainWindow ?? undefined;
+    if (target === undefined || target === null || target.isDestroyed()) return;
+    events.send(target.webContents, 'app:accelerator', { action: 'soft-reload' });
+  };
+  const viewMenu: MenuItemConstructorOptions = {
+    label: 'View',
+    submenu: [
+      {
+        label: 'Reload',
+        accelerator: 'CmdOrCtrl+R',
+        click: (_item, win) => softReload(win instanceof BrowserWindow ? win : undefined),
+      },
+      {
+        label: 'Reload Window',
+        accelerator: 'CmdOrCtrl+Shift+R',
+        click: (_item, win) => {
+          const target = win instanceof BrowserWindow ? win : mainWindow;
+          if (target !== null && !target.isDestroyed()) target.webContents.reload();
+        },
+      },
+      { role: 'toggleDevTools' },
+      { type: 'separator' },
+      { role: 'resetZoom' },
+      { role: 'zoomIn' },
+      { role: 'zoomOut' },
+      { type: 'separator' },
+      { role: 'togglefullscreen' },
+    ],
+  };
   const template: MenuItemConstructorOptions[] = [
     ...(isMac ? [{ role: 'appMenu' } as MenuItemConstructorOptions] : []),
     ...(isMac
@@ -489,7 +533,7 @@ function installAppMenu(): void {
           } as MenuItemConstructorOptions,
         ]),
     { role: 'editMenu' },
-    { role: 'viewMenu' },
+    viewMenu,
     {
       label: 'Window',
       submenu: [
@@ -614,6 +658,30 @@ function registerAppIpc(): void {
       'app:set-badge': (req) => {
         if (process.platform !== 'darwin' || app.dock === undefined) return { ok: false };
         app.dock.setBadge(req.count > 0 ? String(req.count) : '');
+        return { ok: true };
+      },
+
+      /*
+       * THE RELOAD THE CRASH CARD'S BUTTONS PRESS.
+       *
+       * They used to call `window.location.reload()` and assign
+       * `window.location.search`, and BOTH are renderer-initiated navigations —
+       * which `will-navigate` refuses a few lines above, deliberately. So the
+       * one screen in the app whose entire job is to get you out of a broken
+       * state had two buttons that did nothing, and the user had to reach for ⌘R.
+       *
+       * From here it is `webContents.reload()` / `loadRenderer()`: programmatic,
+       * and therefore not a navigation for the guard to catch.
+       */
+      'app:reload-window': (req) => {
+        const focused = BrowserWindow.getFocusedWindow();
+        const win = focused !== null && !focused.isDestroyed() ? focused : mainWindow;
+        if (win === null || win.isDestroyed()) return { ok: false };
+        // `fresh` drops the query the window was loaded with (dev route params,
+        // `?canvasPopout`) as well as every scrap of renderer state — the
+        // "fresh window" the card offers. Plain reload keeps the same URL.
+        if (req.fresh === true) loadRenderer(win);
+        else win.webContents.reload();
         return { ok: true };
       },
     },

@@ -124,7 +124,22 @@ export { streamingUpdateSpec } from './surfaces/code-append.ts';
 export type { CodeSurfaceProps } from './surfaces/code-surface.tsx';
 export { CodeSurface, rawSourceContent } from './surfaces/code-surface.tsx';
 // Computer-use monitor (Mac): the live view of the app Pi is driving
+export type { AxShape, MonitorSource } from './surfaces/computer-use-ax.ts';
+export {
+  axLabelFor,
+  axShapeFor,
+  ellipsize,
+  idleCursorDrift,
+  layoutAxScene,
+  pickMonitorSource,
+  rectOfBbox,
+  restingCursor,
+  wrapText,
+} from './surfaces/computer-use-ax.ts';
 export type {
+  MacMonitorAxElement,
+  MacMonitorAxScene,
+  MacMonitorAxWindow,
   MacMonitorCursorState,
   MacMonitorDecodedFrame,
   MacMonitorFeed,

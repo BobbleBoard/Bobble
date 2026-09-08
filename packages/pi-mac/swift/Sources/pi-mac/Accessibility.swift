@@ -132,6 +132,10 @@ struct SnapEl {
   /// dialog titled Open, so the model can tell at a glance which surface an
   /// index belongs to.
   let surface: String
+  /// This element is its surface's DEFAULT button (AXDefaultButton). macOS gives
+  /// a save sheet no AXTitle at all, so the default button's name is the only
+  /// thing in the whole snapshot that can name it.
+  let isDefault: Bool
 }
 
 /// Roles worth surfacing even when they expose no AX action (so a text area the
@@ -212,6 +216,14 @@ struct SnapshotResult {
   let windowTitle: String
   let truncated: Bool
   let total: Int
+  /// How many candidates the `find` filter matched (== `total` when none was
+  /// asked for). The paging line needs the size of the pool it is capping, not
+  /// the size of the app.
+  let matched: Int
+  /// Where this page starts in the app's own tree order.
+  let offset: Int
+  /// The `find` substring this page was filtered by, echoed back.
+  let find: String
   /// PID of the resolved target app. The serve loop namespaces its index→element
   /// map by this so concurrent sessions driving DIFFERENT apps never clobber each
   /// other's indices (concurrency-safe across apps).
@@ -237,7 +249,18 @@ struct SnapshotResult {
 /// (default cap 60). Deterministic document-order traversal; on-screen elements
 /// sort first. Returns nil only when the target app cannot be resolved; an empty
 /// list (AX not granted → every copy fails) is a valid, non-nil result.
-func collectSnapshot(target: SnapshotTarget, cap: Int) -> SnapshotResult? {
+/// Case-insensitive substring test used by `find`. Deliberately not a regex:
+/// the model is typing a word it read, and a bad pattern must never be the
+/// reason a snapshot comes back empty.
+private func matchesFind(_ el: SnapEl, _ needle: String) -> Bool {
+  let n = needle.lowercased()
+  return el.name.lowercased().contains(n) || el.role.lowercased().contains(n)
+    || el.value.lowercased().contains(n)
+}
+
+func collectSnapshot(
+  target: SnapshotTarget, cap: Int, find: String = "", from: Int = 0
+) -> SnapshotResult? {
   guard let resolved = resolveTargetPid(target) else { return nil }
   let app = AXUIElementCreateApplication(resolved.pid)
   // Walk EVERY surface the app is presenting, front-to-back — its window and
@@ -272,11 +295,24 @@ func collectSnapshot(target: SnapshotTarget, cap: Int) -> SnapshotResult? {
     let win: CGWindowID?
     let hostPid: pid_t
     let surface: String
+    let isDefault: Bool
   }
 
   var cands: [Cand] = []
   var visited = 0
   var seenElements = Set<AXUIElement>()
+  // The DEFAULT button of every surface the app is presenting. A save sheet has
+  // no title, so this is the only thing in the payload that can name it.
+  var defaultButtons = Set<AXUIElement>()
+  for root in roots {
+    for host in [root.el] + axChildren(root.el).filter({
+      axString($0, kAXRoleAttribute) == "AXWindow"
+    }) {
+      if let def = axCopy(host, kAXDefaultButtonAttribute) {
+        defaultButtons.insert(unsafeBitCast(def, to: AXUIElement.self))
+      }
+    }
+  }
   for root in roots {
   let surfaceWin = root.win
   let surfaceLabel: String = {
@@ -321,7 +357,8 @@ func collectSnapshot(target: SnapshotTarget, cap: Int) -> SnapshotResult? {
         el: el, role: role, name: truncate(name, NAME_MAX), rect: rect, editable: editable,
         enabled: enabled, focused: focused, value: truncate(cleanText(value), NAME_MAX),
         actions: actions, onScreen: onScreen, win: surfaceWin?.windowId,
-        hostPid: surfaceWin?.hostPid ?? resolved.pid, surface: surfaceLabel))
+        hostPid: surfaceWin?.hostPid ?? resolved.pid, surface: surfaceLabel,
+        isDefault: defaultButtons.contains(el)))
   }
   }
 
@@ -331,25 +368,36 @@ func collectSnapshot(target: SnapshotTarget, cap: Int) -> SnapshotResult? {
   let offScreenCands = cands.filter { !$0.onScreen }
   let ordered = onScreenCands + offScreenCands
 
-  let limit = cap > 0 ? cap : ordered.count
-  var elements: [SnapEl] = []
-  var i = 0
-  for c in ordered {
-    if i >= limit { break }
-    i += 1
-    elements.append(
-      SnapEl(
-        index: i, role: c.role, name: c.name,
-        x: Int(c.rect.midX.rounded()), y: Int(c.rect.midY.rounded()),
-        w: Int(c.rect.width.rounded()), h: Int(c.rect.height.rounded()),
-        editable: c.editable, enabled: c.enabled, focused: c.focused, value: c.value,
-        actions: c.actions, element: c.el, win: c.win, hostPid: c.hostPid,
-        surface: c.surface))
+  /*
+   * INDICES ARE POSITIONS IN THE WHOLE TREE, NOT IN THE PAGE.
+   *
+   * `find` and `from` exist because the cap used to be a dead end: 60 of 812
+   * shown, and no way to see the other 752. They are only useful if a control
+   * the model finds on page two can then be clicked — so an element's number is
+   * its position in the FULL ordered walk, and filtering or paging never
+   * renumbers it. `find:"save"` returning `[7] AXButton "Save"` means index 7 is
+   * the same control an unfiltered snapshot would have called 7.
+   */
+  let all: [SnapEl] = ordered.enumerated().map { (i, c) in
+    SnapEl(
+      index: i + 1, role: c.role, name: c.name,
+      x: Int(c.rect.midX.rounded()), y: Int(c.rect.midY.rounded()),
+      w: Int(c.rect.width.rounded()), h: Int(c.rect.height.rounded()),
+      editable: c.editable, enabled: c.enabled, focused: c.focused, value: c.value,
+      actions: c.actions, element: c.el, win: c.win, hostPid: c.hostPid,
+      surface: c.surface, isDefault: c.isDefault)
   }
 
+  let needle = find.trimmingCharacters(in: .whitespaces)
+  let pool = needle.isEmpty ? all : all.filter { matchesFind($0, needle) }
+  let start = max(0, min(from, pool.count))
+  let limit = cap > 0 ? cap : pool.count
+  let page = Array(pool[start..<min(pool.count, start + limit)])
+
   return SnapshotResult(
-    elements: elements, appName: resolved.name, windowTitle: windowTitle,
-    truncated: ordered.count > elements.count, total: ordered.count,
+    elements: page, appName: resolved.name, windowTitle: windowTitle,
+    truncated: pool.count > start + page.count, total: all.count,
+    matched: pool.count, offset: start, find: needle,
     pid: resolved.pid, windowId: windowId, windowBounds: windowBounds, windows: surfaces,
     dialog: surfaces.first(where: { $0.isModal }))
 }
@@ -502,7 +550,26 @@ func elementDict(_ el: SnapEl) -> [String: Any] {
   if !el.value.isEmpty { d["value"] = el.value }
   if !el.actions.isEmpty { d["actions"] = el.actions }
   if !el.surface.isEmpty { d["surface"] = el.surface }
+  if el.isDefault { d["isDefault"] = true }
   if let w = el.win { d["win"] = Int(w) }
+  return d
+}
+
+/// The summary block. `matched`/`offset`/`find` only ride along when a `find`
+/// or `from` was actually asked for, so an ordinary snapshot's wire shape (and
+/// the text rendered from it) is byte-for-byte what it always was.
+private func summaryDict(_ snap: SnapshotResult) -> [String: Any] {
+  var d: [String: Any] = [
+    "app": snap.appName,
+    "window": snap.windowTitle,
+    "elementCount": snap.total,
+    "truncated": snap.truncated,
+  ]
+  if !snap.find.isEmpty {
+    d["find"] = snap.find
+    d["matched"] = snap.matched
+  }
+  if snap.offset > 0 { d["offset"] = snap.offset }
   return d
 }
 
@@ -512,12 +579,7 @@ func snapshotResultDict(_ snap: SnapshotResult, screenshot: [String: Any]?) -> [
     "pid": Int(snap.pid),
     "window": snap.windowTitle,
     "elements": snap.elements.map(elementDict),
-    "summary": [
-      "app": snap.appName,
-      "window": snap.windowTitle,
-      "elementCount": snap.total,
-      "truncated": snap.truncated,
-    ],
+    "summary": summaryDict(snap),
   ]
   if let wid = snap.windowId { result["windowId"] = Int(wid) }
   if let wb = snap.windowBounds {
@@ -535,8 +597,9 @@ func snapshotResultDict(_ snap: SnapshotResult, screenshot: [String: Any]?) -> [
   }
   // The menu bar is a third of a real app's capability and appears in no
   // window, so the top-level titles ride along with every snapshot. Titles
-  // only — a whole menu bar is hundreds of entries; naming one lists it.
-  let menus = menuEntries(pid: snap.pid, under: [], levels: 1).map { $0.title }
+  // only — a whole menu bar is hundreds of entries; naming one lists it. The
+  // system (Apple) menu is not the app's and is not offered.
+  let menus = listableMenuTitles(pid: snap.pid)
   if !menus.isEmpty { result["menus"] = menus }
   if let shot = screenshot { result["screenshot"] = shot }
   return result

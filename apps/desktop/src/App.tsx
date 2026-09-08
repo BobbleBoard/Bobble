@@ -5,6 +5,7 @@ import type { AppInfo } from '../electron/ipc-contract';
 import { CandidatesRoute, candidateSet } from './candidates/CandidatesRoute';
 import { ChatApp } from './chat/ChatApp';
 import { CanvasPopoutView } from './chat/canvas/CanvasPopoutView';
+import { useGenStream } from './chat/gen-stream';
 import { ConnectorsScreen } from './connectors/ConnectorsScreen';
 import { SituationDemoView } from './demo/SituationDemoView';
 import { GalleryView } from './gallery/GalleryView';
@@ -110,6 +111,11 @@ export function App() {
   useEffect(() => {
     applyThemeAttributes(document.documentElement, { flavor, mode });
   }, [flavor, mode]);
+
+  /* A running generation streams its progress to the thread's inline card (it
+     used to stream to a canvas tab). At app level so the job keeps reporting
+     while its owner steps into a studio and back — see chat/gen-stream.ts. */
+  useGenStream();
 
   /* E2E theme hook, on the same `?piE2E=1` opt-in as `__pi_canvas`. Probes need
    * to flip the theme to check that the native office views re-theme with the

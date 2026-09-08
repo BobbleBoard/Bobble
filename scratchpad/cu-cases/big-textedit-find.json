@@ -1,0 +1,1760 @@
+{
+ "app": "TextEdit",
+ "elements": [
+  {
+   "actions": [
+    "AXPress"
+   ],
+   "bbox": {
+    "h": 20,
+    "w": 22,
+    "x": 671,
+    "y": 140
+   },
+   "enabled": true,
+   "index": 2,
+   "name": "bold",
+   "role": "AXCheckBox",
+   "win": 37829
+  },
+  {
+   "actions": [
+    "AXPress"
+   ],
+   "bbox": {
+    "h": 20,
+    "w": 22,
+    "x": 642,
+    "y": 445
+   },
+   "enabled": true,
+   "index": 23,
+   "name": "bold",
+   "role": "AXCheckBox",
+   "surface": "Untitled 63",
+   "win": 37828
+  },
+  {
+   "actions": [
+    "AXPress"
+   ],
+   "bbox": {
+    "h": 20,
+    "w": 22,
+    "x": 613,
+    "y": 416
+   },
+   "enabled": true,
+   "index": 44,
+   "name": "bold",
+   "role": "AXCheckBox",
+   "surface": "Untitled 62",
+   "win": 37827
+  },
+  {
+   "actions": [
+    "AXPress"
+   ],
+   "bbox": {
+    "h": 20,
+    "w": 22,
+    "x": 584,
+    "y": 387
+   },
+   "enabled": true,
+   "index": 65,
+   "name": "bold",
+   "role": "AXCheckBox",
+   "surface": "Untitled 61",
+   "win": 37826
+  },
+  {
+   "actions": [
+    "AXPress"
+   ],
+   "bbox": {
+    "h": 20,
+    "w": 22,
+    "x": 555,
+    "y": 358
+   },
+   "enabled": true,
+   "index": 86,
+   "name": "bold",
+   "role": "AXCheckBox",
+   "surface": "Untitled 60",
+   "win": 37825
+  },
+  {
+   "actions": [
+    "AXPress"
+   ],
+   "bbox": {
+    "h": 20,
+    "w": 22,
+    "x": 526,
+    "y": 329
+   },
+   "enabled": true,
+   "index": 107,
+   "name": "bold",
+   "role": "AXCheckBox",
+   "surface": "Untitled 59",
+   "win": 37824
+  },
+  {
+   "actions": [
+    "AXPress"
+   ],
+   "bbox": {
+    "h": 20,
+    "w": 22,
+    "x": 497,
+    "y": 300
+   },
+   "enabled": true,
+   "index": 128,
+   "name": "bold",
+   "role": "AXCheckBox",
+   "surface": "Untitled 58",
+   "win": 37823
+  },
+  {
+   "actions": [
+    "AXPress"
+   ],
+   "bbox": {
+    "h": 20,
+    "w": 22,
+    "x": 468,
+    "y": 271
+   },
+   "enabled": true,
+   "index": 149,
+   "name": "bold",
+   "role": "AXCheckBox",
+   "surface": "Untitled 57",
+   "win": 37822
+  },
+  {
+   "actions": [
+    "AXPress"
+   ],
+   "bbox": {
+    "h": 20,
+    "w": 22,
+    "x": 439,
+    "y": 242
+   },
+   "enabled": true,
+   "index": 170,
+   "name": "bold",
+   "role": "AXCheckBox",
+   "surface": "Untitled 56",
+   "win": 37821
+  },
+  {
+   "actions": [
+    "AXPress"
+   ],
+   "bbox": {
+    "h": 20,
+    "w": 22,
+    "x": 410,
+    "y": 213
+   },
+   "enabled": true,
+   "index": 191,
+   "name": "bold",
+   "role": "AXCheckBox",
+   "surface": "Untitled 55",
+   "win": 37820
+  },
+  {
+   "actions": [
+    "AXPress"
+   ],
+   "bbox": {
+    "h": 20,
+    "w": 22,
+    "x": 381,
+    "y": 184
+   },
+   "enabled": true,
+   "index": 212,
+   "name": "bold",
+   "role": "AXCheckBox",
+   "surface": "Untitled 54",
+   "win": 37819
+  },
+  {
+   "actions": [
+    "AXPress"
+   ],
+   "bbox": {
+    "h": 20,
+    "w": 22,
+    "x": 352,
+    "y": 155
+   },
+   "enabled": true,
+   "index": 233,
+   "name": "bold",
+   "role": "AXCheckBox",
+   "surface": "Untitled 53",
+   "win": 37818
+  },
+  {
+   "actions": [
+    "AXPress"
+   ],
+   "bbox": {
+    "h": 20,
+    "w": 22,
+    "x": 323,
+    "y": 126
+   },
+   "enabled": true,
+   "index": 254,
+   "name": "bold",
+   "role": "AXCheckBox",
+   "surface": "Untitled 52",
+   "win": 37817
+  },
+  {
+   "actions": [
+    "AXPress"
+   ],
+   "bbox": {
+    "h": 20,
+    "w": 22,
+    "x": 294,
+    "y": 431
+   },
+   "enabled": true,
+   "index": 275,
+   "name": "bold",
+   "role": "AXCheckBox",
+   "surface": "Untitled 51",
+   "win": 37816
+  },
+  {
+   "actions": [
+    "AXPress"
+   ],
+   "bbox": {
+    "h": 20,
+    "w": 22,
+    "x": 265,
+    "y": 402
+   },
+   "enabled": true,
+   "index": 296,
+   "name": "bold",
+   "role": "AXCheckBox",
+   "surface": "Untitled 50",
+   "win": 37815
+  },
+  {
+   "actions": [
+    "AXPress"
+   ],
+   "bbox": {
+    "h": 20,
+    "w": 22,
+    "x": 236,
+    "y": 373
+   },
+   "enabled": true,
+   "index": 317,
+   "name": "bold",
+   "role": "AXCheckBox",
+   "surface": "Untitled 49",
+   "win": 37814
+  },
+  {
+   "actions": [
+    "AXPress"
+   ],
+   "bbox": {
+    "h": 20,
+    "w": 22,
+    "x": 207,
+    "y": 344
+   },
+   "enabled": true,
+   "index": 338,
+   "name": "bold",
+   "role": "AXCheckBox",
+   "surface": "Untitled 48",
+   "win": 37813
+  },
+  {
+   "actions": [
+    "AXPress"
+   ],
+   "bbox": {
+    "h": 20,
+    "w": 22,
+    "x": 178,
+    "y": 315
+   },
+   "enabled": true,
+   "index": 359,
+   "name": "bold",
+   "role": "AXCheckBox",
+   "surface": "Untitled 47",
+   "win": 37812
+  },
+  {
+   "actions": [
+    "AXPress"
+   ],
+   "bbox": {
+    "h": 20,
+    "w": 22,
+    "x": 149,
+    "y": 286
+   },
+   "enabled": true,
+   "index": 380,
+   "name": "bold",
+   "role": "AXCheckBox",
+   "surface": "Untitled 46",
+   "win": 37811
+  },
+  {
+   "actions": [
+    "AXPress"
+   ],
+   "bbox": {
+    "h": 20,
+    "w": 22,
+    "x": 120,
+    "y": 257
+   },
+   "enabled": true,
+   "index": 401,
+   "name": "bold",
+   "role": "AXCheckBox",
+   "surface": "Untitled 45",
+   "win": 37810
+  },
+  {
+   "actions": [
+    "AXPress"
+   ],
+   "bbox": {
+    "h": 20,
+    "w": 22,
+    "x": 91,
+    "y": 228
+   },
+   "enabled": true,
+   "index": 422,
+   "name": "bold",
+   "role": "AXCheckBox",
+   "surface": "Untitled 44",
+   "win": 37809
+  },
+  {
+   "actions": [
+    "AXPress"
+   ],
+   "bbox": {
+    "h": 20,
+    "w": 22,
+    "x": 62,
+    "y": 199
+   },
+   "enabled": true,
+   "index": 443,
+   "name": "bold",
+   "role": "AXCheckBox",
+   "surface": "Untitled 43",
+   "win": 37808
+  },
+  {
+   "actions": [
+    "AXPress"
+   ],
+   "bbox": {
+    "h": 20,
+    "w": 22,
+    "x": 33,
+    "y": 170
+   },
+   "enabled": true,
+   "index": 464,
+   "name": "bold",
+   "role": "AXCheckBox",
+   "surface": "Untitled 42",
+   "win": 37807
+  },
+  {
+   "actions": [
+    "AXPress"
+   ],
+   "bbox": {
+    "h": 20,
+    "w": 22,
+    "x": 925,
+    "y": 141
+   },
+   "enabled": true,
+   "index": 485,
+   "name": "bold",
+   "role": "AXCheckBox",
+   "surface": "Untitled 41",
+   "win": 37806
+  },
+  {
+   "actions": [
+    "AXPress"
+   ],
+   "bbox": {
+    "h": 20,
+    "w": 22,
+    "x": 896,
+    "y": 112
+   },
+   "enabled": true,
+   "index": 506,
+   "name": "bold",
+   "role": "AXCheckBox",
+   "surface": "Untitled 40",
+   "win": 37805
+  },
+  {
+   "actions": [
+    "AXPress"
+   ],
+   "bbox": {
+    "h": 20,
+    "w": 22,
+    "x": 867,
+    "y": 446
+   },
+   "enabled": true,
+   "index": 527,
+   "name": "bold",
+   "role": "AXCheckBox",
+   "surface": "Untitled 39",
+   "win": 37804
+  },
+  {
+   "actions": [
+    "AXPress"
+   ],
+   "bbox": {
+    "h": 20,
+    "w": 22,
+    "x": 838,
+    "y": 417
+   },
+   "enabled": true,
+   "index": 548,
+   "name": "bold",
+   "role": "AXCheckBox",
+   "surface": "Untitled 38",
+   "win": 37803
+  },
+  {
+   "actions": [
+    "AXPress"
+   ],
+   "bbox": {
+    "h": 20,
+    "w": 22,
+    "x": 809,
+    "y": 388
+   },
+   "enabled": true,
+   "index": 569,
+   "name": "bold",
+   "role": "AXCheckBox",
+   "surface": "Untitled 37",
+   "win": 37802
+  },
+  {
+   "actions": [
+    "AXPress"
+   ],
+   "bbox": {
+    "h": 20,
+    "w": 22,
+    "x": 780,
+    "y": 359
+   },
+   "enabled": true,
+   "index": 590,
+   "name": "bold",
+   "role": "AXCheckBox",
+   "surface": "Untitled 36",
+   "win": 37801
+  },
+  {
+   "actions": [
+    "AXPress"
+   ],
+   "bbox": {
+    "h": 20,
+    "w": 22,
+    "x": 751,
+    "y": 330
+   },
+   "enabled": true,
+   "index": 611,
+   "name": "bold",
+   "role": "AXCheckBox",
+   "surface": "Untitled 35",
+   "win": 37800
+  },
+  {
+   "actions": [
+    "AXPress"
+   ],
+   "bbox": {
+    "h": 20,
+    "w": 22,
+    "x": 722,
+    "y": 301
+   },
+   "enabled": true,
+   "index": 632,
+   "name": "bold",
+   "role": "AXCheckBox",
+   "surface": "Untitled 34",
+   "win": 37799
+  },
+  {
+   "actions": [
+    "AXPress"
+   ],
+   "bbox": {
+    "h": 20,
+    "w": 22,
+    "x": 693,
+    "y": 272
+   },
+   "enabled": true,
+   "index": 653,
+   "name": "bold",
+   "role": "AXCheckBox",
+   "surface": "Untitled 33",
+   "win": 37798
+  },
+  {
+   "actions": [
+    "AXPress"
+   ],
+   "bbox": {
+    "h": 20,
+    "w": 22,
+    "x": 664,
+    "y": 243
+   },
+   "enabled": true,
+   "index": 674,
+   "name": "bold",
+   "role": "AXCheckBox",
+   "surface": "Untitled 32",
+   "win": 37797
+  },
+  {
+   "actions": [
+    "AXPress"
+   ],
+   "bbox": {
+    "h": 20,
+    "w": 22,
+    "x": 635,
+    "y": 214
+   },
+   "enabled": true,
+   "index": 695,
+   "name": "bold",
+   "role": "AXCheckBox",
+   "surface": "Untitled 31",
+   "win": 37796
+  },
+  {
+   "actions": [
+    "AXPress"
+   ],
+   "bbox": {
+    "h": 20,
+    "w": 22,
+    "x": 606,
+    "y": 185
+   },
+   "enabled": true,
+   "index": 716,
+   "name": "bold",
+   "role": "AXCheckBox",
+   "surface": "Untitled 30",
+   "win": 37795
+  },
+  {
+   "actions": [
+    "AXPress"
+   ],
+   "bbox": {
+    "h": 20,
+    "w": 22,
+    "x": 577,
+    "y": 156
+   },
+   "enabled": true,
+   "index": 737,
+   "name": "bold",
+   "role": "AXCheckBox",
+   "surface": "Untitled 29",
+   "win": 37794
+  },
+  {
+   "actions": [
+    "AXPress"
+   ],
+   "bbox": {
+    "h": 20,
+    "w": 22,
+    "x": 548,
+    "y": 127
+   },
+   "enabled": true,
+   "index": 758,
+   "name": "bold",
+   "role": "AXCheckBox",
+   "surface": "Untitled 28",
+   "win": 37793
+  },
+  {
+   "actions": [
+    "AXPress"
+   ],
+   "bbox": {
+    "h": 20,
+    "w": 22,
+    "x": 519,
+    "y": 98
+   },
+   "enabled": true,
+   "index": 779,
+   "name": "bold",
+   "role": "AXCheckBox",
+   "surface": "Untitled 27",
+   "win": 37792
+  },
+  {
+   "actions": [
+    "AXPress"
+   ],
+   "bbox": {
+    "h": 20,
+    "w": 22,
+    "x": 490,
+    "y": 443
+   },
+   "enabled": true,
+   "index": 800,
+   "name": "bold",
+   "role": "AXCheckBox",
+   "surface": "Untitled 26",
+   "win": 37791
+  },
+  {
+   "actions": [
+    "AXPress"
+   ],
+   "bbox": {
+    "h": 20,
+    "w": 22,
+    "x": 461,
+    "y": 414
+   },
+   "enabled": true,
+   "index": 821,
+   "name": "bold",
+   "role": "AXCheckBox",
+   "surface": "Untitled 25",
+   "win": 37788
+  },
+  {
+   "actions": [
+    "AXPress"
+   ],
+   "bbox": {
+    "h": 20,
+    "w": 22,
+    "x": 432,
+    "y": 385
+   },
+   "enabled": true,
+   "index": 842,
+   "name": "bold",
+   "role": "AXCheckBox",
+   "surface": "Untitled 24",
+   "win": 37787
+  },
+  {
+   "actions": [
+    "AXPress"
+   ],
+   "bbox": {
+    "h": 20,
+    "w": 22,
+    "x": 403,
+    "y": 356
+   },
+   "enabled": true,
+   "index": 863,
+   "name": "bold",
+   "role": "AXCheckBox",
+   "surface": "Untitled 23",
+   "win": 37786
+  },
+  {
+   "actions": [
+    "AXPress"
+   ],
+   "bbox": {
+    "h": 20,
+    "w": 22,
+    "x": 374,
+    "y": 327
+   },
+   "enabled": true,
+   "index": 884,
+   "name": "bold",
+   "role": "AXCheckBox",
+   "surface": "Untitled 22",
+   "win": 37785
+  },
+  {
+   "actions": [
+    "AXPress"
+   ],
+   "bbox": {
+    "h": 20,
+    "w": 22,
+    "x": 345,
+    "y": 298
+   },
+   "enabled": true,
+   "index": 905,
+   "name": "bold",
+   "role": "AXCheckBox",
+   "surface": "Untitled 21",
+   "win": 37784
+  },
+  {
+   "actions": [
+    "AXPress"
+   ],
+   "bbox": {
+    "h": 20,
+    "w": 22,
+    "x": 316,
+    "y": 269
+   },
+   "enabled": true,
+   "index": 926,
+   "name": "bold",
+   "role": "AXCheckBox",
+   "surface": "Untitled 20",
+   "win": 37783
+  },
+  {
+   "actions": [
+    "AXPress"
+   ],
+   "bbox": {
+    "h": 20,
+    "w": 22,
+    "x": 287,
+    "y": 240
+   },
+   "enabled": true,
+   "index": 947,
+   "name": "bold",
+   "role": "AXCheckBox",
+   "surface": "Untitled 19",
+   "win": 37782
+  },
+  {
+   "actions": [
+    "AXPress"
+   ],
+   "bbox": {
+    "h": 20,
+    "w": 22,
+    "x": 258,
+    "y": 211
+   },
+   "enabled": true,
+   "index": 968,
+   "name": "bold",
+   "role": "AXCheckBox",
+   "surface": "Untitled 18",
+   "win": 37781
+  },
+  {
+   "actions": [
+    "AXPress"
+   ],
+   "bbox": {
+    "h": 20,
+    "w": 22,
+    "x": 229,
+    "y": 182
+   },
+   "enabled": true,
+   "index": 990,
+   "name": "bold",
+   "role": "AXCheckBox",
+   "surface": "Untitled 17",
+   "win": 37780
+  },
+  {
+   "actions": [
+    "AXPress"
+   ],
+   "bbox": {
+    "h": 20,
+    "w": 22,
+    "x": 200,
+    "y": 153
+   },
+   "enabled": true,
+   "index": 1011,
+   "name": "bold",
+   "role": "AXCheckBox",
+   "surface": "Untitled 16",
+   "win": 37767
+  },
+  {
+   "actions": [
+    "AXPress"
+   ],
+   "bbox": {
+    "h": 20,
+    "w": 22,
+    "x": 171,
+    "y": 124
+   },
+   "enabled": true,
+   "index": 1032,
+   "name": "bold",
+   "role": "AXCheckBox",
+   "surface": "Screen Recording of Accessibility Tree 7",
+   "win": 37765
+  }
+ ],
+ "menus": [
+  "TextEdit",
+  "File",
+  "Edit",
+  "Format",
+  "View",
+  "Window",
+  "Help"
+ ],
+ "permissions": {
+  "accessibility": true,
+  "hint": "macOS has not granted this app Screen Recording. Until it does, apps read as empty and screenshots are blank. Enable them in System Settings > Privacy & Security.",
+  "screenRecording": false
+ },
+ "pid": 32866,
+ "summary": {
+  "app": "TextEdit",
+  "elementCount": 1051,
+  "find": "bold",
+  "matched": 50,
+  "truncated": false,
+  "window": "Untitled 64"
+ },
+ "union": {
+  "h": 853,
+  "w": 1495,
+  "x": 14,
+  "y": 47
+ },
+ "window": "Untitled 64",
+ "windowBounds": {
+  "h": 505,
+  "w": 603,
+  "x": 652,
+  "y": 89
+ },
+ "windowId": 37829,
+ "windows": [
+  {
+   "focused": true,
+   "frame": {
+    "h": 505,
+    "w": 603,
+    "x": 652,
+    "y": 89
+   },
+   "hostPid": 32866,
+   "main": true,
+   "modal": false,
+   "role": "AXWindow",
+   "sheet": false,
+   "subrole": "AXStandardWindow",
+   "title": "Untitled 64",
+   "windowId": 37829
+  },
+  {
+   "focused": false,
+   "frame": {
+    "h": 505,
+    "w": 603,
+    "x": 623,
+    "y": 394
+   },
+   "hostPid": 32866,
+   "main": false,
+   "modal": false,
+   "role": "AXWindow",
+   "sheet": false,
+   "subrole": "AXStandardWindow",
+   "title": "Untitled 63",
+   "windowId": 37828
+  },
+  {
+   "focused": false,
+   "frame": {
+    "h": 505,
+    "w": 603,
+    "x": 594,
+    "y": 365
+   },
+   "hostPid": 32866,
+   "main": false,
+   "modal": false,
+   "role": "AXWindow",
+   "sheet": false,
+   "subrole": "AXStandardWindow",
+   "title": "Untitled 62",
+   "windowId": 37827
+  },
+  {
+   "focused": false,
+   "frame": {
+    "h": 505,
+    "w": 603,
+    "x": 565,
+    "y": 336
+   },
+   "hostPid": 32866,
+   "main": false,
+   "modal": false,
+   "role": "AXWindow",
+   "sheet": false,
+   "subrole": "AXStandardWindow",
+   "title": "Untitled 61",
+   "windowId": 37826
+  },
+  {
+   "focused": false,
+   "frame": {
+    "h": 505,
+    "w": 603,
+    "x": 536,
+    "y": 307
+   },
+   "hostPid": 32866,
+   "main": false,
+   "modal": false,
+   "role": "AXWindow",
+   "sheet": false,
+   "subrole": "AXStandardWindow",
+   "title": "Untitled 60",
+   "windowId": 37825
+  },
+  {
+   "focused": false,
+   "frame": {
+    "h": 505,
+    "w": 603,
+    "x": 507,
+    "y": 278
+   },
+   "hostPid": 32866,
+   "main": false,
+   "modal": false,
+   "role": "AXWindow",
+   "sheet": false,
+   "subrole": "AXStandardWindow",
+   "title": "Untitled 59",
+   "windowId": 37824
+  },
+  {
+   "focused": false,
+   "frame": {
+    "h": 505,
+    "w": 603,
+    "x": 478,
+    "y": 249
+   },
+   "hostPid": 32866,
+   "main": false,
+   "modal": false,
+   "role": "AXWindow",
+   "sheet": false,
+   "subrole": "AXStandardWindow",
+   "title": "Untitled 58",
+   "windowId": 37823
+  },
+  {
+   "focused": false,
+   "frame": {
+    "h": 505,
+    "w": 603,
+    "x": 449,
+    "y": 220
+   },
+   "hostPid": 32866,
+   "main": false,
+   "modal": false,
+   "role": "AXWindow",
+   "sheet": false,
+   "subrole": "AXStandardWindow",
+   "title": "Untitled 57",
+   "windowId": 37822
+  },
+  {
+   "focused": false,
+   "frame": {
+    "h": 505,
+    "w": 603,
+    "x": 420,
+    "y": 191
+   },
+   "hostPid": 32866,
+   "main": false,
+   "modal": false,
+   "role": "AXWindow",
+   "sheet": false,
+   "subrole": "AXStandardWindow",
+   "title": "Untitled 56",
+   "windowId": 37821
+  },
+  {
+   "focused": false,
+   "frame": {
+    "h": 505,
+    "w": 603,
+    "x": 391,
+    "y": 162
+   },
+   "hostPid": 32866,
+   "main": false,
+   "modal": false,
+   "role": "AXWindow",
+   "sheet": false,
+   "subrole": "AXStandardWindow",
+   "title": "Untitled 55",
+   "windowId": 37820
+  },
+  {
+   "focused": false,
+   "frame": {
+    "h": 505,
+    "w": 603,
+    "x": 362,
+    "y": 133
+   },
+   "hostPid": 32866,
+   "main": false,
+   "modal": false,
+   "role": "AXWindow",
+   "sheet": false,
+   "subrole": "AXStandardWindow",
+   "title": "Untitled 54",
+   "windowId": 37819
+  },
+  {
+   "focused": false,
+   "frame": {
+    "h": 505,
+    "w": 603,
+    "x": 333,
+    "y": 104
+   },
+   "hostPid": 32866,
+   "main": false,
+   "modal": false,
+   "role": "AXWindow",
+   "sheet": false,
+   "subrole": "AXStandardWindow",
+   "title": "Untitled 53",
+   "windowId": 37818
+  },
+  {
+   "focused": false,
+   "frame": {
+    "h": 505,
+    "w": 603,
+    "x": 304,
+    "y": 75
+   },
+   "hostPid": 32866,
+   "main": false,
+   "modal": false,
+   "role": "AXWindow",
+   "sheet": false,
+   "subrole": "AXStandardWindow",
+   "title": "Untitled 52",
+   "windowId": 37817
+  },
+  {
+   "focused": false,
+   "frame": {
+    "h": 505,
+    "w": 603,
+    "x": 275,
+    "y": 380
+   },
+   "hostPid": 32866,
+   "main": false,
+   "modal": false,
+   "role": "AXWindow",
+   "sheet": false,
+   "subrole": "AXStandardWindow",
+   "title": "Untitled 51",
+   "windowId": 37816
+  },
+  {
+   "focused": false,
+   "frame": {
+    "h": 505,
+    "w": 603,
+    "x": 246,
+    "y": 351
+   },
+   "hostPid": 32866,
+   "main": false,
+   "modal": false,
+   "role": "AXWindow",
+   "sheet": false,
+   "subrole": "AXStandardWindow",
+   "title": "Untitled 50",
+   "windowId": 37815
+  },
+  {
+   "focused": false,
+   "frame": {
+    "h": 505,
+    "w": 603,
+    "x": 217,
+    "y": 322
+   },
+   "hostPid": 32866,
+   "main": false,
+   "modal": false,
+   "role": "AXWindow",
+   "sheet": false,
+   "subrole": "AXStandardWindow",
+   "title": "Untitled 49",
+   "windowId": 37814
+  },
+  {
+   "focused": false,
+   "frame": {
+    "h": 505,
+    "w": 603,
+    "x": 188,
+    "y": 293
+   },
+   "hostPid": 32866,
+   "main": false,
+   "modal": false,
+   "role": "AXWindow",
+   "sheet": false,
+   "subrole": "AXStandardWindow",
+   "title": "Untitled 48",
+   "windowId": 37813
+  },
+  {
+   "focused": false,
+   "frame": {
+    "h": 505,
+    "w": 603,
+    "x": 159,
+    "y": 264
+   },
+   "hostPid": 32866,
+   "main": false,
+   "modal": false,
+   "role": "AXWindow",
+   "sheet": false,
+   "subrole": "AXStandardWindow",
+   "title": "Untitled 47",
+   "windowId": 37812
+  },
+  {
+   "focused": false,
+   "frame": {
+    "h": 505,
+    "w": 603,
+    "x": 130,
+    "y": 235
+   },
+   "hostPid": 32866,
+   "main": false,
+   "modal": false,
+   "role": "AXWindow",
+   "sheet": false,
+   "subrole": "AXStandardWindow",
+   "title": "Untitled 46",
+   "windowId": 37811
+  },
+  {
+   "focused": false,
+   "frame": {
+    "h": 505,
+    "w": 603,
+    "x": 101,
+    "y": 206
+   },
+   "hostPid": 32866,
+   "main": false,
+   "modal": false,
+   "role": "AXWindow",
+   "sheet": false,
+   "subrole": "AXStandardWindow",
+   "title": "Untitled 45",
+   "windowId": 37810
+  },
+  {
+   "focused": false,
+   "frame": {
+    "h": 505,
+    "w": 603,
+    "x": 72,
+    "y": 177
+   },
+   "hostPid": 32866,
+   "main": false,
+   "modal": false,
+   "role": "AXWindow",
+   "sheet": false,
+   "subrole": "AXStandardWindow",
+   "title": "Untitled 44",
+   "windowId": 37809
+  },
+  {
+   "focused": false,
+   "frame": {
+    "h": 505,
+    "w": 603,
+    "x": 43,
+    "y": 148
+   },
+   "hostPid": 32866,
+   "main": false,
+   "modal": false,
+   "role": "AXWindow",
+   "sheet": false,
+   "subrole": "AXStandardWindow",
+   "title": "Untitled 43",
+   "windowId": 37808
+  },
+  {
+   "focused": false,
+   "frame": {
+    "h": 505,
+    "w": 603,
+    "x": 14,
+    "y": 119
+   },
+   "hostPid": 32866,
+   "main": false,
+   "modal": false,
+   "role": "AXWindow",
+   "sheet": false,
+   "subrole": "AXStandardWindow",
+   "title": "Untitled 42",
+   "windowId": 37807
+  },
+  {
+   "focused": false,
+   "frame": {
+    "h": 505,
+    "w": 603,
+    "x": 906,
+    "y": 90
+   },
+   "hostPid": 32866,
+   "main": false,
+   "modal": false,
+   "role": "AXWindow",
+   "sheet": false,
+   "subrole": "AXStandardWindow",
+   "title": "Untitled 41",
+   "windowId": 37806
+  },
+  {
+   "focused": false,
+   "frame": {
+    "h": 505,
+    "w": 603,
+    "x": 877,
+    "y": 61
+   },
+   "hostPid": 32866,
+   "main": false,
+   "modal": false,
+   "role": "AXWindow",
+   "sheet": false,
+   "subrole": "AXStandardWindow",
+   "title": "Untitled 40",
+   "windowId": 37805
+  },
+  {
+   "focused": false,
+   "frame": {
+    "h": 505,
+    "w": 603,
+    "x": 848,
+    "y": 395
+   },
+   "hostPid": 32866,
+   "main": false,
+   "modal": false,
+   "role": "AXWindow",
+   "sheet": false,
+   "subrole": "AXStandardWindow",
+   "title": "Untitled 39",
+   "windowId": 37804
+  },
+  {
+   "focused": false,
+   "frame": {
+    "h": 505,
+    "w": 603,
+    "x": 819,
+    "y": 366
+   },
+   "hostPid": 32866,
+   "main": false,
+   "modal": false,
+   "role": "AXWindow",
+   "sheet": false,
+   "subrole": "AXStandardWindow",
+   "title": "Untitled 38",
+   "windowId": 37803
+  },
+  {
+   "focused": false,
+   "frame": {
+    "h": 505,
+    "w": 603,
+    "x": 790,
+    "y": 337
+   },
+   "hostPid": 32866,
+   "main": false,
+   "modal": false,
+   "role": "AXWindow",
+   "sheet": false,
+   "subrole": "AXStandardWindow",
+   "title": "Untitled 37",
+   "windowId": 37802
+  },
+  {
+   "focused": false,
+   "frame": {
+    "h": 505,
+    "w": 603,
+    "x": 761,
+    "y": 308
+   },
+   "hostPid": 32866,
+   "main": false,
+   "modal": false,
+   "role": "AXWindow",
+   "sheet": false,
+   "subrole": "AXStandardWindow",
+   "title": "Untitled 36",
+   "windowId": 37801
+  },
+  {
+   "focused": false,
+   "frame": {
+    "h": 505,
+    "w": 603,
+    "x": 732,
+    "y": 279
+   },
+   "hostPid": 32866,
+   "main": false,
+   "modal": false,
+   "role": "AXWindow",
+   "sheet": false,
+   "subrole": "AXStandardWindow",
+   "title": "Untitled 35",
+   "windowId": 37800
+  },
+  {
+   "focused": false,
+   "frame": {
+    "h": 505,
+    "w": 603,
+    "x": 703,
+    "y": 250
+   },
+   "hostPid": 32866,
+   "main": false,
+   "modal": false,
+   "role": "AXWindow",
+   "sheet": false,
+   "subrole": "AXStandardWindow",
+   "title": "Untitled 34",
+   "windowId": 37799
+  },
+  {
+   "focused": false,
+   "frame": {
+    "h": 505,
+    "w": 603,
+    "x": 674,
+    "y": 221
+   },
+   "hostPid": 32866,
+   "main": false,
+   "modal": false,
+   "role": "AXWindow",
+   "sheet": false,
+   "subrole": "AXStandardWindow",
+   "title": "Untitled 33",
+   "windowId": 37798
+  },
+  {
+   "focused": false,
+   "frame": {
+    "h": 505,
+    "w": 603,
+    "x": 645,
+    "y": 192
+   },
+   "hostPid": 32866,
+   "main": false,
+   "modal": false,
+   "role": "AXWindow",
+   "sheet": false,
+   "subrole": "AXStandardWindow",
+   "title": "Untitled 32",
+   "windowId": 37797
+  },
+  {
+   "focused": false,
+   "frame": {
+    "h": 505,
+    "w": 603,
+    "x": 616,
+    "y": 163
+   },
+   "hostPid": 32866,
+   "main": false,
+   "modal": false,
+   "role": "AXWindow",
+   "sheet": false,
+   "subrole": "AXStandardWindow",
+   "title": "Untitled 31",
+   "windowId": 37796
+  },
+  {
+   "focused": false,
+   "frame": {
+    "h": 505,
+    "w": 603,
+    "x": 587,
+    "y": 134
+   },
+   "hostPid": 32866,
+   "main": false,
+   "modal": false,
+   "role": "AXWindow",
+   "sheet": false,
+   "subrole": "AXStandardWindow",
+   "title": "Untitled 30",
+   "windowId": 37795
+  },
+  {
+   "focused": false,
+   "frame": {
+    "h": 505,
+    "w": 603,
+    "x": 558,
+    "y": 105
+   },
+   "hostPid": 32866,
+   "main": false,
+   "modal": false,
+   "role": "AXWindow",
+   "sheet": false,
+   "subrole": "AXStandardWindow",
+   "title": "Untitled 29",
+   "windowId": 37794
+  },
+  {
+   "focused": false,
+   "frame": {
+    "h": 505,
+    "w": 603,
+    "x": 529,
+    "y": 76
+   },
+   "hostPid": 32866,
+   "main": false,
+   "modal": false,
+   "role": "AXWindow",
+   "sheet": false,
+   "subrole": "AXStandardWindow",
+   "title": "Untitled 28",
+   "windowId": 37793
+  },
+  {
+   "focused": false,
+   "frame": {
+    "h": 505,
+    "w": 603,
+    "x": 500,
+    "y": 47
+   },
+   "hostPid": 32866,
+   "main": false,
+   "modal": false,
+   "role": "AXWindow",
+   "sheet": false,
+   "subrole": "AXStandardWindow",
+   "title": "Untitled 27",
+   "windowId": 37792
+  },
+  {
+   "focused": false,
+   "frame": {
+    "h": 505,
+    "w": 603,
+    "x": 471,
+    "y": 392
+   },
+   "hostPid": 32866,
+   "main": false,
+   "modal": false,
+   "role": "AXWindow",
+   "sheet": false,
+   "subrole": "AXStandardWindow",
+   "title": "Untitled 26",
+   "windowId": 37791
+  },
+  {
+   "focused": false,
+   "frame": {
+    "h": 505,
+    "w": 603,
+    "x": 442,
+    "y": 363
+   },
+   "hostPid": 32866,
+   "main": false,
+   "modal": false,
+   "role": "AXWindow",
+   "sheet": false,
+   "subrole": "AXStandardWindow",
+   "title": "Untitled 25",
+   "windowId": 37788
+  },
+  {
+   "focused": false,
+   "frame": {
+    "h": 505,
+    "w": 603,
+    "x": 413,
+    "y": 334
+   },
+   "hostPid": 32866,
+   "main": false,
+   "modal": false,
+   "role": "AXWindow",
+   "sheet": false,
+   "subrole": "AXStandardWindow",
+   "title": "Untitled 24",
+   "windowId": 37787
+  },
+  {
+   "focused": false,
+   "frame": {
+    "h": 505,
+    "w": 603,
+    "x": 384,
+    "y": 305
+   },
+   "hostPid": 32866,
+   "main": false,
+   "modal": false,
+   "role": "AXWindow",
+   "sheet": false,
+   "subrole": "AXStandardWindow",
+   "title": "Untitled 23",
+   "windowId": 37786
+  },
+  {
+   "focused": false,
+   "frame": {
+    "h": 505,
+    "w": 603,
+    "x": 355,
+    "y": 276
+   },
+   "hostPid": 32866,
+   "main": false,
+   "modal": false,
+   "role": "AXWindow",
+   "sheet": false,
+   "subrole": "AXStandardWindow",
+   "title": "Untitled 22",
+   "windowId": 37785
+  },
+  {
+   "focused": false,
+   "frame": {
+    "h": 505,
+    "w": 603,
+    "x": 326,
+    "y": 247
+   },
+   "hostPid": 32866,
+   "main": false,
+   "modal": false,
+   "role": "AXWindow",
+   "sheet": false,
+   "subrole": "AXStandardWindow",
+   "title": "Untitled 21",
+   "windowId": 37784
+  },
+  {
+   "focused": false,
+   "frame": {
+    "h": 505,
+    "w": 603,
+    "x": 297,
+    "y": 218
+   },
+   "hostPid": 32866,
+   "main": false,
+   "modal": false,
+   "role": "AXWindow",
+   "sheet": false,
+   "subrole": "AXStandardWindow",
+   "title": "Untitled 20",
+   "windowId": 37783
+  },
+  {
+   "focused": false,
+   "frame": {
+    "h": 505,
+    "w": 603,
+    "x": 268,
+    "y": 189
+   },
+   "hostPid": 32866,
+   "main": false,
+   "modal": false,
+   "role": "AXWindow",
+   "sheet": false,
+   "subrole": "AXStandardWindow",
+   "title": "Untitled 19",
+   "windowId": 37782
+  },
+  {
+   "focused": false,
+   "frame": {
+    "h": 505,
+    "w": 603,
+    "x": 239,
+    "y": 160
+   },
+   "hostPid": 32866,
+   "main": false,
+   "modal": false,
+   "role": "AXWindow",
+   "sheet": false,
+   "subrole": "AXStandardWindow",
+   "title": "Untitled 18",
+   "windowId": 37781
+  },
+  {
+   "focused": false,
+   "frame": {
+    "h": 168,
+    "w": 280,
+    "x": 30,
+    "y": 202
+   },
+   "hostPid": 32866,
+   "main": false,
+   "modal": false,
+   "role": "AXWindow",
+   "sheet": false,
+   "subrole": "AXDialog",
+   "title": "",
+   "windowId": 37789
+  },
+  {
+   "focused": false,
+   "frame": {
+    "h": 505,
+    "w": 603,
+    "x": 210,
+    "y": 131
+   },
+   "hostPid": 32866,
+   "main": false,
+   "modal": false,
+   "role": "AXWindow",
+   "sheet": false,
+   "subrole": "AXStandardWindow",
+   "title": "Untitled 17",
+   "windowId": 37780
+  },
+  {
+   "focused": false,
+   "frame": {
+    "h": 505,
+    "w": 603,
+    "x": 181,
+    "y": 102
+   },
+   "hostPid": 32866,
+   "main": false,
+   "modal": false,
+   "role": "AXWindow",
+   "sheet": false,
+   "subrole": "AXStandardWindow",
+   "title": "Untitled 16",
+   "windowId": 37767
+  },
+  {
+   "focused": false,
+   "frame": {
+    "h": 505,
+    "w": 603,
+    "x": 152,
+    "y": 73
+   },
+   "hostPid": 32866,
+   "main": false,
+   "modal": false,
+   "role": "AXWindow",
+   "sheet": false,
+   "subrole": "AXStandardWindow",
+   "title": "Screen Recording of Accessibility Tree 7",
+   "windowId": 37765
+  }
+ ]
+}

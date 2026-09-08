@@ -256,6 +256,36 @@ func activeSurface(_ windows: [AppWindow]) -> AppWindow? {
   return windows.first
 }
 
+/// The name of a surface's DEFAULT button ("Save", "Open", "Don't Save").
+///
+/// MEASURED: macOS gives a save sheet `AXTitle: ""`, so this is the only thing
+/// on the whole surface that can name it — the difference between telling a
+/// model "A DIALOG IS OPEN — an untitled sheet" and "— the Save sheet" at the
+/// moment it most needs to know what it is answering. Read from the sheet, and
+/// then from the sheet's own AXWindow child, because AppKit hangs
+/// AXDefaultButton off whichever of the two is the real panel.
+///
+/// MEASURED on macOS 27: TextEdit's save sheet and its save-changes alert both
+/// answer empty here (the sandboxed NSSavePanel service exposes a thin tree), so
+/// the TypeScript side keeps a name-based fallback. This stays because when an
+/// app does publish AXDefaultButton it is exact, and it costs one AX read on a
+/// surface that is by definition rare.
+func defaultButtonTitle(_ el: AXUIElement) -> String {
+  func nameOf(_ host: AXUIElement) -> String {
+    guard let raw = axCopy(host, kAXDefaultButtonAttribute) else { return "" }
+    let button = unsafeBitCast(raw, to: AXUIElement.self)
+    return cleanText(
+      axString(button, kAXTitleAttribute) ?? axString(button, kAXDescriptionAttribute) ?? "")
+  }
+  let own = nameOf(el)
+  if !own.isEmpty { return own }
+  for kid in axChildren(el) where axString(kid, kAXRoleAttribute) == "AXWindow" {
+    let inner = nameOf(kid)
+    if !inner.isEmpty { return inner }
+  }
+  return ""
+}
+
 func windowDict(_ w: AppWindow) -> [String: Any] {
   var d: [String: Any] = [
     "role": w.role, "subrole": w.subrole, "title": w.title,
@@ -264,6 +294,12 @@ func windowDict(_ w: AppWindow) -> [String: Any] {
     "hostPid": Int(w.hostPid),
   ]
   if let id = w.windowId { d["windowId"] = Int(id) }
+  // Only for the surfaces where it earns its AX read: a titleless modal is
+  // exactly the case that needs naming, and an ordinary window never does.
+  if w.isModal, w.title.isEmpty, let el = w.element {
+    let button = defaultButtonTitle(el)
+    if !button.isEmpty { d["defaultButton"] = button }
+  }
   return d
 }
 

@@ -225,9 +225,28 @@ describe('each capability carries its own guidance (the user)', () => {
     expect(CAPABILITY_PROMPT).toContain('belongs to the app that opened it');
   });
 
-  it('says the user is watching, so the work stays in the background', () => {
-    expect(CAPABILITY_PROMPT).toContain('watches it happen');
-    expect(CAPABILITY_PROMPT).toContain('never take focus');
+  /*
+   * IT USED TO SAY THE OPPOSITE OF THE TRUTH, TWICE.
+   *
+   * "The user watches it happen on their own screen, so work in the background
+   * and never take focus." The user does NOT watch it happen on their own
+   * screen — that is exactly what the background guarantee prevents, and what
+   * the Computer use tab exists for. And "never take focus" flatly contradicts
+   * the `activate:true` affordance the tools offer, so a model reading only the
+   * prompt believes borrowing focus is forbidden and silently fails every Save
+   * (macOS runs a document command only for the frontmost app).
+   */
+  it('says where the user actually watches, and does not forbid the one exception', () => {
+    expect(CAPABILITY_PROMPT).toContain('the app never comes to');
+    expect(CAPABILITY_PROMPT).toContain('Computer use tab');
+    expect(CAPABILITY_PROMPT).not.toContain('never take focus');
+    expect(CAPABILITY_PROMPT).not.toContain('watches it happen on their own screen');
+  });
+
+  it('names the document-command exception and how to run one', () => {
+    expect(CAPABILITY_PROMPT).toContain('document commands (Save, Bold, Close)');
+    expect(CAPABILITY_PROMPT).toContain('activate:true');
+    expect(CAPABILITY_PROMPT).toContain('handed straight back');
   });
 });
 

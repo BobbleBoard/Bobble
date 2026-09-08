@@ -91,6 +91,10 @@ export interface MacWindowInfo {
   readonly focused?: boolean;
   readonly modal?: boolean;
   readonly sheet?: boolean;
+  /** Title of this surface's DEFAULT button, when it is a modal with no title
+   * of its own — the only thing macOS gives us that can name a save sheet.
+   * Absent from an older helper, and absent on ordinary windows. */
+  readonly defaultButton?: string;
 }
 
 /** The frontmost modal surface the app owns, when one is open. */
@@ -100,6 +104,8 @@ export interface MacDialogInfo {
   readonly role?: string;
   /** Present when the helper can name the window the dialog lives in. */
   readonly windowId?: number;
+  /** See {@link MacWindowInfo.defaultButton}. */
+  readonly defaultButton?: string;
 }
 
 /** One indexed AX element as the model sees it (mirror of browser-use's
@@ -117,6 +123,10 @@ export interface MacElement {
   /** The CGWindowID this element lives in — which lets the snapshot text say
    * WHICH surface an index belongs to (the dialog, or the window behind it). */
   readonly win?: number;
+  /** This is the surface's DEFAULT button (AXDefaultButton). macOS gives a save
+   * sheet no title at all, so its default button is the only thing that names
+   * it — "a Save sheet" rather than "untitled". Absent from an older helper. */
+  readonly isDefault?: boolean;
 }
 
 /** The snapshot payload returned by the `snapshot` method. */
@@ -133,8 +143,25 @@ export interface MacSnapshot {
   readonly summary: {
     readonly app: string;
     readonly window: string;
+    /** Every control the app exposes, whatever this page shows. */
     readonly elementCount: number;
     readonly truncated: boolean;
+    /** How many controls the `find` filter matched. Absent when none was asked
+     * for (then the pool IS {@link elementCount}). */
+    readonly matched?: number;
+    /** Where this page starts in the app's own tree order (`from`). */
+    readonly offset?: number;
+    /** The `find` substring this page was filtered by, echoed so the text can
+     * say what produced the list — and so a continuation keeps the filter. */
+    readonly find?: string;
+  };
+  /** Sent ONLY when a TCC grant is missing, so a snapshot never reads as "this
+   * app has nothing in it" when the truth is "macOS did not let us look". The
+   * helper has always sent this; nothing read it until the header line did. */
+  readonly permissions?: {
+    readonly accessibility: boolean;
+    readonly screenRecording: boolean;
+    readonly hint?: string;
   };
   /** The snapshotted window's frame in global screen points (top-left origin),
    * when the root was a real window — drives the app's cursor overlay. */
@@ -214,6 +241,13 @@ export interface MacMenuAck {
   readonly shortcut?: string;
   readonly menus?: readonly string[];
   readonly error?: string;
+  /** The item ends the user's session or destroys data, so the helper refused
+   * it outright. Only a `confirmDestructive` the user themselves authorised
+   * gets past it — session consent is not enough. */
+  readonly destructive?: boolean;
+  /** The resolved path that was refused, so the confirm can name it exactly:
+   * "Log Out the user…", not the "Log Out" the model typed. */
+  readonly item?: string;
   readonly opened?: readonly MacWindowInfo[];
   readonly dialog?: MacWindowInfo;
   /** The command needed the app frontmost, so the focus was taken for the

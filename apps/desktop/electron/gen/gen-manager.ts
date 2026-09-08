@@ -20,10 +20,11 @@
  *   4. apps/desktop/electron/main.ts: call `registerGenIpc({...})` on app-ready
  *      BEFORE the first pi spawn (like registerBrowserAgentIpc), passing a
  *      `createIpcEventSender<AppEventMap>()` send fn + `isTrustedIpcEvent`.
- *   5. Renderer: a `useGen()` hook (mirroring useBrowserAgent) that, on `gen:open`,
- *      `controller.upsertTab(tabId, { kind:'gen-image', ... })` and on `gen:update`
- *      updates that tab's artifact via `genImageContent(payload)`; register the
- *      surface once with `registerGenImageSurface()`.
+ *   5. Renderer: `useGenStream()` at the app root (src/chat/gen-stream.ts) folds
+ *      `gen:open` / `gen:update` into the live-generation store the THREAD reads.
+ *      It used to open a `gen-image` canvas tab; the user, round 21: "image/video/
+ *      audio/media generation tools DO NOT GET SHOWN IN THE CANVAS…. they get
+ *      shown inline, the large card, same as each studio would show."
  */
 import { randomBytes, randomInt } from 'node:crypto';
 import { existsSync, unlinkSync } from 'node:fs';
@@ -31,7 +32,6 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import net from 'node:net';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
 import {
   activeModels,
   ComfyClient,
@@ -204,10 +204,24 @@ function parseSize(size: string | undefined): { width: number; height: number } 
   return { width: clamp(Number(m[1])), height: clamp(Number(m[2])) };
 }
 
-/** A file path → a loadable src. NOTE: if the renderer's CSP blocks file://, the
- * app should serve these via its media protocol instead (one-line swap here). */
+/**
+ * A file path → a src the renderer can actually load.
+ *
+ * THE SWAP THIS COMMENT ASKED FOR. It used to read: "if the renderer's CSP
+ * blocks file://, the app should serve these via its media protocol instead
+ * (one-line swap here)." The CSP does block it, and always has —
+ * `img-src 'self' data: blob: pd-file:` (vite.config.ts), no `file:` — so every
+ * decoded step preview and every finished candidate this stream has ever
+ * published was refused by the renderer before it reached a pixel. Nothing said
+ * so; a blocked `<img>` is silent, and the studio simply showed its shimmer for
+ * the whole run while the frames it was waiting for arrived and were dropped.
+ *
+ * `pd-file://f/<abs path>` is the app's own media scheme (canvas/canvas-main.ts):
+ * fenced to the working roots, of which `~/Bobble` — where every generated file
+ * lands — is one.
+ */
 function toSrc(p: string): string {
-  return pathToFileURL(p).href;
+  return `pd-file://f${p.split('/').map(encodeURIComponent).join('/')}`;
 }
 
 export function registerGenIpc(opts: GenManagerOptions): void {
@@ -379,8 +393,10 @@ export function registerGenIpc(opts: GenManagerOptions): void {
     let note: string | undefined;
 
     const payload = (status: GenSurfacePayload['status'], error?: string): GenSurfacePayload => ({
+      modality: 'image',
       model: modelInfo,
       prompt: raw.prompt,
+      size: { width, height },
       candidates: candidates.map((c) => ({ ...c })),
       progress,
       status,
@@ -492,8 +508,10 @@ export function registerGenIpc(opts: GenManagerOptions): void {
     let progress: GenSurfacePayload['progress'];
 
     const payload = (status: GenSurfacePayload['status'], error?: string): GenSurfacePayload => ({
+      modality: 'video',
       model: modelInfo,
       prompt: raw.prompt,
+      size: { width, height },
       candidates: [{ ...candidate }],
       progress,
       status,
@@ -618,7 +636,7 @@ export function registerGenIpc(opts: GenManagerOptions): void {
       outputDir,
     );
 
-    const _tabId = `pi:gen-${jobId}`;
+    const tabId = `pi:gen-${jobId}`;
     const modelInfo = { id: model.id, label: model.label, license: model.license };
     let candidates: GenSurfacePayload['candidates'] = seeds.map((seed) => ({
       seed,
@@ -627,6 +645,7 @@ export function registerGenIpc(opts: GenManagerOptions): void {
     let progress: GenSurfacePayload['progress'];
 
     const payload = (status: GenSurfacePayload['status'], error?: string): GenSurfacePayload => ({
+      modality: 'audio',
       model: modelInfo,
       prompt: raw.prompt,
       candidates: candidates.map((c) => ({ ...c })),
@@ -636,21 +655,22 @@ export function registerGenIpc(opts: GenManagerOptions): void {
     });
 
     /*
-     * NO CANVAS TAB FOR AUDIO.
+     * AUDIO STREAMS AGAIN, BECAUSE THE STREAM NO LONGER MEANS "CANVAS".
      *
-     * `gen-image` is the only registered surface and it renders candidates as
-     * <img>, so an audio job drew a BROKEN IMAGE labelled "Candidate 1 (seed …)"
-     * in the rail — next to a thread already showing the same clip with a
-     * working waveform. Guarding in the renderer could not fix it: at `gen:open`
-     * the candidates are still `pending` with no `finalSrc`, so nothing there
-     * can yet tell audio from an image. The job knows, so the job decides.
+     * These events used to be built and thrown away. The only consumer was the
+     * canvas hook, `gen-image` was the only registered surface, and it rendered
+     * candidates as `<img>` — so an audio job drew a BROKEN IMAGE labelled
+     * "Candidate 1 (seed …)" in the rail beside a thread already showing the
+     * same clip with a working waveform. Suppressing the events was the right
+     * fix for a stream that could only ever end up in a picture frame.
      *
-     * `payload`/`tabId` stay built and the events stay wired for the day an
-     * audio surface exists; they simply are not sent.
+     * Generation is inline now (the user: "they get shown inline, the large card"),
+     * and `modality` above says which card. So the events are what they always
+     * should have been: progress for the sound being made, delivered to the one
+     * place the sound itself is going to appear.
      */
     const canvasPush = (name: 'gen:open' | 'gen:update', p: GenSurfacePayload): void => {
-      void name;
-      void p;
+      send(name, { tabId, payload: p });
     };
     canvasPush('gen:open', payload('generating'));
 

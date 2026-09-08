@@ -21,14 +21,55 @@
  * is deliberately the small one, marked so it can be replaced.
  */
 
-/** The generate tools whose output we mount. Anything else is left as text. */
+/**
+ * The generate tools whose output we mount. Anything else is left as text.
+ *
+ * `edit_image` belongs here and was missing: an edit produces a NEW picture,
+ * beside the original, and it reached the thread as a line of prose with a path
+ * in it while the identical file from `generate_image` got the full card. The
+ * whole iterate loop — make one, change it, change it again — ran on the one
+ * tool whose output was never shown.
+ */
 export const MEDIA_TOOLS: ReadonlySet<string> = new Set([
   'generate_image',
+  'edit_image',
   'generate_video',
   'generate_speech',
   'generate_music',
   'generate_sfx',
 ]);
+
+/**
+ * The app's own media URL, and the plain path it names.
+ *
+ * `pd-file://f/Users/…` and `/Users/…` are the SAME FILE, and the image tools
+ * return both (line 1 the URL for the renderer, line 2 the path for a follow-up
+ * edit — see packages/harness/src/tools/image-tools.ts). The path scanner below
+ * matched inside the URL as well, so every generated picture mounted TWICE:
+ * once correctly, and once as `//f/Users/…`, a path that exists nowhere and
+ * renders as a broken card directly under the real one.
+ *
+ * A URL is also the STRONGER of the two readings, which is why it is read first
+ * rather than merely excluded. It is a single delimited token, so it survives a
+ * filename with a space in it — which the bare-path scanner deliberately cannot
+ * (see {@link PATH_RX}) — and it is present even when the tool names the file no
+ * other way.
+ */
+const PD_FILE_RX = /pd-file:\/\/f(\/[^\s()]*)/g;
+
+/** `pd-file://f/Users/a%20b/x.png` → `/Users/a b/x.png`, or undefined. */
+export function pdFilePath(url: string): string | undefined {
+  const m = /^pd-file:\/\/f(\/.*)$/.exec(url.trim());
+  if (m === null) return undefined;
+  try {
+    return (m[1] as string)
+      .split('/')
+      .map((seg) => decodeURIComponent(seg))
+      .join('/');
+  } catch {
+    return undefined; // an undecodable URL names nothing we can open
+  }
+}
 
 /**
  * `model` is 3D. It joins the other three because a generated mesh is shown the
@@ -103,16 +144,36 @@ export function mediaFromToolResult(
 
   const seen = new Set<string>();
   const out: ThreadMediaItem[] = [];
-  for (const match of text.matchAll(PATH_RX)) {
-    const path = match[1];
-    const ext = (match[2] ?? '').toLowerCase();
-    const kind = EXT[ext];
-    if (path === undefined || kind === undefined) continue;
-    // A turn that produced four candidates lists four paths; a turn that
-    // mentions the same file twice (path + footnote) should still mount once.
-    if (seen.has(path)) continue;
+
+  const add = (path: string, ext: string): void => {
+    const kind = EXT[ext.toLowerCase()];
+    if (kind === undefined) return;
+    // A turn that produced four candidates lists four paths; a turn that names
+    // the same file twice (its URL and its path) should still mount it once.
+    if (seen.has(path)) return;
     seen.add(path);
     out.push({ path, kind, name: path.split('/').pop() ?? path });
+  };
+
+  /*
+   * THE APP'S OWN URLs FIRST, then the same text with them — and the paths they
+   * name — struck out. A file named both ways has to mount once, and reading the
+   * URL first is what makes that reliable rather than lucky: the prose spelling
+   * of a path with a space in it is one the bare scanner can only read the tail
+   * of ("/fox/cand0.png"), which would have mounted as a second, broken card
+   * beside the real one instead of being recognised as the same file.
+   */
+  let rest = text.replace(PD_FILE_RX, ' ');
+  for (const match of text.matchAll(PD_FILE_RX)) {
+    const path = pdFilePath(match[0]);
+    if (path === undefined) continue;
+    add(path, path.split('.').pop() ?? '');
+    rest = rest.split(path).join(' ');
+  }
+  for (const match of rest.matchAll(PATH_RX)) {
+    const path = match[1];
+    if (path === undefined) continue;
+    add(path, match[2] ?? '');
   }
   return out;
 }

@@ -46,6 +46,7 @@
  */
 
 import { useEffect, useRef } from 'react';
+import { BobbleTileLoader } from './BobbleMark';
 import {
   type DenoiseState,
   EMPTY_DENOISE,
@@ -64,9 +65,20 @@ const EASE_ENTER = 'cubic-bezier(0.165, 0.84, 0.44, 1)';
 
 export function ThreadImagePlaceholder({
   label = 'Generating an image',
+  aspect,
 }: {
   /** Announced to screen readers; also the caption under the card. */
   label?: string;
+  /**
+   * The shape of the thing being made, when the job already said.
+   *
+   * The card takes this shape as soon as the job reports it, so the box is the
+   * right rectangle before anything is in it — a 16:9 clip in a square box is a
+   * card that resizes under the reader when the result lands, and video never
+   * sends a preview frame to correct it later. A decoded FRAME still wins: it
+   * knows the real size.
+   */
+  aspect?: number;
 }) {
   const rootRef = useRef<HTMLDivElement | null>(null);
   const currentRef = useRef<HTMLImageElement | null>(null);
@@ -75,6 +87,27 @@ export function ThreadImagePlaceholder({
   const captionRef = useRef<HTMLDivElement | null>(null);
   const labelRef = useRef(label);
   labelRef.current = label;
+
+  /*
+   * THE SHAPE, AS SOON AS ANYONE KNOWS IT.
+   *
+   * Its own effect rather than a line in the mount effect, because the job says
+   * what it is rendering a beat AFTER the card appears: the tool row starts the
+   * card, and `gen:open` arrives next. Written at mount only would leave every
+   * card square and then resize it under the reader on the first decoded step —
+   * and video, which never sends one, would stay square for the whole run.
+   *
+   * A decoded FRAME still wins: it knows the real size, and it sets the property
+   * itself on arrival. `data-frames` is how this effect can tell whether one has
+   * landed without reaching into the frame state that deliberately bypasses
+   * React.
+   */
+  useEffect(() => {
+    const root = rootRef.current;
+    if (root === null || aspect === undefined || !(aspect > 0)) return;
+    if (root.getAttribute('data-frames') !== '0') return;
+    root.style.setProperty('--pd-dn-aspect', String(aspect));
+  }, [aspect]);
 
   useEffect(() => {
     const root = rootRef.current;
@@ -232,6 +265,24 @@ export function ThreadImagePlaceholder({
             alt=""
             aria-hidden="true"
           />
+        </div>
+        {/*
+          THE WAIT, BEFORE THERE IS ANYTHING TO SHOW.
+
+          the user: "show the bobble logo as a loader with the squares sliding
+          clockwise like a sliding tile puzzle, until there is a diffusion step
+          ready." So the app's own mark solves itself on the empty plate, and
+          the moment a real decode lands the CSS fades it out (`data-phase`
+          flips to `resolving`) and the picture takes the box. It is a
+          placeholder that knows it is one — it never competes with the frames,
+          because it is gone before the first of them finishes arriving.
+
+          Video keeps it for the whole run: ComfyUI publishes step COUNTS and no
+          step images, so there is nothing to unblur and this is the honest
+          answer rather than an empty rectangle.
+        */}
+        <div className="pd-denoise-idle" aria-hidden="true">
+          <BobbleTileLoader size={46} label={label} />
         </div>
         {/* The unravel's leading edge, travelling with the reveal. */}
         <div ref={edgeRef} className="pd-denoise-edge" aria-hidden="true" />

@@ -20,14 +20,14 @@ import {
 } from '@pi-desktop/engine';
 import { type ReactNode, useEffect } from 'react';
 import { abortPi } from '../state/pi-connect';
-import { segmentGroup, toolStepKind } from './activity-mapping';
+import { segmentGroup } from './activity-mapping';
 import { InlineArtifact } from './canvas/InlineArtifacts';
+import { GeneratingMedia, useGeneratingJob } from './GeneratingMedia';
 import { recordJobDuration } from './job-history';
 import { LongJobCard } from './LongJobCard';
 import { type JobKind, jobKindForTool } from './long-job';
 import { Markdown } from './markdown';
 import { ThreadActivityChain } from './ThreadActivity';
-import { ThreadImagePlaceholder } from './ThreadImagePlaceholder';
 import { ThreadMedia } from './ThreadMedia';
 import { mediaFromToolResult, type ThreadMediaItem } from './thread-media';
 
@@ -119,32 +119,13 @@ export function AssistantGroup({
     }
   }
 
-  // The image tool call this group is CURRENTLY waiting on, if any: an image
-  // step the engine reports as executing that has not produced a result yet.
-  // At most one is possible in practice — the generation engine runs one job at
-  // a time on a 24 GB machine (see useDenoisePreview for why that invariant is
-  // what makes the frame stream unambiguous) — and taking the first here makes
-  // that explicit rather than assumed.
-  let pendingImageCallId: string | undefined;
-  if (!suppressInlineArtifacts) {
-    for (const m of group) {
-      for (const b of m.blocks) {
-        if (b.type !== 'toolCall' || pendingImageCallId !== undefined) continue;
-        if (toolStepKind(b.name) !== 'image') continue;
-        if (!runningToolCalls.includes(b.id)) continue;
-        if (resultForBlock.has(b.id)) continue;
-        pendingImageCallId = b.id;
-      }
-    }
-  }
-
   /*
    * THE JOB THIS GROUP IS WAITING ON — the 293 seconds of silence.
    *
-   * Same shape as the pending-image scan above and deliberately not merged with
-   * it: that one exists to place the denoise preview in the right box, this one
-   * exists to put words, a clock and a Cancel around ANY long job, including
-   * the ones (video, music, a 3D build) that have no preview to show at all.
+   * ONE SCAN, NOT TWO. There used to be a second one beside it that found only
+   * the pending IMAGE call, because only an image had anything to draw while it
+   * ran. Now every generated modality does (GeneratingMedia), so the card and
+   * the animation inside it are chosen from the same fact: which job is running.
    *
    * `startedAt` is the owning message's timestamp, which is when pi began the
    * call. Wall-clock, so it survives a re-render and a component remount — a
@@ -167,6 +148,20 @@ export function AssistantGroup({
       }
     }
   }
+
+  /*
+   * THE ENGINE'S OWN ACCOUNT OF THE JOB, for the card that is showing it.
+   *
+   * Step counts, the aspect ratio it is rendering at, the worker's last status
+   * line, and — for audio — the clip the moment it exists. All of this was
+   * already streaming; it went to a canvas tab nobody was told to open (see
+   * chat/gen-stream.ts). Asked for once, here, because there is one running job.
+   *
+   * Absent is ordinary, not an error: the gen3d image path publishes decoded
+   * frames without opening a gen stream at all, and the card is complete
+   * without it.
+   */
+  const generating = useGeneratingJob(runningJob?.kind ?? null);
 
   /*
    * LEARNING WHAT THIS MAC ACTUALLY DOES.
@@ -248,10 +243,6 @@ export function AssistantGroup({
         // decodes, resolving live (ThreadImagePlaceholder). It renders in the
         // chain that owns the pending call, which is where the finished image
         // would appear, so the swap happens in place.
-        const pendingHere =
-          pendingImageCallId !== undefined &&
-          seg.kind === 'chain' &&
-          seg.blocks.some((b) => b.type === 'toolCall' && b.id === pendingImageCallId);
         const jobHere =
           runningJob !== null &&
           seg.kind === 'chain' &&
@@ -294,11 +285,10 @@ export function AssistantGroup({
                 kind={jobHere.kind}
                 startedAt={jobHere.startedAt}
                 onCancel={() => void abortPi()}
+                {...(generating?.note !== undefined ? { note: generating.note } : {})}
               >
-                {pendingHere ? <ThreadImagePlaceholder /> : undefined}
+                <GeneratingMedia kind={jobHere.kind} job={generating} />
               </LongJobCard>
-            ) : pendingHere ? (
-              <ThreadImagePlaceholder />
             ) : null}
             {/* WHAT THE TURN MADE, under the chain that made it. Generated
                 images used to reach the thread only as a 414px markdown embed

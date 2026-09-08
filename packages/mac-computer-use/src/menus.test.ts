@@ -3,8 +3,8 @@ import { describe, expect, it, vi } from 'vitest';
 import type { MacBridge } from './bridge-client.js';
 import { formatMacSnapshot } from './format.js';
 import { createMacConsentGate } from './permissions.js';
-import { createMacSessionState, type MacSessionState } from './session-state.js';
 import type { MacAgentMethod, MacSnapshot } from './protocol.js';
+import { createMacSessionState, type MacSessionState } from './session-state.js';
 import { registerMacComputerUseTools } from './tools.js';
 
 type Handler = (params: Record<string, unknown> | undefined) => unknown;

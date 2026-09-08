@@ -19,7 +19,6 @@ import {
   type TaskState,
 } from '@pi-desktop/ui';
 import { type ReactElement, useEffect, useRef, useState } from 'react';
-import { getCanvasController, useCanvasStore, useCanvasTabsSafe } from '../state/canvas-store';
 import { useLlmStore } from '../state/llm-store';
 import { useModelSelectionStore } from '../state/model-selection-store';
 import { usePiStore } from '../state/pi-slice';
@@ -32,7 +31,6 @@ import {
   showProcessing,
   useHarnessStatus,
 } from './harness-status';
-import { type PanelWork, panelWorkLine, streamingTab } from './panel-work';
 
 /** A plan longer than this starts collapsed so it doesn't crowd the thread. */
 const LONG_PLAN_THRESHOLD = 6;
@@ -58,28 +56,20 @@ function ProcessingRing({
   label,
   fading,
   elapsedMs,
-  sentence,
 }: {
   percent: number | null;
   label: string;
   fading: boolean;
-  /**
-   * Leave the label's capitalisation alone.
-   *
-   * The ring lowercases by default because its labels are fragments of one
-   * running phrase — "45% processing · 2.3s" reads as a status, where "45%
-   * Processing" would read as a heading. But the panel line is a whole sentence
-   * about a named file, and the tester flagged it the moment she saw it:
-   * "capitalise it — it's a sentence, not a log line."
-   */
-  sentence?: boolean;
   /** Live elapsed time in the processing phase — a visible prefill/TTFT timer
    * (the user) so the "processing circle" duration is readable, e.g. "45% processing
    * · 2.3s". */
   elapsedMs?: number;
 }): ReactElement {
   const value = percent === null ? 0 : Math.min(1, Math.max(0, percent / 100));
-  const shown = sentence === true ? label : label.toLowerCase();
+  /* Lowercased because every label here is a fragment of one running phrase —
+     "45% processing · 2.3s" reads as a status where "45% Processing" reads as a
+     heading. */
+  const shown = label.toLowerCase();
   const base = percent === null ? shown : `${Math.round(percent)}% ${shown}`;
   const timer =
     elapsedMs !== undefined && elapsedMs >= 100 ? ` · ${(elapsedMs / 1000).toFixed(1)}s` : '';
@@ -228,20 +218,6 @@ export function ThreadStatusIndicator(): ReactElement | null {
    * a second progress affordance would be a second thing to learn.
    */
   const isCompacting = usePiStore((s) => s.agent.isCompacting);
-  /*
-   * What the OTHER pane is doing. Read through the registered controller rather
-   * than `useCanvasTabs` so this component still renders without a
-   * <CanvasProvider> above it (unit tests, and the frames before the shell
-   * mounts) — "there is no panel" is a fine answer to "is the panel busy?".
-   */
-  const canvasTabs = useCanvasTabsSafe();
-  const busyTab = streamingTab(canvasTabs);
-  const panelLine = panelWorkLine(
-    busyTab === null
-      ? null
-      : { name: busyTab.title, kind: (busyTab.kind as PanelWork['kind']) ?? 'other' },
-    streamingAssistant !== undefined,
-  );
   /** The live "switching to <model>…" banner state — see below. */
   const switching = useModelSelectionStore((s) => s.switching);
 
@@ -269,7 +245,7 @@ export function ThreadStatusIndicator(): ReactElement | null {
   // A model swap and a cold server load are timed too: they are the LONGEST
   // waits in the app (tens of seconds), and an unmoving indicator over one of
   // them is what "everything completely stops" looks like from the outside.
-  const timing = processing || switching !== null || serverStarting || panelLine !== null;
+  const timing = processing || switching !== null || serverStarting;
   useEffect(() => {
     if (!timing) return undefined;
     procStart.current = performance.now();
@@ -321,54 +297,20 @@ export function ThreadStatusIndicator(): ReactElement | null {
    */
   if (serverStarting && !processing) return null;
   /*
-   * THE 70 SECONDS WHERE THE COLUMN WENT QUIET.
+   * THE PANEL LINE IS GONE. the user, with a screenshot of it alone at the foot of
+   * the thread: "◌ Writing svg-icon in the panel → · 1.6s — remove it. It is
+   * pinned to the bottom, the elapsed time resets, and it tells me nothing."
    *
-   * The blind tester: "The chat froze for 70 seconds while the panel filled
-   * beautifully; the app was fine and I couldn't tell."
-   *
-   * She is describing this exact gate. Once a turn has spoken, `processing` is
-   * false forever (deliberately — the re-prefills between tool calls are noise),
-   * so a long tool call that writes into the canvas leaves the ONE live
-   * indicator returning null. The chain above it collapses to a dim
-   * "Editing a file". Everything visibly happening was happening in the other
-   * pane, and the pane she was reading never mentioned it.
-   *
-   * Below the `processing` gate on purpose: a turn that is thinking or
-   * prefilling has its own, better label, and this one should not fight it.
+   * Both complaints were true and both were structural. It was pinned because
+   * this indicator sits at the foot of the thread; the clock reset because its
+   * timer restarts whenever `timing` flips, and a write is a run of short
+   * streaming tabs rather than one long one, so it re-armed on every file. And
+   * it duplicated what two better things already said: the chain row above it
+   * names the file being written, and the canvas rail opens itself and shows
+   * that file filling in. It was built for a case that no longer exists — a
+   * chat column that went silent for 70 seconds — and the chain's live rows
+   * closed that hole properly.
    */
-  if (panelLine !== null) {
-    /*
-     * THE ARROW HAS TO GO SOMEWHERE.
-     *
-     * The tester: "make the arrow clickable, and make it open the panel if the
-     * panel is closed. An arrow pointing at a collapsed pane is worse than no
-     * arrow, because now I've been told where to look and there's nothing
-     * there." A streaming write opens the panel by itself, but nothing stops
-     * someone collapsing it mid-write — and that is precisely the moment they
-     * are most likely to.
-     */
-    const showPanel = (): void => {
-      useCanvasStore.getState().setCanvasOpen(true);
-      if (busyTab !== null) getCanvasController()?.focusTab(busyTab.id);
-    };
-    return (
-      <button
-        type="button"
-        className="pd-panel-jump pd-focusable"
-        onClick={showPanel}
-        data-testid="panel-work-jump"
-        title="Show the panel"
-      >
-        <ProcessingRing
-          percent={null}
-          label={panelLine}
-          fading={false}
-          elapsedMs={elapsedMs}
-          sentence
-        />
-      </button>
-    );
-  }
   if (!processing && !fading) return null;
   // Cold model LOAD → indeterminate pulse + "Loading model" (no fake %). Ingesting
   // → the REAL prefill % (parsePrefillPercent caps at 99, so it never falsely

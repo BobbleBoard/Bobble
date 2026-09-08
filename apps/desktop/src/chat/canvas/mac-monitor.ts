@@ -24,6 +24,7 @@
  */
 import type {
   CanvasController,
+  MacMonitorAxScene,
   MacMonitorDecodedFrame,
   MacMonitorFeed,
   MacMonitorSessionState,
@@ -49,6 +50,9 @@ interface RawFrame {
 class MacMonitorFeedImpl implements MacMonitorFeed {
   #session: MacMonitorSessionState = IDLE_MAC_MONITOR_SESSION;
   #frame: MacMonitorDecodedFrame | null = null;
+  /** The Accessibility drawing's source, when the pixels cannot come. Plain
+   * JSON off the wire — no decode, so no async and no generation guard. */
+  #ax: MacMonitorAxScene | null = null;
   #listeners = new Set<() => void>();
   #wallpaper: HTMLImageElement | null = null;
   #wallpaperUrl: string | null = null;
@@ -80,7 +84,17 @@ class MacMonitorFeedImpl implements MacMonitorFeed {
     window.piDesktop.onEvent('mac:monitor:frame', (payload) => {
       this.#onFrame(payload);
     });
+    window.piDesktop.onEvent('mac:monitor:ax', (scene) => {
+      this.#ax = scene;
+      this.#notify();
+    });
     void this.#send(false);
+  }
+
+  /** Put the user in front of the Screen Recording switch. Main opens the pane;
+   * nothing here (or anywhere) can flip it. */
+  requestCapture(): void {
+    void window.piDesktop.invoke('mac:monitor:request-capture', {}).catch(() => undefined);
   }
 
   async #send(frames: boolean): Promise<void> {
@@ -103,6 +117,7 @@ class MacMonitorFeedImpl implements MacMonitorFeed {
     cursorState: MacMonitorSessionState['cursorState'];
     cursor: { x: number; y: number } | null;
     bubbleVisible: boolean;
+    captureDenied?: boolean;
   }): void {
     this.#session = {
       active: state.active,
@@ -115,9 +130,17 @@ class MacMonitorFeedImpl implements MacMonitorFeed {
       cursorState: state.cursorState,
       cursor: state.cursor,
       bubbleVisible: state.bubbleVisible,
+      captureDenied: state.captureDenied === true,
     };
     this.#ensureWallpaper(state.wallpaperUrl);
-    if (!state.active) this.#dropFrame();
+    if (!state.active) {
+      this.#dropFrame();
+      this.#ax = null;
+    }
+    // Pixels are back: the drawing is stale the instant a real one arrives, and
+    // holding it would let a stutter in the stream flip between a photograph
+    // and a rendering of the same window.
+    if (state.stream === 'live') this.#ax = null;
     this.#notify();
   }
 
@@ -225,6 +248,10 @@ class MacMonitorFeedImpl implements MacMonitorFeed {
     return this.#frame;
   }
 
+  getAxScene(): MacMonitorAxScene | null {
+    return this.#ax;
+  }
+
   getWallpaper(): HTMLImageElement | null {
     return this.#wallpaper;
   }
@@ -253,6 +280,9 @@ class MacMonitorFeedImpl implements MacMonitorFeed {
     if (!active) {
       this.#arrivals = [];
       this.#pending = null;
+      // Nobody is watching, so nothing is polling: keeping the last drawing
+      // would show a window as it was when the tab was hidden.
+      this.#ax = null;
     }
     void this.#send(active);
   }

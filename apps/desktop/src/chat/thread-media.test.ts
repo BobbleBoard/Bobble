@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { clockTime, humanSize, mediaFromToolResult } from './thread-media';
+import { clockTime, humanSize, mediaFromToolResult, pdFilePath } from './thread-media';
 
 /**
  * The strings under test are VERBATIM from the generate tools in
@@ -74,6 +74,63 @@ describe('what it refuses to mount', () => {
   it('survives empty and missing text', () => {
     expect(mediaFromToolResult('generate_image', undefined)).toEqual([]);
     expect(mediaFromToolResult(undefined, 'x')).toEqual([]);
+  });
+});
+
+describe('the app URL and the path name ONE file', () => {
+  /*
+   * The harness image tools return both, deliberately: line 1 is the
+   * `pd-file://` URL the renderer can load, line 2 the plain path the model
+   * feeds back to `edit_image` (packages/harness/src/tools/image-tools.ts).
+   *
+   * The path scanner matched INSIDE the URL as well, so every generated picture
+   * mounted twice — once correctly, and once as "//f/Users/…", a path that
+   * exists nowhere and renders as a broken card directly under the real one.
+   */
+  const IMAGE_TOOL_RESULT =
+    'pd-file://f/Users/j/Bobble/generated/a%20fox/cand0.png\n' +
+    'Generated image saved at /Users/j/Bobble/generated/a fox/cand0.png';
+
+  it('reads the path out of the URL, decoded', () => {
+    expect(pdFilePath('pd-file://f/Users/j/x%20y/a.png')).toBe('/Users/j/x y/a.png');
+    expect(pdFilePath('/Users/j/a.png')).toBeUndefined();
+    expect(pdFilePath('https://example.com/a.png')).toBeUndefined();
+  });
+
+  it('mounts a generated picture exactly once', () => {
+    const items = mediaFromToolResult(
+      'generate_image',
+      'pd-file://f/Users/j/Bobble/generated/fox/cand0.png\n' +
+        'Generated image saved at /Users/j/Bobble/generated/fox/cand0.png',
+    );
+    expect(items).toHaveLength(1);
+    expect(items[0]?.path).toBe('/Users/j/Bobble/generated/fox/cand0.png');
+    expect(items[0]?.kind).toBe('image');
+  });
+
+  it('still mounts it when the URL is all the tool gave', () => {
+    const items = mediaFromToolResult('generate_image', 'pd-file://f/tmp/a.png');
+    expect(items).toHaveLength(1);
+    expect(items[0]?.path).toBe('/tmp/a.png');
+  });
+
+  it('decodes the encoded segments, so a name with a space still resolves', () => {
+    const items = mediaFromToolResult('generate_image', IMAGE_TOOL_RESULT);
+    expect(items).toHaveLength(1);
+    expect(items[0]?.path).toBe('/Users/j/Bobble/generated/a fox/cand0.png');
+  });
+
+  it('gives an EDITED image the same card as a generated one', () => {
+    // `edit_image` produces a NEW picture beside the original, and it used to
+    // reach the thread as a line of prose with a path in it while the identical
+    // file from `generate_image` got the full card. The iterate loop — make one,
+    // change it, change it again — ran on the one tool that showed nothing.
+    const items = mediaFromToolResult(
+      'edit_image',
+      'pd-file://f/tmp/edited.png\nEdited image saved at /tmp/edited.png',
+    );
+    expect(items).toHaveLength(1);
+    expect(items[0]?.path).toBe('/tmp/edited.png');
   });
 });
 

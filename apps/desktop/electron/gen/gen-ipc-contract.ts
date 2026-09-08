@@ -23,8 +23,30 @@ import type { ComfyInstallEvent, ComfyInstallState, ComfyPackLicense } from './c
  * plain payload so Electron MAIN never imports the React surface package. The
  * renderer feeds it straight into `genImageContent(payload)`. */
 export interface GenSurfacePayload {
+  /**
+   * WHICH KIND OF THING IS BEING MADE.
+   *
+   * The stream used to be image-shaped by assumption: one surface, candidates
+   * rendered as `<img>`, and an audio job that pushed into it drew a broken
+   * image labelled "Candidate 1". The job knows what it is making and nothing
+   * downstream could work it out at `gen:open` (the candidates are still
+   * `pending` with no output), so the job says.
+   *
+   * Now that generation renders INLINE rather than in a canvas tab, this is what
+   * picks the card: a picture resolving, or a waveform.
+   */
+  readonly modality: 'image' | 'video' | 'audio';
   readonly model: { readonly id: string; readonly label: string; readonly license: string };
   readonly prompt?: string;
+  /**
+   * The shape of the picture/clip being made, when the job fixed one.
+   *
+   * The inline card takes this aspect ratio from the FIRST event, so the box the
+   * finished image lands in is the box the placeholder occupied — no jump at the
+   * swap. Without it the card has to guess square and then resize under the
+   * reader's eyes on the first decoded step.
+   */
+  readonly size?: { readonly width: number; readonly height: number };
   readonly candidates: ReadonlyArray<{
     readonly seed?: number;
     readonly previewSrc?: string;

@@ -15,7 +15,24 @@
  * renderer, a sidecar, or a GPU.
  */
 
-import type { Gen3dJobPreview } from '../../electron/gen3d/gen3d-contract';
+/**
+ * One intermediate frame, from whichever engine produced it.
+ *
+ * Structurally what `Gen3dJobPreview` already is, stated here as its own type
+ * because there are now TWO engines emitting these — gen3d's image sidecar
+ * (inline data URIs) and the gen-service stream (a `pd-file://` URL to a step
+ * image on disk) — and this reducer has never cared which. `dataUri` therefore
+ * holds a URI of either kind; it is fed straight to `new Image().src`.
+ */
+export interface PreviewFrameInput {
+  readonly dataUri: string;
+  readonly step: number;
+  readonly totalSteps: number;
+  /** Full-resolution size of the image being made; 0 when the engine has not
+   * said, in which case the card keeps the aspect it already had. */
+  readonly width: number;
+  readonly height: number;
+}
 
 /** One real decoded frame, stamped with when the UI actually received it. */
 export interface DenoiseFrame {
@@ -81,7 +98,7 @@ function ease(t: number): number {
 export function noteFrame(
   state: DenoiseState,
   jobId: string,
-  preview: Gen3dJobPreview,
+  preview: PreviewFrameInput,
   now: number,
 ): DenoiseState {
   const fresh = state.jobId !== jobId;

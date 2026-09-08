@@ -138,8 +138,11 @@ COMPUTER USE — see and control any app on the user's Mac.
   back from the same look, so a snapshot is never a dead end. A save sheet, file picker
   or alert belongs to the app that opened it: same snapshot, same clicks. A third of what
   an app can do lives in its menu bar and appears in no window — New, Save As, Format —
-  so mac_click also takes a menu path. The user watches it happen on their own screen, so
-  work in the background and never take focus.
+  so mac_click also takes a menu path. It runs in the background: the app never comes to
+  the front and the user keeps working, watching in the Computer use tab, which opens on
+  its own. One exception — macOS runs document commands (Save, Bold, Close) only for the
+  frontmost app, so for those pass activate:true and the focus is borrowed for that one
+  command and handed straight back.
 
 CALENDAR, MAIL, REMINDERS, CONTACTS & MESSAGES — the user's own macOS data.
   Read and create events, reminders and contacts; read and send Mail and iMessage.

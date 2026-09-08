@@ -14,7 +14,6 @@ import type {
   ActivityStepData,
   ActivityStepKind,
   DiffFileData,
-  DiffLine,
   WebSearchResultData,
 } from '@pi-desktop/ui';
 // Deep source import of the PURE connector-icons module (only pulls
@@ -25,7 +24,9 @@ import type {
 import { connectorIconSvg } from '../../../../packages/mcp-lite/src/connector-icons.ts';
 import { type DetectedArtifact, segmentMessageText } from './canvas/artifacts';
 import { pdFileUrl } from './canvas/file-preview';
+import { editDiffFile } from './edit-diff';
 import { COMMAND_KEYS, CONTENT_KEYS, PATH_KEYS, partialJsonString } from './partial-json';
+import { MEDIA_TOOLS } from './thread-media';
 
 type ToolCallBlock = Extract<ContentBlock, { type: 'toolCall' }>;
 type ThinkingBlock = Extract<ContentBlock, { type: 'thinking' }>;
@@ -644,7 +645,16 @@ function primaryArg(args: Record<string, unknown>): string | undefined {
   );
 }
 
-/** Build a best-effort DiffFileData[] from an edit tool's arguments. */
+/**
+ * Build a DiffFileData[] from an edit tool's arguments.
+ *
+ * The rows come from {@link editDiffFile}, which diffs the two sides properly.
+ * They used to be "every line of old_string as a deletion, every line of
+ * new_string as an addition" — and since a str_replace edit quotes surrounding
+ * lines to make its match unique, that painted a one-word change as fifteen red
+ * rows over fifteen green ones. the user read the result exactly as it looked:
+ * "editing/writing tool calls a lot of the time show up as red."
+ */
 function editDiff(args: Record<string, unknown>): DiffFileData[] | undefined {
   const path = pickPath(args) ?? 'file';
   const oldText = str(args.old_string ?? args.oldText ?? args.old ?? args.oldStr);
@@ -659,19 +669,7 @@ function editDiff(args: Record<string, unknown>): DiffFileData[] | undefined {
       args.file_text,
   );
   if (oldText === undefined && newText === undefined) return undefined;
-  const lines: DiffLine[] = [];
-  if (oldText !== undefined)
-    for (const l of oldText.split('\n')) lines.push({ kind: 'del', text: l });
-  if (newText !== undefined)
-    for (const l of newText.split('\n')) lines.push({ kind: 'add', text: l });
-  return [
-    {
-      path,
-      added: newText !== undefined ? newText.split('\n').length : 0,
-      deleted: oldText !== undefined ? oldText.split('\n').length : 0,
-      lines,
-    },
-  ];
+  return [editDiffFile(path, oldText, newText)];
 }
 
 /** Rows + an optional backend note parsed from a web-search tool result. */
@@ -896,6 +894,59 @@ export function generatedImageSrc(
  * "edited", a verb that asserts the file changed. {@link summarizeActivity} now
  * says what actually happened to them.
  */
+/**
+ * THE GENERATE FAMILY: an artifact row, not a file-read row, and not a canvas
+ * destination.
+ *
+ * These rows do not route to the canvas — the clip or picture is already mounted
+ * in the thread beneath them, as the same large card its studio would show — so
+ * `src` is not a canvas target here. It is what the row can say for itself when
+ * opened: where the file it made actually landed.
+ *
+ * Shared by every produced modality (image, video, speech, music, sfx) because
+ * they are one behaviour; it lived inside a `case` and image could not reach it.
+ */
+function producedArtifactStep(
+  kind: 'image' | 'video' | 'speech' | 'music' | 'sfx',
+  label: string,
+  status: 'running' | 'done',
+  filename: string | undefined,
+  path: string | undefined,
+  result: ToolResultMsg | undefined,
+): MappedStep {
+  /*
+   * THE PLAIN PATH WINS over a `pd-file://` URL when the tool reports both.
+   * This row's only use for it is a line a person reads and copies, and
+   * "pd-file://f/Users/…" is this app's internal address for the same file.
+   * The URL is the fallback, for a generator that returns nothing else.
+   *
+   * `preview` keeps the tool's own words for the same fallback reason — the
+   * seed and the model are what you reach for when a take is worth repeating,
+   * and a generator this app cannot parse still has them.
+   */
+  const produced = reportedOutputPath(str(result?.text)) ?? firstMediaUrl(str(result?.text));
+  const src = produced ?? path;
+  return {
+    data: {
+      kind,
+      label,
+      status,
+      /*
+       * THE HEADER SHOWS THE FILENAME, not the path. The row's inline detail
+       * truncates from the RIGHT — "…/bobble-can-speak-now-14/cand0_seed2…" —
+       * so a full path spends the whole line on the directory and cuts off the
+       * one part you were looking for. The location is a click away in the
+       * reveal.
+       */
+      detail: filename ?? baseName(produced) ?? path,
+      filename: filename ?? baseName(produced),
+      preview: str(result?.text),
+      facts: reportedFacts(str(result?.text)),
+      ...(src !== undefined ? { src } : {}),
+    },
+  };
+}
+
 export function mapToolStep(
   block: ToolCallBlock,
   result: ToolResultMsg | undefined,
@@ -1053,6 +1104,23 @@ function mapToolStepData(
       };
     case 'image':
     case 'pdf': {
+      /*
+       * A PICTURE THIS APP JUST MADE DOES NOT GO TO THE CANVAS.
+       *
+       * the user: "image/video/audio/media generation tools DO NOT GET SHOWN IN THE
+       * CANVAS… they get shown inline, the large card, same as each studio would
+       * show." Video, speech, music and sfx already obeyed that (the arm below);
+       * `generate_image` and `edit_image` did not, so of the five generate tools
+       * the two people actually use were the two that put their result in the
+       * rail — a second copy of a picture already mounted in the thread, in a
+       * panel that slid the conversation sideways to show it.
+       *
+       * A third-party image tool keeps the canvas: the rule is about what the
+       * app GENERATES, which is the thing that also arrives as a media card.
+       */
+      if (kind === 'image' && MEDIA_TOOLS.has(block.name)) {
+        return producedArtifactStep(kind, label, status, filename, path, result);
+      }
       const src = pickMediaSrc(args, result);
       const mediaType = kind === 'pdf' ? 'PDF' : 'PNG';
       // The tab is titled with the file, falling back to the bare type only when
@@ -1153,39 +1221,8 @@ function mapToolStepData(
     case 'video':
     case 'speech':
     case 'music':
-    case 'sfx': {
-      /*
-       * THE PLAIN PATH WINS over a `pd-file://` URL when the tool reports both.
-       * This row's only use for it is a line a person reads and copies, and
-       * "pd-file://f/Users/…" is this app's internal address for the same file.
-       * The URL is the fallback, for a generator that returns nothing else.
-       *
-       * `preview` keeps the tool's own words for the same fallback reason — the
-       * seed and the model are what you reach for when a take is worth
-       * repeating, and a generator this app cannot parse still has them.
-       */
-      const produced = reportedOutputPath(str(result?.text)) ?? firstMediaUrl(str(result?.text));
-      const src = produced ?? path;
-      return {
-        data: {
-          kind,
-          label,
-          status,
-          /*
-           * THE HEADER SHOWS THE FILENAME, not the path. The row's inline
-           * detail truncates from the RIGHT — "…/bobble-can-speak-now-14/
-           * cand0_seed2…" — so a full path spends the whole line on the
-           * directory and cuts off the one part you were looking for. The
-           * location is a click away in the reveal.
-           */
-          detail: filename ?? baseName(produced) ?? path,
-          filename: filename ?? baseName(produced),
-          preview: str(result?.text),
-          facts: reportedFacts(str(result?.text)),
-          ...(src !== undefined ? { src } : {}),
-        },
-      };
-    }
+    case 'sfx':
+      return producedArtifactStep(kind, label, status, filename, path, result);
     default:
       /*
        * PASS THE REAL KIND THROUGH.

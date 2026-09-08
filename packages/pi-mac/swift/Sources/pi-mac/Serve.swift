@@ -49,10 +49,22 @@ private func targetFrom(_ params: [String: Any]) -> SnapshotTarget {
 
 private func doSnapshot(_ params: [String: Any]) -> [String: Any]? {
   let cap = intOf(params["cap"]) ?? DEFAULT_CAP
-  guard let snap = collectSnapshot(target: targetFrom(params), cap: cap) else { return nil }
+  let find = stringOf(params["find"]) ?? ""
+  let from = intOf(params["from"]) ?? 0
+  guard
+    let snap = collectSnapshot(target: targetFrom(params), cap: cap, find: find, from: from)
+  else { return nil }
   // Refresh this pid's resolve-by-index map (leaving other pids' maps intact so
   // concurrent sessions on other apps keep their indices).
-  var map: [Int: SnapEl] = [:]
+  //
+  // A FILTERED OR PAGED LOOK MERGES; A PLAIN ONE REPLACES. `find:"save"` and
+  // `from:60` are continuations of one look at one app, so page two must not
+  // make page one's indices stop resolving — the model would click a button it
+  // can still see in its own transcript and be told the index does not exist.
+  // A plain snapshot is a fresh look and replaces the map outright, which is
+  // what keeps a stale index stale.
+  var map: [Int: SnapEl] =
+    (find.isEmpty && from <= 0) ? [:] : (elementsByPid[snap.pid] ?? [:])
   for el in snap.elements { map[el.index] = el }
   elementsByPid[snap.pid] = map
   lastSnapshotPid = snap.pid
@@ -577,7 +589,16 @@ private func doMenus(_ params: [String: Any]) -> [String: Any] {
     $0.trimmingCharacters(in: .whitespaces)
   }.filter { !$0.isEmpty }
   let levels = intOf(params["levels"]) ?? 1
+  // The system menu is never OFFERED (see Menus.swift): at top level it is
+  // filtered out, and asking for it by name lists nothing.
+  if path.first?.caseInsensitiveCompare(APPLE_MENU_TITLE) == .orderedSame {
+    return [
+      "ok": true, "app": resolved.name, "pid": Int(resolved.pid),
+      "path": path.joined(separator: " > "), "items": [],
+    ]
+  }
   let entries = menuEntries(pid: resolved.pid, under: path, levels: levels)
+    .filter { path.isEmpty ? $0.title != APPLE_MENU_TITLE : true }
   return [
     "ok": true, "app": resolved.name, "pid": Int(resolved.pid),
     "path": path.joined(separator: " > "),
@@ -609,10 +630,21 @@ private func doMenuClick(_ params: [String: Any]) -> [String: Any] {
     ]
   }
   guard let entry = findMenuItem(pid: resolved.pid, path: path) else {
-    let top = menuEntries(pid: resolved.pid, under: [], levels: 1).map { $0.title }
     return [
       "ok": false, "error": "no menu item matching \(path)",
-      "menus": top,
+      "menus": listableMenuTitles(pid: resolved.pid),
+    ]
+  }
+  // THE HARD FENCE ON "SHUT DOWN…". The tool layer asks the user first and only
+  // then stamps `confirmDestructive`; without it this never fires, whatever the
+  // session-wide consent says. A guard that lives only in copy is not a guard.
+  if isDestructiveMenuPath(entry.path), !boolOf(params["confirmDestructive"]) {
+    return [
+      "ok": false, "destructive": true,
+      "item": entry.path.joined(separator: " > "),
+      "error":
+        "\(entry.path.joined(separator: " > ")) ends the user's session or destroys data, "
+        + "so it is not pressed on a model's say-so. Ask the user for it in words.",
     ]
   }
   // Do NOT refuse a menu item that reports itself disabled.

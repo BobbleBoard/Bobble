@@ -1489,16 +1489,7 @@
   "cand-editor:escape-on-select-closed-editor": false,
   "film:cand-save": {
     "frames": 75,
-    "picked": [
-      0,
-      81,
-      168,
-      251,
-      350,
-      434,
-      518,
-      592
-    ]
+    "picked": [0, 81, 168, 251, 350, 434, 518, 592]
   },
   "cand-after-save:selected": "Write up what I worked on this week",
   "cand-after-save:focused": "BODY",
@@ -1524,16 +1515,7 @@
   },
   "film:cand-pane-swap": {
     "frames": 62,
-    "picked": [
-      0,
-      57,
-      117,
-      177,
-      233,
-      299,
-      358,
-      408
-    ]
+    "picked": [0, 57, 117, 177, 233, 299, 358, 408]
   },
   "cand-running": {
     "pill": {
@@ -1668,34 +1650,14 @@
   },
   "film:cand-run-now": {
     "frames": 130,
-    "picked": [
-      0,
-      167,
-      334,
-      517,
-      683,
-      858,
-      1034,
-      1201
-    ]
+    "picked": [0, 167, 334, 517, 683, 858, 1034, 1201]
   },
   "cand-run-now:finished": true,
-  "cand-run-now:ledger-head": [
-    "Today 4:03 PM1sby handDone — hello.txt now greets the world."
-  ],
+  "cand-run-now:ledger-head": ["Today 4:03 PM1sby handDone — hello.txt now greets the world."],
   "cand-search:escape-cleared": 1,
   "film:cand-switch-off": {
     "frames": 60,
-    "picked": [
-      0,
-      75,
-      139,
-      217,
-      283,
-      350,
-      425,
-      508
-    ]
+    "picked": [0, 75, 139, 217, 283, 350, 425, 508]
   },
   "cand-off:panes-moved-by": 46,
   "cand-edit:focused": "sc-editor-prompt",

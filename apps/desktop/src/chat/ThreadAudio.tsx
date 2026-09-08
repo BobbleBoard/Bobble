@@ -16,42 +16,17 @@
  * back to a plain bar. Never let the picture of the sound stop the sound.
  */
 import { type JSX, useCallback, useEffect, useRef, useState } from 'react';
+import { peaksOf, WAVE_BUCKETS } from './audio-peaks';
 import { clockTime } from './thread-media';
 
-/** Peak amplitude per bucket, 0..1, from the decoded PCM. */
-async function peaksOf(url: string, buckets: number, signal: AbortSignal): Promise<number[]> {
-  const res = await fetch(url, { signal });
-  const bytes = await res.arrayBuffer();
-  // `AudioContext` is only needed to decode; it is closed immediately after.
-  const Ctor: typeof AudioContext =
-    window.AudioContext ??
-    (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-  const ctx = new Ctor();
-  try {
-    const buf = await ctx.decodeAudioData(bytes);
-    const data = buf.getChannelData(0);
-    const per = Math.max(1, Math.floor(data.length / buckets));
-    const out: number[] = [];
-    let max = 0;
-    for (let b = 0; b < buckets; b++) {
-      let peak = 0;
-      const start = b * per;
-      for (let i = start; i < start + per && i < data.length; i++) {
-        const v = Math.abs(data[i] ?? 0);
-        if (v > peak) peak = v;
-      }
-      out.push(peak);
-      if (peak > max) max = peak;
-    }
-    // Normalise so a quiet clip is still readable — the shape matters here, not
-    // the absolute level, which the file's own gain already decided.
-    return max > 0 ? out.map((p) => p / max) : out;
-  } finally {
-    void ctx.close();
-  }
-}
-
-const BUCKETS = 96;
+/*
+ * THE DECODE LIVES IN audio-peaks.ts NOW. The generating card draws the same
+ * waveform from the same measurement as it resolves (the user: "pulsing waveforms
+ * that eventually at the end form into a real waveform that's playable"), and
+ * two copies of the bucketing would put the bars in two different places at the
+ * one moment the two cards have to agree.
+ */
+const BUCKETS = WAVE_BUCKETS;
 
 export function ThreadAudio({ src, name }: { src: string; name?: string }): JSX.Element {
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -118,6 +93,11 @@ export function ThreadAudio({ src, name }: { src: string; name?: string }): JSX.
       <div
         className="pd-thread-audio-wave"
         data-testid="thread-audio-wave"
+        /* SETTLE, don't appear. The pulsing placeholder that was here a moment
+           ago had bars in these exact positions; growing them into their real
+           heights makes the swap read as the wave resolving rather than as one
+           card being replaced by another. See .pd-thread-audio-wave[data-settle]. */
+        data-settle={peaks === null ? undefined : 'true'}
         onClick={seek}
         style={{ ['--pd-wave-progress' as string]: String(progress) }}
       >

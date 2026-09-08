@@ -4227,6 +4227,91 @@
   height: 100%;
 }
 
+/* ── "Drawn from Accessibility" ──────────────────────────────────────────
+ *
+ * When the Screen Recording grant is missing the surface keeps working by
+ * DRAWING the window from the Accessibility tree. That must never be mistaken
+ * for a photograph, so the fact is stated permanently, on the picture, in the
+ * corner — a caption, not an error banner and not a toast that disappears.
+ *
+ * Dark glass whatever the theme, because it sits on top of the user's own
+ * wallpaper rather than on the app's ground, and a token-coloured chip would be
+ * invisible over half of the desktop pictures Apple ships.
+ */
+.pd-macmon-source {
+  position: absolute;
+  top: var(--pd-space-sm);
+  left: var(--pd-space-sm);
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  max-width: calc(100% - var(--pd-space-md));
+  padding: 5px 6px 5px 10px;
+  border-radius: var(--pd-radius-full);
+  border: 1px solid rgb(255 255 255 / 14%);
+  background: rgb(18 20 25 / 72%);
+  -webkit-backdrop-filter: blur(14px) saturate(150%);
+  backdrop-filter: blur(14px) saturate(150%);
+  box-shadow: 0 6px 20px rgb(4 6 10 / 34%);
+  color: rgb(255 255 255 / 92%);
+  font-size: var(--pd-font-size-caption);
+  line-height: 16px;
+  white-space: nowrap;
+}
+
+.pd-macmon-source-mark {
+  display: inline-flex;
+  flex: 0 0 auto;
+  color: rgb(255 255 255 / 70%);
+}
+
+.pd-macmon-source-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 500;
+}
+
+.pd-macmon-source-sep {
+  padding: 0 5px;
+  opacity: 0.42;
+}
+
+/* The reason is secondary to the fact: what you are looking at first, why
+   second. */
+.pd-macmon-source-why {
+  color: rgb(255 255 255 / 66%);
+  font-weight: 400;
+}
+
+.pd-macmon-source-action {
+  flex: 0 0 auto;
+  padding: 2px 9px;
+  border-radius: var(--pd-radius-full);
+  border: 1px solid rgb(255 255 255 / 18%);
+  background: rgb(255 255 255 / 12%);
+  color: inherit;
+  font: inherit;
+  font-weight: 500;
+  line-height: 15px;
+  cursor: pointer;
+  transition: background var(--pd-duration-fast) var(--pd-ease-standard);
+}
+
+.pd-macmon-source-action:hover {
+  background: rgb(255 255 255 / 20%);
+}
+
+.pd-macmon-source-action:active {
+  background: rgb(255 255 255 / 26%);
+}
+
+.pd-macmon-source-action:focus-visible {
+  outline: 2px solid var(--pd-accent-primary);
+  outline-offset: 2px;
+}
+
 /* The empty / waiting states. Centred, weightless, and never in the way of the
    footer — the same panel whether there is no session, no window, or no frame
    yet, so switching between them does not reflow the surface. */
@@ -4237,11 +4322,32 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 2px;
   padding: 0 var(--pd-space-lg);
   text-align: center;
   color: var(--pd-text-muted);
   pointer-events: none;
+}
+
+/* Its own ground.
+   The wallpaper used to be dimmed 58% and blurred, which meant this panel could
+   float on it as bare text. It is now drawn as it is (the user: "don't blur the
+   wallpaper please") — and muted grey type over a sunlit photograph is simply
+   not readable. So the panel carries a card instead of the whole picture being
+   pushed down for it: the wallpaper stays untouched everywhere the message is
+   not. */
+.pd-macmon-state-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  max-width: 42ch;
+  padding: var(--pd-space-lg) var(--pd-space-xl) var(--pd-space-lg);
+  border-radius: var(--pd-radius-lg);
+  border: 1px solid var(--pd-border-subtle);
+  background: color-mix(in srgb, var(--pd-bg-base) 88%, transparent);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  backdrop-filter: blur(20px) saturate(140%);
+  box-shadow: var(--pd-shadow-lg);
 }
 
 .pd-macmon-state-mark {
@@ -4306,7 +4412,25 @@
   font-size: var(--pd-font-size-caption);
   line-height: var(--pd-leading-caption);
   color: var(--pd-text-muted);
-  background: linear-gradient(to top, var(--pd-bg-inset), transparent);
+}
+
+/* A scrim that reaches ABOVE the line it carries.
+   With the wallpaper undimmed, a 34px gradient was not enough to keep caption
+   type off a sunlit beach: it has to fade out over a taller run than the row is
+   tall. Drawn behind the footer's own children rather than as its background,
+   so the row can stay 34px for layout while the wash is 56. */
+.pd-macmon-footer::before {
+  content: "";
+  position: absolute;
+  inset: -26px 0 0 0;
+  z-index: -1;
+  pointer-events: none;
+  background: linear-gradient(
+    to top,
+    var(--pd-bg-inset) 34%,
+    color-mix(in srgb, var(--pd-bg-inset) 62%, transparent) 66%,
+    transparent
+  );
 }
 
 .pd-macmon-app {
@@ -4376,6 +4500,18 @@
   animation: pd-macmon-pulse 2s ease-in-out infinite;
 }
 
+/* Drawn from Accessibility: alive, and honestly not the same thing as a live
+   picture — the dot breathes, in the app's own accent rather than in green. */
+.pd-macmon-live[data-drawn="true"] {
+  color: var(--pd-text-secondary);
+}
+
+.pd-macmon-live[data-drawn="true"] .pd-macmon-dot {
+  opacity: 1;
+  background: var(--pd-accent-primary);
+  animation: pd-macmon-pulse 2.6s ease-in-out infinite;
+}
+
 @keyframes pd-macmon-pulse {
   0%,
   100% {
@@ -4394,7 +4530,8 @@
 
 @media (prefers-reduced-motion: reduce) {
   .pd-macmon-glyph-pulse,
-  .pd-macmon-live[data-live="true"] .pd-macmon-dot {
+  .pd-macmon-live[data-live="true"] .pd-macmon-dot,
+  .pd-macmon-live[data-drawn="true"] .pd-macmon-dot {
     animation: none;
   }
 }

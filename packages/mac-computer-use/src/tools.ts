@@ -29,10 +29,12 @@ import {
 } from './chrome.js';
 import {
   blockedIndexes,
+  dialogName,
   dialogOf,
   dialogSignature,
   formatMacSnapshot,
   isAxOpaque,
+  type MacSnapshotView,
   type ResolvedDialog,
 } from './format.js';
 import type { MacConsentGate } from './permissions.js';
@@ -154,11 +156,12 @@ function errResult(action: string, message: string): AgentToolResult<MacDetails>
   return textResult(`${action} failed: ${message}`, { action, ok: false, error: message });
 }
 
+/* The model quotes its errors back to the user, so an error string is user copy.
+ * This one used to name the product's internal codename and an extension the
+ * user has never heard of; where it is hosted is a fact for the log, not for the
+ * person reading the answer. */
 function unavailable(action: string): AgentToolResult<MacDetails> {
-  return errResult(
-    action,
-    'mac bridge unavailable (the mac-computer-use extension must run inside Pi Desktop)',
-  );
+  return errResult(action, "Mac control isn't available in this session.");
 }
 
 function messageOf(err: unknown): string {
@@ -196,7 +199,7 @@ function dialogRedirect(
   snap: MacSnapshot,
   dialog: ResolvedDialog,
 ): AgentToolResult<MacDetails> {
-  const name = dialog.title !== '' ? `"${dialog.title}"` : 'an untitled dialog';
+  const name = dialogName(snap, dialog);
   return textResult(
     `${tool} did NOT run: index ${index} is stale AND a ${dialog.kind} has opened since — ` +
       `${name}. Acting on that number now would have hit the window BEHIND the ${dialog.kind}. ` +
@@ -258,6 +261,27 @@ export function registerMacComputerUseTools(
    */
   let blocked: readonly number[] = [];
 
+  /**
+   * index → name from the LAST look, so an act can say what it acted on.
+   *
+   * "your last act: clicked [7]" is a number the model has to go and look up
+   * again; "clicked [7] Save" is the fact. The name is already in hand at look
+   * time and costs one map, so there is no reason to make the model do the join.
+   */
+  let names = new Map<number, string>();
+
+  /** What an act should be remembered as: `clicked [7] "Save"`. */
+  function actOn(verb: string, index: number): string {
+    const name = names.get(index);
+    return `${verb} [${index}]${name !== undefined && name !== '' ? ` "${name}"` : ''}`;
+  }
+
+  /** What the tool layer knows and the snapshot does not — today, the model's
+   * own last act, which the header reads back so it is not re-derived. */
+  function view(): MacSnapshotView {
+    return { lastAct: session.controlled()?.lastAct };
+  }
+
   /** Gate helper: consent + denylist, returns null when allowed. */
   async function gate(
     action: string,
@@ -269,7 +293,17 @@ export function registerMacComputerUseTools(
     return errResult(action, decision.reason);
   }
 
-  async function snapshot(app?: string, screenshot?: boolean): Promise<MacSnapshot> {
+  /** A page of the element list: which slice, filtered by what. */
+  interface SnapshotPage {
+    readonly find?: string;
+    readonly from?: number;
+  }
+
+  async function snapshot(
+    app?: string,
+    screenshot?: boolean,
+    page: SnapshotPage = {},
+  ): Promise<MacSnapshot> {
     if (bridge === null) throw new Error('bridge unavailable');
     const params: Record<string, unknown> = {};
     // Explicit app wins; otherwise target the CONTROLLED app (the one the model
@@ -278,6 +312,8 @@ export function registerMacComputerUseTools(
     if (app !== undefined && app !== '') params.app = app;
     else Object.assign(params, session.targetParams());
     if (screenshot === true) params.screenshot = true;
+    if (typeof page.find === 'string' && page.find.trim() !== '') params.find = page.find.trim();
+    if (typeof page.from === 'number' && page.from > 0) params.from = Math.floor(page.from);
     params.cap = cap;
     const snap = await bridge.request<MacSnapshot>('snapshot', params);
     /* Remember WHICH KIND of app this is. An app with no Accessibility tree can
@@ -298,6 +334,10 @@ export function registerMacComputerUseTools(
       dialogKey: dialogSignature(dialog),
     });
     blocked = blockedIndexes(snap, dialog);
+    /* A filtered/paged look ADDS to the names it knows, matching the helper's
+     * own merge of the index→element map: page two must not forget page one. */
+    if (params.find === undefined && params.from === undefined) names = new Map();
+    for (const el of snap.elements) names.set(el.index, el.name);
     return snap;
   }
 
@@ -310,12 +350,14 @@ export function registerMacComputerUseTools(
    * dialog dismissed since the last snapshot would otherwise make this refuse a
    * perfectly good index, which is its own dead end.
    */
-  async function behindDialog(index: number): Promise<ResolvedDialog | null> {
+  async function behindDialog(
+    index: number,
+  ): Promise<{ dialog: ResolvedDialog; snap: MacSnapshot } | null> {
     if (!blocked.includes(index)) return null;
     const fresh = await snapshot();
     const dialog = dialogOf(fresh);
     if (dialog === null || !blocked.includes(index)) return null;
-    return dialog;
+    return { dialog, snap: fresh };
   }
 
   /** Refuse an act aimed under an open dialog, naming the way out. */
@@ -323,11 +365,11 @@ export function registerMacComputerUseTools(
     tool: string,
     action: string,
     index: number,
-    dialog: ResolvedDialog,
+    { dialog, snap }: { dialog: ResolvedDialog; snap: MacSnapshot },
   ): AgentToolResult<MacDetails> {
-    const name = dialog.title !== '' ? `"${dialog.title}"` : 'an untitled dialog';
+    const name = dialogName(snap, dialog);
     return textResult(
-      `${tool} did NOT run: [${index}] is in the window BEHIND the open ${dialog.kind} ${name}, ` +
+      `${tool} did NOT run: [${index}] is in the window BEHIND the open ${name}, ` +
         `which stops accepting input while the ${dialog.kind} is up — acting on it would have ` +
         `done nothing at all. Act on the ${dialog.kind}'s own controls, or close it first ` +
         '(mac_key "escape" cancels, "return" confirms).',
@@ -355,9 +397,47 @@ export function registerMacComputerUseTools(
    * there without having to know that a separate listing verb exists, and a
    * path it half-remembers still resolves rather than costing a turn.
    */
-  async function clickMenu(path: string, activate: boolean): Promise<AgentToolResult<MacDetails>> {
+  async function clickMenu(
+    path: string,
+    activate: boolean,
+    ctx: ExtensionContext,
+  ): Promise<AgentToolResult<MacDetails>> {
     if (bridge === null) return unavailable('mac_click');
-    const ack = await bridge.request<MacMenuAck>('menuClick', withTarget({ path, activate }));
+    let ack = await bridge.request<MacMenuAck>('menuClick', withTarget({ path, activate }));
+    /*
+     * "SHUT DOWN…" IS NOT A CLICK LIKE THE OTHERS.
+     *
+     * The session consent the user gave once, at the start, was consent to drive
+     * an app — not to end their login session or empty their Trash. The helper
+     * refuses those outright (Menus.swift) and says so with `destructive`; this
+     * is the only door through that fence, and it opens on the user's word in
+     * their own UI, not on the model's. No UI (print mode, a subagent) means no
+     * door at all.
+     */
+    if (ack.ok !== true && ack.destructive === true) {
+      const item = ack.item ?? path;
+      const allowed = ctx.hasUI
+        ? await ctx.ui
+            .confirm(
+              `Let Bobble use "${item}"?`,
+              'This ends your session or deletes something you cannot get back. ' +
+                'Bobble only does it if you say so here.',
+            )
+            .catch(() => false)
+        : false;
+      if (!allowed) {
+        return errResult(
+          'mac_click',
+          `"${item}" was not pressed — it ends the user's session or destroys data, and they ` +
+            'have not asked for it. Tell them what you were about to do and let them do it, or ' +
+            'find another way to finish the task.',
+        );
+      }
+      ack = await bridge.request<MacMenuAck>(
+        'menuClick',
+        withTarget({ path, activate, confirmDestructive: true }),
+      );
+    }
     if (ack.ok !== true) {
       const known =
         ack.menus !== undefined && ack.menus.length > 0
@@ -385,6 +465,7 @@ export function registerMacComputerUseTools(
       );
     }
     const opened = describeOpened(ack.dialog, ack.opened);
+    session.noteAct(`pressed the menu item ${ack.path ?? path}`);
     const how =
       ack.focusBorrowed === true
         ? ` The user's focus was borrowed for that one command and ${
@@ -409,22 +490,36 @@ export function registerMacComputerUseTools(
     name: MAC_SNAPSHOT_TOOL,
     label: 'Mac: Snapshot',
     description:
-      "Return a COMPACT, indexed list of the target app's actionable Accessibility elements " +
-      '(buttons, fields, menus, …) plus a short summary. This is your view of the app — act on ' +
-      'elements by their [index]. Defaults to the app you are CONTROLLING (the one you launched ' +
-      'or last snapshotted); pass an app name to switch control to another running app. Before ' +
-      'any app is controlled it reads the frontmost app. It also covers the app’s OWN sheets, ' +
-      'dialogs and file pickers: a save panel is part of the app that opened it, so when one is ' +
-      'up the text says so first and the listed controls are the DIALOG’s. If the app exposes ' +
-      'nothing to Accessibility you get a SCREENSHOT of its windows automatically, with the ' +
-      'screen bounds the image covers — act by x,y coordinates in that case; you never need to ' +
-      'ask for the image. Prefer acting by index when indexes exist. The first call asks the ' +
-      'user to allow Mac control.',
+      'Look at a Mac app: a compact, indexed list of its controls, which you then act on by ' +
+      '[index]. Defaults to the app you are controlling; name another running app to switch to ' +
+      'it.\n' +
+      'BIG APPS: only the first 60 controls come back. find:"save" lists just the matching ones ' +
+      'and from:60 continues the list — indexes never change, so anything you find is clickable ' +
+      'straight away.\n' +
+      'DIALOGS: a save panel or file picker belongs to the app that opened it, so it is in this ' +
+      'same list, announced first, and driven the same way.\n' +
+      'NO ACCESSIBILITY: an app that exposes nothing gets a screenshot of its windows ' +
+      'automatically, plus the screen rect it covers — act by x,y then; never ask for the image.',
     promptSnippet: 'See a Mac app (and its dialogs) as an indexed element list',
     parameters: Type.Object({
       app: Type.Optional(
         Type.String({
           description: 'App to snapshot (name or bundle id). Default: the controlled app.',
+        }),
+      ),
+      find: Type.Optional(
+        Type.String({
+          description:
+            'List only controls whose name, role or value contains this (case-insensitive). The ' +
+            'way to reach a control on an app too big to list: find:"save" on a 800-control app ' +
+            'returns the handful that matter, with their real indexes.',
+        }),
+      ),
+      from: Type.Optional(
+        Type.Number({
+          description:
+            'Start the list at this position instead of the beginning — the truncation line ' +
+            'tells you the number to pass to continue. Combines with find.',
         }),
       ),
       screenshot: Type.Optional(
@@ -456,12 +551,13 @@ export function registerMacComputerUseTools(
          * asked for: whatever else fails, a snapshot returns a picture of the
          * window and tells the model to work in coordinates.
          */
-        let snap = await snapshot(params.app, params.screenshot === true);
+        const page = { find: params.find, from: params.from };
+        let snap = await snapshot(params.app, params.screenshot === true, page);
         if (params.screenshot !== true && isAxOpaque(snap)) {
-          snap = await snapshot(params.app, true);
+          snap = await snapshot(params.app, true, page);
         }
         const content: AgentToolResult<MacDetails>['content'] = [
-          { type: 'text', text: formatMacSnapshot(snap) },
+          { type: 'text', text: formatMacSnapshot(snap, view()) },
         ];
         const shot = snap.screenshot;
         const wantImage = params.screenshot === true || isAxOpaque(snap);
@@ -499,25 +595,23 @@ export function registerMacComputerUseTools(
     name: MAC_CLICK_TOOL,
     label: 'Mac: Click',
     description:
-      'Click an element by its [index] from the latest mac_snapshot. This runs in the ' +
-      'BACKGROUND via the element’s own Accessibility action (AXPress/AXConfirm/AXPick) — it ' +
-      'does NOT move the mouse or bring the app to the front, so the user can keep working and ' +
-      'a non-frontmost app can be driven. Elements with no usable AX action get a synthetic ' +
-      'click DELIVERED to the controlled app only (still background). The app’s own sheets, ' +
-      'dialogs and file pickers are clicked the same way — they are part of that app. Or pass ' +
-      'explicit x,y (screen points, together) to click an AX-opaque surface — also delivered in ' +
-      'the background while an app is controlled; a point inside an open dialog hits the ' +
-      'dialog, never the window behind it. A stale index triggers an auto re-snapshot + one ' +
-      'retry, EXCEPT when a dialog has opened in the meantime: that number would now land ' +
-      'behind the dialog, so you get the dialog to act on instead. Or pass `menu` to use the ' +
-      'app’s MENU BAR ("Format > Font > Bold"), which is where a third of any Mac app lives ' +
-      'and appears in no snapshot; naming a menu rather than an item lists what is inside it.',
+      'Click a control by its [index] from the last mac_snapshot, or by x,y, or press a menu ' +
+      'item with menu:"File > New".\n' +
+      "BACKGROUND: clicks go through the app's own Accessibility action, so nothing comes to " +
+      'the front and the user keeps working.\n' +
+      'EXCEPT DOCUMENT COMMANDS. macOS runs Save, Bold, Close and friends only for the ' +
+      'frontmost app, so menu:"File > Save" does nothing in the background — pass activate:true ' +
+      'and the focus is borrowed for that one command and handed straight back.\n' +
+      'DIALOGS: a sheet or file picker is part of the same app and is clicked the same way; a ' +
+      'point inside one hits the dialog, never the window behind it.\n' +
+      'A stale index re-snapshots and retries once — unless a dialog opened in between, when ' +
+      'you get the dialog instead of a click behind it.',
     promptSnippet: 'Click a Mac element by index (or x,y)',
     parameters: Type.Object({
       index: Type.Optional(
         Type.Number({
           description:
-            'Element index from the latest mac_snapshot. A dialog’s controls are indexed too.',
+            "Element index from the latest mac_snapshot. A dialog's controls are indexed too.",
         }),
       ),
       x: Type.Optional(
@@ -534,19 +628,17 @@ export function registerMacComputerUseTools(
         Type.String({
           description:
             'A menu-bar path such as "File > New" or "Format > Font > Bold". Names an ITEM to ' +
-            'press it; names a MENU to list what is inside. The item is pressed through ' +
-            'Accessibility, so no menu opens on screen and the app stays in the background. ' +
-            'mac_snapshot prints the app’s top-level menus.',
+            "press it; names a MENU to list what is inside. mac_snapshot prints this app's own " +
+            'menu titles. Commands that end the session or destroy data (Shut Down, Restart, ' +
+            'Log Out, Empty Trash) are refused unless the user asks for them in their own words.',
         }),
       ),
       activate: Type.Optional(
         Type.Boolean({
           description:
-            'For `menu` only. macOS runs a DOCUMENT command (Save, Bold, Close) only for the ' +
-            'app that is frontmost, so those do nothing while an app is driven in the ' +
-            'background — you will be told when you hit one. This borrows the user’s focus for ' +
-            'that single command and hands it straight back. Prefer the app’s own on-screen ' +
-            'controls when it has them; use this when it does not.',
+            'For `menu` only. Borrow the focus for that one command, then hand it back — the ' +
+            'way to run a document command (Save, Bold, Close), which macOS delivers only to ' +
+            "the frontmost app. Prefer the app's own on-screen controls when it has them.",
         }),
       ),
     }),
@@ -556,7 +648,7 @@ export function registerMacComputerUseTools(
       if (blocked !== null) return blocked;
       try {
         if (typeof params.menu === 'string' && params.menu.trim() !== '') {
-          return await clickMenu(params.menu.trim(), params.activate === true);
+          return await clickMenu(params.menu.trim(), params.activate === true, ctx);
         }
         if (typeof params.x === 'number' && typeof params.y === 'number') {
           /*
@@ -574,6 +666,7 @@ export function registerMacComputerUseTools(
             withTarget({ x: params.x, y: params.y }),
           );
           await sleep(SETTLE_MS);
+          session.noteAct(`clicked at (${params.x}, ${params.y})`);
           return textResult(
             `Clicked at (${params.x}, ${params.y}).${backgroundNote(ack)}` +
               describeOpened(ack.dialog, ack.opened),
@@ -622,6 +715,7 @@ export function registerMacComputerUseTools(
           }
         }
         await sleep(SETTLE_MS);
+        session.noteAct(actOn('clicked', index));
         return textResult(
           `Clicked element [${index}].${backgroundNote(res)}` +
             `${describeOpened(res.dialog, res.opened)} Re-snapshot to see the result.`,
@@ -638,33 +732,31 @@ export function registerMacComputerUseTools(
     name: MAC_TYPE_TOOL,
     label: 'Mac: Type',
     description:
-      'Set text into a field by its [index] from the latest mac_snapshot. This runs in the ' +
-      'BACKGROUND: the field’s Accessibility value is set directly (no focus change, no ' +
-      'keystrokes), so a non-frontmost app can be filled without disturbing the user. Fields ' +
-      'that reject a value set get keystrokes DELIVERED to the controlled app only (still ' +
-      'background). A save sheet or file picker’s filename field is indexed like any other — ' +
-      'it belongs to the app. Set submit:true to commit a search/URL/filename field (background ' +
-      'AX confirm, or a Return delivered to the app). Set append:true to add to existing ' +
-      'content via keystrokes instead of replacing it. Omit the index ONLY for an app that ' +
-      'exposes no Accessibility elements: the text then goes as keystrokes to that app’s own ' +
-      'focused field, still in the background. A stale index triggers an auto re-snapshot + one ' +
-      'retry, EXCEPT when a dialog has opened in the meantime — you get the dialog instead of a ' +
-      'blind retry behind it.',
+      'Put text into a field by its [index] from the last mac_snapshot — including a save ' +
+      "sheet's or file picker's fields, which belong to the same app.\n" +
+      "BACKGROUND: the field's Accessibility value is set directly — no focus change, no " +
+      'keystrokes, nothing for the user to see. Fields that refuse a value set get keystrokes ' +
+      'delivered to that app alone, still in the background.\n' +
+      'NO INDEX: only for an app that exposes nothing to Accessibility. It then types into ' +
+      'whatever has focus INSIDE the controlled app — still background. But with no app under ' +
+      'control there is no app to aim at, and the keystrokes follow the SYSTEM focus into ' +
+      'whatever the user is doing: snapshot or launch something first.\n' +
+      'submit:true commits a search/URL/filename field; append:true adds instead of replacing.',
     promptSnippet: 'Set text into a Mac field (background) + optional submit',
     parameters: Type.Object({
       text: Type.String({ description: 'Text to set/type.' }),
       index: Type.Optional(
         Type.Number({
           description:
-            'Field index from the latest mac_snapshot (a dialog’s fields are indexed too). Omit ' +
-            'only for an app with no Accessibility elements — then it types into that app’s ' +
+            "Field index from the latest mac_snapshot (a dialog's fields are indexed too). Omit " +
+            "only for an app with no Accessibility elements — then it types into that app's " +
             'focused field.',
         }),
       ),
       submit: Type.Optional(
         Type.Boolean({
           description:
-            'Commit the field after typing (search / URL / a save sheet’s filename). Default ' +
+            "Commit the field after typing (search / URL / a save sheet's filename). Default " +
             'false.',
         }),
       ),
@@ -731,7 +823,7 @@ export function registerMacComputerUseTools(
               'mac_type',
               'refusing to type without an index after snapshotting an app: index-less typing ' +
                 'sends keystrokes to whatever holds focus in it, not necessarily the field you ' +
-                'mean. Call mac_snapshot and pass the field’s [index] — including a dialog’s ' +
+                "mean. Call mac_snapshot and pass the field's [index] — including a dialog's " +
                 'field — so the text is set via Accessibility in the background.',
             );
           }
@@ -754,6 +846,7 @@ export function registerMacComputerUseTools(
                 `so this went to its focused field as keystrokes.${backgroundNote(ack)} ` +
                 'Snapshot again to see the result.'
               : `Typed into the focused field.${backgroundNote(ack)}`;
+          session.noteAct('typed into the focused field');
           return textResult(where, {
             action: 'type',
             ok: true,
@@ -780,6 +873,7 @@ export function registerMacComputerUseTools(
           }
         }
         await sleep(SETTLE_MS);
+        session.noteAct(actOn('typed into', index));
         const submitted = res.submitted === true ? ' Submitted.' : '';
         return textResult(
           `Set text into [${index}].${backgroundNote(res)}${submitted} Re-snapshot to see the result.`,
@@ -798,15 +892,15 @@ export function registerMacComputerUseTools(
     description:
       'Press a key combo, e.g. "cmd+s", "cmd+shift+z", "return", "tab", "escape", "down". ' +
       'While you are controlling an app the chord is DELIVERED to that app in the background ' +
-      '(the user’s focus is untouched). Use for menu shortcuts, saving, dialogs, and navigation. ' +
-      'It lands in the app’s key window, which IS the dialog while one is open — "return" ' +
+      "(the user's focus is untouched). Use for menu shortcuts, saving, dialogs, and navigation. " +
+      'It lands in the key window of the app, which IS the dialog while one is open — "return" ' +
       'confirms a save sheet, "escape" cancels it, "tab" moves between its fields. This works ' +
       'even for an app that exposes nothing to Accessibility.',
     promptSnippet: 'Press a Mac key combo (e.g. cmd+s)',
     parameters: Type.Object({
       combo: Type.String({
         description:
-          'Key combo, e.g. cmd+s, cmd+shift+z, return, tab, escape. Goes to the app’s key ' +
+          "Key combo, e.g. cmd+s, cmd+shift+z, return, tab, escape. Goes to the app's key " +
           'window — the open dialog, when there is one.',
       }),
     }),
@@ -822,6 +916,7 @@ export function registerMacComputerUseTools(
         await sleep(SETTLE_MS);
         const note =
           ack.background === true ? ' (delivered to the controlled app, no focus change)' : '';
+        session.noteAct(`pressed ${params.combo}`);
         return textResult(`Pressed ${params.combo}.${note}`, {
           action: 'key',
           ok: true,
@@ -838,7 +933,7 @@ export function registerMacComputerUseTools(
     name: MAC_SCROLL_TOOL,
     label: 'Mac: Scroll',
     description:
-      'Scroll the controlled app’s window (delivered in the background — the window scrolls ' +
+      "Scroll the controlled app's window (delivered in the background — the window scrolls " +
       'without coming to the front), then re-snapshot to reveal off-screen elements.',
     promptSnippet: 'Scroll a Mac app',
     parameters: Type.Object({
@@ -889,6 +984,7 @@ export function registerMacComputerUseTools(
             },
           );
         }
+        session.noteAct(`scrolled ${params.direction}`);
         return textResult(`Scrolled ${params.direction}. Re-snapshot to see new elements.`, {
           action: 'scroll',
           ok: true,
@@ -909,7 +1005,7 @@ export function registerMacComputerUseTools(
     description:
       'Open a Mac app IN THE BACKGROUND and take control of it. The app never steals focus — ' +
       'the user keeps whatever they are doing. The result IMMEDIATELY includes a fresh indexed ' +
-      'element snapshot AND a screenshot of the app’s window, so you can see exactly what it ' +
+      "element snapshot AND a screenshot of the app's window, so you can see exactly what it " +
       'looks like and act in the same turn (no separate mac_snapshot needed). The launched app ' +
       'becomes your CONTROLLED target: every mac_click/mac_type/mac_key/mac_scroll routes to it ' +
       'until you launch or snapshot a different app. Set foreground:true only if the user ' +
@@ -1035,7 +1131,7 @@ export function registerChromeTools(pi: ExtensionAPI): void {
     }
     askedThisSession = true;
     const ok = await ctx.ui.confirm(
-      'Let Pi control Google Chrome?',
+      'Let Bobble use your Chrome?',
       'To read and click pages in YOUR Chrome (with your logins), Chrome has to allow ' +
         'JavaScript from Apple Events. This changes one Chrome setting — the same one under ' +
         'View → Developer → Allow JavaScript from Apple Events — and Chrome must be restarted ' +
@@ -1082,9 +1178,9 @@ export function registerChromeTools(pi: ExtensionAPI): void {
     name: CHROME_CLICK_TOOL,
     label: 'Chrome: Click',
     description:
-      'Click an element in the user’s Chrome by its [index] from the latest chrome_snapshot. ' +
+      "Click an element in the user's Chrome by its [index] from the latest chrome_snapshot. " +
       'Indexes come from the same visible-element ordering, so they always agree.',
-    promptSnippet: 'Click an element in the user’s Chrome by index',
+    promptSnippet: "Click an element in the user's Chrome by index",
     parameters: Type.Object({
       index: Type.Number({ description: 'The [index] from chrome_snapshot.' }),
     }),
@@ -1098,9 +1194,9 @@ export function registerChromeTools(pi: ExtensionAPI): void {
     name: CHROME_TYPE_TOOL,
     label: 'Chrome: Type',
     description:
-      'Type text into an editable element in the user’s Chrome, by its [index] from the latest ' +
+      "Type text into an editable element in the user's Chrome, by its [index] from the latest " +
       'chrome_snapshot. Sets the value and fires the input/change events a page listens for.',
-    promptSnippet: 'Type into a field in the user’s Chrome',
+    promptSnippet: "Type into a field in the user's Chrome",
     parameters: Type.Object({
       index: Type.Number({ description: 'The [index] from chrome_snapshot.' }),
       text: Type.String({ description: 'The text to enter.' }),
@@ -1115,7 +1211,7 @@ export function registerChromeTools(pi: ExtensionAPI): void {
     name: CHROME_GO_TOOL,
     label: 'Chrome: Navigate',
     description: "Navigate the active tab of the user's Chrome to a URL.",
-    promptSnippet: 'Send the user’s Chrome to a URL',
+    promptSnippet: "Send the user's Chrome to a URL",
     parameters: Type.Object({ url: Type.String({ description: 'The URL to open.' }) }),
     async execute(_id, params, _signal, _upd, ctx) {
       const url = params.url.trim();

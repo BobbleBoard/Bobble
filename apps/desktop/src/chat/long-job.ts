@@ -58,8 +58,25 @@ export const JOB_TITLE: Record<JobKind, string> = {
   other: 'Working on it',
 };
 
-/** Kinds that get a card the INSTANT they start, because they are never quick. */
-const ALWAYS_CARD = new Set<JobKind>(['image', 'video', 'music', 'model3d']);
+/**
+ * Kinds that get a card the INSTANT they start.
+ *
+ * It was "kinds that are never quick", and speech and sfx were left out on that
+ * reading: a four-second door slam can be over before you notice it, so waiting
+ * ten seconds to say anything was right.
+ *
+ * It is not right any more, because the card is no longer only an apology for a
+ * wait — it is the BOX THE RESULT ARRIVES IN (the user: "they get shown inline, the
+ * large card"), and its generating state is the waveform that resolves into the
+ * clip you play. Withholding it for ten seconds means a sound that takes eight
+ * appears out of nothing, and one that takes twelve shows two seconds of an
+ * animation whose whole point is the transition into the result.
+ *
+ * `other` keeps the delay. A card in front of a two-second tool call is exactly
+ * the noise the delay exists to prevent — that job has no result to hold a place
+ * for.
+ */
+const ALWAYS_CARD = new Set<JobKind>(['image', 'video', 'music', 'speech', 'sfx', 'model3d']);
 
 /** How long a not-known-slow job runs before it earns a card. */
 export const CARD_AFTER_MS = 10_000;

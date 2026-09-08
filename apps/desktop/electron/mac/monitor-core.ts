@@ -24,10 +24,13 @@
  */
 import {
   EMPTY_MAC_MONITOR_STATE,
+  MAC_CAPTURE_DENIED,
+  type MacMonitorAxScene,
   type MacMonitorFramePayload,
   type MacMonitorState,
   type MacMonitorStreamState,
 } from './mac-monitor-contract';
+import { axSceneFrom, type MacAxSnapshotLike } from './monitor-ax';
 import type { MacOverlayState } from './overlay-geometry';
 import { PimfParser } from './pimf';
 
@@ -44,6 +47,19 @@ const RESTART_DELAY_MS = 800;
 /** A child that survived this long counts as having worked, so its exit resets
  * the restart budget rather than spending it. */
 const HEALTHY_RUN_MS = 5_000;
+/**
+ * Cadence of the Accessibility fallback poll.
+ *
+ * 4Hz, an order of magnitude below the capture stream's 12, because an AX tree
+ * walk is a synchronous round-trip through another process's main thread and
+ * the thing being drawn is a LAYOUT — windows, buttons, the text in a field.
+ * Those change at human speed. Fast enough that a sheet appears the moment it
+ * opens; slow enough to cost the driven app almost nothing.
+ */
+export const AX_POLL_MS = 250;
+/** How many elements the fallback asks for. The helper's own default is 60,
+ * which is a good list for a MODEL and a thin drawing of a window. */
+const AX_CAP = 220;
 
 /** Injected reader for the helper's `wallpaper` method (mac-agent owns the one
  * long-lived helper pipe; the monitor never opens a second one). */
@@ -51,6 +67,10 @@ export type WallpaperReader = () => Promise<{ path?: string } | null>;
 
 /** Injected converter: a system wallpaper path → a path the renderer can load. */
 export type WallpaperResolver = (source: string) => Promise<{ source: string; url: string } | null>;
+
+/** Injected reader for the helper's `snapshot` method — the fallback's eyes.
+ * Goes through the one long-lived `--serve` helper, never a second pipe. */
+export type AxReader = (pid: number, cap: number) => Promise<MacAxSnapshotLike | null>;
 
 /** The capture child, structurally — so a fake stands in for `pi-mac`. */
 export interface StreamChild {
@@ -70,6 +90,9 @@ export interface MonitorSink {
   frames: boolean;
   sendState(state: MacMonitorState): void;
   sendFrame(frame: MacMonitorFramePayload): void;
+  /** The Accessibility-drawn scene. Same gate as frames — it is the same
+   * picture by another route, and costs the driven app a tree walk. */
+  sendAx(scene: MacMonitorAxScene): void;
   /** The renderer is gone; drop it on the next fan-out. */
   isGone(): boolean;
 }
@@ -78,6 +101,7 @@ export interface MacMonitorCoreOptions {
   spawn: StreamSpawnFn;
   wallpaperReader?: WallpaperReader;
   wallpaperResolver?: WallpaperResolver;
+  axReader?: AxReader;
   /** Injected so tests need no timers of their own. */
   setTimer?: (fn: () => void, ms: number) => unknown;
   clearTimer?: (handle: unknown) => void;
@@ -113,6 +137,12 @@ export class MacMonitorCore {
    * surface must draw — the overlay's AX frame is only the main window. */
   #frameRect: MacMonitorState['rect'] = null;
   #frameDisplay: MacMonitorState['display'] = null;
+  #captureDenied = false;
+  /** The Accessibility fallback's poll: a self-rescheduling chain, never an
+   * interval — a tree walk that takes longer than the cadence must not stack. */
+  #axHandle: unknown = null;
+  #axInFlight = false;
+  #axScene: MacMonitorAxScene | null = null;
   #now: () => number = () => Date.now();
 
   readonly #opts: MacMonitorCoreOptions;
@@ -133,6 +163,21 @@ export class MacMonitorCore {
 
   setSpawn(spawn: StreamSpawnFn): void {
     this.#opts.spawn = spawn;
+  }
+
+  setAxReader(reader: AxReader): void {
+    this.#opts.axReader = reader;
+    this.reconcile();
+  }
+
+  /** The installed reader, so a wrapper can delegate to it. */
+  axReader(): AxReader | undefined {
+    return this.#opts.axReader;
+  }
+
+  /** Diagnostics/tests: the last Accessibility scene published, if any. */
+  axScene(): MacMonitorAxScene | null {
+    return this.#axScene;
   }
 
   // ── the phantom's state, pushed in from the overlay ─────────────────────
@@ -160,6 +205,8 @@ export class MacMonitorCore {
     this.#session = { pid, appName: name };
     this.#restarts = 0;
     this.#streamError = null;
+    this.#captureDenied = false;
+    this.#axScene = null;
     this.#stopChild();
     this.#stream = 'idle';
     void this.ensureWallpaper();
@@ -174,8 +221,10 @@ export class MacMonitorCore {
     this.#stopChild();
     this.#stream = 'idle';
     this.#streamError = null;
+    this.#captureDenied = false;
     this.#frameRect = null;
     this.#frameDisplay = null;
+    this.#axScene = null;
     this.reconcile();
     this.broadcastState();
   }
@@ -226,6 +275,7 @@ export class MacMonitorCore {
       cursorState: o.cursorState,
       cursor: o.cursor,
       bubbleVisible: o.bubbleVisible,
+      captureDenied: this.#captureDenied,
     };
   }
 
@@ -264,6 +314,21 @@ export class MacMonitorCore {
     }
   }
 
+  #broadcastAx(scene: MacMonitorAxScene): void {
+    for (const sink of [...this.#sinks]) {
+      if (sink.isGone()) {
+        this.#sinks.delete(sink);
+        continue;
+      }
+      if (!sink.frames) continue;
+      try {
+        sink.sendAx(scene);
+      } catch {
+        /* drop this poll for this renderer; the next one is 250ms away */
+      }
+    }
+  }
+
   // ── the capture child ──────────────────────────────────────────────────
 
   /** Should the capture child be running right now? BOTH gates. */
@@ -275,14 +340,88 @@ export class MacMonitorCore {
     return false;
   }
 
+  /**
+   * Should the Accessibility fallback be polling right now?
+   *
+   * The same "somebody is watching" gate as the capture, AND only while the
+   * pixels are not coming. Two live sources of the same window would be a
+   * wasted tree walk four times a second in the case that already works.
+   */
+  wantsAx(): boolean {
+    return this.wanted() && this.#stream === 'unavailable' && this.#opts.axReader !== undefined;
+  }
+
   reconcile(): void {
     if (this.wanted()) this.#startChild();
     else this.#stopChild();
+    if (this.wantsAx()) this.#startAx();
+    else this.#stopAx();
   }
 
   /** Diagnostics/tests: is a capture child running? */
   streaming(): boolean {
     return this.#child !== null;
+  }
+
+  /** Diagnostics/tests: is the Accessibility fallback polling? */
+  polling(): boolean {
+    return this.#axHandle !== null || this.#axInFlight;
+  }
+
+  // ── the Accessibility fallback ─────────────────────────────────────────
+
+  #startAx(): void {
+    if (this.#axHandle !== null || this.#axInFlight) return;
+    // Poll immediately: the surface is showing an explanation right now, and a
+    // quarter-second of empty stage before the window appears reads as broken.
+    void this.#axTick();
+  }
+
+  #stopAx(): void {
+    if (this.#axHandle === null) return;
+    const clearTimer = this.#opts.clearTimer ?? ((h) => clearTimeout(h as never));
+    clearTimer(this.#axHandle);
+    this.#axHandle = null;
+  }
+
+  async #axTick(): Promise<void> {
+    this.#axHandle = null;
+    const reader = this.#opts.axReader;
+    const session = this.#session;
+    if (reader === undefined || session === null || !this.wantsAx()) return;
+    this.#axInFlight = true;
+    try {
+      const snap = await reader(session.pid, AX_CAP);
+      // The gate can close while a tree walk is in flight (the tab was hidden,
+      // the session ended, pixels started arriving). Publishing then would push
+      // a scene into a surface that has already moved on.
+      if (snap !== null && this.wantsAx() && this.#session?.pid === session.pid) {
+        const scene = axSceneFrom(snap, {
+          t: this.#now(),
+          pid: session.pid,
+          appName: session.appName,
+          display: this.#frameDisplay,
+        });
+        if (scene !== null) {
+          this.#axScene = scene;
+          this.#broadcastAx(scene);
+        }
+      }
+    } catch (err) {
+      // A failed walk is not worth a state change — the app may simply have
+      // been mid-launch. The next tick is 250ms away.
+      this.#opts.log?.warn('mac monitor ax poll failed', {
+        reason: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      this.#axInFlight = false;
+    }
+    if (!this.wantsAx()) return;
+    const setTimer = this.#opts.setTimer ?? ((fn, ms) => setTimeout(fn, ms));
+    this.#axHandle = setTimer(() => {
+      void this.#axTick();
+    }, AX_POLL_MS);
+    (this.#axHandle as { unref?: () => void })?.unref?.();
   }
 
   #startChild(): void {
@@ -324,16 +463,37 @@ export class MacMonitorCore {
 
   #onStdout(chunk: Buffer): void {
     for (const { header, payload } of this.#parser.push(chunk)) {
-      this.#frameRect = { ...header.rect };
-      this.#frameDisplay = { ...header.display };
-      // The contract's once-only "no window" frame: an empty window list AND a
-      // zero-byte payload. Anything else is a picture.
-      const next: MacMonitorStreamState =
-        header.windows.length === 0 && payload.length === 0 ? 'no-window' : 'live';
-      if (next !== this.#stream) {
-        this.#stream = next;
-        this.#streamError = null;
+      // A status frame carries no geometry (all zeros); adopting it would move
+      // the stage to the origin at zero size just as the surface switches to
+      // drawing from Accessibility, which is the one moment the rect matters.
+      const statusOnly = header.error !== undefined || header.empty === true;
+      if (!statusOnly) {
+        this.#frameRect = { ...header.rect };
+        this.#frameDisplay = { ...header.display };
       }
+      // A frame that explains itself wins over anything inferred from its
+      // shape: "the app has no window" and "macOS will not let us capture" look
+      // identical on the wire (no picture) and are completely different facts.
+      const was = this.#stream;
+      if (header.error !== undefined) {
+        this.#giveUp(header.error);
+      } else {
+        // The contract's once-only "no window" frame: an empty window list AND
+        // a zero-byte payload. Anything else is a picture.
+        const next: MacMonitorStreamState =
+          header.empty === true || (header.windows.length === 0 && payload.length === 0)
+            ? 'no-window'
+            : 'live';
+        if (next !== this.#stream) {
+          this.#stream = next;
+          this.#streamError = null;
+          this.#captureDenied = false;
+        }
+      }
+      // FALL THROUGH to the broadcast even for a status frame. The zero-byte
+      // payload is how the renderer learns to drop the picture it is holding:
+      // a grant revoked mid-session would otherwise leave the last good frame
+      // on screen, and a stale photograph outranks the drawing that replaced it.
       this.#broadcastFrame({
         seq: header.seq,
         t: header.t,
@@ -351,6 +511,10 @@ export class MacMonitorCore {
         })),
       });
       this.broadcastState();
+      // A stream state that changed opens or closes the Accessibility poll —
+      // only then, because reconciling on every one of twelve frames a second
+      // would walk the sink set for nothing.
+      if (this.#stream !== was) this.reconcile();
     }
   }
 
@@ -381,9 +545,21 @@ export class MacMonitorCore {
     (this.#restartHandle as { unref?: () => void })?.unref?.();
   }
 
+  /**
+   * The picture is not coming. Say why, and leave the child alone.
+   *
+   * Deliberately NOT killing the stream child on a status frame: the helper
+   * re-resolves its window set every 400ms, so a grant the user turns on while
+   * this screen is up starts producing frames on its own and the surface swaps
+   * back to pixels with nothing to restart. `#startChild` refuses to respawn
+   * while the state is 'unavailable', so a child that actually DIED still stays
+   * dead — which is the case this guard was written for.
+   */
   #giveUp(reason: string): void {
+    if (this.#stream === 'unavailable' && this.#streamError === reason) return;
     this.#stream = 'unavailable';
     this.#streamError = reason;
+    this.#captureDenied = reason === MAC_CAPTURE_DENIED;
     this.#opts.log?.warn('mac monitor stream unavailable', { reason });
     this.broadcastState();
   }
@@ -442,10 +618,13 @@ export class MacMonitorCore {
 
   dispose(): void {
     this.#stopChild();
+    this.#stopAx();
     this.#sinks.clear();
     this.#session = null;
     this.#wallpaper = null;
     this.#stream = 'idle';
+    this.#axScene = null;
+    this.#captureDenied = false;
     this.#lastSentJson = '';
   }
 }

@@ -45,7 +45,6 @@ import { createCanvasDragResize } from './resize-collapse';
 import { useSubagentCanvasRouting } from './subagent-routing';
 import { useArtifactCanvasRouting } from './tabs-routing';
 import { useBashTerminalCanvasRouting } from './terminal-routing';
-import { useGen } from './useGen';
 
 /** E2E: probes open browser/terminal tabs through the shared controller. Gated
  * on the same `?piE2E=1` opt-in as `window.__pi_store` (see pi-connect.ts). */
@@ -140,9 +139,16 @@ export function CanvasTabsPanel({ suppressed = false }: { suppressed?: boolean }
   // Mac computer-use: open/focus the live monitor tab when Pi takes control of
   // an app, and keep its title on the app being driven.
   useMacMonitor(controller);
-  // generation (experimental): stream `generate_image`/`generate_video` jobs into
-  // a live gen-image canvas tab. Inert unless the generation flag / `?gen=1` is on.
-  useGen(controller);
+  /*
+   * NO GENERATION HOOK HERE ANY MORE. Image / video / audio generation used to
+   * stream into a live `gen-image` canvas tab from this list. the user, round 21:
+   * "image/video/audio/media generation tools DO NOT GET SHOWN IN THE CANVAS….
+   * they get shown inline, the large card". The stream is subscribed at the app
+   * root now (chat/gen-stream.ts) and read by the thread's own card, so the rail
+   * never learns a generation happened. Removing the tab is also what makes the
+   * rule hold: the effect below opens the rail on ANY tab-count growth, so a tab
+   * that exists but must not be looked at was never a stable arrangement.
+   */
   // Canvas-awareness: report a compact snapshot of what's on the canvas to main
   // on every surface / active-tab change, so the model's `context` hook always
   // knows what the user is looking at (the user's gotcha).

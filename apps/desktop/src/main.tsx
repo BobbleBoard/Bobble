@@ -1,8 +1,10 @@
 import { installFocusRingTracking } from '@pi-desktop/ui';
-import { StrictMode } from 'react';
+import { StrictMode, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App';
 import { AppErrorBoundary } from './AppErrorBoundary';
+import { completeSoftReload, onSoftReload, reloadGeneration, softReload } from './app-reload';
+import { CrashSeam } from './crash-seam';
 import { connectChildAgents } from './state/child-agent-store';
 import { connectGen } from './state/gen-store';
 import { connectHf } from './state/hf-store';
@@ -39,12 +41,48 @@ if (rootElement === null) {
   throw new Error('index.html is missing the #root element');
 }
 
-createRoot(rootElement).render(
-  <StrictMode>
-    {/* A render throw unmounts the whole tree and leaves a blank window (the user:
-        "total blank screen"). This is the only thing that can catch it. */}
-    <AppErrorBoundary>
+/**
+ * The mount point of the whole app, and the one thing that can RE-mount it.
+ *
+ * `generation` keys the boundary and the app together, so bumping it (⌘R, or
+ * the crash card's Reload) unmounts everything — clearing a caught error along
+ * with whatever render state caused it — and mounts a fresh tree, while the
+ * stores, the pi session and the chat on disk carry straight on. See
+ * app-reload.ts for what is held across the swap and put back afterwards.
+ */
+function AppRoot() {
+  const [generation, setGeneration] = useState(reloadGeneration);
+  useEffect(() => onSoftReload(setGeneration), []);
+  /*
+   * ⌘R, wired HERE rather than in ChatApp with ⌘W: a reload has to work on
+   * every route — a studio, the model hub, the canvas pop-out, and above all
+   * the crash card, none of which have a ChatApp under them.
+   */
+  useEffect(
+    () =>
+      window.piDesktop.onEvent('app:accelerator', ({ action }) => {
+        if (action === 'soft-reload') softReload();
+      }),
+    [],
+  );
+  // After the fresh tree has mounted: the canvas tabs and the scroll position.
+  useEffect(() => {
+    if (generation > 0) completeSoftReload();
+  }, [generation]);
+  return (
+    /* A render throw unmounts the whole tree and leaves a blank window (the user:
+       "total blank screen"). This is the only thing that can catch it. */
+    <AppErrorBoundary key={generation}>
+      {/* Renders nothing; `?piE2E=1` + window.__pi_crash() makes it throw, so
+          the crash card and its recovery can be driven by a probe. */}
+      <CrashSeam />
       <App />
     </AppErrorBoundary>
+  );
+}
+
+createRoot(rootElement).render(
+  <StrictMode>
+    <AppRoot />
   </StrictMode>,
 );

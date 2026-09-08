@@ -48,6 +48,15 @@ export interface ControlledApp {
    * dialog instead of silently acting behind it.
    */
   readonly dialogKey?: string;
+  /**
+   * The last act this session performed, in the model's own vocabulary:
+   * `clicked [7] "Save"`, `pressed cmd+s`, `typed into [3]`.
+   *
+   * The snapshot header reads it back so the model does not re-derive "what did
+   * I just do" from the transcript on every look. It is the cheapest continuity
+   * there is — one clause, written by the tool that did the thing.
+   */
+  readonly lastAct?: string;
 }
 
 /** Snapshot-shaped input (structural: the wire MacSnapshot satisfies it). */
@@ -68,6 +77,8 @@ export interface MacSessionState {
   noteLaunched(app: string, pid: number, windowId?: number): void;
   /** A snapshot resolved → the snapshotted app takes/refreshes control. */
   noteSnapshot(snap: ControlledSnapshotNote): void;
+  /** Record what this session just did, for the next snapshot's header. */
+  noteAct(act: string): void;
   /** Drop control (controlled app quit / explicit reset). */
   release(): void;
   /** Params every act must be stamped with: `{ pid }` while controlling, `{}`
@@ -85,7 +96,7 @@ export function createMacSessionState(): MacSessionState {
     controlled: () => current,
 
     noteLaunched(app: string, pid: number, windowId?: number): void {
-      current = { pid, app, windowId };
+      current = { pid, app, windowId, lastAct: `opened ${app}` };
     },
 
     noteSnapshot(snap: ControlledSnapshotNote): void {
@@ -99,7 +110,17 @@ export function createMacSessionState(): MacSessionState {
          * as important as "a dialog appeared", or a dismissed sheet would keep
          * blocking retries forever. */
         dialogKey: snap.dialogKey ?? '',
+        /* A LOOK IS NOT AN ACT. Snapshotting must not erase what the model
+         * actually did, or the header would say "your last act: looked at it"
+         * on the very turn the model needs to remember it pressed Save. Control
+         * moving to a DIFFERENT app does clear it, because the act belonged to
+         * the app it was aimed at. */
+        lastAct: snap.pid === current?.pid ? current?.lastAct : undefined,
       };
+    },
+
+    noteAct(act: string): void {
+      if (current !== null) current = { ...current, lastAct: act };
     },
 
     release(): void {
