@@ -147,6 +147,12 @@ try {
   })();
 
   showCaption = caption;
+  // Open the canvas so the monitor has somewhere to appear. A fresh profile
+  // starts with it closed, and the point of the recording is what is inside it.
+  const toggle = page.locator('[aria-label*="canvas" i], [title*="canvas" i]').first();
+  if ((await toggle.count()) > 0) await toggle.click().catch(() => {});
+  await sleep(600);
+
   const tcc = await dbg('check');
   say(`grants: ${JSON.stringify(tcc)}`);
 
