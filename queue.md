@@ -73,28 +73,35 @@ with a ✕ appearing.*
       round plus a shadow. The strip's boundary is one unbroken line again.
 - [x] Hover is a filled floating pill; nothing reaches down into the seam.
 
-## 3. One "Activity" tab, not tab spam
+## 3. One "Activity" tab, not tab spam  ✅ DONE
 
-- [ ] The model doing many things must not open many tabs. **One tab, "Activity"**.
-- [ ] The canvas opens to Activity on the first tool call that has anything to
-      show, and from then on Activity *switches* to whatever is happening:
-      a file edited → that file; a file written → that file; something in the
-      browser → the browser; a bash command → a terminal.
-- [ ] Bash only counts when it is really bash — if the command starts with a
-      registered CLI tool name, it is that tool, not a terminal.
-- [ ] **Everything persists.** The terminal keeps its history: `ls -la` and its
-      output stay visible above the next command as that one is typed. Switching
-      away and back keeps the state of every past one.
+- [x] One tab. It opens once, focused, on the first tool call with anything to
+      show, then morphs in place and never takes focus again.
+- [x] What it shows is decided by POSITION in the thread, newest wins across
+      kinds — a file ties-and-wins against the command that wrote it. "A file if
+      there is one, else a terminal" is the trap the corp router had already
+      written down: it pins the tab to whichever surface happened first.
+- [x] Bash vs a registered CLI tool is asked of the registry, not a list. It
+      matches GROUP names, so `ls` (which is `file ls`) has no shim and a real
+      `ls -la` is correctly a terminal.
+- [x] Everything persists because nothing is cached: every surface is re-derived
+      from the whole history, so the terminal's text only ever grows at the end.
+      Verified in the user's exact sequence — `ls -la` and its output still above
+      `$ git status --short` after a file write in between.
 
-## 4. Edits animate as an edit, not as a diff being written
+## 4. Edits animate as an edit, not as a diff being written  ✅ DONE
 
-- [ ] Do not stream the diff. Show **the file**, then:
-      1. the negative side deletes live (forward-delete, animated the way
-         writing is animated),
-      2. then the replacement types in, starting exactly where the delete ended.
-      One smooth line: delete, then type.
+- [x] The tab shows the file, waits for the tool's arguments to finish arriving
+      (half an `old_string` would animate a delete of the wrong text), scrolls
+      the edit site to centre, forward-deletes with the caret parked at the head
+      of the span, and types the replacement from that same offset — so "starts
+      exactly where the delete ended" is not a special case but the only place
+      it could start. Capped so a 4,000-character replacement finishes in 1.4s
+      instead of 20, scaling every duration by the same factor so the motion
+      keeps its shape. No second animation system: the schedule produces text,
+      and that text goes through the same reconcile a file being written does.
 
-## 5. Media generation never goes to the canvas
+## 5. Media generation never goes to the canvas  ✅ DONE
 
 - [ ] Image / video / audio / media generation tools **do not open a canvas tab**.
       They render **inline**, as the large card — the same card its studio shows.
