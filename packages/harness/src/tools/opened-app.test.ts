@@ -57,16 +57,32 @@ describe('what the model is told afterwards', () => {
     expect(note).toContain('chrome_snapshot');
     expect(note).toContain('different browser');
     expect(note).not.toContain('mac_snapshot');
-    // Routed through `use`, which is always advertised — so the next action can
-    // actually happen instead of naming a tool the model cannot reach.
-    expect(note).toContain('use with tool=');
+    // It must NOT route through `use`: `use` only reaches the harness's own
+    // tools, and Chrome's belong to another extension — measured on a real run,
+    // the model followed that instruction, was refused, and gave up.
+    expect(note).not.toContain('use with tool=');
   });
 
   it('sends everything else to computer use, and says a screenshot is automatic', () => {
     const note = openedAppNote({ app: 'Preview', chrome: false, target: 'shot.png' });
     expect(note).toContain('mac_snapshot');
-    expect(note).toContain('use with tool=');
+    expect(note).not.toContain('use with tool=');
     expect(note).toContain('act by x,y coordinates');
+  });
+
+  it('names the COMMAND when the CLI is the interface', () => {
+    // The note is an instruction, and an instruction naming a call the model
+    // cannot make is worse than none: it spends a turn and then a fallback.
+    const note = openedAppNote({ app: 'TextEdit', chrome: false }, (tool) =>
+      tool === 'mac_snapshot' ? 'mac snapshot' : tool === 'mac_click' ? 'mac click' : null,
+    );
+    expect(note).toContain('mac snapshot --app "TextEdit"');
+    expect(note).toContain('mac click --index N');
+  });
+
+  it('names the tool itself when tools are called by name', () => {
+    const note = openedAppNote({ app: 'TextEdit', chrome: false });
+    expect(note).toContain('call mac_snapshot with app "TextEdit"');
   });
 
   it('names what was opened, so the model is not guessing', () => {

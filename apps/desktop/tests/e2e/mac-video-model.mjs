@@ -106,6 +106,18 @@ try {
 
   say(`grants: ${JSON.stringify(await dbg('check'))}`);
 
+  /*
+   * BASH-CLI MODE, because that is the interface the user is using and the one that
+   * failed. Set before pi starts, since pi-main reads the setting when it
+   * spawns the child.
+   */
+  if (process.env.TOOL_INTERFACE !== 'schemas') {
+    await page.evaluate(() =>
+      window.piDesktop.invoke('settings:set', { patch: { toolInterface: 'bash-cli' } }),
+    );
+    say('tool interface: bash-cli');
+  }
+
   // ── the model ────────────────────────────────────────────────────────────
   const startedServer = await page.evaluate(
     (id) => window.piDesktop.invoke('llm:start-server', { modelId: id }),

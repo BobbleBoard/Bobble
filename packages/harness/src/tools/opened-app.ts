@@ -93,7 +93,21 @@ export function detectOpenedApp(command: string): OpenedTarget | undefined {
  * Written as an instruction rather than a description: the model has just been
  * handed a window it cannot see, and the useful thing is the exact next call.
  */
-export function openedAppNote(opened: OpenedTarget): string {
+export function openedAppNote(
+  opened: OpenedTarget,
+  /**
+   * How a computer-use tool is actually invoked in this session, or null when
+   * it is called by name.
+   *
+   * The note used to send the model to `use`, on the reasoning that `use` is
+   * always advertised. But `use` only reaches the harness's own tools, and the
+   * Mac and Chrome tools belong to another extension — so the one instruction
+   * this note gives was a dead end, MEASURED on a real run: the model followed
+   * it, was told the tool "cannot be called this way", abandoned Mac control
+   * and wrote a temp file instead. Name the call that works.
+   */
+  commandFor?: (toolName: string) => string | null,
+): string {
   const what = opened.target !== undefined ? ` (${opened.target})` : '';
   const head = `\n\n[This opened ${opened.app}${what} — a real Mac app, NOT the built-in browser.`;
   /*
@@ -106,9 +120,14 @@ export function openedAppNote(opened: OpenedTarget): string {
    * here closes that: `use` IS advertised, always, so the very next action can
    * drive the window that just opened without a capability round-trip first.
    */
+  const call = (tool: string, args: string): string => {
+    const command = commandFor?.(tool) ?? null;
+    if (command !== null) return `${command} ${args}`.trimEnd();
+    return args === '' ? `call ${tool}` : `call ${tool} with ${args.replace(/--/g, '')}`;
+  };
   if (opened.chrome) {
     return (
-      `${head} Read it through its DOM: call use with tool="chrome_snapshot", then act with ` +
+      `${head} Read it through its DOM: ${call('chrome_snapshot', '')}, then act with ` +
       'chrome_click / chrome_type the same way. Do NOT use the built-in browser tools for it — ' +
       'that is a different browser, with different logins and a different page.]'
     );
@@ -125,9 +144,9 @@ export function openedAppNote(opened: OpenedTarget): string {
     );
   }
   return (
-    `${head} Call use with tool="mac_snapshot" and args={"app":"${opened.app}"} now to see it, ` +
-    'then act on what it lists (use with tool="mac_click", and so on). If the app exposes ' +
-    'nothing to Accessibility you get a screenshot of its window automatically; read that and ' +
-    'act by x,y coordinates.]'
+    `${head} Look at it now: ${call('mac_snapshot', `--app "${opened.app}"`)}, then act on what ` +
+    `it lists (${call('mac_click', '--index N')}, ${call('mac_type', '--index N --text "…"')}). ` +
+    'If the app exposes nothing to Accessibility you get a screenshot of its window ' +
+    'automatically; read that and act by x,y coordinates.]'
   );
 }

@@ -846,6 +846,25 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     return allowed.size > 0 ? registered.filter((t) => allowed.has(t.name)) : registered;
   }
   const toolCliMode = process.env.PI_DESKTOP_TOOL_CLI === '1';
+  /**
+   * How a capability tool is actually invoked in this session: its command line
+   * when the CLI is the interface, null when it is called by name.
+   *
+   * Shared by `use` (so its one dead end becomes a redirect) and by the note
+   * appended when bash opens an app (so the instruction it gives is one the
+   * model can follow). Both used to point at `use`, which cannot reach another
+   * extension's tools at all.
+   */
+  const cliCommandForTool = toolCliMode
+    ? (toolName: string): string | null => {
+        for (const spec of toolCliGroups()) {
+          if (!spec.tools.includes(toolName)) continue;
+          const group = commandNameFor(spec.name);
+          return [group, ...pathFor(group, toolName)].join(' ');
+        }
+        return null;
+      }
+    : undefined;
 
   /** Tools this run may not call at all — see permissions/forbidden.ts. */
   const forbidden = forbiddenTools();
@@ -1885,16 +1904,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
      * every capability tool IS a command, so the one dead end this fallback
      * can produce becomes a redirect instead — see the note on the option.
      */
-    cliCommandForTool: toolCliMode
-      ? (toolName: string): string | null => {
-          for (const spec of toolCliGroups()) {
-            if (!spec.tools.includes(toolName)) continue;
-            const group = commandNameFor(spec.name);
-            return [group, ...pathFor(group, toolName)].join(' ');
-          }
-          return null;
-        }
-      : undefined,
+    cliCommandForTool,
   });
 
   /*
@@ -3246,7 +3256,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     if (event.toolName === 'bash' && lastOpened !== undefined) {
       const opened = lastOpened;
       lastOpened = undefined;
-      const note = openedAppNote(opened);
+      const note = openedAppNote(opened, cliCommandForTool);
       const withNote = event.content.map((part, i) =>
         i === 0 && part.type === 'text' ? { ...part, text: `${part.text}${note}` } : part,
       );
