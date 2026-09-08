@@ -4197,3 +4197,190 @@
 .pd-sitroom-owner-note {
   display: none;
 }
+
+/* ── Computer-use monitor ────────────────────────────────────────────────
+ *
+ * The live view of the Mac app Pi is driving. It is meant to read as an
+ * INSTRUMENT PANEL, not a debug view: the picture is the whole surface, the
+ * chrome is one quiet line at the bottom, and every "nothing to show" state is
+ * a composed empty state rather than an error.
+ *
+ * Everything inside the frame is painted on a <canvas> (the wallpaper, the
+ * window, the phantom cursor, the bubble) — see computer-use-surface.tsx. What
+ * lives here is only the frame, the footer, and the empty states.
+ */
+.pd-macmon {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--pd-bg-inset);
+}
+
+.pd-macmon-canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* The empty / waiting states. Centred, weightless, and never in the way of the
+   footer — the same panel whether there is no session, no window, or no frame
+   yet, so switching between them does not reflow the surface. */
+.pd-macmon-state {
+  position: absolute;
+  inset: 0 0 34px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 0 var(--pd-space-lg);
+  text-align: center;
+  color: var(--pd-text-muted);
+  pointer-events: none;
+}
+
+.pd-macmon-state-mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 62px;
+  height: 62px;
+  margin-bottom: var(--pd-space-sm);
+  border-radius: var(--pd-radius-lg);
+  border: 1px solid var(--pd-border-subtle);
+  background: var(--pd-bg-hover);
+  color: var(--pd-text-secondary);
+}
+
+.pd-macmon-state-title {
+  margin: 0;
+  color: var(--pd-text-secondary);
+  font-size: var(--pd-font-size-body);
+  font-weight: 500;
+}
+
+.pd-macmon-state-sub {
+  margin: 0;
+  max-width: 34ch;
+  font-size: var(--pd-font-size-caption);
+  line-height: var(--pd-leading-caption);
+}
+
+.pd-macmon-state[data-kind="unavailable"] .pd-macmon-state-sub {
+  color: var(--pd-text-muted);
+  font-family: var(--pd-font-mono);
+  font-size: var(--pd-font-size-caption);
+  opacity: 0.85;
+}
+
+/* The waiting glyph breathes; nothing else on this surface moves on its own. */
+.pd-macmon-glyph-pulse {
+  animation: pd-macmon-breathe 2.4s ease-in-out infinite;
+}
+
+@keyframes pd-macmon-breathe {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* One quiet line: what is being watched, and whether the picture is alive. */
+.pd-macmon-footer {
+  position: relative;
+  z-index: 1;
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--pd-space-xs);
+  height: 34px;
+  padding: 0 var(--pd-space-md);
+  font-size: var(--pd-font-size-caption);
+  line-height: var(--pd-leading-caption);
+  color: var(--pd-text-muted);
+  background: linear-gradient(to top, var(--pd-bg-inset), transparent);
+}
+
+.pd-macmon-app {
+  flex: 0 0 auto;
+  color: var(--pd-text-secondary);
+  font-weight: 500;
+}
+
+.pd-macmon-sep {
+  flex: 0 0 auto;
+  width: 3px;
+  height: 3px;
+  border-radius: var(--pd-radius-full);
+  background: currentColor;
+  opacity: 0.5;
+}
+
+.pd-macmon-title {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pd-macmon-spacer {
+  flex: 1 1 auto;
+}
+
+.pd-macmon-live {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.pd-macmon-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--pd-radius-full);
+  background: currentColor;
+  opacity: 0.4;
+}
+
+.pd-macmon-live[data-live="true"] {
+  color: var(--pd-status-success-fg);
+}
+
+.pd-macmon-live[data-live="true"] .pd-macmon-dot {
+  opacity: 1;
+  box-shadow: 0 0 6px currentColor;
+  animation: pd-macmon-pulse 2s ease-in-out infinite;
+}
+
+@keyframes pd-macmon-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.pd-macmon-fps {
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.75;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pd-macmon-glyph-pulse,
+  .pd-macmon-live[data-live="true"] .pd-macmon-dot {
+    animation: none;
+  }
+}

@@ -334,6 +334,9 @@ describe('registerMacComputerUseTools', () => {
 
   // --- the controlled-app loop (snapshot-after-open contract) ----------------
 
+  const DOC_RECT = { x: 100, y: 60, w: 900, h: 700 };
+  const SHEET_RECT = { x: 300, y: 180, w: 560, h: 320 };
+
   const LAUNCH_ACK = {
     ok: true,
     app: 'TextEdit',
@@ -445,6 +448,317 @@ describe('registerMacComputerUseTools', () => {
     const text = String(r.content[0]?.type === 'text' ? r.content[0].text : '');
     expect(text).toContain('snapshot after launch failed');
     expect(r.content.find((c) => c.type === 'image')).toBeUndefined();
+  });
+
+  // --- the app's OWN dialogs, sheets and file pickers ------------------------
+
+  /*
+   * the user's named failure: "the model clicks Open in TextEdit, a file dialog
+   * appears — that dialog is part of TextEdit, not Finder — and the model must
+   * be able to see and drive it."
+   */
+  const SHEET_SNAP = (pid = 4242) => ({
+    app: 'TextEdit',
+    pid,
+    window: 'Untitled',
+    windowId: 3,
+    windows: [
+      { windowId: 3, role: 'AXWindow', title: 'Untitled', frame: DOC_RECT, main: true },
+      {
+        windowId: 7,
+        role: 'AXSheet',
+        title: 'Save',
+        frame: SHEET_RECT,
+        sheet: true,
+        modal: true,
+      },
+    ],
+    dialog: { title: 'Save', role: 'AXSheet' },
+    elements: [
+      { index: 1, role: 'AXTextArea', name: 'text entry area', editable: true, win: 3 },
+      {
+        index: 2,
+        role: 'AXTextField',
+        name: 'Save As:',
+        value: 'Untitled',
+        editable: true,
+        focused: true,
+        win: 7,
+      },
+      { index: 3, role: 'AXButton', name: 'Save', win: 7 },
+      { index: 4, role: 'AXButton', name: 'Cancel', win: 7 },
+    ],
+    summary: { app: 'TextEdit', window: 'Untitled', elementCount: 4, truncated: false },
+  });
+
+  it('announces an open sheet BEFORE the indices, and names it in the details', async () => {
+    const bridge = new FakeBridge().on('snapshot', () => SHEET_SNAP());
+    const tools = collectTools(bridge);
+    const r = await run(tools, 'mac_snapshot', {});
+    expect(details(r).dialog).toBe('Save');
+    const text = String(r.content[0]?.type === 'text' ? r.content[0].text : '');
+    expect(text.indexOf('A DIALOG IS OPEN')).toBeGreaterThanOrEqual(0);
+    expect(text.indexOf('A DIALOG IS OPEN')).toBeLessThan(text.indexOf('[2]'));
+    expect(text).toContain('It belongs to "TextEdit"');
+    expect(text).toContain('[3] AXButton "Save"');
+  });
+
+  /*
+   * THE RETRY THAT USED TO CLICK THROUGH THE PANEL.
+   *
+   * Indices are namespaced per APP, not per window, so once a sheet opens the
+   * number the model is holding resolves to whatever the fresh walk assigned it
+   * — quite possibly a control in the document behind the sheet. Retrying it
+   * blind is the silent version of the user's complaint.
+   */
+  it('stops the blind retry when a dialog opened since, and hands the dialog over', async () => {
+    let sheetUp = false;
+    const bridge = new FakeBridge()
+      .on('snapshot', () =>
+        sheetUp ? SHEET_SNAP() : SNAP([{ index: 5, role: 'AXMenuItem', name: 'Save…' }], 4242),
+      )
+      .on('click', () => {
+        if (!sheetUp) {
+          sheetUp = true; // the click landed, the sheet came up, the index is gone
+          return { found: false };
+        }
+        return { found: true, mode: 'AXPress', background: true };
+      });
+    const tools = collectTools(bridge);
+    await run(tools, 'mac_snapshot', { app: 'TextEdit' }); // indices read with no sheet up
+    const r = await run(tools, 'mac_click', { index: 5 });
+
+    expect(bridge.countOf('click')).toBe(1); // NOT retried behind the sheet
+    expect(details(r).ok).toBe(false);
+    expect(details(r).dialog).toBe('Save');
+    const text = String(r.content[0]?.type === 'text' ? r.content[0].text : '');
+    expect(text).toContain('BEHIND');
+    expect(text).toContain('A DIALOG IS OPEN');
+    expect(text).toContain('[3] AXButton "Save"'); // the dialog, ready to act on
+  });
+
+  it('mac_type stops the same way rather than typing behind the dialog', async () => {
+    let sheetUp = false;
+    const bridge = new FakeBridge()
+      .on('snapshot', () =>
+        sheetUp ? SHEET_SNAP() : SNAP([{ index: 5, role: 'AXTextField', name: 'Title' }], 4242),
+      )
+      .on('type', () => {
+        if (!sheetUp) {
+          sheetUp = true;
+          return { found: false };
+        }
+        return { found: true, background: true };
+      });
+    const tools = collectTools(bridge);
+    await run(tools, 'mac_snapshot', { app: 'TextEdit' });
+    const r = await run(tools, 'mac_type', { index: 5, text: 'report' });
+    expect(bridge.countOf('type')).toBe(1);
+    expect(details(r).ok).toBe(false);
+    expect(details(r).dialog).toBe('Save');
+  });
+
+  /*
+   * The OTHER way an act lands on the wrong surface, and the quieter one: the
+   * index is not stale at all, it just belongs to the window the sheet is
+   * blocking. macOS drops that input, so "Clicked element [1]" reads exactly
+   * like success and the model believes it.
+   */
+  it('refuses an index in the window the dialog is blocking, instead of no-opping', async () => {
+    const bridge = new FakeBridge()
+      .on('snapshot', () => SHEET_SNAP())
+      .on('click', () => ({ found: true, mode: 'AXPress', background: true }));
+    const tools = collectTools(bridge);
+    await run(tools, 'mac_snapshot', {});
+    const r = await run(tools, 'mac_click', { index: 1 }); // the text area, behind the sheet
+    expect(details(r).ok).toBe(false);
+    expect(details(r).dialog).toBe('Save');
+    expect(bridge.countOf('click')).toBe(0); // never reached the app
+    const text = String(r.content[0]?.type === 'text' ? r.content[0].text : '');
+    expect(text).toContain('BEHIND');
+    expect(text).toContain('escape');
+    // ...and the dialog's own controls still act normally.
+    const ok = await run(tools, 'mac_click', { index: 4 });
+    expect(details(ok).ok).toBe(true);
+  });
+
+  it('does not refuse once the dialog is gone — it looks again first', async () => {
+    let sheetUp = true;
+    const bridge = new FakeBridge()
+      .on('snapshot', () =>
+        sheetUp
+          ? SHEET_SNAP()
+          : SNAP([{ index: 1, role: 'AXTextArea', name: 'text entry area', win: 3 }], 4242),
+      )
+      .on('click', () => ({ found: true, mode: 'AXPress', background: true }));
+    const tools = collectTools(bridge);
+    await run(tools, 'mac_snapshot', {}); // [1] recorded as blocked
+    sheetUp = false; // the user (or a key) dismissed it
+    const r = await run(tools, 'mac_click', { index: 1 });
+    expect(details(r).ok).toBe(true);
+    expect(bridge.countOf('click')).toBe(1);
+  });
+
+  it('mac_type refuses a field behind the dialog too', async () => {
+    const bridge = new FakeBridge()
+      .on('snapshot', () => SHEET_SNAP())
+      .on('type', () => ({ found: true, background: true }));
+    const tools = collectTools(bridge);
+    await run(tools, 'mac_snapshot', {});
+    const r = await run(tools, 'mac_type', { index: 1, text: 'x' });
+    expect(details(r).ok).toBe(false);
+    expect(bridge.countOf('type')).toBe(0);
+    // The sheet's own filename field types normally.
+    const ok = await run(tools, 'mac_type', { index: 2, text: 'report.txt', submit: true });
+    expect(details(ok).ok).toBe(true);
+  });
+
+  it('still retries normally when the SAME dialog was already up', async () => {
+    // The dialog is not a reason to stop retrying — a dialog that APPEARED is.
+    let clicks = 0;
+    const bridge = new FakeBridge()
+      .on('snapshot', () => SHEET_SNAP())
+      .on('click', () => ({ found: ++clicks > 1 }));
+    const tools = collectTools(bridge);
+    await run(tools, 'mac_snapshot', {}); // the sheet is already up and recorded
+    const r = await run(tools, 'mac_click', { index: 3 });
+    expect(details(r).ok).toBe(true);
+    expect(bridge.countOf('click')).toBe(2);
+  });
+
+  it('aims a coordinate at the dialog UNTOUCHED — no correction toward the window', async () => {
+    /* A sheet can extend past its parent window, and a panel can be a window of
+     * its own somewhere else entirely. Any clamping toward the controlled
+     * window's frame would send every click at a dialog into the document
+     * behind it, so the point must reach the helper exactly as given (the pid
+     * stamp is the aiming: the app hit-tests it against its OWN windows). */
+    const bridge = new FakeBridge()
+      .on('snapshot', () => SHEET_SNAP())
+      .on('click', () => ({ found: true, mode: 'coordToPid', background: true }));
+    const tools = collectTools(bridge);
+    await run(tools, 'mac_snapshot', {});
+
+    const inSheet = { x: SHEET_RECT.x + 20, y: SHEET_RECT.y + 20 };
+    await run(tools, 'mac_click', inSheet);
+    expect(bridge.lastParams('click')).toEqual({ ...inSheet, pid: 4242 });
+
+    // ...and a point OUTSIDE the parent window is not pulled back into it.
+    const faraway = { x: DOC_RECT.x + DOC_RECT.w + 500, y: DOC_RECT.y + DOC_RECT.h + 400 };
+    await run(tools, 'mac_click', faraway);
+    expect(bridge.lastParams('click')).toEqual({ ...faraway, pid: 4242 });
+  });
+
+  it('degrades silently for a helper that reports no windows/dialog at all', async () => {
+    // The app ships a PREBUILT pi-mac: an older one sends none of these fields,
+    // and the retry must behave exactly as it always did.
+    let clicks = 0;
+    const bridge = new FakeBridge()
+      .on('snapshot', () => SNAP([], 4242))
+      .on('click', () => ({ found: ++clicks > 1 }));
+    const tools = collectTools(bridge);
+    const r = await run(tools, 'mac_click', { index: 3 });
+    expect(details(r).ok).toBe(true);
+    expect(bridge.countOf('click')).toBe(2);
+  });
+
+  // --- an app that exposes NOTHING never dead-ends ---------------------------
+
+  it('steers a visual-only app to coordinates instead of asking for an index', async () => {
+    const bridge = new FakeBridge().on('snapshot', () => SNAP([], 555));
+    const tools = collectTools(bridge);
+    await run(tools, 'mac_snapshot', { app: 'Preview' });
+    const r = await run(tools, 'mac_click', {});
+    expect(details(r).ok).toBe(false);
+    expect(details(r).error).toContain('no indexes');
+    expect(details(r).error).toContain('pass x');
+  });
+
+  it('does not send a visual-only app back for indices that cannot exist', async () => {
+    const bridge = new FakeBridge()
+      .on('snapshot', () => SNAP([], 555))
+      .on('click', () => ({ found: false }));
+    const tools = collectTools(bridge);
+    await run(tools, 'mac_snapshot', { app: 'Preview' });
+    const r = await run(tools, 'mac_click', { index: 2 });
+    expect(details(r).ok).toBe(false);
+    expect(details(r).error).toContain('click by x,y');
+    expect(details(r).error).not.toContain('current indices');
+  });
+
+  /*
+   * `visualOnly` is recorded by a LOOK, and mac_launch takes control without
+   * one — so the flag can be genuinely UNDEFINED, which is the state the old
+   * `visualOnly !== true` test refused in. Refusing on an unknown is how a model
+   * with no indices gets told to pass an index.
+   */
+  it('resolves an unknown app by looking, and only then refuses', async () => {
+    const bridge = new FakeBridge()
+      .on('launch', () => LAUNCH_ACK) // its post-launch snapshot fails: kind unknown
+      .on('type', () => ({ found: true, background: true }));
+    const tools = collectTools(bridge);
+    await run(tools, 'mac_launch', { app: 'TextEdit' });
+    bridge.on('snapshot', () => SNAP([{ index: 1, role: 'AXTextField', name: 'f' }], 4242));
+
+    const r = await run(tools, 'mac_type', { text: 'hello' });
+    expect(details(r).ok).toBe(false);
+    expect(details(r).error).toContain('index');
+    expect(bridge.countOf('type')).toBe(0); // it looked before it refused
+  });
+
+  it('types rather than dead-ending when it cannot find out what kind of app it is', async () => {
+    const bridge = new FakeBridge()
+      .on('launch', () => LAUNCH_ACK)
+      .on('type', () => ({ found: true, background: true, mode: 'keystrokesToPid' }));
+    const tools = collectTools(bridge); // no snapshot handler: the look throws
+    await run(tools, 'mac_launch', { app: 'TextEdit' });
+    const r = await run(tools, 'mac_type', { text: 'hello' });
+    expect(details(r).ok).toBe(true);
+    expect(bridge.lastParams('type')).toMatchObject({ pid: 4242, text: 'hello' });
+  });
+
+  // --- `--help` is the ONLY documentation in bash-CLI mode -------------------
+
+  /*
+   * In CLI mode the model reads `mac click --help`, which tool-cli.ts generates
+   * from the SAME schema the tool validates against — so the schema's
+   * descriptions are the documentation, and a parameter with none is a
+   * parameter the model cannot discover. This is the drift-proofing that
+   * convention buys, made into an assertion rather than a habit.
+   */
+  it('documents every parameter of every verb', () => {
+    const tools = collectTools(new FakeBridge());
+    for (const [name, def] of tools) {
+      const schema = def.parameters as { properties?: Record<string, { description?: string }> };
+      const props = schema?.properties ?? {};
+      expect(Object.keys(props).length, `${name} has no parameters`).toBeGreaterThan(0);
+      for (const [key, spec] of Object.entries(props)) {
+        expect(spec?.description ?? '', `${name} --${key} is undocumented`).not.toBe('');
+      }
+    }
+  });
+
+  it('documents the things this round added: coordinates, and dialogs', () => {
+    const tools = collectTools(new FakeBridge());
+    const help = (n: string) => {
+      const def = tools.get(n);
+      const props = (def?.parameters as { properties?: Record<string, { description?: string }> })
+        ?.properties;
+      return `${def?.description ?? ''} ${Object.values(props ?? {})
+        .map((p) => p?.description ?? '')
+        .join(' ')}`;
+    };
+    // Coordinates: both axes, and what to read them off.
+    expect(help('mac_click')).toContain('x,y');
+    expect(help('mac_click')).toContain('pass with y');
+    expect(help('mac_click')).toContain('pass with x');
+    // Dialogs: every verb the model would reach for while one is open.
+    for (const verb of ['mac_snapshot', 'mac_click', 'mac_type', 'mac_key']) {
+      expect(help(verb).toLowerCase(), `${verb} says nothing about dialogs`).toContain('dialog');
+    }
+    // A union of literals renders as anyOf, so its values live in the prose.
+    for (const dir of ['up', 'down', 'left', 'right']) {
+      expect(help('mac_scroll')).toContain(dir);
+    }
   });
 
   it('a failed launch surfaces the bridge error as a structured refusal', async () => {

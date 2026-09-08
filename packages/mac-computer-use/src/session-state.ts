@@ -36,6 +36,18 @@ export interface ControlledApp {
    * it cannot do, and the turn dead-ends.
    */
   readonly visualOnly?: boolean;
+  /**
+   * The modal surface that was up at the last look, as a comparable signature
+   * ('' for none).
+   *
+   * Why it is remembered: an index the model is about to act on was read from a
+   * snapshot taken at some earlier moment. If a sheet or file picker has opened
+   * since, that number now belongs to whatever the helper resolves TODAY —
+   * quite possibly a control in the window BEHIND the dialog. Comparing this
+   * against a fresh snapshot is what lets the retry path stop and show the
+   * dialog instead of silently acting behind it.
+   */
+  readonly dialogKey?: string;
 }
 
 /** Snapshot-shaped input (structural: the wire MacSnapshot satisfies it). */
@@ -45,6 +57,8 @@ export interface ControlledSnapshotNote {
   readonly windowId?: number;
   /** True when the snapshot came back with no Accessibility elements. */
   readonly visualOnly?: boolean;
+  /** Signature of the modal surface this snapshot saw ('' / absent = none). */
+  readonly dialogKey?: string;
 }
 
 export interface MacSessionState {
@@ -81,6 +95,10 @@ export function createMacSessionState(): MacSessionState {
         app: snap.app ?? current?.app ?? '',
         windowId: snap.windowId ?? (snap.pid === current?.pid ? current?.windowId : undefined),
         visualOnly: snap.visualOnly === true,
+        /* A look ALWAYS overwrites this, including with '' — "no dialog now" is
+         * as important as "a dialog appeared", or a dismissed sheet would keep
+         * blocking retries forever. */
+        dialogKey: snap.dialogKey ?? '',
       };
     },
 

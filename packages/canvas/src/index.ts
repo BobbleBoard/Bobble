@@ -123,6 +123,28 @@ export { BrowserSurface } from './surfaces/browser-surface.tsx';
 export { streamingUpdateSpec } from './surfaces/code-append.ts';
 export type { CodeSurfaceProps } from './surfaces/code-surface.tsx';
 export { CodeSurface, rawSourceContent } from './surfaces/code-surface.tsx';
+// Computer-use monitor (Mac): the live view of the app Pi is driving
+export type {
+  MacMonitorCursorState,
+  MacMonitorDecodedFrame,
+  MacMonitorFeed,
+  MacMonitorRect,
+  MacMonitorSessionState,
+  MacMonitorStreamState,
+  MacMonitorWindowInfo,
+} from './surfaces/computer-use-feed.ts';
+export { IDLE_MAC_MONITOR_SESSION } from './surfaces/computer-use-feed.ts';
+export type { DrawnWindow } from './surfaces/computer-use-geometry.ts';
+export {
+  annotationScale,
+  bubbleAnchor,
+  coverCrop,
+  cursorEase,
+  fitWindow,
+  screenToCanvas,
+} from './surfaces/computer-use-geometry.ts';
+export type { ComputerUseSurfaceProps } from './surfaces/computer-use-surface.tsx';
+export { ComputerUseSurface } from './surfaces/computer-use-surface.tsx';
 // Content-slot / rect contract (native WebContentsView / PTY mounting)
 export type { ContentSlotOptions } from './surfaces/content-slot.ts';
 export { useContentSlot } from './surfaces/content-slot.ts';
@@ -156,6 +178,7 @@ export {
   IconArrowLeft,
   IconArrowRight,
   IconCode,
+  IconDisplay,
   IconDownload,
   IconExpand,
   IconFilm,

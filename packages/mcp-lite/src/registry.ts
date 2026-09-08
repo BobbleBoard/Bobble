@@ -45,6 +45,12 @@ export interface McpServerConfig {
   enabled?: boolean;
   /** Per-server mode override; falls back to the registry default when unset. */
   mode?: McpMode;
+  /**
+   * Tools the user switched off on this server. The server still lists them;
+   * the host drops them before anything is advertised, so every mode pays
+   * prompt tokens only for what is on. Names are the server's own (unprefixed).
+   */
+  disabledTools?: string[];
 }
 
 /** The whole connectors config. */
@@ -127,6 +133,10 @@ function normalizeServer(v: unknown): McpServerConfig | undefined {
   if (typeof v.enabled === 'boolean') server.enabled = v.enabled;
   const mode = normalizeMode(v.mode);
   if (mode) server.mode = mode;
+  const disabledTools = Array.isArray(v.disabledTools)
+    ? v.disabledTools.filter((t): t is string => typeof t === 'string' && t !== '')
+    : [];
+  if (disabledTools.length > 0) server.disabledTools = [...new Set(disabledTools)];
   return server;
 }
 

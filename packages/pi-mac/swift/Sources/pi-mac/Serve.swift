@@ -167,6 +167,29 @@ private func surfaceDelta(pid: pid_t?, before: [AppWindow], settleMs: Int = 220)
   return d
 }
 
+/// macOS silently DROPS input aimed at a window a modal is covering. The act
+/// reports success, nothing happens, and the model spends the rest of the run
+/// re-clicking a dead window. So refuse it here, at the only place that can see
+/// both the element's surface and the modal — and say which control to use
+/// instead.
+private func blockedByDialog(_ el: SnapEl, pid: pid_t) -> [String: Any]? {
+  guard let elementWindow = el.win else { return nil }
+  let surfaces = appWindows(pid: pid)
+  guard let modal = surfaces.first(where: { $0.isModal }), let modalId = modal.windowId,
+    modalId != elementWindow
+  else { return nil }
+  let name = modal.title.isEmpty ? (modal.isSheet ? "a sheet" : "a dialog") : "\"\(modal.title)\""
+  return [
+    "found": false,
+    "blocked": true,
+    "dialog": windowDict(modal),
+    "error":
+      "\(name) is open in front of that window, and macOS drops input to a window behind a "
+      + "modal — this act would have done nothing. Snapshot again and act on the dialog's own "
+      + "controls, or close it first.",
+  ]
+}
+
 private func surfacesNow(_ params: [String: Any]) -> (pid: pid_t?, windows: [AppWindow]) {
   guard let pid = actTargetPid(params) else { return (nil, []) }
   return (pid, appWindows(pid: pid))
@@ -198,7 +221,8 @@ private func doClickInner(_ params: [String: Any]) -> [String: Any] {
   guard let index = intOf(params["index"]) else {
     return ["found": false, "error": "click needs an index or x,y"]
   }
-  guard let (el, _) = resolveElement(params, index) else { return ["found": false] }
+  guard let (el, elPid) = resolveElement(params, index) else { return ["found": false] }
+  if let blocked = blockedByDialog(el, pid: elPid) { return blocked }
   // Deliver to the pid that owns the element's SURFACE: a sandboxed app's
   // Open/Save panel is hosted by another process, so the app's own pid would
   // never see the event.
@@ -240,7 +264,8 @@ private func doTypeInner(_ params: [String: Any]) -> [String: Any] {
     }
     return ["found": true, "mode": "keystrokes", "background": false, "submitted": submit]
   }
-  guard let (el, _) = resolveElement(params, index) else { return ["found": false] }
+  guard let (el, elPid) = resolveElement(params, index) else { return ["found": false] }
+  if let blocked = blockedByDialog(el, pid: elPid) { return blocked }
   let pid = el.hostPid
 
   // AX-FIRST: set the field's value directly (background, no focus, no
@@ -539,6 +564,17 @@ private func doMenuClick(_ params: [String: Any]) -> [String: Any] {
   }
   guard let path = stringOf(params["path"]), !path.isEmpty else {
     return ["ok": false, "error": "menuClick needs a path like \"File > New\""]
+  }
+  // Naming a menu rather than an item LISTS it. One parameter then does both
+  // jobs — discovery and action — so the model never has to know a second verb
+  // exists, and "Format" is a useful thing to say rather than an error.
+  if let entry = findMenuItem(pid: resolved.pid, path: path), entry.hasSubmenu {
+    let items = menuEntries(
+      pid: resolved.pid, under: entry.path, depth: entry.path.count + 1)
+    return [
+      "ok": true, "listed": true, "path": entry.path.joined(separator: " > "),
+      "items": items.map(menuEntryDict),
+    ]
   }
   guard let entry = findMenuItem(pid: resolved.pid, path: path) else {
     let top = menuEntries(pid: resolved.pid, under: [], depth: 1).map { $0.title }

@@ -27,6 +27,7 @@ import { defaultSurfaceRegistry, type SurfaceRegistry } from '../registry.ts';
 import { SituationRoomHost } from '../situation/situation-surface.tsx';
 import { BrowserSurface } from '../surfaces/browser-surface.tsx';
 import { CodeSurface, rawSourceContent } from '../surfaces/code-surface.tsx';
+import { ComputerUseSurface } from '../surfaces/computer-use-surface.tsx';
 import { FileSurface } from '../surfaces/file-surface.tsx';
 import { MediaPreviewSurface } from '../surfaces/media-preview-surface.tsx';
 import { OfficeSurface } from '../surfaces/office-surface.tsx';
@@ -700,6 +701,10 @@ function DefaultSurface({
           onRectChange={(rect) => handlers?.onSurfaceRectChange?.(id, 'terminal', rect)}
         />
       );
+    case 'computer-use':
+      // The Mac computer-use monitor. No native slot: the app pushes decoded
+      // frames through `tab.macMonitor` and the surface paints them itself.
+      return <ComputerUseSurface feed={tab.macMonitor} />;
     case 'subagent':
       return (
         <SubagentSurface
@@ -860,6 +865,9 @@ function activeCopyText(tab: CanvasTab | null): string {
   // "copy the URL" doesn't belong on the browser chrome, so the tab-bar Copy
   // control is hidden there.
   if (tab.kind === 'browser') return '';
+  // Same for the computer-use monitor: a live picture of someone else's app has
+  // no text to copy, so the control stays out of the tab bar.
+  if (tab.kind === 'computer-use') return '';
   if (
     tab.kind === 'image' ||
     tab.kind === 'video' ||

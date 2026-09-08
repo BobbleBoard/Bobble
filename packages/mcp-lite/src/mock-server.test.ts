@@ -102,6 +102,21 @@ describe('ConnectorHost', () => {
     await expect(host.callTool('a', 'ghost', {})).rejects.toThrow(/Unknown tool/);
   });
 
+  it('drops the tools a server config has switched off, for every reader', async () => {
+    const host = newHost();
+    const result = await host.connect({ ...serverConfig('a'), disabledTools: ['echo'] });
+    expect(result.ok).toBe(true);
+    const names = host.getServerTools('a').map((t) => t.name);
+    expect(names).not.toContain('echo');
+    expect(
+      host
+        .getCatalog()
+        .find((c) => c.id === 'a')
+        ?.tools.map((t) => t.name),
+    ).toEqual(names);
+    await expect(host.callTool('a', 'echo', { message: 'hi' })).rejects.toThrow(/Unknown tool/);
+  });
+
   it('captures connect failures instead of throwing', async () => {
     // 3s (not a tight 600ms) so the GOOD server's real subprocess spawn +
     // handshake never spuriously times out when many test suites run in

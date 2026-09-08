@@ -25,7 +25,13 @@ describe('createMacSessionState (controlled-app state machine)', () => {
     const s = createMacSessionState();
     s.noteLaunched('TextEdit', 4242);
     s.noteSnapshot({ app: 'Maps', pid: 7777, windowId: 12 });
-    expect(s.controlled()).toEqual({ pid: 7777, app: 'Maps', windowId: 12, visualOnly: false });
+    expect(s.controlled()).toEqual({
+      pid: 7777,
+      app: 'Maps',
+      windowId: 12,
+      visualOnly: false,
+      dialogKey: '',
+    });
     expect(s.targetParams()).toEqual({ pid: 7777 });
   });
 
@@ -38,6 +44,7 @@ describe('createMacSessionState (controlled-app state machine)', () => {
       app: 'TextEdit',
       windowId: 99,
       visualOnly: false,
+      dialogKey: '',
     });
   });
 
@@ -77,5 +84,32 @@ describe('visual-only control', () => {
     s.noteSnapshot({ app: 'Preview', pid: 31, visualOnly: true });
     s.noteSnapshot({ app: 'Maps', pid: 32 });
     expect(s.controlled()?.visualOnly).toBe(false);
+  });
+});
+
+/*
+ * WHICH SURFACE WAS UP AT THE LAST LOOK.
+ *
+ * An index the model is about to act on was read at some earlier moment. If a
+ * save sheet has opened since, that number now belongs to whatever the fresh
+ * walk assigned it — possibly a control in the window BEHIND the sheet. The
+ * state machine's job here is only to remember the surface; tools.ts compares.
+ */
+describe('the dialog that was open at the last look', () => {
+  it('remembers a modal surface, and forgets it once it is gone', () => {
+    const s = createMacSessionState();
+    s.noteSnapshot({ app: 'TextEdit', pid: 42, dialogKey: '7|Save|AXSheet' });
+    expect(s.controlled()?.dialogKey).toBe('7|Save|AXSheet');
+    // A look with no dialog must OVERWRITE, or a dismissed sheet blocks retries
+    // forever.
+    s.noteSnapshot({ app: 'TextEdit', pid: 42 });
+    expect(s.controlled()?.dialogKey).toBe('');
+  });
+
+  it('does not carry one app’s dialog over to another', () => {
+    const s = createMacSessionState();
+    s.noteSnapshot({ app: 'TextEdit', pid: 42, dialogKey: '7|Save|AXSheet' });
+    s.noteSnapshot({ app: 'Maps', pid: 43 });
+    expect(s.controlled()?.dialogKey).toBe('');
   });
 });

@@ -90,6 +90,26 @@ describe('parseRegistry normalisation', () => {
     expect(parseRegistry({ mode: 'weird', servers: [] }).mode).toBe('lite');
   });
 
+  it('keeps disabledTools as a deduped list of names and drops it when empty', () => {
+    const parsed = parseRegistry({
+      version: 1,
+      servers: [
+        { id: 'a', command: 'x', disabledTools: ['one', 'two', 'one', 3, ''] },
+        { id: 'b', command: 'x', disabledTools: [] },
+        { id: 'c', command: 'x', disabledTools: 'not-a-list' },
+      ],
+    });
+    expect(parsed.servers.map((s) => s.disabledTools)).toEqual([
+      ['one', 'two'],
+      undefined,
+      undefined,
+    ]);
+    // ...and it survives the disk.
+    const io = memoryIO();
+    saveRegistry('/x.json', parsed, io);
+    expect(loadRegistry('/x.json', io).servers[0]?.disabledTools).toEqual(['one', 'two']);
+  });
+
   it('keeps only string args and string env values', () => {
     const cfg = parseRegistry({
       servers: [{ id: 'a', command: 'x', args: ['ok', 5, null], env: { A: '1', B: 2 } }],

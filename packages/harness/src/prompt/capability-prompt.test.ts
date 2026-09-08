@@ -212,6 +212,23 @@ describe('each capability carries its own guidance (the user)', () => {
   it('still says an AX-opaque app gives a screenshot to act on by coordinates', () => {
     expect(CAPABILITY_PROMPT).toContain('act by x,y coordinates');
   });
+
+  /*
+   * the user's named computer-use failure: "the model clicks Open in TextEdit, a
+   * file dialog appears — that dialog is part of TextEdit, not Finder — and the
+   * model must be able to see and drive it." Nothing in the prompt said so, and
+   * a model that thinks a save panel belongs to another app goes looking for
+   * Finder instead of clicking Save.
+   */
+  it('says the app’s own sheets and pickers are part of that app', () => {
+    expect(CAPABILITY_PROMPT).toContain('save sheet, file picker');
+    expect(CAPABILITY_PROMPT).toContain('belongs to the app that opened it');
+  });
+
+  it('says the user is watching, so the work stays in the background', () => {
+    expect(CAPABILITY_PROMPT).toContain('watches it happen');
+    expect(CAPABILITY_PROMPT).toContain('never take focus');
+  });
 });
 
 /*

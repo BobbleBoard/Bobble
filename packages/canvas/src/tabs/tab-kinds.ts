@@ -11,6 +11,7 @@ import {
   IconAudio,
   IconCode,
   IconCube,
+  IconDisplay,
   IconDoc,
   IconFilm,
   IconFolder,
@@ -97,6 +98,16 @@ export const CANVAS_TAB_KINDS: Record<CanvasTabKind, CanvasTabKindMeta> = {
     kind: 'situation',
     label: 'Subagents',
     icon: IconSituation,
+    live: true,
+    opensInCanvas: true,
+  },
+  // The Mac computer-use monitor. `live` because the app feeds it a frame
+  // stream rather than an artifact's text — though unlike browser/terminal it
+  // mounts no native view, so it needs no mount/rect slot.
+  'computer-use': {
+    kind: 'computer-use',
+    label: 'Computer use',
+    icon: IconDisplay,
     live: true,
     opensInCanvas: true,
   },

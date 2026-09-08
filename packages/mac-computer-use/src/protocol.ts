@@ -35,6 +35,9 @@ export type MacAgentMethod =
   | 'screenshot'
   | 'bounds'
   | 'frontmost'
+  | 'windows'
+  | 'wallpaper'
+  | 'menuClick'
   | 'setDriving';
 
 /** One request on the wire. */
@@ -54,6 +57,48 @@ export interface MacAgentResponse {
   readonly error?: string;
 }
 
+/** A rectangle in global screen points, top-left origin. */
+export interface MacRect {
+  readonly x: number;
+  readonly y: number;
+  readonly w: number;
+  readonly h: number;
+}
+
+/**
+ * One on-screen window the controlled app owns — including its SHEETS and
+ * DIALOGS.
+ *
+ * A save sheet is part of TextEdit, not of Finder: the helper walks the focused
+ * window *and* every sheet/dialog/popover the app owns, so this list is how the
+ * Node side learns a modal surface appeared. Every field is optional because an
+ * older prebuilt helper sends none of them — a missing `windows` must degrade,
+ * never throw.
+ */
+export interface MacWindowInfo {
+  /** CGWindowID. */
+  readonly windowId?: number;
+  /** AXWindow | AXSheet | AXDialog | AXPopover… */
+  readonly role?: string;
+  /** AXStandardWindow | AXDialog | AXSystemDialog | "" */
+  readonly subrole?: string;
+  readonly title?: string;
+  readonly frame?: MacRect;
+  readonly main?: boolean;
+  readonly focused?: boolean;
+  readonly modal?: boolean;
+  readonly sheet?: boolean;
+}
+
+/** The frontmost modal surface the app owns, when one is open. */
+export interface MacDialogInfo {
+  readonly title?: string;
+  /** AXSheet | AXDialog | AXWindow… */
+  readonly role?: string;
+  /** Present when the helper can name the window the dialog lives in. */
+  readonly windowId?: number;
+}
+
 /** One indexed AX element as the model sees it (mirror of browser-use's
  * SnapshotElement). Coordinates are SCREEN points, resolved app-side by index. */
 export interface MacElement {
@@ -66,6 +111,9 @@ export interface MacElement {
   readonly enabled?: boolean;
   readonly value?: string;
   readonly actions?: string[];
+  /** The CGWindowID this element lives in — which lets the snapshot text say
+   * WHICH surface an index belongs to (the dialog, or the window behind it). */
+  readonly win?: number;
 }
 
 /** The snapshot payload returned by the `snapshot` method. */
@@ -87,10 +135,32 @@ export interface MacSnapshot {
   };
   /** The snapshotted window's frame in global screen points (top-left origin),
    * when the root was a real window — drives the app's cursor overlay. */
-  readonly windowBounds?: { x: number; y: number; w: number; h: number };
-  /** Optional screenshot (present when requested). Per-window capture when a
-   * windowId is known, else a whole-screen fallback. */
-  readonly screenshot?: { path: string; base64?: string; mimeType?: string; windowId?: number };
+  readonly windowBounds?: MacRect;
+  /** Every on-screen window the app owns, sheets and dialogs included. Absent
+   * from an older helper. */
+  readonly windows?: readonly MacWindowInfo[];
+  /** Top-level menu-bar titles of the target app, when the helper could read
+   * them. Titles only — naming one lists its items. */
+  readonly menus?: readonly string[];
+  /** The frontmost modal surface, or null when there is none. Absent (not null)
+   * from an older helper, which is a different thing: "not reported" rather than
+   * "reported as none" — {@link dialogOf} treats both as no dialog but the
+   * windows list is still consulted. */
+  readonly dialog?: MacDialogInfo | null;
+  /** Bounding box of every window in {@link windows} — the rect the COMPOSITE
+   * screenshot covers, so a point read off that image maps onto the screen. */
+  readonly union?: MacRect;
+  /** Optional screenshot (present when requested). A composite of the app's
+   * windows + sheets when the helper supports it (cropped to `rect`), else a
+   * per-window capture, else a whole-screen fallback. */
+  readonly screenshot?: {
+    path: string;
+    base64?: string;
+    mimeType?: string;
+    windowId?: number;
+    /** Screen-point rect the image covers (the union, for a composite). */
+    rect?: MacRect;
+  };
 }
 
 /** The ack a click/type returns. `background: true` means the act ran with NO
@@ -106,6 +176,43 @@ export interface MacActAck {
   readonly submitted?: boolean;
   readonly x?: number;
   readonly y?: number;
+  /** Surfaces that appeared or disappeared as a RESULT of this act, after a
+   * short settle. A save sheet arrives a few hundred milliseconds after the
+   * key that summoned it, so the act that caused it is the right place to hear
+   * about it — otherwise the next act goes into a window that is now blocked.
+   * Absent from an older helper. */
+  readonly opened?: readonly MacWindowInfo[];
+  readonly closed?: readonly MacWindowInfo[];
+  readonly dialog?: MacWindowInfo;
+  /** The act was refused because it aimed at a window a modal is covering;
+   * macOS would have dropped the input and reported nothing. */
+  readonly blocked?: boolean;
+  readonly error?: string;
+}
+
+/** One menu-bar entry. Menus hold a third of a real Mac app's capability and
+ * appear in no window, so they are listed and pressed through their own path
+ * rather than by index. */
+export interface MacMenuEntry {
+  readonly path: string;
+  readonly title: string;
+  readonly enabled?: boolean;
+  readonly shortcut?: string;
+  readonly submenu?: boolean;
+}
+
+/** `menuClick` either PRESSES an item or, when the path names a menu rather
+ * than an item, LISTS what is inside it. */
+export interface MacMenuAck {
+  readonly ok: boolean;
+  readonly listed?: boolean;
+  readonly path?: string;
+  readonly items?: readonly MacMenuEntry[];
+  readonly shortcut?: string;
+  readonly menus?: readonly string[];
+  readonly error?: string;
+  readonly opened?: readonly MacWindowInfo[];
+  readonly dialog?: MacWindowInfo;
 }
 
 /** Live window geometry returned by the `bounds` method (screen points). The

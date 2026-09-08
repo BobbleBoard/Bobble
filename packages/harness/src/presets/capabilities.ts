@@ -82,13 +82,17 @@ export const CAPABILITIES: readonly Capability[] = [
      * summary itself.
      */
     summary:
-      "Computer use: see and control any app on the user's Mac, plus their own Chrome. " +
-      '"Use <app>", "open <app> and…", "do it in <app>", "click that", "type it in there".',
+      "Computer use: see and control any app on the user's Mac — its windows, menu bar, and its " +
+      'own dialogs, sheets and file pickers — plus their own Chrome. "Use <app>", "open <app> and…", ' +
+      '"do it in <app>", "click that", "type it in there".',
     guidance:
       "For work inside the user's OWN applications — Notes, Finder, Photoshop, a game — and " +
       'for their own browsers (Safari, Chrome, Arc) when they ask for those specifically. For ' +
       'Chrome prefer the chrome_* tools: they read the real DOM instead of pixels. An app that ' +
-      'exposes nothing to Accessibility returns a screenshot automatically; act by x,y then.',
+      'exposes nothing to Accessibility returns a screenshot automatically; act by x,y then. A ' +
+      'save sheet or file picker is part of the app that opened it — same snapshot, same clicks. ' +
+      'A third of what an app can do is in its menu bar, which is in no window: mac_click takes ' +
+      'menu:"File > New". The user watches, so stay in the background.',
     tools: [...MAC_COMPUTER_USE_TOOL_NAMES],
   },
   {

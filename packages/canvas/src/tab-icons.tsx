@@ -254,3 +254,13 @@ export function IconSituation(props: IconProps) {
     </Icon>
   );
 }
+
+/** Display on a stand — the Mac computer-use monitor tab (a watched screen). */
+export function IconDisplay(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect x="1.75" y="2.75" width="12.5" height="8.5" rx="1.6" />
+      <path d="M6 14h4M8 11.25V14" />
+    </Icon>
+  );
+}

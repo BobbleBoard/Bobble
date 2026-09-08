@@ -74,9 +74,13 @@ export class ConnectorHost {
     this.servers.set(config.id, state);
     try {
       const tools = await client.start({ timeoutMs: this.connectTimeoutMs });
-      state.tools = tools;
+      // A tool the user switched off is dropped HERE, at the one point every
+      // mode reads from, so lite's catalog, native's registrations and the
+      // bash-cli dispatcher all agree on what exists.
+      const off = new Set(config.disabledTools ?? []);
+      state.tools = off.size === 0 ? tools : tools.filter((t) => !off.has(t.name));
       state.status = 'connected';
-      return { id: config.id, ok: true, toolCount: tools.length };
+      return { id: config.id, ok: true, toolCount: state.tools.length };
     } catch (e) {
       const error = e instanceof Error ? e.message : String(e);
       try {

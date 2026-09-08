@@ -3,6 +3,7 @@ import type { DiffFileData } from '@pi-desktop/ui';
 import type { ReactNode } from 'react';
 import type { Artifact } from '../model.ts';
 import type { NodeTiming } from '../situation/situation-model.ts';
+import type { MacMonitorFeed } from '../surfaces/computer-use-feed.ts';
 
 /**
  * The kinds a canvas tab can host. Each maps to a surface component (browser |
@@ -48,6 +49,12 @@ export type CanvasTabKind =
   | 'pdf'
   | 'subagent'
   | 'situation'
+  // The Mac computer-use MONITOR: a live view of the app Pi is driving — its
+  // window and any sheets/dialogs it opens, drawn at real point size over the
+  // user's wallpaper with the phantom cursor on top. LIVE, but unlike
+  // browser/terminal it needs no native view: the app feeds it decoded frames
+  // through `macMonitor` and the surface paints them onto a <canvas>.
+  | 'computer-use'
   | 'markdown'
   | 'code';
 
@@ -202,6 +209,14 @@ export interface CanvasTab {
    * it. The pure situation fold can't carry a clock, so the app pushes this in.
    */
   situationNodeTiming?: Record<string, NodeTiming>;
+
+  /**
+   * Mac computer-use monitor: the live frame source for a `computer-use` tab.
+   * Imperative on purpose (see computer-use-feed.ts) — a 12fps stream must not
+   * write to the tab store, so the tab carries the FEED and the surface reads
+   * frames off it directly. Same shape of arrangement as `situationEvents`.
+   */
+  macMonitor?: MacMonitorFeed;
 
   /** Free-form per-surface data the core never reads. */
   data?: Record<string, unknown>;

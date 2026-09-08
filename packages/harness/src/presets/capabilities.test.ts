@@ -54,6 +54,18 @@ describe('the groups themselves', () => {
   it('sends Chrome down the DOM path inside computer-use', () => {
     expect(findCapability('computer-use')?.guidance).toContain('chrome_*');
   });
+
+  /*
+   * In bash-CLI mode this summary is ALL the model gets about the group — the
+   * capability section that spells it out is stripped there. So "an app's own
+   * dialogs are part of that app", which is the whole of the user's TextEdit
+   * save-panel complaint, has to survive into the one line.
+   */
+  it('says dialogs and file pickers are part of the app, in the summary itself', () => {
+    const cu = findCapability('computer-use');
+    expect(cu?.summary).toContain('dialogs, sheets and file pickers');
+    expect(cu?.guidance).toContain('part of the app that opened it');
+  });
 });
 
 describe('what the model is told', () => {

@@ -27,10 +27,25 @@ import {
   chromeJsAllowed,
   enableChromeJs,
 } from './chrome.js';
-import { formatMacSnapshot, isAxOpaque } from './format.js';
+import {
+  blockedIndexes,
+  dialogOf,
+  dialogSignature,
+  formatMacSnapshot,
+  isAxOpaque,
+  type ResolvedDialog,
+} from './format.js';
 import type { MacConsentGate } from './permissions.js';
 import { createMacConsentGate } from './permissions.js';
-import type { MacActAck, MacLaunchAck, MacSnapshot, MacTccStatus } from './protocol.js';
+import type {
+  MacActAck,
+  MacLaunchAck,
+  MacMenuAck,
+  MacMenuEntry,
+  MacSnapshot,
+  MacTccStatus,
+  MacWindowInfo,
+} from './protocol.js';
 import { scrollDelta } from './scroll.js';
 import { createMacSessionState, type MacSessionState } from './session-state.js';
 
@@ -108,6 +123,33 @@ function textResult(text: string, details: MacDetails): AgentToolResult<MacDetai
   return { content: [{ type: 'text', text }], details };
 }
 
+/**
+ * What an act CAUSED, said in the result of the act that caused it.
+ *
+ * A save sheet arrives a few hundred milliseconds after the key that summoned
+ * it. Without this line the model has no reason to look again, so its next act
+ * goes into a window that is by then blocked behind a dialog it never saw —
+ * and macOS drops that input silently, which reads to the user as the model
+ * having simply stopped working.
+ */
+function describeOpened(
+  dialog: MacWindowInfo | undefined,
+  opened: readonly MacWindowInfo[] | undefined,
+): string {
+  if (dialog !== undefined) {
+    const name = dialog.title !== undefined && dialog.title !== '' ? `"${dialog.title}"` : 'one';
+    const kind = dialog.sheet === true ? 'sheet' : 'dialog';
+    return ` A ${kind} is now open (${name}) — it belongs to this app; snapshot and act on its controls.`;
+  }
+  if (opened !== undefined && opened.length > 0) {
+    const titles = opened
+      .map((w) => (w.title !== undefined && w.title !== '' ? `"${w.title}"` : 'an untitled window'))
+      .join(', ');
+    return ` A new window opened (${titles}) — snapshot to see it.`;
+  }
+  return '';
+}
+
 function errResult(action: string, message: string): AgentToolResult<MacDetails> {
   return textResult(`${action} failed: ${message}`, { action, ok: false, error: message });
 }
@@ -125,6 +167,47 @@ function messageOf(err: unknown): string {
 
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
+}
+
+/**
+ * A MODAL SURFACE THAT WAS NOT THERE WHEN THE INDEX WAS READ.
+ *
+ * The stale-index path re-snapshots and retries the SAME number, which is right
+ * while the app is showing the same surface — the element moved, the tree was
+ * rebuilt, the index still means what the model meant. It is wrong the moment a
+ * sheet or file picker has opened in between: indices are namespaced per app,
+ * not per window, so that number now resolves to whatever the fresh walk
+ * assigned it — quite possibly a control in the window BEHIND the dialog. the user's
+ * exact complaint is the model clicking through a TextEdit save panel it cannot
+ * see, so the retry stops here and hands the dialog over instead.
+ */
+function dialogOpenedSince(snap: MacSnapshot, previousKey: string): ResolvedDialog | null {
+  const dialog = dialogOf(snap);
+  if (dialog === null) return null;
+  return dialogSignature(dialog) === previousKey ? null : dialog;
+}
+
+/** The redirect that replaces a blind retry: name the dialog, say why the act
+ * did not run, and hand over the fresh snapshot so the next call lands on it. */
+function dialogRedirect(
+  tool: string,
+  action: string,
+  index: number,
+  snap: MacSnapshot,
+  dialog: ResolvedDialog,
+): AgentToolResult<MacDetails> {
+  const name = dialog.title !== '' ? `"${dialog.title}"` : 'an untitled dialog';
+  return textResult(
+    `${tool} did NOT run: index ${index} is stale AND a ${dialog.kind} has opened since — ` +
+      `${name}. Acting on that number now would have hit the window BEHIND the ${dialog.kind}. ` +
+      `Here is the ${dialog.kind}; act on it by index.\n\n${formatMacSnapshot(snap)}`,
+    {
+      action,
+      ok: false,
+      dialog: dialog.title,
+      error: `a ${dialog.kind} opened — index ${index} is stale`,
+    },
+  );
 }
 
 /** Register every mac_* tool onto `pi`. */
@@ -145,6 +228,15 @@ export function registerMacComputerUseTools(
    * pid only (postToPid — background, no focus steal).
    */
   const session = options.session ?? createMacSessionState();
+
+  /**
+   * Indices the LAST look put in a window the open dialog is blocking.
+   *
+   * Per-look data rather than control state, so it lives here beside the
+   * session (same lifetime) instead of growing the state machine. Reset by every
+   * snapshot, empty whenever nothing can be attributed.
+   */
+  let blocked: readonly number[] = [];
 
   /** Gate helper: consent + denylist, returns null when allowed. */
   async function gate(
@@ -170,9 +262,62 @@ export function registerMacComputerUseTools(
     const snap = await bridge.request<MacSnapshot>('snapshot', params);
     /* Remember WHICH KIND of app this is. An app with no Accessibility tree can
      * only be driven by coordinates and keystrokes, and the typing rule below
-     * has to know that before it refuses. */
-    session.noteSnapshot({ ...snap, visualOnly: isAxOpaque(snap) });
+     * has to know that before it refuses.
+     *
+     * ...and WHICH SURFACE was up. Every look records the modal surface it saw
+     * (or '' for none) so a later act can tell "the same dialog I indexed
+     * against" from "a dialog that appeared after". Built explicitly rather than
+     * spread from the wire shape: the state machine stores a comparable
+     * signature, not the helper's dialog object. */
+    const dialog = dialogOf(snap);
+    session.noteSnapshot({
+      app: snap.app,
+      pid: snap.pid,
+      windowId: snap.windowId,
+      visualOnly: isAxOpaque(snap),
+      dialogKey: dialogSignature(dialog),
+    });
+    blocked = blockedIndexes(snap, dialog);
     return snap;
+  }
+
+  /**
+   * Is this index in the window the open dialog is BLOCKING?
+   *
+   * Returns the dialog when acting on that index would be a silent no-op —
+   * macOS drops input to a window under a modal sheet, and "Clicked element [1]"
+   * reads exactly like success. Confirms against a FRESH look first, because a
+   * dialog dismissed since the last snapshot would otherwise make this refuse a
+   * perfectly good index, which is its own dead end.
+   */
+  async function behindDialog(index: number): Promise<ResolvedDialog | null> {
+    if (!blocked.includes(index)) return null;
+    const fresh = await snapshot();
+    const dialog = dialogOf(fresh);
+    if (dialog === null || !blocked.includes(index)) return null;
+    return dialog;
+  }
+
+  /** Refuse an act aimed under an open dialog, naming the way out. */
+  function behindDialogResult(
+    tool: string,
+    action: string,
+    index: number,
+    dialog: ResolvedDialog,
+  ): AgentToolResult<MacDetails> {
+    const name = dialog.title !== '' ? `"${dialog.title}"` : 'an untitled dialog';
+    return textResult(
+      `${tool} did NOT run: [${index}] is in the window BEHIND the open ${dialog.kind} ${name}, ` +
+        `which stops accepting input while the ${dialog.kind} is up — acting on it would have ` +
+        `done nothing at all. Act on the ${dialog.kind}'s own controls, or close it first ` +
+        '(mac_key "escape" cancels, "return" confirms).',
+      {
+        action,
+        ok: false,
+        dialog: dialog.title,
+        error: `[${index}] is behind the open ${dialog.kind}`,
+      },
+    );
   }
 
   /** Stamp the controlled app's pid onto an act so the helper resolves the
@@ -180,6 +325,52 @@ export function registerMacComputerUseTools(
    * (background). */
   function withTarget(params: Record<string, unknown>): Record<string, unknown> {
     return Object.assign(params, session.targetParams());
+  }
+
+  /**
+   * The menu bar, through the same verb as everything else.
+   *
+   * Naming a menu LISTS it and naming an item PRESSES it, so one parameter
+   * covers discovery and action: the model can say "Format" to find out what is
+   * there without having to know that a separate listing verb exists, and a
+   * path it half-remembers still resolves rather than costing a turn.
+   */
+  async function clickMenu(path: string): Promise<AgentToolResult<MacDetails>> {
+    if (bridge === null) return unavailable('mac_click');
+    const ack = await bridge.request<MacMenuAck>('menuClick', withTarget({ path }));
+    if (ack.ok !== true) {
+      const known =
+        ack.menus !== undefined && ack.menus.length > 0
+          ? ` This app's menus are: ${ack.menus.join(', ')}.`
+          : '';
+      return errResult('mac_click', `${ack.error ?? `no menu item matching "${path}"`}${known}`);
+    }
+    if (ack.listed === true) {
+      const items = (ack.items ?? []).map((item: MacMenuEntry) => {
+        const marks = [
+          item.submenu === true ? '▸' : null,
+          item.shortcut !== undefined && item.shortcut !== '' ? item.shortcut : null,
+          item.enabled === false ? 'disabled' : null,
+        ].filter((m): m is string => m !== null);
+        return `  ${item.path}${marks.length > 0 ? `   ${marks.join('  ')}` : ''}`;
+      });
+      const body =
+        items.length > 0
+          ? items.join('\n')
+          : '  (this menu lists nothing until the app builds it — press its items by full path)';
+      return textResult(
+        `Menu "${ack.path ?? path}" — pass one of these as \`menu\` to press it. ` +
+          `A ▸ marks a submenu you can name to list in turn.\n${body}`,
+        { action: 'menu', ok: true, listed: true, path: ack.path ?? path },
+      );
+    }
+    const opened = describeOpened(ack.dialog, ack.opened);
+    return textResult(
+      `Pressed menu ${ack.path ?? path}.` +
+        (ack.shortcut !== undefined && ack.shortcut !== '' ? ` (${ack.shortcut})` : '') +
+        ` The menu never opened on screen and the app stayed in the background.${opened}`,
+      { action: 'menu', ok: true, background: true, path: ack.path ?? path },
+    );
   }
 
   // --- mac_snapshot --------------------------------------------------------
@@ -191,11 +382,14 @@ export function registerMacComputerUseTools(
       '(buttons, fields, menus, …) plus a short summary. This is your view of the app — act on ' +
       'elements by their [index]. Defaults to the app you are CONTROLLING (the one you launched ' +
       'or last snapshotted); pass an app name to switch control to another running app. Before ' +
-      'any app is controlled it reads the frontmost app. If the app exposes nothing to ' +
-      'Accessibility you get a SCREENSHOT of its window automatically, with its bounds — act by ' +
-      'x,y coordinates in that case; you never need to ask for the image. Prefer acting by ' +
-      'index when indexes exist. The first call asks the user to allow Mac control.',
-    promptSnippet: 'See a Mac app as an indexed Accessibility element list',
+      'any app is controlled it reads the frontmost app. It also covers the app’s OWN sheets, ' +
+      'dialogs and file pickers: a save panel is part of the app that opened it, so when one is ' +
+      'up the text says so first and the listed controls are the DIALOG’s. If the app exposes ' +
+      'nothing to Accessibility you get a SCREENSHOT of its windows automatically, with the ' +
+      'screen bounds the image covers — act by x,y coordinates in that case; you never need to ' +
+      'ask for the image. Prefer acting by index when indexes exist. The first call asks the ' +
+      'user to allow Mac control.',
+    promptSnippet: 'See a Mac app (and its dialogs) as an indexed element list',
     parameters: Type.Object({
       app: Type.Optional(
         Type.String({
@@ -206,7 +400,9 @@ export function registerMacComputerUseTools(
         Type.Boolean({
           description:
             'Force a screenshot even when Accessibility answers (heavier). Default false — an ' +
-            'app with no AX elements attaches one on its own.',
+            'app with no AX elements attaches one on its own. The image covers every window the ' +
+            'app has open, sheets and dialogs included, and the text gives the screen rect it ' +
+            'covers so a point read off it maps onto the screen.',
         }),
       ),
     }),
@@ -245,6 +441,7 @@ export function registerMacComputerUseTools(
             mimeType: shot.mimeType ?? 'image/png',
           });
         }
+        const dialog = dialogOf(snap);
         return {
           content,
           details: {
@@ -254,6 +451,10 @@ export function registerMacComputerUseTools(
             pid: snap.pid,
             window: snap.window,
             elementCount: snap.summary.elementCount,
+            /* Surfaced for the trace/UI as well as the text: "a dialog was open"
+             * is the single most useful thing to see when a run went sideways. */
+            dialog: dialog?.title,
+            visualOnly: isAxOpaque(snap),
           },
         };
       } catch (err) {
@@ -271,17 +472,41 @@ export function registerMacComputerUseTools(
       'BACKGROUND via the element’s own Accessibility action (AXPress/AXConfirm/AXPick) — it ' +
       'does NOT move the mouse or bring the app to the front, so the user can keep working and ' +
       'a non-frontmost app can be driven. Elements with no usable AX action get a synthetic ' +
-      'click DELIVERED to the controlled app only (still background). Or pass explicit x,y ' +
-      '(screen points) to click an AX-opaque surface — also delivered in the background while ' +
-      'an app is controlled. A stale index triggers an auto re-snapshot + one retry.',
+      'click DELIVERED to the controlled app only (still background). The app’s own sheets, ' +
+      'dialogs and file pickers are clicked the same way — they are part of that app. Or pass ' +
+      'explicit x,y (screen points, together) to click an AX-opaque surface — also delivered in ' +
+      'the background while an app is controlled; a point inside an open dialog hits the ' +
+      'dialog, never the window behind it. A stale index triggers an auto re-snapshot + one ' +
+      'retry, EXCEPT when a dialog has opened in the meantime: that number would now land ' +
+      'behind the dialog, so you get the dialog to act on instead. Or pass `menu` to use the ' +
+      'app’s MENU BAR ("Format > Font > Bold"), which is where a third of any Mac app lives ' +
+      'and appears in no snapshot; naming a menu rather than an item lists what is inside it.',
     promptSnippet: 'Click a Mac element by index (or x,y)',
     parameters: Type.Object({
-      index: Type.Optional(Type.Number({ description: 'Element index from mac_snapshot.' })),
+      index: Type.Optional(
+        Type.Number({
+          description:
+            'Element index from the latest mac_snapshot. A dialog’s controls are indexed too.',
+        }),
+      ),
       x: Type.Optional(
-        Type.Number({ description: 'Screen x (points) for a raw coordinate click.' }),
+        Type.Number({
+          description:
+            'Screen x (points) for a raw coordinate click; pass with y. Read it off the ' +
+            'snapshot image using the image bounds the snapshot prints.',
+        }),
       ),
       y: Type.Optional(
-        Type.Number({ description: 'Screen y (points) for a raw coordinate click.' }),
+        Type.Number({ description: 'Screen y (points) for a raw coordinate click; pass with x.' }),
+      ),
+      menu: Type.Optional(
+        Type.String({
+          description:
+            'A menu-bar path such as "File > New" or "Format > Font > Bold". Names an ITEM to ' +
+            'press it; names a MENU to list what is inside. The item is pressed through ' +
+            'Accessibility, so no menu opens on screen and the app stays in the background. ' +
+            'mac_snapshot prints the app’s top-level menus.',
+        }),
       ),
     }),
     async execute(_id, params, _signal, _upd, ctx): Promise<AgentToolResult<MacDetails>> {
@@ -289,28 +514,66 @@ export function registerMacComputerUseTools(
       const blocked = await gate('mac_click', ctx);
       if (blocked !== null) return blocked;
       try {
+        if (typeof params.menu === 'string' && params.menu.trim() !== '') {
+          return await clickMenu(params.menu.trim());
+        }
         if (typeof params.x === 'number' && typeof params.y === 'number') {
+          /*
+           * THE POINT GOES THROUGH UNTOUCHED — no clamping, no nudging toward
+           * the controlled window's frame.
+           *
+           * A sheet or file picker can sit outside its parent window's rect, so
+           * "correcting" a coordinate into that rect would send every click at a
+           * dialog into the document behind it. The pid stamp is all the aiming
+           * this needs: the receiving app hit-tests the point against its OWN
+           * windows, dialog included.
+           */
           const ack = await bridge.request<MacActAck>(
             'click',
             withTarget({ x: params.x, y: params.y }),
           );
           await sleep(SETTLE_MS);
-          return textResult(`Clicked at (${params.x}, ${params.y}).${backgroundNote(ack)}`, {
-            action: 'click',
-            ok: true,
-            background: ack.background,
-            mode: ack.mode,
-          });
+          return textResult(
+            `Clicked at (${params.x}, ${params.y}).${backgroundNote(ack)}` +
+              describeOpened(ack.dialog, ack.opened),
+            {
+              action: 'click',
+              ok: true,
+              background: ack.background,
+              mode: ack.mode,
+            },
+          );
         }
         if (typeof params.index !== 'number') {
+          const visual = session.controlled();
+          if (visual !== null && visual.visualOnly === true) {
+            return errResult(
+              'mac_click',
+              `"${visual.app}" exposes no Accessibility elements, so it has no indexes — pass x ` +
+                'and y (screen points read off the snapshot image) instead.',
+            );
+          }
           return errResult('mac_click', 'provide an element index, or x and y');
         }
         const index = params.index;
+        const under = await behindDialog(index);
+        if (under !== null) return behindDialogResult('mac_click', 'click', index, under);
+        const knownDialog = session.controlled()?.dialogKey ?? '';
         let res = await bridge.request<MacActAck>('click', withTarget({ index }));
         if (!res.found) {
-          await snapshot();
+          const fresh = await snapshot();
+          const opened = dialogOpenedSince(fresh, knownDialog);
+          if (opened !== null) return dialogRedirect('mac_click', 'click', index, fresh, opened);
           res = await bridge.request<MacActAck>('click', withTarget({ index }));
           if (!res.found) {
+            const now = session.controlled();
+            if (now !== null && now.visualOnly === true) {
+              return errResult(
+                'mac_click',
+                `index ${index} does not exist: "${now.app}" exposes no Accessibility elements, ` +
+                  'so there are no indexes at all. Snapshot it and click by x,y instead.',
+              );
+            }
             return errResult(
               'mac_click',
               `index ${index} not found — call mac_snapshot for current indices`,
@@ -319,7 +582,8 @@ export function registerMacComputerUseTools(
         }
         await sleep(SETTLE_MS);
         return textResult(
-          `Clicked element [${index}].${backgroundNote(res)} Re-snapshot to see the result.`,
+          `Clicked element [${index}].${backgroundNote(res)}` +
+            `${describeOpened(res.dialog, res.opened)} Re-snapshot to see the result.`,
           { action: 'click', ok: true, background: res.background, mode: res.mode },
         );
       } catch (err) {
@@ -337,16 +601,31 @@ export function registerMacComputerUseTools(
       'BACKGROUND: the field’s Accessibility value is set directly (no focus change, no ' +
       'keystrokes), so a non-frontmost app can be filled without disturbing the user. Fields ' +
       'that reject a value set get keystrokes DELIVERED to the controlled app only (still ' +
-      'background). Set submit:true to commit a search/URL field (background AX confirm, or a ' +
-      'Return delivered to the app). Set append:true to add to existing content via keystrokes ' +
-      'instead of replacing it. Omit the index to type into whatever is focused (foreground ' +
-      'keystrokes). A stale index triggers an auto re-snapshot + one retry.',
+      'background). A save sheet or file picker’s filename field is indexed like any other — ' +
+      'it belongs to the app. Set submit:true to commit a search/URL/filename field (background ' +
+      'AX confirm, or a Return delivered to the app). Set append:true to add to existing ' +
+      'content via keystrokes instead of replacing it. Omit the index ONLY for an app that ' +
+      'exposes no Accessibility elements: the text then goes as keystrokes to that app’s own ' +
+      'focused field, still in the background. A stale index triggers an auto re-snapshot + one ' +
+      'retry, EXCEPT when a dialog has opened in the meantime — you get the dialog instead of a ' +
+      'blind retry behind it.',
     promptSnippet: 'Set text into a Mac field (background) + optional submit',
     parameters: Type.Object({
       text: Type.String({ description: 'Text to set/type.' }),
-      index: Type.Optional(Type.Number({ description: 'Field index from mac_snapshot.' })),
+      index: Type.Optional(
+        Type.Number({
+          description:
+            'Field index from the latest mac_snapshot (a dialog’s fields are indexed too). Omit ' +
+            'only for an app with no Accessibility elements — then it types into that app’s ' +
+            'focused field.',
+        }),
+      ),
       submit: Type.Optional(
-        Type.Boolean({ description: 'Commit the field after typing (search/URL). Default false.' }),
+        Type.Boolean({
+          description:
+            'Commit the field after typing (search / URL / a save sheet’s filename). Default ' +
+            'false.',
+        }),
       ),
       append: Type.Optional(
         Type.Boolean({
@@ -388,15 +667,31 @@ export function registerMacComputerUseTools(
            * So for a visual-only app it types — after bringing the app forward,
            * because keystrokes follow the system focus and there is no
            * background path for an app that exposes nothing.
+           *
+           * AND IT NEVER REFUSES ON AN UNKNOWN. `visualOnly` is recorded by a
+           * LOOK, and mac_launch takes control without one (its post-launch
+           * snapshot can fail), so the flag can be genuinely undefined — the
+           * exact state in which the old test `visualOnly !== true` refused, and
+           * told a model with no indices to go and pass an index. If we do not
+           * know which kind of app this is, find out; if we cannot find out, act
+           * rather than dead-end (the keystrokes are pid-stamped, so they go to
+           * the controlled app's own queue, not to the user's window).
            */
           const controlled = session.controlled();
-          if (controlled !== null && controlled.visualOnly !== true) {
+          if (controlled !== null && controlled.visualOnly === undefined) {
+            try {
+              await snapshot();
+            } catch {
+              /* Could not look — do not refuse on an unknown. */
+            }
+          }
+          if (session.controlled()?.visualOnly === false) {
             return errResult(
               'mac_type',
               'refusing to type without an index after snapshotting an app: index-less typing ' +
-                'sends keystrokes to the FRONTMOST app (which may be the user’s), not your ' +
-                'target. Call mac_snapshot and pass the field’s [index] so the text is set via ' +
-                'Accessibility in the background.',
+                'sends keystrokes to whatever holds focus in it, not necessarily the field you ' +
+                'mean. Call mac_snapshot and pass the field’s [index] — including a dialog’s ' +
+                'field — so the text is set via Accessibility in the background.',
             );
           }
 
@@ -411,9 +706,10 @@ export function registerMacComputerUseTools(
            */
           const ack = await bridge.request<MacActAck>('type', withTarget({ text, submit }));
           await sleep(SETTLE_MS);
+          const target = session.controlled(); // may have been resolved just above
           const where =
-            controlled !== null && controlled.visualOnly === true
-              ? `Typed into ${controlled.app || 'the app'} — it exposes no Accessibility elements, ` +
+            target !== null
+              ? `Typed into ${target.app || 'the app'} — it exposes no Accessibility elements, ` +
                 `so this went to its focused field as keystrokes.${backgroundNote(ack)} ` +
                 'Snapshot again to see the result.'
               : `Typed into the focused field.${backgroundNote(ack)}`;
@@ -425,10 +721,15 @@ export function registerMacComputerUseTools(
           });
         }
         const index = params.index;
+        const under = await behindDialog(index);
+        if (under !== null) return behindDialogResult('mac_type', 'type', index, under);
+        const knownDialog = session.controlled()?.dialogKey ?? '';
         const body = (): Record<string, unknown> => withTarget({ index, text, submit, append });
         let res = await bridge.request<MacActAck>('type', body());
         if (!res.found) {
-          await snapshot();
+          const fresh = await snapshot();
+          const opened = dialogOpenedSince(fresh, knownDialog);
+          if (opened !== null) return dialogRedirect('mac_type', 'type', index, fresh, opened);
           res = await bridge.request<MacActAck>('type', body());
           if (!res.found) {
             return errResult(
@@ -456,11 +757,16 @@ export function registerMacComputerUseTools(
     description:
       'Press a key combo, e.g. "cmd+s", "cmd+shift+z", "return", "tab", "escape", "down". ' +
       'While you are controlling an app the chord is DELIVERED to that app in the background ' +
-      '(the user’s focus is untouched). Use for menu shortcuts, saving, dialogs, and navigation.',
+      '(the user’s focus is untouched). Use for menu shortcuts, saving, dialogs, and navigation. ' +
+      'It lands in the app’s key window, which IS the dialog while one is open — "return" ' +
+      'confirms a save sheet, "escape" cancels it, "tab" moves between its fields. This works ' +
+      'even for an app that exposes nothing to Accessibility.',
     promptSnippet: 'Press a Mac key combo (e.g. cmd+s)',
     parameters: Type.Object({
       combo: Type.String({
-        description: 'Key combo, e.g. cmd+s, cmd+shift+z, return, tab, escape.',
+        description:
+          'Key combo, e.g. cmd+s, cmd+shift+z, return, tab, escape. Goes to the app’s key ' +
+          'window — the open dialog, when there is one.',
       }),
     }),
     async execute(_id, params, _signal, _upd, ctx): Promise<AgentToolResult<MacDetails>> {
@@ -497,7 +803,10 @@ export function registerMacComputerUseTools(
     parameters: Type.Object({
       direction: Type.Union(
         [Type.Literal('up'), Type.Literal('down'), Type.Literal('left'), Type.Literal('right')],
-        { description: 'Scroll direction.' },
+        /* The allowed values are SPELLED OUT: a union of literals renders as
+         * `anyOf`, which the CLI help has no enum line for, so a `--help` that
+         * only said "Scroll direction" left the model to guess the four words. */
+        { description: 'Scroll direction: up, down, left or right.' },
       ),
       amount: Type.Optional(Type.Number({ description: 'Pixels to scroll (default ~300).' })),
     }),
