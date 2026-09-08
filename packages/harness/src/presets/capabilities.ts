@@ -73,7 +73,17 @@ export const CAPABILITIES: readonly Capability[] = [
   },
   {
     name: 'computer-use',
-    summary: "See and control any app on the user's Mac, plus their own Chrome.",
+    /*
+     * NAME THE REQUEST, not just the ability. the user asked for the Mac tools to be
+     * "described as computer use so it knows when the user asks for 'use this
+     * app' it can do that" — and in bash-CLI mode this one line is ALL the model
+     * gets about the group, because the capability section that spells it out is
+     * stripped there. So the phrasings a person actually uses have to be in the
+     * summary itself.
+     */
+    summary:
+      "Computer use: see and control any app on the user's Mac, plus their own Chrome. " +
+      '"Use <app>", "open <app> and…", "do it in <app>", "click that", "type it in there".',
     guidance:
       "For work inside the user's OWN applications — Notes, Finder, Photoshop, a game — and " +
       'for their own browsers (Safari, Chrome, Arc) when they ask for those specifically. For ' +
