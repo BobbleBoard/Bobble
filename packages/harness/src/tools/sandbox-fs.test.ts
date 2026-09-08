@@ -21,7 +21,9 @@ import {
   guardDestructiveRewrite,
   isInsideRoots,
   isNamedDestination,
+  malformedPathComplaint,
   outsideWorkspaceRefusal,
+  repairDroppedRootSlash,
   registerSandboxFileTools,
   resolveWorkspacePath,
   resolveWorkspaceRoot,
@@ -826,5 +828,34 @@ describe('an edit that breaks a file is refused and rolled back', () => {
       ctx(ws),
     );
     expect(fs.readFileSync(file, 'utf8')).toContain('unbalanced');
+  });
+});
+
+describe('a path that is not a path', () => {
+  it('refuses tool-call markup instead of making a file out of it', () => {
+    // The exact value a 4B model sent on the Reminders run.
+    const raw = 'private/var/x/reminders.json\n</parameter>\r\n<parameter=content>\n';
+    const note = malformedPathComplaint(raw);
+    expect(note).not.toBeNull();
+    expect(note).toContain('NOTHING WAS WRITTEN');
+    expect(note).toContain('tool-call syntax');
+  });
+
+  it('refuses a path with a line break even without markup', () => {
+    expect(malformedPathComplaint('notes.txt\nhello')).toContain('line break');
+  });
+
+  it('says nothing about an ordinary path', () => {
+    expect(malformedPathComplaint('src/index.ts')).toBeNull();
+    expect(malformedPathComplaint('/Users/user/Desktop/a file.txt')).toBeNull();
+    // A filename may legitimately contain angle brackets; only the tool-call
+    // tags are markup.
+    expect(malformedPathComplaint('a<b>c.txt')).toBeNull();
+  });
+
+  it('repairs a dropped slash on /private, which macOS paths are full of', () => {
+    expect(repairDroppedRootSlash('private/var/folders/x/T/w/out.json')).toBe(
+      '/private/var/folders/x/T/w/out.json',
+    );
   });
 });

@@ -116,6 +116,40 @@ export const CAPABILITY_REACH_SCHEMAS =
 export const CAPABILITY_REACH_CLI =
   "Every one of these is a COMMAND already on your PATH — nothing to turn on, nothing to wait for. Run `<command> --help` the first time you use one and it will tell you its verbs and flags. Reach for them rather than improvising with general shell tools: `open -a` hands an app to the user's foreground instead of to you, and a file written and opened is not the same as having used the app.";
 
+/**
+ * THE OTHER SENTENCES THAT DESCRIBE THE MECHANISM RATHER THAN THE ABILITY.
+ *
+ * The reach paragraph is not the only place the section says "call
+ * `capability`". Three more sentences do, scattered through prose that is
+ * otherwise interface-agnostic, and in CLI mode each one told the model to
+ * reach for a tool that does not exist there — the worst of them as its FIRST
+ * action, ahead of doing the work.
+ *
+ * MEASURED: asked to add a reminder, a 4B model in CLI mode never ran `mac` or
+ * `personal`; it wrote a `reminders.json`. It had been told, in the imperative,
+ * that the list it could see was not the list of things it could do — so the
+ * commands in front of it read as a partial list to be topped up by a call it
+ * could not make, and the file route is what is left when that stalls.
+ *
+ * Each pair keeps the PRESSURE and changes only the mechanism: "decide which
+ * group this lands in before you conclude you cannot" is the load-bearing half,
+ * and it is just as true when the answer is a command as when it is a call.
+ */
+export const CLI_MECHANISM_SWAPS: ReadonlyArray<readonly [string, string]> = [
+  [
+    'For everything beyond navigating and looking — clicking, typing, scrolling — call\n  `capability` with "browser" once and the whole suite arrives in your list.',
+    'Clicking, typing and scrolling are `browser click` / `browser type` / `browser scroll`,\n  already on your PATH beside it — nothing to turn on first.',
+  ],
+  [
+    'TURN THE CAPABILITY ON BEFORE YOU DECIDE YOU CANNOT DO SOMETHING. Read the request and ask which of the groups above it lands in; if it lands in one that is not currently in your list, activating it is your FIRST action, not a fallback after something fails. The list you can see is not the list of things you can do, and treating it that way is how a request gets answered with a description instead of the thing itself.',
+    "NAME THE COMMAND BEFORE YOU DECIDE HOW TO DO SOMETHING. Read the request and ask which of the groups above it lands in — the user's own app is `mac`, their calendar and reminders are `personal`, a web page is `browser` — then run that command's `--help` and use it. Every one of them is already on your PATH; there is nothing to activate and nothing missing. Reaching for a general shell workaround instead is how a request to use an app ends as a file nobody asked for: writing `reminders.json` is not adding a reminder, and a document written to disk is not a document typed into the app.",
+  ],
+  [
+    "Don't repeat `capability` or update_plan back-to-back: one activation, one plan, then do the work.",
+    "Don't re-run update_plan back-to-back, and don't re-read a `--help` you have already read: one plan, then do the work.",
+  ],
+];
+
 export const CAPABILITY_PROMPT = `${CAPABILITY_PROMPT_MARKER}
 
 You run locally on the user's Mac as an autonomous agent, not a passive chatbot. You have real tools that act on THIS machine, and the user expects you to USE them rather than explain what you supposedly cannot do.
@@ -403,13 +437,14 @@ const SCHEMA_ONLY_LINES: readonly RegExp[] = [
  * names and the reach paragraph do, and both are mechanical to swap.
  */
 export function capabilityPromptForCli(commandFor?: ReadonlyMap<string, string>): string {
-  const body = CAPABILITY_PROMPT.replace(CAPABILITY_REACH_SCHEMAS, CAPABILITY_REACH_CLI)
+  let body = CAPABILITY_PROMPT.replace(CAPABILITY_REACH_SCHEMAS, CAPABILITY_REACH_CLI)
     // The same mechanism, named once more inside the guidelines. There is no
     // `capability` call to make here: the way to find out is to ask a command.
     .replace(
       'if unsure, call `capability` first, then act',
       'if unsure, run `<command> --help` first, then act',
     );
+  for (const [schemas, cli] of CLI_MECHANISM_SWAPS) body = body.replace(schemas, cli);
   return commandFor === undefined ? body : retargetToolNames(body, commandFor);
 }
 

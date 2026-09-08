@@ -140,6 +140,17 @@ export interface MacSnapshot {
    * screenshot target exactly that window (occluded / non-frontmost, focus-free). */
   readonly windowId?: number;
   readonly elements: MacElement[];
+  /**
+   * What the app is DISPLAYING and you cannot click: the calculator's answer,
+   * the alert's message, the total under the table, the error beneath a field.
+   *
+   * Not indexed, and deliberately so. Indices address things you ACT on, and
+   * every caller and overlay depends on them not shifting; this is the app
+   * talking back. Until it existed a model could drive an app perfectly and
+   * never learn what it said — a snapshot of Calculator returned 25 buttons and
+   * not the display.
+   */
+  readonly text?: readonly string[];
   readonly summary: {
     readonly app: string;
     readonly window: string;

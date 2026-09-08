@@ -72,6 +72,19 @@ function isLabel(el: MacElement): boolean {
   return !(el.actions ?? []).some((a) => PRESS_ACTIONS.has(a));
 }
 
+/**
+ * What the app is SAYING, above the controls.
+ *
+ * Above, because it is usually the answer to whatever the last act was, and a
+ * model that reads a long control list first has spent its attention before it
+ * gets here. Short, in document order — the order is most of the meaning
+ * ("37 × 24" then "888").
+ */
+function showingLines(text: readonly string[] | undefined): string[] {
+  if (text === undefined || text.length === 0) return [];
+  return ['', ...wrap(`Showing: ${text.map((t) => JSON.stringify(t)).join(' · ')}`)];
+}
+
 /** The labels tail: names, no promise that they can be acted on. */
 function labelLines(labels: MacElement[]): string[] {
   if (labels.length === 0) return [];
@@ -553,6 +566,7 @@ export function formatMacSnapshot(snap: MacSnapshot, view: MacSnapshotView = {})
     const dialogControls = split.inDialog.filter((el) => !isLabel(el));
     const lines = [
       ...head,
+      ...showingLines(snap.text),
       '',
       "The dialog's controls (act by index):",
       ...dialogControls.map(elementLine),
@@ -569,5 +583,5 @@ export function formatMacSnapshot(snap: MacSnapshot, view: MacSnapshotView = {})
   const labels = snap.elements.filter(isLabel);
   const controls = snap.elements.filter((el) => !isLabel(el));
   const body = [lead, ...controls.map(elementLine), ...labelLines(labels)].join('\n');
-  return `${head.join('\n')}\n\n${body}${cap}`;
+  return `${head.join('\n')}${showingLines(snap.text).join('\n')}\n\n${body}${cap}`;
 }

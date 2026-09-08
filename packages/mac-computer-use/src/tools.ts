@@ -507,6 +507,9 @@ export function registerMacComputerUseTools(
       'straight away.\n' +
       'DIALOGS: a save panel or file picker belongs to the app that opened it, so it is in this ' +
       'same list, announced first, and driven the same way.\n' +
+      'WHAT IT SAYS BACK: read the "Showing:" line — the result, the total, the message in the ' +
+      'alert, the error under the field. That is how you check an act worked and how you answer ' +
+      'a question the app computed. Snapshot again after acting and read it.\n' +
       'NO ACCESSIBILITY: an app that exposes nothing gets a screenshot of its windows ' +
       'automatically, plus the screen rect it covers — act by x,y then; never ask for the image.',
     promptSnippet: 'See a Mac app (and its dialogs) as an indexed element list',

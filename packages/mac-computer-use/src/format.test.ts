@@ -656,3 +656,37 @@ describe('the menu line', () => {
     expect(formatMacSnapshot(withMenus(['Apple']))).not.toContain('Menus');
   });
 });
+
+describe('what the app is saying back', () => {
+  /*
+   * A snapshot listed only what could be pressed or typed into, so a model could
+   * drive an app flawlessly and never read the result. MEASURED: Calculator
+   * returns 25 buttons and its display is not among them — 37 × 24 = 888 was
+   * computed and unreadable.
+   */
+  const base = {
+    app: 'Calculator',
+    window: 'Calculator',
+    elements: [
+      { index: 1, role: 'AXButton', name: 'Equals', x: 502, y: 820, w: 48, h: 48, actions: ['AXPress'] },
+    ],
+    summary: { app: 'Calculator', window: 'Calculator', elementCount: 1, truncated: false },
+  } as unknown as MacSnapshot;
+
+  it('prints the display, and prints it before the control list', () => {
+    const out = formatMacSnapshot({ ...base, text: ['37 × 24', '888'] } as MacSnapshot);
+    expect(out).toContain('Showing:');
+    expect(out).toContain('888');
+    expect(out.indexOf('Showing:')).toBeLessThan(out.indexOf('Actionable elements'));
+  });
+
+  it('says nothing at all when the app displays nothing', () => {
+    expect(formatMacSnapshot(base)).not.toContain('Showing:');
+    expect(formatMacSnapshot({ ...base, text: [] } as MacSnapshot)).not.toContain('Showing:');
+  });
+
+  it('keeps the reading order, which is most of the meaning', () => {
+    const out = formatMacSnapshot({ ...base, text: ['Total', '48.20'] } as MacSnapshot);
+    expect(out.indexOf('Total')).toBeLessThan(out.indexOf('48.20'));
+  });
+});

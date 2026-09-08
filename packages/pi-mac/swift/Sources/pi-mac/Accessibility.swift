@@ -16,6 +16,24 @@ func axString(_ el: AXUIElement, _ attr: String) -> String? {
   return v as? String
 }
 
+/// An attribute's DISPLAYED value, whatever type AX chose to hand it back in.
+///
+/// `axString` is `v as? String`, which is nil for a number — and AX returns
+/// numbers wherever a value is numeric. MEASURED on Calculator: the display's
+/// AXValue is an NSNumber, so reading it as a string failed and the name fell
+/// through to the role description, "Edit field". The one number on screen was
+/// unreadable, and the app looked like it had nothing to say.
+///
+/// Booleans are spelled out rather than rendered as CFNumber's 1/0, since a
+/// checkbox reading "1" is worse than one reading "true".
+func axValueText(_ el: AXUIElement, _ attr: String) -> String? {
+  guard let v = axCopy(el, attr) else { return nil }
+  if let s = v as? String { return s }
+  if CFGetTypeID(v) == CFBooleanGetTypeID() { return (v as? Bool) == true ? "true" : "false" }
+  if let n = v as? NSNumber { return n.stringValue }
+  return nil
+}
+
 func axBool(_ el: AXUIElement, _ attr: String) -> Bool? {
   guard let v = axCopy(el, attr) else { return nil }
   return v as? Bool
@@ -156,8 +174,28 @@ private let NOISE_ROLES: Set<String> = [
   "AXIncrementorArrow", "AXLayoutItem", "AXLayoutArea", "AXUnknown",
 ]
 
+/// Roles that DISPLAY something rather than accept an action.
+///
+/// WHAT AN APP SAYS BACK IS NOT CLICKABLE. Every snapshot until now listed only
+/// what could be pressed or typed into, so a model could drive an app and never
+/// read the consequence: Calculator's answer, an alert's message, the validation
+/// error under a field, a status line, a computed total. MEASURED — a snapshot of
+/// Calculator returns 25 buttons and not the display, so "what is 37 × 24" is
+/// unanswerable by the app that just computed it.
+///
+/// These do NOT join the indexed list. Indices address things you act on, and
+/// every caller, doc and monitor overlay depends on them not shifting. The read
+/// text rides alongside in its own block.
+private let TEXT_ROLES: Set<String> = [
+  "AXStaticText", "AXHeading",
+]
+
 private let NAME_MAX = 120
 private let MAX_NODES = 4000
+/// Read text is a summary, not a transcript — enough to see what the app is
+/// saying, capped so a document-shaped window cannot flood the result.
+private let TEXT_MAX_ITEMS = 40
+private let TEXT_ITEM_MAX = 200
 
 func cleanText(_ s: String) -> String {
   let collapsed = s.replacingOccurrences(
@@ -174,7 +212,7 @@ private func accessibleName(_ el: AXUIElement, role: String) -> String {
   if let t = axString(el, kAXTitleAttribute), !cleanText(t).isEmpty { return cleanText(t) }
   if let d = axString(el, kAXDescriptionAttribute), !cleanText(d).isEmpty { return cleanText(d) }
   // A value is a decent name for buttons/links whose title is empty.
-  if let v = axString(el, kAXValueAttribute), !cleanText(v).isEmpty {
+  if let v = axValueText(el, kAXValueAttribute), !cleanText(v).isEmpty {
     return cleanText(v)
   }
   if let placeholder = axString(el, kAXPlaceholderValueAttribute), !cleanText(placeholder).isEmpty {
@@ -243,6 +281,9 @@ struct SnapshotResult {
   /// anywhere else while this is non-nil does nothing, so the tool layer says
   /// so out loud rather than letting the model click into a dead window.
   let dialog: AppWindow?
+  /// Read-only text the app is showing: the calculator's answer, the alert's
+  /// message, the error under the field. Not indexed — see TEXT_ROLES.
+  let text: [String]
 }
 
 /// Walk the AX tree of `target` and return a COMPACT, INDEXED element list
@@ -301,6 +342,9 @@ func collectSnapshot(
   var cands: [Cand] = []
   var visited = 0
   var seenElements = Set<AXUIElement>()
+  /// What the app is DISPLAYING, in document order — see TEXT_ROLES. Kept with
+  /// its frame so a label can be told from a control by WHERE it is.
+  var readText: [(rect: CGRect, text: String)] = []
   // The DEFAULT button of every surface the app is presenting. A save sheet has
   // no title, so this is the only thing in the payload that can name it.
   var defaultButtons = Set<AXUIElement>()
@@ -335,7 +379,30 @@ func collectSnapshot(
     let editable = isEditable(el, role: role)
     let pressable = actions.contains("AXPress") || actions.contains("AXConfirm")
     let interactive = INTERACTIVE_ROLES.contains(role)
-    if !editable && !pressable && !interactive { continue }
+    if !editable && !pressable && !interactive {
+      // Not something to act on — but possibly something the app is SAYING.
+      if TEXT_ROLES.contains(role), readText.count < TEXT_MAX_ITEMS {
+        /*
+         * FOR A LABEL, THE VALUE IS THE TEXT. `accessibleName` prefers title,
+         * then description — right for a control, wrong here: Calculator's
+         * display carries AXDescription "Edit field" and AXValue "888", so the
+         * generic order reported the furniture and hid the answer.
+         */
+        let shown = cleanText(axValueText(el, kAXValueAttribute) ?? "").isEmpty
+          ? accessibleName(el, role: role)
+          : cleanText(axValueText(el, kAXValueAttribute) ?? "")
+        if !shown.isEmpty {
+          let pos = axPoint(el, kAXPositionAttribute) ?? CGPoint(x: -1, y: -1)
+          let size = axSize(el, kAXSizeAttribute) ?? CGSize(width: 0, height: 0)
+          // A zero-sized label is laid out but not shown; reading it back would
+          // report text the user cannot see.
+          if size.width > 1, size.height > 1 {
+            readText.append((CGRect(origin: pos, size: size), truncate(shown, TEXT_ITEM_MAX)))
+          }
+        }
+      }
+      continue
+    }
 
     let name = accessibleName(el, role: role)
     if name.isEmpty && !editable { continue }  // nameless non-field control → skip
@@ -344,7 +411,7 @@ func collectSnapshot(
     let size = axSize(el, kAXSizeAttribute) ?? CGSize(width: 0, height: 0)
     if size.width <= 1 || size.height <= 1 { continue }
     let rect = CGRect(origin: pos, size: size)
-    let value = editable ? (axString(el, kAXValueAttribute) ?? "") : ""
+    let value = editable ? (axValueText(el, kAXValueAttribute) ?? "") : ""
     let enabled = axBool(el, kAXEnabledAttribute) ?? true
     let focused = axBool(el, kAXFocusedAttribute) ?? false
     let onScreen = rect.intersects(bounds)
@@ -399,7 +466,49 @@ func collectSnapshot(
     truncated: pool.count > start + page.count, total: all.count,
     matched: pool.count, offset: start, find: needle,
     pid: resolved.pid, windowId: windowId, windowBounds: windowBounds, windows: surfaces,
-    dialog: surfaces.first(where: { $0.isModal }))
+    dialog: surfaces.first(where: { $0.isModal }),
+    /*
+     * Deduplicated against the controls, because a button's label is usually its
+     * own child AXStaticText and listing both says the same thing twice. What
+     * survives is the text that belongs to no control — which is exactly the
+     * part the model could not see.
+     */
+    text: dedupeReadText(readText, against: all))
+}
+
+/// Read text minus the labels that BELONG to a listed control.
+///
+/// Dedupe by string alone was wrong in the first app it met: Calculator's
+/// display reads "0" and Calculator also has a button labelled "0", so the one
+/// number the model needed was the one thing dropped. A control's label is its
+/// own child, so it sits INSIDE the control's frame — and the display, which
+/// belongs to no control, does not. Geometry tells them apart; a matching string
+/// does not.
+///
+/// Order is preserved: an app's static text reads top-to-bottom, and that order
+/// is most of its meaning ("Total:" then "48.20").
+func dedupeReadText(_ text: [(rect: CGRect, text: String)], against controls: [SnapEl]) -> [String]
+{
+  // Spelled out rather than inlined: the one-line version defeats the Swift
+  // type checker (SnapEl's Ints and CGFloat in one CGRect literal).
+  let frames: [CGRect] = controls.map { (c: SnapEl) -> CGRect in
+    let w = CGFloat(c.w)
+    let h = CGFloat(c.h)
+    let x = CGFloat(c.x) - w / 2
+    let y = CGFloat(c.y) - h / 2
+    return CGRect(x: x, y: y, width: w, height: h)
+  }
+  var seen = Set<String>()
+  var out: [String] = []
+  for item in text {
+    let key = item.text.lowercased()
+    if key.isEmpty || seen.contains(key) { continue }
+    // Inside a control's box → it is that control's own label, already listed.
+    if frames.contains(where: { $0.insetBy(dx: -1, dy: -1).contains(item.rect) }) { continue }
+    seen.insert(key)
+    out.append(item.text)
+  }
+  return out
 }
 
 /// Frame of an AX window element in global screen points, or nil when the
@@ -595,6 +704,7 @@ func snapshotResultDict(_ snap: SnapshotResult, screenshot: [String: Any]?) -> [
   if let d = snap.dialog {
     result["dialog"] = windowDict(d)
   }
+  if !snap.text.isEmpty { result["text"] = snap.text }
   // The menu bar is a third of a real app's capability and appears in no
   // window, so the top-level titles ride along with every snapshot. Titles
   // only — a whole menu bar is hundreds of entries; naming one lists it. The

@@ -4,6 +4,7 @@ import {
   BOBBLE_IDENTITY,
   CAPABILITY_PROMPT,
   CAPABILITY_PROMPT_MARKER,
+  CLI_MECHANISM_SWAPS,
   MANAGER_PROMPT_MARKER,
   retargetToolNames,
   stripToolCatalog,
@@ -425,6 +426,34 @@ describe('the prompt must not contradict the interface it ships with', () => {
     expect(cli).toContain('--help');
     // and it still carries the thing that matters: what this app can do
     expect(cli).toContain('COMPUTER USE');
+  });
+
+  it('never names `capability` in CLI mode, wrapped across a line or not', () => {
+    /*
+     * The guard above looked for "call `capability`" as one string. The prompt
+     * wraps, so the browser paragraph's "call\n  `capability` with browser"
+     * slipped past it and shipped — along with "TURN THE CAPABILITY ON …
+     * activating it is your FIRST action", which told a model whose active set
+     * is ['bash'] to begin by calling a tool that is not there.
+     *
+     * Match the NAME, not a phrase that happens to precede it.
+     */
+    const cli = augmentSystemPrompt('base', { toolInterface: 'bash-cli' });
+    expect(cli).not.toMatch(/`capability`/);
+    expect(cli).not.toMatch(/TURN THE CAPABILITY ON/);
+    expect(cli).not.toMatch(/one activation, one plan/);
+    // …and the pressure those sentences carried survives the swap.
+    expect(cli).toMatch(/BEFORE YOU DECIDE/);
+    expect(cli).toContain('already on your PATH');
+  });
+
+  it('applies every mechanism swap — a stale left-hand side is a silent no-op', () => {
+    // Each swap is a literal `.replace`. Edit the prose it targets and the
+    // replacement quietly stops happening, which is exactly how the sentences
+    // above survived a prompt rewrite. Assert the source text is still findable.
+    for (const [schemas] of CLI_MECHANISM_SWAPS) {
+      expect(CAPABILITY_PROMPT, schemas.slice(0, 40)).toContain(schemas);
+    }
   });
 
   it('keeps it in the schema mode it describes', () => {

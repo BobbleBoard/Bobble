@@ -93,6 +93,40 @@ function expandUserPath(raw: string): string {
 }
 
 /**
+ * A path that is not a path — the model's own tool-call syntax, arriving as an
+ * argument value.
+ *
+ * MEASURED, the Reminders run. A 4B model on the Qwen3.5 XML tool-call template
+ * emitted a `write` whose `path` was:
+ *
+ *   private/var/…/reminders.json\n</parameter>\r\n<parameter=content>\n
+ *
+ * The closing tag of one parameter and the opening tag of the next, swallowed
+ * into the first parameter's value. Nothing rejected it: the fence resolved it,
+ * created the directories, and answered "Successfully wrote 433 bytes" — so the
+ * model was told its malformed call had WORKED, and the next four calls were
+ * empty. A shell would have said "no such file"; we said yes and made one.
+ *
+ * Refusing is the whole fix. The model can re-emit the call; it cannot recover
+ * from being told a broken one succeeded.
+ */
+const TOOL_CALL_MARKUP = /<\/?(?:parameter|function|tool_call)\b|<\/parameter>|<\|/;
+
+export function malformedPathComplaint(raw: string): string | null {
+  if (TOOL_CALL_MARKUP.test(raw)) {
+    return `That path is not a path — it contains your own tool-call syntax: ${JSON.stringify(
+      raw.slice(0, 120),
+    )}. The value of one parameter ran into the next. NOTHING WAS WRITTEN. Re-send the call with each parameter closed before the next one opens, and the path as a plain filename or absolute path with no markup in it.`;
+  }
+  if (/[\r\n\t]/.test(raw)) {
+    return `That path contains a line break or tab: ${JSON.stringify(
+      raw.slice(0, 120),
+    )}. NOTHING WAS WRITTEN. A path is a single line — put the file body in the content parameter, not in the path.`;
+  }
+  return null;
+}
+
+/**
  * Resolve `raw` against `root`: absolute (or `~`-expanded to absolute) paths pass
  * through (still normalized so `..` segments collapse); a relative path is joined
  * to the workspace root — NEVER to HOME. This is the load-bearing fix for the
@@ -115,6 +149,10 @@ export function resolveWorkspacePath(raw: string, root: string): string {
  */
 const ROOT_LEVEL_DIRS = new Set([
   'Users',
+  // macOS: /var, /tmp and /etc are symlinks INTO /private, so a dropped slash
+  // shows up as `private/var/folders/…` — which joined happily to the workspace
+  // and produced `<workspace>/private/var/folders/…/Bobble/reminders.json`.
+  'private',
   'Applications',
   'Library',
   'System',
@@ -534,6 +572,12 @@ function fenceTool<S extends TSchema, D>(
     async execute(toolCallId, params, signal, onUpdate, ctx) {
       const root = getRoot(ctx);
       const raw = argPath(params);
+      // A malformed call is refused BEFORE resolution — resolving it is what
+      // turned tool-call markup into a real directory tree (see above).
+      if (raw !== undefined) {
+        const malformed = malformedPathComplaint(raw);
+        if (malformed !== null) throw new Error(malformed);
+      }
       // ls with no `path` → the built-in defaults to "."; make that "." resolve
       // against OUR root by passing the root explicitly.
       const abs = raw === undefined ? root : resolveWorkspacePath(raw, root);
