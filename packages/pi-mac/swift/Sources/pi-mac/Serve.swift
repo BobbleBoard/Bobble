@@ -152,10 +152,22 @@ private func deliveryPid(_ params: [String: Any], at point: CGPoint? = nil) -> p
 /// in the act's own result costs one settle and saves a wasted turn — and a
 /// wasted turn here means clicking into a dead window, which looks to the user
 /// like the model is broken.
-private func surfaceDelta(pid: pid_t?, before: [AppWindow], settleMs: Int = 220) -> [String: Any] {
+private func surfaceDelta(pid: pid_t?, before: [AppWindow], settleMs: Int = 500) -> [String: Any] {
   guard let pid else { return [:] }
-  usleep(UInt32(settleMs) * 1000)
-  let after = appWindows(pid: pid)
+  // Poll rather than sleep the whole window: a sheet takes its time to animate
+  // in (MEASURED around 600ms for TextEdit's save sheet, far past a fixed
+  // 220ms), but the common act opens nothing at all and should not pay for the
+  // rare one. Early exit on the first change keeps the cost proportional.
+  let beforeIdsEarly = Set(before.compactMap { $0.windowId })
+  var after = before
+  let step = 70
+  var waited = 0
+  while waited < settleMs {
+    usleep(UInt32(step) * 1000)
+    waited += step
+    after = appWindows(pid: pid)
+    if Set(after.compactMap { $0.windowId }) != beforeIdsEarly { break }
+  }
   let beforeIds = Set(before.compactMap { $0.windowId })
   let afterIds = Set(after.compactMap { $0.windowId })
   var d: [String: Any] = [:]
@@ -235,8 +247,11 @@ private func doClickInner(_ params: [String: Any]) -> [String: Any] {
 
 private func doType(_ params: [String: Any]) -> [String: Any] {
   let pre = surfacesNow(params)
+  // Typing almost never puts up a dialog, and it is the act a model does most
+  // often, so it barely waits.
   return doTypeInner(params).merging(
-    surfaceDelta(pid: pre.pid, before: pre.windows), uniquingKeysWith: { a, _ in a })
+    surfaceDelta(pid: pre.pid, before: pre.windows, settleMs: 200),
+    uniquingKeysWith: { a, _ in a })
 }
 
 private func doTypeInner(_ params: [String: Any]) -> [String: Any] {
@@ -304,8 +319,11 @@ private func doTypeInner(_ params: [String: Any]) -> [String: Any] {
 
 private func doKey(_ params: [String: Any]) -> [String: Any] {
   let pre = surfacesNow(params)
+  // A key chord is the likeliest thing to summon a dialog (⌘S, ⌘O, ⌘P), so it
+  // gets the longest look before answering.
   return doKeyInner(params).merging(
-    surfaceDelta(pid: pre.pid, before: pre.windows), uniquingKeysWith: { a, _ in a })
+    surfaceDelta(pid: pre.pid, before: pre.windows, settleMs: 900),
+    uniquingKeysWith: { a, _ in a })
 }
 
 private func doKeyInner(_ params: [String: Any]) -> [String: Any] {
@@ -492,6 +510,7 @@ private func dispatch(method: String, params: [String: Any]) -> [String: Any]? {
   case "windows": return doWindows(params)
   case "wallpaper": return doWallpaper(params)
   case "menus": return doMenus(params)
+  case "focusWindow", "raiseWindow": return doFocusWindow(params)
   case "menuClick": return doMenuClick(params)
   case "recordStart": return recordStart(params)
   case "recordStop": return recordStop()
@@ -536,6 +555,17 @@ private func doWindows(_ params: [String: Any]) -> [String: Any] {
   return d
 }
 
+/// `focusWindow` method: give the app a main window so its menus can validate,
+/// without activating it or moving the user's focus.
+private func doFocusWindow(_ params: [String: Any]) -> [String: Any] {
+  guard let resolved = resolveTargetPid(targetFrom(params)) else {
+    return ["ok": false, "error": "no such app"]
+  }
+  let ok = makeWindowMain(pid: resolved.pid)
+  let front = NSWorkspace.shared.frontmostApplication?.processIdentifier
+  return ["ok": ok, "frontmostUnchanged": front != resolved.pid]
+}
+
 /// `menus` method: the app's menu bar. With no `path` it lists the top-level
 /// menus; with one it lists that menu's items. A whole menu bar is hundreds of
 /// entries, so the default is deliberately shallow.
@@ -546,8 +576,8 @@ private func doMenus(_ params: [String: Any]) -> [String: Any] {
   let path = (stringOf(params["path"]) ?? "").split(separator: ">").map {
     $0.trimmingCharacters(in: .whitespaces)
   }.filter { !$0.isEmpty }
-  let depth = intOf(params["depth"]) ?? (path.isEmpty ? 1 : 2)
-  let entries = menuEntries(pid: resolved.pid, under: path, depth: depth)
+  let levels = intOf(params["levels"]) ?? 1
+  let entries = menuEntries(pid: resolved.pid, under: path, levels: levels)
   return [
     "ok": true, "app": resolved.name, "pid": Int(resolved.pid),
     "path": path.joined(separator: " > "),
@@ -558,7 +588,10 @@ private func doMenus(_ params: [String: Any]) -> [String: Any] {
 /// `menuClick` method: press a menu item by path. Accessibility presses the item
 /// directly, so the menu never opens on screen and the app never has to come to
 /// the front — the same background guarantee every other act keeps.
+private var result0FocusWarning = false
+
 private func doMenuClick(_ params: [String: Any]) -> [String: Any] {
+  result0FocusWarning = false
   guard let resolved = resolveTargetPid(targetFrom(params)) else {
     return ["ok": false, "error": "no such app"]
   }
@@ -569,36 +602,106 @@ private func doMenuClick(_ params: [String: Any]) -> [String: Any] {
   // jobs — discovery and action — so the model never has to know a second verb
   // exists, and "Format" is a useful thing to say rather than an error.
   if let entry = findMenuItem(pid: resolved.pid, path: path), entry.hasSubmenu {
-    let items = menuEntries(
-      pid: resolved.pid, under: entry.path, depth: entry.path.count + 1)
+    let items = menuEntries(pid: resolved.pid, under: entry.path, levels: 1)
     return [
       "ok": true, "listed": true, "path": entry.path.joined(separator: " > "),
       "items": items.map(menuEntryDict),
     ]
   }
   guard let entry = findMenuItem(pid: resolved.pid, path: path) else {
-    let top = menuEntries(pid: resolved.pid, under: [], depth: 1).map { $0.title }
+    let top = menuEntries(pid: resolved.pid, under: [], levels: 1).map { $0.title }
     return [
       "ok": false, "error": "no menu item matching \(path)",
       "menus": top,
     ]
   }
-  guard entry.enabled else {
-    return [
-      "ok": false, "error": "\(entry.path.joined(separator: " > ")) is disabled right now",
-    ]
+  // Do NOT refuse a menu item that reports itself disabled.
+  //
+  // AppKit only revalidates its menus when the app is ACTIVE or a menu is
+  // actually opened, so for the background app this whole surface exists to
+  // drive, "enabled" is routinely stale — File > Save read as disabled on a
+  // dirty, unsaved document. Refusing on that would make the menu bar unusable
+  // exactly where it is most useful. Pressing a genuinely disabled item does
+  // nothing, so trying costs nothing; the result says what it looked like and
+  // what actually happened.
+  // A stale "disabled" almost always means the app has no main window to
+  // validate against. Give it one and re-resolve, so the model does not have to
+  // know any of this — it asked for File > Save and it should get File > Save.
+  var item = entry
+  if !item.enabled {
+    makeWindowMain(pid: resolved.pid)
+    usleep(120_000)
+    if let refreshed = findMenuItem(pid: resolved.pid, path: path) { item = refreshed }
   }
   let before = appWindows(pid: resolved.pid)
-  let err = AXUIElementPerformAction(entry.element, kAXPressAction as CFString)
+
+  // If it STILL reads as disabled, press it the way a person would: send the
+  // item's own keyboard shortcut to the app.
+  //
+  // AppKit revalidates on the key-equivalent path at the moment the event
+  // arrives, so ⌘S lands on a document an inactive app's menu still describes
+  // as unsavable. MEASURED on TextEdit: File > Save and File > Close both read
+  // disabled with a dirty document open, AXPress on them did nothing, and the
+  // same command sent as its shortcut opened the save sheet. The event goes to
+  // this app's pid only, so the user's focus is still untouched.
+  var mode = "axPress"
+  var err = AXError.success
+  var borrowedFocus = false
+  if boolOf(params["activate"]) {
+    // The caller asked for the focus to be borrowed, because the item is one
+    // macOS will only run for the active app. Take it, run the command, hand it
+    // straight back.
+    let outcome = withBorrowedFocus(pid: resolved.pid) { () -> AXError in
+      guard let fresh = findMenuItem(pid: resolved.pid, path: path) else { return .cannotComplete }
+      let pressed = AXUIElementPerformAction(fresh.element, kAXPressAction as CFString)
+      if pressed != .success, !fresh.shortcut.isEmpty, let chord = parseCombo(fresh.shortcut) {
+        postKeyToPid(resolved.pid, flags: chord.flags, key: chord.key)
+        return .success
+      }
+      return pressed
+    }
+    err = outcome.value
+    borrowedFocus = true
+    mode = "activated"
+    if !outcome.restored { result0FocusWarning = true }
+  } else if !item.enabled, !item.shortcut.isEmpty, let chord = parseCombo(item.shortcut) {
+    postKeyToPid(resolved.pid, flags: chord.flags, key: chord.key)
+    mode = "shortcutToPid"
+  } else {
+    err = AXUIElementPerformAction(item.element, kAXPressAction as CFString)
+  }
   var result: [String: Any] = [
-    "ok": err == .success, "path": entry.path.joined(separator: " > "),
-    "background": true,
-    "shortcut": entry.shortcut,
+    "ok": err == .success, "path": item.path.joined(separator: " > "),
+    "background": !borrowedFocus,
+    "mode": mode,
+    "shortcut": item.shortcut,
   ]
+  if borrowedFocus {
+    result["focusBorrowed"] = true
+    result["focusRestored"] = !result0FocusWarning
+  }
   // A menu item is the most likely thing in the whole surface to put up a
   // dialog (Open…, Save As…, Print…), so the settle matters most here.
-  for (k, v) in surfaceDelta(pid: resolved.pid, before: before, settleMs: 350) {
-    result[k] = v
+  let delta = surfaceDelta(pid: resolved.pid, before: before, settleMs: 900)
+  for (k, v) in delta { result[k] = v }
+
+  if !item.enabled {
+    result["lookedDisabled"] = true
+    // Nothing happened, and the item read as disabled. For a background app
+    // that is the documented case, not a guess: macOS validates document
+    // commands only for the ACTIVE app, so Save, Bold and friends are inert
+    // until someone is looking at the app. Say so, and say what to do instead —
+    // an error the model cannot act on is worth nothing.
+    if delta.isEmpty && !borrowedFocus {
+      result["ok"] = false
+      result["error"] =
+        "\(item.path.joined(separator: " > ")) did nothing: macOS only runs a document command "
+        + "like this for the app that is FRONTMOST, and this app is being driven in the "
+        + "background. Either use the app's own on-screen controls (a snapshot lists them — "
+        + "TextEdit's ruler has bold/italic, most apps put their common commands in a toolbar), "
+        + "or pass activate:true to borrow the user's focus for just this one command and hand "
+        + "it straight back."
+    }
   }
   return result
 }

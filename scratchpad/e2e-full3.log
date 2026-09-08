@@ -1,0 +1,278 @@
+$ export PI_E2E_BACKGROUND=1 && node tests/e2e/headless-probe.mjs && node tests/e2e/probe.mjs && node tests/e2e/pi-probe.mjs && node tests/e2e/chat-ui-probe.mjs && node tests/e2e/session-switch-probe.mjs && node tests/e2e/canvas-probe.mjs && node tests/e2e/browser-probe.mjs && node tests/e2e/browser-use-probe.mjs && node tests/e2e/terminal-probe.mjs && node tests/e2e/onboarding-probe.mjs && node tests/e2e/settings-probe.mjs && node tests/e2e/connectors-probe.mjs && node tests/e2e/round3-probe.mjs && node tests/e2e/round4-probe.mjs && node tests/e2e/round5-probe.mjs && node tests/e2e/round6-probe.mjs && node tests/e2e/round7-probe.mjs && node tests/e2e/round8-probe.mjs && node tests/e2e/tasklist-probe.mjs && node tests/e2e/round9-live-render-probe.mjs && node tests/e2e/round9-file-write-probe.mjs && node tests/e2e/round9-file-edit-probe.mjs && node tests/e2e/round9-freescroll-probe.mjs && node tests/e2e/round9-sidebar-terminal-probe.mjs && node tests/e2e/round9-terminal-mirror-probe.mjs && node tests/e2e/round9-harness-probe.mjs && node tests/e2e/round9-connectors-probe.mjs && node tests/e2e/round9-robustness-probe.mjs && node tests/e2e/round9-single-instance-probe.mjs && node tests/e2e/round9-pi-crash-probe.mjs && node tests/e2e/round9-file-edit-live-probe.mjs && node tests/e2e/round9-canvas-tab-switch-probe.mjs && node tests/e2e/round14-download-probe.mjs && node tests/e2e/round14-composer-probe.mjs && node tests/e2e/effort-popover-probe.mjs && node tests/e2e/effort-toggle-probe.mjs && node tests/e2e/escape-stop-probe.mjs && node tests/e2e/jump-latest-probe.mjs && node tests/e2e/shortcuts-probe.mjs && node tests/e2e/add-server-probe.mjs && node tests/e2e/session-search-probe.mjs && node tests/e2e/export-drag-probe.mjs && node tests/e2e/notice-row-probe.mjs && node tests/e2e/slash-commands-probe.mjs && node tests/e2e/notify-probe.mjs && node tests/e2e/mention-probe.mjs && node tests/e2e/palette-probe.mjs && node tests/e2e/instructions-probe.mjs && node tests/e2e/a11y-probe.mjs && node tests/e2e/permission-probe.mjs && node tests/e2e/checkpoint-probe.mjs && node tests/e2e/round14-sidebar-rail-probe.mjs && node tests/e2e/round15-scale-probe.mjs && node tests/e2e/queue-explainer-probe.mjs && node tests/e2e/new-chat-snappy-probe.mjs && node tests/e2e/canvas-continuity-probe.mjs && node tests/e2e/bg-continuation-probe.mjs && node tests/e2e/queue-drain-probe.mjs && node tests/e2e/new-chat-stream-probe.mjs && node tests/e2e/notif-redesign-probe.mjs && node tests/e2e/live-canvas-probe.mjs && node tests/e2e/child-agent-probe.mjs && node tests/e2e/child-view-probe.mjs && node tests/e2e/corp-dropdown-probe.mjs && node tests/e2e/subagent-bridge-probe.mjs && node tests/e2e/child-dropdown-ux-probe.mjs && node tests/e2e/chat-projects-probe.mjs && node tests/e2e/chat-auto-projects-probe.mjs && node tests/e2e/chat-project-cwd-probe.mjs && node tests/e2e/mac-overlay-probe.mjs && node tests/e2e/mac-computeruse-probe.mjs && node tests/e2e/mac-live-fixes-probe.mjs && node tests/e2e/tripo-ui-probe.mjs && node tests/e2e/tripo-resize-probe.mjs && node tests/e2e/tripo-decisions-probe.mjs && node tests/e2e/studio-layout-probe.mjs && node tests/e2e/media-card-probe.mjs && node tests/e2e/topbar-title-probe.mjs && node tests/e2e/chat-quality-probe.mjs && node tests/e2e/jitter-selftest-probe.mjs && node tests/e2e/chat-stress-probe.mjs && node tests/e2e/power-probe.mjs && node tests/e2e/media-handoff-probe.mjs && node tests/e2e/download-stress-probe.mjs && node tests/e2e/settings-stress-probe.mjs && node tests/e2e/focus-ring-probe.mjs && node tests/e2e/run-card-probe.mjs && node tests/e2e/dialog-focus-probe.mjs
+[headless] OK: 1 window(s), none visible
+[headless] OK: not in the dock or the ⌘-Tab switcher
+[headless] OK: a home of its own, not the user's
+[headless] OK: laid out (700px) and animating (61 frames in 500ms — a hidden window runs off a timer, not vsync)
+[headless] OK: a real screenshot of a window nobody can see → /var/folders/4h/nq1c73q107v594j4g0lq6bw00000gn/T/pd-shots/headless-probe/hidden-window.png
+[headless] OK: notifications are suppressed, and say why
+headless-probe OK
+probe OK — bobble/claude/codex flavor+mode combos verified; screenshot: /Users/user/Desktop/OSS-harness/apps/desktop/test-results/w0-window.png
+pi-probe OK — mock-pi streamed a prompt end-to-end into the renderer store
+chat-ui-probe OK — streamed text + a COLLAPSED ActivityChain that expanded on click into steps, a step revealed its command, and `/` opened the command menu (B2)
+session-switch-probe OK — sidebar switch rehydrated the seeded session into the thread
+canvas-probe OK — big artifact → canvas TAB; small artifact stayed inline + moved to a tab; an inline svg rendered BETWEEN its text runs (A1); a data-URI PNG rendered loaded, not a spinner (B1)
+browser-probe OK — WebContentsView loaded a data: page (title flowed to the tab + URL bar), back/forward history works, and closing the canvas fully collapses the panel
+browser-use-probe OK — drove a live page over the socket bridge: navigated (PIBUA), snapshot returned 3 indexed elements, typed "hello" into the field, clicked the button by index (handler saw "CLICKED:hello"), read the article, and the virtual cursor moved to the commanded point (left=220px).
+terminal-probe OK — xterm mounted, PTY spawned, and `echo hi=$((6*7))` executed (rendered "hi=42")
+onboarding-probe OK (pass 1) — walked wizard; imports + flag landed on disk
+onboarding-probe OK (pass 2) — returning profile skipped straight to chat
+settings-probe OK — theme applied live + persisted; permission/effort/mcp-mode persisted; registry rewritten
+connectors-probe OK — recommended rendered from mocked scan; real brand SVGs render for github/figma/blender; trademark disclaimer present; install + enable/disable persisted; detail page + permission popup rendered; bash-cli mode persisted
+round3-probe OK — centered composer, no suggestions, markdown, hard-stop scroll, inline edit, drop overlay
+round4-probe OK — settings menu from bottom-left, custom instructions + icon-stroke persist, top bar cleaned, composer keeps focus after a modal interrupts it, narrowest window does not overflow and a tiny one collapses the sidebar
+round5-probe OK — workspace nav on top, title rename, info popover, no model footnote, thought collapsed+expands, inline image card+expand, canvas slide toggle
+round6-probe OK — streaming thought expanded→collapsed on response; thinking-only turn shows chain chrome (clock/line/Done); settings gear cog + open transition; the settings dialog closes from a labelled ✕ in its header
+round7-probe OK — search glass; light/dark bottom-left flips theme; top-right toggle opens/closes an empty canvas; file/browser/image operation bars render; reveal/open-with/open-external IPC fired; a file-write tool call opened a live streaming file tab
+round8-probe OK — sidebar collapse-left-of-search + CollapsibleSearch + Model-management + rail-on-collapse; canvas + menu opens file/browser/terminal; top-right toggle hides when canvas open (X in canvas); split Open fires default + lists other apps (default omitted) + fires open-with; project picker sets working folder + file-tree root; free-scroll holds during generation
+tasklist-probe: PASS
+round9-live-render-probe OK — streamed html routed to a live pd-preview iframe (frame posted ready + applied patches, seq climbed, same node/src across deltas = no reload); rendered/raw toggle flipped html to a highlighted source editor and back; streamed svg rendered + updated its drawn marker live; svg rendered/raw toggle flipped to source and back
+round9-file-write-probe OK — a write tool call opened a live file tab that updated across 3 streaming deltas, then finalized from disk (flipped to the authoritative on-disk bytes and dropped streaming)
+round9-file-edit-probe OK — an editable canvas file tab took a ⌘S edit that fired fs:write-file with the edited buffer and reflected it on the tab; the real write handler wrote an in-root path and REFUSED an out-of-root path (no file created)
+round9-freescroll-probe OK — chat thread held its scroll position through 6 rapid deltas then re-armed at the bottom; the live canvas file tab did the same (wheel-up released the stick, rapid deltas did not snap back, returning to the bottom re-armed autoscroll)
+round9-sidebar-terminal-probe OK — terminal tab mounted + FOCUSED and executed a command (rendered "hi=42"); sidebar collapsed to a ~64px icon rail and expanded back
+round9-terminal-mirror-probe OK — an interactive bash tool call opened a live mirror terminal tab whose xterm rendered the command ($ npm run dev) and its output (VITE ready)
+round9-harness-probe OK — status cluster showed class "coding" + live timer + repair indicator (3) + plan checklist; a subagent wave opened a live canvas subagent tab (Research running / Tests queued) and advanced in place; a multi-select answer [api,db] and a slider answer (40) round-tripped to pi and finished the plan
+round9-connectors-probe OK — sectioned gallery (Video editing under By us, HyperFrames under Official, both Preinstalled); builtin install is a rejected no-op; the "+" added memory; Bash CLI mode persisted to settings.json + rewrote the connector registry (mcp-connectors.json) + reflected in the renderer settings store; the Skills tab installed a bundled skill (copied SKILL.md into the isolated skills dir) and removed it on toggle-off
+round9-robustness-probe OK — a truncated session JSONL degraded gracefully (listed + rehydrated its valid turns, no crash); a tiny window + theme flip mid-stream did not overflow or crash
+round9-single-instance-probe OK — a second launch sharing the userData dir did not open a second window; the first app stayed alive with its single window (single-instance lock held)
+round9-pi-crash-probe OK — killing pi mid-stream surfaced ONE humanized restart toast ("●The assistant stoppedYour conversation is safe. Restart to keep going.Restart"), no raw signal code, no internal engine name, and left the UI mounted (no white-screen/hang)
+round9-file-edit-live-probe OK — a live-written file tab became editable after finalize and ⌘S saved the edit
+round9-canvas-tab-switch-probe OK — a second terminal tab showed its own surface, not the first terminal's content
+round14-download-probe OK — auto-download prompt is a centered Dialog (scrim + .pd-dialog); Verified + Recommended chips, size + Vision pills, speedometer "slow" word; Download → Downloading N% + Cancel mid-flight (cancelDownload clears the bar); corner-X dismisses
+round14-composer-probe OK — no .pd-tier-dot / composer-tier; empty center spacer; the Effort button reads "Effort · Adaptive" and reveals the slider popover; the footer chip shows "Auto · gemma4 e2b" (the LOADED model, not the tier) under Auto and "Balanced" when a tier is pinned; the tok/s readout is gone from the input bar; the turn-stats info button is always present; and (blind-test #1/#5) run status lives in exactly ONE thread indicator, the composer footer shows no run status, and a pinned tier never shows "Classifying"
+[effort] {"gapToTrigger":8.8,"rightEdgeSkew":1,"editorOverlapY":43.8,"aboveCardTop":false,"draftHeight":141.59}
+[effort] OK: the popover opens 8.8px above its own trigger, right edges aligned to 1px, with a 141.59px draft in the box (it covers 43.8px of the editor BY DESIGN — see the header)
+effort-toggle-probe OK
+[escape] OK: Escape stopped the turn
+[escape] OK: one Escape leaves the draft alone
+[escape] OK: the second Escape cleared it
+[escape] OK: the arming window expires
+escape-stop-probe OK
+[jump] at rest: {"distanceFromBottom":635,"scrollable":true}
+[jump] OK: hidden at the bottom
+[jump] OK: appears when scrolled up
+[jump] OK: lands at the bottom
+[jump] OK: hides again once there
+jump-latest-probe OK
+[keys] OK: ⌘U opens the file picker
+[keys] OK: ⌘T opened a tab (["New tab"])
+[keys] OK: ⌘P opened a tab (["New tab","Files"])
+shortcuts-probe OK
+[mcp] OK: adding a server is a button, not a menu of one
+[mcp] OK: submit is disabled until name + command
+[mcp] OK: registry has it ({"id":"probe-weather","name":"Probe Weather","command":"npx","args":["-y","@acme/weather-mcp"],"env":{"WEATHER_KEY":"abc123"},"enabled":true})
+add-server-probe OK
+[search] OK: main matched with excerpt "…k step 37 of the work step 38 of the work step 39 of the work Finally I ran the xylophone calibration ritual and it passed."
+[search] OK: a nonsense query matches nothing
+[search] OK: the sidebar explains the match ("…k step 37 of the work step 38 of the work step 39 of the work Finally I ran the xylophone calibration ritual and it passed.")
+session-search-probe OK
+[export] OK: markdown carries the renamed title and the tools
+[export] OK: raw JSONL is verbatim
+[export] OK: a non-session path is refused
+[export] OK: a real file starts an OS drag
+[export] OK: a missing file does not start one
+export-drag-probe OK
+[notice] OK: the warning is in the transcript
+[notice] OK: legible ({"color":"rgb(214, 214, 219)","background":"rgba(255, 159, 10, 0.14)","width":660})
+[notice] OK: info stays out of the transcript
+notice-row-probe OK
+[slash] OK: /help renders the help
+[slash] OK: /help never reached the model
+[slash] OK: a command with a tail is treated as a message
+[slash] OK: /compact refuses mid-stream, and says why
+slash-commands-probe OK
+[notify] OK: a test run is suppressed and says why — "suppressed: background test mode"
+[notify] OK: still suppressed with the window blurred — "suppressed: background test mode"
+[notify] OK: the dock badge counts waiting chats
+[notify] OK: zero clears it
+notify-probe OK
+[mention] OK: every top-level directory is reachable
+[mention] OK: found by name
+[mention] OK: the mention is the pill, and nothing above the box
+[mention] OK: it arrives as a pill, not typed text
+[mention] OK: the path stays in the message too
+mention-probe OK
+[palette] OK: opens with 6 rows
+[palette] OK: filters
+[palette] OK: initials match
+[palette] OK: Escape closes it
+[palette] OK: over Settings, one Escape closes only the palette
+palette-probe OK
+[instr] OK: reports the project file
+[instr] OK: with a size and a label (/var/folders/4h/nq1c73q107v594j4g0lq6bw00000gn/T/pd-instr-NPYwrK/AGENTS.md · 32 B)
+[instr] OK: a subdirectory inherits it
+[instr] OK: a bare project reports none of its own
+[instr] OK: a missing directory answers cleanly
+instructions-probe OK
+[a11y] OK: one main landmark
+[a11y] OK: a polite live region, present to the tree
+[a11y] OK: announced a stage — "Done"
+[a11y] OK: 2 tabs, full pattern
+a11y-probe OK
+[perm] OK: three answers
+[perm] OK: an edit renders as a diff
+[perm] OK: with the path it touches
+[perm] OK: answering closes it
+[perm] OK: the whole command is shown (605 chars)
+permission-probe OK
+[cp] OK: the checkpoint root is allowlisted for writes
+[cp] OK: the fence still refuses everything else
+[cp] (no harness status under mock-pi — the shape is unit-tested)
+checkpoint-probe OK
+round14-sidebar-rail-probe OK — 16px row icons; the panel stays mounted through the slide, leaves the tree once it is closed, and the shell toggle reopens it
+round15-scale-probe OK — sidebar + menu scale sliders drive --pd-sidebar-scale/--pd-menu-scale on <html>, persist, and grow the sidebar row height + menu-item min-height
+queue-explainer-probe OK — screenshots in /var/folders/4h/nq1c73q107v594j4g0lq6bw00000gn/T/queue-explainer-shots
+new-chat-snappy-probe OK — optimistic row shown; screenshot in /var/folders/4h/nq1c73q107v594j4g0lq6bw00000gn/T/new-chat-snappy-shots
+canvas-continuity-probe OK — filetree + browser tabs preserved across switch; /var/folders/4h/nq1c73q107v594j4g0lq6bw00000gn/T/canvas-continuity-shots
+bg-continuation-probe OK — A kept running off-screen + restored on return; /var/folders/4h/nq1c73q107v594j4g0lq6bw00000gn/T/bg-continuation-shots
+queue-drain-probe OK — queued hint below composer + queue drains when the bg run ends
+new-chat-stream-probe OK — New chat backgrounds the streaming chat (no dispose, no false finish); branch file hidden
+notif-redesign-probe OK — unread dots (blue/orange), input banner + dialog gate, bg optimistic row, queued thread
+live-canvas-probe OK — file tab auto-opens + focuses (LC1) and draws as it streams (LC2)
+child-agent-probe OK — spawned an independent pi (pid 56533), 14 tagged events, folded into a "Test subagent" transcript (2 msgs, assistant text "Hello from mock-pi — streaming works.…"), listed + disposed
+child-view-probe OK — nested dropdown lists the child (MP3); clicking shows its transcript via the same thread UI (MP4)
+corp-dropdown-probe OK — a running hierarchy lists every role in the situation room with the CEO first; clicking one pins it for viewing, and the CEO row is the way back
+subagent-bridge-probe OK — bridge spawned a subagent pi, streamed it to the dropdown ("Researcher": "Hello from mock-pi — streaming works.…"), and returned its answer as the summary ("Hello from mock-pi — streaming works.…")
+child-dropdown-ux-probe OK — A4 hover-caret swap + focused-chat fold toggle; A3 finished dot on a child that completed unviewed, cleared on open
+chat-projects-probe OK — created a project, assigned a chat into it (grouping), renamed a chat inline, pinned it, and deleted it through the confirm dialog (file removed)
+chat-auto-projects-probe OK — a working directory does NOT sprout a folder (auto-folders removed); the sandbox chat stays ungrouped; the "make this a project" offer lands on exactly the third chat
+chat-project-cwd-probe OK — projectless project offers "Set working folder", its project:project-sandbox dir is created, a new chat roots there + groups under the project, and the composer chip shows the project name (not "Sandbox").
+window checks OK (buffer=56): {"bounds":{"x":64,"y":64,"width":1012,"height":732},"alwaysOnTop":true,"focusable":false,"visible":false,"focused":false}
+live tracking OK: overlay followed the moved window
+prompt retarget OK: overlay followed the setBounds retarget
+occlusion conceal/reveal OK (z-order truth beats the frontmost proxy)
+mac-overlay-probe OK — shots in /var/folders/4h/nq1c73q107v594j4g0lq6bw00000gn/T/mac-overlay-shots
+mac-computeruse-probe: SKIP — set PI_MAC_E2E=1 to run (it launches + types into a real TextEdit on this machine)
+(a skipped probe is NOT a pass)
+mac-live-fixes-probe: SKIP — set PI_MAC_E2E=1 to run (drags/scrolls real apps on this machine)
+(a skipped probe is NOT a pass)
+  shot: 01-default.png
+  shot: 02-download-panel.png
+  shot: 03-imported.png
+  shot: 04-mode-textured.png
+  shot: 04-mode-normal.png
+  shot: 04b-wireframe-overlay.png
+  shot: 05-stage-download.png
+  shot: 06-animate.png
+  shot: 07-light-theme.png
+tripo-ui-probe PASSED — no placeholder, download panel with per-model downloads (and no card-size capability loops), multi-image input, drop-import with rendered previews, 3 render modes + wireframe overlay, stage download cards, the animate rig GATE, Send To logos, export. Shots: /var/folders/4h/nq1c73q107v594j4g0lq6bw00000gn/T/tripo-ui-shots
+  ok 760x480  rail 74 · panel 232 · viewport 200 · right 254
+  ok 760x900  rail 74 · panel 232 · viewport 200 · right 254
+  ok 820x480  rail 74 · panel 255 · viewport 200 · right 291
+  ok 820x900  rail 74 · panel 255 · viewport 200 · right 291
+  ok 900x480  rail 74 · panel 293 · viewport 200 · right 333
+  ok 900x900  rail 74 · panel 293 · viewport 200 · right 333
+  ok 1280x480  rail 74 · panel 302 · viewport 506 · right 344
+  ok 1280x900  rail 74 · panel 302 · viewport 506 · right 344
+
+tripo-resize-probe OK — no column leaves the window at any tested size
+  PASS  D3  tp-workspace-label nodes = 0 (want 0)
+  PASS  D8  single-line menu rows 32px @ 14px vs app 32px / 14px
+  PASS  D7  role=radiogroup/radio aria-checked=false,true,false tabindex=-1,0,-1 keys start@1→R0→R1→L0 Home@0 End@1 Down@0
+  PASS  D9  static row border="solid 0px rgb(245, 245, 247)" bg="rgba(0, 0, 0, 0)" vs card "solid 1px rgba(255, 255, 255, 0.08)"
+  PASS  D10  2 groups [tp-light-btn+tp-snapshot-btn+tp-grid-btn] [tp-help-btn+tp-history-btn], orphans=[]
+  PASS  D5  "Download all" accentFilled=false 182×32=5838px² @12px vs per-card accentFilled=true 169×34=5757px² @13px
+  PASS  D6  capability loops inside download cards = 0 across 8 cards (want 0)
+  PASS  D4  accent-filled controls on the Image panel = 1 (Generate Image=true, Make 3D=false)
+  PASS  D11  legacy class nodes {"tp-generate-btn":0,"tp-retry-btn":0,"tp-upload-btn":0} → semantic {"tp-btn-primary":5,"tp-btn-tonal":1,"tp-btn-quiet":2}
+  PASS  D2-floor  tripo.css declares 0 sub-11px sizes []; app renders 0 sub-11px text nodes
+  PASS  D2-axis  axis balls: 11px, worst contrast 4.06:1, 0 below 3:1 []
+
+decisions.json + screenshots → /var/folders/4h/nq1c73q107v594j4g0lq6bw00000gn/T/tripo-decisions
+
+tripo-decisions-probe PASSED — every decision measured in the running app.
+studio-layout-probe OK
+media-card-probe OK
+studio closing: 280 → 183, worst reversal 0px
+studio opening: 183 → 280, worst reversal 0px
+chat closing: 280 → 183, worst reversal 0px
+chat opening: 183 → 280, worst reversal 0px
+topbar-title-probe OK
+chat-quality-probe OK
+8 finding(s):
+  • bounce: div#1(1) moved 20px and came back 207ms later
+  • bounce: div#0(3) moved 20px and came back 207ms later
+  • bounce: div#0(0) appeared for 201ms (700x40)
+  • bounce: .pd-composer#1(2) shifted 20px
+  • bounce: div#0(3) shifted 20px (2×)
+  • bounce: .pd-composer#0(2) shifted 20px
+  • flash: [selftest-flash] appeared for 121ms (120x60)
+  • stall: 450ms frame
+jitter-selftest-probe OK
+[2s] steer-mid-turn
+[4s] pause-then-send
+[4s] new-chat-while-running
+[5s] attach-and-edit-files
+[8s] branch-switch
+[9s] model-swap-mid-turn
+[11s] rapid-sends
+[14s] model-download
+[17s] chain-settles
+[18s] route-switching
+[22s] chrome-toggles
+[27s] idle
+
+no jitter findings
+chat-stress-probe OK
+power-probe OK
+[1s] image handoff
+[2s] clear input
+[2s] drop accepted
+[2s] drop refused
+[5s] video handoff
+[6s] audio handoff
+[6s] 3d handoff
+[7s] result → chat, and back as input
+no jitter findings across the handoff paths
+shots: /var/folders/4h/nq1c73q107v594j4g0lq6bw00000gn/T/pd-shots/media-handoff-probe
+media-handoff-probe OK
+[1s] missing file
+   404 said: GET http://127.0.0.1:58990/unsloth/Qwen3.5-0.8B-MTP-GGUF/resolve/main/Qwen3.5-0.8B-Q8_0.gguf failed: HTTP 404 Not Found
+[2s] connection dropped
+   kept 2.1 MB for the retry
+[5s] resume from partial
+[6s] usable mid-download
+   resumed with: bytes=2097152-
+[14s] verify
+   verify: {"ok":true,"files":[{"file":"Qwen3.5-0.8B-Q8_0.gguf","ok":true,"checked":false}]}
+[14s] pause keeps, cancel discards
+[24s] delete
+no jitter findings during downloading
+shots: /var/folders/4h/nq1c73q107v594j4g0lq6bw00000gn/T/pd-shots/download-stress-probe
+download-stress-probe OK
+[1s] every settings section
+[3s] a knob reaches disk
+   icon stroke 1.25 -> 2.25
+[4s] capabilities gate the rooms
+[5s] image studio knobs
+   image models: Recommended | FLUX.2 klein (4B) | Z-Image Turbo | Qwen-Image 2512 | FLUX.1 schnell | FLUX.1-dev GGUF Q6_K (advanced)not available yet
+[8s] video studio knobs
+   video models: Recommended | Wan2.1 T2V (1.3B)not available yet | LTX-Video 2B distilled (safetensors, fast)not available yet | LTX-2 distilled (safetensors, default)not available yet | LTX-2 22B (quality · 64GB / remote)not available yet
+[15s] audio studio knobs
+   audio models: Recommended | Qwen3-TTS (1.7B) | Qwen3-TTS (0.6B, light) | Kokoro-82M | Voxtral 4B TTS | MOSS-TTSD (8B, dialogue) | MOSS-TTS Local (1.7B) | Dia (1.6B, expressive) | Chatterbox (voice clone)not available yet
+[17s] thrash
+no jitter findings while wrangling settings
+[20s] restart
+settings-stress-probe OK
+   survived: powerMode=low iconStroke=2.25
+shots: /var/folders/4h/nq1c73q107v594j4g0lq6bw00000gn/T/pd-shots/settings-stress-probe
+settings-stress-probe-2 OK
+  0 · before any click               ring=false focus-visible=false outline=none 3px rgb(245, 245, 247) @2px on studio-settings-toggle
+  1 · trigger clicked (menu open)    ring=false focus-visible=false outline=none 3px rgb(245, 245, 247) @0px on div.pd-menu.min-w-[190px]
+  2 · item chosen, menu closed       ring=false focus-visible=false outline=none 3px rgb(214, 214, 219) @2px on video-model-rail
+  3 · plain button clicked           ring=false focus-visible=false outline=none 3px rgb(245, 245, 247) @2px on studio-settings-toggle
+  4 · menu dismissed with Escape     ring=false focus-visible=true  outline=solid 2px rgba(0, 0, 0, 0) @2px on video-model-rail
+  5a · clicked away, ring cleared    ring=false focus-visible=true  outline=none 3px rgb(245, 245, 247) @2px on studio-prompt
+  5b · window blurred then refocused ring=false focus-visible=true  outline=none 3px rgb(245, 245, 247) @2px on studio-prompt
+
+  6 · tabbed to the next control     ring=true  focus-visible=true  outline=solid 2px rgb(41, 151, 255) @2px on video-shape
+  7 · light mode, escape-dismissed   ring=false focus-visible=true  outline=solid 2px rgba(0, 0, 0, 0) @2px on video-model-rail
+shots: <session-scratchpad>/ring
+focus-ring-probe OK
+   frame 322px vs image 320px
+   card left-offset 0px · prompt right-offset 0px
+   knob: {"label":"Edit magnitudeLowMediumHigh","options":["Low","Medium","High"]}
+shots: <session-scratchpad>/card
+run-card-probe OK
+[dialog-focus] the typed line is visible in the composer → 02-typing-lands-in-composer.png
+dialog-focus-probe OK

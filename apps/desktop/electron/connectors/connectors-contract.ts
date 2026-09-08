@@ -1,9 +1,10 @@
 /**
- * Connectors IPC contract — the Codex-style connectors gallery reads the catalog
- * + configured registry, runs the /Applications scan for "Recommended for you",
- * and mutates the registry (install / upsert / remove / enable). The main-process
- * handler (./connectors-main.ts) owns `~/.pi/desktop/mcp-connectors.json` via the
- * @pi-desktop/mcp-lite registry helpers.
+ * Connectors IPC contract — the Connectors screen reads the catalog + configured
+ * registry, runs the /Applications scan for "Recommended for you", mutates the
+ * registry (install / upsert / remove / enable), and lists a server's tools by
+ * starting it once. The main-process handler (./connectors-main.ts) owns
+ * `~/.pi/desktop/mcp-connectors.json` via the @pi-desktop/mcp-lite registry
+ * helpers.
  *
  * All payload types come from @pi-desktop/mcp-lite as TYPE-ONLY imports, so the
  * renderer/preload never bundle that package's node-touching modules — only the
@@ -15,6 +16,30 @@ import type {
   McpRegistryConfig,
   McpServerConfig,
 } from '@pi-desktop/mcp-lite';
+
+/** A tool as the screen shows it: name, one line, and what it costs to advertise. */
+export interface ConnectorToolListing {
+  /**
+   * Every tool the server reported — switched-off ones included, since the
+   * screen draws their switches. Never a schema; `tokens` is the estimate of
+   * what the schema costs the prompt when the tool is advertised in Native
+   * mode (≈ JSON length / 4).
+   */
+  tools: Array<{ name: string; description: string; tokens: number }>;
+  /**
+   * Set (tools empty) when the id is unknown / builtin / not installed, or
+   * the server could not be started or did not complete the handshake — the
+   * host's own sentence ("MCP server process exited (code 1)", "spawn uvx
+   * ENOENT", "… timed out after 15000ms").
+   */
+  error?: string;
+  /**
+   * The last lines the server wrote to stderr before it failed ("GitHub API:
+   * 401 Bad credentials") — the reason in the server's own words, which the
+   * host's exit code never carries. Empty on success.
+   */
+  stderr?: string[];
+}
 
 export type ConnectorsInvokeMap = {
   /** The configured registry (mode + servers) plus the full catalog of cards. */
@@ -49,16 +74,21 @@ export type ConnectorsInvokeMap = {
     response: { registry: McpRegistryConfig };
   };
   /**
-   * Live tool discovery for the detail view (Tier 2): spawn the installed server
-   * once via the mcp-lite ConnectorHost, list its tools (names + one-line
-   * descriptions — never schemas), then tear it down. Only ever called for an
-   * installed + enabled MCP connector; `error` is set (tools empty) when the id
-   * is unknown / builtin / not installed, or the handshake fails, so the view
-   * can fall back to the static Tier-1 config.
+   * List an installed + enabled server's tools: start it once via the mcp-lite
+   * ConnectorHost, list, tear it down. Only ever for an installed + enabled
+   * MCP connector; see {@link ConnectorToolListing} for the failure shape.
    */
   'connectors:tools': {
     request: { id: string };
-    response: { tools: Array<{ name: string; description: string }>; error?: string };
+    response: ConnectorToolListing;
+  };
+  /**
+   * The same listing for a config that is NOT in the registry — the add
+   * dialog's Test: start what the person typed, show its tools, write nothing.
+   */
+  'connectors:probe': {
+    request: { server: McpServerConfig };
+    response: ConnectorToolListing;
   };
 };
 
@@ -70,4 +100,5 @@ export const CONNECTORS_INVOKE_CHANNELS = [
   'connectors:remove',
   'connectors:set-enabled',
   'connectors:tools',
+  'connectors:probe',
 ] as const satisfies readonly (keyof ConnectorsInvokeMap)[];

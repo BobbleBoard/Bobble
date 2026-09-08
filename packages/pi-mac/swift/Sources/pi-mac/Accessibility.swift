@@ -536,9 +536,7 @@ func snapshotResultDict(_ snap: SnapshotResult, screenshot: [String: Any]?) -> [
   // The menu bar is a third of a real app's capability and appears in no
   // window, so the top-level titles ride along with every snapshot. Titles
   // only — a whole menu bar is hundreds of entries; naming one lists it.
-  let menus = menuEntries(pid: snap.pid, under: [], depth: 1)
-    .filter { $0.path.count == 1 }
-    .map { $0.title }
+  let menus = menuEntries(pid: snap.pid, under: [], levels: 1).map { $0.title }
   if !menus.isEmpty { result["menus"] = menus }
   if let shot = screenshot { result["screenshot"] = shot }
   return result

@@ -24,6 +24,8 @@ import { app, BrowserWindow } from 'electron';
 import { isBackgroundMode } from '../background-mode';
 import {
   comboLabel,
+  type MacCursorState,
+  type MacOverlayState,
   type OverlayRect,
   overlayBoundsFor,
   overlayShouldShow,
@@ -77,6 +79,9 @@ export type BoundsSample = OverlayRect & {
 /** Injected read of the controlled window's live frame (null = no window). */
 export type BoundsReader = (pid: number) => Promise<BoundsSample | null>;
 
+/** Re-exported for callers that already import from this module. */
+export type { MacOverlayState } from './overlay-geometry';
+
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => {
     const t = setTimeout(r, ms);
@@ -105,10 +110,61 @@ class MacOverlayController {
   #wantsVisible = false;
   #revertTimer: ReturnType<typeof setTimeout> | null = null;
   #idleTimer: ReturnType<typeof setTimeout> | null = null;
+  /** The phantom's position in GLOBAL SCREEN POINTS — see {@link MacOverlayState}. */
+  #screenCursor: { x: number; y: number } | null = null;
+  #cursorState: MacCursorState = 'idle';
+  #statusText = '';
+  #bubbleVisible = false;
+  #watchers = new Set<(state: MacOverlayState) => void>();
 
   /** mac-agent injects the helper-backed bounds reader once at registration. */
   setBoundsReader(reader: BoundsReader): void {
     this.#boundsReader = reader;
+  }
+
+  // ── published state (monitor.ts's single source of truth) ──────────────
+
+  /** A snapshot of what the phantom is doing right now. */
+  state(): MacOverlayState {
+    const target = this.#target;
+    return {
+      engaged: target !== null,
+      pid: target?.pid ?? null,
+      rect: target === null ? null : { ...target.rect },
+      cursor: this.#screenCursor === null ? null : { ...this.#screenCursor },
+      cursorState: this.#cursorState,
+      statusText: this.#statusText,
+      bubbleVisible: this.#bubbleVisible,
+      wantsVisible: this.#wantsVisible,
+    };
+  }
+
+  /** Watch {@link state} for changes. Returns an unsubscribe. */
+  watch(listener: (state: MacOverlayState) => void): () => void {
+    this.#watchers.add(listener);
+    return () => {
+      this.#watchers.delete(listener);
+    };
+  }
+
+  #emit(): void {
+    if (this.#watchers.size === 0) return;
+    const snapshot = this.state();
+    for (const w of this.#watchers) {
+      try {
+        w(snapshot);
+      } catch {
+        /* a watcher must never break a tool call */
+      }
+    }
+  }
+
+  /** Record the bubble state alongside the push to overlay.html, so the two
+   * always describe the same moment. */
+  #setStatus(state: MacCursorState, text = ''): void {
+    this.#cursorState = state;
+    this.#statusText = text;
+    this.#bubbleVisible = state !== 'idle';
   }
 
   // ── window lifecycle ───────────────────────────────────────────────────
@@ -196,6 +252,7 @@ class MacOverlayController {
     this.#markActivity(); // control() means the model just acted → show
     win.setBounds(overlayBoundsFor(this.#target.rect));
     this.#applyVisibility(true);
+    this.#emit();
     await this.#push({ kind: 'reset' });
     this.#startTracking();
   }
@@ -207,6 +264,7 @@ class MacOverlayController {
     this.#target = { pid: null, rect };
     win.setBounds(overlayBoundsFor(rect));
     this.#applyVisibility(true);
+    this.#emit();
     await this.#push({ kind: 'reset' });
   }
 
@@ -260,6 +318,7 @@ class MacOverlayController {
     target.rect = { x: fresh.x, y: fresh.y, w: fresh.w, h: fresh.h };
     // Instant follow: no animate, no moveTop/focus — just the new frame.
     win.setBounds(overlayBoundsFor(target.rect));
+    this.#emit();
     if (resized && this.#cursorOutsidePadded(target.rect)) await this.#push({ kind: 'reset' });
   }
 
@@ -282,7 +341,9 @@ class MacOverlayController {
      * should be. Keeping the answer here is what lets a probe test that logic
      * without a window ever appearing over someone's work.
      */
+    const changed = this.#wantsVisible !== show;
     this.#wantsVisible = show;
+    if (changed) this.#emit();
     if (show) {
       if (!win.isVisible() && !isBackgroundMode()) win.showInactive();
     } else if (win.isVisible()) {
@@ -359,6 +420,9 @@ class MacOverlayController {
     if (target === null) return null;
     const p = toLocalPoint(screenX, screenY, target.rect);
     this.#lastCursor = p; // remembered so a resize knows whether to re-clamp
+    // The GLOBAL point too: the canvas monitor draws in screen space and would
+    // otherwise have to invert the overlay's padded-local mapping.
+    this.#screenCursor = { x: screenX, y: screenY };
     return p;
   }
 
@@ -367,6 +431,7 @@ class MacOverlayController {
     const p = this.#local(screenX, screenY);
     if (p === null) return;
     this.#armIdle();
+    this.#emit();
     await this.#push({ kind: 'cursor', x: p.x, y: p.y, ms: CURSOR_TRAVEL_MS });
     await sleep(CURSOR_TRAVEL_MS);
   }
@@ -376,6 +441,9 @@ class MacOverlayController {
     const p = this.#local(screenX, screenY);
     if (p === null) return;
     this.#armIdle();
+    // overlay.html's 'click' message shows the "Clicking" bubble itself.
+    this.#setStatus('clicking');
+    this.#emit();
     await this.#push({ kind: 'click', x: p.x, y: p.y });
     this.#revertSoon();
   }
@@ -383,36 +451,51 @@ class MacOverlayController {
   /** Live-typing bubble (optionally previewing the text) at the cursor. */
   async typing(text: string): Promise<void> {
     this.#armIdle();
-    await this.#push({ kind: 'status', status: 'typing', text: typingPreview(text) });
+    const preview = typingPreview(text);
+    this.#setStatus('typing', preview);
+    this.#emit();
+    await this.#push({ kind: 'status', status: 'typing', text: preview });
   }
 
   async keyPress(combo: string): Promise<void> {
     this.#armIdle();
-    await this.#push({ kind: 'status', status: 'pressing', text: comboLabel(combo) });
+    const label = comboLabel(combo);
+    this.#setStatus('pressing', label);
+    this.#emit();
+    await this.#push({ kind: 'status', status: 'pressing', text: label });
     this.#revertSoon();
   }
 
   async scrolling(): Promise<void> {
     this.#armIdle();
+    this.#setStatus('scrolling');
+    this.#emit();
     await this.#push({ kind: 'status', status: 'scrolling' });
     this.#revertSoon();
   }
 
   async opening(appName: string): Promise<void> {
     this.#armIdle();
-    await this.#push({ kind: 'status', status: 'opening', text: `Opening ${appName}` });
+    const label = `Opening ${appName}`;
+    this.#setStatus('opening', label);
+    this.#emit();
+    await this.#push({ kind: 'status', status: 'opening', text: label });
   }
 
   /** The resting state between actions: the model is deciding what to do. */
   async thinking(): Promise<void> {
     this.#clearRevert();
     this.#armIdle();
+    this.#setStatus('thinking');
+    this.#emit();
     await this.#push({ kind: 'status', status: 'thinking' });
   }
 
   #revertSoon(): void {
     this.#clearRevert();
     this.#revertTimer = setTimeout(() => {
+      this.#setStatus('thinking');
+      this.#emit();
       void this.#push({ kind: 'status', status: 'thinking' });
     }, TRANSIENT_STATUS_MS);
     this.#revertTimer.unref?.();
@@ -433,6 +516,8 @@ class MacOverlayController {
     this.#markActivity();
     if (this.#idleTimer !== null) clearTimeout(this.#idleTimer);
     this.#idleTimer = setTimeout(() => {
+      this.#bubbleVisible = false;
+      this.#emit();
       void this.#push({ kind: 'hide-bubble' });
     }, BUBBLE_IDLE_MS);
     this.#idleTimer.unref?.();
@@ -490,13 +575,17 @@ class MacOverlayController {
     this.#lastCursor = null;
     this.#lastActivityAt = null;
     this.#lastOccluded = null;
+    this.#screenCursor = null;
+    this.#setStatus('idle');
     const win = this.#win;
     this.#wantsVisible = false;
     if (win !== null && !win.isDestroyed() && win.isVisible()) win.hide();
+    this.#emit();
   }
 
   dispose(): void {
     this.hide();
+    this.#watchers.clear();
     const win = this.#win;
     this.#win = null;
     if (win !== null && !win.isDestroyed()) win.destroy();

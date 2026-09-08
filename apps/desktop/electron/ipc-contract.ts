@@ -38,6 +38,11 @@ import {
 } from './gen3d/gen3d-contract';
 import { IMPORT_INVOKE_CHANNELS, type ImportInvokeMap } from './import/import-contract';
 import {
+  MAC_MONITOR_INVOKE_CHANNELS,
+  type MacMonitorEventMap,
+  type MacMonitorInvokeMap,
+} from './mac/mac-monitor-contract';
+import {
   STORE_INVOKE_CHANNELS,
   type StoreEventMap,
   type StoreInvokeMap,
@@ -836,6 +841,9 @@ export type MacInvokeMap = {
 
 export const MAC_INVOKE_CHANNELS = ['mac:debug'] as const satisfies readonly (keyof MacInvokeMap)[];
 
+// The computer-use monitor's own channels live in mac/mac-monitor-contract.ts
+// (they are a real product surface, not an E2E seam like `mac:debug`).
+
 export type AppInvokeMap = CoreInvokeMap &
   FsInvokeMap &
   LlmInvokeMap &
@@ -865,6 +873,7 @@ export type AppInvokeMap = CoreInvokeMap &
   PtyInvokeMap &
   CorpInvokeMap &
   MacInvokeMap &
+  MacMonitorInvokeMap &
   PiInvokeMap;
 
 /** Runtime allowlist for the preload's invoke passthrough: only channels in
@@ -897,6 +906,7 @@ export const APP_INVOKE_CHANNELS = [
   ...PTY_INVOKE_CHANNELS,
   ...CORP_INVOKE_CHANNELS,
   ...MAC_INVOKE_CHANNELS,
+  ...MAC_MONITOR_INVOKE_CHANNELS,
   ...PI_INVOKE_CHANNELS,
   ...ENGINE_INVOKE_CHANNELS,
   ...HARNESS_INVOKE_CHANNELS,
@@ -967,6 +977,7 @@ export type AppEventMap = {
   'canvas:popout-artifact': CanvasArtifactPayload;
 } & BrowserEventMap &
   BrowserAgentEventMap &
+  MacMonitorEventMap &
   PtyEventMap &
   CorpEventMap &
   GenEventMap &

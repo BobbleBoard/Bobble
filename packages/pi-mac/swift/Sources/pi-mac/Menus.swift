@@ -45,10 +45,11 @@ private func shortcutLabel(_ el: AXUIElement) -> String {
   return label + ch.uppercased()
 }
 
-/// Walk the menu bar depth-first. `under` limits the walk to one top-level menu
-/// (the common case — a whole menu bar is hundreds of items and would drown the
-/// snapshot it is meant to help).
-func menuEntries(pid: pid_t, under: [String] = [], depth: Int = 2) -> [MenuEntry] {
+/// Walk the menu bar depth-first. `under` limits the walk to one branch and
+/// `levels` says how many levels BELOW that branch to include — a whole menu bar
+/// is hundreds of items and returning it all would drown the list it is meant to
+/// help, so one level is the default and naming a submenu opens the next.
+func menuEntries(pid: pid_t, under: [String] = [], levels: Int = 1) -> [MenuEntry] {
   guard let bar = menuBar(of: pid) else { return [] }
   var out: [MenuEntry] = []
 
@@ -64,6 +65,7 @@ func menuEntries(pid: pid_t, under: [String] = [], depth: Int = 2) -> [MenuEntry
       let title = cleanText(axString(child, kAXTitleAttribute) ?? "")
       if title.isEmpty { continue }  // separators
       let here = path + [title]
+      if here.count > under.count + levels { continue }
       // Only descend the branch the caller asked about.
       let onPath =
         under.isEmpty || zip(under, here).allSatisfy { $0.lowercased() == $1.lowercased() }
@@ -76,7 +78,9 @@ func menuEntries(pid: pid_t, under: [String] = [], depth: Int = 2) -> [MenuEntry
             enabled: axBool(child, kAXEnabledAttribute) ?? true,
             shortcut: shortcutLabel(child), hasSubmenu: submenu != nil, element: child))
       }
-      if let submenu, level < depth { walk(submenu, path: here, level: level + 1) }
+      if let submenu, here.count < under.count + levels {
+        walk(submenu, path: here, level: level + 1)
+      }
     }
   }
   walk(bar, path: [], level: 0)
@@ -92,7 +96,7 @@ func findMenuItem(pid: pid_t, path: String) -> MenuEntry? {
     $0.trimmingCharacters(in: .whitespaces).lowercased()
   }.filter { !$0.isEmpty }
   guard !wanted.isEmpty else { return nil }
-  let all = menuEntries(pid: pid, under: [], depth: 3)
+  let all = menuEntries(pid: pid, under: [], levels: 3)
   // Exact path first.
   if let hit = all.first(where: { $0.path.map { p in p.lowercased() } == wanted }) { return hit }
   // Then a path SUFFIX ("New" → File > New), preferring the shallowest match so

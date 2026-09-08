@@ -86,8 +86,13 @@ struct AppWindow {
 
 /// Roles that are a presented surface in their own right rather than content.
 private let SURFACE_ROLES: Set<String> = ["AXSheet", "AXDrawer", "AXPopover"]
-/// Subroles that mark a top-level window as a dialog rather than a document.
-private let DIALOG_SUBROLES: Set<String> = ["AXDialog", "AXSystemDialog", "AXFloatingWindow"]
+/// Subroles that mark a window as a SYSTEM dialog. Deliberately not "AXDialog":
+/// MEASURED on macOS 27, every one of TextEdit's ordinary document windows
+/// reports subrole AXDialog, so treating that as modal marked eight open
+/// documents as eight modals and would have refused every legitimate act on
+/// them. Modality is read from AXModal and from the AXSheet role, which are the
+/// two signals that mean it.
+private let DIALOG_SUBROLES: Set<String> = ["AXSystemDialog"]
 /// Processes that host UI on another app's behalf. Their windows belong to the
 /// app the user is looking at, so control has to follow them.
 let PANEL_HOST_BUNDLES: Set<String> = [
@@ -144,8 +149,7 @@ private func windowRecord(
     frame: frame,
     isMain: axBool(el, kAXMainAttribute) ?? false,
     isFocused: wid != nil && wid == focusedId,
-    isModal: isSheet || DIALOG_SUBROLES.contains(subrole)
-      || (axBool(el, "AXModal") ?? false),
+    isModal: isSheet || DIALOG_SUBROLES.contains(subrole) || (axBool(el, "AXModal") ?? false),
     isSheet: isSheet,
     z: cg?.z ?? Int.max)
 }
@@ -160,6 +164,13 @@ func appWindows(pid: pid_t, includeOffScreen: Bool = false) -> [AppWindow] {
   let screen = onScreenWindows()
   var byId: [CGWindowID: CGWinInfo] = [:]
   for w in screen { byId[w.windowId] = w }
+  // Without the Screen Recording grant the window server can hand back a list
+  // with none of this app's windows in it. That is missing INFORMATION, not
+  // evidence that the app has no windows — and treating it as the latter is
+  // what made a whole app (dialogs included) enumerate as empty while
+  // Accessibility was happily returning its elements. When the window server
+  // tells us nothing about this pid, trust Accessibility alone.
+  let cgKnowsThisApp = screen.contains { $0.ownerPid == pid }
 
   let focusedEl = axCopy(app, kAXFocusedWindowAttribute).map { unsafeBitCast($0, to: AXUIElement.self) }
   let focusedId = focusedEl.flatMap { axWindowID($0) }
@@ -179,7 +190,7 @@ func appWindows(pid: pid_t, includeOffScreen: Bool = false) -> [AppWindow] {
         if seenIds.contains(id) { continue }
         seenIds.insert(id)
       }
-      if !includeOffScreen && rec.windowId != nil && byId[rec.windowId!] == nil { continue }
+      if !includeOffScreen, cgKnowsThisApp, let id = rec.windowId, byId[id] == nil { continue }
       out.append(rec)
     }
   }
@@ -258,4 +269,66 @@ func windowDict(_ w: AppWindow) -> [String: Any] {
 
 func rectDict(_ r: CGRect) -> [String: Any] {
   ["x": r.minX, "y": r.minY, "w": r.width, "h": r.height]
+}
+
+
+/// Make an app's front document window its MAIN window, without activating the
+/// app.
+///
+/// AppKit only validates its menus against the responder chain of the main
+/// window, and an inactive app can have none — which is why File > Save reads
+/// as disabled on a dirty, unsaved document and pressing it does nothing. This
+/// gives the menu something to validate against while leaving the user's focus
+/// exactly where it was.
+@discardableResult
+func makeWindowMain(pid: pid_t) -> Bool {
+  let surfaces = appWindows(pid: pid)
+  // Never steal main-ness from a modal — that is the surface the app is
+  // deliberately blocked behind.
+  guard let target = surfaces.first(where: { !$0.isModal && $0.role == "AXWindow" }),
+    let el = target.element
+  else { return false }
+  // AXRaise reorders the window WITHIN its own app, which is what gives an
+  // inactive app a main window to validate its menus against — unlike setting
+  // AXFrontmost, it does not activate the app or move the user's focus.
+  let raised = AXUIElementPerformAction(el, kAXRaiseAction as CFString)
+  let main = AXUIElementSetAttributeValue(el, kAXMainAttribute as CFString, kCFBooleanTrue)
+  let focused = AXUIElementSetAttributeValue(el, kAXFocusedAttribute as CFString, kCFBooleanTrue)
+  return raised == .success || main == .success || focused == .success
+}
+
+
+/// Run `body` with the target app momentarily frontmost, then give the user's
+/// app back the focus.
+///
+/// MEASURED on macOS 27: AppKit only validates document-scoped menu commands
+/// against the main window of the ACTIVE app, and an inactive app has none. So
+/// File > Save and Format > Font > Bold read as disabled on a dirty, open
+/// document, AXPress on them does nothing, and ⌘S delivered to the app's own
+/// queue does nothing either. AXRaise, AXMain and AXFocused were all tried
+/// first: raise succeeds and changes nothing about validation.
+///
+/// Borrowing the focus for the length of one command is therefore the only way
+/// those commands run at all. It is never done silently — the caller asks for
+/// it, and the result says the focus was borrowed and returned.
+func withBorrowedFocus<T>(pid: pid_t, _ body: () -> T) -> (value: T, restored: Bool) {
+  let previous = NSWorkspace.shared.frontmostApplication
+  let target = NSRunningApplication(processIdentifier: pid)
+  target?.activate(options: [])
+  // Activation is asynchronous; a command sent before it lands validates
+  // against the old state and is silently dropped, which is the whole bug.
+  var waited = 0
+  while waited < 900,
+    NSWorkspace.shared.frontmostApplication?.processIdentifier != pid
+  {
+    usleep(50_000)
+    waited += 50
+  }
+  let value = body()
+  usleep(150_000)
+  var restored = true
+  if let previous, previous.processIdentifier != pid {
+    restored = previous.activate(options: [])
+  }
+  return (value, restored)
 }

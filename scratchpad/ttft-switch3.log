@@ -1,0 +1,33 @@
+
+waiting for the app to bring its own model up…
+
+  app activated: qwen3.5-4b-mtp on http://127.0.0.1:58382/v1
+llama-server on 51410
+
+  cold-open                   7487ms   reused   9733 /   9733 tok   (dispatch 25ms)
+      system prompt diverges at char 0 of 0 (0% in)
+        was: ""
+        now: "You are an expert coding assistant operating inside pi, a coding agent harness. You help users by reading files, executing commands, editing"
+      PREFIX CHANGED before follow-up: system prompt (0→17646 chars) +tools[capability,use,read,write,edit,bash,update_plan,ask_user,present,generate_image,generate_video,generate_speech,generate_music,generate_sfx,web_search,web_fetch,spawn_subagent,talk_to_manager]
+  follow-up                    724ms   reused   9733 /   9733 tok   (dispatch 36ms)
+  (the chat's messages came back in 43ms)
+  chat-switch-back            2435ms   reused   9733 /   9733 tok   (dispatch 16ms)
+
+──────────────── TTFT matrix ────────────────
+  case                        ttft      reused / prompt   verdict
+  cold-open                   7487ms     9733 /   9733  100%  reused
+  follow-up                    724ms     9733 /   9733  100%  reused
+  chat-switch-back            2435ms     9733 /   9733  100%  reused
+
+  OK: every route over 1500ms that the app could SEE coming said so on screen.
+
+  slow, and the screen said so:
+    cold-open                 7487ms — "Getting ready · 0:01"
+
+  slow for a reason nothing in the app models (reported, not a failure):
+    chat-switch-back          2435ms   9733/9733 reused
+        prefill {"at":1788807865808,"what":"prime","slotEpoch":"","prefixChars":0,"historyTurns":4,"withUser":false,"tools":18}
+        prefill {"at":1788807865813,"what":"primed","success":true,"aborted":true}
+        prefill {"at":1788807867077,"what":"prime","slotEpoch":"3","prefixChars":0,"historyTurns":4,"withUser":false,"tools":18}
+        prefill {"at":1788807867080,"what":"primed","success":true,"aborted":true}
+  OK: every route under 1500ms had a clear screen.

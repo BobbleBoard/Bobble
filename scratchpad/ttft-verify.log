@@ -1,0 +1,35 @@
+
+waiting for the app to bring its own model up…
+
+  app activated: qwen3.5-4b-mtp on http://127.0.0.1:56361/v1
+llama-server on 64507
+
+  cold-open                   7950ms   reused   9738 /   9738 tok   (dispatch 37ms)
+      system prompt diverges at char 0 of 0 (0% in)
+        was: ""
+        now: "You are an expert coding assistant operating inside pi, a coding agent harness. You help users by reading files, executing commands, editing"
+      PREFIX CHANGED before follow-up: system prompt (0→17646 chars) +tools[capability,use,read,write,edit,bash,update_plan,ask_user,present,generate_image,generate_video,generate_speech,generate_music,generate_sfx,web_search,web_fetch,spawn_subagent,talk_to_manager]
+  follow-up                    756ms   reused   9738 /   9738 tok   (dispatch 34ms)
+      PREFIX CHANGED before follow-up-after-postturn: +tools[ls]
+  follow-up-after-postturn     749ms   reused   9738 /   9738 tok   (dispatch 34ms)
+  (the chat's messages came back in 48ms)
+      PREFIX CHANGED before chat-switch-back: -tools[ls]
+  chat-switch-back            1744ms   reused   9738 /   9738 tok   (dispatch 20ms)
+  new-chat                     658ms   reused   9738 /   9738 tok   (dispatch 31ms)
+  attachment                   220ms   reused   9738 /   9738 tok   (dispatch 41ms)
+
+──────────────── TTFT matrix ────────────────
+  case                        ttft      reused / prompt   verdict
+  cold-open                   7950ms     9738 /   9738  100%  reused
+  follow-up                    756ms     9738 /   9738  100%  reused
+  follow-up-after-postturn     749ms     9738 /   9738  100%  reused  (after 20s of quiet)
+  chat-switch-back            1744ms     9738 /   9738  100%  reused
+  new-chat                     658ms     9738 /   9738  100%  reused
+  attachment                   220ms     9738 /   9738  100%  reused  (after an 8s prefill window)
+
+  OK: every route over 1500ms that the app could SEE coming said so on screen.
+
+  slow, and the screen said so:
+    cold-open                 7950ms — "Getting ready · 0:01"
+    chat-switch-back          1744ms — "Getting this ready"
+  OK: every route under 1500ms had a clear screen.

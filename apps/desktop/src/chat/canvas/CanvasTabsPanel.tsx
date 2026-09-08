@@ -39,6 +39,7 @@ import {
   useCorpCanvasRouting,
 } from './corp-canvas-routing';
 import { openProjectFileTree, useFileTabRefresh, useFileWriteCanvasRouting } from './file-tabs';
+import { useMacMonitor } from './mac-monitor';
 import { useNativeSurfaces } from './native-surfaces';
 import { createCanvasDragResize } from './resize-collapse';
 import { useSubagentCanvasRouting } from './subagent-routing';
@@ -136,6 +137,9 @@ export function CanvasTabsPanel({ suppressed = false }: { suppressed?: boolean }
   // browser-use: open/focus + register the agent browser tab on request from
   // the main-process bridge, and reflect its "driving" chrome.
   useBrowserAgent(controller);
+  // Mac computer-use: open/focus the live monitor tab when Pi takes control of
+  // an app, and keep its title on the app being driven.
+  useMacMonitor(controller);
   // generation (experimental): stream `generate_image`/`generate_video` jobs into
   // a live gen-image canvas tab. Inert unless the generation flag / `?gen=1` is on.
   useGen(controller);

@@ -1,0 +1,98 @@
+model qwen3.5-4b-mtp on 57609
+
+measuring the prime… (~4500 tokens, 24898 chars)
+  the attachment primes in 32749ms (busy: true, prompt 15798 tok)
+
+  OK: the attachment is actually primed in the background at all
+  OK: the primed prompt leaves room under the context (15798 of 32768)
+      slot +82ms  busy=true 0/15816
+      slot +108ms  busy=true 14/15816
+      slot +194ms  busy=true 14/15820
+  waited-for-prime           242ms   processed     14 of  15820
+  OK: waited-for-prime: the turn did not error
+      {"at":1788799090751,"what":"skipped","because":"no model server","prefixChars":0}
+      {"at":1788799092593,"what":"skipped","because":"no system prompt published yet","prefixChars":0}
+      {"at":1788799092611,"what":"skipped","because":"no system prompt published yet","prefixChars":24938}
+      {"at":1788799094863,"what":"skipped","because":"the turn tools are not known yet","prefixChars":24938}
+      {"at":1788799095066,"what":"prime","slotEpoch":"","prefixChars":24938,"historyTurns":0,"withUser":true,"tools":18}
+      {"at":1788799108779,"what":"primed","success":true,"aborted":false,"promptN":15802,"processedN":15802,"processedMs":13656.119}
+      {"at":1788799116326,"what":"prime","slotEpoch":"1","prefixChars":24938,"historyTurns":0,"withUser":true,"tools":18}
+      {"at":1788799122781,"what":"primed","success":true,"aborted":false,"promptN":15802,"processedN":6086,"processedMs":6419.358}
+      {"at":1788799125625,"what":"aborted-on-send","had":false}
+      {"at":1788799125637,"what":"skipped","because":"a turn is using the slot","prefixChars":0}
+      {"at":1788799125677,"what":"skipped","because":"a turn is using the slot","prefixChars":0}
+      {"at":1788799125864,"what":"skipped","because":"a turn is using the slot","prefixChars":0}
+      slot +56ms  busy=true 2048/13309
+      slot +1573ms  busy=true 4096/13309
+      slot +2206ms  busy=true 4096/15286
+      slot +3823ms  busy=true 6073/15286
+      slot +4457ms  busy=true 6073/15798
+      slot +4490ms  busy=true 6585/15798
+      slot +5054ms  busy=true 6585/15802
+      slot +5107ms  busy=true 14/15816
+      slot +5208ms  busy=true 14/15820
+      slot +5242ms  busy=true 18/15823
+  sent-mid-prime            5242ms   processed     18 of  15823
+  OK: sent-mid-prime: the turn did not error
+      {"at":1788799128281,"what":"skipped","because":"a turn is using the slot","prefixChars":0}
+      {"at":1788799128282,"what":"skipped","because":"a turn is using the slot","prefixChars":0}
+      {"at":1788799128322,"what":"skipped","because":"a turn is using the slot","prefixChars":0}
+      {"at":1788799128323,"what":"skipped","because":"a turn is using the slot","prefixChars":0}
+      {"at":1788799128324,"what":"skipped","because":"a turn is using the slot","prefixChars":0}
+      {"at":1788799128363,"what":"skipped","because":"a turn is using the slot","prefixChars":0}
+      {"at":1788799128364,"what":"skipped","because":"a turn is using the slot","prefixChars":0}
+      {"at":1788799128365,"what":"skipped","because":"a turn is using the slot","prefixChars":0}
+      {"at":1788799128403,"what":"skipped","because":"a turn is using the slot","prefixChars":0}
+      {"at":1788799128410,"what":"skipped","because":"a turn is using the slot","prefixChars":0}
+      {"at":1788799128446,"what":"skipped","because":"no system prompt published yet","prefixChars":0}
+      {"at":1788799129476,"what":"skipped","because":"the turn tools are not known yet","prefixChars":0}
+      {"at":1788799129476,"what":"skipped","because":"an empty chat is the warm-up's job","prefixChars":0}
+      {"at":1788799130943,"what":"skipped","because":"an empty chat is the warm-up's job","prefixChars":0}
+      {"at":1788799131160,"what":"prime","slotEpoch":"2","prefixChars":24938,"historyTurns":0,"withUser":true,"tools":18}
+      {"at":1788799133072,"what":"kept-on-send","had":true}
+      {"at":1788799133079,"what":"skipped","because":"a turn is using the slot","prefixChars":0}
+      {"at":1788799133102,"what":"skipped","because":"a turn is using the slot","prefixChars":0}
+      {"at":1788799138167,"what":"primed","success":true,"aborted":false,"promptN":15802,"processedN":6589,"processedMs":6972.584}
+      {"at":1788799138305,"what":"skipped","because":"a turn is using the slot","prefixChars":0}
+  OK: the mid-prime case really did send while the prime was in flight
+      slot +35ms  busy=true 0/9716
+      slot +67ms  busy=true 503/9716
+      slot +520ms  busy=true 503/11764
+      slot +1910ms  busy=true 2551/11764
+      slot +2521ms  busy=true 2551/13812
+      slot +4042ms  busy=true 4599/13812
+      slot +4671ms  busy=true 4599/15304
+      slot +5779ms  busy=true 6091/15304
+      slot +6407ms  busy=true 6091/15816
+      slot +6435ms  busy=true 6603/15816
+      slot +7017ms  busy=true 6603/15820
+  sent-immediately          7068ms   processed   6603 of  15820
+  OK: sent-immediately: the turn did not error
+      {"at":1788799139532,"what":"skipped","because":"a turn is using the slot","prefixChars":0}
+      {"at":1788799139533,"what":"skipped","because":"a turn is using the slot","prefixChars":0}
+      {"at":1788799139534,"what":"skipped","because":"a turn is using the slot","prefixChars":0}
+      {"at":1788799139575,"what":"skipped","because":"a turn is using the slot","prefixChars":0}
+      {"at":1788799139576,"what":"skipped","because":"a turn is using the slot","prefixChars":0}
+      {"at":1788799139577,"what":"skipped","because":"a turn is using the slot","prefixChars":0}
+      {"at":1788799139617,"what":"skipped","because":"a turn is using the slot","prefixChars":0}
+      {"at":1788799139618,"what":"skipped","because":"a turn is using the slot","prefixChars":0}
+      {"at":1788799139619,"what":"skipped","because":"a turn is using the slot","prefixChars":0}
+      {"at":1788799139659,"what":"skipped","because":"a turn is using the slot","prefixChars":0}
+      {"at":1788799139659,"what":"skipped","because":"a turn is using the slot","prefixChars":0}
+      {"at":1788799139661,"what":"skipped","because":"a turn is using the slot","prefixChars":0}
+      {"at":1788799139696,"what":"skipped","because":"no system prompt published yet","prefixChars":0}
+      {"at":1788799140501,"what":"skipped","because":"the turn tools are not known yet","prefixChars":0}
+      {"at":1788799140501,"what":"skipped","because":"an empty chat is the warm-up's job","prefixChars":0}
+      {"at":1788799142194,"what":"skipped","because":"an empty chat is the warm-up's job","prefixChars":0}
+      {"at":1788799142304,"what":"aborted-on-send","had":false}
+      {"at":1788799142310,"what":"skipped","because":"a turn is using the slot","prefixChars":0}
+      {"at":1788799142324,"what":"skipped","because":"a turn is using the slot","prefixChars":0}
+      {"at":1788799149362,"what":"skipped","because":"a turn is using the slot","prefixChars":0}
+
+──────── does waiting buy anything? ────────
+  OK: waiting for the prime more than halves the work at send (14 vs 6603)
+  OK: a fully primed attachment sends near-instantly (242ms)
+  OK: sending mid-prime still keeps what the prime got done (18 vs 6603)
+  OK: and is no slower than not priming at all (5242ms vs 7068ms)
+
+prefill-exactness-probe OK

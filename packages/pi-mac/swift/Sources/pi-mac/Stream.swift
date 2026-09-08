@@ -138,10 +138,8 @@ final class WindowStreamer: NSObject, SCStreamOutput, SCStreamDelegate, @uncheck
 
   private func configFor(_ shape: StreamShape) -> SCStreamConfiguration {
     let target = CaptureTarget(windowIds: shape.ids, rect: shape.rect)
-    var display: SCDisplay?
-    // configuration(for:) needs the display only for its origin; resolve it from
-    // the rect so this stays synchronous on the polling path.
-    _ = display
+    // The display is needed only for its origin, and that is resolved from the
+    // rect so this stays synchronous on the polling path.
     let config = SCStreamConfiguration()
     let origin = displayOrigin(for: shape.rect)
     let scale = scaleFor(rect: shape.rect)

@@ -1,0 +1,17 @@
+model qwen3.5-4b-mtp on 65479
+
+  (the slot was busy 2 time(s) after the paste)
+  OK: the app primed the attachment in the background
+  what the composer's prefill did: [{"at":1788797189132,"what":"skipped","because":"no model server","prefixChars":0},{"at":1788797191238,"what":"skipped","because":"no system prompt published yet","prefixChars":0},{"at":1788797191266,"what":"skipped","because":"no system prompt published yet","prefixChars":7589},{"at":1788797193702,"what":"skipped","because":"the turn tools are not known yet","prefixChars":7589},{"at":1788797193904,"what":"prime","slotEpoch":"","prefixChars":7589,"historyTurns":0,"withUser":true,"tools":18},{"at":1788797203394,"what":"primed","success":true,"aborted":false,"promptN":11430,"processedN":11430,"processedMs":9443.283},{"at":1788797211257,"what":"prime","slotEpoch":"1","prefixChars":7589,"historyTurns":0,"withUser":true,"tools":18},{"at":1788797213069,"what":"primed","success":true,"aborted":false,"promptN":11430,"processedN":1714,"processedMs":1780.852}]
+  OK: the harness published a system prompt
+
+  the prime's prompt is 11430 tokens (0 of them system + tools)
+  re-priming it right after the app's own prime re-read 4
+  FAILED: the app's prime left exactly this prompt in the slot (4 tokens re-read, expected ≤2)
+
+  the turn: 212ms to first token, processed 18 of 11448
+  the message pi sent: 7633 chars, starts "Attached file `pasted content`:\n```\nParagraph 0: the quantity surveyor logged an unusual r"
+  OK: the sent message begins with the primed attachment
+  OK: the turn reused the whole primed prefix (read 18 of 11448, so it kept 11430 of 11430 primed)
+
+prefill-divergence-probe: 1 failure(s)

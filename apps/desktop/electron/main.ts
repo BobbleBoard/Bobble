@@ -39,6 +39,7 @@ import { registerGen3dIpc } from './gen3d/gen3d-main';
 import { registerImportIpc } from './import/import-main';
 import {
   getInferenceUtility,
+  getLoadedModel,
   heavyJobsAllowed,
   pushPowerSettings,
   registerLlmIpc,
@@ -787,6 +788,8 @@ function registerAppIpc(): void {
     allowSender,
     getWindow: () => mainWindow ?? null,
     createRunBridge: createScheduledRunBridge,
+    // So a run record can say what ran it ("41s · Gemma 4 12B").
+    currentModel: getLoadedModel,
   });
 
   // Connectors gallery: catalog + registry read/mutate + /Applications scan.

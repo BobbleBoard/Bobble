@@ -36,7 +36,12 @@ import {
   type ScheduledTask,
   type ScheduleState,
 } from './schedule-logic';
-import type { ScheduledEventMap, ScheduledInvokeMap, TaskRun } from './scheduled-contract';
+import type {
+  RunModel,
+  ScheduledEventMap,
+  ScheduledInvokeMap,
+  TaskRun,
+} from './scheduled-contract';
 import { createScheduledRunner, type RunBridge, type ScheduledRunner } from './scheduled-runner';
 
 const log = createLogger('desktop:scheduled');
@@ -182,6 +187,8 @@ export function registerScheduledHandlers(
     getWindow: () => BrowserWindow | null;
     /** Build a headless top-level bridge — pi-main's createScheduledRunBridge. */
     createRunBridge: (opts: { cwd?: string }, onEvent: (e: PiBridgeEvent) => void) => RunBridge;
+    /** The model the inference server has loaded right now, for the run record. */
+    currentModel?: () => RunModel | null;
   },
 ): void {
   const emitRun = (run: TaskRun): void => {
@@ -195,6 +202,7 @@ export function registerScheduledHandlers(
     onRunUpdated: emitRun,
     markRan,
     now: () => Date.now(),
+    ...(opts.currentModel !== undefined ? { currentModel: opts.currentModel } : {}),
   });
   const activeRunner = runner;
 
@@ -228,6 +236,7 @@ export function registerScheduledHandlers(
       const { runId } = activeRunner.run(task, 'manual');
       return { ok: true, runId };
     },
+    'tasks:stop': (req) => ({ ok: activeRunner.stop(req.id) }),
     'tasks:list-runs': (req) => ({ runs: activeRunner.listRuns(req.taskId) }),
     'tasks:delete-run': (req) => ({ ok: activeRunner.deleteRun(req.taskId, req.runId) }),
   };

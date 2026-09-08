@@ -59,6 +59,14 @@ spends its space, what it does at the moment of action. And be willing to write
 poor choices, and copying their noise instead of their good ideas is the standard
 failure mode of this work.
 
+**Lifting a layout from a reference is a good thing to do.** It is not
+plagiarism and it does not need to be disguised. A person who already knows the
+reference gets to transition without learning anything new, which is a real gift
+to them. So when a reference's arrangement is better, take the arrangement —
+then improve on it, because you can see your own product's constraints and they
+could not. The failure mode is the opposite one: inventing a worse layout to
+avoid resembling something good.
+
 ## 3. Play with the product, do not just look at it
 
 Drive it. Click things, resize it, type into it, open the failing states, tab
@@ -98,6 +106,17 @@ Every item must be:
 A useful item reads like: *"The card's second line is 14px, the same as the name
 above it (`shelf-plus-bobble-dark.png`), so the two read as one block; the
 reference sets the note a step down. Take it to 13px/18px."*
+
+### Structure
+A specific thing to look for, because it is the most common way a screen reads
+as amateur: **text with nothing holding it.** Runs of differently-styled type —
+a heading, a caption, a label, a value — laid on the page with no container, no
+grouping, no rule, nothing to say which belongs with which. Its opposite failure
+is a screen that is nothing BUT stacked cards, one after another, with no other
+kind of surface to break the rhythm or signal what matters more.
+
+Both read as "somebody typed the content in and never composed the page". Call
+them out by name and say what the grouping should be.
 
 ### Feel and vibe
 **After** all the categories, and deliberately separate.

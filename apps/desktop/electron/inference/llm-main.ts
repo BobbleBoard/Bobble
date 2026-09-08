@@ -93,6 +93,18 @@ export function getInferenceContextWindow(): number | null {
 }
 
 /**
+ * The model the server has loaded RIGHT NOW, by id and display name, or null
+ * while nothing is up. A scheduled run stamps this on its record so the run
+ * history can say what ran it — read live, for the same reason as the context
+ * window above.
+ */
+export function getLoadedModel(): { id: string; displayName: string } | null {
+  const m = lastStatus?.model;
+  if (m === undefined || m === null || lastStatus?.phase !== 'ready') return null;
+  return { id: m.id, displayName: m.displayName };
+}
+
+/**
  * Whether the running server can READ AN IMAGE — ask this, not the launch mode.
  *
  * A projector is attached on every llama.cpp launch, so `fast-text` sees fine.

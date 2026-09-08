@@ -1,0 +1,32 @@
+model qwen3.5-4b-mtp on 65115
+
+  (opening warm-up never seen)
+
+  turn   ttft      prompt    read    reused   thinking?
+     1   20012ms    12912    3192     9720   yes
+     2    9104ms    16113    6896     9217   yes
+     3   13596ms    19314   10101     9213   yes
+     4       ?ms    13089   13085        4   yes
+     5   65787ms    25991   16151     9840   yes
+     6   41202ms    29196   19356     9840   yes
+     7   85659ms    32398   22558     9840   yes
+     8       ?ms    13185    3341     9844   yes
+     9       ?ms    13198    3178    10020   yes
+    10       ?ms    13367    3334    10033   yes
+    11       ?ms    13380    3334    10046   yes
+    12       ?ms    13393    3334    10059   yes
+    13       ?ms    13406    3334    10072   yes
+    14       ?ms    13419    3334    10085   yes
+
+──────── is the conversation cached? ────────
+  the prompt grew by -5895 tokens between turn 3 and turn 14
+  the REUSED part grew by 872 tokens over the same stretch
+
+  OK: the conversation is being cached — reuse grows with the transcript.
+
+  turns that re-read MOST of their own prompt:
+    turn  3  read 10101 of 19314  (52%)  13596ms
+    turn  4  read 13085 of 13089  (100%)  nullms
+    turn  5  read 16151 of 25991  (62%)  65787ms
+    turn  6  read 19356 of 29196  (66%)  41202ms
+    turn  7  read 22558 of 32398  (70%)  85659ms

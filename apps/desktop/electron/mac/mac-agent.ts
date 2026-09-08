@@ -45,6 +45,8 @@ import { createLogger } from '@pi-desktop/shared';
 import { app, ipcMain } from 'electron';
 import { resolveBundledPackageAsset } from '../app-paths';
 import { isTrustedIpcEvent } from '../trusted-senders';
+import { macMonitor, registerMacMonitorIpc } from './monitor';
+import { macMonitorMockControl, startMacMonitorMock } from './monitor-mock';
 import type { OverlayRect } from './overlay-geometry';
 import { macOverlay } from './overlay-window';
 
@@ -240,6 +242,9 @@ async function snapshotWithOverlay(params: Record<string, unknown>): Promise<Mac
   if (typeof snap.pid === 'number') {
     const wb = snap.windowBounds;
     await macOverlay.control(snap.pid, wb ? { x: wb.x, y: wb.y, w: wb.w, h: wb.h } : null);
+    // The monitor tab follows the SAME target the overlay just took (one
+    // controlled app at a time); the app name is what titles the tab.
+    macMonitor.setSession(snap.pid, String(snap.app ?? params.app ?? ''));
     await macOverlay.thinking();
   }
   return snap;
@@ -295,6 +300,16 @@ async function dispatch(method: MacAgentMethod, params: Record<string, unknown>)
       await macOverlay.scrolling();
       return getHelper().request('scroll', params);
     }
+    // The menu bar. Accessibility presses the item directly, so no menu opens
+    // on screen and the app stays in the background — there is no point to
+    // animate the phantom cursor to, so the bubble just says what was pressed.
+    case 'menuClick': {
+      const ack = (await getHelper().request('menuClick', params)) as { listed?: boolean };
+      if (ack.listed !== true) await macOverlay.thinking();
+      return ack;
+    }
+    case 'windows':
+      return getHelper().request('windows', params);
     case 'screenshot':
       return getHelper().request('screenshot', params);
     case 'bounds':
@@ -305,6 +320,7 @@ async function dispatch(method: MacAgentMethod, params: Record<string, unknown>)
       const ack = await launchApp(String(params.app ?? ''), params.background !== false);
       if (ack.ok && typeof ack.pid === 'number' && ack.bounds !== undefined) {
         await macOverlay.control(ack.pid, rectOf(ack.bounds));
+        macMonitor.setSession(ack.pid, ack.app);
         await macOverlay.opening(ack.app);
       }
       return ack;
@@ -312,7 +328,10 @@ async function dispatch(method: MacAgentMethod, params: Record<string, unknown>)
     // The overlay follows the controlled app; an explicit driving=false from
     // the extension (session end/reset) puts it away.
     case 'setDriving': {
-      if (params.driving === false) macOverlay.hide();
+      if (params.driving === false) {
+        macOverlay.hide();
+        macMonitor.clearSession();
+      }
       return { ok: true };
     }
     default:
@@ -417,9 +436,29 @@ export function registerMacAgentIpc(): void {
       occluded: typeof extras.occluded === 'boolean' ? extras.occluded : null,
     };
   });
+  // The computer-use MONITOR (round-21 Lane A): the canvas tab that live-
+  // streams the controlled window. It owns its own `pi-mac --stream` child, so
+  // it needs the resolved helper path; the `wallpaper` method goes through the
+  // one long-lived --serve helper this module owns (never a second pipe).
+  macMonitor.setHelperPath(HELPER_PATH);
+  macMonitor.setWallpaperReader(async () => {
+    try {
+      return await getHelper().request<{ ok: boolean; path?: string }>('wallpaper');
+    } catch {
+      // Older helper without the `wallpaper` method: fall back to the standard
+      // macOS default picture, which is present on every install.
+      return existsSync(FALLBACK_WALLPAPER) ? { path: FALLBACK_WALLPAPER } : null;
+    }
+  });
+  registerMacMonitorIpc();
+  startMacMonitorMock();
   if (process.env.PI_E2E === '1') registerE2eDebugChannel();
   log.info('mac-agent helper path', { helperPath: HELPER_PATH, packaged: app.isPackaged });
 }
+
+/** Shipped on every macOS 14+ install; the honest last resort when the helper
+ * cannot report the user's own desktop picture. */
+const FALLBACK_WALLPAPER = '/System/Library/CoreServices/DefaultDesktop.heic';
 
 /**
  * PI_E2E-only introspection/driving channel. Two op families:
@@ -450,6 +489,15 @@ function registerE2eDebugChannel(): void {
           case 'key':
           case 'scroll':
           case 'moveWindow':
+          // Surface + menu reads, and the recorder that proves a run happened.
+          // Recording composites only the controlled app's own windows, so it
+          // cannot pick up anything else on the user's screen.
+          case 'windows':
+          case 'wallpaper':
+          case 'menus':
+          case 'menuClick':
+          case 'recordStart':
+          case 'recordStop':
             return { ok: true, result: await getHelper().request(req.op, params) };
           case 'launch': {
             const ack = await launchApp(String(params.app ?? ''), params.background !== false);
@@ -492,6 +540,25 @@ function registerE2eDebugChannel(): void {
           }
           case 'overlay-info':
             return { ok: true, result: macOverlay.info() };
+          // The computer-use MONITOR's own truth, read-only. A probe cannot use
+          // `mac:monitor:subscribe` to look: there is one sink per renderer, so
+          // asking for state would DOWNGRADE the surface's frame subscription
+          // and stop the very capture it was checking on.
+          // Dev frame source only (PI_MAC_MONITOR_MOCK=1): drive the states a
+          // running stream never sits still in — "no window", "no frame yet".
+          case 'monitor-mock': {
+            macMonitorMockControl({
+              windows: typeof params.windows === 'boolean' ? params.windows : undefined,
+              restart: params.restart === true,
+              delayMs: typeof params.delayMs === 'number' ? params.delayMs : undefined,
+            });
+            return { ok: true };
+          }
+          case 'monitor-info':
+            return {
+              ok: true,
+              result: { ...macMonitor.state(), capturing: macMonitor.streaming() },
+            };
           case 'overlay-retarget': {
             // Prompt reposition to a new frame (the tracker's move path) — proves
             // the overlay follows without snap-on-release. Also update the
@@ -562,6 +629,7 @@ export function disposeMacAgent(): void {
   server = null;
   helper?.dispose();
   helper = null;
+  macMonitor.dispose();
   macOverlay.dispose();
   elementCenters.clear();
   tccCache = null;

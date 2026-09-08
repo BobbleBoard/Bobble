@@ -1,0 +1,23 @@
+model qwen3.5-4b-mtp on 51014
+
+  (opening warm-up never seen)
+
+  tools advertised: 18
+
+  turn-1                    6231ms   read     18 of   9737  (reused   9719)
+  follow-up                  280ms   read     40 of   9773  (reused   9733)  no tool change
+
+  …turning on a capability (preset change)…
+  tools advertised: 22 (+ls,find,grep,python_run)
+
+  after-capability         46819ms   read  10514 of  10514  (reused      0)  right after the tool set changed
+  one-more                   306ms   read     31 of  10545  (reused  10514)  the turn after that
+
+──────── what a tool-set change costs ────────
+  a plain follow-up read 40 tokens in 280ms
+  the one after the change read 10514 in 46819ms
+  and the next one read 31 in 306ms
+
+  TURNING A CAPABILITY ON RE-READS THE WHOLE PROMPT. Tools render at the
+  start, so a set that grows moves everything behind it — the length of the
+  conversation has nothing to do with it.

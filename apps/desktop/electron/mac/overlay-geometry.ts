@@ -191,6 +191,91 @@ function capitalize(s: string): string {
   return s.length === 0 ? s : s.charAt(0).toUpperCase() + s.slice(1);
 }
 
+/**
+ * The states the status bubble can be in — the exact set overlay.html's STATUS
+ * map handles, plus `idle` for "no bubble is showing".
+ */
+export type MacCursorState =
+  | 'idle'
+  | 'opening'
+  | 'thinking'
+  | 'clicking'
+  | 'typing'
+  | 'pressing'
+  | 'scrolling'
+  | 'reading';
+
+/** What the bubble reads: a label, an optional monospace detail, and whether
+ * the animated dots are running. */
+export interface BubbleContent {
+  label: string;
+  /** The `<em>` tail (the typed preview) — '' when the state has none. */
+  detail: string;
+  dots: boolean;
+}
+
+/**
+ * The SAME words overlay.html paints, computed here so the canvas monitor tab
+ * and the on-screen overlay can never disagree about what Pi is doing.
+ *
+ * overlay.html is a static file with no build step, so it cannot import this;
+ * what it CAN do is stay a one-to-one mirror of these seven cases, which is
+ * cheap to check and is what this test-covered function pins down. `text` is
+ * the already-prepared payload the controller pushes — a {@link typingPreview}
+ * for typing, a {@link comboLabel} for a key press, an app name for opening.
+ */
+export function bubbleContent(state: MacCursorState, text = ''): BubbleContent {
+  switch (state) {
+    case 'opening':
+      return { label: text === '' ? 'Opening' : text, detail: '', dots: true };
+    case 'thinking':
+      return { label: 'Thinking', detail: '', dots: true };
+    case 'clicking':
+      return { label: 'Clicking', detail: '', dots: false };
+    case 'typing':
+      return { label: 'Typing', detail: text, dots: true };
+    case 'pressing':
+      return { label: `Pressing ${text}`.trimEnd(), detail: '', dots: false };
+    case 'scrolling':
+      return { label: 'Scrolling', detail: '', dots: true };
+    case 'reading':
+      return { label: 'Reading the screen', detail: '', dots: true };
+    default:
+      return { label: '', detail: '', dots: false };
+  }
+}
+
+/**
+ * EVERYTHING THE PHANTOM IS DOING, IN ONE PLACE.
+ *
+ * The computer-use canvas tab draws the same cursor and the same bubble over a
+ * live picture of the controlled window, and the two must never disagree — a
+ * monitor showing the cursor somewhere the real overlay is not is worse than no
+ * monitor. So the overlay controller, which already owns all of this to drive
+ * overlay.html, publishes it; monitor.ts reads it rather than deriving a second
+ * copy from the same tool events.
+ *
+ * `cursor` is in GLOBAL SCREEN POINTS (the space `rect` is in), not the
+ * overlay's padded-window local space — the canvas maps it with the same pure
+ * helpers, and a local coordinate would be meaningless there.
+ */
+export interface MacOverlayState {
+  /** An app is under computer-use control (the overlay is targeted). */
+  engaged: boolean;
+  pid: number | null;
+  /** The controlled window's frame in global screen points. */
+  rect: OverlayRect | null;
+  /** Phantom cursor position in GLOBAL screen points (null before placement). */
+  cursor: { x: number; y: number } | null;
+  cursorState: MacCursorState;
+  /** The payload for the state: typed preview, key combo, app name — ''. */
+  statusText: string;
+  /** Is the bubble showing at all (it fades after BUBBLE_IDLE_MS of silence)? */
+  bubbleVisible: boolean;
+  /** What the visibility rule decided, before the background-mode gate. */
+  wantsVisible: boolean;
+}
+
 /** Truncate the live-typing preview so the bubble stays a bubble. */
 export function typingPreview(text: string, max = 44): string {
   const clean = text.replace(/\s+/g, ' ').trim();

@@ -1,0 +1,641 @@
+• turbo 2.10.4
+
+   • Packages in scope: @pi-desktop/afm, @pi-desktop/browser-use, @pi-desktop/canvas, @pi-desktop/cluster, @pi-desktop/coordination, @pi-desktop/desktop, @pi-desktop/engine, @pi-desktop/gen-canvas, @pi-desktop/gen-service, @pi-desktop/gen-tools, @pi-desktop/gen3d-engine, @pi-desktop/harness, @pi-desktop/importers, @pi-desktop/inference, @pi-desktop/mac-computer-use, @pi-desktop/mac-connectors, @pi-desktop/mcp-lite, @pi-desktop/model-store, @pi-desktop/pi-mac, @pi-desktop/provider-afm, @pi-desktop/provider-llamacpp, @pi-desktop/provider-mlx, @pi-desktop/shared, @pi-desktop/themes, @pi-desktop/tool-bus, @pi-desktop/ui, @pi-desktop/web-tools
+   • Running typecheck, test in 27 packages
+   • Remote caching disabled
+
+@pi-desktop/shared:typecheck: cache miss, executing e8a349e51d254051
+@pi-desktop/gen3d-engine:test: cache hit, suppressing logs ec16b8a2afb0c370
+@pi-desktop/pi-mac:test: cache miss, executing a7dcadb1526338c2
+@pi-desktop/cluster:test: cache hit, suppressing logs d98518b47fd6fe78
+@pi-desktop/shared:test: cache hit, suppressing logs 49a85b2035ec6121
+@pi-desktop/tool-bus:typecheck: cache hit, suppressing logs 66aab58175af737b
+@pi-desktop/tool-bus:test: cache hit, suppressing logs 9b6611bf73983884
+@pi-desktop/web-tools:test: cache hit, suppressing logs acb0f1768cddc09f
+@pi-desktop/cluster:typecheck: cache hit, suppressing logs 4a92ab6eaa59499f
+@pi-desktop/gen3d-engine:typecheck: cache hit, suppressing logs 6471e8cc5acb7d40
+@pi-desktop/mcp-lite:test: cache hit, suppressing logs 33c81e12ba38fdb6
+@pi-desktop/mac-computer-use:test: cache miss, executing cee48263de4d85ca
+@pi-desktop/mac-connectors:test: cache hit, suppressing logs 13c3bfd4e64a6c1c
+@pi-desktop/engine:test: cache hit, suppressing logs e58249c36dc66d09
+@pi-desktop/afm:test: cache hit, suppressing logs 57b3d1bf2852f5ce
+@pi-desktop/browser-use:test: cache hit, suppressing logs 73cf01e0c6161f58
+@pi-desktop/themes:test: cache hit, suppressing logs 6785903544ec682f
+@pi-desktop/inference:test: cache hit, suppressing logs 00ed3963cb0b6c2a
+@pi-desktop/ui:test: cache hit, suppressing logs 1022ee1c4a1d137f
+@pi-desktop/gen-service:test: cache hit, suppressing logs 383214e920b8069f
+@pi-desktop/model-store:test: cache hit, suppressing logs f6f2cb7f6ef9dc02
+@pi-desktop/provider-llamacpp:test: cache hit, suppressing logs 34146d3b0dd39822
+@pi-desktop/importers:test: cache hit, suppressing logs 1fd738b31edf9278
+@pi-desktop/harness:test: cache miss, executing 6e071b069cde8b63
+@pi-desktop/provider-afm:test: cache hit, suppressing logs e6a29f348cb2bd0b
+@pi-desktop/provider-mlx:test: cache hit, suppressing logs 1b4e70005b1854e2
+@pi-desktop/coordination:test: cache miss, executing 6e132b2eee68e41e
+@pi-desktop/canvas:test: cache miss, executing f0613357a6fc0599
+@pi-desktop/gen-tools:test: cache hit, suppressing logs 6d788d30b9691d5b
+@pi-desktop/gen-canvas:test: cache miss, executing 1fc505ace7cad538
+@pi-desktop/desktop:test: cache miss, executing 4bafbaacbc21558f
+@pi-desktop/mac-computer-use:test: $ vitest run
+@pi-desktop/coordination:test: $ vitest run
+@pi-desktop/pi-mac:test: $ vitest run
+@pi-desktop/desktop:test: $ vitest run
+@pi-desktop/shared:typecheck: $ tsc --noEmit
+@pi-desktop/harness:test: $ vitest run
+@pi-desktop/canvas:test: $ vitest run
+@pi-desktop/gen-canvas:test: $ vitest run
+@pi-desktop/mac-computer-use:test: 
+@pi-desktop/mac-computer-use:test: [1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/Users/user/Desktop/OSS-harness/packages/mac-computer-use[39m
+@pi-desktop/mac-computer-use:test: 
+@pi-desktop/pi-mac:test: 
+@pi-desktop/pi-mac:test: [1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/Users/user/Desktop/OSS-harness/packages/pi-mac[39m
+@pi-desktop/pi-mac:test: 
+@pi-desktop/desktop:test: 
+@pi-desktop/desktop:test: [1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/Users/user/Desktop/OSS-harness/apps/desktop[39m
+@pi-desktop/desktop:test: 
+@pi-desktop/harness:test: 
+@pi-desktop/harness:test: [1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/Users/user/Desktop/OSS-harness/packages/harness[39m
+@pi-desktop/harness:test: 
+@pi-desktop/coordination:test: 
+@pi-desktop/coordination:test: [1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/Users/user/Desktop/OSS-harness/packages/coordination[39m
+@pi-desktop/coordination:test: 
+@pi-desktop/canvas:test: 
+@pi-desktop/gen-canvas:test: 
+@pi-desktop/canvas:test: [1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/Users/user/Desktop/OSS-harness/packages/canvas[39m
+@pi-desktop/gen-canvas:test: [1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/Users/user/Desktop/OSS-harness/packages/gen-canvas[39m
+@pi-desktop/gen-canvas:test: 
+@pi-desktop/canvas:test: 
+@pi-desktop/mcp-lite:typecheck: cache miss, executing fc1f743b7f785624
+@pi-desktop/pi-mac:typecheck: cache miss, executing 8d604fb721dbaca4
+@pi-desktop/themes:typecheck: cache miss, executing 28829758ab3eb8ca
+@pi-desktop/mac-computer-use:test:  [32m✓[39m src/session-state.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+@pi-desktop/mac-computer-use:test:  [32m✓[39m src/bridge-client.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 136[2mms[22m[39m
+@pi-desktop/pi-mac:test:  [32m✓[39m src/check.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+@pi-desktop/pi-mac:test:  [2m[90m↓[39m[22m src/live.test.ts [2m([22m[2m2 tests[22m[2m | [22m[33m2 skipped[39m[2m)[22m
+@pi-desktop/coordination:test:  [32m✓[39m src/coordination-engine.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+@pi-desktop/pi-mac:test:  [32m✓[39m src/serve-client.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 27[2mms[22m[39m
+@pi-desktop/pi-mac:test: 
+@pi-desktop/pi-mac:test: [2m Test Files [22m [1m[32m2 passed[39m[22m[2m | [22m[33m1 skipped[39m[90m (3)[39m
+@pi-desktop/pi-mac:test: [2m      Tests [22m [1m[32m11 passed[39m[22m[2m | [22m[33m2 skipped[39m[90m (13)[39m
+@pi-desktop/pi-mac:test: [2m   Start at [22m 21:27:27
+@pi-desktop/pi-mac:test: [2m   Duration [22m 674ms[2m (transform 302ms, setup 0ms, import 484ms, tests 30ms, environment 0ms)[22m
+@pi-desktop/pi-mac:test: 
+@pi-desktop/mac-computer-use:test:  [32m✓[39m src/permissions.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+@pi-desktop/inference:typecheck: cache miss, executing 2fabee2287e1cf3a
+@pi-desktop/mac-computer-use:test:  [32m✓[39m src/scroll.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 2[2mms[22m[39m
+@pi-desktop/mac-computer-use:test:  [32m✓[39m src/format.test.ts [2m([22m[2m20 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+@pi-desktop/mac-computer-use:test:  [32m✓[39m src/chrome.test.ts [2m([22m[2m15 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/model-call/one-way-in.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 29[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/tools/workspace-guard.test.ts [2m([22m[2m14 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/verify/checkpoints.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 53[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m electron/office/rebrand-guard.test.ts [2m([22m[2m8 tests[22m[2m)[22m[33m 319[2mms[22m[39m
+@pi-desktop/themes:typecheck: $ tsc --noEmit
+@pi-desktop/pi-mac:typecheck: $ tsc --noEmit
+@pi-desktop/desktop:test:  [32m✓[39m electron/corp/product-gate.test.ts [2m([22m[2m13 tests[22m[2m)[22m[33m 412[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/corp/prompts.test.ts [2m([22m[2m24 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/permissions/rules.test.ts [2m([22m[2m63 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+@pi-desktop/mcp-lite:typecheck: $ tsc --noEmit
+@pi-desktop/harness:test:  [32m✓[39m src/model-call/call-model.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 29[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/classify/classify.test.ts [2m([22m[2m69 tests[22m[2m)[22m[32m 19[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m electron/full-access.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 200[2mms[22m[39m
+@pi-desktop/desktop:test: [90mstdout[2m | electron/scheduled/scheduled-runner.test.ts[2m > [22m[2mstopping[2m > [22m[2mends the live run as `stopped`, keeps what it had said, and frees the bridge
+@pi-desktop/desktop:test: [22m[39m2026-09-08T04:27:28.795Z [desktop:scheduled-runner] scheduled run stopped by hand { taskId: [32m'task_x'[39m, runId: [32m'run_mts64pzj_k44r'[39m }
+@pi-desktop/desktop:test: 
+@pi-desktop/desktop:test: [90mstdout[2m | electron/scheduled/scheduled-runner.test.ts[2m > [22m[2mstopping[2m > [22m[2mdrops a run still waiting in the queue, which then leaves no record
+@pi-desktop/desktop:test: [22m[39m2026-09-08T04:27:28.848Z [desktop:scheduled-runner] scheduled run stopped by hand { taskId: [32m'a'[39m, runId: [32m'run_mts64q0m_by8o'[39m }
+@pi-desktop/desktop:test: 
+@pi-desktop/desktop:test: [harness] syntax check unavailable (/opt/homebrew/Cellar/node/26.7.0/bin/node --check) — writes of this kind are NOT parsed
+@pi-desktop/harness:test:  [32m✓[39m src/subagent/child-agent.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 26[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/tools/tool-cli.test.ts [2m([22m[2m28 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+@pi-desktop/inference:typecheck: $ tsc --noEmit
+@pi-desktop/desktop:test:  [32m✓[39m electron/scheduled/scheduled-runner.test.ts [2m([22m[2m12 tests[22m[2m)[22m[33m 319[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/tools/tool-cli-bridge.test.ts [2m([22m[2m13 tests[22m[2m)[22m[33m 405[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/corp/ceo.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/corp/dispatch.test.ts [2m([22m[2m20 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+@pi-desktop/coordination:test:  [32m✓[39m src/corp/corp-engine.test.ts [2m([22m[2m14 tests[22m[2m)[22m[32m 26[2mms[22m[39m
+@pi-desktop/coordination:test: 
+@pi-desktop/coordination:test: [2m Test Files [22m [1m[32m2 passed[39m[22m[90m (2)[39m
+@pi-desktop/coordination:test: [2m      Tests [22m [1m[32m23 passed[39m[22m[90m (23)[39m
+@pi-desktop/coordination:test: [2m   Start at [22m 21:27:27
+@pi-desktop/coordination:test: [2m   Duration [22m 1.68s[2m (transform 997ms, setup 0ms, import 1.22s, tests 34ms, environment 0ms)[22m
+@pi-desktop/coordination:test: 
+@pi-desktop/browser-use:typecheck: cache miss, executing 83b4dad0a437e5a4
+@pi-desktop/desktop:test:  [32m✓[39m electron/corp/capabilities.test.ts [2m([22m[2m7 tests[22m[2m)[22m[33m 1135[2mms[22m[39m
+@pi-desktop/desktop:test:      [33m[2m✓[22m[39m only probes what the task is plausibly about [33m 415[2mms[22m[39m
+@pi-desktop/desktop:test:      [33m[2m✓[22m[39m probes YAML and test tooling for the converter task [33m 576[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m electron/fs-handlers.test.ts [2m([22m[2m13 tests[22m[2m)[22m[33m 551[2mms[22m[39m
+@pi-desktop/desktop:test:      [33m[2m✓[22m[39m takes a bare ~ as HOME itself [33m 483[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/corp/mesh.test.ts [2m([22m[2m25 tests[22m[2m)[22m[32m 32[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/verify/checkpoint-flow.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m electron/corp/role-agent.test.ts [2m([22m[2m90 tests[22m[2m)[22m[33m 438[2mms[22m[39m
+@pi-desktop/canvas:test:  [32m✓[39m tests/harness.e2e.test.ts [2m([22m[2m1 test[22m[2m)[22m[33m 907[2mms[22m[39m
+@pi-desktop/canvas:test:      [33m[2m✓[22m[39m keeps an input value + a running counter alive across a streaming patch (no reload) [33m 389[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/presets/presets.test.ts [2m([22m[2m17 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/corp/budget.test.ts [2m([22m[2m16 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/prompt/capability-prompt.test.ts [2m([22m[2m53 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/subagent/specialist-commission.test.ts [2m([22m[2m19 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/corp/persistence.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 34[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/corp/promote-tool.test.ts [2m([22m[2m35 tests[22m[2m)[22m[32m 22[2mms[22m[39m
+@pi-desktop/canvas:test:  [32m✓[39m src/harness/patcher.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 28[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/tools/tool-output-truncate.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 54[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/corp/review.test.ts [2m([22m[2m46 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/corp/engineer.test.ts [2m([22m[2m41 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m electron/list-files.test.ts [2m([22m[2m5 tests[22m[2m)[22m[33m 1315[2mms[22m[39m
+@pi-desktop/desktop:test:      [33m[2m✓[22m[39m reaches a small directory that sits behind a huge one [33m 306[2mms[22m[39m
+@pi-desktop/desktop:test:      [33m[2m✓[22m[39m finds a file by name wherever it sits [33m 492[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/subagent/bridge-client.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/classify/escalation.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+@pi-desktop/browser-use:typecheck: $ tsc --noEmit
+@pi-desktop/mac-computer-use:test:  [32m✓[39m src/menus.test.ts [2m([22m[2m11 tests[22m[2m)[22m[33m 1780[2mms[22m[39m
+@pi-desktop/mac-computer-use:test:      [33m[2m✓[22m[39m does not reach the menu path when an index or a point was given [33m 711[2mms[22m[39m
+@pi-desktop/mac-computer-use:test:      [33m[2m✓[22m[39m names a dialog that appeared as a result of the click [33m 351[2mms[22m[39m
+@pi-desktop/mac-computer-use:test:      [33m[2m✓[22m[39m names a plain new window too [33m 352[2mms[22m[39m
+@pi-desktop/mac-computer-use:test:      [33m[2m✓[22m[39m stays quiet when the act opened nothing [33m 352[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m electron/corp/submit-work.test.ts [2m([22m[2m18 tests[22m[2m)[22m[32m 79[2mms[22m[39m
+@pi-desktop/harness:test: [harness] syntax check unavailable (python3 -m py_compile) — writes of this kind are NOT parsed
+@pi-desktop/harness:test:  [32m✓[39m src/scheduled/schedule-tool.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 18[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/tripo/preset-motions.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 58[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/tools/use-tool.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/permissions/flag-bash.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/classify/tier.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/corp/corp-mesh.test.ts [2m([22m[2m32 tests[22m[2m)[22m[32m 26[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/verify/verify.test.ts [2m([22m[2m43 tests[22m[2m)[22m[32m 34[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m electron/corp/corp-search.test.ts [2m([22m[2m16 tests[22m[2m)[22m[33m 386[2mms[22m[39m
+@pi-desktop/canvas:test:  [32m✓[39m src/situation/mock-run.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 99[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/corp/verification.test.ts [2m([22m[2m27 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m electron/pi/present-bridge.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 240[2mms[22m[39m
+@pi-desktop/canvas:test:  [32m✓[39m src/tabs/menu-surface.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 16[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/tools/sandbox-fs.test.ts [2m([22m[2m77 tests[22m[2m)[22m[33m 397[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/tools/intent-bias.test.ts [2m([22m[2m26 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/corp/run.test.ts [2m([22m[2m19 tests[22m[2m)[22m[32m 42[2mms[22m[39m
+@pi-desktop/desktop:test: [90mstdout[2m | electron/corp/blind-critic.test.ts[2m > [22m[2mthe critic never blocks a handback[2m > [22m[2msays nothing when it cannot run at all
+@pi-desktop/desktop:test: [22m[39m2026-09-08T04:27:30.605Z [desktop:corp] blind critic did not run {
+@pi-desktop/desktop:test:   err: [32m"TypeError: Cannot read properties of undefined (reading 'contextWindow')"[39m
+@pi-desktop/desktop:test: }
+@pi-desktop/desktop:test: 
+@pi-desktop/desktop:test:  [32m✓[39m electron/corp/blind-critic.test.ts [2m([22m[2m7 tests[22m[2m)[22m[33m 1790[2mms[22m[39m
+@pi-desktop/desktop:test:      [33m[2m✓[22m[39m says nothing when it cannot run at all [33m 1786[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/chat/composer/attachment-view.test.ts [2m([22m[2m16 tests[22m[2m)[22m[32m 17[2mms[22m[39m
+@pi-desktop/mac-connectors:typecheck: cache miss, executing cdcd86b66384d9a6
+@pi-desktop/harness:test:  [32m✓[39m src/corp/contracts.test.ts [2m([22m[2m23 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/loop/loop-detector.test.ts [2m([22m[2m29 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m electron/corp/mesh-run.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 183[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/corp/architect.test.ts [2m([22m[2m25 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/repair/rungs.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/subagent/subagent-tool.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+@pi-desktop/desktop:test: [90mstderr[2m | electron/gen3d/image-jobs.test.ts[2m > [22m[2mImageJobTracker[2m > [22m[2mdoes not grow without bound when nobody claims outcomes
+@pi-desktop/desktop:test: [22m[39mPromise returned by `expect(actual).resolves.toEqual(expected)` was not awaited. Vitest currently auto-awaits hanging assertions at the end of the test, but this will cause the test to fail in the next Vitest major. Please remember to await the assertion.
+@pi-desktop/desktop:test:     at /Users/user/Desktop/OSS-harness/apps/desktop/electron/gen3d/image-jobs.test.ts:88:39
+@pi-desktop/harness:test:  [32m✓[39m src/tools/image-tools.test.ts [2m([22m[2m15 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+@pi-desktop/desktop:test: 
+@pi-desktop/harness:test:  [32m✓[39m src/net/offline.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 2[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m electron/gen3d/image-jobs.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 22[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/tools/edit-diagnosis.test.ts [2m([22m[2m23 tests[22m[2m)[22m[32m 45[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/corp/preflight.test.ts [2m([22m[2m20 tests[22m[2m)[22m[32m 84[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/corp/sanitize.test.ts [2m([22m[2m15 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/tools/opened-app.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m electron/gen/prompt-enhancer.test.ts [2m([22m[2m20 tests[22m[2m)[22m[32m 16[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m electron/sandbox.test.ts [2m([22m[2m16 tests[22m[2m)[22m[32m 29[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/corp/promotion.test.ts [2m([22m[2m21 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/verify/documented.test.ts [2m([22m[2m23 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m electron/corp/hierarchy-store.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 25[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/corp/raise-hand.test.ts [2m([22m[2m24 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/corp/revise.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m electron/canvas/favicons.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 25[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/model-call/utility-file.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/corp/bridge-client.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 2[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/corp/delivery.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/corp/manager-gates.test.ts [2m([22m[2m15 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/corp/integration-contract.test.ts [2m([22m[2m15 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+@pi-desktop/afm:typecheck: cache miss, executing 2f9ae7c431e92878
+@pi-desktop/desktop:test:  [32m✓[39m electron/corp/workspace-paths.test.ts [2m([22m[2m29 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/tools/tool-search.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/corp/plan.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m electron/gen/comfy-install.test.ts [2m([22m[2m39 tests[22m[2m)[22m[32m 24[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/subagent/scheduler.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 39[2mms[22m[39m
+@pi-desktop/mac-connectors:typecheck: $ tsc --noEmit
+@pi-desktop/desktop:test:  [32m✓[39m electron/pi/child-agents.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 21[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/index.test.ts [2m([22m[2m32 tests[22m[2m)[22m[32m 24[2mms[22m[39m
+@pi-desktop/canvas:test:  [32m✓[39m src/surfaces/svg-surface.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[32m 22[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/wiring.test.ts [2m([22m[2m43 tests[22m[2m)[22m[32m 76[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/corp/division.test.ts [2m([22m[2m22 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m electron/corp/team-record.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/tools/mcp-fidelity.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/corp/escalate.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/review/review.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/corp/dag.test.ts [2m([22m[2m15 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/corp/workspace.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m electron/corp/mesh-host.test.ts [2m([22m[2m72 tests[22m[2m)[22m[33m 1523[2mms[22m[39m
+@pi-desktop/desktop:test:      [33m[2m✓[22m[39m reports zero-collected as the failure it is [33m 708[2mms[22m[39m
+@pi-desktop/desktop:test:      [33m[2m✓[22m[39m passes a real suite through [33m 711[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/presets/capabilities.test.ts [2m([22m[2m18 tests[22m[2m)[22m[32m 56[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/corp/retry.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/tools/ask-user.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/corp/integrate.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/tools/present.test.ts [2m([22m[2m17 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/corp/org-chart.test.ts [2m([22m[2m19 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/model/model-size.test.ts [2m([22m[2m23 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/corp/vision.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/tools/repeat-notice.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/skills/skill-instructions.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m electron/corp/role-agent-seam-impl.test.ts [2m([22m[2m26 tests[22m[2m)[22m[32m 38[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/loop/unfinished-plan.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 16[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/styles/token-hygiene.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 17[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/subagent/specialist-env.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/permissions/forbidden.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 2[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/corp/verify.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+@pi-desktop/afm:typecheck: $ tsc --noEmit
+@pi-desktop/harness:test:  [32m✓[39m src/corp/assemble.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/effort/effort.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/permissions/prompt.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/loop/handback.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/model-call/warmup.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/subagent/budget.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 2[2mms[22m[39m
+@pi-desktop/canvas:test:  [32m✓[39m src/situation/replay-stream.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+@pi-desktop/canvas:test:  [32m✓[39m src/sanitize.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 28[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/AppErrorBoundary.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[32m 40[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/prompt/same-wording.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 2[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/repair/fixer.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/permissions/modes.test.ts [2m([22m[2m19 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+@pi-desktop/mac-computer-use:typecheck: cache miss, executing 115def79981b411f
+@pi-desktop/canvas:test:  [32m✓[39m src/surfaces/browser-surface.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[32m 22[2mms[22m[39m
+@pi-desktop/canvas:test:  [32m✓[39m src/surfaces/media-preview-surface.test.tsx [2m([22m[2m14 tests[22m[2m)[22m[32m 68[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/tools/hang-guard.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+@pi-desktop/canvas:test:  [32m✓[39m src/tabs/file-tree.test.tsx [2m([22m[2m10 tests[22m[2m)[22m[32m 73[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/prompt/strip-pi.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 2[2mms[22m[39m
+@pi-desktop/canvas:test:  [32m✓[39m src/tabs/project-picker.test.tsx [2m([22m[2m9 tests[22m[2m)[22m[32m 89[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/models/models-layout.test.ts [2m([22m[2m41 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/chat/canvas/browser-freeze.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 19[2mms[22m[39m
+@pi-desktop/canvas:test:  [32m✓[39m src/tabs/canvas-operation-bar.test.tsx [2m([22m[2m22 tests[22m[2m)[22m[32m 231[2mms[22m[39m
+@pi-desktop/canvas:test:  [32m✓[39m src/inline-widget.test.tsx [2m([22m[2m5 tests[22m[2m)[22m[32m 96[2mms[22m[39m
+@pi-desktop/gen-canvas:test:  [32m✓[39m src/register.test.tsx [2m([22m[2m3 tests[22m[2m)[22m[32m 2[2mms[22m[39m
+@pi-desktop/canvas:test:  [32m✓[39m src/situation/situation-surface.test.tsx [2m([22m[2m9 tests[22m[2m)[22m[33m 325[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/state.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 2[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m electron/corp/agent-pool.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+@pi-desktop/gen-canvas:test:  [32m✓[39m src/gen-image-surface.test.tsx [2m([22m[2m8 tests[22m[2m)[22m[32m 38[2mms[22m[39m
+@pi-desktop/gen-canvas:test: 
+@pi-desktop/gen-canvas:test: [2m Test Files [22m [1m[32m2 passed[39m[22m[90m (2)[39m
+@pi-desktop/gen-canvas:test: [2m      Tests [22m [1m[32m11 passed[39m[22m[90m (11)[39m
+@pi-desktop/gen-canvas:test: [2m   Start at [22m 21:27:27
+@pi-desktop/gen-canvas:test: [2m   Duration [22m 5.73s[2m (transform 2.76s, setup 0ms, import 6.64s, tests 40ms, environment 3.77s)[22m
+@pi-desktop/gen-canvas:test: 
+@pi-desktop/web-tools:typecheck: cache miss, executing 1717e6efc399e91b
+@pi-desktop/harness:test:  [32m✓[39m src/output-limit.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+@pi-desktop/canvas:test:  [32m✓[39m src/tabs/terminal-surface.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+@pi-desktop/harness:test:  [32m✓[39m src/tools/plan-tool.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+@pi-desktop/harness:test: 
+@pi-desktop/harness:test: [2m Test Files [22m [1m[32m94 passed[39m[22m[90m (94)[39m
+@pi-desktop/harness:test: [2m      Tests [22m [1m[32m1593 passed[39m[22m[90m (1593)[39m
+@pi-desktop/harness:test: [2m   Start at [22m 21:27:27
+@pi-desktop/harness:test: [2m   Duration [22m 5.84s[2m (transform 17.09s, setup 0ms, import 39.67s, tests 1.94s, environment 5ms)[22m
+@pi-desktop/harness:test: 
+@pi-desktop/engine:typecheck: cache miss, executing 1e0bcecd61b3544c
+@pi-desktop/desktop:test:  [32m✓[39m src/models/recommended-catalog.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+@pi-desktop/canvas:test:  [32m✓[39m src/surfaces/code-surface.test.tsx [2m([22m[2m6 tests[22m[2m)[22m[33m 537[2mms[22m[39m
+@pi-desktop/canvas:test:      [33m[2m✓[22m[39m mounts a read-only CodeMirror viewer with the initial content [33m 307[2mms[22m[39m
+@pi-desktop/mac-computer-use:typecheck: $ tsc --noEmit
+@pi-desktop/desktop:test:  [32m✓[39m src/chat/corp/corp-blocks.test.ts [2m([22m[2m25 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+@pi-desktop/desktop:test: [90mstderr[2m | src/chat/use-prefill-pill.test.tsx[2m > [22m[2musePrefillPill[2m > [22m[2msays nothing about a prime that finishes quickly
+@pi-desktop/desktop:test: [22m[39mThe current testing environment is not configured to support act(...)
+@pi-desktop/desktop:test: The current testing environment is not configured to support act(...)
+@pi-desktop/desktop:test: 
+@pi-desktop/ui:typecheck: cache miss, executing f1a22e2ebc8e8ed7
+@pi-desktop/canvas:test:  [32m✓[39m src/canvas.test.tsx [2m([22m[2m5 tests[22m[2m)[22m[33m 534[2mms[22m[39m
+@pi-desktop/canvas:test:      [33m[2m✓[22m[39m toggles the raw source view [33m 430[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/chat/quick-menu.test.ts [2m([22m[2m15 tests[22m[2m)[22m[32m 33[2mms[22m[39m
+@pi-desktop/desktop:test: [90mstderr[2m | src/chat/use-prefill-pill.test.tsx[2m > [22m[2musePrefillPill[2m > [22m[2msays nothing about a prime that finishes quickly
+@pi-desktop/desktop:test: [22m[39mThe current testing environment is not configured to support act(...)
+@pi-desktop/desktop:test: 
+@pi-desktop/desktop:test: [90mstderr[2m | src/chat/use-prefill-pill.test.tsx[2m > [22m[2musePrefillPill[2m > [22m[2mspeaks up once the wait is long enough to feel
+@pi-desktop/desktop:test: [22m[39mThe current testing environment is not configured to support act(...)
+@pi-desktop/desktop:test: 
+@pi-desktop/desktop:test: [90mstderr[2m | src/chat/use-prefill-pill.test.tsx[2m > [22m[2musePrefillPill[2m > [22m[2mspeaks up once the wait is long enough to feel
+@pi-desktop/desktop:test: [22m[39mThe current testing environment is not configured to support act(...)
+@pi-desktop/desktop:test: 
+@pi-desktop/desktop:test: [90mstderr[2m | src/chat/use-prefill-pill.test.tsx[2m > [22m[2musePrefillPill[2m > [22m[2mtakes it back the moment the prime lands
+@pi-desktop/desktop:test: [22m[39mThe current testing environment is not configured to support act(...)
+@pi-desktop/desktop:test: The current testing environment is not configured to support act(...)
+@pi-desktop/desktop:test: 
+@pi-desktop/desktop:test: [90mstderr[2m | src/chat/use-prefill-pill.test.tsx[2m > [22m[2musePrefillPill[2m > [22m[2mtakes it back the moment the prime lands
+@pi-desktop/desktop:test: [22m[39mThe current testing environment is not configured to support act(...)
+@pi-desktop/desktop:test: 
+@pi-desktop/desktop:test: [90mstderr[2m | src/chat/use-prefill-pill.test.tsx[2m > [22m[2musePrefillPill[2m > [22m[2mleaves nothing behind when it unmounts mid-prime
+@pi-desktop/desktop:test: [22m[39mThe current testing environment is not configured to support act(...)
+@pi-desktop/desktop:test: The current testing environment is not configured to support act(...)
+@pi-desktop/desktop:test: 
+@pi-desktop/desktop:test: [90mstderr[2m | src/chat/use-prefill-pill.test.tsx[2m > [22m[2musePrefillPill[2m > [22m[2mleaves nothing behind when it unmounts mid-prime
+@pi-desktop/desktop:test: [22m[39mThe current testing environment is not configured to support act(...)
+@pi-desktop/desktop:test: 
+@pi-desktop/canvas:test:  [32m✓[39m src/surfaces/file-surface.test.tsx [2m([22m[2m9 tests[22m[2m)[22m[33m 704[2mms[22m[39m
+@pi-desktop/canvas:test:      [33m[2m✓[22m[39m opens empty and fills incrementally while streaming (no remount) [33m 440[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/chat/use-prefill-pill.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[32m 76[2mms[22m[39m
+@pi-desktop/canvas:test:  [32m✓[39m src/tab-icons.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[32m 16[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/settings/model-manager-logic.test.ts [2m([22m[2m48 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m electron/session-chains.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m electron/corp/concurrency.test.ts [2m([22m[2m19 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+@pi-desktop/web-tools:typecheck: $ tsc --noEmit
+@pi-desktop/engine:typecheck: $ tsc --noEmit
+@pi-desktop/model-store:typecheck: cache miss, executing d1ccc5723ada2f6c
+@pi-desktop/desktop:test:  [32m✓[39m electron/gen/hyperframes-still.test.ts [2m([22m[2m26 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/settings/icons.test.tsx [2m([22m[2m7 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+@pi-desktop/ui:typecheck: $ tsc --noEmit
+@pi-desktop/canvas:test:  [32m✓[39m src/tabs/controller.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+@pi-desktop/canvas:test:  [32m✓[39m src/situation/situation-model.test.ts [2m([22m[2m24 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+@pi-desktop/canvas:test:  [32m✓[39m src/tabs/canvas-tabs.test.tsx [2m([22m[2m26 tests[22m[2m)[22m[33m 970[2mms[22m[39m
+@pi-desktop/canvas:test:      [33m[2m✓[22m[39m toggles a markdown file tab between rendered prose and raw source [33m 301[2mms[22m[39m
+@pi-desktop/canvas:test:  [32m✓[39m src/harness/harness-runtime.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+@pi-desktop/canvas:test:  [32m✓[39m src/surfaces/computer-use-geometry.test.ts [2m([22m[2m26 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+@pi-desktop/canvas:test:  [32m✓[39m src/situation/worker-streams.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m electron/scheduled/schedule-logic.test.ts [2m([22m[2m31 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+@pi-desktop/canvas:test:  [32m✓[39m src/surfaces/code-append.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m electron/workspace/project-dir.test.ts [2m([22m[2m21 tests[22m[2m)[22m[32m 17[2mms[22m[39m
+@pi-desktop/canvas:test:  [32m✓[39m src/surfaces/html-surface.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+@pi-desktop/provider-llamacpp:typecheck: cache miss, executing 47f16e4f38b08f9f
+@pi-desktop/model-store:typecheck: $ tsc --noEmit
+@pi-desktop/canvas:test:  [32m✓[39m src/registry.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/chat/composer/pill-node.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/chat/activity-mapping.test.ts [2m([22m[2m93 tests[22m[2m)[22m[32m 21[2mms[22m[39m
+@pi-desktop/canvas:test:  [32m✓[39m src/surfaces/markdown-surface.test.tsx [2m([22m[2m3 tests[22m[2m)[22m[32m 19[2mms[22m[39m
+@pi-desktop/canvas:test: 
+@pi-desktop/canvas:test: [2m Test Files [22m [1m[32m29 passed[39m[22m[90m (29)[39m
+@pi-desktop/canvas:test: [2m      Tests [22m [1m[32m238 passed[39m[22m[90m (238)[39m
+@pi-desktop/canvas:test: [2m   Start at [22m 21:27:27
+@pi-desktop/canvas:test: [2m   Duration [22m 7.00s[2m (transform 12.10s, setup 0ms, import 35.71s, tests 4.84s, environment 39.77s)[22m
+@pi-desktop/canvas:test: 
+@pi-desktop/gen-service:typecheck: cache miss, executing d9b49d5f2a7d2b73
+@pi-desktop/provider-afm:typecheck: cache miss, executing 4c88e94aba91b28a
+@pi-desktop/desktop:test:  [32m✓[39m electron/gen/video-dispatch.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+@pi-desktop/provider-llamacpp:typecheck: $ tsc --noEmit
+@pi-desktop/desktop:test:  [32m✓[39m electron/mac/monitor-core.test.ts [2m([22m[2m24 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/chat/corp/CorpInlineTurn.test.tsx [2m([22m[2m10 tests[22m[2m)[22m[32m 126[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m electron/gen/gen-catalog-dto.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/chat/corp/corp-file-content.test.ts [2m([22m[2m19 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m electron/pi/pi-sessions.test.ts [2m([22m[2m19 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/settings/engine-catalog.test.ts [2m([22m[2m19 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+@pi-desktop/desktop:test: [90mstderr[2m | src/chat/palette-escape.test.tsx[2m > [22m[2mthe command palette owns Escape[2m > [22m[2mcloses when Escape arrives with focus on the body
+@pi-desktop/desktop:test: [22m[39mThe current testing environment is not configured to support act(...)
+@pi-desktop/desktop:test: 
+@pi-desktop/gen-service:typecheck: $ tsc --noEmit
+@pi-desktop/desktop:test: [90mstderr[2m | src/chat/palette-escape.test.tsx[2m > [22m[2mthe command palette owns Escape[2m > [22m[2mcloses when Escape arrives with focus on the body
+@pi-desktop/desktop:test: [22m[39mThe current testing environment is not configured to support act(...)
+@pi-desktop/desktop:test: 
+@pi-desktop/desktop:test: [90mstderr[2m | src/chat/palette-escape.test.tsx[2m > [22m[2mthe command palette owns Escape[2m > [22m[2mcloses when Escape arrives from an element outside it entirely
+@pi-desktop/desktop:test: [22m[39mThe current testing environment is not configured to support act(...)
+@pi-desktop/desktop:test: 
+@pi-desktop/desktop:test: [90mstderr[2m | src/chat/palette-escape.test.tsx[2m > [22m[2mthe command palette owns Escape[2m > [22m[2mcloses when Escape arrives from an element outside it entirely
+@pi-desktop/desktop:test: [22m[39mThe current testing environment is not configured to support act(...)
+@pi-desktop/desktop:test: 
+@pi-desktop/desktop:test: [90mstderr[2m | src/chat/palette-escape.test.tsx[2m > [22m[2mthe command palette owns Escape[2m > [22m[2mdoes nothing when it is closed
+@pi-desktop/desktop:test: [22m[39mThe current testing environment is not configured to support act(...)
+@pi-desktop/desktop:test: 
+@pi-desktop/desktop:test: [90mstderr[2m | src/chat/palette-escape.test.tsx[2m > [22m[2mthe command palette owns Escape[2m > [22m[2mdoes nothing when it is closed
+@pi-desktop/desktop:test: [22m[39mThe current testing environment is not configured to support act(...)
+@pi-desktop/desktop:test: 
+@pi-desktop/desktop:test: [90mstderr[2m | src/chat/palette-escape.test.tsx[2m > [22m[2mthe command palette owns Escape[2m > [22m[2mleaves Escape to whatever opened above it
+@pi-desktop/desktop:test: [22m[39mThe current testing environment is not configured to support act(...)
+@pi-desktop/desktop:test: 
+@pi-desktop/desktop:test: [90mstderr[2m | src/chat/palette-escape.test.tsx[2m > [22m[2mthe command palette owns Escape[2m > [22m[2mleaves Escape to whatever opened above it
+@pi-desktop/desktop:test: [22m[39mThe current testing environment is not configured to support act(...)
+@pi-desktop/desktop:test: 
+@pi-desktop/desktop:test:  [32m✓[39m src/chat/palette-escape.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[32m 26[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m electron/inference/download-cancellation.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/chat/spinner-continuity.test.tsx [2m([22m[2m5 tests[22m[2m)[22m[32m 61[2mms[22m[39m
+@pi-desktop/provider-afm:typecheck: $ tsc --noEmit
+@pi-desktop/desktop:test:  [32m✓[39m electron/corp/shell-writes.test.ts [2m([22m[2m17 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/chat/canvas/corp-canvas-routing.test.tsx [2m([22m[2m7 tests[22m[2m)[22m[32m 71[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m electron/pi/quit-hold.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+@pi-desktop/importers:typecheck: cache miss, executing e4dbb54f046ee9b8
+@pi-desktop/desktop:test:  [32m✓[39m electron/settings/settings-logic.test.ts [2m([22m[2m23 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/settings/harness-catalog.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m electron/inference/reap-orphans.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+@pi-desktop/desktop:test: [90mstdout[2m | electron/gen3d/gen3d-bridge.test.ts[2m > [22m[2mbridge ↔ harness client (real socket)[2m > [22m[2mcarries a generate_image request through and returns the path
+@pi-desktop/desktop:test: [22m[39m2026-09-08T04:27:35.356Z [desktop:gen3d-bridge] gen3d bridge listening { socketPath: [32m'/tmp/pi-gen3d-97491-8993ef50.sock'[39m }
+@pi-desktop/desktop:test: 
+@pi-desktop/desktop:test: [90mstdout[2m | electron/gen3d/gen3d-bridge.test.ts[2m > [22m[2mbridge ↔ harness client (real socket)[2m > [22m[2mcarries an edit_image request through, mapping imagePath → editFrom
+@pi-desktop/desktop:test: [22m[39m2026-09-08T04:27:35.360Z [desktop:gen3d-bridge] gen3d bridge listening { socketPath: [32m'/tmp/pi-gen3d-97491-a8d5b6ed.sock'[39m }
+@pi-desktop/desktop:test: 
+@pi-desktop/desktop:test: [90mstdout[2m | electron/gen3d/gen3d-bridge.test.ts[2m > [22m[2mbridge ↔ harness client (real socket)[2m > [22m[2mpasses an engine refusal back as a clean reason, not a hang
+@pi-desktop/desktop:test: [22m[39m2026-09-08T04:27:35.362Z [desktop:gen3d-bridge] gen3d bridge listening { socketPath: [32m'/tmp/pi-gen3d-97491-6067ede3.sock'[39m }
+@pi-desktop/desktop:test: 
+@pi-desktop/desktop:test: [90mstdout[2m | electron/gen3d/gen3d-bridge.test.ts[2m > [22m[2mbridge ↔ harness client (real socket)[2m > [22m[2mrejects a wrong token
+@pi-desktop/desktop:test: [22m[39m2026-09-08T04:27:35.363Z [desktop:gen3d-bridge] gen3d bridge listening { socketPath: [32m'/tmp/pi-gen3d-97491-682461cc.sock'[39m }
+@pi-desktop/desktop:test: 
+@pi-desktop/desktop:test:  [32m✓[39m electron/gen3d/gen3d-bridge.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/state/corp-store.test.ts [2m([22m[2m22 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+@pi-desktop/importers:typecheck: $ tsc --noEmit
+@pi-desktop/desktop:test:  [32m✓[39m src/state/pi-slice.test.ts [2m([22m[2m26 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/chat/thread-media.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/chat/auto-router.test.ts [2m([22m[2m36 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/settings/engine-picker.test.ts [2m([22m[2m16 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/chat/corp/corp-subagent-flow.test.tsx [2m([22m[2m11 tests[22m[2m)[22m[32m 47[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/models/model-card-schema.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m electron/gen/asset-gate.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m electron/session-export.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/chat/denoise-preview.test.ts [2m([22m[2m14 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/chat/corp/CorpWorkerFeed.test.tsx [2m([22m[2m14 tests[22m[2m)[22m[32m 136[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m electron/renderer-recovery.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/chat/corp/CorpChatStream.test.tsx [2m([22m[2m12 tests[22m[2m)[22m[32m 211[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/models/model-recommender.test.ts [2m([22m[2m16 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/chat/history-pole.test.ts [2m([22m[2m19 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m electron/inference/process-priority.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m electron/gen/audio-dispatch.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/chat/canvas/resize-collapse.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/chat/composer-bar-logic.test.ts [2m([22m[2m27 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/chat/long-job.test.ts [2m([22m[2m15 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/connectors/model.test.ts [2m([22m[2m14 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m electron/mac/pimf.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m electron/skills/skills-registry.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/chat/composer/agent-message.test.ts [2m([22m[2m14 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/chat/canvas/file-canvas-routing.test.ts [2m([22m[2m16 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/connectors/add-server-dialog.test.ts [2m([22m[2m19 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/settings/panels/agent-presets.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/chat/slash-commands.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/chat/canvas/file-preview.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m electron/ipc-contract.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 2[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m electron/window-policy.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/chat/composer/prefill-gate.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m electron/corp/mesh-plan.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/chat/footer-models.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m electron/office/office-theme.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/chat/canvas/agent-surfaces.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/tripo/module-state.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/chat/starters.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/chat/canvas/subagent-routing.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/media/video-keys.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 2[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m electron/inference/parallel-launch.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 2[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m electron/inference/modelcard-main.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/chat/composer-pill.test.ts [2m([22m[2m15 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/chat/prefill-risk.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+@pi-desktop/gen-tools:typecheck: cache miss, executing b5dcb60809c24de3
+@pi-desktop/desktop:test:  [32m✓[39m src/state/canvas-store.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/state/send-feasibility.test.ts [2m([22m[2m17 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m electron/mac/overlay-geometry.test.ts [2m([22m[2m26 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/state/settings-store.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/chat/composer/tokens.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 2[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/models/model-card-preamble.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 2[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/state/chat-org.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/chat/palette-rank.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/chat/harness-status.test.tsx [2m([22m[2m20 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/styles/shell-styles.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 2[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/state/notice-routing.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m electron/corp/compaction-settings.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/chat/canvas/canvas-state-report.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 2[2mms[22m[39m
+@pi-desktop/desktop:test: [90mstdout[2m | src/models/recommendation-matrix.test.ts[2m > [22m[2mthe recommendation matrix[2m > [22m[2mprints what every machine class is told to run
+@pi-desktop/desktop:test: [22m[39m
+@pi-desktop/desktop:test: ── 8 GB MacBook Air (6 GB usable)
+@pi-desktop/desktop:test:    text   Gemma 4 E4B                      Q8_0     5.3 GB
+@pi-desktop/desktop:test:    image  — nothing fits
+@pi-desktop/desktop:test:    video  — nothing fits
+@pi-desktop/desktop:test:    audio  Kokoro 82M                                2 GB
+@pi-desktop/desktop:test:    3d     TripoSR base                              6 GB
+@pi-desktop/desktop:test: 
+@pi-desktop/desktop:test: ── 16 GB laptop (12 GB usable)
+@pi-desktop/desktop:test:    text   Gemma 4 12B QAT                  Q5_K_M   11 GB
+@pi-desktop/desktop:test:    image  Mage Flow Turbo · int8                    12 GB
+@pi-desktop/desktop:test:    video  LTX-Video 2B distilled · Q4               10 GB
+@pi-desktop/desktop:test:    audio  Kokoro 82M                                2 GB
+@pi-desktop/desktop:test:    3d     TRELLIS v1 large                          10 GB
+@pi-desktop/desktop:test: 
+@pi-desktop/desktop:test: ── 24 GB M5 Pro (this Mac) (18 GB usable)
+@pi-desktop/desktop:test:    text   Qwen3.8 27B                      Q3_K_M   17.2 GB
+@pi-desktop/desktop:test:    image  Mage Flow Turbo · int8                    12 GB
+@pi-desktop/desktop:test:    video  LTX-Video 2B distilled · Q4               10 GB
+@pi-desktop/desktop:test:    audio  Kokoro 82M                                2 GB
+@pi-desktop/desktop:test:    3d     TRELLIS v2 · 4B                           18 GB
+@pi-desktop/desktop:test: 
+@pi-desktop/desktop:test: ── RTX 3060 12 GB (12 GB usable)
+@pi-desktop/desktop:test:    text   Gemma 4 12B QAT                  Q5_K_M   11 GB
+@pi-desktop/desktop:test:    image  Mage Flow Turbo · int8                    12 GB
+@pi-desktop/desktop:test:    video  LTX-Video 2B distilled · Q4               10 GB
+@pi-desktop/desktop:test:    audio  Kokoro 82M                                2 GB
+@pi-desktop/desktop:test:    3d     TRELLIS v1 large                          10 GB
+@pi-desktop/desktop:test: 
+@pi-desktop/desktop:test: ── RTX 4090 24 GB (24 GB usable)
+@pi-desktop/desktop:test:    text   Qwen3.8 27B                      Q4_K_M   21.3 GB
+@pi-desktop/desktop:test:    image  Mage Flow Turbo · bf16                    20 GB
+@pi-desktop/desktop:test:    video  LTX-Video 2.5 22B · Q3                    22 GB
+@pi-desktop/desktop:test:    audio  Kokoro 82M                                2 GB
+@pi-desktop/desktop:test:    3d     TRELLIS v2 · 4B                           18 GB
+@pi-desktop/desktop:test: 
+@pi-desktop/desktop:test: ── 48 GB M4 Max (36 GB usable)
+@pi-desktop/desktop:test:    text   Qwen3.8 27B                      Q8_0     35.8 GB
+@pi-desktop/desktop:test:    image  Mage Flow Turbo · bf16                    20 GB
+@pi-desktop/desktop:test:    video  LTX-Video 2.5 22B · Q4                    28 GB
+@pi-desktop/desktop:test:    audio  Kokoro 82M                                2 GB
+@pi-desktop/desktop:test:    3d     TRELLIS v2 · 4B                           18 GB
+@pi-desktop/desktop:test: 
+@pi-desktop/desktop:test: ── 128 GB workstation (96 GB usable)
+@pi-desktop/desktop:test:    text   Qwen3.8 27B                      Q8_0     35.8 GB
+@pi-desktop/desktop:test:    image  Mage Flow Turbo · bf16                    20 GB
+@pi-desktop/desktop:test:    video  LTX-Video 2.5 22B · Q4                    28 GB
+@pi-desktop/desktop:test:    audio  Kokoro 82M                                2 GB
+@pi-desktop/desktop:test:    3d     TRELLIS v2 · 4B                           18 GB
+@pi-desktop/desktop:test: 
+@pi-desktop/desktop:test:  [32m✓[39m src/models/recommendation-matrix.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 2[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/chat/canvas/browser-bounds.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+@pi-desktop/provider-mlx:typecheck: cache miss, executing 019f3eba94dc662f
+@pi-desktop/harness:typecheck: cache miss, executing 1a2daef71052a25a
+@pi-desktop/desktop:test:  [32m✓[39m electron/gen/worker-path.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 2[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/chat/reprefill-watch.test.ts [2m([22m[2m14 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/chat/attached-files.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/chat/chrome-corner.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+@pi-desktop/gen-tools:typecheck: $ tsc --noEmit
+@pi-desktop/desktop:test:  [32m✓[39m src/state/corp-child-bridge.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 2[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/state/rejected-send.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/state/present-store.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/store/theme.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/chat/profile-menu.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 2[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/tripo/stage-estimates.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/chat/queue-explainer.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m electron/bobble-paths.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/chat/partial-json.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m electron/pi/extension-dirs.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 2[2mms[22m[39m
+@pi-desktop/provider-mlx:typecheck: $ tsc --noEmit
+@pi-desktop/desktop:test:  [32m✓[39m src/chat/toast-policy.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 2[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/state/studio-handoff.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+@pi-desktop/harness:typecheck: $ tsc --noEmit
+@pi-desktop/desktop:test:  [32m✓[39m src/studio/use-studio.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 2[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/state/vision.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m electron/studio/studio-workflow.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 2[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/chat/composer/pill-delete.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/chat/composer-gen-actions.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 2[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/state/model-selection.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 2[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/chat/panel-work.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 2[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m electron/notify-gate.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/studio/use-handoff.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 2[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m electron/scheduled/blocked-permission.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 2[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/onboarding/onboarding-logic.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 2[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m electron/session-search.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 2[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m electron/inference/dedupe-flags.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 2[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m electron/inference/model-fit.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 2[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m electron/canvas/browser-manager.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 2[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m electron/background-mode.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 2[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/state/pi-slice-bgrun.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m electron/trusted-senders.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 2[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/state/download-progress.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/chat/permission-preview.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 2[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m electron/window-chrome.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 1[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/chat/composer/history-prefix.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 2[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/chat/harness-status.test.ts [2m([22m[2m20 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m tests/e2e/harness.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 2[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/chat/stage-announcer.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/studio/studio-run.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 2[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/chat/harness-title.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 2[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/state/visible-projects.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/chat/canvas/mac-monitor.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 2[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/state/steer-send.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 2[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/chat/composer/abort-on-send.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 2[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/chat/canvas/browser-agent.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 2[2mms[22m[39m
+@pi-desktop/desktop:test:  [32m✓[39m src/chat/canvas/file-tabs.test.tsx [2m([22m[2m5 tests[22m[2m)[22m[32m 1[2mms[22m[39m
+@pi-desktop/desktop:test: 
+@pi-desktop/desktop:test: [2m Test Files [22m [1m[32m169 passed[39m[22m[90m (169)[39m
+@pi-desktop/desktop:test: [2m      Tests [22m [1m[32m2063 passed[39m[22m[90m (2063)[39m
+@pi-desktop/desktop:test: [2m   Start at [22m 21:27:27
+@pi-desktop/desktop:test: [2m   Duration [22m 10.89s[2m (transform 35.47s, setup 0ms, import 86.26s, tests 10.62s, environment 18.42s)[22m
+@pi-desktop/desktop:test: 
+@pi-desktop/coordination:typecheck: cache miss, executing a91790f587d2d482
+@pi-desktop/coordination:typecheck: $ tsc --noEmit
+@pi-desktop/canvas:typecheck: cache miss, executing 919bdb2400202b9e
+@pi-desktop/canvas:typecheck: $ tsc --noEmit
+@pi-desktop/mac-computer-use:test:  [32m✓[39m src/tools.test.ts [2m([22m[2m40 tests[22m[2m)[22m[33m 12306[2mms[22m[39m
+@pi-desktop/mac-computer-use:test:      [33m[2m✓[22m[39m click by index re-snapshots + retries once on a stale index [33m 352[2mms[22m[39m
+@pi-desktop/mac-computer-use:test:      [33m[2m✓[22m[39m click accepts explicit x,y coordinates [33m 351[2mms[22m[39m
+@pi-desktop/mac-computer-use:test:      [33m[2m✓[22m[39m type by index passes index+text; focused type omits index [33m 702[2mms[22m[39m
+@pi-desktop/mac-computer-use:test:      [33m[2m✓[22m[39m refuses index-less typing into an app that DOES expose Accessibility [33m 353[2mms[22m[39m
+@pi-desktop/mac-computer-use:test:      [33m[2m✓[22m[39m types into an app that exposes no Accessibility, in the background [33m 352[2mms[22m[39m
+@pi-desktop/mac-computer-use:test:      [33m[2m✓[22m[39m surfaces the background flag + mode when the helper sets a value via AX [33m 351[2mms[22m[39m
+@pi-desktop/mac-computer-use:test:      [33m[2m✓[22m[39m marks a click as foreground when the helper falls back to a coordinate click [33m 351[2mms[22m[39m
+@pi-desktop/mac-computer-use:test:      [33m[2m✓[22m[39m type forwards submit:true so the helper can commit a search field [33m 352[2mms[22m[39m
+@pi-desktop/mac-computer-use:test:      [33m[2m✓[22m[39m stamps the snapshotted pid onto later click/type (concurrency-safe indices) [33m 703[2mms[22m[39m
+@pi-desktop/mac-computer-use:test:      [33m[2m✓[22m[39m launch opens in the background by default and foregrounds on request [33m 703[2mms[22m[39m
+@pi-desktop/mac-computer-use:test:      [33m[2m✓[22m[39m key forwards the combo [33m 350[2mms[22m[39m
+@pi-desktop/mac-computer-use:test:      [33m[2m✓[22m[39m launch focuses/launches the named app [33m 351[2mms[22m[39m
+@pi-desktop/mac-computer-use:test:      [33m[2m✓[22m[39m the first action asks for consent, then acts; a decline blocks without acting [33m 703[2mms[22m[39m
+@pi-desktop/mac-computer-use:test:      [33m[2m✓[22m[39m launch returns a fresh snapshot AND a window screenshot in the SAME tool result [33m 352[2mms[22m[39m
+@pi-desktop/mac-computer-use:test:      [33m[2m✓[22m[39m after launch, EVERY act stamps the controlled pid (unambiguous routing) [33m 1407[2mms[22m[39m
+@pi-desktop/mac-computer-use:test:      [33m[2m✓[22m[39m mac_scroll surfaces the helper-verified ladder ack (mode + honest no-movement) [33m 351[2mms[22m[39m
+@pi-desktop/mac-computer-use:test:      [33m[2m✓[22m[39m a default (app-less) snapshot targets the CONTROLLED app, not frontmost [33m 351[2mms[22m[39m
+@pi-desktop/mac-computer-use:test:      [33m[2m✓[22m[39m launch degrades to text-only (still ok) when the post-open snapshot fails [33m 351[2mms[22m[39m
+@pi-desktop/mac-computer-use:test:      [33m[2m✓[22m[39m refuses an index in the window the dialog is blocking, instead of no-opping [33m 351[2mms[22m[39m
+@pi-desktop/mac-computer-use:test:      [33m[2m✓[22m[39m does not refuse once the dialog is gone — it looks again first [33m 352[2mms[22m[39m
+@pi-desktop/mac-computer-use:test:      [33m[2m✓[22m[39m mac_type refuses a field behind the dialog too [33m 352[2mms[22m[39m
+@pi-desktop/mac-computer-use:test:      [33m[2m✓[22m[39m still retries normally when the SAME dialog was already up [33m 351[2mms[22m[39m
+@pi-desktop/mac-computer-use:test:      [33m[2m✓[22m[39m aims a coordinate at the dialog UNTOUCHED — no correction toward the window [33m 702[2mms[22m[39m
+@pi-desktop/mac-computer-use:test:      [33m[2m✓[22m[39m degrades silently for a helper that reports no windows/dialog at all [33m 350[2mms[22m[39m
+@pi-desktop/mac-computer-use:test:      [33m[2m✓[22m[39m resolves an unknown app by looking, and only then refuses [33m 351[2mms[22m[39m
+@pi-desktop/mac-computer-use:test:      [33m[2m✓[22m[39m types rather than dead-ending when it cannot find out what kind of app it is [33m 703[2mms[22m[39m
+@pi-desktop/mac-computer-use:test: 
+@pi-desktop/mac-computer-use:test: [2m Test Files [22m [1m[32m8 passed[39m[22m[90m (8)[39m
+@pi-desktop/mac-computer-use:test: [2m      Tests [22m [1m[32m113 passed[39m[22m[90m (113)[39m
+@pi-desktop/mac-computer-use:test: [2m   Start at [22m 21:27:27
+@pi-desktop/mac-computer-use:test: [2m   Duration [22m 13.20s[2m (transform 783ms, setup 0ms, import 1.93s, tests 14.24s, environment 0ms)[22m
+@pi-desktop/mac-computer-use:test: 
+@pi-desktop/gen-canvas:typecheck: cache miss, executing 37768a09d192def3
+@pi-desktop/gen-canvas:typecheck: $ tsc --noEmit
+@pi-desktop/desktop:typecheck: cache miss, executing 22df72dce9e6b7f5
+@pi-desktop/desktop:typecheck: $ tsc -p tsconfig.json --noEmit && tsc -p tsconfig.node.json --noEmit
+
+ Tasks:    54 successful, 54 total
+Cached:    23 cached, 54 total
+  Time:    22.919s 
+
+EXIT=0

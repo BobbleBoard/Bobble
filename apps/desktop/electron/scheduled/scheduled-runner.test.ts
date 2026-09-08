@@ -199,6 +199,118 @@ describe('serialisation', () => {
   });
 });
 
+describe('stopping', () => {
+  /** A bridge whose prompt never ends on its own — the run stays live until stopped. */
+  function hangingRunner(opts: { onDispose?: () => void } = {}) {
+    let emit: (e: unknown) => void = () => {};
+    const runner = createScheduledRunner({
+      createBridge: (_opts, onEvent) => {
+        emit = onEvent as (e: unknown) => void;
+        return {
+          ready: () => Promise.resolve(),
+          alive: true,
+          prompt: async () => {
+            emit({ type: 'message_start' });
+            emit({
+              type: 'message_update',
+              assistantMessageEvent: { type: 'text_delta', delta: 'Half way ' },
+            });
+            await new Promise(() => {});
+          },
+          dispose: () => {
+            opts.onDispose?.();
+            // The real bridge reports its exit after dispose; that must not
+            // turn a stopped run into a failed one.
+            emit({ type: '_bridge_exit' });
+          },
+        };
+      },
+      onRunUpdated: (run) => updates.push({ id: run.id, status: run.status }),
+      markRan: () => {},
+      now: () => Date.now(),
+    });
+    return runner;
+  }
+
+  it('ends the live run as `stopped`, keeps what it had said, and frees the bridge', async () => {
+    let disposed = 0;
+    const runner = hangingRunner({ onDispose: () => disposed++ });
+    const { runId } = runner.run(task(), 'manual');
+    await settle();
+    expect(runner.listRuns('task_x')[0]?.status).toBe('running');
+
+    expect(runner.stop('task_x')).toBe(true);
+    await settle();
+    const run = runner.listRuns('task_x')[0];
+    expect(run?.id).toBe(runId);
+    expect(run?.status).toBe('stopped');
+    expect(run?.error).toBeUndefined();
+    expect(run?.summary).toBe('Half way');
+    expect(run?.finishedAt).toBeGreaterThanOrEqual(run?.startedAt ?? 0);
+    expect(disposed).toBe(1);
+    expect(updates.map((u) => u.status)).toEqual(['running', 'stopped']);
+  });
+
+  it('drops a run still waiting in the queue, which then leaves no record', async () => {
+    const runner = hangingRunner();
+    runner.run(task({ id: 'a' }));
+    runner.run(task({ id: 'b' }));
+    await settle();
+    // b is queued behind a: nothing of b's exists yet.
+    expect(runner.listRuns('b')).toEqual([]);
+    expect(runner.stop('b')).toBe(true);
+    // a is still running; stop it so the queue drains and b's turn comes.
+    expect(runner.stop('a')).toBe(true);
+    await settle();
+    await settle();
+    expect(runner.listRuns('a')[0]?.status).toBe('stopped');
+    expect(runner.listRuns('b')).toEqual([]);
+  });
+
+  it('says so when there is nothing to stop', async () => {
+    const runner = makeRunner(OK_SCRIPT);
+    runner.run(task());
+    await settle();
+    expect(runner.stop('task_x')).toBe(false);
+    expect(runner.listRuns('task_x')[0]?.status).toBe('ok');
+  });
+});
+
+describe('the model on the record', () => {
+  it('stamps the loaded model at the start, and at the end if it came up during the run', async () => {
+    let loaded: { id: string; displayName: string } | null = null;
+    const runner = createScheduledRunner({
+      createBridge: (_opts, onEvent) => ({
+        ready: () => Promise.resolve(),
+        alive: true,
+        prompt: async () => {
+          // The first run of the day: the model loads while it is going.
+          loaded = { id: 'gemma-4-12b', displayName: 'Gemma 4 12B' };
+          (onEvent as (e: unknown) => void)({ type: 'agent_end' });
+        },
+        dispose: () => {},
+      }),
+      onRunUpdated: () => {},
+      markRan: () => {},
+      now: () => Date.now(),
+      currentModel: () => loaded,
+    });
+    runner.run(task());
+    await settle();
+    expect(runner.listRuns('task_x')[0]?.model).toEqual({
+      id: 'gemma-4-12b',
+      displayName: 'Gemma 4 12B',
+    });
+  });
+
+  it('leaves the field off rather than guessing when nothing was ever loaded', async () => {
+    const runner = makeRunner(OK_SCRIPT);
+    runner.run(task());
+    await settle();
+    expect(runner.listRuns('task_x')[0]?.model).toBeUndefined();
+  });
+});
+
 describe('pruning + deletion', () => {
   it('keeps a task deletable — deleteRunsForTask removes the whole history', async () => {
     const runner = makeRunner(OK_SCRIPT);

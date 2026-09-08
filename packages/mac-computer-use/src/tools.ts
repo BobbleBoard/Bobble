@@ -335,9 +335,9 @@ export function registerMacComputerUseTools(
    * there without having to know that a separate listing verb exists, and a
    * path it half-remembers still resolves rather than costing a turn.
    */
-  async function clickMenu(path: string): Promise<AgentToolResult<MacDetails>> {
+  async function clickMenu(path: string, activate: boolean): Promise<AgentToolResult<MacDetails>> {
     if (bridge === null) return unavailable('mac_click');
-    const ack = await bridge.request<MacMenuAck>('menuClick', withTarget({ path }));
+    const ack = await bridge.request<MacMenuAck>('menuClick', withTarget({ path, activate }));
     if (ack.ok !== true) {
       const known =
         ack.menus !== undefined && ack.menus.length > 0
@@ -365,11 +365,22 @@ export function registerMacComputerUseTools(
       );
     }
     const opened = describeOpened(ack.dialog, ack.opened);
+    const how =
+      ack.focusBorrowed === true
+        ? ` The user's focus was borrowed for that one command and ${
+            ack.focusRestored === false ? 'could NOT be handed back' : 'handed straight back'
+          }.`
+        : ' The menu never opened on screen and the app stayed in the background.';
     return textResult(
       `Pressed menu ${ack.path ?? path}.` +
         (ack.shortcut !== undefined && ack.shortcut !== '' ? ` (${ack.shortcut})` : '') +
-        ` The menu never opened on screen and the app stayed in the background.${opened}`,
-      { action: 'menu', ok: true, background: true, path: ack.path ?? path },
+        `${how}${opened}`,
+      {
+        action: 'menu',
+        ok: true,
+        background: ack.focusBorrowed !== true,
+        path: ack.path ?? path,
+      },
     );
   }
 
@@ -508,6 +519,16 @@ export function registerMacComputerUseTools(
             'mac_snapshot prints the app’s top-level menus.',
         }),
       ),
+      activate: Type.Optional(
+        Type.Boolean({
+          description:
+            'For `menu` only. macOS runs a DOCUMENT command (Save, Bold, Close) only for the ' +
+            'app that is frontmost, so those do nothing while an app is driven in the ' +
+            'background — you will be told when you hit one. This borrows the user’s focus for ' +
+            'that single command and hands it straight back. Prefer the app’s own on-screen ' +
+            'controls when it has them; use this when it does not.',
+        }),
+      ),
     }),
     async execute(_id, params, _signal, _upd, ctx): Promise<AgentToolResult<MacDetails>> {
       if (bridge === null) return unavailable('mac_click');
@@ -515,7 +536,7 @@ export function registerMacComputerUseTools(
       if (blocked !== null) return blocked;
       try {
         if (typeof params.menu === 'string' && params.menu.trim() !== '') {
-          return await clickMenu(params.menu.trim());
+          return await clickMenu(params.menu.trim(), params.activate === true);
         }
         if (typeof params.x === 'number' && typeof params.y === 'number') {
           /*

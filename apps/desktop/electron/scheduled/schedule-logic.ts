@@ -10,6 +10,8 @@
  * rather than in the maths.
  */
 
+import { describeScheduleWords, formatClockTime, nameFrom, nameWasCut } from '@pi-desktop/shared';
+
 export type Frequency = 'manual' | 'hourly' | 'daily' | 'weekdays' | 'weekly';
 
 export const FREQUENCIES: readonly Frequency[] = [
@@ -36,8 +38,6 @@ export interface ScheduledTask {
   readonly enabled: boolean;
   /** Working directory the run happens in; undefined = the app's default. */
   readonly cwd?: string;
-  /** Model id override; undefined = whatever the app is set to. */
-  readonly modelId?: string;
   /** Epoch ms of the last completed run, for "last run" + catch-up. */
   readonly lastRunAt?: number;
   /** Epoch ms the task was created (ordering, and a stable tiebreak). */
@@ -76,7 +76,8 @@ export function normalizeTask(raw: Partial<ScheduledTask> & { id: string }): Sch
     weekday: clampInt(raw.weekday, 0, 6, 1),
     enabled: raw.enabled !== false,
     ...(raw.cwd !== undefined && raw.cwd !== '' ? { cwd: raw.cwd } : {}),
-    ...(raw.modelId !== undefined && raw.modelId !== '' ? { modelId: raw.modelId } : {}),
+    // A `modelId` used to be kept here and read by nothing: a run uses whatever
+    // model the app has loaded, and the run record says which (TaskRun.model).
     ...(typeof raw.lastRunAt === 'number' ? { lastRunAt: raw.lastRunAt } : {}),
     createdAt: typeof raw.createdAt === 'number' ? raw.createdAt : 0,
   };
@@ -186,37 +187,15 @@ export function previousRun(task: ScheduledTask, nowMs: number): number | undefi
   return undefined;
 }
 
-const WEEKDAY_NAMES = [
-  'Sunday',
-  'Monday',
-  'Tuesday',
-  'Wednesday',
-  'Thursday',
-  'Friday',
-  'Saturday',
-];
-
 /** "8:00 AM" — 12-hour, because that is how the schedule is spoken. */
 export function formatTime(hour: number, minute: number): string {
-  const suffix = hour < 12 ? 'AM' : 'PM';
-  const h = hour % 12 === 0 ? 12 : hour % 12;
-  return `${h}:${String(minute).padStart(2, '0')} ${suffix}`;
+  return formatClockTime(hour, minute);
 }
 
-/** The one-line schedule under a task's name. */
+/** The one-line schedule under a task's name — the shared words, so the
+ *  harness tool reads a schedule back exactly as the screen prints it. */
 export function describeSchedule(task: ScheduledTask): string {
-  switch (task.frequency) {
-    case 'manual':
-      return 'Only when you run it';
-    case 'hourly':
-      return `Every hour at :${String(task.minute).padStart(2, '0')}`;
-    case 'daily':
-      return `Every day at ${formatTime(task.hour, task.minute)}`;
-    case 'weekdays':
-      return `Weekdays at ${formatTime(task.hour, task.minute)}`;
-    case 'weekly':
-      return `Every ${WEEKDAY_NAMES[task.weekday]} at ${formatTime(task.hour, task.minute)}`;
-  }
+  return describeScheduleWords(task);
 }
 
 /** "in 4h", "in 2 days", "now" — relative, for the next-run column. */
@@ -256,6 +235,17 @@ export interface ParsedTaskDraft {
   readonly hour: number;
   readonly minute: number;
   readonly weekday: number;
+  /**
+   * WHAT WAS ACTUALLY READ, so a surface can tell a reading from a default.
+   *
+   * The parser always returns a full schedule — daily, 9:00 — because the
+   * draft it feeds must be complete. But "eve" typed into the sentence box is
+   * not "Every day at 9:00 AM", and a chip that presents the fallback with the
+   * confidence of a reading spends the trust the live parse earns. `cadence`
+   * is true once a frequency word was found; `time` once a clock time was
+   * (or the cadence has no time of its own — hourly).
+   */
+  readonly read: { readonly cadence: boolean; readonly time: boolean };
 }
 
 const DAY_WORDS: Record<string, number> = {
@@ -285,6 +275,8 @@ export function parseTaskDraft(input: string): ParsedTaskDraft {
   let weekday = 1;
   let hour = 9;
   let minute = 0;
+  let readCadence = false;
+  let readTime = false;
   const consumed: string[] = [];
 
   // --- day / cadence -------------------------------------------------------
@@ -292,9 +284,11 @@ export function parseTaskDraft(input: string): ParsedTaskDraft {
     /\bevery\s+(sunday|monday|tuesday|wednesday|thursday|friday|saturday)\b/.exec(lower);
   if (/\bevery\s+hour\b|\bhourly\b/.test(lower)) {
     frequency = 'hourly';
+    readCadence = true;
     consumed.push('every hour', 'hourly');
   } else if (/\bevery\s+weekday\b|\bweekdays?\b|\bevery\s+work(ing)?\s+day\b/.test(lower)) {
     frequency = 'weekdays';
+    readCadence = true;
     consumed.push(
       'every weekday',
       'every weekdays',
@@ -305,13 +299,16 @@ export function parseTaskDraft(input: string): ParsedTaskDraft {
     );
   } else if (weekdayMatch !== null) {
     frequency = 'weekly';
+    readCadence = true;
     weekday = DAY_WORDS[weekdayMatch[1] ?? ''] ?? 1;
     consumed.push(weekdayMatch[0]);
   } else if (/\bevery\s+week\b|\bweekly\b/.test(lower)) {
     frequency = 'weekly';
+    readCadence = true;
     consumed.push('every week', 'weekly');
   } else if (/\bevery\s+day\b|\bdaily\b|\beach\s+day\b/.test(lower)) {
     frequency = 'daily';
+    readCadence = true;
     consumed.push('every day', 'daily', 'each day');
   }
 
@@ -325,17 +322,22 @@ export function parseTaskDraft(input: string): ParsedTaskDraft {
     if (raw >= 0 && raw <= 23 && mins >= 0 && mins <= 59) {
       hour = meridiem === 'pm' ? (raw % 12) + 12 : meridiem === 'am' ? raw % 12 : raw;
       minute = mins;
+      readTime = true;
       consumed.push(timeMatch[0]);
     }
   } else if (/\bnoon\b/.test(lower)) {
     hour = 12;
     minute = 0;
+    readTime = true;
     consumed.push('noon');
   } else if (/\bmidnight\b/.test(lower)) {
     hour = 0;
     minute = 0;
+    readTime = true;
     consumed.push('midnight');
   }
+  // An hourly task has no time of day to be missing.
+  if (frequency === 'hourly') readTime = true;
 
   // --- what is left is the instruction -------------------------------------
   let prompt = text;
@@ -348,17 +350,28 @@ export function parseTaskDraft(input: string): ParsedTaskDraft {
     .trim();
   if (prompt.length === 0) prompt = text;
 
-  return { name: titleFrom(prompt), prompt, frequency, hour, minute, weekday };
+  return {
+    name: nameFrom(prompt),
+    prompt,
+    frequency,
+    hour,
+    minute,
+    weekday,
+    read: { cadence: readCadence, time: readTime },
+  };
 }
 
 function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-/** A short title from the instruction — the first clause, capitalised. */
-export function titleFrom(prompt: string): string {
-  const firstClause = prompt.split(/[.,;\n]/)[0] ?? prompt;
-  const words = firstClause.trim().split(/\s+/).slice(0, 6).join(' ');
-  if (words.length === 0) return 'Scheduled task';
-  return words.charAt(0).toUpperCase() + words.slice(1);
-}
+// ---------------------------------------------------------------------------
+// Naming — one implementation for the screen, the scheduler and the harness
+// tool (packages/shared/src/schedule-words.ts), re-exported here so the
+// renderer keeps one import path for everything a task is called.
+// ---------------------------------------------------------------------------
+
+export { nameFrom, nameWasCut };
+
+/** The earlier name for `nameFrom`, kept so nothing that imported it moves. */
+export const titleFrom = nameFrom;

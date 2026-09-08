@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  bubbleContent,
   comboLabel,
   OVERLAY_BUFFER,
   overlayBoundsFor,
@@ -191,5 +192,39 @@ describe('typingPreview', () => {
     const out = typingPreview(long);
     expect(out.length).toBe(44);
     expect(out.endsWith('…')).toBe(true);
+  });
+});
+
+describe('bubbleContent — the words the canvas monitor and overlay.html share', () => {
+  it('mirrors every state the overlay STATUS map paints', () => {
+    expect(bubbleContent('thinking')).toEqual({ label: 'Thinking', detail: '', dots: true });
+    expect(bubbleContent('clicking')).toEqual({ label: 'Clicking', detail: '', dots: false });
+    expect(bubbleContent('scrolling')).toEqual({ label: 'Scrolling', detail: '', dots: true });
+    expect(bubbleContent('reading')).toEqual({
+      label: 'Reading the screen',
+      detail: '',
+      dots: true,
+    });
+  });
+
+  it('carries the typed preview as the monospace tail, not in the label', () => {
+    expect(bubbleContent('typing', 'hello world')).toEqual({
+      label: 'Typing',
+      detail: 'hello world',
+      dots: true,
+    });
+  });
+
+  it('puts the key combo in the label, as the overlay does', () => {
+    expect(bubbleContent('pressing', comboLabel('cmd+shift+s')).label).toBe('Pressing ⌘⇧S');
+  });
+
+  it('never leaves a dangling word when the payload is empty', () => {
+    expect(bubbleContent('pressing').label).toBe('Pressing');
+    expect(bubbleContent('opening').label).toBe('Opening');
+  });
+
+  it('idle is no bubble at all', () => {
+    expect(bubbleContent('idle')).toEqual({ label: '', detail: '', dots: false });
   });
 });

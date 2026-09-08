@@ -1,0 +1,39 @@
+
+waiting for the app to bring its own model up…
+
+  app activated: qwen3.5-4b-mtp on http://127.0.0.1:65357/v1
+llama-server on 64507
+
+  cold-open                   7535ms   reused   9738 /   9738 tok   (dispatch 24ms)
+      system prompt diverges at char 0 of 0 (0% in)
+        was: ""
+        now: "You are an expert coding assistant operating inside pi, a coding agent harness. You help users by reading files, executing commands, editing"
+      PREFIX CHANGED before follow-up: system prompt (0→17646 chars) +tools[capability,use,read,write,edit,bash,update_plan,ask_user,present,generate_image,generate_video,generate_speech,generate_music,generate_sfx,web_search,web_fetch,spawn_subagent,talk_to_manager]
+  follow-up                    726ms   reused   9738 /   9738 tok   (dispatch 35ms)
+  follow-up-after-postturn     733ms   reused   9738 /   9738 tok   (dispatch 33ms)
+  chat-switch-back             697ms   reused   9738 /   9738 tok   (dispatch 29ms)
+  new-chat                     654ms   reused   9738 /   9738 tok   (dispatch 29ms)
+  attachment                   203ms   reused   9738 /   9738 tok   (dispatch 26ms)
+  hidden-no-refocus           7505ms   reused   9738 /   9738 tok   (dispatch 24ms)
+  refocus                      645ms   reused   9738 /   9738 tok   (dispatch 21ms)
+  (idling 6 min…)
+  idle                         979ms   reused   9738 /   9738 tok   (dispatch 33ms)
+  model-switch                4457ms   reused   9766 /   9766 tok   (dispatch 23ms)
+
+──────────────── TTFT matrix ────────────────
+  case                        ttft      reused / prompt   verdict
+  cold-open                   7535ms     9738 /   9738  100%  reused
+  follow-up                    726ms     9738 /   9738  100%  reused
+  follow-up-after-postturn     733ms     9738 /   9738  100%  reused  (after 20s of quiet)
+  chat-switch-back             697ms     9738 /   9738  100%  reused
+  new-chat                     654ms     9738 /   9738  100%  reused
+  attachment                   203ms     9738 /   9738  100%  reused  (after an 8s prefill window)
+  hidden-no-refocus           7505ms     9738 /   9738  100%  reused  (30s hidden, no focus event)
+  refocus                      645ms     9738 /   9738  100%  reused  (after 30s hidden + a 4s re-prime window)
+  idle                         979ms     9738 /   9738  100%  reused  (after 6 min idle)
+  model-switch                4457ms     9766 /   9766  100%  reused  (switched to gemma-4-e2b-it)
+
+  OK: every route over 1500ms had something on screen saying so.
+    cold-open                 7535ms — the screen said "Getting ready · 0:01"
+    hidden-no-refocus         7505ms — the screen said "Getting ready · 0:36"
+    model-switch              4457ms — the screen said "Getting ready · 6:56"

@@ -1,0 +1,47 @@
+
+waiting for the app to bring its own model up…
+
+  app activated: qwen3.5-4b-mtp on http://127.0.0.1:59524/v1
+llama-server on 64507
+
+  cold-open                   7470ms   reused   9738 /   9738 tok   (dispatch 26ms)
+      system prompt diverges at char 0 of 0 (0% in)
+        was: ""
+        now: "You are an expert coding assistant operating inside pi, a coding agent harness. You help users by reading files, executing commands, editing"
+      PREFIX CHANGED before follow-up: system prompt (0→17646 chars) +tools[capability,use,read,write,edit,bash,update_plan,ask_user,present,generate_image,generate_video,generate_speech,generate_music,generate_sfx,web_search,web_fetch,spawn_subagent,talk_to_manager]
+  follow-up                    746ms   reused   9738 /   9738 tok   (dispatch 30ms)
+      PREFIX CHANGED before follow-up-after-postturn: +tools[ls]
+  follow-up-after-postturn     732ms   reused   9738 /   9738 tok   (dispatch 46ms)
+      PREFIX CHANGED before chat-switch-back: -tools[ls]
+  chat-switch-back            7414ms   reused   9738 /   9738 tok   (dispatch 30ms)
+  new-chat                     641ms   reused   9738 /   9738 tok   (dispatch 27ms)
+  attachment                   216ms   reused   9738 /   9738 tok   (dispatch 38ms)
+  hidden-no-refocus           7385ms   reused   9738 /   9738 tok   (dispatch 31ms)
+  refocus                      679ms   reused   9738 /   9738 tok   (dispatch 27ms)
+  (idling 6 min…)
+  idle                         975ms   reused   9738 /   9738 tok   (dispatch 32ms)
+  model-switch                5204ms   reused   9754 /   9768 tok   (dispatch 25ms)
+
+──────────────── TTFT matrix ────────────────
+  case                        ttft      reused / prompt   verdict
+  cold-open                   7470ms     9738 /   9738  100%  reused
+  follow-up                    746ms     9738 /   9738  100%  reused
+  follow-up-after-postturn     732ms     9738 /   9738  100%  reused  (after 20s of quiet)
+  chat-switch-back            7414ms     9738 /   9738  100%  reused
+  new-chat                     641ms     9738 /   9738  100%  reused
+  attachment                   216ms     9738 /   9738  100%  reused  (after an 8s prefill window)
+  hidden-no-refocus           7385ms     9738 /   9738  100%  reused  (30s hidden, no focus event)
+  refocus                      679ms     9738 /   9738  100%  reused  (after 30s hidden + a 4s re-prime window)
+  idle                         975ms     9738 /   9738  100%  reused  (after 6 min idle)
+  model-switch                5204ms     9754 /   9768  100%  reused  (switched to gemma-4-e2b-it)
+
+  OK: every route over 1500ms that the app could SEE coming said so on screen.
+
+  slow, and the screen said so:
+    cold-open                 7470ms — "Getting ready · 0:01"
+
+  slow for a reason nothing in the app models (reported, not a failure):
+    chat-switch-back          7414ms   9738/9738 reused
+    hidden-no-refocus         7385ms   9738/9738 reused
+    model-switch              5204ms   9754/9768 reused
+  OK: every route under 1500ms had a clear screen.

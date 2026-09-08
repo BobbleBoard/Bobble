@@ -1,0 +1,43 @@
+model qwen3.5-4b-mtp on 50447
+
+  1 slot(s), n_ctx 32768 each
+
+  (opening warm-up seen and settled)
+
+  turn   ttft      prompt    read    reused   thinking?
+     1    1671ms    12915      16    12899   yes
+          {"at":1788823369804,"what":"skipped","because":"a turn is using the slot","prefixChars":0}
+          {"at":1788823369846,"what":"skipped","because":"a turn is using the slot","prefixChars":0}
+          {"at":1788823369854,"what":"skipped","because":"a turn is using the slot","prefixChars":0}
+     2    2251ms    16124      16    16108   yes
+          {"at":1788823375748,"what":"skipped","because":"a turn is using the slot","prefixChars":0}
+          {"at":1788823375788,"what":"skipped","because":"a turn is using the slot","prefixChars":0}
+          {"at":1788823375792,"what":"skipped","because":"a turn is using the slot","prefixChars":0}
+     3   17841ms    19459      16    19443   yes
+          {"at":1788823396564,"what":"skipped","because":"a turn is using the slot","prefixChars":0}
+          {"at":1788823396605,"what":"skipped","because":"a turn is using the slot","prefixChars":0}
+          {"at":1788823396610,"what":"skipped","because":"a turn is using the slot","prefixChars":0}
+     4   33383ms    22800   22797        3   yes
+          {"at":1788823432889,"what":"skipped","because":"a turn is using the slot","prefixChars":0}
+          {"at":1788823432929,"what":"skipped","because":"a turn is using the slot","prefixChars":0}
+          {"at":1788823432935,"what":"skipped","because":"a turn is using the slot","prefixChars":0}
+     5   32893ms    26009   16169     9840   yes
+          {"at":1788823468848,"what":"skipped","because":"a turn is using the slot","prefixChars":0}
+          {"at":1788823468851,"what":"skipped","because":"a turn is using the slot","prefixChars":0}
+          {"at":1788823468857,"what":"skipped","because":"a turn is using the slot","prefixChars":0}
+     6   72558ms    29219   19379     9840   yes
+          {"at":1788823544398,"what":"skipped","because":"a turn is using the slot","prefixChars":0}
+          {"at":1788823544402,"what":"skipped","because":"a turn is using the slot","prefixChars":0}
+          {"at":1788823544455,"what":"skipped","because":"a turn is using the slot","prefixChars":0}
+
+──────── is the conversation cached? ────────
+  the prompt grew by 9760 tokens between turn 3 and turn 6
+  the REUSED part grew by -9603 tokens over the same stretch
+
+  THE CONVERSATION IS NOT CACHED: every turn re-reads what came before.
+  Each turn reads ~14590 tokens, and that number grows with the conversation.
+
+  turns that re-read MOST of their own prompt:
+    turn  4  read 22797 of 22800  (100%)  33383ms
+    turn  5  read 16169 of 26009  (62%)  32893ms
+    turn  6  read 19379 of 29219  (66%)  72558ms

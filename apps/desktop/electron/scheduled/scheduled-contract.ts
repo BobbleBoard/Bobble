@@ -9,7 +9,18 @@ export type { Frequency, ScheduledTask, ScheduleState } from './schedule-logic';
 /** Everything a caller may set. `id`, `createdAt` and `lastRunAt` are ours. */
 export type TaskDraft = Omit<ScheduledTask, 'id' | 'createdAt' | 'lastRunAt'>;
 
-export type RunStatus = 'running' | 'ok' | 'error';
+/**
+ * `stopped` is a run a person ended with Stop. It is neither a success nor a
+ * failure — the task did not misbehave, someone wanted the model back — so it
+ * counts in neither tally and draws in neither colour.
+ */
+export type RunStatus = 'running' | 'ok' | 'error' | 'stopped';
+
+/** The model a run used, as the inference supervisor named it when the run started. */
+export interface RunModel {
+  readonly id: string;
+  readonly displayName: string;
+}
 
 /** One file a run produced, for the past-runs view. */
 export interface RunArtifact {
@@ -41,6 +52,13 @@ export interface TaskRun {
   readonly trigger?: 'schedule' | 'manual';
   readonly finishedAt?: number;
   readonly status: RunStatus;
+  /**
+   * What ran it. Stamped from the loaded model when the run starts, and again
+   * when it finishes if none was loaded at the start (the first run of the day
+   * loads one). Absent on records from before this field, and on a run that
+   * ended before any model came up — the surface says nothing rather than guess.
+   */
+  readonly model?: RunModel;
   /** The run's final assistant text — what it reports it did. */
   readonly summary: string;
   /** Tool names the run used, in order, for a compact "what it did" trail. */
@@ -64,6 +82,13 @@ export type ScheduledInvokeMap = {
   /** Run a task now, headless, in main. Resolves when the run has been QUEUED,
    *  not when it finishes — progress arrives via `tasks:run-updated`. */
   'tasks:run-now': { request: { id: string }; response: { ok: boolean; runId?: string } };
+  /**
+   * Stop a task's run. The live run is ended and its record finalised as
+   * `stopped` (the update arrives via `tasks:run-updated`); a run still waiting
+   * in the queue is dropped before it starts. `ok: false` means nothing of that
+   * task's was running or queued.
+   */
+  'tasks:stop': { request: { id: string }; response: { ok: boolean } };
   /** Past runs for one task, newest first. */
   'tasks:list-runs': { request: { taskId: string }; response: { runs: TaskRun[] } };
   'tasks:delete-run': { request: { taskId: string; runId: string }; response: { ok: boolean } };
@@ -76,6 +101,7 @@ export const SCHEDULED_INVOKE_CHANNELS = [
   'tasks:update',
   'tasks:delete',
   'tasks:run-now',
+  'tasks:stop',
   'tasks:list-runs',
   'tasks:delete-run',
 ] as const satisfies readonly (keyof ScheduledInvokeMap)[];

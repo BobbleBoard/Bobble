@@ -22,6 +22,7 @@ import {
   loadRegistry,
   type McpRegistryConfig,
   type McpServerConfig,
+  type McpToolDef,
   nodeDetectAppsEnv,
   nodeRegistryIO,
   oneLineDescription,
@@ -33,7 +34,7 @@ import {
 } from '@pi-desktop/mcp-lite';
 import { createLogger, type IpcHandlers, registerIpcHandlers } from '@pi-desktop/shared';
 import type { IpcMain } from 'electron';
-import type { ConnectorsInvokeMap } from './connectors-contract';
+import type { ConnectorsInvokeMap, ConnectorToolListing } from './connectors-contract';
 
 const log = createLogger('desktop:connectors');
 const REGISTRY_PATH = defaultRegistryPath(os.homedir());
@@ -58,6 +59,65 @@ function scanEnv(): DetectAppsEnv {
     return { ...nodeDetectAppsEnv(fixtureDir), listProcesses: () => [] };
   }
   return nodeDetectAppsEnv();
+}
+
+/**
+ * What advertising one tool costs the prompt in Native mode: the JSON the model
+ * is shown (name, description, schema) at the usual ~4 characters per token.
+ * An estimate, and said to be one on screen — but the only number either
+ * reference product never shows, and on a local model the one that matters.
+ */
+export function estimateToolTokens(tool: McpToolDef): number {
+  const shown = JSON.stringify({
+    name: tool.name,
+    description: tool.description ?? '',
+    input_schema: tool.inputSchema ?? { type: 'object', properties: {} },
+  });
+  return Math.max(1, Math.ceil(shown.length / 4));
+}
+
+/** The last few stderr lines a server wrote — its own account of why it failed. */
+const STDERR_KEEP = 3;
+
+/**
+ * Start a server once, list what it has, tear it down. Shared by the
+ * registry-backed listing and the dialog's Test, which differ only in where
+ * the config came from.
+ */
+async function listTools(server: McpServerConfig): Promise<ConnectorToolListing> {
+  const stderr: string[] = [];
+  const host = new ConnectorHost({
+    connectTimeoutMs: 15_000,
+    onLog: (_id, line) => {
+      const text = line.trim();
+      if (text === '') return;
+      stderr.push(text.length > 240 ? `${text.slice(0, 240)}…` : text);
+      if (stderr.length > STDERR_KEEP) stderr.shift();
+    },
+  });
+  // Every tool the server has, whatever the person switched off: the screen
+  // draws the switches, so it needs the off ones too. The host filters for the
+  // model; this listing is for the person.
+  const { disabledTools: _off, ...everything } = server;
+  try {
+    const result = await host.connect(everything);
+    if (!result.ok) return { tools: [], error: result.error ?? 'failed to connect', stderr };
+    const tools = host.getServerTools(server.id).map((t) => ({
+      name: t.name,
+      description: oneLineDescription(t.description),
+      tokens: estimateToolTokens(t),
+    }));
+    return { tools };
+  } catch (error) {
+    log.warn('connectors: listing failed', { id: server.id, error: String(error) });
+    return {
+      tools: [],
+      error: String(error instanceof Error ? error.message : error),
+      stderr,
+    };
+  } finally {
+    host.disposeAll();
+  }
 }
 
 const handlers: IpcHandlers<ConnectorsInvokeMap> = {
@@ -103,31 +163,20 @@ const handlers: IpcHandlers<ConnectorsInvokeMap> = {
   },
 
   'connectors:tools': async (req) => {
-    // Live tool discovery (Tier 2). Only for an installed + enabled MCP server —
-    // never a builtin (no server) or an uninstalled card (don't spawn something
-    // the user hasn't added). Failures degrade to the static Tier-1 config.
+    // Only for an installed + enabled MCP server — never a builtin (no server)
+    // or an uninstalled card (don't spawn something the user hasn't added).
     if (isBuiltinConnector(req.id)) {
       return { tools: [], error: `"${req.id}" is a built-in (no live server)` };
     }
     const server = read().servers.find((s) => s.id === req.id);
     if (server === undefined) return { tools: [], error: `"${req.id}" is not installed` };
     if (server.enabled === false) return { tools: [], error: `"${req.id}" is disabled` };
-
-    const host = new ConnectorHost({ connectTimeoutMs: 15_000 });
-    try {
-      const result = await host.connect(server);
-      if (!result.ok) return { tools: [], error: result.error ?? 'failed to connect' };
-      const tools = host
-        .getServerTools(req.id)
-        .map((t) => ({ name: t.name, description: oneLineDescription(t.description) }));
-      return { tools };
-    } catch (error) {
-      log.warn('connectors:tools failed', { id: req.id, error: String(error) });
-      return { tools: [], error: String(error instanceof Error ? error.message : error) };
-    } finally {
-      host.disposeAll();
-    }
+    return listTools(server);
   },
+
+  // The dialog's Test. Starts exactly what was typed and writes nothing: the
+  // registry is untouched whether it worked or not.
+  'connectors:probe': (req) => listTools(req.server),
 };
 
 export function registerConnectorsIpc(

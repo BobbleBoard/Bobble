@@ -1,0 +1,25 @@
+
+waiting for the app to bring its own model up…
+
+  app activated: qwen3.5-4b-mtp on http://127.0.0.1:53598/v1
+llama-server on 51410
+
+  cold-open                   7521ms   reused   9733 /   9733 tok   (dispatch 29ms)
+      system prompt diverges at char 0 of 0 (0% in)
+        was: ""
+        now: "You are an expert coding assistant operating inside pi, a coding agent harness. You help users by reading files, executing commands, editing"
+      PREFIX CHANGED before follow-up: system prompt (0→17646 chars) +tools[capability,use,read,write,edit,bash,update_plan,ask_user,present,generate_image,generate_video,generate_speech,generate_music,generate_sfx,web_search,web_fetch,spawn_subagent,talk_to_manager]
+  follow-up                    732ms   reused   9733 /   9733 tok   (dispatch 35ms)
+  chat-switch-back             680ms   reused   9733 /   9733 tok   (dispatch 30ms)
+
+──────────────── TTFT matrix ────────────────
+  case                        ttft      reused / prompt   verdict
+  cold-open                   7521ms     9733 /   9733  100%  reused
+  follow-up                    732ms     9733 /   9733  100%  reused
+  chat-switch-back             680ms     9733 /   9733  100%  reused
+
+  OK: every route over 1500ms that the app could SEE coming said so on screen.
+
+  slow, and the screen said so:
+    cold-open                 7521ms — "Getting ready · 0:01"
+  OK: every route under 1500ms had a clear screen.

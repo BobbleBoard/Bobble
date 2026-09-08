@@ -37,7 +37,10 @@ export type MacAgentMethod =
   | 'frontmost'
   | 'windows'
   | 'wallpaper'
+  | 'menus'
   | 'menuClick'
+  | 'recordStart'
+  | 'recordStop'
   | 'setDriving';
 
 /** One request on the wire. */
@@ -213,6 +216,10 @@ export interface MacMenuAck {
   readonly error?: string;
   readonly opened?: readonly MacWindowInfo[];
   readonly dialog?: MacWindowInfo;
+  /** The command needed the app frontmost, so the focus was taken for the
+   * length of it and given back. Only ever set when the caller asked. */
+  readonly focusBorrowed?: boolean;
+  readonly focusRestored?: boolean;
 }
 
 /** Live window geometry returned by the `bounds` method (screen points). The

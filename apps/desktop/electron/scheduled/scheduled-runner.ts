@@ -17,7 +17,13 @@ import * as path from 'node:path';
 import type { PiBridgeEvent } from '@pi-desktop/engine';
 import { createLogger } from '@pi-desktop/shared';
 import { blockedPermission, blockedPermissionError } from './blocked-permission';
-import type { RunArtifact, ScheduledTask, TaskRun } from './scheduled-contract';
+import type {
+  RunArtifact,
+  RunModel,
+  RunStatus,
+  ScheduledTask,
+  TaskRun,
+} from './scheduled-contract';
 
 const log = createLogger('desktop:scheduled-runner');
 
@@ -43,6 +49,12 @@ export interface ScheduledRunnerDeps {
   /** Stamp the task as having run (updates lastRunAt), called at run START. */
   markRan: (taskId: string, whenMs: number) => void;
   now: () => number;
+  /**
+   * The model the inference server has loaded right now, or null. Read at a
+   * run's start and again at its end, so the record can say what ran it
+   * (`TaskRun.model`). Optional so the runner stays usable without a server.
+   */
+  currentModel?: () => RunModel | null;
 }
 
 function taskRunsDir(taskId: string): string {
@@ -169,6 +181,14 @@ export interface ScheduledRunner {
   /** Queue a run; resolves with the runId once queued (not when it finishes).
    * `trigger` records whether the clock or a person started it — see TaskRun. */
   run(task: ScheduledTask, trigger?: 'schedule' | 'manual'): { runId: string };
+  /**
+   * STOP a task's run. The live run — if it is this task's — is ended: the
+   * bridge is disposed (which frees the model slot it held) and the record is
+   * finalised as `stopped`, with whatever it had said so far. A run of this
+   * task still waiting in the queue is dropped before it starts and leaves no
+   * record, because it never began. `false` when there was nothing to stop.
+   */
+  stop(taskId: string): boolean;
   listRuns: typeof listRuns;
   deleteRun: typeof deleteRun;
   deleteRunsForTask: typeof deleteRunsForTask;
@@ -176,15 +196,31 @@ export interface ScheduledRunner {
   dispose(): void;
 }
 
+/** A run in flight: enough to end it from outside its own closure. */
+interface LiveRun {
+  readonly taskId: string;
+  readonly runId: string;
+  readonly bridge: RunBridge;
+  readonly end: (status: 'stopped') => void;
+}
+
 export function createScheduledRunner(deps: ScheduledRunnerDeps): ScheduledRunner {
   let queue: Promise<void> = Promise.resolve();
-  let liveBridge: RunBridge | null = null;
+  let live: LiveRun | null = null;
+  /** Runs queued behind the live one, in order. A stop removes from here. */
+  const waiting: Array<{ taskId: string; runId: string }> = [];
+  /** Queued runs that were stopped before they started; `execute` skips them. */
+  const dropped = new Set<string>();
 
   function execute(
     task: ScheduledTask,
     runId: string,
     trigger: 'schedule' | 'manual',
   ): Promise<void> {
+    const at = waiting.findIndex((w) => w.runId === runId);
+    if (at !== -1) waiting.splice(at, 1);
+    if (dropped.delete(runId)) return Promise.resolve();
+
     const startedAt = deps.now();
     // No cwd on the task → a dedicated per-run output dir, so the deliverables
     // are isolated and cleanly scannable. A named folder is used as-is.
@@ -198,12 +234,14 @@ export function createScheduledRunner(deps: ScheduledRunnerDeps): ScheduledRunne
       }
     }
 
+    const modelAtStart = deps.currentModel?.() ?? null;
     let run: TaskRun = {
       id: runId,
       taskId: task.id,
       startedAt,
       trigger,
       status: 'running',
+      ...(modelAtStart !== null ? { model: modelAtStart } : {}),
       summary: '',
       toolCalls: [],
       cwd,
@@ -218,15 +256,19 @@ export function createScheduledRunner(deps: ScheduledRunnerDeps): ScheduledRunne
       const toolCalls: string[] = [];
       let settled = false;
 
-      const finish = (status: 'ok' | 'error', error?: string): void => {
+      const finish = (status: Exclude<RunStatus, 'running'>, error?: string): void => {
         if (settled) return;
         settled = true;
         clearTimeout(timeout);
         const artifacts = scanArtifacts(cwd, startedAt, dedicated);
+        // A run that started before any model was loaded loaded one itself;
+        // name it now, so the record does not stay blank for the whole first day.
+        const model = run.model ?? deps.currentModel?.() ?? undefined;
         run = {
           ...run,
           status,
           finishedAt: deps.now(),
+          ...(model !== undefined ? { model } : {}),
           summary: summary.trim(),
           toolCalls,
           artifacts,
@@ -235,12 +277,13 @@ export function createScheduledRunner(deps: ScheduledRunnerDeps): ScheduledRunne
         writeRun(run);
         prune(task.id);
         deps.onRunUpdated(run);
+        const bridge = live?.runId === runId ? live.bridge : null;
+        if (live?.runId === runId) live = null;
         try {
-          liveBridge?.dispose();
+          bridge?.dispose();
         } catch {
           // ignore
         }
-        liveBridge = null;
         resolve();
       };
 
@@ -294,7 +337,7 @@ export function createScheduledRunner(deps: ScheduledRunnerDeps): ScheduledRunne
         );
         return;
       }
-      liveBridge = bridge;
+      live = { taskId: task.id, runId, bridge, end: (status) => finish(status) };
 
       const timeout = setTimeout(() => finish('error', 'the run timed out'), RUN_TIMEOUT_MS);
 
@@ -316,6 +359,7 @@ export function createScheduledRunner(deps: ScheduledRunnerDeps): ScheduledRunne
   return {
     run(task, trigger = 'schedule') {
       const runId = newRunId(deps.now());
+      waiting.push({ taskId: task.id, runId });
       // Chain onto the queue so runs never overlap.
       queue = queue
         .then(() => execute(task, runId, trigger))
@@ -324,16 +368,31 @@ export function createScheduledRunner(deps: ScheduledRunnerDeps): ScheduledRunne
         });
       return { runId };
     },
+    stop(taskId) {
+      let stopped = false;
+      if (live?.taskId === taskId) {
+        log.info('scheduled run stopped by hand', { taskId, runId: live.runId });
+        live.end('stopped');
+        stopped = true;
+      }
+      for (const w of waiting) {
+        if (w.taskId !== taskId) continue;
+        dropped.add(w.runId);
+        stopped = true;
+      }
+      return stopped;
+    },
     listRuns,
     deleteRun,
     deleteRunsForTask,
     dispose() {
+      const bridge = live?.bridge ?? null;
+      live = null;
       try {
-        liveBridge?.dispose();
+        bridge?.dispose();
       } catch {
         // ignore
       }
-      liveBridge = null;
     },
   };
 }

@@ -1,0 +1,38 @@
+
+waiting for the app to bring its own model up…
+
+  app activated: qwen3.5-4b-mtp on http://127.0.0.1:51410/v1
+llama-server on 64507
+
+  cold-open                   7638ms   reused   9738 /   9738 tok   (dispatch 32ms)
+      system prompt diverges at char 0 of 0 (0% in)
+        was: ""
+        now: "You are an expert coding assistant operating inside pi, a coding agent harness. You help users by reading files, executing commands, editing"
+      PREFIX CHANGED before follow-up: system prompt (0→17646 chars) +tools[capability,use,read,write,edit,bash,update_plan,ask_user,present,generate_image,generate_video,generate_speech,generate_music,generate_sfx,web_search,web_fetch,spawn_subagent,talk_to_manager]
+  follow-up                    779ms   reused   9738 /   9738 tok   (dispatch 41ms)
+  follow-up-after-postturn     765ms   reused   9738 /   9738 tok   (dispatch 35ms)
+  chat-switch-back             711ms   reused   9738 /   9738 tok   (dispatch 28ms)
+  new-chat                     665ms   reused   9738 /   9738 tok   (dispatch 15ms)
+  attachment                   195ms   reused   9738 /   9738 tok   (dispatch 32ms)
+  hidden-no-refocus           7561ms   reused   9738 /   9738 tok   (dispatch 29ms)
+  refocus                      653ms   reused   9738 /   9738 tok   (dispatch 22ms)
+  (idling 6 min…)
+ttft-matrix-probe: page.waitForTimeout: Target page, context or browser has been closed
+page.waitForTimeout: Target page, context or browser has been closed
+    at /Users/user/Desktop/OSS-harness/apps/desktop/tests/e2e/ttft-matrix-probe.mjs:505:15
+
+──────────────── TTFT matrix ────────────────
+  case                        ttft      reused / prompt   verdict
+  cold-open                   7638ms     9738 /   9738  100%  reused
+  follow-up                    779ms     9738 /   9738  100%  reused
+  follow-up-after-postturn     765ms     9738 /   9738  100%  reused  (after 20s of quiet)
+  chat-switch-back             711ms     9738 /   9738  100%  reused
+  new-chat                     665ms     9738 /   9738  100%  reused
+  attachment                   195ms     9738 /   9738  100%  reused  (after an 8s prefill window)
+  hidden-no-refocus           7561ms     9738 /   9738  100%  reused  (30s hidden, no focus event)
+  refocus                      653ms     9738 /   9738  100%  reused  (after 30s hidden + a 4s re-prime window)
+
+  SLOW AND SILENT — over 1500ms with nothing on screen:
+    hidden-no-refocus         7561ms
+    cold-open                 7638ms — the screen said "Getting ready · 0:01"
+  OK: every route under 1500ms had a clear screen.

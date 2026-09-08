@@ -9,6 +9,8 @@ import {
   describeSchedule,
   dueTasks,
   formatTime,
+  nameFrom,
+  nameWasCut,
   nextRun,
   normalizeTask,
   parseTaskDraft,
@@ -182,6 +184,67 @@ describe('parseTaskDraft', () => {
   it('12am is midnight and 12pm is noon', () => {
     expect(parseTaskDraft('daily at 12am do a thing').hour).toBe(0);
     expect(parseTaskDraft('daily at 12pm do a thing').hour).toBe(12);
+  });
+
+  it('says what it read, so a default is never shown as a reading', () => {
+    // "eve" is not "Every day at 9:00 AM"; the surface must be able to tell.
+    expect(parseTaskDraft('eve').read).toEqual({ cadence: false, time: false });
+    expect(parseTaskDraft('every friday write it up').read).toEqual({
+      cadence: true,
+      time: false,
+    });
+    expect(parseTaskDraft('at 4pm write it up').read).toEqual({ cadence: false, time: true });
+    expect(parseTaskDraft('every friday at 4pm write it up').read).toEqual({
+      cadence: true,
+      time: true,
+    });
+    // An hourly task has no time of day to be missing.
+    expect(parseTaskDraft('every hour check the queue').read).toEqual({
+      cadence: true,
+      time: true,
+    });
+    expect(parseTaskDraft('at noon stretch').read.time).toBe(true);
+  });
+});
+
+describe('nameFrom', () => {
+  it('keeps a short first clause whole', () => {
+    expect(nameFrom('write up what I worked on this week')).toBe(
+      'Write up what I worked on this week',
+    );
+    expect(nameFrom('summarise what changed in my working folder')).toBe(
+      'Summarise what changed in my working folder',
+    );
+    expect(nameWasCut('write up what I worked on this week')).toBe(false);
+  });
+
+  it('stops at the first sentence, colon or line', () => {
+    expect(nameFrom('Run the test suite in my working folder. If anything fails, say so.')).toBe(
+      'Run the test suite in my working folder',
+    );
+    expect(nameFrom('Summarise my week: what changed in my working folder')).toBe(
+      'Summarise my week',
+    );
+  });
+
+  it('cuts a long clause at a conjunction before anything else', () => {
+    expect(
+      nameFrom('Check my working folder for outdated dependencies and known advisories.'),
+    ).toBe('Check my working folder for outdated dependencies');
+  });
+
+  it('never ends on a dangling word when it must cut by count', () => {
+    expect(nameFrom('Look at the git history in my working folder for the last 24 hours.')).toBe(
+      'Look at the git history',
+    );
+    expect(nameWasCut('Look at the git history in my working folder for the last 24 hours.')).toBe(
+      true,
+    );
+  });
+
+  it('drops a lead-in and never returns nothing', () => {
+    expect(nameFrom('please remind me to stretch')).toBe('Remind me to stretch');
+    expect(nameFrom('   ')).toBe('Scheduled task');
   });
 });
 

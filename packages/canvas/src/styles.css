@@ -4336,6 +4336,20 @@
   flex: 1 1 auto;
 }
 
+/* A sheet or dialog is PART of the app, not a different window — so it is a
+   tag beside the window's own name, never a replacement for it. */
+.pd-macmon-dialog {
+  flex: 0 0 auto;
+  padding: 1px 7px;
+  border-radius: var(--pd-radius-full);
+  border: 1px solid var(--pd-border-subtle);
+  background: var(--pd-bg-hover);
+  color: var(--pd-text-secondary);
+  font-size: var(--pd-font-size-caption);
+  line-height: 16px;
+  white-space: nowrap;
+}
+
 .pd-macmon-live {
   flex: 0 0 auto;
   display: inline-flex;

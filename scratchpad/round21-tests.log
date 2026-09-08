@@ -1,0 +1,12 @@
+• turbo 2.10.4
+
+   • Packages in scope: @pi-desktop/afm, @pi-desktop/browser-use, @pi-desktop/canvas, @pi-desktop/cluster, @pi-desktop/coordination, @pi-desktop/desktop, @pi-desktop/engine, @pi-desktop/gen-canvas, @pi-desktop/gen-service, @pi-desktop/gen-tools, @pi-desktop/gen3d-engine, @pi-desktop/harness, @pi-desktop/importers, @pi-desktop/inference, @pi-desktop/mac-computer-use, @pi-desktop/mac-connectors, @pi-desktop/mcp-lite, @pi-desktop/model-store, @pi-desktop/pi-mac, @pi-desktop/provider-afm, @pi-desktop/provider-llamacpp, @pi-desktop/provider-mlx, @pi-desktop/shared, @pi-desktop/themes, @pi-desktop/tool-bus, @pi-desktop/ui, @pi-desktop/web-tools
+   • Running test in 27 packages
+   • Remote caching disabled
+
+
+ Tasks:    27 successful, 27 total
+Cached:    20 cached, 27 total
+  Time:    13.808s 
+
+EXIT=0

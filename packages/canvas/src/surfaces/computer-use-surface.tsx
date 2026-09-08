@@ -278,8 +278,11 @@ export function ComputerUseSurface({ feed, className }: ComputerUseSurfaceProps)
       const windows = frame?.windows ?? [];
       const main = windows.find((w) => !w.sheet && !w.modal) ?? windows[0];
       const dialog = windows.find((w) => w.sheet || w.modal);
-      setWindowTitle((prev) => (main === undefined || prev === main.title ? prev : main.title));
-      const dialogName = dialog === undefined ? '' : dialog.title;
+      // A window title outlives its session otherwise, and the footer ends up
+      // reading "No app · Untitled 2 — Edited" over an empty state.
+      const mainName = next.active && main !== undefined ? main.title : '';
+      const dialogName = next.active && dialog !== undefined ? dialog.title : '';
+      setWindowTitle((prev) => (prev === mainName ? prev : mainName));
       setDialogTitle((prev) => (prev === dialogName ? prev : dialogName));
     });
     return () => {
@@ -366,7 +369,10 @@ export function ComputerUseSurface({ feed, className }: ComputerUseSurfaceProps)
     }
 
     // 4. The phantom, glided onto its target on the overlay's own easing curve.
-    const target = session.cursor;
+    //    ONLY over a real picture: the cursor lives ON the controlled window,
+    //    and with no window to be on, its mapped position means nothing — a
+    //    phantom floating over bare wallpaper claims to be somewhere it is not.
+    const target = bitmap === null ? null : session.cursor;
     if (target !== null) {
       const g = glide.current;
       if (g.to === null || g.to.x !== target.x || g.to.y !== target.y) {
@@ -527,7 +533,7 @@ function emptyState(
     return {
       kind: 'idle',
       title: 'Nothing is being controlled',
-      sub: 'This view wakes up when Pi takes control of a Mac app.',
+      sub: 'This view wakes up when Bobble takes control of a Mac app.',
     };
   }
   if (session.stream === 'unavailable') {
@@ -603,8 +609,10 @@ function drawCursor(
   ctx.scale(CURSOR_BOX.w / CURSOR_VIEWBOX.w, CURSOR_BOX.h / CURSOR_VIEWBOX.h);
   ctx.translate(-CURSOR_VIEWBOX.x, -CURSOR_VIEWBOX.y);
 
-  // The luminous rim (overlay.html carries it on a CSS drop-shadow so the glyph
-  // itself stays crisp; here it is two shadowed fills under the real one).
+  // The three drop-shadows overlay.html stacks on #cursor, in the same order:
+  // a tight dark one (which is what keeps a pearl-white glyph legible over a
+  // WHITE document — without it the cursor dissolves into the page it is
+  // pointing at), then two luminous rims.
   ctx.save();
   ctx.fillStyle = 'rgba(255,255,255,0.9)';
   ctx.shadowColor = 'rgba(150, 168, 255, 0.55)';
@@ -612,6 +620,10 @@ function drawCursor(
   ctx.fill(path);
   ctx.shadowColor = 'rgba(205, 210, 255, 0.9)';
   ctx.shadowBlur = 5;
+  ctx.fill(path);
+  ctx.shadowColor = 'rgba(10, 12, 40, 0.55)';
+  ctx.shadowBlur = 2.5;
+  ctx.shadowOffsetY = 1.2;
   ctx.fill(path);
   ctx.restore();
 

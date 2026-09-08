@@ -105,6 +105,37 @@ describe('the menu bar', () => {
     expect(text).toContain('File, Edit, Format');
   });
 
+  it('borrows the focus only when asked, and says so both ways', async () => {
+    const quiet = new FakeBridge().on('menuClick', () => ({ ok: true, path: 'File > New' }));
+    expect(textOf(await click(quiet, { menu: 'File > New' }))).toContain(
+      'stayed in the background',
+    );
+    expect(quiet.lastParams('menuClick')?.activate).toBe(false);
+
+    const borrowed = new FakeBridge().on('menuClick', () => ({
+      ok: true,
+      path: 'File > Save',
+      focusBorrowed: true,
+      focusRestored: true,
+    }));
+    const text = textOf(await click(borrowed, { menu: 'File > Save', activate: true }));
+    expect(borrowed.lastParams('menuClick')?.activate).toBe(true);
+    expect(text).toContain('handed straight back');
+    expect(text).not.toContain('stayed in the background');
+  });
+
+  it('does not hide it when the focus could NOT be handed back', async () => {
+    const stuck = new FakeBridge().on('menuClick', () => ({
+      ok: true,
+      path: 'File > Save',
+      focusBorrowed: true,
+      focusRestored: false,
+    }));
+    expect(textOf(await click(stuck, { menu: 'File > Save', activate: true }))).toContain(
+      'could NOT be handed back',
+    );
+  });
+
   it('does not reach the menu path when an index or a point was given', async () => {
     const bridge = new FakeBridge().on('click', () => ({ found: true, background: true }));
     await click(bridge, { index: 1 });

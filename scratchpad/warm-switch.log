@@ -1,0 +1,43 @@
+warm[12995#wlmb2]: no callModel (no endpoint env and no live file)
+warm[13038#ez6la]: waiting a tick for the system prompt to settle
+warm[13038#ez6la]: tool set changed (18) — waiting a tick for it to settle
+warm[13038#ez6la]: WARMING 17646 chars, 18 tools [capability,use,read,write,edit,bash,update_plan,ask_user,present,generate_image,generate_video,generate_speech,generate_music,generate_sfx,web_search,web_fetch,spawn_subagent,talk_to_manager], hasUI=true
+slot: 1788807018700 utility call starts — "."
+warm[13038#ez6la]: already warmed (same prompt + tools)
+warm[13038#ez6la]: already warmed (same prompt + tools)
+warm[13038#ez6la]: already warmed (same prompt + tools)
+warm[13038#ez6la]: already warmed (same prompt + tools)
+warm[13038#ez6la]: already warmed (same prompt + tools)
+warm[13038#ez6la]: already warmed (same prompt + tools)
+slot: 1788807025036 utility call done in 6336ms — "."
+warm[13038#ez6la]: warm result ok=true in 6336ms
+warm[13038#ez6la]: already warmed (same prompt + tools)
+warm[13038#ez6la]: already warmed (same prompt + tools)
+slot: 1788807027425 utility call starts — "Before continuing, respond with ONLY a JSON object describin"
+slot: 1788807027449 utility call done in 24ms — "Before continuing, respond with ONLY a JSON object describin"
+warm[13038#ez6la]: already warmed (same prompt + tools)
+warm[13038#ez6la]: already warmed (same prompt + tools)
+warm[13038#ez6la]: already warmed (same prompt + tools)
+warm[13038#ez6la]: already warmed (same prompt + tools)
+warm[13038#ez6la]: already warmed (same prompt + tools)
+warm[13038#ez6la]: already warmed (same prompt + tools)
+slot: 1788807033219 utility call starts — "Before continuing, respond with ONLY a JSON object describin"
+slot: 1788807033231 utility call done in 12ms — "Before continuing, respond with ONLY a JSON object describin"
+warm[13038#zp3fv]: waiting a tick for the system prompt to settle
+warm[13038#zp3fv]: tool set changed (18) — waiting a tick for it to settle
+warm[13038#zp3fv]: already warmed (same prompt + tools)
+warm[13038#zp3fv]: already warmed (same prompt + tools)
+warm[13038#zp3fv]: already warmed (same prompt + tools)
+warm[13038#zp3fv]: already warmed (same prompt + tools)
+warm[13038#zp3fv]: already warmed (same prompt + tools)
+warm[13038#zp3fv]: already warmed (same prompt + tools)
+warm[13038#zp3fv]: already warmed (same prompt + tools)
+warm[13038#zp3fv]: already warmed (same prompt + tools)
+warm[13038#zp3fv]: already warmed (same prompt + tools)
+warm[13038#zp3fv]: already warmed (same prompt + tools)
+warm[13038#zp3fv]: already warmed (same prompt + tools)
+warm[13038#zp3fv]: already warmed (same prompt + tools)
+slot: 1788807047436 utility call starts — "Before continuing, respond with ONLY a JSON object describin"
+slot: 1788807047463 utility call done in 27ms — "Before continuing, respond with ONLY a JSON object describin"
+warm[13038#zp3fv]: already warmed (same prompt + tools)
+warm[13038#zp3fv]: already warmed (same prompt + tools)
