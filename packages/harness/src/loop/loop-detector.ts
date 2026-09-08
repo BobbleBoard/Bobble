@@ -95,9 +95,18 @@ export interface LoopDetectorConfig {
   readonly windowSize?: number;
 }
 
-/** Default ERROR-streak thresholds (kept constant across effort — a loop is a loop). */
-export const DEFAULT_LOOP_STEER_AFTER = 3;
-export const DEFAULT_LOOP_ABORT_AFTER = 5;
+/**
+ * Default ERROR-streak thresholds (kept constant across effort — a loop is a loop).
+ *
+ * the user raised these to 75 for the same reason he raised the repeat guard: three
+ * consecutive tool errors is a model learning a CLI's argument shape, not a
+ * loop. He watched it fire on exactly that — three `mac launch` calls in a row
+ * that failed on syntax, then a yellow bar in the middle of the reply — and
+ * said "after 75 not 3". The wall clock still catches a genuinely stuck turn
+ * long before the count gets there.
+ */
+export const DEFAULT_LOOP_STEER_AFTER = 75;
+export const DEFAULT_LOOP_ABORT_AFTER = 100;
 /**
  * Repeat guard: consecutive IDENTICAL calls before the one "you're repeating
  * yourself" steer. the user raised this from 5 to 75. Three identical calls is a

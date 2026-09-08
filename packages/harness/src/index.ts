@@ -747,7 +747,19 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
    * are commands now (`ask user "…"`, `plan update "…"`), so there is exactly
    * one call shape in the whole session.
    */
-  const TOOL_CLI_PINNED = ['bash'] as const;
+  /*
+   * ...AND THE FILE TOOLS, which is a correction to the paragraph above.
+   *
+   * the user, looking at the advanced panel in CLI mode: "read write and edit
+   * native pi tools are not active which they should be as well as the bash
+   * tool, otherwise it has to write read and such via bash." He is right and
+   * the reasoning above does not apply to them: `ask_user` and `update_plan`
+   * were removed because they were STRUCTURED surfaces the model kept failing
+   * on with mangled payloads. Reading and writing a file are neither exotic nor
+   * failure-prone, and doing them through `bash` means heredocs, quoting and
+   * escaping — strictly more ways to get it wrong than `edit` has.
+   */
+  const TOOL_CLI_PINNED = ['read', 'write', 'edit', 'bash'] as const;
 
   /*
    * The two harness tools that are not a capability but still have to be
@@ -787,7 +799,8 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
   const TOOL_CLI_COORDINATE_GROUP: CliGroupSpec = {
     name: 'coordinate',
     summary:
-      'Ask the user something, publish your plan, hand work to a subagent, or brief the manager.',
+      'Ask the user something, publish your plan, hand work to a subagent, or contract ' +
+      'large tasks that are not feasible to complete on your own.',
     tools: ['ask_user', 'update_plan', SPAWN_SUBAGENT_TOOL_NAME, TALK_TO_MANAGER],
   };
 
@@ -1264,7 +1277,29 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
      * never once showed up in a real session.
      */
     const available = pi.getAllTools().map((t) => t.name);
-    const warmNames = resolvePresetTools(warmClass, available);
+    /*
+     * THE TURN'S OWN LIST, IN THE TURN'S OWN ORDER, once there is one.
+     *
+     * The preset order is a GUESS at what the next turn will advertise, and it
+     * is only right before the first turn has run. After that, `activeTools` is
+     * the truth: `applyPreset` unions the preset onto the existing list and
+     * APPENDS what is missing, precisely so a growing set never moves a tool
+     * that is already in the prompt. Rebuilding the warm from the preset threw
+     * that away and warmed a different ORDER of the same tools.
+     *
+     * MEASURED, turning a capability on mid-conversation (18 tools → 22):
+     * the warm advertised `read,write,edit,ls,find,grep,bash,python_run,
+     * capability,use,…` while the turn advertised `capability,use,read,write,
+     * edit,bash,…,ls,find,grep,python_run`. Chat templates emit tools
+     * positionally, so those are two different prompts that share nothing past
+     * the first schema — and the turn came back `read 10514 of 10514, reused 0`
+     * after 46.8 seconds, on a TWO-MESSAGE conversation. The turn after it,
+     * with the set settled, was 306ms.
+     */
+    const warmNames =
+      runtime.activeTools.length > 0
+        ? runtime.activeTools.slice()
+        : resolvePresetTools(warmClass, available);
     if (
       corpToolEnabled(runtime.config.effort) &&
       available.includes(CREATE_PRODUCTION_HIERARCHY) &&
@@ -1770,7 +1805,22 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
         cause: signal.cause,
         reason: signal.reason,
       });
-      if (ctx?.hasUI === true) ctx.ui.notify(`Loop guard: ${signal.reason} — nudging.`, 'warning');
+      /*
+       * THE STEER IS BACKGROUND WORK, NOT AN ANNOUNCEMENT.
+       *
+       * the user, watching one fire mid-reply: "that loop guard going in the middle
+       * of a message and making the user totally confused as there's a banner
+       * that just appeared, but the play button is still going in the input bar,
+       * and then a few seconds later a new thinking chain appears again, this
+       * should be totally background if anything at all."
+       *
+       * He is right that the banner explains nothing to the person it interrupts:
+       * it names an internal mechanism, arrives while the reply is still
+       * streaming, and is followed by the model apparently starting over. The
+       * correction itself is worth doing silently; a nudge the user has to
+       * interpret is worse than a nudge they never see. The entry is still
+       * appended, so a run can be traced afterwards.
+       */
       pi.sendUserMessage?.(signal.message, { deliverAs: 'steer' });
       return false;
     }
@@ -1927,7 +1977,24 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
           if (target === undefined) {
             return { text: `${name}: not registered in this build.`, isError: true };
           }
-          const res = (await target.execute('tool-cli', args)) as {
+          /*
+           * THE CONTEXT IS AN ARGUMENT, and dropping it crashed real tools.
+           *
+           * pi calls a tool as `execute(id, params, signal, update, ctx)`, and
+           * anything that has to ask the person something reads that last one —
+           * the Mac tools gate every action on `ctx.hasUI` before touching the
+           * machine. Calling with two arguments handed them `undefined`, so in
+           * CLI mode every one of them died with "Cannot read properties of
+           * undefined (reading 'hasUI')" — which the model then treated as a
+           * syntax error and spent a turn guessing new argument shapes against.
+           */
+          const res = (await target.execute(
+            'tool-cli',
+            args,
+            undefined,
+            undefined,
+            runtime.currentCtx ?? undefined,
+          )) as {
             content?: { type: string; text?: string }[];
             isError?: boolean;
           };

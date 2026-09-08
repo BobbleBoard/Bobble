@@ -31,7 +31,11 @@ import {
   type VerifyBashRunner,
   wireHarness,
 } from './index.js';
-import { DEFAULT_REPEAT_STEER_AFTER } from './loop/loop-detector.js';
+import {
+  DEFAULT_LOOP_ABORT_AFTER,
+  DEFAULT_LOOP_STEER_AFTER,
+  DEFAULT_REPEAT_STEER_AFTER,
+} from './loop/loop-detector.js';
 import type { CallModel } from './model-call/call-model.js';
 import type { ToolSchemaLike } from './repair/rungs.js';
 
@@ -455,23 +459,29 @@ describe('loop detector — live wiring through tool_call / tool_execution_end',
     expect(rig.steerMessages).toHaveLength(1); // still just the one nudge
   });
 
+  /*
+   * The THRESHOLDS moved to 75/100 (the user: three consecutive tool errors is a
+   * model learning a CLI's argument shape, not a loop). The ESCALATION is what
+   * this test is for, so it drives the full streak rather than asserting the
+   * old numbers — a test that hard-codes a tuning knob fails every time the
+   * knob is tuned and tells you nothing about the mechanism.
+   */
   it('steers then aborts on a consecutive tool-execution-error streak', async () => {
     const rig = makeRig({ effort: 'medium' });
     await startSession(rig);
     await startTurn(rig);
     const err = () => rig.fire('tool_execution_end', TOOL_END(true));
 
-    await err();
-    await err();
-    await err(); // 3rd error → steer
+    for (let i = 0; i < DEFAULT_LOOP_STEER_AFTER - 1; i += 1) await err();
+    expect(rig.steerMessages).toHaveLength(0); // one short of the threshold
+    await err(); // the threshold error → steer
     expect(rig.steerMessages).toHaveLength(1);
     expect(loopEntries(rig)).toContainEqual({
       action: 'steer',
       cause: 'error',
       reason: expect.any(String),
     });
-    await err();
-    await err(); // 5th error → abort
+    for (let i = DEFAULT_LOOP_STEER_AFTER; i < DEFAULT_LOOP_ABORT_AFTER; i += 1) await err();
     expect(rig.abort).toHaveBeenCalledOnce();
     expect(loopEntries(rig)).toContainEqual({
       action: 'abort',
@@ -1041,14 +1051,23 @@ describe('CLI mode keeps one advertised tool', () => {
     };
   };
 
+  /*
+   * The POINT is that the set does not grow — turning a capability on must not
+   * move a single token of the prompt. What the set CONTAINS is a separate
+   * decision: the user added the file tools back ("otherwise it has to write read
+   * and such via bash"), so the assertion is that the set is unchanged, not
+   * that it is one particular list.
+   */
   it('does not grow the tool set when a capability is turned on', async () => {
     process.env.PI_DESKTOP_TOOL_CLI = '1';
     const rig = makeRig();
     await startSession(rig);
     await startTurn(rig);
-    expect(rig.activeTools()).toEqual(['bash']);
+    const before = rig.activeTools();
+    expect(before).toContain('bash');
+    expect(before).toContain('read');
     await activate(rig, 'web-research');
-    expect(rig.activeTools()).toEqual(['bash']);
+    expect(rig.activeTools()).toEqual(before);
   });
 
   /* ...and says so honestly: nothing is pending, so do not spend a turn
