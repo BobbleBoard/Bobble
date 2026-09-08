@@ -34,7 +34,7 @@ act on without them.
 
 ---
 
-## 1. Rendering error — unacceptable, top priority after the video  ◐ MOSTLY DONE
+## 1. Rendering error — unacceptable, top priority after the video  ✅ DONE
 
 *Screenshot: the whole Bobble window replaced by "Bobble hit a rendering error /
 The window stopped drawing. Your chats are on disk and were not affected.",
@@ -56,10 +56,16 @@ and "Reload with a fresh window". Menu bar reads Bobble · Edit · View · Windo
       now.
 - [x] ⌘R is a safe re-mount that keeps the chat, the canvas tabs and the scroll
       position; ⌘⇧R is the real document reload.
-- [ ] REMAINING: a **second real cause** of the full-window crash — a lazily
-      imported route chunk that fails to fetch (seen when a rebuild changed a
-      hash mid-session) takes down the whole app through the same boundary. The
-      Studio/Tripo lazy routes need their own boundary. IN FLIGHT.
+- [x] The second cause is fixed too: every `React.lazy` route now has its own
+      boundary, so a chunk that fails to fetch takes down one route and leaves
+      the shell running. Reproduced without a mock — the real chunk was parked
+      out of the build while the window was open, which is byte-for-byte what a
+      rebuild leaves behind. Two things had to be discovered for the retry to be
+      real: React caches a lazy's rejected promise forever (so each attempt gets
+      its own), and Chromium poisons its module-map entry (so the retry
+      re-imports the URL cache-busted). Bounded at two presses per route per
+      session, after which the panel offers only Reload — it never auto-retries,
+      so there is no loop.
 
 ## 2. Canvas tabs — floating, not connected  ✅ DONE
 
@@ -113,7 +119,7 @@ with a ✕ appearing.*
 - [ ] The moment diffusion steps exist, show them — the image unblurring live as
       soon as it resembles anything at all.
 
-## 6. The "Starting up" pill must mean something  ◐ MOSTLY DONE
+## 6. The "Starting up" pill must mean something  ✅ DONE
 
 *Screenshot: the new-chat screen — "Bobble / How can I help you today?" — with a
 pill overlapping the subtitle line reading "◌ Starting up — usually about 2s on
@@ -130,11 +136,12 @@ this Mac · 0:01". A hand-drawn red arrow points up at it: move it up.*
       every keystroke).
 - [x] Attachments show their own loading **in the composer** while they are
       tokenized and prefilled, and it clears when they are.
-- [ ] REMAINING: the spinner does not survive **send** — the chips leave the
-      composer with the message, and the copies rendered in the thread
-      (`ChatThread.tsx`, `data-testid="user-attachments"`) carry no prefill
-      state. the user called this one a "maybe"; the turn's own prefill progress is
-      already shown in the thread, so this is about putting it on the chips.
+- [x] The spinner survives send. It reads the same `prefilling` phase the
+      thread's processing ring draws rather than inventing a second notion, and
+      spins only on the newest, still-unanswered user turn — which is what stops
+      a reopened chat spinning forever, since the warm-up path can leave the
+      underlying flag set. A large paste renders as a different card that had no
+      prefill state at all; it has one now.
 
 ## 7. Kill the pinned "Writing svg-icon in the panel" line  ✅ DONE
 

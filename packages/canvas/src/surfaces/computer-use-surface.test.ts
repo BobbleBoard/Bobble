@@ -23,12 +23,8 @@ import {
   thinkingAfter,
 } from './computer-use-surface.tsx';
 
-const say = (
-  state: Parameters<typeof bubbleText>[0],
-  text = '',
-  since = 0,
-  after = '',
-): Bubble => bubbleText(state, text, since, after);
+const say = (state: Parameters<typeof bubbleText>[0], text = '', since = 0, after = ''): Bubble =>
+  bubbleText(state, text, since, after);
 
 describe('bubbleText — naming the act', () => {
   it('names what is being clicked when the producer supplies a name', () => {
@@ -145,6 +141,14 @@ describe('dialogCaption', () => {
     // TextEdit's real save sheet measures as `title: ""`.
     expect(dialogCaption('TextEdit', '')).toBe('TextEdit is asking you something');
     expect(dialogCaption('', '')).toBe('This app is asking you something');
+  });
+
+  it('names an unnamed sheet from its own confirming button', () => {
+    // The real save sheet's buttons, as the AX tree reports them.
+    expect(dialogCaption('TextEdit', '', ['Cancel', 'Save'])).toBe('TextEdit is asking: Save');
+    expect(dialogCaption('Mail', '', ['Cancel', 'Send'])).toBe('Mail is asking: Send');
+    // Cancel alone is not a question anybody is asking.
+    expect(dialogCaption('TextEdit', '', ['Cancel'])).toBe('TextEdit is asking you something');
   });
 });
 

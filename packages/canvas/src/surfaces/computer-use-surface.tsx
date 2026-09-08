@@ -1036,13 +1036,26 @@ export function ComputerUseSurface({ feed, className }: ComputerUseSurfaceProps)
     //    most expensive mistake this feature can make — so it gets the beat.
     if (painted && dialogWin !== null && scrubbed === null) {
       dimBehindDialog(ctx, drawn, rect, dialogWin.frame, radius);
+      // An unnamed sheet is named from its own buttons, which the Accessibility
+      // scene already carries when it is the source.
+      const sheetButtons =
+        ax === null
+          ? []
+          : ax.elements
+              .filter(
+                (el) =>
+                  el.win === dialogWin.windowId &&
+                  el.role.toLowerCase().includes('button') &&
+                  el.name !== '',
+              )
+              .map((el) => el.name);
       drawDialogCaption(
         ctx,
         drawn,
         rect,
         dialogWin.frame,
         viewport,
-        dialogCaption(session.appName, dialogWin.title),
+        dialogCaption(session.appName, dialogWin.title, sheetButtons),
         annotationScale(drawn.scale),
       );
     }
@@ -2174,13 +2187,37 @@ function dimBehindDialog(
   ctx.restore();
 }
 
+/**
+ * The names a sheet's own confirming button goes by, in the order a caption
+ * should prefer them. macOS sheets are overwhelmingly one of these.
+ */
+const CONFIRM_BUTTONS = [
+  'Save',
+  'Replace',
+  'Open',
+  'Send',
+  'Allow',
+  'Delete',
+  'Discard',
+  "Don't Save",
+  'Continue',
+  'Done',
+  'OK',
+];
+
 /** "TextEdit is asking: Save" — what the sheet is, in the app's own voice. */
-export function dialogCaption(app: string, title: string): string {
+export function dialogCaption(app: string, title: string, buttons: readonly string[] = []): string {
   const who = app.trim() === '' ? 'This app' : app.trim();
   const what = title.trim();
-  // TextEdit's real save sheet has `title: ""` — the most common dialog on
-  // macOS. "untitled" is a fact about our data, not about the user's screen.
-  return what === '' ? `${who} is asking you something` : `${who} is asking: ${what}`;
+  if (what !== '') return `${who} is asking: ${what}`;
+  // TextEdit's real save sheet measures as `title: ""` — the most common dialog
+  // on macOS produces no name at all. Naming it from its own confirming button
+  // is what the tree already knows; "untitled" is a fact about our data rather
+  // than about the user's screen, and this caption never says it.
+  const confirm = CONFIRM_BUTTONS.find((name) =>
+    buttons.some((b) => b.trim().toLowerCase() === name.toLowerCase()),
+  );
+  return confirm === undefined ? `${who} is asking you something` : `${who} is asking: ${confirm}`;
 }
 
 /**
