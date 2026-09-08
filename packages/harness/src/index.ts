@@ -2416,6 +2416,26 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     return toolCliMode ? `${toolCliPreamble()}\n\n${augmented}` : augmented;
   }
 
+  /**
+   * A tool's description, cut to the one line the list can afford.
+   *
+   * the user: "the names and a quick description of what it is is there for each
+   * tool, with a tidbit at the end that says --help should be used to get
+   * started with any." That is what a schema gives a model, and CLI mode is
+   * supposed to lose nothing — a group summary alone told it `mac` existed but
+   * not that `mac launch` did, which is how a model asked to open an app never
+   * found the command for opening apps.
+   *
+   * The first sentence, and no more: the rest of a description is arguments and
+   * caveats, which is what `--help` is for.
+   */
+  function shortDescription(description: string): string {
+    if (description.trim() === '') return 'no description';
+    const first = description.trim().split(/(?<=\.)\s+/)[0] ?? description.trim();
+    const line = first.replace(/\s+/g, ' ').trim();
+    return line.length <= 96 ? line : `${line.slice(0, 95).trimEnd()}…`;
+  }
+
   /** Tool name → the command line that runs it, straight from the CLI model. */
   function toolCliCommandNames(): Map<string, string> {
     const map = new Map<string, string>();
@@ -2498,7 +2518,13 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
        * worth opening, without the commands, the arguments or the flags. About
        * 170 tokens against the tree's ~8,800.
        */
-      ...cli.groups.map((g) => `  ${g.name} — ${g.summary}`),
+      ...cli.groups.flatMap((g) => [
+        `  ${g.name} — ${g.summary}`,
+        ...g.commands.map(
+          (c) =>
+            `    ${[g.name, ...c.path].join(' ')} — ${shortDescription(c.tool.description ?? '')}`,
+        ),
+      ]),
       '',
       'They are the ONLY way to do what they do. Do not look for other programs —',
       'ffmpeg, sox, say, festival, imaging libraries and the like are not how this',

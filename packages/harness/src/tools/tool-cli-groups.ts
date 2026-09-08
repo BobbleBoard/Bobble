@@ -64,11 +64,44 @@ export const TOOL_CLI_COORDINATE_GROUP: CliGroupSpec = {
   summary:
     'Ask the user something, publish your plan, hand work to a subagent, or contract ' +
     'large tasks that are not feasible to complete on your own.',
-  tools: ['ask_user', 'update_plan', SPAWN_SUBAGENT_TOOL_NAME, TALK_TO_MANAGER],
+  tools: [
+    'ask_user',
+    'update_plan',
+    SPAWN_SUBAGENT_TOOL_NAME,
+    TALK_TO_MANAGER,
+    // Showing the user a finished thing is the last step of coordinating with
+    // them, and it had no command at all.
+    'present',
+    // Handing work to a future self is the same shape as handing it to a
+    // subagent, and it also had none.
+    'create_scheduled_task',
+  ],
+};
+
+/**
+ * THE FOUR THAT HAD NO COMMAND AT ALL.
+ *
+ * Measured against a live session's registered tools: `python_run`,
+ * `spotlight_search`, `create_scheduled_task` and `present` were runnable, were
+ * offered as schemas, and were reachable from CLI mode by nothing. the user's
+ * definition of the mode leaves no room for that — "cli mode has no capability
+ * loss over regular, it simply makes everything cli based and accessible via
+ * the bash tool, all tools are always available".
+ *
+ * They are grouped by what a person would go looking for rather than by which
+ * extension happens to register them: running code and searching this Mac are
+ * both "this machine", and showing the user a finished thing is the last step
+ * of coordinating with them, next to asking them a question.
+ */
+export const TOOL_CLI_MACHINE_GROUP: CliGroupSpec = {
+  name: 'machine',
+  summary: 'Run Python on this Mac, and search everything on it by name or contents.',
+  tools: ['python_run', 'spotlight_search'],
 };
 
 export const TOOL_CLI_EXTRA_GROUPS: readonly CliGroupSpec[] = [
   TOOL_CLI_COORDINATE_GROUP,
+  TOOL_CLI_MACHINE_GROUP,
   /*
    * THE FENCED FILE TOOLS, BY NAME.
    *

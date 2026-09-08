@@ -117,6 +117,11 @@ const COMMAND_PATH_OVERRIDES: Readonly<Record<string, readonly string[]>> = {
    * false-availability failure as naming a tool that is not advertised.
    */
   ask_user: ['ask'],
+  // `machine spotlight search` reads as three nouns; `machine search` is the
+  // thing it does. Same for the other two, which would otherwise repeat their
+  // group or their verb.
+  spotlight_search: ['search'],
+  create_scheduled_task: ['schedule'],
   update_plan: ['plan'],
   spawn_subagent: ['delegate'],
   talk_to_manager: ['manager'],

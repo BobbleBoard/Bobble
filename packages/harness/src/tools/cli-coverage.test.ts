@@ -1,0 +1,125 @@
+import { describe, expect, it } from 'vitest';
+import { CAPABILITIES } from '../presets/capabilities';
+import { PRESET_TOOLS } from '../presets/presets';
+import { toolCliGroups } from './tool-cli-groups';
+
+/**
+ * CLI MODE MUST NOT LOSE A CAPABILITY.
+ *
+ * the user's definition, and the whole point of the mode: "cli mode has no
+ * capability loss over regular, it simply makes everything cli based and
+ * accessible via the bash tool, all tools are always available, and their
+ * information accessible via `<name> --help`."
+ *
+ * So anything a model could be handed as a schema must be reachable as a
+ * command. This is the guard: add a tool to a preset or a capability group
+ * without giving it a command and the build says so, here, rather than a model
+ * discovering the hole mid-task and shelling out instead — which is exactly
+ * what happened before `python_run`, `spotlight_search`,
+ * `create_scheduled_task` and `present` were given commands.
+ *
+ * The live counterpart is `apps/desktop/tests/e2e/cli-coverage-probe.mjs`,
+ * which asks a real session what it registered. This file can only see what is
+ * written down; that one sees what is true.
+ */
+
+/** Everything schemas mode can put in front of a model, from the static tables. */
+function schemaReachable(): Set<string> {
+  const out = new Set<string>();
+  for (const tools of Object.values(PRESET_TOOLS)) for (const t of tools) out.add(t);
+  for (const cap of CAPABILITIES) for (const t of cap.tools) out.add(t);
+  return out;
+}
+
+/** Everything CLI mode can put on PATH. */
+function commandReachable(): Set<string> {
+  const out = new Set<string>();
+  for (const group of toolCliGroups()) for (const t of group.tools) out.add(t);
+  return out;
+}
+
+/**
+ * The interface itself. A command for `bash` would be a loop, and `capability`
+ * / `use` are the schema mechanism — one turns a group on, the other calls a
+ * tool that is not in the list. In CLI mode nothing is off and nothing is
+ * hidden, so both are meaningless there. That is the mode working.
+ */
+const INTERFACE_TOOLS = new Set(['bash', 'capability', 'use']);
+
+/**
+ * the user's round-20 decision: the fenced file tools stay advertised as schemas in
+ * CLI mode, because every accumulated write/edit safety fix hangs off them.
+ * They ALSO have `file …` commands, so nothing is lost either way.
+ */
+const PINNED_AS_SCHEMAS = new Set(['read', 'write', 'edit', 'ls']);
+
+/**
+ * Provided by a CONNECTOR, not by this package — HyperFrames and the video
+ * editing façade arrive over MCP. In CLI mode they are reachable through the
+ * connector bridge (`pi-tool <server> <tool>`, `--help` rendered from the
+ * server's own inputSchema), which is a different translation from this one.
+ */
+const CONNECTOR_PROVIDED = new Set([
+  'motion_graphics_render',
+  'video_edit',
+  'extract_frames',
+  'probe',
+]);
+
+/**
+ * Named in a preset, registered by nothing in this repo.
+ *
+ * These front-load a class for a build that has the extension; here they are
+ * filtered out by `resolvePresetTools`, which keeps only what the session
+ * actually registered. Listed rather than deleted because deleting them would
+ * silently un-front-load those classes wherever the tools DO exist — but listed
+ * so the next audit does not have to rediscover that they are inert.
+ */
+const NOT_REGISTERED_HERE = new Set([
+  'image_generate',
+  'image_edit',
+  'image_detect',
+  'image_ocr',
+  'image_segment',
+  'video_locate',
+  'model_3d_generate',
+  'model_3d_view',
+  // The registered tool is `generate_video`, which the media group has; this
+  // is an older spelling that nothing answers to.
+  'video_generate',
+  'find',
+  'grep',
+]);
+
+describe('every schema tool is reachable as a command', () => {
+  it('leaves no capability that CLI mode cannot reach', () => {
+    const commands = commandReachable();
+    const missing = [...schemaReachable()]
+      .filter(
+        (t) =>
+          !commands.has(t) &&
+          !INTERFACE_TOOLS.has(t) &&
+          !PINNED_AS_SCHEMAS.has(t) &&
+          !CONNECTOR_PROVIDED.has(t) &&
+          !NOT_REGISTERED_HERE.has(t),
+      )
+      .sort();
+    expect(missing).toEqual([]);
+  });
+
+  it('gives the four that had no command one', () => {
+    // The gap this test was written for, kept as a named case so a refactor
+    // that drops one of them fails loudly rather than quietly.
+    const commands = commandReachable();
+    for (const t of ['python_run', 'spotlight_search', 'create_scheduled_task', 'present']) {
+      expect(commands.has(t), t).toBe(true);
+    }
+  });
+
+  it('exempts nothing that is not also reachable some other way', () => {
+    // Every exemption above must be justified by another route. The pinned file
+    // tools are schemas AND commands; the connector tools come over MCP; the
+    // unregistered ones are not there to reach.
+    for (const t of PINNED_AS_SCHEMAS) expect(commandReachable().has(t)).toBe(true);
+  });
+});
