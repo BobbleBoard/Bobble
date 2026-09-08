@@ -34,7 +34,7 @@ act on without them.
 
 ---
 
-## 1. Rendering error — unacceptable, top priority after the video
+## 1. Rendering error — unacceptable, top priority after the video  ◐ MOSTLY DONE
 
 *Screenshot: the whole Bobble window replaced by "Bobble hit a rendering error /
 The window stopped drawing. Your chats are on disk and were not affected.",
@@ -42,12 +42,24 @@ with `Minified React error #185` in a code box and two buttons, "Reload" (blue)
 and "Reload with a fresh window". Menu bar reads Bobble · Edit · View · Window,
 8:53:28 PM.*
 
-- [ ] React error #185 is "maximum update depth exceeded" — an effect/setState
-      loop. Find it and kill the cause; this must not happen at all.
-- [ ] **The Reload buttons do not work.** He has to press ⌘R, which "clears
-      really everything".
-- [ ] ⌘R should NOT do that hard clear. Replace it with a safe reload we control
-      — one that restores the chat, the canvas tabs and the scroll position.
+- [x] #185 hunted with a commit-counting detector across chat, canvas, every
+      rail route, settings, session switching and 300+ prefill/status
+      transitions. Nothing loops (peak 85 commits/250ms vs hundreds for a real
+      loop). Three genuine instances of the INGREDIENT found and killed — writes
+      that change nothing but notify anyway: the canvas controller committing a
+      fresh state object on every quiet refresh, `dismissPill` returning a new
+      array whether or not it removed anything, and `useRunningChats`'s
+      stability memo keyed on objects built fresh in the render body.
+- [x] **The Reload buttons** — root cause was our own security guard:
+      `will-navigate` is preventDefaulted, and both buttons navigated the
+      renderer, so the app refused its own recovery. Recovery goes through main
+      now.
+- [x] ⌘R is a safe re-mount that keeps the chat, the canvas tabs and the scroll
+      position; ⌘⇧R is the real document reload.
+- [ ] REMAINING: a **second real cause** of the full-window crash — a lazily
+      imported route chunk that fails to fetch (seen when a rebuild changed a
+      hash mid-session) takes down the whole app through the same boundary. The
+      Studio/Tripo lazy routes need their own boundary. IN FLIGHT.
 
 ## 2. Canvas tabs — floating, not connected  ✅ DONE
 
@@ -117,22 +129,30 @@ this Mac · 0:01". A hand-drawn red arrow points up at it: move it up.*
       state. the user called this one a "maybe"; the turn's own prefill progress is
       already shown in the thread, so this is about putting it on the chips.
 
-## 7. Kill the pinned "Writing svg-icon in the panel" line
+## 7. Kill the pinned "Writing svg-icon in the panel" line  ✅ DONE
 
 *Screenshot: a lone grey line at the bottom, "◌ Writing svg-icon in the panel →
 · 1.6s" — the timer keeps resetting and it shows nothing useful.*
 
-- [ ] Remove it. It is pinned to the bottom, the elapsed time resets, and it
-      tells him nothing.
+- [x] Deleted, not hidden — both complaints were structural: it was pinned
+      because the one status indicator sits at the foot of the thread, and its
+      clock reset because the timer re-arms whenever the timing flips, which a
+      run of short streaming tabs does per file. A probe now asserts it stays
+      gone while the column still names what is happening.
 
-## 8. Edit/write tool calls show as errors
+## 8. Edit/write tool calls show as errors  ✅ DONE
 
 *Screenshot: a `file-icon.svg` canvas tab, Rendered/Raw toggle, showing
 `file-icon.svg +11 −18` with a large red (removed) block and a green (added)
 block below it.*
 
-- [ ] "editing/writing tool calls a lot of the time show up as red". Find why a
-      successful edit renders as a failure and fix it.
+- [x] Nothing was ever misclassified — the diff was fake. Both places that draw
+      an edit listed EVERY line of `old_string` as a deletion and EVERY line of
+      `new_string` as an addition, and a `str_replace` quotes its surroundings
+      to make the match unique, so a two-line change arrived as nine deleted and
+      nine added. A real line diff, shared by both so they cannot drift: the
+      same fixture goes from 210px of red at `+9 −9` to 47px at `+2 −2` with
+      seven untinted context rows.
 
 ---
 
