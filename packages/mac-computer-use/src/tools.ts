@@ -168,7 +168,10 @@ export function registerMacComputerUseTools(
     if (screenshot === true) params.screenshot = true;
     params.cap = cap;
     const snap = await bridge.request<MacSnapshot>('snapshot', params);
-    session.noteSnapshot(snap);
+    /* Remember WHICH KIND of app this is. An app with no Accessibility tree can
+     * only be driven by coordinates and keystrokes, and the typing rule below
+     * has to know that before it refuses. */
+    session.noteSnapshot({ ...snap, visualOnly: isAxOpaque(snap) });
     return snap;
   }
 
@@ -366,7 +369,28 @@ export function registerMacComputerUseTools(
           // is controlled, refuse and steer the model to the background
           // AX-by-index path. (Focused typing is only allowed before any control
           // exists, i.e. genuine "type into the frontmost field" use.)
-          if (session.controlled() !== null) {
+          /*
+           * THE REFUSAL ONLY MAKES SENSE WHEN THERE IS SOMETHING ELSE TO DO.
+           *
+           * Index-less typing sends keystrokes to whatever holds the SYSTEM
+           * focus, so while driving a background app it would land in the
+           * user's own window. That is worth refusing — but only when the model
+           * has an alternative, and it only has one when the app answers
+           * Accessibility. An app with no AX tree has no indices to pass, so
+           * the old refusal told it to "pass the field's [index]" for a thing
+           * that has none: snapshot says act by coordinates, type says pass an
+           * index, and the turn dead-ends between them.
+           *
+           * the user: "if an app is not visually controllable, mac snapshot just
+           * returns … a screenshot and a 'this app must be controlled visually'
+           * type needs to just type into active field."
+           *
+           * So for a visual-only app it types — after bringing the app forward,
+           * because keystrokes follow the system focus and there is no
+           * background path for an app that exposes nothing.
+           */
+          const controlled = session.controlled();
+          if (controlled !== null && controlled.visualOnly !== true) {
             return errResult(
               'mac_type',
               'refusing to type without an index after snapshotting an app: index-less typing ' +
@@ -375,9 +399,21 @@ export function registerMacComputerUseTools(
                 'Accessibility in the background.',
             );
           }
+          if (controlled !== null && controlled.app !== '') {
+            /* Focus it first, or the keystrokes go wherever the user is. */
+            await bridge
+              .request<MacLaunchAck>('launch', { app: controlled.app, background: false })
+              .catch(() => undefined);
+            await sleep(SETTLE_MS);
+          }
           const ack = await bridge.request<MacActAck>('type', { text, submit });
           await sleep(SETTLE_MS);
-          return textResult(`Typed into the focused field.${backgroundNote(ack)}`, {
+          const where =
+            controlled !== null && controlled.visualOnly === true
+              ? `Typed into ${controlled.app || 'the app'} — it has no Accessibility tree, so this ` +
+                'went to its focused field as keystrokes. Snapshot again to see the result.'
+              : `Typed into the focused field.${backgroundNote(ack)}`;
+          return textResult(where, {
             action: 'type',
             ok: true,
             background: ack.background,

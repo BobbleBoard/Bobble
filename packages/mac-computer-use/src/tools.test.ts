@@ -157,21 +157,41 @@ describe('registerMacComputerUseTools', () => {
     expect(bridge.calls[1]).toMatchObject({ method: 'type', params: { text: 'more' } });
   });
 
-  it('refuses index-less typing after a snapshot (never blast keystrokes at the user’s app)', async () => {
+  it('refuses index-less typing into an app that DOES expose Accessibility', async () => {
     const bridge = new FakeBridge()
-      .on('snapshot', () => SNAP([], 555))
+      .on('snapshot', () => SNAP([{ index: 1, role: 'AXTextField', title: 'Search' }], 555))
       .on('type', () => ({ found: true }));
     const tools = collectTools(bridge);
     // Before any snapshot: focused typing is allowed (genuine frontmost use).
     await run(tools, 'mac_type', { text: 'ok before snapshot' });
     expect(bridge.countOf('type')).toBe(1);
-    // After snapshotting a target app: index-less typing is refused (would hit
-    // the user's frontmost app via foreground keystrokes).
+    // After snapshotting a target app that has indices, index-less typing would
+    // hit the user's frontmost app instead — and there IS a better way, so refuse.
     await run(tools, 'mac_snapshot', { app: 'Maps' });
     const r = await run(tools, 'mac_type', { text: 'San Francisco to Palo Alto', submit: true });
     expect(details(r).ok).toBe(false);
     expect(details(r).error).toContain('index');
     expect(bridge.countOf('type')).toBe(1); // never reached the bridge again
+  });
+
+  /*
+   * ...and the other half, which is the case that used to dead-end: an app with
+   * NO Accessibility tree has no index to pass, so refusing for want of one told
+   * the model to do something impossible. the user: "if an app is not visually
+   * controllable … type needs to just type into active field."
+   */
+  it('types into an app that exposes no Accessibility, after bringing it forward', async () => {
+    const bridge = new FakeBridge()
+      .on('snapshot', () => SNAP([], 555)) // no elements → visual only
+      .on('launch', () => ({ ok: true, app: 'Preview', pid: 555 }))
+      .on('type', () => ({ found: true }));
+    const tools = collectTools(bridge);
+    await run(tools, 'mac_snapshot', { app: 'Preview' });
+    const r = await run(tools, 'mac_type', { text: 'hello', submit: true });
+    expect(details(r).ok).toBe(true);
+    expect(bridge.countOf('type')).toBe(1);
+    // Keystrokes follow the system focus, so it has to be frontmost first.
+    expect(bridge.countOf('launch')).toBe(1);
   });
 
   // --- background/foreground flag (AX-action path) ---------------------------

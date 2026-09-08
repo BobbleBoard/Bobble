@@ -25,6 +25,17 @@ export interface ControlledApp {
   readonly pid: number;
   readonly app: string;
   readonly windowId?: number;
+  /**
+   * The app answered Accessibility with nothing, so the only way to see it is
+   * the screenshot and the only way to act on it is coordinates and keystrokes.
+   *
+   * This is recorded because the SAFE rule for typing — "never type without an
+   * index, it would land in the user's frontmost app" — has no safe alternative
+   * here: an app with no AX tree has no indices to pass. Without knowing which
+   * kind of app is being controlled, the tools tell the model to do something
+   * it cannot do, and the turn dead-ends.
+   */
+  readonly visualOnly?: boolean;
 }
 
 /** Snapshot-shaped input (structural: the wire MacSnapshot satisfies it). */
@@ -32,6 +43,8 @@ export interface ControlledSnapshotNote {
   readonly app?: string;
   readonly pid?: number;
   readonly windowId?: number;
+  /** True when the snapshot came back with no Accessibility elements. */
+  readonly visualOnly?: boolean;
 }
 
 export interface MacSessionState {
@@ -67,6 +80,7 @@ export function createMacSessionState(): MacSessionState {
         pid: snap.pid,
         app: snap.app ?? current?.app ?? '',
         windowId: snap.windowId ?? (snap.pid === current?.pid ? current?.windowId : undefined),
+        visualOnly: snap.visualOnly === true,
       };
     },
 
