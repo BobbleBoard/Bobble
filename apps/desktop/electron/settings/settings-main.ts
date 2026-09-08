@@ -99,6 +99,28 @@ function applySearchEnv(settings: DesktopSettings): void {
 }
 
 /** Flip the `mode` field of the mcp-lite registry, preserving `servers`. */
+/**
+ * The connector mode the registry should actually run in.
+ *
+ * `mcpMode` and `toolInterface` were independent, so turning on the bash-CLI
+ * interface left connectors on the JSON `mcp_call` proxy — the model was told
+ * "these commands are your abilities", handed a shim per capability, and then
+ * given MCP as a structured tool call. the user: "all capabilities / mcp when in
+ * bash mode should be translated."
+ *
+ * mcp-lite already has the translation — `pi-tool gmail search --query foo`,
+ * with `--help` generated live from each tool's own inputSchema, so it cannot
+ * drift from the server. It just was not being switched on. A mixed state is
+ * the contradiction that costs the most: a model that can see one JSON tool
+ * reaches for it and never learns the commands.
+ *
+ * `native` is left alone — that is a deliberate choice to register every
+ * connector tool individually, and it is not what this is about.
+ */
+export function effectiveMcpMode(mcpMode: McpMode, toolInterface: string): McpMode {
+  return toolInterface === 'bash-cli' && mcpMode === 'lite' ? 'bash-cli' : mcpMode;
+}
+
 function applyMcpMode(mode: McpMode): void {
   let doc: Record<string, unknown> = { version: 1, mode, servers: [] };
   const raw = safeRead(MCP_REGISTRY_PATH);
@@ -139,7 +161,7 @@ function writeSettings(settings: DesktopSettings): void {
   // 0600: the document carries web-search API keys.
   fs.writeFileSync(SETTINGS_PATH, `${JSON.stringify(settings, null, 2)}\n`, { mode: 0o600 });
   applySearchEnv(settings);
-  applyMcpMode(settings.mcpMode);
+  applyMcpMode(effectiveMcpMode(settings.mcpMode, settings.toolInterface));
   writeSamplingSidecar(settings);
 }
 
