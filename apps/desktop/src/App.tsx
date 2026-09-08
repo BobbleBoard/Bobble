@@ -15,6 +15,8 @@ import { ScheduledView } from './scheduled/ScheduledView';
 import { startTaskRunner } from './scheduled/tasks-store';
 import { type SettingsSection, SettingsView } from './settings/SettingsView';
 import { exitModality, useModalityStore } from './state/modality-store';
+import { newSession } from './state/pi-connect';
+import { usePiStore } from './state/pi-slice';
 import { applyThemeAttributes, useThemeStore } from './store/theme';
 
 /** First-run gate status: unknown until onboarding:get-state resolves. */
@@ -370,7 +372,20 @@ export function App() {
                        sidebar section that took the window instead, which is why
                        it needed a back button and a traffic-light inset of its
                        own. See the note at the top of ConnectorsScreen. */
-                    <ConnectorsScreen />
+                    <ConnectorsScreen
+                      /* "Try in chat": a NEW chat, because pi reads the
+                         connector registry when a session starts, so the
+                         thing just turned on is only certainly there in the
+                         next one. The prompt lands in the composer through
+                         the same hand-off the Edit action uses. */
+                      onTryInChat={(prompt) => {
+                        setView('chat');
+                        exitModality();
+                        void newSession().then(() => {
+                          usePiStore.setState({ composerText: prompt });
+                        });
+                      }}
+                    />
                   ) : undefined
                 }
               />

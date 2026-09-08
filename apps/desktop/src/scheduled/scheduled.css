@@ -1,0 +1,848 @@
+/*
+ * Scheduled tasks — the page's own styles. Every colour, radius, duration
+ * and easing is a --pd-* token so the flavour × mode combinations restyle it
+ * live; nothing here is a literal colour. Prefixed `sd-` so nothing collides
+ * with the design candidates' `sc-` rules when both are loaded.
+ *
+ * These rules are UNLAYERED, so they beat Tailwind's layered utilities on the
+ * same element whatever the specificity. That is why no rule here sets a
+ * margin a caller might want to tune with `mt-*`.
+ */
+
+/* ---- page ---------------------------------------------------------------- */
+
+.sd-page {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+  background: var(--pd-bg-base);
+  color: var(--pd-text-primary);
+  font-family: var(--pd-font-sans);
+  /* The second line is a step smaller than the name, locally: the app's
+     footnote token equals its body token (14px), so a row's line was the
+     name's size and differed only in weight and colour. 13/18 here, as on
+     Connectors. */
+  --pd-font-size-footnote: 13px;
+  --pd-leading-footnote: 18px;
+  --sd-gutter: 24px;
+}
+
+/* One column of content, left with the top bar's title, capped at a measure. */
+.sd-body {
+  max-width: 960px;
+  padding: 18px var(--sd-gutter) 40px;
+  animation: sd-in var(--pd-duration-base) var(--pd-easing-enter);
+}
+
+@keyframes sd-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ---- header: the title, its line, and the controls beside the title -------- */
+
+.sd-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 16px;
+  row-gap: 4px;
+  margin-bottom: 20px;
+}
+
+.sd-title {
+  margin: 0;
+  font-size: var(--pd-font-size-title);
+  line-height: var(--pd-leading-title);
+  font-weight: var(--pd-font-weight-medium);
+  letter-spacing: -0.02em;
+}
+
+.sd-header-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 12px;
+}
+
+.sd-lede {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 0;
+  color: var(--pd-text-muted);
+  font-size: var(--pd-font-size-body);
+  line-height: var(--pd-leading-body);
+}
+
+.sd-lede[data-off="true"] {
+  color: var(--pd-status-warning-fg);
+}
+
+.sd-lede > .pd-icon {
+  flex: none;
+  margin-top: 3px;
+}
+
+/* The magnifier in the header: a small ghost button, a field when opened. */
+.sd-header-actions .pd-collapsible-search--collapsed {
+  width: auto;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: var(--pd-radius-sm);
+  font-size: var(--pd-font-size-footnote);
+  color: var(--pd-text-muted);
+}
+
+.sd-header-actions .pd-collapsible-search--collapsed:hover {
+  background: var(--pd-bg-hover);
+  color: var(--pd-text-secondary);
+}
+
+.sd-header-actions .pd-collapsible-search--expanded {
+  width: 200px;
+}
+
+/* ---- rows: straight on the background ------------------------------------ */
+
+.sd-list {
+  display: flex;
+  flex-direction: column;
+  /* The hover fill bleeds past the text edge; the text stays on the gutter. */
+  margin: 0 -12px;
+}
+
+.sd-row {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: var(--pd-radius-row);
+  background: transparent;
+  color: var(--pd-text-primary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--pd-duration-base) var(--pd-easing-standard);
+}
+
+.sd-row:hover {
+  background: var(--pd-bg-hover);
+}
+
+/* The app's focus ring, drawn inside the row so a scroll area cannot clip it. */
+.sd-row.pd-focusable,
+.sd-run-head.pd-focusable,
+.sd-more.pd-focusable {
+  outline-offset: -2px;
+}
+
+.sd-row-text {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.sd-row-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--pd-font-size-body);
+  line-height: var(--pd-leading-body);
+  font-weight: var(--pd-font-weight-medium);
+}
+
+.sd-row[data-muted="true"] .sd-row-name {
+  color: var(--pd-text-muted);
+}
+
+.sd-row-line {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--pd-text-muted);
+  font-size: var(--pd-font-size-footnote);
+  line-height: var(--pd-leading-footnote);
+}
+
+/* A suggestion's blurb is a whole sentence, and it finishes. */
+.sd-row-line--wrap {
+  white-space: normal;
+  color: var(--pd-text-secondary);
+}
+
+.sd-row-when {
+  margin-top: 2px;
+  color: var(--pd-text-muted);
+  font-size: var(--pd-font-size-caption);
+  line-height: var(--pd-leading-caption);
+}
+
+.sd-row-word {
+  flex: none;
+  font-size: var(--pd-font-size-footnote);
+  line-height: var(--pd-leading-footnote);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The "+" that says what a click on a suggestion does. */
+.sd-row-plus {
+  display: inline-flex;
+  flex: none;
+  color: var(--pd-text-muted);
+  transition: color var(--pd-duration-fast) var(--pd-easing-standard);
+}
+
+.sd-row:hover .sd-row-plus {
+  color: var(--pd-text-primary);
+}
+
+/* The clause that is a warning, inside a line that is not. */
+.sd-warn {
+  color: var(--pd-status-warning-fg);
+}
+
+.sd-live {
+  color: var(--pd-accent-primary);
+}
+
+.sd-nothing {
+  margin: 0;
+  padding: 8px 12px;
+  color: var(--pd-text-muted);
+  font-size: var(--pd-font-size-footnote);
+}
+
+/* The tile: one container for whatever glyph a row carries. */
+.sd-tile {
+  display: inline-flex;
+  width: 36px;
+  height: 36px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--pd-radius-md);
+  background: var(--pd-bg-inset);
+  box-shadow: inset 0 0 0 1px var(--pd-border-subtle);
+  color: var(--pd-text-secondary);
+}
+
+/* Suggestions lay their rows two abreast when there is room. */
+.sd-suggest-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  margin: 0 -12px;
+}
+
+.sd-suggest-grid[data-columns="2"] {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 24px;
+}
+
+.sd-suggest-grid .sd-row {
+  align-items: flex-start;
+}
+
+.sd-suggest-grid .sd-row-plus {
+  margin-top: 8px;
+}
+
+/* ---- the empty page ------------------------------------------------------- */
+
+.sd-empty-title {
+  margin: 12px 0 0;
+  font-size: var(--pd-font-size-body);
+  line-height: var(--pd-leading-body);
+  font-weight: var(--pd-font-weight-medium);
+}
+
+.sd-empty-line {
+  margin: 2px 0 12px;
+  color: var(--pd-text-muted);
+  font-size: var(--pd-font-size-footnote);
+  line-height: var(--pd-leading-footnote);
+}
+
+/* ---- "and more": the suggestions under a list ----------------------------- */
+
+.sd-more-section {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--pd-border-subtle);
+}
+
+.sd-more {
+  display: flex;
+  width: calc(100% + 24px);
+  align-items: center;
+  gap: 12px;
+  margin: 0 -12px;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: var(--pd-radius-row);
+  background: transparent;
+  color: var(--pd-text-secondary);
+  font: inherit;
+  font-size: var(--pd-font-size-footnote);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--pd-duration-base) var(--pd-easing-standard);
+}
+
+.sd-more:hover {
+  background: var(--pd-bg-hover);
+  color: var(--pd-text-primary);
+}
+
+.sd-more-text {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sd-more-chev {
+  display: inline-flex;
+  flex: none;
+  color: var(--pd-text-muted);
+  transition: transform var(--pd-duration-base) var(--pd-easing-standard);
+}
+
+.sd-more-chev[data-open="true"] {
+  transform: rotate(90deg);
+}
+
+.sd-cluster {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+}
+
+.sd-tile--xs {
+  width: 22px;
+  height: 22px;
+  border-radius: var(--pd-radius-xs);
+  box-shadow:
+    inset 0 0 0 1px var(--pd-border-subtle),
+    0 0 0 2px var(--pd-bg-base);
+}
+
+.sd-cluster > .sd-tile--xs + .sd-tile--xs {
+  margin-left: -6px;
+}
+
+/* ---- a task's page ------------------------------------------------------- */
+
+.sd-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin: 0 0 14px -6px;
+  padding: 4px 8px 4px 4px;
+  border: 0;
+  border-radius: var(--pd-radius-sm);
+  background: transparent;
+  color: var(--pd-text-secondary);
+  font: inherit;
+  font-size: var(--pd-font-size-footnote);
+  cursor: pointer;
+  transition:
+    background-color var(--pd-duration-fast) var(--pd-easing-standard),
+    color var(--pd-duration-fast) var(--pd-easing-standard);
+}
+
+.sd-back:hover {
+  background: var(--pd-bg-hover);
+  color: var(--pd-text-primary);
+}
+
+.sd-task-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+}
+
+.sd-task-title {
+  margin: 0;
+  outline: none;
+  font-size: var(--pd-font-size-title);
+  line-height: var(--pd-leading-title);
+  font-weight: var(--pd-font-weight-medium);
+  letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
+}
+
+.sd-task-line {
+  margin: 2px 0 0;
+  color: var(--pd-text-muted);
+  font-size: var(--pd-font-size-footnote);
+  line-height: var(--pd-leading-footnote);
+}
+
+.sd-task-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+/* The instruction: plain text at a reading measure — the one block on the page. */
+.sd-prompt {
+  max-width: 720px;
+  margin: 20px 0 0;
+  color: var(--pd-text-secondary);
+  font-size: var(--pd-font-size-body);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
+/* ---- section headings: body-medium, a step above the rows they head -------- */
+
+.sd-section {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+.sd-section-title {
+  margin: 0;
+  color: var(--pd-text-primary);
+  font-size: var(--pd-font-size-body);
+  line-height: var(--pd-leading-body);
+  font-weight: var(--pd-font-weight-medium);
+}
+
+.sd-section-aside {
+  color: var(--pd-text-muted);
+  font-size: var(--pd-font-size-caption);
+  line-height: var(--pd-leading-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- the facts under the instruction: three quiet label/value rows -------- */
+
+.sd-facts {
+  display: grid;
+  max-width: 720px;
+  grid-template-columns: 72px minmax(0, 1fr);
+  row-gap: 4px;
+  column-gap: 12px;
+  margin: 18px 0 0;
+  font-size: var(--pd-font-size-footnote);
+  line-height: var(--pd-leading-footnote);
+}
+
+.sd-facts dt {
+  color: var(--pd-text-muted);
+}
+
+.sd-facts dd {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--pd-text-secondary);
+}
+
+/* ---- the ledger of runs --------------------------------------------------- */
+
+.sd-run {
+  position: relative;
+  display: grid;
+  grid-template-columns: 16px 1fr;
+  column-gap: 12px;
+  padding: 10px 0;
+}
+
+/* The rail: a hairline joining the dots into a timeline. */
+.sd-run::before {
+  content: "";
+  position: absolute;
+  top: 28px;
+  bottom: -8px;
+  left: 7.5px;
+  width: 1px;
+  background: var(--pd-border-default);
+}
+
+.sd-run:last-of-type::before {
+  display: none;
+}
+
+.sd-run-dot {
+  display: inline-flex;
+  width: 16px;
+  height: 16px;
+  align-items: center;
+  justify-content: center;
+  margin-top: 2px;
+  color: var(--pd-text-muted);
+  transition: color var(--pd-duration-base) var(--pd-easing-standard);
+}
+
+.sd-run-dot[data-tone="ok"] {
+  color: var(--pd-status-success-fg);
+}
+
+.sd-run-dot[data-tone="error"] {
+  color: var(--pd-status-danger-fg);
+}
+
+.sd-run-dot[data-tone="live"] {
+  color: var(--pd-accent-primary);
+}
+
+.sd-run-dot[data-tone="stopped"] {
+  color: var(--pd-text-muted);
+}
+
+/* A run's head opens it; the hover says so, bleeding 8px past the text. */
+.sd-run-head {
+  display: flex;
+  width: calc(100% + 16px);
+  align-items: flex-start;
+  gap: 8px;
+  margin: -3px -8px;
+  padding: 3px 8px;
+  border: 0;
+  border-radius: var(--pd-radius-sm);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--pd-duration-fast) var(--pd-easing-standard);
+}
+
+.sd-run-head:hover {
+  background: var(--pd-bg-hover);
+}
+
+.sd-run-when {
+  flex: none;
+  color: var(--pd-text-primary);
+  font-size: var(--pd-font-size-footnote);
+  line-height: var(--pd-leading-footnote);
+  font-weight: var(--pd-font-weight-medium);
+  white-space: nowrap;
+}
+
+.sd-run-took {
+  flex: none;
+  color: var(--pd-text-muted);
+  font-size: var(--pd-font-size-caption);
+  line-height: var(--pd-leading-footnote);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* "by hand" / "1h 42m late": what trigger + slot let the ledger say honestly. */
+.sd-run-tag {
+  flex: none;
+  margin-top: 1px;
+  padding: 0 6px;
+  border-radius: var(--pd-radius-xs);
+  background: var(--pd-bg-inset);
+  box-shadow: var(--pd-shadow-hairline);
+  color: var(--pd-text-muted);
+  font-size: var(--pd-font-size-caption);
+  line-height: var(--pd-leading-caption);
+  white-space: nowrap;
+}
+
+.sd-run-tag[data-tone="warn"] {
+  background: var(--pd-status-warning-bg);
+  box-shadow: none;
+  color: var(--pd-status-warning-fg);
+}
+
+.sd-run-headline {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--pd-text-secondary);
+  font-size: var(--pd-font-size-footnote);
+  line-height: var(--pd-leading-footnote);
+}
+
+/* An error's actionable part is at its end; give it a second line. */
+.sd-run-headline[data-tone="error"] {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  white-space: normal;
+  color: var(--pd-status-danger-fg);
+  overflow-wrap: anywhere;
+}
+
+/* The picture a run made, on its row — the one artifact worth a glance. */
+.sd-run-thumb {
+  width: 36px;
+  height: 36px;
+  flex: none;
+  border-radius: var(--pd-radius-sm);
+  box-shadow: var(--pd-shadow-hairline);
+  object-fit: cover;
+  background: var(--pd-bg-inset);
+}
+
+.sd-run-body {
+  max-width: 720px;
+  margin-top: 6px;
+  color: var(--pd-text-secondary);
+  font-size: var(--pd-font-size-footnote);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
+.sd-run-body[data-tone="error"] {
+  color: var(--pd-status-danger-fg);
+}
+
+.sd-run-trail {
+  color: var(--pd-text-muted);
+  font-size: var(--pd-font-size-caption);
+  line-height: var(--pd-leading-caption);
+}
+
+/* Quiet until the run is under the pointer or the keyboard. */
+.sd-run-delete {
+  opacity: 0;
+  transition: opacity var(--pd-duration-fast) var(--pd-easing-standard);
+}
+
+.sd-run:hover .sd-run-delete,
+.sd-run:focus-within .sd-run-delete,
+.sd-run-delete:focus-visible {
+  opacity: 1;
+}
+
+.sd-run-delete:hover {
+  color: var(--pd-status-danger-fg);
+}
+
+.sd-ledger-more {
+  margin-top: 4px;
+  margin-left: 28px;
+  padding: 2px 0;
+  border: 0;
+  background: transparent;
+  color: var(--pd-text-muted);
+  font: inherit;
+  font-size: var(--pd-font-size-caption);
+  line-height: var(--pd-leading-caption);
+  cursor: pointer;
+}
+
+.sd-ledger-more:hover {
+  color: var(--pd-text-primary);
+}
+
+.sd-artifacts {
+  display: grid;
+  max-width: 720px;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.sd-artifact {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--pd-radius-sm);
+  background: var(--pd-bg-inset);
+  box-shadow: var(--pd-shadow-hairline);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: box-shadow var(--pd-duration-fast) var(--pd-easing-standard);
+}
+
+.sd-artifact:hover {
+  box-shadow: 0 0 0 1px var(--pd-border-strong);
+}
+
+.sd-artifact-preview {
+  display: flex;
+  height: 84px;
+  align-items: center;
+  justify-content: center;
+  color: var(--pd-text-muted);
+  background: var(--pd-bg-inset);
+}
+
+.sd-artifact-preview img,
+.sd-artifact-preview video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.sd-artifact-preview audio {
+  width: 100%;
+  padding: 0 6px;
+}
+
+.sd-artifact-name {
+  overflow: hidden;
+  padding: 4px 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--pd-text-secondary);
+  font-size: var(--pd-font-size-caption);
+  line-height: var(--pd-leading-caption);
+}
+
+/* ---- the end of a task's page: a hairline, what deleting takes, the control - */
+
+.sd-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 28px;
+  padding-top: 12px;
+  border-top: 1px solid var(--pd-border-subtle);
+}
+
+.sd-delete-armed {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  animation: sd-in var(--pd-duration-fast) var(--pd-easing-enter);
+}
+
+/* On, but not firing: the per-task switch while scheduling is off. */
+.sd-dim {
+  opacity: 0.45;
+}
+
+/* ---- the dialog ------------------------------------------------------------- */
+
+.sd-dialog.pd-dialog {
+  width: min(92vw, 560px);
+  max-width: min(92vw, 560px);
+}
+
+.sd-dialog-body.pd-dialog-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-top: 14px;
+}
+
+.sd-dialog-footer.pd-dialog-footer {
+  padding: 8px 20px 16px;
+}
+
+.sd-field-label {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--pd-text-muted);
+  font-size: var(--pd-font-size-caption);
+  line-height: var(--pd-leading-caption);
+}
+
+/* What the sentence was read as, under the instruction: one line of prose with the schedule in it. */
+.sd-parse {
+  margin: 8px 0 0;
+  color: var(--pd-text-muted);
+  font-size: var(--pd-font-size-caption);
+  line-height: 22px;
+  animation: sd-in var(--pd-duration-fast) var(--pd-easing-enter);
+}
+
+.sd-parse strong {
+  color: var(--pd-text-secondary);
+  font-weight: var(--pd-font-weight-regular);
+}
+
+/* A hairline chip with a glyph: the parse's schedule, inline in the sentence. */
+.sd-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 22px;
+  margin: 0 2px;
+  padding: 0 8px;
+  border-radius: var(--pd-radius-full);
+  box-shadow: 0 0 0 1px var(--pd-border-default);
+  color: var(--pd-text-secondary);
+  font-size: var(--pd-font-size-caption);
+  line-height: 1;
+  vertical-align: top;
+  white-space: nowrap;
+}
+
+.sd-chip .pd-icon {
+  color: var(--pd-text-muted);
+}
+
+/* The consequence: the schedule in primary, the caveats a quieter line under it. */
+.sd-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sd-preview p {
+  margin: 0;
+}
+
+.sd-preview-main {
+  color: var(--pd-text-secondary);
+  font-size: var(--pd-font-size-footnote);
+  line-height: var(--pd-leading-footnote);
+}
+
+.sd-preview-main strong {
+  color: var(--pd-text-primary);
+  font-weight: var(--pd-font-weight-medium);
+}
+
+.sd-preview-note {
+  color: var(--pd-text-muted);
+  font-size: var(--pd-font-size-caption);
+  line-height: var(--pd-leading-caption);
+}
+
+/* ---- reduced motion --------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .sd-body,
+  .sd-parse,
+  .sd-delete-armed {
+    animation: none;
+  }
+
+  .sd-more-chev {
+    transition: none;
+  }
+}

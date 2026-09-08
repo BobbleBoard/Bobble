@@ -1,0 +1,569 @@
+[
+  {
+    "key": "theme on a fresh home",
+    "value": {
+      "flavor": "bobble",
+      "mode": "dark"
+    }
+  },
+  {
+    "key": "list extent (content 1152)",
+    "value": {
+      "scrollHeight": 3246,
+      "clientHeight": 788
+    }
+  },
+  {
+    "key": "cards / preinstalled / official badges / add buttons",
+    "value": {
+      "cards": 37,
+      "preinstalled": 7,
+      "official": 25,
+      "firstAddY": 991,
+      "sections": [
+        {
+          "id": "connectors-section-added-by-you",
+          "y": 262,
+          "n": 1
+        },
+        {
+          "id": "connectors-section-by-us",
+          "y": 454,
+          "n": 6
+        },
+        {
+          "id": "connectors-section-recommended",
+          "y": 950,
+          "n": 4
+        },
+        {
+          "id": "connectors-section-official",
+          "y": 1290,
+          "n": 16
+        },
+        {
+          "id": "connectors-section-popular",
+          "y": 2538,
+          "n": 10
+        }
+      ]
+    }
+  },
+  {
+    "key": "title",
+    "value": {
+      "x": 448,
+      "y": 52,
+      "w": 111,
+      "h": 28,
+      "fontSize": "22px",
+      "lineHeight": "28px",
+      "fontWeight": "400",
+      "color": "rgb(245, 245, 247)",
+      "background": "rgba(0, 0, 0, 0)",
+      "outline": "3px none rgb(245, 245, 247)",
+      "boxShadow": "none"
+    }
+  },
+  {
+    "key": "section heading",
+    "value": {
+      "x": 443,
+      "y": 262,
+      "w": 816,
+      "h": 20,
+      "fontSize": "14px",
+      "lineHeight": "20px",
+      "fontWeight": "400",
+      "color": "rgb(245, 245, 247)",
+      "background": "rgba(0, 0, 0, 0)",
+      "outline": "3px none rgb(245, 245, 247)",
+      "boxShadow": "none"
+    }
+  },
+  {
+    "key": "card name",
+    "value": {
+      "x": 460,
+      "y": 1835,
+      "w": 45,
+      "h": 20,
+      "fontSize": "14px",
+      "lineHeight": "20px",
+      "fontWeight": "400",
+      "color": "rgb(245, 245, 247)",
+      "background": "rgba(0, 0, 0, 0)",
+      "outline": "3px none rgb(245, 245, 247)",
+      "boxShadow": "none"
+    }
+  },
+  {
+    "key": "card description",
+    "value": {
+      "x": 460,
+      "y": 1857,
+      "w": 304,
+      "h": 32,
+      "fontSize": "13px",
+      "lineHeight": "18px",
+      "fontWeight": "400",
+      "color": "rgb(152, 152, 159)",
+      "background": "rgba(0, 0, 0, 0)",
+      "outline": "3px none rgb(152, 152, 159)",
+      "boxShadow": "none"
+    }
+  },
+  {
+    "key": "card icon tile",
+    "value": {
+      "x": 460,
+      "y": 1787,
+      "w": 40,
+      "h": 40,
+      "fontSize": "16px",
+      "lineHeight": "21px",
+      "fontWeight": "400",
+      "color": "rgb(245, 245, 247)",
+      "background": "rgb(18, 18, 20)",
+      "outline": "3px none rgb(245, 245, 247)",
+      "boxShadow": "none"
+    }
+  },
+  {
+    "key": "card",
+    "value": {
+      "x": 443,
+      "y": 1770,
+      "w": 402,
+      "h": 140,
+      "fontSize": "14px",
+      "lineHeight": "20px",
+      "fontWeight": "400",
+      "color": "rgb(245, 245, 247)",
+      "background": "rgba(0, 0, 0, 0)",
+      "outline": "3px none rgb(245, 245, 247)",
+      "boxShadow": "none"
+    }
+  },
+  {
+    "key": "mode hint",
+    "value": {
+      "x": 443,
+      "y": 218,
+      "w": 816,
+      "h": 20,
+      "fontSize": "12px",
+      "lineHeight": "19.5px",
+      "fontWeight": "400",
+      "color": "rgb(152, 152, 159)",
+      "background": "rgba(0, 0, 0, 0)",
+      "outline": "3px none rgb(152, 152, 159)",
+      "boxShadow": "none"
+    }
+  },
+  {
+    "key": "search",
+    "value": {
+      "x": 448,
+      "y": 128,
+      "w": 816,
+      "h": 32,
+      "fontSize": "14px",
+      "lineHeight": "20px",
+      "fontWeight": "400",
+      "color": "rgb(245, 245, 247)",
+      "background": "rgb(30, 30, 33)",
+      "outline": "3px none rgb(245, 245, 247)",
+      "boxShadow": "rgba(255, 255, 255, 0.12) 0px 0px 0px 1px"
+    }
+  },
+  {
+    "key": "card hover bg (dark)",
+    "value": {
+      "before": "rgba(0, 0, 0, 0)",
+      "after": "rgba(255, 255, 255, 0.06)"
+    }
+  },
+  {
+    "key": "card hover bg (light)",
+    "value": {
+      "before": "rgba(0, 0, 0, 0)",
+      "after": "rgba(0, 0, 0, 0.04)"
+    }
+  },
+  {
+    "key": "tab order from the search field",
+    "value": [
+      "button:\"Lite\"",
+      "button:\"Native\"",
+      "button:\"Bash CLI\"",
+      "connector-overflow-weather",
+      "button:\"🔌WeatherRuns node /User\"",
+      "connector-overflow-video-editing",
+      "button:\"Video editingOfficialA t\"",
+      "connector-overflow-mac-calendar",
+      "button:\"CalendarOfficialRead and\"",
+      "connector-overflow-mac-mail",
+      "button:\"MailOfficialSearch, list\"",
+      "connector-overflow-mac-messages",
+      "button:\"MessagesOfficialRead rec\"",
+      "connector-overflow-mac-contacts",
+      "button:\"ContactsOfficialSearch p\"",
+      "connector-overflow-mac-reminders"
+    ]
+  },
+  {
+    "key": "first section y before/after Native",
+    "value": {
+      "before": 262,
+      "after": 262
+    }
+  },
+  {
+    "key": "first section y on Bash CLI",
+    "value": 262
+  },
+  {
+    "key": "github detail: Tools text while off",
+    "value": "ToolsTurn this on to see what it can do — nothing is fetched while it is off."
+  },
+  {
+    "key": "github detail: command block",
+    "value": {
+      "x": 523,
+      "y": 358,
+      "w": 656,
+      "h": 82,
+      "fontSize": "13px",
+      "lineHeight": "18px",
+      "fontWeight": "400",
+      "color": "rgb(245, 245, 247)",
+      "background": "rgba(255, 255, 255, 0.04)",
+      "outline": "3px none rgb(245, 245, 247)",
+      "boxShadow": "none"
+    }
+  },
+  {
+    "key": "github detail: Tools text after turning on with no key",
+    "value": "ToolsThis connector exposes no tools."
+  },
+  {
+    "key": "memory: ms from click to tool list (first open)",
+    "value": 92
+  },
+  {
+    "key": "memory tool row name",
+    "value": {
+      "x": 540,
+      "y": 304,
+      "w": 117,
+      "h": 15,
+      "fontSize": "13px",
+      "lineHeight": "18px",
+      "fontWeight": "400",
+      "color": "rgb(245, 245, 247)",
+      "background": "rgba(0, 0, 0, 0)",
+      "outline": "3px none rgb(245, 245, 247)",
+      "boxShadow": "none"
+    }
+  },
+  {
+    "key": "memory tool row desc",
+    "value": {
+      "x": 540,
+      "y": 323,
+      "w": 622,
+      "h": 18,
+      "fontSize": "13px",
+      "lineHeight": "18px",
+      "fontWeight": "400",
+      "color": "rgb(152, 152, 159)",
+      "background": "rgba(0, 0, 0, 0)",
+      "outline": "3px none rgb(152, 152, 159)",
+      "boxShadow": "none"
+    }
+  },
+  {
+    "key": "memory: ms from click to tool list (second open)",
+    "value": 103
+  },
+  {
+    "key": "skipped:detail: custom / builtin / available",
+    "value": "TimeoutError: page.waitForSelector: Timeout 10000ms exceeded."
+  },
+  {
+    "key": "permission dialog: focused element",
+    "value": "button:\"Cancel\""
+  },
+  {
+    "key": "registry after slack",
+    "value": [
+      {
+        "id": "memory",
+        "enabled": true,
+        "cmd": "npx"
+      },
+      {
+        "id": "filesystem",
+        "enabled": true,
+        "cmd": "npx"
+      },
+      {
+        "id": "github",
+        "enabled": false,
+        "cmd": "npx"
+      },
+      {
+        "id": "blender",
+        "enabled": true,
+        "cmd": "uvx"
+      },
+      {
+        "id": "weather",
+        "enabled": true,
+        "cmd": "node"
+      },
+      {
+        "id": "sequential-thinking",
+        "enabled": false,
+        "cmd": "npx"
+      },
+      {
+        "id": "slack",
+        "enabled": false,
+        "cmd": "npx"
+      }
+    ]
+  },
+  {
+    "key": "add dialog: focused on open",
+    "value": "add-server-name"
+  },
+  {
+    "key": "add dialog box",
+    "value": {
+      "x": 560,
+      "y": 162,
+      "w": 320,
+      "h": 576,
+      "fontSize": "14px",
+      "lineHeight": "20px",
+      "fontWeight": "400",
+      "color": "rgb(245, 245, 247)",
+      "background": "color(srgb 0.137255 0.137255 0.152941 / 0.663765)",
+      "outline": "3px none rgb(245, 245, 247)",
+      "boxShadow": "rgba(255, 255, 255, 0.14) 0px 0px 0px 0.5px, rgba(0, 0, 0, 0.45) 0px 12px 32px -"
+    }
+  },
+  {
+    "key": "add dialog title",
+    "value": {
+      "x": 580,
+      "y": 178,
+      "w": 180,
+      "h": 28,
+      "fontSize": "22px",
+      "lineHeight": "28px",
+      "fontWeight": "500",
+      "color": "rgb(245, 245, 247)",
+      "background": "rgba(0, 0, 0, 0)",
+      "outline": "3px none rgb(245, 245, 247)",
+      "boxShadow": "none"
+    }
+  },
+  {
+    "key": "add dialog label",
+    "value": {
+      "x": 560,
+      "y": 206,
+      "w": 320,
+      "h": 16,
+      "fontSize": "12px",
+      "lineHeight": "16px",
+      "fontWeight": "400",
+      "color": "rgb(214, 214, 219)",
+      "background": "rgba(0, 0, 0, 0)",
+      "outline": "3px none rgb(214, 214, 219)",
+      "boxShadow": "none"
+    }
+  },
+  {
+    "key": "add dialog input",
+    "value": {
+      "x": 560,
+      "y": 226,
+      "w": 320,
+      "h": 32,
+      "fontSize": "14px",
+      "lineHeight": "20px",
+      "fontWeight": "400",
+      "color": "rgb(245, 245, 247)",
+      "background": "rgb(30, 30, 33)",
+      "outline": "3px none rgba(0, 0, 0, 0)",
+      "boxShadow": "rgb(41, 151, 255) 0px 0px 0px 1.5px"
+    }
+  },
+  {
+    "key": "add dialog hint",
+    "value": {
+      "x": 560,
+      "y": 262,
+      "w": 320,
+      "h": 18,
+      "fontSize": "13px",
+      "lineHeight": "18px",
+      "fontWeight": "400",
+      "color": "rgb(152, 152, 159)",
+      "background": "rgba(0, 0, 0, 0)",
+      "outline": "3px none rgb(152, 152, 159)",
+      "boxShadow": "none"
+    }
+  },
+  {
+    "key": "add dialog submit",
+    "value": {
+      "x": 772,
+      "y": 696,
+      "w": 96,
+      "h": 32,
+      "fontSize": "14px",
+      "lineHeight": "20px",
+      "fontWeight": "500",
+      "color": "rgb(245, 245, 247)",
+      "background": "rgba(0, 0, 0, 0)",
+      "outline": "2px solid rgba(0, 0, 0, 0)",
+      "boxShadow": "none"
+    }
+  },
+  {
+    "key": "add dialog: still open after Enter on empty form / submit disabled",
+    "value": {
+      "open": true,
+      "disabled": true,
+      "errorText": false
+    }
+  },
+  {
+    "key": "add dialog: tab order from Name",
+    "value": [
+      "add-server-command",
+      "add-server-args",
+      "add-server-cwd",
+      "add-server-env",
+      "button:\"Cancel\"",
+      "Close",
+      "add-server-name",
+      "add-server-command",
+      "add-server-args"
+    ]
+  },
+  {
+    "key": "add dialog: Enter in a filled field submits?",
+    "value": false
+  },
+  {
+    "key": "add dialog: focused after close",
+    "value": "body:\"BobbleBobbleSearch chats\""
+  },
+  {
+    "key": "added card position",
+    "value": {
+      "y": 290,
+      "section": "connectors-section-added-by-you",
+      "badge": true
+    }
+  },
+  {
+    "key": "registry after add",
+    "value": [
+      {
+        "id": "memory",
+        "enabled": true,
+        "cmd": "npx"
+      },
+      {
+        "id": "filesystem",
+        "enabled": true,
+        "cmd": "npx"
+      },
+      {
+        "id": "github",
+        "enabled": false,
+        "cmd": "npx"
+      },
+      {
+        "id": "blender",
+        "enabled": true,
+        "cmd": "uvx"
+      },
+      {
+        "id": "weather",
+        "enabled": true,
+        "cmd": "node"
+      },
+      {
+        "id": "sequential-thinking",
+        "enabled": false,
+        "cmd": "npx"
+      },
+      {
+        "id": "slack",
+        "enabled": false,
+        "cmd": "npx"
+      },
+      {
+        "id": "weather-two",
+        "enabled": true,
+        "cmd": "node"
+      }
+    ]
+  },
+  {
+    "key": "skipped:add-server dialog",
+    "value": "TimeoutError: page.waitForSelector: Timeout 10000ms exceeded."
+  },
+  {
+    "key": "skill row",
+    "value": {
+      "x": 443,
+      "y": 514,
+      "w": 816,
+      "h": 66,
+      "fontSize": "14px",
+      "lineHeight": "20px",
+      "fontWeight": "400",
+      "color": "rgb(245, 245, 247)",
+      "background": "rgba(0, 0, 0, 0)",
+      "outline": "3px none rgb(245, 245, 247)",
+      "boxShadow": "none"
+    }
+  },
+  {
+    "key": "at a 1188 window (900 content)",
+    "value": {
+      "columns": 2,
+      "cardW": 402,
+      "content": 916
+    }
+  },
+  {
+    "key": "at a 928 window (640 content)",
+    "value": {
+      "columns": 2,
+      "cardW": 285,
+      "content": 656
+    }
+  },
+  {
+    "key": "at an 800 window (512 content)",
+    "value": {
+      "columns": 2,
+      "cardW": 221,
+      "content": 528
+    }
+  },
+  {
+    "key": "memory detail while the server exits before the handshake",
+    "value": "ToolsThis connector exposes no tools."
+  }
+]

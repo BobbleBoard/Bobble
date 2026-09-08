@@ -1,0 +1,1703 @@
+{
+  "cand-default": {
+    "h1": {
+      "text": "Scheduled tasks",
+      "box": {
+        "x": 24,
+        "y": 59,
+        "w": 466,
+        "h": 28
+      },
+      "font": "22px/28px 500",
+      "color": "rgb(245, 245, 247)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "0px",
+      "outline": "3px none rgb(245, 245, 247) offset 0px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "subtitle": {
+      "text": "Work Bobble does on its own while it is open — what ran, and",
+      "box": {
+        "x": 24,
+        "y": 89,
+        "w": 466,
+        "h": 18
+      },
+      "font": "13px/18px 400",
+      "color": "rgb(152, 152, 159)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "0px",
+      "outline": "3px none rgb(152, 152, 159) offset 0px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "switchLabel": {
+      "text": "",
+      "box": {
+        "x": 1003,
+        "y": 62,
+        "w": 36,
+        "h": 20
+      },
+      "font": "13px/18px 400",
+      "color": "rgb(214, 214, 219)",
+      "bg": "rgb(41, 151, 255)",
+      "border": "none",
+      "radius": "9999px",
+      "outline": "2px solid rgba(0, 0, 0, 0) offset 2px",
+      "transition": "background-color 0.18s",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "newTask": {
+      "text": "New task",
+      "box": {
+        "x": 1051,
+        "y": 59,
+        "w": 93,
+        "h": 26
+      },
+      "font": "12px/16px 500",
+      "color": "rgb(30, 30, 33)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "7.5px",
+      "outline": "2px solid rgba(0, 0, 0, 0) offset 2px",
+      "transition": "outline-color, color, opacity, transform 0.2s, 0.18s, 0.18s, 0.18s",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "composer": {
+      "text": "",
+      "box": {
+        "x": 24,
+        "y": 119,
+        "w": 1120,
+        "h": 48
+      },
+      "font": "14px/20px 400",
+      "color": "rgb(245, 245, 247)",
+      "bg": "rgb(30, 30, 33)",
+      "border": "1px rgb(41, 151, 255)",
+      "radius": "18px",
+      "outline": "3px none rgb(245, 245, 247) offset 0px",
+      "transition": "border-color, box-shadow 0.12s, 0.12s",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "composerInput": {
+      "text": "",
+      "box": {
+        "x": 41,
+        "y": 127,
+        "w": 1057,
+        "h": 33
+      },
+      "font": "16px/21px 400",
+      "color": "rgb(245, 245, 247)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "0px",
+      "outline": "3px none rgb(245, 245, 247) offset 0px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "go": {
+      "text": "",
+      "box": {
+        "x": 1108,
+        "y": 129,
+        "w": 28,
+        "h": 28
+      },
+      "font": "14px/20px 500",
+      "color": "rgb(152, 152, 159)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "9999px",
+      "outline": "2px solid rgba(0, 0, 0, 0) offset 2px",
+      "transition": "outline-color, color, opacity, transform 0.2s, 0.18s, 0.18s, 0.18s",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "lane": {
+      "text": "",
+      "box": {
+        "x": 24,
+        "y": 167,
+        "w": 1120,
+        "h": 34
+      },
+      "font": "14px/20px 400",
+      "color": "rgb(245, 245, 247)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "0px",
+      "outline": "3px none rgb(245, 245, 247) offset 0px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "listHead": {
+      "text": "Search tasks",
+      "box": {
+        "x": 0,
+        "y": 202,
+        "w": 279,
+        "h": 44
+      },
+      "font": "14px/20px 400",
+      "color": "rgb(245, 245, 247)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "0px",
+      "outline": "3px none rgb(245, 245, 247) offset 0px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "group": {
+      "text": "Now",
+      "box": {
+        "x": 8,
+        "y": 246,
+        "w": 253,
+        "h": 24
+      },
+      "font": "12px/16px 400",
+      "color": "rgb(152, 152, 159)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "0px",
+      "outline": "3px none rgb(152, 152, 159) offset 0px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "row": {
+      "text": "Portrait of the dayEvery day at 8:00 AM24s",
+      "box": {
+        "x": 8,
+        "y": 270,
+        "w": 253,
+        "h": 58
+      },
+      "font": "14px/20px 400",
+      "color": "rgb(245, 245, 247)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "9px",
+      "outline": "2px solid rgba(0, 0, 0, 0) offset -2px",
+      "transition": "background-color 0.18s",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "rowName": {
+      "text": "Portrait of the day",
+      "box": {
+        "x": 46,
+        "y": 280,
+        "w": 170,
+        "h": 20
+      },
+      "font": "14px/20px 500",
+      "color": "rgb(245, 245, 247)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "0px",
+      "outline": "3px none rgb(245, 245, 247) offset 0px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "rowMeta": {
+      "text": "Every day at 8:00 AM",
+      "box": {
+        "x": 46,
+        "y": 300,
+        "w": 170,
+        "h": 18
+      },
+      "font": "13px/18px 400",
+      "color": "rgb(152, 152, 159)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "0px",
+      "outline": "3px none rgb(152, 152, 159) offset 0px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "selectedRow": {
+      "text": "Morning briefWeekdays at 7:30 AM",
+      "box": {
+        "x": 8,
+        "y": 492,
+        "w": 253,
+        "h": 58
+      },
+      "font": "14px/20px 400",
+      "color": "rgb(245, 245, 247)",
+      "bg": "rgba(255, 255, 255, 0.09)",
+      "border": "none",
+      "radius": "9px",
+      "outline": "2px solid rgba(0, 0, 0, 0) offset -2px",
+      "transition": "background-color 0.18s",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "detailTitle": {
+      "text": "Morning brief",
+      "box": {
+        "x": 409,
+        "y": 222,
+        "w": 286,
+        "h": 28
+      },
+      "font": "22px/28px 500",
+      "color": "rgb(245, 245, 247)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "0px",
+      "outline": "3px none rgb(245, 245, 247) offset 0px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "detailSub": {
+      "text": "Weekdays at 7:30 AM · next Tomorrow 7:30 AM",
+      "box": {
+        "x": 409,
+        "y": 250,
+        "w": 286,
+        "h": 18
+      },
+      "font": "13px/18px 400",
+      "color": "rgb(152, 152, 159)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "0px",
+      "outline": "3px none rgb(152, 152, 159) offset 0px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "runNow": {
+      "text": "Run now",
+      "box": {
+        "x": 889,
+        "y": 222,
+        "w": 87,
+        "h": 26
+      },
+      "font": "12px/16px 500",
+      "color": "rgb(245, 245, 247)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "7.5px",
+      "outline": "2px solid rgba(0, 0, 0, 0) offset 2px",
+      "transition": "outline-color, color, opacity, transform 0.2s, 0.18s, 0.18s, 0.18s",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "edit": {
+      "text": "Edit",
+      "box": {
+        "x": 983,
+        "y": 222,
+        "w": 60,
+        "h": 26
+      },
+      "font": "12px/16px 500",
+      "color": "rgb(214, 214, 219)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "7.5px",
+      "outline": "2px solid rgba(0, 0, 0, 0) offset 2px",
+      "transition": "outline-color, color, opacity, transform 0.2s, 0.18s, 0.18s, 0.18s",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "prompt": {
+      "text": "Turn on the \"personal\" capability, then write me a short bri",
+      "box": {
+        "x": 357,
+        "y": 284,
+        "w": 724,
+        "h": 161
+      },
+      "font": "13px/19.5px 400",
+      "color": "rgb(214, 214, 219)",
+      "bg": "rgb(18, 18, 20)",
+      "border": "none",
+      "radius": "10px",
+      "outline": "3px none rgb(214, 214, 219) offset 0px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "section": {
+      "text": "Reach",
+      "box": {
+        "x": 357,
+        "y": 469,
+        "w": 40,
+        "h": 20
+      },
+      "font": "14px/20px 400",
+      "color": "rgb(245, 245, 247)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "0px",
+      "outline": "3px none rgb(245, 245, 247) offset 0px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "facts": {
+      "text": "ReachesCalendar · Mail · RemindersRuns inA folder of its own",
+      "box": {
+        "x": 357,
+        "y": 497,
+        "w": 724,
+        "h": 66
+      },
+      "font": "13px/18px 400",
+      "color": "rgb(245, 245, 247)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "0px",
+      "outline": "3px none rgb(245, 245, 247) offset 0px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "runWhen": {
+      "text": "Today 7:30 AM",
+      "box": {
+        "x": 385,
+        "y": 626,
+        "w": 92,
+        "h": 18
+      },
+      "font": "13px/18px 500",
+      "color": "rgb(245, 245, 247)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "0px",
+      "outline": "3px none rgb(245, 245, 247) offset 0px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "runTook": {
+      "text": "41s",
+      "box": {
+        "x": 485,
+        "y": 625,
+        "w": 21,
+        "h": 20
+      },
+      "font": "12px/20px 400",
+      "color": "rgb(152, 152, 159)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "0px",
+      "outline": "3px none rgb(152, 152, 159) offset 0px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "runHeadline": {
+      "text": "Calendar: nothing today.",
+      "box": {
+        "x": 513,
+        "y": 772,
+        "w": 568,
+        "h": 18
+      },
+      "font": "13px/18px 400",
+      "color": "rgb(214, 214, 219)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "0px",
+      "outline": "3px none rgb(214, 214, 219) offset 0px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "runBody": {
+      "text": "Calendar: 10:00 Bobble sync (30 min), 14:30 dentist.\nMail th",
+      "box": {
+        "x": 385,
+        "y": 651,
+        "w": 696,
+        "h": 78
+      },
+      "font": "13px/19.5px 400",
+      "color": "rgb(214, 214, 219)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "0px",
+      "outline": "3px none rgb(214, 214, 219) offset 0px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "footer": {
+      "text": "Deleting removes the task and its 5 runs.Delete",
+      "box": {
+        "x": 357,
+        "y": 949,
+        "w": 724,
+        "h": 39
+      },
+      "font": "14px/20px 400",
+      "color": "rgb(245, 245, 247)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "1px rgba(255, 255, 255, 0.08)",
+      "radius": "0px",
+      "outline": "3px none rgb(245, 245, 247) offset 0px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "deleteBtn": {
+      "text": "Delete",
+      "box": {
+        "x": 1024,
+        "y": 962,
+        "w": 57,
+        "h": 26
+      },
+      "font": "12px/16px 500",
+      "color": "rgb(152, 152, 159)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "7.5px",
+      "outline": "2px solid rgba(0, 0, 0, 0) offset 2px",
+      "transition": "outline-color, color, opacity, transform 0.2s, 0.18s, 0.18s, 0.18s",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "pane": {
+      "text": "Morning briefWeekdays at 7:30 AM · next Tomorrow 7:30 AM Run",
+      "box": {
+        "x": 329,
+        "y": 202,
+        "w": 780,
+        "h": 806
+      },
+      "font": "14px/20px 400",
+      "color": "rgb(245, 245, 247)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "0px",
+      "outline": "3px none rgb(245, 245, 247) offset 0px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    }
+  },
+  "tab-order:cand-default": [
+    {
+      "tag": "BUTTON",
+      "testid": "sc-new",
+      "label": null,
+      "text": "New task",
+      "ring": "2px solid rgba(0, 0, 0, 0)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 59
+    },
+    {
+      "tag": "INPUT",
+      "testid": "sc-composer-input",
+      "label": "Describe a task, with a time",
+      "text": "",
+      "ring": "3px none rgb(245, 245, 247)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 127
+    },
+    {
+      "tag": "BUTTON",
+      "testid": null,
+      "label": null,
+      "text": "Search tasks",
+      "ring": "2px solid rgb(41, 151, 255)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 212
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "sc-ledger-row-task_mtrujsm0_yc8006",
+      "label": null,
+      "text": "Portrait of the dayEvery day at 8:00 AM2",
+      "ring": "2px solid rgb(41, 151, 255)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 270
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "sc-ledger-row-task_mtrujslk_dg03oa",
+      "label": null,
+      "text": "What changed todayWeekdays at 6:00 PM",
+      "ring": "2px solid rgb(41, 151, 255)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 352
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "sc-ledger-row-task_mtrujsm3_v3jlas",
+      "label": null,
+      "text": "What did I missWeekdays at 6:30 PMmissed",
+      "ring": "2px solid rgb(41, 151, 255)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 410
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "sc-ledger-row-task_mtrujsla_8svvc9",
+      "label": null,
+      "text": "Morning briefWeekdays at 7:30 AM",
+      "ring": "2px solid rgb(41, 151, 255)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 492
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "sc-ledger-row-task_mtrujslf_6u2e5j",
+      "label": null,
+      "text": "Run the testsEvery day at 7:30 AM",
+      "ring": "2px solid rgb(41, 151, 255)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 550
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "sc-ledger-row-task_mtrujslr_ofibgn",
+      "label": null,
+      "text": "Watch llama.cpp releasesEvery day at 9:0",
+      "ring": "2px solid rgb(41, 151, 255)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 608
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "sc-ledger-row-task_mtrujslo_31xyh0",
+      "label": null,
+      "text": "Weekly reviewEvery Friday at 4:00 PM",
+      "ring": "2px solid rgb(41, 151, 255)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 690
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "sc-ledger-row-task_mtrujslx_i3tegq",
+      "label": null,
+      "text": "Sort my DownloadsOnly when you run it",
+      "ring": "2px solid rgb(41, 151, 255)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 772
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "sc-ledger-row-task_mtrujslu_hgswr0",
+      "label": null,
+      "text": "Dependency checkEvery Monday at 9:00 AMp",
+      "ring": "2px solid rgb(41, 151, 255)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 802
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "sc-run-now",
+      "label": null,
+      "text": "Run now",
+      "ring": "2px solid rgba(0, 0, 0, 0)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 222
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "sc-edit",
+      "label": null,
+      "text": "Edit",
+      "ring": "2px solid rgba(0, 0, 0, 0)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 222
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "sc-task-switch",
+      "label": "Pause this task",
+      "text": "",
+      "ring": "2px solid rgb(41, 151, 255)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 227
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "sc-run-head-run_a1",
+      "label": null,
+      "text": "Today 7:30 AM41s",
+      "ring": "2px solid rgb(41, 151, 255)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 622
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "sc-run-delete",
+      "label": null,
+      "text": "Delete run",
+      "ring": "2px solid rgb(41, 151, 255)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 735
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "sc-run-head-run_a2",
+      "label": null,
+      "text": "4 Sep 7:30 AM38sCalendar: nothing today.",
+      "ring": "2px solid rgb(41, 151, 255)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 768
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "sc-run-head-run_a3",
+      "label": null,
+      "text": "3 Sep 7:30 AM6scalendar_list_events was ",
+      "ring": "2px solid rgb(41, 151, 255)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 808
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "sc-run-head-run_a4",
+      "label": null,
+      "text": "2 Sep 7:30 AM44sCalendar: 09:30 standup,",
+      "ring": "2px solid rgb(41, 151, 255)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 834
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "sc-run-head-run_a5",
+      "label": null,
+      "text": "1 Sep 7:30 AM40sCalendar: all-day \"offsi",
+      "ring": "2px solid rgb(41, 151, 255)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 740
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "sc-delete",
+      "label": null,
+      "text": "Delete",
+      "ring": "2px solid rgba(0, 0, 0, 0)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 814
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "candidate-tab-ledger-plus",
+      "label": null,
+      "text": "Ledger+",
+      "ring": "1px auto rgb(153, 200, 255)",
+      "boxShadow": "rgba(255, 255, 255, 0.14) 0px 0px 0px 0.5px, rgba(0, 0, 0, 0.28) 0px 1px 3px 0px",
+      "visible": true,
+      "y": 8
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "candidate-tab-ledger",
+      "label": null,
+      "text": "Ledger",
+      "ring": "1px auto rgb(153, 200, 255)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 8
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "candidate-tab-agenda",
+      "label": null,
+      "text": "Agenda",
+      "ring": "1px auto rgb(153, 200, 255)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 8
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "candidate-tab-routines",
+      "label": null,
+      "text": "Routines",
+      "ring": "1px auto rgb(153, 200, 255)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 8
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "sc-scheduling-switch",
+      "label": "Scheduling",
+      "text": "",
+      "ring": "2px solid rgb(41, 151, 255)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 62
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "sc-new",
+      "label": null,
+      "text": "New task",
+      "ring": "2px solid rgba(0, 0, 0, 0)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 59
+    },
+    {
+      "tag": "INPUT",
+      "testid": "sc-composer-input",
+      "label": "Describe a task, with a time",
+      "text": "",
+      "ring": "3px none rgb(245, 245, 247)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 127
+    },
+    {
+      "tag": "BUTTON",
+      "testid": null,
+      "label": null,
+      "text": "Search tasks",
+      "ring": "2px solid rgb(41, 151, 255)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 212
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "sc-ledger-row-task_mtrujsm0_yc8006",
+      "label": null,
+      "text": "Portrait of the dayEvery day at 8:00 AM2",
+      "ring": "2px solid rgb(41, 151, 255)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 246
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "sc-ledger-row-task_mtrujslk_dg03oa",
+      "label": null,
+      "text": "What changed todayWeekdays at 6:00 PM",
+      "ring": "2px solid rgb(41, 151, 255)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 328
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "sc-ledger-row-task_mtrujsm3_v3jlas",
+      "label": null,
+      "text": "What did I missWeekdays at 6:30 PMmissed",
+      "ring": "2px solid rgb(41, 151, 255)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 386
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "sc-ledger-row-task_mtrujsla_8svvc9",
+      "label": null,
+      "text": "Morning briefWeekdays at 7:30 AM",
+      "ring": "2px solid rgb(41, 151, 255)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 468
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "sc-ledger-row-task_mtrujslf_6u2e5j",
+      "label": null,
+      "text": "Run the testsEvery day at 7:30 AM",
+      "ring": "2px solid rgb(41, 151, 255)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 526
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "sc-ledger-row-task_mtrujslr_ofibgn",
+      "label": null,
+      "text": "Watch llama.cpp releasesEvery day at 9:0",
+      "ring": "2px solid rgb(41, 151, 255)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 584
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "sc-ledger-row-task_mtrujslo_31xyh0",
+      "label": null,
+      "text": "Weekly reviewEvery Friday at 4:00 PM",
+      "ring": "2px solid rgb(41, 151, 255)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 666
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "sc-ledger-row-task_mtrujslx_i3tegq",
+      "label": null,
+      "text": "Sort my DownloadsOnly when you run it",
+      "ring": "2px solid rgb(41, 151, 255)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 748
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "sc-ledger-row-task_mtrujslu_hgswr0",
+      "label": null,
+      "text": "Dependency checkEvery Monday at 9:00 AMp",
+      "ring": "2px solid rgb(41, 151, 255)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 802
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "sc-run-now",
+      "label": null,
+      "text": "Run now",
+      "ring": "2px solid rgba(0, 0, 0, 0)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 222
+    }
+  ],
+  "cand-typing": {
+    "chip": {
+      "text": "Every Friday at 4:00 PM",
+      "box": {
+        "x": 28,
+        "y": 175,
+        "w": 168,
+        "h": 22
+      },
+      "font": "12px/12px 400",
+      "color": "rgb(214, 214, 219)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "9999px",
+      "outline": "3px none rgb(214, 214, 219) offset 0px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "quote": {
+      "text": "“write up what I worked on this week”",
+      "box": {
+        "x": 354,
+        "y": 176,
+        "w": 227,
+        "h": 20
+      },
+      "font": "13px/20px 400",
+      "color": "rgb(152, 152, 159)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "0px",
+      "outline": "3px none rgb(152, 152, 159) offset 0px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "hint": {
+      "text": "↵ to check it",
+      "box": {
+        "x": 1057,
+        "y": 176,
+        "w": 83,
+        "h": 20
+      },
+      "font": "12px/20px 400",
+      "color": "rgb(152, 152, 159)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "0px",
+      "outline": "3px none rgb(152, 152, 159) offset 0px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "go": {
+      "text": "",
+      "box": {
+        "x": 1108,
+        "y": 129,
+        "w": 28,
+        "h": 28
+      },
+      "font": "14px/20px 500",
+      "color": "rgb(255, 255, 255)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "9999px",
+      "outline": "2px solid rgba(0, 0, 0, 0) offset 2px",
+      "transition": "outline-color, color, opacity, transform 0.2s, 0.18s, 0.18s, 0.18s",
+      "animation": "none",
+      "opacity": "1"
+    }
+  },
+  "cand-review:list-head-moved-by": 0,
+  "cand-review:focused": "sc-editor-name",
+  "cand-review:name": "Write up what I worked on this week",
+  "cand-editor": {
+    "strip": {
+      "text": "From “every friday at 4pm, write up what I worked on this we",
+      "box": {
+        "x": 24,
+        "y": 119,
+        "w": 1120,
+        "h": 48
+      },
+      "font": "13px/18px 400",
+      "color": "rgb(152, 152, 159)",
+      "bg": "rgb(18, 18, 20)",
+      "border": "none",
+      "radius": "18px",
+      "outline": "3px none rgb(152, 152, 159) offset 0px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "stripText": {
+      "text": "From “every friday at 4pm, write up what I worked on this we",
+      "box": {
+        "x": 64,
+        "y": 134,
+        "w": 964,
+        "h": 18
+      },
+      "font": "13px/18px 400",
+      "color": "rgb(152, 152, 159)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "0px",
+      "outline": "3px none rgb(152, 152, 159) offset 0px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "heading": {
+      "text": "New task",
+      "box": {
+        "x": 357,
+        "y": 222,
+        "w": 724,
+        "h": 21
+      },
+      "font": "16px/21px 500",
+      "color": "rgb(245, 245, 247)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "0px",
+      "outline": "3px none rgb(245, 245, 247) offset 0px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "lead": {
+      "text": "Read from your sentence. Check the name and the schedule, th",
+      "box": {
+        "x": 357,
+        "y": 259,
+        "w": 724,
+        "h": 18
+      },
+      "font": "13px/18px 400",
+      "color": "rgb(152, 152, 159)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "0px",
+      "outline": "3px none rgb(152, 152, 159) offset 0px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "label": {
+      "text": "What should it do?",
+      "box": {
+        "x": 357,
+        "y": 293,
+        "w": 724,
+        "h": 16
+      },
+      "font": "12px/16px 400",
+      "color": "rgb(152, 152, 159)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "0px",
+      "outline": "3px none rgb(152, 152, 159) offset 0px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "prompt": {
+      "text": "write up what I worked on this week",
+      "box": {
+        "x": 357,
+        "y": 317,
+        "w": 724,
+        "h": 120
+      },
+      "font": "14px/20px 400",
+      "color": "rgb(245, 245, 247)",
+      "bg": "rgb(30, 30, 33)",
+      "border": "none",
+      "radius": "10px",
+      "outline": "3px none rgb(245, 245, 247) offset 0px",
+      "transition": "box-shadow 0.18s",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "name": {
+      "text": "",
+      "box": {
+        "x": 357,
+        "y": 477,
+        "w": 724,
+        "h": 32
+      },
+      "font": "14px/20px 400",
+      "color": "rgb(245, 245, 247)",
+      "bg": "rgb(30, 30, 33)",
+      "border": "none",
+      "radius": "10px",
+      "outline": "3px none rgb(245, 245, 247) offset 0px",
+      "transition": "box-shadow 0.18s",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "frequency": {
+      "text": "Every week",
+      "box": {
+        "x": 357,
+        "y": 549,
+        "w": 110,
+        "h": 26
+      },
+      "font": "12px/16px 500",
+      "color": "rgb(245, 245, 247)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "7.5px",
+      "outline": "2px solid rgba(0, 0, 0, 0) offset 2px",
+      "transition": "outline-color, color, opacity, transform 0.2s, 0.18s, 0.18s, 0.18s",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "preview": {
+      "text": "Every Friday at 4:00 PM· first run Fri 4:00 PM (in 4 days)· ",
+      "box": {
+        "x": 357,
+        "y": 591,
+        "w": 724,
+        "h": 42
+      },
+      "font": "13px/18px 400",
+      "color": "rgb(152, 152, 159)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "0px",
+      "outline": "3px none rgb(152, 152, 159) offset 0px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "save": {
+      "text": "Schedule it",
+      "box": {
+        "x": 996,
+        "y": 649,
+        "w": 85,
+        "h": 26
+      },
+      "font": "12px/16px 500",
+      "color": "rgb(30, 30, 33)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "7.5px",
+      "outline": "2px solid rgba(0, 0, 0, 0) offset 2px",
+      "transition": "outline-color, color, opacity, transform 0.2s, 0.18s, 0.18s, 0.18s",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "cancel": {
+      "text": "Cancel",
+      "box": {
+        "x": 929,
+        "y": 649,
+        "w": 60,
+        "h": 26
+      },
+      "font": "12px/16px 500",
+      "color": "rgb(214, 214, 219)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "7.5px",
+      "outline": "2px solid rgba(0, 0, 0, 0) offset 2px",
+      "transition": "outline-color, color, opacity, transform 0.2s, 0.18s, 0.18s, 0.18s",
+      "animation": "none",
+      "opacity": "1"
+    }
+  },
+  "tab-order:cand-editor": [
+    {
+      "tag": "BUTTON",
+      "testid": "sc-new",
+      "label": null,
+      "text": "New task",
+      "ring": "2px solid rgba(0, 0, 0, 0)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 59
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "sc-sentence-strip-action",
+      "label": null,
+      "text": "Edit sentence",
+      "ring": "2px solid rgba(0, 0, 0, 0)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 130
+    },
+    {
+      "tag": "BUTTON",
+      "testid": null,
+      "label": null,
+      "text": "Search tasks",
+      "ring": "2px solid rgb(41, 151, 255)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 212
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "sc-ledger-row-task_mtrujsm0_yc8006",
+      "label": null,
+      "text": "Portrait of the dayEvery day at 8:00 AM2",
+      "ring": "2px solid rgb(41, 151, 255)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 246
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "sc-ledger-row-task_mtrujslk_dg03oa",
+      "label": null,
+      "text": "What changed todayWeekdays at 6:00 PM",
+      "ring": "2px solid rgb(41, 151, 255)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 328
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "sc-ledger-row-task_mtrujsm3_v3jlas",
+      "label": null,
+      "text": "What did I missWeekdays at 6:30 PMmissed",
+      "ring": "2px solid rgb(41, 151, 255)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 386
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "sc-ledger-row-task_mtrujsla_8svvc9",
+      "label": null,
+      "text": "Morning briefWeekdays at 7:30 AM",
+      "ring": "2px solid rgb(41, 151, 255)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 468
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "sc-ledger-row-task_mtrujslf_6u2e5j",
+      "label": null,
+      "text": "Run the testsEvery day at 7:30 AM",
+      "ring": "2px solid rgb(41, 151, 255)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 526
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "sc-ledger-row-task_mtrujslr_ofibgn",
+      "label": null,
+      "text": "Watch llama.cpp releasesEvery day at 9:0",
+      "ring": "2px solid rgb(41, 151, 255)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 584
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "sc-ledger-row-task_mtrujslo_31xyh0",
+      "label": null,
+      "text": "Weekly reviewEvery Friday at 4:00 PM",
+      "ring": "2px solid rgb(41, 151, 255)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 666
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "sc-ledger-row-task_mtrujslx_i3tegq",
+      "label": null,
+      "text": "Sort my DownloadsOnly when you run it",
+      "ring": "2px solid rgb(41, 151, 255)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 748
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "sc-ledger-row-task_mtrujslu_hgswr0",
+      "label": null,
+      "text": "Dependency checkEvery Monday at 9:00 AMp",
+      "ring": "2px solid rgb(41, 151, 255)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 802
+    },
+    {
+      "tag": "TEXTAREA",
+      "testid": "sc-editor-prompt",
+      "label": null,
+      "text": "write up what I worked on this week",
+      "ring": "3px none rgb(245, 245, 247)",
+      "boxShadow": "rgba(255, 255, 255, 0.12) 0px 0px 0px 1px",
+      "visible": true,
+      "y": 317
+    },
+    {
+      "tag": "INPUT",
+      "testid": "sc-editor-name",
+      "label": null,
+      "text": "",
+      "ring": "3px none rgb(245, 245, 247)",
+      "boxShadow": "rgba(42, 151, 255, 0.973) 0px 0px 0px 1.48505px",
+      "visible": true,
+      "y": 477
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "sc-editor-frequency",
+      "label": null,
+      "text": "Every week",
+      "ring": "2px solid rgba(0, 0, 0, 0)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 549
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "sc-editor-weekday",
+      "label": null,
+      "text": "Friday",
+      "ring": "2px solid rgba(0, 0, 0, 0)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 549
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "sc-editor-hour",
+      "label": null,
+      "text": "4 PM",
+      "ring": "2px solid rgba(0, 0, 0, 0)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 549
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "sc-editor-minute",
+      "label": null,
+      "text": ":00",
+      "ring": "2px solid rgba(0, 0, 0, 0)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 549
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "sc-editor-folder",
+      "label": null,
+      "text": "A folder of its own",
+      "ring": "2px solid rgba(0, 0, 0, 0)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 549
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "sc-editor-cancel",
+      "label": null,
+      "text": "Cancel",
+      "ring": "2px solid rgba(0, 0, 0, 0)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 649
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "sc-editor-save",
+      "label": null,
+      "text": "Schedule it",
+      "ring": "2px solid rgba(0, 0, 0, 0)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 649
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "candidate-tab-ledger-plus",
+      "label": null,
+      "text": "Ledger+",
+      "ring": "1px auto rgb(153, 200, 255)",
+      "boxShadow": "rgba(255, 255, 255, 0.14) 0px 0px 0px 0.5px, rgba(0, 0, 0, 0.28) 0px 1px 3px 0px",
+      "visible": true,
+      "y": 8
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "candidate-tab-ledger",
+      "label": null,
+      "text": "Ledger",
+      "ring": "1px auto rgb(153, 200, 255)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 8
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "candidate-tab-agenda",
+      "label": null,
+      "text": "Agenda",
+      "ring": "1px auto rgb(153, 200, 255)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 8
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "candidate-tab-routines",
+      "label": null,
+      "text": "Routines",
+      "ring": "1px auto rgb(153, 200, 255)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 8
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "sc-scheduling-switch",
+      "label": "Scheduling",
+      "text": "",
+      "ring": "2px solid rgb(41, 151, 255)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 62
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "sc-new",
+      "label": null,
+      "text": "New task",
+      "ring": "2px solid rgba(0, 0, 0, 0)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 59
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "sc-sentence-strip-action",
+      "label": null,
+      "text": "Edit sentence",
+      "ring": "2px solid rgba(0, 0, 0, 0)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 130
+    },
+    {
+      "tag": "BUTTON",
+      "testid": null,
+      "label": null,
+      "text": "Search tasks",
+      "ring": "2px solid rgb(41, 151, 255)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 212
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "sc-ledger-row-task_mtrujsm0_yc8006",
+      "label": null,
+      "text": "Portrait of the dayEvery day at 8:00 AM2",
+      "ring": "2px solid rgb(41, 151, 255)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 246
+    }
+  ],
+  "cand-editor:escape-on-select-closed-editor": false,
+  "film:cand-save": {
+    "frames": 75,
+    "picked": [
+      0,
+      81,
+      168,
+      251,
+      350,
+      434,
+      518,
+      592
+    ]
+  },
+  "cand-after-save:selected": "Write up what I worked on this week",
+  "cand-after-save:focused": "BODY",
+  "cand-row-hover": {
+    "row": {
+      "text": "Run the testsEvery day at 7:30 AM",
+      "box": {
+        "x": 8,
+        "y": 526,
+        "w": 253,
+        "h": 58
+      },
+      "font": "14px/20px 400",
+      "color": "rgb(245, 245, 247)",
+      "bg": "rgba(255, 255, 255, 0.06)",
+      "border": "none",
+      "radius": "9px",
+      "outline": "2px solid rgba(0, 0, 0, 0) offset -2px",
+      "transition": "background-color 0.18s",
+      "animation": "none",
+      "opacity": "1"
+    }
+  },
+  "film:cand-pane-swap": {
+    "frames": 62,
+    "picked": [
+      0,
+      57,
+      117,
+      177,
+      233,
+      299,
+      358,
+      408
+    ]
+  },
+  "cand-running": {
+    "pill": {
+      "text": "Running · 24s",
+      "box": {
+        "x": 357,
+        "y": 280,
+        "w": 110,
+        "h": 20
+      },
+      "font": "12px/12px 500",
+      "color": "rgb(10, 132, 255)",
+      "bg": "rgba(10, 132, 255, 0.16)",
+      "border": "none",
+      "radius": "9999px",
+      "outline": "3px none rgb(10, 132, 255) offset 0px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "runNow": null,
+    "edit": {
+      "text": "Edit",
+      "box": {
+        "x": 983,
+        "y": 222,
+        "w": 60,
+        "h": 26
+      },
+      "font": "12px/16px 500",
+      "color": "rgb(214, 214, 219)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "7.5px",
+      "outline": "2px solid rgba(0, 0, 0, 0) offset 2px",
+      "transition": "outline-color, color, opacity, transform 0.2s, 0.18s, 0.18s, 0.18s",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "rowTrail": {
+      "text": "24s",
+      "box": {
+        "x": 228,
+        "y": 267,
+        "w": 21,
+        "h": 16
+      },
+      "font": "12px/16px 400",
+      "color": "rgb(152, 152, 159)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "0px",
+      "outline": "3px none rgb(152, 152, 159) offset 0px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "thumb": {
+      "text": "",
+      "box": {
+        "x": 1045,
+        "y": 647,
+        "w": 36,
+        "h": 36
+      },
+      "font": "14px/20px 400",
+      "color": "rgb(245, 245, 247)",
+      "bg": "rgb(18, 18, 20)",
+      "border": "none",
+      "radius": "7px",
+      "outline": "3px none rgb(245, 245, 247) offset 0px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    }
+  },
+  "cand-failed": {
+    "dot": {
+      "text": "",
+      "box": {
+        "x": 357,
+        "y": 707,
+        "w": 16,
+        "h": 16
+      },
+      "font": "14px/20px 400",
+      "color": "rgb(255, 105, 97)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "0px",
+      "outline": "3px none rgb(255, 105, 97) offset 0px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "body": {
+      "text": "calendar_list_events was blocked: this Mac has not granted A",
+      "box": {
+        "x": 385,
+        "y": 731,
+        "w": 696,
+        "h": 39
+      },
+      "font": "13px/19.5px 400",
+      "color": "rgb(255, 105, 97)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "0px",
+      "outline": "3px none rgb(255, 105, 97) offset 0px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "head": {
+      "text": "3 Sep 7:30 AM6s",
+      "box": {
+        "x": 377,
+        "y": 702,
+        "w": 712,
+        "h": 26
+      },
+      "font": "14px/20px 400",
+      "color": "rgb(245, 245, 247)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "7px",
+      "outline": "3px none rgb(245, 245, 247) offset -2px",
+      "transition": "background-color 0.12s",
+      "animation": "none",
+      "opacity": "1"
+    }
+  },
+  "film:cand-run-now": {
+    "frames": 130,
+    "picked": [
+      0,
+      167,
+      334,
+      517,
+      683,
+      858,
+      1034,
+      1201
+    ]
+  },
+  "cand-run-now:finished": true,
+  "cand-run-now:ledger-head": [
+    "Today 4:03 PM1sby handDone — hello.txt now greets the world."
+  ],
+  "cand-search:escape-cleared": 1,
+  "film:cand-switch-off": {
+    "frames": 60,
+    "picked": [
+      0,
+      75,
+      139,
+      217,
+      283,
+      350,
+      425,
+      508
+    ]
+  },
+  "cand-off:panes-moved-by": 46,
+  "cand-edit:focused": "sc-editor-prompt",
+  "cand:missed-row": "What did I missWeekdays at 6:30 PMmissed"
+}

@@ -1,0 +1,1919 @@
+{
+  "ship-empty": {
+    "h1": {
+      "text": "Scheduled tasks",
+      "box": {
+        "x": 430,
+        "y": 72,
+        "w": 382,
+        "h": 28
+      },
+      "font": "22px/28px 400",
+      "color": "rgb(245, 245, 247)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "0px",
+      "outline": "3px none rgb(245, 245, 247) offset 0px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "subtitle": {
+      "text": "Work Bobble does on its own, on a schedule or on demand.",
+      "box": {
+        "x": 430,
+        "y": 104,
+        "w": 382,
+        "h": 20
+      },
+      "font": "14px/20px 400",
+      "color": "rgb(214, 214, 219)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "0px",
+      "outline": "3px none rgb(214, 214, 219) offset 0px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "schedulingPill": {
+      "text": "Scheduling on",
+      "box": {
+        "x": 1062,
+        "y": 72,
+        "w": 128,
+        "h": 32
+      },
+      "font": "13px/18px 400",
+      "color": "rgb(245, 245, 247)",
+      "bg": "rgb(30, 30, 33)",
+      "border": "1px rgba(255, 255, 255, 0.12)",
+      "radius": "1.67772e+07px",
+      "outline": "2px solid rgba(0, 0, 0, 0) offset 2px",
+      "transition": "color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to 0.15s",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "newTask": {
+      "text": "New task",
+      "box": {
+        "x": 1198,
+        "y": 73,
+        "w": 84,
+        "h": 30
+      },
+      "font": "13px/18px 400",
+      "color": "rgb(255, 255, 255)",
+      "bg": "rgb(10, 132, 255)",
+      "border": "none",
+      "radius": "14px",
+      "outline": "2px solid rgba(0, 0, 0, 0) offset 2px",
+      "transition": "opacity 0.15s",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "quickInput": {
+      "text": "",
+      "box": {
+        "x": 430,
+        "y": 144,
+        "w": 770,
+        "h": 42
+      },
+      "font": "14px/20px 400",
+      "color": "rgb(245, 245, 247)",
+      "bg": "rgb(18, 18, 20)",
+      "border": "1px rgba(255, 255, 255, 0.12)",
+      "radius": "12px",
+      "outline": "2px solid rgba(0, 0, 0, 0) offset 2px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "quickGo": {
+      "text": "Draft it",
+      "box": {
+        "x": 1208,
+        "y": 144,
+        "w": 74,
+        "h": 42
+      },
+      "font": "13px/18px 400",
+      "color": "rgb(152, 152, 159)",
+      "bg": "rgb(18, 18, 20)",
+      "border": "none",
+      "radius": "12px",
+      "outline": "2px solid rgba(0, 0, 0, 0) offset 2px",
+      "transition": "opacity 0.15s",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "emptyLine": {
+      "text": "Nothing scheduled yet. Start from one of these, or write you",
+      "box": {
+        "x": 430,
+        "y": 218,
+        "w": 852,
+        "h": 18
+      },
+      "font": "13px/18px 400",
+      "color": "rgb(152, 152, 159)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "0px",
+      "outline": "3px none rgb(152, 152, 159) offset 0px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "templateCard": {
+      "text": "☀Morning briefYour day, before you start it: today's events,",
+      "box": {
+        "x": 430,
+        "y": 248,
+        "w": 422,
+        "h": 90
+      },
+      "font": "14px/20px 400",
+      "color": "rgb(245, 245, 247)",
+      "bg": "rgb(30, 30, 33)",
+      "border": "1px rgba(255, 255, 255, 0.08)",
+      "radius": "12px",
+      "outline": "2px solid rgba(0, 0, 0, 0) offset 2px",
+      "transition": "color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to 0.15s",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "templateName": {
+      "text": "☀Morning brief",
+      "box": {
+        "x": 445,
+        "y": 263,
+        "w": 392,
+        "h": 20
+      },
+      "font": "14px/20px 400",
+      "color": "rgb(245, 245, 247)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "0px",
+      "outline": "3px none rgb(245, 245, 247) offset 0px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "templateIcon": {
+      "text": "☀",
+      "box": {
+        "x": 445,
+        "y": 263,
+        "w": 13,
+        "h": 20
+      },
+      "font": "14px/20px 400",
+      "color": "rgb(152, 152, 159)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "0px",
+      "outline": "3px none rgb(152, 152, 159) offset 0px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "templateBlurb": {
+      "text": "Your day, before you start it: today's events, what arrived ",
+      "box": {
+        "x": 445,
+        "y": 287,
+        "w": 392,
+        "h": 36
+      },
+      "font": "13px/18px 400",
+      "color": "rgb(214, 214, 219)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "0px",
+      "outline": "3px none rgb(214, 214, 219) offset 0px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "container": {
+      "text": "Scheduled tasksWork Bobble does on its own, on a schedule or",
+      "box": {
+        "x": 406,
+        "y": 48,
+        "w": 900,
+        "h": 746
+      },
+      "font": "14px/20px 400",
+      "color": "rgb(245, 245, 247)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "0px",
+      "outline": "3px none rgb(245, 245, 247) offset 0px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    }
+  },
+  "ship-empty-template-hover": {
+    "card": {
+      "text": "☀Morning briefYour day, before you start it: today's events,",
+      "box": {
+        "x": 430,
+        "y": 248,
+        "w": 422,
+        "h": 90
+      },
+      "font": "14px/20px 400",
+      "color": "rgb(245, 245, 247)",
+      "bg": "rgba(255, 255, 255, 0.06)",
+      "border": "1px rgba(255, 255, 255, 0.08)",
+      "radius": "12px",
+      "outline": "2px solid rgba(0, 0, 0, 0) offset 2px",
+      "transition": "color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to 0.15s",
+      "animation": "none",
+      "opacity": "1"
+    }
+  },
+  "tab-order:ship-empty": [
+    {
+      "tag": "BUTTON",
+      "testid": "tasks-new",
+      "label": null,
+      "text": "New task",
+      "ring": "2px solid rgb(41, 151, 255)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 73
+    },
+    {
+      "tag": "INPUT",
+      "testid": "tasks-quick-input",
+      "label": null,
+      "text": "",
+      "ring": "2px solid rgb(41, 151, 255)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 144
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "tasks-template-morning-brief",
+      "label": null,
+      "text": "☀Morning briefYour day, before you start",
+      "ring": "2px solid rgba(0, 0, 0, 0)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 248
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "tasks-template-what-did-i-miss",
+      "label": null,
+      "text": "⟲What did I missAn end-of-day catch-up o",
+      "ring": "2px solid rgba(0, 0, 0, 0)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 248
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "tasks-template-draft-replies",
+      "label": null,
+      "text": "✎Draft replies, do not sendReads what is",
+      "ring": "2px solid rgba(0, 0, 0, 0)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 346
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "tasks-template-repo-digest",
+      "label": null,
+      "text": "◷What changed todayRead the day's commit",
+      "ring": "2px solid rgba(0, 0, 0, 0)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 346
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "tasks-template-test-run",
+      "label": null,
+      "text": "✓Run the testsRun the test suite and rep",
+      "ring": "2px solid rgba(0, 0, 0, 0)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 444
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "tasks-template-deps",
+      "label": null,
+      "text": "↑Dependency checkLook for outdated or vu",
+      "ring": "2px solid rgba(0, 0, 0, 0)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 444
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "tasks-template-inbox-folder",
+      "label": null,
+      "text": "⇢Sort a drop folderTidy a folder you dum",
+      "ring": "2px solid rgba(0, 0, 0, 0)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 542
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "tasks-template-watch-topic",
+      "label": null,
+      "text": "◎Watch a topicSearch the web for news on",
+      "ring": "2px solid rgba(0, 0, 0, 0)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 542
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "tasks-template-weekly-review",
+      "label": null,
+      "text": "☰Weekly reviewA Friday summary of the we",
+      "ring": "2px solid rgba(0, 0, 0, 0)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 640
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "collapse-sidebar",
+      "label": "Collapse sidebar",
+      "text": "",
+      "ring": "2px solid rgba(0, 0, 0, 0)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 7
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "mode-chat",
+      "label": "Chat",
+      "text": "",
+      "ring": "2px solid rgb(41, 151, 255)",
+      "boxShadow": "rgba(255, 255, 255, 0.14) 0px 0px 0px 0.5px, rgba(0, 0, 0, 0.28) 0px 1px 3px 0px",
+      "visible": true,
+      "y": 11
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "mode-work",
+      "label": "Project",
+      "text": "",
+      "ring": "2px solid rgb(41, 151, 255)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 11
+    },
+    {
+      "tag": "BUTTON",
+      "testid": null,
+      "label": null,
+      "text": "Search chats",
+      "ring": "2px solid rgb(41, 151, 255)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 84
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "new-chat",
+      "label": null,
+      "text": "New chat⌘N",
+      "ring": "2px solid rgb(41, 151, 255)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 132
+    }
+  ],
+  "ship-quick-typed": {
+    "input": {
+      "text": "",
+      "box": {
+        "x": 430,
+        "y": 144,
+        "w": 770,
+        "h": 42
+      },
+      "font": "14px/20px 400",
+      "color": "rgb(245, 245, 247)",
+      "bg": "rgb(18, 18, 20)",
+      "border": "1px rgba(255, 255, 255, 0.12)",
+      "radius": "12px",
+      "outline": "2px solid rgb(41, 151, 255) offset 2px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "go": {
+      "text": "Draft it",
+      "box": {
+        "x": 1208,
+        "y": 144,
+        "w": 74,
+        "h": 42
+      },
+      "font": "13px/18px 400",
+      "color": "rgb(245, 245, 247)",
+      "bg": "rgba(255, 255, 255, 0.1)",
+      "border": "none",
+      "radius": "12px",
+      "outline": "2px solid rgba(0, 0, 0, 0) offset 2px",
+      "transition": "opacity 0.15s",
+      "animation": "none",
+      "opacity": "1"
+    }
+  },
+  "ship-dialog-from-sentence:name": "Write up what I worked on",
+  "ship-dialog-from-sentence:focused": "tasks-quick-input",
+  "ship-dialog": {
+    "panel": {
+      "text": "New scheduled task✕NameWhat should it do?write up what I wor",
+      "box": {
+        "x": 410,
+        "y": 184,
+        "w": 620,
+        "h": 500
+      },
+      "font": "14px/20px 400",
+      "color": "rgb(245, 245, 247)",
+      "bg": "rgb(30, 30, 33)",
+      "border": "1px rgba(255, 255, 255, 0.08)",
+      "radius": "16px",
+      "outline": "3px none rgb(245, 245, 247) offset 0px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "backdrop": {
+      "text": "",
+      "box": {
+        "x": 0,
+        "y": 0,
+        "w": 1440,
+        "h": 868
+      },
+      "font": "14px/20px 400",
+      "color": "rgb(245, 245, 247)",
+      "bg": "rgba(0, 0, 0, 0.5)",
+      "border": "none",
+      "radius": "0px",
+      "outline": "3px none rgb(245, 245, 247) offset 0px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "title": {
+      "text": "New scheduled task",
+      "box": {
+        "x": 431,
+        "y": 205,
+        "w": 192,
+        "h": 28
+      },
+      "font": "22px/28px 400",
+      "color": "rgb(245, 245, 247)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "0px",
+      "outline": "3px none rgb(245, 245, 247) offset 0px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "close": {
+      "text": "✕",
+      "box": {
+        "x": 990,
+        "y": 205,
+        "w": 19,
+        "h": 28
+      },
+      "font": "14px/20px 400",
+      "color": "rgb(152, 152, 159)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "10px",
+      "outline": "2px solid rgba(0, 0, 0, 0) offset 2px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "nameLabel": {
+      "text": "Name",
+      "box": {
+        "x": 431,
+        "y": 249,
+        "w": 578,
+        "h": 18
+      },
+      "font": "13px/18px 400",
+      "color": "rgb(214, 214, 219)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "0px",
+      "outline": "3px none rgb(214, 214, 219) offset 0px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "name": {
+      "text": "",
+      "box": {
+        "x": 431,
+        "y": 273,
+        "w": 578,
+        "h": 38
+      },
+      "font": "14px/20px 400",
+      "color": "rgb(245, 245, 247)",
+      "bg": "rgb(18, 18, 20)",
+      "border": "1px rgba(255, 255, 255, 0.12)",
+      "radius": "14px",
+      "outline": "2px solid rgba(0, 0, 0, 0) offset 2px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "prompt": {
+      "text": "write up what I worked on this week",
+      "box": {
+        "x": 431,
+        "y": 351,
+        "w": 578,
+        "h": 118
+      },
+      "font": "14px/20px 400",
+      "color": "rgb(245, 245, 247)",
+      "bg": "rgb(18, 18, 20)",
+      "border": "1px rgba(255, 255, 255, 0.12)",
+      "radius": "14px",
+      "outline": "2px solid rgba(0, 0, 0, 0) offset 2px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "hint": {
+      "text": "Runs as a normal chat, with your tools and working folder, s",
+      "box": {
+        "x": 431,
+        "y": 475,
+        "w": 578,
+        "h": 16
+      },
+      "font": "12px/16px 400",
+      "color": "rgb(152, 152, 159)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "0px",
+      "outline": "3px none rgb(152, 152, 159) offset 0px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "frequency": {
+      "text": "Every week",
+      "box": {
+        "x": 431,
+        "y": 507,
+        "w": 170,
+        "h": 32
+      },
+      "font": "13px/18px 400",
+      "color": "rgb(245, 245, 247)",
+      "bg": "rgb(18, 18, 20)",
+      "border": "1px rgba(255, 255, 255, 0.12)",
+      "radius": "14px",
+      "outline": "2px solid rgba(0, 0, 0, 0) offset 2px",
+      "transition": "color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to 0.15s",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "hour": {
+      "text": "4 PM",
+      "box": {
+        "x": 767,
+        "y": 507,
+        "w": 110,
+        "h": 32
+      },
+      "font": "13px/18px 400",
+      "color": "rgb(245, 245, 247)",
+      "bg": "rgb(18, 18, 20)",
+      "border": "1px rgba(255, 255, 255, 0.12)",
+      "radius": "14px",
+      "outline": "2px solid rgba(0, 0, 0, 0) offset 2px",
+      "transition": "color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to 0.15s",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "minute": {
+      "text": ":00",
+      "box": {
+        "x": 885,
+        "y": 507,
+        "w": 86,
+        "h": 32
+      },
+      "font": "13px/18px 400",
+      "color": "rgb(245, 245, 247)",
+      "bg": "rgb(18, 18, 20)",
+      "border": "1px rgba(255, 255, 255, 0.12)",
+      "radius": "14px",
+      "outline": "2px solid rgba(0, 0, 0, 0) offset 2px",
+      "transition": "color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to 0.15s",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "preview": {
+      "text": "Every Friday at 4:00 PM",
+      "box": {
+        "x": 864,
+        "y": 547,
+        "w": 145,
+        "h": 18
+      },
+      "font": "13px/18px 400",
+      "color": "rgb(152, 152, 159)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "0px",
+      "outline": "3px none rgb(152, 152, 159) offset 0px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "folder": {
+      "text": "Default folder",
+      "box": {
+        "x": 431,
+        "y": 581,
+        "w": 200,
+        "h": 32
+      },
+      "font": "13px/18px 400",
+      "color": "rgb(245, 245, 247)",
+      "bg": "rgb(18, 18, 20)",
+      "border": "1px rgba(255, 255, 255, 0.12)",
+      "radius": "14px",
+      "outline": "2px solid rgba(0, 0, 0, 0) offset 2px",
+      "transition": "color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to 0.15s",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "enabled": {
+      "text": "Active",
+      "box": {
+        "x": 639,
+        "y": 581,
+        "w": 79,
+        "h": 32
+      },
+      "font": "13px/18px 400",
+      "color": "rgb(245, 245, 247)",
+      "bg": "oklab(0.624235 -0.0514993 -0.199003 / 0.1)",
+      "border": "1px oklab(0.624235 -0.0514993 -0.199003 / 0.4)",
+      "radius": "14px",
+      "outline": "2px solid rgba(0, 0, 0, 0) offset 2px",
+      "transition": "color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to 0.15s",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "cancel": {
+      "text": "Cancel",
+      "box": {
+        "x": 834,
+        "y": 633,
+        "w": 66,
+        "h": 30
+      },
+      "font": "13px/18px 400",
+      "color": "rgb(214, 214, 219)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "14px",
+      "outline": "2px solid rgba(0, 0, 0, 0) offset 2px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "save": {
+      "text": "Create task",
+      "box": {
+        "x": 908,
+        "y": 633,
+        "w": 101,
+        "h": 30
+      },
+      "font": "13px/18px 400",
+      "color": "rgb(255, 255, 255)",
+      "bg": "rgb(10, 132, 255)",
+      "border": "none",
+      "radius": "14px",
+      "outline": "2px solid rgba(0, 0, 0, 0) offset 2px",
+      "transition": "opacity 0.15s",
+      "animation": "none",
+      "opacity": "1"
+    }
+  },
+  "tab-order:ship-dialog": [
+    {
+      "tag": "TEXTAREA",
+      "testid": "task-prompt",
+      "label": null,
+      "text": "write up what I worked on this week",
+      "ring": "2px solid rgb(41, 151, 255)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 351
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "task-frequency",
+      "label": null,
+      "text": "Every week",
+      "ring": "2px solid rgba(0, 0, 0, 0)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 507
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "task-weekday",
+      "label": null,
+      "text": "Friday",
+      "ring": "2px solid rgba(0, 0, 0, 0)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 507
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "task-hour",
+      "label": null,
+      "text": "4 PM",
+      "ring": "2px solid rgba(0, 0, 0, 0)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 507
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "task-minute",
+      "label": null,
+      "text": ":00",
+      "ring": "2px solid rgba(0, 0, 0, 0)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 507
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "task-folder",
+      "label": null,
+      "text": "Default folder",
+      "ring": "2px solid rgba(0, 0, 0, 0)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 581
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "task-enabled",
+      "label": null,
+      "text": "Active",
+      "ring": "2px solid rgba(0, 0, 0, 0)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 581
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "task-cancel",
+      "label": null,
+      "text": "Cancel",
+      "ring": "2px solid rgb(41, 151, 255)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 633
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "task-save",
+      "label": null,
+      "text": "Create task",
+      "ring": "2px solid rgb(41, 151, 255)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 633
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "collapse-sidebar",
+      "label": "Collapse sidebar",
+      "text": "",
+      "ring": "2px solid rgba(0, 0, 0, 0)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 7
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "mode-chat",
+      "label": "Chat",
+      "text": "",
+      "ring": "2px solid rgb(41, 151, 255)",
+      "boxShadow": "rgba(255, 255, 255, 0.14) 0px 0px 0px 0.5px, rgba(0, 0, 0, 0.28) 0px 1px 3px 0px",
+      "visible": true,
+      "y": 11
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "mode-work",
+      "label": "Project",
+      "text": "",
+      "ring": "2px solid rgb(41, 151, 255)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 11
+    },
+    {
+      "tag": "BUTTON",
+      "testid": null,
+      "label": null,
+      "text": "Search chats",
+      "ring": "2px solid rgb(41, 151, 255)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 84
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "new-chat",
+      "label": null,
+      "text": "New chat⌘N",
+      "ring": "2px solid rgb(41, 151, 255)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 132
+    }
+  ],
+  "ship-dialog-frequency-menu": {
+    "menu": {
+      "text": "Only when I run itEvery hourEvery dayWeekdaysEvery week",
+      "box": {
+        "x": 432,
+        "y": 540,
+        "w": 180,
+        "h": 160
+      },
+      "font": "14px/20px 400",
+      "color": "rgb(245, 245, 247)",
+      "bg": "rgb(30, 30, 33)",
+      "border": "none",
+      "radius": "14px",
+      "outline": "3px none rgb(245, 245, 247) offset 0px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "item": {
+      "text": "Every week",
+      "box": {
+        "x": 437,
+        "y": 665,
+        "w": 170,
+        "h": 30
+      },
+      "font": "14px/20px 500",
+      "color": "rgb(245, 245, 247)",
+      "bg": "rgba(255, 255, 255, 0.06)",
+      "border": "none",
+      "radius": "7px",
+      "outline": "3px none rgb(245, 245, 247) offset 0px",
+      "transition": "background-color, opacity 0.18s, 0.18s",
+      "animation": "none",
+      "opacity": "1"
+    }
+  },
+  "ship-dialog:escape-with-picker-open-closed-dialog": true,
+  "ship-dialog:page-moved-under-dialog": false,
+  "ship-dialog:focus-after-close": "BODY",
+  "ship-dialog:quick-input-after-close": "",
+  "film:ship-dialog-open": {
+    "frames": 12,
+    "picked": [
+      0,
+      223,
+      230,
+      284,
+      335,
+      389
+    ]
+  },
+  "film:ship-dialog-close": {
+    "frames": 12,
+    "picked": [
+      0,
+      207,
+      219,
+      270,
+      312
+    ]
+  },
+  "film:ship-template-hover": {
+    "frames": 13,
+    "picked": [
+      0,
+      93,
+      135,
+      176,
+      218,
+      234
+    ]
+  },
+  "ship-dialog-template:focused": "tasks-template-morning-brief",
+  "ship-dialog-new:focused": "tasks-new",
+  "ship-dialog-new-typed:name-placeholder": "Named from the instruction if you leave this blank",
+  "ship-dialog:cmd-enter-saves": false,
+  "film:ship-create": {
+    "frames": 3,
+    "picked": [
+      0,
+      218,
+      227
+    ]
+  },
+  "ship-one-task:focus-after-create": "BODY",
+  "ship-one-task:name": "Run the test suite and tell me only what",
+  "ship-one-task": {
+    "list": {
+      "text": "Run the test suite and tell me only whatEvery day at 9:00 AM",
+      "box": {
+        "x": 430,
+        "y": 206,
+        "w": 852,
+        "h": 64
+      },
+      "font": "14px/20px 400",
+      "color": "rgb(245, 245, 247)",
+      "bg": "rgb(30, 30, 33)",
+      "border": "1px rgba(255, 255, 255, 0.08)",
+      "radius": "16px",
+      "outline": "3px none rgb(245, 245, 247) offset 0px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "row": {
+      "text": "Run the test suite and tell me only whatEvery day at 9:00 AM",
+      "box": {
+        "x": 431,
+        "y": 207,
+        "w": 850,
+        "h": 62
+      },
+      "font": "14px/20px 400",
+      "color": "rgb(245, 245, 247)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "0px",
+      "outline": "3px none rgb(245, 245, 247) offset 0px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "dot": {
+      "text": "",
+      "box": {
+        "x": 447,
+        "y": 233,
+        "w": 10,
+        "h": 10
+      },
+      "font": "14px/20px 400",
+      "color": "rgb(245, 245, 247)",
+      "bg": "rgb(48, 209, 88)",
+      "border": "none",
+      "radius": "1.67772e+07px",
+      "outline": "2px solid rgba(0, 0, 0, 0) offset 2px",
+      "transition": "color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to 0.15s",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "name": {
+      "text": "Run the test suite and tell me only what",
+      "box": {
+        "x": 469,
+        "y": 219,
+        "w": 477,
+        "h": 20
+      },
+      "font": "14px/20px 400",
+      "color": "rgb(245, 245, 247)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "0px",
+      "outline": "3px none rgb(245, 245, 247) offset 0px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "meta": {
+      "text": "Every day at 9:00 AM",
+      "box": {
+        "x": 469,
+        "y": 239,
+        "w": 477,
+        "h": 18
+      },
+      "font": "13px/18px 400",
+      "color": "rgb(152, 152, 159)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "0px",
+      "outline": "3px none rgb(152, 152, 159) offset 0px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "next": {
+      "text": "in 17h",
+      "box": {
+        "x": 958,
+        "y": 229,
+        "w": 38,
+        "h": 18
+      },
+      "font": "13px/18px 400",
+      "color": "rgb(152, 152, 159)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "0px",
+      "outline": "3px none rgb(152, 152, 159) offset 0px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "runNow": {
+      "text": "Run now",
+      "box": {
+        "x": 1008,
+        "y": 225,
+        "w": 72,
+        "h": 26
+      },
+      "font": "13px/18px 400",
+      "color": "rgb(214, 214, 219)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "14px",
+      "outline": "2px solid rgba(0, 0, 0, 0) offset 2px",
+      "transition": "color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to 0.15s",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "pastRuns": {
+      "text": "Past runs",
+      "box": {
+        "x": 1082,
+        "y": 225,
+        "w": 77,
+        "h": 26
+      },
+      "font": "13px/18px 400",
+      "color": "rgb(214, 214, 219)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "14px",
+      "outline": "2px solid rgba(0, 0, 0, 0) offset 2px",
+      "transition": "color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to 0.15s",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "edit": {
+      "text": "Edit",
+      "box": {
+        "x": 1160,
+        "y": 225,
+        "w": 43,
+        "h": 26
+      },
+      "font": "13px/18px 400",
+      "color": "rgb(214, 214, 219)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "14px",
+      "outline": "2px solid rgba(0, 0, 0, 0) offset 2px",
+      "transition": "color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to 0.15s",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "del": {
+      "text": "Delete",
+      "box": {
+        "x": 1206,
+        "y": 225,
+        "w": 59,
+        "h": 26
+      },
+      "font": "13px/18px 400",
+      "color": "rgb(255, 105, 97)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "14px",
+      "outline": "2px solid rgba(0, 0, 0, 0) offset 2px",
+      "transition": "color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to 0.15s",
+      "animation": "none",
+      "opacity": "1"
+    }
+  },
+  "ship-drawer-empty": {
+    "panel": {
+      "text": "Run the test suite and tell me only whatPast runsRun now✕No ",
+      "box": {
+        "x": 880,
+        "y": 0,
+        "w": 560,
+        "h": 868
+      },
+      "font": "14px/20px 400",
+      "color": "rgb(245, 245, 247)",
+      "bg": "rgb(21, 21, 23)",
+      "border": "none",
+      "radius": "0px",
+      "outline": "3px none rgb(245, 245, 247) offset 0px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "header": {
+      "text": "Run the test suite and tell me only whatPast runsRun now✕",
+      "box": {
+        "x": 881,
+        "y": 0,
+        "w": 559,
+        "h": 77
+      },
+      "font": "14px/20px 400",
+      "color": "rgb(245, 245, 247)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "0px",
+      "outline": "3px none rgb(245, 245, 247) offset 0px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "title": {
+      "text": "Run the test suite and tell me only what",
+      "box": {
+        "x": 901,
+        "y": 16,
+        "w": 408,
+        "h": 28
+      },
+      "font": "22px/28px 400",
+      "color": "rgb(245, 245, 247)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "0px",
+      "outline": "3px none rgb(245, 245, 247) offset 0px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "sub": {
+      "text": "Past runs",
+      "box": {
+        "x": 901,
+        "y": 44,
+        "w": 408,
+        "h": 16
+      },
+      "font": "12px/16px 400",
+      "color": "rgb(152, 152, 159)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "0px",
+      "outline": "3px none rgb(152, 152, 159) offset 0px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "runNow": {
+      "text": "Run now",
+      "box": {
+        "x": 1317,
+        "y": 23,
+        "w": 76,
+        "h": 30
+      },
+      "font": "13px/18px 400",
+      "color": "rgb(255, 255, 255)",
+      "bg": "rgb(10, 132, 255)",
+      "border": "none",
+      "radius": "14px",
+      "outline": "2px solid rgba(0, 0, 0, 0) offset 2px",
+      "transition": "opacity 0.15s",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "empty": {
+      "text": "No runs yet. Use “Run now” to try it. Results appear here, n",
+      "box": {
+        "x": 901,
+        "y": 97,
+        "w": 519,
+        "h": 42
+      },
+      "font": "13px/18px 400",
+      "color": "rgb(152, 152, 159)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "0px",
+      "outline": "3px none rgb(152, 152, 159) offset 0px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    }
+  },
+  "ship-drawer:escape-closes": false,
+  "ship-many:row-order": [
+    {
+      "name": "What changed today",
+      "meta": "Weekdays at 6:00 PM · last ran 9/7/2026",
+      "next": "in 2h",
+      "run": "Run now",
+      "h": 63
+    },
+    {
+      "name": "What did I miss",
+      "meta": "Weekdays at 6:30 PM",
+      "next": "in 2h",
+      "run": "Run now",
+      "h": 63
+    },
+    {
+      "name": "Morning brief",
+      "meta": "Weekdays at 7:30 AM · last ran 9/7/2026",
+      "next": "in 15h",
+      "run": "Run now",
+      "h": 63
+    },
+    {
+      "name": "Run the tests",
+      "meta": "Every day at 7:30 AM · last ran 9/7/2026",
+      "next": "in 15h",
+      "run": "Run now",
+      "h": 63
+    },
+    {
+      "name": "Portrait of the day",
+      "meta": "Every day at 8:00 AM · last ran 9/7/2026",
+      "next": "in 16h",
+      "run": "Running…",
+      "h": 63
+    },
+    {
+      "name": "Run the test suite and tell me only what",
+      "meta": "Every day at 9:00 AM",
+      "next": "in 17h",
+      "run": "Run now",
+      "h": 63
+    },
+    {
+      "name": "Watch llama.cpp releases",
+      "meta": "Every day at 9:00 AM · last ran 9/7/2026",
+      "next": "in 17h",
+      "run": "Run now",
+      "h": 63
+    },
+    {
+      "name": "Weekly review",
+      "meta": "Every Friday at 4:00 PM · last ran 9/7/2026",
+      "next": "in 4 days",
+      "run": "Run now",
+      "h": 63
+    },
+    {
+      "name": "Dependency check",
+      "meta": "Every Monday at 9:00 AM · last ran 9/7/2026",
+      "next": "paused",
+      "run": "Run now",
+      "h": 63
+    },
+    {
+      "name": "Sort my Downloads",
+      "meta": "Only when you run it · last ran 9/7/2026",
+      "next": "—",
+      "run": "Run now",
+      "h": 62
+    }
+  ],
+  "ship-many": {
+    "row": {
+      "text": "Morning briefWeekdays at 7:30 AM · last ran 9/7/2026in 15hRu",
+      "box": {
+        "x": 426,
+        "y": 333,
+        "w": 850,
+        "h": 63
+      },
+      "font": "14px/20px 400",
+      "color": "rgb(245, 245, 247)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "0px",
+      "outline": "3px none rgb(245, 245, 247) offset 0px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "name": {
+      "text": "Morning brief",
+      "box": {
+        "x": 464,
+        "y": 345,
+        "w": 477,
+        "h": 20
+      },
+      "font": "14px/20px 400",
+      "color": "rgb(245, 245, 247)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "0px",
+      "outline": "3px none rgb(245, 245, 247) offset 0px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "meta": {
+      "text": "Weekdays at 7:30 AM · last ran 9/7/2026",
+      "box": {
+        "x": 464,
+        "y": 365,
+        "w": 477,
+        "h": 18
+      },
+      "font": "13px/18px 400",
+      "color": "rgb(152, 152, 159)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "0px",
+      "outline": "3px none rgb(152, 152, 159) offset 0px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "next": {
+      "text": "in 15h",
+      "box": {
+        "x": 953,
+        "y": 355,
+        "w": 38,
+        "h": 18
+      },
+      "font": "13px/18px 400",
+      "color": "rgb(152, 152, 159)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "0px",
+      "outline": "3px none rgb(152, 152, 159) offset 0px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "pausedName": {
+      "text": "Dependency check",
+      "box": {
+        "x": 464,
+        "y": 723,
+        "w": 471,
+        "h": 20
+      },
+      "font": "14px/20px 400",
+      "color": "rgb(152, 152, 159)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "0px",
+      "outline": "3px none rgb(152, 152, 159) offset 0px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "pausedNext": {
+      "text": "paused",
+      "box": {
+        "x": 947,
+        "y": 733,
+        "w": 44,
+        "h": 18
+      },
+      "font": "13px/18px 400",
+      "color": "rgb(152, 152, 159)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "0px",
+      "outline": "3px none rgb(152, 152, 159) offset 0px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "runningLabel": {
+      "text": "Running…",
+      "box": {
+        "x": 995,
+        "y": 477,
+        "w": 80,
+        "h": 26
+      },
+      "font": "13px/18px 400",
+      "color": "rgb(214, 214, 219)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "14px",
+      "outline": "2px solid rgba(0, 0, 0, 0) offset 2px",
+      "transition": "color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to 0.15s",
+      "animation": "none",
+      "opacity": "1"
+    }
+  },
+  "ship-many-row-hover": {
+    "row": {
+      "text": "Morning briefWeekdays at 7:30 AM · last ran 9/7/2026in 15hRu",
+      "box": {
+        "x": 426,
+        "y": 333,
+        "w": 850,
+        "h": 63
+      },
+      "font": "14px/20px 400",
+      "color": "rgb(245, 245, 247)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "0px",
+      "outline": "3px none rgb(245, 245, 247) offset 0px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    }
+  },
+  "tab-order:ship-many": [
+    {
+      "tag": "BUTTON",
+      "testid": "modalities-toggle",
+      "label": null,
+      "text": "Modalities",
+      "ring": "2px solid rgb(41, 151, 255)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 317
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "modality-3d",
+      "label": null,
+      "text": "3D Studio",
+      "ring": "2px solid rgb(41, 151, 255)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 349
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "modality-image",
+      "label": null,
+      "text": "Image",
+      "ring": "2px solid rgb(41, 151, 255)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 377
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "modality-video",
+      "label": null,
+      "text": "Video",
+      "ring": "2px solid rgb(41, 151, 255)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 405
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "modality-audio",
+      "label": null,
+      "text": "Audio",
+      "ring": "2px solid rgb(41, 151, 255)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 433
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "new-project",
+      "label": "New project",
+      "text": "",
+      "ring": "2px solid rgb(41, 151, 255)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 480
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "chat-row-New chat",
+      "label": null,
+      "text": "New chatnow",
+      "ring": "2px solid rgb(41, 151, 255)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 573
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "chat-menu-New chat",
+      "label": "Chat actions",
+      "text": "",
+      "ring": "2px solid rgb(41, 151, 255)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 577
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "profile-button",
+      "label": "Account and theme",
+      "text": "BBobble · Local",
+      "ring": "2px solid rgb(41, 151, 255)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 816
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "footer-settings",
+      "label": "Settings",
+      "text": "",
+      "ring": "2px solid rgb(41, 151, 255)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 822
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "canvas-toggle",
+      "label": "Open canvas",
+      "text": "",
+      "ring": "2px solid rgba(0, 0, 0, 0)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 10
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "tasks-enabled",
+      "label": null,
+      "text": "Scheduling on",
+      "ring": "2px solid rgba(0, 0, 0, 0)",
+      "boxShadow": "none",
+      "visible": true,
+      "y": 72
+    }
+  ],
+  "film:ship-pause": {
+    "frames": 2,
+    "picked": [
+      0,
+      217
+    ]
+  },
+  "ship-off:list-moved-by": 52,
+  "ship-off": {
+    "note": {
+      "text": "Scheduling is off. Your tasks are kept, and you can still ru",
+      "box": {
+        "x": 425,
+        "y": 140,
+        "w": 852,
+        "h": 36
+      },
+      "font": "13px/18px 400",
+      "color": "rgb(214, 214, 219)",
+      "bg": "rgb(18, 18, 20)",
+      "border": "1px rgba(255, 255, 255, 0.12)",
+      "radius": "14px",
+      "outline": "3px none rgb(214, 214, 219) offset 0px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "pill": {
+      "text": "Scheduling off",
+      "box": {
+        "x": 1055,
+        "y": 72,
+        "w": 130,
+        "h": 32
+      },
+      "font": "13px/18px 400",
+      "color": "rgb(152, 152, 159)",
+      "bg": "rgb(18, 18, 20)",
+      "border": "1px rgba(255, 255, 255, 0.12)",
+      "radius": "1.67772e+07px",
+      "outline": "3px none rgb(152, 152, 159) offset 2px",
+      "transition": "color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to 0.15s",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "next": {
+      "text": "—",
+      "box": {
+        "x": 980,
+        "y": 344,
+        "w": 11,
+        "h": 18
+      },
+      "font": "13px/18px 400",
+      "color": "rgb(152, 152, 159)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "0px",
+      "outline": "3px none rgb(152, 152, 159) offset 0px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    }
+  },
+  "ship-delete-armed": {
+    "btn": {
+      "text": "Delete for good?",
+      "box": {
+        "x": 1139,
+        "y": 729,
+        "w": 121,
+        "h": 26
+      },
+      "font": "13px/18px 400",
+      "color": "rgb(255, 105, 97)",
+      "bg": "rgba(255, 255, 255, 0.06)",
+      "border": "none",
+      "radius": "14px",
+      "outline": "3px none rgb(255, 105, 97) offset 2px",
+      "transition": "color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to 0.15s",
+      "animation": "none",
+      "opacity": "1"
+    }
+  },
+  "ship-delete:disarmed-on-leave": true,
+  "film:ship-delete": {
+    "frames": 12,
+    "picked": [
+      0,
+      197,
+      235,
+      285,
+      335
+    ]
+  },
+  "ship-delete:row-gone": true,
+  "ship-dialog-edit:focused": "task-edit-task_mtrugdla_sk81sn",
+  "ship-drawer-week": {
+    "card": {
+      "text": "Sep 7, 7:30 AM· 41sDeleteCalendar: 10:00 Bobble sync (30 min",
+      "box": {
+        "x": 901,
+        "y": 97,
+        "w": 519,
+        "h": 154
+      },
+      "font": "14px/20px 400",
+      "color": "rgb(245, 245, 247)",
+      "bg": "rgb(30, 30, 33)",
+      "border": "1px rgba(255, 255, 255, 0.08)",
+      "radius": "12px",
+      "outline": "3px none rgb(245, 245, 247) offset 0px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "when": {
+      "text": "Sep 7, 7:30 AM",
+      "box": {
+        "x": 932,
+        "y": 113,
+        "w": 91,
+        "h": 18
+      },
+      "font": "13px/18px 400",
+      "color": "rgb(245, 245, 247)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "0px",
+      "outline": "3px none rgb(245, 245, 247) offset 0px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "took": {
+      "text": "· 41s",
+      "box": {
+        "x": 1031,
+        "y": 114,
+        "w": 26,
+        "h": 16
+      },
+      "font": "12px/16px 400",
+      "color": "rgb(152, 152, 159)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "0px",
+      "outline": "3px none rgb(152, 152, 159) offset 0px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "summary": {
+      "text": "Calendar: 10:00 Bobble sync (30 min), 14:30 dentist.\nMail th",
+      "box": {
+        "x": 916,
+        "y": 140,
+        "w": 489,
+        "h": 72
+      },
+      "font": "13px/18px 400",
+      "color": "rgb(214, 214, 219)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "0px",
+      "outline": "3px none rgb(214, 214, 219) offset 0px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "trail": {
+      "text": "calendar_list_events · mail_recent · reminders_list",
+      "box": {
+        "x": 916,
+        "y": 220,
+        "w": 489,
+        "h": 16
+      },
+      "font": "12px/16px 400",
+      "color": "rgb(152, 152, 159)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "0px",
+      "outline": "3px none rgb(152, 152, 159) offset 0px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "del": {
+      "text": "Delete",
+      "box": {
+        "x": 1352,
+        "y": 112,
+        "w": 53,
+        "h": 20
+      },
+      "font": "12px/16px 400",
+      "color": "rgb(152, 152, 159)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "10px",
+      "outline": "2px solid rgba(0, 0, 0, 0) offset 2px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "errCard": {
+      "text": "Sep 3, 7:30 AM· 6sDeletecalendar_list_events was blocked: th",
+      "box": {
+        "x": 901,
+        "y": 411,
+        "w": 519,
+        "h": 136
+      },
+      "font": "14px/20px 400",
+      "color": "rgb(245, 245, 247)",
+      "bg": "rgb(30, 30, 33)",
+      "border": "1px rgba(255, 255, 255, 0.08)",
+      "radius": "12px",
+      "outline": "3px none rgb(245, 245, 247) offset 0px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "err": {
+      "text": "calendar_list_events was blocked: this Mac has not granted A",
+      "box": {
+        "x": 916,
+        "y": 454,
+        "w": 489,
+        "h": 54
+      },
+      "font": "13px/18px 400",
+      "color": "rgb(255, 105, 97)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "0px",
+      "outline": "3px none rgb(255, 105, 97) offset 0px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    }
+  },
+  "ship-drawer-artifact:img-loaded": {
+    "complete": true,
+    "naturalWidth": 256
+  },
+  "film:ship-run-now": {
+    "frames": 13,
+    "picked": [
+      0,
+      216,
+      347,
+      371
+    ]
+  },
+  "ship-run-now:finished": true,
+  "ship-run-now:drawer-cards": [
+    {
+      "status": "ok",
+      "text": "Sep 7, 4:00 PM· 1sDeleteDone — hello.txt now greets the world."
+    },
+    {
+      "status": "ok",
+      "text": "Sep 4, 2:00 PM· 33sDelete14 files since yesterday: 9 screenshots, 3 PDFs (two invoices, one datasheet), 2 .dmg. Suggested: screenshots → ~/Pictures/Screenshots,"
+    }
+  ],
+  "ship-laptop:rows": [
+    {
+      "h": 63,
+      "wraps": true
+    },
+    {
+      "h": 63,
+      "wraps": true
+    },
+    {
+      "h": 63,
+      "wraps": true
+    },
+    {
+      "h": 63,
+      "wraps": true
+    }
+  ],
+  "ship-small:rows": [
+    {
+      "h": 63,
+      "wraps": true
+    },
+    {
+      "h": 63,
+      "wraps": true
+    },
+    {
+      "h": 63,
+      "wraps": true
+    },
+    {
+      "h": 63,
+      "wraps": true
+    }
+  ],
+  "ship-minimum:rows": [
+    {
+      "h": 63,
+      "wraps": true
+    },
+    {
+      "h": 63,
+      "wraps": true
+    },
+    {
+      "h": 63,
+      "wraps": true
+    },
+    {
+      "h": 63,
+      "wraps": true
+    }
+  ],
+  "ship:missed-task-next": "in 2h"
+}

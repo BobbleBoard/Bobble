@@ -1,5 +1,5 @@
 /**
- * Renderer connectors state for the Codex-style connectors gallery. Mirrors the
+ * Renderer connectors state for the Connectors screen. Mirrors the
  * main-process `~/.pi/desktop/mcp-connectors.json` registry (via the connectors:*
  * IPC), the full connector catalog, and the /Applications scan that powers
  * "Recommended for you". Mutations (install / enable / disable / remove) round-
@@ -16,6 +16,7 @@ import type {
   McpServerConfig,
 } from '@pi-desktop/mcp-lite';
 import { create } from 'zustand';
+import type { ConnectorToolListing } from '../../electron/connectors/connectors-contract';
 
 interface ConnectorsStoreState {
   registry: McpRegistryConfig;
@@ -36,15 +37,20 @@ interface ConnectorsStoreState {
   setEnabled: (id: string, enabled: boolean) => Promise<void>;
   /** Insert or replace an arbitrary server config. */
   upsert: (server: McpServerConfig) => Promise<void>;
-  /** Live tool discovery for the detail view (installed + enabled MCP only). */
-  fetchTools: (id: string) => Promise<{ tools: ConnectorTool[]; error?: string }>;
+  /**
+   * The same write without the busy state: a per-tool switch is a one-word
+   * change to a server that stays on, and the spinner that replaces the
+   * server's own switch for the write would read as the server restarting.
+   */
+  upsertQuiet: (server: McpServerConfig) => Promise<void>;
+  /** Start an installed + enabled server once and list what it has. */
+  fetchTools: (id: string) => Promise<ConnectorToolListing>;
+  /** The same for a config that is not (yet) in the registry — the dialog's Test. */
+  probeServer: (server: McpServerConfig) => Promise<ConnectorToolListing>;
 }
 
-/** A tool as shown in the detail view (name + one-line description, no schema). */
-export interface ConnectorTool {
-  name: string;
-  description: string;
-}
+/** A tool as shown on the screen (name + one line + prompt cost, no schema). */
+export type ConnectorTool = ConnectorToolListing['tools'][number];
 
 const EMPTY_REGISTRY: McpRegistryConfig = { version: 1, mode: 'lite', servers: [] };
 
@@ -115,11 +121,15 @@ export const useConnectorsStore = create<ConnectorsStoreState>((set) => ({
     }
   },
 
-  fetchTools: async (id) => {
-    // Read-only probe — no busy/registry mutation. The detail view owns the
-    // loading spinner and falls back to the static config on `error`.
-    return window.piDesktop.invoke('connectors:tools', { id });
+  upsertQuiet: async (server) => {
+    const { registry } = await window.piDesktop.invoke('connectors:upsert', { server });
+    set({ registry });
   },
+
+  // Read-only probes — no busy/registry mutation. The screen's tool cache owns
+  // the in-flight state and remembers the answer (connectors/model.ts).
+  fetchTools: (id) => window.piDesktop.invoke('connectors:tools', { id }),
+  probeServer: (server) => window.piDesktop.invoke('connectors:probe', { server }),
 }));
 
 /** The configured server for a catalog id, if it has been installed. */

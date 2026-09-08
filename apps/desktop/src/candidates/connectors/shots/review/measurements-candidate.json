@@ -1,0 +1,401 @@
+[
+  {
+    "key": "list extent (1152)",
+    "value": {
+      "scrollHeight": 1260,
+      "clientHeight": 733
+    }
+  },
+  {
+    "key": "pane mode at 1152",
+    "value": "pinned"
+  },
+  {
+    "key": "title",
+    "value": {
+      "x": 24,
+      "y": 63,
+      "w": 420,
+      "h": 28,
+      "fontSize": "22px",
+      "lineHeight": "28px",
+      "fontWeight": "400",
+      "color": "rgb(245, 245, 247)",
+      "background": "rgba(0, 0, 0, 0)",
+      "outline": "3px none rgb(245, 245, 247)",
+      "boxShadow": "none"
+    }
+  },
+  {
+    "key": "subtitle",
+    "value": {
+      "x": 24,
+      "y": 93,
+      "w": 420,
+      "h": 18,
+      "fontSize": "13px",
+      "lineHeight": "18px",
+      "fontWeight": "400",
+      "color": "rgb(152, 152, 159)",
+      "background": "rgba(0, 0, 0, 0)",
+      "outline": "3px none rgb(152, 152, 159)",
+      "boxShadow": "none"
+    }
+  },
+  {
+    "key": "section heading",
+    "value": {
+      "x": 24,
+      "y": 265,
+      "w": 34,
+      "h": 20,
+      "fontSize": "14px",
+      "lineHeight": "20px",
+      "fontWeight": "400",
+      "color": "rgb(245, 245, 247)",
+      "background": "rgba(0, 0, 0, 0)",
+      "outline": "3px none rgb(245, 245, 247)",
+      "boxShadow": "none"
+    }
+  },
+  {
+    "key": "card name",
+    "value": {
+      "x": 84,
+      "y": 305,
+      "w": 178,
+      "h": 20,
+      "fontSize": "14px",
+      "lineHeight": "20px",
+      "fontWeight": "400",
+      "color": "rgb(245, 245, 247)",
+      "background": "rgba(0, 0, 0, 0)",
+      "outline": "3px none rgb(245, 245, 247)",
+      "boxShadow": "none"
+    }
+  },
+  {
+    "key": "card description",
+    "value": {
+      "x": 84,
+      "y": 327,
+      "w": 178,
+      "h": 36,
+      "fontSize": "13px",
+      "lineHeight": "17.875px",
+      "fontWeight": "400",
+      "color": "rgb(152, 152, 159)",
+      "background": "rgba(0, 0, 0, 0)",
+      "outline": "3px none rgb(152, 152, 159)",
+      "boxShadow": "none"
+    }
+  },
+  {
+    "key": "card",
+    "value": {
+      "x": 24,
+      "y": 293,
+      "w": 332,
+      "h": 82,
+      "fontSize": "14px",
+      "lineHeight": "20px",
+      "fontWeight": "400",
+      "color": "rgb(245, 245, 247)",
+      "background": "rgb(30, 30, 33)",
+      "outline": "3px none rgb(245, 245, 247)",
+      "boxShadow": "rgba(255, 255, 255, 0.08) 0px 0px 0px 1px"
+    }
+  },
+  {
+    "key": "pane heading",
+    "value": {
+      "x": 752,
+      "y": 187,
+      "w": 380,
+      "h": 21,
+      "fontSize": "16px",
+      "lineHeight": "21px",
+      "fontWeight": "400",
+      "color": "rgb(245, 245, 247)",
+      "background": "rgba(0, 0, 0, 0)",
+      "outline": "3px none rgb(245, 245, 247)",
+      "boxShadow": "none"
+    }
+  },
+  {
+    "key": "pane summary",
+    "value": {
+      "x": 752,
+      "y": 210,
+      "w": 380,
+      "h": 18,
+      "fontSize": "13px",
+      "lineHeight": "18px",
+      "fontWeight": "400",
+      "color": "rgb(152, 152, 159)",
+      "background": "rgba(0, 0, 0, 0)",
+      "outline": "3px none rgb(152, 152, 159)",
+      "boxShadow": "none"
+    }
+  },
+  {
+    "key": "pane row name",
+    "value": {
+      "x": 796,
+      "y": 357,
+      "w": 282,
+      "h": 18,
+      "fontSize": "13px",
+      "lineHeight": "18px",
+      "fontWeight": "400",
+      "color": "rgb(245, 245, 247)",
+      "background": "rgba(0, 0, 0, 0)",
+      "outline": "3px none rgb(245, 245, 247)",
+      "boxShadow": "none"
+    }
+  },
+  {
+    "key": "search",
+    "value": {
+      "x": 24,
+      "y": 123,
+      "w": 744,
+      "h": 32,
+      "fontSize": "14px",
+      "lineHeight": "20px",
+      "fontWeight": "400",
+      "color": "rgb(245, 245, 247)",
+      "background": "rgb(30, 30, 33)",
+      "outline": "2px solid rgba(0, 0, 0, 0)",
+      "boxShadow": "rgba(255, 255, 255, 0.14) 0px 0px 0px 0.5px"
+    }
+  },
+  {
+    "key": "pill (pressed)",
+    "value": {
+      "x": 774,
+      "y": 125,
+      "w": 41,
+      "h": 28,
+      "fontSize": "13px",
+      "lineHeight": "20px",
+      "fontWeight": "400",
+      "color": "rgb(30, 30, 33)",
+      "background": "rgb(245, 245, 247)",
+      "outline": "2px solid rgba(0, 0, 0, 0)",
+      "boxShadow": "none"
+    }
+  },
+  {
+    "key": "switch (checked) colour",
+    "value": {
+      "x": 316,
+      "y": 397,
+      "w": 28,
+      "h": 16,
+      "fontSize": "14px",
+      "lineHeight": "20px",
+      "fontWeight": "400",
+      "color": "rgb(245, 245, 247)",
+      "background": "rgb(41, 151, 255)",
+      "outline": "2px solid rgba(0, 0, 0, 0)",
+      "boxShadow": "none"
+    }
+  },
+  {
+    "key": "setup pill",
+    "value": {
+      "x": 274,
+      "y": 305,
+      "w": 70,
+      "h": 26,
+      "fontSize": "12px",
+      "lineHeight": "16px",
+      "fontWeight": "500",
+      "color": "rgb(245, 245, 247)",
+      "background": "rgba(0, 0, 0, 0)",
+      "outline": "2px solid rgba(0, 0, 0, 0)",
+      "boxShadow": "none"
+    }
+  },
+  {
+    "key": "warning dot",
+    "value": {
+      "x": 1011,
+      "y": 136,
+      "w": 7,
+      "h": 7,
+      "fontSize": "13px",
+      "lineHeight": "20px",
+      "fontWeight": "400",
+      "color": "rgb(214, 214, 219)",
+      "background": "rgb(255, 179, 64)",
+      "outline": "3px none rgb(214, 214, 219)",
+      "boxShadow": "rgb(30, 30, 33) 0px 0px 0px 2px"
+    }
+  },
+  {
+    "key": "list scrollbar",
+    "value": null
+  },
+  {
+    "key": "card hover (light) bg/shadow",
+    "value": {
+      "before": [
+        "rgb(255, 255, 255)",
+        "rgba(0, 0, 0, 0.06) 0px 0px 0px 1px"
+      ],
+      "after": [
+        "rgb(255, 255, 255)",
+        "rgba(0, 0, 0, 0.22) 0px 0px 0px 1px"
+      ]
+    }
+  },
+  {
+    "key": "tab order from the search field",
+    "value": [
+      "cand-filter-all",
+      "cand-filter-tools",
+      "cand-filter-skills",
+      "cand-filter-on",
+      "cand-filter-setup",
+      "cand-open-chrome-devtools",
+      "cand-add-chrome-devtools",
+      "cand-open-xcode",
+      "cand-add-xcode",
+      "cand-open-docker",
+      "cand-add-docker",
+      "cand-open-github",
+      "cand-setup-github",
+      "cand-open-custom:weather",
+      "cand-toggle-custom:weather",
+      "cand-open-filesystem",
+      "cand-toggle-filesystem",
+      "cand-open-memory"
+    ]
+  },
+  {
+    "key": "Enter on a focused card opens its detail",
+    "value": true
+  },
+  {
+    "key": "focused after Enter",
+    "value": "cand-open-github"
+  },
+  {
+    "key": "Escape closes the detail (pinned)",
+    "value": false
+  },
+  {
+    "key": "clicking an open card again closes its detail",
+    "value": true
+  },
+  {
+    "key": "bad key: ms from Save to the error",
+    "value": 136
+  },
+  {
+    "key": "bad key: error text",
+    "value": "Could not list its tools.MCP server process exited (code 1)Try againChange the key"
+  },
+  {
+    "key": "good key: ms from Save to the tool list",
+    "value": 134
+  },
+  {
+    "key": "tool row name",
+    "value": {
+      "x": 764,
+      "y": 366,
+      "w": 44,
+      "h": 18,
+      "fontSize": "13px",
+      "lineHeight": "18px",
+      "fontWeight": "400",
+      "color": "rgb(29, 29, 31)",
+      "background": "rgba(0, 0, 0, 0)",
+      "outline": "3px none rgb(29, 29, 31)",
+      "boxShadow": "none"
+    }
+  },
+  {
+    "key": "tool row id",
+    "value": {
+      "x": 816,
+      "y": 368,
+      "w": 43,
+      "h": 16,
+      "fontSize": "12px",
+      "lineHeight": "16px",
+      "fontWeight": "400",
+      "color": "rgb(134, 134, 139)",
+      "background": "rgba(0, 0, 0, 0)",
+      "outline": "3px none rgb(134, 134, 139)",
+      "boxShadow": "none"
+    }
+  },
+  {
+    "key": "tool row desc",
+    "value": {
+      "x": 764,
+      "y": 384,
+      "w": 346,
+      "h": 18,
+      "fontSize": "13px",
+      "lineHeight": "17.875px",
+      "fontWeight": "400",
+      "color": "rgb(134, 134, 139)",
+      "background": "rgba(0, 0, 0, 0)",
+      "outline": "3px none rgb(134, 134, 139)",
+      "boxShadow": "none"
+    }
+  },
+  {
+    "key": "memory: ms from click to tool list",
+    "value": 41
+  },
+  {
+    "key": "time: ms from Add to Bobble to a tool list (or timeout)",
+    "value": 15060
+  },
+  {
+    "key": "candidate add dialog: focused on open",
+    "value": "add-server-name"
+  },
+  {
+    "key": "candidate add dialog: focused after close",
+    "value": "body:\"Shelf+ShelfLedgerReachCo\""
+  },
+  {
+    "key": "added: ms until its card exists",
+    "value": 385
+  },
+  {
+    "key": "added card position / selected / in ledger",
+    "value": {
+      "y": 385,
+      "selected": "false",
+      "inLedger": true,
+      "ledgerLine": "Weather TwoRuns node · added by you"
+    }
+  },
+  {
+    "key": "pane mode control y before/after Native",
+    "value": {
+      "before": 821,
+      "after": 821
+    }
+  },
+  {
+    "key": "pane mode at 1103",
+    "value": "overlay"
+  },
+  {
+    "key": "Escape closes the overlay sheet",
+    "value": false
+  },
+  {
+    "key": "clicking the scrim closes the sheet",
+    "value": true
+  }
+]

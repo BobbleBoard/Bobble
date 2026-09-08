@@ -1,5 +1,5 @@
 /**
- * Starter tasks, offered when the list is empty.
+ * Starter tasks, offered when the list is empty (and under a short list).
  *
  * Each is written as an instruction that ends in something READABLE — the value
  * of an unattended run is what you find waiting for you.
@@ -20,12 +20,14 @@
  * blocks it at `tool_call` for every unattended run (permissions/forbidden.ts),
  * not merely by asking nicely in the prompt. That is what makes "draft replies"
  * a safe thing to offer.
+ *
+ * The glyph for each card is drawn by `TemplateIcon` (shared.tsx) from its id —
+ * a stroked icon in the app's own recipe, not a Unicode character.
  */
 import type { Frequency } from '../../electron/scheduled/schedule-logic';
 
 export interface TaskTemplate {
   readonly id: string;
-  readonly icon: string;
   readonly name: string;
   readonly blurb: string;
   readonly prompt: string;
@@ -38,7 +40,6 @@ export interface TaskTemplate {
 export const TASK_TEMPLATES: readonly TaskTemplate[] = [
   {
     id: 'morning-brief',
-    icon: '☀',
     name: 'Morning brief',
     blurb:
       "Your day, before you start it: today's events, what arrived overnight, what is due. " +
@@ -58,7 +59,6 @@ export const TASK_TEMPLATES: readonly TaskTemplate[] = [
   },
   {
     id: 'what-did-i-miss',
-    icon: '⟲',
     name: 'What did I miss',
     blurb:
       'An end-of-day catch-up on mail and messages you did not get to. Reads locally; sends nothing.',
@@ -75,7 +75,6 @@ export const TASK_TEMPLATES: readonly TaskTemplate[] = [
   },
   {
     id: 'draft-replies',
-    icon: '✎',
     name: 'Draft replies, do not send',
     blurb: 'Reads what is waiting and writes the replies for you to review. It cannot send them.',
     prompt:
@@ -91,7 +90,6 @@ export const TASK_TEMPLATES: readonly TaskTemplate[] = [
   },
   {
     id: 'repo-digest',
-    icon: '◷',
     name: 'What changed today',
     blurb: "Read the day's commits and diffs in your working folder and summarise them.",
     prompt:
@@ -104,7 +102,6 @@ export const TASK_TEMPLATES: readonly TaskTemplate[] = [
   },
   {
     id: 'test-run',
-    icon: '✓',
     name: 'Run the tests',
     blurb: 'Run the test suite and report only what failed, with the failing output.',
     prompt:
@@ -117,7 +114,6 @@ export const TASK_TEMPLATES: readonly TaskTemplate[] = [
   },
   {
     id: 'deps',
-    icon: '↑',
     name: 'Dependency check',
     blurb: 'Look for outdated or vulnerable dependencies and say which are worth doing.',
     prompt:
@@ -130,7 +126,6 @@ export const TASK_TEMPLATES: readonly TaskTemplate[] = [
   },
   {
     id: 'inbox-folder',
-    icon: '⇢',
     name: 'Sort a drop folder',
     blurb: 'Tidy a folder you dump things into: rename, group, summarise.',
     prompt:
@@ -143,7 +138,6 @@ export const TASK_TEMPLATES: readonly TaskTemplate[] = [
   },
   {
     id: 'watch-topic',
-    icon: '◎',
     name: 'Watch a topic',
     blurb: 'Search the web for news on something you care about and summarise what is new.',
     prompt:
@@ -156,7 +150,6 @@ export const TASK_TEMPLATES: readonly TaskTemplate[] = [
   },
   {
     id: 'weekly-review',
-    icon: '☰',
     name: 'Weekly review',
     blurb: 'A Friday summary of the week across your working folder and chats.',
     prompt:

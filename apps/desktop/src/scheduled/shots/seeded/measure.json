@@ -1,0 +1,911 @@
+{
+  "devicePixelRatio": 2,
+  "list": {
+    "topbarTitle": {
+      "text": "Scheduled",
+      "box": {
+        "x": 280,
+        "y": 10,
+        "w": 85,
+        "h": 28
+      },
+      "font": "14px/20px 400",
+      "color": "rgb(245, 245, 247)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "0px",
+      "opacity": "1"
+    },
+    "title": {
+      "text": "Scheduled",
+      "box": {
+        "x": 296,
+        "y": 66,
+        "w": 568,
+        "h": 28
+      },
+      "font": "22px/28px 500",
+      "color": "rgb(245, 245, 247)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "0px",
+      "opacity": "1"
+    },
+    "lede": {
+      "text": "What Bobble does on its own while it is open.",
+      "box": {
+        "x": 296,
+        "y": 98,
+        "w": 912,
+        "h": 20
+      },
+      "font": "14px/20px 400",
+      "color": "rgb(152, 152, 159)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "0px",
+      "opacity": "1"
+    },
+    "search": {
+      "text": "Search",
+      "box": {
+        "x": 880,
+        "y": 66,
+        "w": 80,
+        "h": 28
+      },
+      "font": "13px/20px 400",
+      "color": "rgb(152, 152, 159)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "7px",
+      "opacity": "1"
+    },
+    "newTask": {
+      "text": "New task",
+      "box": {
+        "x": 1115,
+        "y": 67,
+        "w": 93,
+        "h": 26
+      },
+      "font": "12px/16px 500",
+      "color": "rgb(30, 30, 33)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "7.5px",
+      "opacity": "1"
+    },
+    "list": {
+      "text": "Portrait of the dayEvery day at 8:00 AM25sWhat did I missWeekdays at 6:30 PM · n",
+      "box": {
+        "x": 284,
+        "y": 138,
+        "w": 936,
+        "h": 531
+      },
+      "font": "14px/20px 400",
+      "color": "rgb(245, 245, 247)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "0px",
+      "opacity": "1"
+    },
+    "row": {
+      "text": "Morning briefWeekdays at 7:30 AM · next tomorrow",
+      "box": {
+        "x": 284,
+        "y": 256,
+        "w": 936,
+        "h": 59
+      },
+      "font": "14px/20px 400",
+      "color": "rgb(245, 245, 247)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "9px",
+      "opacity": "1"
+    },
+    "tile": {
+      "text": "",
+      "box": {
+        "x": 296,
+        "y": 268,
+        "w": 36,
+        "h": 36
+      },
+      "font": "14px/20px 400",
+      "color": "rgb(214, 214, 219)",
+      "bg": "rgb(18, 18, 20)",
+      "border": "none",
+      "radius": "10px",
+      "opacity": "1"
+    },
+    "rowName": {
+      "text": "Morning brief",
+      "box": {
+        "x": 346,
+        "y": 266,
+        "w": 862,
+        "h": 20
+      },
+      "font": "14px/20px 500",
+      "color": "rgb(245, 245, 247)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "0px",
+      "opacity": "1"
+    },
+    "rowLine": {
+      "text": "Weekdays at 7:30 AM · next tomorrow",
+      "box": {
+        "x": 346,
+        "y": 287,
+        "w": 862,
+        "h": 18
+      },
+      "font": "13px/18px 400",
+      "color": "rgb(152, 152, 159)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "0px",
+      "opacity": "1"
+    },
+    "running": {
+      "text": "25s",
+      "box": {
+        "x": 1185,
+        "y": 159,
+        "w": 23,
+        "h": 18
+      },
+      "font": "13px/18px 400",
+      "color": "rgb(10, 132, 255)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "0px",
+      "opacity": "1"
+    },
+    "missed": {
+      "text": "missed",
+      "box": {
+        "x": 1165,
+        "y": 218,
+        "w": 43,
+        "h": 18
+      },
+      "font": "13px/18px 400",
+      "color": "rgb(255, 179, 64)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "0px",
+      "opacity": "1"
+    },
+    "more": {
+      "text": "Start from a suggestion — Draft replies, do not send, Sort a drop folder and 1 m",
+      "box": {
+        "x": 284,
+        "y": 686,
+        "w": 936,
+        "h": 38
+      },
+      "font": "13px/20px 400",
+      "color": "rgb(214, 214, 219)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "9px",
+      "opacity": "1"
+    }
+  },
+  "list:rows": [
+    "Portrait of the day",
+    "What did I miss",
+    "Morning brief",
+    "Run the tests",
+    "Watch llama.cpp releases",
+    "What changed today",
+    "Weekly review",
+    "Sort my Downloads",
+    "Dependency check"
+  ],
+  "list:overflows": false,
+  "list-hover": {
+    "row": {
+      "text": "Run the testsEvery day at 7:30 AM · next tomorrow",
+      "box": {
+        "x": 284,
+        "y": 315,
+        "w": 936,
+        "h": 59
+      },
+      "font": "14px/20px 400",
+      "color": "rgb(245, 245, 247)",
+      "bg": "rgba(255, 255, 255, 0.06)",
+      "border": "none",
+      "radius": "9px",
+      "opacity": "1"
+    }
+  },
+  "list:suggestions": 3,
+  "task": {
+    "back": {
+      "text": "All tasks",
+      "box": {
+        "x": 290,
+        "y": 66,
+        "w": 79,
+        "h": 28
+      },
+      "font": "13px/20px 400",
+      "color": "rgb(214, 214, 219)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "7px",
+      "opacity": "1"
+    },
+    "title": {
+      "text": "Morning brief",
+      "box": {
+        "x": 346,
+        "y": 108,
+        "w": 656,
+        "h": 28
+      },
+      "font": "22px/28px 500",
+      "color": "rgb(245, 245, 247)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "0px",
+      "opacity": "1"
+    },
+    "line": {
+      "text": "Weekdays at 7:30 AM · next tomorrow",
+      "box": {
+        "x": 346,
+        "y": 138,
+        "w": 656,
+        "h": 18
+      },
+      "font": "13px/18px 400",
+      "color": "rgb(152, 152, 159)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "0px",
+      "opacity": "1"
+    },
+    "tile": {
+      "text": "",
+      "box": {
+        "x": 296,
+        "y": 114,
+        "w": 36,
+        "h": 36
+      },
+      "font": "14px/20px 400",
+      "color": "rgb(214, 214, 219)",
+      "bg": "rgb(18, 18, 20)",
+      "border": "none",
+      "radius": "10px",
+      "opacity": "1"
+    },
+    "runNow": {
+      "text": "Run now",
+      "box": {
+        "x": 1016,
+        "y": 119,
+        "w": 87,
+        "h": 26
+      },
+      "font": "12px/16px 500",
+      "color": "rgb(245, 245, 247)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "7.5px",
+      "opacity": "1"
+    },
+    "prompt": {
+      "text": "Turn on the \"personal\" capability, then write me a short brief for today.\n\nCover",
+      "box": {
+        "x": 296,
+        "y": 176,
+        "w": 720,
+        "h": 168
+      },
+      "font": "14px/21px 400",
+      "color": "rgb(214, 214, 219)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "0px",
+      "opacity": "1"
+    },
+    "facts": {
+      "text": "ReachesCalendar · Mail · RemindersRuns inIts own folder (a new one per run)Runs ",
+      "box": {
+        "x": 296,
+        "y": 362,
+        "w": 720,
+        "h": 62
+      },
+      "font": "13px/18px 400",
+      "color": "rgb(245, 245, 247)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "0px",
+      "opacity": "1"
+    },
+    "section": {
+      "text": "Runs",
+      "box": {
+        "x": 296,
+        "y": 452,
+        "w": 33,
+        "h": 20
+      },
+      "font": "14px/20px 500",
+      "color": "rgb(245, 245, 247)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "0px",
+      "opacity": "1"
+    },
+    "runWhen": {
+      "text": "Today 7:30 AM",
+      "box": {
+        "x": 324,
+        "y": 488,
+        "w": 92,
+        "h": 18
+      },
+      "font": "13px/18px 500",
+      "color": "rgb(245, 245, 247)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "0px",
+      "opacity": "1"
+    },
+    "runsOn": {
+      "text": "Gemma 4 12B last time · none loaded now",
+      "box": {
+        "x": 380,
+        "y": 406,
+        "w": 636,
+        "h": 18
+      },
+      "font": "13px/18px 400",
+      "color": "rgb(214, 214, 219)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "0px",
+      "opacity": "1"
+    },
+    "footer": {
+      "text": "Deleting removes the task and its 5 runs.Delete",
+      "box": {
+        "x": 296,
+        "y": 820,
+        "w": 912,
+        "h": 39
+      },
+      "font": "14px/20px 400",
+      "color": "rgb(245, 245, 247)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "1px rgba(255, 255, 255, 0.08)",
+      "radius": "0px",
+      "opacity": "1"
+    }
+  },
+  "task:overflows": false,
+  "failed": {
+    "headline": null
+  },
+  "running-seeded": {
+    "stop": {
+      "text": "Stop",
+      "box": {
+        "x": 1039,
+        "y": 119,
+        "w": 65,
+        "h": 26
+      },
+      "font": "12px/16px 500",
+      "color": "rgb(245, 245, 247)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "7.5px",
+      "opacity": "1"
+    },
+    "state": {
+      "text": "Running · 32s",
+      "box": {
+        "x": 487,
+        "y": 140,
+        "w": 83,
+        "h": 15
+      },
+      "font": "13px/18px 400",
+      "color": "rgb(10, 132, 255)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "0px",
+      "opacity": "1"
+    }
+  },
+  "missed": {
+    "state": {
+      "text": "Missed 4 Sep 6:30 PM · next in 14m",
+      "box": {
+        "x": 489,
+        "y": 140,
+        "w": 217,
+        "h": 15
+      },
+      "font": "13px/18px 400",
+      "color": "rgb(255, 179, 64)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "0px",
+      "opacity": "1"
+    }
+  },
+  "search:rows-typed": 1,
+  "search:rows-after-escape": 9,
+  "off:list-moved-by": 0,
+  "off:reordered": false,
+  "edit:focused": "sd-editor-prompt",
+  "edit:focus-after-escape": "sd-edit",
+  "new-sentence": {
+    "read": "all",
+    "chip": "Every Friday at 4:00 PM",
+    "hint": " — the instruction becomes “write up what I worked on this week”",
+    "frequency": "Every week",
+    "preview": "Every Friday at 4:00 PM · first run Fri 4:00 PM (in 4 days)No model is loaded yet — the first run loads one · reads your Mac, never sends"
+  },
+  "new:focus-after-cancel": "sd-new",
+  "tab-order:list": [
+    {
+      "tag": "BUTTON",
+      "testid": "sd-scheduling-switch",
+      "label": "Scheduling on",
+      "text": "",
+      "ring": "2px solid",
+      "visible": true,
+      "y": 70
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "sd-new",
+      "label": null,
+      "text": "New task",
+      "ring": "2px solid",
+      "visible": true,
+      "y": 67
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "sd-row-task_mtrzal8i_fimqaq",
+      "label": null,
+      "text": "Portrait of the dayEvery day at 8:00 AM4",
+      "ring": "2px solid",
+      "visible": true,
+      "y": 138
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "sd-row-task_mtrzal8k_c6huy0",
+      "label": null,
+      "text": "What did I missWeekdays at 6:30 PM · nex",
+      "ring": "2px solid",
+      "visible": true,
+      "y": 197
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "sd-row-task_mtrzal7u_bz4trc",
+      "label": null,
+      "text": "Morning briefWeekdays at 7:30 AM · next ",
+      "ring": "2px solid",
+      "visible": true,
+      "y": 256
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "sd-row-task_mtrzal7y_juygnm",
+      "label": null,
+      "text": "Run the testsEvery day at 7:30 AM · next",
+      "ring": "2px solid",
+      "visible": true,
+      "y": 315
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "sd-row-task_mtrzal88_edzsyw",
+      "label": null,
+      "text": "Watch llama.cpp releasesEvery day at 9:0",
+      "ring": "2px solid",
+      "visible": true,
+      "y": 374
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "sd-row-task_mtrzal81_f3kbbj",
+      "label": null,
+      "text": "What changed todayWeekdays at 6:00 PM · ",
+      "ring": "2px solid",
+      "visible": true,
+      "y": 433
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "sd-row-task_mtrzal84_pcl56r",
+      "label": null,
+      "text": "Weekly reviewEvery Friday at 4:00 PM · n",
+      "ring": "2px solid",
+      "visible": true,
+      "y": 492
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "sd-row-task_mtrzal8f_79dxi6",
+      "label": null,
+      "text": "Sort my DownloadsOnly when you run it",
+      "ring": "2px solid",
+      "visible": true,
+      "y": 551
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "sd-row-task_mtrzal8b_lthgul",
+      "label": null,
+      "text": "Dependency checkEvery Monday at 9:00 AMp",
+      "ring": "2px solid",
+      "visible": true,
+      "y": 610
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "sd-more-templates",
+      "label": null,
+      "text": "Start from a suggestion — Draft replies,",
+      "ring": "2px solid",
+      "visible": true,
+      "y": 686
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "collapse-sidebar",
+      "label": "Collapse sidebar",
+      "text": "",
+      "ring": "2px solid",
+      "visible": true,
+      "y": 7
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "mode-chat",
+      "label": "Chat",
+      "text": "",
+      "ring": "2px solid",
+      "visible": true,
+      "y": 11
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "mode-work",
+      "label": "Project",
+      "text": "",
+      "ring": "2px solid",
+      "visible": true,
+      "y": 11
+    },
+    {
+      "tag": "BUTTON",
+      "testid": null,
+      "label": null,
+      "text": "Search chats",
+      "ring": "2px solid",
+      "visible": true,
+      "y": 84
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "new-chat",
+      "label": null,
+      "text": "New chat⌘N",
+      "ring": "2px solid",
+      "visible": true,
+      "y": 132
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "nav-model-management",
+      "label": null,
+      "text": "Model management",
+      "ring": "2px solid",
+      "visible": true,
+      "y": 205
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "nav-connectors",
+      "label": null,
+      "text": "Connectors",
+      "ring": "2px solid",
+      "visible": true,
+      "y": 237
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "nav-scheduled",
+      "label": null,
+      "text": "Scheduled",
+      "ring": "2px solid",
+      "visible": true,
+      "y": 269
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "modalities-toggle",
+      "label": null,
+      "text": "Modalities",
+      "ring": "2px solid",
+      "visible": true,
+      "y": 317
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "modality-3d",
+      "label": null,
+      "text": "3D Studio",
+      "ring": "2px solid",
+      "visible": true,
+      "y": 349
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "modality-image",
+      "label": null,
+      "text": "Image",
+      "ring": "2px solid",
+      "visible": true,
+      "y": 377
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "modality-video",
+      "label": null,
+      "text": "Video",
+      "ring": "2px solid",
+      "visible": true,
+      "y": 405
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "modality-audio",
+      "label": null,
+      "text": "Audio",
+      "ring": "2px solid",
+      "visible": true,
+      "y": 433
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "new-project",
+      "label": "New project",
+      "text": "",
+      "ring": "2px solid",
+      "visible": true,
+      "y": 480
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "chat-row-New chat",
+      "label": null,
+      "text": "New chatnow",
+      "ring": "2px solid",
+      "visible": true,
+      "y": 573
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "chat-menu-New chat",
+      "label": "Chat actions",
+      "text": "",
+      "ring": "2px solid",
+      "visible": true,
+      "y": 577
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "profile-button",
+      "label": "Account and theme",
+      "text": "BBobble · Local",
+      "ring": "2px solid",
+      "visible": true,
+      "y": 816
+    },
+    {
+      "tag": "BUTTON",
+      "testid": "footer-settings",
+      "label": "Settings",
+      "text": "",
+      "ring": "2px solid",
+      "visible": true,
+      "y": 822
+    }
+  ],
+  "keys:after-arrow-down": "sd-row-task_mtrzal7y_juygnm",
+  "keys:enter-opens": "Run the tests",
+  "keys:escape-back-focused": "sd-row-task_mtrzal7y_juygnm",
+  "width-laptop-list": {
+    "header": {
+      "x": 296,
+      "y": 66,
+      "w": 842,
+      "h": 52
+    },
+    "switchLabel": "Scheduling on",
+    "overflows": false,
+    "names": [
+      {
+        "text": "Portrait of the day",
+        "clipped": false
+      },
+      {
+        "text": "What did I miss",
+        "clipped": false
+      },
+      {
+        "text": "Morning brief",
+        "clipped": false
+      },
+      {
+        "text": "Run the tests",
+        "clipped": false
+      }
+    ]
+  },
+  "width-laptop-suggestions": {
+    "columns": "2",
+    "overflows": false
+  },
+  "width-laptop-task": {
+    "head": {
+      "x": 296,
+      "y": 108,
+      "w": 842,
+      "h": 48
+    },
+    "actions": {
+      "x": 946,
+      "y": 119,
+      "w": 192,
+      "h": 26
+    },
+    "overflows": false
+  },
+  "width-small-list": {
+    "header": {
+      "x": 296,
+      "y": 66,
+      "w": 570,
+      "h": 52
+    },
+    "switchLabel": "",
+    "overflows": false,
+    "names": [
+      {
+        "text": "Portrait of the day",
+        "clipped": false
+      },
+      {
+        "text": "What did I miss",
+        "clipped": false
+      },
+      {
+        "text": "Morning brief",
+        "clipped": false
+      },
+      {
+        "text": "Run the tests",
+        "clipped": false
+      }
+    ]
+  },
+  "width-small-suggestions": {
+    "columns": "1",
+    "overflows": false
+  },
+  "width-small-task": {
+    "head": {
+      "x": 296,
+      "y": 108,
+      "w": 570,
+      "h": 48
+    },
+    "actions": {
+      "x": 674,
+      "y": 119,
+      "w": 192,
+      "h": 26
+    },
+    "overflows": false
+  },
+  "width-minimum-list": {
+    "header": {
+      "x": 296,
+      "y": 66,
+      "w": 430,
+      "h": 52
+    },
+    "switchLabel": "",
+    "overflows": false,
+    "names": [
+      {
+        "text": "Portrait of the day",
+        "clipped": false
+      },
+      {
+        "text": "What did I miss",
+        "clipped": false
+      },
+      {
+        "text": "Morning brief",
+        "clipped": false
+      },
+      {
+        "text": "Run the tests",
+        "clipped": false
+      }
+    ]
+  },
+  "width-minimum-suggestions": {
+    "columns": "1",
+    "overflows": false
+  },
+  "width-minimum-task": {
+    "head": {
+      "x": 296,
+      "y": 108,
+      "w": 430,
+      "h": 66
+    },
+    "actions": {
+      "x": 534,
+      "y": 128,
+      "w": 192,
+      "h": 26
+    },
+    "overflows": false
+  },
+  "film:open": {
+    "frames": 23,
+    "picked": [0, 58, 115, 167, 223, 282]
+  },
+  "film-back": {
+    "frames": 42,
+    "picked": [0, 226, 231, 292, 342, 401]
+  },
+  "film:switch-off": {
+    "frames": 48,
+    "picked": [0, 51, 117, 167, 226, 283, 350, 401]
+  },
+  "film:suggestions": {
+    "frames": 42,
+    "picked": [0, 58, 117, 175, 224, 294, 344, 402]
+  },
+  "film:run-now": {
+    "frames": 159,
+    "picked": [0, 229, 456, 690, 917, 1142, 1375, 1598]
+  },
+  "running-real": {
+    "state": "Running · 37s"
+  },
+  "running-real:row": {
+    "word": "37s",
+    "first": "Portrait of the day"
+  },
+  "film:stop": {
+    "frames": 26,
+    "picked": [0, 141, 284]
+  }
+}

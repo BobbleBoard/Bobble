@@ -1,0 +1,92 @@
+{
+  "name": "scheduled-slow",
+  "state": {
+    "sessionFile": "/tmp/mock-pi/sessions/scheduled-slow.jsonl",
+    "sessionId": "mock-session-scheduled-slow"
+  },
+  "prompts": [
+    {
+      "response": { "success": true },
+      "steps": [
+        { "emit": { "type": "agent_start" } },
+        { "emit": { "type": "turn_start" } },
+        {
+          "emit": {
+            "type": "message_start",
+            "message": { "role": "assistant", "content": [] }
+          }
+        },
+        {
+          "delayMs": 300,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [{ "type": "text", "text": "Looking at ~/Downloads. " }]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "Looking at ~/Downloads. ",
+              "partial": {
+                "role": "assistant",
+                "content": [{ "type": "text", "text": "Looking at ~/Downloads. " }]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 200,
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [
+                { "type": "text", "text": "Looking at ~/Downloads. " },
+                { "type": "toolCall", "id": "call_bash_1", "name": "bash", "arguments": {} }
+              ]
+            },
+            "assistantMessageEvent": {
+              "type": "toolcall_start",
+              "contentIndex": 1,
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  { "type": "text", "text": "Looking at ~/Downloads. " },
+                  { "type": "toolCall", "id": "call_bash_1", "name": "bash", "arguments": {} }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "delayMs": 45000,
+          "emit": {
+            "type": "turn_end",
+            "message": { "role": "assistant", "content": [] },
+            "toolResults": []
+          }
+        },
+        {
+          "emit": {
+            "type": "message_update",
+            "message": {
+              "role": "assistant",
+              "content": [{ "type": "text", "text": "14 files since yesterday. No moves made." }]
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "14 files since yesterday. No moves made.",
+              "partial": {
+                "role": "assistant",
+                "content": [{ "type": "text", "text": "14 files since yesterday. No moves made." }]
+              }
+            }
+          }
+        },
+        { "emit": { "type": "agent_end", "messages": [] } }
+      ]
+    }
+  ]
+}

@@ -5,7 +5,7 @@
  * real chat), but the user: "a clean new temporary session that is started, conducts
  * and then is hidden/deleted" — so execution moved to MAIN, in a throwaway
  * bridge that never becomes a sidebar chat (scheduled-runner.ts). This store
- * only asks main to run, and reads back the run records for the past-runs view.
+ * only asks main to run (or stop), and reads back the run records for the page.
  */
 import { create } from 'zustand';
 import type {
@@ -19,7 +19,7 @@ interface TasksState {
   readonly enabled: boolean;
   readonly tasks: readonly ScheduledTask[];
   readonly loaded: boolean;
-  /** Run records by task id, for the past-runs view. Loaded on demand. */
+  /** Run records by task id, newest first. Loaded once per task, then followed live. */
   readonly runs: Readonly<Record<string, readonly TaskRun[]>>;
   load: () => Promise<void>;
   setEnabled: (enabled: boolean) => Promise<void>;
@@ -27,18 +27,14 @@ interface TasksState {
   update: (id: string, patch: Partial<TaskDraft>) => Promise<void>;
   remove: (id: string) => Promise<void>;
   runNow: (id: string) => Promise<void>;
+  /** End a task's live run (or drop its queued one). The record arrives as `stopped`. */
+  stop: (id: string) => Promise<void>;
   loadRuns: (taskId: string) => Promise<void>;
   deleteRun: (taskId: string, runId: string) => Promise<void>;
 }
 
 function apply(set: (s: Partial<TasksState>) => void, state: ScheduleState): void {
   set({ enabled: state.enabled, tasks: state.tasks, loaded: true });
-}
-
-/** Is a task mid-run right now? Derived from its newest record, so it survives a
- *  reload and needs no separate "running" list to keep in sync. */
-export function isRunning(runs: readonly TaskRun[] | undefined): boolean {
-  return runs?.[0]?.status === 'running';
 }
 
 export const useTasksStore = create<TasksState>((set, get) => ({
@@ -80,6 +76,13 @@ export const useTasksStore = create<TasksState>((set, get) => ({
   runNow: async (id) => {
     // Fire-and-forget: main queues it and streams progress via tasks:run-updated.
     await window.piDesktop.invoke('tasks:run-now', { id }).catch(() => undefined);
+    await get().loadRuns(id);
+  },
+
+  stop: async (id) => {
+    // The finalised record comes back through tasks:run-updated; the reload
+    // is for the case where the event beat the invoke's return.
+    await window.piDesktop.invoke('tasks:stop', { id }).catch(() => undefined);
     await get().loadRuns(id);
   },
 

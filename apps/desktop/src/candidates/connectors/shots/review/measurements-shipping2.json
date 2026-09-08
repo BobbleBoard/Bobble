@@ -1,0 +1,115 @@
+[
+  {
+    "key": "custom card: detail opened after clicking its body",
+    "value": false
+  },
+  {
+    "key": "custom card: detail opened after \"View details\"",
+    "value": false
+  },
+  {
+    "key": "catalog card: detail opened after clicking its body",
+    "value": true
+  },
+  {
+    "key": "time detail after Connect: text",
+    "value": "ConnectorsTimeOfficialCurrent time and timezone conversions.RemoveMCP serverToolsThis connector exposes no tools.How it runsshelluvx mcp-server-timeInformationDevelopermodelcontextprotocolCategoryDevelopmentTransportstdio · uvx modelcontextprotocol"
+  },
+  {
+    "key": "after Remove: confirm dialog? detail still open?",
+    "value": {
+      "dialog": false,
+      "detail": false
+    }
+  },
+  {
+    "key": "registry after remove",
+    "value": [
+      {
+        "id": "memory",
+        "enabled": true,
+        "cmd": "npx"
+      },
+      {
+        "id": "filesystem",
+        "enabled": true,
+        "cmd": "npx"
+      },
+      {
+        "id": "github",
+        "enabled": false,
+        "cmd": "npx"
+      },
+      {
+        "id": "blender",
+        "enabled": true,
+        "cmd": "uvx"
+      },
+      {
+        "id": "weather",
+        "enabled": true,
+        "cmd": "node"
+      },
+      {
+        "id": "sequential-thinking",
+        "enabled": false,
+        "cmd": "npx"
+      }
+    ]
+  },
+  {
+    "key": "focused before Enter",
+    "value": "button:\"🔌WeatherRuns node /User\""
+  },
+  {
+    "key": "Enter on a focused card body opens its detail",
+    "value": false
+  },
+  {
+    "key": "registry after adding a duplicate id \"weather\" with a different command",
+    "value": [
+      {
+        "id": "memory",
+        "enabled": true,
+        "cmd": "npx"
+      },
+      {
+        "id": "filesystem",
+        "enabled": true,
+        "cmd": "npx"
+      },
+      {
+        "id": "github",
+        "enabled": false,
+        "cmd": "npx"
+      },
+      {
+        "id": "blender",
+        "enabled": true,
+        "cmd": "uvx"
+      },
+      {
+        "id": "sequential-thinking",
+        "enabled": false,
+        "cmd": "npx"
+      },
+      {
+        "id": "weather",
+        "enabled": true,
+        "cmd": "python3"
+      }
+    ]
+  },
+  {
+    "key": "Escape closes the add dialog",
+    "value": true
+  },
+  {
+    "key": "focused after Escape",
+    "value": "body:\"BobbleBobbleSearch chats\""
+  },
+  {
+    "key": "focused after Cancel",
+    "value": "body:\"BobbleBobbleSearch chats\""
+  }
+]

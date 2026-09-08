@@ -1,0 +1,31 @@
+title / search: {"title":{"x":411,"y":84,"w":450,"h":34},"search":{"x":1051,"y":85,"w":240,"h":34}}
+row at rest: {"background":"rgba(0, 0, 0, 0)","shadow":"none","border":"0px"}
+installed strip tiles: 7
+sections: [{"id":"connectors-section-recommended","y":328,"n":3},{"id":"connectors-section-custom","y":546,"n":1},{"id":"connectors-section-dev","y":696,"n":7},{"id":"connectors-section-data","y":1050,"n":5},{"id":"connectors-section-browse","y":1336,"n":2},{"id":"connectors-section-comms","y":1486,"n":5},{"id":"connectors-section-docs","y":1772,"n":3},{"id":"connectors-section-media","y":1990,"n":4},{"id":"connectors-section-skills","y":2208,"n":6},{"id":"connectors-section-builtin","y":2546,"n":7}]
+skills overflow row: See Debugging, Data analysis, and more
+first row / its heading: {"first":{"x":403,"y":730,"w":436,"h":64},"heading":{"x":411,"y":696,"w":880,"h":22}}
+installed order: ["github","filesystem","memory","blender","custom:weather","sequential-thinking","skill:code-review","hyperframes","video-editing","mac-calendar","mac-mail","mac-messages","mac-contacts","mac-reminders"]
+github menu: ["Set up…","Edit…","Remove…"]
+memory menu: ["Turn off","Edit…","Remove…"]
+try in chat / name: {"tryBtn":{"x":1138,"y":238,"w":93,"h":32},"name":{"x":471,"y":234,"w":559,"h":34}}
+custom try prompt: Use Weather to get forecast for me.
+custom tool cost: ≈ 61 tokens per turn in Lite · ≈ 159 in Native — an estimate.
+cost with one tool off: 3 on · ≈ 47 tokens per turn in Lite · ≈ 120 in Native — an estimate.
+focus after Escape: connector-open-custom:weather
+focus after keyboard open: connectors-back
+screen geometry: {"innerHeight":900,"rootBottom":900,"documentScrolls":false}
+setup help: Create a token at github.com › Settings › Developer settings Open
+failure reason: GitHub API: 401 Bad credentials
+status line: Needs setup
+row line: GitHubCould not start · tried just now
+tools aside: Tools50 · listed just now Refresh
+tool cost: ≈ 799 tokens per turn in Lite · ≈ 2.0k in Native — an estimate.
+github try prompt: List my open pull requests and summarise the ones waiting on my review.
+time failure title: Could not starttried just now
+time failure reason: mcp-fixture: no fixture for "mcp-server-time"
+dialog / title / name field: {"dialog":{"x":480,"y":265,"w":480,"h":371},"title":{"x":500,"y":281,"w":117,"h":28},"name":{"x":500,"y":345,"w":430,"h":32}}
+focus on open: add-server-name
+after paste: {"nameValue":"Weather Two","cmdValue":"node /Users/user/tools/weather-two/index.js"}
+focus after cancel: connectors-add-server
+focus after escape: connectors-add-server
+composer after Try in chat: Remember that the client meeting moved to Thursday, then tell me what you know about the client.

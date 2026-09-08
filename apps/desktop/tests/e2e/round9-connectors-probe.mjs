@@ -1,6 +1,6 @@
 /**
- * Round-9 adversarial E2E — CONNECTORS: SKILLS TAB + BASH-CLI MODE (failure
- * points #9, #10). Isolated HOME so all persistence is deterministic.
+ * Round-9 adversarial E2E — CONNECTORS: SKILLS + BASH-CLI MODE (failure points
+ * #9, #10). Isolated HOME so all persistence is deterministic. Headless.
  *
  *  #10 BASH-CLI MODE: switching the MCP mode to "Bash CLI" persists to
  *      settings.json (mcpMode) AND rewrites the connector registry
@@ -9,110 +9,92 @@
  *      generated pi-tool shim dir + socket + PATH injection — lives in the pi
  *      child via @pi-desktop/mcp-lite and is covered by that package's unit
  *      tests, out of reach of a mock-pi desktop probe.]
- *  #9  SKILLS TAB: the connectors Skills tab lists the bundled skill catalog;
- *      toggling a skill's Install switch COPIES it into the isolated skills dir
- *      (~/.pi/agent/skills/<id>/SKILL.md); toggling off removes it.
+ *  #9  SKILLS: skills are rows in the one list, under their own section; a
+ *      skill's "+" COPIES it into the isolated skills dir
+ *      (~/.pi/agent/skills/<id>/SKILL.md); "Turn off" in its "···" menu
+ *      removes it. (There is no Skills pill any more: the screen has no filter
+ *      pills at all, by design — the sections are the grouping.)
  *
+ * Also: the two bundled tools are BUILT IN — no "+", no menu — and installing
+ * a builtin over IPC is a rejected no-op that never seeds a phantom server.
  * Run `pnpm build` first.
  */
-import { existsSync, mkdtempSync, readFileSync } from 'node:fs';
-import { createRequire } from 'node:module';
-import { tmpdir } from 'node:os';
+import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { _electron as electron } from 'playwright-core';
+import { launchApp, REPO_ROOT } from './harness.mjs';
 
-const require = createRequire(import.meta.url);
-const electronBinary = require('electron');
-const appRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-const repoRoot = path.resolve(appRoot, '../..');
-const mockPi = path.join(repoRoot, 'packages/engine/tools/mock-pi/mock-pi.mjs');
-const fixture = path.join(repoRoot, 'packages/engine/tools/mock-pi/fixtures/simple-chat.json');
+const fixture = path.join(REPO_ROOT, 'packages/engine/tools/mock-pi/fixtures/simple-chat.json');
 
-function assert(condition, message) {
-  if (!condition) throw new Error(`round9-connectors-probe failed: ${message}`);
-}
+const { page, check, finish, home } = await launchApp('round9-connectors-probe', {
+  fixture,
+  waitFor: '[data-testid="composer-input"]',
+});
 
-assert(existsSync(path.join(appRoot, 'dist/index.html')), 'app is not built — run `pnpm build`');
-
-const home = mkdtempSync(path.join(tmpdir(), 'pi-e2e-home-'));
-const userDataDir = mkdtempSync(path.join(tmpdir(), 'pi-e2e-udd-'));
 const settingsPath = path.join(home, '.pi', 'desktop', 'settings.json');
 const mcpPath = path.join(home, '.pi', 'desktop', 'mcp-connectors.json');
 const skillFile = path.join(home, '.pi', 'agent', 'skills', 'code-review', 'SKILL.md');
-
 const readJson = (p) => JSON.parse(readFileSync(p, 'utf8'));
 
 async function waitFor(predicate, label, timeout = 6000) {
   const start = Date.now();
   while (Date.now() - start < timeout) {
     try {
-      if (predicate()) return;
+      if (predicate()) return true;
     } catch {
       // not written yet
     }
     await new Promise((r) => setTimeout(r, 100));
   }
-  throw new Error(`round9-connectors-probe failed: timed out waiting for ${label}`);
+  return check(false, `timed out waiting for ${label}`);
 }
 
-const app = await electron.launch({
-  executablePath: electronBinary,
-  args: [appRoot, `--user-data-dir=${userDataDir}`],
-  env: { ...process.env, HOME: home, PI_BIN: mockPi, MOCK_PI_FIXTURE: fixture, PI_E2E: '1' },
-});
+const search = async (q) => {
+  await page.fill('[data-testid="connectors-search"]', q);
+  await page.waitForTimeout(250);
+};
 
 try {
-  const page = await app.firstWindow();
-  await page.waitForSelector('[data-testid="composer-input"]', { timeout: 12000 });
   await page.click('[data-testid="nav-connectors"]');
   await page.waitForSelector('[data-testid="connectors-screen"]', { timeout: 8000 });
 
-  // ── SECTIONED GALLERY: By us / Official + preinstalled builtins ──────────────
-  // Our own tool (Video editing) is "By us"; HeyGen's HyperFrames is a bundled
-  // third-party tool → "Official / Verified", never "By us". Both are builtins
-  // that render a static "Preinstalled" badge (no "+").
-  await page.waitForSelector('[data-testid="connectors-section-by-us"]', { timeout: 8000 });
-  await page.waitForSelector(
-    '[data-testid="connectors-section-by-us"] [data-testid="connector-card-video-editing"]',
-    { timeout: 8000 },
-  );
-  await page.waitForSelector(
-    '[data-testid="connectors-section-official"] [data-testid="connector-card-hyperframes"]',
-    { timeout: 8000 },
-  );
-  assert(
-    (await page
-      .locator(
-        '[data-testid="connectors-section-by-us"] [data-testid="connector-card-hyperframes"]',
-      )
-      .count()) === 0,
-    'HyperFrames (HeyGen\'s tool) must NOT appear under "By us"',
-  );
-  await page.waitForSelector('[data-testid="connector-preinstalled-video-editing"]', {
-    timeout: 8000,
-  });
-  await page.waitForSelector('[data-testid="connector-preinstalled-hyperframes"]', {
-    timeout: 8000,
-  });
+  // ── BUILT IN: our own tool (Video editing) and HeyGen's HyperFrames are both
+  // in the "Built in" section, with nothing to press — no "+", no menu. ──
+  for (const id of ['video-editing', 'hyperframes']) {
+    await search(id === 'video-editing' ? 'video' : 'hyperframes');
+    await page.waitForSelector(
+      `[data-testid="connectors-section-builtin"] [data-testid="connector-card-${id}"]`,
+      { timeout: 8000 },
+    );
+    check(!(await page.$(`[data-testid="connector-add-${id}"]`)), `${id} has no "+"`);
+    check(!(await page.$(`[data-testid="connector-menu-${id}"]`)), `${id} has no menu`);
+    check(
+      !(await page.$(
+        `[data-testid="connectors-section-dev"] [data-testid="connector-card-${id}"], [data-testid="connectors-section-media"] [data-testid="connector-card-${id}"]`,
+      )),
+      `${id} is not listed among the servers`,
+    );
+  }
+  await search('');
 
   // ── BUILTIN INSTALL IS A REJECTED NO-OP (never seeds a phantom server) ───────
   const builtinInstall = await page.evaluate(() =>
     window.piDesktop.invoke('connectors:install', { id: 'hyperframes' }),
   );
-  assert(
+  check(
     typeof builtinInstall.error === 'string',
     'installing a builtin should return an error (no-op)',
   );
-  assert(
+  check(
     !builtinInstall.registry.servers.some((s) => s.id === 'hyperframes'),
     'a builtin must never be seeded into the connector registry',
   );
 
   // ── #10 BASH-CLI MODE reaches settings + the connector registry + the store ──
   // Add a plain connector (the "+") so the registry file exists, then flip mode.
+  await search('memory');
   await page.click('[data-testid="connector-add-memory"]');
   await waitFor(() => readJson(mcpPath).servers.some((s) => s.id === 'memory'), 'memory installed');
+  await search('');
   await page.click('[data-testid="connectors-mcp-mode"] >> text=Bash CLI');
   await waitFor(
     () => readJson(settingsPath).mcpMode === 'bash-cli',
@@ -125,28 +107,40 @@ try {
   const storeMode = await page.evaluate(
     () => window.__settings_store?.().getState().settings.mcpMode,
   );
-  assert(
+  check(
     storeMode === 'bash-cli',
     `renderer settings store should reflect bash-cli, got ${JSON.stringify(storeMode)}`,
   );
 
-  // ── #9 SKILLS TAB: install a bundled skill → copied into the skills dir ──────
-  await page.click('[data-testid="connectors-tab-skills"]');
-  await page.waitForSelector('[data-testid="connectors-skills"]', { timeout: 8000 });
-  await page.waitForSelector('[data-testid="skill-card-code-review"]', { timeout: 8000 });
-  assert(!existsSync(skillFile), 'the skill should not be installed before toggling');
-  await page.click('[data-testid="skill-toggle-code-review"]');
+  // ── #9 SKILLS: a row under Skills; its "+" → copied into the skills dir ──
+  await page.waitForSelector(
+    '[data-testid="connectors-section-skills"] [data-testid="connector-card-skill:code-review"]',
+    { timeout: 8000 },
+  );
+  check(!(await page.$('[data-testid^="connectors-filter-"]')), 'no filter pills anywhere');
+  check(!existsSync(skillFile), 'the skill should not be installed before toggling');
+  await page.click('[data-testid="connector-add-skill:code-review"]');
   await waitFor(
     () => existsSync(skillFile),
     'skill copied into ~/.pi/agent/skills/code-review/SKILL.md',
   );
-  // Toggling off removes it from the skills dir.
-  await page.click('[data-testid="skill-toggle-code-review"]');
-  await waitFor(() => !existsSync(skillFile), 'skill removed from the skills dir on toggle-off');
+  // On, its control is the "···" menu; Turn off removes it from the skills dir.
+  await page.waitForSelector('[data-testid="connector-menu-skill:code-review"]', {
+    timeout: 8000,
+  });
+  await page.click('[data-testid="connector-menu-skill:code-review"]');
+  await page.waitForSelector('[data-testid="connector-menu-toggle-skill:code-review"]', {
+    timeout: 4000,
+  });
+  await page.click('[data-testid="connector-menu-toggle-skill:code-review"]');
+  await waitFor(() => !existsSync(skillFile), 'skill removed from the skills dir on Turn off');
 
   console.log(
-    'round9-connectors-probe OK — sectioned gallery (Video editing under By us, HyperFrames under Official, both Preinstalled); builtin install is a rejected no-op; the "+" added memory; Bash CLI mode persisted to settings.json + rewrote the connector registry (mcp-connectors.json) + reflected in the renderer settings store; the Skills tab installed a bundled skill (copied SKILL.md into the isolated skills dir) and removed it on toggle-off',
+    'round9-connectors-probe: Video editing and HyperFrames under Built in with nothing to press; ' +
+      'builtin install is a rejected no-op; the "+" added memory; Bash CLI mode persisted to ' +
+      'settings.json + rewrote the registry + reflected in the store; the Skills section lists the ' +
+      'bundled skills, a row "+" installed one (SKILL.md copied) and its menu removed it again',
   );
 } finally {
-  await app.close();
+  await finish();
 }

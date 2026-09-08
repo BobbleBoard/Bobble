@@ -1,0 +1,76 @@
+{
+  "cand-chrome": {
+    "topbarTitle": {
+      "text": "Scheduled",
+      "box": {
+        "x": 280,
+        "y": 10,
+        "w": 85,
+        "h": 28
+      },
+      "font": "14px/20px 400",
+      "color": "rgb(245, 245, 247)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "0px",
+      "outline": "3px none rgb(245, 245, 247) offset 0px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "h1": {
+      "text": "Scheduled tasks",
+      "box": {
+        "x": 296,
+        "y": 64,
+        "w": 466,
+        "h": 28
+      },
+      "font": "22px/28px 500",
+      "color": "rgb(245, 245, 247)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "0px",
+      "outline": "3px none rgb(245, 245, 247) offset 0px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "composer": {
+      "text": "",
+      "box": {
+        "x": 296,
+        "y": 124,
+        "w": 1120,
+        "h": 48
+      },
+      "font": "14px/20px 400",
+      "color": "rgb(245, 245, 247)",
+      "bg": "rgb(30, 30, 33)",
+      "border": "1px rgba(255, 255, 255, 0.12)",
+      "radius": "18px",
+      "outline": "3px none rgb(245, 245, 247) offset 0px",
+      "transition": "border-color, box-shadow 0.12s, 0.12s",
+      "animation": "none",
+      "opacity": "1"
+    },
+    "list": {
+      "text": "Search tasksNowPortrait of the dayEvery day at 8:00 AM24sTod",
+      "box": {
+        "x": 272,
+        "y": 207,
+        "w": 280,
+        "h": 661
+      },
+      "font": "14px/20px 400",
+      "color": "rgb(245, 245, 247)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "none",
+      "radius": "0px",
+      "outline": "3px none rgb(245, 245, 247) offset 0px",
+      "transition": "all",
+      "animation": "none",
+      "opacity": "1"
+    }
+  }
+}

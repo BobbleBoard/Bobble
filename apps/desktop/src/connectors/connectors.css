@@ -1,0 +1,761 @@
+/*
+ * The Connectors screen. Every colour, radius and motion value is a --pd-*
+ * token so all six flavour × mode combinations restyle it; nothing here is a
+ * hex. Container queries throughout: the screen lives beside a 288px sidebar,
+ * so every width decision is about the box it is in, not the window.
+ *
+ * The shape is the reference's: one centred column, rows on the bare
+ * background, two to a line, and a lot of air. The restraint is the design.
+ */
+
+.pdc {
+  container-type: inline-size;
+  container-name: pdc;
+}
+.pdc-list,
+.pdc-detail {
+  min-height: 0;
+  flex: 1;
+}
+.pdc-list[data-hidden="true"] {
+  display: none;
+}
+.pdc-detail {
+  animation: pdc-swap var(--pd-duration-slow) var(--pd-easing-enter);
+}
+@keyframes pdc-swap {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* An overlay scrollbar: the thumb appears only while the pointer is over the
+   scroller; the gutter stays so nothing shifts. */
+.pdc-list::-webkit-scrollbar-thumb,
+.pdc-detail::-webkit-scrollbar-thumb {
+  transition: background-color var(--pd-duration-base) var(--pd-easing-standard);
+}
+.pdc-list:not(:hover)::-webkit-scrollbar-thumb,
+.pdc-detail:not(:hover)::-webkit-scrollbar-thumb {
+  background-color: transparent;
+}
+
+/* ---- the column: 880px of content, centred, the reference's proportions ---- */
+.pdc-col {
+  width: 100%;
+  max-width: 944px;
+  margin: 0 auto;
+  padding: 0 32px 48px;
+}
+.pdc-col--detail {
+  max-width: 824px;
+}
+
+/* ---- the title row: title, one line, a compact search ---- */
+.pdc-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px 24px;
+  padding-top: 36px;
+}
+.pdc-title {
+  font-size: 28px;
+  line-height: 34px;
+  font-weight: var(--pd-font-weight-semibold);
+  letter-spacing: -0.015em;
+  color: var(--pd-text-primary);
+}
+.pdc-sub {
+  margin-top: 6px;
+  font-size: 15px;
+  line-height: 22px;
+  color: var(--pd-text-secondary);
+}
+.pdc-search-wrap {
+  position: relative;
+  display: flex;
+  flex: none;
+  width: 240px;
+  max-width: 100%;
+  margin-top: 1px;
+}
+.pdc-search {
+  width: 100%;
+  min-width: 0;
+  height: 34px;
+  padding: 0 14px 0 34px;
+  border: 1px solid var(--pd-border-subtle);
+  border-radius: var(--pd-radius-full);
+  background: var(--pd-bg-raised);
+  color: var(--pd-text-primary);
+  font-family: var(--pd-font-sans);
+  font-size: var(--pd-font-size-body);
+  box-shadow: var(--pd-shadow-hairline);
+}
+.pdc-search::placeholder {
+  color: var(--pd-text-muted);
+}
+.pdc-search::-webkit-search-decoration,
+.pdc-search::-webkit-search-cancel-button {
+  appearance: none;
+}
+.pdc-search-wrap > svg {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--pd-text-muted);
+  pointer-events: none;
+}
+
+/* ---- sections and their headings ---- */
+.pdc-section {
+  margin-top: 52px;
+}
+.pdc-h2,
+.pdc-h2-btn {
+  font-size: 16px;
+  line-height: 22px;
+  font-weight: var(--pd-font-weight-semibold);
+  color: var(--pd-text-primary);
+}
+.pdc-h2 {
+  margin-bottom: 12px;
+}
+.pdc-h2-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+/* "Installed ›" — a heading that opens. The chevron is the affordance and turns when it is open. */
+.pdc-h2-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: -6px;
+  padding: 2px 6px;
+  border-radius: var(--pd-radius-sm);
+  font-family: var(--pd-font-sans);
+  cursor: pointer;
+  transition: background-color var(--pd-duration-base) var(--pd-easing-standard);
+}
+.pdc-h2-btn:hover {
+  background: var(--pd-bg-hover);
+}
+.pdc-h2-btn > .pdc-chev {
+  display: inline-flex;
+  color: var(--pd-text-muted);
+  transition:
+    transform var(--pd-duration-base) var(--pd-easing-standard),
+    color var(--pd-duration-base) var(--pd-easing-standard);
+}
+.pdc-h2-btn:hover > .pdc-chev,
+.pdc-h2-btn[aria-expanded="true"] > .pdc-chev {
+  color: var(--pd-text-primary);
+}
+.pdc-h2-btn[aria-expanded="true"] > .pdc-chev {
+  transform: rotate(90deg);
+}
+.pdc-attention {
+  font-size: var(--pd-font-size-caption);
+  color: var(--pd-status-warning-fg);
+}
+.pdc-label {
+  margin: 20px 0 6px;
+  font-size: var(--pd-font-size-caption);
+  color: var(--pd-text-muted);
+}
+.pdc-quiet {
+  font-size: var(--pd-font-size-footnote);
+  line-height: var(--pd-leading-footnote);
+  color: var(--pd-text-muted);
+}
+.pdc-empty {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* ---- the Installed strip: marks only, 40px, and the way to add your own ---- */
+.pdc-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.pdc-tile {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  border-radius: var(--pd-radius-lg);
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+  cursor: pointer;
+  transition:
+    transform var(--pd-duration-base) var(--pd-easing-standard),
+    opacity var(--pd-duration-base) var(--pd-easing-standard);
+}
+.pdc-tile:hover {
+  transform: translateY(-1px);
+}
+.pdc-tile[data-state="off"] {
+  opacity: 0.45;
+}
+.pdc-tile[data-state="off"]:hover {
+  opacity: 0.8;
+}
+.pdc-tile-dot {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 10px;
+  height: 10px;
+  border-radius: var(--pd-radius-full);
+  background: var(--pd-status-warning-fg);
+  box-shadow: 0 0 0 2px var(--pd-bg-base);
+}
+.pdc-tile--add {
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: 1.5px dashed var(--pd-border-strong);
+  color: var(--pd-text-muted);
+  transition:
+    color var(--pd-duration-base) var(--pd-easing-standard),
+    border-color var(--pd-duration-base) var(--pd-easing-standard),
+    background-color var(--pd-duration-base) var(--pd-easing-standard);
+}
+.pdc-tile--add:hover,
+.pdc-addrow:hover > .pdc-tile--add {
+  color: var(--pd-text-primary);
+  border-color: var(--pd-text-secondary);
+  background: var(--pd-bg-hover);
+}
+.pdc-installed-open {
+  display: flex;
+  flex-direction: column;
+}
+/* "Add a server" as a row, at the end of the open Installed list. */
+.pdc-addrow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 14px -8px 0;
+  padding: 8px;
+  border-radius: var(--pd-radius-lg);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--pd-duration-base) var(--pd-easing-standard);
+}
+.pdc-addrow:hover {
+  background: var(--pd-bg-hover);
+}
+
+/* ---- the mark tile: one container whatever is inside it ---- */
+.pdc-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  background: var(--pd-bg-inset);
+  box-shadow: inset 0 0 0 1px var(--pd-border-default);
+  color: var(--pd-text-primary);
+}
+/* A skill is a document, not a brand: its tile is drawn as a page. */
+.pdc-mark--skill {
+  background: var(--pd-bg-raised);
+  color: var(--pd-text-secondary);
+}
+
+/* ---- status dot (the detail's state line) ---- */
+.pdc-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: var(--pd-radius-full);
+  background: var(--pd-text-muted);
+  box-shadow: 0 0 0 2px var(--pd-bg-raised);
+}
+.pdc-dot[data-state="on"],
+.pdc-dot[data-state="builtin"] {
+  background: var(--pd-status-success-fg);
+}
+.pdc-dot[data-state="needs-setup"] {
+  background: var(--pd-status-warning-fg);
+}
+.pdc-dot[data-state="off"] {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--pd-text-muted);
+}
+.pdc-dot[data-state="available"] {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--pd-border-strong);
+}
+
+/* ---- the row grid: two to a line when the column is wide enough ---- */
+.pdc-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  column-gap: 40px;
+  row-gap: 4px;
+}
+@container pdc (min-width: 760px) {
+  .pdc-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* ---- a row: mark · name · one line · one control. No border, no fill. ----
+   The 8px the hover fill reaches past the column is a negative margin, so
+   the mark's left edge sits on the heading's. */
+.pdc-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 64px;
+  margin: 0 -8px;
+  padding: 6px 6px 6px 8px;
+  border-radius: var(--pd-radius-lg);
+  transition: background-color var(--pd-duration-base) var(--pd-easing-standard);
+}
+.pdc-row:hover {
+  background: var(--pd-bg-hover);
+}
+.pdc-open {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: center;
+  gap: 14px;
+  padding: 0;
+  text-align: left;
+  outline: none;
+  cursor: pointer;
+  transition: opacity var(--pd-duration-base) var(--pd-easing-standard);
+}
+.pdc-row[data-state="off"] > .pdc-open {
+  opacity: 0.55;
+}
+.pdc-row-text {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 1px;
+}
+.pdc-row-name {
+  font-size: 15px;
+  line-height: 20px;
+  color: var(--pd-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pdc-row-line {
+  font-size: var(--pd-font-size-footnote);
+  line-height: 19px;
+  color: var(--pd-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pdc-row-line[data-warn="true"] {
+  color: var(--pd-status-warning-fg);
+}
+
+/* ---- the one control: "+" or "···", a glyph with a hover fill ---- */
+.pdc-ctl {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--pd-radius-md);
+  color: var(--pd-text-secondary);
+  cursor: pointer;
+  transition:
+    background-color var(--pd-duration-base) var(--pd-easing-standard),
+    color var(--pd-duration-base) var(--pd-easing-standard);
+}
+.pdc-ctl:hover,
+.pdc-ctl[data-state="open"] {
+  background: var(--pd-bg-active);
+  color: var(--pd-text-primary);
+}
+
+/* ---- "See Git, Time, and more" — three marks in a little box, then words ---- */
+.pdc-seemore {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  max-width: 100%;
+  margin: 10px 0 0 -8px;
+  padding: 6px 12px 6px 8px;
+  border-radius: var(--pd-radius-md);
+  color: var(--pd-text-secondary);
+  font-family: var(--pd-font-sans);
+  font-size: var(--pd-font-size-footnote);
+  line-height: var(--pd-leading-footnote);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color var(--pd-duration-base) var(--pd-easing-standard),
+    color var(--pd-duration-base) var(--pd-easing-standard);
+}
+.pdc-seemore:hover {
+  background: var(--pd-bg-hover);
+  color: var(--pd-text-primary);
+}
+.pdc-cluster {
+  display: inline-flex;
+  flex: none;
+  gap: 4px;
+  padding: 4px;
+  border-radius: var(--pd-radius-md);
+  background: var(--pd-bg-inset);
+  box-shadow: inset 0 0 0 1px var(--pd-border-subtle);
+}
+.pdc-cluster > .pdc-mark {
+  background: var(--pd-bg-raised);
+  box-shadow: none;
+}
+
+/* ---- the foot: how tools reach the model, and the one-line disclaimer ---- */
+.pdc-foot {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 56px;
+  padding-top: 20px;
+  border-top: 1px solid var(--pd-border-subtle);
+}
+
+/* ---- the detail page: a way back, a large mark, the name, the controls ---- */
+.pdc-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin: 20px 0 0 -8px;
+  padding: 4px 10px 4px 6px;
+  border-radius: var(--pd-radius-sm);
+  color: var(--pd-text-secondary);
+  font-family: var(--pd-font-sans);
+  font-size: var(--pd-font-size-footnote);
+  line-height: var(--pd-leading-footnote);
+  cursor: pointer;
+  transition:
+    background-color var(--pd-duration-base) var(--pd-easing-standard),
+    color var(--pd-duration-base) var(--pd-easing-standard);
+}
+.pdc-back:hover {
+  background: var(--pd-bg-hover);
+  color: var(--pd-text-primary);
+}
+.pdc-detail-head {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  margin-top: 40px;
+}
+.pdc-detail-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px 24px;
+}
+.pdc-detail-name {
+  font-size: 28px;
+  line-height: 34px;
+  font-weight: var(--pd-font-weight-semibold);
+  letter-spacing: -0.015em;
+  color: var(--pd-text-primary);
+  overflow-wrap: anywhere;
+}
+.pdc-detail-desc {
+  margin-top: 6px;
+  font-size: 15px;
+  line-height: 22px;
+  color: var(--pd-text-secondary);
+}
+.pdc-detail-state {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  font-size: var(--pd-font-size-caption);
+}
+.pdc-detail-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 10px;
+  padding-top: 4px;
+}
+.pdc-detail-body {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  margin-top: 36px;
+}
+
+/* ---- a key/value spec list in details ---- */
+.pdc-spec {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr);
+  row-gap: 6px;
+  column-gap: 12px;
+  font-size: var(--pd-font-size-footnote);
+}
+.pdc-spec dt {
+  color: var(--pd-text-muted);
+}
+.pdc-spec dd {
+  margin: 0;
+  min-width: 0;
+  color: var(--pd-text-primary);
+  /* break-word, not anywhere: a URL may wrap at a slash, a key only at its
+     <wbr>s — never GITHUB_PERSONAL_ACC|ESS_TOKEN. */
+  overflow-wrap: break-word;
+}
+.pdc-key {
+  font-family: var(--pd-font-mono);
+  font-size: var(--pd-font-size-caption);
+  color: var(--pd-text-primary);
+  word-break: keep-all;
+}
+
+/* ---- muted mono for commands (never a scrolling code block for one line) ---- */
+.pdc-cmd {
+  display: block;
+  padding: 8px 10px;
+  border-radius: var(--pd-radius-sm);
+  background: var(--pd-code-block-bg);
+  box-shadow: inset 0 0 0 1px var(--pd-code-block-border);
+  color: var(--pd-text-secondary);
+  font-family: var(--pd-font-mono);
+  font-size: var(--pd-font-size-caption);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* ---- a document inside a detail: prose at UI scale, not chat scale ---- */
+.pdc-doc .pd-prose {
+  font-size: var(--pd-font-size-footnote);
+  line-height: var(--pd-leading-footnote);
+}
+.pdc-doc .pd-prose h1 {
+  font-size: var(--pd-font-size-heading);
+}
+.pdc-doc .pd-prose h2 {
+  font-size: var(--pd-font-size-body);
+}
+.pdc-doc .pd-prose h3,
+.pdc-doc .pd-prose :is(h4, h5, h6) {
+  font-size: var(--pd-font-size-footnote);
+}
+
+/* ---- the tools list in a detail ---- */
+.pdc-tools {
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--pd-radius-lg);
+  box-shadow: 0 0 0 1px var(--pd-border-subtle);
+  overflow: hidden;
+}
+.pdc-tool {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 7px 10px 8px 12px;
+}
+.pdc-tool + .pdc-tool {
+  box-shadow: 0 -1px 0 0 var(--pd-border-subtle);
+}
+.pdc-tool-text {
+  min-width: 0;
+  flex: 1;
+  transition: opacity var(--pd-duration-base) var(--pd-easing-standard);
+}
+.pdc-tool[data-on="false"] > .pdc-tool-text {
+  opacity: 0.55;
+}
+.pdc-tool > .pd-switch {
+  flex: none;
+  margin-top: 2px;
+}
+
+/* ---- a text button: the quiet action beside a title (Refresh, Show all) ---- */
+.pdc-textbtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: var(--pd-radius-sm);
+  color: var(--pd-text-secondary);
+  font-family: var(--pd-font-sans);
+  font-size: var(--pd-font-size-footnote);
+  line-height: var(--pd-leading-footnote);
+  cursor: pointer;
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+  transition: color var(--pd-duration-base) var(--pd-easing-standard);
+}
+.pdc-textbtn:hover:not(:disabled) {
+  color: var(--pd-text-primary);
+}
+.pdc-textbtn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* ---- an inline link in a spec row (the category that searches for itself) ---- */
+.pdc-link {
+  border-radius: var(--pd-radius-sm);
+  color: var(--pd-text-link);
+  font: inherit;
+  cursor: pointer;
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+}
+.pdc-link:hover {
+  text-decoration: underline;
+}
+
+/* ---- the setup card and the failure card: the one warm surface on the page ---- */
+.pdc-setup,
+.pdc-fail {
+  padding: 14px 16px 16px;
+  border-radius: var(--pd-radius-lg);
+  border: 1px solid var(--pd-status-warning-border);
+  background: var(--pd-status-warning-bg);
+}
+.pdc-stderr {
+  margin: 0;
+  padding: 6px 8px;
+  border-radius: var(--pd-radius-sm);
+  background: var(--pd-code-block-bg);
+  box-shadow: inset 0 0 0 1px var(--pd-code-block-border);
+  color: var(--pd-text-secondary);
+  font-family: var(--pd-font-mono);
+  font-size: var(--pd-font-size-caption);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* ---- "Try it": the outcome before the inventory ----
+   One real ask, drawn the way the chat draws it — a person's bubble on the
+   right — over a raised card. The button that sends it is in the header. */
+.pdc-try {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border-radius: var(--pd-radius-lg);
+  background: var(--pd-bg-raised);
+  box-shadow: 0 0 0 1px var(--pd-border-subtle);
+}
+.pdc-try-bubble {
+  align-self: flex-end;
+  max-width: 88%;
+  padding: 10px 14px;
+  border-radius: var(--pd-radius-lg);
+  border-bottom-right-radius: var(--pd-radius-sm);
+  background: var(--pd-bg-selected);
+  color: var(--pd-text-primary);
+  font-size: 15px;
+  line-height: 22px;
+}
+
+/* ---- keyboard focus on a row: the ring goes on the CONTAINER, not on the
+   inner button, whose box is not what the eye reads as the thing. An
+   OUTLINE, 2px out — the app's own focus grammar. ---- */
+.pdc-row:has(> .pdc-open:focus-visible) {
+  outline: 2px solid var(--pd-focus-ring);
+  outline-offset: 2px;
+}
+
+/* ---- the add / edit dialog ----
+   Opaque, whatever the flavour's dialog translucency: the list's text was
+   legible through the form for the first 80ms of its entrance. A width, so
+   the dialog is not the width of its longest input. */
+.pdc-dialog.pd-dialog {
+  width: min(92vw, 480px);
+  max-width: min(92vw, 480px);
+  background: linear-gradient(var(--pd-bg-overlay), var(--pd-bg-overlay)), var(--pd-bg-raised);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+.pdc-dialog .pd-dialog-body {
+  padding-top: 16px;
+}
+.pdc-field-error {
+  color: var(--pd-status-danger-fg);
+  font-size: var(--pd-font-size-caption);
+}
+.pdc-dialog .pd-input[aria-invalid="true"] {
+  border-color: var(--pd-status-danger-fg);
+}
+.pdc-dialog textarea.pd-input {
+  resize: none;
+  min-height: 64px;
+}
+.pdc-dialog .pd-btn--accent:disabled {
+  opacity: 0.4;
+}
+/* The detected-config line and the Test result. */
+.pdc-detected {
+  color: var(--pd-text-muted);
+  font-size: var(--pd-font-size-caption);
+}
+.pdc-test {
+  padding: 10px 12px;
+  border-radius: var(--pd-radius-md);
+  background: var(--pd-bg-inset);
+  box-shadow: inset 0 0 0 1px var(--pd-border-subtle);
+}
+.pdc-test[data-ok="false"] {
+  border: 1px solid var(--pd-status-warning-border);
+  background: var(--pd-status-warning-bg);
+  box-shadow: none;
+}
+/* A disclosure that opens to its measured height. */
+.pdc-more > summary {
+  list-style: none;
+  cursor: pointer;
+  color: var(--pd-text-secondary);
+  font-size: var(--pd-font-size-footnote);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: var(--pd-radius-sm);
+}
+.pdc-more > summary::-webkit-details-marker {
+  display: none;
+}
+.pdc-more > summary > svg {
+  transition: transform var(--pd-duration-base) var(--pd-easing-standard);
+}
+.pdc-more[open] > summary > svg {
+  transform: rotate(180deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pdc-detail {
+    animation: none;
+  }
+  .pdc-tile:hover {
+    transform: none;
+  }
+}
