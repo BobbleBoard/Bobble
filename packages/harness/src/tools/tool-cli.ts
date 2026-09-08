@@ -121,6 +121,8 @@ const COMMAND_PATH_OVERRIDES: Readonly<Record<string, readonly string[]>> = {
   // thing it does. Same for the other two, which would otherwise repeat their
   // group or their verb.
   spotlight_search: ['search'],
+  // `machine python run` repeats itself; running Python IS the command.
+  python_run: ['python'],
   create_scheduled_task: ['schedule'],
   update_plan: ['plan'],
   spawn_subagent: ['delegate'],

@@ -64,6 +64,7 @@ import { capabilityForTool } from './presets/capabilities.js';
 import { resolvePresetTools } from './presets/presets.js';
 import { augmentSystemPrompt } from './prompt/capability-prompt.js';
 import { sameWording } from './prompt/same-wording.js';
+import { shortDescription } from './prompt/short-description.js';
 import { connectRepairBridge, type LiveRepairDeps } from './repair/bridge.js';
 import { createToolCallFixer, withRepairAttempts } from './repair/fixer.js';
 import {
@@ -2414,26 +2415,6 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
      * Ordering does not touch the KV prefix — the prompt is frozen per session.
      */
     return toolCliMode ? `${toolCliPreamble()}\n\n${augmented}` : augmented;
-  }
-
-  /**
-   * A tool's description, cut to the one line the list can afford.
-   *
-   * the user: "the names and a quick description of what it is is there for each
-   * tool, with a tidbit at the end that says --help should be used to get
-   * started with any." That is what a schema gives a model, and CLI mode is
-   * supposed to lose nothing — a group summary alone told it `mac` existed but
-   * not that `mac launch` did, which is how a model asked to open an app never
-   * found the command for opening apps.
-   *
-   * The first sentence, and no more: the rest of a description is arguments and
-   * caveats, which is what `--help` is for.
-   */
-  function shortDescription(description: string): string {
-    if (description.trim() === '') return 'no description';
-    const first = description.trim().split(/(?<=\.)\s+/)[0] ?? description.trim();
-    const line = first.replace(/\s+/g, ' ').trim();
-    return line.length <= 96 ? line : `${line.slice(0, 95).trimEnd()}…`;
   }
 
   /** Tool name → the command line that runs it, straight from the CLI model. */
