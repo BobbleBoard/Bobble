@@ -152,7 +152,38 @@ check(
   `retry count is not bounded sensibly (${presses.length} presses accepted)`,
 );
 
-// ── 4. …and the rest of the app still works afterwards ───────────────────
+/*
+ * ── 4. The pieces that are NOT screens ───────────────────────────────────
+ *
+ * The 3D studio's Send To / Export pair is lazy too, out of the same chunk as
+ * the workspace, and it lives in the top bar. A full card there would be a worse
+ * failure than the one it is reporting, so that boundary draws a chip instead —
+ * and the workspace beside it must still come up.
+ */
+await openStudio('chat');
+await page.waitForTimeout(400);
+await page.evaluate(() => window.__pi_fail_chunk('3D controls', 99));
+await openStudio('3d');
+await page.waitForTimeout(4000);
+const inline = await page.evaluate(() => {
+  const el = document.querySelector('[data-route="3D controls"]');
+  return {
+    found: el !== null,
+    inline: el?.classList.contains('pd-route-inline') ?? false,
+    height: el === null ? 0 : Math.round(el.getBoundingClientRect().height),
+    workspace: document.querySelector('[data-testid="tp-viewport"]') !== null,
+    appCrashed: document.querySelector('[data-testid="app-crash"]') !== null,
+  };
+});
+console.log('inline variant:', JSON.stringify(inline));
+await shot('05-inline-variant');
+check(inline.found, 'the lazy top-bar controls have no boundary of their own');
+check(inline.inline, 'a top-bar control failure drew the full-size panel');
+check(inline.height > 0 && inline.height < 60, `the chip is not chip-sized (${inline.height}px)`);
+check(inline.workspace, 'the 3D workspace went down with its two buttons');
+check(!inline.appCrashed, 'the top-bar controls took the app with them');
+
+// ── 5. …and the rest of the app still works afterwards ───────────────────
 await openStudio('chat');
 await page.waitForTimeout(800);
 const back = await page.evaluate(() => ({
@@ -160,7 +191,7 @@ const back = await page.evaluate(() => ({
   appCrashed: document.querySelector('[data-testid="app-crash"]') !== null,
 }));
 console.log('back in chat:', JSON.stringify(back));
-await shot('05-back-in-chat');
+await shot('06-back-in-chat');
 check(back.composer, 'the chat did not come back after the route failed');
 check(!back.appCrashed, 'the app ended on the crash card');
 
