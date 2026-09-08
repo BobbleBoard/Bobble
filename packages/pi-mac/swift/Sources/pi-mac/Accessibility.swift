@@ -122,6 +122,16 @@ struct SnapEl {
   let value: String
   let actions: [String]
   let element: AXUIElement
+  /// The surface (window / sheet / dialog) this element lives in, and the pid
+  /// that really owns that surface. A sandboxed app's Open/Save panel is hosted
+  /// by another process, so a coordinate act aimed at the app's own pid would
+  /// miss it — acts follow `hostPid`, not the snapshot's pid.
+  let win: CGWindowID?
+  let hostPid: pid_t
+  /// Non-empty when the element is NOT in the app's main window: "Open" for a
+  /// dialog titled Open, so the model can tell at a glance which surface an
+  /// index belongs to.
+  let surface: String
 }
 
 /// Roles worth surfacing even when they expose no AX action (so a text area the
@@ -213,6 +223,14 @@ struct SnapshotResult {
   /// when the root is a real window — the cursor overlay positions itself over
   /// exactly this rect. Nil when the root fell back to the app element.
   let windowBounds: CGRect?
+  /// Every surface the app is presenting, front-to-back — windows, sheets,
+  /// dialogs, popovers. The monitor streams their union; the model is told when
+  /// one of them is modal.
+  let windows: [AppWindow]
+  /// The frontmost modal surface, when the app is blocked behind one. Acting
+  /// anywhere else while this is non-nil does nothing, so the tool layer says
+  /// so out loud rather than letting the model click into a dead window.
+  let dialog: AppWindow?
 }
 
 /// Walk the AX tree of `target` and return a COMPACT, INDEXED element list
@@ -222,10 +240,22 @@ struct SnapshotResult {
 func collectSnapshot(target: SnapshotTarget, cap: Int) -> SnapshotResult? {
   guard let resolved = resolveTargetPid(target) else { return nil }
   let app = AXUIElementCreateApplication(resolved.pid)
-  let root = rootFor(app: app)
-  let windowTitle = axString(root, kAXTitleAttribute) ?? ""
-  let windowId = axWindowID(root)
-  let windowBounds = windowFrame(root)
+  // Walk EVERY surface the app is presenting, front-to-back — its window and
+  // any sheet, dialog or file panel on top of it. A save panel is part of the
+  // app the user is looking at, so its controls have to be in the same indexed
+  // list as the window's; walking only the focused window is what made the
+  // model click into a window that was blocked behind a dialog.
+  let surfaces = appWindows(pid: resolved.pid)
+  let active = activeSurface(surfaces)
+  let fallbackRoot = rootFor(app: app)
+  let roots: [(el: AXUIElement, win: AppWindow?)] =
+    surfaces.isEmpty
+    ? [(fallbackRoot, nil)]
+    : surfaces.compactMap { w in w.element.map { (el: $0, win: w) } }
+  let mainWindowId = surfaces.first(where: { !$0.isModal })?.windowId
+  let windowTitle = active?.title ?? (axString(fallbackRoot, kAXTitleAttribute) ?? "")
+  let windowId = active?.windowId ?? axWindowID(fallbackRoot)
+  let windowBounds = active?.frame ?? windowFrame(fallbackRoot)
   let bounds = mainDisplayBounds()
 
   struct Cand {
@@ -239,11 +269,22 @@ func collectSnapshot(target: SnapshotTarget, cap: Int) -> SnapshotResult? {
     let value: String
     let actions: [String]
     let onScreen: Bool
+    let win: CGWindowID?
+    let hostPid: pid_t
+    let surface: String
   }
 
   var cands: [Cand] = []
   var visited = 0
-  var stack: [AXUIElement] = [root]
+  var seenElements = Set<AXUIElement>()
+  for root in roots {
+  let surfaceWin = root.win
+  let surfaceLabel: String = {
+    guard let w = surfaceWin, w.windowId != mainWindowId else { return "" }
+    if !w.title.isEmpty { return w.title }
+    return w.isSheet ? "sheet" : (w.isModal ? "dialog" : "window")
+  }()
+  var stack: [AXUIElement] = [root.el]
 
   while let el = stack.popLast() {
     if visited >= MAX_NODES { break }
@@ -272,11 +313,16 @@ func collectSnapshot(target: SnapshotTarget, cap: Int) -> SnapshotResult? {
     let focused = axBool(el, kAXFocusedAttribute) ?? false
     let onScreen = rect.intersects(bounds)
 
+    if seenElements.contains(el) { continue }
+    seenElements.insert(el)
+
     cands.append(
       Cand(
         el: el, role: role, name: truncate(name, NAME_MAX), rect: rect, editable: editable,
         enabled: enabled, focused: focused, value: truncate(cleanText(value), NAME_MAX),
-        actions: actions, onScreen: onScreen))
+        actions: actions, onScreen: onScreen, win: surfaceWin?.windowId,
+        hostPid: surfaceWin?.hostPid ?? resolved.pid, surface: surfaceLabel))
+  }
   }
 
   // On-screen first, then document order (traversal already document order, so a
@@ -297,13 +343,15 @@ func collectSnapshot(target: SnapshotTarget, cap: Int) -> SnapshotResult? {
         x: Int(c.rect.midX.rounded()), y: Int(c.rect.midY.rounded()),
         w: Int(c.rect.width.rounded()), h: Int(c.rect.height.rounded()),
         editable: c.editable, enabled: c.enabled, focused: c.focused, value: c.value,
-        actions: c.actions, element: c.el))
+        actions: c.actions, element: c.el, win: c.win, hostPid: c.hostPid,
+        surface: c.surface))
   }
 
   return SnapshotResult(
     elements: elements, appName: resolved.name, windowTitle: windowTitle,
     truncated: ordered.count > elements.count, total: ordered.count,
-    pid: resolved.pid, windowId: windowId, windowBounds: windowBounds)
+    pid: resolved.pid, windowId: windowId, windowBounds: windowBounds, windows: surfaces,
+    dialog: surfaces.first(where: { $0.isModal }))
 }
 
 /// Frame of an AX window element in global screen points, or nil when the
@@ -323,8 +371,16 @@ func windowFrame(_ el: AXUIElement) -> CGRect? {
 func windowBoundsInfo(target: SnapshotTarget) -> [String: Any]? {
   guard let resolved = resolveTargetPid(target) else { return nil }
   let app = AXUIElementCreateApplication(resolved.pid)
-  let root = rootFor(app: app)
-  guard let frame = windowFrame(root) else { return nil }
+  // The overlay has to cover EVERY surface the app is presenting, not just its
+  // window: when a save sheet or a file panel is up, that is where the model is
+  // clicking, and a phantom cursor that stops at the window edge would be
+  // pointing at nothing. So x/y/w/h is the UNION, while `active` reports the
+  // surface an act would actually land in.
+  let surfaces = appWindows(pid: resolved.pid)
+  let active = activeSurface(surfaces)
+  let root = active?.element ?? rootFor(app: app)
+  let ownFrame = active?.frame ?? windowFrame(root)
+  guard let frame = unionFrame(surfaces) ?? ownFrame else { return nil }
   var d: [String: Any] = [
     "ok": true,
     "app": resolved.name,
@@ -334,18 +390,37 @@ func windowBoundsInfo(target: SnapshotTarget) -> [String: Any]? {
     "w": Int(frame.width.rounded()),
     "h": Int(frame.height.rounded()),
     "frontmost": NSWorkspace.shared.frontmostApplication?.processIdentifier == resolved.pid,
-    "windowTitle": axString(root, kAXTitleAttribute) ?? "",
+    "windowTitle": active?.title ?? (axString(root, kAXTitleAttribute) ?? ""),
+    "surfaces": surfaces.count,
   ]
-  if let wid = axWindowID(root) {
+  if let a = active {
+    d["active"] = windowDict(a)
+    if a.isModal { d["dialog"] = windowDict(a) }
+  }
+  if let wid = active?.windowId ?? axWindowID(root) {
     d["windowId"] = Int(wid)
     // Z-order truth for the overlay's app-scoping (one cheap window-server
     // read): is the window on the CURRENT space, and how much of it is covered
     // by OTHER apps' windows above it? The overlay hides while occluded — the
     // phantom must never paint on top of whatever covers the controlled app.
+    // Surfaces the app itself presents (its own sheets, its own file panel —
+    // even when that panel is hosted by another process) must NOT count as
+    // occluders, or the overlay would hide exactly when a dialog opens.
+    let ownPids = Set(surfaces.map { $0.hostPid })
     let z = zOrderInfo(windowId: wid, pid: resolved.pid, fallbackFrame: frame)
-    d["onScreen"] = z.onScreen
-    d["occluded"] = z.onScreen && z.coveredFraction >= OCCLUSION_FRACTION
-    d["covered"] = (z.coveredFraction * 100).rounded() / 100
+    let foreign = z.occluders.filter { r in
+      !surfaces.contains { $0.frame.insetBy(dx: -2, dy: -2).contains(r.origin) }
+    }
+    let covered = ownFrame.map { own -> Double in
+      let area = own.width * own.height
+      guard area > 0 else { return 0 }
+      let hit = foreign.map { $0.intersection(own) }.filter { !$0.isEmpty }
+      return min(1, max(0, Double(unionArea(hit) / area)))
+    } ?? z.coveredFraction
+    d["onScreen"] = z.onScreen || !surfaces.isEmpty
+    d["occluded"] = covered >= OCCLUSION_FRACTION
+    d["covered"] = (covered * 100).rounded() / 100
+    d["hostPids"] = ownPids.map { Int($0) }.sorted()
   }
   return d
 }
@@ -426,6 +501,8 @@ func elementDict(_ el: SnapEl) -> [String: Any] {
   if el.focused { d["focused"] = true }
   if !el.value.isEmpty { d["value"] = el.value }
   if !el.actions.isEmpty { d["actions"] = el.actions }
+  if !el.surface.isEmpty { d["surface"] = el.surface }
+  if let w = el.win { d["win"] = Int(w) }
   return d
 }
 
@@ -448,6 +525,13 @@ func snapshotResultDict(_ snap: SnapshotResult, screenshot: [String: Any]?) -> [
       "x": Int(wb.origin.x.rounded()), "y": Int(wb.origin.y.rounded()),
       "w": Int(wb.width.rounded()), "h": Int(wb.height.rounded()),
     ]
+  }
+  if !snap.windows.isEmpty {
+    result["windows"] = snap.windows.map(windowDict)
+    if let u = unionFrame(snap.windows) { result["union"] = rectDict(u) }
+  }
+  if let d = snap.dialog {
+    result["dialog"] = windowDict(d)
   }
   if let shot = screenshot { result["screenshot"] = shot }
   return result

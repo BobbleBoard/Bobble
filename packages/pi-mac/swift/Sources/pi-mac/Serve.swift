@@ -59,9 +59,16 @@ private func doSnapshot(_ params: [String: Any]) -> [String: Any]? {
   // When a screenshot is requested, prefer a focus-free PER-WINDOW capture of
   // the snapshotted window (works occluded / non-frontmost); fall back to the
   // whole screen only if the window id / grant is unavailable.
+  // A COMPOSITE of every surface the app is presenting — the window plus any
+  // sheet or dialog on top of it. Capturing the single focused window is what
+  // made a save panel invisible to the model while it was the only thing it
+  // could act on.
   var shot: [String: Any]?
   if boolOf(params["screenshot"]) {
-    if let wid = snap.windowId { shot = captureWindow(windowID: wid, withBase64: true) }
+    shot = captureAppSurfaces(pid: snap.pid, withBase64: true)
+    if shot == nil, let wid = snap.windowId {
+      shot = captureWindow(windowID: wid, withBase64: true)
+    }
     if shot == nil { shot = captureScreenshot(withBase64: true) }
   }
   return snapshotResultDict(snap, screenshot: shot)
@@ -98,6 +105,25 @@ private func actTargetPid(_ params: [String: Any]) -> pid_t? {
   return nil
 }
 
+/// The pid a background act must be DELIVERED to, once the app's presented
+/// surfaces are taken into account.
+///
+/// A sandboxed app's Open/Save panel is a window owned by another process, so
+/// "send it to the app's pid" silently drops every event aimed at the one
+/// surface the model can actually act on. With a point, the frontmost surface
+/// containing that point wins; without one, the frontmost modal wins, because
+/// that is what the app is blocked behind.
+private func deliveryPid(_ params: [String: Any], at point: CGPoint? = nil) -> pid_t? {
+  guard let base = actTargetPid(params) else { return nil }
+  let surfaces = appWindows(pid: base)
+  if surfaces.isEmpty { return base }
+  if let p = point {
+    if let hit = surfaces.first(where: { $0.frame.contains(p) }) { return hit.hostPid }
+    return base
+  }
+  return activeSurface(surfaces)?.hostPid ?? base
+}
+
 // ── act dispatch (shared) ────────────────────────────────────────────────────
 
 private func doClick(_ params: [String: Any]) -> [String: Any] {
@@ -105,9 +131,12 @@ private func doClick(_ params: [String: Any]) -> [String: Any] {
   // DELIVERED to that app only (postToPid — background, no focus steal); with
   // no pid it falls back to the legacy shared-cursor foreground click.
   if let x = doubleOf(params["x"]), let y = doubleOf(params["y"]) {
-    if let pid = actTargetPid(params) {
+    if let pid = deliveryPid(params, at: CGPoint(x: x, y: y)) {
       postClickToPid(pid, x: x, y: y)
-      return ["found": true, "mode": "coordToPid", "background": true, "x": x, "y": y]
+      return [
+        "found": true, "mode": "coordToPid", "background": true, "x": x, "y": y,
+        "deliveredTo": Int(pid),
+      ]
     }
     withCoordinateLock { postClick(x: x, y: y) }
     return ["found": true, "mode": "coord", "background": false, "x": x, "y": y]
@@ -115,9 +144,12 @@ private func doClick(_ params: [String: Any]) -> [String: Any] {
   guard let index = intOf(params["index"]) else {
     return ["found": false, "error": "click needs an index or x,y"]
   }
-  guard let (el, pid) = resolveElement(params, index) else { return ["found": false] }
+  guard let (el, _) = resolveElement(params, index) else { return ["found": false] }
+  // Deliver to the pid that owns the element's SURFACE: a sandboxed app's
+  // Open/Save panel is hosted by another process, so the app's own pid would
+  // never see the event.
   let (mode, background) = performPress(
-    el.element, x: Double(el.x), y: Double(el.y), targetPid: pid)
+    el.element, x: Double(el.x), y: Double(el.y), targetPid: el.hostPid)
   // x,y echo the acted-on point (element centre, screen points) so the app can
   // animate the phantom cursor to where the click actually landed.
   return ["found": true, "mode": mode, "background": background, "x": el.x, "y": el.y]
@@ -134,12 +166,12 @@ private func doType(_ params: [String: Any]) -> [String: Any] {
   // target at all falls back to the system focus, which is the genuine
   // "type into the frontmost field" case.
   guard let index = intOf(params["index"]) else {
-    if let raw = intOf(params["pid"]) {
-      let pid = pid_t(raw)
+    if params["pid"] != nil || params["app"] != nil, let pid = deliveryPid(params) {
       typeTextToPid(pid, text)
       if submit { postKeyToPid(pid, flags: [], key: 36) }
       return [
         "found": true, "mode": "keystrokesToPid", "background": true, "submitted": submit,
+        "deliveredTo": Int(pid),
       ]
     }
     withCoordinateLock {
@@ -148,7 +180,8 @@ private func doType(_ params: [String: Any]) -> [String: Any] {
     }
     return ["found": true, "mode": "keystrokes", "background": false, "submitted": submit]
   }
-  guard let (el, pid) = resolveElement(params, index) else { return ["found": false] }
+  guard let (el, _) = resolveElement(params, index) else { return ["found": false] }
+  let pid = el.hostPid
 
   // AX-FIRST: set the field's value directly (background, no focus, no
   // keystrokes). If the element rejects a value set (or `append` asks for
@@ -194,9 +227,9 @@ private func doKey(_ params: [String: Any]) -> [String: Any] {
   // With a target pid the chord is delivered to that app only (background —
   // the user's focus is untouched). Pid delivery also honors the event's own
   // modifier flags, so ⌘-chords land correctly.
-  if let pid = actTargetPid(params) {
+  if let pid = deliveryPid(params) {
     postKeyToPid(pid, flags: parsed.flags, key: parsed.key)
-    return ["ok": true, "background": true]
+    return ["ok": true, "background": true, "deliveredTo": Int(pid)]
   }
   // Legacy pid-less path: chords hit the SYSTEM focus (foreground).
   withCoordinateLock { postKey(flags: parsed.flags, key: parsed.key) }
@@ -365,6 +398,8 @@ private func dispatch(method: String, params: [String: Any]) -> [String: Any]? {
   case "bounds": return doBounds(params)
   case "frontmost": return doFrontmost()
   case "moveWindow": return doMoveWindow(params)
+  case "windows": return doWindows(params)
+  case "wallpaper": return doWallpaper(params)
   default: return nil
   }
 }
@@ -388,6 +423,35 @@ private func doBounds(_ params: [String: Any]) -> [String: Any] {
   return ["ok": false, "error": "no resolvable window for target"]
 }
 
+/// `windows` method: EVERY surface the app is presenting, front-to-back — its
+/// windows and the sheets, dialogs and file panels on top of them. This is what
+/// the monitor stream points at and what tells the tool layer a dialog is up.
+private func doWindows(_ params: [String: Any]) -> [String: Any] {
+  guard let resolved = resolveTargetPid(targetFrom(params)) else {
+    return ["ok": false, "error": "no such app"]
+  }
+  let windows = appWindows(pid: resolved.pid, includeOffScreen: boolOf(params["all"]))
+  var d: [String: Any] = [
+    "ok": true, "pid": Int(resolved.pid), "app": resolved.name,
+    "windows": windows.map(windowDict),
+  ]
+  if let u = unionFrame(windows) { d["union"] = rectDict(u) }
+  if let a = activeSurface(windows) { d["active"] = windowDict(a) }
+  if let dlg = windows.first(where: { $0.isModal }) { d["dialog"] = windowDict(dlg) }
+  return d
+}
+
+/// `wallpaper` method: the user's desktop picture, which the canvas monitor
+/// paints behind the streamed window so an unsized window still sits on a real
+/// desktop rather than on a void.
+private func doWallpaper(_ params: [String: Any]) -> [String: Any] {
+  var rect: CGRect?
+  if let resolved = resolveTargetPid(targetFrom(params)) {
+    rect = unionFrame(appWindows(pid: resolved.pid))
+  }
+  return desktopWallpaper(rect: rect)
+}
+
 /// `frontmost` method: which app currently owns the user's focus.
 private func doFrontmost() -> [String: Any] {
   guard let app = NSWorkspace.shared.frontmostApplication else {
@@ -406,7 +470,14 @@ private func doFrontmost() -> [String: Any] {
 /// whole screen. Never nil — a failure returns a structured error.
 private func doScreenshot(_ params: [String: Any]) -> [String: Any] {
   var windowId = intOf(params["windowId"]).map { CGWindowID($0) }
-  if windowId == nil, (params["app"] != nil || params["pid"] != nil) {
+  // No explicit window id → composite EVERY surface the app is presenting.
+  if windowId == nil, params["app"] != nil || params["pid"] != nil {
+    if let resolved = resolveTargetPid(targetFrom(params)),
+      let composite = captureAppSurfaces(
+        pid: resolved.pid, withBase64: true, maxWidth: intOf(params["maxWidth"]))
+    {
+      return composite
+    }
     if let resolved = resolveTargetPid(targetFrom(params)) {
       let root = rootFor(app: AXUIElementCreateApplication(resolved.pid))
       windowId = axWindowID(root)

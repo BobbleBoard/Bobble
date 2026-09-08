@@ -37,6 +37,8 @@ case "--act":
   runActCommand(Array(arguments.dropFirst()))
 case "--serve":
   runServe()
+case "--stream":
+  runStream(Array(arguments.dropFirst()))
 default:
   writeStderr(
     "usage: pi-mac [--check | --snapshot [--frontmost|--pid N|--app NAME] [--screenshot]"
