@@ -103,6 +103,43 @@ export function buildDecoy(name: string, suggestion: string): string {
 }
 
 /**
+ * `open`, wrapped rather than shadowed.
+ *
+ * `open -a <App>` ACTIVATES the app: it comes to the front and takes the user's
+ * screen away mid-sentence. That is the one thing this product promises not to
+ * do, and MEASURED across two models it is the first thing either reaches for
+ * when asked to work in a Mac app — before, and instead of, the `mac` command
+ * sitting on the same PATH.
+ *
+ * So only that form is redirected, and it is redirected to the command that
+ * does the same job properly: `mac launch` opens the app in the background and
+ * hands back its window. `-g` is already the background flag, so it passes
+ * through, and every other use of `open` — a file, a URL, a directory — is the
+ * real thing, because those are legitimate and refusing them would be a dead
+ * end rather than a signpost.
+ */
+export function buildOpenWrapper(): string {
+  return [
+    '#!/bin/sh',
+    "# open — wrapped while Bobble's tool commands are on PATH.",
+    'for arg in "$@"; do',
+    '  case "$arg" in',
+    '    -g|--background) exec /usr/bin/open "$@" ;;',
+    '    -a|--application|-b)',
+    // Single-quoted, and no angle brackets: an unquoted `<name>` in a shell
+    // script is a redirect, not a placeholder, and the message died on it.
+    "      echo 'open with that flag brings the app to the FRONT and takes the screen away from the user.' >&2",
+    '      echo \'Use: mac launch --app "TextEdit" — it opens the app in the BACKGROUND and hands you back its window to act on.\' >&2',
+    '      exit 127',
+    '      ;;',
+    '  esac',
+    'done',
+    'exec /usr/bin/open "$@"',
+    '',
+  ].join('\n');
+}
+
+/**
  * How long a command may take before the shim gives up.
  *
  * MUST EXCEED THE BASH TOOL'S OWN TIMEOUT, or the shim reports failure for work
@@ -227,6 +264,9 @@ export function registerToolCli(host: ToolCliHost, opts: ToolCliOptions = {}): T
     const p = path.join(shimDir, command);
     fs.writeFileSync(p, buildShim(execPath, dispatcherPath, command), { mode: 0o755 });
   }
+  // `open` is wrapped, not shadowed: only the form that steals the screen is
+  // redirected (see buildOpenWrapper).
+  fs.writeFileSync(path.join(shimDir, 'open'), buildOpenWrapper(), { mode: 0o755 });
   for (const [decoy, suggestion] of Object.entries(DECOYS)) {
     // Only where a real command of that name is not already the point — these
     // sit FIRST on PATH, so they shadow the system one for this session only.
