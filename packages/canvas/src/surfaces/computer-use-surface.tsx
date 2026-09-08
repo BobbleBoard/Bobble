@@ -426,90 +426,8 @@ function ensureBackdrop(
   return off;
 }
 
-// ── the Accessibility-drawn window ──────────────────────────────────────────
-//
-// The palette of a light macOS window, which is what the fallback draws on
-// (AX reports no colours, and a document window is white on every Mac that has
-// not been deliberately changed). Named rather than inlined because the whole
-// point of this surface is that everything on it is either something AX said or
-// something acknowledged here as chrome.
-const AX_PAPER = '#ffffff';
-const AX_TITLE_TOP = '#f4f4f6';
-const AX_TITLE_BOTTOM = '#e6e6e9';
-const AX_HAIRLINE = 'rgba(0, 0, 0, 0.14)';
-const AX_CONTROL = '#fdfdfe';
-const AX_CONTROL_EDGE = 'rgba(0, 0, 0, 0.2)';
-const AX_INK = '#1d1d20';
-const AX_INK_SOFT = 'rgba(29, 29, 32, 0.62)';
-const AX_DISABLED = 'rgba(29, 29, 32, 0.3)';
-const AX_LIGHTS = ['#ec6a5e', '#f4bf4f', '#61c554'];
-/** System font stack for anything drawn inside the fake window. */
-const AX_FONT = '-apple-system, "SF Pro Text", system-ui, sans-serif';
-
-interface AxRender {
-  canvas: HTMLCanvasElement | null;
-  /** What was drawn: scene timestamp + the geometry it was drawn for. */
-  key: string;
-}
-
 /** No drift. A shared frozen object so the hot path allocates nothing. */
 const ZERO = { x: 0, y: 0 } as const;
-
-/**
- * Render the Accessibility scene into an offscreen canvas, reusing the last one
- * whenever nothing that affects it has changed.
- *
- * The key includes the caret's blink phase, which is what keeps a focused text
- * area's insertion point alive at 1Hz without re-rendering the scene sixty
- * times a second to animate one 2px rectangle.
- */
-function ensureAxRender(
-  cache: { current: AxRender },
-  scene: MacMonitorAxScene,
-  drawn: DrawnWindow,
-  viewport: { w: number; h: number },
-  dpr: number,
-  accent: string,
-  now: number,
-  reduced: boolean,
-): HTMLCanvasElement | null {
-  // Reduced motion: the caret is drawn steady rather than blinking, so the key
-  // stops changing and the offscreen stops being re-rendered at 1Hz too.
-  const blink = reduced ? 0 : Math.floor(now / 530);
-  const key = [
-    scene.t,
-    scene.windows.length,
-    scene.elements.length,
-    Math.round(drawn.x),
-    Math.round(drawn.y),
-    Math.round(drawn.w),
-    Math.round(drawn.h),
-    drawn.scale.toFixed(4),
-    Math.round(viewport.w),
-    Math.round(viewport.h),
-    dpr,
-    accent,
-    blink,
-  ].join('|');
-  const c = cache.current;
-  if (c.canvas !== null && c.key === key) return c.canvas;
-  const cssW = viewport.w;
-  const cssH = viewport.h;
-  const off = c.canvas ?? document.createElement('canvas');
-  const pxW = Math.max(1, Math.round(cssW * dpr));
-  const pxH = Math.max(1, Math.round(cssH * dpr));
-  if (off.width !== pxW || off.height !== pxH) {
-    off.width = pxW;
-    off.height = pxH;
-  }
-  const g = off.getContext('2d');
-  if (g === null) return null;
-  g.setTransform(dpr, 0, 0, dpr, 0, 0);
-  g.clearRect(0, 0, cssW, cssH);
-  drawAxScene(g, scene, drawn, accent, now, reduced);
-  cache.current = { canvas: off, key };
-  return off;
-}
 
 function roundRect(
   ctx: CanvasRenderingContext2D,
@@ -556,6 +474,9 @@ export function ComputerUseSurface({ feed, className }: ComputerUseSurfaceProps)
   /** Which source is on screen. React state (not a ref) because the honest
    * "this is a drawing" label is chrome, and chrome lives in the DOM. */
   const [source, setSource] = useState<MonitorSource>('none');
+  /* The system prompts for Screen Recording ONCE per app. After that the only
+     route is the Settings pane, so the panel changes what it says and does. */
+  const [askedForCapture, setAskedForCapture] = useState(false);
   /** The history strip. Bounded at MAX_ACTS; the pictures are JPEG data URLs so
    * a long run costs kilobytes rather than decoded bitmaps. */
   const [acts, setActs] = useState<readonly MonitorAct[]>([]);
@@ -587,7 +508,6 @@ export function ComputerUseSurface({ feed, className }: ComputerUseSurfaceProps)
    * re-running two hundred canvas ops per animation frame would be paying the
    * expensive part fifteen times over for a picture that has not changed.
    */
-  const axRef = useRef<AxRender>({ canvas: null, key: '' });
   const cursorPath = useMemo(
     () => (typeof Path2D === 'function' ? new Path2D(CURSOR_PATH) : null),
     [],
@@ -673,13 +593,10 @@ export function ComputerUseSurface({ feed, className }: ComputerUseSurfaceProps)
         return prev === now ? prev : now;
       });
       const frame = feed.getFrame();
-      const ax = feed.getAxScene();
-      const nextSource = pickMonitorSource(next, frame, ax);
+      const nextSource = pickMonitorSource(next, frame);
       setSource((prev) => (prev === nextSource ? prev : nextSource));
-      // The footer names whatever the picture is OF, from whichever source drew
-      // it — the window list is the same list either way.
-      const windows =
-        nextSource === 'accessibility' && ax !== null ? ax.windows : (frame?.windows ?? []);
+      // The footer names whatever the picture is OF.
+      const windows = frame?.windows ?? [];
       const main = windows.find((w) => !w.sheet && !w.modal) ?? windows[0];
       const dialog = windows.find((w) => w.sheet || w.modal);
       // A window title outlives its session otherwise, and the footer ends up
@@ -892,20 +809,15 @@ export function ComputerUseSurface({ feed, className }: ComputerUseSurfaceProps)
     }
 
     const frame = feed?.getFrame() ?? null;
-    const ax = feed?.getAxScene() ?? null;
-    const from = pickMonitorSource(session, frame, ax);
-    const empty = from === 'accessibility' ? null : emptyState(session, frame);
+    const from = pickMonitorSource(session, frame);
+    const empty = from === 'permission' ? null : emptyState(session, frame);
     // The stage is the union rect of whichever source is drawing — computed the
     // same way on both sides, so a switch between them moves nothing. Scrubbing
     // back uses the rect the act was captured at, so the window does not jump.
     const scrubbed = scrub !== null && scrub.rect !== null ? scrub : null;
     const scrubShot = scrubbed === null ? null : scrubImage(scrubbed);
     const rect =
-      scrubbed !== null && scrubShot !== null
-        ? scrubbed.rect
-        : from === 'accessibility' && ax !== null
-          ? ax.rect
-          : (frame?.rect ?? session.rect);
+      scrubbed !== null && scrubShot !== null ? scrubbed.rect : (frame?.rect ?? session.rect);
     const bitmap = frame?.bitmap ?? null;
     // `undefined <= 0` is false, so a header with no rect at all used to pass
     // this guard and produce NaN geometry.
@@ -946,8 +858,7 @@ export function ComputerUseSurface({ feed, className }: ComputerUseSurfaceProps)
 
     // What the crop is centred on: the dialog, when one is up — a sheet IS the
     // story — otherwise the cursor.
-    const windows: readonly (MacMonitorWindowInfo | MacMonitorAxWindow)[] =
-      from === 'accessibility' && ax !== null ? ax.windows : (frame?.windows ?? []);
+    const windows: readonly MacMonitorWindowInfo[] = frame?.windows ?? [];
     const dialogWin = windows.find((w) => w.sheet || w.modal) ?? null;
     const focusPoint: Point =
       dialogWin !== null
@@ -1061,19 +972,6 @@ export function ComputerUseSurface({ feed, className }: ComputerUseSurfaceProps)
       ctx.drawImage(bitmap, drawn.x, drawn.y, drawn.w, drawn.h);
       ctx.restore();
       painted = true;
-    } else if (from === 'accessibility' && ax !== null) {
-      const rendered = ensureAxRender(
-        axRef,
-        ax,
-        drawn,
-        viewport,
-        dpr,
-        palette.accent,
-        now,
-        reduced,
-      );
-      if (rendered !== null) ctx.drawImage(rendered, 0, 0, cssW, cssH);
-      painted = true;
     }
     lastDrawn.current = { drawn, rect, painted };
     if (painted && scrubShot === null) {
@@ -1088,19 +986,10 @@ export function ComputerUseSurface({ feed, className }: ComputerUseSurfaceProps)
     //    most expensive mistake this feature can make — so it gets the beat.
     if (painted && dialogWin !== null && scrubbed === null) {
       dimBehindDialog(ctx, drawn, rect, dialogWin.frame, radius);
-      // An unnamed sheet is named from its own buttons, which the Accessibility
-      // scene already carries when it is the source.
-      const sheetButtons =
-        ax === null
-          ? []
-          : ax.elements
-              .filter(
-                (el) =>
-                  el.win === dialogWin.windowId &&
-                  el.role.toLowerCase().includes('button') &&
-                  el.name !== '',
-              )
-              .map((el) => el.name);
+      // The sheet's own buttons used to name an untitled sheet, read off the
+      // Accessibility scene while that was the drawing source. With pixels the
+      // only source, the caption falls back to the app and title it has.
+      const sheetButtons: string[] = [];
       drawDialogCaption(
         ctx,
         drawn,
@@ -1273,12 +1162,8 @@ export function ComputerUseSurface({ feed, className }: ComputerUseSurfaceProps)
     return () => document.removeEventListener('keydown', onKey);
   }, [caps.stop, onStop]);
 
-  const drawnFromAx = source === 'accessibility';
-  const empty = takenOver
-    ? null
-    : drawnFromAx
-      ? null
-      : emptyState(session, feed?.getFrame() ?? null);
+  const needsCapture = source === 'permission';
+  const empty = takenOver || needsCapture ? null : emptyState(session, feed?.getFrame() ?? null);
   const rootClass = ['pd-macmon', className].filter(Boolean).join(' ');
   const live = session.stream === 'live';
   const stalled = chrome.stalledFor > 0 && live;
@@ -1307,8 +1192,16 @@ export function ComputerUseSurface({ feed, className }: ComputerUseSurfaceProps)
     >
       <div className="pd-macmon-stage" ref={stageRef}>
         <canvas className="pd-macmon-canvas" ref={canvasRef} aria-label={canvasLabel} />
-        {drawnFromAx ? (
-          <SourceNote denied={session.captureDenied} onTurnOn={() => feed?.requestCapture?.()} />
+        {needsCapture ? (
+          <CapturePermissionPanel
+            app={session.appName}
+            asked={askedForCapture}
+            onAllow={() => {
+              setAskedForCapture(true);
+              feed?.requestCapture?.();
+            }}
+            onOpenSettings={() => feed?.openCaptureSettings?.()}
+          />
         ) : null}
         {takenOver ? (
           <div className="pd-macmon-state" data-kind="taken-over">
@@ -1464,7 +1357,6 @@ export function ComputerUseSurface({ feed, className }: ComputerUseSurfaceProps)
           <span
             className="pd-macmon-live"
             data-live={live && !stalled ? 'true' : 'false'}
-            data-drawn={drawnFromAx ? 'true' : 'false'}
             data-stalled={stalled ? 'true' : 'false'}
           >
             <span className="pd-macmon-dot" aria-hidden="true" />
@@ -1472,9 +1364,7 @@ export function ComputerUseSurface({ feed, className }: ComputerUseSurfaceProps)
               ? `Stalled · ${chrome.stalledFor}s`
               : live
                 ? 'Live'
-                : drawnFromAx
-                  ? 'Drawn live'
-                  : streamWord(session.stream)}
+                : streamWord(session.stream)}
           </span>
         </div>
       )}
@@ -1650,6 +1540,110 @@ function StateMark({ app, kind }: { app: string; kind: string }) {
  * "allow" or "grant": no app can turn this on, and a button that implies it can
  * is the kind of small lie that makes people stop trusting the big things.
  */
+/**
+ * THE REAL macOS SCREEN RECORDING ICON — a white circle on a red superellipse.
+ *
+ * Drawn rather than shipped as an asset: it is the mark the user is about to
+ * look for in System Settings, and a panel that shows a DIFFERENT glyph than the
+ * one on the row they have to find is a panel that makes the job harder. The
+ * squircle is Apple's continuous corner, not a rounded rect — the difference is
+ * small and it is the whole reason their icons read as theirs.
+ */
+function ScreenRecordingIcon({ size = 56 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 64 64" aria-hidden="true">
+      <title>Screen Recording</title>
+      <defs>
+        <linearGradient id="pd-srec-g" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#ff5f52" />
+          <stop offset="1" stopColor="#e0281c" />
+        </linearGradient>
+      </defs>
+      {/* An Apple continuous-corner squircle, as a path — a plain rx rounds the
+          corner with a circular arc, which reads visibly tighter than theirs. */}
+      <path
+        d="M32 1.5C50.8 1.5 58 8.7 58 27.5v9C58 55.3 50.8 62.5 32 62.5S6 55.3 6 36.5v-9C6 8.7 13.2 1.5 32 1.5Z"
+        fill="url(#pd-srec-g)"
+      />
+      <circle cx="32" cy="32" r="13.5" fill="#fff" />
+    </svg>
+  );
+}
+
+/**
+ * WHAT TO SHOW WHEN THERE ARE NO PIXELS.
+ *
+ * This surface used to draw the window from its Accessibility tree — every
+ * control as a labelled box, in its real position. It is honest and it is
+ * genuinely useful for a form, and the user's verdict on it against a real app was
+ * the right one: "that reconstruction of the calculator app does not feel like
+ * it's at the best it can be, surely you can get color layout and such more?"
+ *
+ * It cannot. Accessibility gives roles, names and rectangles — no colour, no
+ * type, no artwork, no custom-drawn anything. The layout is real; everything
+ * that makes an app look like itself is unavailable in principle, not for want
+ * of effort. So a drawing of an ARBITRARY app is always going to be a grey
+ * approximation of it, and the user's instruction covers exactly that case: "if you
+ * can't do that great a construction for any arbitrary app, just show in there
+ * 'please enable screen recording to show preview'".
+ *
+ * Which is also the better outcome, because the real thing is one grant away —
+ * and once granted, "always use the real window visual" (the user), which is what
+ * `pickMonitorSource` already does by preferring pixels over everything.
+ */
+function CapturePermissionPanel({
+  app,
+  onAllow,
+  onOpenSettings,
+  asked,
+}: {
+  app: string;
+  onAllow: () => void;
+  onOpenSettings: () => void;
+  /** True once this panel has asked — the system only prompts once per app. */
+  asked: boolean;
+}) {
+  return (
+    <div className="pd-macmon-state" data-kind="permission" data-testid="macmon-permission">
+      <div className="pd-macmon-state-card pd-macmon-perm">
+        <ScreenRecordingIcon />
+        <p className="pd-macmon-state-title">Enable Screen Recording to show the preview</p>
+        <p className="pd-macmon-state-sub">
+          Bobble is controlling {app === '' ? 'the app' : app} right now and that part works without
+          it — this is only so you can watch.
+        </p>
+        <ol className="pd-macmon-perm-steps">
+          <li>
+            <span className="pd-macmon-perm-step">1</span>
+            Press the button below.
+          </li>
+          <li>
+            <span className="pd-macmon-perm-step">2</span>
+            {asked ? (
+              <>
+                Find <strong>Bobble</strong> under Screen &amp; System Audio Recording and turn it
+                on.
+              </>
+            ) : (
+              <>
+                Choose <strong>Allow</strong> when macOS asks.
+              </>
+            )}
+          </li>
+        </ol>
+        <button type="button" className="pd-macmon-btn pd-macmon-btn--primary" onClick={onAllow}>
+          {asked ? 'Open Screen Recording settings' : 'Allow Screen Recording'}
+        </button>
+        {asked ? null : (
+          <button type="button" className="pd-macmon-perm-alt" onClick={onOpenSettings}>
+            Already said no? Open Settings
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function SourceNote({ denied, onTurnOn }: { denied: boolean; onTurnOn: () => void }) {
   return (
     <div className="pd-macmon-source" data-testid="macmon-source-note">
@@ -1820,375 +1814,6 @@ function ScreenGlyph({ pulse }: { pulse: boolean }) {
 }
 
 // ── the Accessibility drawing ───────────────────────────────────────────────
-
-/**
- * Draw the whole scene: every window, back to front, at its real frame.
- *
- * `origin`/`scale` map screen points into the canvas exactly as the pixel path
- * maps them, because they ARE the pixel path's — `fitWindow` over the same
- * union rect. Switching source therefore cannot move anything.
- *
- * Everything below is a likeness of macOS chrome, drawn from geometry AX
- * reported. No control gets a label the tree did not name, no field gets text
- * it did not return, and a window with nothing in it is drawn empty rather than
- * furnished.
- */
-function drawAxScene(
-  ctx: CanvasRenderingContext2D,
-  scene: MacMonitorAxScene,
-  drawn: DrawnWindow,
-  accent: string,
-  now: number,
-  reduced: boolean,
-): void {
-  const k = drawn.scale;
-  const at = (x: number, y: number): { x: number; y: number } => ({
-    x: drawn.x + (x - scene.rect.x) * k,
-    y: drawn.y + (y - scene.rect.y) * k,
-  });
-  for (const layout of layoutAxScene(scene)) {
-    const p = at(layout.rect.x, layout.rect.y);
-    const w = layout.rect.w * k;
-    const h = layout.rect.h * k;
-    if (w < 2 || h < 2) continue;
-    const sheet = layout.titleBar === 0;
-    const radius = (sheet ? 12 : WINDOW_RADIUS) * k;
-
-    // The window's own shadow. A sheet sits ON the window behind it, so it
-    // needs a tighter, darker one to lift off a surface rather than off a
-    // wallpaper — which is exactly how a real sheet reads.
-    ctx.save();
-    ctx.shadowColor = sheet ? 'rgba(0, 0, 0, 0.42)' : 'rgba(0, 0, 0, 0.5)';
-    ctx.shadowBlur = (sheet ? 34 : 44) * k + 8;
-    ctx.shadowOffsetY = (sheet ? 12 : 16) * k + 2;
-    ctx.fillStyle = AX_PAPER;
-    roundRect(ctx, p.x, p.y, w, h, radius);
-    ctx.fill();
-    ctx.restore();
-
-    ctx.save();
-    roundRect(ctx, p.x, p.y, w, h, radius);
-    ctx.clip();
-    ctx.fillStyle = AX_PAPER;
-    ctx.fillRect(p.x, p.y, w, h);
-    if (!sheet) {
-      const barH = layout.titleBar * k;
-      // Controls that LIVE IN the title bar — TextEdit's "Edited"/"Suggested"
-      // filename popup is one — get out of the title's way, because AppKit
-      // gives way to them too. Without this the title is drawn straight
-      // through a real control at its real position.
-      const blockers = layout.elements
-        .map((it) => {
-          const q = at(it.rect.x, it.rect.y);
-          return { x: q.x, y: q.y, w: it.rect.w * k, h: it.rect.h * k };
-        })
-        .filter((r) => r.y < p.y + barH && r.y + r.h > p.y);
-      drawAxTitleBar(ctx, layout.win, p, w, barH, k, blockers);
-    }
-    for (const item of layout.elements) {
-      drawAxElement(ctx, item, at, k, accent, now, reduced);
-    }
-    ctx.restore();
-
-    ctx.strokeStyle = sheet ? 'rgba(0,0,0,0.22)' : 'rgba(255,255,255,0.2)';
-    ctx.lineWidth = 1;
-    roundRect(ctx, p.x + 0.5, p.y + 0.5, w - 1, h - 1, radius);
-    ctx.stroke();
-  }
-}
-
-/** Title bar: the gradient, the hairline, the three lights, the real title. */
-function drawAxTitleBar(
-  ctx: CanvasRenderingContext2D,
-  win: MacMonitorAxWindow,
-  p: { x: number; y: number },
-  w: number,
-  barH: number,
-  k: number,
-  blockers: readonly { x: number; w: number }[] = [],
-): void {
-  const grad = ctx.createLinearGradient(p.x, p.y, p.x, p.y + barH);
-  grad.addColorStop(0, AX_TITLE_TOP);
-  grad.addColorStop(1, AX_TITLE_BOTTOM);
-  ctx.fillStyle = grad;
-  ctx.fillRect(p.x, p.y, w, barH);
-  ctx.fillStyle = AX_HAIRLINE;
-  ctx.fillRect(p.x, p.y + barH - Math.max(1, k), w, Math.max(1, k));
-
-  const r = 6 * k;
-  for (let i = 0; i < 3; i++) {
-    ctx.beginPath();
-    ctx.arc(p.x + (20 + i * 20) * k, p.y + barH / 2, r, 0, Math.PI * 2);
-    ctx.fillStyle = AX_LIGHTS[i] as string;
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(0,0,0,0.08)';
-    ctx.lineWidth = 1;
-    ctx.stroke();
-  }
-
-  if (win.title === '' || barH < 12) return;
-  const size = 13 * k;
-  ctx.font = `600 ${size}px ${AX_FONT}`;
-  ctx.textBaseline = 'middle';
-  ctx.textAlign = 'center';
-  // Centred, but never under the traffic lights and never through a control
-  // that lives in the bar — the same room AppKit leaves a long title.
-  const cx = p.x + w / 2;
-  let left = p.x + 80 * k;
-  let right = p.x + w - 12 * k;
-  for (const b of blockers) {
-    if (b.x + b.w <= cx) left = Math.max(left, b.x + b.w + 8 * k);
-    else if (b.x >= cx) right = Math.min(right, b.x - 8 * k);
-  }
-  const room = Math.min(cx - left, right - cx) * 2;
-  const measure = (s: string): number => ctx.measureText(s).width;
-  const text = ellipsize(win.title, Math.max(20, room), measure);
-  ctx.fillStyle = win.focused ? AX_INK : AX_INK_SOFT;
-  ctx.fillText(text, p.x + w / 2, p.y + barH / 2 + 0.5 * k);
-  ctx.textAlign = 'left';
-}
-
-/** One control, at its real bbox, in the shape its role earns. */
-function drawAxElement(
-  ctx: CanvasRenderingContext2D,
-  item: AxDrawable,
-  at: (x: number, y: number) => { x: number; y: number },
-  k: number,
-  accent: string,
-  now: number,
-  reduced: boolean,
-): void {
-  const p = at(item.rect.x, item.rect.y);
-  const w = item.rect.w * k;
-  const h = item.rect.h * k;
-  if (w < 2 || h < 2) return;
-  const enabled = item.el.enabled !== false;
-  const ink = enabled ? AX_INK : AX_DISABLED;
-  const measure = (s: string): number => ctx.measureText(s).width;
-  const pad = Math.min(9 * k, w * 0.2);
-
-  const chrome = (radius: number, fill = AX_CONTROL): void => {
-    ctx.fillStyle = fill;
-    roundRect(ctx, p.x, p.y, w, h, radius);
-    ctx.fill();
-    ctx.strokeStyle = AX_CONTROL_EDGE;
-    ctx.lineWidth = 1;
-    roundRect(ctx, p.x + 0.5, p.y + 0.5, w - 1, h - 1, radius);
-    ctx.stroke();
-  };
-  const focusRing = (radius: number): void => {
-    if (item.el.focused !== true) return;
-    ctx.save();
-    ctx.globalAlpha = 0.55;
-    ctx.strokeStyle = accent;
-    ctx.lineWidth = 2.5 * k;
-    roundRect(ctx, p.x - 1.5 * k, p.y - 1.5 * k, w + 3 * k, h + 3 * k, radius + 1.5 * k);
-    ctx.stroke();
-    ctx.restore();
-  };
-  const centred = (text: string): void => {
-    if (text === '') return;
-    ctx.font = `500 ${Math.min(13, item.rect.h * 0.5) * k}px ${AX_FONT}`;
-    ctx.textBaseline = 'middle';
-    ctx.textAlign = 'center';
-    ctx.fillStyle = ink;
-    ctx.fillText(ellipsize(text, w - pad * 2, measure), p.x + w / 2, p.y + h / 2);
-    ctx.textAlign = 'left';
-  };
-  const leading = (text: string, inset = pad): void => {
-    if (text === '') return;
-    ctx.font = `400 ${Math.min(13, item.rect.h * 0.55) * k}px ${AX_FONT}`;
-    ctx.textBaseline = 'middle';
-    ctx.fillStyle = ink;
-    ctx.fillText(ellipsize(text, w - inset * 2, measure), p.x + inset, p.y + h / 2);
-  };
-
-  switch (item.shape) {
-    case 'document': {
-      // The page itself, and the real text on it. This is the whole reason the
-      // fallback is worth having: the user can READ what the model is working
-      // on, not just see that a window exists.
-      drawAxDocument(ctx, item, p, w, h, k, accent, now, reduced);
-      return;
-    }
-    case 'field': {
-      chrome(5 * k, '#ffffff');
-      focusRing(5 * k);
-      leading(item.label);
-      return;
-    }
-    case 'button': {
-      chrome(6 * k);
-      focusRing(6 * k);
-      centred(item.label);
-      return;
-    }
-    case 'popup': {
-      chrome(6 * k);
-      focusRing(6 * k);
-      leading(item.label, pad);
-      // The two chevrons that make a pop-up a pop-up.
-      const cx = p.x + w - 11 * k;
-      const cy = p.y + h / 2;
-      ctx.strokeStyle = ink;
-      ctx.lineWidth = 1.4 * k;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      for (const dir of [-1, 1]) {
-        ctx.beginPath();
-        ctx.moveTo(cx - 3.2 * k, cy + dir * 4.6 * k - dir * 2.2 * k);
-        ctx.lineTo(cx, cy + dir * 4.6 * k);
-        ctx.lineTo(cx + 3.2 * k, cy + dir * 4.6 * k - dir * 2.2 * k);
-        ctx.stroke();
-      }
-      return;
-    }
-    case 'checkbox': {
-      const side = Math.min(h, 14 * k);
-      ctx.fillStyle = '#ffffff';
-      roundRect(ctx, p.x, p.y + (h - side) / 2, side, side, 3.5 * k);
-      ctx.fill();
-      ctx.strokeStyle = AX_CONTROL_EDGE;
-      ctx.lineWidth = 1;
-      ctx.stroke();
-      ctx.font = `400 ${Math.min(13, item.rect.h * 0.7) * k}px ${AX_FONT}`;
-      ctx.textBaseline = 'middle';
-      ctx.fillStyle = ink;
-      ctx.fillText(
-        ellipsize(item.label, w - side - 6 * k, measure),
-        p.x + side + 6 * k,
-        p.y + h / 2,
-      );
-      return;
-    }
-    case 'radio': {
-      const r = Math.min(h, 14 * k) / 2;
-      ctx.beginPath();
-      ctx.arc(p.x + r, p.y + h / 2, r, 0, Math.PI * 2);
-      ctx.fillStyle = '#ffffff';
-      ctx.fill();
-      ctx.strokeStyle = AX_CONTROL_EDGE;
-      ctx.lineWidth = 1;
-      ctx.stroke();
-      ctx.font = `400 ${Math.min(13, item.rect.h * 0.7) * k}px ${AX_FONT}`;
-      ctx.textBaseline = 'middle';
-      ctx.fillStyle = ink;
-      ctx.fillText(
-        ellipsize(item.label, w - r * 2 - 6 * k, measure),
-        p.x + r * 2 + 6 * k,
-        p.y + h / 2,
-      );
-      return;
-    }
-    case 'toggle': {
-      // Too small to hold its own name — a toolbar chip. Drawn as the chip it
-      // is rather than captioned with text that would not fit; inventing a
-      // glyph for "bold" is exactly the kind of guess this surface must not make.
-      chrome(4.5 * k, 'rgba(0,0,0,0.045)');
-      return;
-    }
-    case 'link': {
-      ctx.font = `400 ${Math.min(13, item.rect.h * 0.7) * k}px ${AX_FONT}`;
-      ctx.textBaseline = 'middle';
-      ctx.fillStyle = accent;
-      const text = ellipsize(item.label, w, measure);
-      ctx.fillText(text, p.x, p.y + h / 2);
-      const tw = ctx.measureText(text).width;
-      ctx.fillRect(p.x, p.y + h / 2 + 6 * k, tw, Math.max(1, k));
-      return;
-    }
-    case 'tab': {
-      chrome(6 * k, 'rgba(0,0,0,0.05)');
-      centred(item.label);
-      return;
-    }
-    case 'row': {
-      ctx.fillStyle = AX_HAIRLINE;
-      ctx.fillRect(p.x, p.y + h - Math.max(1, k), w, Math.max(1, k));
-      leading(item.label, 4 * k);
-      return;
-    }
-    case 'slider': {
-      const cy = p.y + h / 2;
-      ctx.fillStyle = 'rgba(0,0,0,0.14)';
-      roundRect(ctx, p.x, cy - 2 * k, w, 4 * k, 2 * k);
-      ctx.fill();
-      return;
-    }
-    case 'disclosure': {
-      const cx = p.x + w / 2;
-      const cy = p.y + h / 2;
-      const s = Math.min(w, h) * 0.28;
-      ctx.strokeStyle = AX_INK_SOFT;
-      ctx.lineWidth = 1.6 * k;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      ctx.beginPath();
-      ctx.moveTo(cx - s * 0.6, cy - s);
-      ctx.lineTo(cx + s * 0.6, cy);
-      ctx.lineTo(cx - s * 0.6, cy + s);
-      ctx.stroke();
-      return;
-    }
-    default: {
-      if (item.label === '') return;
-      leading(item.label, 2 * k);
-    }
-  }
-}
-
-/** The document surface: the page, its real text, and a caret when focused. */
-function drawAxDocument(
-  ctx: CanvasRenderingContext2D,
-  item: AxDrawable,
-  p: { x: number; y: number },
-  w: number,
-  h: number,
-  k: number,
-  accent: string,
-  now: number,
-  reduced: boolean,
-): void {
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(p.x, p.y, w, h);
-  if (item.el.focused === true) {
-    ctx.save();
-    ctx.globalAlpha = 0.28;
-    ctx.strokeStyle = accent;
-    ctx.lineWidth = 2 * k;
-    ctx.strokeRect(p.x + k, p.y + k, w - 2 * k, h - 2 * k);
-    ctx.restore();
-  }
-  const text = item.label;
-  if (text === '') return;
-  const size = 13 * k;
-  const lineH = size * 1.45;
-  const inset = 10 * k;
-  ctx.font = `400 ${size}px ${AX_FONT}`;
-  ctx.textBaseline = 'alphabetic';
-  ctx.fillStyle = AX_INK;
-  const maxLines = Math.max(0, Math.floor((h - inset * 2) / lineH));
-  const lines = wrapText(text, w - inset * 2, maxLines, (s) => ctx.measureText(s).width);
-  let y = p.y + inset + size;
-  let lastX = p.x + inset;
-  for (const line of lines) {
-    ctx.fillText(line, p.x + inset, y);
-    if (line !== '') lastX = p.x + inset + ctx.measureText(line).width;
-    y += lineH;
-  }
-  // The insertion point, blinking at the system's ~1Hz — drawn only for a text
-  // area AX reported as focused, which is a fact, not a flourish.
-  if (
-    item.el.focused === true &&
-    lines.length > 0 &&
-    (reduced || Math.floor(now / 530) % 2 === 0)
-  ) {
-    ctx.fillStyle = AX_INK;
-    ctx.fillRect(lastX + 1 * k, y - lineH - size + 1 * k, Math.max(1, 1.5 * k), size * 1.15);
-  }
-}
-
-// ── canvas painters ─────────────────────────────────────────────────────────
 
 /**
  * A calm ground under an empty panel, and ONLY under an empty panel.

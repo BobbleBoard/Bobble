@@ -4897,3 +4897,101 @@
     animation: none;
   }
 }
+
+/* The Screen Recording ask.
+   A macOS-shaped panel rather than our usual empty state: the user is about to
+   go and look for this exact icon in System Settings, so the panel shows the
+   real one and the steps read in the order they will happen. It replaced a
+   drawing of the app made from its Accessibility tree — honest, but grey, and
+   the user's call on it was right: AX has roles, names and rectangles and no colour
+   or artwork, so an arbitrary app can never look like itself. */
+.pd-macmon-state[data-kind="permission"] {
+  pointer-events: auto;
+}
+
+.pd-macmon-perm {
+  gap: var(--pd-space-xs);
+  max-width: 34ch;
+  padding-top: var(--pd-space-xl);
+}
+
+.pd-macmon-perm .pd-macmon-state-title {
+  margin-top: var(--pd-space-sm);
+}
+
+.pd-macmon-perm-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin: var(--pd-space-md) 0 var(--pd-space-xs);
+  padding: 0;
+  list-style: none;
+  text-align: left;
+  color: var(--pd-text-secondary);
+  font-size: var(--pd-font-size-caption);
+  line-height: 1.45;
+}
+
+.pd-macmon-perm-steps li {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+/* The step number: a small filled disc, the way a macOS setup sheet counts. */
+.pd-macmon-perm-step {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 17px;
+  height: 17px;
+  margin-top: 1px;
+  border-radius: 50%;
+  background: var(--pd-bg-inset);
+  border: 1px solid var(--pd-border-subtle);
+  color: var(--pd-text-muted);
+  font-size: 10.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The secondary route, for someone who has already said no once. Quiet: it is
+   the unhappy path, and putting it at button weight would make the panel read
+   as two equal choices when one of them is plainly better. */
+.pd-macmon-perm-alt {
+  margin-top: 2px;
+  border: 0;
+  background: none;
+  padding: 4px 6px;
+  color: var(--pd-text-muted);
+  font-size: var(--pd-font-size-caption);
+  cursor: pointer;
+  border-radius: var(--pd-radius-sm);
+}
+
+.pd-macmon-perm-alt:hover {
+  color: var(--pd-text-secondary);
+  background: var(--pd-bg-hover);
+}
+
+/* The one thing to press. macOS gives the default button in a permission sheet
+   the accent fill, and this panel exists to be acted on — a bordered grey
+   button here reads as "dismiss", which is the opposite of the ask. */
+.pd-macmon-btn--primary {
+  height: 26px;
+  padding: 0 14px;
+  border-color: transparent;
+  /* `--pd-accent-primary` is the token this app actually defines; `--pd-accent`
+     does not exist, so the fill silently resolved to nothing and the one thing
+     to press rendered as bold text. Caught by looking at it. */
+  background: var(--pd-accent-primary);
+  color: #fff;
+  font-weight: 590;
+  line-height: 24px;
+}
+
+.pd-macmon-btn--primary:hover {
+  background: color-mix(in srgb, var(--pd-accent-primary) 88%, #000);
+  color: #fff;
+}

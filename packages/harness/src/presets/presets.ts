@@ -11,7 +11,6 @@
  * present therefore degrade gracefully to tool-search-only.
  */
 
-import { BROWSER_TOOL_NAMES } from '@pi-desktop/browser-use/tool-names';
 import { SPAWN_SUBAGENT_TOOL_NAME } from '../subagent/types.js';
 
 /** The always-available tool-search tool name. */
@@ -34,42 +33,32 @@ export const TOOL_SEARCH_TOOL_NAME = 'capability';
 export const USE_TOOL_NAME = 'use';
 
 /**
- * The browser tools that are ALWAYS advertised — the WHOLE suite.
+ * THE BROWSER SUITE IS NOT ALWAYS-ON ANY MORE, and this is the note explaining
+ * why it was, so nobody puts it back.
  *
- * the user asked for navigate by default so "open example.com" never falls to the
- * shell. Shipping navigate ALONE caused the loop he then hit: "it's constantly in
- * a loop of calling browser navigate … it really seems like the models are trying
- * to call browser snapshot or something and then they're getting forced to call
- * browser navigate." So navigate and snapshot shipped together, and the rest of
- * the suite was left to arrive on demand via `capability`.
- *
- * IT COULD NOT ARRIVE. Measured with tests/e2e/browser-click-reach-probe.mjs —
- * one page, one button, 20 requests, reading the tools array llama-server was
- * actually sent. It never changed: tools[17], every time. The transcript:
+ * It was pinned to every turn because `capability` could not deliver it.
+ * MEASURED with tests/e2e/browser-click-reach-probe.mjs — one page, one button,
+ * 20 requests, reading the tools array llama-server was actually sent. It never
+ * changed: tools[17], every time:
  *
  *     browser_click {index:1}      → "Tool browser_click not found"
  *     capability {name:"browser"}  → "browser is on. You now have: … browser_click …"
  *     browser_click {index:1}      → "Tool browser_click not found"
  *     use {tool:"browser_click"}   → "There is no tool called browser_click"
  *
- * pi's Agent SNAPSHOTS the tool array when a run starts (pi-agent-core
- * agent.js:273, `tools: this._state.tools.slice()`); both the provider request
- * and the tool executor read that snapshot, and `setActiveToolsByName` only
- * mutates state for the NEXT run — pi's own words: "Changes take effect on the
- * next agent turn." An agentic run is one turn, so nothing turned on inside a run
- * can be called during it. That is what produced the nine-snapshot loop in the
- * hive-logbook run, and it means half a browser was never a temporary state.
+ * The cause was pi's Agent SNAPSHOTTING the tool array when a run starts
+ * (pi-agent-core agent.js:273, `tools: this._state.tools.slice()`), so nothing
+ * turned on inside a run could be called during it — pi's own words, "Changes
+ * take effect on the next agent turn", and an agentic run IS one turn. A tool
+ * that takes you somewhere and no tool that lets you look is a trap, so the
+ * whole suite shipped up front, on every prefix, forever.
  *
- * A tool that takes you somewhere and no tool that lets you look is not half a
- * browser, it is a trap; a browser you can look at but never touch is the same
- * trap one rung along. The suite ships together, up front, where it works.
- *
- * the user, on the fix: "let's fix this so it has the manager tool and everything
- * configured correctly from the start … just advertise the right tools."
+ * That line is patched now (patches/@mariozechner__pi-agent-core: the tools
+ * setter mutates in place and the loop shares the live array), so a capability
+ * lands inside the turn that asks for it — verified at 14 tools on request 1 and
+ * 25 on request 3 of the same turn. The suite goes back behind `capability`,
+ * where it costs nothing until it is wanted.
  */
-export const BROWSER_NAVIGATE_ALWAYS = 'browser_navigate';
-export const BROWSER_SNAPSHOT_ALWAYS = 'browser_snapshot';
-export const ALWAYS_BROWSER_TOOLS = BROWSER_TOOL_NAMES;
 
 /**
  * Harness tools kept active in EVERY preset (when registered), independent of
@@ -113,31 +102,21 @@ export const ALWAYS_ACTIVE_TOOLS: readonly string[] = [
    */
   'present',
   /*
-   * THE GENERATION TOOLS, on every turn — the same argument `WEB` won.
+   * THE GENERATION TOOLS ARE NOT HERE ANY MORE — same story as the browser
+   * suite above.
    *
-   * the user: "from the chat interface, these backends should be connected. I should
-   * be able to go to a new chat and ask for any of these types of media."
-   *
-   * They cannot arrive any other way. The per-turn class is HARDCODED to
-   * 'coding' (index.ts: `preset === 'auto' ? 'coding' : …`) because semantic
-   * tool preload was removed on purpose — it churned the KV prefix — so no
-   * class-based preset for image, video, 3D or audio is ever selected. And the
-   * capability route cannot finish the job either: `use` dispatches through the
-   * harness's OWN registry and every extension gets its own api object, so
-   * `use({tool:'generate_speech'})` answers "cannot be called this way" exactly
-   * as `browser_click` and `mac_click` did. MEASURED, on a real turn: the model
+   * They rode every prefix for one reason: "the capability route cannot finish
+   * the job either — `use` dispatches through the harness's OWN registry and
+   * every extension gets its own api object, so `use({tool:'generate_speech'})`
+   * answers 'cannot be called this way'." MEASURED on a real turn: the model
    * discovered the capability, activated it, called `use`, and was refused.
    *
-   * Five names on every prefix is a real cost, and it is the same trade `WEB`
-   * makes: STABLE (never varies with the wording of a message, so the prefix is
-   * still reused) and filtered against what is registered below, so a build
-   * without gen-tools lists none of them.
+   * the user's requirement stands — "from the chat interface, these backends should
+   * be connected. I should be able to go to a new chat and ask for any of these
+   * types of media" — and it is now met the way it was always meant to be: the
+   * model activates `generation` and uses it in the SAME turn. Five names come
+   * off every prefix in every conversation that never asks for media.
    */
-  'generate_image',
-  'generate_video',
-  'generate_speech',
-  'generate_music',
-  'generate_sfx',
   /*
    * A CEO COMMISSIONS. the user: "it should always have the commission tools…
    * that's what we wanted right, clean context ceo, until really needed for

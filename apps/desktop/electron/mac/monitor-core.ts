@@ -576,10 +576,21 @@ export class MacMonitorCore {
    */
   wantsAx(): boolean {
     if (!this.wanted() || this.#opts.axReader === undefined) return false;
-    // On the Electron path the tree walk is not a fallback at all: it is where
-    // the geometry comes from, and the window ids it reports are what join
-    // Chromium's pixels to the right window.
-    return this.#stream === 'unavailable' || this.#source === 'electron';
+    /*
+     * ONLY WHERE THE TREE IS ACTUALLY USED — the Electron path, where it is not
+     * a fallback at all: it is where the geometry comes from, and the window ids
+     * it reports are what join Chromium's pixels to the right window.
+     *
+     * It used to ALSO run whenever the pixel stream was unavailable, to feed a
+     * drawing of the window made from the tree. That drawing is gone (the user, on
+     * seeing it against a real app: "that reconstruction of the calculator app
+     * does not feel like it's at the best it can be" — and Accessibility has no
+     * colour or artwork to give, so an arbitrary app can never look like
+     * itself). What shows instead is the Screen Recording ask, which needs no
+     * tree — so this was a full walk of the user's app, four times a second, for
+     * a picture nobody sees.
+     */
+    return this.#source === 'electron';
   }
 
   reconcile(): void {

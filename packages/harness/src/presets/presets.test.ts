@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { CAPABILITIES } from './capabilities.js';
 import { resolveBaseTools, TOOL_SEARCH_TOOL_NAME } from './presets.js';
 
 /**
@@ -186,5 +187,38 @@ describe('present is always reachable', () => {
   it('is omitted when the build never registered it', () => {
     const without = withPresent.filter((t) => t !== 'present');
     expect(resolveBaseTools(without)).not.toContain('present');
+  });
+});
+
+describe('the two workarounds that outlived their bug', () => {
+  /*
+   * Both were pinned to every prefix for the SAME reason and said so in their own
+   * comments: `capability` could not deliver a toolset mid-turn, because pi's
+   * agent loop snapshotted the tool array at turn start
+   * (agent.js:273, `tools: this._state.tools.slice()`). That line is patched, and
+   * a capability now lands inside the turn that asks for it — verified live at 14
+   * tools on request 1 and 25 on request 3 of one turn.
+   *
+   * So they come off the prefix. These assert they stay off: re-adding either is
+   * a real cost paid by every conversation that never asks for media or a page.
+   */
+  it('does not carry the generation tools', () => {
+    const tools = resolveBaseTools(ALL_TOOLS);
+    for (const t of ['generate_image', 'generate_video', 'generate_speech', 'generate_music']) {
+      expect(tools, `${t} is back on every prefix`).not.toContain(t);
+    }
+  });
+
+  it('does not carry the browser suite', () => {
+    const tools = resolveBaseTools(ALL_TOOLS);
+    for (const t of ['browser_navigate', 'browser_snapshot', 'browser_click']) {
+      expect(tools, `${t} is back on every prefix`).not.toContain(t);
+    }
+  });
+
+  it('still reaches both through a capability, which is the whole point', () => {
+    const names = CAPABILITIES.flatMap((c) => c.tools);
+    expect(names).toContain('generate_image');
+    expect(names).toContain('browser_click');
   });
 });

@@ -85,39 +85,38 @@ function session(patch: Partial<MacMonitorSessionState> = {}): MacMonitorSession
 
 describe('pickMonitorSource', () => {
   it('prefers pixels whenever a frame has one', () => {
-    expect(pickMonitorSource(session(), { bitmap: {} }, scene())).toBe('pixels');
+    // the user: "when screen recording permissions are granted always use the real
+    // window visual."
+    expect(pickMonitorSource(session(), { bitmap: {} })).toBe('pixels');
   });
 
-  it('draws from Accessibility once the stream has given up', () => {
-    expect(pickMonitorSource(session({ stream: 'unavailable' }), { bitmap: null }, scene())).toBe(
-      'accessibility',
+  it('asks for the grant when that is why there are no pixels', () => {
+    expect(pickMonitorSource(session({ stream: 'unavailable', captureDenied: true }), null)).toBe(
+      'permission',
     );
   });
 
-  it('does not draw while the stream is merely starting', () => {
-    // A quarter-second of "connecting" is not a reason to switch to a drawing —
-    // it would flash a rendering and then replace it with the photograph.
-    expect(pickMonitorSource(session({ stream: 'starting' }), null, scene())).toBe('none');
+  it('does not ask while the stream is merely starting', () => {
+    // A quarter-second of "connecting" is not a reason to show a permission
+    // panel — the picture is on its way.
+    expect(pickMonitorSource(session({ stream: 'starting' }), null)).toBe('none');
   });
 
-  it('falls back to the honest empty state when the scene has no windows', () => {
-    expect(
-      pickMonitorSource(session({ stream: 'unavailable' }), null, scene({ windows: [] })),
-    ).toBe('none');
+  it('leaves the honest empty state alone when the grant is not the problem', () => {
+    // Stream failed for some other reason: "Live view unavailable" says so, and
+    // asking for a permission the user already granted would be a lie.
+    expect(pickMonitorSource(session({ stream: 'unavailable' }), null)).toBe('none');
   });
 
-  it('draws nothing at all with no session', () => {
-    expect(pickMonitorSource(session({ active: false }), { bitmap: {} }, scene())).toBe('none');
+  it('shows nothing at all with no session', () => {
+    expect(pickMonitorSource(session({ active: false }), { bitmap: {} })).toBe('none');
   });
 
-  it('goes back to pixels the moment a capture grant lets frames through', () => {
-    const denied = pickMonitorSource(
-      session({ stream: 'unavailable', captureDenied: true }),
-      null,
-      scene(),
+  it('goes straight back to pixels the moment a grant lets frames through', () => {
+    expect(pickMonitorSource(session({ stream: 'unavailable', captureDenied: true }), null)).toBe(
+      'permission',
     );
-    expect(denied).toBe('accessibility');
-    expect(pickMonitorSource(session({ stream: 'live' }), { bitmap: {} }, scene())).toBe('pixels');
+    expect(pickMonitorSource(session({ stream: 'live' }), { bitmap: {} })).toBe('pixels');
   });
 });
 

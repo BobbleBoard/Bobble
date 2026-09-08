@@ -280,7 +280,12 @@ export type MacMonitorInvokeMap = {
    */
   'mac:monitor:request-capture': {
     request: Record<string, never>;
-    response: { ok: boolean };
+    /**
+     * `granted` is true when the system's own Allow/Deny alert was answered
+     * Allow — the one-click path. False means the alert will not appear again
+     * for this app and the Screen Recording pane was opened instead.
+     */
+    response: { ok: boolean; granted?: boolean };
   };
   /**
    * Renderer → main: THE BRAKE, and the wheel.

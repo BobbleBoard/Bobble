@@ -111,9 +111,16 @@ class MacMonitorFeedImpl implements MacMonitorFeed {
     void this.#send(false);
   }
 
-  /** Put the user in front of the Screen Recording switch. Main opens the pane;
-   * nothing here (or anywhere) can flip it. */
+  /**
+   * Ask macOS for Screen Recording. Main puts up the system's own Allow/Deny
+   * alert and, only if that alert cannot appear again, opens the pane instead.
+   */
   requestCapture(): void {
+    void window.piDesktop.invoke('mac:monitor:request-capture', {}).catch(() => undefined);
+  }
+
+  /** The unhappy path: someone who already said no has to use the pane. */
+  openCaptureSettings(): void {
     void window.piDesktop.invoke('mac:monitor:request-capture', {}).catch(() => undefined);
   }
 

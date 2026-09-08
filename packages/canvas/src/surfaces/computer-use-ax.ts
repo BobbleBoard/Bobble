@@ -24,13 +24,13 @@ import type {
 import type { Rect } from './computer-use-geometry.ts';
 
 /** Where the picture in the tab is coming from. */
-export type MonitorSource = 'pixels' | 'accessibility' | 'none';
+export type MonitorSource = 'pixels' | 'permission' | 'none';
 
 /**
  * Pick the source.
  *
  * PIXELS WIN whenever there are any: a photograph of the window is always
- * better than a drawing of it, and a capture grant that arrives mid-session
+ * better than anything else, and a capture grant that arrives mid-session
  * should simply take over with nothing to restart.
  *
  * Accessibility takes over only when the stream has actually given up — which
@@ -43,15 +43,23 @@ export type MonitorSource = 'pixels' | 'accessibility' | 'none';
  * surface already does better than any drawing could.
  */
 export function pickMonitorSource(
-  session: Pick<MacMonitorSessionState, 'active' | 'stream'>,
+  session: Pick<MacMonitorSessionState, 'active' | 'stream' | 'captureDenied'>,
   frame: { bitmap: unknown | null } | null,
-  ax: MacMonitorAxScene | null,
 ): MonitorSource {
   if (!session.active) return 'none';
+  /*
+   * PIXELS WIN, ALWAYS. the user: "when screen recording permissions are granted
+   * always use the real window visual."
+   */
   if (frame?.bitmap != null) return 'pixels';
-  if (session.stream === 'unavailable' && ax !== null && ax.windows.length > 0) {
-    return 'accessibility';
-  }
+  /*
+   * No pixels because the grant is missing → ask for it, rather than drawing a
+   * grey approximation of the app. See CapturePermissionPanel for why the
+   * Accessibility drawing was retired: AX has roles, names and rectangles and
+   * no colour, type or artwork, so a reconstruction of an ARBITRARY app can
+   * never look like that app.
+   */
+  if (session.captureDenied) return 'permission';
   return 'none';
 }
 

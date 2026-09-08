@@ -555,112 +555,36 @@ describe('MacMonitorCore — the Accessibility fallback', () => {
     expect(sink.last?.rect).toEqual({ x: 100, y: 100, w: 800, h: 600 });
   });
 
-  it('polls and publishes a scene once the stream is unavailable', async () => {
-    const reader = vi.fn(async () => snapshot());
-    const { core, spawned, timers } = makeAxCore(reader);
+  /*
+   * THE AX POLL TESTS THAT USED TO LIVE HERE ARE GONE WITH THE DRAWING.
+   *
+   * The tree was walked four times a second whenever the pixel stream was
+   * unavailable, to feed a rendering of the window built from Accessibility.
+   * That rendering is retired — it can show layout and never colour, type or
+   * artwork, so an arbitrary app could never look like itself — and the surface
+   * now asks for the Screen Recording grant instead, which needs no tree.
+   *
+   * The reader is still wired for the ELECTRON source, where the walk is not a
+   * fallback but the geometry itself; `wantsAx()` is asserted below.
+   */
+  it('does not walk the tree just because the pixel stream is unavailable', () => {
+    const h = makeCore();
     const sink = new FakeSink(true);
-    core.addSink(sink);
-    core.setSession(4242, 'TextEdit');
-    expect(reader).not.toHaveBeenCalled(); // pixels are still being tried
-    denyStream(spawned[0], timers);
-    await settle();
-    expect(reader).toHaveBeenCalledWith(4242, expect.any(Number));
-    expect(sink.scenes).toHaveLength(1);
-    expect(sink.scenes[0]?.windows.map((w) => w.windowId)).toEqual([2, 1]);
-    expect(sink.scenes[0]?.rect).toEqual({ x: 100, y: 100, w: 800, h: 600 });
-  });
-
-  it('never polls while pixels are arriving', async () => {
-    const reader = vi.fn(async () => snapshot());
-    const { core, spawned } = makeAxCore(reader);
-    core.addSink(new FakeSink(true));
-    core.setSession(4242, 'TextEdit');
-    spawned[0]?.emit(encodePimf(header(), new Uint8Array([1, 2, 3])));
-    await settle();
-    expect(core.polling()).toBe(false);
-    expect(reader).not.toHaveBeenCalled();
-  });
-
-  it('stops polling when the tab stops watching — the same gate as the capture', async () => {
-    const reader = vi.fn(async () => snapshot());
-    const { core, spawned, timers } = makeAxCore(reader);
-    const sink = new FakeSink(true);
-    core.addSink(sink);
-    core.setSession(4242, 'TextEdit');
-    denyStream(spawned[0], timers);
-    await settle();
-    expect(core.polling()).toBe(true);
-    sink.frames = false;
-    core.addSink(sink); // re-subscribe state-only, as the surface does when hidden
-    expect(core.polling()).toBe(false);
-    const seen = reader.mock.calls.length;
-    await settle();
-    expect(reader.mock.calls.length).toBe(seen);
-  });
-
-  it('stops polling when the session ends and forgets the scene', async () => {
-    const { core, spawned, timers } = makeAxCore(async () => snapshot());
-    core.addSink(new FakeSink(true));
-    core.setSession(4242, 'TextEdit');
-    denyStream(spawned[0], timers);
-    await settle();
-    expect(core.axScene()).not.toBeNull();
-    core.clearSession();
-    expect(core.polling()).toBe(false);
-    expect(core.axScene()).toBeNull();
-  });
-
-  it('survives a reader that throws, and keeps polling', async () => {
-    let calls = 0;
-    const { core, spawned, timers } = makeAxCore(async () => {
-      calls += 1;
-      if (calls === 1) throw new Error('helper busy');
-      return snapshot();
-    });
-    const sink = new FakeSink(true);
-    core.addSink(sink);
-    core.setSession(4242, 'TextEdit');
-    denyStream(spawned[0], timers);
-    await settle();
-    expect(sink.scenes).toHaveLength(0);
-    for (const fn of timers.splice(0, timers.length)) fn();
-    await settle();
-    expect(sink.scenes).toHaveLength(1);
-  });
-
-  it('publishes nothing when Accessibility comes back empty', async () => {
-    const { core, spawned, timers } = makeAxCore(async () => ({ app: 'TextEdit', windows: [] }));
-    const sink = new FakeSink(true);
-    core.addSink(sink);
-    core.setSession(4242, 'TextEdit');
-    denyStream(spawned[0], timers);
-    await settle();
-    expect(sink.scenes).toHaveLength(0);
-    expect(core.axScene()).toBeNull();
-  });
-
-  it('sends the scene only to sinks that asked for frames', async () => {
-    const { core, spawned, timers } = makeAxCore(async () => snapshot());
-    const watcher = new FakeSink(true);
-    const listener = new FakeSink(false);
-    core.addSink(watcher);
-    core.addSink(listener);
-    core.setSession(4242, 'TextEdit');
-    denyStream(spawned[0], timers);
-    await settle();
-    expect(watcher.scenes).toHaveLength(1);
-    expect(listener.scenes).toHaveLength(0);
+    h.core.addSink(sink);
+    h.core.setAxReader(async () => null);
+    h.core.setSession(4242, 'TextEdit');
+    denyStream(h.spawned[0], h.timers);
+    expect(h.core.wantsAx()).toBe(false);
   });
 });
 
 describe('MacMonitorCore — a grant revoked mid-session', () => {
   it('forwards the status frame so the renderer drops the picture it is holding', async () => {
     // Without this the last good frame stays on screen under a surface that has
-    // switched to drawing from Accessibility, and the stale PHOTOGRAPH wins the
+    // switched to the Screen Recording ask, and the stale PHOTOGRAPH wins the
     // source race — the monitor then shows a window frozen at the moment the
     // capture died, with no sign that anything is wrong.
-    const reader = vi.fn(async () => snapshot());
-    const { core, spawned, timers } = makeAxCore(reader);
+    const { core, spawned, timers } = makeAxCore(vi.fn(async () => snapshot()));
     const sink = new FakeSink(true);
     core.addSink(sink);
     core.setSession(4242, 'TextEdit');
@@ -670,8 +594,15 @@ describe('MacMonitorCore — a grant revoked mid-session', () => {
     expect(sink.frameList).toHaveLength(2);
     expect(sink.frameList[1]?.jpeg).toHaveLength(0);
     expect(sink.last?.captureDenied).toBe(true);
+    /*
+     * It used to also assert a replacement Accessibility scene arrived. Nothing
+     * publishes one now — the surface asks for the grant instead of drawing the
+     * window from its tree — so what matters is only the half above: the empty
+     * status frame reaches the renderer, which is what makes it let go of the
+     * photograph it was still showing.
+     */
     await settle();
-    expect(sink.scenes).toHaveLength(1);
+    expect(sink.scenes).toHaveLength(0);
   });
 });
 

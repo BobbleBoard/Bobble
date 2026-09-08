@@ -145,8 +145,13 @@ export interface MacMonitorFeed {
   /** The newest Accessibility scene, or null when none has arrived. Present
    * only while the pixel stream is unavailable — see the contract. */
   getAxScene(): MacMonitorAxScene | null;
-  /** Show the user where the Screen Recording switch lives. */
+  /**
+   * Ask macOS for Screen Recording — the one-shot Allow/Deny alert, when the
+   * system will still show it. See CapturePermissionPanel.
+   */
   requestCapture?(): void;
+  /** Open the Screen Recording pane, for when the alert will not come again. */
+  openCaptureSettings?(): void;
   /** The decoded wallpaper backdrop, or null while it loads / has none. */
   getWallpaper(): ImageBitmap | HTMLImageElement | null;
   /** Frames per second over the recent window (0 before enough frames). */

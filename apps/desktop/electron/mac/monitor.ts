@@ -323,13 +323,32 @@ export function registerMacMonitorIpc(): void {
     if (!isTrustedIpcEvent(event)) throw new Error('[mac-monitor] rejected request-capture');
     if (process.platform !== 'darwin') return { ok: false };
     await registerForScreenRecording();
-    await promptCaptureGrant?.().catch(() => undefined);
+    /*
+     * ASK FIRST, AND ONLY SEND THEM TO SETTINGS IF ASKING CANNOT WORK.
+     *
+     * This used to prompt AND open System Settings, every time — so the happy
+     * path (macOS has never asked about this app; `CGRequestScreenCaptureAccess`
+     * puts up one Allow/Deny alert) buried the alert under a Settings window the
+     * user did not need. the user: "ideally those steps can just be 'click here and
+     * click allow' if you can just prompt the user to one button allow/deny."
+     *
+     * So: prompt, read the answer, and open the pane only when the answer is no
+     * — which is also the only case where the pane is the ONLY route, since the
+     * system alert never appears twice for the same app.
+     */
+    const granted = await promptCaptureGrant?.()
+      .then((r) => (r as { screenRecording?: boolean } | undefined)?.screenRecording === true)
+      .catch(() => false);
+    if (granted === true) {
+      log.info('screen recording granted from the prompt');
+      return { ok: true, granted: true };
+    }
     try {
       await shell.openExternal(MAC_SCREEN_RECORDING_PANE);
-      return { ok: true };
+      return { ok: true, granted: false };
     } catch (err) {
       log.warn('could not open the Screen Recording pane', { error: String(err) });
-      return { ok: false };
+      return { ok: false, granted: false };
     }
   });
   /**
