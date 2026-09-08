@@ -104,9 +104,10 @@
   flex: 0 0 auto;
   /* The seam under the strip: see `.pd-edge-line` in ui/styles/base.css. It
    * fades out at both ends rather than stopping dead against the panel edges,
-   * so it reads as the boundary of the strip instead of a drawn rule. The
-   * ACTIVE tab sits on top of it and breaks it, which is what makes that tab
-   * read as continuous with the content below. */
+   * so it reads as the boundary of the strip instead of a drawn rule. Nothing
+   * breaks it any more — the tabs FLOAT above it rather than merging into the
+   * content, so the strip has one unbroken boundary and the selected tab is
+   * an object sitting on it. */
   position: relative;
 }
 
@@ -187,7 +188,9 @@
 .pd-canvas-tab-slot {
   position: relative;
   display: inline-flex;
-  align-items: flex-end;
+  /* Centred, not bottom-aligned: a floating tab has air under it as well as
+   * over it. Bottom alignment is what made a tab look joined to the seam. */
+  align-items: center;
   flex: 0 0 auto;
 }
 
@@ -263,8 +266,11 @@
    * transparent border keeps the active tab's own border from changing the
    * layout when selection moves. */
   border: 1px solid transparent;
-  /* rounded TOP corners only — the bottom edge rests on the toolbar seam */
-  border-radius: var(--pd-radius-md) var(--pd-radius-md) 0 0;
+  /* Rounded on ALL four corners: the tab is an object floating on the strip,
+   * not a folder tab joined to the page. the user, on the old treatment: "tabs need
+   * to be floating, none besides the selected one has the border that comes up
+   * around and down the other side". */
+  border-radius: var(--pd-radius-md);
   background: transparent;
   color: var(--pd-text-muted);
   transition:
@@ -274,24 +280,27 @@
 }
 
 /* Hover is the only thing an unselected tab does, so it also brings the label up
- * to full strength — a wash alone is easy to miss on a dark strip. */
+ * to full strength — a wash alone is easy to miss on a dark strip. It is a
+ * FLOATING highlight: a filled pill with air under it, never a shape that
+ * reaches down into the seam. */
 .pd-canvas-tab:not([data-active]):hover {
   background: var(--pd-bg-hover);
   color: var(--pd-text-primary);
 }
 
-/* The active tab is LIFTED and connected to the body: filled with the content
- * bg (bg-raised), a stronger border on the top + sides, and NO bottom border —
- * so it flows into the toolbar/content below (both bg-raised) with no divider,
- * while inactive tabs keep their hairline bottom (the classic Safari "current
- * tab flows into the page" look). The active tab rests flush on the tab-bar seam
- * (no negative margin — the strip is overflow-x:auto, so an overhang would clip
- * / trip a phantom scrollbar; the colour match already carries the connection). */
+/* The active tab FLOATS: filled with the content bg, a hairline all the way
+ * round, and a shadow that lifts it off the strip. The old treatment was the
+ * Safari one — border on three sides and no bottom, so the tab merged into the
+ * page and its border ran up, across and back down around the content. That is
+ * exactly what the user asked to lose: a tab should read as a selected object on a
+ * strip, not as the front of a folder. */
 .pd-canvas-tab[data-active] {
   background: var(--pd-bg-raised);
   border-color: var(--pd-canvas-rule);
-  border-bottom-color: transparent;
   color: var(--pd-text-primary);
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 0.16),
+    0 0 0 0.5px rgb(0 0 0 / 0.04);
   /* The selected label carries a touch more weight, so the state survives even
    * where the fill is subtle. */
   font-weight: var(--pd-font-weight-medium, 500);
