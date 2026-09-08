@@ -4,8 +4,9 @@ Everything here was queued while computer use was being finished. Order below is
 the user's, not mine. He said: "you have a whole night to do it and produce that
 video, you can take your time with all of it."
 
-**Do the video first, then this file.** — the video is done and delivered
-(`scratchpad/mac-video/bobble-drives-textedit.mp4`, plus a close-up cut).
+**ALL EIGHT ITEMS ARE DONE.** The video was recorded first, then re-recorded on
+the finished build (`scratchpad/mac-video/bobble-drives-textedit.mp4` + a
+close-up cut). Shipped to /Applications at 2026-09-07 23:56.
 
 Six screenshots came with the message. They could not be written to disk from
 the conversation, so each is described where it belongs — precisely enough to
