@@ -422,9 +422,54 @@ export function renderCommandHelp(c: CliCommand): string {
     const req = required.has(key) ? ' (required)' : '';
     const desc = typeof p.description === 'string' ? ` — ${p.description}` : '';
     const enumVals = Array.isArray(p.enum) ? ` [${p.enum.join('|')}]` : '';
-    lines.push(`  --${key} <${type}>${enumVals}${req}${desc}`);
+    lines.push(`  --${key} <${describeType(p, type)}>${enumVals}${req}${desc}`);
+    lines.push(...shapeLines(p));
   }
   return lines.join('\n');
+}
+
+/** `array of string`, `array of object`, or the plain type. */
+function describeType(p: Record<string, unknown>, type: string): string {
+  if (type !== 'array') return type;
+  const items = p.items as Record<string, unknown> | undefined;
+  const inner = typeof items?.type === 'string' ? items.type : undefined;
+  return inner === undefined ? 'array' : `array of ${inner}`;
+}
+
+/**
+ * THE SHAPE OF A NESTED ARGUMENT, or the model has to guess its key names.
+ *
+ * An MCP client hands the model the entire JSON Schema, so it can see that
+ * `--assignee` takes `{login, notify}`. Help that says only `--assignee
+ * <object>` reaches the same argument and loses the same information — every
+ * field is technically passable and none of them is knowable. That is the one
+ * real capability gap between a tool called as a schema and the same tool
+ * called as a command, and it costs nothing to close: this text is read on
+ * demand by `--help`, not carried in the system prompt.
+ *
+ * One level deep, because a schema nested deeper than that is better read as
+ * JSON than as an outline, and the JSON is what the flag takes anyway. Pure.
+ */
+function shapeLines(p: Record<string, unknown>): string[] {
+  const type = typeof p.type === 'string' ? p.type : '';
+  const shape = (type === 'array' ? (p.items as Record<string, unknown> | undefined) : p) as
+    | CliSchema
+    | undefined;
+  if (shape === undefined || typeof shape !== 'object') return [];
+  const props = shape.properties ?? {};
+  const keys = Object.keys(props);
+  if (keys.length === 0) return [];
+  const required = new Set(shape.required ?? []);
+  const noun = type === 'array' ? 'each entry' : 'JSON object';
+  return [
+    `      ${noun}: {${keys.join(', ')}}`,
+    ...keys.map((k) => {
+      const q = props[k] ?? {};
+      const t = typeof q.type === 'string' ? q.type : 'string';
+      const d = typeof q.description === 'string' ? ` — ${q.description}` : '';
+      return `        ${k} <${t}>${required.has(k) ? ' (required)' : ''}${d}`;
+    }),
+  ];
 }
 
 /**
