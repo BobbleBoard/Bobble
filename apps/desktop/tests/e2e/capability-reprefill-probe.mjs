@@ -24,7 +24,8 @@ import { _electron as electron } from 'playwright-core';
 import { backgroundLaunch } from './_focus.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const OUT = process.env.OUT ?? path.resolve(here, '../../../..', '.corp-runs', 'capability-reprefill');
+const OUT =
+  process.env.OUT ?? path.resolve(here, '../../../..', '.corp-runs', 'capability-reprefill');
 const APP = process.env.APP ?? '/Applications/Bobble.app/Contents/MacOS/Bobble';
 mkdirSync(OUT, { recursive: true });
 
@@ -48,9 +49,13 @@ try {
   await win.waitForFunction(() => typeof window.__pi_store === 'function', { timeout: 90_000 });
   await win.waitForSelector('[data-testid="composer-input"]', { timeout: 90_000 });
   await win
-    .waitForFunction(() => window.__llm_store?.().getState().status.serverRunning === true, undefined, {
-      timeout: 600_000,
-    })
+    .waitForFunction(
+      () => window.__llm_store?.().getState().status.serverRunning === true,
+      undefined,
+      {
+        timeout: 600_000,
+      },
+    )
     .catch(() => undefined);
   const status = await win.evaluate(() => window.__llm_store().getState().status);
   const port = Number(/:(\d+)\/v1/.exec(status.baseUrl ?? '')?.[1] ?? 0) || null;
@@ -161,7 +166,14 @@ try {
     );
     await idle();
     const reused = turn === null ? null : turn.total - turn.processed;
-    rows.push({ label, note, ttft, total: turn?.total ?? null, processed: turn?.processed ?? null, reused });
+    rows.push({
+      label,
+      note,
+      ttft,
+      total: turn?.total ?? null,
+      processed: turn?.processed ?? null,
+      reused,
+    });
     console.log(
       `  ${label.padEnd(22)} ${String(ttft ?? '?').padStart(7)}ms   read ` +
         `${String(turn?.processed ?? '?').padStart(6)} of ${String(turn?.total ?? '?').padStart(6)}` +
@@ -188,7 +200,9 @@ try {
   await idle();
   const after = await toolNames();
   const added = after.filter((t) => !before.includes(t));
-  console.log(`  tools advertised: ${after.length}${added.length > 0 ? ` (+${added.join(',')})` : ' (unchanged)'}\n`);
+  console.log(
+    `  tools advertised: ${after.length}${added.length > 0 ? ` (+${added.join(',')})` : ' (unchanged)'}\n`,
+  );
 
   await send('after-capability', 'And three metals.', 'right after the tool set changed');
   await send('one-more', 'And three rivers.', 'the turn after that');
@@ -211,7 +225,10 @@ try {
     );
     if (hurt) process.exitCode = 1;
   }
-  writeFileSync(path.join(OUT, 'capability.json'), JSON.stringify({ before, after, rows }, null, 2));
+  writeFileSync(
+    path.join(OUT, 'capability.json'),
+    JSON.stringify({ before, after, rows }, null, 2),
+  );
 } catch (err) {
   console.error(`capability-reprefill-probe: ${err.message}\n${err.stack}`);
   process.exitCode = 1;

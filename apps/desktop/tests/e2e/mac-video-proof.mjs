@@ -21,7 +21,14 @@
  * the frontmost app.
  */
 import { execFile } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  writeFileSync,
+} from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
@@ -125,7 +132,8 @@ try {
   // ── assertions on disk, not on the picture ───────────────────────────────
   const takeover = frontmost.filter((a) => /textedit/i.test(String(a)));
   console.log(`frontmost samples: ${frontmost.length}, TextEdit was frontmost ${takeover.length}`);
-  if (takeover.length > 0) fail('TextEdit took the foreground — the run must stay in the background');
+  if (takeover.length > 0)
+    fail('TextEdit took the foreground — the run must stay in the background');
 
   const saved = findSaved(DOCNAME);
   if (saved === null) {
@@ -227,7 +235,10 @@ async function encode(dir, out) {
   const frames = readdirSync(dir)
     .filter((f) => f.endsWith('.jpg'))
     .sort()
-    .map((f) => ({ file: path.join(dir, f), t: Number(f.split('-')[2]?.replace('.jpg', '') ?? 0) }));
+    .map((f) => ({
+      file: path.join(dir, f),
+      t: Number(f.split('-')[2]?.replace('.jpg', '') ?? 0),
+    }));
   if (frames.length === 0) fail('no frames were recorded');
   const lines = [];
   for (let i = 0; i < frames.length; i += 1) {
@@ -239,9 +250,22 @@ async function encode(dir, out) {
   const list = path.join(dir, 'frames.txt');
   writeFileSync(list, lines.join('\n'));
   await execFileAsync('ffmpeg', [
-    '-y', '-f', 'concat', '-safe', '0', '-i', list,
-    '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2,fps=24',
-    '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-preset', 'veryfast', out,
+    '-y',
+    '-f',
+    'concat',
+    '-safe',
+    '0',
+    '-i',
+    list,
+    '-vf',
+    'scale=trunc(iw/2)*2:trunc(ih/2)*2,fps=24',
+    '-c:v',
+    'libx264',
+    '-pix_fmt',
+    'yuv420p',
+    '-preset',
+    'veryfast',
+    out,
   ]);
 }
 

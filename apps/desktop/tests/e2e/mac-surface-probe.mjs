@@ -14,17 +14,42 @@ const app = await electron.launch({
 });
 try {
   const page = await app.firstWindow();
-  await page.waitForFunction(() => typeof window.piDesktop?.invoke === 'function', { timeout: 30000 });
-  const dbg = (op, params) => page.evaluate((r) => window.piDesktop.invoke('mac:debug', r), { op, params });
+  await page.waitForFunction(() => typeof window.piDesktop?.invoke === 'function', {
+    timeout: 30000,
+  });
+  const dbg = (op, params) =>
+    page.evaluate((r) => window.piDesktop.invoke('mac:debug', r), { op, params });
   console.log('check:', JSON.stringify((await dbg('check')).result));
   const snap = await dbg('snapshot', { app: 'TextEdit', screenshot: true });
   const r = snap.result ?? {};
-  console.log('app:', r.app, '| window:', JSON.stringify(r.window), '| elements:', (r.elements ?? []).length);
-  console.log('windows[]:', JSON.stringify((r.windows ?? []).map((w) => [w.role, w.title, w.frame?.w, w.frame?.h])));
+  console.log(
+    'app:',
+    r.app,
+    '| window:',
+    JSON.stringify(r.window),
+    '| elements:',
+    (r.elements ?? []).length,
+  );
+  console.log(
+    'windows[]:',
+    JSON.stringify((r.windows ?? []).map((w) => [w.role, w.title, w.frame?.w, w.frame?.h])),
+  );
   const shot = r.screenshot ?? {};
-  console.log('screenshot: composite=', shot.composite, 'size=', shot.width, 'x', shot.height, 'b64=', (shot.base64 ?? '').length);
+  console.log(
+    'screenshot: composite=',
+    shot.composite,
+    'size=',
+    shot.width,
+    'x',
+    shot.height,
+    'b64=',
+    (shot.base64 ?? '').length,
+  );
   if (shot.base64) {
-    writeFileSync('/Users/user/Desktop/OSS-harness/scratchpad/surface-probe.png', Buffer.from(shot.base64, 'base64'));
+    writeFileSync(
+      '/Users/user/Desktop/OSS-harness/scratchpad/surface-probe.png',
+      Buffer.from(shot.base64, 'base64'),
+    );
     console.log('wrote scratchpad/surface-probe.png');
   }
 } finally {

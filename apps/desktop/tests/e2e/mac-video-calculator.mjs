@@ -51,7 +51,8 @@ const run = promisify(execFile);
 const osa = (s) => run('osascript', ['-e', s]).catch(() => undefined);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const BUNDLE = process.env.BOBBLE_APP ?? '/Applications/Bobble.app';
-const OUT = process.env.OUT_DIR ?? '/Users/user/Desktop/OSS-harness/scratchpad/mac-video-calculator';
+const OUT =
+  process.env.OUT_DIR ?? '/Users/user/Desktop/OSS-harness/scratchpad/mac-video-calculator';
 const FPS = Number(process.env.FPS ?? 8);
 const MODEL_ID = process.env.MAC_CU_MODEL ?? 'qwen3.5-4b-mtp';
 /*

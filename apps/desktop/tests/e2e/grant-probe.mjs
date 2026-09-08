@@ -26,7 +26,9 @@ try {
   console.log('main process sees:', JSON.stringify(status));
 
   const page = await app.firstWindow();
-  await page.waitForFunction(() => typeof window.piDesktop?.invoke === 'function', { timeout: 30000 });
+  await page.waitForFunction(() => typeof window.piDesktop?.invoke === 'function', {
+    timeout: 30000,
+  });
   const helper = await page.evaluate(() => window.piDesktop.invoke('mac:debug', { op: 'check' }));
   console.log('helper sees:', JSON.stringify(helper.result ?? helper));
 
@@ -54,12 +56,29 @@ try {
   console.log('desktopCapturer:', JSON.stringify(shot));
 
   // Drive a real session and see whether pixels come.
-  await page.evaluate(() => window.piDesktop.invoke('mac:debug', { op: 'launch', params: { app: 'Calculator', background: true } }));
+  await page.evaluate(() =>
+    window.piDesktop.invoke('mac:debug', {
+      op: 'launch',
+      params: { app: 'Calculator', background: true },
+    }),
+  );
   await sleep(2500);
-  const sub = await page.evaluate(() => window.piDesktop.invoke('mac:monitor:subscribe', { frames: true }));
+  const sub = await page.evaluate(() =>
+    window.piDesktop.invoke('mac:monitor:subscribe', { frames: true }),
+  );
   await sleep(4000);
-  const st = await page.evaluate(() => window.piDesktop.invoke('mac:monitor:subscribe', { frames: true }));
-  console.log('monitor:', JSON.stringify({ stream: st?.state?.stream, denied: st?.state?.captureDenied, err: st?.state?.streamError, source: st?.state?.source }));
+  const st = await page.evaluate(() =>
+    window.piDesktop.invoke('mac:monitor:subscribe', { frames: true }),
+  );
+  console.log(
+    'monitor:',
+    JSON.stringify({
+      stream: st?.state?.stream,
+      denied: st?.state?.captureDenied,
+      err: st?.state?.streamError,
+      source: st?.state?.source,
+    }),
+  );
 } finally {
   await app.close().catch(() => {});
 }

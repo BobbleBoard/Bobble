@@ -25,11 +25,16 @@ await sleep(2000);
  */
 await run('open', [
   '-g',
-  '--env', 'PI_E2E=1',
-  '--env', 'PI_E2E_BACKGROUND=1',
-  '--env', 'PI_MAC_PRECONSENT=1',
-  '-a', '/Applications/Bobble.app',
-  '--args', `--remote-debugging-port=${PORT}`,
+  '--env',
+  'PI_E2E=1',
+  '--env',
+  'PI_E2E_BACKGROUND=1',
+  '--env',
+  'PI_MAC_PRECONSENT=1',
+  '-a',
+  '/Applications/Bobble.app',
+  '--args',
+  `--remote-debugging-port=${PORT}`,
 ]);
 await sleep(6000);
 
@@ -39,17 +44,37 @@ try {
   const ctx = browser.contexts()[0];
   const page = (ctx?.pages() ?? []).find((p) => !p.url().startsWith('devtools://'));
   if (page === undefined) throw new Error('no renderer page over CDP');
-  await page.waitForFunction(() => typeof window.piDesktop?.invoke === 'function', { timeout: 30000 });
+  await page.waitForFunction(() => typeof window.piDesktop?.invoke === 'function', {
+    timeout: 30000,
+  });
   const helper = await page.evaluate(() => window.piDesktop.invoke('mac:debug', { op: 'check' }));
   console.log('helper sees:', JSON.stringify(helper?.result ?? helper));
-  const grants = await page.evaluate(() => window.piDesktop.invoke('mac:debug', { op: 'grants' })).catch((e) => String(e).slice(0, 60));
+  const grants = await page
+    .evaluate(() => window.piDesktop.invoke('mac:debug', { op: 'grants' }))
+    .catch((e) => String(e).slice(0, 60));
   console.log('grants op:', JSON.stringify(grants));
-  await page.evaluate(() => window.piDesktop.invoke('mac:debug', { op: 'launch', params: { app: 'Calculator', background: true } })).catch(() => {});
+  await page
+    .evaluate(() =>
+      window.piDesktop.invoke('mac:debug', {
+        op: 'launch',
+        params: { app: 'Calculator', background: true },
+      }),
+    )
+    .catch(() => {});
   await sleep(2500);
   await page.evaluate(() => window.piDesktop.invoke('mac:monitor:subscribe', { frames: true }));
   await sleep(5000);
-  const st = await page.evaluate(() => window.piDesktop.invoke('mac:monitor:subscribe', { frames: true }));
-  console.log('monitor:', JSON.stringify({ stream: st?.state?.stream, denied: st?.state?.captureDenied, err: st?.state?.streamError }));
+  const st = await page.evaluate(() =>
+    window.piDesktop.invoke('mac:monitor:subscribe', { frames: true }),
+  );
+  console.log(
+    'monitor:',
+    JSON.stringify({
+      stream: st?.state?.stream,
+      denied: st?.state?.captureDenied,
+      err: st?.state?.streamError,
+    }),
+  );
 } finally {
   await browser?.close().catch(() => {});
 }

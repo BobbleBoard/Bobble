@@ -15,10 +15,14 @@ const app = await electron.launch({
 });
 try {
   const page = await app.firstWindow();
-  await page.waitForFunction(() => typeof window.piDesktop?.invoke === 'function', { timeout: 30000 });
+  await page.waitForFunction(() => typeof window.piDesktop?.invoke === 'function', {
+    timeout: 30000,
+  });
   const before = await page.evaluate(() => window.piDesktop.invoke('mac:debug', { op: 'check' }));
   console.log('before:', JSON.stringify(before.result ?? before));
-  const prompted = await page.evaluate(() => window.piDesktop.invoke('mac:debug', { op: 'promptGrants' }));
+  const prompted = await page.evaluate(() =>
+    window.piDesktop.invoke('mac:debug', { op: 'promptGrants' }),
+  );
   console.log('prompted:', JSON.stringify(prompted.result ?? prompted));
   const after = await page.evaluate(() => window.piDesktop.invoke('mac:debug', { op: 'check' }));
   console.log('after:', JSON.stringify(after.result ?? after));

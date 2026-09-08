@@ -17,7 +17,9 @@ const app = await electron.launch({
 });
 try {
   const page = await app.firstWindow();
-  await page.waitForFunction(() => typeof window.piDesktop?.invoke === 'function', { timeout: 30000 });
+  await page.waitForFunction(() => typeof window.piDesktop?.invoke === 'function', {
+    timeout: 30000,
+  });
   const helper = await page.evaluate(() => window.piDesktop.invoke('mac:debug', { op: 'check' }));
   console.log('helper --check       :', JSON.stringify(helper.result ?? helper));
 
@@ -28,41 +30,54 @@ try {
 
   const sources = await app.evaluate(async ({ desktopCapturer }) => {
     try {
-    const list = await desktopCapturer.getSources({
-      types: ['window'],
-      thumbnailSize: { width: 320, height: 200 },
-      fetchWindowIcons: false,
-    });
-    return list.slice(0, 40).map((s) => ({
-      id: s.id,
-      name: s.name,
-      empty: s.thumbnail.isEmpty(),
-      size: s.thumbnail.getSize(),
-    }));
+      const list = await desktopCapturer.getSources({
+        types: ['window'],
+        thumbnailSize: { width: 320, height: 200 },
+        fetchWindowIcons: false,
+      });
+      return list.slice(0, 40).map((s) => ({
+        id: s.id,
+        name: s.name,
+        empty: s.thumbnail.isEmpty(),
+        size: s.thumbnail.getSize(),
+      }));
     } catch (err) {
       return [{ id: 'error', name: String(err), empty: true, size: null }];
     }
   });
   const named = sources.filter((s) => s.name && s.name !== '');
-  console.log('desktopCapturer      :', sources.length, 'windows,', named.length, 'with real names');
+  console.log(
+    'desktopCapturer      :',
+    sources.length,
+    'windows,',
+    named.length,
+    'with real names',
+  );
   console.log('  sample             :', JSON.stringify(sources.slice(0, 6)));
 
   const shot = await app.evaluate(async ({ desktopCapturer }) => {
     try {
-    const list = await desktopCapturer.getSources({
-      types: ['window'],
-      thumbnailSize: { width: 1200, height: 800 },
-    });
-    const target = list.find((s) => /textedit/i.test(s.name)) ?? list[0];
-    if (target === undefined) return null;
-    return { name: target.name, png: target.thumbnail.toPNG().toString('base64') };
+      const list = await desktopCapturer.getSources({
+        types: ['window'],
+        thumbnailSize: { width: 1200, height: 800 },
+      });
+      const target = list.find((s) => /textedit/i.test(s.name)) ?? list[0];
+      if (target === undefined) return null;
+      return { name: target.name, png: target.thumbnail.toPNG().toString('base64') };
     } catch (err) {
       return { name: `error: ${String(err)}`, png: '' };
     }
   });
   if (shot !== null && shot.png.length > 2000) {
-    writeFileSync('/Users/user/Desktop/OSS-harness/scratchpad/capture-path-probe.png', Buffer.from(shot.png, 'base64'));
-    console.log('wrote scratchpad/capture-path-probe.png from', JSON.stringify(shot.name), `(${shot.png.length} b64 chars)`);
+    writeFileSync(
+      '/Users/user/Desktop/OSS-harness/scratchpad/capture-path-probe.png',
+      Buffer.from(shot.png, 'base64'),
+    );
+    console.log(
+      'wrote scratchpad/capture-path-probe.png from',
+      JSON.stringify(shot.name),
+      `(${shot.png.length} b64 chars)`,
+    );
   } else {
     console.log('desktopCapturer produced no usable image');
   }

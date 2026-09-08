@@ -15,7 +15,9 @@ const app = await electron.launch({
 });
 try {
   const page = await app.firstWindow();
-  await page.waitForFunction(() => typeof window.piDesktop?.invoke === 'function', { timeout: 30000 });
+  await page.waitForFunction(() => typeof window.piDesktop?.invoke === 'function', {
+    timeout: 30000,
+  });
   const res = await page.evaluate(() => window.piDesktop.invoke('mac:debug', { op: 'check' }));
   console.log('INSTALLED Bobble TCC:', JSON.stringify(res));
 } finally {

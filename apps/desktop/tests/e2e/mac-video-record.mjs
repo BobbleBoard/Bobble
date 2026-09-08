@@ -161,7 +161,10 @@ try {
 
   const launch = await dbg('launch', { app: 'TextEdit', background: true });
   const pid = launch.pid;
-  say(`TextEdit launched in the background, pid ${pid}`, 'TextEdit opens in the background — it never comes to the front');
+  say(
+    `TextEdit launched in the background, pid ${pid}`,
+    'TextEdit opens in the background — it never comes to the front',
+  );
   await sleep(2200);
 
   // 1. New document — from the MENU BAR, which is where "New" actually lives.
@@ -181,8 +184,12 @@ try {
   await sleep(1600);
   snap = await dbg('snapshot', { pid });
   const typed = String((snap.elements ?? []).find((e) => e.role === 'AXTextArea')?.value ?? '');
-  say(`typed → document reads ${JSON.stringify(typed.slice(0, 60))}`, 'Typing — real keystrokes, into an app that is not in front');
-  if (!typed.toLowerCase().includes('bobble typed this line')) throw new Error('typing did not land');
+  say(
+    `typed → document reads ${JSON.stringify(typed.slice(0, 60))}`,
+    'Typing — real keystrokes, into an app that is not in front',
+  );
+  if (!typed.toLowerCase().includes('bobble typed this line'))
+    throw new Error('typing did not land');
 
   // 3. Format it — select all, then the ruler's own bold control (an in-window
   //    control, so no focus is borrowed).
@@ -220,7 +227,7 @@ try {
   const inSheet = (withSheet.elements ?? []).filter((e) => e.win === sheetId);
   say(
     `the dialog is indexed: ${JSON.stringify(inSheet.map((e) => e.name))}`,
-    "The save dialog is part of TextEdit, and every one of its controls is indexed",
+    'The save dialog is part of TextEdit, and every one of its controls is indexed',
   );
 
   // 5. Act INSIDE the dialog: type the filename, then click its Save button.
@@ -275,7 +282,9 @@ try {
   if (file === null) {
     say('note: the save folder is not readable from here; the window title is the check');
   } else {
-    const rtf = await run('cat', [file]).then((r) => r.stdout).catch(() => '');
+    const rtf = await run('cat', [file])
+      .then((r) => r.stdout)
+      .catch(() => '');
     say(`saved ${file} (${rtf.length} bytes)`);
     say(`  contains the typed line: ${rtf.toLowerCase().includes('bobble typed this line')}`);
     say(`  contains a bold run: ${rtf.includes(String.fromCharCode(92) + 'b')}`);
@@ -300,7 +309,10 @@ if (frames.length === 0) throw new Error('no frames were captured');
 const lines = [];
 for (let i = 0; i < frames.length; i += 1) {
   const next = frames[i + 1]?.t ?? frames[i].t + 1000 / FPS;
-  lines.push(`file '${frames[i].file}'`, `duration ${Math.min(3, Math.max(0.03, (next - frames[i].t) / 1000)).toFixed(3)}`);
+  lines.push(
+    `file '${frames[i].file}'`,
+    `duration ${Math.min(3, Math.max(0.03, (next - frames[i].t) / 1000)).toFixed(3)}`,
+  );
 }
 lines.push(`file '${frames[frames.length - 1].file}'`);
 const list = path.join(OUT, 'frames.txt');
@@ -311,11 +323,29 @@ const video = path.join(OUT, 'bobble-drives-textedit.mp4');
 // The .srt is written anyway, as a readable transcript of the run.
 writeFileSync(path.join(OUT, 'captions.srt'), srt(log, (frames.at(-1)?.t ?? started) - started));
 await run('ffmpeg', [
-  '-y', '-f', 'concat', '-safe', '0', '-i', list,
-  '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2,fps=24',
-  '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-preset', 'veryfast', '-crf', '20', video,
+  '-y',
+  '-f',
+  'concat',
+  '-safe',
+  '0',
+  '-i',
+  list,
+  '-vf',
+  'scale=trunc(iw/2)*2:trunc(ih/2)*2,fps=24',
+  '-c:v',
+  'libx264',
+  '-pix_fmt',
+  'yuv420p',
+  '-preset',
+  'veryfast',
+  '-crf',
+  '20',
+  video,
 ]);
-writeFileSync(path.join(OUT, 'run-log.txt'), log.map((e) => `${(e.at / 1000).toFixed(1)}s  ${e.text}`).join('\n'));
+writeFileSync(
+  path.join(OUT, 'run-log.txt'),
+  log.map((e) => `${(e.at / 1000).toFixed(1)}s  ${e.text}`).join('\n'),
+);
 console.log(`\n${frames.length} frames → ${video}`);
 
 function findSaved(name) {
