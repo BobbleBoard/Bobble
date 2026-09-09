@@ -10,19 +10,72 @@
  * It is therefore also the only app here that cannot work at all without the
  * Screen Recording grant: with no pixels the model is acting blind.
  *
- * The task is deliberately the smallest real one — delete the default cube —
- * because the interesting measurement is whether a model can locate anything in
- * a dense custom UI at all, not whether it can model.
+ * THE TASK IS TO ADD, NOT TO DELETE. It was "delete the default cube" until the
+ * scene was checked from outside: the user's startup file is EMPTY —
+ * `bpy.data.objects` is `[]`, no cube, no camera, no light. So the task had no
+ * cube to delete and every run "passed" by doing nothing, which is the same
+ * mistake as asking for a Maps place that was already on screen. Adding a
+ * primitive cannot be passed by inaction, and it is the same kind of work:
+ * find the Add menu in a dense custom interface and drive it.
  *
- * VERIFIED FROM OUTSIDE. Blender tells Accessibility nothing about its scene, so
- * the run cannot check itself; the window title is the one signal it does give
- * (Blender marks an edited file). The scene itself is checked separately, from
- * this session's Blender MCP, so the evidence never comes from the model.
+ * VERIFIED FROM INSIDE BLENDER. The scene is read over the MCP add-on's own
+ * socket while Blender is still up, so the evidence is Blender's object list
+ * rather than the model's account of it — and a screenshot is written next to
+ * the video so the viewport can be LOOKED AT (the user: "videos should be visually
+ * verified by frames after significant actions").
  */
+import { mkdirSync, writeFileSync } from 'node:fs';
+import net from 'node:net';
+import path from 'node:path';
 import { demoRun } from './demo-run.mjs';
 
 const MODEL = process.env.MAC_CU_MODEL ?? 'qwen3.5-9b-mtp';
 const MODE = process.env.TOOL_INTERFACE === 'schemas' ? 'schemas' : 'bash-cli';
+
+/* A different primitive per run, so a scene left dirty by an earlier run cannot
+   be mistaken for this one's success. */
+const SHAPES = [
+  { name: 'cube', type: 'MESH', match: /cube/i },
+  { name: 'UV sphere', type: 'MESH', match: /sphere/i },
+  { name: 'cylinder', type: 'MESH', match: /cylinder/i },
+  { name: 'cone', type: 'MESH', match: /cone/i },
+];
+const SHAPE = SHAPES[Math.floor(Math.random() * SHAPES.length)] ?? SHAPES[0];
+
+/**
+ * Ask the running Blender what is in its scene.
+ *
+ * The add-on speaks null-delimited JSON on 127.0.0.1:9876 (the name resolves to
+ * ::1 first, where it is not listening) and autostarts with
+ * Blender, so this needs no setup — and it is the only channel that can answer
+ * the question at all, since Blender tells Accessibility nothing about a scene.
+ */
+function askBlender(code, timeoutMs = 6000) {
+  return new Promise((resolve) => {
+    const socket = net.createConnection({ host: '127.0.0.1', port: 9876 });
+    let buf = '';
+    const done = (v) => {
+      socket.destroy();
+      resolve(v);
+    };
+    socket.setTimeout(timeoutMs);
+    socket.on('timeout', () => done({ error: 'timeout' }));
+    socket.on('error', (e) => done({ error: String(e.message ?? e) }));
+    socket.on('connect', () => {
+      socket.write(`${JSON.stringify({ type: 'execute', code, strict_json: true })}\0`);
+    });
+    socket.on('data', (d) => {
+      buf += d.toString();
+      const nul = buf.indexOf('\0');
+      if (nul < 0) return;
+      try {
+        done(JSON.parse(buf.slice(0, nul)));
+      } catch (e) {
+        done({ error: `bad response: ${String(e)}` });
+      }
+    });
+  });
+}
 
 await demoRun({
   name: process.env.RUN_NAME ?? `blender-${MODEL}-${MODE}`,
@@ -30,17 +83,39 @@ await demoRun({
   model: MODEL,
   mode: MODE,
   prompt:
-    'Use Blender on this Mac to delete the default cube from the scene. ' +
+    `Use Blender on this Mac to add a ${SHAPE.name} to the scene. ` +
     'It draws its own interface, so look at its window and work from what you see. ' +
     'Then tell me what you did and what the viewport shows now.',
   verify: async (dbg, last) => {
     const snap = await dbg('snapshot', { app: 'Blender' });
     const shot = await dbg('screenshot', { app: 'Blender' }).catch(() => null);
+
+    let shotPath = null;
+    if (shot?.base64) {
+      const dir = path.join(
+        '/Users/user/Desktop/OSS-harness/scratchpad/demos',
+        process.env.RUN_NAME ?? `blender-${MODEL}-${MODE}`,
+      );
+      mkdirSync(dir, { recursive: true });
+      shotPath = path.join(dir, 'blender-final.png');
+      writeFileSync(shotPath, Buffer.from(shot.base64, 'base64'));
+    }
+
+    const scene = await askBlender(
+      'import bpy\nresult = {"objects": [[o.name, o.type] for o in bpy.data.objects]}',
+    );
+    const objects = scene?.result?.objects ?? scene?.objects ?? [];
+    const names = Array.isArray(objects) ? objects.map((o) => (Array.isArray(o) ? o[0] : o)) : [];
+
     return {
+      asked: SHAPE.name,
+      // Blender's OWN answer, not the model's.
+      sceneObjects: names,
+      shapeInScene: names.some((n) => SHAPE.match.test(String(n))),
+      sceneQuery: scene?.error ?? 'ok',
+      finalScreenshot: shotPath,
       window: snap.window,
       axElements: (snap.elements ?? []).length,
-      // Proof the pixels were actually there for it to work from — a Blender run
-      // without them is measuring something else entirely.
       screenshotBytes: shot?.base64 ? shot.base64.length : 0,
       modelDescribedResult: last.text.length > 0,
     };
