@@ -109,8 +109,75 @@ export function isAxOpaque(snap: MacSnapshot): boolean {
    * coordinates, and record the app as visual-only for the rest of the session —
    * all because a search missed. The app's own count is the truth; the page
    * length is only a fallback for a helper too old to send one. */
-  if (snap.elements.length > 0) return false;
-  return (snap.summary?.elementCount ?? 0) === 0;
+  if (actionableCount(snap.elements) > 0) return false;
+  /* ...but a page showing nothing is not an APP showing nothing. `find:"zzz"` on
+     Numbers returns no lines and 812 controls, and calling that opaque would
+     record the app as visual-only for the rest of the session because a search
+     missed. Only judge a look that is showing the whole app. */
+  const total = snap.summary?.elementCount ?? snap.elements.length;
+  return total <= snap.elements.length;
+}
+
+/**
+ * Controls a model could actually AIM AT: named, and not window furniture.
+ *
+ * "Exposes nothing" and "exposes nothing USEFUL" need the same answer, because
+ * the model can do the same amount with either. MEASURED on Chrome's profile
+ * picker, which is the first thing a Chrome with more than one profile shows:
+ *
+ *   9 elements — close / full screen / minimize, and five UNNAMED groups
+ *
+ * The five groups are the profiles. Nothing names them, so there is no index
+ * worth clicking, and because the list was not EMPTY the snapshot carried no
+ * screenshot either — the model had neither a list nor a picture, on the very
+ * screen standing between it and the browser.
+ *
+ * Window buttons are excluded because every window has them and they are never
+ * the task.
+ */
+const WINDOW_FURNITURE = new Set([
+  'close button',
+  'full screen button',
+  'minimize button',
+  'zoom button',
+]);
+
+/**
+ * Roles that are worth an index even with no name — a search field is aimable
+ * whether or not anything labelled it. A GROUP is not: it is a box around
+ * things, and Chrome's profile cards are exactly that.
+ */
+const AIMABLE_ROLES = new Set([
+  'AXButton',
+  'AXTextField',
+  'AXTextArea',
+  'AXComboBox',
+  'AXSearchField',
+  'AXCheckBox',
+  'AXRadioButton',
+  'AXPopUpButton',
+  'AXMenuButton',
+  'AXMenuItem',
+  'AXLink',
+  'AXSlider',
+  'AXTab',
+  'AXDisclosureTriangle',
+  'AXIncrementor',
+  'AXStepper',
+  'AXCell',
+  'AXRow',
+]);
+
+export function actionableCount(elements: readonly MacElement[]): number {
+  return elements.filter((e) => {
+    const name = (e.name ?? '').trim().toLowerCase();
+    if (WINDOW_FURNITURE.has(name)) return false;
+    if (e.editable === true) return true;
+    if (AIMABLE_ROLES.has(e.role)) return true;
+    // A named non-control still tells the model something it can act on by
+    // index; "group" is the helper's placeholder for an anonymous box.
+    return name !== '' && name !== 'group';
+  }).length;
 }
 
 /** A dialog as this module talks about it: whatever the helper told us, plus

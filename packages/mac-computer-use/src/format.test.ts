@@ -9,6 +9,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
+  actionableCount,
   blockedIndexes,
   dialogName,
   dialogOf,
@@ -697,5 +698,68 @@ describe('what the app is saying back', () => {
   it('keeps the reading order, which is most of the meaning', () => {
     const out = formatMacSnapshot({ ...base, text: ['Total', '48.20'] } as MacSnapshot);
     expect(out.indexOf('Total')).toBeLessThan(out.indexOf('48.20'));
+  });
+});
+
+describe('an app that exposes nothing USEFUL is treated like one that exposes nothing', () => {
+  /*
+   * MEASURED on Chrome's profile picker — the first screen a Chrome with more
+   * than one profile shows, and the user has five:
+   *
+   *   9 elements: close / full screen / minimize, and five UNNAMED groups
+   *
+   * The groups are the profiles. Nothing names them, so no index is worth
+   * clicking; and because the list was not EMPTY the snapshot carried no
+   * screenshot either. The model had neither a list nor a picture, on the exact
+   * screen standing between it and the browser. the user, watching: "the profile
+   * selection screen might be proving a bit challenging, perhaps visual control
+   * is needed there?"
+   */
+  const el = (over: Record<string, unknown>) =>
+    ({ index: 1, role: 'AXGroup', name: '', x: 0, y: 0, w: 10, h: 10, ...over }) as never;
+
+  const snap = (elements: unknown[]) =>
+    ({
+      app: 'Google Chrome',
+      window: "Who's using Chrome?",
+      elements,
+      summary: { app: '', window: '', elementCount: elements.length, truncated: false },
+    }) as never;
+
+  it('calls the profile picker opaque, so it gets a picture', () => {
+    const picker = snap([
+      el({ index: 1, name: "Who's using Chrome?", role: 'AXGroup' }),
+      el({ index: 2, name: 'group' }),
+      el({ index: 3, name: 'group' }),
+      el({ index: 4, name: 'group' }),
+      el({ index: 5, name: 'group' }),
+      el({ index: 6, role: 'AXButton', name: 'close button' }),
+      el({ index: 7, role: 'AXButton', name: 'full screen button' }),
+      el({ index: 8, role: 'AXButton', name: 'minimize button' }),
+    ]);
+    // The window's own title-group is the only named thing, and it is not a
+    // control — everything else is furniture or an anonymous box.
+    expect(actionableCount(picker.elements)).toBeLessThan(2);
+  });
+
+  it('does NOT call a real app opaque just because it has some groups', () => {
+    const maps = snap([
+      el({ index: 1, role: 'AXTextField', name: 'Apple Maps', editable: true }),
+      el({ index: 2, role: 'AXButton', name: 'Clear Recents' }),
+      el({ index: 3, name: 'group' }),
+      el({ index: 4, role: 'AXButton', name: 'close button' }),
+    ]);
+    expect(actionableCount(maps.elements)).toBe(2);
+    expect(isAxOpaque(maps)).toBe(false);
+  });
+
+  it('window furniture alone is not an app you can drive', () => {
+    const bare = snap([
+      el({ index: 1, role: 'AXButton', name: 'close button' }),
+      el({ index: 2, role: 'AXButton', name: 'zoom button' }),
+      el({ index: 3, role: 'AXButton', name: 'minimize button' }),
+    ]);
+    expect(actionableCount(bare.elements)).toBe(0);
+    expect(isAxOpaque(bare)).toBe(true);
   });
 });

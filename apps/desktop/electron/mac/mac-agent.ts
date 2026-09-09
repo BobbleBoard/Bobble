@@ -46,6 +46,7 @@ import { app, BrowserWindow, globalShortcut, ipcMain, systemPreferences } from '
 import { resolveBundledPackageAsset } from '../app-paths';
 import { isBackgroundMode } from '../background-mode';
 import { isTrustedIpcEvent } from '../trusted-senders';
+import { userLaunchEnv } from './launch-env';
 import {
   macMonitor,
   registerMacMonitorIpc,
@@ -175,7 +176,9 @@ async function launchApp(name: string, background = true): Promise<MacLaunchAck>
   const appName = name.trim();
   if (appName === '') return { ok: false, app: name, error: 'launch needs an app name' };
   try {
-    await execFileAsync('open', background ? ['-g', '-a', appName] : ['-a', appName]);
+    await execFileAsync('open', background ? ['-g', '-a', appName] : ['-a', appName], {
+      env: userLaunchEnv(),
+    });
   } catch (err) {
     if (!background) {
       // Foreground ask for an already-running app `open` couldn't match: a
