@@ -1454,12 +1454,29 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
       // `prompt_progress` fraction here; publish it on the LIVE turn's status
       // channel so the desktop "N% processing" ring shows real prefill progress.
       // Reads runtime.currentCtx at call time, so the static deps object still
-      // targets whatever turn is active. Capped 99 (renderer drives the final 100).
+      // targets whatever turn is active.
+      /*
+       * AND IT SAYS WHEN AN INGEST IS DONE.
+       *
+       * The value used to be capped at 99 — "the renderer drives the final 100"
+       * — so completion was never signalled on the channel at all. Clearing it
+       * at the turn boundaries was not enough: a turn is many tool calls and
+       * many ingests, so the channel sat on the first ingest's last percentage
+       * for the whole turn. MEASURED while instrumenting it: "1 ingest, 257.6s"
+       * on a run whose ingests were each a fraction of a second.
+       *
+       * An ingest that finished is no ingest. Now the channel can be read for
+       * what it claims to report, per ingest, which is what makes a long one
+       * findable.
+       */
       onPromptProgress: (fraction) => {
         const ctx = runtime.currentCtx;
-        if (ctx?.hasUI === true) {
-          ctx.ui.setStatus('harness-prefill', String(Math.min(99, Math.round(fraction * 100))));
-        }
+        if (ctx?.hasUI !== true) return;
+        const done = !Number.isFinite(fraction) || fraction >= 1;
+        ctx.ui.setStatus(
+          'harness-prefill',
+          done ? '' : String(Math.min(99, Math.round(fraction * 100))),
+        );
       },
     };
   }

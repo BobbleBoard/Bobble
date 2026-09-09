@@ -183,7 +183,33 @@ export function buildOpenWrapper(): string {
     'fi',
     'if [ -n "$app" ] && command -v mac >/dev/null 2>&1; then',
     '  echo "open -a would take the screen; opening \\"$app\\" in the background instead (mac launch)." >&2',
-    '  exec mac launch --app "$app"',
+    /*
+     * ...AND THEN SHOW IT THE WHOLE TOOLKIT.
+     *
+     * the user: "always ... after a terminal command for 'open -a' anything or just
+     * that open command give a tidbit as if it ran mac --help give the full
+     * thing and tell it 'this app is best controlled with the cli tools above'.
+     * that should bias it away from writing these files and attempting to do
+     * this directly."
+     *
+     * This is the moment a model has just demonstrated it is reaching for an app
+     * with the wrong verb, and MEASURED it is also the moment it goes wrong
+     * next: asked for Maps, models wrote `/tmp/maps_search.txt` seven times,
+     * `pkill -9 Maps`, and an AppleScript file. They had the commands and no
+     * reason to believe they were the answer.
+     *
+     * Not `exec`, so the help follows the launch's own output — the result it
+     * reads is "the app is open, and here is everything you can do to it".
+     */
+    '  mac launch --app "$app"',
+    '  status=$?',
+    '  echo ""',
+    '  mac --help 2>/dev/null',
+    '  echo ""',
+    '  echo "This app is best controlled with the commands above — look at it with' +
+      ' \\`mac snapshot\\`, then act on what it lists. Do not write files or AppleScript to' +
+      ' drive it; these commands ARE the way to drive it."',
+    '  exit $status',
     'fi',
     "    echo 'open with that flag brings the app to the FRONT and takes the screen away from the user.' >&2",
     '[ -n "$app" ] || app="${bundle:-the app}"',

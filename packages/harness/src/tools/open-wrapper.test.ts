@@ -202,3 +202,51 @@ describe('a bare URL open is the OTHER way to take the screen', () => {
     }
   });
 });
+
+describe('reaching for an app the wrong way is answered with the whole toolkit', () => {
+  /*
+   * the user: "after a terminal command for 'open -a' anything ... give a tidbit as
+   * if it ran mac --help give the full thing and tell it 'this app is best
+   * controlled with the cli tools above'. that should bias it away from writing
+   * these files and attempting to do this directly."
+   *
+   * MEASURED, and it is the dominant failure in the app matrix: asked to search
+   * Maps, models wrote `/tmp/maps_search.txt` seven times, ran `pkill -9 Maps`,
+   * and wrote an AppleScript file — after successfully opening the app. They had
+   * the commands on the PATH the whole time and no reason to believe they were
+   * the answer. This is the one moment we KNOW they are thinking about the app.
+   */
+  function withMacHelp(args: string[]): { code: number; out: string; err: string } {
+    const dir = mkdtempSync(path.join(tmpdir(), 'pi-openwrap-help-'));
+    writeFileSync(path.join(dir, 'open'), buildOpenWrapper(), { mode: 0o755 });
+    writeFileSync(
+      path.join(dir, 'mac'),
+      '#!/bin/sh\nif [ "$1" = "--help" ]; then echo "mac snapshot — look at an app"; echo "mac click — click by index"; exit 0; fi\necho "mac $*"\n',
+      { mode: 0o755 },
+    );
+    chmodSync(path.join(dir, 'open'), 0o755);
+    chmodSync(path.join(dir, 'mac'), 0o755);
+    const r = spawnSync(path.join(dir, 'open'), args, {
+      encoding: 'utf8',
+      env: { ...process.env, PATH: `${dir}:${process.env.PATH ?? ''}` },
+    });
+    return { code: r.status ?? -1, out: r.stdout ?? '', err: r.stderr ?? '' };
+  }
+
+  it('opens the app AND lists everything that can drive it', () => {
+    const r = withMacHelp(['-a', 'Maps']);
+    expect(r.out).toContain('mac launch --app Maps');
+    expect(r.out).toContain('mac snapshot');
+    expect(r.out).toContain('mac click');
+  });
+
+  it('says plainly that files and AppleScript are not the route', () => {
+    const r = withMacHelp(['-a', 'Maps']);
+    expect(r.out).toContain('best controlled with the commands above');
+    expect(r.out).toContain('Do not write files or AppleScript');
+  });
+
+  it('still reports the launch’s own exit status', () => {
+    expect(withMacHelp(['-a', 'Maps']).code).toBe(0);
+  });
+});

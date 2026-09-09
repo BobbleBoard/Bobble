@@ -92,12 +92,27 @@ export async function demoRun(o) {
    * and is how a task is dry-run before it is worth twelve long recordings.
    */
   const LAUNCH = process.env.LAUNCH ?? 'open';
+  /*
+   * LIVE=1 — run it where the user can watch.
+   *
+   * Everything here is normally invisible by default, which is the standing rule
+   * and stays the default. But a run nobody can see is also a run nobody can
+   * sanity-check, and the user asked to observe these: "why don't you open these
+   * live actually rather than headlessly i'd like to observe (still do the
+   * screen recording)".
+   *
+   * So LIVE drops background mode and brings the window forward. The recording
+   * is unchanged — it is the same page screenshots and the same capture stream —
+   * and the target app still opens in the background, because that is the
+   * product's behaviour and the monitor tab is the better view of it anyway.
+   */
+  const LIVE = process.env.LIVE === '1';
   const env = {
     HOME,
     PI_E2E: '1',
-    PI_E2E_BACKGROUND: '1',
     PI_MAC_PRECONSENT: '1',
     PI_MAC_OVERLAY: '1',
+    ...(LIVE ? {} : { PI_E2E_BACKGROUND: '1' }),
   };
   let browser = null;
   let electronApp = null;
@@ -111,7 +126,7 @@ export async function demoRun(o) {
     page = await electronApp.firstWindow();
   } else {
     await run('open', [
-      '-g',
+      ...(LIVE ? [] : ['-g']),
       ...Object.entries(env).flatMap(([k, v]) => ['--env', `${k}=${v}`]),
       '-a',
       '/Applications/Bobble.app',
@@ -284,7 +299,10 @@ export async function demoRun(o) {
     );
 
     const stole = frontSamples.filter((a) => new RegExp(o.app, 'i').test(String(a)));
-    say(`focus guard: ${frontSamples.length} samples, ${o.app} was frontmost ${stole.length}`);
+    say(
+      `focus guard: ${frontSamples.length} samples, ${o.app} was frontmost ${stole.length}` +
+        (LIVE ? ' (LIVE run — Bobble is deliberately visible; the app should still not be)' : ''),
+    );
     say(`tool calls (${last.tools.length}): ${JSON.stringify(last.tools)}`);
     say(`model said: ${JSON.stringify(last.text.slice(0, 400))}`);
 
