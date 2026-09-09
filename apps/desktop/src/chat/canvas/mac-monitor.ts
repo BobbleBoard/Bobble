@@ -35,6 +35,7 @@ import { IDLE_MAC_MONITOR_SESSION } from '@pi-desktop/canvas';
 import { useEffect, useRef } from 'react';
 import { useCanvasStore } from '../../state/canvas-store';
 import { abortPi, pausePi } from '../../state/pi-connect';
+import { useSettingsStore } from '../../state/settings-store';
 
 /** Stable upsert key for the monitor tab — one tab, reused across sessions. */
 export const MAC_MONITOR_TAB_KEY = 'mac-monitor';
@@ -358,6 +359,21 @@ class MacMonitorFeedImpl implements MacMonitorFeed {
     return () => {
       this.#listeners.delete(listener);
     };
+  }
+
+  /*
+   * The pill toggle, read and written where the pill IS. the user asked for it "in
+   * the canvas as a toggle setting during computer use and in the settings
+   * menu" — the same setting, reachable from both, because the moment you want
+   * it gone is the moment you are looking at it.
+   */
+  getStatusPillShown(): boolean {
+    return useSettingsStore.getState().settings.showComputerUseStatusPill !== false;
+  }
+
+  setStatusPillShown(next: boolean): void {
+    void useSettingsStore.getState().update({ showComputerUseStatusPill: next });
+    this.#notify();
   }
 
   setActive(active: boolean): void {

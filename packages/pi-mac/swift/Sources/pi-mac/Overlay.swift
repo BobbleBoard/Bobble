@@ -124,6 +124,13 @@ private func doubleValue(_ v: Any?) -> Double? {
   return nil
 }
 
+private func boolValue(_ v: Any?) -> Bool? {
+  if let b = v as? Bool { return b }
+  if let n = v as? NSNumber { return n.boolValue }
+  if let s = v as? String { return s == "true" || s == "1" }
+  return nil
+}
+
 private func cgColor(_ r: CGFloat, _ g: CGFloat, _ b: CGFloat, _ a: CGFloat) -> CGColor {
   CGColor(srgbRed: r, green: g, blue: b, alpha: a)
 }
@@ -219,8 +226,32 @@ final class OverlayController: NSObject {
   private let cursorGroup = CALayer()
   private let glyphFill = CAGradientLayer()
   private let glyphStroke = CAShapeLayer()
+  /*
+   * THE PILL'S LOOK, in one place because the user specified it in one breath:
+   * "blue background white text grey % bar, just not a purple gradient", solid,
+   * "no noticable border", and small — "really small width and just show a
+   * bouncing ... by default".
+   */
+  private let PILL_BLUE = cgColor(0.153, 0.412, 0.937, 0.96)
+  private let PILL_RADIUS: CGFloat = 13
+
   private let bubble = CALayer()
   private let bubbleFill = CAGradientLayer()
+  private let progressTrack = CALayer()
+  private let progressFill = CALayer()
+  /** 0...1 while an image is being ingested; nil when nothing is prefilling. */
+  private var prefillFraction: Double?
+  /*
+   * THE WINDOW THE PILL BELONGS TO, in AX (top-left) screen points.
+   *
+   * the user: "always on top isuse is not solved" — with a screenshot of the pill
+   * sitting on top of a DIFFERENT app. It was parked below-right of the cursor
+   * and only flipped at the edge of the SCREEN, so a cursor near the controlled
+   * window's right edge threw the pill clean over whatever was beside it. The
+   * phantom is allowed to say what it is doing to the app it is driving; it is
+   * not allowed to write on somebody else's window.
+   */
+  private var windowAX: CGRect?
   private let bubbleText = CATextLayer()
   private let bubbleSub = CATextLayer()
   private var bubbleDots: [CALayer] = []
@@ -231,6 +262,8 @@ final class OverlayController: NSObject {
   private let glyph: (path: CGPath, box: CGSize, tip: CGPoint)
   private var cursorAX: CGPoint?
   private var bubbleStatus = ""
+  /** The pill's collapsed width — dots only, no words. */
+  private var collapsedWidth: CGFloat = 0
   private var bubbleTextValue = ""
   private var bubbleSubValue = ""
   private var bubbleFlipX = false
@@ -360,24 +393,46 @@ final class OverlayController: NSObject {
     stage.addSublayer(cursorGroup)
 
     // ── status pill ──
+    /*
+     * SOLID, NOT A GRADIENT, AND NO BORDER YOU CAN SEE.
+     *
+     * the user, looking at it on his screen: "color should be styled, but solid
+     * color no noticable border, eg. blue background white text grey % bar, just
+     * not a purple gradient." It was a blue-to-purple gradient with a white
+     * hairline; both are gone. The shadow stays — it is what separates the pill
+     * from whatever it is floating over — but quieter and neutral, since a
+     * coloured glow reads as the gradient's sibling.
+     */
     bubble.contentsScale = scale
-    bubble.cornerRadius = 999
+    bubble.cornerRadius = PILL_RADIUS
     bubble.masksToBounds = false
     bubble.opacity = 0
-    bubble.borderWidth = 1
-    bubble.borderColor = cgColor(1, 1, 1, 0.28)
-    bubble.shadowColor = cgColor(0.07, 0.09, 0.3, 1)
-    bubble.shadowOpacity = 0.42
-    bubble.shadowRadius = 9
-    bubble.shadowOffset = CGSize(width: 0, height: -2)
+    bubble.borderWidth = 0
+    bubble.shadowColor = cgColor(0, 0, 0, 1)
+    bubble.shadowOpacity = 0.26
+    bubble.shadowRadius = 7
+    bubble.shadowOffset = CGSize(width: 0, height: 1)
 
     bubbleFill.contentsScale = scale
-    bubbleFill.colors = [cgColor(0.247, 0.322, 0.675, 0.95), cgColor(0.376, 0.227, 0.729, 0.95)]
+    bubbleFill.colors = [PILL_BLUE, PILL_BLUE]
     bubbleFill.startPoint = CGPoint(x: 0, y: 1)
     bubbleFill.endPoint = CGPoint(x: 1, y: 0)
-    bubbleFill.cornerRadius = 999
+    bubbleFill.cornerRadius = PILL_RADIUS
     bubbleFill.masksToBounds = true
     bubble.addSublayer(bubbleFill)
+
+    /* The prefill bar: a grey track with a white fill, inside the pill's own
+       rounded bottom. Only shown while an image is being ingested. */
+    progressTrack.contentsScale = scale
+    progressTrack.backgroundColor = cgColor(1, 1, 1, 0.22)
+    progressTrack.cornerRadius = 1.5
+    progressTrack.opacity = 0
+    bubble.addSublayer(progressTrack)
+    progressFill.contentsScale = scale
+    progressFill.backgroundColor = cgColor(1, 1, 1, 0.92)
+    progressFill.cornerRadius = 1.5
+    progressFill.opacity = 0
+    bubble.addSublayer(progressFill)
 
     for _ in 0..<3 {
       let dot = CALayer()
@@ -427,6 +482,13 @@ final class OverlayController: NSObject {
   /// into the panel so a wild coordinate parks at the edge instead of vanishing
   /// — the panel IS the desktop, so this only ever bites on a point genuinely
   /// off every display.
+  /// An AX (top-left) RECT in panel-local coordinates. Cocoa's y grows upward,
+  /// so the rect's top-left corner becomes its bottom-left here.
+  private func local(_ ax: CGRect) -> CGRect {
+    let bottomLeft = local(CGPoint(x: ax.minX, y: ax.maxY))
+    return CGRect(x: bottomLeft.x, y: bottomLeft.y, width: ax.width, height: ax.height)
+  }
+
   private func local(_ ax: CGPoint) -> CGPoint {
     let frame = panel.frame
     let cocoaY = cocoaFlipBase() - ax.y
@@ -602,6 +664,7 @@ final class OverlayController: NSObject {
 
   // ── status pill ──────────────────────────────────────────────────────────
 
+
   /// `status` is the state name (thinking/clicking/typing/pressing/scrolling/
   /// opening/reading); `text` is the already-prettified label the Node side
   /// built (a key-combo glyph run, a typing preview, an app name).
@@ -630,10 +693,30 @@ final class OverlayController: NSObject {
       bubbleTextValue = text.isEmpty ? "Thinking" : text
       bubbleSubValue = ""
     }
+    /*
+     * WHAT THE PILL SAYS, in the user's order:
+     *
+     *   default        — really small, just a bouncing "..."
+     *   prefilling     — expands, a % bar and "Processing"
+     *   thinking       — "Thinking..."
+     *   anything else  — the tool call actually running
+     *
+     * so the dots are the resting state and every word has to earn the width it
+     * costs. `prefillFraction` outranks the status because ingesting a picture
+     * is the one thing that takes long enough to be worth explaining.
+     */
+    if let fraction = prefillFraction {
+      bubbleTextValue = "Processing"
+      bubbleSubValue = "\(Int((fraction * 100).rounded()))%"
+    }
     let dots = status == "thinking" || status == "typing" || status == "scrolling"
-      || status == "opening" || status == "reading"
+      || status == "opening" || status == "reading" || prefillFraction != nil
     layoutBubbleContents(dots: dots)
-    setPulsing(status == "thinking")
+    setPulsing(status == "thinking" && prefillFraction == nil)
+    guard pillEnabled else {
+      setModelOpacity(bubble, 0)
+      return
+    }
     if bubble.opacity < 0.5 {
       let fade = CABasicAnimation(keyPath: "opacity")
       fade.fromValue = 0
@@ -643,6 +726,29 @@ final class OverlayController: NSObject {
       bubble.add(fade, forKey: "bubble-in")
     }
     layoutBubble()
+  }
+
+  /// An image is being ingested: `fraction` 0...1, or nil when it is done. The
+  /// pill expands to explain the wait and collapses again when it ends.
+  /// Draw the pill at all. The cursor is unaffected — it is the part that shows
+  /// WHERE something is happening, and only the pill puts words on the screen.
+  /// The controlled window's frame, so the pill can stay inside it.
+  func setWindowRect(_ rect: CGRect?) {
+    windowAX = rect
+    if bubble.opacity > 0 { layoutBubble() }
+  }
+
+  func setPillEnabled(_ on: Bool) {
+    pillEnabled = on
+    if !on { hideBubble() } else if !bubbleStatus.isEmpty { setStatus(bubbleStatus, text: "") }
+  }
+  private var pillEnabled = true
+
+  func setPrefill(_ fraction: Double?) {
+    let was = prefillFraction
+    prefillFraction = fraction
+    if was == nil && fraction == nil { return }
+    setStatus(bubbleStatus.isEmpty ? "thinking" : bubbleStatus, text: "")
   }
 
   func hideBubble() {
@@ -689,10 +795,32 @@ final class OverlayController: NSObject {
     let subSize = bubbleSubValue.isEmpty
       ? .zero
       : (" \(bubbleSubValue)" as NSString).size(withAttributes: [.font: subFont])
-    let dotsWidth: CGFloat = dots ? 4 * 3 + 3 * 2 + gap : 0
+    /* Collapsed: the dots carry no trailing gap, because there is nothing after
+       them — that gap is what made a "just thinking" pill look padded. */
+    let bare = bubbleTextValue.isEmpty
+    let dotsWidth: CGFloat = dots ? (4 * 3 + 3 * 2) + (bare ? 0 : gap) : 0
     let contentW = dotsWidth + ceil(mainSize.width) + ceil(subSize.width)
-    let h = ceil(max(mainSize.height, subSize.height)) + padY * 2
-    let w = contentW + padX * 2
+    let h = ceil(max(mainSize.height, max(subSize.height, 15))) + padY * 2
+    let w = contentW + (bare ? padY * 2 : padX * 2)
+
+    /*
+     * THE WIDTH CHANGE IS THE ANIMATION.
+     *
+     * the user: "it should be a smooth expanding and collapsing animation." Bounds
+     * were set inside a disabled-actions transaction, so the pill used to snap
+     * between sizes. Everything INSIDE it still moves without animating — text
+     * sliding to a new x while the pill grows around it reads as jitter — so
+     * only the pill's own bounds, fill and shadow are allowed to animate.
+     */
+    let grew = abs(bubble.bounds.width - w) > 0.5
+    if grew && !reduceMotion() {
+      CATransaction.begin()
+      CATransaction.setAnimationDuration(0.24)
+      CATransaction.setAnimationTimingFunction(CAMediaTimingFunction(name: .easeInEaseOut))
+      bubble.bounds = CGRect(x: 0, y: 0, width: w, height: h)
+      bubbleFill.frame = CGRect(x: 0, y: 0, width: w, height: h)
+      CATransaction.commit()
+    }
 
     CATransaction.begin()
     CATransaction.setDisableActions(true)
@@ -735,6 +863,22 @@ final class OverlayController: NSObject {
     bubbleSub.string = NSAttributedString(
       string: bubbleSubValue.isEmpty ? "" : " \(bubbleSubValue)",
       attributes: [.font: subFont, .foregroundColor: NSColor.white.withAlphaComponent(0.78)])
+
+    /* The prefill bar hugs the pill's bottom edge, inset so the rounded ends do
+       not clip it. Grey track, white fill — the user's "grey % bar". */
+    if let fraction = prefillFraction {
+      let inset: CGFloat = h / 2 * 0.55
+      let barW = max(0, w - inset * 2)
+      let barY = h - padY * 0.62
+      progressTrack.frame = CGRect(x: inset, y: barY, width: barW, height: 3)
+      progressFill.frame = CGRect(
+        x: inset, y: barY, width: barW * CGFloat(min(1, max(0, fraction))), height: 3)
+      progressTrack.opacity = 1
+      progressFill.opacity = 1
+    } else {
+      progressTrack.opacity = 0
+      progressFill.opacity = 0
+    }
     CATransaction.commit()
   }
 
@@ -763,14 +907,30 @@ final class OverlayController: NSObject {
     let frame = panel.frame
     let cocoa = CGPoint(x: ax.x, y: cocoaFlipBase() - ax.y)
     let screen = NSScreen.screens.first { $0.frame.contains(cocoa) } ?? NSScreen.screens.first
-    let sf = (screen?.frame ?? frame).offsetBy(dx: -frame.minX, dy: -frame.minY)
+    let screenLocal = (screen?.frame ?? frame).offsetBy(dx: -frame.minX, dy: -frame.minY)
+    /* Inside the controlled window when we know where it is, and inside the
+       screen otherwise. The window is the tighter box and the one that matters:
+       spilling past it is spilling onto another app. */
+    let sf = windowAX.map { local($0) } ?? screenLocal
     bubbleFlipX = p.x + dx + w > sf.maxX - 8
     bubbleFlipY = p.y - dy - h < sf.minY + 8
+    var bx = bubbleFlipX ? p.x - dx : p.x + dx
+    var by = bubbleFlipY ? p.y + dy : p.y - dy
+    /* Flipping alone is not enough for a cursor sitting in a corner, or for a
+       window narrower than the pill — clamp the resulting box into the same
+       bounds so no part of it lands outside. */
+    let leftEdge = bubbleFlipX ? bx - w : bx
+    if leftEdge < sf.minX + 4 { bx += sf.minX + 4 - leftEdge }
+    let rightEdge = bubbleFlipX ? bx : bx + w
+    if rightEdge > sf.maxX - 4 { bx -= rightEdge - (sf.maxX - 4) }
+    let topEdge = bubbleFlipY ? by : by - h
+    if topEdge < sf.minY + 4 { by += sf.minY + 4 - topEdge }
+    let bottomEdge = bubbleFlipY ? by + h : by
+    if bottomEdge > sf.maxY - 4 { by -= bottomEdge - (sf.maxY - 4) }
     CATransaction.begin()
     CATransaction.setDisableActions(true)
     bubble.anchorPoint = CGPoint(x: bubbleFlipX ? 1 : 0, y: bubbleFlipY ? 0 : 1)
-    bubble.position = CGPoint(
-      x: bubbleFlipX ? p.x - dx : p.x + dx, y: bubbleFlipY ? p.y + dy : p.y - dy)
+    bubble.position = CGPoint(x: bx, y: by)
     CATransaction.commit()
   }
 
@@ -1003,6 +1163,22 @@ private func handleOverlay(
     }
     controller.placeCursor(
       CGPoint(x: x, y: y), travelMs: doubleValue(params["ms"]) ?? DEFAULT_TRAVEL_MS)
+    return ["ok": true]
+  case "target":
+    if let x = doubleValue(params["x"]), let y = doubleValue(params["y"]),
+      let w = doubleValue(params["w"]), let h = doubleValue(params["h"])
+    {
+      controller.setWindowRect(CGRect(x: x, y: y, width: w, height: h))
+    } else {
+      controller.setWindowRect(nil)
+    }
+    return ["ok": true]
+  case "pill":
+    controller.setPillEnabled(boolValue(params["enabled"]) ?? true)
+    return ["ok": true]
+  case "prefill":
+    /* nil clears it; a number 0...1 expands the pill and fills the bar. */
+    controller.setPrefill(doubleValue(params["fraction"]))
     return ["ok": true]
   case "shift":
     controller.shiftCursor(dx: doubleValue(params["dx"]) ?? 0, dy: doubleValue(params["dy"]) ?? 0)

@@ -38,6 +38,7 @@ const base: DesktopSettings = {
   toolInterface: 'schemas',
   workMode: 'chat',
   powerMode: 'auto',
+  showComputerUseStatusPill: true,
 };
 
 describe('sliderToLevel / levelToSlider', () => {

@@ -120,7 +120,15 @@ describe('what counts as pressure depends on the wall', () => {
 describe('the lever matches the machine', () => {
   it('has no clock knob on unified memory, so every lever is a memory lever', () => {
     const d = decidePower(at({ mode: 'low', bottleneck: 'unified' }));
-    expect(d.quantizeKv).toBe(true);
+    /*
+     * Every lever EXCEPT the KV cache. the user: "no quantizing kv that damages a
+     * lot especially at this model size." The KV is what a 2B-27B model
+     * remembers of the conversation, and quantising it makes every remembered
+     * token slightly wrong; a smaller context is a smaller KV in exact
+     * proportion and degrades by forgetting the oldest turn instead. Speed was
+     * never the question here — q8_0 measured 12% FASTER on this machine.
+     */
+    expect(d.quantizeKv).toBe(false);
     expect(d.maxParallel).toBe(1);
     expect(d.threads).toBeUndefined(); // MEASURED useless on Metal
     expect(d.keepKvOnHost).toBeUndefined();
@@ -148,6 +156,7 @@ describe('the lever matches the machine', () => {
 
   it('leaves the user some cores when the machine is CPU-bound', () => {
     const d = decidePower(at({ mode: 'low', bottleneck: 'cpu', cpuCount: 8 }));
+    expect(d.quantizeKv).toBe(false);
     expect(d.threads).toBe(4);
     expect(d.reason).toContain('4 of 8 cores');
   });

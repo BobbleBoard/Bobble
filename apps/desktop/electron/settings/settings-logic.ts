@@ -118,6 +118,7 @@ export const DEFAULT_SETTINGS: DesktopSettings = {
   toolInterface: 'schemas',
   workMode: 'chat',
   powerMode: 'auto',
+  showComputerUseStatusPill: true,
   capabilities: { image: true, video: true, audio: true, threeD: true },
   customInstructions: '',
   iconStroke: ICON_STROKE_DEFAULT,
@@ -275,6 +276,7 @@ export function clampSettings(raw: unknown): DesktopSettings {
     toolInterface: oneOf(o.toolInterface, TOOL_INTERFACES, d.toolInterface),
     workMode: oneOf(o.workMode, WORK_MODES, d.workMode),
     powerMode: oneOf(o.powerMode, POWER_MODES, d.powerMode),
+    showComputerUseStatusPill: bool(o.showComputerUseStatusPill, d.showComputerUseStatusPill),
     // 0 and negatives mean "derive one from the machine", which is what absent
     // means too — so they normalise to the same thing rather than to a promise
     // the app cannot keep.

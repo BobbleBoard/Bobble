@@ -278,6 +278,14 @@ export interface DesktopSettings {
   /** How hard the app may push this machine (see {@link PowerMode}). */
   powerMode: PowerMode;
   /**
+   * Draw the status pill beside the phantom cursor during computer use.
+   *
+   * the user: "remove the pill entirely via a setting 'show computer use status
+   * pill'". It is the one part of the overlay that sits ON TOP of the user's own
+   * windows saying words, so it is the one part somebody might not want.
+   */
+  showComputerUseStatusPill: boolean;
+  /**
    * GB of memory the app promises never to take, so the machine stays usable
    * while it works. `undefined`/0 ⇒ derived from the machine's size (a quarter,
    * floored at 2 GB and capped at 8 — see `defaultReserveGB`). A NUMBER rather
@@ -360,6 +368,7 @@ export interface DesktopSettingsPatch {
   toolInterface?: ToolInterface;
   workMode?: WorkMode;
   powerMode?: PowerMode;
+  showComputerUseStatusPill?: boolean;
   powerReserveGB?: number;
   capabilities?: Partial<GenerationCapabilities>;
   customInstructions?: string;

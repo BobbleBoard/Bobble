@@ -42,6 +42,7 @@ const DEFAULTS: DesktopSettings = {
   toolInterface: 'schemas',
   workMode: 'chat',
   powerMode: 'auto',
+  showComputerUseStatusPill: true,
   /*
    * ON BY DEFAULT — and they now MEAN something.
    *

@@ -207,6 +207,7 @@ class MacOverlayController {
     this.#target = { pid, rect: { x: known.x, y: known.y, w: known.w, h: known.h } };
     this.#missingSince = null;
     this.#markActivity(); // control() means the model just acted → show
+    await this.#pushTarget(this.#target.rect);
     await this.#show();
     await this.#seedCursor();
     this.#startTracking();
@@ -328,6 +329,15 @@ class MacOverlayController {
     const { dx, dy } = rectDelta(target.rect, fresh);
     target.rect = { x: fresh.x, y: fresh.y, w: fresh.w, h: fresh.h };
     if (dx !== 0 || dy !== 0) await this.#push('shift', { dx, dy });
+    // The panel keeps the pill inside this rect, so a resize matters as much as
+    // a move — send it whenever either changed.
+    await this.#pushTarget(target.rect);
+  }
+
+  /** Tell the panel which window the phantom belongs to, so the pill stays
+   * inside it instead of spilling onto whatever app is beside it. */
+  async #pushTarget(rect: OverlayRect | null): Promise<void> {
+    await this.#push('target', rect === null ? {} : { x: rect.x, y: rect.y, w: rect.w, h: rect.h });
   }
 
   async #applyVisibility(show: boolean): Promise<void> {
@@ -468,6 +478,32 @@ class MacOverlayController {
     await this.#push('status', { status: 'thinking' });
   }
 
+  /**
+   * An image is being ingested — 0...1, or null when it finishes.
+   *
+   * the user: "when an image is prefilling it should expand horizontally and show a
+   * prefill % ring and 'processing' text". Ingesting a screenshot is the one
+   * wait long enough to be worth explaining rather than hiding behind dots.
+   */
+  async prefill(fraction: number | null): Promise<void> {
+    if (fraction === this.#prefill) return;
+    this.#prefill = fraction;
+    await this.#push('prefill', fraction === null ? {} : { fraction });
+  }
+  #prefill: number | null = null;
+
+  /**
+   * Show the pill at all. Off means the phantom cursor still moves and clicks —
+   * that is the part that shows what is happening — but nothing writes words
+   * over the user's own windows.
+   */
+  async setPillEnabled(on: boolean): Promise<void> {
+    if (on === this.#pillEnabled) return;
+    this.#pillEnabled = on;
+    await this.#push('pill', { enabled: on });
+  }
+  #pillEnabled = true;
+
   /** Looking at the screen — a snapshot, not an act on anything. */
   async reading(): Promise<void> {
     this.#armIdle();
@@ -584,6 +620,7 @@ class MacOverlayController {
     this.#clearIdle();
     this.#stopTracking();
     this.#target = null;
+    void this.#pushTarget(null);
     this.#missingSince = null;
     this.#lastActivityAt = null;
     this.#lastOccluded = null;

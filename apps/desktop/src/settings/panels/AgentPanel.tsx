@@ -71,6 +71,21 @@ export function AgentPanel() {
        * already owns. The underlying `/harness preset` route is untouched for
        * anything that drives it directly.
        */}
+      <SettingRow
+        label="Show computer use status pill"
+        hint="The small label beside the phantom cursor while the agent drives an app. Turning it off leaves the cursor — you still see where it is acting, just without words over your windows."
+      >
+        <SegmentedControl
+          aria-label="Show computer use status pill"
+          data-testid="settings-status-pill"
+          value={settings.showComputerUseStatusPill === false ? 'off' : 'on'}
+          onValueChange={(v) => void update({ showComputerUseStatusPill: v === 'on' })}
+          options={[
+            { value: 'on', label: 'Show' },
+            { value: 'off', label: 'Hide' },
+          ]}
+        />
+      </SettingRow>
     </SettingSection>
   );
 }

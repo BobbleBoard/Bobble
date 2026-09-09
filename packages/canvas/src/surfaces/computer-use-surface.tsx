@@ -468,6 +468,11 @@ export function ComputerUseSurface({ feed, className }: ComputerUseSurfaceProps)
     stalledFor: 0,
   });
   const [windowTitle, setWindowTitle] = useState('');
+  /** Mirrors the app's "show computer use status pill" setting, so the toggle
+   * beside the picture reflects a change made anywhere else. */
+  const [pillShown, setPillShown] = useState<boolean | undefined>(() =>
+    feed?.getStatusPillShown?.(),
+  );
   /** The frontmost sheet/dialog the app has open, named — a save panel IS part
    * of the app, and the surface should say so rather than quietly renaming the
    * window. */
@@ -652,6 +657,13 @@ export function ComputerUseSurface({ feed, className }: ComputerUseSurfaceProps)
    * ever taken — measured: two chips in three had no thumbnail. The act's
    * identity is the state and its text; the rest is read at the moment it fires.
    */
+  useEffect(() => {
+    if (feed?.getStatusPillShown === undefined) return;
+    const sync = () => setPillShown(feed.getStatusPillShown?.());
+    sync();
+    return feed.subscribe(sync);
+  }, [feed]);
+
   const actContext = useRef({ session, dialogTitle });
   actContext.current = { session, dialogTitle };
   useEffect(() => {
@@ -1327,6 +1339,23 @@ export function ComputerUseSurface({ feed, className }: ComputerUseSurfaceProps)
               Follow
             </button>
           </div>
+          {pillShown === undefined ? null : (
+            <button
+              type="button"
+              className="pd-macmon-btn"
+              data-on={pillShown ? 'true' : 'false'}
+              aria-pressed={pillShown}
+              onClick={() => feed?.setStatusPillShown?.(!pillShown)}
+              data-testid="macmon-pill-toggle"
+              title={
+                pillShown
+                  ? 'Hide the status pill on screen (the cursor keeps moving)'
+                  : 'Show the status pill on screen'
+              }
+            >
+              {pillShown ? 'Hide pill' : 'Show pill'}
+            </button>
+          )}
         </div>
       )}
 

@@ -891,6 +891,18 @@ function registerE2eDebugChannel(): void {
           // Without this a probe cannot look at the monitor drawing a real
           // window at all: it can drive TextEdit and it can read the surface,
           // but nothing joins them.
+          /* A window move, done by the process that HAS the Accessibility
+             grant. the user: "if I move the map around the cursor does not move
+             with it" — reproducing that needs a real move, and a probe's own
+             shell cannot make one (System Events refuses without the grant). */
+          case 'move-window': {
+            const pid = Number(params.pid ?? 0);
+            const x = Number(params.x ?? 0);
+            const y = Number(params.y ?? 0);
+            if (!Number.isFinite(pid) || pid <= 0) return { ok: false, error: 'needs a pid' };
+            const res = await getHelper().request('moveWindow', { pid, x, y });
+            return { ok: true, result: res };
+          }
           case 'monitor-session': {
             const pid = Number(params.pid ?? 0);
             if (!Number.isFinite(pid) || pid <= 0) return { ok: false, error: 'needs a pid' };

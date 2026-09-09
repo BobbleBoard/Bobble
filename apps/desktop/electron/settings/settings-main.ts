@@ -20,6 +20,7 @@ import * as path from 'node:path';
 import { createLogger, type IpcHandlers, registerIpcHandlers } from '@pi-desktop/shared';
 import type { IpcMain } from 'electron';
 import type { OnboardingChoices } from '../import/import-contract';
+import { macOverlay } from '../mac/overlay-controller';
 import type { DesktopSettings, McpMode, SettingsInvokeMap } from './settings-contract';
 import { clampSettings, mergeSettingsPatch, seedFromOnboarding } from './settings-logic';
 
@@ -206,6 +207,12 @@ const handlers: IpcHandlers<SettingsInvokeMap> = {
      */
     if (next.powerMode !== before.powerMode || next.powerReserveGB !== before.powerReserveGB) {
       onPowerSettingsChanged?.();
+    }
+    /* The pill is drawn by the Swift panel, which has no idea a setting exists —
+       so the change has to be pushed at it, and it has to take effect on a pill
+       that is ALREADY on screen, not just the next one. */
+    if (next.showComputerUseStatusPill !== before.showComputerUseStatusPill) {
+      void macOverlay.setPillEnabled(next.showComputerUseStatusPill);
     }
     log.info('settings updated', {
       keys: Object.keys(req.patch),

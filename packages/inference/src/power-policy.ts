@@ -279,7 +279,9 @@ export function decidePower(inputs: PowerInputs): PowerDecision {
     const threads = Math.max(1, Math.floor(cores * (gentle ? 0.5 : 0.75)) || 1);
     return {
       ...common,
-      quantizeKv: gentle,
+      // Never — see the unified-memory branch below on why the KV is not the
+      // place to save, whatever the bottleneck.
+      quantizeKv: false,
       threads,
       reason: `CPU-bound: ${threads} of ${cores} cores, so the machine stays responsive`,
     };
@@ -302,13 +304,26 @@ export function decidePower(inputs: PowerInputs): PowerDecision {
     };
   }
 
-  // Unified memory: there is no clock knob (MEASURED), so every lever is a
-  // memory lever.
+  /*
+   * Unified memory: there is no clock knob (MEASURED), so every lever is a
+   * memory lever — but NOT the KV cache.
+   *
+   * the user: "no quantizing kv that damages a lot especially at this model size."
+   * He is talking about ANSWER QUALITY, and he is right that it is the wrong
+   * thing to spend here: these are 2B-27B models whose attention is already the
+   * fragile part, and the KV is what they remember of the conversation. I had
+   * measured only speed (q8_0 is ~12% FASTER here) and that is not the axis this
+   * decision lives on.
+   *
+   * Context size stays the lever: a smaller window is a smaller KV in exact
+   * proportion, and it degrades by forgetting the oldest turn rather than by
+   * making every remembered token slightly wrong.
+   */
   return {
     ...common,
-    quantizeKv: true,
+    quantizeKv: false,
     reason: gentle
-      ? 'memory is tight: smaller context, quantised KV, one slot, no heavy jobs'
-      : 'easing off: smaller context and a quantised KV cache to leave you room',
+      ? 'memory is tight: smaller context, one slot, no heavy jobs'
+      : 'easing off: a smaller context to leave you room',
   };
 }

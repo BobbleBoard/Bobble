@@ -160,6 +160,14 @@ export interface MacMonitorFeed {
   subscribe(listener: () => void): () => void;
   /** Tell the feed whether a surface is mounted and visible. */
   setActive(active: boolean): void;
+  /**
+   * Is the on-screen status pill drawn? Undefined when the host does not offer
+   * the choice. The toggle lives beside the picture because that is where you
+   * are when you decide you have had enough of it — the user asked for it "in the
+   * canvas as a toggle setting during computer use and in the settings menu".
+   */
+  getStatusPillShown?(): boolean;
+  setStatusPillShown?(next: boolean): void;
 
   // ── the actions row (all optional: a host that cannot do a thing does not
   //    advertise it, and the surface then does not draw a button for it) ─────
