@@ -613,7 +613,8 @@ export function registerMacAgentIpc(): void {
       occluded: typeof extras.occluded === 'boolean' ? extras.occluded : null,
       // The rects themselves, so the phantom can ask whether anything is over
       // the exact point it is about to draw on — see OverlayRect.occluders.
-      occluders: Array.isArray(extras.occluders) ? extras.occluders : [],    };
+      occluders: Array.isArray(extras.occluders) ? extras.occluders : [],
+    };
   });
   // The computer-use MONITOR (round-21 Lane A): the canvas tab that live-
   // streams the controlled window. It owns its own `pi-mac --stream` child, so
