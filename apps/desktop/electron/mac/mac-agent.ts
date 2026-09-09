@@ -42,7 +42,7 @@ import {
 } from '@pi-desktop/mac-computer-use/protocol';
 import { MacHelperClient } from '@pi-desktop/pi-mac';
 import { createLogger } from '@pi-desktop/shared';
-import { app, BrowserWindow, globalShortcut, ipcMain, systemPreferences } from 'electron';
+import { app, globalShortcut, ipcMain, systemPreferences } from 'electron';
 import { resolveBundledPackageAsset } from '../app-paths';
 import { isBackgroundMode } from '../background-mode';
 import { isTrustedIpcEvent } from '../trusted-senders';
@@ -653,19 +653,19 @@ export function registerMacAgentIpc(): void {
     tccCache = null;
     return getHelper().request('promptGrants');
   });
-  // The brake, wired to all three of its buttons (see applyControl), and to the
-  // overlay's own ✕ — the only control that exists while the user is in another
-  // app. Clicking the bubble body brings Bobble forward on the monitor.
+  /*
+   * The brake, wired to its buttons (see applyControl) and to the global Escape
+   * below.
+   *
+   * It used to be wired to the overlay's own ✕ as well. The phantom is now a
+   * native panel that is click-through end to end, so there is no ✕ to click and
+   * `setBrake` no longer exists — MEASURED, calling it threw during startup and
+   * the app's window never opened. What is lost is the one control that existed
+   * while the user was in another app; Escape still brakes, and the surface's
+   * own button still does. A hit-testable control would need a second, tiny
+   * panel that is click-through except for its button rect.
+   */
   setMacControlHandler(applyControl);
-  macOverlay.setBrake(applyControl, () => {
-    const win = BrowserWindow.getAllWindows().find((w) => !w.isDestroyed() && w.isFocusable());
-    if (win !== undefined) {
-      if (win.isMinimized()) win.restore();
-      win.show();
-      win.focus();
-    }
-    macMonitor.reveal();
-  });
   // An app being driven is exactly when the global Escape brake should exist,
   // and the overlay's own engagement is the app's single truth for that.
   macOverlay.watch((state) => armEscBrake(state.engaged));

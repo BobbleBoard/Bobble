@@ -271,7 +271,6 @@ export interface MacOverlayState {
   wantsVisible: boolean;
 }
 
-/** Truncate the live-typing preview so the bubble stays a bubble. */
 /** Truncate the live-typing preview so the pill stays a pill. */
 export function typingPreview(text: string, max = 44): string {
   const clean = text.replace(/\s+/g, ' ').trim();

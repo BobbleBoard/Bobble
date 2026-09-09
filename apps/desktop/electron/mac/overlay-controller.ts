@@ -44,6 +44,8 @@ import { MacHelperClient } from '@pi-desktop/pi-mac';
 import { createLogger } from '@pi-desktop/shared';
 import {
   comboLabel,
+  type MacCursorState,
+  type MacOverlayState,
   type OverlayOccluders,
   type OverlayRect,
   occludersDiffer,
@@ -129,7 +131,29 @@ class MacOverlayController {
   #lastOccluded: boolean | null = null;
   #lastOccluders: OverlayOccluders | null = null;
   #visible = false;
+  /*
+   * WHO WANTS TELLING WHEN THE PHANTOM IS ENGAGED.
+   *
+   * The global Escape brake exists exactly while an app is being driven, and
+   * the overlay's engagement is the app's single truth for that. The old
+   * BrowserWindow overlay exposed this as `watch`; the panel has to keep it, or
+   * Escape stops braking — and MEASURED, the missing method threw during
+   * startup and the app's window never opened at all.
+   */
+  #watchers: ((state: MacOverlayState) => void)[] = [];
   #cursorPlaced = false;
+  /*
+   * WHAT THE PANEL IS SHOWING, MIRRORED HERE.
+   *
+   * The canvas monitor draws the same phantom over a live picture of the
+   * controlled window, and reads it through `state()`. The old BrowserWindow
+   * overlay held this in its DOM; the panel holds it in another process, so the
+   * controller has to remember what it last pushed or the two surfaces disagree
+   * — and MEASURED, the missing method threw at startup and no window opened.
+   */
+  #cursor: { x: number; y: number } | null = null;
+  #cursorState: MacCursorState = 'idle';
+  #statusText = '';
   #revertTimer: ReturnType<typeof setTimeout> | null = null;
   #idleTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -244,6 +268,7 @@ class MacOverlayController {
   async debugHidePanel(): Promise<void> {
     await this.#push('hide');
     this.#visible = false;
+    this.#announce();
   }
 
   /** Probe seam: push an occluder set straight to the panel, bypassing the
@@ -265,6 +290,7 @@ class MacOverlayController {
   async #show(): Promise<void> {
     await this.#push('show');
     this.#visible = true;
+    this.#announce();
   }
 
   async #readBounds(pid: number): Promise<BoundsSample | null> {
@@ -307,6 +333,7 @@ class MacOverlayController {
   async #applyVisibility(show: boolean): Promise<void> {
     if (show === this.#visible) return;
     this.#visible = show;
+    this.#announce();
     await this.#push(show ? 'show' : 'hide');
   }
 
@@ -390,14 +417,18 @@ class MacOverlayController {
     if (this.#target === null) return;
     this.#armIdle();
     this.#cursorPlaced = true;
+    this.#cursor = { x: screenX, y: screenY };
     await this.#push('cursor', { x: screenX, y: screenY, ms: CURSOR_TRAVEL_MS });
     await sleep(CURSOR_TRAVEL_MS);
   }
 
-  /** Click feedback at a screen point: press dip + expanding ripples. */
-  async clickAt(screenX: number, screenY: number): Promise<void> {
+  /** Click feedback at a screen point: press dip + expanding ripples. `label`
+   * is what was clicked, which the pill shows. */
+  async clickAt(screenX: number, screenY: number, label = ''): Promise<void> {
     if (this.#target === null) return;
     this.#armIdle();
+    this.#cursor = { x: screenX, y: screenY };
+    this.#note('clicking', label);
     await this.#push('click', { x: screenX, y: screenY });
     this.#revertSoon();
   }
@@ -405,23 +436,27 @@ class MacOverlayController {
   /** Live-typing pill (previewing the text) at the cursor. */
   async typing(text: string): Promise<void> {
     this.#armIdle();
+    this.#note('typing', typingPreview(text));
     await this.#push('status', { status: 'typing', text: typingPreview(text) });
   }
 
   async keyPress(combo: string): Promise<void> {
     this.#armIdle();
+    this.#note('pressing', comboLabel(combo));
     await this.#push('status', { status: 'pressing', text: comboLabel(combo) });
     this.#revertSoon();
   }
 
   async scrolling(): Promise<void> {
     this.#armIdle();
+    this.#note('scrolling');
     await this.#push('status', { status: 'scrolling' });
     this.#revertSoon();
   }
 
   async opening(appName: string): Promise<void> {
     this.#armIdle();
+    this.#note('opening', `Opening ${appName}`);
     await this.#push('status', { status: 'opening', text: `Opening ${appName}` });
   }
 
@@ -429,12 +464,45 @@ class MacOverlayController {
   async thinking(): Promise<void> {
     this.#clearRevert();
     this.#armIdle();
+    this.#note('thinking');
     await this.#push('status', { status: 'thinking' });
+  }
+
+  /** Looking at the screen — a snapshot, not an act on anything. */
+  async reading(): Promise<void> {
+    this.#armIdle();
+    this.#note('reading');
+    await this.#push('status', { status: 'reading' });
+    this.#revertSoon();
+  }
+
+  /** Remember the pill we just pushed. */
+  #note(state: MacCursorState, text = ''): void {
+    this.#cursorState = state;
+    this.#statusText = text;
+  }
+
+  /**
+   * Everything the phantom is doing, for the canvas monitor — the same shape
+   * the BrowserWindow overlay reported, so monitor-core is unchanged.
+   */
+  state(): MacOverlayState {
+    return {
+      engaged: this.#target !== null,
+      pid: this.#target?.pid ?? null,
+      rect: this.#target?.rect ?? null,
+      cursor: this.#cursorPlaced ? this.#cursor : null,
+      cursorState: this.#cursorState,
+      statusText: this.#statusText,
+      bubbleVisible: this.#visible && this.#cursorState !== 'idle',
+      wantsVisible: this.#visible,
+    };
   }
 
   #revertSoon(): void {
     this.#clearRevert();
     this.#revertTimer = setTimeout(() => {
+      this.#note('thinking');
       void this.#push('status', { status: 'thinking' });
     }, TRANSIENT_STATUS_MS);
     this.#revertTimer.unref?.();
@@ -470,6 +538,29 @@ class MacOverlayController {
   /** Info for probes/assertions. Cheap and synchronous — main's own view of
    * the overlay (what it is tracking and whether it asked for it to be shown).
    * The panel's own truth is nativeInfo(). */
+  /** Call `fn` whenever the phantom engages or disengages. The whole state
+   * goes with it: the canvas monitor mirrors the phantom from this, so half of
+   * it would leave the two surfaces drawing different things. */
+  watch(fn: (state: MacOverlayState) => void): void {
+    this.#watchers.push(fn);
+    fn(this.state());
+  }
+
+  /** Tell the watchers, but only when the answer actually changed. */
+  #announce(): void {
+    if (this.#announced === this.#visible) return;
+    this.#announced = this.#visible;
+    const snapshot = this.state();
+    for (const fn of this.#watchers) {
+      try {
+        fn(snapshot);
+      } catch {
+        /* a watcher that throws must not take the overlay down with it */
+      }
+    }
+  }
+  #announced: boolean | null = null;
+
   info(): {
     visible: boolean;
     bounds: OverlayRect | null;
@@ -498,7 +589,10 @@ class MacOverlayController {
     this.#lastOccluded = null;
     this.#lastOccluders = null;
     this.#visible = false;
+    this.#announce();
     this.#cursorPlaced = false;
+    this.#cursor = null;
+    this.#note('idle');
     void this.#push('reset');
   }
 
