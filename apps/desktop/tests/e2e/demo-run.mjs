@@ -43,7 +43,12 @@ const osa = (s) => run('osascript', ['-e', s]).catch(() => undefined);
  */
 export async function demoRun(o) {
   const OUT = path.join('/Users/user/Desktop/OSS-harness/scratchpad/demos', o.name);
-  const FPS = Number(process.env.FPS ?? 6);
+  /* the user: "please video at 30+ if possible ... earlier ones were low framerate".
+     They were: capture ran at 5-6/s and ffmpeg then held each frame for ~5 output
+     frames. The cost is the screenshot, so the frames are JPEG at CSS scale
+     (1440x867, not the 2880x1734 backing store) — a quarter of the pixels and no
+     PNG deflate, which is what makes 30/s reachable at all. */
+  const FPS = Number(process.env.FPS ?? 30);
   const DEADLINE_MS = Number(process.env.DEADLINE_MS ?? 300_000);
   const PORT = Number(process.env.CDP_PORT ?? 9350);
   const log = [];
@@ -139,6 +144,8 @@ export async function demoRun(o) {
   }
 
   let shooting = true;
+  /** The camera loop, hoisted so `finally` can wait for it to stop. */
+  let camera = Promise.resolve();
   let shot = 0;
   try {
     if (page === undefined) throw new Error('no renderer page');
@@ -199,13 +206,16 @@ export async function demoRun(o) {
       }
     }, 250);
 
-    const camera = (async () => {
+    camera = (async () => {
       while (shooting) {
         const at = Date.now();
         try {
           await page.screenshot({
-            path: path.join(OUT, 'frames', `f-${String(++shot).padStart(5, '0')}-${at}.png`),
+            path: path.join(OUT, 'frames', `f-${String(++shot).padStart(5, '0')}-${at}.jpg`),
             animations: 'allow',
+            type: 'jpeg',
+            quality: 72,
+            scale: 'css',
           });
         } catch {
           /* mid-layout; skip */
@@ -289,6 +299,37 @@ export async function demoRun(o) {
     }
     clearInterval(watcher);
     clearInterval(prefillWatch);
+
+    /*
+     * WHAT THE MODEL ACTUALLY LOOKED AT (the user) — read off `harness-modality`,
+     * which the harness accumulates per tool result. Reported as three numbers
+     * that mean different things: what came back, what the acts were aimed by,
+     * and how many snapshots had no tree to aim at. The third is what separates
+     * "the model chose pixels" from "the app left it nothing else".
+     */
+    let modality = null;
+    try {
+      const raw = await page.evaluate(
+        () => window.__pi_store().getState().extensionStatus['harness-modality'],
+      );
+      modality = raw ? JSON.parse(raw) : null;
+    } catch {
+      /* the app may already be closing */
+    }
+    if (modality !== null) {
+      const aimed = modality.byIndex + modality.byCoord;
+      const pct = (n, d) => (d === 0 ? '—' : `${Math.round((n / d) * 100)}%`);
+      const trees = modality.axSnapshots + modality.domSnapshots;
+      say(
+        `modality: images ${modality.images} (${(modality.imageBytes / 1024).toFixed(0)}KB) · ` +
+          `ax ${modality.axSnapshots} (${(modality.axChars / 1024).toFixed(0)}KB) · ` +
+          `dom ${modality.domSnapshots} (${(modality.domChars / 1024).toFixed(0)}KB) · ` +
+          `aimed by index ${modality.byIndex}/${aimed} (${pct(modality.byIndex, aimed)}), ` +
+          `by pixel ${modality.byCoord}/${aimed} (${pct(modality.byCoord, aimed)}) · ` +
+          `snapshots with no tree ${modality.visualOnly}/${trees}`,
+      );
+      say(`MODALITY: ${JSON.stringify(modality)}`);
+    }
     if (prefillStart !== null) prefills.push({ ms: Date.now() - prefillStart, peak: prefillPeak });
     const slow = prefills.filter((p) => p.ms >= 2000);
     say(
@@ -318,7 +359,10 @@ export async function demoRun(o) {
     await sleep(1200);
   } finally {
     shooting = false;
-    await sleep(1000 / FPS + 250);
+    /* Wait for the camera itself, not for a guess at its period: a screenshot in
+       flight when the app closes writes a truncated frame that ffmpeg then trips
+       over, and at 30/s there is almost always one in flight. */
+    await camera.catch(() => {});
     await browser?.close().catch(() => {});
     await electronApp?.close().catch(() => {});
     await osa('tell application "Bobble" to quit');
@@ -327,13 +371,17 @@ export async function demoRun(o) {
 
   const dir = path.join(OUT, 'frames');
   const frames = readdirSync(dir)
-    .filter((f) => f.endsWith('.png'))
+    .filter((f) => f.endsWith('.jpg'))
     .sort()
     .map((f) => ({
       file: path.join(dir, f),
-      t: Number(f.split('-')[2]?.replace('.png', '') ?? 0),
+      t: Number(f.split('-')[2]?.replace('.jpg', '') ?? 0),
     }));
   if (frames.length === 0) throw new Error('no frames were captured');
+  /* What the camera ACHIEVED, not what it was asked for — a target FPS that the
+     screenshot cost cannot meet would otherwise be reported as if it had. */
+  const span = (frames[frames.length - 1].t - frames[0].t) / 1000;
+  const achieved = span > 0 ? frames.length / span : 0;
   const lines = [];
   for (let i = 0; i < frames.length; i += 1) {
     const next = frames[i + 1]?.t ?? frames[i].t + 1000 / FPS;
@@ -355,7 +403,7 @@ export async function demoRun(o) {
     '-i',
     list,
     '-vf',
-    'scale=trunc(iw/2)*2:trunc(ih/2)*2,fps=24',
+    'scale=trunc(iw/2)*2:trunc(ih/2)*2,fps=30',
     '-c:v',
     'libx264',
     '-pix_fmt',
@@ -367,6 +415,6 @@ export async function demoRun(o) {
     video,
   ]);
   writeFileSync(path.join(OUT, 'run-log.txt'), log.join('\n'));
-  console.log(`\n${frames.length} frames → ${video}`);
+  console.log(`\n${frames.length} frames, captured at ${achieved.toFixed(1)}/s → ${video}`);
   return { video, log };
 }

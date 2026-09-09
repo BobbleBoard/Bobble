@@ -172,7 +172,39 @@ export function buildOpenWrapper(): string {
     '  esac',
     '  prev="$arg"',
     'done',
-    '[ -n "$flagged" ] || exec /usr/bin/open "$@"',
+    /*
+     * AND A BARE PATH TAKES THE SCREEN TOO.
+     *
+     * REPORTED by the user, twice, with no run in flight: "finder keeps on opening
+     * up to exactly /Users/user/Desktop/OSS-harness/packages/harness". That is
+     * pi's own cwd, which means the line was `open .` — the most natural thing a
+     * model types when it wants to look inside a folder, and the one form
+     * guaranteed to put a Finder window in front of the user. It fell straight
+     * through to /usr/bin/open here because only -a and URLs were flagged.
+     *
+     * A folder HAS a true equivalent — `ls` answers "what is in here" without a
+     * window — so translate it, the same as `open -a`. A regular file does not:
+     * the honest answer is the read tool, which is a normal tool call rather
+     * than a command on this PATH, so say that instead of exec'ing a guess.
+     */
+    'if [ -z "$flagged" ]; then',
+    '  target=""',
+    '  for arg in "$@"; do',
+    '    case "$arg" in',
+    '      -*) ;;',
+    '      *) [ -n "$target" ] || target="$arg" ;;',
+    '    esac',
+    '  done',
+    '  if [ -d "$target" ]; then',
+    '    echo "open <folder> opens a Finder window in front of the user. Listing it instead (ls -la)." >&2',
+    '    exec ls -la "$target"',
+    '  fi',
+    '  if [ -e "$target" ]; then',
+    '    echo "open <file> hands the file to a GUI app and brings that app to the front, taking the screen from the user. Use the read tool on "$target" — it is a normal tool, not a command — or act on the file with the shell." >&2',
+    '    exit 1',
+    '  fi',
+    '  exec /usr/bin/open "$@"',
+    'fi',
     // The translation. `mac` is on the same PATH this wrapper is on, so a plain
     // name resolves; guarded anyway, because a wrapper that exec's something
     // missing is a worse failure than the refusal it replaced.

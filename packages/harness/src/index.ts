@@ -35,6 +35,7 @@ import { HANDBACK_NUDGE, isChoiceHandback } from './loop/handback.js';
 import { createLoopDetector, type LoopDetector, loopDetectorConfig } from './loop/loop-detector.js';
 import { newSameCallState, noteRepeatedCall } from './loop/same-call.js';
 import { unfinishedPlan, unfinishedPlanNudge } from './loop/unfinished-plan.js';
+import { emptyTally, noteResult } from './modality';
 import { parseModelParams, smallModelCapabilityWarning } from './model/model-size.js';
 import { type CallModel, callModelFromEnv } from './model-call/call-model.js';
 import { warmSystemPrompt } from './model-call/warmup.js';
@@ -839,6 +840,10 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
   const toolCliMode = process.env.PI_DESKTOP_TOOL_CLI === '1';
   /** The call in flight, so a result can tell whether it is a verbatim repeat. */
   let lastCallInput: { tool: string; input: unknown } | null = null;
+  /* the user: what the model actually looked at, per session — see ./modality.ts.
+     Published on `harness-modality` so a run can read the real split instead of
+     the advertised one. */
+  const modality = emptyTally();
   const sameCall = newSameCallState();
   /**
    * How a capability tool is actually invoked in this session: its command line
@@ -3317,6 +3322,11 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
   /** What the last bash command opened, if anything — consumed by its result. */
   let lastOpened: ReturnType<typeof detectOpenedApp>;
   pi.on('tool_result', (event) => {
+    noteResult(modality, event.toolName, lastCallInput?.input, event.content);
+    const mctx = runtime.currentCtx;
+    if (mctx?.hasUI === true) {
+      mctx.ui.setStatus('harness-modality', JSON.stringify(modality));
+    }
     /*
      * THE SAME CALL, MADE AGAIN, WITH THE SAME ANSWER.
      *

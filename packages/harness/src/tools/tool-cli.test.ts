@@ -56,9 +56,18 @@ const TOOLS: CliTool[] = [
     },
   },
   {
+    /* Shaped like the real mac_click/browser_click: NOTHING is required, because
+       an index and an x,y pair are alternatives, and the index is a number. */
     name: 'browser_click',
     description: 'Click an element on the page.',
-    parameters: { type: 'object', properties: { ref: { type: 'string' } }, required: ['ref'] },
+    parameters: {
+      type: 'object',
+      properties: {
+        index: { type: 'number', description: 'Element index from the latest snapshot.' },
+        x: { type: 'number' },
+        y: { type: 'number' },
+      },
+    },
   },
   {
     name: 'browser_snapshot',
@@ -157,6 +166,23 @@ describe('resolveCli — the line a model actually writes', () => {
   it('coerces to the schema’s types', () => {
     const r = resolveCli(cli, ['media', 'generate', 'image', '--prompt', 'x', '--n', '4']);
     expect(r).toEqual({ kind: 'call', tool: 'generate_image', args: { prompt: 'x', n: 4 } });
+  });
+
+  it('coerces a POSITIONAL to the schema’s types too, not only a flag', () => {
+    /*
+     * `browser click 1` and `browser click --index 1` have to mean the same
+     * thing. They did not: flags went through coerceArgs and positionals were
+     * assigned as raw strings, so the tool’s own `typeof index !== 'number'`
+     * guard rejected the line it had just advertised as
+     * `click "index"  (positional: fills --index)`. A 27B spent four of its nine
+     * calls on that in the Maps run before finding the flag form.
+     */
+    expect(call('browser click 1')).toEqual({
+      kind: 'call',
+      tool: 'browser_click',
+      args: { index: 1 },
+    });
+    expect(call('browser click 1')).toEqual(call('browser click --index 1'));
   });
 
   it('a flag beats a positional for the same argument', () => {

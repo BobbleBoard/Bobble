@@ -40,6 +40,38 @@ describe('the open wrapper', () => {
     }
   });
 
+  it('does not open a Finder window for `open .`', () => {
+    /*
+     * the user, twice, with no run in flight: "finder keeps on opening up to exactly
+     * /Users/user/Desktop/OSS-harness/packages/harness" — pi's own cwd, so the
+     * line was `open .`. Only -a and URLs were flagged, so a bare path fell
+     * through to /usr/bin/open and put a Finder window in front of him.
+     *
+     * The static assertion comes FIRST and deliberately: if the guard is gone,
+     * this test must fail without ever executing the line, because executing it
+     * is the bug — it would take the screen of whoever is running the suite.
+     */
+    expect(buildOpenWrapper()).toContain('if [ -d "$target" ]; then');
+
+    const dir = mkdtempSync(path.join(tmpdir(), 'pi-openwrap-dir-'));
+    writeFileSync(path.join(dir, 'a-file.txt'), 'hi');
+    const res = spawnSync(installed(), [dir], { encoding: 'utf8' });
+    expect(res.status).toBe(0);
+    expect(res.stdout).toContain('a-file.txt');
+    expect(res.stderr).toContain('Finder window');
+  });
+
+  it('names the read tool instead of handing a file to a GUI app', () => {
+    expect(buildOpenWrapper()).toContain('if [ -e "$target" ]; then');
+
+    const dir = mkdtempSync(path.join(tmpdir(), 'pi-openwrap-file-'));
+    const file = path.join(dir, 'notes.txt');
+    writeFileSync(file, 'hi');
+    const res = spawnSync(installed(), [file], { encoding: 'utf8' });
+    expect(res.status).toBe(1);
+    expect(res.stderr).toContain('read tool');
+  });
+
   it('lets the background flag through — that form was never the problem', () => {
     // -g is what `mac launch` itself uses; refusing it would be superstition.
     const res = run(['-g', '-a', 'NoSuchApplicationZZZ']);

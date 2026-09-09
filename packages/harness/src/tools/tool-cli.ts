@@ -379,14 +379,22 @@ export function resolveCli(cli: CliModel, argv: readonly string[]): CliResolutio
 
   /* Positionals fill required arguments in order — `media generate image "a red
      fox"` is the line a person (or a small model) actually writes, and refusing
-     it would measure our parser rather than the model. Flags always win. */
+     it would measure our parser rather than the model. Flags always win.
+
+     They go through coerceArgs for the same reason the flags do: `click 1` and
+     `click --index 1` are the same line typed two ways, so a positional that
+     stayed a raw string would be rejected by the tool's own `typeof !== number`
+     guard — on the very form the help advertises as
+     `click "index"  (positional: fills --index)`. */
   const spare = [...leftover, ...parsed.positionals];
   if (spare.length > 0) {
     const keys = positionalKeys(schema).filter((k) => args[k] === undefined);
+    const raw: Record<string, string> = {};
     keys.forEach((key, i) => {
       const v = i === keys.length - 1 ? spare.slice(i).join(' ') : spare[i];
-      if (v !== undefined && v !== '') args[key] = v;
+      if (v !== undefined && v !== '') raw[key] = v;
     });
+    Object.assign(args, coerceArgs(raw, schema));
   }
 
   const missing = (schema?.required ?? []).filter((k) => args[k] === undefined);
