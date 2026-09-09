@@ -621,7 +621,20 @@ export async function demoRun(o) {
     const next = frames[i + 1]?.t ?? frames[i].t + 1000 / FPS;
     lines.push(
       `file '${frames[i].file}'`,
-      `duration ${Math.min(3, Math.max(0.03, (next - frames[i].t) / 1000)).toFixed(3)}`,
+      /*
+       * REAL TIME, WHATEVER THE CAPTURE RATE.
+       *
+       * The floor used to be 0.03s, which is invisible at 25/s and ruinous at
+       * 70: the screencast pushes a frame every ~14ms, each one was then held
+       * for 30ms, and MEASURED the video ran 2.28x slow — 376 seconds of run
+       * stretched into 856 seconds of video. the user, watching one: "a prefill
+       * timer ticking up in very much slower than real time so over a minute or
+       * so it reports 14 seconds". That was this.
+       *
+       * The floor now only guards against a zero-length frame; the cap still
+       * compresses dead air.
+       */
+      `duration ${Math.min(3, Math.max(0.004, (next - frames[i].t) / 1000)).toFixed(3)}`,
     );
   }
   lines.push(`file '${frames[frames.length - 1].file}'`);
