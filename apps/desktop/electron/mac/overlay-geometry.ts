@@ -1,11 +1,19 @@
 /**
  * Pure support logic for the Mac computer-use cursor overlay, extracted from
- * overlay-window.ts so it unit-tests in plain Node (window-policy.ts
- * precedent): screen↔overlay coordinate mapping, window-bounds diffing for the
- * tracking loop, and the key-combo → display-label prettifier the status
- * bubble shows. All coordinates are global macOS screen POINTS (top-left
- * origin) — the same space AX positions, CGEvent posts, and Electron window
- * bounds share, so mapping is pure translation (no scaling).
+ * overlay-controller.ts so it unit-tests in plain Node (window-policy.ts
+ * precedent): window-bounds diffing for the tracking loop, the delta the
+ * phantom rides when the controlled window is dragged, occluder-set change
+ * detection for the mask push, the app-scoped visibility rule, and the
+ * key-combo → display-label prettifier the status pill shows.
+ *
+ * All coordinates are global macOS screen POINTS (top-left origin) — the same
+ * space AX positions, CGEvent posts and CGWindowList bounds share, and the same
+ * space the native overlay panel is addressed in. There is no screen→window
+ * mapping left to do: the panel spans the whole desktop and never moves, so a
+ * screen point IS the coordinate we send. (The previous overlay was a
+ * window-sized BrowserWindow, which is why this file used to carry
+ * OVERLAY_BUFFER and a toLocalPoint mapping — both of them workarounds for a
+ * canvas that could clip.)
  */
 
 /** A window rect in global screen points. */
@@ -16,40 +24,8 @@ export interface OverlayRect {
   readonly h: number;
 }
 
-/**
- * Extra transparent margin (points) the overlay window carries on EVERY side
- * beyond the tracked app window. It buys two things the old "exactly the window
- * bounds" sizing couldn't: the phantom cursor can protrude PAST the app's edge
- * (an action a hair outside the frame, or the arrow's glow at the very border)
- * without being clipped, and the status pill has room to render fully / flip
- * near a corner instead of being sheared off. All screen→local mapping is
- * offset by this buffer so a point on the app's own edge lands `buffer` px in
- * from the padded window's edge. 56pt clears the whole 34×40 cursor glyph
- * (which reaches ~35px below its tip) at any edge. */
-export const OVERLAY_BUFFER = 56;
-
-/** Integer Electron bounds for the overlay window covering `rect` plus the
- * buffer margin on every side (larger than the tracked window on purpose — see
- * OVERLAY_BUFFER). Never collapses below 1×1. */
-export function overlayBoundsFor(
-  rect: OverlayRect,
-  buffer = OVERLAY_BUFFER,
-): {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-} {
-  return {
-    x: Math.round(rect.x - buffer),
-    y: Math.round(rect.y - buffer),
-    width: Math.max(1, Math.round(rect.w + buffer * 2)),
-    height: Math.max(1, Math.round(rect.h + buffer * 2)),
-  };
-}
-
-/** Did the tracked window move/resize enough to reposition the overlay?
- * (Sub-point AX jitter is ignored so the tracker doesn't thrash setBounds.) */
+/** Did the tracked window move/resize enough for the overlay to react?
+ * (Sub-point AX jitter is ignored so the tracker doesn't thrash the helper.) */
 export function rectsDiffer(a: OverlayRect | null, b: OverlayRect | null): boolean {
   if (a === null || b === null) return a !== b;
   return (
@@ -61,29 +37,45 @@ export function rectsDiffer(a: OverlayRect | null, b: OverlayRect | null): boole
 }
 
 /**
- * Map a global screen point into overlay-local coordinates. The overlay window
- * is padded by `buffer` on every side (see OVERLAY_BUFFER), so a screen point
- * ON the tracked window's own edge maps to `buffer` px in from the padded
- * window edge — leaving the buffer zone free for the cursor glyph to protrude
- * past the app's border without clipping. Clamped into the PADDED window with a
- * tiny inset (the buffer, not the inset, is what keeps the glyph on-screen), so
- * a point a hair outside the tracked rect mid-drag still lands cleanly.
+ * How far the phantom cursor must travel to stay glued to the controlled window
+ * after it moved from `from` to `to` — its ORIGIN delta, rounded to whole
+ * points.
+ *
+ * The old overlay got this for free: the window moved and dragged its contents
+ * with it. A screen-coordinate canvas has to shift the cursor explicitly, and it
+ * has to, because the cursor marks a place INSIDE the app (the button it is
+ * about to click), not an absolute spot on the desktop. A pure resize from the
+ * bottom-right leaves the origin alone and so leaves the cursor alone, which is
+ * also right — the content under it did not move.
  */
-export function toLocalPoint(
-  screenX: number,
-  screenY: number,
-  rect: OverlayRect,
-  buffer = OVERLAY_BUFFER,
-  inset = 2,
-): { x: number; y: number } {
-  const paddedW = rect.w + buffer * 2;
-  const paddedH = rect.h + buffer * 2;
-  const maxX = Math.max(inset, paddedW - inset);
-  const maxY = Math.max(inset, paddedH - inset);
-  return {
-    x: Math.min(maxX, Math.max(inset, Math.round(screenX - rect.x) + buffer)),
-    y: Math.min(maxY, Math.max(inset, Math.round(screenY - rect.y) + buffer)),
-  };
+export function rectDelta(from: OverlayRect, to: OverlayRect): { dx: number; dy: number } {
+  return { dx: Math.round(to.x - from.x), dy: Math.round(to.y - from.y) };
+}
+
+/** Windows stacked ABOVE the controlled one, in screen points — the rects the
+ * native overlay masks out so the phantom never paints over them. */
+export type OverlayOccluders = readonly OverlayRect[];
+
+/**
+ * Is this occluder set meaningfully different from the last one we pushed?
+ *
+ * The tracker samples bounds every ~16ms while visible, and the helper answers
+ * with the full occluder list each time; re-sending an identical list would put
+ * a CoreAnimation mask rebuild on every one of those ticks for nothing. Whole
+ * points are the comparison unit — the same sub-point-jitter reasoning as
+ * rectsDiffer, and the mask is a screen-space cut-out where a fraction of a
+ * point is invisible.
+ */
+export function occludersDiffer(a: OverlayOccluders | null, b: OverlayOccluders | null): boolean {
+  if (a === null || b === null) return a !== b;
+  if (a.length !== b.length) return true;
+  for (let i = 0; i < a.length; i++) {
+    const left = a[i];
+    const right = b[i];
+    if (left === undefined || right === undefined) return true;
+    if (rectsDiffer(left, right)) return true;
+  }
+  return false;
 }
 
 /** Inputs the overlay-visibility rule reads each tracking tick. */
@@ -104,21 +96,24 @@ export interface OverlayVisibilityState {
 }
 
 /**
- * Should the phantom cursor overlay be VISIBLE?
+ * Should the phantom cursor overlay be VISIBLE AT ALL?
  *
- * macOS window levels are global bands, not per-app, so a click-through child
- * window can't be truly z-sandwiched between the controlled app and whatever
- * else is on screen. The honest scope, then, is a show/hide rule: the overlay
- * is tied to the controlled app, never floating over an app the user has turned
- * to on their own.
+ * macOS window levels are global bands, not per-app, so a click-through panel
+ * can't be truly z-sandwiched between the controlled app and whatever else is
+ * on screen. Two things scope it instead, and this is the COARSE one: a
+ * whole-overlay show/hide tied to the controlled app, so the phantom never
+ * floats over an app the user has turned to on their own. The FINE one is the
+ * occluder mask the native panel applies (see occludersDiffer), which stops the
+ * cursor painting on individual windows above the app long before their
+ * coverage trips the hide threshold.
  *
  *   - The window must exist at all (`appVisible`) — nothing to overlay
  *     otherwise.
  *   - OCCLUSION IS TRUTH when the helper reports it: a controlled window
- *     covered by another app's window must never wear the phantom (even while
- *     the model is driving — the cursor lives ON the app, not on whatever the
- *     user dragged over it), and a CLEAR window keeps its cursor even when
- *     the model is idle and the app is backgrounded.
+ *     substantially covered by another app's window must never wear the phantom
+ *     (even while the model is driving — the cursor lives ON the app, not on
+ *     whatever the user dragged over it), and a CLEAR window keeps its cursor
+ *     even when the model is idle and the app is backgrounded.
  *   - Occlusion unknown (old helper): fall back to the proxy rule — show
  *     while DRIVING or while the controlled app is FRONTMOST, tuck away
  *     otherwise.
@@ -167,7 +162,7 @@ const KEY_LABELS: Record<string, string> = {
 };
 
 /** Render "cmd+shift+s" as the label macOS users read: "⌘⇧S". Unknown tokens
- * pass through capitalized, so the bubble never shows an empty label. */
+ * pass through capitalized, so the pill never shows an empty label. */
 export function comboLabel(combo: string): string {
   const parts = combo
     .split(/[+-]/)
@@ -277,6 +272,7 @@ export interface MacOverlayState {
 }
 
 /** Truncate the live-typing preview so the bubble stays a bubble. */
+/** Truncate the live-typing preview so the pill stays a pill. */
 export function typingPreview(text: string, max = 44): string {
   const clean = text.replace(/\s+/g, ' ').trim();
   if (clean.length <= max) return clean;

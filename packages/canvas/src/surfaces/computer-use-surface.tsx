@@ -77,7 +77,7 @@ const CURSOR_PATH =
 const CURSOR_VIEWBOX = { x: 8.14, y: 8.24, w: 26.56, h: 24.21 };
 const CURSOR_BOX = { w: 34, h: 31 };
 const CURSOR_TIP = { x: 2.9, y: 1.6 };
-/** Matches CURSOR_TRAVEL_MS in overlay-window.ts. */
+/** Matches CURSOR_TRAVEL_MS in overlay-controller.ts. */
 const CURSOR_TRAVEL_MS = 300;
 /** How long a click ripple lives (overlay.html's .ripple transition). */
 const RIPPLE_MS = 620;

@@ -1,0 +1,517 @@
+/**
+ * The Mac computer-use CURSOR OVERLAY — the only thing the user perceives while
+ * Pi drives an app in the background.
+ *
+ * This module used to CREATE the overlay (a transparent, click-through,
+ * always-on-top BrowserWindow sized to the controlled app's window, hosting an
+ * overlay.html). It no longer does: the overlay is a NATIVE NSPanel living in a
+ * `pi-mac --overlay` child process, and what is left here is the choreography —
+ * spawn it, tell it where the phantom cursor is and what the pill should say,
+ * and run the tracking loop that decides when it should be visible.
+ *
+ * WHY THE MOVE (both are the user's field reports on real runs):
+ *   - "mission control still shows blank window". An Electron window is a
+ *     first-class managed window, so Mission Control laid the overlay out as a
+ *     tile beside the app it was supposed to be painted ON, and the two came
+ *     apart on screen. The fix is NSWindowCollectionBehavior.transient, which
+ *     Electron does not expose at all.
+ *   - "the window is sized directly to the app window size and thus causing cut
+ *     off if the mouse cursor goes even a little bit off the screen to the right
+ *     especially". The old window was the app frame plus a 56pt margin, so a
+ *     cursor past that margin was clipped by the overlay's own window.
+ *
+ * The native panel is sized to the union of every screen and NEVER MOVES, which
+ * deletes both problems along with a whole mechanism: there is no
+ * reposition-on-drag path, no screen→window coordinate mapping, and no way to
+ * clip. Everything below speaks GLOBAL SCREEN POINTS straight through.
+ *
+ * Transport is the same NDJSON dialect `--serve` uses, so MacHelperClient drives
+ * it unchanged (lazy spawn, id correlation, per-request timeout, respawn after a
+ * crash). Every push is best-effort: the overlay is cosmetic and must never
+ * break a tool call.
+ *
+ * NO ✕ BRAKE HERE. The panel is `ignoresMouseEvents = true` end to end — it
+ * cannot receive a click, so a "stop" affordance cannot live on the pill without
+ * making the overlay swallow mouse events over the app the model is driving,
+ * which is the one thing it must never do. If the brake is wanted it needs its
+ * own small hit-testable panel (a second NSPanel, click-through everywhere
+ * except the button's rect); that is deliberately not built here.
+ *
+ * Driven by REAL tool events from mac-agent.ts (launch/snapshot/click/type/…)
+ * so the pill always reflects what is actually happening.
+ */
+import { MacHelperClient } from '@pi-desktop/pi-mac';
+import { createLogger } from '@pi-desktop/shared';
+import {
+  comboLabel,
+  type OverlayOccluders,
+  type OverlayRect,
+  occludersDiffer,
+  overlayShouldShow,
+  rectDelta,
+  rectsDiffer,
+  typingPreview,
+} from './overlay-geometry';
+
+const log = createLogger('desktop:mac-overlay');
+
+/** How long the phantom cursor takes to glide to an action point (mirrored by
+ * the panel's travel animation, so a tool act can wait it out). */
+export const CURSOR_TRAVEL_MS = 300;
+/** Window-tracking poll cadence while the overlay is VISIBLE. The panel no
+ * longer has to be repositioned, but the sample still carries the visibility
+ * inputs (frontmost/onScreen/occluded) and the occluder rects the mask is built
+ * from, and the phantom rides a window drag off this same delta — so the tight
+ * cadence still earns its keep. The tracker self-reschedules AFTER each bounds
+ * read resolves, so at most one read is ever outstanding on the
+ * (single-threaded) helper pipe: a real tool act waits behind at most one cheap
+ * bounds read, never a backlog. */
+const FAST_TRACK_MS = 16;
+/** Slower cadence while the overlay is hidden-but-still-tracking (app
+ * backgrounded / model idle): we only need to notice a refocus, not animate. */
+const SLOW_TRACK_MS = 250;
+/** Bounds have read null (window minimized/closed/quit) continuously for this
+ * long → tear the overlay all the way down rather than track a ghost. A brief
+ * miss (space-switch animation, AX hiccup) just hides it visually and recovers. */
+const MISSING_GRACE_MS = 1500;
+/** The model counts as actively DRIVING for this long after its last action —
+ * the overlay stays visible through it even while the app is backgrounded, so
+ * the user can watch Pi work; once it lapses (and the app isn't frontmost) the
+ * overlay tucks away. */
+const DRIVING_WINDOW_MS = 4_000;
+/** How long a transient pill (key press / scroll) lingers before returning to
+ * the resting 'thinking' state. */
+const TRANSIENT_STATUS_MS = 1200;
+/** With NO tool activity for this long the pill fades out (the cursor stays —
+ * always visible while an app is controlled). "Thinking…" must reflect a turn
+ * actually in flight, not linger forever after the model finished. */
+const BUBBLE_IDLE_MS = 15_000;
+/** The overlay draws; it never computes. A command that has not been answered
+ * in this long means the panel process is wedged, and waiting the helper
+ * client's 30s default would stall the tool act that is waiting on the glide. */
+const OVERLAY_REQUEST_TIMEOUT_MS = 4_000;
+
+/** A live window-frame read, plus the visibility-rule inputs that ride along
+ * with it (see overlayShouldShow): whether the controlled app is frontmost,
+ * whether its window is on the CURRENT space, whether it is meaningfully
+ * OCCLUDED by other apps' windows above it, and WHICH rects those are (helper
+ * CGWindowList truth; absent on older helpers). */
+export type BoundsSample = OverlayRect & {
+  readonly frontmost?: boolean;
+  readonly onScreen?: boolean;
+  readonly occluded?: boolean | null;
+  readonly occluders?: OverlayOccluders;
+};
+
+/** Injected read of the controlled window's live frame (null = no window). */
+export type BoundsReader = (pid: number) => Promise<BoundsSample | null>;
+
+/** What the native panel reports about itself — the probe's replacement for
+ * reading the old overlay's DOM. Shape is the Swift `info` result; typed loosely
+ * on purpose so a helper that predates a field degrades instead of throwing. */
+export type NativeOverlayInfo = Record<string, unknown>;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((r) => {
+    const t = setTimeout(r, ms);
+    t.unref?.();
+  });
+}
+
+class MacOverlayController {
+  #client: MacHelperClient | null = null;
+  #helperPath: string | undefined;
+  #boundsReader: BoundsReader | null = null;
+  #target: { pid: number | null; rect: OverlayRect } | null = null;
+  #trackTimer: ReturnType<typeof setTimeout> | null = null;
+  #missingSince: number | null = null;
+  #lastActivityAt: number | null = null;
+  #lastOccluded: boolean | null = null;
+  #lastOccluders: OverlayOccluders | null = null;
+  #visible = false;
+  #cursorPlaced = false;
+  #revertTimer: ReturnType<typeof setTimeout> | null = null;
+  #idleTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /** mac-agent injects the resolved `pi-mac` binary path (dev build output or
+   * the asarUnpack'd bundle path) once at registration. */
+  setHelperPath(path: string): void {
+    this.#helperPath = path;
+  }
+
+  /** mac-agent injects the helper-backed bounds reader once at registration. */
+  setBoundsReader(reader: BoundsReader): void {
+    this.#boundsReader = reader;
+  }
+
+  // ── panel process lifecycle ────────────────────────────────────────────
+
+  /** The overlay process, spawned on first use. Same client as `--serve`: it
+   * respawns after a crash, so a panel that dies mid-run comes back on the next
+   * push rather than leaving the run blind. */
+  #panel(): MacHelperClient {
+    if (this.#client === null) {
+      this.#client = new MacHelperClient({
+        helperPath: this.#helperPath,
+        helperArgs: ['--overlay'],
+        requestTimeoutMs: OVERLAY_REQUEST_TIMEOUT_MS,
+      });
+    }
+    return this.#client;
+  }
+
+  async #push(method: string, params?: Record<string, unknown>): Promise<unknown> {
+    if (process.platform !== 'darwin') return null;
+    try {
+      return await this.#panel().request(method, params);
+    } catch (err) {
+      // The overlay is cosmetic — a failed push must never break a tool call.
+      log.debug('overlay push failed', { method, error: String(err) });
+      return null;
+    }
+  }
+
+  // ── control / tracking ─────────────────────────────────────────────────
+
+  /** Show the overlay for `pid`'s window and track it. Idempotent per pid; a
+   * new pid re-targets the overlay. `rect` is the caller's already-known frame
+   * (a snapshot/launch ack) to save a round-trip. */
+  async control(pid: number, rect: OverlayRect | null | undefined): Promise<void> {
+    if (process.platform !== 'darwin') return;
+    const known = rect ?? (await this.#readBounds(pid));
+    if (known === null) return; // no window yet — a later snapshot will retry
+    this.#target = { pid, rect: { x: known.x, y: known.y, w: known.w, h: known.h } };
+    this.#missingSince = null;
+    this.#markActivity(); // control() means the model just acted → show
+    await this.#show();
+    await this.#seedCursor();
+    this.#startTracking();
+  }
+
+  /** E2E seam: bring the panel up with NO pid tracking, targeted at an
+   * arbitrary rect (mac-overlay-probe.mjs drives states deterministically). */
+  async debugShow(rect: OverlayRect): Promise<void> {
+    this.#target = { pid: null, rect };
+    await this.#show();
+    await this.#seedCursor();
+  }
+
+  /** Put the phantom on the controlled window's CENTRE the first time we take
+   * an app, before any act has told us where it is going.
+   *
+   * Without this the pill's first appearance ("Thinking", pushed by the
+   * snapshot that starts a session) has no cursor to hang off, and a
+   * screen-sized canvas puts "no position" at the desktop's bottom-left corner
+   * — a status pill in the corner of the display, nowhere near the app. The old
+   * window-sized overlay got the same behaviour for free from its
+   * place-at-centre-on-first-message rule, because its centre WAS the window's. */
+  async #seedCursor(): Promise<void> {
+    const target = this.#target;
+    if (target === null || this.#cursorPlaced) return;
+    this.#cursorPlaced = true;
+    await this.#push('cursor', {
+      x: Math.round(target.rect.x + target.rect.w / 2),
+      y: Math.round(target.rect.y + target.rect.h / 2),
+      ms: 0,
+    });
+  }
+
+  /** E2E seam: simulate ONE tracker reposition to `rect` synchronously (the
+   * same code path a live bounds change takes) so a probe can assert the
+   * phantom rides a window move in the SAME tick. */
+  async debugRetarget(rect: OverlayRect): Promise<void> {
+    if (this.#target === null) return;
+    await this.#follow(rect);
+  }
+
+  /** Raw panel introspection for probes — the native panel's own view of
+   * itself (frame, click-through, focus, collection behavior, cursor, pill). */
+  async nativeInfo(): Promise<NativeOverlayInfo | null> {
+    const res = await this.#push('info');
+    return (res as NativeOverlayInfo | null) ?? null;
+  }
+
+  /** Probe seam: paint a solid colour behind the phantom and render the panel's
+   * layer tree to a PNG. The panel is transparent, so this is the only way to
+   * capture what the overlay actually draws without a Screen Recording grant. */
+  async debugBackdrop(color: string | null): Promise<void> {
+    await this.#push('backdrop', color === null ? {} : { color });
+  }
+
+  /** Probe seam: order the panel OUT without tearing tracking down, so a
+   * screenshot can be rendered with the (opaque, full-desktop) probe backdrop
+   * painted and no chance of it reaching a real screen. */
+  async debugHidePanel(): Promise<void> {
+    await this.#push('hide');
+    this.#visible = false;
+  }
+
+  /** Probe seam: push an occluder set straight to the panel, bypassing the
+   * tracker — a deterministic mask for a screenshot, with no bounds poll
+   * racing it back to empty. */
+  async debugOccluders(rects: OverlayRect[]): Promise<void> {
+    this.#lastOccluders = rects;
+    await this.#push('occluders', { rects });
+  }
+
+  async debugRender(
+    path: string,
+    crop?: { x: number; y: number; w: number; h: number; scale?: number },
+  ): Promise<boolean> {
+    const res = (await this.#push('render', { path, ...(crop ?? {}) })) as { ok?: boolean } | null;
+    return res?.ok === true;
+  }
+
+  async #show(): Promise<void> {
+    await this.#push('show');
+    this.#visible = true;
+  }
+
+  async #readBounds(pid: number): Promise<BoundsSample | null> {
+    const reader = this.#boundsReader;
+    if (reader === null) return null;
+    try {
+      return await reader(pid);
+    } catch {
+      return null;
+    }
+  }
+
+  /** True while the model is actively driving (recent action) — see
+   * DRIVING_WINDOW_MS. */
+  #isDriving(): boolean {
+    return this.#lastActivityAt !== null && Date.now() - this.#lastActivityAt < DRIVING_WINDOW_MS;
+  }
+
+  #markActivity(): void {
+    this.#lastActivityAt = Date.now();
+    // If we're tracking but currently tucked away, re-evaluate visibility right
+    // now so the overlay reappears the instant the model resumes — don't wait
+    // out the slow hidden-cadence poll.
+    if (this.#trackTimer !== null && !this.#visible) this.#scheduleTrack(0);
+  }
+
+  /** Follow the controlled window: the phantom shifts by the window's ORIGIN
+   * delta so it stays glued to the thing it is pointing at. Nothing is
+   * repositioned — the panel spans the desktop — so this is one small message,
+   * not a window move, and a pure resize (origin unchanged) sends nothing at
+   * all. */
+  async #follow(fresh: OverlayRect): Promise<void> {
+    const target = this.#target;
+    if (target === null) return;
+    const { dx, dy } = rectDelta(target.rect, fresh);
+    target.rect = { x: fresh.x, y: fresh.y, w: fresh.w, h: fresh.h };
+    if (dx !== 0 || dy !== 0) await this.#push('shift', { dx, dy });
+  }
+
+  async #applyVisibility(show: boolean): Promise<void> {
+    if (show === this.#visible) return;
+    this.#visible = show;
+    await this.#push(show ? 'show' : 'hide');
+  }
+
+  #startTracking(): void {
+    if (this.#trackTimer !== null) return;
+    this.#scheduleTrack(0);
+  }
+
+  #scheduleTrack(delay: number): void {
+    if (this.#trackTimer !== null) clearTimeout(this.#trackTimer);
+    this.#trackTimer = setTimeout(() => {
+      void this.#trackTick();
+    }, delay);
+    this.#trackTimer.unref?.();
+  }
+
+  #stopTracking(): void {
+    if (this.#trackTimer !== null) {
+      clearTimeout(this.#trackTimer);
+      this.#trackTimer = null;
+    }
+  }
+
+  /** One self-rescheduling tracking tick: read the live frame, ride any move,
+   * refresh the occluder mask, and apply the app-scoped visibility rule.
+   * Re-schedules itself AFTER the async read resolves (never on a fixed
+   * interval), so reads can't pile up on the helper pipe. */
+  async #trackTick(): Promise<void> {
+    const target = this.#target;
+    if (target === null || target.pid === null) {
+      this.#trackTimer = null;
+      return;
+    }
+    const sample = await this.#readBounds(target.pid);
+    // Bail if control was dropped / re-targeted while the read was in flight.
+    if (this.#target !== target) return;
+
+    let visible = false;
+    if (sample === null) {
+      // Window not currently readable (minimized / space animation / quit).
+      if (this.#missingSince === null) this.#missingSince = Date.now();
+      await this.#applyVisibility(false);
+      if (Date.now() - this.#missingSince >= MISSING_GRACE_MS) {
+        this.hide();
+        return;
+      }
+    } else {
+      this.#missingSince = null;
+      if (rectsDiffer(target.rect, sample)) await this.#follow(sample);
+      this.#lastOccluded = typeof sample.occluded === 'boolean' ? sample.occluded : null;
+      await this.#applyOccluders(sample.occluders);
+      visible = overlayShouldShow({
+        controlledFrontmost: sample.frontmost === true,
+        // onScreen === false means the helper SAW the window off the current
+        // space (or minimized) even though AX still reports a frame — the
+        // phantom must not haunt the space the user switched to.
+        appVisible: sample.onScreen !== false,
+        driving: this.#isDriving(),
+        occluded: this.#lastOccluded,
+      });
+      await this.#applyVisibility(visible);
+    }
+    this.#scheduleTrack(visible ? FAST_TRACK_MS : SLOW_TRACK_MS);
+  }
+
+  /** Push the occluder rects the panel masks itself against, but only when the
+   * set actually changed — see occludersDiffer. An absent list (older helper,
+   * or a window we could not find in the z-order) leaves the mask alone rather
+   * than clearing it to a guess. */
+  async #applyOccluders(occluders: OverlayOccluders | undefined): Promise<void> {
+    if (occluders === undefined) return;
+    if (!occludersDiffer(this.#lastOccluders, occluders)) return;
+    this.#lastOccluders = occluders.map((r) => ({ x: r.x, y: r.y, w: r.w, h: r.h }));
+    await this.#push('occluders', { rects: this.#lastOccluders });
+  }
+
+  // ── action-driven states (called by mac-agent dispatch) ────────────────
+
+  /** Glide the cursor to a screen point and wait out the travel. */
+  async moveCursor(screenX: number, screenY: number): Promise<void> {
+    if (this.#target === null) return;
+    this.#armIdle();
+    this.#cursorPlaced = true;
+    await this.#push('cursor', { x: screenX, y: screenY, ms: CURSOR_TRAVEL_MS });
+    await sleep(CURSOR_TRAVEL_MS);
+  }
+
+  /** Click feedback at a screen point: press dip + expanding ripples. */
+  async clickAt(screenX: number, screenY: number): Promise<void> {
+    if (this.#target === null) return;
+    this.#armIdle();
+    await this.#push('click', { x: screenX, y: screenY });
+    this.#revertSoon();
+  }
+
+  /** Live-typing pill (previewing the text) at the cursor. */
+  async typing(text: string): Promise<void> {
+    this.#armIdle();
+    await this.#push('status', { status: 'typing', text: typingPreview(text) });
+  }
+
+  async keyPress(combo: string): Promise<void> {
+    this.#armIdle();
+    await this.#push('status', { status: 'pressing', text: comboLabel(combo) });
+    this.#revertSoon();
+  }
+
+  async scrolling(): Promise<void> {
+    this.#armIdle();
+    await this.#push('status', { status: 'scrolling' });
+    this.#revertSoon();
+  }
+
+  async opening(appName: string): Promise<void> {
+    this.#armIdle();
+    await this.#push('status', { status: 'opening', text: `Opening ${appName}` });
+  }
+
+  /** The resting state between actions: the model is deciding what to do. */
+  async thinking(): Promise<void> {
+    this.#clearRevert();
+    this.#armIdle();
+    await this.#push('status', { status: 'thinking' });
+  }
+
+  #revertSoon(): void {
+    this.#clearRevert();
+    this.#revertTimer = setTimeout(() => {
+      void this.#push('status', { status: 'thinking' });
+    }, TRANSIENT_STATUS_MS);
+    this.#revertTimer.unref?.();
+  }
+
+  #clearRevert(): void {
+    if (this.#revertTimer !== null) {
+      clearTimeout(this.#revertTimer);
+      this.#revertTimer = null;
+    }
+  }
+
+  /** Every real activity push re-arms the idle fade: after BUBBLE_IDLE_MS of
+   * silence the pill hides (the cursor rests in place, still visible). Also
+   * marks the model as actively driving, which keeps the overlay visible (see
+   * overlayShouldShow) even while the controlled app is backgrounded. */
+  #armIdle(): void {
+    this.#markActivity();
+    if (this.#idleTimer !== null) clearTimeout(this.#idleTimer);
+    this.#idleTimer = setTimeout(() => {
+      void this.#push('hideBubble');
+    }, BUBBLE_IDLE_MS);
+    this.#idleTimer.unref?.();
+  }
+
+  #clearIdle(): void {
+    if (this.#idleTimer !== null) {
+      clearTimeout(this.#idleTimer);
+      this.#idleTimer = null;
+    }
+  }
+
+  /** Info for probes/assertions. Cheap and synchronous — main's own view of
+   * the overlay (what it is tracking and whether it asked for it to be shown).
+   * The panel's own truth is nativeInfo(). */
+  info(): {
+    visible: boolean;
+    bounds: OverlayRect | null;
+    trackingPid: number | null;
+    occluded: boolean | null;
+    occluders: number;
+  } {
+    return {
+      visible: this.#visible,
+      bounds: this.#target?.rect ?? null,
+      trackingPid: this.#target?.pid ?? null,
+      occluded: this.#lastOccluded,
+      occluders: this.#lastOccluders?.length ?? 0,
+    };
+  }
+
+  /** Put the phantom away: the panel stays spawned (respawning it per app is
+   * pure latency in the middle of a run) but is ordered out and cleared. */
+  hide(): void {
+    this.#clearRevert();
+    this.#clearIdle();
+    this.#stopTracking();
+    this.#target = null;
+    this.#missingSince = null;
+    this.#lastActivityAt = null;
+    this.#lastOccluded = null;
+    this.#lastOccluders = null;
+    this.#visible = false;
+    this.#cursorPlaced = false;
+    void this.#push('reset');
+  }
+
+  dispose(): void {
+    this.hide();
+    const client = this.#client;
+    this.#client = null;
+    // dispose() ends stdin and SIGTERMs the child; the panel process also exits
+    // on its own when stdin closes, so a hard kill is never the normal path.
+    client?.dispose();
+  }
+}
+
+/** The app-wide overlay singleton (one controlled app at a time — matches the
+ * single long-lived pi-mac helper). */
+export const macOverlay = new MacOverlayController();

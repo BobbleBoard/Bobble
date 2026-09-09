@@ -21,6 +21,13 @@ import Foundation
 /// normal windows (above it in z) before we call it occluded.
 let OCCLUSION_FRACTION = 0.15
 
+/// How many occluder rects the `bounds` reply carries for the overlay's mask.
+/// Every rect above the controlled window is reported, but the reply rides the
+/// overlay's ~16ms tracking poll, so the list is capped — past a dozen windows
+/// stacked above the app the overlay is hiding wholesale anyway (see
+/// OCCLUSION_FRACTION) and the extra rects buy nothing but wire bytes.
+let OCCLUDER_REPORT_CAP = 12
+
 struct ZOrderInfo {
   /// Live frame from the window server (nil when the window is not on the
   /// current space / minimized — CGWindowList onScreenOnly drops it).

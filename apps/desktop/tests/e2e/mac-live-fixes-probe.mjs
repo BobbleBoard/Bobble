@@ -73,21 +73,11 @@ const app = await electron.launch({
 let launchedTextEdit = false;
 let launchedSettings = false;
 
-/** Overlay BrowserWindow bounds straight from Electron main (ground truth). */
-const overlayBounds = () =>
-  app.evaluate(({ BrowserWindow }) => {
-    const w = BrowserWindow.getAllWindows().find((x) =>
-      x.webContents.getURL().includes('overlay.html'),
-    );
-    return w ? { ...w.getBounds(), visible: w.isVisible(), focused: w.isFocused() } : null;
-  });
-
-/** Move/resize the MAIN app window (the probe's real occluder). */
+/** Move/resize the MAIN app window (the probe's real occluder). The overlay is
+ * no longer a BrowserWindow at all, so this is simply our only window. */
 const setMainBounds = (r) =>
   app.evaluate(({ BrowserWindow }, rect) => {
-    const w = BrowserWindow.getAllWindows().find(
-      (x) => !x.webContents.getURL().includes('overlay.html'),
-    );
+    const w = BrowserWindow.getAllWindows()[0];
     if (!w) return null;
     w.setBounds(rect);
     return w.getBounds();
@@ -131,6 +121,28 @@ try {
     return res.result;
   };
 
+  /**
+   * The phantom's live state, straight from the native overlay panel.
+   *
+   * This replaced reading the overlay BrowserWindow's frame. The overlay is a
+   * `pi-mac --overlay` NSPanel now, sized to the whole desktop and never moved,
+   * so "does the overlay follow the window" is no longer a question about a
+   * window frame — it is about where the CURSOR is drawn. `cursorDrawn` is that
+   * point, in screen coordinates, which is exactly the quantity that used to be
+   * (overlay.x + buffer).
+   */
+  const phantom = async () => {
+    const p = await dbg('overlay-native-info');
+    if (p === null) return null;
+    return {
+      x: Math.round(p.cursorDrawn?.x ?? 0),
+      y: Math.round(p.cursorDrawn?.y ?? 0),
+      visible: p.visible === true,
+      focused: p.isKeyWindow === true || p.appActive === true || p.frontmostPid === p.pid,
+      panel: p.frame,
+    };
+  };
+
   // ── TCC gate (through the app's helper — the only non-lying identity) ────
   const tcc = await dbg('check');
   console.log('TCC status (dev Electron identity):', JSON.stringify(tcc));
@@ -171,44 +183,50 @@ try {
     );
   }
 
-  // Defect 4: overlay window = controlled rect + symmetric clip buffer.
+  // Defect 4 (superseded): the overlay canvas must be able to hold the window
+  // AND anything drawn past its edge. It is the whole desktop now, so the check
+  // is simply that it strictly contains the controlled window — there is no
+  // buffer to get wrong because there is nothing to clip against.
   const b0 = await dbg('bounds', { pid });
-  const ob0 = await overlayBounds();
-  if (ob0 === null) fail('overlay BrowserWindow missing');
-  const bufX = (ob0.width - b0.w) / 2;
-  const bufY = (ob0.height - b0.h) / 2;
-  if (bufX <= 0 || bufX !== bufY) {
-    fail(`overlay buffer not symmetric/positive: x=${bufX} y=${bufY} (${JSON.stringify(ob0)})`);
+  const ph0 = await phantom();
+  if (ph0 === null) fail('overlay panel process missing');
+  const panel = ph0.panel;
+  if (
+    panel.x > b0.x ||
+    panel.y > b0.y ||
+    panel.x + panel.w < b0.x + b0.w ||
+    panel.y + panel.h < b0.y + b0.h
+  ) {
+    fail(`overlay canvas ${JSON.stringify(panel)} does not contain ${JSON.stringify(b0)}`);
   }
-  const BUFFER = bufX;
-  if (Math.abs(ob0.x - (b0.x - BUFFER)) > 2 || Math.abs(ob0.y - (b0.y - BUFFER)) > 2) {
-    fail(`overlay not centred on the window: ${JSON.stringify(ob0)} vs ${JSON.stringify(b0)}`);
-  }
-  console.log(`clip buffer OK: ${BUFFER}px, overlay=${JSON.stringify(ob0)}`);
+  console.log(`screen-sized canvas OK: ${JSON.stringify(panel)}`);
 
   // ── 1) tracking latency: discrete AX "drag" moves ────────────────────────
+  // Put the phantom somewhere inside the window first — what we measure is the
+  // phantom riding the window's delta, so it has to be placed before it can ride.
   const base = { x: 620, y: 160 };
+  await dbg('overlay-cursor', { x: base.x + 200, y: base.y + 150 });
+  await sleep(450);
+  const anchor = await phantom();
   const latencies = [];
   for (let i = 0; i < 6; i++) {
     const tx = base.x + (i % 2 === 0 ? 240 : 0);
     const ty = base.y + (i % 2 === 0 ? 70 : 0);
+    const wantX = anchor.x + (tx - base.x);
+    const wantY = anchor.y + (ty - base.y);
     const t0 = Date.now();
     await dbg('moveWindow', { pid, x: tx, y: ty });
     let landed = -1;
     const deadline = Date.now() + 2000;
     while (Date.now() < deadline) {
-      const ob = await overlayBounds();
-      if (
-        ob !== null &&
-        Math.abs(ob.x - (tx - BUFFER)) <= 2 &&
-        Math.abs(ob.y - (ty - BUFFER)) <= 2
-      ) {
+      const ob = await phantom();
+      if (ob !== null && Math.abs(ob.x - wantX) <= 2 && Math.abs(ob.y - wantY) <= 2) {
         landed = Date.now() - t0;
         break;
       }
       await sleep(8);
     }
-    if (landed < 0) fail(`overlay never followed move ${i} to (${tx},${ty})`);
+    if (landed < 0) fail(`the phantom never followed move ${i} to (${tx},${ty})`);
     latencies.push(landed);
   }
   const sorted = [...latencies].sort((a, b) => a - b);
@@ -222,13 +240,13 @@ try {
   if (median > 250) fail(`median tracking latency ${median}ms — not live`);
   if (worst > 1000) fail(`worst tracking latency ${worst}ms`);
 
-  // Continuous drag: 25 small moves at 40ms; the overlay must RIDE along
+  // Continuous drag: 25 small moves at 40ms; the phantom must RIDE along
   // (many distinct intermediate positions), not teleport once at the end.
   const seen = new Set();
   let sampling = true;
   const sampler = (async () => {
     while (sampling) {
-      const ob = await overlayBounds();
+      const ob = await phantom();
       if (ob !== null) seen.add(ob.x);
       await sleep(15);
     }
@@ -240,9 +258,9 @@ try {
   await sleep(350);
   sampling = false;
   await sampler;
-  console.log(`continuous drag: overlay passed through ${seen.size} distinct x positions`);
+  console.log(`continuous drag: the phantom passed through ${seen.size} distinct x positions`);
   if (seen.size < 8) {
-    fail(`overlay teleported (only ${seen.size} distinct positions during a 25-step drag)`);
+    fail(`the phantom teleported (only ${seen.size} distinct positions during a 25-step drag)`);
   }
   await dbg('moveWindow', { pid, x: base.x, y: base.y });
   await sleep(300);
@@ -251,15 +269,13 @@ try {
   const bNow = await dbg('bounds', { pid });
   await setMainBounds({ x: bNow.x - 20, y: bNow.y - 20, width: bNow.w + 40, height: bNow.h + 40 });
   await app.evaluate(({ BrowserWindow }) => {
-    const w = BrowserWindow.getAllWindows().find(
-      (x) => !x.webContents.getURL().includes('overlay.html'),
-    );
+    const w = BrowserWindow.getAllWindows()[0];
     w?.showInactive();
     w?.moveTop();
   });
   await sleep(800); // a fast tick + hide (tracker sees occluded on next read)
   const concealedInfo = await dbg('overlay-info');
-  const obConcealed = await overlayBounds();
+  const obConcealed = await phantom();
   console.log('occluded state:', JSON.stringify(concealedInfo), JSON.stringify(obConcealed));
   if (concealedInfo.occluded !== true) {
     fail(`helper did not detect the covering window (occluded=${concealedInfo.occluded})`);
@@ -272,14 +288,14 @@ try {
   await setMainBounds({ x: 0, y: 40, width: 520, height: 420 });
   await sleep(800);
   const revealedInfo = await dbg('overlay-info');
-  const obRevealed = await overlayBounds();
+  const obRevealed = await phantom();
   if (revealedInfo.occluded !== false || obRevealed?.visible !== true) {
     fail(
       `overlay did not re-show once clear: ${JSON.stringify(revealedInfo)} ${JSON.stringify(obRevealed)}`,
     );
   }
   console.log('z-order conceal/reveal OK');
-  if (obRevealed.focused) fail('overlay took focus');
+  if (obRevealed.focused) fail('the overlay panel took focus');
 
   // ── 3) scroll: TextEdit (long doc, background, verified) ─────────────────
   const snap = await dbg('snapshot', { pid, cap: 60 });

@@ -54,8 +54,8 @@ import {
   setMacControlHandler,
 } from './monitor';
 import { macMonitorMockControl, startMacMonitorMock } from './monitor-mock';
+import { macOverlay } from './overlay-controller';
 import type { OverlayRect } from './overlay-geometry';
-import { macOverlay } from './overlay-window';
 
 const log = createLogger('desktop:mac-agent');
 const execFileAsync = promisify(execFile);
@@ -86,7 +86,12 @@ let tccCache: { at: number; status: MacTccStatus } | null = null;
  * (via an injected bounds reader) so the deterministic probe can move the
  * "controlled window" with no TCC/real app and assert the overlay follows. */
 let e2eFakeBounds:
-  | (OverlayRect & { frontmost?: boolean; onScreen?: boolean; occluded?: boolean | null })
+  | (OverlayRect & {
+      frontmost?: boolean;
+      onScreen?: boolean;
+      occluded?: boolean | null;
+      occluders?: OverlayRect[];
+    })
   | null = null;
 /** The system permission dialogs are surfaced at most once per app session
  * (first mac_* use without the grants) — never nag. */
@@ -581,19 +586,25 @@ function armEscBrake(on: boolean): void {
  */
 export function registerMacAgentIpc(): void {
   startServer();
+  // The overlay is a SECOND pi-mac process (`--overlay`) — same binary, same
+  // wire format, its own NSApplication runloop — so it needs the same resolved
+  // path the `--serve` bridge uses.
+  macOverlay.setHelperPath(HELPER_PATH);
   macOverlay.setBoundsReader(async (pid) => {
     const b = await readBounds({ pid });
     if (b === null) return null;
     const rect = rectOf(b);
     // Thread the visibility-rule inputs alongside the frame: `frontmost`
     // ("user is looking at the controlled app"), `onScreen` (current space),
-    // and `occluded` (CGWindowList z-order truth — another app's window covers
-    // the controlled one, so the phantom must not paint over it).
+    // `occluded` (CGWindowList z-order truth — another app's window covers the
+    // controlled one, so the phantom must not paint over it) and `occluders`
+    // (WHICH rects those are — the native overlay masks them out, which is the
+    // per-window version of the same rule).
     if (rect === null) return null;
     const extras = b as unknown as {
       onScreen?: boolean;
       occluded?: boolean;
-      occluders?: { x: number; y: number; w: number; h: number }[];
+      occluders?: OverlayRect[];
     };
     return {
       ...rect,
@@ -602,8 +613,7 @@ export function registerMacAgentIpc(): void {
       occluded: typeof extras.occluded === 'boolean' ? extras.occluded : null,
       // The rects themselves, so the phantom can ask whether anything is over
       // the exact point it is about to draw on — see OverlayRect.occluders.
-      occluders: Array.isArray(extras.occluders) ? extras.occluders : [],
-    };
+      occluders: Array.isArray(extras.occluders) ? extras.occluders : [],    };
   });
   // The computer-use MONITOR (round-21 Lane A): the canvas tab that live-
   // streams the controlled window. It owns its own `pi-mac --stream` child, so
@@ -676,6 +686,22 @@ const FALLBACK_WALLPAPER = '/System/Library/CoreServices/DefaultDesktop.heic';
  *     so the overlay probe can screenshot every cursor/bubble state.
  * Trusted-sender-gated like every other channel; never registered outside E2E.
  */
+/** One synthetic bounds sample from probe params — the shape the overlay's real
+ * tracking loop reads, including the occluder rects the native mask is built
+ * from. PI_E2E only. */
+function fakeSample(params: Record<string, unknown>): NonNullable<typeof e2eFakeBounds> {
+  return {
+    x: Number(params.x ?? 0),
+    y: Number(params.y ?? 0),
+    w: Number(params.w ?? 600),
+    h: Number(params.h ?? 400),
+    frontmost: params.frontmost !== false,
+    onScreen: params.onScreen !== false,
+    occluded: typeof params.occluded === 'boolean' ? params.occluded : null,
+    occluders: Array.isArray(params.occluders) ? (params.occluders as OverlayRect[]) : undefined,
+  };
+}
+
 function registerE2eDebugChannel(): void {
   ipcMain.handle(
     'mac:debug',
@@ -786,12 +812,6 @@ function registerE2eDebugChannel(): void {
             applyControl(mode);
             return { ok: true, result: { control: macMonitor.control() } };
           }
-          // Exactly what a hover or a click on the overlay's bubble sends, so a
-          // probe can press the brake the user can press without a real mouse
-          // over a real always-on-top window.
-          case 'overlay-page':
-            macOverlay.debugFromPage(String(params.verb ?? ''));
-            return { ok: true, result: macOverlay.info() };
           // The computer-use MONITOR's own truth, read-only. A probe cannot use
           // `mac:monitor:subscribe` to look: there is one sink per renderer, so
           // asking for state would DOWNGRADE the surface's frame subscription
@@ -832,6 +852,39 @@ function registerE2eDebugChannel(): void {
                 ax: macMonitor.axScene(),
               },
             };
+          // The native panel's own truth (frame, click-through, focus,
+          // collection behavior, cursor position, pill state). This is what
+          // replaced reading the old overlay window's DOM — there is no DOM
+          // any more, so the panel reports on itself.
+          case 'overlay-native-info':
+            return { ok: true, result: await macOverlay.nativeInfo() };
+          case 'overlay-hide-panel': {
+            await macOverlay.debugHidePanel();
+            return { ok: true };
+          }
+          case 'overlay-occluders': {
+            await macOverlay.debugOccluders(
+              Array.isArray(params.rects) ? (params.rects as OverlayRect[]) : [],
+            );
+            return { ok: true };
+          }
+          case 'overlay-backdrop': {
+            await macOverlay.debugBackdrop(typeof params.color === 'string' ? params.color : null);
+            return { ok: true };
+          }
+          case 'overlay-render': {
+            const crop =
+              typeof params.w === 'number' && typeof params.h === 'number'
+                ? {
+                    x: Number(params.x ?? 0),
+                    y: Number(params.y ?? 0),
+                    w: Number(params.w),
+                    h: Number(params.h),
+                    scale: Number(params.scale ?? 2),
+                  }
+                : undefined;
+            return { ok: await macOverlay.debugRender(String(params.path ?? ''), crop) };
+          }
           case 'overlay-retarget': {
             // Prompt reposition to a new frame (the tracker's move path) — proves
             // the overlay follows without snap-on-release. Also update the
@@ -849,15 +902,7 @@ function registerE2eDebugChannel(): void {
           }
           case 'overlay-fake-control': {
             // Drive the REAL tracking loop off a synthetic bounds source.
-            e2eFakeBounds = {
-              x: Number(params.x ?? 0),
-              y: Number(params.y ?? 0),
-              w: Number(params.w ?? 600),
-              h: Number(params.h ?? 400),
-              frontmost: params.frontmost !== false,
-              onScreen: params.onScreen !== false,
-              occluded: typeof params.occluded === 'boolean' ? params.occluded : null,
-            };
+            e2eFakeBounds = fakeSample(params);
             macOverlay.setBoundsReader(async () => e2eFakeBounds);
             await macOverlay.control(Number(params.pid ?? 424242), {
               x: e2eFakeBounds.x,
@@ -871,15 +916,7 @@ function registerE2eDebugChannel(): void {
             // Move the synthetic window; the live tracker picks it up on its
             // next fast tick (probe waits a beat, then asserts the overlay
             // window moved with it).
-            e2eFakeBounds = {
-              x: Number(params.x ?? 0),
-              y: Number(params.y ?? 0),
-              w: Number(params.w ?? 600),
-              h: Number(params.h ?? 400),
-              frontmost: params.frontmost !== false,
-              onScreen: params.onScreen !== false,
-              occluded: typeof params.occluded === 'boolean' ? params.occluded : null,
-            };
+            e2eFakeBounds = fakeSample(params);
             return { ok: true };
           }
           case 'overlay-hide': {

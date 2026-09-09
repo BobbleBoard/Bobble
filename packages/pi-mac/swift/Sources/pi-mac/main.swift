@@ -24,6 +24,14 @@ NSApplication.shared.setActivationPolicy(.prohibited)
 //                                          snapshot and the acts that follow, so
 //                                          the bridge can act by [index]. This is
 //                                          the mode Electron main drives.
+//   pi-mac --overlay                    → the phantom-cursor overlay: a
+//                                          screen-sized, click-through,
+//                                          Mission-Control-excluded NSPanel
+//                                          drawn with CoreAnimation, driven by
+//                                          the same NDJSON dialect. Runs its own
+//                                          NSApplication (a live runloop), which
+//                                          is why it is a second process rather
+//                                          than a `--serve` method.
 //
 // Deliberately no arg-parsing dependency: positional subcommands only.
 let arguments = Array(CommandLine.arguments.dropFirst())
@@ -39,9 +47,11 @@ case "--serve":
   runServe()
 case "--stream":
   runStream(Array(arguments.dropFirst()))
+case "--overlay":
+  runOverlay()
 default:
   writeStderr(
     "usage: pi-mac [--check | --snapshot [--frontmost|--pid N|--app NAME] [--screenshot]"
-      + " | --act <json> | --serve]\n")
+      + " | --act <json> | --serve | --overlay]\n")
   exit(2)
 }

@@ -4,9 +4,14 @@
  *
  *   - the browser-use virtual cursor injected into the canvas browser page
  *     (browser-scripts.ts `cursorCommand`), and
- *   - the Mac computer-use overlay window (mac/overlay.html — a STATIC page
- *     that cannot import this module, so it carries a byte-equal copy of the
- *     SVG with a SYNC comment pointing here; change BOTH together).
+ *   - HISTORICALLY the Mac computer-use overlay, which carried a byte-equal
+ *     copy of this SVG. It no longer does: that overlay is now a native NSPanel
+ *     drawing with CoreAnimation (packages/pi-mac/swift/.../Overlay.swift), and
+ *     the user asked for its pointer to be redrawn smaller, rounder and without the
+ *     protruding fins or the glow. So THE TWO SURFACES HAVE DIVERGED — the
+ *     browser cursor below is still the old frosted send-dart. Bringing them
+ *     back to one identity means porting the Swift glyph's geometry here; it is
+ *     deliberately not done in the same change as the overlay rewrite.
  *
  * The artwork (the user's reference): a chunky, softly-rounded send-dart pointing
  * up-and-right, with a FROSTED body — a translucent pearl/lavender fill under a

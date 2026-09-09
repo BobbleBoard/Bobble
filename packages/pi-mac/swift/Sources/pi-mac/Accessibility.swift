@@ -643,7 +643,10 @@ func windowBoundsInfo(target: SnapshotTarget) -> [String: Any]? {
      * With the rects in hand the overlay can ask the precise question instead —
      * is anything on top of the exact point I am about to draw on.
      */
-    d["occluders"] = foreign.map(rectDict)
+    /* Capped, because this rides every bounds sample: a desktop with fifty
+       windows would otherwise send fifty rects several times a second, and the
+       phantom only needs the ones that could be over it. */
+    d["occluders"] = foreign.prefix(OCCLUDER_REPORT_CAP).map(rectDict)
     d["hostPids"] = ownPids.map { Int($0) }.sorted()
   }
   return d
