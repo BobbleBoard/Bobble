@@ -3,7 +3,7 @@
  * pi rather than about this app, and both are paid for on every single turn.
  */
 import { describe, expect, it } from 'vitest';
-import { BOBBLE_IDENTITY, stripPiIdentity } from './capability-prompt';
+import { stripPiIdentity } from './capability-prompt';
 
 /* The real opening of pi 0.68.1's base prompt, verbatim. */
 const BASE = `You are an expert coding assistant operating inside pi, a coding agent harness. You help users by reading files, executing commands, editing code, and writing new files.
@@ -28,8 +28,12 @@ describe('stripPiIdentity', () => {
     expect(out).not.toContain('coding agent harness');
   });
 
-  it('says what this actually is instead', () => {
-    expect(out).toContain(BOBBLE_IDENTITY);
+  it('says nothing about identity at all — that was three lines of prefill', () => {
+    // the user, cutting the prompt down: "strip out the part about 'describing pi'
+    // and 'you are pi'". Behaviour comes from the rules and the commands.
+    const out = stripPiIdentity(BASE);
+    expect(out).not.toContain('You are an expert coding assistant');
+    expect(out).not.toMatch(/^You are /m);
   });
 
   it('drops the pi documentation block, paths and all', () => {

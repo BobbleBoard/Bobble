@@ -50,7 +50,6 @@ import { capabilityForTool } from './presets/capabilities.js';
 import { resolveBaseTools } from './presets/presets.js';
 import { augmentSystemPrompt } from './prompt/capability-prompt.js';
 import { sameWording } from './prompt/same-wording.js';
-import { shortDescription } from './prompt/short-description.js';
 import { connectRepairBridge, type LiveRepairDeps } from './repair/bridge.js';
 import { createToolCallFixer, withRepairAttempts } from './repair/fixer.js';
 import {
@@ -2466,6 +2465,19 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
   function toolCliCommandNames(): Map<string, string> {
     const map = new Map<string, string>();
     for (const group of buildCli(toolCliGroups(), cliVisibleTools()).groups) {
+      /*
+       * THE FILE TOOLS KEEP THEIR OWN NAMES.
+       *
+       * read / write / edit stay pinned as ordinary pi tools with their own
+       * schemas — every accumulated write and edit safety fix hangs off them —
+       * so pi's own guidance about them ("Use `edit` for precise changes;
+       * edits[].oldText must match exactly") is about a tool the model really
+       * has. Renaming it to `file edit` pointed that guidance at a command,
+       * advertising one capability under two names. the user: "keep the native pi
+       * file read write and edit tool format those don't go as any special cli
+       * tools."
+       */
+      if (group.name === 'file') continue;
       for (const command of group.commands) {
         map.set(command.tool.name, [group.name, ...command.path].join(' '));
       }
@@ -2544,13 +2556,24 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
        * worth opening, without the commands, the arguments or the flags. About
        * 170 tokens against the tree's ~8,800.
        */
-      ...cli.groups.flatMap((g) => [
-        `  ${g.name} — ${g.summary}`,
-        ...g.commands.map(
-          (c) =>
-            `    ${[g.name, ...c.path].join(' ')} — ${shortDescription(c.tool.description ?? '')}`,
-        ),
-      ]),
+      /*
+       * ONE LINE PER GROUP, not per command.
+       *
+       * Every command used to get its own line with its own one-sentence
+       * description — effectively `--help` for `mac` and `browser` pre-pasted
+       * into every prompt. the user: "I notice for some reason you pre advertise as
+       * if it ran --help on mac and browser ... when there should just be 1
+       * about the overarching tool". He is right that it is the same content
+       * twice: the instruction below already says to run `--help` first, and the
+       * translated `open -a` prints the whole of `mac --help` at the moment a
+       * model is actually reaching for an app.
+       *
+       * The FILE tools are not listed at all. read / write / edit stay pinned as
+       * ordinary pi tools with their own schemas — every accumulated write and
+       * edit safety fix hangs off them — so listing `file read` beside them
+       * would advertise one capability under two names.
+       */
+      ...cli.groups.filter((g) => g.name !== 'file').map((g) => `  ${g.name} — ${g.summary}`),
       '',
       'They are the ONLY way to do what they do. Do not look for other programs —',
       'ffmpeg, sox, say, festival, imaging libraries and the like are not how this',
@@ -2592,7 +2615,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
        * redirection lands correctly — the loss is the repairs, and absolute
        * paths. Naming the preferred path is the part a prompt can do.
        */
-      'To create or change a file, use `file write` / `file edit` rather than shell',
+      'To create or change a file, use the `write` / `edit` tools rather than shell',
       'redirection — they land in the right place and repair common mistakes.',
     ].join('\n');
   }
