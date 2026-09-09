@@ -197,3 +197,46 @@ describe('dropStaleScreenshots', () => {
     expect(twice.trimmedCount).toBe(0);
   });
 });
+
+describe('what dropping stale screenshots is worth', () => {
+  it('keeps a twelve-look conversation from carrying twelve pictures', () => {
+    /*
+     * The shape of the real cost, at the size the capture path actually
+     * produces: a point-size JPEG of a window is ~200KB, and the demo runs
+     * measured exactly that. Twelve looks is not a pathological case — it is one
+     * ordinary Maps run.
+     */
+    const shot = (i: number) =>
+      ({
+        role: 'toolResult' as const,
+        toolCallId: `t${i}`,
+        toolName: 'mac_snapshot',
+        output: '',
+        isError: false,
+        content: [
+          { type: 'text' as const, text: `[1] AXTextField "Apple Maps" (look ${i})` },
+          { type: 'image' as const, data: 'A'.repeat(200_000), mimeType: 'image/jpeg' },
+        ],
+      }) as unknown as Message;
+
+    const before = { messages: Array.from({ length: 12 }, (_, i) => shot(i)) } as unknown as Context;
+    const after = dropStaleScreenshots(before).context;
+
+    const bytes = (c: Context) => JSON.stringify(c.messages).length;
+    expect(bytes(after)).toBeLessThan(bytes(before) / 10);
+
+    // And the one that is still true is still there, whole.
+    const images = after.messages.flatMap((m) =>
+      (m as { content: { type: string }[] }).content.filter((c) => c.type === 'image'),
+    );
+    expect(images).toHaveLength(1);
+
+    // Every look's TEXT survives — the model can still see what it found before.
+    const texts = after.messages
+      .flatMap((m) => (m as { content: { type: string; text?: string }[] }).content)
+      .filter((c) => c.type === 'text')
+      .map((c) => c.text ?? '')
+      .join(' ');
+    for (let i = 0; i < 12; i += 1) expect(texts).toContain(`look ${i}`);
+  });
+});
