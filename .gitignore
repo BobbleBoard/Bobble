@@ -50,3 +50,11 @@ scratchpad/round21-items-1-7-8/
 
 scratchpad/mac-video-model/frames/
 scratchpad/mac-video-model/frames.txt
+
+# Demo/benchmark recordings: the individual FRAMES are build output — a single
+# run writes tens of thousands of JPEGs, and `git add -A` put 128,070 of them
+# into this repo before anyone noticed. The assembled .mp4 and the run log are
+# small and worth keeping; the frames are not.
+scratchpad/demos/*/frames/
+scratchpad/demos/*/frames.txt
+scratchpad/capture-probe/
