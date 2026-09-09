@@ -90,17 +90,31 @@ export function followWindow(
   content: Rect,
   viewport: Size,
   focus: Point,
-  minScale = 0.85,
+  minScale = 0.3,
   padding = 0,
+  maxScale = 0.45,
 ): DrawnWindow {
   const fit = fitWindow(content, viewport, padding);
-  // COVER, not contain: the point of this mode is that the docked rail is full
-  // of the app rather than full of wallpaper, so the target is the smallest
-  // scale that leaves no letterbox — which on a rail taller than the window is
-  // real size, the composition this surface is built on. Clamped by the floor
-  // (a huge window still has to be cropped somewhere) and by 1 (never upscale).
+  /*
+   * COVER, CAPPED — because cover alone crops the window to a sliver.
+   *
+   * Cover is the smallest scale that leaves no letterbox, which sounds like
+   * "fill the rail with the app". On a rail that is TALL and NARROW and a window
+   * that is wide, it is decided entirely by the height: MEASURED on the Chrome
+   * runs, a 440pt rail against a 1024pt window covered at 0.85, so the video
+   * showed a quarter of the window — a giant cropped "oogle" where the Google
+   * page should be — for the whole run. the user, watching it: "the zoom and
+   * following is either not working or way too much, needs at least twice less
+   * zoom."
+   *
+   * Letterboxing was never the thing to avoid: the surface paints the user's own
+   * wallpaper behind the window on purpose. Being able to SEE the app is. So
+   * cover is now a target rather than a demand, capped so the crop keeps at
+   * least twice the width it had, and the floor is the fit threshold rather than
+   * a number far above it.
+   */
   const cover = Math.max(viewport.w / Math.max(1, content.w), viewport.h / Math.max(1, content.h));
-  const scale = Math.min(1, Math.max(minScale, cover));
+  const scale = Math.min(1, Math.max(minScale, Math.min(cover, maxScale)));
   if (scale <= fit.scale) return fit;
   const w = Math.max(1, content.w) * scale;
   const h = Math.max(1, content.h) * scale;

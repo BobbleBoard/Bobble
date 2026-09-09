@@ -163,24 +163,54 @@ describe('followWindow', () => {
     expect(follow).toEqual(fitWindow(rect, big));
   });
 
-  it('COVERS the stage rather than fitting inside it', () => {
-    // fit would give 0.49 — a picture of a window. Cover fills the tall rail,
-    // and on a rail taller than the window that lands on REAL SIZE.
-    expect(fitWindow(rect, viewport).scale).toBeCloseTo(0.489, 3);
+  it('never magnifies past the cap, however tall the rail is', () => {
+    /*
+     * Covering a TALL, NARROW rail with a WIDE window is decided entirely by the
+     * height, and it crops the width to a sliver. MEASURED on the Chrome runs: a
+     * 440pt rail against a 1024pt window covered at 0.85 and the video showed a
+     * quarter of the window — a giant cropped "oogle" — for the whole run. the user:
+     * "the zoom and following is either not working or way too much, needs at
+     * least twice less zoom."
+     *
+     * Letterboxing was never the thing to avoid; the surface paints the user's
+     * own wallpaper behind the window on purpose.
+     */
+    // This window already fits better than the cap, so following simply fits it —
+    // the whole window, no crop at all, which cover would have refused to do.
     const follow = followWindow(rect, viewport, { x: 650, y: 430 });
-    expect(follow.scale).toBe(1);
-    expect(follow.h).toBe(620);
+    expect(follow).toEqual(fitWindow(rect, viewport));
+
+    // A window that genuinely needs cropping stops at the cap, not at cover.
+    const wide = { x: 0, y: 0, w: 2400, h: 900 };
+    const cropped = followWindow(wide, viewport, { x: 1200, y: 450 });
+    expect(cropped.scale).toBeCloseTo(0.45, 6);
+    expect(cropped.scale).toBeLessThan(Math.max(viewport.w / wide.w, viewport.h / wide.h));
   });
 
-  it('scales to cover, not to the floor, when covering is enough', () => {
+  it('shows at least twice the width cover would have', () => {
+    // The regression this cap exists for, stated as the thing the viewer sees.
+    const covered = Math.max(viewport.w / rect.w, viewport.h / rect.h);
+    const follow = followWindow(rect, viewport, { x: 650, y: 430 });
+    expect(viewport.w / follow.scale).toBeGreaterThanOrEqual((viewport.w / covered) * 2);
+  });
+
+  it('takes the smaller of cover and the cap when covering is cheap', () => {
     const wide = { x: 0, y: 0, w: 1440, h: 900 };
     const follow = followWindow(wide, viewport, { x: 700, y: 450 });
-    expect(follow.scale).toBeCloseTo(780 / 900, 6);
+    expect(follow.scale).toBeCloseTo(Math.min(780 / 900, 0.45), 6);
   });
 
-  it('stops at the floor for a window too big to cover', () => {
+  it('caps a window far too big to cover, instead of magnifying it', () => {
     const huge = { x: 0, y: 0, w: 2560, h: 1600 };
-    expect(followWindow(huge, viewport, { x: 1280, y: 800 }).scale).toBe(0.85);
+    expect(followWindow(huge, viewport, { x: 1280, y: 800 }).scale).toBeCloseTo(0.45, 6);
+  });
+
+  it('takes the floor only when even the cap would letterbox worse than fitting', () => {
+    // The floor is the fit threshold now, so the two modes meet rather than jump.
+    const strip = { x: 0, y: 0, w: 4000, h: 400 };
+    const follow = followWindow(strip, viewport, { x: 2000, y: 200 });
+    expect(follow.scale).toBeGreaterThanOrEqual(0.3);
+    expect(follow.scale).toBeLessThanOrEqual(0.45);
   });
 
   it('centres the focus point, and clamps so no gap opens beside the window', () => {
@@ -195,7 +225,7 @@ describe('followWindow', () => {
 
   it('centres an axis that is not cropped, exactly as fit does', () => {
     const follow = followWindow(rect, viewport, { x: 650, y: 430 });
-    expect(follow.y).toBeCloseTo((780 - 620) / 2, 6);
+    expect(follow.y).toBeCloseTo((viewport.h - follow.h) / 2, 6);
   });
 
   it('never upscales, whatever the floor says', () => {

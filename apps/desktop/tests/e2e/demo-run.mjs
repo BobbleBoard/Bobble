@@ -350,11 +350,21 @@ export async function demoRun(o) {
       }
     })();
 
+    /*
+     * POWER=low runs the whole thing on the app's gentle profile.
+     *
+     * the user: "run these on 'low power mode' that we have in the app and see if it
+     * works also keeping things speedy and mem pressure low". It has to be set
+     * BEFORE llm:start-server, because it decides how the server is launched —
+     * setting it afterwards would describe a run that had already started.
+     */
+    const power = process.env.POWER ?? 'auto';
     await page.evaluate(
-      (m) => window.piDesktop.invoke('settings:set', { patch: { toolInterface: m } }),
-      o.mode,
+      ({ m, p }) =>
+        window.piDesktop.invoke('settings:set', { patch: { toolInterface: m, powerMode: p } }),
+      { m: o.mode, p: power },
     );
-    say(`tool interface: ${o.mode}`);
+    say(`tool interface: ${o.mode}, power: ${power}`);
 
     const up = await page.evaluate(
       (id) => window.piDesktop.invoke('llm:start-server', { modelId: id }),

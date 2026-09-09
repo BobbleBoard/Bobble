@@ -42,7 +42,7 @@ import {
 } from '@pi-desktop/mac-computer-use/protocol';
 import { MacHelperClient } from '@pi-desktop/pi-mac';
 import { createLogger } from '@pi-desktop/shared';
-import { app, globalShortcut, ipcMain, systemPreferences } from 'electron';
+import { app, globalShortcut, ipcMain, screen, systemPreferences } from 'electron';
 import { resolveBundledPackageAsset } from '../app-paths';
 import { isBackgroundMode } from '../background-mode';
 import { isTrustedIpcEvent } from '../trusted-senders';
@@ -282,7 +282,64 @@ async function launchApp(name: string, background = true): Promise<MacLaunchAck>
   }
   // Let first-paint settle so the snapshot-after-open screenshot shows content.
   await sleep(LAUNCH_SETTLE_MS);
+  bounds = (await nudgeOnScreen(bounds)) ?? bounds;
   return { ok: true, app: bounds.app ?? appName, pid: bounds.pid, bounds };
+}
+
+/**
+ * PULL A WINDOW BACK ONTO THE SCREEN BEFORE DRIVING IT.
+ *
+ * MEASURED on the Maps runs: the window was 1024pt wide at x=641 on a 1512pt
+ * display, so 153pt of it hung off the right edge — and macOS asks an app to
+ * draw only what is on screen, so Maps left that strip blank. It reached the
+ * model as a solid white band down the side of every screenshot for the whole
+ * run, and the user watched it in every video.
+ *
+ * The picture is the smaller half of the problem: nothing in that strip can be
+ * clicked either, because there is no screen there to click. A window we are
+ * about to drive has to be somewhere it can be seen and hit.
+ *
+ * Only ever a nudge — the window keeps its size, and one that already fits is
+ * left exactly where the user put it.
+ */
+async function nudgeOnScreen(bounds: MacWindowBounds): Promise<MacWindowBounds | null> {
+  const { x: bx, y: by, w: bw, h: bh } = bounds;
+  if (bx === undefined || by === undefined || bw === undefined || bh === undefined) return null;
+  const area = displayContaining({ x: bx, y: by, w: bw, h: bh });
+  if (area === null) return null;
+  const x = Math.max(area.x, Math.min(bx, area.x + area.w - bw));
+  const y = Math.max(area.y, Math.min(by, area.y + area.h - bh));
+  if (Math.abs(x - bx) < 1 && Math.abs(y - by) < 1) return null;
+  try {
+    await getHelper().request('moveWindow', { pid: bounds.pid, x, y });
+  } catch {
+    return null; // a window that refuses to move is still worth driving
+  }
+  await sleep(LAUNCH_SETTLE_MS);
+  return await readBounds({ pid: bounds.pid });
+}
+
+/** The visible frame of the display this window is mostly on, in the same
+ * top-left screen points the helper reports. */
+function displayContaining(b: { x: number; y: number; w: number; h: number }): {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+} | null {
+  const displays = screen.getAllDisplays();
+  const first = displays[0];
+  if (first === undefined) return null;
+  const overlap = (d: Electron.Display) => {
+    const a = d.workArea;
+    return (
+      Math.max(0, Math.min(b.x + b.w, a.x + a.width) - Math.max(b.x, a.x)) *
+      Math.max(0, Math.min(b.y + b.h, a.y + a.height) - Math.max(b.y, a.y))
+    );
+  };
+  const best = displays.reduce((m, d) => (overlap(d) > overlap(m) ? d : m), first);
+  const a = best.workArea;
+  return { x: a.x, y: a.y, w: a.width, h: a.height };
 }
 
 // ── overlay choreography around helper acts ─────────────────────────────────

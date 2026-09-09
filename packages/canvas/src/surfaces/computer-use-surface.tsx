@@ -104,8 +104,9 @@ const FOLLOW_ENTER_BELOW = 0.3;
 const FOLLOW_LEAVE_ABOVE = 0.42;
 /** How long a change of placement takes. It is a zoom, so it is animated. */
 const ZOOM_MS = 460;
-/** The smallest the followed crop is allowed to get. */
-const FOLLOW_MIN_SCALE = 0.85;
+/** The smallest the followed crop is allowed to get — the same threshold that
+ * makes fitting unacceptable, so the two modes meet instead of jumping. */
+const FOLLOW_MIN_SCALE = FOLLOW_ENTER_BELOW;
 /** How long the follow camera takes to pan, on the cursor's own curve. */
 const CAMERA_MS = 420;
 /**
