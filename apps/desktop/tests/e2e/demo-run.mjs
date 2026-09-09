@@ -264,13 +264,17 @@ export async function demoRun(o) {
      * fall back rather than lose the video — a lower framerate is worth more
      * than no recording.
      */
+    /* When the last pushed frame arrived — the pull loop skips a shot if the
+       push is keeping up, and takes over the moment it stops. */
+    let lastPush = 0;
     let screencast = null;
-    if (process.env.SCREENCAST === '1') {
+    if (process.env.SCREENCAST !== '0') {
       try {
         screencast = await page.context().newCDPSession(page);
         screencast.on('Page.screencastFrame', async (f) => {
           if (!shooting) return;
           const at = Date.now();
+          lastPush = at;
           writeFileSync(
             path.join(OUT, 'frames', `f-${String(++shot).padStart(5, '0')}-${at}.jpg`),
             Buffer.from(f.data, 'base64'),
@@ -299,11 +303,25 @@ export async function demoRun(o) {
 
     camera = (async () => {
       while (shooting) {
-        if (screencast !== null) {
-          await sleep(200);
+        const at = Date.now();
+        /*
+         * PUSH WHEN IT CAN, PULL WHEN IT CANNOT.
+         *
+         * Page.startScreencast reaches 79/s — and MEASURED it stopped after 40
+         * seconds of a 125-second run, because Chromium suspends the screencast
+         * when the window is not visibly updating, which is exactly this case:
+         * the app being driven is in front and Bobble is behind it. A video that
+         * covers a third of the run at 79/s is worth less than one that covers
+         * all of it at 25/s.
+         *
+         * So the pull loop stays, and simply stands down while the push is
+         * keeping up. Together they hold 30+ through the busy parts without ever
+         * leaving a gap.
+         */
+        if (screencast !== null && at - lastPush < 1000 / FPS) {
+          await sleep(Math.max(5, 1000 / FPS / 2));
           continue;
         }
-        const at = Date.now();
         try {
           await page.screenshot({
             path: path.join(OUT, 'frames', `f-${String(++shot).padStart(5, '0')}-${at}.jpg`),
