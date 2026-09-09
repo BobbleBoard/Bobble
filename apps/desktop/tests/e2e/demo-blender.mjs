@@ -42,6 +42,24 @@ const SHAPES = [
 ];
 const SHAPE = SHAPES[Math.floor(Math.random() * SHAPES.length)] ?? SHAPES[0];
 
+/*
+ * NO_SPLASH=1 — the same task, minus Blender's welcome screen.
+ *
+ * MEASURED across all six cold runs: none of them got past the splash. A 4B
+ * clicked four times inside it, a 27B left its cursor hovering "Sculpting", and
+ * not one model reached the Add menu the task is actually about. That IS a
+ * finding — an unfamiliar modal stops every model here — but it means the cold
+ * runs cannot say anything about driving Blender itself, because nothing ever
+ * drove Blender.
+ *
+ * Opening a FILE skips the splash (Blender only shows it for an empty start), so
+ * this variant hands the model the same empty scene with the interface already
+ * on screen. The two together separate "can you dismiss a modal you have never
+ * seen" from "can you find a menu in a dense custom interface".
+ */
+const NO_SPLASH = process.env.NO_SPLASH === '1';
+const SCENE = '/Users/user/Desktop/OSS-harness/scratchpad/demos/empty-scene.blend';
+
 /**
  * Ask the running Blender what is in its scene.
  *
@@ -77,9 +95,23 @@ function askBlender(code, timeoutMs = 6000) {
   });
 }
 
+if (NO_SPLASH) {
+  const { execFile } = await import('node:child_process');
+  const { promisify } = await import('node:util');
+  const run = promisify(execFile);
+  await run('osascript', ['-e', 'tell application "Blender" to quit']).catch(() => {});
+  await new Promise((r) => setTimeout(r, 2500));
+  // -g so preparing the scene never takes the screen the run must not take.
+  await run('open', ['-g', '-a', 'Blender', SCENE]);
+  await new Promise((r) => setTimeout(r, 9000));
+}
+
 await demoRun({
   name: process.env.RUN_NAME ?? `blender-${MODEL}-${MODE}`,
   app: 'Blender',
+  // With the scene already open, the run must not restart Blender — that would
+  // put the splash straight back.
+  attach: NO_SPLASH,
   model: MODEL,
   mode: MODE,
   prompt:
