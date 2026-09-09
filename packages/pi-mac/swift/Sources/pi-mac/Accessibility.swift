@@ -286,6 +286,50 @@ struct SnapshotResult {
   let text: [String]
 }
 
+/**
+ * ASK A CHROMIUM APP TO TURN ITS ACCESSIBILITY TREE ON.
+ *
+ * Chrome, Electron and everything else built on Chromium build their AX tree
+ * LAZILY: with no assistive client watching, the whole app is one empty
+ * rectangle. MEASURED on Bobble itself — an Electron app — a snapshot returned
+ * 0 elements, which is the same nothing Blender gives, for an entirely
+ * different and fixable reason.
+ *
+ * `AXManualAccessibility` is the attribute Chromium watches for exactly this.
+ * Setting it is what an assistive technology does, it needs no cooperation from
+ * the app, no launch flag, no restart and no Apple Events — so it works on an
+ * app that is ALREADY OPEN, which a `--remote-debugging-port` approach can
+ * never do.
+ *
+ * Set on every target and ignored by everything that is not Chromium, so there
+ * is no need to know in advance what kind of app this is (and no list of app
+ * names to keep up to date, which is the version of this that rots).
+ */
+/** Apps already asked this session, so only the first look pays the wake-up. */
+private var chromiumPrimed = Set<pid_t>()
+private let chromiumPrimeLock = NSLock()
+
+/**
+ * Wake a Chromium app's accessibility tree, and wait the first time.
+ *
+ * Returns true when this pid was primed just now (so the caller knows to give
+ * the tree a beat to appear).
+ */
+@discardableResult
+func enableChromiumAccessibility(_ app: AXUIElement, pid: pid_t) -> Bool {
+  let ok = AXUIElementSetAttributeValue(app, "AXManualAccessibility" as CFString, kCFBooleanTrue)
+  // The older spelling, still honoured by some Chromium builds and by Java/SWT.
+  AXUIElementSetAttributeValue(app, "AXEnhancedUserInterface" as CFString, kCFBooleanTrue)
+  if ProcessInfo.processInfo.environment["PI_MAC_DEBUG_AX"] == "1" {
+    FileHandle.standardError.write(
+      "AXManualAccessibility=\(ok.rawValue) pid=\(pid)\n".data(using: .utf8)!)
+  }
+  guard ok == .success else { return false }
+  chromiumPrimeLock.lock()
+  defer { chromiumPrimeLock.unlock() }
+  return chromiumPrimed.insert(pid).inserted
+}
+
 /// Walk the AX tree of `target` and return a COMPACT, INDEXED element list
 /// (default cap 60). Deterministic document-order traversal; on-screen elements
 /// sort first. Returns nil only when the target app cannot be resolved; an empty
@@ -304,6 +348,15 @@ func collectSnapshot(
 ) -> SnapshotResult? {
   guard let resolved = resolveTargetPid(target) else { return nil }
   let app = AXUIElementCreateApplication(resolved.pid)
+  /*
+   * A Chromium app publishes NOTHING until an assistive client asks, and it
+   * builds the tree asynchronously — so the very first look after the ask comes
+   * back with the window and an empty element list. Pay the wait once, here,
+   * rather than making every caller take two snapshots to see an app.
+   */
+  if enableChromiumAccessibility(app, pid: resolved.pid) {
+    Thread.sleep(forTimeInterval: 0.45)
+  }
   // Walk EVERY surface the app is presenting, front-to-back — its window and
   // any sheet, dialog or file panel on top of it. A save panel is part of the
   // app the user is looking at, so its controls have to be in the same indexed
