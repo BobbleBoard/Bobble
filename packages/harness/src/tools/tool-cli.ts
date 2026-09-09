@@ -377,6 +377,32 @@ export function resolveCli(cli: CliModel, argv: readonly string[]): CliResolutio
   const leftover = restWords.slice(match.path.length);
   const args = coerceArgs(parsed.flags, schema);
 
+  /*
+   * `mac click x:500 y:400` AND `mac click menu:"File > New Tab"`.
+   *
+   * MEASURED on a 4B driving Chrome: given a command it had not used before, it
+   * invented `x:500 y:400` and `menu:"File > New Tab"` — both naming real
+   * arguments of the command it had just read the help for, in a shape the
+   * parser did not know. The keys are RIGHT; only the punctuation is wrong, and
+   * refusing that measures our parser rather than the model, which is the same
+   * reason the positional form is accepted at all.
+   *
+   * Gated on the key actually being an argument of THIS command, so a URL
+   * (`https://…`), a Windows path or any other colon in a value stays a value.
+   */
+  const props = schema?.properties ?? {};
+  const keyed: Record<string, string> = {};
+  const bare: string[] = [];
+  for (const word of [...leftover, ...parsed.positionals]) {
+    const m = /^([A-Za-z][A-Za-z0-9_]*):(.*)$/.exec(word);
+    if (m !== null && m[1] !== undefined && m[2] !== '' && props[m[1]] !== undefined) {
+      keyed[m[1]] = m[2];
+    } else {
+      bare.push(word);
+    }
+  }
+  Object.assign(args, coerceArgs(keyed, schema));
+
   /* Positionals fill required arguments in order — `media generate image "a red
      fox"` is the line a person (or a small model) actually writes, and refusing
      it would measure our parser rather than the model. Flags always win.
@@ -386,7 +412,7 @@ export function resolveCli(cli: CliModel, argv: readonly string[]): CliResolutio
      stayed a raw string would be rejected by the tool's own `typeof !== number`
      guard — on the very form the help advertises as
      `click "index"  (positional: fills --index)`. */
-  const spare = [...leftover, ...parsed.positionals];
+  const spare = bare;
   if (spare.length > 0) {
     const keys = positionalKeys(schema).filter((k) => args[k] === undefined);
     const raw: Record<string, string> = {};

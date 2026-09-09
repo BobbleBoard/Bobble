@@ -72,6 +72,27 @@ describe('the open wrapper', () => {
     expect(res.stderr).toContain('read tool');
   });
 
+  it('treats a bare app name as a launch, not a missing file', () => {
+    /*
+     * the user, mid-run: "keychain not found popup persists, chrome profile screen
+     * taking focus". The line was `open -n "Google Chrome"` — /usr/bin/open reads
+     * that as a PATH and fails, and `-n` asks for a SECOND Chrome, which comes up
+     * with no profile and no keychain and shows both prompts in front of him.
+     * Same intent as `open -a`, so it gets the same translation.
+     */
+    const res = run(['-n', 'Google Chrome']);
+    expect(res.err).toContain('mac launch');
+    expect(res.err).not.toContain('does not exist');
+  });
+
+  it('carries the user’s real HOME into anything it still passes through', () => {
+    // A probe's throwaway HOME is what produced the keychain prompt; the wrapper
+    // is the last place that can put the right one back for the model's shell.
+    const script = buildOpenWrapper();
+    expect(script).toMatch(/^HOME='.+'$/m);
+    expect(script).toContain('export HOME');
+  });
+
   it('lets the background flag through — that form was never the problem', () => {
     // -g is what `mac launch` itself uses; refusing it would be superstition.
     const res = run(['-g', '-a', 'NoSuchApplicationZZZ']);

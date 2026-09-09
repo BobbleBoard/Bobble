@@ -258,14 +258,33 @@ export async function demoRun(o) {
         const ps = window.__pi_store().getState();
         return {
           streaming: ps.agent.isStreaming,
+          /* The call AND what came back. A name-only log says a run made forty
+             calls and not which of them failed, so every diagnosis needed the
+             session JSONL afterwards — too late to act on during an overnight
+             batch. The result is truncated hard: this is a trace, not a copy of
+             the conversation. */
           tools: ps.messages
             .filter((m) => m.kind === 'assistant')
             .flatMap((m) =>
               m.blocks
                 .filter((b) => b.type === 'toolCall')
-                .map(
-                  (b) => `${b.name} ${JSON.stringify(b.args ?? b.arguments ?? {}).slice(0, 120)}`,
-                ),
+                .map((b) => {
+                  const args = JSON.stringify(b.args ?? b.arguments ?? {}).slice(0, 120);
+                  const parts = b.result?.content ?? b.result?.output ?? [];
+                  const text = Array.isArray(parts)
+                    ? parts
+                        .filter((x) => x?.type === 'text')
+                        .map((x) => x.text)
+                        .join(' ')
+                    : typeof b.result === 'string'
+                      ? b.result
+                      : '';
+                  const imgs = Array.isArray(parts)
+                    ? parts.filter((x) => x?.type === 'image').length
+                    : 0;
+                  const back = `${imgs > 0 ? `[+${imgs} image] ` : ''}${text.replace(/\s+/g, ' ').slice(0, 220)}`;
+                  return `${b.name} ${args}${back.trim() === '' ? '' : `\n      → ${back}`}`;
+                }),
             ),
           text: ps.messages
             .filter((m) => m.kind === 'assistant')

@@ -185,6 +185,30 @@ describe('resolveCli — the line a model actually writes', () => {
     expect(call('browser click 1')).toEqual(call('browser click --index 1'));
   });
 
+  it('accepts the key:value form a model invents for a command it just met', () => {
+    /*
+     * MEASURED on a 4B driving Chrome: `mac click x:500 y:400` and
+     * `mac click menu:"File > New Tab"`. The argument NAMES are right — it had
+     * read the help — and only the punctuation is invented, so refusing it
+     * measures the parser rather than the model.
+     */
+    expect(call('browser click x:500 y:400')).toEqual({
+      kind: 'call',
+      tool: 'browser_click',
+      args: { x: 500, y: 400 },
+    });
+  });
+
+  it('does not read a colon inside a VALUE as an argument name', () => {
+    // `https://example.com` and `note: a thing` are values with colons in them;
+    // only a colon whose key is an argument of THIS command is punctuation.
+    expect(call('media generate image a fox at 5:30pm')).toEqual({
+      kind: 'call',
+      tool: 'generate_image',
+      args: { prompt: 'a fox at 5:30pm' },
+    });
+  });
+
   it('a flag beats a positional for the same argument', () => {
     const r = call('media generate image --prompt explicit ignored words');
     expect(r).toEqual({ kind: 'call', tool: 'generate_image', args: { prompt: 'explicit' } });

@@ -119,10 +119,36 @@ export function buildDecoy(name: string, suggestion: string): string {
  * real thing, because those are legitimate and refusing them would be a dead
  * end rather than a signpost.
  */
+/** The real home, read from the password database rather than a $HOME that may
+ * be a test harness's lie. */
+function userHome(): string {
+  try {
+    return os.userInfo().homedir;
+  } catch {
+    return process.env.HOME ?? '/';
+  }
+}
+
+/** Single-quote a value for /bin/sh. */
+function shellQuote(v: string): string {
+  return `'${v.replaceAll("'", `'\\''`)}'`;
+}
+
 export function buildOpenWrapper(): string {
   return [
     '#!/bin/sh',
     "# open — wrapped while Bobble's tool commands are on PATH.",
+    /*
+     * AND WHATEVER STILL REACHES /usr/bin/open GOES WITH THE USER'S OWN HOME.
+     *
+     * `mac launch` already sanitises this (see electron/mac/launch-env.ts), but
+     * the model's shell does not: a probe's throwaway HOME is inherited by
+     * anything bash starts, so `open -g -a "Google Chrome"` brings up a Chrome
+     * with no profile and no keychain — the picker and the "A keychain cannot be
+     * found" prompt the user reported, both in front of him. Same bug, other route.
+     */
+    `HOME=${shellQuote(userHome())}`,
+    'export HOME',
     /*
      * TRANSLATE IT, DO NOT ARGUE WITH IT.
      *
@@ -158,6 +184,13 @@ export function buildOpenWrapper(): string {
     '    -b) bundle="$arg" ;;',
     '  esac',
     '  case "$arg" in',
+    /* `-n` opens a SECOND instance. REPORTED by the user mid-run: "keychain not
+       found popup persists, chrome profile screen taking focus" — a 4B had run
+       `open -n "Google Chrome"`, and a second Chrome comes up with no profile
+       chosen and no keychain, so it shows the picker AND a keychain prompt, both
+       in front of the user. There is never a reason to want a second copy of the
+       app the user already has open. */
+    '    -n|--new) flagged=1 ;;',
     '    -g|--background) exec /usr/bin/open "$@" ;;',
     // A URL is the OTHER form that takes the screen: `open <url>` hands the page
     // to the user's default browser and activates it. MEASURED — a run asked to
@@ -187,7 +220,7 @@ export function buildOpenWrapper(): string {
      * the honest answer is the read tool, which is a normal tool call rather
      * than a command on this PATH, so say that instead of exec'ing a guess.
      */
-    'if [ -z "$flagged" ]; then',
+    'if [ -z "$app$url$bundle" ]; then',
     '  target=""',
     '  for arg in "$@"; do',
     '    case "$arg" in',
@@ -195,15 +228,21 @@ export function buildOpenWrapper(): string {
     '      *) [ -n "$target" ] || target="$arg" ;;',
     '    esac',
     '  done',
-    '  if [ -d "$target" ]; then',
+    /* `open -n "Google Chrome"` names an APP, not a path — /usr/bin/open would
+       fail with "does not exist", and the model would try again with a form that
+       does take the screen. If an app by that name is installed, this is the
+       same intent as `open -a` and gets the same translation. */
+    '  if [ -n "$target" ] && [ -d "/Applications/$target.app" ]; then',
+    '    app="$target"',
+    '    flagged=1',
+    '  elif [ -d "$target" ]; then',
     '    echo "open <folder> opens a Finder window in front of the user. Listing it instead (ls -la)." >&2',
     '    exec ls -la "$target"',
-    '  fi',
-    '  if [ -e "$target" ]; then',
+    '  elif [ -e "$target" ]; then',
     '    echo "open <file> hands the file to a GUI app and brings that app to the front, taking the screen from the user. Use the read tool on "$target" — it is a normal tool, not a command — or act on the file with the shell." >&2',
     '    exit 1',
     '  fi',
-    '  exec /usr/bin/open "$@"',
+    '  [ -n "$flagged" ] || exec /usr/bin/open "$@"',
     'fi',
     // The translation. `mac` is on the same PATH this wrapper is on, so a plain
     // name resolves; guarded anyway, because a wrapper that exec's something
