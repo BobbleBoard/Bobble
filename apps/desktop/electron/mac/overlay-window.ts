@@ -76,6 +76,18 @@ export type BoundsSample = OverlayRect & {
   readonly frontmost?: boolean;
   readonly onScreen?: boolean;
   readonly occluded?: boolean | null;
+  /**
+   * The windows currently ABOVE the controlled one, in screen points.
+   *
+   * Whole-window coverage answers "is this app buried", which is not the
+   * question a phantom cursor needs: the overlay floats above everything, so a
+   * cursor on an UNCOVERED part of a background window still paints on top of
+   * whatever sits between them. the user, watching a run: "the fake cursor is an
+   * always on top invisible window, so i'm seeing the fake cursor even when maps
+   * correctly open in the background." With the rects here the phantom can hide
+   * for exactly the point it is about to draw on.
+   */
+  readonly occluders?: readonly { x: number; y: number; w: number; h: number }[];
 };
 
 /** Injected read of the controlled window's live frame (null = no window). */
@@ -141,6 +153,10 @@ class MacOverlayController {
   #lastCursor: { x: number; y: number } | null = null;
   #lastActivityAt: number | null = null;
   #lastOccluded: boolean | null = null;
+  /** Windows above the controlled one — see BoundsSample.occluders. */
+  #lastOccluders: readonly { x: number; y: number; w: number; h: number }[] = [];
+  /** Where the phantom currently points, in SCREEN points, for the same check. */
+  #cursorScreen: { x: number; y: number } | null = null;
   /** What {@link #applyVisibility} last decided, before the background-mode gate. */
   #wantsVisible = false;
   #revertTimer: ReturnType<typeof setTimeout> | null = null;
@@ -230,6 +246,17 @@ class MacOverlayController {
     if (this.#win !== null && !this.#win.isDestroyed()) return this.#win;
     const win = new BrowserWindow({
       show: false,
+      /*
+       * A PANEL, NOT A WINDOW — so the phantom stops being a thing of its own.
+       *
+       * As a plain BrowserWindow the overlay is a first-class window: Mission
+       * Control lays it out beside the app it is supposed to be painted ON, and
+       * the two visibly come apart. the user: "so that the window doesn't seperate
+       * in mission control". macOS keeps panels out of Mission Control and
+       * Exposé, which is exactly the relationship this window wants to the rest
+       * of the desktop — present, never a destination.
+       */
+      type: 'panel',
       frame: false,
       transparent: true,
       hasShadow: false,
@@ -354,6 +381,28 @@ class MacOverlayController {
     if (!this.#catching) return;
     this.#catching = false;
     win.setIgnoreMouseEvents(true, { forward: true });
+  }
+
+  /**
+   * Is something sitting on top of the exact spot the phantom points at?
+   *
+   * The whole-window occlusion rule asks "is the controlled app buried", which
+   * a phantom cursor does not need to know: the overlay floats above every
+   * window, so a cursor on an UNCOVERED part of a background window still paints
+   * over whatever is stacked between them. the user caught it on a live run — Maps
+   * opened correctly in the background and the cursor was visible anyway.
+   *
+   * This asks the question that actually matters, per point, from the occluder
+   * rects the helper already computes. Nothing above the point ⇒ the phantom is
+   * genuinely ON the app it is driving, whether or not that app is frontmost,
+   * which is the behaviour the feature is for.
+   */
+  #cursorIsCovered(): boolean {
+    const p = this.#cursorScreen;
+    if (p === null || this.#lastOccluders.length === 0) return false;
+    return this.#lastOccluders.some(
+      (r) => p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h,
+    );
   }
 
   /** Probes: is the overlay currently catching the mouse for its bubble? */
@@ -546,15 +595,17 @@ class MacOverlayController {
       this.#missingSince = null;
       if (rectsDiffer(target.rect, sample)) await this.#reposition(sample);
       this.#lastOccluded = typeof sample.occluded === 'boolean' ? sample.occluded : null;
-      visible = overlayShouldShow({
-        controlledFrontmost: sample.frontmost === true,
-        // onScreen === false means the helper SAW the window off the current
-        // space (or minimized) even though AX still reports a frame — the
-        // phantom must not haunt the space the user switched to.
-        appVisible: sample.onScreen !== false,
-        driving: this.#isDriving(),
-        occluded: this.#lastOccluded,
-      });
+      this.#lastOccluders = sample.occluders ?? [];
+      visible =
+        overlayShouldShow({
+          controlledFrontmost: sample.frontmost === true,
+          // onScreen === false means the helper SAW the window off the current
+          // space (or minimized) even though AX still reports a frame — the
+          // phantom must not haunt the space the user switched to.
+          appVisible: sample.onScreen !== false,
+          driving: this.#isDriving(),
+          occluded: this.#lastOccluded,
+        }) && !this.#cursorIsCovered();
       this.#applyVisibility(visible);
     }
     this.#scheduleTrack(visible ? FAST_TRACK_MS : SLOW_TRACK_MS);
@@ -577,6 +628,7 @@ class MacOverlayController {
   async moveCursor(screenX: number, screenY: number): Promise<void> {
     const p = this.#local(screenX, screenY);
     if (p === null) return;
+    this.#cursorScreen = { x: screenX, y: screenY };
     this.#armIdle();
     this.#emit();
     await this.#push({ kind: 'cursor', x: p.x, y: p.y, ms: CURSOR_TRAVEL_MS });
@@ -751,6 +803,7 @@ class MacOverlayController {
     this.#lastCursor = null;
     this.#lastActivityAt = null;
     this.#lastOccluded = null;
+    this.#lastOccluders = [];
     this.#screenCursor = null;
     this.#setStatus('idle');
     const win = this.#win;

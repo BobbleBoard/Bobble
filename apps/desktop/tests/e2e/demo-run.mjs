@@ -20,7 +20,7 @@ import { existsSync, mkdirSync, readdirSync, rmSync, symlinkSync, writeFileSync 
 import { homedir } from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
-import { chromium } from 'playwright-core';
+import { _electron as electron, chromium } from 'playwright-core';
 import { probeHome } from './harness.mjs';
 
 const run = promisify(execFile);
@@ -67,33 +67,48 @@ export async function demoRun(o) {
     symlinkSync(realCache, path.join(HOME, '.cache/pi-desktop'));
   }
 
-  await run('open', [
-    '-g',
-    '--env',
-    `HOME=${HOME}`,
-    '--env',
-    'PI_E2E=1',
-    '--env',
-    'PI_E2E_BACKGROUND=1',
-    '--env',
-    'PI_MAC_PRECONSENT=1',
-    '--env',
-    'PI_MAC_OVERLAY=1',
-    '-a',
-    '/Applications/Bobble.app',
-    '--args',
-    `--remote-debugging-port=${PORT}`,
-  ]);
-  await sleep(7000);
+  /*
+   * TWO WAYS IN, because TCC gives them different answers (see the header).
+   * `open` is the one that can record; `spawn` is the one that works on a
+   * machine whose Accessibility row is bound to the shell rather than the app,
+   * and is how a task is dry-run before it is worth twelve long recordings.
+   */
+  const LAUNCH = process.env.LAUNCH ?? 'open';
+  const env = {
+    HOME,
+    PI_E2E: '1',
+    PI_E2E_BACKGROUND: '1',
+    PI_MAC_PRECONSENT: '1',
+    PI_MAC_OVERLAY: '1',
+  };
+  let browser = null;
+  let electronApp = null;
+  let page;
+  if (LAUNCH === 'spawn') {
+    electronApp = await electron.launch({
+      executablePath: '/Applications/Bobble.app/Contents/MacOS/Bobble',
+      env: { ...process.env, ...env },
+      args: [`--user-data-dir=${path.join(HOME, 'udd')}`],
+    });
+    page = await electronApp.firstWindow();
+  } else {
+    await run('open', [
+      '-g',
+      ...Object.entries(env).flatMap(([k, v]) => ['--env', `${k}=${v}`]),
+      '-a',
+      '/Applications/Bobble.app',
+      '--args',
+      `--remote-debugging-port=${PORT}`,
+    ]);
+    await sleep(7000);
+    browser = await chromium.connectOverCDP(`http://127.0.0.1:${PORT}`);
+    page = (browser.contexts()[0]?.pages() ?? []).find((p) => !p.url().startsWith('devtools://'));
+  }
 
-  const browser = await chromium.connectOverCDP(`http://127.0.0.1:${PORT}`);
   let shooting = true;
   let shot = 0;
   try {
-    const page = (browser.contexts()[0]?.pages() ?? []).find(
-      (p) => !p.url().startsWith('devtools://'),
-    );
-    if (page === undefined) throw new Error('no renderer page over CDP');
+    if (page === undefined) throw new Error('no renderer page');
     await page.waitForFunction(() => typeof window.piDesktop?.invoke === 'function', {
       timeout: 40_000,
     });
@@ -222,7 +237,8 @@ export async function demoRun(o) {
   } finally {
     shooting = false;
     await sleep(1000 / FPS + 250);
-    await browser.close().catch(() => {});
+    await browser?.close().catch(() => {});
+    await electronApp?.close().catch(() => {});
     await osa('tell application "Bobble" to quit');
     await osa(`tell application "${o.app}" to quit`);
   }

@@ -630,6 +630,20 @@ func windowBoundsInfo(target: SnapshotTarget) -> [String: Any]? {
     d["onScreen"] = z.onScreen || !surfaces.isEmpty
     d["occluded"] = covered >= OCCLUSION_FRACTION
     d["covered"] = (covered * 100).rounded() / 100
+    /*
+     * THE OCCLUDERS THEMSELVES, not just how much they add up to.
+     *
+     * Whole-window coverage answers "is this app buried", which is the wrong
+     * question for a phantom cursor: the overlay floats ABOVE everything, so a
+     * cursor sitting on an uncovered part of a background window still paints on
+     * top of whatever window happens to be between them. the user, watching a run:
+     * "the fake cursor is an always on top invisible window, so i'm seeing the
+     * fake cursor even when maps correctly open in the background."
+     *
+     * With the rects in hand the overlay can ask the precise question instead —
+     * is anything on top of the exact point I am about to draw on.
+     */
+    d["occluders"] = foreign.map(rectDict)
     d["hostPids"] = ownPids.map { Int($0) }.sorted()
   }
   return d

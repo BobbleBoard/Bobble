@@ -228,3 +228,31 @@ describe('bubbleContent — the words the canvas monitor and overlay.html share'
     expect(bubbleContent('idle')).toEqual({ label: '', detail: '', dots: false });
   });
 });
+
+describe('the phantom hides for the point it is on, not the window it is in', () => {
+  /*
+   * the user, watching a live run: "the fake cursor is an always on top invisible
+   * window, so i'm seeing the fake cursor even when maps correctly open in the
+   * background."
+   *
+   * The whole-window rule asks "is the controlled app buried", which is the
+   * wrong question here — the overlay floats above EVERY window, so a cursor on
+   * an uncovered part of a background window still paints over whatever is
+   * stacked between them. These pin the rule that replaced it; the per-point
+   * check itself lives on the overlay (see #cursorIsCovered) because it needs
+   * the live cursor position.
+   */
+  const clear = { controlledFrontmost: false, appVisible: true, driving: true };
+
+  it('still shows on a clear background window — that is the whole feature', () => {
+    expect(overlayShouldShow({ ...clear, occluded: false })).toBe(true);
+  });
+
+  it('hides when the controlled window is meaningfully buried', () => {
+    expect(overlayShouldShow({ ...clear, occluded: true })).toBe(false);
+  });
+
+  it('hides when the window left the space, whatever else is true', () => {
+    expect(overlayShouldShow({ ...clear, appVisible: false, occluded: false })).toBe(false);
+  });
+});

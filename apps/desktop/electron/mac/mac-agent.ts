@@ -540,12 +540,19 @@ export function registerMacAgentIpc(): void {
     // and `occluded` (CGWindowList z-order truth — another app's window covers
     // the controlled one, so the phantom must not paint over it).
     if (rect === null) return null;
-    const extras = b as unknown as { onScreen?: boolean; occluded?: boolean };
+    const extras = b as unknown as {
+      onScreen?: boolean;
+      occluded?: boolean;
+      occluders?: { x: number; y: number; w: number; h: number }[];
+    };
     return {
       ...rect,
       frontmost: b.frontmost === true,
       onScreen: typeof extras.onScreen === 'boolean' ? extras.onScreen : undefined,
       occluded: typeof extras.occluded === 'boolean' ? extras.occluded : null,
+      // The rects themselves, so the phantom can ask whether anything is over
+      // the exact point it is about to draw on — see OverlayRect.occluders.
+      occluders: Array.isArray(extras.occluders) ? extras.occluders : [],
     };
   });
   // The computer-use MONITOR (round-21 Lane A): the canvas tab that live-
