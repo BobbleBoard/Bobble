@@ -64,6 +64,23 @@ try {
   await sleep(2500);
   await page.evaluate(() => window.piDesktop.invoke('mac:monitor:subscribe', { frames: true }));
   await sleep(5000);
+  /* DO FRAMES ACTUALLY ARRIVE? `stream: "live"` is the monitor's opinion; a
+     frame is the evidence. Count them where they land. */
+  await page.evaluate(() => {
+    window.__frames = 0;
+    window.piDesktop.onEvent('mac:monitor:frame', () => {
+      window.__frames += 1;
+    });
+  });
+  await sleep(9000);
+  const frames = await page.evaluate(() => window.__frames ?? -1);
+  const after = await page.evaluate(() =>
+    window.piDesktop.invoke('mac:monitor:subscribe', { frames: true }),
+  );
+  console.log(
+    `frames in 9s: ${frames} (stream=${after?.state?.stream} err=${after?.state?.streamError ?? 'none'})`,
+  );
+
   const st = await page.evaluate(() =>
     window.piDesktop.invoke('mac:monitor:subscribe', { frames: true }),
   );

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type {
   MacMonitorAxScene,
   MacMonitorFramePayload,
@@ -654,6 +654,23 @@ function makeCaptureCore(opts: {
 }
 
 describe('MacMonitorCore — which binary takes the picture', () => {
+  /*
+   * The Electron path is OPT-IN now: it enumerates the window and publishes a
+   * source id, and nothing turns that id into a stream — there is no
+   * `getUserMedia({chromeMediaSourceId})` consumer. While Screen Recording was
+   * denied the gate never opened and the helper always ran; the moment it was
+   * granted the monitor reported `live` and no frame ever arrived, which is why
+   * every demo recording was a blank canvas reading "Stalled · 20s".
+   *
+   * These still cover the path — the flag is what the consumer will remove.
+   */
+  beforeEach(() => {
+    process.env.PI_MAC_ELECTRON_CAPTURE = '1';
+  });
+  afterEach(() => {
+    delete process.env.PI_MAC_ELECTRON_CAPTURE;
+  });
+
   it('prefers Electron when the APP holds the grant, and spawns no helper at all', async () => {
     // macOS keys the grant to the binary that captures. The helper is signed
     // separately, so a user who enabled "Bobble" — the only name they would

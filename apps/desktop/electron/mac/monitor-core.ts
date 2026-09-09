@@ -560,6 +560,28 @@ export class MacMonitorCore {
    * has done everything right can still have granted the wrong thing.
    */
   #prefersElectron(): boolean {
+    /*
+     * THE ELECTRON PATH DOES NOT PRODUCE FRAMES, so it must not win.
+     *
+     * It enumerates the controlled window through `desktopCapturer` and
+     * publishes a source id — deliberately with a zero-size thumbnail, because
+     * rasterising every window on the machine at 8fps is not a cost worth
+     * paying. Something then has to turn that id into a stream, and nothing
+     * does: there is no `getUserMedia({chromeMediaSourceId})` consumer in the
+     * renderer.
+     *
+     * It stayed invisible while Screen Recording was denied — the grant check
+     * below was false, so the helper always ran. The moment the user granted it, the
+     * gate opened, enumeration SUCCEEDED (so the give-up counter never fired),
+     * the monitor reported `live`, and no frame ever arrived: "Getting a picture
+     * of Maps … Stalled · 20s" over a blank canvas, in every demo recording.
+     *
+     * The helper produces real PIMF frames and now holds its own Screen
+     * Recording grant, so the original argument for preferring Chromium — "a
+     * second capture of the same window, by a binary the user never granted
+     * anything to" — no longer applies. Opt-in until the consumer exists.
+     */
+    if (process.env.PI_MAC_ELECTRON_CAPTURE !== '1') return false;
     return (
       this.#opts.sourceReader !== undefined &&
       this.#grant === 'granted' &&

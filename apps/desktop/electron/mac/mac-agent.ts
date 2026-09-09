@@ -164,6 +164,38 @@ function rectOf(b: MacWindowBounds): OverlayRect | null {
   return { x: b.x, y: b.y, w: b.w, h: b.h };
 }
 
+/** The app that currently has the screen, or null when we cannot tell. */
+async function frontmostAppName(): Promise<string | null> {
+  try {
+    const r = await getHelper().request<{ app?: string }>('frontmost', {});
+    return typeof r.app === 'string' && r.app !== '' ? r.app : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Hand the screen back to whoever had it, if a background launch took it.
+ *
+ * Polled rather than done once: an app that activates itself does so a beat
+ * AFTER `open` returns, so a single check right away sees the old frontmost and
+ * concludes all is well. Bounded, and it never fights the user — if they have
+ * moved to something else in the meantime, that is not ours to undo.
+ */
+async function restoreFocusTo(previous: string, launched: string): Promise<void> {
+  for (let i = 0; i < 6; i += 1) {
+    await new Promise((r) => setTimeout(r, 350));
+    const now = await frontmostAppName();
+    if (now === null) return;
+    if (now !== launched) return; // the user is somewhere else, or it behaved
+    try {
+      await getHelper().request('focus', { app: previous });
+    } catch {
+      return;
+    }
+  }
+}
+
 /**
  * Launch an app in the BACKGROUND (`open -g -a NAME` — injection-safe, no
  * shell; the app opens without stealing focus) and WAIT until it has a real
@@ -175,6 +207,19 @@ function rectOf(b: MacWindowBounds): OverlayRect | null {
 async function launchApp(name: string, background = true): Promise<MacLaunchAck> {
   const appName = name.trim();
   if (appName === '') return { ok: false, app: name, error: 'launch needs an app name' };
+  /*
+   * WHO HAD THE SCREEN BEFORE WE TOUCHED IT.
+   *
+   * `open -g` asks for a background launch, and that is a REQUEST, not a
+   * guarantee: an app is free to activate itself on startup and some do.
+   * MEASURED, on the user's machine, three runs in a row — Chrome's profile chooser
+   * came up frontmost and stayed there for the whole run (519 of 519 focus
+   * samples), while every one of them had asked for the background.
+   *
+   * So the promise is kept where it can actually be kept: remember the app that
+   * had focus, and if the launch took it, give it back.
+   */
+  const hadFocus = background ? await frontmostAppName() : null;
   try {
     await execFileAsync('open', background ? ['-g', '-a', appName] : ['-a', appName], {
       env: userLaunchEnv(),
@@ -192,6 +237,8 @@ async function launchApp(name: string, background = true): Promise<MacLaunchAck>
     }
     return { ok: false, app: appName, error: err instanceof Error ? err.message : String(err) };
   }
+
+  if (hadFocus !== null) void restoreFocusTo(hadFocus, appName);
 
   let ax = false;
   try {

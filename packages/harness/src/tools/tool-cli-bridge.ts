@@ -151,6 +151,7 @@ export function buildOpenWrapper(): string {
     'prev=""',
     'flagged=""',
     'bundle=""',
+    'url=""',
     'for arg in "$@"; do',
     '  case "$prev" in',
     '    -a|--application) app="$arg" ;;',
@@ -158,6 +159,12 @@ export function buildOpenWrapper(): string {
     '  esac',
     '  case "$arg" in',
     '    -g|--background) exec /usr/bin/open "$@" ;;',
+    // A URL is the OTHER form that takes the screen: `open <url>` hands the page
+    // to the user's default browser and activates it. MEASURED — a run asked to
+    // use Chrome ran `open chrome://new-tab`, which put a browser in front of
+    // the user for the rest of the run. Same shape as `open -a`: right intent, wrong
+    // verb, and there is a command that does it properly.
+    '    [a-z]*://*) url="$arg"; flagged=1 ;;',
     '    --application=*) app="${arg#--application=}"; flagged=1 ;;',
     '    -a?*) app="${arg#-a}"; flagged=1 ;;',
     '    -a|--application) flagged=1 ;;',
@@ -169,6 +176,11 @@ export function buildOpenWrapper(): string {
     // The translation. `mac` is on the same PATH this wrapper is on, so a plain
     // name resolves; guarded anyway, because a wrapper that exec's something
     // missing is a worse failure than the refusal it replaced.
+    // The URL form, translated the same way and for the same reason.
+    'if [ -n "$url" ] && command -v browser >/dev/null 2>&1; then',
+    '  echo "open <url> hands the page to another browser and brings it to the front. Opening it in the app own browser instead (browser navigate). For the user OWN Chrome: mac chrome go --url \\"$url\\"" >&2',
+    '  exec browser navigate --url "$url"',
+    'fi',
     'if [ -n "$app" ] && command -v mac >/dev/null 2>&1; then',
     '  echo "open -a would take the screen; opening \\"$app\\" in the background instead (mac launch)." >&2',
     '  exec mac launch --app "$app"',

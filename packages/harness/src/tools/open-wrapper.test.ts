@@ -151,3 +151,54 @@ describe('with `mac` on the PATH, it translates rather than refuses', () => {
     expect(run(['-a', 'Calculator']).err).toContain('quoted differently, will not work');
   });
 });
+
+describe('a bare URL open is the OTHER way to take the screen', () => {
+  /*
+   * MEASURED, and the user watched it happen: a run asked to use Chrome ran
+   *
+   *     open chrome://new-tab
+   *
+   * which is not the `-a` form, so the wrapper passed it straight through — and
+   * `open <url>` hands the page to the default browser AND brings it to the
+   * front. A browser sat in front of him for the rest of the run, from a run
+   * that had asked for the background at every other step.
+   *
+   * Same shape as `open -a`, same answer: translate it to the command that does
+   * the job without taking the screen.
+   */
+  function withCommands(args: string[]): { code: number; out: string; err: string } {
+    const dir = mkdtempSync(path.join(tmpdir(), 'pi-openwrap-url-'));
+    writeFileSync(path.join(dir, 'open'), buildOpenWrapper(), { mode: 0o755 });
+    for (const name of ['mac', 'browser']) {
+      writeFileSync(path.join(dir, name), `#!/bin/sh\necho "${name} $*"\n`, { mode: 0o755 });
+      chmodSync(path.join(dir, name), 0o755);
+    }
+    chmodSync(path.join(dir, 'open'), 0o755);
+    const r = spawnSync(path.join(dir, 'open'), args, {
+      encoding: 'utf8',
+      env: { ...process.env, PATH: `${dir}:${process.env.PATH ?? ''}` },
+    });
+    return { code: r.status ?? -1, out: r.stdout ?? '', err: r.stderr ?? '' };
+  }
+
+  it('sends an http URL to the app’s own browser', () => {
+    const r = withCommands(['https://example.com/page']);
+    expect(r.code).toBe(0);
+    expect(r.out).toContain('browser navigate --url https://example.com/page');
+  });
+
+  it('catches a browser scheme too — that is the one that was measured', () => {
+    expect(withCommands(['chrome://new-tab']).out).toContain('browser navigate');
+  });
+
+  it('names the route to the user’s OWN Chrome, since that is often the ask', () => {
+    expect(withCommands(['https://example.com']).err).toContain('mac chrome go');
+  });
+
+  it('still opens a FILE, a folder or a flag for real', () => {
+    // `open report.pdf` and `open .` are legitimate and must not be hijacked.
+    for (const args of [['report.pdf'], ['.'], ['--version']]) {
+      expect(withCommands(args).out, args.join(' ')).not.toContain('browser navigate');
+    }
+  });
+});
