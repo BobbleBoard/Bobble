@@ -14,7 +14,9 @@ import PackageDescription
 //
 // The AX/CGEvent frameworks (ApplicationServices, AppKit, CoreGraphics) are
 // linked explicitly so the executable resolves AXUIElement*/CGEvent* symbols
-// even when auto-linking is conservative.
+// even when auto-linking is conservative. QuartzCore comes in for the `--overlay`
+// mode's CALayer tree and ImageIO for the PNG writer the overlay probe renders
+// its screenshots through.
 let package = Package(
   name: "pi-mac",
   platforms: [
@@ -29,6 +31,8 @@ let package = Package(
         .linkedFramework("AppKit"),
         .linkedFramework("ApplicationServices"),
         .linkedFramework("CoreGraphics"),
+        .linkedFramework("QuartzCore"),
+        .linkedFramework("ImageIO"),
       ]
     )
   ]

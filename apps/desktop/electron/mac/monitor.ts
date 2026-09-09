@@ -39,7 +39,7 @@ import {
   type StreamSpawnFn,
   type WallpaperReader,
 } from './monitor-core';
-import { macOverlay } from './overlay-window';
+import { macOverlay } from './overlay-controller';
 import { cacheWallpaper } from './wallpaper';
 import {
   capturableWindows,

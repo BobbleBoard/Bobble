@@ -256,18 +256,19 @@ try {
     fail(`TextEdit became frontmost ${texteditFrontmostCount}× — focus was stolen`);
   }
 
-  // The overlay is up over the controlled app and never focused.
+  // The overlay is up over the controlled app and never focused. It is a native
+  // NSPanel in the `pi-mac --overlay` process now, not a BrowserWindow, so the
+  // panel reports on itself.
   const overlayInfo = await dbg('overlay-info');
   console.log('overlay:', JSON.stringify(overlayInfo));
   if (overlayInfo.visible !== true) fail('cursor overlay not visible during control');
-  const overlayFocus = await app.evaluate(({ BrowserWindow }) => {
-    const w = BrowserWindow.getAllWindows().find((x) =>
-      x.webContents.getURL().includes('overlay.html'),
-    );
-    return w ? { focused: w.isFocused(), alwaysOnTop: w.isAlwaysOnTop() } : null;
-  });
-  if (overlayFocus === null) fail('overlay window missing in main');
-  if (overlayFocus.focused) fail('overlay window took focus');
+  const panel = await dbg('overlay-native-info');
+  if (panel === null) fail('overlay panel process did not answer');
+  if (panel.onScreenPerWindowServer !== true) fail('overlay panel is not on screen');
+  if (panel.isKeyWindow || panel.appActive || panel.frontmostPid === panel.pid) {
+    fail(`overlay panel took focus: ${JSON.stringify(panel)}`);
+  }
+  if (panel.clickThrough !== true) fail('overlay panel is not click-through');
 
   // Ground truth: a FRESH helper snapshot of TextEdit contains the marker in
   // an editable element's AX value (structural — no OCR).

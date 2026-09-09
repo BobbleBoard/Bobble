@@ -13,6 +13,12 @@
  * helper can never hang a tool. Never throws across the boundary in a way that
  * escapes: transport/timeout failures reject, and the bridge turns a rejection
  * into a `{ ok:false, error }` wire response. Injectable spawn for tests.
+ *
+ * `helperArgs` picks WHICH long-lived mode is spoken to. `--serve` (the default)
+ * is the computer-use bridge; `--overlay` is the phantom-cursor panel, a second
+ * process because it runs an NSApplication runloop. They share this client
+ * because they share the wire format exactly — same request shape, same
+ * response shape, same "one process, many correlated requests" lifetime.
  */
 import { helperPath } from './helper-path.js';
 import { defaultSpawn, type MacChildProcess, type MacSpawnFn } from './spawn.js';
@@ -26,6 +32,8 @@ interface Pending {
 export interface MacHelperClientOptions {
   /** Explicit helper binary path (packaged app injects the bundle path). */
   readonly helperPath?: string;
+  /** Which persistent helper mode to spawn. Default `['--serve']`. */
+  readonly helperArgs?: readonly string[];
   /** Injectable spawn for tests. */
   readonly spawnFn?: MacSpawnFn;
   /** Per-request timeout (ms). Default 30000. */
@@ -36,6 +44,7 @@ const DEFAULT_REQUEST_TIMEOUT = 30_000;
 
 export class MacHelperClient {
   readonly #bin: string;
+  readonly #args: readonly string[];
   readonly #spawnFn: MacSpawnFn;
   readonly #requestTimeoutMs: number;
   readonly #pending = new Map<number, Pending>();
@@ -45,13 +54,14 @@ export class MacHelperClient {
 
   constructor(opts: MacHelperClientOptions = {}) {
     this.#bin = helperPath(opts.helperPath);
+    this.#args = opts.helperArgs ?? ['--serve'];
     this.#spawnFn = opts.spawnFn ?? defaultSpawn;
     this.#requestTimeoutMs = opts.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT;
   }
 
   #ensureChild(): MacChildProcess {
     if (this.#child !== null) return this.#child;
-    const child = this.#spawnFn(this.#bin, ['--serve']);
+    const child = this.#spawnFn(this.#bin, this.#args);
     this.#child = child;
     this.#buffer = '';
     child.stdout?.on('data', (chunk) => this.#onData(String(chunk)));

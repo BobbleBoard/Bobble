@@ -2,47 +2,12 @@ import { describe, expect, it } from 'vitest';
 import {
   bubbleContent,
   comboLabel,
-  OVERLAY_BUFFER,
-  overlayBoundsFor,
+  occludersDiffer,
   overlayShouldShow,
+  rectDelta,
   rectsDiffer,
-  toLocalPoint,
   typingPreview,
 } from './overlay-geometry';
-
-describe('overlayBoundsFor', () => {
-  it('rounds to integer Electron bounds and never collapses to zero size (buffer 0)', () => {
-    expect(overlayBoundsFor({ x: 10.4, y: 20.6, w: 800.2, h: 599.9 }, 0)).toEqual({
-      x: 10,
-      y: 21,
-      width: 800,
-      height: 600,
-    });
-    expect(overlayBoundsFor({ x: 0, y: 0, w: 0.2, h: 0 }, 0)).toEqual({
-      x: 0,
-      y: 0,
-      width: 1,
-      height: 1,
-    });
-  });
-  it('pads the window by the buffer on every side (larger than the tracked rect)', () => {
-    const b = 40;
-    expect(overlayBoundsFor({ x: 200, y: 150, w: 800, h: 600 }, b)).toEqual({
-      x: 200 - b,
-      y: 150 - b,
-      width: 800 + b * 2,
-      height: 600 + b * 2,
-    });
-    // Default buffer is applied when none is passed.
-    const def = overlayBoundsFor({ x: 200, y: 150, w: 800, h: 600 });
-    expect(def).toEqual({
-      x: 200 - OVERLAY_BUFFER,
-      y: 150 - OVERLAY_BUFFER,
-      width: 800 + OVERLAY_BUFFER * 2,
-      height: 600 + OVERLAY_BUFFER * 2,
-    });
-  });
-});
 
 describe('rectsDiffer (tracking-loop thrash guard)', () => {
   const base = { x: 100, y: 100, w: 640, h: 480 };
@@ -60,30 +25,36 @@ describe('rectsDiffer (tracking-loop thrash guard)', () => {
   });
 });
 
-describe('toLocalPoint (screen → overlay mapping)', () => {
+describe('rectDelta (the phantom rides a window drag)', () => {
   const win = { x: 200, y: 150, w: 800, h: 600 };
-  it('translates a screen point, offset by the buffer (window is padded)', () => {
-    // Interior point: local = (screen - origin) + buffer on each axis.
-    expect(toLocalPoint(600, 450, win, 40)).toEqual({ x: 440, y: 340 });
-    // With buffer 0 it is pure translation (legacy behavior).
-    expect(toLocalPoint(600, 450, win, 0)).toEqual({ x: 400, y: 300 });
+  it('is the origin delta, so the cursor stays glued to what it points at', () => {
+    expect(rectDelta(win, { ...win, x: 260, y: 190 })).toEqual({ dx: 60, dy: 40 });
+    expect(rectDelta(win, { ...win, x: 140, y: 110 })).toEqual({ dx: -60, dy: -40 });
   });
-  it('lets the cursor sit ON the app edge inside the buffer zone (no clip)', () => {
-    // A point on the app's own top-left corner maps to (buffer, buffer): the
-    // cursor tip sits `buffer` px in, its glyph free to protrude toward 0.
-    expect(toLocalPoint(200, 150, win, 40)).toEqual({ x: 40, y: 40 });
-    // The app's bottom-right corner → padded window minus the buffer.
-    expect(toLocalPoint(1000, 750, win, 40)).toEqual({ x: 40 + 800, y: 40 + 600 });
+  it('is zero for a resize that leaves the origin alone — nothing under the cursor moved', () => {
+    expect(rectDelta(win, { ...win, w: 1000, h: 700 })).toEqual({ dx: 0, dy: 0 });
   });
-  it('clamps a point well outside the padded window to a tiny inset', () => {
-    const b = 40;
-    const paddedW = win.w + b * 2;
-    const paddedH = win.h + b * 2;
-    expect(toLocalPoint(5000, 5000, win, b, 2)).toEqual({ x: paddedW - 2, y: paddedH - 2 });
-    expect(toLocalPoint(-5000, -5000, win, b, 2)).toEqual({ x: 2, y: 2 });
+  it('rounds to whole screen points (AX reports fractional frames)', () => {
+    expect(rectDelta(win, { ...win, x: 200.4, y: 150.6 })).toEqual({ dx: 0, dy: 1 });
   });
-  it('survives degenerate window sizes', () => {
-    expect(toLocalPoint(5, 5, { x: 0, y: 0, w: 2, h: 2 }, 0, 4)).toEqual({ x: 4, y: 4 });
+});
+
+describe('occludersDiffer (mask-push thrash guard)', () => {
+  const first = { x: 0, y: 0, w: 100, h: 100 };
+  const second = { x: 300, y: 200, w: 50, h: 50 };
+  const a = [first, second];
+  it('ignores sub-point jitter in an otherwise identical set', () => {
+    expect(occludersDiffer(a, [{ ...first, x: 0.4 }, second])).toBe(false);
+  });
+  it('detects a moved, added or removed occluder', () => {
+    expect(occludersDiffer(a, [{ ...first, x: 40 }, second])).toBe(true);
+    expect(occludersDiffer(a, [first])).toBe(true);
+    expect(occludersDiffer(a, [...a, { x: 9, y: 9, w: 9, h: 9 }])).toBe(true);
+  });
+  it('treats an empty set as a real state (the mask must be cleared)', () => {
+    expect(occludersDiffer(null, [])).toBe(true);
+    expect(occludersDiffer([], [])).toBe(false);
+    expect(occludersDiffer(a, [])).toBe(true);
   });
 });
 

@@ -24,7 +24,7 @@ import { deflateSync } from 'node:zlib';
 import { createLogger } from '@pi-desktop/shared';
 import { BrowserWindow, nativeImage } from 'electron';
 import { macMonitor, type StreamChild } from './monitor';
-import { macOverlay } from './overlay-window';
+import { macOverlay } from './overlay-controller';
 import { encodePimf, type PimfHeader } from './pimf';
 
 const log = createLogger('desktop:mac-monitor-mock');

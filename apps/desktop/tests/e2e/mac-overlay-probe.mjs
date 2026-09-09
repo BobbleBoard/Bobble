@@ -1,25 +1,40 @@
 /**
- * Deterministic Mac cursor-overlay probe — drives the overlay window DIRECTLY
- * (no real app control, no model, no TCC needed) through the PI_E2E-only
- * `mac:debug` channel and verifies, structurally and visually:
+ * Deterministic Mac cursor-overlay probe — drives the overlay DIRECTLY (no real
+ * app control, no model, no TCC needed) through the PI_E2E-only `mac:debug`
+ * channel and verifies, structurally and visually:
  *
- *   - the overlay window is the tracked rect PLUS a symmetric buffer margin
- *     (so the cursor can protrude past the app edge and the pill renders fully),
- *     always-on-top and non-focusable (a click-through phantom, never a
- *     perceivable window);
- *   - cursor moves land where they were sent (buffer-offset screen→local
- *     mapping) and the DOM reflects each state: Thinking pulse, click ripples,
- *     typing bubble with live text preview, key-combo label;
- *   - the cursor sitting ON the app's own edge is NOT clipped, and the status
- *     pill flips/clamps near a corner instead of being sheared off;
- *   - the overlay follows a controlled-window move LIVE (fast tracker + a
- *     synchronous retarget), not snapping only when the drag is released;
- *   - screenshots of every state are saved for human review (the cursor +
- *     bubble must look premium: gradient fill, white outline, glow).
+ *   - the overlay is NOT an Electron window any more. It is a native NSPanel in
+ *     a `pi-mac --overlay` child process, sized to the union of every SCREEN and
+ *     never moved — which is what makes it impossible to clip and what lets it
+ *     carry NSWindowCollectionBehavior.transient (the flag that keeps it out of
+ *     Mission Control, and the whole reason for going native);
+ *   - it is click-through, cannot become key or main, and never activates its
+ *     app — a phantom, never a perceivable window;
+ *   - cursor moves land EXACTLY where they were sent, in screen points, including
+ *     well past the controlled window's right edge (the reported cut-off) and
+ *     past the screen edge itself;
+ *   - the pill reflects each state (Thinking pulse, click ripples, typing with a
+ *     live preview, key-combo label) and flips near a screen corner instead of
+ *     being sheared off;
+ *   - the phantom rides a controlled-window move by the window's own delta, so it
+ *     stays glued to what it is pointing at;
+ *   - occlusion both CONCEALS the whole overlay (heavy coverage) and punches
+ *     per-window holes in it (the mask), so the cursor never paints on a window
+ *     stacked above the app;
+ *   - screenshots of every state are saved for human review — rendered by the
+ *     panel itself from its own layer tree, which needs no Screen Recording
+ *     grant and captures exactly what it draws.
+ *
+ * SCREEN HYGIENE: every screenshot is taken with the panel HIDDEN (CoreAnimation
+ * still runs, so the renders are honest) because the probe backdrop is a
+ * full-desktop opaque layer. The panel is only ordered on screen for the short
+ * window-server/visibility assertions, where it shows nothing but a small
+ * transparent cursor and pill and never takes focus.
  *
  * Run `npm run build` first. Shots default to $TMPDIR/mac-overlay-shots
  * (override with MAC_OVERLAY_OUT).
  */
+import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
@@ -37,6 +52,8 @@ const electronBinary = require('electron');
 const appRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const repoRoot = path.resolve(appRoot, '../..');
 const mockPi = path.join(repoRoot, 'packages/engine/tools/mock-pi/mock-pi.mjs');
+const swiftDir = path.join(repoRoot, 'packages/pi-mac/swift');
+const helperBin = path.join(swiftDir, '.build/release/pi-mac');
 const OUT_DIR = process.env.MAC_OVERLAY_OUT ?? path.join(tmpdir(), 'mac-overlay-shots');
 
 const fail = (m) => {
@@ -51,6 +68,13 @@ if (!existsSync(path.join(appRoot, 'dist/index.html'))) {
   console.error('mac-overlay-probe: app not built — run `npm run build` first');
   process.exit(1);
 }
+// The overlay IS the Swift helper now, so the probe needs it on disk. Building
+// takes ~50s from cold; skipping the build and failing on a missing binary would
+// just move that cost onto whoever runs it next.
+if (!existsSync(helperBin)) {
+  console.log('mac-overlay-probe: building pi-mac (swift build -c release)…');
+  execFileSync('swift', ['build', '-c', 'release'], { cwd: swiftDir, stdio: 'inherit' });
+}
 mkdirSync(OUT_DIR, { recursive: true });
 
 const RECT = { x: 120, y: 120, w: 900, h: 620 };
@@ -62,6 +86,7 @@ const app = await electron.launch({
 });
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const near = (a, b, tol = 1) => Math.abs(a - b) <= tol;
 
 try {
   const page = await app.firstWindow();
@@ -71,369 +96,452 @@ try {
 
   const dbg = (op, params) =>
     page.evaluate((req) => window.piDesktop.invoke('mac:debug', req), { op, params });
+  /** The native panel's own account of itself — this replaced reading the old
+   * overlay window's DOM, because there is no DOM any more. */
+  const native = async () => {
+    const res = await dbg('overlay-native-info');
+    if (res.ok !== true || res.result == null) fail(`overlay-native-info: ${res.error}`);
+    return res.result;
+  };
+  const shot = async (name, crop) => {
+    const res = await dbg('overlay-render', { path: path.join(OUT_DIR, name), ...(crop ?? {}) });
+    if (res.ok !== true) fail(`render ${name} failed`);
+    return path.join(OUT_DIR, name);
+  };
+  /** A crop framed around an action point, with the cursor up-left so the pill
+   * (which hangs down-right of it) lands inside the frame. */
+  const shotAt = (name, x, y, w = 540, h = 250) =>
+    shot(name, { x: x - Math.round(w * 0.28), y: y - Math.round(h * 0.32), w, h, scale: 2 });
+  /** Pixels in a rendered shot that are NOT the flat probe backdrop — i.e. how
+   * much of the phantom actually got painted. Read through nativeImage in main
+   * (the same trick mac-live-fixes-probe uses for its pixel diffs). */
+  const paintedPixels = (file, hex) =>
+    app.evaluate(
+      ({ nativeImage }, [p, rgb]) => {
+        const b = nativeImage.createFromPath(p).toBitmap(); // BGRA
+        let n = 0;
+        for (let i = 0; i < b.length; i += 4) {
+          if (
+            Math.abs(b[i] - rgb[2]) > 6 ||
+            Math.abs(b[i + 1] - rgb[1]) > 6 ||
+            Math.abs(b[i + 2] - rgb[0]) > 6
+          ) {
+            n++;
+          }
+        }
+        return n;
+      },
+      [
+        file,
+        [
+          Number.parseInt(hex.slice(0, 2), 16),
+          Number.parseInt(hex.slice(2, 4), 16),
+          Number.parseInt(hex.slice(4, 6), 16),
+        ],
+      ],
+    );
+  /** Hide first: the backdrop is a full-desktop opaque layer and must never be
+   * ordered on screen. Rendering works fine on a hidden panel. */
+  const withBackdrop = async (color) => {
+    await dbg('overlay-hide-panel');
+    await dbg('overlay-backdrop', { color });
+  };
 
-  // ── show the overlay over a fixed rect ────────────────────────────────────
+  // ── bring the overlay up over a fixed rect ────────────────────────────────
   const shown = await dbg('overlay-show', RECT);
   if (shown.ok !== true) fail(`overlay-show: ${shown.error}`);
 
-  // The overlay is its own BrowserWindow → its page appears in app.windows().
-  let overlay = null;
-  for (let i = 0; i < 60 && overlay == null; i++) {
-    overlay = app.windows().find((w) => w.url().includes('overlay.html')) ?? null;
-    if (overlay == null) await sleep(200);
-  }
-  if (overlay == null) fail('overlay window (overlay.html) never appeared');
+  // ── the mechanism actually changed ────────────────────────────────────────
+  // The old overlay was a BrowserWindow loading overlay.html; Mission Control
+  // laid it out as its own tile beside the app it was painted on. If one is
+  // still here, nothing below is testing what it claims to test.
+  const stray = app.windows().find((w) => w.url().includes('overlay.html'));
+  if (stray !== undefined) fail('an overlay.html BrowserWindow is still being created');
+  const anyOverlayWindow = await app.evaluate(({ BrowserWindow }) =>
+    BrowserWindow.getAllWindows().some((w) => w.webContents.getURL().includes('overlay')),
+  );
+  if (anyOverlayWindow) fail('main still owns an overlay BrowserWindow');
 
-  // ── structural window checks (main-process truth) ─────────────────────────
-  const winInfo = await app.evaluate(({ BrowserWindow }) => {
-    const win = BrowserWindow.getAllWindows().find((w) =>
-      w.webContents.getURL().includes('overlay.html'),
-    );
-    if (!win) return null;
-    return {
-      bounds: win.getBounds(),
-      alwaysOnTop: win.isAlwaysOnTop(),
-      focusable: win.isFocusable(),
-      visible: win.isVisible(),
-      focused: win.isFocused(),
-    };
-  });
-  if (winInfo == null) fail('overlay BrowserWindow not found in main');
-  if (!winInfo.alwaysOnTop) fail('overlay is not always-on-top');
-  if (winInfo.focusable) fail('overlay must be non-focusable (it stole focusability)');
-  if (winInfo.focused) fail('overlay took focus — it must never');
-  /*
-   * VISIBILITY IS THE ONE THING THAT FLIPS WITH BACKGROUND MODE.
-   *
-   * This probe launches with PI_E2E=1, which IS background mode — and a
-   * background run must never put an always-on-top overlay over the user's
-   * screen. So the assertion is inverted rather than dropped: hidden is the
-   * REQUIREMENT here, and `engaged` below carries what "the overlay is working"
-   * used to mean. Run with PI_E2E_VISIBLE=1 and the other branch applies.
-   */
-  const shouldShow = process.env.PI_E2E_VISIBLE === '1';
-  if (shouldShow && !winInfo.visible) fail('overlay not visible after overlay-show');
-  if (!shouldShow && winInfo.visible) {
-    fail('overlay is VISIBLE in a background run — it would float over the user');
-  }
-  // The window is the tracked rect PLUS a symmetric buffer margin on every side
-  // (so the cursor can protrude past the app edge and the pill can render fully).
-  const b = winInfo.bounds;
-  const bufX = (b.width - RECT.w) / 2;
-  const bufY = (b.height - RECT.h) / 2;
-  if (bufX <= 0 || bufY <= 0) {
-    fail(`overlay window ${JSON.stringify(b)} is not larger than target ${JSON.stringify(RECT)}`);
-  }
-  if (bufX !== bufY) fail(`overlay buffer asymmetric: x=${bufX} y=${bufY}`);
-  const BUFFER = bufX;
-  // Centres must align (buffer applied symmetrically), so the padding truly
-  // surrounds the tracked window rather than shifting it.
-  if (b.x + b.width / 2 !== RECT.x + RECT.w / 2 || b.y + b.height / 2 !== RECT.y + RECT.h / 2) {
-    fail(`overlay not centred on target: ${JSON.stringify(b)} vs ${JSON.stringify(RECT)}`);
-  }
-  if (b.x !== RECT.x - BUFFER || b.y !== RECT.y - BUFFER) {
-    fail(`overlay origin ${JSON.stringify(b)} != target-minus-buffer(${BUFFER})`);
-  }
-  console.log(`window checks OK (buffer=${BUFFER}):`, JSON.stringify(winInfo));
+  // ── structural panel checks (native truth) ────────────────────────────────
+  const info = await native();
+  console.log('panel:', JSON.stringify(info));
 
-  const info = await dbg('overlay-info');
-  // `engaged`, not `visible`: the overlay is targeted and tracking, which is
-  // true in both modes; whether it is on screen is asserted above.
-  if (info.result?.engaged !== true) fail('overlay-info says the overlay is not engaged');
-  if (info.result?.visible !== shouldShow) {
-    fail(`overlay-info visible=${info.result?.visible}, expected ${shouldShow}`);
+  // Sized to the SCREENS, not to the tracked window. This is the fix for
+  // "the window is sized directly to the app window size and thus causing cut
+  // off if the mouse cursor goes even a little bit off the screen to the right".
+  const screens = info.screens ?? [];
+  if (screens.length === 0) fail('panel reports no screens');
+  const union = screens.reduce(
+    (u, s) => ({
+      x: Math.min(u.x, s.x),
+      y: Math.min(u.y, s.y),
+      r: Math.max(u.r, s.x + s.w),
+      b: Math.max(u.b, s.y + s.h),
+    }),
+    { x: Infinity, y: Infinity, r: -Infinity, b: -Infinity },
+  );
+  const f = info.frame;
+  if (
+    !near(f.x, union.x) ||
+    !near(f.y, union.y) ||
+    !near(f.w, union.r - union.x) ||
+    !near(f.h, union.b - union.y)
+  ) {
+    fail(`panel frame ${JSON.stringify(f)} is not the union of screens ${JSON.stringify(union)}`);
   }
-  // overlay-info reports the RAW tracked rect (not the padded window).
-  const ib = info.result?.bounds;
+  if (f.w <= RECT.w || f.h <= RECT.h) {
+    fail(`panel ${JSON.stringify(f)} is not bigger than the tracked rect — it can still clip`);
+  }
+
+  // Never a perceivable window, never a focus thief.
+  if (info.clickThrough !== true) fail('panel is not click-through');
+  if (info.canBecomeKey !== false) fail('panel can become key — it must never');
+  if (info.canBecomeMain !== false) fail('panel can become main — it must never');
+  if (info.isKeyWindow !== false) fail('panel IS the key window');
+  if (info.appActive !== false) fail('the overlay process activated itself — focus was stolen');
+  if (info.activationPolicy === 'regular') {
+    fail(`overlay activation policy is ${info.activationPolicy} — it would take a Dock tile`);
+  }
+  if (info.frontmostPid === info.pid) fail('the overlay process became frontmost');
+  if (info.opaque !== false || info.hasShadow !== false) {
+    fail(`panel is not a transparent shadowless surface: ${JSON.stringify(info)}`);
+  }
+  // NSPanel defaults hidesOnDeactivate to true, and we are never active — left
+  // alone it would hide the overlay permanently.
+  if (info.hidesOnDeactivate !== false) fail('panel hides on deactivate (it would never show)');
+  if (info.level !== info.floatingLevel) {
+    fail(`panel level ${info.level} != floating ${info.floatingLevel}`);
+  }
+  // THE Mission Control fix. `.transient` is what excludes a window from
+  // Mission Control/Exposé, and it is the flag Electron never exposed.
+  if (info.behavior?.transient !== true) fail('panel is not .transient — Mission Control shows it');
+  if (info.behavior?.managed === true) fail('panel is still a MANAGED window');
+  for (const flag of ['canJoinAllSpaces', 'ignoresCycle', 'fullScreenAuxiliary']) {
+    if (info.behavior?.[flag] !== true) fail(`panel collection behavior missing .${flag}`);
+  }
+  // The window server genuinely has it on screen — `isVisible` alone is our own
+  // bookkeeping and would still be true under an activation policy that refuses
+  // to display windows at all.
+  if (info.visible !== true) fail('panel not visible after overlay-show');
+  if (info.onScreenPerWindowServer !== true) {
+    fail('the window server does not have the panel on screen (activation policy refused it?)');
+  }
+  console.log('panel checks OK: screen-sized, transient, click-through, non-activating');
+
+  const mainInfo = await dbg('overlay-info');
+  if (mainInfo.result?.visible !== true) fail('overlay-info says not visible');
+  const ib = mainInfo.result?.bounds;
   if (!ib || ib.x !== RECT.x || ib.y !== RECT.y || ib.w !== RECT.w || ib.h !== RECT.h) {
     fail(`overlay-info bounds ${JSON.stringify(ib)} != tracked rect ${JSON.stringify(RECT)}`);
   }
+  // Taking an app SEEDS the phantom on that window's centre. On a screen-sized
+  // canvas "nowhere yet" would otherwise draw the first Thinking pill in the
+  // desktop's bottom-left corner, nowhere near the app.
+  if (!near(info.cursor?.x, RECT.x + RECT.w / 2) || !near(info.cursor?.y, RECT.y + RECT.h / 2)) {
+    fail(`taking an app did not seed the phantom on its centre: ${JSON.stringify(info.cursor)}`);
+  }
 
-  // Deterministic screenshots: paint a backdrop (the real window is
-  // transparent) and pin the caret/dots animations where useful.
-  await overlay.evaluate(() => {
-    document.body.style.background = '#eceef2';
-  });
+  const screen = screens[0];
+  const LIGHT = 'eceef2';
 
-  // ── state: thinking (resting pulse) ───────────────────────────────────────
+  // ── state: thinking (resting) ─────────────────────────────────────────────
+  await withBackdrop(LIGHT);
   await dbg('overlay-cursor', { x: RECT.x + 320, y: RECT.y + 200 });
   await dbg('overlay-status', { status: 'thinking' });
   await sleep(650); // let travel + fade-in settle
-  await overlay.screenshot({ path: path.join(OUT_DIR, '01-thinking-light.png') });
+  await shotAt('01-thinking-light.png', RECT.x + 320, RECT.y + 200);
 
-  const domThinking = await overlay.evaluate(() => ({
-    transform: document.getElementById('cursor-wrap').style.transform,
-    wrapOpacity: getComputedStyle(document.getElementById('cursor-wrap')).opacity,
-    bubbleShown: document.getElementById('bubble').classList.contains('show'),
-    pulse: document.getElementById('bubble').classList.contains('pulse'),
-    text: document.getElementById('btext').textContent,
-    dots: document.getElementById('bdots').classList.contains('on'),
-  }));
-  // Local mapping is offset by the buffer: screen (RECT.x+320) → local 320+BUFFER.
-  const expectXform = `translate3d(${320 + BUFFER}px, ${200 + BUFFER}px, 0px)`;
-  if (domThinking.transform !== expectXform) {
-    fail(`cursor transform ${domThinking.transform} != ${expectXform} (mapping/buffer broken)`);
+  const thinking = await native();
+  // Screen points in, screen points out — there is no window-local mapping left
+  // to get wrong.
+  if (!near(thinking.cursor?.x, RECT.x + 320) || !near(thinking.cursor?.y, RECT.y + 200)) {
+    fail(`cursor at ${JSON.stringify(thinking.cursor)} != the point it was sent to`);
   }
-  if (domThinking.wrapOpacity !== '1') fail('cursor not fully visible while resting');
-  if (!domThinking.bubbleShown || !domThinking.pulse || domThinking.text !== 'Thinking') {
-    fail(`thinking bubble wrong: ${JSON.stringify(domThinking)}`);
+  if (thinking.cursorVisible !== true) fail('cursor not fully visible while resting');
+  if (thinking.bubble?.visible !== true || thinking.bubble?.text !== 'Thinking') {
+    fail(`thinking pill wrong: ${JSON.stringify(thinking.bubble)}`);
   }
-  if (!domThinking.dots) fail('thinking dots not animating');
+  if (thinking.bubble?.dots !== true) fail('thinking dots not animating');
+  // The resting pill breathes — the only sign a turn is still in flight while
+  // nothing is moving. (Skipped when the user has asked for Reduce Motion.)
+  if (thinking.reduceMotion !== true && thinking.bubble?.pulse !== true) {
+    fail('the thinking pill is not breathing');
+  }
 
   // ── state: mid-travel (never teleports) ───────────────────────────────────
   const moveP = dbg('overlay-cursor', { x: RECT.x + 700, y: RECT.y + 460 });
   await sleep(120); // capture mid-flight (travel is 300ms)
-  await overlay.screenshot({ path: path.join(OUT_DIR, '02-moving-midflight.png') });
+  await shot('02-moving-midflight.png', {
+    x: RECT.x + 240,
+    y: RECT.y + 130,
+    w: 560,
+    h: 400,
+    scale: 2,
+  });
+  const midFlight = await native();
   await moveP;
+  // The rendered glyph is somewhere BETWEEN the two points — proof it glides.
+  const gx = midFlight.cursorGlyph?.x ?? 0;
+  if (!(gx > RECT.x + 300 && gx < RECT.x + 700)) {
+    fail(`cursor teleported instead of gliding (glyph x=${gx})`);
+  }
 
   // ── state: clicking (press dip + ripples) ─────────────────────────────────
   const clickP = dbg('overlay-click', { x: RECT.x + 450, y: RECT.y + 300 });
   await sleep(430); // 300ms travel inside the op + catch ripples early
-  const domClick = await overlay.evaluate(() => ({
-    ripples: document.querySelectorAll('.ripple').length,
-    text: document.getElementById('btext').textContent,
-  }));
-  await overlay.screenshot({ path: path.join(OUT_DIR, '03-clicking-ripple.png') });
+  const clicking = await native();
+  await shotAt('03-clicking-ripple.png', RECT.x + 450, RECT.y + 300);
   await clickP;
-  if (domClick.ripples < 1) fail('no click ripple rendered');
-  if (domClick.text !== 'Clicking') fail(`click bubble text: ${domClick.text}`);
+  if (!(clicking.ripples >= 1)) fail('no click ripple rendered');
+  if (clicking.bubble?.text !== 'Clicking') fail(`click pill text: ${clicking.bubble?.text}`);
 
   // ── state: typing (dots + live preview) ───────────────────────────────────
   await dbg('overlay-typing', { text: 'Hello from Pi — background typing' });
-  await sleep(250);
-  const domType = await overlay.evaluate(() => ({
-    text: document.getElementById('btext').textContent,
-    dots: document.getElementById('bdots').classList.contains('on'),
-  }));
-  await overlay.screenshot({ path: path.join(OUT_DIR, '04-typing.png') });
-  if (!domType.text.startsWith('Typing') || !domType.text.includes('Hello from Pi')) {
-    fail(`typing bubble text: ${domType.text}`);
+  await sleep(280);
+  const typing = await native();
+  await shotAt('04-typing.png', RECT.x + 450, RECT.y + 300, 620);
+  if (typing.bubble?.text !== 'Typing' || !typing.bubble?.sub?.includes('Hello from Pi')) {
+    fail(`typing pill: ${JSON.stringify(typing.bubble)}`);
   }
-  if (!domType.dots) fail('typing dots not shown');
+  if (typing.bubble?.dots !== true) fail('typing dots not shown');
 
   // ── state: key combo label ────────────────────────────────────────────────
   await dbg('overlay-key', { combo: 'cmd+shift+s' });
-  await sleep(200);
-  const domKey = await overlay.evaluate(() => document.getElementById('btext').textContent);
-  await overlay.screenshot({ path: path.join(OUT_DIR, '05-key-combo.png') });
-  if (domKey !== 'Pressing ⌘⇧S') fail(`key bubble label: ${domKey}`);
+  await sleep(220);
+  const keyed = await native();
+  await shotAt('05-key-combo.png', RECT.x + 450, RECT.y + 300);
+  if (keyed.bubble?.text !== 'Pressing ⌘⇧S') fail(`key pill label: ${keyed.bubble?.text}`);
 
-  // ── dark backdrop variant (glow must read on dark too) ────────────────────
-  await overlay.evaluate(() => {
-    document.body.style.background = '#1e2030';
-  });
+  // ── dark backdrop variant (the glyph must read on dark too) ───────────────
+  await withBackdrop('1e2030');
   await dbg('overlay-status', { status: 'thinking' });
   await dbg('overlay-cursor', { x: RECT.x + 520, y: RECT.y + 260 });
   await sleep(500);
-  await overlay.screenshot({ path: path.join(OUT_DIR, '06-thinking-dark.png') });
-
-  // ── buffer: cursor AT the app edge must not clip ──────────────────────────
-  // Reset the backdrop light and drive the cursor to the tracked window's
-  // bottom-right CORNER (a screen point on the app's own edge). With the buffer
-  // margin its whole glyph must still render inside the padded window.
-  await overlay.evaluate(() => {
-    document.body.style.background = '#eceef2';
+  await shotAt('06-thinking-dark.png', RECT.x + 520, RECT.y + 260);
+  // Close-ups of the redesigned pointer alone, on both grounds — this is what a
+  // human actually judges "smaller, rounder, smoother, no fins" from.
+  await shot('10-cursor-zoom-dark.png', {
+    x: RECT.x + 514,
+    y: RECT.y + 254,
+    w: 40,
+    h: 40,
+    scale: 8,
   });
+
+  // ── PAST the app's own right edge: nothing clips ──────────────────────────
+  // The reported failure: "the window is sized directly to the app window size
+  // and thus causing cut off if the mouse cursor goes even a little bit off the
+  // screen to the right especially". 200pt beyond the tracked window's right
+  // edge is far outside the old window+buffer canvas; the glyph must still be
+  // whole and exactly where it was sent.
+  await withBackdrop(LIGHT);
   await dbg('overlay-status', { status: 'thinking' });
-  await dbg('overlay-cursor', { x: RECT.x + RECT.w, y: RECT.y + RECT.h });
+  const farX = RECT.x + RECT.w + 200;
+  const farY = RECT.y + RECT.h;
+  await dbg('overlay-cursor', { x: farX, y: farY });
   await sleep(450);
-  const edge = await overlay.evaluate(() => {
-    const c = document.getElementById('cursor').getBoundingClientRect();
-    return {
-      innerW: window.innerWidth,
-      innerH: window.innerHeight,
-      rect: { left: c.left, top: c.top, right: c.right, bottom: c.bottom },
-    };
-  });
-  await overlay.screenshot({ path: path.join(OUT_DIR, '07-cursor-at-edge.png') });
-  if (
-    edge.rect.left < 0 ||
-    edge.rect.top < 0 ||
-    edge.rect.right > edge.innerW ||
-    edge.rect.bottom > edge.innerH
-  ) {
-    fail(
-      `cursor glyph clipped at edge: ${JSON.stringify(edge.rect)} outside ` +
-        `0..${edge.innerW} x 0..${edge.innerH}`,
-    );
+  await shotAt('07-cursor-past-app-edge.png', farX, farY, 360, 200);
+  await shot('10-cursor-zoom-light.png', { x: farX - 6, y: farY - 6, w: 40, h: 40, scale: 8 });
+  const far = await native();
+  if (!near(far.cursor?.x, farX) || !near(far.cursor?.y, farY)) {
+    fail(`cursor past the app edge landed at ${JSON.stringify(far.cursor)}, not (${farX},${farY})`);
+  }
+  const g = far.cursorGlyph;
+  if (g.x < f.x || g.y < f.y || g.x + g.w > f.x + f.w || g.y + g.h > f.y + f.h) {
+    fail(`glyph ${JSON.stringify(g)} clipped by the panel ${JSON.stringify(f)}`);
+  }
+  console.log('no-clip OK: cursor 200pt past the app edge is placed exactly and drawn whole');
+
+  // A point beyond the SCREEN edge is clamped onto the canvas rather than lost:
+  // the phantom parks at the border, it does not disappear. `cursor` still
+  // reports the point that was ASKED for; `cursorDrawn` is where the tip
+  // actually ended up.
+  const wayOut = { x: screen.x + screen.w + 400, y: screen.y + 200 };
+  await dbg('overlay-cursor', wayOut);
+  await sleep(400);
+  const offscreen = await native();
+  if (!near(offscreen.cursor?.x, wayOut.x)) fail('the requested point was not recorded verbatim');
+  const drawn = offscreen.cursorDrawn;
+  if (!near(drawn.x, f.x + f.w, 1) || !near(drawn.y, wayOut.y, 1)) {
+    fail(`off-screen cursor was not clamped to the panel edge: ${JSON.stringify(drawn)}`);
   }
 
-  // ── pill flips / clamps near the edge (never sheared off) ─────────────────
-  // The cursor near the right+bottom edge would push the pill (default: right &
-  // below the cursor) out of view; it must flip to the other side and stay
-  // fully inside the padded window.
+  // ── pill flips near the screen corner (never sheared off) ─────────────────
+  // The cursor near the right+bottom SCREEN edge would push the pill (default:
+  // right of and below the cursor) out of view; it must flip and stay inside.
+  await dbg('overlay-cursor', { x: screen.x + screen.w - 40, y: screen.y + screen.h - 30 });
   await dbg('overlay-typing', { text: 'Reticulating the edge-anchored pill preview text' });
-  await sleep(300);
-  const pill = await overlay.evaluate(() => {
-    const bub = document.getElementById('bubble');
-    const r = bub.getBoundingClientRect();
-    return {
-      flipX: bub.classList.contains('flip-x'),
-      flipY: bub.classList.contains('flip-y'),
-      innerW: window.innerWidth,
-      innerH: window.innerHeight,
-      rect: { left: r.left, top: r.top, right: r.right, bottom: r.bottom },
-    };
+  await sleep(400);
+  const pill = await native();
+  await shot('08-pill-flipped-edge.png', {
+    x: screen.x + screen.w - 420,
+    y: screen.y + screen.h - 180,
+    w: 420,
+    h: 180,
+    scale: 2,
   });
-  await overlay.screenshot({ path: path.join(OUT_DIR, '08-pill-flipped-edge.png') });
-  if (!pill.flipX && !pill.flipY) {
-    fail(`pill did not flip near the corner: ${JSON.stringify(pill)}`);
+  if (pill.bubble?.flipX !== true && pill.bubble?.flipY !== true) {
+    fail(`pill did not flip near the corner: ${JSON.stringify(pill.bubble)}`);
   }
+  const pb = pill.bubble.frame;
   if (
-    pill.rect.left < -1 ||
-    pill.rect.top < -1 ||
-    pill.rect.right > pill.innerW + 1 ||
-    pill.rect.bottom > pill.innerH + 1
+    pb.x < screen.x - 1 ||
+    pb.y < screen.y - 1 ||
+    pb.x + pb.w > screen.x + screen.w + 1 ||
+    pb.y + pb.h > screen.y + screen.h + 1
   ) {
-    fail(`pill not clamped inside padded window: ${JSON.stringify(pill)}`);
+    fail(`pill not clamped inside the screen: ${JSON.stringify(pb)}`);
   }
 
-  /*
-   * A NARROW WINDOW, which is where mirroring stops being enough.
-   *
-   * The case above uses a 900pt window, so flipping the pill to the cursor's
-   * left happens to fit. Calculator is ~305pt wide, and there mirroring puts the
-   * pill's left edge off the window — the user caught it on a live run: the "Still
-   * thinking" pill sheared off mid-word. Reproduce the real geometry.
-   */
-  const NARROW = { x: 900, y: 240, w: 305, h: 470 };
-  await dbg('overlay-show', NARROW);
-  await sleep(250);
-  // Cursor near the narrow window's RIGHT edge: below-right overflows, and the
-  // mirror to the left overflows the other way.
-  await dbg('overlay-cursor', { x: NARROW.x + NARROW.w - 20, y: NARROW.y + 200 });
-  await dbg('overlay-typing', { text: 'Reticulating the edge-anchored pill preview text' });
-  await sleep(350);
-  const narrowPill = await overlay.evaluate(() => {
-    const bub = document.getElementById('bubble');
-    const r = bub.getBoundingClientRect();
-    return {
-      innerW: window.innerWidth,
-      innerH: window.innerHeight,
-      rect: { left: r.left, top: r.top, right: r.right, bottom: r.bottom },
-    };
-  });
-  await overlay.screenshot({ path: path.join(OUT_DIR, '08b-pill-narrow-window.png') });
-  if (
-    narrowPill.rect.left < -1 ||
-    narrowPill.rect.top < -1 ||
-    narrowPill.rect.right > narrowPill.innerW + 1 ||
-    narrowPill.rect.bottom > narrowPill.innerH + 1
-  ) {
-    fail(`pill sheared off a NARROW window: ${JSON.stringify(narrowPill)}`);
-  }
-  await dbg('overlay-show', RECT);
-  await sleep(250);
-
-  // ── live tracking: the overlay follows a window move with NO snap lag ──────
-  // Drive the REAL tracking loop off a synthetic bounds source (no TCC / real
-  // app). The window must reposition to the target rect + buffer.
+  // ── live tracking: the phantom rides a window move ────────────────────────
+  // The old overlay got this from moving its window; a screen-coordinate canvas
+  // shifts the cursor by the window's own delta instead. Drive the REAL tracking
+  // loop off a synthetic bounds source (no TCC / real app).
   const A = { x: 300, y: 260, w: 760, h: 520 };
-  const winBounds = () =>
-    app.evaluate(({ BrowserWindow }) => {
-      const w = BrowserWindow.getAllWindows().find((x) =>
-        x.webContents.getURL().includes('overlay.html'),
-      );
-      return w ? w.getBounds() : null;
-    });
   await dbg('overlay-fake-control', A);
-  await sleep(120);
-  let wb = await winBounds();
-  const expectPadded = (r) => ({
-    x: r.x - BUFFER,
-    y: r.y - BUFFER,
-    width: r.w + BUFFER * 2,
-    height: r.h + BUFFER * 2,
-  });
-  const eqBounds = (got, want) =>
-    got &&
-    got.x === want.x &&
-    got.y === want.y &&
-    got.width === want.width &&
-    got.height === want.height;
-  if (!eqBounds(wb, expectPadded(A))) {
-    fail(`fake-control: window ${JSON.stringify(wb)} != ${JSON.stringify(expectPadded(A))}`);
-  }
+  await dbg('overlay-cursor', { x: A.x + 200, y: A.y + 150 });
+  await sleep(420);
+  const beforeMove = (await native()).cursor;
 
-  // Move the synthetic window; the fast tracker must catch up within a few
-  // ticks (this is the drag-follow that used to snap only on release).
   const B = { x: 520, y: 420, w: 760, h: 520 };
   await dbg('overlay-fake-move', B);
   let followed = false;
-  for (let i = 0; i < 40 && !followed; i++) {
-    await sleep(20);
-    wb = await winBounds();
-    followed = eqBounds(wb, expectPadded(B));
+  let after = null;
+  for (let i = 0; i < 60 && !followed; i++) {
+    await sleep(25);
+    after = (await native()).cursor;
+    followed =
+      near(after?.x, beforeMove.x + (B.x - A.x), 2) &&
+      near(after?.y, beforeMove.y + (B.y - A.y), 2);
   }
   if (!followed) {
     fail(
-      `tracker did not follow the moved window: ${JSON.stringify(wb)} != ${JSON.stringify(expectPadded(B))}`,
+      `phantom did not ride the window move: ${JSON.stringify(after)} != ` +
+        `${JSON.stringify({ x: beforeMove.x + (B.x - A.x), y: beforeMove.y + (B.y - A.y) })}`,
     );
   }
-  console.log('live tracking OK: overlay followed the moved window');
+  console.log('live tracking OK: the phantom stayed glued to the moved window');
 
-  // Prompt retarget (the tracker's move path) via setBounds — no 'reset'
-  // round-trip. Electron's macOS setBounds applies on the next runloop (not the
-  // same microsecond), so allow a short settle rather than asserting instantly.
+  // The prompt-retarget path (what the tracker calls on a bounds change) does
+  // the same thing synchronously.
   const C = { x: 140, y: 180, w: 900, h: 600 };
+  const beforeRetarget = (await native()).cursor;
   await dbg('overlay-retarget', C);
-  let retargeted = false;
-  for (let i = 0; i < 15 && !retargeted; i++) {
-    await sleep(20);
-    wb = await winBounds();
-    retargeted = eqBounds(wb, expectPadded(C));
+  await sleep(80);
+  const retargeted = (await native()).cursor;
+  if (
+    !near(retargeted.x, beforeRetarget.x + (C.x - B.x), 2) ||
+    !near(retargeted.y, beforeRetarget.y + (C.y - B.y), 2)
+  ) {
+    fail(`retarget did not carry the phantom: ${JSON.stringify(retargeted)}`);
   }
-  if (!retargeted) {
-    fail(`retarget did not land: ${JSON.stringify(wb)} != ${JSON.stringify(expectPadded(C))}`);
+  console.log('prompt retarget OK');
+
+  // ── occluder MASK: per-window holes, not all-or-nothing ───────────────────
+  // The helper reports every window stacked above the controlled one; the panel
+  // masks those rects out, so the phantom stops painting on a window the user
+  // dragged over the app long before coverage trips the whole-overlay hide.
+  const holes = [
+    { x: C.x + 400, y: C.y + 40, w: 220, h: 160 },
+    { x: C.x + 40, y: C.y + 380, w: 180, h: 120 },
+  ];
+  await dbg('overlay-fake-move', { ...C, occluders: holes });
+  let masked = false;
+  for (let i = 0; i < 40 && !masked; i++) {
+    await sleep(25);
+    masked = (await native()).maskHoles === holes.length;
   }
-  console.log('prompt retarget OK: overlay followed the setBounds retarget');
+  if (!masked) fail('the occluder mask was never applied');
+  await dbg('overlay-fake-move', { ...C, occluders: [] });
+  let cleared = false;
+  for (let i = 0; i < 40 && !cleared; i++) {
+    await sleep(25);
+    cleared = (await native()).maskHoles === 0;
+  }
+  if (!cleared) fail('the occluder mask was never cleared');
+  console.log('occluder mask OK: per-window holes applied and cleared by the tracker');
 
   // ── z-order truth: occluded ⇒ hidden, clear ⇒ shown (even while driving) ──
-  // The fake bounds source now reports the controlled window covered by
-  // another app's window (helper CGWindowList truth in production). The
-  // tracker must hide the overlay — the phantom never paints over the
-  // covering app — and re-show it the moment the window is clear again.
-  const winVisible = () =>
-    app.evaluate(({ BrowserWindow }) => {
-      const w = BrowserWindow.getAllWindows().find((x) =>
-        x.webContents.getURL().includes('overlay.html'),
-      );
-      return w ? w.isVisible() : null;
-    });
   await dbg('overlay-fake-move', { ...C, occluded: true });
-  let occludedHidden = false;
-  for (let i = 0; i < 40 && !occludedHidden; i++) {
+  let concealed = false;
+  for (let i = 0; i < 40 && !concealed; i++) {
     await sleep(25);
     const inf = await dbg('overlay-info');
-    // `wantsVisible` is the overlay's own decision, taken BEFORE the
-    // background-mode gate — the only thing that can be asserted here in a run
-    // where the window is deliberately never shown. In a visible run the window
-    // must actually be hidden too, and that is checked as well.
-    occludedHidden =
-      inf.result?.occluded === true &&
-      inf.result?.wantsVisible === false &&
-      (!shouldShow || (await winVisible()) === false);
+    concealed = inf.result?.occluded === true && (await native()).visible === false;
   }
-  if (!occludedHidden) fail('overlay still showing while the fake source reports occluded');
+  if (!concealed) fail('overlay still visible while the fake source reports occluded');
 
   // Clear again — and explicitly NOT frontmost: occlusion truth must win over
-  // the driving/frontmost proxy (cursor lives on the app whenever it is clear).
+  // the driving/frontmost proxy (the cursor lives on the app whenever it is clear).
   await dbg('overlay-fake-move', { ...C, occluded: false, frontmost: false });
-  let clearShown = false;
-  for (let i = 0; i < 40 && !clearShown; i++) {
+  let revealed = false;
+  for (let i = 0; i < 40 && !revealed; i++) {
     await sleep(25);
-    const inf = await dbg('overlay-info');
-    clearShown =
-      inf.result?.wantsVisible === true && (!shouldShow || (await winVisible()) === true);
+    revealed = (await native()).visible === true;
   }
-  if (!clearShown) fail('overlay did not re-show after the occluder cleared');
+  if (!revealed) fail('overlay did not re-show after the occluder cleared');
   console.log('occlusion conceal/reveal OK (z-order truth beats the frontmost proxy)');
+
+  // Still never took focus, after all of that.
+  const end = await native();
+  if (end.appActive !== false || end.isKeyWindow !== false || end.frontmostPid === end.pid) {
+    fail(`overlay ended up with focus: ${JSON.stringify(end)}`);
+  }
+
+  // ── the mask actually ERASES the phantom (pixels, not a counter) ──────────
+  // Re-target with no pid, which stops the tracking loop (nothing left to poll)
+  // so the bounds source can't race the mask back to empty mid-measurement,
+  // then push the holes straight at the panel.
+  await dbg('overlay-show', C);
+  await withBackdrop(LIGHT);
+  const hole = holes[0];
+  // Straddling the hole's left edge: part of the glyph is over the "window
+  // above us" and must be cut away, the rest still drawn. This is the shot that
+  // shows what the mask does.
+  const straddle = { x: hole.x - 6, y: hole.y + 60 };
+  const measure = { x: hole.x - 90, y: hole.y + 20, w: 220, h: 130, scale: 2 };
+
+  await dbg('overlay-occluders', { rects: [] });
+  await dbg('overlay-cursor', { x: straddle.x, y: straddle.y, ms: 0 });
+  await dbg('overlay-status', { status: 'thinking' });
+  await sleep(450);
+  const unmaskedShot = await shot('09a-no-mask.png', measure);
+  const unmaskedPx = await paintedPixels(unmaskedShot, LIGHT);
+
+  await dbg('overlay-occluders', { rects: holes });
+  await sleep(200);
+  const maskedShot = await shot('09-occluder-mask.png', measure);
+  const maskedPx = await paintedPixels(maskedShot, LIGHT);
+
+  // Fully inside the hole, nothing of the phantom may survive.
+  await dbg('overlay-cursor', { x: hole.x + 70, y: hole.y + 70, ms: 0 });
+  await sleep(300);
+  const buriedShot = await shot('09b-inside-occluder.png', {
+    x: hole.x + 20,
+    y: hole.y + 20,
+    w: 160,
+    h: 110,
+    scale: 2,
+  });
+  const buriedPx = await paintedPixels(buriedShot, LIGHT);
+
+  if (unmaskedPx === 0) fail('nothing was painted even without a mask — measurement is broken');
+  if (!(maskedPx < unmaskedPx * 0.8)) {
+    fail(`the mask did not cut the phantom: ${maskedPx} painted px vs ${unmaskedPx} unmasked`);
+  }
+  if (buriedPx !== 0) {
+    fail(`${buriedPx} px of phantom still painted INSIDE an occluder — it must be erased`);
+  }
+  console.log(
+    `occluder mask erases: ${unmaskedPx}px unmasked → ${maskedPx}px straddling → ${buriedPx}px inside`,
+  );
+  if ((await native()).maskHoles !== holes.length) fail('mask holes vanished mid-measurement');
 
   // ── hide puts the phantom away ────────────────────────────────────────────
   await dbg('overlay-hide');
   const hidden = await dbg('overlay-info');
   if (hidden.result?.visible !== false) fail('overlay still visible after overlay-hide');
-  if (hidden.result?.wantsVisible !== false) fail('overlay still WANTS to show after overlay-hide');
+  if ((await native()).visible !== false) fail('native panel still on screen after overlay-hide');
 
   console.log(`mac-overlay-probe OK — shots in ${OUT_DIR}`);
 } finally {
