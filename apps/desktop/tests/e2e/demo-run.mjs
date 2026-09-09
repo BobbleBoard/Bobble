@@ -152,8 +152,21 @@ export async function demoRun(o) {
     });
     page = await electronApp.firstWindow();
   } else {
+    /*
+     * AND KEEP THE MAIN PROCESS'S OUTPUT.
+     *
+     * LaunchServices sends a launched app's stdout to the system log, where this
+     * run cannot see it — so when a message enters the conversation and pi never
+     * runs a turn (MEASURED five times tonight, with the renderer console
+     * silent), the one place that could say why is thrown away. `open` will
+     * redirect it if asked.
+     */
     await run('open', [
       ...(LIVE ? [] : ['-g']),
+      '--stdout',
+      path.join(OUT, 'main-stdout.log'),
+      '--stderr',
+      path.join(OUT, 'main-stderr.log'),
       ...Object.entries(env).flatMap(([k, v]) => ['--env', `${k}=${v}`]),
       '-a',
       '/Applications/Bobble.app',
