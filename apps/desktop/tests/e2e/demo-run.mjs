@@ -287,11 +287,48 @@ export async function demoRun(o) {
     say(`model: ${target.id}`);
     await sleep(2500);
 
+    /*
+     * AND CHECK THE MESSAGE ACTUALLY LANDED.
+     *
+     * Typing and pressing Enter was fire-and-forget, and MEASURED four times in
+     * this matrix the message simply did not arrive: `prefill: 0 ingests`, no
+     * text, no tool call, and the run then spent its entire deadline polling an
+     * idle app. `pi:restart` above is asynchronous, so a send that races it is
+     * dropped with nothing raised — the failure looks exactly like a model that
+     * chose to say nothing, which is what made it so slow to spot.
+     *
+     * A user message in the store is the only proof the send took. If it is not
+     * there, press Enter again, and retype if the composer was cleared without
+     * the message landing.
+     */
     const editor = page.locator('[contenteditable="true"]').first();
-    await editor.click();
-    await page.keyboard.type(o.prompt, { delay: 18 });
-    await sleep(600);
-    await page.keyboard.press('Enter');
+    const landed = () =>
+      page.evaluate(
+        (want) =>
+          window
+            .__pi_store()
+            .getState()
+            .messages.some((m) => m.kind === 'user' && m.text === want),
+        o.prompt,
+      );
+
+    let sent = false;
+    for (let attempt = 0; attempt < 3 && !sent; attempt += 1) {
+      if (attempt > 0) say(`the send did not land; retrying (${attempt})`);
+      await editor.click();
+      const empty = await page.evaluate(
+        (el) => el.textContent.trim() === '',
+        await editor.elementHandle(),
+      );
+      if (empty) await page.keyboard.type(o.prompt, { delay: 18 });
+      await sleep(600);
+      await page.keyboard.press('Enter');
+      for (let i = 0; i < 30 && !sent; i += 1) {
+        sent = await landed().catch(() => false);
+        if (!sent) await sleep(400);
+      }
+    }
+    if (!sent) throw new Error('the prompt never entered the conversation');
     say(`sent: ${JSON.stringify(o.prompt)}`);
 
     const readState = () =>
