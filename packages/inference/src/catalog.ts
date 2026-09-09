@@ -1202,6 +1202,70 @@ export const K2_HORIZON_0_9B: CatalogModel = {
   quantRange: 'BF16 only (no quants published)',
 };
 
+
+/**
+ * MiniCPM5 2B — the user's first queued small model.
+ *
+ * TEXT ONLY. The repo publishes three GGUFs and no mmproj, so there is no
+ * vision tower to load: this model cannot be given a screenshot, which is why
+ * it is not in the computer-use matrix. It is here to be measured on the work
+ * that does not need eyes.
+ */
+const MINICPM5_2B: CatalogModel = {
+  id: 'minicpm5-2b',
+  displayName: 'MiniCPM5 2B',
+  hfRepo: 'openbmb/MiniCPM5-2B-GGUF',
+  files: [
+    {
+      name: 'MiniCPM5-2B-Q8_0.gguf',
+      bytes: 2_679_710_688,
+      quant: 'Q8_0',
+      sha256: 'c5415f8989bf88a8288f1b55a3cc371af53c07b0faa220a63bd7a990cfaba078',
+    },
+  ],
+  license: 'Apache-2.0',
+  minRamGB: 6,
+  contextWindow: 32_768,
+  input: ['text'],
+  verified: true,
+  engine: 'llamacpp',
+  publisher: { handle: 'openbmb', reliable: true },
+  tier: 'fast',
+  quantRange: 'Q4_K_M–F16',
+};
+
+/**
+ * Nanbeige 4.2 3B — the user's second queued small model.
+ *
+ * Also text only, and from bartowski rather than the model's own org: Nanbeige
+ * publish no GGUF themselves. Q8_0 for the same reason as MiniCPM's — at this
+ * size the whole file fits several times over, so there is no reason to measure
+ * a quantisation artefact and call it the model.
+ */
+const NANBEIGE42_3B: CatalogModel = {
+  id: 'nanbeige4.2-3b',
+  displayName: 'Nanbeige 4.2 3B',
+  hfRepo: 'bartowski/Nanbeige_Nanbeige4.2-3B-GGUF',
+  baseRepo: 'Nanbeige/Nanbeige4.2-3B',
+  files: [
+    {
+      name: 'Nanbeige4.2-3B-Q8_0.gguf',
+      bytes: 4_434_787_488,
+      quant: 'Q8_0',
+      sha256: '837ba713ef3a3b5c9aee82e5dcba07600ea7db36ae392419f982b3bfaec04ef2',
+    },
+  ],
+  license: 'Apache-2.0',
+  minRamGB: 8,
+  contextWindow: 32_768,
+  input: ['text'],
+  verified: true,
+  engine: 'llamacpp',
+  publisher: { handle: 'bartowski', reliable: true },
+  tier: 'fast',
+  quantRange: 'IQ2_M–Q8_0',
+};
+
 export const CATALOG: readonly CatalogModel[] = [
   GEMMA4_E2B,
   GEMMA4_E4B,
@@ -1210,6 +1274,8 @@ export const CATALOG: readonly CatalogModel[] = [
   GEMMA4_31B,
   QWEN35_0_8B_MTP,
   QWEN35_2B_MTP,
+  MINICPM5_2B,
+  NANBEIGE42_3B,
   QWEN35_4B_MTP,
   QWEN35_9B_MTP,
   LING3_TINY,
