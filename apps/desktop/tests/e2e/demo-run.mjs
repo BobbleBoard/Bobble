@@ -296,11 +296,14 @@ export async function demoRun(o) {
             .send('Page.screencastFrameAck', { sessionId: f.sessionId })
             .catch(() => {});
         });
+        /* No size caps: uncapped, the screencast emits the page's own CSS size,
+           which is exactly what `scale: 'css'` gives the pulled frames. Capping
+           it made pushed frames 1600x963 against the pull's 1440x868, and a
+           concat of two sizes makes ffmpeg reconfigure its filter graph on every
+           single frame. */
         await screencast.send('Page.startScreencast', {
           format: 'jpeg',
           quality: 72,
-          maxWidth: 1600,
-          maxHeight: 1000,
           everyNthFrame: 1,
         });
         screencastStop = async () => {
@@ -641,26 +644,62 @@ export async function demoRun(o) {
   const list = path.join(OUT, 'frames.txt');
   writeFileSync(list, lines.join('\n'));
   const video = path.join(OUT, `${o.name}.mp4`);
-  await run('ffmpeg', [
-    '-y',
-    '-f',
-    'concat',
-    '-safe',
-    '0',
-    '-i',
-    list,
-    '-vf',
-    'scale=trunc(iw/2)*2:trunc(ih/2)*2,fps=30',
-    '-c:v',
-    'libx264',
-    '-pix_fmt',
-    'yuv420p',
-    '-preset',
-    'veryfast',
-    '-crf',
-    '20',
-    video,
-  ]);
+  /*
+   * ONE SIZE FOR THE WHOLE CONCAT.
+   *
+   * The window is resized by a pixel here and there over a long run, so the
+   * frames are not all identical even from one camera — MEASURED 1440x868 and
+   * 1440x867 in the same run, plus 1600x963 from the screencast before its caps
+   * came off. ffmpeg handles that by reconfiguring its filter graph and saying
+   * so, once per frame, and MEASURED that killed a finished run outright:
+   * execFile's 1MB stderr buffer overflowed and threw
+   * ERR_CHILD_PROCESS_STDIO_MAXBUFFER after every frame had been captured.
+   *
+   * So: pin the output to the first frame's size, and make ffmpeg quiet and
+   * unable to overflow anything regardless.
+   */
+  const first = await run('ffprobe', [
+    '-v',
+    'error',
+    '-select_streams',
+    'v:0',
+    '-show_entries',
+    'stream=width,height',
+    '-of',
+    'csv=p=0',
+    frames[0].file,
+  ]).then(
+    (r) => r.stdout.trim().split(',').map(Number),
+    () => [1440, 868],
+  );
+  const evenW = Math.max(2, Math.floor((first[0] ?? 1440) / 2) * 2);
+  const evenH = Math.max(2, Math.floor((first[1] ?? 868) / 2) * 2);
+  await run(
+    'ffmpeg',
+    [
+      '-y',
+      '-loglevel',
+      'error',
+      '-f',
+      'concat',
+      '-safe',
+      '0',
+      '-i',
+      list,
+      '-vf',
+      `scale=${evenW}:${evenH},fps=30`,
+      '-c:v',
+      'libx264',
+      '-pix_fmt',
+      'yuv420p',
+      '-preset',
+      'veryfast',
+      '-crf',
+      '20',
+      video,
+    ],
+    { maxBuffer: 64 * 1024 * 1024 },
+  );
   writeFileSync(path.join(OUT, 'run-log.txt'), log.join('\n'));
   console.log(`\n${frames.length} frames, captured at ${achieved.toFixed(1)}/s → ${video}`);
   return { video, log };
