@@ -209,6 +209,28 @@ describe('resolveCli — the line a model actually writes', () => {
     });
   });
 
+  it('reads two bare numbers as a POINT, not as one mangled index', () => {
+    /*
+     * MEASURED on a 27B driving Blender — an app with no Accessibility tree, so
+     * every act is a coordinate. It wrote `mac click 660 558`, the natural form,
+     * and was told "provide an element index, or x and y": with nothing required
+     * in the schema, both numbers were joined into `index` as the string
+     * "660 558", which is not a number, so the tool refused the form it had just
+     * asked for. These tools take EITHER an index OR a point, which the schema
+     * cannot express — the count of values says which one was meant.
+     */
+    expect(call('browser click 660 558')).toEqual({
+      kind: 'call',
+      tool: 'browser_click',
+      args: { x: 660, y: 558 },
+    });
+    expect(call('browser click 7')).toEqual({
+      kind: 'call',
+      tool: 'browser_click',
+      args: { index: 7 },
+    });
+  });
+
   it('a flag beats a positional for the same argument', () => {
     const r = call('media generate image --prompt explicit ignored words');
     expect(r).toEqual({ kind: 'call', tool: 'generate_image', args: { prompt: 'explicit' } });

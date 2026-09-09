@@ -300,12 +300,35 @@ function splitList(value: string): string[] {
 }
 
 /** The schema properties a positional may fill, in declaration order. */
-function positionalKeys(schema: CliSchema | undefined): string[] {
+function positionalKeys(schema: CliSchema | undefined, count = 1): string[] {
   const props = schema?.properties ?? {};
   const required = new Set(schema?.required ?? []);
   const keys = Object.keys(props);
   const req = keys.filter((k) => required.has(k));
-  return req.length > 0 ? req : keys.slice(0, 1);
+  if (req.length > 0) return req;
+
+  /*
+   * `mac click 660 558` — TWO numbers mean a POINT.
+   *
+   * MEASURED on a 27B driving Blender, which has no Accessibility tree to aim
+   * at, so every act is a coordinate: it wrote the natural form and got "provide
+   * an element index, or x and y" back. With nothing required, the first
+   * property was the only positional slot, so both numbers were joined into
+   * `index` as the string "660 558" — which is not a number, so the tool
+   * rejected the very form it had just asked for.
+   *
+   * These tools take a target as EITHER an index OR a point, which a JSON schema
+   * cannot say. The count does: one value is the index, two values are the pair.
+   */
+  if (count === 2 && isNumeric(props.x) && isNumeric(props.y)) return ['x', 'y'];
+  return keys.slice(0, 1);
+}
+
+/** Does this property want a number? */
+function isNumeric(prop: unknown): boolean {
+  const p = prop as Record<string, unknown> | undefined;
+  const t = typeof p?.type === 'string' ? p.type : unionType(p);
+  return t === 'number' || t === 'integer';
 }
 
 // ── resolution ───────────────────────────────────────────────────────────────
@@ -416,7 +439,7 @@ export function resolveCli(cli: CliModel, argv: readonly string[]): CliResolutio
      `click "index"  (positional: fills --index)`. */
   const spare = bare;
   if (spare.length > 0) {
-    const keys = positionalKeys(schema).filter((k) => args[k] === undefined);
+    const keys = positionalKeys(schema, spare.length).filter((k) => args[k] === undefined);
     const raw: Record<string, string> = {};
     keys.forEach((key, i) => {
       const v = i === keys.length - 1 ? spare.slice(i).join(' ') : spare[i];
