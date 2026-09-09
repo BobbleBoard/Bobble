@@ -127,6 +127,79 @@ export interface TrimResult {
   readonly trimmedCount: number;
 }
 
+/** What a dropped screenshot leaves behind. Says WHY, so a model that wonders
+ * where the picture went is told rather than left to infer it was never there. */
+export const STALE_SHOT_PLACEHOLDER =
+  '[screenshot removed — it showed the screen as it was several actions ago, ' +
+  'which is no longer what is there. Take a fresh one if you need to look.]';
+
+/** How many of the most recent screenshots are worth keeping. */
+export const KEEP_RECENT_SHOTS = 1;
+
+/**
+ * DROP SCREENSHOTS THAT HAVE STOPPED BEING TRUE.
+ *
+ * Not an overflow measure — this runs on every request, because an old
+ * screenshot is WRONG as well as expensive. It shows a screen that has since
+ * been clicked, typed into and navigated away from, and the model has to reason
+ * about which of five pictures is the current one.
+ *
+ * The cost is the reason it was found. MEASURED on two runs of the same Maps
+ * task on the same build, differing only in how many screenshots the model
+ * happened to take:
+ *
+ *   1 screenshot  → 42 ingests, 3 over 2s, worst 3.5s
+ *   12 screenshots → 31 ingests, 14 over 2s, worst 51.1s
+ *
+ * and the second run's prefill grew monotonically — 0.5s, 1.0s, 2.5s, 3.0s,
+ * 3.7s, 4.3s, 5.0s, 5.8s, 7.0s — because every turn re-ingests every picture
+ * taken so far. A screenshot is ~200KB and on the order of a thousand vision
+ * tokens; keeping twelve of them makes a computer-use conversation quadratic in
+ * the number of looks.
+ *
+ * This was hiding behind a power-mode question. It is not a power problem: the
+ * same task in "low power" was FASTER, because it took one screenshot.
+ *
+ * Pure, and idempotent — an already-placeholdered result has no image left to
+ * drop, so repeated passes are no-ops.
+ */
+export function dropStaleScreenshots(context: Context, keep = KEEP_RECENT_SHOTS): TrimResult {
+  const withImages: number[] = [];
+  context.messages.forEach((msg, i) => {
+    if (msg.role !== 'toolResult') return;
+    if (msg.content.some((c) => c.type === 'image')) withImages.push(i);
+  });
+  // The newest `keep` stay exactly as they are.
+  const stale = withImages.slice(0, Math.max(0, withImages.length - keep));
+  if (stale.length === 0) return { context, removedTokens: 0, trimmedCount: 0 };
+
+  const out: Message[] = context.messages.slice();
+  let removed = 0;
+  for (const i of stale) {
+    const msg = out[i];
+    if (msg === undefined || msg.role !== 'toolResult') continue;
+    const kept = msg.content.filter((c) => c.type !== 'image');
+    const text = toolResultText(msg);
+    /* The TEXT of the result is kept — it is the indexed element list, which is
+       small and still tells the model what was on screen. Only the picture goes. */
+    out[i] = {
+      ...msg,
+      content: [
+        ...(kept.length > 0 ? kept : [{ type: 'text' as const, text }]),
+        { type: 'text' as const, text: STALE_SHOT_PLACEHOLDER },
+      ],
+    };
+    // A screenshot at point size costs on the order of a thousand vision tokens;
+    // the exact number is the model's business, so this is deliberately a floor.
+    removed += 1000;
+  }
+  return {
+    context: { ...context, messages: out },
+    removedTokens: removed,
+    trimmedCount: stale.length,
+  };
+}
+
 /**
  * Free ~`tokensToRemove` tokens from `context` by replacing the OLDEST not-yet-
  * trimmed tool results with {@link OVERFLOW_TRIM_PLACEHOLDER}, stopping as soon

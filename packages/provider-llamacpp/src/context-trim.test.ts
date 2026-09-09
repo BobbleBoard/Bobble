@@ -2,9 +2,11 @@ import type { Context, Message } from '@mariozechner/pi-ai';
 import { describe, expect, it } from 'vitest';
 import {
   cleanProviderError,
+  dropStaleScreenshots,
   estimateTokens,
   OVERFLOW_TRIM_PLACEHOLDER,
   parseContextOverflow,
+  STALE_SHOT_PLACEHOLDER,
   trimContextForOverflow,
 } from './context-trim.js';
 
@@ -132,5 +134,66 @@ describe('cleanProviderError', () => {
     const generic = cleanProviderError(500, undefined);
     expect(generic).toContain('HTTP 500');
     expect(generic).not.toContain('{');
+  });
+});
+
+describe('dropStaleScreenshots', () => {
+  const shot = (id: string, text: string) =>
+    ({
+      role: 'toolResult' as const,
+      toolCallId: id,
+      toolName: 'mac_snapshot',
+      output: '',
+      isError: false,
+      content: [
+        { type: 'text' as const, text },
+        { type: 'image' as const, data: 'AAAA', mimeType: 'image/jpeg' },
+      ],
+    }) as unknown as Message;
+
+  const ctx = (messages: Message[]) => ({ messages }) as unknown as Context;
+
+  it('keeps the newest picture and drops the ones that stopped being true', () => {
+    /*
+     * MEASURED on two runs of the same Maps task on the same build, differing
+     * only in how many screenshots the model happened to take: one screenshot
+     * gave 42 ingests with a 3.5s worst case; twelve gave 31 ingests with a
+     * 51.1s worst case, and a prefill that grew every single turn. Every turn
+     * re-ingests every picture taken so far.
+     */
+    const r = dropStaleScreenshots(
+      ctx([shot('a', 'first'), shot('b', 'second'), shot('c', 'third')]),
+    );
+    expect(r.trimmedCount).toBe(2);
+    const kinds = r.context.messages.map((m) =>
+      (m as { content: { type: string }[] }).content.map((c) => c.type).join('+'),
+    );
+    expect(kinds[0]).toBe('text+text');
+    expect(kinds[1]).toBe('text+text');
+    expect(kinds[2]).toBe('text+image');
+  });
+
+  it('keeps the result’s TEXT, which is the part still worth having', () => {
+    // The indexed element list is small and still describes what was on screen;
+    // only the picture is both large and out of date.
+    const r = dropStaleScreenshots(ctx([shot('a', '[1] AXButton "Save"'), shot('b', 'now')]));
+    const first = r.context.messages[0] as { content: { type: string; text?: string }[] };
+    expect(first.content[0]?.text).toContain('AXButton');
+    expect(first.content[1]?.text).toBe(STALE_SHOT_PLACEHOLDER);
+  });
+
+  it('says WHY the picture is gone, so a model does not think it never looked', () => {
+    const r = dropStaleScreenshots(ctx([shot('a', 'x'), shot('b', 'y')]));
+    const first = r.context.messages[0] as { content: { text?: string }[] };
+    expect(first.content.at(-1)?.text).toMatch(/no longer what is there|fresh one/);
+  });
+
+  it('is a no-op when there is nothing stale, and idempotent when there was', () => {
+    const one = ctx([shot('a', 'only')]);
+    expect(dropStaleScreenshots(one).context).toBe(one);
+    const twice = dropStaleScreenshots(
+      dropStaleScreenshots(ctx([shot('a', 'x'), shot('b', 'y')])).context,
+    );
+    expect(twice.trimmedCount).toBe(0);
   });
 });

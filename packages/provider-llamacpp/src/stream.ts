@@ -26,6 +26,7 @@ import {
 } from '@mariozechner/pi-ai';
 import {
   cleanProviderError,
+  dropStaleScreenshots,
   MAX_OVERFLOW_RETRIES,
   parseContextOverflow,
   REPLY_MARGIN_TOKENS,
@@ -593,7 +594,14 @@ export function createLlamaCppStream(deps: LlamaCppStreamDeps = {}): LlamaCppStr
         // retry — re-reading the fresh token counts the server reports on each
         // pass — until the prompt fits or nothing is left to trim. This keeps the
         // turn going transparently; pi never sees the overflow. See context-trim.ts.
-        let sendContext = context;
+        /*
+         * Stale screenshots go before the request is built, every time — not
+         * only when the prompt overflows. An old screenshot is wrong as well as
+         * expensive: it shows a screen that has since been clicked and typed
+         * into. See dropStaleScreenshots for the measurement that found it.
+         */
+        const pruned = dropStaleScreenshots(context);
+        let sendContext = pruned.context;
         let res: Response;
         for (let attempt = 0; ; attempt++) {
           let body = buildChatCompletionsRequest(model, sendContext, options);
