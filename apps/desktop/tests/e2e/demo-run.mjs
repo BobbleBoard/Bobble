@@ -20,7 +20,7 @@ import { existsSync, mkdirSync, readdirSync, rmSync, symlinkSync, writeFileSync 
 import { homedir } from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
-import { _electron as electron, chromium } from 'playwright-core';
+import { chromium, _electron as electron } from 'playwright-core';
 import { probeHome } from './harness.mjs';
 
 const run = promisify(execFile);
@@ -36,6 +36,8 @@ const osa = (s) => run('osascript', ['-e', s]).catch(() => undefined);
  * @param {string} o.prompt      Typed into the composer, verbatim.
  * @param {string} o.model       Model id.
  * @param {'bash-cli'|'schemas'} o.mode
+ * @param {boolean} [o.attach] Use the app as it already is, rather than quitting
+ *        it first — see the note at the quit below.
  * @param {(dbg: Function) => Promise<Record<string, unknown>>} [o.verify]
  *        Asked of the APP once the turn ends — the run's own evidence.
  */
@@ -54,9 +56,25 @@ export async function demoRun(o) {
   rmSync(path.join(OUT, 'frames'), { recursive: true, force: true });
   mkdirSync(path.join(OUT, 'frames'), { recursive: true });
 
-  await osa(`tell application "${o.app}" to quit`);
+  /*
+   * ATTACH TO WHAT IS OPEN, when the app has state worth attaching to.
+   *
+   * Quitting the target first makes a run repeatable, and for Maps or Blender
+   * that is free. For Chrome it manufactured a bug: a cold start with five
+   * profiles opens the profile chooser, so three runs measured a model's ability
+   * to get past a screen the user would never have been on. the user: "this allows
+   * attaching to an already open chrome session though too right we wouldn't
+   * need it then right?" — right, and attaching is also the case the tools are
+   * built for, with the user's logins and their session.
+   */
+  if (o.attach !== true) await osa(`tell application "${o.app}" to quit`);
   await osa('tell application "Bobble" to quit');
   await sleep(2500);
+  if (o.attach === true) {
+    // Make sure there IS something to attach to, without stealing the screen.
+    await run('open', ['-g', '-a', o.app]).catch(() => undefined);
+    await sleep(4000);
+  }
 
   /* A throwaway HOME keeps settings and conversations out of the user's; the model
      cache is linked in, or the run dies on "model not downloaded". */
@@ -240,7 +258,7 @@ export async function demoRun(o) {
     await browser?.close().catch(() => {});
     await electronApp?.close().catch(() => {});
     await osa('tell application "Bobble" to quit');
-    await osa(`tell application "${o.app}" to quit`);
+    if (o.attach !== true) await osa(`tell application "${o.app}" to quit`);
   }
 
   const dir = path.join(OUT, 'frames');

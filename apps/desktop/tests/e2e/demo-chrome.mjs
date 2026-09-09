@@ -18,6 +18,8 @@ const TOPIC = process.env.TOPIC ?? 'wikipedia.org';
 await demoRun({
   name: process.env.RUN_NAME ?? `chrome-${MODEL}-${MODE}`,
   app: 'Google Chrome',
+  // Their real browser, as they left it — see demo-run's note on attaching.
+  attach: true,
   model: MODEL,
   mode: MODE,
   prompt:

@@ -16,6 +16,7 @@ import {
   dialogSignature,
   formatMacSnapshot,
   isAxOpaque,
+  isChromeProfilePicker,
   snapshotRect,
 } from './format';
 import type { MacSnapshot } from './protocol';
@@ -761,5 +762,37 @@ describe('an app that exposes nothing USEFUL is treated like one that exposes no
     ]);
     expect(actionableCount(bare.elements)).toBe(0);
     expect(isAxOpaque(bare)).toBe(true);
+  });
+});
+
+describe("Chrome's profile chooser is named, not just photographed", () => {
+  /*
+   * The generic opacity rule already gets a picture onto this screen. Knowing
+   * WHICH screen it is buys the thing a picture cannot: five anonymous rounded
+   * rectangles are a puzzle, "this is the profile chooser" is not.
+   */
+  const picker = {
+    app: 'Google Chrome',
+    window: "Who's using Chrome?",
+    elements: [],
+    summary: { app: 'Google Chrome', window: '', elementCount: 0, truncated: false },
+  } as never;
+
+  it('recognises it', () => {
+    expect(isChromeProfilePicker(picker)).toBe(true);
+  });
+
+  it('does not mistake an ordinary Chrome window for it', () => {
+    expect(isChromeProfilePicker({ ...picker, window: 'Wikipedia — Google Chrome' })).toBe(false);
+  });
+
+  it('does not claim it for another app that happens to say that', () => {
+    expect(isChromeProfilePicker({ ...picker, app: 'Maps' })).toBe(false);
+  });
+
+  it('tells the model what the cards are and how to get past them', () => {
+    const out = formatMacSnapshot(picker);
+    expect(out).toContain('profile chooser');
+    expect(out).toContain('x,y');
   });
 });

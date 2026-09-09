@@ -168,6 +168,39 @@ const AIMABLE_ROLES = new Set([
   'AXRow',
 ]);
 
+/**
+ * Chrome's profile chooser, by name.
+ *
+ * The generic rule above already gets a screenshot onto this screen — nothing on
+ * it is aimable, so it counts as opaque. But knowing WHICH screen it is buys
+ * something the generic rule cannot: the model can be told what the cards are
+ * and that picking one is the way through, instead of inferring a chooser from a
+ * picture of five rounded rectangles.
+ *
+ * the user, who has five profiles and hit this three times in a row: "how about just
+ * detect, if this is the profile selection screen, take a screenshot, i'm ok
+ * hardcoding this one case since chrome is popular and we're already giving it
+ * sort of special treatment anyways."
+ *
+ * Matched on the window title, which Chrome sets in the user's language — so the
+ * English check is a best-effort hint, never a gate. Everything still works
+ * without the match; this only adds a sentence.
+ */
+export function isChromeProfilePicker(snap: MacSnapshot): boolean {
+  const app = (snap.app ?? '').toLowerCase();
+  if (!app.includes('chrome')) return false;
+  const title = (snap.window ?? '').toLowerCase();
+  return title.includes("who's using chrome") || title.includes('choose a profile');
+}
+
+/** What to tell a model that has landed on the profile chooser. */
+export const CHROME_PICKER_NOTE = [
+  "This is Chrome's profile chooser, which it shows at startup when there is more",
+  'than one profile. The cards are profiles and Accessibility does not name them,',
+  'so read the picture: click a card by its x,y to open that profile, and the',
+  'browser you asked for is behind it.',
+].join(' ');
+
 export function actionableCount(elements: readonly MacElement[]): number {
   return elements.filter((e) => {
     const name = (e.name ?? '').trim().toLowerCase();
@@ -601,7 +634,12 @@ export function formatMacSnapshot(snap: MacSnapshot, view: MacSnapshotView = {})
           'combos — none of those need the picture. To see it as well, the user grants',
           'Screen Recording in System Settings → Privacy & Security.',
         ];
-    return [...head, '', ...body, ...(bounds.length > 0 ? ['', ...bounds] : [])].join('\n');
+    /* A screen we RECOGNISE is worth naming: five anonymous rounded rectangles
+       in a picture are a puzzle, and "this is the profile chooser" is not. */
+    const known = isChromeProfilePicker(snap) ? ['', ...wrap(CHROME_PICKER_NOTE)] : [];
+    return [...head, ...known, '', ...body, ...(bounds.length > 0 ? ['', ...bounds] : [])].join(
+      '\n',
+    );
   }
 
   const cap = `${menuLine(snap)}${truncationLine(snap)}`;
