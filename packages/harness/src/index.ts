@@ -1983,6 +1983,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
             isError?: boolean;
           };
           noteResult(modality, name, args, res.content ?? []);
+          if (name === 'mac_launch' && typeof args.app === 'string') controlledApp = args.app;
           /*
            * AND THE PICTURE HAS TO SURVIVE THE PIPE.
            *
@@ -3222,6 +3223,10 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     // Kept for the result hook: a repeat is only a repeat if the ARGUMENTS
     // matched too, and the result event does not carry them.
     lastCallInput = { tool: event.toolName, input: event.input };
+    if (event.toolName === 'mac_launch') {
+      const app = (event.input as { app?: unknown } | undefined)?.app;
+      if (typeof app === 'string') controlledApp = app;
+    }
     /*
      * A TOOL THIS RUN MAY NOT CALL, whatever it thinks.
      *
@@ -3344,10 +3349,18 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
   // disposable; `read` is left alone (its content is the point, and pi already
   // bounds it). Only the text parts are capped — image parts pass through.
   const TRUNCATE_TOOLS = new Set(['bash', 'grep', 'find', 'ls']);
+  /** The tools whose refusal is worth redirecting at the app being driven. */
+  const FILE_TOOLS = new Set(['edit', 'write', 'read', 'multi_edit']);
   /** What the last bash command opened, if anything — consumed by its result. */
   let lastOpened: ReturnType<typeof detectOpenedApp>;
   /** Image parts a CLI dispatch produced, re-attached to its bash result. */
   let cliImages: { type: string; text?: string; data?: string; mimeType?: string }[] = [];
+  /*
+   * The app currently being driven, remembered from whichever `mac_launch` the
+   * model made — through the CLI or as a tool. Only used to answer a file-tool
+   * refusal with something better than more path advice; see FILE_TOOLS below.
+   */
+  let controlledApp: string | null = null;
   pi.on('tool_result', (event) => {
     /* In CLI mode every call is `bash`, so the real tool name is only known at
        the dispatch (see the CLI host's `call`); tally there instead, or the
@@ -3356,6 +3369,43 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     const mctx = runtime.currentCtx;
     if (mctx?.hasUI === true) {
       mctx.ui.setStatus('harness-modality', JSON.stringify(modality));
+    }
+    /*
+     * A FILE TOOL REFUSED WHILE AN APP IS BEING DRIVEN IS NOT A PATH PROBLEM.
+     *
+     * MEASURED on a 4B asked to add a cone in Blender: it said "I can see
+     * Blender's start screen. I'll click on General", and then called `edit`
+     * with path "/testbed" and oldText "This is the root directory" — training
+     * residue, not a real path. It was refused, and the refusal explains where
+     * the workspace is, so it guessed another path. EIGHT times, without ever
+     * calling click.
+     *
+     * The refusal is right about the sandbox and useless here: the model does
+     * not want a different path, it wants the app. Naming the app it launched,
+     * and the command that acts on it, points at what it already said it meant
+     * to do. The sandbox message is left intact underneath — this is an extra
+     * sentence, not a replacement, because the fence still has to be explained
+     * to a model that really was trying to write a file.
+     */
+    if (FILE_TOOLS.has(event.toolName) && event.isError === true && controlledApp !== null) {
+      const said = event.content
+        .map((p) => (p.type === 'text' ? p.text : ''))
+        .join('');
+      if (/outside the workspace|Refusing to /.test(said)) {
+        const how = toolCliMode
+          ? `\`mac click --x <x> --y <y>\` (screen points, read off the screenshot)`
+          : 'the mac_click tool';
+        const note =
+          `\n\nYou are driving "${controlledApp}" right now. Writing or editing a file does ` +
+          `NOT do anything to it — nothing you put on disk reaches that window. Act on the ` +
+          `app itself: \`mac snapshot --screenshot\` to see it, then ${how}. If you just ` +
+          `said what you were about to click, click it.`;
+        return {
+          content: event.content.map((part, i) =>
+            i === 0 && part.type === 'text' ? { ...part, text: `${part.text}${note}` } : part,
+          ),
+        };
+      }
     }
     if (event.toolName === 'bash' && cliImages.length > 0) {
       const attached = cliImages.map((c) => ({

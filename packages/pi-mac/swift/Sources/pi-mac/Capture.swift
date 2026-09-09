@@ -131,6 +131,54 @@ func encode(_ image: CGImage, as type: UTType, quality: Double = 0.72) -> Data? 
   return data as Data
 }
 
+
+/// THE PICTURE THE MODEL GETS, AT THE SIZE ITS COORDINATES ARE IN.
+///
+/// The composite is captured in native backing pixels: on this Retina Mac a
+/// Blender window is 3024x1730 and 7.5 MB of PNG. MEASURED once images reached
+/// the model in CLI mode — two screenshots cost 11 MB in one turn and prefill
+/// went to 34.7s and 30.8s. A screenshot that costs half a minute to look at is
+/// not a perception surface.
+///
+/// Point size is also the CORRECT size, not merely a smaller one: every act
+/// takes screen POINTS, so a 2x image had the model halving each coordinate it
+/// read off the picture. `rect` is already in points and the image is in pixels,
+/// so their ratio is this capture's exact scale — no guess at a backing factor,
+/// and it stays right on a non-Retina or mixed-display Mac.
+///
+/// The full-resolution PNG still goes to disk. The path is deliberate — the
+/// model is told it can operate on that file with code — and only the INLINE
+/// copy needs to be cheap.
+private let maxInlineSide = 1600
+
+func inlineImage(_ image: CGImage, pointWidth: CGFloat) -> [String: Any]? {
+  let target = min(Int(pointWidth.rounded()), maxInlineSide)
+  guard target > 0, image.width > 0 else { return nil }
+  let scaled = target >= image.width ? image : resize(image, toWidth: target)
+  guard let shrunk = scaled, let data = encode(shrunk, as: .jpeg) else { return nil }
+  return [
+    "base64": data.base64EncodedString(),
+    "mimeType": "image/jpeg",
+    "inlineWidth": shrunk.width,
+    "inlineHeight": shrunk.height,
+  ]
+}
+
+/// Redraw at `width`, preserving aspect. CGContext rather than an ImageIO
+/// thumbnail because the image is already decoded here.
+private func resize(_ image: CGImage, toWidth width: Int) -> CGImage? {
+  let height = max(1, Int((CGFloat(width) * CGFloat(image.height) / CGFloat(image.width)).rounded()))
+  guard
+    let ctx = CGContext(
+      data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
+      space: CGColorSpaceCreateDeviceRGB(),
+      bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue)
+  else { return nil }
+  ctx.interpolationQuality = .high
+  ctx.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+  return ctx.makeImage()
+}
+
 func writePNG(_ image: CGImage, prefix: String) -> String? {
   guard let data = encode(image, as: .png) else { return nil }
   let path = (NSTemporaryDirectory() as NSString).appendingPathComponent(
@@ -166,9 +214,13 @@ func captureAppSurfaces(pid: pid_t, withBase64: Bool, maxWidth: Int? = nil) -> [
       "path": path, "rect": rectDict(rect), "width": image.width, "height": image.height,
       "windows": windows.map(windowDict), "composite": true,
     ]
-    if withBase64, let data = try? Data(contentsOf: URL(fileURLWithPath: path)) {
-      result["base64"] = data.base64EncodedString()
-      result["mimeType"] = "image/png"
+    if withBase64 {
+      if let inline = inlineImage(image, pointWidth: rect.width) {
+        result.merge(inline) { _, new in new }
+      } else if let data = try? Data(contentsOf: URL(fileURLWithPath: path)) {
+        result["base64"] = data.base64EncodedString()
+        result["mimeType"] = "image/png"
+      }
     }
     return result
   }
