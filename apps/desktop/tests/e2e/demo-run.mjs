@@ -169,6 +169,8 @@ export async function demoRun(o) {
   /** The camera loop, hoisted so `finally` can wait for it to stop. */
   let camera = Promise.resolve();
   let shot = 0;
+  /** Stops the CDP screencast, if one was started. */
+  let screencastStop = null;
   try {
     if (page === undefined) throw new Error('no renderer page');
 
@@ -247,8 +249,60 @@ export async function demoRun(o) {
       }
     }, 250);
 
+    /*
+     * THIRTY FRAMES A SECOND NEEDS A PUSH, NOT A PULL.
+     *
+     * the user: "please video at 30+ if possible ... it seems earlier ones were low
+     * framerate". Asking for a screenshot per frame is a full CDP round trip
+     * each time, and MEASURED it tops out between 15/s (while Blender is busy
+     * on the GPU) and 27/s. Page.startScreencast has the browser PUSH frames
+     * instead, already JPEG-encoded at the size we ask for, so the rate stops
+     * depending on our round trip.
+     *
+     * Frames are written with the same name shape as the pulled ones, so the
+     * assembler cannot tell the difference. If the session fails to start we
+     * fall back rather than lose the video — a lower framerate is worth more
+     * than no recording.
+     */
+    let screencast = null;
+    if (process.env.SCREENCAST === '1') {
+      try {
+        screencast = await page.context().newCDPSession(page);
+        screencast.on('Page.screencastFrame', async (f) => {
+          if (!shooting) return;
+          const at = Date.now();
+          writeFileSync(
+            path.join(OUT, 'frames', `f-${String(++shot).padStart(5, '0')}-${at}.jpg`),
+            Buffer.from(f.data, 'base64'),
+          );
+          await screencast
+            .send('Page.screencastFrameAck', { sessionId: f.sessionId })
+            .catch(() => {});
+        });
+        await screencast.send('Page.startScreencast', {
+          format: 'jpeg',
+          quality: 72,
+          maxWidth: 1600,
+          maxHeight: 1000,
+          everyNthFrame: 1,
+        });
+        screencastStop = async () => {
+          await screencast?.send('Page.stopScreencast').catch(() => {});
+          await screencast?.detach().catch(() => {});
+        };
+        say('camera: CDP screencast');
+      } catch (e) {
+        screencast = null;
+        say(`camera: screenshots (screencast unavailable: ${String(e).slice(0, 80)})`);
+      }
+    }
+
     camera = (async () => {
       while (shooting) {
+        if (screencast !== null) {
+          await sleep(200);
+          continue;
+        }
         const at = Date.now();
         try {
           await page.screenshot({
@@ -301,6 +355,39 @@ export async function demoRun(o) {
      * there, press Enter again, and retype if the composer was cleared without
      * the message landing.
      */
+    /*
+     * WAIT FOR CAPACITY BEFORE TYPING, AND NAME THE GATE IF THERE IS NONE.
+     *
+     * A message sent while the app believes a turn is running does not fail — it
+     * is QUEUED (pi-slice's canDrainQueue: not streaming, no prompt in flight,
+     * no background run, not resuming) and drains later. MEASURED: after
+     * `pi:restart` one of those flags can still be set, so the prompt lands in
+     * the store as a user message, the queue never drains, and the run sits for
+     * its whole deadline with `prefill: 0 ingests` and nothing to show. It looks
+     * identical to a model that said nothing.
+     */
+    const capacity = async () =>
+      page.evaluate(() => {
+        const s = window.__pi_store().getState();
+        return {
+          ok:
+            !s.agent.isStreaming && !s.promptInFlight && s.bgRun?.streaming !== true && !s.resuming,
+          streaming: s.agent.isStreaming === true,
+          promptInFlight: s.promptInFlight === true,
+          bgRun: s.bgRun?.streaming === true,
+          resuming: s.resuming === true,
+          queued: (s.queuedSends ?? []).length,
+        };
+      });
+    let cap = await capacity();
+    for (let i = 0; i < 40 && !cap.ok; i += 1) {
+      await sleep(500);
+      cap = await capacity();
+    }
+    if (!cap.ok) {
+      say(`WARNING sending anyway, the app reports no capacity: ${JSON.stringify(cap)}`);
+    }
+
     const editor = page.locator('[contenteditable="true"]').first();
     const landed = () =>
       page.evaluate(
@@ -330,6 +417,10 @@ export async function demoRun(o) {
     }
     if (!sent) throw new Error('the prompt never entered the conversation');
     say(`sent: ${JSON.stringify(o.prompt)}`);
+    /* A message can be IN the conversation and still be waiting: report the
+       queue rather than letting the run look like a silent model. */
+    const after = await capacity();
+    if (after.queued > 0 || !after.ok) say(`after send: ${JSON.stringify(after)}`);
 
     const readState = () =>
       page.evaluate(() => {
@@ -460,6 +551,7 @@ export async function demoRun(o) {
     await sleep(1200);
   } finally {
     shooting = false;
+    await screencastStop?.().catch(() => {});
     /* Wait for the camera itself, not for a guess at its period: a screenshot in
        flight when the app closes writes a truncated frame that ffmpeg then trips
        over, and at 30/s there is almost always one in flight. */
