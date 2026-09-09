@@ -147,6 +147,43 @@ export async function demoRun(o) {
       throw new Error('accessibility is not granted for the LaunchServices identity — see README');
     }
 
+    /*
+     * PREFILL, PER TURN, WHILE IT HAPPENS.
+     *
+     * the user: "check that prefill makes sense on each turn ... when there's a >2
+     * second prefill in a turn check it out". The provider reports real
+     * processed/total over the `harness-prefill` status channel, so the run can
+     * time every ingest episode rather than inferring one from wall clock.
+     * Recorded next to the tool count, because the usual reason an ingest gets
+     * long is that the prompt's prefix moved — and the tool schemas ARE that
+     * prefix.
+     */
+    const prefills = [];
+    let prefillStart = null;
+    let prefillPeak = 0;
+    const prefillWatch = setInterval(async () => {
+      try {
+        const raw = await page.evaluate(
+          () => window.__pi_store().getState().extensionStatus['harness-prefill'],
+        );
+        /* The channel carries a bare percentage string ("0".."99"), not JSON —
+           `parsePrefillPercent` is the reader, and 100/absent means done. */
+        const pct = raw === undefined || raw === '' ? Number.NaN : Number(raw);
+        const active = Number.isFinite(pct) && pct >= 0 && pct < 100;
+        if (active && prefillStart === null) {
+          prefillStart = Date.now();
+          prefillPeak = 0;
+        }
+        if (active) prefillPeak = Math.max(prefillPeak, pct);
+        if (!active && prefillStart !== null) {
+          prefills.push({ ms: Date.now() - prefillStart, peak: Math.round(prefillPeak) });
+          prefillStart = null;
+        }
+      } catch {
+        /* between turns */
+      }
+    }, 250);
+
     const camera = (async () => {
       while (shooting) {
         const at = Date.now();
@@ -236,6 +273,15 @@ export async function demoRun(o) {
       await sleep(800);
     }
     clearInterval(watcher);
+    clearInterval(prefillWatch);
+    if (prefillStart !== null) prefills.push({ ms: Date.now() - prefillStart, peak: prefillPeak });
+    const slow = prefills.filter((p) => p.ms >= 2000);
+    say(
+      `prefill: ${prefills.length} ingests, ${slow.length} over 2s` +
+        (prefills.length === 0
+          ? ''
+          : ` — ${prefills.map((p) => `${(p.ms / 1000).toFixed(1)}s`).join(', ')}`),
+    );
 
     const stole = frontSamples.filter((a) => new RegExp(o.app, 'i').test(String(a)));
     say(`focus guard: ${frontSamples.length} samples, ${o.app} was frontmost ${stole.length}`);

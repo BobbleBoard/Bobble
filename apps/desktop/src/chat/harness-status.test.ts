@@ -4,6 +4,7 @@ import {
   modelReadyStage,
   PREFIX_WARM_STATUS,
   PROMOTE_STATUS_KEY,
+  parsePrefillPercent,
   parsePromoteSignal,
   showLoadingModel,
   showProcessing,
@@ -216,5 +217,33 @@ describe('a prefill caused by a capability loading', () => {
       loadingCapability: 'browser',
     });
     expect(v?.label).not.toContain('Loading');
+  });
+});
+
+describe('the prefill channel clears when the ingest ends', () => {
+  /*
+   * `harness-prefill` was only ever SET, capped at 99 because "the renderer
+   * drives the final 100" — and nothing ever wrote that 100. The channel kept
+   * its last value for the life of the session, so a reader sees a turn that has
+   * been ingesting ever since it finished, and the NEXT turn opens showing the
+   * PREVIOUS turn's percentage until a real progress frame replaces it.
+   *
+   * Found by instrumenting it for the user's ask ("check that prefill makes sense on
+   * each turn"): a demo run measured "1 ingest, 252.1s", which was the whole run
+   * rather than any ingest. The harness now clears it at both turn boundaries;
+   * these pin the reader's half of the contract.
+   */
+  it('reads an empty channel as no ingest', () => {
+    expect(parsePrefillPercent('')).toBeNull();
+    expect(parsePrefillPercent(undefined)).toBeNull();
+  });
+
+  it('reads a real percentage as an ingest in progress', () => {
+    expect(parsePrefillPercent('0')).toBe(0);
+    expect(parsePrefillPercent('87')).toBe(87);
+  });
+
+  it('treats a completed ingest as no ingest', () => {
+    expect(parsePrefillPercent('100')).toBeNull();
   });
 });

@@ -13,7 +13,10 @@ import { demoRun } from './demo-run.mjs';
 
 const MODEL = process.env.MAC_CU_MODEL ?? 'qwen3.5-9b-mtp';
 const MODE = process.env.TOOL_INTERFACE === 'schemas' ? 'schemas' : 'bash-cli';
-const TOPIC = process.env.TOPIC ?? 'wikipedia.org';
+/* A different destination per run, for the same reason the Maps place varies: a
+   tab already open on the target is not a navigation. */
+const SITES = ['wikipedia.org', 'example.com', 'openstreetmap.org', 'archive.org'];
+const TOPIC = process.env.TOPIC ?? SITES[Math.floor(Math.random() * SITES.length)] ?? 'example.com';
 
 await demoRun({
   name: process.env.RUN_NAME ?? `chrome-${MODEL}-${MODE}`,

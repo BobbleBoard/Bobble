@@ -13,7 +13,26 @@
  */
 import { demoRun } from './demo-run.mjs';
 
-const PLACE = process.env.PLACE ?? 'Golden Gate Bridge';
+/*
+ * A DIFFERENT PLACE EVERY RUN.
+ *
+ * the user: "make sure you vary some tasks so that for example it doesn't open maps
+ * like it just did to the golden gate already there." He is right that it
+ * invalidates the measurement: after one run the place is in Maps' Recents, and
+ * the next model can find it without searching — one of them said as much in its
+ * own reasoning ("there's already a Golden Gate Bridge entry in the recents
+ * list"). The task has to be new to the app each time or it stops being a task.
+ */
+const PLACES = [
+  'Sydney Opera House',
+  'Mount Fuji',
+  'Colosseum, Rome',
+  'Table Mountain',
+  'Reykjavik Harbour',
+  'Machu Picchu',
+];
+const PLACE =
+  process.env.PLACE ?? PLACES[Math.floor(Math.random() * PLACES.length)] ?? 'Mount Fuji';
 const MODEL = process.env.MAC_CU_MODEL ?? 'qwen3.5-9b-mtp';
 const MODE = process.env.TOOL_INTERFACE === 'schemas' ? 'schemas' : 'bash-cli';
 

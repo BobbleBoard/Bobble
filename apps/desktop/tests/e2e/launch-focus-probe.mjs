@@ -26,18 +26,30 @@ await run('osascript', ['-e', `tell application "${APP}" to quit`]).catch(() => 
 await run('osascript', ['-e', 'tell application "Bobble" to quit']).catch(() => {});
 await sleep(3000);
 await run('open', [
-  '-g', '--env', 'PI_E2E=1', '--env', 'PI_E2E_BACKGROUND=1',
-  '-a', '/Applications/Bobble.app', '--args', `--remote-debugging-port=${PORT}`,
+  '-g',
+  '--env',
+  'PI_E2E=1',
+  '--env',
+  'PI_E2E_BACKGROUND=1',
+  '-a',
+  '/Applications/Bobble.app',
+  '--args',
+  `--remote-debugging-port=${PORT}`,
 ]);
 await sleep(7000);
 
 const browser = await chromium.connectOverCDP(`http://127.0.0.1:${PORT}`);
 try {
-  const page = (browser.contexts()[0]?.pages() ?? []).find((p) => !p.url().startsWith('devtools://'));
-  await page.waitForFunction(() => typeof window.piDesktop?.invoke === 'function', { timeout: 30000 });
+  const page = (browser.contexts()[0]?.pages() ?? []).find(
+    (p) => !p.url().startsWith('devtools://'),
+  );
+  await page.waitForFunction(() => typeof window.piDesktop?.invoke === 'function', {
+    timeout: 30000,
+  });
   console.log(`before launch, frontmost: ${await front()}`);
   await page.evaluate(
-    (app) => window.piDesktop.invoke('mac:debug', { op: 'launch', params: { app, background: true } }),
+    (app) =>
+      window.piDesktop.invoke('mac:debug', { op: 'launch', params: { app, background: true } }),
     APP,
   );
   const seen = [];

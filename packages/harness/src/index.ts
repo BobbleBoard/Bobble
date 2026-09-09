@@ -2059,6 +2059,11 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
       }
     }
   };
+  /** Say that no prompt is being ingested. See the call in `agent_end`. */
+  const clearPrefillStatus = (ctx: ExtensionContext): void => {
+    if (ctx.hasUI === true) ctx.ui.setStatus('harness-prefill', '');
+  };
+
   /* One-shot guard for the tool-cost diagnostic below: it is the same on every
    * request of a run, and a per-request dump would bury the file. */
   let toolCostLogged = false;
@@ -2936,6 +2941,8 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
      * and a role that needs something else can still reach for `tool_search`.
      */
     applyPreset(ctx);
+    // A new turn starts at no-ingest, not at whatever the last one reached.
+    clearPrefillStatus(ctx);
     // Replace the turn's system prompt with the capability-affirming version.
     return { systemPrompt: augmentedSystemPrompt };
   });
@@ -2954,6 +2961,19 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     runtime.taskStart = null;
     // The re-prefill it named is over with the turn.
     runtime.loadingCapability = null;
+    /*
+     * AND THE INGEST IS OVER TOO — say so.
+     *
+     * `harness-prefill` was only ever SET, capped at 99 because "the renderer
+     * drives the final 100". Nothing ever wrote that 100, so the channel kept
+     * its last value for the life of the session: a reader sees a turn that has
+     * been ingesting since it finished, and the NEXT turn opens showing the
+     * PREVIOUS turn's percentage until a real progress frame replaces it.
+     *
+     * Found by instrumenting it — a demo run measured "1 ingest, 252.1s", which
+     * was the whole run rather than any ingest.
+     */
+    clearPrefillStatus(ctx);
     publishStatus(ctx);
     /*
      * A TURN THAT ENDED BY ASKING WHICH OPTION TO TAKE IS A TURN THAT STOPPED.
