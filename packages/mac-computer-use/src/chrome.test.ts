@@ -106,11 +106,32 @@ describe('when it fails, it says what would unblock it', () => {
     );
   });
 
-  it('names the restart that the preference needs', () => {
-    expect(explainChromeFailure('Error executing JavaScript (-2700)')).toContain('restarted');
+  it('says the chrome_* route is closed for the whole session', () => {
+    // It used to name the restart the preference needs, which is advice for the
+    // USER at a moment only the MODEL is reading. What the model needs to know
+    // is that retrying this route cannot work — see the test below for the
+    // route that does.
+    const msg = explainChromeFailure('Error executing JavaScript (-2700)');
+    expect(msg).toContain('none of them will work');
   });
 
   it('says when there is simply no window open', () => {
     expect(explainChromeFailure("can't get front window")).toContain('no open window');
+  });
+});
+
+describe('the Apple Events refusal names a route that works', () => {
+  it('does not leave the model with a setting it cannot change', () => {
+    /*
+     * MEASURED on the user's machine: "Allow JavaScript from Apple Events" is off,
+     * so every chrome_* call fails this way. The old message said to enable it —
+     * which the model cannot do and must not try — and a 4B and a 9B each spent
+     * a run re-trying the blocked route. A 27B found the way out unaided ("so I
+     * typed the URL into the address bar") and finished the task.
+     */
+    const msg = explainChromeFailure('Error executing JavaScript (-2700)');
+    expect(msg).toContain('mac_key');
+    expect(msg).toContain('cmd+l');
+    expect(msg).toMatch(/do NOT try|only the user/i);
   });
 });

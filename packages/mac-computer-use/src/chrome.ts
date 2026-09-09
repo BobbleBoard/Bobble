@@ -89,9 +89,24 @@ export function explainChromeFailure(stderr: string): string {
     );
   }
   if (s.includes('javascript') || s.includes('-2700') || s.includes('executing javascript')) {
+    /*
+     * AND SAY WHAT TO DO INSTEAD, because the model cannot fix this and must
+     * not try. "Allow JavaScript from Apple Events" is off by default and is the
+     * user's setting to change; telling a model to enable it is a signpost
+     * pointing at nothing, and MEASURED on the user's machine it is off, so every
+     * chrome_* call fails this way.
+     *
+     * The way out is the one a 27B found unaided on the archive.org run — "so I
+     * typed the URL into the address bar like a [person]" — while a 4B and a 9B
+     * did not, and spent their runs re-trying the blocked route. Chrome is still
+     * an app: ⌘L focuses the address bar and it can be typed into.
+     */
     return (
-      'Chrome is refusing JavaScript from Apple Events. It must be enabled AND Chrome ' +
-      'restarted for the setting to take effect.'
+      'Chrome is refusing JavaScript from Apple Events (it is off by default, and only ' +
+      'the user can turn it on — do NOT try). The chrome_* commands all go through it, ' +
+      'so none of them will work in this session. DRIVE CHROME AS AN APP INSTEAD, which ' +
+      'needs no setting: mac_key "cmd+l" to focus the address bar, mac_type the URL with ' +
+      'submit, then mac_snapshot to read the page. The window title carries the page title.'
     );
   }
   if (s.includes("can't get") || s.includes('front window')) {

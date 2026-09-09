@@ -74,7 +74,29 @@ export async function demoRun(o) {
    */
   if (o.attach !== true) await osa(`tell application "${o.app}" to quit`);
   await osa('tell application "Bobble" to quit');
-  await sleep(2500);
+  /*
+   * AND WAIT FOR IT TO ACTUALLY BE GONE.
+   *
+   * A fixed sleep after the quit is a hope, not a gate, and MEASURED it lost
+   * four runs of an overnight batch in a row: a Bobble killed mid-run (its
+   * `finally` never reached) was still tearing down when the next run launched,
+   * so Playwright found a window whose composer never became visible and every
+   * run after it failed identically with the same TimeoutError. Nothing about
+   * that is diagnosable from the run it breaks, which is what makes it worth a
+   * real check rather than a longer sleep.
+   */
+  for (let i = 0; i < 40; i += 1) {
+    // execFile is promisified, so this resolves to {stdout}; pgrep exits 1 when
+    // nothing matches, which rejects — and "no match" is exactly "not alive".
+    const alive = await run('pgrep', ['-f', 'Bobble.app/Contents/MacOS/Bobble']).then(
+      (r) => String(r.stdout ?? '').trim() !== '',
+      () => false,
+    );
+    if (!alive) break;
+    if (i === 20) await osa('tell application "Bobble" to quit');
+    await sleep(500);
+  }
+  await sleep(1500);
   if (o.attach === true) {
     // Make sure there IS something to attach to, without stealing the screen.
     await run('open', ['-g', '-a', o.app]).catch(() => undefined);
