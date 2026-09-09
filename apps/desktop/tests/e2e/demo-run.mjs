@@ -171,6 +171,25 @@ export async function demoRun(o) {
   let shot = 0;
   try {
     if (page === undefined) throw new Error('no renderer page');
+
+    /*
+     * WHATEVER THE APP ITSELF COMPLAINED ABOUT.
+     *
+     * MEASURED three times across this matrix: the prompt goes in, prefill
+     * finishes, and the turn ends having produced NOTHING — no text, no tool
+     * call, no error the run can see. A frame from the middle shows the composer
+     * back at "Ask anything...", so the turn really did end; the run has no way
+     * to say why, and that is exactly the failure the user asked me to make sure
+     * never just hangs quietly. The renderer's own errors are the one channel
+     * that might say, and nothing was reading it.
+     */
+    page.on('console', (m) => {
+      if (m.type() === 'error' || m.type() === 'warning') {
+        log.push(`  [app ${m.type()}] ${m.text().slice(0, 300)}`);
+      }
+    });
+    page.on('pageerror', (e) => log.push(`  [app pageerror] ${String(e).slice(0, 300)}`));
+
     await page.waitForFunction(() => typeof window.piDesktop?.invoke === 'function', {
       timeout: 40_000,
     });
