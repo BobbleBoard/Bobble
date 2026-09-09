@@ -1979,11 +1979,36 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
             undefined,
             runtime.currentCtx ?? undefined,
           )) as {
-            content?: { type: string; text?: string }[];
+            content?: { type: string; text?: string; data?: string; mimeType?: string }[];
             isError?: boolean;
           };
+          noteResult(modality, name, args, res.content ?? []);
+          /*
+           * AND THE PICTURE HAS TO SURVIVE THE PIPE.
+           *
+           * A command's result comes back to the model as the bash tool's stdout,
+           * which is text — so an image part was being rendered as the literal
+           * string "[image]" and thrown away. MEASURED consequence: in CLI mode
+           * the model never saw a single screenshot. On an app with an
+           * Accessibility tree that is a handicap; on one without (Blender draws
+           * its own interface and exposes three elements) it is acting blind, and
+           * the run would have measured our pipe rather than the model.
+           *
+           * The parts are held here and re-attached to the bash tool_result that
+           * this dispatch produced, which is the one place downstream that can
+           * still carry them. Same shape as `lastOpened` below: written by the
+           * cause, consumed once by the result.
+           */
+          const images = (res.content ?? []).filter((c) => c.type === 'image' && c.data);
+          if (images.length > 0) cliImages = images;
           const text = (res.content ?? [])
-            .map((c) => (c.type === 'text' ? (c.text ?? '') : `[${c.type}]`))
+            .map((c) =>
+              c.type === 'text'
+                ? (c.text ?? '')
+                : c.type === 'image'
+                  ? '[screenshot attached below]'
+                  : `[${c.type}]`,
+            )
             .join('\n');
           return { text, isError: res.isError === true };
         },
@@ -3321,11 +3346,25 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
   const TRUNCATE_TOOLS = new Set(['bash', 'grep', 'find', 'ls']);
   /** What the last bash command opened, if anything — consumed by its result. */
   let lastOpened: ReturnType<typeof detectOpenedApp>;
+  /** Image parts a CLI dispatch produced, re-attached to its bash result. */
+  let cliImages: { type: string; text?: string; data?: string; mimeType?: string }[] = [];
   pi.on('tool_result', (event) => {
-    noteResult(modality, event.toolName, lastCallInput?.input, event.content);
+    /* In CLI mode every call is `bash`, so the real tool name is only known at
+       the dispatch (see the CLI host's `call`); tally there instead, or the
+       whole split reads as zero. */
+    if (!toolCliMode) noteResult(modality, event.toolName, lastCallInput?.input, event.content);
     const mctx = runtime.currentCtx;
     if (mctx?.hasUI === true) {
       mctx.ui.setStatus('harness-modality', JSON.stringify(modality));
+    }
+    if (event.toolName === 'bash' && cliImages.length > 0) {
+      const attached = cliImages.map((c) => ({
+        type: 'image' as const,
+        data: c.data ?? '',
+        mimeType: c.mimeType ?? 'image/png',
+      }));
+      cliImages = [];
+      return { content: [...event.content, ...attached] };
     }
     /*
      * THE SAME CALL, MADE AGAIN, WITH THE SAME ANSWER.

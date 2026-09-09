@@ -261,31 +261,35 @@ export async function demoRun(o) {
           /* The call AND what came back. A name-only log says a run made forty
              calls and not which of them failed, so every diagnosis needed the
              session JSONL afterwards — too late to act on during an overnight
-             batch. The result is truncated hard: this is a trace, not a copy of
-             the conversation. */
-          tools: ps.messages
-            .filter((m) => m.kind === 'assistant')
-            .flatMap((m) =>
-              m.blocks
-                .filter((b) => b.type === 'toolCall')
-                .map((b) => {
-                  const args = JSON.stringify(b.args ?? b.arguments ?? {}).slice(0, 120);
-                  const parts = b.result?.content ?? b.result?.output ?? [];
-                  const text = Array.isArray(parts)
-                    ? parts
-                        .filter((x) => x?.type === 'text')
-                        .map((x) => x.text)
-                        .join(' ')
-                    : typeof b.result === 'string'
-                      ? b.result
-                      : '';
-                  const imgs = Array.isArray(parts)
-                    ? parts.filter((x) => x?.type === 'image').length
-                    : 0;
-                  const back = `${imgs > 0 ? `[+${imgs} image] ` : ''}${text.replace(/\s+/g, ' ').slice(0, 220)}`;
-                  return `${b.name} ${args}${back.trim() === '' ? '' : `\n      → ${back}`}`;
-                }),
-            ),
+             batch. Results are their own messages, joined back by toolCallId;
+             truncated hard, because this is a trace and not a copy of the
+             conversation. */
+          tools: (() => {
+            const resultFor = new Map();
+            for (const m of ps.messages) {
+              if (m.kind === 'toolResult') resultFor.set(m.toolCallId, m);
+            }
+            return ps.messages
+              .filter((m) => m.kind === 'assistant')
+              .flatMap((m) =>
+                m.blocks
+                  .filter((b) => b.type === 'toolCall')
+                  .map((b) => {
+                    const args = JSON.stringify(b.args ?? b.arguments ?? {}).slice(0, 140);
+                    const r = resultFor.get(b.id);
+                    const parts = Array.isArray(r?.content) ? r.content : [];
+                    const text = [
+                      r?.text ?? '',
+                      ...parts.filter((x) => x?.type === 'text').map((x) => x.text ?? ''),
+                    ].join(' ');
+                    const imgs = parts.filter((x) => x?.type === 'image').length;
+                    const back =
+                      `${imgs > 0 ? `[+${imgs} image] ` : ''}` +
+                      `${r?.isError ? 'ERROR ' : ''}${text.replace(/\s+/g, ' ').slice(0, 240)}`;
+                    return `${b.name} ${args}${back.trim() === '' ? '' : `\n      -> ${back}`}`;
+                  }),
+              );
+          })(),
           text: ps.messages
             .filter((m) => m.kind === 'assistant')
             .flatMap((m) => m.blocks.filter((b) => b.type === 'text').map((b) => b.text))

@@ -395,8 +395,10 @@ export function resolveCli(cli: CliModel, argv: readonly string[]): CliResolutio
   const bare: string[] = [];
   for (const word of [...leftover, ...parsed.positionals]) {
     const m = /^([A-Za-z][A-Za-z0-9_]*):(.*)$/.exec(word);
-    if (m !== null && m[1] !== undefined && m[2] !== '' && props[m[1]] !== undefined) {
-      keyed[m[1]] = m[2];
+    const key = m?.[1];
+    const value = m?.[2];
+    if (key !== undefined && value !== undefined && value !== '' && props[key] !== undefined) {
+      keyed[key] = value;
     } else {
       bare.push(word);
     }
