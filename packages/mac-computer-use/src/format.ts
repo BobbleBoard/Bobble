@@ -82,6 +82,19 @@ function isLabel(el: MacElement): boolean {
  */
 function showingLines(text: readonly string[] | undefined): string[] {
   if (text === undefined || text.length === 0) return [];
+  /*
+   * A LABEL IS A PHRASE; A PAGE IS PROSE.
+   *
+   * `Showing: "a" · "b" · "c"` is right for the three things a native window
+   * says back — Calculator's answer, an alert's message. It is wrong for a web
+   * page, which now arrives here as dozens of real lines (Chrome reports its
+   * text with zero height, and we used to drop all of it — see
+   * dedupeReadText). Quoted and dot-joined, a page reads as debris; one line
+   * each, it reads as the page.
+   */
+  if (text.length > 3) {
+    return ['', 'Text on screen:', ...text.map((t) => `  ${t}`)];
+  }
   return ['', ...wrap(`Showing: ${text.map((t) => JSON.stringify(t)).join(' · ')}`)];
 }
 

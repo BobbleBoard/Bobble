@@ -796,3 +796,49 @@ describe("Chrome's profile chooser is named, not just photographed", () => {
     expect(out).toContain('x,y');
   });
 });
+
+describe('page text (a web page is prose, not labels)', () => {
+  it('lists a page one line at a time instead of dot-joining quoted fragments', () => {
+    const out = formatMacSnapshot({
+      app: 'Google Chrome',
+      window: 'Shop iPhone — Apple',
+      summary: { app: 'Google Chrome', window: 'Shop iPhone — Apple', elementCount: 1 },
+      elements: [
+        {
+          index: 1,
+          role: 'AXButton',
+          name: 'Buy',
+          x: 40,
+          y: 40,
+          w: 60,
+          h: 20,
+          actions: ['AXPress'],
+        },
+      ],
+      text: [
+        'Apple Store Mac iPad iPhone',
+        'Buy from $3199 or $133.29 per month for 24 months',
+        'Storage. How much space do you need?',
+        '256GB 512GB 1TB 2TB',
+      ],
+    } as unknown as MacSnapshot);
+    expect(out).toContain('Text on screen:');
+    expect(out).toContain('  256GB 512GB 1TB 2TB');
+    // Not the label form: a page must not come back as quoted, dot-joined debris.
+    expect(out).not.toContain('Showing:');
+    expect(out).not.toContain('"256GB 512GB 1TB 2TB"');
+  });
+
+  it('keeps the compact one-liner when an app says only a thing or two', () => {
+    const out = formatMacSnapshot({
+      app: 'Calculator',
+      window: 'Calculator',
+      summary: { app: 'Calculator', window: 'Calculator', elementCount: 1 },
+      elements: [
+        { index: 1, role: 'AXButton', name: '7', x: 10, y: 10, w: 20, h: 20, actions: ['AXPress'] },
+      ],
+      text: ['888'],
+    } as unknown as MacSnapshot);
+    expect(out).toContain('Showing: "888"');
+  });
+});
