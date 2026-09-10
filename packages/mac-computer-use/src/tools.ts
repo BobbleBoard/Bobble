@@ -74,6 +74,7 @@ export {
 } from './tool-names.js';
 
 import { shareTool } from '@pi-desktop/tool-bus';
+import { nearMissNote, type PageLine, searchPage } from './page-search.js';
 import {
   CHROME_CLICK_TOOL,
   CHROME_GO_TOOL,
@@ -126,6 +127,14 @@ export interface MacComputerUseOptions {
   /** The controlled-app state machine; defaults to a fresh one (test seam). */
   readonly session?: MacSessionState;
   readonly elementCap?: number;
+  /**
+   * How the Chrome tab list is read over Apple Events. Injectable because the
+   * real one talks to the DEVELOPER'S OWN Chrome, and a unit test that hands in
+   * a fake bridge was silently being answered by it — the tabs test passed only
+   * while that browser happened to have two tabs open, and failed the moment it
+   * had one. A test that depends on the machine it runs on is not a test.
+   */
+  readonly readChromeTabs?: () => Promise<ChromeTabInfo[] | null>;
 }
 
 /** The helper's answer to any of the tab verbs. */
@@ -273,6 +282,7 @@ export function registerMacComputerUseTools(
   const bridge = options.bridge;
   const cap = options.elementCap ?? DEFAULT_ELEMENT_CAP;
   const consent = options.consent ?? createMacConsentGate();
+  const readChromeTabs = options.readChromeTabs ?? chromeTabs;
 
   /**
    * Per-session CONTROLLED-APP state (see ./session-state.ts). Each pi session
@@ -598,6 +608,15 @@ export function registerMacComputerUseTools(
             'tells you the number to pass to continue. Combines with find.',
         }),
       ),
+      like: Type.Optional(
+        Type.String({
+          description:
+            'Search this screen for what you MEAN, not the exact word: ranks everything on it ' +
+            'against your phrase and lists the best with their indexes. Use when you do not ' +
+            'know the app\'s wording — like:"storage options" finds "Not sure how much storage ' +
+            'to get?". `find` is the exact-substring filter; this is the search.',
+        }),
+      ),
       screenshot: Type.Optional(
         Type.Boolean({
           description:
@@ -633,8 +652,54 @@ export function registerMacComputerUseTools(
         if (params.screenshot !== true && isAxOpaque(snap)) {
           snap = await snapshot(params.app, true, page);
         }
+        /*
+         * `like` — SEARCH THE PAGE, rather than filter it.
+         *
+         * the user: "would it be possible to take a really small embedding model and
+         * quickly index and search a page ... this should be implemented as an
+         * argument/flag on snapshot tools."
+         *
+         * MEASURED before building it, because the answer turns on size: the
+         * largest real snapshot ever recorded here is 7.0 KB and the median 5.3,
+         * and ranking a 120-line page takes 69 µs — 0.4% of the time this machine
+         * needs to generate ONE token. The DOM is nowhere near heavy enough to be
+         * the problem, on any device that can run the model at all.
+         *
+         * Kept SEPARATE from `find` on purpose. `find` is an exact filter with an
+         * invariant this package already tests — a look that filters to nothing
+         * must not cost a second round trip or be mistaken for an opaque app — and
+         * `like` is a different question ("what on this page is about X"), so it
+         * pays for its own extra look only when it is asked for.
+         *
+         * The scorer is IDF-weighted overlap, no model: see page-search.ts, which
+         * also documents what it provably cannot do — synonyms. "checkout" will
+         * not find "Add to Bag" by any amount of token overlap, and that is the
+         * one case that would justify an embedding model. The seam is shaped so
+         * one can replace the scorer when a measured case needs it.
+         */
+        const like = typeof params.like === 'string' ? params.like.trim() : '';
+        let nearMiss = '';
+        if (like !== '') {
+          const lines: PageLine[] = [
+            ...(snap.elements ?? []).map((e) => ({ text: e.name, index: e.index })),
+            /* Older helpers send plain strings here, newer ones {text,x,y}. */
+            ...(snap.text ?? []).map((t) => ({ text: typeof t === 'string' ? t : t.text })),
+          ].filter((l) => l.text.trim() !== '');
+          const hits = searchPage(lines, like);
+          nearMiss =
+            hits.length === 0
+              ? `\n\n(nothing on this screen is about "${like}". Read the list without ` +
+                'it rather than narrowing again.)'
+              : `\n\n(${hits.length} on this screen about "${like}", best first)${nearMissNote(
+                  like,
+                  hits,
+                )}\n` +
+                hits
+                  .map((h) => `${h.index === undefined ? '   ' : `[${h.index}]`} ${h.text}`)
+                  .join('\n');
+        }
         const content: AgentToolResult<MacDetails>['content'] = [
-          { type: 'text', text: formatMacSnapshot(snap, view()) },
+          { type: 'text', text: `${formatMacSnapshot(snap, view())}${nearMiss}` },
         ];
         const shot = snap.screenshot;
         const wantImage = params.screenshot === true || isAxOpaque(snap);
@@ -1052,7 +1117,7 @@ export function registerMacComputerUseTools(
          */
         const wanted = params.app ?? CHROME_APP;
         if (/chrome/i.test(wanted)) {
-          const viaEvents = await chromeTabs();
+          const viaEvents = await readChromeTabs();
           if (viaEvents !== null) {
             return textResult(formatChromeTabs(viaEvents), {
               action: 'tabs',

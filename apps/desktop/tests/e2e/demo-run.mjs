@@ -108,6 +108,20 @@ async function reapOrphanServers(when) {
  *        Asked of the APP once the turn ends — the run's own evidence.
  */
 export async function demoRun(o) {
+  /*
+   * A NEWLINE IN THE PROMPT IS AN ENTER.
+   *
+   * The prompt is typed into the composer with `keyboard.type`, so a multi-line
+   * prompt sends itself halfway through and the run dies further down with "the
+   * prompt never entered the conversation" — which says nothing about the cause.
+   * MEASURED once, on a demo whose passage was separated by blank lines.
+   */
+  if (typeof o.prompt === 'string' && /[\r\n]/.test(o.prompt)) {
+    throw new Error(
+      'demoRun: the prompt contains a newline, and prompts are TYPED — that Enter ' +
+        'sends the message early. Put it on one line.',
+    );
+  }
   const OUT = path.join('/Users/user/Desktop/OSS-harness/scratchpad/demos', o.name);
   /* the user: "please video at 30+ if possible ... earlier ones were low framerate".
      They were: capture ran at 5-6/s and ffmpeg then held each frame for ~5 output
@@ -451,6 +465,11 @@ export async function demoRun(o) {
       o.model,
     );
     if (up.success !== true) throw new Error(`llm:start-server: ${up.error}`);
+    /* llama-server's own throughput counters, so "speed" is a measurement
+       rather than a stopwatch guess. Prometheus text at /metrics on the same
+       origin as the OpenAI endpoint. */
+    const metricsUrl =
+      typeof up.baseUrl === 'string' ? `${up.baseUrl.replace(/\/v1\/?$/, '')}/metrics` : null;
     await page.evaluate(() => window.piDesktop.invoke('pi:restart', {}));
     const models = await page.evaluate(() => window.piDesktop.invoke('pi:get-models', undefined));
     const target = models.models.find((m) => m.provider === 'llamacpp');
@@ -748,6 +767,53 @@ export async function demoRun(o) {
     }
     if (invalid !== null) say(`INVALID: ${invalid}`);
 
+    /*
+     * HOW FAST WAS IT, in the server's own numbers.
+     *
+     * Wall time answers "did the run finish" and nothing about the model: on a
+     * computer-use task most of it is the app, the screenshots and the waiting.
+     * llama.cpp counts what it actually did — tokens generated per second and
+     * prompt tokens processed per second — so a small model's speed can be
+     * compared across task types that spend wildly different amounts of time
+     * outside the model.
+     */
+    if (metricsUrl !== null) {
+      /*
+       * A FIXED, TINY COMPLETION, timed by llama.cpp itself.
+       *
+       * /metrics needs the server launched with --metrics and ours is not, so
+       * the counters came back empty. llama.cpp's own /completion always
+       * reports `timings`, so the speed number is measured rather than
+       * estimated — and because every model gets the SAME short prompt, the
+       * generation rate is comparable across them in a way wall-clock never is
+       * (a computer-use run spends most of its time in the app, not the model).
+       */
+      try {
+        const origin = metricsUrl.replace(/\/metrics$/, '');
+        const res = await fetch(`${origin}/completion`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            prompt: 'Count from one to twenty in words, comma separated.',
+            n_predict: 96,
+            temperature: 0,
+            cache_prompt: false,
+          }),
+        });
+        const j = res.ok ? await res.json() : null;
+        const t = j?.timings ?? null;
+        say(
+          t === null
+            ? 'speed: unavailable (no timings from /completion)'
+            : `speed: ${Number(t.predicted_per_second ?? 0).toFixed(1)} tok/s generated, ` +
+                `${Number(t.prompt_per_second ?? 0).toFixed(0)} tok/s prompt ` +
+                `(${t.predicted_n ?? '?'} tokens in ${Math.round(t.predicted_ms ?? 0)}ms)`,
+        );
+      } catch (err) {
+        say(`speed: unavailable (${String(err).slice(0, 90)})`);
+      }
+    }
+
     if (o.verify !== undefined) {
       try {
         const evidence = await o.verify(dbg, last);
@@ -764,11 +830,22 @@ export async function demoRun(o) {
      * thing recorded was who was in front at the END, which is the same line
      * whether the run stole focus or simply found the app already there.
      */
-    const focusAfter = (await dbg('frontmost')).app;
+    /* Best-effort: this is the run's own report card, and a window that has
+       already gone (the app quit, the machine slept) must not turn a finished
+       run into a failed one. MEASURED: a completed recall run — verdict printed,
+       speed printed — exited 1 here because the page had closed. */
+    let focusAfter = null;
+    try {
+      focusAfter = (await dbg('frontmost')).app;
+    } catch {
+      /* fall through to the unknown case below */
+    }
     say(
-      focusBefore === focusAfter
-        ? `FOCUS HELD: "${focusAfter}" was in front before the run and still is.`
-        : `FOCUS MOVED: "${focusBefore}" -> "${focusAfter}" — the run took the user's screen.`,
+      focusAfter === null
+        ? `FOCUS UNKNOWN: the app was gone before it could be read (was "${focusBefore}").`
+        : focusBefore === focusAfter
+          ? `FOCUS HELD: "${focusAfter}" was in front before the run and still is.`
+          : `FOCUS MOVED: "${focusBefore}" -> "${focusAfter}" — the run took the user's screen.`,
     );
     await sleep(1200);
   } finally {

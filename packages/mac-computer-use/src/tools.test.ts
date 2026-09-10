@@ -60,7 +60,12 @@ function collectTools(
   const pi = {
     registerTool: (def: ToolDefinition) => tools.set(def.name, def),
   } as unknown as ExtensionAPI;
-  registerMacComputerUseTools(pi, { bridge, consent });
+  /* No Apple Events in a unit test. The real reader talks to whatever Chrome is
+     open on the machine running the suite, and it answered BEFORE the fake
+     bridge — so the tabs test passed only while that browser had two tabs and
+     failed when it had one. Returning null here puts the fake bridge back in
+     charge, which is the only thing these tests are supposed to be measuring. */
+  registerMacComputerUseTools(pi, { bridge, consent, readChromeTabs: async () => null });
   return tools;
 }
 
