@@ -74,7 +74,7 @@ export {
 } from './tool-names.js';
 
 import { shareTool } from '@pi-desktop/tool-bus';
-import { nearMissNote, type PageLine, searchPage } from './page-search.js';
+import { type Embedder, nearMissNote, type PageLine, searchPageBoth } from './page-search.js';
 import {
   CHROME_CLICK_TOOL,
   CHROME_GO_TOOL,
@@ -135,6 +135,9 @@ export interface MacComputerUseOptions {
    * had one. A test that depends on the machine it runs on is not a test.
    */
   readonly readChromeTabs?: () => Promise<ChromeTabInfo[] | null>;
+  /** Turns short texts into vectors, for the `like` search. Absent until an
+   *  embedding model is deployed; the keyword half answers alone until then. */
+  readonly embedText?: Embedder;
 }
 
 /** The helper's answer to any of the tab verbs. */
@@ -283,6 +286,10 @@ export function registerMacComputerUseTools(
   const cap = options.elementCap ?? DEFAULT_ELEMENT_CAP;
   const consent = options.consent ?? createMacConsentGate();
   const readChromeTabs = options.readChromeTabs ?? chromeTabs;
+  /* Undefined until an embedding model is deployed (EmbeddingGemma-300M behind
+     a llama.cpp --embedding server is the intended one). Injected rather than
+     imported so this package never depends on a model being present. */
+  const embedText: Embedder | undefined = options.embedText;
 
   /**
    * Per-session CONTROLLED-APP state (see ./session-state.ts). Each pi session
@@ -685,17 +692,26 @@ export function registerMacComputerUseTools(
             /* Older helpers send plain strings here, newer ones {text,x,y}. */
             ...(snap.text ?? []).map((t) => ({ text: typeof t === 'string' ? t : t.text })),
           ].filter((l) => l.text.trim() !== '');
-          const hits = searchPage(lines, like);
+          /* BOTH searches, always — the user: "don't let the model choose between
+             keyword and semantic, just give the top ~10 of both ordered". The
+             model cannot know whether the app spells the thing the way it
+             guessed; that is why it is searching. `embedText` is absent until an
+             embedding model is deployed, and the keyword half answers alone
+             until then — the model's instructions do not change either way. */
+          const found = await searchPageBoth(lines, like, { embed: embedText, perKind: 10 });
+          const hits = found.hits;
           nearMiss =
             hits.length === 0
               ? `\n\n(nothing on this screen is about "${like}". Read the list without ` +
                 'it rather than narrowing again.)'
-              : `\n\n(${hits.length} on this screen about "${like}", best first)${nearMissNote(
-                  like,
-                  hits,
-                )}\n` +
+              : `\n\n(${hits.length} on this screen about "${like}", best first` +
+                `${found.semantic === 'used' ? '; · = by meaning, = = both agree' : ''})` +
+                `${nearMissNote(like, hits)}\n` +
                 hits
-                  .map((h) => `${h.index === undefined ? '   ' : `[${h.index}]`} ${h.text}`)
+                  .map((h) => {
+                    const mark = h.kind === 'both' ? '=' : h.kind === 'semantic' ? '·' : ' ';
+                    return `${mark}${h.index === undefined ? '   ' : `[${h.index}]`} ${h.text}`;
+                  })
                   .join('\n');
         }
         const content: AgentToolResult<MacDetails>['content'] = [
