@@ -237,65 +237,31 @@ func typeTextToPid(_ pid: pid_t, _ text: String) {
 /// Post a key chord (modifiers + one key) to `pid` only. Unlike the HID tap,
 /// pid delivery honors the event's own `.flags`, so chords land correctly.
 /**
- * PUT THE USER BACK WHERE THEY WERE.
+ * THE USER'S FOCUS CANNOT BE HANDED BACK. Measured, so nobody tries again.
  *
- * the user, twice in one session: "chrome took focus right now again", and "opened a
- * tab, and switched to a different tab but it took focus again". MEASURED which
- * half does it: pressing a tab through Accessibility does NOT move focus, and
- * posting a KEYSTROKE does — Chrome brings itself forward when it handles ⌘T,
- * and the scroll ladder's keyboard rung is a keystroke too, so after that fix
- * every scroll was quietly stealing the screen.
+ * the user, twice in one session: "chrome took focus right now again", and "opened
+ * a tab, and switched to a different tab but it took focus again". The obvious
+ * fix is to remember who was in front and put them back afterwards. It does not
+ * work: from a background process, BOTH
  *
- * The keystroke cannot be given up (it is the only thing a browser listens to
- * from the background), so the focus is taken back instead: remember who was in
- * front, do the thing, and if the front changed, put them back. It is not free —
- * there is a flicker — but the alternative is the user losing their window mid
- * sentence, which is the one thing computer use here is not allowed to do.
+ *   NSRunningApplication.activate()                       -> returns true
+ *   AXUIElementSetAttributeValue(app, AXFrontmost, true)   -> returns .success
+ *
+ * and NEITHER changes the frontmost app on macOS 26 — verified from a process
+ * that holds Accessibility, which is the strongest grant we have. macOS simply
+ * does not let a background process decide what the user is looking at, which
+ * is the right call and is also the rule this whole subsystem is built on.
+ *
+ * So the answer is not to take focus in the first place, and where an app takes
+ * it for us — Chrome activates itself whenever a tab is created, by its own
+ * button as much as by ⌘T — the only honest thing left is to SAY so. See the
+ * tookFocus flag on the tab verbs.
+ *
+ * What was checked, so the split is known rather than guessed:
+ *   Page Down / arrow keys posted to a pid   — focus stays put.
+ *   Pressing a control through Accessibility — focus stays put.
+ *   ⌘T, ⌘W, and Chrome's own New Tab button — Chrome comes to the front.
  */
-@discardableResult
-func restoringFrontmost<T>(_ patience: [UInt32] = [60_000], _ body: () -> T) -> T {
-  let before = NSWorkspace.shared.frontmostApplication
-  let result = body()
-  guard let before = before, before.processIdentifier != getpid() else { return result }
-  /*
-   * `patience` is how long to keep watching, and it differs by how the app
-   * behaves. MEASURED: a Page Down never moves focus at all, so the scroll rung
-   * pays one 60ms glance; ⌘T raises Chrome a few hundred milliseconds later, so
-   * a tab op watches for longer. And the hand-back has to be VERIFIED —
-   * back-to-back closes left the second one having captured "Chrome" as the app
-   * to restore, because the first restore had not landed yet.
-   */
-  for (i, wait) in patience.enumerated() {
-    usleep(wait)
-    let now = NSWorkspace.shared.frontmostApplication?.processIdentifier
-    if now == before.processIdentifier {
-      if i == patience.count - 1 { return result }
-      continue
-    }
-    raiseApp(before)
-  }
-  return result
-}
-
-/**
- * Put an app back in front.
- *
- * `NSRunningApplication.activate()` is the obvious call and MEASURED it does
- * nothing here: macOS does not let a background process activate another app,
- * and our helper is about as background as a process gets. Accessibility is a
- * different permission with a different answer — setting AXFrontmost on the
- * app element is exactly what an assistive client is allowed to do, and we
- * already hold that grant to drive anything at all.
- */
-private func raiseApp(_ app: NSRunningApplication) {
-  let el = AXUIElementCreateApplication(app.processIdentifier)
-  AXUIElementSetAttributeValue(el, kAXFrontmostAttribute as CFString, kCFBooleanTrue)
-  app.activate()
-}
-
-/// The watch a keystroke that OPENS something needs: the app raises itself a
-/// beat after the key, not with it.
-let SLOW_FOCUS_WATCH: [UInt32] = [250_000, 300_000, 300_000]
 
 func postKeyToPid(_ pid: pid_t, flags: CGEventFlags, key: CGKeyCode) {
   let src = eventSource()

@@ -1106,9 +1106,7 @@ func pressElement(_ el: AXUIElement) -> Bool {
 func newBrowserTab(pid: pid_t) -> Bool {
   let root = rootFor(app: AXUIElementCreateApplication(pid))
   if let button = findNewTabButton(root), pressElement(button) { return true }
-  restoringFrontmost(SLOW_FOCUS_WATCH) {
-    postKeyToPid(pid, flags: .maskCommand, key: 17)  // t
-    usleep(220_000)
-  }
+  postKeyToPid(pid, flags: .maskCommand, key: 17)  // t
+  usleep(220_000)
   return true
 }

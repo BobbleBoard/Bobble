@@ -659,16 +659,13 @@ private func doTabAct(_ params: [String: Any], act: String) -> [String: Any] {
    * this borrows the focus for exactly one keystroke and hands it straight back,
    * which is the pattern the capability text already describes for File > Save.
    */
-  let borrowed = restoringFrontmost(SLOW_FOCUS_WATCH) { () -> Bool in
-    NSRunningApplication(processIdentifier: resolved.pid)?.activate()
-    usleep(220_000)
-    postKeyToPid(resolved.pid, flags: .maskCommand, key: 13)  // w
-    usleep(260_000)
-    return true
-  }
+  NSRunningApplication(processIdentifier: resolved.pid)?.activate()
+  usleep(240_000)
+  postKeyToPid(resolved.pid, flags: .maskCommand, key: 13)  // w
+  usleep(260_000)
   let after = browserTabs(pid: resolved.pid)
   return [
-    "ok": borrowed && after.count < tabs.count, "app": resolved.name, "closed": tab.title,
+    "ok": after.count < tabs.count, "app": resolved.name, "closed": tab.title,
     "tookFocus": true,
     "note":
       "\(resolved.name) came to the front: closing a tab is a document command and macOS runs "
