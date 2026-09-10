@@ -20,6 +20,7 @@ import {
   dialogCaption,
   identity,
   type MonitorAct,
+  mainWindowOf,
   thinkingAfter,
 } from './computer-use-surface.tsx';
 
@@ -170,5 +171,46 @@ describe('identity', () => {
   it('survives a session with no window and no app', () => {
     expect(identity('TextEdit', '')).toEqual({ text: 'TextEdit', edited: false });
     expect(identity('', '')).toEqual({ text: '', edited: false });
+  });
+});
+
+describe('which window the footer is about', () => {
+  const w = (title: string, ww = 800, h = 600, extra = {}) => ({
+    title,
+    frame: { w: ww, h },
+    ...extra,
+  });
+
+  /* SEEN on recorded frames: "Google Chrome — Window", with the real window
+     second in the list. macOS titles an untitled window "Window". */
+  it('prefers the named window over the generic "Window"', () => {
+    const picked = mainWindowOf([w('Window'), w('Shop iPhone Duo - Apple')]);
+    expect(picked?.title).toBe('Shop iPhone Duo - Apple');
+  });
+
+  it('falls back to the biggest when neither is named', () => {
+    const picked = mainWindowOf([w('Window', 400, 300), w('', 1400, 900)]);
+    expect(picked?.frame.w).toBe(1400);
+  });
+
+  it('prefers the bigger of two named windows', () => {
+    const picked = mainWindowOf([w('Small', 300, 200), w('Big', 1400, 900)]);
+    expect(picked?.title).toBe('Big');
+  });
+
+  it('never picks a sheet or a modal — those are reported as the dialog', () => {
+    const picked = mainWindowOf([
+      w('Save', 500, 300, { sheet: true }),
+      w('Untitled.txt', 900, 700),
+    ]);
+    expect(picked?.title).toBe('Untitled.txt');
+  });
+
+  it('still answers when a sheet is all there is', () => {
+    expect(mainWindowOf([w('Save', 500, 300, { sheet: true })])?.title).toBe('Save');
+  });
+
+  it('says nothing about an empty list', () => {
+    expect(mainWindowOf([])).toBeUndefined();
   });
 });

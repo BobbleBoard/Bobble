@@ -612,7 +612,7 @@ export function ComputerUseSurface({ feed, className }: ComputerUseSurfaceProps)
       setSource((prev) => (prev === nextSource ? prev : nextSource));
       // The footer names whatever the picture is OF.
       const windows = frame?.windows ?? [];
-      const main = windows.find((w) => !w.sheet && !w.modal) ?? windows[0];
+      const main = mainWindowOf(windows);
       const dialog = windows.find((w) => w.sheet || w.modal);
       // A window title outlives its session otherwise, and the footer ends up
       // reading "No app · Untitled 2 — Edited" over an empty state.
@@ -1473,6 +1473,38 @@ export function ComputerUseSurface({ feed, className }: ComputerUseSurfaceProps)
  * document's edited state carried by a dot rather than by the word "Edited"
  * hanging off the end of the title — which is how a Mac title bar says it.
  */
+/**
+ * WHICH WINDOW THE FOOTER IS ABOUT.
+ *
+ * This was `windows.find(w => !w.sheet && !w.modal) ?? windows[0]` — the first
+ * one in list order — directly under a comment saying the footer names whatever
+ * the picture is OF. SEEN on recorded frames: "Google Chrome — Window" and
+ * "Blender — Window", for two different apps in the same session.
+ *
+ * macOS reports the generic title "Window" for a window that has none, and
+ * Chrome's own run evidence lists exactly that: `windowTitles: ["Window", "Shop
+ * iPhone Duo - Apple - Google Chrome"]`. The untitled one came first, so the
+ * footer named it and the real subject sat second in the list.
+ *
+ * So pick the window a viewer would say the picture is of: the biggest one,
+ * and among equals one that actually has a name. Sheets and modals stay
+ * excluded — they are reported separately as the dialog.
+ */
+export function mainWindowOf<
+  W extends { title: string; sheet?: boolean; modal?: boolean; frame?: { w: number; h: number } },
+>(windows: readonly W[]): W | undefined {
+  const real = windows.filter((w) => w.sheet !== true && w.modal !== true);
+  if (real.length === 0) return windows[0];
+  const named = (w: W): boolean => w.title.trim() !== '' && w.title.trim() !== 'Window';
+  const area = (w: W): number => (w.frame?.w ?? 0) * (w.frame?.h ?? 0);
+  return [...real].sort((a, b) => {
+    /* A named window wins outright: a title is the only thing here that can
+       actually tell a viewer what they are looking at. */
+    if (named(a) !== named(b)) return named(a) ? -1 : 1;
+    return area(b) - area(a);
+  })[0];
+}
+
 export function identity(app: string, title: string): { text: string; edited: boolean } {
   const edited = / [—-] Edited$/.test(title);
   const clean = edited ? title.replace(/ [—-] Edited$/, '') : title;
