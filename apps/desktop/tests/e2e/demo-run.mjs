@@ -491,9 +491,21 @@ export async function demoRun(o) {
       )
       .catch(() => '');
     const shortId = o.model.split('/').pop() ?? o.model;
-    const chipNames =
-      chip.toLowerCase().includes(shortId.toLowerCase().split('-')[0] ?? shortId.toLowerCase()) ||
-      chip.toLowerCase().includes(shortId.toLowerCase());
+    /*
+     * COMPARE THE LETTERS, NOT THE PUNCTUATION.
+     *
+     * This split the id on "-" and looked for the first piece in the chip, which
+     * works only when the display name punctuates exactly like the id. MEASURED:
+     * `nanbeige4.2-3b` renders as "Nanbeige 4.2 3B", so the check looked for
+     * "nanbeige4.2" in "nanbeige 4.2 3b", missed on one space, and warned that
+     * the chip did not name the model — while the chip named it perfectly.
+     *
+     * A verification that cries wolf is worse than none: it would have gone into
+     * a report as a UI defect that does not exist. Strip everything that is not
+     * a letter or digit from BOTH sides and compare that.
+     */
+    const bare = (t) => t.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const chipNames = bare(chip).includes(bare(shortId));
     say(
       `model: ${target.id} · selector shows ${JSON.stringify(chip.trim())}` +
         (chipNames ? '' : ' — WARNING: the chip does not name this model'),
