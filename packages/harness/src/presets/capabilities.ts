@@ -87,8 +87,12 @@ export const CAPABILITIES: readonly Capability[] = [
       '"do it in <app>", "click that", "type it in there".',
     guidance:
       "For work inside the user's OWN applications — Notes, Finder, Photoshop, a game — and " +
-      'for their own browsers (Safari, Chrome, Arc) when they ask for those specifically. For ' +
-      'Chrome prefer the chrome_* tools: they read the real DOM instead of pixels. An app that ' +
+      'for their own browsers (Safari, Chrome, Arc) when they ask for those specifically. A web ' +
+      "page in any of them comes back as TEXT from the ordinary snapshot — the page's own " +
+      'headings, prices and labels, each with the point to click it — so read a page that way ' +
+      'first rather than reaching for a screenshot. (The chrome_* tools read the real DOM, but ' +
+      'they need a Chrome setting that is off by default and that only the user can turn on, so ' +
+      'they usually fail; the snapshot needs nothing.) An app that ' +
       'exposes nothing to Accessibility returns a screenshot automatically; act by x,y then. A ' +
       'save sheet or file picker is part of the app that opened it — same snapshot, same clicks. ' +
       'A third of what an app can do is in its menu bar, which is in no window: mac_click takes ' +
