@@ -513,8 +513,30 @@ func collectSnapshot(
 
     let pos = axPoint(el, kAXPositionAttribute) ?? CGPoint(x: -1, y: -1)
     let size = axSize(el, kAXSizeAttribute) ?? CGSize(width: 0, height: 0)
-    if size.width <= 1 || size.height <= 1 { continue }
-    let rect = CGRect(origin: pos, size: size)
+    /*
+     * A CONTROL BELOW THE FOLD IS STILL A CONTROL.
+     *
+     * the user: "controlling through dom shouldn't need scroll right? why would it?
+     * especially if you can read the full page and then have a snapshot with an
+     * optional search <keyword> argument, scrolling should only be necessary if
+     * using visually." Exactly right, and the reason it was not true here was
+     * this line: it required BOTH dimensions, and Chrome reports everything
+     * outside the viewport with a real width and a height of ZERO.
+     *
+     * MEASURED with the page scrolled to the very top: all four storage radio
+     * buttons are already in the tree at 329x0. They were being thrown away, so
+     * `find:"2TB"` answered "not on this page" and the only way left was to
+     * scroll until they rendered — which is a VISUAL workflow, imposed on a
+     * text one by a filter.
+     *
+     * They keep their index and their element reference, so a click reaches
+     * them by AXPress with no coordinate involved. What they do NOT get is a
+     * believable position: `onScreen` is false, so they sort after everything
+     * visible and nothing aims a pointer at them.
+     */
+    if size.width <= 1 && size.height <= 1 { continue }
+    let rect = CGRect(origin: pos, size: max(size.height, 1) == size.height
+      ? size : CGSize(width: size.width, height: 1))
     let value = editable ? (axValueText(el, kAXValueAttribute) ?? "") : ""
     let enabled = axBool(el, kAXEnabledAttribute) ?? true
     let focused = axBool(el, kAXFocusedAttribute) ?? false

@@ -58,6 +58,8 @@ export {
   CHROME_CLICK_TOOL,
   CHROME_GO_TOOL,
   CHROME_SNAPSHOT_TOOL,
+  CHROME_TAB_TOOL,
+  CHROME_TABS_TOOL,
   CHROME_TYPE_TOOL,
   MAC_CLICK_TOOL,
   MAC_COMPUTER_USE_TOOL_NAMES,
@@ -65,8 +67,6 @@ export {
   MAC_LAUNCH_TOOL,
   MAC_SCROLL_TOOL,
   MAC_SNAPSHOT_TOOL,
-  MAC_TAB_TOOL,
-  MAC_TABS_TOOL,
   MAC_TYPE_TOOL,
 } from './tool-names.js';
 
@@ -75,14 +75,14 @@ import {
   CHROME_CLICK_TOOL,
   CHROME_GO_TOOL,
   CHROME_SNAPSHOT_TOOL,
+  CHROME_TAB_TOOL,
+  CHROME_TABS_TOOL,
   CHROME_TYPE_TOOL,
   MAC_CLICK_TOOL,
   MAC_KEY_TOOL,
   MAC_LAUNCH_TOOL,
   MAC_SCROLL_TOOL,
   MAC_SNAPSHOT_TOOL,
-  MAC_TAB_TOOL,
-  MAC_TABS_TOOL,
   MAC_TYPE_TOOL,
 } from './tool-names.js';
 
@@ -540,7 +540,9 @@ export function registerMacComputerUseTools(
     name: MAC_SNAPSHOT_TOOL,
     label: 'Mac: Snapshot',
     description:
-      'Look at a Mac app: a compact, indexed list of its controls, plus the text it is showing, ' +
+      'Look at a Mac app: a compact, indexed list of its controls — INCLUDING the ones below the ' +
+      'fold, which you can press by [index] without scrolling to them — plus the text it is ' +
+      'showing, ' +
       "which you then act on by [index] or at a line's point. Defaults to the app you are " +
       'controlling — and before you control anything, to whatever happens to be in FRONT, which ' +
       'is usually not the app the user meant. MEASURED: a run asked to work in Chrome ' +
@@ -1000,8 +1002,8 @@ export function registerMacComputerUseTools(
    * same in Safari and other Chromium browsers.
    */
   shareTool(pi, {
-    name: MAC_TABS_TOOL,
-    label: 'Mac: Tabs',
+    name: CHROME_TABS_TOOL,
+    label: 'Chrome: Tabs',
     description:
       "List a browser's open tabs — their titles and which one is in front. Works on the user's " +
       'own Chrome, Safari or any Chromium browser, reads the window rather than the page, and ' +
@@ -1014,24 +1016,24 @@ export function registerMacComputerUseTools(
       ),
     }),
     async execute(_id, params, _signal, _upd, ctx): Promise<AgentToolResult<MacDetails>> {
-      if (bridge === null) return unavailable('mac_tabs');
-      const blocked = await gate('mac_tabs', ctx);
+      if (bridge === null) return unavailable('chrome_tabs');
+      const blocked = await gate('chrome_tabs', ctx);
       if (blocked !== null) return blocked;
       try {
         const res = await bridge.request<MacTabsAck>('tabs', withTarget(appParam(params.app)));
         if (res.ok !== true) {
-          return errResult('mac_tabs', res.error ?? 'no tab strip in that window.');
+          return errResult('chrome_tabs', res.error ?? 'no tab strip in that window.');
         }
         return textResult(formatTabs(res), { action: 'tabs', ok: true, app: res.app });
       } catch (err) {
-        return errResult('mac_tabs', messageOf(err));
+        return errResult('chrome_tabs', messageOf(err));
       }
     },
   });
 
   shareTool(pi, {
-    name: MAC_TAB_TOOL,
-    label: 'Mac: Tab',
+    name: CHROME_TAB_TOOL,
+    label: 'Chrome: Tab',
     description:
       'Switch to, open or close a browser tab. `index` is from mac_tabs.\n' +
       'SWITCHING is background — the user keeps whatever they are looking at.\n' +
@@ -1052,8 +1054,8 @@ export function registerMacComputerUseTools(
       ),
     }),
     async execute(_id, params, _signal, _upd, ctx): Promise<AgentToolResult<MacDetails>> {
-      if (bridge === null) return unavailable('mac_tab');
-      const blocked = await gate('mac_tab', ctx);
+      if (bridge === null) return unavailable('chrome_tab');
+      const blocked = await gate('chrome_tab', ctx);
       if (blocked !== null) return blocked;
       const verb =
         params.action === 'new' ? 'tabNew' : params.action === 'close' ? 'tabClose' : 'tabSelect';
@@ -1065,7 +1067,7 @@ export function registerMacComputerUseTools(
             ...(params.index === undefined ? {} : { index: params.index }),
           }),
         );
-        if (res.ok !== true) return errResult('mac_tab', res.error ?? 'that did not work.');
+        if (res.ok !== true) return errResult('chrome_tab', res.error ?? 'that did not work.');
         session.noteAct(`${params.action} tab`);
         const did =
           params.action === 'select'
@@ -1081,12 +1083,14 @@ export function registerMacComputerUseTools(
           background: res.tookFocus !== true,
         });
       } catch (err) {
-        return errResult('mac_tab', messageOf(err));
+        return errResult('chrome_tab', messageOf(err));
       }
     },
   });
 
   // --- mac_scroll ----------------------------------------------------------
+  /* Scrolling is for SEEING, not for reaching: every control on the page is in
+     the snapshot already, wherever it sits. See the note in mac_snapshot. */
   shareTool(pi, {
     name: MAC_SCROLL_TOOL,
     label: 'Mac: Scroll',
@@ -1110,6 +1114,10 @@ export function registerMacComputerUseTools(
              clause and removes the whole misreading. */
           description:
             'How far, in PIXELS — not wheel clicks (default ~300; a screenful is roughly 800).',
+          /* the user: "controlling through dom shouldn't need scroll right? ...
+             scrolling should only be necessary if using visually." Right: a
+             snapshot lists what is below the fold and `find` reaches it, so
+             scrolling is for LOOKING, not for acting. */
         }),
       ),
     }),

@@ -29,8 +29,8 @@ export const MAC_LAUNCH_TOOL = 'mac_launch';
  * instead, so they need no Chrome setting and work in Safari and the other
  * Chromium browsers too.
  */
-export const MAC_TABS_TOOL = 'mac_tabs';
-export const MAC_TAB_TOOL = 'mac_tab';
+export const CHROME_TABS_TOOL = 'chrome_tabs';
+export const CHROME_TAB_TOOL = 'chrome_tab';
 /* Chrome, driven through its DOM rather than its pixels — the user's OWN Chrome,
  * with their sessions. See ./chrome.ts for why this beats sighted clicking. */
 export const CHROME_SNAPSHOT_TOOL = 'chrome_snapshot';
@@ -41,13 +41,30 @@ export const CHROME_GO_TOOL = 'chrome_go';
 /** Every `mac_*` computer-use tool name — the full background-control pipeline. */
 export const MAC_COMPUTER_USE_TOOL_NAMES = [
   MAC_LAUNCH_TOOL,
-  MAC_TABS_TOOL,
-  MAC_TAB_TOOL,
   MAC_SNAPSHOT_TOOL,
   MAC_CLICK_TOOL,
   MAC_TYPE_TOOL,
   MAC_KEY_TOOL,
   MAC_SCROLL_TOOL,
+  CHROME_SNAPSHOT_TOOL,
+  CHROME_CLICK_TOOL,
+  CHROME_TYPE_TOOL,
+  CHROME_GO_TOOL,
+] as const;
+
+/**
+ * THE BROWSER'S OWN SET.
+ *
+ * the user: "instead of integrating into mac, add a chrome connector and have chrome
+ * be its own set." A browser is not just another app you click at — it has tabs,
+ * a page, an address bar and a session that belongs to the user — and folding
+ * that into the generic Mac tools made the model reach for `mac` when it wanted
+ * `chrome`. These are the ones that work with no Chrome setting to turn on,
+ * because they read the Accessibility tree rather than asking for Apple Events.
+ */
+export const CHROME_TOOL_NAMES = [
+  CHROME_TABS_TOOL,
+  CHROME_TAB_TOOL,
   CHROME_SNAPSHOT_TOOL,
   CHROME_CLICK_TOOL,
   CHROME_TYPE_TOOL,

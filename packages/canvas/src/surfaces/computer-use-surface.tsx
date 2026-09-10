@@ -1031,13 +1031,18 @@ export function ComputerUseSurface({ feed, className }: ComputerUseSurfaceProps)
       );
     }
 
-    // 6. "Something is happening" belongs to the FRAME, not to a 110px pill in
-    //    the middle of the picture. An inset outline on the window's own rounded
-    //    rect reads from across the room and can never be mistaken for app
-    //    chrome, because real chrome is inside the frame.
-    if (painted && scrubbed === null && session.cursorState !== 'idle') {
-      drawWorkingOutline(ctx, drawn, viewport, radius, palette.accent, now, reduced);
-    }
+    /*
+     * 6. NO WORKING OUTLINE EITHER.
+     *
+     * "Something is happening belongs to the FRAME" was the argument for a
+     * breathing accent outline on the window's rounded rect. the user, looking at
+     * the canvas after every other edge treatment had been taken out: "i'm
+     * still seeing the blue border around the edge of the window in the canvas
+     * viewer." He had already settled this for the static edge — "why don't we
+     * just remove the border" — and this one was a second edge wearing a
+     * different justification. What is happening is said by the pill, which
+     * says it in words, and by the cursor, which says it where it is happening.
+     */
 
     // 7. The phantom. ALWAYS, whenever there is a window for it to be on —
     //    the user: "always show the fake cursor around there even if just idling,
@@ -1992,39 +1997,6 @@ function drawDialogCaption(
  * frees the bubble to carry words rather than the whole burden of being the
  * only signal that work is in flight.
  */
-function drawWorkingOutline(
-  ctx: CanvasRenderingContext2D,
-  drawn: DrawnWindow,
-  viewport: { w: number; h: number },
-  radius: number,
-  accent: string,
-  now: number,
-  reduced: boolean,
-): void {
-  // Follow mode crops the window, so the outline hugs whichever of the window
-  // and the stage is smaller — never a rectangle floating off-screen.
-  const x = Math.max(0, drawn.x);
-  const y = Math.max(0, drawn.y);
-  const w = Math.min(viewport.w, drawn.x + drawn.w) - x;
-  const h = Math.min(viewport.h, drawn.y + drawn.h) - y;
-  if (w <= 2 || h <= 2) return;
-  const width = Math.max(4, 8 * drawn.scale);
-  // Skyvern insets its outline because its stage IS the viewport. Ours usually
-  // is not: when the whole window is on the stage the outline goes just OUTSIDE
-  // it, so it never covers the app's own edge pixels — and only tucks inside
-  // when the stage is doing the cropping and there is no outside to draw in.
-  const clipped = drawn.x < 0 || drawn.y < 0 || drawn.w > viewport.w || drawn.h > viewport.h;
-  const inset = clipped ? width / 2 : -width / 2 - 1;
-  const breath = reduced ? 0.5 : 0.5 + 0.5 * Math.sin((now / 1600) * Math.PI * 2);
-  ctx.save();
-  ctx.globalAlpha = 0.18 + breath * 0.14;
-  ctx.strokeStyle = accent;
-  ctx.lineWidth = width;
-  roundRect(ctx, x + inset, y + inset, w - inset * 2, h - inset * 2, Math.max(2, radius));
-  ctx.stroke();
-  ctx.restore();
-}
-
 /** Where the crop is, inside the whole window. 96px, bottom-right, quiet. */
 function drawMinimap(
   ctx: CanvasRenderingContext2D,

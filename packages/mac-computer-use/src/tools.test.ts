@@ -84,13 +84,13 @@ describe('registerMacComputerUseTools', () => {
     const tools = collectTools(new FakeBridge());
     expect([...tools.keys()].sort()).toEqual(
       [
+        'chrome_tab',
+        'chrome_tabs',
         'mac_click',
         'mac_key',
         'mac_launch',
         'mac_scroll',
         'mac_snapshot',
-        'mac_tab',
-        'mac_tabs',
         'mac_type',
       ].sort(),
     );
@@ -1031,7 +1031,7 @@ describe('browser tabs (the window around the page)', () => {
         { index: 2, title: 'Shop iPhone', active: true },
       ],
     }));
-    const res = await run(collectTools(bridge), 'mac_tabs', {});
+    const res = await run(collectTools(bridge), 'chrome_tabs', {});
     const text = res.content.map((c) => (c.type === 'text' ? c.text : '')).join('');
     expect(text).toContain('2 tabs');
     expect(text).toContain('* [2] Shop iPhone');
@@ -1048,7 +1048,7 @@ describe('browser tabs (the window around the page)', () => {
       selected: 'Apple',
       tabs: [{ index: 1, title: 'Apple', active: true }],
     }));
-    const res = await run(collectTools(bridge), 'mac_tab', { action: 'select', index: 1 });
+    const res = await run(collectTools(bridge), 'chrome_tab', { action: 'select', index: 1 });
     expect(details(res).background).toBe(true);
   });
 
@@ -1060,7 +1060,7 @@ describe('browser tabs (the window around the page)', () => {
       note: 'Google Chrome came to the front — a browser activates itself when it opens a tab.',
       tabs: [{ index: 1, title: 'New Tab', active: true }],
     }));
-    const res = await run(collectTools(bridge), 'mac_tab', { action: 'new' });
+    const res = await run(collectTools(bridge), 'chrome_tab', { action: 'new' });
     expect(details(res).background).toBe(false);
     expect(res.content.map((c) => (c.type === 'text' ? c.text : '')).join('')).toContain(
       'came to the front',
