@@ -170,3 +170,48 @@ describe('a coordinate that hit nothing', () => {
     expect(s.missAt(380, 450)).toContain('NOTHING IS AT');
   });
 });
+
+/*
+ * MEASURED on a Blender run: the model worked a point out carefully from the
+ * screenshot, clicked it, and was told "NOTHING IS AT (263, 106) — the click
+ * landed on empty window. Blender lists its controls, so click them by
+ * [index]". Blender lists three: close, full screen, minimize. Telling a model
+ * its correct action failed is worse than saying nothing.
+ */
+describe('an app whose whole list is window furniture cannot adjudicate a click', () => {
+  const furniture = [
+    { index: 1, name: 'close button', role: 'AXButton', bbox: { x: 10, y: 10, w: 14, h: 14 } },
+    {
+      index: 2,
+      name: 'full screen button',
+      role: 'AXButton',
+      bbox: { x: 30, y: 10, w: 14, h: 14 },
+    },
+    { index: 3, name: 'minimize button', role: 'AXButton', bbox: { x: 50, y: 10, w: 14, h: 14 } },
+  ];
+
+  it('says nothing about a click in the middle of Blender', () => {
+    const s = createMacSessionState();
+    s.noteSnapshot({ app: 'Blender', pid: 1, visualOnly: false, elements: furniture });
+    expect(s.missAt(600, 400)).toBeNull();
+  });
+
+  it('still warns in an app that really does list controls', () => {
+    const s = createMacSessionState();
+    s.noteSnapshot({
+      app: 'Maps',
+      pid: 2,
+      visualOnly: false,
+      elements: [
+        ...furniture,
+        {
+          index: 4,
+          name: 'Apple Maps',
+          role: 'AXTextField',
+          bbox: { x: 40, y: 60, w: 200, h: 24 },
+        },
+      ],
+    });
+    expect(s.missAt(900, 700)).toMatch(/NOTHING IS AT/);
+  });
+});

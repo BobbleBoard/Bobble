@@ -122,6 +122,17 @@ export interface MacSessionState {
   missAt(x: number, y: number): string | null;
 }
 
+/** The three or four buttons every macOS window has. An app that lists only
+ * these has told Accessibility nothing about itself — see missAt. Kept here
+ * rather than imported from format.ts, which imports this module's protocol
+ * types; one small list is cheaper than a cycle. */
+const WINDOW_FURNITURE = new Set([
+  'close button',
+  'full screen button',
+  'minimize button',
+  'zoom button',
+]);
+
 /** Centre-distance ordering, so "nearest" means what it looks like on screen. */
 function distance(el: SnapElementLike, x: number, y: number): number {
   const b = el.bbox;
@@ -184,6 +195,23 @@ export function createMacSessionState(): MacSessionState {
       // Nothing to check against, or an app that genuinely has no controls —
       // coordinates are the right and only way to drive that, so say nothing.
       if (current === null || current.visualOnly === true || els.length === 0) return null;
+      /*
+       * AND CHECK IT AGAIN HERE, because `visualOnly` is a judgement made at
+       * SNAPSHOT time and this runs later.
+       *
+       * MEASURED on a Blender run: the model clicked a point it had worked out
+       * carefully from the screenshot and was told "NOTHING IS AT (263, 106) —
+       * the click landed on empty window. Blender lists its controls, so click
+       * them by [index]". Blender lists three: close, full screen, minimize.
+       * The model was right to distrust it — "this may be because the hit test
+       * is only looking at accessible controls (Blender doesn't expose its
+       * controls)" — and a harness that tells a model its correct action failed
+       * is worse than one that says nothing.
+       *
+       * An app whose entire list is window furniture cannot adjudicate a click
+       * anywhere inside it.
+       */
+      if (!els.some((e) => !WINDOW_FURNITURE.has(e.name.trim().toLowerCase()))) return null;
       if (els.some((e) => contains(e, x, y))) return null;
       const near = [...els]
         .sort((a, b) => distance(a, x, y) - distance(b, x, y))
