@@ -816,14 +816,16 @@ describe('page text (a web page is prose, not labels)', () => {
         },
       ],
       text: [
-        'Apple Store Mac iPad iPhone',
-        'Buy from $3199 or $133.29 per month for 24 months',
-        'Storage. How much space do you need?',
-        '256GB 512GB 1TB 2TB',
+        { text: 'Apple Store Mac iPad iPhone', x: 300, y: 60 },
+        { text: 'Buy from $3199 or $133.29 per month for 24 months', x: 760, y: 430 },
+        { text: 'Storage. How much space do you need?', x: 740, y: 900 },
+        { text: '256GB 512GB 1TB 2TB', x: 750, y: 960 },
       ],
     } as unknown as MacSnapshot);
-    expect(out).toContain('Text on screen:');
-    expect(out).toContain('  256GB 512GB 1TB 2TB');
+    expect(out).toContain('Text on screen');
+    // With the point to click: Apple's own Buy control is not in the tree at
+    // all, so this line is the only handle a model has on it.
+    expect(out).toContain('  (760,430) Buy from $3199 or $133.29 per month for 24 months');
     // Not the label form: a page must not come back as quoted, dot-joined debris.
     expect(out).not.toContain('Showing:');
     expect(out).not.toContain('"256GB 512GB 1TB 2TB"');

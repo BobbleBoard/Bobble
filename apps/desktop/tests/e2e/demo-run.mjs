@@ -688,6 +688,14 @@ export async function demoRun(o) {
       list,
       '-vf',
       `scale=${evenW}:${evenH},fps=30`,
+      /* CFR, explicitly. MEASURED: the frames go in at 66/s and the video comes
+         out the right LENGTH (321.8s captured, 323.7s of video), but ffmpeg's
+         default frame-rate mode drops the slots where nothing changed, so the
+         file reports 7,977 frames over 323.7s — 24.6/s — and reads as under
+         the user's "video at 30+" even though every moving second of it was 30.
+         Nothing is added by leaving that ambiguous. */
+      '-fps_mode',
+      'cfr',
       '-c:v',
       'libx264',
       '-pix_fmt',

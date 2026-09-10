@@ -130,6 +130,13 @@ export interface MacElement {
 }
 
 /** The snapshot payload returned by the `snapshot` method. */
+/** A line of text the app is showing, with the point to click to reach it. */
+export interface MacReadLine {
+  readonly text: string;
+  readonly x: number;
+  readonly y: number;
+}
+
 export interface MacSnapshot {
   readonly app: string;
   /** PID of the resolved target app. Threaded back onto click/type so concurrent
@@ -150,7 +157,7 @@ export interface MacSnapshot {
    * never learn what it said — a snapshot of Calculator returned 25 buttons and
    * not the display.
    */
-  readonly text?: readonly string[];
+  readonly text?: readonly (string | MacReadLine)[];
   readonly summary: {
     readonly app: string;
     readonly window: string;

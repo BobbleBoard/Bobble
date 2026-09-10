@@ -92,30 +92,32 @@ export function followWindow(
   focus: Point,
   minScale = 0.3,
   padding = 0,
-  maxScale = 0.45,
 ): DrawnWindow {
   const fit = fitWindow(content, viewport, padding);
   /*
-   * COVER, CAPPED — because cover alone crops the window to a sliver.
+   * THE WHOLE WINDOW, UNLESS THE WHOLE WINDOW IS TOO SMALL TO READ.
    *
-   * Cover is the smallest scale that leaves no letterbox, which sounds like
-   * "fill the rail with the app". On a rail that is TALL and NARROW and a window
-   * that is wide, it is decided entirely by the height: MEASURED on the Chrome
-   * runs, a 440pt rail against a 1024pt window covered at 0.85, so the video
-   * showed a quarter of the window — a giant cropped "oogle" where the Google
-   * page should be — for the whole run. the user, watching it: "the zoom and
-   * following is either not working or way too much, needs at least twice less
-   * zoom."
+   * This used to aim at COVER — the smallest scale with no letterbox — capped at
+   * 0.45. Both halves were wrong, and the second hid the first. On a tall narrow
+   * rail, cover is decided entirely by the height and crops a wide window to a
+   * sliver: MEASURED, a 440pt rail against a 1024pt window covered at 0.85 and
+   * the video showed a giant cropped "oogle" for a whole run. the user: "the zoom
+   * and following is either not working or way too much, needs at least twice
+   * less zoom."
    *
-   * Letterboxing was never the thing to avoid: the surface paints the user's own
-   * wallpaper behind the window on purpose. Being able to SEE the app is. So
-   * cover is now a target rather than a demand, capped so the crop keeps at
-   * least twice the width it had, and the floor is the fit threshold rather than
-   * a number far above it.
+   * The cap made that less bad, not right. MEASURED on the Chrome run after it:
+   * the rail fitted the window at 0.397 and the cap zoomed to 0.45 — so the
+   * video paid 13% of the window's WIDTH, permanently cropped off the left, to
+   * buy 13% more size. There is no version of that trade worth making.
+   *
+   * Letterboxing was never the thing to avoid; the surface paints the user's own
+   * wallpaper behind the window on purpose. Being able to SEE the app is. So:
+   * fit, whenever fitting is still legible, and only zoom-and-follow when the
+   * window is so much bigger than the rail that fitting it would leave nothing
+   * readable.
    */
-  const cover = Math.max(viewport.w / Math.max(1, content.w), viewport.h / Math.max(1, content.h));
-  const scale = Math.min(1, Math.max(minScale, Math.min(cover, maxScale)));
-  if (scale <= fit.scale) return fit;
+  if (fit.scale >= minScale) return fit;
+  const scale = Math.min(1, minScale);
   const w = Math.max(1, content.w) * scale;
   const h = Math.max(1, content.h) * scale;
   const axis = (span: number, view: number, at: number): number => {

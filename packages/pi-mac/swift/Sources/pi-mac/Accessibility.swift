@@ -292,7 +292,7 @@ struct SnapshotResult {
   let dialog: AppWindow?
   /// Read-only text the app is showing: the calculator's answer, the alert's
   /// message, the error under the field. Not indexed — see TEXT_ROLES.
-  let text: [String]
+  let text: [ReadLine]
 }
 
 /**
@@ -600,7 +600,16 @@ func joinTextRuns(_ runs: [(rect: CGRect, text: String)]) -> [(rect: CGRect, tex
   return out
 }
 
-func dedupeReadText(_ text: [(rect: CGRect, text: String)], against controls: [SnapEl]) -> [String]
+/// A line of text the app is showing, and where it is — the WHERE is what makes
+/// it actionable. Reading "Buy from $3199" off a page and having no way to click
+/// it is half a capability.
+struct ReadLine {
+  let text: String
+  let x: Int
+  let y: Int
+}
+
+func dedupeReadText(_ text: [(rect: CGRect, text: String)], against controls: [SnapEl]) -> [ReadLine]
 {
   // Spelled out rather than inlined: the one-line version defeats the Swift
   // type checker (SnapEl's Ints and CGFloat in one CGRect literal).
@@ -613,7 +622,7 @@ func dedupeReadText(_ text: [(rect: CGRect, text: String)], against controls: [S
   }
   let labels = Set(controls.map { $0.name.lowercased() }.filter { !$0.isEmpty })
   var seen = Set<String>()
-  var out: [String] = []
+  var out: [ReadLine] = []
   var chars = 0
   for item in joinTextRuns(text) {
     /* A whole web page of text is worth having, an entire legal appendix is
@@ -633,7 +642,8 @@ func dedupeReadText(_ text: [(rect: CGRect, text: String)], against controls: [S
     { continue }
     seen.insert(key)
     chars += item.text.count
-    out.append(item.text)
+    out.append(
+      ReadLine(text: item.text, x: Int(item.rect.midX.rounded()), y: Int(item.rect.midY.rounded())))
   }
   return out
 }
@@ -848,7 +858,9 @@ func snapshotResultDict(_ snap: SnapshotResult, screenshot: [String: Any]?) -> [
   if let d = snap.dialog {
     result["dialog"] = windowDict(d)
   }
-  if !snap.text.isEmpty { result["text"] = snap.text }
+  if !snap.text.isEmpty {
+    result["text"] = snap.text.map { ["text": $0.text, "x": $0.x, "y": $0.y] }
+  }
   // The menu bar is a third of a real app's capability and appears in no
   // window, so the top-level titles ride along with every snapshot. Titles
   // only — a whole menu bar is hundreds of entries; naming one lists it. The

@@ -18,7 +18,14 @@
  * `pi-mac`, so a snapshot with no `windows`/`dialog`/`win` must degrade to
  * exactly the old output rather than throw.
  */
-import type { MacDialogInfo, MacElement, MacRect, MacSnapshot, MacWindowInfo } from './protocol.js';
+import type {
+  MacDialogInfo,
+  MacElement,
+  MacReadLine,
+  MacRect,
+  MacSnapshot,
+  MacWindowInfo,
+} from './protocol.js';
 
 function elementLine(el: MacElement): string {
   const marks: string[] = [];
@@ -80,8 +87,9 @@ function isLabel(el: MacElement): boolean {
  * gets here. Short, in document order — the order is most of the meaning
  * ("37 × 24" then "888").
  */
-function showingLines(text: readonly string[] | undefined): string[] {
+function showingLines(text: readonly (string | MacReadLine)[] | undefined): string[] {
   if (text === undefined || text.length === 0) return [];
+  const lines = text.map((t) => (typeof t === 'string' ? { text: t, x: -1, y: -1 } : t));
   /*
    * A LABEL IS A PHRASE; A PAGE IS PROSE.
    *
@@ -92,10 +100,17 @@ function showingLines(text: readonly string[] | undefined): string[] {
    * dedupeReadText). Quoted and dot-joined, a page reads as debris; one line
    * each, it reads as the page.
    */
-  if (text.length > 3) {
-    return ['', 'Text on screen:', ...text.map((t) => `  ${t}`)];
+  if (lines.length > 3) {
+    /* WITH THE POINT TO CLICK. Reading "Buy from $3199" off a page and having no
+       way to reach it is half a capability: Apple's own Buy control is not in
+       the Accessibility tree at all, so the text IS the only handle on it. */
+    return [
+      '',
+      'Text on screen (click a line at its point to press what it labels):',
+      ...lines.map((t) => (t.x < 0 ? `  ${t.text}` : `  (${t.x},${t.y}) ${t.text}`)),
+    ];
   }
-  return ['', ...wrap(`Showing: ${text.map((t) => JSON.stringify(t)).join(' · ')}`)];
+  return ['', ...wrap(`Showing: ${lines.map((t) => JSON.stringify(t.text)).join(' · ')}`)];
 }
 
 /** The labels tail: names, no promise that they can be acted on. */
