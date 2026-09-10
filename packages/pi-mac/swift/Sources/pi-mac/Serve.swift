@@ -245,8 +245,50 @@ private func doClickInner(_ params: [String: Any]) -> [String: Any] {
   guard let index = intOf(params["index"]) else {
     return ["found": false, "error": "click needs an index or x,y"]
   }
-  guard let (el, elPid) = resolveElement(params, index) else { return ["found": false] }
+  guard var (el, elPid) = resolveElement(params, index) else { return ["found": false] }
   if let blocked = blockedByDialog(el, pid: elPid) { return blocked }
+  /*
+   * BRING IT INTO VIEW BEFORE PRESSING IT.
+   *
+   * the user: "why don't you do something like scroll automatically such that the
+   * button clicked is visible/reasonably centered as much as possible, and then
+   * move the fake cursor, that helps with visual a lot."
+   *
+   * Acting no longer NEEDS the element on screen — a control below the fold is
+   * in the snapshot and AXPress reaches it wherever it is. But a video of a
+   * cursor pressing something nobody can see is a video of nothing happening,
+   * and a person watching over the model's shoulder has the same problem. So
+   * when the target is off screen, ask the app to scroll it into view first —
+   * AXScrollToVisible is the app's own idea of "put this where it can be seen",
+   * so it lands wherever that app would put it — then re-read the position, so
+   * the coordinates handed back (and therefore the phantom cursor) point at
+   * where the thing now IS rather than where it was hiding.
+   */
+  var scrolledIntoView = false
+  /* "Off screen" is legible from the geometry the snapshot already reports:
+     anything outside the viewport comes back with a collapsed height (see the
+     note on the control walk in Accessibility.swift). */
+  if el.h <= 1 || el.w <= 1,
+    AXUIElementPerformAction(el.element, "AXScrollToVisible" as CFString) == .success
+  {
+    usleep(260_000)
+    /* Re-read the ELEMENT, not the index. Scrolling brings more controls into
+       view and the numbering shifts under you — resolving index 61 again after
+       the scroll returned a different control, and the click's reported point
+       (which is where the phantom cursor goes) was still the old clamped one. */
+    if let p = axPoint(el.element, kAXPositionAttribute),
+      let sz = axSize(el.element, kAXSizeAttribute), sz.height > 1
+    {
+      el = SnapEl(
+        index: el.index, role: el.role, name: el.name,
+        x: Int((p.x + sz.width / 2).rounded()), y: Int((p.y + sz.height / 2).rounded()),
+        w: Int(sz.width.rounded()), h: Int(sz.height.rounded()),
+        editable: el.editable, enabled: el.enabled, focused: el.focused, value: el.value,
+        actions: el.actions, element: el.element, win: el.win, hostPid: el.hostPid,
+        surface: el.surface, isDefault: el.isDefault)
+      scrolledIntoView = true
+    }
+  }
   // Deliver to the pid that owns the element's SURFACE: a sandboxed app's
   // Open/Save panel is hosted by another process, so the app's own pid would
   // never see the event.
@@ -254,7 +296,11 @@ private func doClickInner(_ params: [String: Any]) -> [String: Any] {
     el.element, x: Double(el.x), y: Double(el.y), targetPid: el.hostPid)
   // x,y echo the acted-on point (element centre, screen points) so the app can
   // animate the phantom cursor to where the click actually landed.
-  return ["found": true, "mode": mode, "background": background, "x": el.x, "y": el.y]
+  var out: [String: Any] = [
+    "found": true, "mode": mode, "background": background, "x": el.x, "y": el.y,
+  ]
+  if scrolledIntoView { out["scrolledIntoView"] = true }
+  return out
 }
 
 private func doType(_ params: [String: Any]) -> [String: Any] {

@@ -460,6 +460,8 @@ export async function demoRun(o) {
       }
     }
     if (!sent) throw new Error('the prompt never entered the conversation');
+    const focusBefore = (await dbg('frontmost')).app;
+    say(`frontmost before the run: ${focusBefore}`);
     say(`sent: ${JSON.stringify(o.prompt)}`);
     /* A message can be IN the conversation and still be waiting: report the
        queue rather than letting the run look like a silent model. */
@@ -591,7 +593,19 @@ export async function demoRun(o) {
         say(`verify failed: ${String(err).slice(0, 140)}`);
       }
     }
-    say(`frontmost at the end: ${(await dbg('frontmost')).app}`);
+    /*
+     * DID THE RUN TAKE THE USER'S SCREEN? Say so, rather than leaving it to be
+     * noticed. the user, watching one: "it took focus again, that whole issue
+     * should be solved by now" — and I could not answer him, because the only
+     * thing recorded was who was in front at the END, which is the same line
+     * whether the run stole focus or simply found the app already there.
+     */
+    const focusAfter = (await dbg('frontmost')).app;
+    say(
+      focusBefore === focusAfter
+        ? `FOCUS HELD: "${focusAfter}" was in front before the run and still is.`
+        : `FOCUS MOVED: "${focusBefore}" -> "${focusAfter}" — the run took the user's screen.`,
+    );
     await sleep(1200);
   } finally {
     shooting = false;
