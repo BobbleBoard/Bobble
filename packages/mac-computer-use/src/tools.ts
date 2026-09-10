@@ -65,6 +65,8 @@ export {
   MAC_LAUNCH_TOOL,
   MAC_SCROLL_TOOL,
   MAC_SNAPSHOT_TOOL,
+  MAC_TAB_TOOL,
+  MAC_TABS_TOOL,
   MAC_TYPE_TOOL,
 } from './tool-names.js';
 
@@ -79,6 +81,8 @@ import {
   MAC_LAUNCH_TOOL,
   MAC_SCROLL_TOOL,
   MAC_SNAPSHOT_TOOL,
+  MAC_TAB_TOOL,
+  MAC_TABS_TOOL,
   MAC_TYPE_TOOL,
 } from './tool-names.js';
 
@@ -119,6 +123,36 @@ export interface MacComputerUseOptions {
   /** The controlled-app state machine; defaults to a fresh one (test seam). */
   readonly session?: MacSessionState;
   readonly elementCap?: number;
+}
+
+/** The helper's answer to any of the tab verbs. */
+interface MacTabsAck {
+  ok?: boolean;
+  app?: string;
+  error?: string;
+  note?: string;
+  tookFocus?: boolean;
+  selected?: string;
+  closed?: string;
+  tabs?: { index: number; title: string; active: boolean; url?: string }[];
+}
+
+/** `app` only when one was named — an absent app means "the one being driven". */
+function appParam(app: string | undefined): Record<string, unknown> {
+  return app === undefined || app === '' ? {} : { app };
+}
+
+/** The tab strip as the user sees it: numbered, with the front one marked. */
+function formatTabs(res: MacTabsAck): string {
+  const tabs = res.tabs ?? [];
+  if (tabs.length === 0) return 'No tabs.';
+  const lines = tabs.map(
+    (t) => `${t.active ? '*' : ' '} [${t.index}] ${t.title === '' ? '(untitled)' : t.title}`,
+  );
+  return [
+    `${res.app ?? 'Browser'} — ${tabs.length} tab${tabs.length === 1 ? '' : 's'} (* = front):`,
+    ...lines,
+  ].join('\n');
 }
 
 function textResult(text: string, details: MacDetails): AgentToolResult<MacDetails> {
@@ -949,6 +983,105 @@ export function registerMacComputerUseTools(
         });
       } catch (err) {
         return errResult('mac_key', messageOf(err));
+      }
+    },
+  });
+
+  // --- mac_tabs / mac_tab ---------------------------------------------------
+  /*
+   * THE WINDOW AROUND THE PAGE.
+   *
+   * the user: "for chrome, we need tab handling so it can read open tabs, switch
+   * tab, make new tab and close tab — the dom wouldn't let it drive that, or for
+   * example profiles, settings, top bar." He is right about the DOM: a page's
+   * JavaScript can see its own document and nothing about the browser holding
+   * it. The tab strip is in the ACCESSIBILITY tree though, as an ordinary
+   * AXTabGroup — so this needs no Chrome setting, no Apple Events, and works the
+   * same in Safari and other Chromium browsers.
+   */
+  shareTool(pi, {
+    name: MAC_TABS_TOOL,
+    label: 'Mac: Tabs',
+    description:
+      "List a browser's open tabs — their titles and which one is in front. Works on the user's " +
+      'own Chrome, Safari or any Chromium browser, reads the window rather than the page, and ' +
+      'needs no browser setting. Switch between them with mac_tab.\n' +
+      'BACKGROUND: listing and switching change nothing about what the user is looking at.',
+    promptSnippet: "List a browser's open tabs",
+    parameters: Type.Object({
+      app: Type.Optional(
+        Type.String({ description: 'Browser to read. Defaults to the app being controlled.' }),
+      ),
+    }),
+    async execute(_id, params, _signal, _upd, ctx): Promise<AgentToolResult<MacDetails>> {
+      if (bridge === null) return unavailable('mac_tabs');
+      const blocked = await gate('mac_tabs', ctx);
+      if (blocked !== null) return blocked;
+      try {
+        const res = await bridge.request<MacTabsAck>('tabs', withTarget(appParam(params.app)));
+        if (res.ok !== true) {
+          return errResult('mac_tabs', res.error ?? 'no tab strip in that window.');
+        }
+        return textResult(formatTabs(res), { action: 'tabs', ok: true, app: res.app });
+      } catch (err) {
+        return errResult('mac_tabs', messageOf(err));
+      }
+    },
+  });
+
+  shareTool(pi, {
+    name: MAC_TAB_TOOL,
+    label: 'Mac: Tab',
+    description:
+      'Switch to, open or close a browser tab. `index` is from mac_tabs.\n' +
+      'SWITCHING is background — the user keeps whatever they are looking at.\n' +
+      'OPENING and CLOSING are NOT: a browser brings itself to the front when it opens a tab, ' +
+      'and closing one is a document command that macOS runs only for the frontmost app. ' +
+      'Neither can be undone from the background, so do them when the user is not mid-sentence, ' +
+      'and prefer switching where switching will do.',
+    promptSnippet: 'Switch, open or close a browser tab',
+    parameters: Type.Object({
+      action: Type.Union([Type.Literal('select'), Type.Literal('new'), Type.Literal('close')], {
+        description: 'select (background) · new · close (both take the screen).',
+      }),
+      index: Type.Optional(
+        Type.Number({ description: 'Tab number from mac_tabs. Required for select and close.' }),
+      ),
+      app: Type.Optional(
+        Type.String({ description: 'Browser to act on. Defaults to the app being controlled.' }),
+      ),
+    }),
+    async execute(_id, params, _signal, _upd, ctx): Promise<AgentToolResult<MacDetails>> {
+      if (bridge === null) return unavailable('mac_tab');
+      const blocked = await gate('mac_tab', ctx);
+      if (blocked !== null) return blocked;
+      const verb =
+        params.action === 'new' ? 'tabNew' : params.action === 'close' ? 'tabClose' : 'tabSelect';
+      try {
+        const res = await bridge.request<MacTabsAck>(
+          verb,
+          withTarget({
+            ...appParam(params.app),
+            ...(params.index === undefined ? {} : { index: params.index }),
+          }),
+        );
+        if (res.ok !== true) return errResult('mac_tab', res.error ?? 'that did not work.');
+        session.noteAct(`${params.action} tab`);
+        const did =
+          params.action === 'select'
+            ? `Switched to ${JSON.stringify(res.selected ?? '')}.`
+            : params.action === 'close'
+              ? `Closed ${JSON.stringify(res.closed ?? '')}.`
+              : 'Opened a new tab.';
+        const note = res.note === undefined ? '' : `\n${res.note}`;
+        return textResult(`${did}${note}\n\n${formatTabs(res)}`, {
+          action: `tab:${params.action}`,
+          ok: true,
+          app: res.app,
+          background: res.tookFocus !== true,
+        });
+      } catch (err) {
+        return errResult('mac_tab', messageOf(err));
       }
     },
   });

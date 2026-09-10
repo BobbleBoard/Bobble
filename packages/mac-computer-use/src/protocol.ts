@@ -39,6 +39,11 @@ export type MacAgentMethod =
   | 'wallpaper'
   | 'menus'
   | 'menuClick'
+  /* The window around the page — see MAC_TABS_TOOL. */
+  | 'tabs'
+  | 'tabSelect'
+  | 'tabNew'
+  | 'tabClose'
   | 'recordStart'
   | 'recordStop'
   | 'setDriving';

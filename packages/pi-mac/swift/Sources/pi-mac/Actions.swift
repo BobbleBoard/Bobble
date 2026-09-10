@@ -1,3 +1,4 @@
+import AppKit
 import ApplicationServices
 import CoreGraphics
 import Foundation
@@ -235,6 +236,67 @@ func typeTextToPid(_ pid: pid_t, _ text: String) {
 
 /// Post a key chord (modifiers + one key) to `pid` only. Unlike the HID tap,
 /// pid delivery honors the event's own `.flags`, so chords land correctly.
+/**
+ * PUT THE USER BACK WHERE THEY WERE.
+ *
+ * the user, twice in one session: "chrome took focus right now again", and "opened a
+ * tab, and switched to a different tab but it took focus again". MEASURED which
+ * half does it: pressing a tab through Accessibility does NOT move focus, and
+ * posting a KEYSTROKE does — Chrome brings itself forward when it handles ⌘T,
+ * and the scroll ladder's keyboard rung is a keystroke too, so after that fix
+ * every scroll was quietly stealing the screen.
+ *
+ * The keystroke cannot be given up (it is the only thing a browser listens to
+ * from the background), so the focus is taken back instead: remember who was in
+ * front, do the thing, and if the front changed, put them back. It is not free —
+ * there is a flicker — but the alternative is the user losing their window mid
+ * sentence, which is the one thing computer use here is not allowed to do.
+ */
+@discardableResult
+func restoringFrontmost<T>(_ patience: [UInt32] = [60_000], _ body: () -> T) -> T {
+  let before = NSWorkspace.shared.frontmostApplication
+  let result = body()
+  guard let before = before, before.processIdentifier != getpid() else { return result }
+  /*
+   * `patience` is how long to keep watching, and it differs by how the app
+   * behaves. MEASURED: a Page Down never moves focus at all, so the scroll rung
+   * pays one 60ms glance; ⌘T raises Chrome a few hundred milliseconds later, so
+   * a tab op watches for longer. And the hand-back has to be VERIFIED —
+   * back-to-back closes left the second one having captured "Chrome" as the app
+   * to restore, because the first restore had not landed yet.
+   */
+  for (i, wait) in patience.enumerated() {
+    usleep(wait)
+    let now = NSWorkspace.shared.frontmostApplication?.processIdentifier
+    if now == before.processIdentifier {
+      if i == patience.count - 1 { return result }
+      continue
+    }
+    raiseApp(before)
+  }
+  return result
+}
+
+/**
+ * Put an app back in front.
+ *
+ * `NSRunningApplication.activate()` is the obvious call and MEASURED it does
+ * nothing here: macOS does not let a background process activate another app,
+ * and our helper is about as background as a process gets. Accessibility is a
+ * different permission with a different answer — setting AXFrontmost on the
+ * app element is exactly what an assistive client is allowed to do, and we
+ * already hold that grant to drive anything at all.
+ */
+private func raiseApp(_ app: NSRunningApplication) {
+  let el = AXUIElementCreateApplication(app.processIdentifier)
+  AXUIElementSetAttributeValue(el, kAXFrontmostAttribute as CFString, kCFBooleanTrue)
+  app.activate()
+}
+
+/// The watch a keystroke that OPENS something needs: the app raises itself a
+/// beat after the key, not with it.
+let SLOW_FOCUS_WATCH: [UInt32] = [250_000, 300_000, 300_000]
+
 func postKeyToPid(_ pid: pid_t, flags: CGEventFlags, key: CGKeyCode) {
   let src = eventSource()
   if let down = CGEvent(keyboardEventSource: src, virtualKey: key, keyDown: true) {

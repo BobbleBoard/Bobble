@@ -34,6 +34,18 @@ func axValueText(_ el: AXUIElement, _ attr: String) -> String? {
   return nil
 }
 
+/// An AXURL attribute, which comes back as a CFURL and so is nil through both
+/// `axString` (`as? String`) and `axValueText`.
+func axURLText(_ el: AXUIElement, _ attr: String) -> String? {
+  guard let v = axCopy(el, attr) else { return nil }
+  if let u = v as? URL { return u.absoluteString }
+  if CFGetTypeID(v) == CFURLGetTypeID() {
+    return (unsafeBitCast(v, to: CFURL.self) as URL).absoluteString
+  }
+  if let s = v as? String { return s }
+  return nil
+}
+
 func axBool(_ el: AXUIElement, _ attr: String) -> Bool? {
   guard let v = axCopy(el, attr) else { return nil }
   return v as? Bool
@@ -924,4 +936,179 @@ func snapshotResultDict(_ snap: SnapshotResult, screenshot: [String: Any]?) -> [
   if !menus.isEmpty { result["menus"] = menus }
   if let shot = screenshot { result["screenshot"] = shot }
   return result
+}
+
+// ── browser tabs ─────────────────────────────────────────────────────────────
+
+/**
+ * THE TAB STRIP IS IN THE TREE, and nothing else can reach it.
+ *
+ * the user: "for chrome, we need tab handling so it can read open tabs, switch tab,
+ * make new tab and close tab — the dom wouldn't let it drive that, or for
+ * example profiles, settings, top bar. So we should possibly have some
+ * dedicated chrome tools."
+ *
+ * He is right that the DOM cannot: a page's JavaScript sees its own document
+ * and nothing about the window around it. But this needs no Apple Events and no
+ * Chrome-specific anything either — Chrome publishes its tab strip as an
+ * ordinary AXTabGroup whose children are one AXRadioButton per tab (AXValue
+ * "true" on the active one) each followed by its Close button, with a New Tab
+ * button at the end. Safari and other Chromium browsers are the same shape, so
+ * this is written against the SHAPE rather than against Chrome.
+ */
+struct BrowserTab {
+  let index: Int
+  let title: String
+  let url: String
+  let active: Bool
+  let element: AXUIElement
+  let close: AXUIElement?
+}
+
+/**
+ * BREADTH-first, deliberately.
+ *
+ * Depth-first spends its whole budget inside the page — a Chrome window is two
+ * thousand nodes of web content and about forty of browser — so the first
+ * attempt reported "not showing a tab strip" for a window with two tabs open in
+ * it. The strip is three or four levels from the window root; the page is
+ * twenty. Breadth-first reaches it in dozens of nodes instead of thousands.
+ */
+private func findByRole(_ root: AXUIElement, _ want: (AXUIElement, String) -> Bool) -> AXUIElement?
+{
+  var queue: [AXUIElement] = [root]
+  var seen = 0
+  var head = 0
+  while head < queue.count, seen < 900 {
+    let el = queue[head]
+    head += 1
+    seen += 1
+    let role = axString(el, kAXRoleAttribute) ?? ""
+    if want(el, role) { return el }
+    /* Never descend into the page itself: it cannot contain browser furniture
+       and it is where all the nodes are. */
+    if role == "AXWebArea" { continue }
+    queue.append(contentsOf: axChildren(el))
+  }
+  return nil
+}
+
+private func findTabGroup(_ root: AXUIElement) -> AXUIElement? {
+  findByRole(root) { _, role in role == "AXTabGroup" }
+}
+
+/// The New Tab button, which lives beside the strip rather than inside it.
+/**
+ * The New Tab button is the tab strip's NEXT SIBLING.
+ *
+ * Searching for it by name does not work: MEASURED, Chrome gives that button an
+ * empty AXTitle and an empty AXDescription — a full snapshot only calls it "New
+ * Tab" because it falls back to attributes the search did not read. Its
+ * POSITION, though, is not ambiguous: it is the button immediately after the
+ * AXTabGroup in the same parent, exactly where it is on screen.
+ *
+ * This matters more than tidiness. The alternative was ⌘T, and MEASURED, Chrome
+ * brings itself to the front when it handles that — and a background process
+ * cannot put the user back (NSRunningApplication.activate() and AXFrontmost
+ * both return success and do nothing). So a keystroke here costs the user their
+ * screen permanently; pressing the button costs nothing.
+ */
+private func findNewTabButton(_ root: AXUIElement) -> AXUIElement? {
+  guard let group = findTabGroup(root),
+    let parentRef = axCopy(group, kAXParentAttribute)
+  else { return nil }
+  let parent = unsafeBitCast(parentRef, to: AXUIElement.self)
+  let siblings = axChildren(parent)
+  guard let at = siblings.firstIndex(where: { CFEqual($0, group) }) else { return nil }
+  for sib in siblings[(at + 1)...] where axString(sib, kAXRoleAttribute) == "AXButton" {
+    return sib
+  }
+  return nil
+}
+
+/// The window's address bar, which is where the ACTIVE tab's URL actually is —
+/// Chrome does not populate AXURL on the tab elements themselves.
+private func addressBarURL(_ root: AXUIElement) -> String? {
+  let field = findByRole(root) { el, role in
+    guard role == "AXTextField" else { return false }
+    let name = (axString(el, kAXTitleAttribute) ?? axString(el, kAXDescriptionAttribute) ?? "")
+    return name.lowercased().contains("address")
+  }
+  return field.flatMap { axValueText($0, kAXValueAttribute) }
+}
+
+func browserTabs(pid: pid_t) -> [BrowserTab] {
+  let root = rootFor(app: AXUIElementCreateApplication(pid))
+  guard let group = findTabGroup(root) else { return [] }
+  let barURL = addressBarURL(root)
+  var out: [BrowserTab] = []
+  var pendingTitle = ""
+  var pendingURL = ""
+  var pendingActive = false
+  var pendingEl: AXUIElement?
+  func flush(close: AXUIElement?) {
+    guard let el = pendingEl else { return }
+    out.append(
+      BrowserTab(
+        index: out.count + 1, title: pendingTitle, url: pendingURL, active: pendingActive,
+        element: el, close: close))
+    pendingEl = nil
+  }
+  for kid in axChildren(group) {
+    let role = axString(kid, kAXRoleAttribute) ?? ""
+    if role == "AXRadioButton" {
+      flush(close: nil)
+      /*
+       * MEASURED on Chrome 141: a tab's page title is its AXDescription, and its
+       * AXTitle is present but EMPTY — so `title ?? description` never reached
+       * the description and every tab came back nameless. And the selected flag
+       * is AXValue "1"/"0", not "true"/"false". Both of those are the kind of
+       * thing you only learn by printing the attributes.
+       */
+      let title = axString(kid, kAXTitleAttribute) ?? ""
+      let raw = title.isEmpty ? (axString(kid, kAXDescriptionAttribute) ?? "") : title
+      /* Chrome appends its own tooltip to the tab's description — "Shop iPhone
+         Duo - Apple - Memory usage - 191 MB". The memory reading is Chrome
+         talking about itself, not the page. */
+      pendingTitle = raw.replacingOccurrences(
+        of: " - Memory usage - [^-]*$", with: "", options: .regularExpression)
+      /* AXURL is an NSURL, and AXValue a number — `axString` is `as? String`
+         and nil for both, which is why the first pass had no URLs and no
+         active tab. axValueText handles the number; the URL needs its own. */
+      /* Chrome populates neither AXURL on the tab nor, reliably, a readable
+         address-bar value from here — both came back empty every time. The
+         title is what a tab strip actually knows, and the URL of the tab you
+         are ON is one ordinary snapshot away, so this does not pretend. */
+      pendingURL = axURLText(kid, "AXURL") ?? (barURL ?? "")
+      let v = (axValueText(kid, kAXValueAttribute) ?? "").lowercased()
+      pendingActive = v == "1" || v == "true"
+      pendingEl = kid
+    } else if role == "AXButton", pendingEl != nil {
+      let name = (axString(kid, kAXTitleAttribute) ?? axString(kid, kAXDescriptionAttribute) ?? "")
+      if name.lowercased().contains("close") { flush(close: kid) }
+    }
+  }
+  flush(close: nil)
+  return out
+}
+
+/// Press an element the way a person would, without moving the pointer or
+/// taking focus — the same AXPress the indexed click uses.
+@discardableResult
+func pressElement(_ el: AXUIElement) -> Bool {
+  AXUIElementPerformAction(el, kAXPressAction as CFString) == .success
+}
+
+/// New tab: the window's own button when it publishes one, else ⌘T posted to
+/// the app. MEASURED: Chrome lists a "New Tab" AXButton in a full snapshot but
+/// it is not reachable from the window root by a bounded breadth-first walk, so
+/// the keystroke is not a fallback for exotic browsers — it is the normal path.
+func newBrowserTab(pid: pid_t) -> Bool {
+  let root = rootFor(app: AXUIElementCreateApplication(pid))
+  if let button = findNewTabButton(root), pressElement(button) { return true }
+  restoringFrontmost(SLOW_FOCUS_WATCH) {
+    postKeyToPid(pid, flags: .maskCommand, key: 17)  // t
+    usleep(220_000)
+  }
+  return true
 }

@@ -565,6 +565,118 @@ private func doScrollLadder(
   return result("exhausted", moved: false)
 }
 
+/**
+ * `tabs` / `tabSelect` / `tabClose` / `tabNew`: the window around the page.
+ *
+ * See browserTabs in Accessibility.swift for why this is Accessibility rather
+ * than Apple Events, and why it is written against the SHAPE of a tab strip
+ * rather than against Chrome.
+ */
+private func tabDict(_ t: BrowserTab) -> [String: Any] {
+  var d: [String: Any] = ["index": t.index, "title": t.title, "active": t.active]
+  if !t.url.isEmpty { d["url"] = t.url }
+  return d
+}
+
+private func doTabs(_ params: [String: Any]) -> [String: Any] {
+  guard let resolved = resolveTargetPid(targetFrom(params)) else {
+    return ["ok": false, "error": "no such app"]
+  }
+  let tabs = browserTabs(pid: resolved.pid)
+  if tabs.isEmpty {
+    return [
+      "ok": false, "app": resolved.name,
+      "error":
+        "\(resolved.name) is not showing a tab strip — either it is not a browser, or its window "
+        + "has no tabs to list.",
+    ]
+  }
+  return [
+    "ok": true, "app": resolved.name,
+    "tabs": tabs.map { tabDict($0) },
+  ]
+}
+
+private func doTabAct(_ params: [String: Any], act: String) -> [String: Any] {
+  guard let resolved = resolveTargetPid(targetFrom(params)) else {
+    return ["ok": false, "error": "no such app"]
+  }
+  if act == "new" {
+    let ok = newBrowserTab(pid: resolved.pid)
+    return ok
+      ? [
+        "ok": true, "app": resolved.name,
+        /* MEASURED, and worth saying out loud every time: Chrome brings itself
+           to the front when a tab is created — by its own button as much as by
+           ⌘T — and a background process cannot put the user back
+           (NSRunningApplication.activate() and AXFrontmost both return success
+           and change nothing on macOS 26). Listing and switching stay in the
+           background; creating does not. */
+        "tookFocus": true,
+        "note":
+          "\(resolved.name) came to the front — a browser activates itself when it opens a tab, "
+          + "and that cannot be undone from the background. Listing and switching tabs do not do "
+          + "this, so prefer those when the user is working.",
+        "tabs": browserTabs(pid: resolved.pid).map { tabDict($0) },
+      ]
+      : ["ok": false, "error": "\(resolved.name) has no New Tab button in its window."]
+  }
+  let tabs = browserTabs(pid: resolved.pid)
+  guard let want = intOf(params["index"]), want >= 1, want <= tabs.count else {
+    return [
+      "ok": false,
+      "error": "tab \(intOf(params["index"]).map(String.init) ?? "?") is not one of the \(tabs.count) open tabs.",
+    ]
+  }
+  let tab = tabs[want - 1]
+  if act == "select" {
+    let ok = pressElement(tab.element)
+    return [
+      "ok": ok, "app": resolved.name, "selected": tab.title,
+      "tabs": browserTabs(pid: resolved.pid).map { tabDict($0) },
+    ]
+  }
+  /*
+   * Closing: the tab's own × when it has one — Chrome publishes one only for the
+   * tab under the pointer, so usually it does not.
+   *
+   * NOT ⌘W. MEASURED: it reports success and closes nothing, because macOS
+   * routes document commands (Close, Save, Print) to the FRONTMOST app only —
+   * the same rule the capability text already warns about for File > Save. The
+   * menu bar has no such restriction, so selecting the tab and pressing
+   * File > Close Tab does in the background what the keystroke cannot.
+   */
+  if let close = tab.close, pressElement(close) {
+    return ["ok": true, "app": resolved.name, "closed": tab.title, "how": "closeButton"]
+  }
+  _ = pressElement(tab.element)
+  usleep(140_000)
+  /*
+   * Closing a tab is a DOCUMENT COMMAND, and macOS runs those only for the app
+   * that is frontmost. MEASURED every way round: ⌘W posted to a background pid
+   * reports success and closes nothing, and pressing the menu item does the
+   * same — the harness's own menu path already says so in as many words. So
+   * this borrows the focus for exactly one keystroke and hands it straight back,
+   * which is the pattern the capability text already describes for File > Save.
+   */
+  let borrowed = restoringFrontmost(SLOW_FOCUS_WATCH) { () -> Bool in
+    NSRunningApplication(processIdentifier: resolved.pid)?.activate()
+    usleep(220_000)
+    postKeyToPid(resolved.pid, flags: .maskCommand, key: 13)  // w
+    usleep(260_000)
+    return true
+  }
+  let after = browserTabs(pid: resolved.pid)
+  return [
+    "ok": borrowed && after.count < tabs.count, "app": resolved.name, "closed": tab.title,
+    "tookFocus": true,
+    "note":
+      "\(resolved.name) came to the front: closing a tab is a document command and macOS runs "
+      + "those only for the frontmost app. That cannot be undone from the background.",
+    "tabs": after.map { tabDict($0) },
+  ]
+}
+
 /// Activate a running app (bring to front) by name — a lightweight focus that
 /// doesn't need osascript. Launching a NOT-running app stays the bridge's job
 /// (osascript `open -a`), so this only focuses.
@@ -606,6 +718,10 @@ private func dispatch(method: String, params: [String: Any]) -> [String: Any]? {
   case "menus": return doMenus(params)
   case "focusWindow", "raiseWindow": return doFocusWindow(params)
   case "menuClick": return doMenuClick(params)
+  case "tabs": return doTabs(params)
+  case "tabSelect": return doTabAct(params, act: "select")
+  case "tabClose": return doTabAct(params, act: "close")
+  case "tabNew": return doTabAct(params, act: "new")
   case "recordStart": return recordStart(params)
   case "recordStop": return recordStop()
   default: return nil

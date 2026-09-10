@@ -19,6 +19,18 @@ export const MAC_TYPE_TOOL = 'mac_type';
 export const MAC_KEY_TOOL = 'mac_key';
 export const MAC_SCROLL_TOOL = 'mac_scroll';
 export const MAC_LAUNCH_TOOL = 'mac_launch';
+/**
+ * The window AROUND the page.
+ *
+ * the user: "for chrome, we need tab handling so it can read open tabs, switch tab,
+ * make new tab and close tab — the dom wouldn't let it drive that." Right about
+ * the DOM: a page's JavaScript sees its own document and nothing about the
+ * browser holding it. These read the tab strip out of the Accessibility tree
+ * instead, so they need no Chrome setting and work in Safari and the other
+ * Chromium browsers too.
+ */
+export const MAC_TABS_TOOL = 'mac_tabs';
+export const MAC_TAB_TOOL = 'mac_tab';
 /* Chrome, driven through its DOM rather than its pixels — the user's OWN Chrome,
  * with their sessions. See ./chrome.ts for why this beats sighted clicking. */
 export const CHROME_SNAPSHOT_TOOL = 'chrome_snapshot';
@@ -29,6 +41,8 @@ export const CHROME_GO_TOOL = 'chrome_go';
 /** Every `mac_*` computer-use tool name — the full background-control pipeline. */
 export const MAC_COMPUTER_USE_TOOL_NAMES = [
   MAC_LAUNCH_TOOL,
+  MAC_TABS_TOOL,
+  MAC_TAB_TOOL,
   MAC_SNAPSHOT_TOOL,
   MAC_CLICK_TOOL,
   MAC_TYPE_TOOL,
