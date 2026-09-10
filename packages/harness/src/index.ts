@@ -2943,6 +2943,9 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
   // utility model is configured, ambiguous heuristics escalate to a tier-2
   // double-check (classifyWithEscalation); otherwise the pure heuristic stands.
   pi.on('before_agent_start', async (event, ctx) => {
+    /* A new turn deserves the full explanation again — the escalation is about
+       one turn's refusal to take an answer, not a grudge. */
+    fencedWhileDriving = 0;
     // FIRST, before anything else: give the user the slot. Post-turn naming and
     // the reviewer share the single llama-server, and until they stop this
     // message is queued behind them. Cancelling the PENDING timer is the case
@@ -3374,6 +3377,10 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
    * refusal with something better than more path advice; see FILE_TOOLS below.
    */
   let controlledApp: string | null = null;
+  /** File-tool refusals in THIS turn while an app was being driven — see the
+   * escalation in the tool_result hook. Reset per turn, not per session: a
+   * later turn deserves the full explanation again. */
+  let fencedWhileDriving = 0;
   pi.on('tool_result', (event) => {
     /* In CLI mode every call is `bash`, so the real tool name is only known at
        the dispatch (see the CLI host's `call`); tally there instead, or the
@@ -3406,11 +3413,40 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
         const how = toolCliMode
           ? `\`mac click --x <x> --y <y>\` (screen points, read off the screenshot)`
           : 'the mac_click tool';
+        fencedWhileDriving += 1;
+        /*
+         * SAYING IT LOUDER IS NOT SAYING IT AGAIN.
+         *
+         * MEASURED on a Maps run: a 9B was refused, read the redirect, said in
+         * its own words "the system is telling me I'm driving the Maps app and
+         * should use mac commands directly" — and then wrote the file again.
+         * Twenty times, until the run was over. Repeating a paragraph that has
+         * demonstrably not worked is the harness talking to itself.
+         *
+         * So after the second one the sandbox explanation goes: it is advice
+         * for a model that genuinely wanted to write a file, and by the third
+         * refusal this is not that model. What is left is one sentence about
+         * the only thing that can make progress.
+         */
         const note =
           `\n\nYou are driving "${controlledApp}" right now. Writing or editing a file does ` +
           `NOT do anything to it — nothing you put on disk reaches that window. Act on the ` +
           `app itself: \`mac snapshot --screenshot\` to see it, then ${how}. If you just ` +
           `said what you were about to click, click it.`;
+        if (fencedWhileDriving >= 3) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text:
+                  `Refused, for the ${fencedWhileDriving}${fencedWhileDriving === 3 ? 'rd' : 'th'} ` +
+                  `time this turn. Nothing written to disk reaches "${controlledApp}", and the ` +
+                  `task is in that window. Your next call must act on it — ${how} — or say ` +
+                  `plainly that you cannot.`,
+              },
+            ],
+          };
+        }
         return {
           content: event.content.map((part, i) =>
             i === 0 && part.type === 'text' ? { ...part, text: `${part.text}${note}` } : part,
