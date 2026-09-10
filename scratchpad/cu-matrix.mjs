@@ -40,6 +40,17 @@ const PLAN = [
   ]),
 ];
 
+/*
+ * MATRIX_ONLY=maps,blender — re-run part of the plan against a fixed harness
+ * without discarding the ledger that found the problem. The original twelve are
+ * an honest record of the harness as it was; a re-run belongs beside them, not
+ * on top of them, so point MATRIX_OUT somewhere new when using this.
+ */
+const ONLY = (process.env.MATRIX_ONLY ?? '')
+  .split(',')
+  .map((s) => s.trim())
+  .filter((s) => s !== '');
+
 const run = (cmd, args, env) =>
   new Promise((resolve) => {
     execFile(
@@ -63,6 +74,9 @@ const MAX_ATTEMPTS = 3;
 
 const started = Date.now();
 for (const [i, job] of PLAN.entries()) {
+  /* Numbering stays tied to the full plan, so run 7 is the same cell whether or
+     not runs 1-6 were part of this pass. */
+  if (ONLY.length > 0 && !ONLY.includes(job.app)) continue;
   const name = `matrix-${String(i + 1).padStart(2, '0')}-${job.app}-${job.model}${job.take === undefined ? '' : `-${job.take}`}`;
   const t0 = Date.now();
   console.log(`\n[${i + 1}/${PLAN.length}] ${name}`);
