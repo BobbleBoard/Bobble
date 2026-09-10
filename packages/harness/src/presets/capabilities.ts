@@ -92,7 +92,9 @@ export const CAPABILITIES: readonly Capability[] = [
       'headings, prices and labels, each with the point to click it — so read a page that way ' +
       'first rather than reaching for a screenshot. (The chrome_* tools read the real DOM, but ' +
       'they need a Chrome setting that is off by default and that only the user can turn on, so ' +
-      'they usually fail; the snapshot needs nothing.) An app that ' +
+      'they usually fail; the snapshot needs nothing.) The window AROUND the page — which tabs ' +
+      'are open, switching between them, opening and closing one — is mac_tabs / mac_tab, and no ' +
+      'page can tell you any of it. An app that ' +
       'exposes nothing to Accessibility returns a screenshot automatically; act by x,y then. A ' +
       'save sheet or file picker is part of the app that opened it — same snapshot, same clicks. ' +
       'A third of what an app can do is in its menu bar, which is in no window: mac_click takes ' +
