@@ -64,10 +64,9 @@ private let GLYPH_GLOW = cgColor(0x95 / 255.0, 0xF9 / 255.0, 0xE5 / 255.0, 1)
 /// His stroke width, in the 291-wide viewBox the path is written in — so it
 /// scales WITH the glyph rather than going fat as the cursor shrinks.
 private let GLYPH_STROKE_W: CGFloat = 13.79
-/// How tall the drawn cursor is, in points. The previous glyph measured
-/// 18.1x22.1 and the user asked for that size ("tiny"); his artwork is a little
-/// wider in proportion, so height is the honest thing to pin.
-private let OVERLAY_GLYPH_HEIGHT: CGFloat = 22.0
+/// How tall the drawn cursor is, in points. the user, after seeing it on screen:
+/// "size cursor up maybe 15%" — 22.0 x 1.15.
+private let OVERLAY_GLYPH_HEIGHT: CGFloat = 25.3
 
 /// Travel time for a cursor glide, mirrored by CURSOR_TRAVEL_MS on the Node
 /// side so a tool act can wait the animation out before it fires.
@@ -933,8 +932,9 @@ final class OverlayController: NSObject {
     let p = local(ax)
     let w = bubble.bounds.width
     let h = bubble.bounds.height
-    let dx: CGFloat = 18
-    let dy: CGFloat = 24
+    /* the user: "bring pill a bit closer to it". */
+    let dx: CGFloat = 11
+    let dy: CGFloat = 15
     // The screen under the cursor, in panel-local coordinates.
     let frame = panel.frame
     let cocoa = CGPoint(x: ax.x, y: cocoaFlipBase() - ax.y)

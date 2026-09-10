@@ -1612,7 +1612,11 @@ export interface ActivityChainProps extends Omit<HTMLAttributes<HTMLDivElement>,
    * `percent: null` = ingesting but no frame yet (indeterminate). Clear the whole
    * prop the instant tokens resume — the real row takes its place.
    */
-  prefill?: { percent: number | null };
+  /** The prefill row: how far along, and WHAT this wait is. The label names
+   * the cause ("Loading model", "Loading Computer use tools", "Starting up")
+   * because "processing the prompt" describes the mechanism to somebody who is
+   * waiting to know why. */
+  prefill?: { percent: number | null; label?: string };
 }
 
 /**
@@ -1726,6 +1730,28 @@ export const ActivityChain = forwardRef<HTMLDivElement, ActivityChainProps>(func
   const settledGuess = useSettled(quiet);
   const [everDone, setEverDone] = useState(false);
   const doneNow = chainIsDone({ complete, quiet, settledGuess });
+  /*
+   * A FINISHED CHAIN FOLDS ITSELF AWAY. the user: "collapse thinking/tool chains
+   * after they are finished (user can always reopen manually)."
+   *
+   * It stays open for the whole turn — that is the rule above, and it is the
+   * one that matters while you are watching — but once the turn is genuinely
+   * done the eight rows of it are history, and leaving them open pushes the
+   * answer off the screen. Only when the user has not made their own choice:
+   * someone who opened a step to read it keeps it open.
+   */
+  const foldedOnDone = useRef(false);
+  useEffect(() => {
+    if (!doneNow) {
+      foldedOnDone.current = false;
+      return;
+    }
+    if (foldedOnDone.current || userChose) return;
+    foldedOnDone.current = true;
+    setInternalExpanded(false);
+    setOpenStep(null);
+  }, [doneNow, userChose]);
+
   useEffect(() => {
     if (doneNow) {
       setEverDone(true);
@@ -1830,8 +1856,8 @@ export const ActivityChain = forwardRef<HTMLDivElement, ActivityChainProps>(func
                   </span>
                   <ShimmerText className="pd-chain-step-label">
                     {prefill.percent === null
-                      ? 'Processing the prompt…'
-                      : `${Math.round(prefill.percent)}% processing the prompt`}
+                      ? `${prefill.label ?? 'Processing the prompt'}…`
+                      : `${Math.round(prefill.percent)}% · ${prefill.label ?? 'processing the prompt'}`}
                   </ShimmerText>
                 </div>
               </div>

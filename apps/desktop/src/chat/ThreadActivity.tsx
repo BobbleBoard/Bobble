@@ -19,6 +19,7 @@ import type { ToolResultMsg } from '@pi-desktop/engine';
 import { ActivityChain } from '@pi-desktop/ui';
 import type { ReactNode } from 'react';
 import { useCanvasStore } from '../state/canvas-store';
+import { useLlmStore } from '../state/llm-store';
 import { usePiStore } from '../state/pi-slice';
 import {
   type ActivityBlock,
@@ -31,7 +32,12 @@ import {
 // Local module (NOT a package barrel) — keep the open-in-canvas action off the
 // renderer-forbidden barrels (the gotcha); `openFileInCanvas` reads via IPC.
 import { openFileInCanvas } from './canvas/file-tabs';
-import { PREFILL_STATUS_KEY, parsePrefillPercent } from './harness-status';
+import {
+  PREFILL_STATUS_KEY,
+  parsePrefillPercent,
+  prefillLabel,
+  useHarnessStatus,
+} from './harness-status';
 
 export { segmentBlocks } from './activity-mapping';
 
@@ -177,6 +183,21 @@ export function ThreadActivityChain({
   const partials = usePiStore((st) => st.toolOutputPartials);
   const prefillRaw = usePiStore((st) => st.extensionStatus[PREFILL_STATUS_KEY]);
   const prefillPct = parsePrefillPercent(prefillRaw);
+  /* The wait's CAUSE, so the row can name it — see prefillLabel. */
+  const harness = useHarnessStatus();
+  /* "Starting up" belongs to the FIRST reply of a conversation — after that the
+     model is resident and the wait is something else. */
+  const firstAssistantTurn = usePiStore(
+    (st) => st.messages.filter((m) => m.kind === 'assistant').length <= 1,
+  );
+  /* The real server phase, from the inference store — 'starting' while weights
+     load, which is the 27-second wait the user saw on the first message. */
+  const llmPhase = useLlmStore((st) => st.status.phase);
+  const label = prefillLabel({
+    modelPhase: llmPhase ?? null,
+    loadingCapability: harness?.loadingCapability ?? null,
+    firstOfSession: firstAssistantTurn,
+  });
 
   // E1: only the LAST block of a live chain is present-tense; every settled prior
   // step stays past-tense (a new action must not re-present the ones before it).
@@ -264,8 +285,30 @@ export function ThreadActivityChain({
        * The moment a real tool call or thought starts, that row IS the answer
        * and this one clears — the replacement the user asked for.
        */
-      {...(streaming && !runningFlags.some(Boolean) && prefillPct !== null && prefillPct < 100
-        ? { prefill: { percent: prefillPct } }
+      /*
+       * AND THE GAPS WHERE NOTHING WAS SHOWN AT ALL.
+       *
+       * the user, timing one: "from 1:00 when it initally shows the tool as
+       * finished to 1:11, there is no user feedback, no processing % ring, no
+       * thinking, nothing, then it finally at ~1:12 shows 99% instantly ...
+       * the bunch of waits, especially times without any processing circle or
+       * tool executing are not good and really what makes a user think
+       * something's broken."
+       *
+       * The row required a REPORTED percent, and llama reports nothing until it
+       * starts the ingest — so the whole run-up (assembling the prompt, the
+       * tool schemas changing, the server picking the request up) was silent.
+       * An indeterminate ring covers it now: the same row, spinning, from the
+       * moment the model owes us a reply.
+       *
+       * Still not shown during generation — the last block being a FINISHED
+       * tool call is what says the model has not started answering yet, so the
+       * text streaming in is never talked over.
+       */
+      {...(streaming &&
+      !runningFlags.some(Boolean) &&
+      (prefillPct === null ? blocks.at(-1)?.type === 'toolCall' : prefillPct < 100)
+        ? { prefill: { percent: prefillPct, label } }
         : {})}
       onOpenCanvas={(_step, index) => {
         const spec = steps[index]?.tabSpec;

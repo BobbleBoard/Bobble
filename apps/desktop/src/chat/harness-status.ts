@@ -30,6 +30,34 @@ export function useHarnessStatus(): HarnessStatus | null {
   return useMemo(() => parseHarnessStatus(raw), [raw]);
 }
 
+/**
+ * WHAT THIS PARTICULAR WAIT IS, in words that name its cause.
+ *
+ * the user, watching a run: the prefill row "initially shows 'working' ... staying
+ * at 0% for 14 seconds", and later a ten-second gap ends with "of all things
+ * 'processing the prompt'" when what was actually happening was a toolset being
+ * switched on. "this initial one i'd like to say 'starting up' or something
+ * like that if it's the first message or 'loading model' or changing between
+ * the two accurately."
+ *
+ * So the label is chosen by cause, most specific first: a model that is still
+ * loading, then a capability whose tools just arrived (turning them on
+ * re-ingests the whole prompt, which IS this wait), then the first prefill of a
+ * session, and only then the generic mechanism.
+ */
+export function prefillLabel(inp: {
+  readonly modelPhase?: string | null;
+  readonly loadingCapability?: string | null;
+  readonly firstOfSession?: boolean;
+}): string {
+  const phase = inp.modelPhase ?? null;
+  if (phase !== null && phase !== 'ready' && phase !== 'idle') return 'Loading model';
+  const cap = inp.loadingCapability ?? null;
+  if (cap !== null && cap !== '') return `Loading ${CAPABILITY_LABEL[cap] ?? cap} tools`;
+  if (inp.firstOfSession === true) return 'Starting up';
+  return 'Processing the prompt';
+}
+
 /** Human label for a task class (falls back to the raw id, dashes → spaces). */
 export function classLabel(cls: string | null | undefined): string | null {
   if (cls === null || cls === undefined) return null;

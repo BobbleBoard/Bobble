@@ -1003,10 +1003,53 @@ export function ComputerUseSurface({ feed, className }: ComputerUseSurfaceProps)
     }
     lastDrawn.current = { drawn, rect, painted };
     if (painted && scrubShot === null) {
-      ctx.strokeStyle = 'rgba(255,255,255,0.16)';
-      ctx.lineWidth = 1;
-      roundRect(ctx, drawn.x + 0.5, drawn.y + 0.5, drawn.w - 1, drawn.h - 1, radius);
-      ctx.stroke();
+      /*
+       * A MISTY GLOW AROUND THE EDGE, NOT A LINE ON IT.
+       *
+       * the user: "that blue translucent looking line at the end of the window ...
+       * i'd just like it to be a misty glow that sits around the window making
+       * it seem like it is being 'propped up' ... never over on on top of the
+       * window or it's content, just the outer edge."
+       *
+       * So it is painted OUTSIDE the window: the window's own rectangle is
+       * punched out with `destination-out`-style clipping (evenodd against the
+       * viewport), which means not one pixel of the glow can land on the
+       * picture. And an edge that is CUT OFF gets none of it — a window running
+       * past the rail has no outer edge there to prop up, and a glow drawn along
+       * the crop would read as a border.
+       */
+      const glowPad = Math.max(6, 10 * drawn.scale);
+      const cut = 1.5;
+      const openLeft = drawn.x > cut;
+      const openTop = drawn.y > cut;
+      const openRight = drawn.x + drawn.w < viewport.w - cut;
+      const openBottom = drawn.y + drawn.h < viewport.h - cut;
+      if (openLeft || openTop || openRight || openBottom) {
+        ctx.save();
+        // Clip to everything EXCEPT the window, so the glow can only be outside.
+        ctx.beginPath();
+        ctx.rect(0, 0, viewport.w, viewport.h);
+        roundRect(ctx, drawn.x, drawn.y, drawn.w, drawn.h, radius);
+        ctx.clip('evenodd');
+        // Only the edges that actually exist: an off-canvas side is excluded so
+        // nothing is drawn along a crop.
+        ctx.beginPath();
+        ctx.rect(
+          openLeft ? drawn.x - glowPad : drawn.x,
+          openTop ? drawn.y - glowPad : drawn.y,
+          drawn.w + (openLeft ? glowPad : 0) + (openRight ? glowPad : 0),
+          drawn.h + (openTop ? glowPad : 0) + (openBottom ? glowPad : 0),
+        );
+        ctx.clip();
+        ctx.shadowColor = CURSOR_GLOW;
+        ctx.shadowBlur = glowPad;
+        ctx.strokeStyle = 'rgba(149, 249, 229, 0.34)';
+        ctx.lineWidth = 2;
+        roundRect(ctx, drawn.x + 1, drawn.y + 1, drawn.w - 2, drawn.h - 2, radius);
+        ctx.stroke();
+        ctx.stroke();
+        ctx.restore();
+      }
     }
 
     // 5. A modal is up: the room goes quiet. macOS's own composition dims the

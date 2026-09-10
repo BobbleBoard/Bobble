@@ -430,6 +430,7 @@ class MacOverlayController {
     this.#cursor = { x: screenX, y: screenY };
     await this.#push('cursor', { x: screenX, y: screenY, ms: CURSOR_TRAVEL_MS });
     await sleep(CURSOR_TRAVEL_MS);
+    this.#announce();
   }
 
   /** Click feedback at a screen point: press dip + expanding ripples. `label`
@@ -441,6 +442,7 @@ class MacOverlayController {
     this.#note('clicking', label);
     await this.#push('click', { x: screenX, y: screenY });
     this.#revertSoon();
+    this.#announce();
   }
 
   /** Live-typing pill (previewing the text) at the cursor. */
@@ -448,6 +450,7 @@ class MacOverlayController {
     this.#armIdle();
     this.#note('typing', typingPreview(text));
     await this.#push('status', { status: 'typing', text: typingPreview(text) });
+    this.#announce();
   }
 
   async keyPress(combo: string): Promise<void> {
@@ -455,6 +458,7 @@ class MacOverlayController {
     this.#note('pressing', comboLabel(combo));
     await this.#push('status', { status: 'pressing', text: comboLabel(combo) });
     this.#revertSoon();
+    this.#announce();
   }
 
   async scrolling(): Promise<void> {
@@ -462,12 +466,14 @@ class MacOverlayController {
     this.#note('scrolling');
     await this.#push('status', { status: 'scrolling' });
     this.#revertSoon();
+    this.#announce();
   }
 
   async opening(appName: string): Promise<void> {
     this.#armIdle();
     this.#note('opening', `Opening ${appName}`);
     await this.#push('status', { status: 'opening', text: `Opening ${appName}` });
+    this.#announce();
   }
 
   /** The resting state between actions: the model is deciding what to do. */
@@ -476,6 +482,7 @@ class MacOverlayController {
     this.#armIdle();
     this.#note('thinking');
     await this.#push('status', { status: 'thinking' });
+    this.#announce();
   }
 
   /**
@@ -510,6 +517,7 @@ class MacOverlayController {
     this.#note('reading');
     await this.#push('status', { status: 'reading' });
     this.#revertSoon();
+    this.#announce();
   }
 
   /** Remember the pill we just pushed. */
@@ -582,11 +590,26 @@ class MacOverlayController {
     fn(this.state());
   }
 
-  /** Tell the watchers, but only when the answer actually changed. */
+  /**
+   * Tell the watchers whenever the phantom's STATE changed — not just when it
+   * appeared or disappeared.
+   *
+   * the user, watching the Apple run: "you can see it finally has selected the 2tb
+   * option, and yet, the mouse cursor didn't move at all, the click happened
+   * invisibly." This was mine: the old BrowserWindow overlay pushed its state
+   * continuously, and when the native panel replaced it I made the notification
+   * fire on visibility alone. So the canvas monitor — which draws the same
+   * phantom over a picture of the window — was frozen from the moment it became
+   * visible, and every move and click after that happened off-screen.
+   *
+   * Compared on the whole state rather than one flag, and cheap: this is a
+   * handful of numbers and two short strings.
+   */
   #announce(): void {
-    if (this.#announced === this.#visible) return;
-    this.#announced = this.#visible;
     const snapshot = this.state();
+    const key = JSON.stringify(snapshot);
+    if (key === this.#announced) return;
+    this.#announced = key;
     for (const fn of this.#watchers) {
       try {
         fn(snapshot);
@@ -595,7 +618,7 @@ class MacOverlayController {
       }
     }
   }
-  #announced: boolean | null = null;
+  #announced: string | null = null;
 
   info(): {
     visible: boolean;
