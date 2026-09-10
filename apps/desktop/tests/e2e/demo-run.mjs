@@ -398,9 +398,12 @@ export async function demoRun(o) {
      * CHIP BACK. The write alone would be the same class of mistake as before —
      * a thing that was set but never seen.
      */
+    /* `window.__settings_store()` is the renderer store itself — the thing the
+       picker writes and the chip reads. Writing the setting through main
+       instead left the chip on "Balanced", which the read-back below caught. */
     await page.evaluate(
       (id) =>
-        window.useSettingsStore?.getState?.().update?.({
+        window.__settings_store?.().getState?.().update?.({
           modelSelection: { mode: 'model', modelId: id },
         }) ??
         window.piDesktop.invoke('settings:set', {
