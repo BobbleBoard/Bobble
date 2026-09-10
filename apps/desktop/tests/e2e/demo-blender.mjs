@@ -139,11 +139,26 @@ await demoRun({
     const objects = scene?.result?.objects ?? scene?.objects ?? [];
     const names = Array.isArray(objects) ? objects.map((o) => (Array.isArray(o) ? o[0] : o)) : [];
 
+    const shapeInScene = names.some((n) => SHAPE.match.test(String(n)));
+    /*
+     * THE VERDICT — same three-answer rule as the Chrome demo, and for the same
+     * reason: a false failure is worse than no answer.
+     *
+     * Blender is the best-placed of the three to be judged, because the
+     * evidence is Blender's own `bpy.data.objects` rather than anything read off
+     * a screen. So `unseen` is reserved for the one case where that evidence is
+     * genuinely missing — the scene query itself failed — and everything else
+     * is a real pass or a real fail.
+     */
+    const noEvidence = scene == null || scene.error != null;
+    const verdict = noEvidence ? 'unseen' : shapeInScene ? 'pass' : 'fail';
+
     return {
+      verdict,
       asked: SHAPE.name,
       // Blender's OWN answer, not the model's.
       sceneObjects: names,
-      shapeInScene: names.some((n) => SHAPE.match.test(String(n))),
+      shapeInScene,
       sceneQuery: scene?.error ?? 'ok',
       finalScreenshot: shotPath,
       window: snap.window,

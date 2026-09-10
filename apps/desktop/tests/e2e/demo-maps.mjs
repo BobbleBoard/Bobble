@@ -62,10 +62,28 @@ await demoRun({
       .toLowerCase();
     const needle = PLACE.toLowerCase();
     const word = needle.split(' ')[0] ?? needle;
+    /*
+     * A VERDICT, ON THE SAME THREE-ANSWER RULE AS THE CHROME DEMO.
+     *
+     * This demo collected all the evidence and then never said what it meant,
+     * so the matrix ledger's verdict column came back "?" — and since Blender
+     * did the same, NINE of the twelve runs were unscoreable. The evidence was
+     * always here; only the sentence was missing.
+     *
+     * `pass` only on the app's OWN evidence (Maps is showing the place),
+     * `unseen` when Maps exposed nothing to judge on at all — which is not the
+     * same as failing, and mis-scoring it would mark a good model bad — and
+     * `fail` when Maps was readable and the place is not in it. The model's own
+     * claim is recorded beside it and deliberately does not decide anything.
+     */
+    const mapsMentionsPlace = shown.includes(needle) || shown.includes(word);
+    const verdict = els.length === 0 ? 'unseen' : mapsMentionsPlace ? 'pass' : 'fail';
+
     return {
+      verdict,
       searchField: field?.value ?? null,
       window: snap.window,
-      mapsMentionsPlace: shown.includes(needle) || shown.includes(word),
+      mapsMentionsPlace,
       modelMentionsPlace: last.text.toLowerCase().includes(word),
       elements: els.length,
     };
