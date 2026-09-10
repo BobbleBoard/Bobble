@@ -4,7 +4,7 @@ import { forwardRef, useEffect, useRef, useState } from 'react';
 import { DiffStat } from './activity.tsx';
 import { writeClipboardText } from './copy-button.tsx';
 import { type DiffFileData, DiffView } from './diff-view.tsx';
-import { IconCheck, IconChevronRight, IconExternal } from './icons.tsx';
+import { IconCheck, IconChevronRight, IconConnector, IconExternal } from './icons.tsx';
 import { ContextGauge } from './indicators.tsx';
 import { Markdown } from './markdown.tsx';
 import { ShimmerText } from './shimmer.tsx';
@@ -98,6 +98,14 @@ interface ActivityStepCommon {
    * the name to a picture; the chain only has to carry the name.
    */
   app?: string;
+  /**
+   * The verb ALONE, with the app's name taken out of it — which turns the row
+   * from a sentence into the shape the user asked for: "<generic connectors icon>
+   * Used <connector app icon> <connector app name> <action eg. read page or
+   * listed tabs>". Present only for the connector-shaped rows; everything else
+   * keeps its ordinary label.
+   */
+  action?: string;
   /** Small pill/subtitle ("Script", or a filename). */
   tag?: ReactNode;
   /** Drives the file-extension icon badge and the default pill/tag. */
@@ -1383,10 +1391,23 @@ export const ActivityStep = forwardRef<HTMLDivElement, ActivityStepProps>(functi
      one — otherwise the generic tool glyph, which is still better than a wrong
      picture. */
   const appIcon = data.app === undefined ? undefined : resolveAppIcon?.(data.app);
+  /*
+   * A CONNECTOR ROW IS A DIFFERENT SENTENCE.
+   *
+   * the user: "for connector usage, the icon shown in the left is not the app icon,
+   * but it shows as follows, left svg: <generic connectors icon> Used
+   * <connector app icon> <connector app name> <action eg. read page or listed
+   * tabs>". So the app's icon moves OUT of the leading slot — which now says
+   * what KIND of thing this row is — and in beside the app's name, where it
+   * belongs to the noun it illustrates.
+   */
+  const connectorRow = data.action !== undefined && data.app !== undefined;
   const iconEl = (
     <span className="pd-chain-step-icon">
       {running ? (
         <Spinner size={14} />
+      ) : connectorRow ? (
+        <IconConnector size={15} />
       ) : appIcon !== undefined ? (
         <img className="pd-chain-app-icon" src={appIcon} alt="" width={15} height={15} />
       ) : (
@@ -1434,6 +1455,26 @@ export const ActivityStep = forwardRef<HTMLDivElement, ActivityStepProps>(functi
         <span className="pd-chain-step-subline" title={detail}>
           {subline}
         </span>
+      </span>
+    ) : connectorRow ? (
+      /*
+       * "Used <icon> <app> <action>", and NOTHING ELSE on the line. the user: "the
+       * tiny text to the right with the raw cli command is not shown, instead a
+       * '>' is shown ... clicking that expands the individual tool and shows the
+       * exact cli command and what was returned." The command is not lost — it
+       * is the row's detail, which is exactly what the disclosure reveals.
+       */
+      <span className="pd-chain-step-label pd-chain-used">
+        <span className="pd-chain-used-verb">Used</span>
+        {appIcon === undefined ? null : (
+          <img className="pd-chain-app-icon" src={appIcon} alt="" width={14} height={14} />
+        )}
+        <span className="pd-chain-used-app">{data.app}</span>
+        <span className="pd-chain-used-action">
+          {running ? <ShimmerText>{data.action}</ShimmerText> : data.action}
+        </span>
+        {elapsedEl}
+        {stateWordEl}
       </span>
     ) : (
       <>

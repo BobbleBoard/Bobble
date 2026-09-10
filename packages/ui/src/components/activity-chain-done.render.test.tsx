@@ -125,3 +125,50 @@ describe('ActivityChain — a finished chain folds even while the turn runs on',
     expect(ui.expanded()).toBe(false);
   });
 });
+
+/*
+ * the user's connector row: "<generic connectors icon> Used <connector app icon>
+ * <connector app name> <action eg. read page or listed tabs>", and "the tiny
+ * text to the right with the raw cli command is not shown, instead a '>' ...
+ * clicking that expands the individual tool and shows the exact cli command and
+ * what was returned."
+ */
+describe('ActivityChain — connector usage reads as a sentence, not a shell line', () => {
+  const used = (over: Partial<ActivityStepData> = {}): ActivityStepData =>
+    ({
+      kind: 'bash',
+      label: 'Read the page in Chrome',
+      action: 'Read the page',
+      app: 'Google Chrome',
+      detail: 'chrome snapshot "2TB"',
+      command: 'chrome snapshot "2TB"',
+      id: 'c1',
+      ...over,
+    }) as ActivityStepData;
+
+  it('says Used, then the app, then the action', () => {
+    const ui = mount({ steps: [used()], complete: true, active: false });
+    expect(ui.text()).toMatch(/Used/);
+    expect(ui.text()).toMatch(/Google Chrome/);
+    expect(ui.text()).toMatch(/Read the page/);
+  });
+
+  it('does not put the raw command on the row', () => {
+    const ui = mount({ steps: [used()], complete: true, active: false });
+    const row = host?.querySelector('.pd-chain-used');
+    expect(row).not.toBeNull();
+    expect(row?.textContent ?? '').not.toMatch(/chrome snapshot/);
+  });
+
+  /* An ordinary shell command has no app and no action, so it keeps the old
+     shape — the raw line beside the verb. */
+  it('leaves a plain command alone', () => {
+    const ui = mount({
+      steps: [step({ label: 'Ran a command', detail: 'ls -la' })],
+      complete: true,
+      active: false,
+    });
+    expect(host?.querySelector('.pd-chain-used')).toBeNull();
+    expect(ui.text()).toMatch(/ls -la/);
+  });
+});

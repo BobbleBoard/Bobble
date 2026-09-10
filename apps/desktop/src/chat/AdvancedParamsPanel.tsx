@@ -12,68 +12,35 @@
  *
  * Rendered only for power users (userMode === 'power'); the trigger icon lives
  * in the chat top bar (see ChatApp).
+ *
+ * It is drawn with the SAME parts as the Settings panels — DialogHeader/Body
+ * for the chrome, SettingSection/SettingGroup/SettingSlider for the contents.
+ * It used to hand-roll all of them, which is how it ended up as the one dialog
+ * in the app with no padding: content ran flush into the rounded corners
+ * because nothing was ever telling it not to.
  */
-import { Button, Dialog, DialogContent, SegmentedControl, Slider } from '@pi-desktop/ui';
+import {
+  Button,
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  SegmentedControl,
+} from '@pi-desktop/ui';
 import { type ReactNode, useState } from 'react';
 import { DEFAULT_ADVANCED } from '../../electron/settings/settings-contract';
+import { SettingGroup, SettingRow, SettingSection, SettingSlider } from '../settings/parts';
 import { useGroundTruth } from '../state/advanced-store';
 import { setAdvanced, useAdvancedSettings } from '../state/settings-store';
 
-/** A labeled slider row with a live numeric readout on the right. */
-function ParamSlider(props: {
-  label: string;
-  hint?: string;
-  value: number;
-  min: number;
-  max: number;
-  step: number;
-  format?: (v: number) => string;
-  onChange: (v: number) => void;
-}): ReactNode {
-  const { label, hint, value, min, max, step, format, onChange } = props;
+/** The section-level "Reset", in the app's small ghost-button idiom. */
+function ResetButton({ onClick }: { onClick: () => void }): ReactNode {
   return (
-    <div className="flex flex-col gap-1.5">
-      <div className="flex items-baseline justify-between gap-3">
-        <span className="text-body text-text-primary">{label}</span>
-        <span className="text-caption tabular-nums text-text-muted">
-          {format ? format(value) : String(value)}
-        </span>
-      </div>
-      {hint !== undefined ? <span className="text-footnote text-text-muted">{hint}</span> : null}
-      <Slider
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        aria-label={label}
-        onValueChange={onChange}
-      />
-    </div>
-  );
-}
-
-/** Section header + a small "Reset" affordance. */
-function SectionHead({
-  title,
-  sub,
-  onReset,
-}: {
-  title: string;
-  sub?: string;
-  onReset?: () => void;
-}) {
-  return (
-    <div className="flex items-baseline justify-between gap-3">
-      <div>
-        <h3 className="text-heading text-text-primary">{title}</h3>
-        {sub !== undefined ? <p className="mt-0.5 text-footnote text-text-muted">{sub}</p> : null}
-      </div>
-      {onReset !== undefined ? (
-        <Button variant="ghost" className="pd-btn--sm shrink-0" onClick={onReset}>
-          Reset
-        </Button>
-      ) : null}
-    </div>
+    <Button variant="ghost" className="pd-btn--sm shrink-0" onClick={onClick}>
+      Reset
+    </Button>
   );
 }
 
@@ -82,8 +49,12 @@ function GroundTruthView(): ReactNode {
   const gt = useGroundTruth();
   const [tab, setTab] = useState<'prompt' | 'tools' | 'raw'>('prompt');
   if (gt === null) {
+    /* Was a DASHED box on --pd-bg-raised, which in light mode is a bright white
+       card with a cut-out border — the two loudest things a surface can do, for
+       the quietest state the panel has. An inset well says "nothing here yet"
+       without asking to be looked at. */
     return (
-      <p className="rounded-xl border border-dashed border-border-default bg-bg-raised px-4 py-6 text-center text-footnote text-text-muted">
+      <p className="pd-adv-well px-4 py-8 text-center text-footnote text-text-muted">
         Send a message. The exact system prompt, tool definitions, and context the model receives
         will appear here.
       </p>
@@ -102,21 +73,23 @@ function GroundTruthView(): ReactNode {
         ]}
       />
       {tab === 'prompt' ? (
-        <pre className="max-h-[36vh] overflow-auto whitespace-pre-wrap rounded-xl border border-border-default bg-bg-sunken p-3 text-caption text-text-primary">
+        <pre className="pd-adv-well pd-scroll max-h-[36vh] overflow-auto whitespace-pre-wrap p-3.5 font-mono text-caption text-text-secondary">
           {gt.systemPrompt || '(empty system prompt)'}
         </pre>
       ) : null}
       {tab === 'tools' ? (
-        <div className="max-h-[36vh] overflow-auto rounded-xl border border-border-default bg-bg-sunken p-3">
+        <div className="pd-adv-well pd-scroll max-h-[36vh] overflow-auto p-1.5">
           {gt.tools.length === 0 ? (
-            <p className="text-caption text-text-muted">No tools were sent this turn.</p>
+            <p className="px-2 py-2 text-caption text-text-muted">No tools were sent this turn.</p>
           ) : (
-            <ul className="flex flex-col gap-2">
+            <ul className="flex flex-col">
               {gt.tools.map((t) => (
-                <li key={t.name} className="text-caption">
-                  <span className="font-mono text-text-primary">{t.name}</span>
+                <li key={t.name} className="rounded-sm px-2 py-1.5 hover:bg-bg-hover">
+                  <span className="font-mono text-caption text-text-primary">{t.name}</span>
                   {t.description ? (
-                    <span className="text-text-muted"> · {t.description}</span>
+                    <span className="mt-0.5 block text-caption text-text-muted">
+                      {t.description}
+                    </span>
                   ) : null}
                 </li>
               ))}
@@ -125,7 +98,7 @@ function GroundTruthView(): ReactNode {
         </div>
       ) : null}
       {tab === 'raw' ? (
-        <pre className="max-h-[36vh] overflow-auto whitespace-pre-wrap rounded-xl border border-border-default bg-bg-sunken p-3 text-caption text-text-primary">
+        <pre className="pd-adv-well pd-scroll max-h-[36vh] overflow-auto whitespace-pre-wrap p-3.5 font-mono text-caption text-text-secondary">
           {JSON.stringify({ model: gt.model, messages: gt.messages, tools: gt.tools }, null, 2)}
         </pre>
       ) : null}
@@ -151,150 +124,151 @@ export function AdvancedParamsPanel({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        aria-label="Advanced parameters"
-        className="pd-adv-panel"
-        style={{ width: 'min(560px, 92vw)', maxWidth: '92vw' }}
-      >
-        <header className="mb-4">
-          <h2 className="text-title text-text-primary">Advanced parameters</h2>
-          <p className="mt-1 text-footnote text-text-muted">
-            Power-user knobs and the live context sent to the local model.
-          </p>
-        </header>
+      <DialogContent aria-label="Advanced parameters" className="pd-adv-panel">
+        <DialogHeader>
+          <div className="min-w-0 pr-8">
+            <DialogTitle>Advanced parameters</DialogTitle>
+            <DialogDescription className="mt-1 text-footnote">
+              Power-user knobs and the live context sent to the local model.
+            </DialogDescription>
+          </div>
+        </DialogHeader>
 
-        <div className="flex flex-col gap-7 overflow-y-auto pr-1" style={{ maxHeight: '70vh' }}>
+        <DialogBody className="flex flex-col gap-8">
           {/* GROUND TRUTH ---------------------------------------------------- */}
-          <section className="flex flex-col gap-3">
-            <SectionHead
-              title="Live context"
-              sub="The exact prompt, tools, and messages of the last turn."
-            />
+          <SettingSection
+            title="Live context"
+            description="The exact prompt, tools, and messages of the last turn."
+          >
             <GroundTruthView />
-          </section>
+          </SettingSection>
 
           {/* SAMPLING (per-request) ----------------------------------------- */}
-          <section className="flex flex-col gap-4">
-            <SectionHead
-              title="Sampling"
-              sub="Applied to the next request. No restart."
-              onReset={() => patchSampling(DEFAULT_ADVANCED.sampling)}
-            />
-            <ParamSlider
-              label="Temperature"
-              value={s.temperature}
-              min={0}
-              max={2}
-              step={0.05}
-              format={(v) => v.toFixed(2)}
-              onChange={(v) => patchSampling({ temperature: v })}
-            />
-            <ParamSlider
-              label="Top P"
-              value={s.topP}
-              min={0}
-              max={1}
-              step={0.01}
-              format={(v) => v.toFixed(2)}
-              onChange={(v) => patchSampling({ topP: v })}
-            />
-            <ParamSlider
-              label="Top K"
-              value={s.topK}
-              min={0}
-              max={200}
-              step={1}
-              format={(v) => (v === 0 ? 'Off' : String(v))}
-              onChange={(v) => patchSampling({ topK: v })}
-            />
-            <ParamSlider
-              label="Min P"
-              value={s.minP}
-              min={0}
-              max={1}
-              step={0.01}
-              format={(v) => v.toFixed(2)}
-              onChange={(v) => patchSampling({ minP: v })}
-            />
-            <ParamSlider
-              label="Repetition penalty"
-              hint="1.00 = off. DRY handles anti-looping; a flat penalty here hurts code."
-              value={s.repetitionPenalty}
-              min={0.8}
-              max={1.5}
-              step={0.01}
-              format={(v) => (v === 1 ? 'Off (1.00)' : v.toFixed(2))}
-              onChange={(v) => patchSampling({ repetitionPenalty: v })}
-            />
-            <ParamSlider
-              label="Presence penalty"
-              value={s.presencePenalty}
-              min={-2}
-              max={2}
-              step={0.1}
-              format={(v) => v.toFixed(1)}
-              onChange={(v) => patchSampling({ presencePenalty: v })}
-            />
-            <ParamSlider
-              label="Max tokens"
-              hint="Per-request output cap. 0 = model default."
-              value={s.maxTokens}
-              min={0}
-              max={32768}
-              step={256}
-              format={(v) => (v === 0 ? 'Model default' : String(v))}
-              onChange={(v) => patchSampling({ maxTokens: v })}
-            />
-          </section>
+          <SettingSection
+            title="Sampling"
+            description="Applied to the next request. No restart."
+            action={<ResetButton onClick={() => patchSampling(DEFAULT_ADVANCED.sampling)} />}
+          >
+            <SettingGroup testId="advanced-sampling">
+              <SettingSlider
+                label="Temperature"
+                value={s.temperature}
+                min={0}
+                max={2}
+                step={0.05}
+                format={(v) => v.toFixed(2)}
+                onChange={(v) => patchSampling({ temperature: v })}
+              />
+              <SettingSlider
+                label="Top P"
+                value={s.topP}
+                min={0}
+                max={1}
+                step={0.01}
+                format={(v) => v.toFixed(2)}
+                onChange={(v) => patchSampling({ topP: v })}
+              />
+              <SettingSlider
+                label="Top K"
+                value={s.topK}
+                min={0}
+                max={200}
+                step={1}
+                format={(v) => (v === 0 ? 'Off' : String(v))}
+                onChange={(v) => patchSampling({ topK: v })}
+              />
+              <SettingSlider
+                label="Min P"
+                value={s.minP}
+                min={0}
+                max={1}
+                step={0.01}
+                format={(v) => v.toFixed(2)}
+                onChange={(v) => patchSampling({ minP: v })}
+              />
+              <SettingSlider
+                label="Repetition penalty"
+                hint="1.00 = off. DRY handles anti-looping; a flat penalty here hurts code."
+                value={s.repetitionPenalty}
+                min={0.8}
+                max={1.5}
+                step={0.01}
+                format={(v) => (v === 1 ? 'Off (1.00)' : v.toFixed(2))}
+                onChange={(v) => patchSampling({ repetitionPenalty: v })}
+              />
+              <SettingSlider
+                label="Presence penalty"
+                value={s.presencePenalty}
+                min={-2}
+                max={2}
+                step={0.1}
+                format={(v) => v.toFixed(1)}
+                onChange={(v) => patchSampling({ presencePenalty: v })}
+              />
+              <SettingSlider
+                label="Max tokens"
+                hint="Per-request output cap. 0 = model default."
+                value={s.maxTokens}
+                min={0}
+                max={32768}
+                step={256}
+                format={(v) => (v === 0 ? 'Model default' : String(v))}
+                onChange={(v) => patchSampling({ maxTokens: v })}
+              />
+            </SettingGroup>
+          </SettingSection>
 
           {/* REASONING (launch-time) ---------------------------------------- */}
-          <section className="flex flex-col gap-4">
-            <SectionHead
-              title="Reasoning"
-              sub="Applied on the next server relaunch."
-              onReset={() => patchReasoning(DEFAULT_ADVANCED.reasoning)}
-            />
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex flex-col">
-                <span className="text-body text-text-primary">Preserve thinking</span>
-                <span className="text-footnote text-text-muted">
-                  Keep &lt;think&gt; across the whole history, not just the last turn.
-                </span>
+          <SettingSection
+            title="Reasoning"
+            description="Applied on the next server relaunch."
+            action={<ResetButton onClick={() => patchReasoning(DEFAULT_ADVANCED.reasoning)} />}
+          >
+            <SettingGroup testId="advanced-reasoning">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex min-w-0 flex-col">
+                  <span className="text-body font-medium text-text-primary">Preserve thinking</span>
+                  <span className="mt-0.5 text-footnote text-text-muted">
+                    Keep &lt;think&gt; across the whole history, not just the last turn.
+                  </span>
+                </div>
+                <SegmentedControl
+                  className="shrink-0"
+                  aria-label="Preserve thinking"
+                  value={r.preserve ? 'on' : 'off'}
+                  onValueChange={(v) => patchReasoning({ preserve: v === 'on' })}
+                  options={[
+                    { value: 'on', label: 'On' },
+                    { value: 'off', label: 'Off' },
+                  ]}
+                />
               </div>
-              <SegmentedControl
-                aria-label="Preserve thinking"
-                value={r.preserve ? 'on' : 'off'}
-                onValueChange={(v) => patchReasoning({ preserve: v === 'on' })}
-                options={[
-                  { value: 'on', label: 'On' },
-                  { value: 'off', label: 'Off' },
-                ]}
+              <SettingSlider
+                label="Reasoning budget"
+                hint="Token cap on thinking. -1 = unrestricted; 0 = no thinking."
+                value={r.budget}
+                min={-1}
+                max={8192}
+                step={128}
+                format={(v) => (v === -1 ? 'Unrestricted' : v === 0 ? 'Off' : `${v} tokens`)}
+                onChange={(v) => patchReasoning({ budget: v })}
               />
-            </div>
-            <ParamSlider
-              label="Reasoning budget"
-              hint="Token cap on thinking. -1 = unrestricted; 0 = no thinking."
-              value={r.budget}
-              min={-1}
-              max={8192}
-              step={128}
-              format={(v) => (v === -1 ? 'Unrestricted' : v === 0 ? 'Off' : `${v} tokens`)}
-              onChange={(v) => patchReasoning({ budget: v })}
-            />
-            <label className="flex flex-col gap-1.5">
-              <span className="text-body text-text-primary">Budget-reached message</span>
-              <span className="text-footnote text-text-muted">
-                Injected before the end-of-thinking tag when the budget runs out.
-              </span>
+            </SettingGroup>
+
+            <SettingRow
+              label="Budget-reached message"
+              hint="Injected before the end-of-thinking tag when the budget runs out."
+            >
               <input
                 type="text"
-                className="rounded-lg border border-border-default bg-bg-sunken px-3 py-2 text-body text-text-primary outline-none focus:border-border-strong"
+                aria-label="Budget-reached message"
+                className="pd-input pd-focusable w-full"
                 value={r.budgetMessage}
                 onChange={(e) => patchReasoning({ budgetMessage: e.target.value })}
               />
-            </label>
-          </section>
-        </div>
+            </SettingRow>
+          </SettingSection>
+        </DialogBody>
       </DialogContent>
     </Dialog>
   );

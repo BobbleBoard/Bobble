@@ -22,6 +22,16 @@ export interface CliCommandLabel {
   readonly done: string;
   /** The app this acted on, when there is one — the row shows its real icon. */
   readonly app?: string;
+  /**
+   * The ACTION alone, with the app's name taken out of it.
+   *
+   * the user wants the row read as "<connectors icon> Used <app icon> <app name>
+   * <action eg. read page or listed tabs>", which means the app is a NAMED
+   * PART of the row rather than a word inside a sentence — the sentence has to
+   * come apart for that. `running`/`done` stay whole for the rows that have no
+   * app to name.
+   */
+  readonly action?: { readonly running: string; readonly done: string };
 }
 
 /** Split a command line into words, respecting simple quoting. */
@@ -65,6 +75,15 @@ const BROWSER_VERBS: Record<string, [string, string]> = {
   scroll: ['Scrolling', 'Scrolled'],
 };
 
+const CHROME_VERBS: Record<string, [string, string]> = {
+  tabs: ['Listing tabs', 'Listed tabs'],
+  tab: ['Switching tab', 'Switched tab'],
+  snapshot: ['Reading the page', 'Read the page'],
+  click: ['Clicking', 'Clicked'],
+  type: ['Typing', 'Typed'],
+  go: ['Opening a page', 'Opened a page'],
+};
+
 /**
  * Read one command line, or null when it is not one of ours — an ordinary
  * shell command keeps the ordinary "Ran a command" row, which is honest about
@@ -97,6 +116,7 @@ export function cliCommandLabel(command: string | undefined): CliCommandLabel | 
         running: `${pair[0]} in Chrome`,
         done: `${pair[1]} in Chrome`,
         app: 'Google Chrome',
+        action: { running: pair[0], done: pair[1] },
       };
     }
     const pair = MAC_VERBS[verb];
@@ -109,7 +129,25 @@ export function cliCommandLabel(command: string | undefined): CliCommandLabel | 
     return {
       running: app === undefined ? pair[0] : `${pair[0]} ${app}`,
       done: app === undefined ? pair[1] : `${pair[1]} ${app}`,
-      ...(app === undefined ? {} : { app }),
+      ...(app === undefined ? {} : { app, action: { running: pair[0], done: pair[1] } }),
+    };
+  }
+
+  /*
+   * `chrome …` — the browser's own set, which is a CONNECTOR rather than an app
+   * being clicked at. the user asked for these to read as connector usage, and the
+   * verbs are its own: tabs and a tab are things only a browser has.
+   */
+  if (group === 'chrome') {
+    const verb = rest.find((w) => !w.startsWith('-'));
+    if (verb === undefined) return null;
+    const pair = CHROME_VERBS[verb] ?? BROWSER_VERBS[verb];
+    if (pair === undefined) return null;
+    return {
+      running: `${pair[0]} in Chrome`,
+      done: `${pair[1]} in Chrome`,
+      app: 'Google Chrome',
+      action: { running: pair[0], done: pair[1] },
     };
   }
 

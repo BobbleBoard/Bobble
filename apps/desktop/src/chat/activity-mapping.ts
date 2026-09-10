@@ -1020,6 +1020,11 @@ function mapToolStepData(
        * opening the row still shows exactly what was typed.
        */
       const cli = cliCommandLabel(command);
+      /* When the line names an app, the row becomes "Used <icon> <app>
+         <action>" and the raw command moves behind the disclosure — see the
+         connector-row note in activity-chain. `detail` still carries it, which
+         is what the disclosure shows. */
+      const act = cli?.action;
       return {
         data: {
           kind,
@@ -1029,6 +1034,7 @@ function mapToolStepData(
           command,
           output: str(result?.text),
           ...(cli?.app === undefined ? {} : { app: cli.app }),
+          ...(act === undefined ? {} : { action: status === 'running' ? act.running : act.done }),
         },
       };
     }

@@ -242,6 +242,41 @@ button.pd-chain-step-row:hover {
  * remaining row width and ellipsizes; the reveal + title carry the full value. */
 /* Was `1 1 auto`, which grew to fill the row and pushed the chevron away from
  * the command it belongs to. It still SHRINKS (and ellipsizes) on a long one. */
+/*
+ * "Used <icon> <app> <action>" — the user's shape for a connector row.
+ *
+ * Three weights on one line and they have to stay legible as three things: the
+ * verb is quiet (it is the same word on every such row), the APP is the part
+ * you scan for, and the action is what actually happened. The raw command is
+ * not here at all — it lives behind the chevron.
+ */
+.pd-chain-used {
+  display: inline-flex;
+  min-width: 0;
+  flex: 0 1 auto;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+}
+
+.pd-chain-used-verb {
+  color: var(--pd-text-muted);
+}
+
+.pd-chain-used-app {
+  flex: 0 0 auto;
+  color: var(--pd-text-primary);
+  font-weight: 550;
+}
+
+.pd-chain-used-action {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--pd-text-secondary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .pd-chain-step-detail {
   flex: 0 1 auto;
   min-width: 0;

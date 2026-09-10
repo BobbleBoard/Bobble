@@ -9,11 +9,16 @@ describe('a Bobble command, said as what it did', () => {
      * visuals eg. 'snapshotted <app icon inline><app>'."
      */
     expect(cliCommandLabel('mac snapshot "Google Chrome"')).toEqual({
+      /* The app is a NAMED PART of the row now, not a word inside the sentence
+         — the user: "<connectors icon> Used <connector app icon> <connector app
+         name> <action>". So the verb phrase comes back on its own as well. */
+      action: { running: 'Looking at', done: 'Snapshotted' },
       running: 'Looking at Google Chrome',
       done: 'Snapshotted Google Chrome',
       app: 'Google Chrome',
     });
     expect(cliCommandLabel('mac launch Blender')).toEqual({
+      action: { running: 'Opening', done: 'Opened' },
       running: 'Opening Blender',
       done: 'Opened Blender',
       app: 'Blender',
@@ -51,5 +56,26 @@ describe('a Bobble command, said as what it did', () => {
     expect(cliCommandLabel('ls -la /tmp')).toBeNull();
     expect(cliCommandLabel('python3 build.py')).toBeNull();
     expect(cliCommandLabel('')).toBeNull();
+  });
+});
+
+describe("Chrome's own set reads as connector usage", () => {
+  it('names the browser and the action separately', () => {
+    expect(cliCommandLabel('chrome tabs')).toEqual({
+      running: 'Listing tabs in Chrome',
+      done: 'Listed tabs in Chrome',
+      app: 'Google Chrome',
+      action: { running: 'Listing tabs', done: 'Listed tabs' },
+    });
+  });
+
+  it('reads a page without mentioning a shell', () => {
+    const l = cliCommandLabel('chrome snapshot "2TB"');
+    expect(l?.action?.done).toBe('Read the page');
+    expect(l?.app).toBe('Google Chrome');
+  });
+
+  it('leaves an ordinary shell command alone', () => {
+    expect(cliCommandLabel('ls -la /tmp')).toBeNull();
   });
 });
