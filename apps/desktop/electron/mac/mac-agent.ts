@@ -81,6 +81,22 @@ let helper: MacHelperClient | null = null;
  * echoed x,y covers stale/unknown indices afterwards. Snapshot bbox x,y are
  * element CENTRES (screen points) by the pi-mac wire contract. */
 const elementCenters = new Map<number, Map<number, { x: number; y: number; name: string }>>();
+/**
+ * The controlled window's frame, from the last look at it.
+ *
+ * Cached rather than read live because it exists to make the phantom cursor
+ * move BEFORE an act, and a helper round-trip to find out where to move would
+ * put back exactly the delay it is there to remove. Every snapshot refreshes it.
+ */
+const windowFrames = new Map<number, { x: number; y: number; w: number; h: number }>();
+
+/** Where a pointer would sit to scroll this app's content — the window's
+ *  middle, biased below the toolbar so it is over content and not chrome. */
+function scrollPoint(pid: number | null): { x: number; y: number } | null {
+  const f = pid === null ? null : (windowFrames.get(pid) ?? null);
+  if (f === null || !(f.w > 0) || !(f.h > 0)) return null;
+  return { x: Math.round(f.x + f.w / 2), y: Math.round(f.y + f.h * 0.55) };
+}
 /** Windows already pulled fully on-screen this session — once each, so a window
  * the user moves afterwards is left where they put it. */
 const nudgedPids = new Set<number>();
@@ -366,6 +382,8 @@ function cacheSnapshot(snap: MacSnapshot): void {
     }
   }
   elementCenters.set(snap.pid, map);
+  const wb = snap.windowBounds;
+  if (wb !== undefined) windowFrames.set(snap.pid, { x: wb.x, y: wb.y, w: wb.w, h: wb.h });
 }
 
 /** The name of the control an act names by index, when a look has seen it. */
@@ -424,7 +442,7 @@ async function snapshotWithOverlay(params: Record<string, unknown>): Promise<Mac
 }
 
 /** Click: glide the phantom cursor to the target BEFORE the act (element
- * centre from the last snapshot, or the explicit x,y), fire, then ripple at
+ * centre from the last snapshot, or the explicit x,y), fire, then press at
  * the point the helper actually acted on. */
 async function clickWithOverlay(params: Record<string, unknown>): Promise<MacActAck> {
   const known =
@@ -503,6 +521,23 @@ async function dispatch(method: MacAgentMethod, params: Record<string, unknown>)
       return getHelper().request('key', params);
     }
     case 'scroll': {
+      /*
+       * PUT THE POINTER WHERE THE SCROLLING IS HAPPENING, FIRST.
+       *
+       * the user: "move the cursor/scroll more proactively so that there's not delay
+       * between the action being executed and the fake cursor moving around."
+       * Click and type already glide the cursor to their target before firing;
+       * scroll only changed the pill's text, so the content moved while the
+       * phantom sat wherever the last click had left it — which reads as the
+       * page moving by itself.
+       *
+       * A scroll names no element, so the point is the one a person's pointer
+       * would be at: the middle of the window, a little below centre so it is
+       * over content rather than the toolbar. From the cached frame, so this
+       * costs no round-trip — the delay is the thing being removed.
+       */
+      const at = scrollPoint(typeof params.pid === 'number' ? params.pid : null);
+      if (at !== null) await macOverlay.moveCursor(at.x, at.y);
       await macOverlay.scrolling();
       return getHelper().request('scroll', params);
     }

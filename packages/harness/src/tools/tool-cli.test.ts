@@ -391,3 +391,36 @@ describe('delegation is reachable from the CLI', () => {
     expect(cli.groups.map((g) => g.name)).toEqual(['browser']);
   });
 });
+
+describe('the word a model reaches for', () => {
+  const schema = {
+    type: 'object',
+    properties: { app: { type: 'string' }, screenshot: { type: 'boolean' } },
+  } as const;
+
+  /* the user: "add a flag to snapshot to force a visual eg snapshot --image/visual".
+     It existed as --screenshot, and the synonyms silently did nothing. */
+  it('accepts --image, --visual and friends as --screenshot', () => {
+    for (const alias of ['image', 'visual', 'picture', 'shot', 'see']) {
+      expect(coerceArgs({ [alias]: true }, schema), alias).toEqual({ screenshot: true });
+    }
+  });
+
+  it('still accepts the real flag', () => {
+    expect(coerceArgs({ screenshot: true }, schema)).toEqual({ screenshot: true });
+  });
+
+  it('coerces an aliased string the way the real property is typed', () => {
+    expect(coerceArgs({ visual: 'true' }, schema)).toEqual({ screenshot: true });
+  });
+
+  /* An alias must never shadow a flag a tool genuinely has. */
+  it('leaves a real `image` property alone', () => {
+    const own = { type: 'object', properties: { image: { type: 'string' } } } as const;
+    expect(coerceArgs({ image: 'cat.png' }, own)).toEqual({ image: 'cat.png' });
+  });
+
+  it('leaves an unknown flag unknown, so it still reaches the tool as an error', () => {
+    expect(coerceArgs({ nonsense: 'x' }, schema)).toEqual({ nonsense: 'x' });
+  });
+});

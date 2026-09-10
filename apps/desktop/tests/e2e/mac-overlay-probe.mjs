@@ -13,7 +13,7 @@
  *   - cursor moves land EXACTLY where they were sent, in screen points, including
  *     well past the controlled window's right edge (the reported cut-off) and
  *     past the screen edge itself;
- *   - the pill reflects each state (Thinking pulse, click ripples, typing with a
+ *   - the pill reflects each state (Thinking pulse, click press, typing with a
  *     live preview, key-combo label) and flips near a screen corner instead of
  *     being sheared off;
  *   - the phantom rides a controlled-window move by the window's own delta, so it
@@ -286,13 +286,17 @@ try {
     fail(`cursor teleported instead of gliding (glyph x=${gx})`);
   }
 
-  // ── state: clicking (press dip + ripples) ─────────────────────────────────
+  // ── state: clicking (a quick press of the glyph itself) ───────────────────
+  /* the user asked for the expanding rings to go and the cursor to do the whole
+     gesture, so the thing to assert on is the press, not a ripple count. The
+     press is 150ms, so this has to look sooner than the old 430ms did. */
   const clickP = dbg('overlay-click', { x: RECT.x + 450, y: RECT.y + 300 });
-  await sleep(430); // 300ms travel inside the op + catch ripples early
+  await sleep(340); // 300ms travel inside the op, then catch the 150ms press
   const clicking = await native();
-  await shotAt('03-clicking-ripple.png', RECT.x + 450, RECT.y + 300);
+  await shotAt('03-clicking-press.png', RECT.x + 450, RECT.y + 300);
   await clickP;
-  if (!(clicking.ripples >= 1)) fail('no click ripple rendered');
+  if (!(clicking.press >= 1)) fail('no click press animation rendered');
+  if (clicking.ripples !== undefined) fail('the ripple ring is back');
   if (clicking.bubble?.text !== 'Clicking') fail(`click pill text: ${clicking.bubble?.text}`);
 
   // ── state: typing (dots + live preview) ───────────────────────────────────

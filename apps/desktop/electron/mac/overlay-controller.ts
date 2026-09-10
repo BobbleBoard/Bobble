@@ -534,7 +534,7 @@ class MacOverlayController {
     this.#announce();
   }
 
-  /** Click feedback at a screen point: press dip + expanding ripples. `label`
+  /** Click feedback at a screen point: a quick press of the cursor glyph. `label`
    * is what was clicked, which the pill shows. */
   async clickAt(screenX: number, screenY: number, label = ''): Promise<void> {
     if (this.#target === null) return;

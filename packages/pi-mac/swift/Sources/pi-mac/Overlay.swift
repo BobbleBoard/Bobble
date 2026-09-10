@@ -653,7 +653,9 @@ final class OverlayController: NSObject {
   private var bubbleFlipX = false
   private var bubbleFlipY = false
   private var maskHoles = 0
-  private var liveRipples = 0
+  /// Press animations in flight — the observable signal a probe can assert on,
+  /// now that there is no ring to count.
+  private var livePress = 0
   private var displayVerified = false
   /* The controls live on their own tiny panel — see OverlayControlsPanel. */
   private var controls: OverlayControlsPanel?
@@ -1115,53 +1117,36 @@ final class OverlayController: NSObject {
     placeCursor(ax, travelMs: 0)
     pressPop()
     setStatus("clicking", text: "")
-    ripple(at: ax, delay: 0)
-    ripple(at: ax, delay: 0.13)
   }
 
+  /*
+   * THE CLICK IS THE CURSOR, NOT A RING AROUND IT.
+   *
+   * the user: "remove the circle pulsa animation and instead have a quick scale down
+   * scale up for a click animation". The two expanding rings were also the last
+   * purple left on this layer — stroke (0.478, 0.424, 1) — on a UI whose standing
+   * rule is no purple, and they drew attention to a spot the cursor was already
+   * sitting on.
+   *
+   * So the whole gesture is the glyph itself: down and straight back, 150ms,
+   * anchored on the tip so it presses INTO the point it is clicking rather than
+   * shrinking toward its own middle. No overshoot — a bounce reads as a bouncy
+   * button, and what is being shown here is a press.
+   */
   private func pressPop() {
+    livePress += 1
     let pop = CAKeyframeAnimation(keyPath: "transform.scale")
-    pop.values = [1.0, 0.84, 1.08, 1.0]
-    pop.keyTimes = [0, 0.38, 0.7, 1]
-    pop.duration = 0.34
-    pop.timingFunction = CAMediaTimingFunction(controlPoints: 0.3, 0.7, 0.3, 1.25)
-    // The group is anchored on the tip, so the pop radiates from the hotspot.
+    pop.values = [1.0, 0.78, 1.0]
+    pop.keyTimes = [0, 0.45, 1]
+    pop.duration = 0.15
+    pop.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+    // The group is anchored on the tip, so the press lands on the hotspot.
     cursorGroup.add(pop, forKey: "press")
-  }
-
-  private func ripple(at ax: CGPoint, delay: Double) {
-    let p = local(ax)
-    liveRipples += 1
-    let r = CAShapeLayer()
-    let d: CGFloat = 18
-    r.bounds = CGRect(x: 0, y: 0, width: d, height: d)
-    r.position = p
-    r.path = CGPath(ellipseIn: CGRect(x: 1.25, y: 1.25, width: d - 2.5, height: d - 2.5), transform: nil)
-    r.fillColor = nil
-    r.strokeColor = cgColor(0.478, 0.424, 1, 0.95)
-    r.lineWidth = 2.5
-    r.contentsScale = scale
-    r.opacity = 0
-    stage.insertSublayer(r, below: cursorGroup)
-
-    let grow = CABasicAnimation(keyPath: "transform.scale")
-    grow.fromValue = 0.55
-    grow.toValue = 3.1
-    let fade = CABasicAnimation(keyPath: "opacity")
-    fade.fromValue = 0.95
-    fade.toValue = 0
-    let group = CAAnimationGroup()
-    group.animations = [grow, fade]
-    group.duration = 0.5
-    group.beginTime = CACurrentMediaTime() + delay
-    group.timingFunction = CAMediaTimingFunction(controlPoints: 0.16, 0.84, 0.44, 1)
-    group.fillMode = .backwards
-    r.add(group, forKey: "ripple")
-    DispatchQueue.main.asyncAfter(deadline: .now() + delay + 0.55) { [weak self] in
-      r.removeFromSuperlayer()
-      self?.liveRipples = max(0, (self?.liveRipples ?? 1) - 1)
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
+      self?.livePress = max(0, (self?.livePress ?? 1) - 1)
     }
   }
+
 
   // ── status pill ──────────────────────────────────────────────────────────
 
@@ -1896,7 +1881,7 @@ final class OverlayController: NSObject {
       "cursorVisible": (cursorGroup.presentation() ?? cursorGroup).opacity > 0.5,
       "maskHoles": maskHoles,
       "reduceMotion": reduceMotion(),
-      "ripples": liveRipples,
+      "press": livePress,
       "glyph": ["w": Double(glyph.box.width), "h": Double(glyph.box.height)],
       "bubble": [
         "visible": (bubble.presentation() ?? bubble).opacity > 0.5,

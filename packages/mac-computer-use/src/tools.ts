@@ -601,7 +601,8 @@ export function registerMacComputerUseTools(
       screenshot: Type.Optional(
         Type.Boolean({
           description:
-            'Force a screenshot even when Accessibility answers (heavier). Default false — an ' +
+            'Force a screenshot even when Accessibility answers (heavier). Also spelled ' +
+            '--image and --visual. Default false — an ' +
             'app with no AX elements attaches one on its own. The image covers every window the ' +
             'app has open, sheets and dialogs included, and the text gives the screen rect it ' +
             'covers so a point read off it maps onto the screen.',

@@ -11,7 +11,7 @@
  *     photograph, with muted grey text across the seam);
  *   - reduced motion on the CANVAS (measured: 753 sampled pixels still changing
  *     per 400ms with `prefers-reduced-motion: reduce`), which the CSS rules
- *     never covered because the cursor, the ripples, the press pop and the
+ *     never covered because the cursor, the press pop and the
  *     bubble dots are all drawn, not animated;
  *   - the act strip: hover previews, click commits, and what the pinned pill
  *     says while you are scrubbed back;

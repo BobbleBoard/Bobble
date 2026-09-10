@@ -220,13 +220,41 @@ export function parseArgv(argv: readonly string[]): ParsedArgv {
  * accepts more than it documents still works, and a typo reaches the tool as a
  * typo — which produces a real error message instead of a silent no-op.
  */
+/**
+ * THE WORD A MODEL REACHES FOR, POINTING AT THE FLAG WE ACTUALLY HAVE.
+ *
+ * the user: "why don't you add a flag to snapshot to force a visual eg snapshot
+ * --image/visual". The flag exists — `--screenshot` — and that is exactly the
+ * problem: an unknown flag is passed through untouched (see below, which is
+ * right for a typo that should reach the tool as an error), but a BOOLEAN typo
+ * errors at nothing. `mac snapshot --image` silently produced no picture and no
+ * complaint, which is the worst of both.
+ *
+ * Aliases are applied only when the real property exists on this tool's schema
+ * and the alias itself does not, so this can never shadow a flag a tool really
+ * has — `--image` on a tool that genuinely takes `image` is untouched.
+ */
+const FLAG_ALIASES: Readonly<Record<string, readonly string[]>> = {
+  screenshot: ['image', 'visual', 'picture', 'shot', 'see'],
+};
+
+/** Resolve one flag name onto a schema property, or return it unchanged. */
+export function resolveFlagName(key: string, props: Readonly<Record<string, unknown>>): string {
+  if (key in props) return key;
+  for (const [real, synonyms] of Object.entries(FLAG_ALIASES)) {
+    if (real in props && synonyms.includes(key)) return real;
+  }
+  return key;
+}
+
 export function coerceArgs(
   raw: Readonly<Record<string, string | boolean>>,
   schema: CliSchema | undefined,
 ): Record<string, unknown> {
   const props = schema?.properties ?? {};
   const out: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(raw)) {
+  for (const [rawKey, value] of Object.entries(raw)) {
+    const key = resolveFlagName(rawKey, props);
     const prop = props[key] as Record<string, unknown> | undefined;
     const type = typeof prop?.type === 'string' ? (prop.type as string) : unionType(prop);
     if (typeof value === 'boolean' || type === undefined) {

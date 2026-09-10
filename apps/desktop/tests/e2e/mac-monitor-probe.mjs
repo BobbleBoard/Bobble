@@ -210,7 +210,7 @@ try {
   });
   check(stillMounted, 'the surface unmounted when the canvas went fullscreen again');
   // The choreography runs on its own clock; these waits land the screenshots on
-  // different bubble states (click ripple → typing → key press + save sheet).
+  // different bubble states (click press → typing → key press + save sheet).
   await sleep(1200);
   const phantom = await shot('03-phantom-and-bubble');
 

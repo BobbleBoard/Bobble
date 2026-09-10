@@ -241,8 +241,29 @@ private func accessibleName(_ el: AXUIElement, role: String) -> String {
   if let placeholder = axString(el, kAXPlaceholderValueAttribute), !cleanText(placeholder).isEmpty {
     return cleanText(placeholder)
   }
-  if let rd = axString(el, kAXRoleDescriptionAttribute), !cleanText(rd).isEmpty {
-    return cleanText(rd)
+  /*
+   * AXRoleDescription NAMES THE ROLE, NOT THE THING.
+   *
+   * MEASURED on Maps: five AXStaticText elements came back named "text", and a
+   * button named "button". Those are macOS's role descriptions surfacing because
+   * the element publishes no title, description, value or placeholder — so the
+   * snapshot printed `[3] AXStaticText "text"` five times, which reads to a
+   * model like five pieces of content called "text" rather than five elements
+   * with nothing in them. A fake name is worse than no name: it costs a line,
+   * it invites a click, and the role is already printed beside it.
+   *
+   * So it is kept ONLY when it says something the role does not. "text" for an
+   * AXStaticText and "button" for an AXButton are restatements and go; a genuine
+   * app-specific description ("map view" on an AXGroup) survives, because that
+   * is the case this fallback was worth having for.
+   */
+  if let rd = axString(el, kAXRoleDescriptionAttribute) {
+    let described = cleanText(rd)
+    let flat = described.lowercased().replacingOccurrences(of: " ", with: "")
+    let roleWord = role.lowercased().replacingOccurrences(of: "ax", with: "")
+    if !described.isEmpty, !flat.isEmpty, !roleWord.contains(flat) {
+      return described
+    }
   }
   return ""
 }
