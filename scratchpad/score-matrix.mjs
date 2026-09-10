@@ -31,6 +31,41 @@ const rows = readFileSync(path.join(DIR, 'ledger.jsonl'), 'utf8')
   .filter((l) => l.trim() !== '')
   .map((l) => JSON.parse(l));
 
+/**
+ * A RUN THAT SPENT ITS WHOLE WINDOW RE-PREFILLING DID NOT FAIL AT THE TASK.
+ *
+ * MEASURED across four 27B runs. The first prefill is healthy and a later one
+ * is catastrophic:
+ *
+ *   chrome  (passed)   11.0s 1.0s 0.5s 11.0s 1.3s 1.8s 1.3s 5.5s
+ *   blender splash     292.1s
+ *   blender no-splash  13.0s 0.3s 255.9s
+ *   maps               17.3s 274.8s
+ *
+ * That is not model loading — loading is the first one. It is a full re-prefill
+ * of the ~9.4k-token computer-use prompt mid-conversation, which on a 27B costs
+ * four to five minutes and so eats the entire 300s deadline. The run then
+ * reports zero tool calls and an empty reply, which reads exactly like a model
+ * that could not do the task.
+ *
+ * It is scored separately for that reason. `stalled` is a statement about this
+ * harness on this machine, and lumping it in with `fail` would attribute our
+ * own KV eviction to the model.
+ */
+function stalledOn(log, deadlineMs = 300_000) {
+  const line = log.match(/^prefill: .*?—\s*(.*)$/m);
+  if (line === null) return null;
+  const waits = line[1]
+    .split(',')
+    .map((w) => Number.parseFloat(w.trim()))
+    .filter((n) => Number.isFinite(n));
+  const worst = Math.max(0, ...waits);
+  /* Half the window on ONE prefill, and nothing to show for the run. Both
+     halves matter: a slow prefill that still left time to work is not a stall. */
+  const noCalls = /^tool calls \(0\): \[\]$/m.test(log);
+  return worst * 1000 > deadlineMs * 0.5 && noCalls ? worst : null;
+}
+
 /** The VERIFY object a run wrote, or null when it never got that far. */
 function evidenceFor(name) {
   try {
@@ -62,13 +97,21 @@ function score(app, e) {
 const out = [];
 for (const r of rows) {
   const e = evidenceFor(r.name);
+  let rawLog = '';
+  try {
+    rawLog = readFileSync(path.join(DIR, `${r.name}.log`), 'utf8');
+  } catch {
+    /* no log kept for this run */
+  }
+  const stalled = stalledOn(rawLog);
   const m = r.modality === null || r.modality === undefined ? {} : JSON.parse(r.modality);
   out.push({
     n: r.n,
     app: r.app,
     model: r.model,
     take: r.take,
-    scored: r.invalid == null ? score(r.app, e) : 'INVALID',
+    scored: r.invalid != null ? 'INVALID' : stalled !== null ? 'stalled' : score(r.app, e),
+    stalledSec: stalled === null ? null : Math.round(stalled),
     ledgerSaid: r.verdict,
     seconds: r.seconds,
     attempts: r.attempts ?? 1,
@@ -97,6 +140,18 @@ for (const r of out) {
 const tally = {};
 for (const r of out) tally[r.scored] = (tally[r.scored] ?? 0) + 1;
 console.log(`\n${out.length} runs:`, tally);
+const stalls = out.filter((r) => r.scored === 'stalled');
+if (stalls.length > 0) {
+  console.log(
+    `stalled on a re-prefill (ours, not the model): ${stalls
+      .map((r) => `#${r.n} ${r.model} ${r.stalledSec}s`)
+      .join(' · ')}`,
+  );
+}
 /* Focus is the standing rule, not a metric: a single MOVED is a bug report. */
 const moved = out.filter((r) => r.focus !== 'held');
-console.log(moved.length === 0 ? 'focus HELD on every run.' : `FOCUS MOVED on: ${moved.map((r) => r.n).join(', ')}`);
+console.log(
+  moved.length === 0
+    ? 'focus HELD on every run.'
+    : `FOCUS MOVED on: ${moved.map((r) => r.n).join(', ')}`,
+);
