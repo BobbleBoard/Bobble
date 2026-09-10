@@ -76,10 +76,59 @@ export function isCoercedToolCall(content: string, app: string | null): boolean 
  */
 export function coercedWriteRefusal(content: string, app: string, how: string): string {
   const wanted = content.trim().split('\n')[0] ?? '';
+  /*
+   * IF WHAT IT WROTE IS ALREADY A COMMAND, THE ANSWER IS "RUN IT", NOT A
+   * DIFFERENT COMMAND.
+   *
+   * MEASURED, matrix run 5 (Maps, 9B): 68 of 70 calls wrote `open -a "Maps"`
+   * into map-search.sh. This refusal fired 59 times and every one of them
+   * answered "the command that actually does it is `mac snapshot`" — which is
+   * a READ, and not remotely what the model was asking for. Refusing with
+   * irrelevant advice is why it kept going: the model was right about its
+   * intent and only wrong about writing it down.
+   *
+   * `open -a` in particular is already handled — the shell wrapper turns it
+   * into a background launch — so the honest answer is the shortest one.
+   */
+  if (RUNNABLE.test(wanted)) {
+    return (
+      `Not written — that is a COMMAND, not a file. Run it instead of saving it: type ` +
+      `\`${wanted}\` straight into bash. (\`open -a\` is safe here — it launches in the ` +
+      `background and does not take the user's screen.) Writing a command to a file never ` +
+      `runs it.`
+    );
+  }
   return (
     `Not written — that was a tool call, not a file. You asked to "${wanted}", and putting ` +
     `that sentence on disk does nothing to ${app}. The command that actually does it is ` +
     `${how}. Run that now.`
+  );
+}
+
+/** Content that is itself a command line this session can just execute. */
+const RUNNABLE =
+  /^(?:open|osascript|mac|chrome|browser|media|defaults|killall|pkill|sh|bash|zsh)\s/i;
+
+/**
+ * The blunt version, once the polite one has demonstrably not worked.
+ *
+ * Same principle as the write-while-driving escalation: repeating a paragraph
+ * that has already failed N times is the harness talking to itself. MEASURED:
+ * 59 identical refusals in one run, none of which changed what the model did
+ * next.
+ */
+export function coercedWriteEscalation(
+  content: string,
+  app: string,
+  how: string,
+  n: number,
+): string {
+  const wanted = content.trim().split('\n')[0] ?? '';
+  const run = RUNNABLE.test(wanted) ? `\`${wanted}\`` : how;
+  return (
+    `That is the ${n}th time. Writing "${wanted}" to a file has not worked and will not ` +
+    `work. Your next call must be ${run} — run it, in bash — or say plainly that you cannot ` +
+    `drive ${app}.`
   );
 }
 

@@ -99,6 +99,7 @@ import { registerAskUser } from './tools/ask-user.js';
 import { registerCapabilityTool } from './tools/capability-tool.js';
 import {
   coercedEditRefusal,
+  coercedWriteEscalation,
   coercedWriteRefusal,
   isCoercedEdit,
   isCoercedToolCall,
@@ -2953,6 +2954,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     /* A new turn deserves the full explanation again — the escalation is about
        one turn's refusal to take an answer, not a grudge. */
     fencedWhileDriving = 0;
+    coercedRefusals = 0;
     // FIRST, before anything else: give the user the slot. Post-turn naming and
     // the reviewer share the single llama-server, and until they stop this
     // message is queued behind them. Cancelling the PENDING timer is the case
@@ -3336,7 +3338,16 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
       const body = (event.input as { content?: unknown })?.content;
       if (typeof body === 'string' && isCoercedToolCall(body, controlledApp)) {
         pi.appendEntry(HARNESS_LOOP_ENTRY, { action: 'block', cause: 'coerced-write' });
-        return { block: true, reason: coercedWriteRefusal(body, controlledApp, drivingHowTo()) };
+        coercedRefusals += 1;
+        /* Saying it louder is not saying it again — MEASURED, 59 identical
+           refusals in one run, none of which changed the next call. */
+        return {
+          block: true,
+          reason:
+            coercedRefusals >= 3
+              ? coercedWriteEscalation(body, controlledApp, drivingHowTo(), coercedRefusals)
+              : coercedWriteRefusal(body, controlledApp, drivingHowTo()),
+        };
       }
       /* …and the `edit` spelling of it, which is the one a model reaches for
          when what it wants is to TYPE — see isCoercedEdit. */
@@ -3463,6 +3474,8 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
    * escalation in the tool_result hook. Reset per turn, not per session: a
    * later turn deserves the full explanation again. */
   let fencedWhileDriving = 0;
+  /** Coerced write/edit refusals in THIS turn — see coercedWriteEscalation. */
+  let coercedRefusals = 0;
   pi.on('tool_result', (event) => {
     /* In CLI mode every call is `bash`, so the real tool name is only known at
        the dispatch (see the CLI host's `call`); tally there instead, or the

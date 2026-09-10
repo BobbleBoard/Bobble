@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   coercedEditRefusal,
+  coercedWriteEscalation,
   coercedWriteRefusal,
   isCoercedEdit,
   isCoercedToolCall,
@@ -73,5 +74,31 @@ describe('the same mistake wearing edit', () => {
     expect(r).toContain('"Colosseum, Rome"');
     expect(r).toContain('"Apple Maps"');
     expect(r).toContain('mac snapshot');
+  });
+});
+
+describe('the refusal has to answer what was actually asked', () => {
+  /* MEASURED: 59 refusals telling a model that wanted to LAUNCH Maps to run
+     `mac snapshot`, which is a read. */
+  it('says "run it" when the content is already a command', () => {
+    const r = coercedWriteRefusal('open -a "Maps"', 'Maps', '`mac snapshot --app "Maps"`');
+    expect(r).toContain('COMMAND, not a file');
+    expect(r).toContain('open -a "Maps"');
+    expect(r).not.toContain('mac snapshot');
+  });
+
+  it('still names the read command when the content is a wish, not a command', () => {
+    const r = coercedWriteRefusal(
+      'read the URL of Google Chrome',
+      'Google Chrome',
+      '`mac chrome snapshot`',
+    );
+    expect(r).toContain('mac chrome snapshot');
+  });
+
+  it('escalates to one sentence naming the single next call', () => {
+    const r = coercedWriteEscalation('open -a "Maps"', 'Maps', '`mac snapshot`', 3);
+    expect(r).toContain('3th time');
+    expect(r).toContain('open -a "Maps"');
   });
 });
