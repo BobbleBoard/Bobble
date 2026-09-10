@@ -177,7 +177,7 @@ async function readBounds(params: Record<string, unknown>): Promise<MacWindowBou
   }
 }
 
-function rectOf(b: MacWindowBounds): OverlayRect | null {
+function rectOf(b: MacWindowBounds): (OverlayRect & { windowId?: number }) | null {
   if (
     typeof b.x !== 'number' ||
     typeof b.y !== 'number' ||
@@ -186,7 +186,27 @@ function rectOf(b: MacWindowBounds): OverlayRect | null {
   ) {
     return null;
   }
-  return { x: b.x, y: b.y, w: b.w, h: b.h };
+  /*
+   * THE WINDOW NUMBER HAS TO TRAVEL WITH THE RECT.
+   *
+   * This returned x/y/w/h and dropped a windowId it was holding, so every
+   * caller that goes through it — the launch ack and the monitor-session seam —
+   * handed `control()` a target with no window number. `trackedWindow` then
+   * stayed 0, and `refreshOcclusion` guards on `trackedWindow > 0`: no occluder
+   * mask, and no off-desktop hiding either.
+   *
+   * The snapshot path never showed this because it passes `snap.windowId`
+   * itself, a few lines below — which is why the layering the user signed off on
+   * works as soon as the model looks at anything, and why this only bites in
+   * the window between a launch and the first snapshot.
+   */
+  return {
+    x: b.x,
+    y: b.y,
+    w: b.w,
+    h: b.h,
+    ...(typeof b.windowId === 'number' ? { windowId: b.windowId } : {}),
+  };
 }
 
 /** The app that currently has the screen, or null when we cannot tell. */

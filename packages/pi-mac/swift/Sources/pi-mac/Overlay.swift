@@ -1491,6 +1491,47 @@ final class OverlayController: NSObject {
       rects.append(r)
     }
     setOccluders(found ? rects : [])
+    /*
+     * THE WINDOW IS ON ANOTHER DESKTOP, SO THE PHANTOM MUST NOT BE ON THIS ONE.
+     *
+     * the user: "when I switch desktops I notice a new bug where the mouse cursor
+     * follows instead of staying on the window in the other desktop and redoes
+     * the on top of wrong window bug."
+     *
+     * The panel carries `.canJoinAllSpaces`, which it needs — the controlled
+     * window can be on any Space and the phantom has to be able to reach it.
+     * The cost is that the panel is on EVERY Space, including ones the tracked
+     * window is not on.
+     *
+     * `optionOnScreenOnly` lists only the current Space, so `found == false`
+     * already means "not here" — and the old answer to that was to clear the
+     * occluders, i.e. paint the phantom at FULL strength over whatever the user
+     * switched to. Exactly backwards, and it is the same failure as the
+     * wrong-window layering because it has the same cause: no window of ours to
+     * be behind.
+     *
+     * Two consecutive misses before hiding: at 30Hz that is 66ms, enough that a
+     * momentarily incomplete window list cannot make the phantom blink during a
+     * normal drag.
+     */
+    offSpaceStreak = found ? 0 : min(offSpaceStreak + 1, 3)
+    setOffSpace(offSpaceStreak >= 2)
+  }
+
+  /// Consecutive occlusion ticks on which the tracked window was not on this
+  /// Space. Hysteresis — see refreshOcclusion.
+  private var offSpaceStreak = 0
+  private var offSpace = false
+
+  /// Hide the whole phantom while the window it belongs to is on another Space,
+  /// and bring it back untouched when the user returns. Alpha rather than
+  /// `orderOut`, because ordering out drops the panel's place in the window
+  /// server's stack and the layering has to be re-established on the way back.
+  private func setOffSpace(_ away: Bool) {
+    if away == offSpace { return }
+    offSpace = away
+    panel.alphaValue = away ? 0 : 1
+    controls?.alphaValue = away ? 0 : 1
   }
 
   /// Probe seam: see previewHover. Lays the controls out first, because a pill
@@ -1901,6 +1942,7 @@ final class OverlayController: NSObject {
       "behavior": [
         "transient": behavior.contains(.transient),
         "canJoinAllSpaces": behavior.contains(.canJoinAllSpaces),
+        "offSpace": offSpace,
         "ignoresCycle": behavior.contains(.ignoresCycle),
         "fullScreenAuxiliary": behavior.contains(.fullScreenAuxiliary),
         "managed": behavior.contains(.managed),
