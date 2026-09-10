@@ -154,7 +154,7 @@ describe('ActivityChain — connector usage reads as a sentence, not a shell lin
   });
 
   it('does not put the raw command on the row', () => {
-    const ui = mount({ steps: [used()], complete: true, active: false });
+    const _ui = mount({ steps: [used()], complete: true, active: false });
     const row = host?.querySelector('.pd-chain-used');
     expect(row).not.toBeNull();
     expect(row?.textContent ?? '').not.toMatch(/chrome snapshot/);

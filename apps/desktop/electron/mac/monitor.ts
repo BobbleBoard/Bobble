@@ -367,6 +367,36 @@ export function registerMacMonitorIpc(): void {
       return { ok: true, control: macMonitor.control() };
     },
   );
+
+  /*
+   * THE ONE THING HERE THAT IS MEANT TO TAKE THE SCREEN.
+   *
+   * the user: "have a prominent Open <app icon> <app name> <square with top right
+   * arrow> prominently in the top right of the computer use canvas area."
+   * Everything else in this subsystem works hard NOT to move the user's focus;
+   * this exists because they asked to be put in front of the window they have
+   * been watching. It can only run from that click — the model has no path to
+   * this channel.
+   */
+  ipcMain.handle('mac:monitor:open-app', async (event: IpcMainInvokeEvent) => {
+    if (!isTrustedIpcEvent(event)) throw new Error('[mac-monitor] rejected open-app');
+    const app = macMonitor.state().appName;
+    if (app === undefined || app === '') return { ok: false };
+    try {
+      await openControlledApp(app);
+      return { ok: true, app };
+    } catch {
+      return { ok: false, app };
+    }
+  });
+}
+
+/** Raising the app is the mac-agent's job (it owns the helper); injected the
+ * same way the control handler is, so this file keeps no helper of its own. */
+let openControlledApp: (app: string) => Promise<void> = async () => {};
+
+export function setMacOpenAppHandler(fn: (app: string) => Promise<void>): void {
+  openControlledApp = fn;
 }
 
 /**

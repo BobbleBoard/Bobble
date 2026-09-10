@@ -36,6 +36,7 @@ import { useEffect, useRef } from 'react';
 import { useCanvasStore } from '../../state/canvas-store';
 import { abortPi, pausePi } from '../../state/pi-connect';
 import { useSettingsStore } from '../../state/settings-store';
+import { appIconSrc } from '../app-icons';
 
 /** Stable upsert key for the monitor tab — one tab, reused across sessions. */
 export const MAC_MONITOR_TAB_KEY = 'mac-monitor';
@@ -328,6 +329,16 @@ class MacMonitorFeedImpl implements MacMonitorFeed {
 
   isTakenOver(): boolean {
     return this.#takenOver;
+  }
+
+  /* the user's Open button. The only thing in this file that intends to move the
+     user's focus, and it only ever runs from their click. */
+  openApp(): void {
+    void window.piDesktop.invoke('mac:monitor:open-app', {}).catch(() => undefined);
+  }
+
+  appIcon(app: string): string | undefined {
+    return appIconSrc(app);
   }
 
   getViewMode(): MacMonitorViewMode {

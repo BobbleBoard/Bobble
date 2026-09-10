@@ -186,9 +186,15 @@ export function SettingsView({
         aria-labelledby={titleId}
         tabIndex={-1}
         data-testid="settings-view"
-        className="relative flex h-[min(640px,100%)] w-[min(920px,100%)] overflow-hidden rounded-2xl border border-border-default bg-bg-base shadow-2xl outline-none"
+        className="relative flex h-[min(640px,100%)] w-[min(920px,100%)] overflow-hidden rounded-[var(--pd-radius-surface)] border border-border-default bg-bg-base shadow-[var(--pd-shadow-hairline),var(--pd-shadow-lg)] outline-none"
       >
-        <nav className="flex w-56 shrink-0 flex-col border-r border-border-default bg-bg-sunken px-2 py-3">
+        {/*
+         * `bg-bg-sunken` was a class that does not exist: the @theme block in
+         * global.css declares no `--color-bg-sunken`, so Tailwind emitted no
+         * rule and the nav has been the same colour as the page beside it,
+         * separated by its border alone. `bg-inset` is the real recessed token.
+         */}
+        <nav className="flex w-56 shrink-0 flex-col border-r border-border-default bg-bg-inset px-2 py-3">
           <div className="px-1 pb-2">
             <label className="sr-only" htmlFor={`${titleId}-search`}>
               Search settings

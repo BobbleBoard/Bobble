@@ -20,14 +20,23 @@ const OUT = process.env.MATRIX_OUT ?? '/Users/user/Desktop/OSS-harness/scratchpa
 mkdirSync(OUT, { recursive: true });
 const LEDGER = path.join(OUT, 'ledger.jsonl');
 
-/* Blender twice per model because it is the case the matrix exists for and the
-   one with the widest spread between attempts; the other two once each. */
+/*
+ * Blender twice per model, and the two are DIFFERENT QUESTIONS rather than two
+ * attempts at one.
+ *
+ * MEASURED across six cold runs: not one model got past Blender's welcome
+ * splash — a 4B clicked four times inside it, a 27B left its cursor hovering
+ * "Sculpting". That is a real finding, and it also means those runs say nothing
+ * about driving Blender, because nothing ever drove Blender. Opening a file
+ * skips the splash, so the pair separates "can you dismiss a modal you have
+ * never seen" from "can you find a menu in a dense custom interface".
+ */
 const PLAN = [
   ...MODELS.map((m) => ({ app: 'chrome', demo: 'demo-apple.mjs', model: m })),
   ...MODELS.map((m) => ({ app: 'maps', demo: 'demo-maps.mjs', model: m })),
   ...MODELS.flatMap((m) => [
-    { app: 'blender', demo: 'demo-blender.mjs', model: m, take: 1 },
-    { app: 'blender', demo: 'demo-blender.mjs', model: m, take: 2 },
+    { app: 'blender', demo: 'demo-blender.mjs', model: m, take: 'splash' },
+    { app: 'blender', demo: 'demo-blender.mjs', model: m, take: 'no-splash', noSplash: true },
   ]),
 ];
 
@@ -39,13 +48,14 @@ const run = (cmd, args, env) =>
 
 const started = Date.now();
 for (const [i, job] of PLAN.entries()) {
-  const name = `matrix-${String(i + 1).padStart(2, '0')}-${job.app}-${job.model}${job.take ? `-t${job.take}` : ''}`;
+  const name = `matrix-${String(i + 1).padStart(2, '0')}-${job.app}-${job.model}${job.take === undefined ? '' : `-${job.take}`}`;
   const t0 = Date.now();
   console.log(`\n[${i + 1}/${PLAN.length}] ${name}`);
   const res = await run('node', [`apps/desktop/tests/e2e/${job.demo}`], {
     MAC_CU_MODEL: job.model,
     RUN_NAME: name,
     POWER: 'low',
+    ...(job.noSplash === true ? { NO_SPLASH: '1' } : {}),
   });
   const log = `${res.stdout}\n${res.stderr}`;
   writeFileSync(path.join(OUT, `${name}.log`), log);
@@ -58,6 +68,7 @@ for (const [i, job] of PLAN.entries()) {
     ok: res.ok,
     seconds: Math.round((Date.now() - t0) / 1000),
     verdict: pick(/"verdict":"(\w+)"/),
+    take: job.take ?? null,
     focus: /FOCUS HELD/.test(log) ? 'held' : /FOCUS MOVED/.test(log) ? 'moved' : null,
     modality: pick(/MODALITY: (\{.*\})/),
     frames: pick(/(\d+) frames, captured at/),

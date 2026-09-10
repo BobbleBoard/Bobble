@@ -46,10 +46,7 @@ export function SearchPanel() {
   };
 
   return (
-    <SettingSection
-      title="Web search"
-      description="Optional keys upgrade web search beyond the built-in DuckDuckGo backend. DuckDuckGo needs no key."
-    >
+    <SettingSection description="Optional keys upgrade web search beyond the built-in DuckDuckGo backend. DuckDuckGo needs no key.">
       <SettingRow
         label="Brave Search API key"
         hint="Used when set. Otherwise search falls back to DuckDuckGo."

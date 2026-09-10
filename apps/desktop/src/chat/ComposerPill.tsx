@@ -15,7 +15,6 @@
  * real number exists.
  */
 import { Spinner } from '@pi-desktop/ui';
-import { useEffect, useRef, useState } from 'react';
 import { useLlmStore } from '../state/llm-store';
 import { usePiStore } from '../state/pi-slice';
 import { typicalBootSeconds } from './boot-history';

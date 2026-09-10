@@ -52,6 +52,7 @@ import {
   registerMacMonitorIpc,
   setCaptureGrantPrompt,
   setMacControlHandler,
+  setMacOpenAppHandler,
 } from './monitor';
 import { macMonitorMockControl, startMacMonitorMock } from './monitor-mock';
 import { macOverlay } from './overlay-controller';
@@ -768,6 +769,12 @@ export function registerMacAgentIpc(): void {
    * panel that is click-through except for its button rect.
    */
   setMacControlHandler(applyControl);
+  /* The Open button on the monitor surface — the one deliberate focus change in
+     this subsystem, and only ever from a click. `focus` activates a RUNNING app
+     without launching anything. */
+  setMacOpenAppHandler(async (app) => {
+    await getHelper().request('focus', { app });
+  });
   /*
    * The pill's own buttons. the user asked for them back — an ✕, a pause and a
    * hide, on the one surface that exists while the user is in another app

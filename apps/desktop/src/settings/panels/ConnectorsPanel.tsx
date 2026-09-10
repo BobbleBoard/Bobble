@@ -20,10 +20,7 @@ export function ConnectorsPanel({ onOpenConnectors }: { onOpenConnectors?: () =>
   const update = useSettingsStore((s) => s.update);
 
   return (
-    <SettingSection
-      title="Connectors"
-      description="How MCP connector tools are exposed to the agent."
-    >
+    <SettingSection description="How MCP connector tools are exposed to the agent.">
       <SettingRow label="MCP mode" hint={MODE_HINT[mode]}>
         <SegmentedControl
           aria-label="MCP mode"

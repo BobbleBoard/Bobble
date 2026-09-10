@@ -24,19 +24,13 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  type AxDrawable,
-  ellipsize,
   idleCursorDrift,
-  layoutAxScene,
   type MonitorSource,
   pickMonitorSource,
   restingCursor,
-  wrapText,
 } from './computer-use-ax.ts';
 import {
   IDLE_MAC_MONITOR_SESSION,
-  type MacMonitorAxScene,
-  type MacMonitorAxWindow,
   type MacMonitorCursorState,
   type MacMonitorFeed,
   type MacMonitorRect,
@@ -1227,6 +1221,50 @@ export function ComputerUseSurface({ feed, className }: ComputerUseSurfaceProps)
     >
       <div className="pd-macmon-stage" ref={stageRef}>
         <canvas className="pd-macmon-canvas" ref={canvasRef} aria-label={canvasLabel} />
+        {/*
+         * OPEN THE ACTUAL APP — the user: "have a prominent Open <app icon> <app
+         * name> <square with top right arrow> prominently in the top right of
+         * the computer use canvas area."
+         *
+         * Prominent on purpose, and the only control on this surface that is
+         * MEANT to take the screen: everything else here goes out of its way
+         * not to, but a person who presses this is asking to be put in front of
+         * the window they have been watching.
+         */}
+        {session.active && session.appName !== '' && feed?.openApp !== undefined ? (
+          <button
+            type="button"
+            className="pd-macmon-open"
+            data-testid="macmon-open-app"
+            onClick={() => feed.openApp?.()}
+            title={`Bring ${session.appName} to the front`}
+          >
+            <span className="pd-macmon-open-verb">Open</span>
+            {(() => {
+              const icon = feed.appIcon?.(session.appName);
+              return icon === undefined ? null : (
+                <img className="pd-macmon-open-icon" src={icon} alt="" width={16} height={16} />
+              );
+            })()}
+            <span className="pd-macmon-open-app">{session.appName}</span>
+            <svg
+              className="pd-macmon-open-arrow"
+              viewBox="0 0 16 16"
+              width={13}
+              height={13}
+              aria-hidden="true"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={1.5}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M9.5 2.5H13.5V6.5" />
+              <path d="M13.5 2.5 8 8" />
+              <path d="M12.2 9.6v3.1a.8.8 0 0 1-.8.8H3.3a.8.8 0 0 1-.8-.8V4.6a.8.8 0 0 1 .8-.8h3.1" />
+            </svg>
+          </button>
+        ) : null}
         {needsCapture ? (
           <CapturePermissionPanel
             app={session.appName}
@@ -1696,7 +1734,7 @@ function CapturePermissionPanel({
   );
 }
 
-function SourceNote({ denied, onTurnOn }: { denied: boolean; onTurnOn: () => void }) {
+function _SourceNote({ denied, onTurnOn }: { denied: boolean; onTurnOn: () => void }) {
   return (
     <div className="pd-macmon-source" data-testid="macmon-source-note">
       <span className="pd-macmon-source-mark" aria-hidden="true">

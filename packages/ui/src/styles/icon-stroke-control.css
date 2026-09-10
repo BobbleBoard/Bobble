@@ -8,8 +8,11 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
+  /* The 22rem cap was here to stop the PREVIEW strip stretching, and it capped
+   * the track with it — so in Settings this slider stopped two-fifths across
+   * its card while the Element-size sliders beside it ran the full width, with
+   * their readouts nowhere near this one's. The cap belongs on the strip. */
   width: 100%;
-  max-width: 22rem;
 }
 
 .pd-icon-stroke-control-header {
@@ -35,6 +38,7 @@
 
 .pd-icon-stroke-control-preview {
   display: flex;
+  align-self: flex-start;
   align-items: center;
   gap: 16px;
   padding: 12px 14px;

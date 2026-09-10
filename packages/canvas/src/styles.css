@@ -77,6 +77,20 @@
    * so the canvas has a single dial the next person can turn.
    */
   --pd-canvas-rule: var(--pd-border-default);
+  /* How far the selected tab's fill runs out past its own sides on the way into
+   * the pane — the width of each of Chrome's two bottom flares. It matches the
+   * tab's own corner radius, so the curve that opens out at the bottom is the
+   * same size as the one that closes at the top. It DOES reach across the 4px
+   * gap onto the neighbour; checked with that neighbour hovered, and the two
+   * curves nest — the flare sweeps out exactly where the neighbour's rounded
+   * corner sweeps away. */
+  --pd-canvas-tab-flare: var(--pd-radius-md);
+  /* How far the tab list has to reach PAST its own left edge to have anywhere
+   * to paint the FIRST tab's flare — see `.pd-canvas-tablist`. Named because two
+   * rules have to agree on it: the list bleeds left by exactly this much, and
+   * the start edge-fade has to grow by exactly this much to go on covering the
+   * list's clipping edge. */
+  --pd-canvas-tablist-bleed: calc(var(--pd-canvas-tab-flare) - var(--pd-space-xs));
 }
 
 .pd-canvas-tabs--collapsed {
@@ -87,13 +101,11 @@
   padding: var(--pd-space-xs);
 }
 
-/* macOS Safari-style BORDERED tab strip. The strip is the darker "frame"
- * (bg-inset); each tab is an individually SEGMENTED, hairline-bordered pill with
- * rounded top corners. Tabs bottom-align so the ACTIVE one — filled with the
- * toolbar/content bg (bg-raised) and dropped 1px onto the seam (margin-bottom)
- * with no bottom border — reads as LIFTED and connected to the body below.
- * Inactive tabs are recessed and lift to bg-hover on hover. (Replaces the older
- * Chrome-style mask-carved corner flares.) */
+/* A BORDERED tab strip: the strip is the darker "frame" (bg-inset) and each tab
+ * is an individually SEGMENTED pill with rounded top corners. Tabs bottom-align
+ * so the ACTIVE one — filled with the toolbar/content bg (bg-raised) — reads as
+ * continuous with the body below. Inactive tabs are recessed and lift to a wash
+ * on hover. */
 .pd-canvas-tabbar {
   display: flex;
   align-items: stretch;
@@ -104,10 +116,13 @@
   flex: 0 0 auto;
   /* The seam under the strip: see `.pd-edge-line` in ui/styles/base.css. It
    * fades out at both ends rather than stopping dead against the panel edges,
-   * so it reads as the boundary of the strip instead of a drawn rule. Nothing
-   * breaks it any more — the tabs FLOAT above it rather than merging into the
-   * content, so the strip has one unbroken boundary and the selected tab is
-   * an object sitting on it. */
+   * so it reads as the boundary of the strip instead of a drawn rule.
+   *
+   * ONE THING BREAKS IT, deliberately: the selected tab. An unbroken boundary
+   * and a tab that folds into the pane are the same statement made two opposite
+   * ways, and the user asked for the fold — so the seam now runs everywhere EXCEPT
+   * under the selected tab and its flares, which is precisely what says that
+   * tab and the pane below are one surface. */
   position: relative;
 }
 
@@ -148,7 +163,20 @@
   display: flex;
   align-items: flex-end;
   gap: var(--pd-space-xs);
-  padding-left: var(--pd-space-xs);
+  /*
+   * ROOM FOR THE FIRST TAB'S FLARE, and not one pixel of movement for anything
+   * else. `overflow-x: auto` clips: a scroll container hides what sits to its
+   * left rather than letting you scroll to it, so when the FIRST tab was the
+   * selected one its outward curve met a straight vertical wall four pixels out
+   * (SEEN in a magnified corner shot — every other tab's flare was fine, which
+   * is exactly why it would have survived a casual look).
+   *
+   * The padding grows to the flare's own width so the curve has somewhere to
+   * paint, and the negative margin takes the same amount back off the box, so
+   * the first tab starts where it always did.
+   */
+  padding-left: var(--pd-canvas-tab-flare);
+  margin-left: calc(-1 * var(--pd-canvas-tablist-bleed));
   flex: 1 1 auto;
   min-width: 0;
   overflow-x: auto;
@@ -163,16 +191,29 @@
  * only for the side that is actually overflowing (measured against scrollLeft),
  * so a settled edge shows no fade. */
 .pd-canvas-tabfade {
+  --pd-canvas-tabfade-w: 24px;
   position: absolute;
   top: 0;
   bottom: 0;
-  width: 24px;
+  width: var(--pd-canvas-tabfade-w);
   pointer-events: none;
 }
 
+/* The fade has to start where the SCROLLER clips, and the scroller now bleeds
+ * left of this overlay's own container to give the first tab's flare room. Left
+ * as it was, a tab scrolling out of view got six pixels of hard-cut, unfaded
+ * travel at the panel edge — SEEN, once the strip was narrowed enough to
+ * scroll, not reasoned about. So the overlay reaches back over the bleed and
+ * holds full opacity across it; the 24px ramp beyond is the one that was there
+ * before, at the width it was tuned at. */
 .pd-canvas-tabfade--start {
-  left: 0;
-  background: linear-gradient(to right, var(--pd-bg-inset), transparent);
+  left: calc(-1 * var(--pd-canvas-tablist-bleed));
+  width: calc(var(--pd-canvas-tabfade-w) + var(--pd-canvas-tablist-bleed));
+  background: linear-gradient(
+    to right,
+    var(--pd-bg-inset) var(--pd-canvas-tablist-bleed),
+    transparent
+  );
 }
 
 .pd-canvas-tabfade--end {
@@ -266,45 +307,129 @@
    * transparent border keeps the active tab's own border from changing the
    * layout when selection moves. */
   border: 1px solid transparent;
-  /* Rounded on ALL four corners: the tab is an object floating on the strip,
-   * not a folder tab joined to the page. the user, on the old treatment: "tabs need
-   * to be floating, none besides the selected one has the border that comes up
-   * around and down the other side". */
+  /* Rounded on all four corners while unselected — an object on the strip. The
+   * selected tab squares off the bottom two and folds into the pane instead;
+   * the corner radii are in the transition below so that is a movement, not a
+   * swap. */
   border-radius: var(--pd-radius-md);
   background: transparent;
   color: var(--pd-text-muted);
+  /* the user asked for the fold to happen "smoothly", so every property the fold
+   * moves is listed here: fill, hairline, label, the two bottom corners opening
+   * out, and the lift shadow being let go. No keyframes — a finite transition
+   * collapses to 0.01ms on its own under `prefers-reduced-motion` via the
+   * duration tokens (see the note at the foot of themes.css), which is how the
+   * rest of the app handles it. */
   transition:
     background var(--pd-duration-fast) var(--pd-easing-standard),
     border-color var(--pd-duration-fast) var(--pd-easing-standard),
+    border-radius var(--pd-duration-fast) var(--pd-easing-standard),
+    box-shadow var(--pd-duration-fast) var(--pd-easing-standard),
     color var(--pd-duration-fast) var(--pd-easing-standard);
 }
 
-/* Hover is the only thing an unselected tab does, so it also brings the label up
- * to full strength — a wash alone is easy to miss on a dark strip. It is a
- * FLOATING highlight: a filled pill with air under it, never a shape that
- * reaches down into the seam. */
+/*
+ * THE TWO FLARES UNDER THE SELECTED TAB — the half of Chrome's shape that a
+ * border-radius cannot draw. Each is a concave fillet in the PANE's own colour,
+ * so the tab's fill does not stop at its own edge: it runs out sideways, curves
+ * down and becomes the pane. Without them a squared-off bottom is just a tab
+ * that has lost its corners.
+ *
+ * One element carrying two corner gradients rather than ::before + ::after,
+ * because a single free pseudo is worth keeping. It is declared on EVERY tab
+ * (hidden at opacity 0) so the fold animates in both directions — a rule that
+ * only exists while [data-active] has nothing to fade back out of.
+ */
+.pd-canvas-tab::after {
+  content: "";
+  position: absolute;
+  /* -1px, not 0: an absolutely positioned box is offset from its containing
+   * block's PADDING box, and the tab keeps a 1px border all round. At 0 the
+   * flare stopped one row short and the strip's seam went on painting straight
+   * through the widest part of the curve (SEEN in a pixel map of the corner,
+   * not deduced). -1px lands it on the tab's own bottom edge, which is also the
+   * scroller's, so nothing clips. */
+  bottom: -1px;
+  left: calc(-1 * var(--pd-canvas-tab-flare));
+  right: calc(-1 * var(--pd-canvas-tab-flare));
+  height: var(--pd-canvas-tab-flare);
+  pointer-events: none;
+  opacity: 0;
+  /* The transparent quarter-disc is centred on the corner the tab occupies, so
+   * the painted part is the arc BELOW it — zero thickness where it meets the
+   * tab, full flare width where it meets the pane. */
+  background-image:
+    radial-gradient(
+      circle var(--pd-canvas-tab-flare) at top left,
+      transparent 96%,
+      var(--pd-bg-raised) 100%
+    ),
+    radial-gradient(
+      circle var(--pd-canvas-tab-flare) at top right,
+      transparent 96%,
+      var(--pd-bg-raised) 100%
+    );
+  background-position:
+    left bottom,
+    right bottom;
+  background-size: var(--pd-canvas-tab-flare) 100%;
+  background-repeat: no-repeat;
+  transition: opacity var(--pd-duration-fast) var(--pd-easing-standard);
+}
+
+.pd-canvas-tab[data-active]::after {
+  opacity: 1;
+}
+
+/*
+ * HOVER (the user's B). "(B) needs to highlight on hover as shown."
+ *
+ * It did already wash and brighten — but MEASURED in bobble dark, `--pd-bg-hover`
+ * over the strip lands on rgb(32,32,34) and the selected tab's fill is
+ * rgb(30,30,33): two counts apart, indistinguishable. So a hovered tab looked
+ * exactly like the selected one, and the hover read as "you have selected this"
+ * rather than "you are pointing at this". `--pd-bg-active` is the next step up
+ * the same ladder and clears both the strip and the selected fill.
+ *
+ * The SHAPE stays a pill on all four corners: pointing at a tab must never
+ * borrow the selected tab's fold.
+ */
 .pd-canvas-tab:not([data-active]):hover {
-  background: var(--pd-bg-hover);
+  background: var(--pd-bg-active);
   color: var(--pd-text-primary);
 }
 
-/* The active tab FLOATS: filled with the content bg, a hairline all the way
- * round, and a shadow that lifts it off the strip. The old treatment was the
- * Safari one — border on three sides and no bottom, so the tab merged into the
- * page and its border ran up, across and back down around the content. That is
- * exactly what the user asked to lose: a tab should read as a selected object on a
- * strip, not as the front of a folder. */
+/*
+ * THE SELECTED TAB FOLDS INTO THE PANE (the user's A). With Chrome's own tab bar
+ * marked up A/B/C: "the selected tab needs to fold into the bottom like A does
+ * in the reference smoothly, (B) needs to highlight on hover as shown and
+ * default like c needs to just be how it currently is."
+ *
+ * This rule used to do the opposite on purpose — a hairline all the way round
+ * and a drop shadow, so the tab read as a selected object sitting ON the strip.
+ * A bottom edge is what makes that reading, and the fold is the same three
+ * things taken away: square off the bottom corners, stop painting the bottom
+ * hairline, stop lifting it. The fill was already the pane's own bg-raised and
+ * the tab was already flush with the strip's bottom (MEASURED: 0px between
+ * them), so nothing has to move for the two surfaces to become one.
+ *
+ * `border-bottom-color: transparent` rather than `border-bottom: 0`: the border
+ * box must keep its 1px or the tab changes height as it is selected, and the
+ * tab's own fill paints under a transparent border — which is also what covers
+ * the strip's seam where it crosses.
+ */
 .pd-canvas-tab[data-active] {
   background: var(--pd-bg-raised);
   border-color: var(--pd-canvas-rule);
+  border-bottom-color: transparent;
+  border-bottom-right-radius: 0;
+  border-bottom-left-radius: 0;
   color: var(--pd-text-primary);
-  box-shadow:
-    0 1px 2px rgb(0 0 0 / 0.16),
-    0 0 0 0.5px rgb(0 0 0 / 0.04);
+  box-shadow: none;
   /* The selected label carries a touch more weight, so the state survives even
    * where the fill is subtle. */
   font-weight: var(--pd-font-weight-medium, 500);
-  /* Lift above neighbours so its side borders paint over theirs cleanly. */
+  /* Above neighbours so its side borders and its flares paint over theirs. */
   z-index: 1;
 }
 
@@ -4243,6 +4368,64 @@
 }
 
 /* The picture, and nothing else. */
+/*
+ * "Open <app icon> <app name> ↗", top right of the stage.
+ *
+ * the user asked for it PROMINENT, which on a surface whose whole job is to be
+ * unobtrusive means it has to earn the exception: raised ground, a real border,
+ * and the app's own icon so it reads as that app rather than as a generic
+ * button. It sits over the picture rather than in the rail below, because the
+ * rail is where the controls that DON'T take your screen live.
+ */
+.pd-macmon-open {
+  position: absolute;
+  z-index: 4;
+  top: 12px;
+  right: 12px;
+  display: inline-flex;
+  max-width: calc(100% - 24px);
+  align-items: center;
+  gap: 7px;
+  padding: 7px 11px;
+  border: 1px solid var(--pd-border-default);
+  border-radius: var(--pd-radius-full);
+  background: var(--pd-bg-raised);
+  box-shadow: var(--pd-shadow-hairline), var(--pd-shadow-md);
+  color: var(--pd-text-primary);
+  font-size: var(--pd-font-size-caption);
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background var(--pd-duration-fast) var(--pd-easing-standard),
+    border-color var(--pd-duration-fast) var(--pd-easing-standard);
+}
+
+.pd-macmon-open:hover {
+  border-color: var(--pd-border-strong);
+  background: var(--pd-bg-hover);
+}
+
+.pd-macmon-open-verb {
+  color: var(--pd-text-secondary);
+}
+
+.pd-macmon-open-icon {
+  flex: 0 0 auto;
+  border-radius: 3px;
+}
+
+.pd-macmon-open-app {
+  overflow: hidden;
+  font-weight: 550;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pd-macmon-open-arrow {
+  flex: 0 0 auto;
+  color: var(--pd-text-muted);
+}
+
 .pd-macmon-stage {
   position: relative;
   flex: 1 1 auto;

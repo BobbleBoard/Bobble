@@ -10,7 +10,7 @@ export function AppearancePanel() {
   const update = useSettingsStore((s) => s.update);
 
   return (
-    <SettingSection title="Appearance" description="Choose light, dark, or match your system.">
+    <SettingSection description="Choose light, dark, or match your system.">
       <SettingRow label="Mode" hint="System follows your macOS appearance setting.">
         <SegmentedControl
           aria-label="Theme mode"

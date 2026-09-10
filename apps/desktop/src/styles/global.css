@@ -1770,6 +1770,57 @@ body {
   }
 }
 
+/*
+ * A segmented control inside a settings card is a CONTROL, not a tab bar.
+ *
+ * `.pd-segmented` is inline-flex, so it takes the width of its options — but a
+ * settings card stacks its control block, and a stretched flex item makes an
+ * inline-flex box full width. Every one of them was therefore drawing a track
+ * that ran to the far edge of the card with a lane of empty grey after the last
+ * option: "Bypass · Reviewer · Review all" then four inches of nothing.
+ *
+ * Buttons for the same reason: "Open connectors" ran the width of its card
+ * while "Redo onboarding" and "Open component gallery" — identical buttons in
+ * identical cards — did not, because those two happen to be wrapped in a div
+ * and it was not. A control's size should not depend on that.
+ */
+.pd-setting-row .pd-segmented,
+.pd-setting-row .pd-btn {
+  align-self: flex-start;
+}
+
+/*
+ * ADVANCED PARAMETERS (chat top bar → gears). The class existed on the dialog
+ * with no rule behind it, which is roughly what the panel looked like.
+ *
+ * Wider than the 34rem dialog default because the ground-truth block below the
+ * knobs is a wall of prompt text and tool schemas, and 34rem wraps it to
+ * ribbons.
+ */
+.pd-adv-panel {
+  width: min(600px, 92vw);
+  max-width: 92vw;
+}
+
+/* The last card should not sit on the rounded bottom edge; a dialog with no
+ * footer has to find that gap in its own scroll padding. */
+.pd-adv-panel .pd-dialog-body {
+  padding-bottom: var(--pd-space-xl);
+}
+
+/*
+ * The recessed well the read-only ground truth sits in — the empty state, the
+ * prompt/raw dumps, the tool list. `--pd-bg-inset` (NOT the `bg-bg-sunken`
+ * utility these used to ask for: no `--color-bg-sunken` is declared in the
+ * @theme block above, so that class emits nothing at all and the blocks were
+ * simply the panel's own background wearing a border).
+ */
+.pd-adv-well {
+  border-radius: var(--pd-radius-md);
+  background: var(--pd-bg-inset);
+  box-shadow: inset 0 0 0 0.5px var(--pd-border-subtle);
+}
+
 /* Onboarding wizard: each step fades/slides in on mount (keyed by step index).
  * Reduced-motion drops the animation entirely. */
 @keyframes pd-onboard-step-in {
@@ -5934,7 +5985,10 @@ body[data-media-expanded="true"] .pd-studio-compose {
 }
 
 .pd-modelcard-by {
-  color: var(--pd-text-tertiary);
+  /* --pd-text-tertiary does not exist. It rendered as NOTHING, which is the
+     bug the token-hygiene test is for and which is invisible on a dark ground
+     until you look for it. */
+  color: var(--pd-text-muted);
   font-size: var(--pd-font-size-caption);
   line-height: var(--pd-leading-caption);
 }

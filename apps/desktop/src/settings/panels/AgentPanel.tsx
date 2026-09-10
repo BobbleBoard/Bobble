@@ -6,9 +6,7 @@
  * active task class. The descriptions mirror what each level actually changes.
  */
 import { SegmentedControl } from '@pi-desktop/ui';
-import { useEffect, useState } from 'react';
 import type { EffortLevel, PermissionMode } from '../../../electron/settings/settings-contract';
-import { classLabel, useHarnessStatus } from '../../chat/harness-status';
 import { useSettingsStore } from '../../state/settings-store';
 import { SettingRow, SettingSection } from '../parts';
 
@@ -31,10 +29,7 @@ export function AgentPanel() {
   const update = useSettingsStore((s) => s.update);
 
   return (
-    <SettingSection
-      title="Agent"
-      description="How much oversight and effort the agent applies. Takes effect in the current session."
-    >
+    <SettingSection description="How much oversight and effort the agent applies. Takes effect in the current session.">
       <SettingRow label="Permissions" hint={PERMISSION_HINT[settings.permissionMode]}>
         <SegmentedControl
           aria-label="Permission mode"

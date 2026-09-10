@@ -47,19 +47,26 @@ export function TopBarStatus() {
      * card that only exists under a pointer does not exist for anyone driving
      * this from the keyboard.
      */
-    <div
+    <button
+      type="button"
       className="pd-topbar-status"
       data-kind={view.kind}
       data-testid="topbar-status"
+      /* A BUTTON, not a div with handlers on it. The card has to be reachable
+         without a pointer — the user asked for hover, but a status you can only see
+         by hovering does not exist for anyone on a keyboard — and a real button
+         is what already answers to focus, Enter and a screen reader. */
+      aria-expanded={open}
+      aria-label={`${view.text}. Show model and engine details`}
       onMouseEnter={() => setOpen(true)}
       onMouseLeave={() => setOpen(false)}
       onFocus={() => setOpen(true)}
       onBlur={() => setOpen(false)}
-      tabIndex={0}
+      onClick={() => setOpen((v) => !v)}
     >
       <Spinner size={12} />
       <span data-testid="topbar-status-text">{view.text}</span>
       {open ? <TopBarModelCard /> : null}
-    </div>
+    </button>
   );
 }

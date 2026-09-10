@@ -6,9 +6,9 @@
  * Appearance view) and a developer entry into the component GALLERY (relocated
  * off the top bar). Default icon stroke is the token value (1.25).
  */
-import { Button, IconStrokeControl, SegmentedControl, Slider } from '@pi-desktop/ui';
+import { Button, IconStrokeControl, SegmentedControl } from '@pi-desktop/ui';
 import { useSettingsStore } from '../../state/settings-store';
-import { SettingRow, SettingSection } from '../parts';
+import { SettingGroup, SettingRow, SettingSection, SettingSlider } from '../parts';
 
 export function InterfacePanel({
   onOpenGallery,
@@ -27,7 +27,7 @@ export function InterfacePanel({
 
   return (
     <div className="flex flex-col gap-8">
-      <SettingSection title="Interface" description="Fine-tune how the app's chrome looks.">
+      <SettingSection description="Fine-tune how the app's chrome looks.">
         <SettingRow
           label="Icon thickness"
           hint="How heavy the line icons throughout the app appear. Lighter reads calmer."
@@ -44,62 +44,57 @@ export function InterfacePanel({
         title="Element size"
         description="Scale individual parts of the app up or down. 1.00× is the default."
       >
-        <SettingRow label="Sidebar size" hint="Scale the sidebar's rows, icons and text.">
-          <div className="flex items-center gap-3">
-            <Slider
-              min={0.8}
-              max={1.5}
-              step={0.05}
-              value={sidebarScale}
-              aria-label="Sidebar size"
-              data-testid="settings-sidebar-scale"
-              onValueChange={(v) => void update({ sidebarScale: v })}
-            />
-            <span className="text-caption font-mono text-text-secondary tabular-nums">
-              {sidebarScale.toFixed(2)}×
-            </span>
-            {sidebarScale !== 1 ? (
-              <Button
-                variant="ghost"
-                size="sm"
-                data-testid="settings-sidebar-scale-reset"
-                onClick={() => void update({ sidebarScale: 1 })}
-              >
-                Reset
-              </Button>
-            ) : null}
-          </div>
-        </SettingRow>
-
-        <SettingRow
-          label="Menu size"
-          hint="Scale dropdown menu options (the model picker and the + menu)."
-        >
-          <div className="flex items-center gap-3">
-            <Slider
-              min={0.8}
-              max={1.5}
-              step={0.05}
-              value={menuScale}
-              aria-label="Menu size"
-              data-testid="settings-menu-scale"
-              onValueChange={(v) => void update({ menuScale: v })}
-            />
-            <span className="text-caption font-mono text-text-secondary tabular-nums">
-              {menuScale.toFixed(2)}×
-            </span>
-            {menuScale !== 1 ? (
-              <Button
-                variant="ghost"
-                size="sm"
-                data-testid="settings-menu-scale-reset"
-                onClick={() => void update({ menuScale: 1 })}
-              >
-                Reset
-              </Button>
-            ) : null}
-          </div>
-        </SettingRow>
+        {/* The two scale knobs and the icon-thickness one above them are the
+            same kind of control, so they are now drawn by the same part — the
+            readout used to sit AFTER the track here and ABOVE it there. */}
+        <SettingGroup>
+          <SettingSlider
+            label="Sidebar size"
+            hint="Scale the sidebar's rows, icons and text."
+            min={0.8}
+            max={1.5}
+            step={0.05}
+            value={sidebarScale}
+            testId="settings-sidebar-scale"
+            format={(v) => `${v.toFixed(2)}×`}
+            onChange={(v) => void update({ sidebarScale: v })}
+            action={
+              sidebarScale !== 1 ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  data-testid="settings-sidebar-scale-reset"
+                  onClick={() => void update({ sidebarScale: 1 })}
+                >
+                  Reset
+                </Button>
+              ) : null
+            }
+          />
+          <SettingSlider
+            label="Menu size"
+            hint="Scale dropdown menu options (the model picker and the + menu)."
+            min={0.8}
+            max={1.5}
+            step={0.05}
+            value={menuScale}
+            testId="settings-menu-scale"
+            format={(v) => `${v.toFixed(2)}×`}
+            onChange={(v) => void update({ menuScale: v })}
+            action={
+              menuScale !== 1 ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  data-testid="settings-menu-scale-reset"
+                  onClick={() => void update({ menuScale: 1 })}
+                >
+                  Reset
+                </Button>
+              ) : null
+            }
+          />
+        </SettingGroup>
       </SettingSection>
 
       <SettingSection title="Advanced" description="Deeper customization and developer tools.">

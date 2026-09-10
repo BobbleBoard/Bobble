@@ -45,10 +45,7 @@ export function CapabilitiesPanel() {
   const update = useSettingsStore((s) => s.update);
 
   return (
-    <SettingSection
-      title="Capabilities"
-      description="Generation features to enable. Models download in the background when you first use one."
-    >
+    <SettingSection description="Generation features to enable. Models download in the background when you first use one.">
       <div className="flex flex-col gap-3">
         {CAPS.map((cap) => (
           // biome-ignore lint/a11y/noLabelWithoutControl: wraps a Radix Checkbox (custom control)

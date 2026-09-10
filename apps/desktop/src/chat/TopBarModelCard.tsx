@@ -58,12 +58,21 @@ function Half({
       {/* A real anchor, not a button that calls out: the app opens external
           links in the user's browser and an anchor is what screen readers and
           right-click both already understand. */}
+      {/*
+        biome-ignore lint/a11y/noAmbiguousAnchorText: the words are the user's — "a
+        Learn more <square with top right arrow> big blue button for both top
+        and bottom parts" — and the ambiguity the rule guards against is
+        answered by the aria-label, which names which of the two this is.
+      */}
       <a
         className="pd-btn pd-btn--accent pd-modelcard-cta"
         href={href}
         target="_blank"
         rel="noreferrer"
         data-testid={`${testid}-learn-more`}
+        /* "Learn more" twice on one card is ambiguous to anything reading it
+           aloud — the visible words stay, the accessible name says which. */
+        aria-label={`Learn more about ${name}`}
       >
         Learn more
         <IconExternal width={14} height={14} />

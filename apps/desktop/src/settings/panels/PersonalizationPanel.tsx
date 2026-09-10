@@ -24,10 +24,7 @@ export function PersonalizationPanel() {
   };
 
   return (
-    <SettingSection
-      title="Custom instructions"
-      description="Standing guidance for every new chat: tone, formatting, defaults, things to remember."
-    >
+    <SettingSection description="Standing guidance for every new chat: tone, formatting, defaults, things to remember.">
       <SettingRow
         label="System instructions"
         hint="Applied at the start of each new chat. Existing chats keep the instructions they began with."
