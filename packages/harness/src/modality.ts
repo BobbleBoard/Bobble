@@ -87,6 +87,13 @@ type Part = { type: string; text?: string; data?: string };
 const SNAPSHOT_TOOLS = new Set([
   'mac_snapshot',
   'mac_launch',
+  /* Chrome's own set reads the same tree (or the DOM when Apple Events are on),
+     so it is the structured view too. MEASURED: a run that did the whole task
+     through `chrome` scored ZERO snapshots and 8KB of "other", which reads as
+     "the model used neither modality" when in fact it used one of them
+     exclusively. */
+  'chrome_snapshot',
+  'chrome_tabs',
   'browser_snapshot',
   'browser_navigate',
 ]);
@@ -130,7 +137,10 @@ export function noteResult(
   }
 
   if (SNAPSHOT_TOOLS.has(toolName)) {
-    if (toolName.startsWith('browser')) {
+    /* chrome_* is the DOM when Apple Events are on and the Accessibility tree
+       when they are not; it says which in its own output, and either way it is
+       the browser's structured view rather than the Mac's. */
+    if (toolName.startsWith('browser') || toolName.startsWith('chrome')) {
       tally.domSnapshots += 1;
       tally.domChars += text.length;
     } else {
@@ -147,7 +157,7 @@ export function noteResult(
   /* How the act was AIMED. Only the acting tools carry a target, and a call that
      carries both an index and a coordinate is aimed by the index — that is the
      order the tools themselves resolve them in. */
-  if (/_(click|type|scroll|drag|hover|move)$/.test(toolName)) {
+  if (/_(click|type|scroll|drag|hover|move|tab)$/.test(toolName)) {
     const args = (input ?? {}) as Record<string, unknown>;
     if (typeof args.index === 'number') tally.byIndex += 1;
     else if (typeof args.x === 'number' && typeof args.y === 'number') {
