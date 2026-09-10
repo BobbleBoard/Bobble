@@ -65,3 +65,36 @@ describe('the modality tally', () => {
     expect(t.otherResults).toBe(1);
   });
 });
+
+describe('a coordinate the tree named is not a coordinate off a picture', () => {
+  it('counts a click on a read-text line as tree-grounded', () => {
+    const t = emptyTally();
+    noteResult(t, 'mac_snapshot', {}, [
+      {
+        type: 'text',
+        text: 'Text on screen (click a line at its point):\n  (291,415) Buy from $3199\n',
+      },
+    ]);
+    noteResult(t, 'mac_click', { x: 295, y: 418 }, [{ type: 'text', text: 'Clicked.' }]);
+    expect(t.byCoord).toBe(1);
+    expect(t.byCoordFromText).toBe(1);
+  });
+
+  it('does not credit a click nowhere near anything the tree said', () => {
+    const t = emptyTally();
+    noteResult(t, 'mac_snapshot', {}, [
+      { type: 'text', text: 'Text on screen:\n  (291,415) Buy from $3199\n' },
+    ]);
+    noteResult(t, 'mac_click', { x: 800, y: 600 }, [{ type: 'text', text: 'Clicked.' }]);
+    expect(t.byCoord).toBe(1);
+    expect(t.byCoordFromText).toBe(0);
+  });
+
+  it('keeps two sessions apart', () => {
+    const a = emptyTally();
+    const b = emptyTally();
+    noteResult(a, 'mac_snapshot', {}, [{ type: 'text', text: '  (10,10) thing' }]);
+    noteResult(b, 'mac_click', { x: 10, y: 10 }, [{ type: 'text', text: 'Clicked.' }]);
+    expect(b.byCoordFromText).toBe(0);
+  });
+});

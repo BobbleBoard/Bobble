@@ -30,9 +30,20 @@ export interface ModalityTally {
   axChars: number;
   domSnapshots: number;
   domChars: number;
-  /** Acts aimed by an element index (tree-grounded) vs by raw x,y (pixel-grounded). */
+  /** Acts aimed by an element index (tree-grounded) vs by raw x,y. */
   byIndex: number;
   byCoord: number;
+  /**
+   * Of the coordinate acts, the ones aimed at a point the TREE had just named.
+   *
+   * This is the distinction the user's question turns on, and it needs saying
+   * because the two look identical from outside: an element line is `[7]
+   * AXButton "Save"` with no geometry, so the only coordinates a snapshot ever
+   * hands over are the points on its read-text lines. A click at one of those is
+   * text-grounded — the model read a word and pressed the word. A click
+   * anywhere else was read off a picture.
+   */
+  byCoordFromText: number;
   /** Snapshots that came back with no actionable element — the forced-to-pixels case. */
   visualOnly: number;
   /** Every other text result, for a denominator that adds up. */
@@ -50,6 +61,7 @@ export function emptyTally(): ModalityTally {
     domChars: 0,
     byIndex: 0,
     byCoord: 0,
+    byCoordFromText: 0,
     visualOnly: 0,
     otherResults: 0,
     otherChars: 0,
@@ -82,6 +94,25 @@ const SNAPSHOT_TOOLS = new Set([
 /** A phrase the mac/browser formatters emit when a surface has no usable tree. */
 const NO_TREE = /exposes no Accessibility elements|no actionable elements/i;
 
+/**
+ * Every point a snapshot told the model about, from its read-text lines.
+ *
+ * Kept per tally rather than globally: two sessions must not contaminate each
+ * other's numbers. Only the LAST snapshot counts — a point from four snapshots
+ * ago is not what the model was looking at.
+ */
+const lastPoints = new WeakMap<ModalityTally, { x: number; y: number }[]>();
+/** How close a click has to land to count as aimed at that line. */
+const GROUNDED_WITHIN = 40;
+
+function pointsIn(text: string): { x: number; y: number }[] {
+  const out: { x: number; y: number }[] = [];
+  for (const m of text.matchAll(/\((\d{1,5}),(\d{1,5})\)/g)) {
+    out.push({ x: Number(m[1]), y: Number(m[2]) });
+  }
+  return out;
+}
+
 export function noteResult(
   tally: ModalityTally,
   toolName: string,
@@ -107,6 +138,7 @@ export function noteResult(
       tally.axChars += text.length;
     }
     if (NO_TREE.test(text)) tally.visualOnly += 1;
+    lastPoints.set(tally, pointsIn(text));
   } else if (text.length > 0) {
     tally.otherResults += 1;
     tally.otherChars += text.length;
@@ -118,7 +150,15 @@ export function noteResult(
   if (/_(click|type|scroll|drag|hover|move)$/.test(toolName)) {
     const args = (input ?? {}) as Record<string, unknown>;
     if (typeof args.index === 'number') tally.byIndex += 1;
-    else if (typeof args.x === 'number' && typeof args.y === 'number') tally.byCoord += 1;
+    else if (typeof args.x === 'number' && typeof args.y === 'number') {
+      tally.byCoord += 1;
+      const x = args.x;
+      const y = args.y;
+      const near = (lastPoints.get(tally) ?? []).some(
+        (p) => Math.abs(p.x - x) <= GROUNDED_WITHIN && Math.abs(p.y - y) <= GROUNDED_WITHIN,
+      );
+      if (near) tally.byCoordFromText += 1;
+    }
   }
 }
 
@@ -131,6 +171,7 @@ export function describeTally(t: ModalityTally): string {
     `ax ${t.axSnapshots} (${(t.axChars / 1024).toFixed(0)}KB)`,
     `dom ${t.domSnapshots} (${(t.domChars / 1024).toFixed(0)}KB)`,
     `aimed by index ${t.byIndex}/${aimed} (${pct(t.byIndex, aimed)})`,
+    `by a point the tree named ${t.byCoordFromText}/${t.byCoord}`,
     `no-tree snapshots ${t.visualOnly}/${t.axSnapshots + t.domSnapshots}`,
   ].join(', ');
 }
