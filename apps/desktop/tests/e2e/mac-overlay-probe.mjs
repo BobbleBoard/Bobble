@@ -142,9 +142,13 @@ try {
     );
   /** Hide first: the backdrop is a full-desktop opaque layer and must never be
    * ordered on screen. Rendering works fine on a hidden panel. */
-  const withBackdrop = async (color) => {
+  /* `over` pins the flat ground to the rect about to be measured. Without it
+     the backdrop tracks the phantom, so a region measured anywhere else counts
+     bare desktop as painted phantom — which is exactly what made the occluder
+     check report 22,400 surviving pixels while the phantom was fully erased. */
+  const withBackdrop = async (color, over) => {
     await dbg('overlay-hide-panel');
-    await dbg('overlay-backdrop', { color });
+    await dbg('overlay-backdrop', { color, ...(over ?? {}) });
   };
 
   // ── bring the overlay up over a fixed rect ────────────────────────────────
@@ -505,6 +509,9 @@ try {
   const straddle = { x: hole.x - 6, y: hole.y + 60 };
   const measure = { x: hole.x - 90, y: hole.y + 20, w: 220, h: 130, scale: 2 };
 
+  /* Pin the ground over the whole area these three shots measure, so what is
+     counted is the phantom and never the desktop behind it. */
+  await withBackdrop(LIGHT, { x: measure.x - 20, y: measure.y - 20, w: 320, h: 260 });
   await dbg('overlay-occluders', { rects: [] });
   await dbg('overlay-cursor', { x: straddle.x, y: straddle.y, ms: 0 });
   await dbg('overlay-status', { status: 'thinking' });

@@ -318,8 +318,14 @@ class MacOverlayController {
   /** Probe seam: paint a solid colour behind the phantom and render the panel's
    * layer tree to a PNG. The panel is transparent, so this is the only way to
    * capture what the overlay actually draws without a Screen Recording grant. */
-  async debugBackdrop(color: string | null): Promise<void> {
-    await this.#push('backdrop', color === null ? {} : { color });
+  async debugBackdrop(
+    color: string | null,
+    over?: { x: number; y: number; w: number; h: number },
+  ): Promise<void> {
+    /* `over` pins the ground to the region a caller is about to MEASURE.
+       Without it the backdrop follows the phantom, which cannot promise to
+       cover someone else's rect — see setBackdrop in Overlay.swift. */
+    await this.#push('backdrop', color === null ? {} : { color, ...(over ?? {}) });
   }
 
   /** Probe seam: order the panel OUT without tearing tracking down, so a

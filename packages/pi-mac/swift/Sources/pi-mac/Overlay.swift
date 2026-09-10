@@ -1761,7 +1761,12 @@ final class OverlayController: NSObject {
   /// Paint a solid colour behind the overlay. Probe-only: a transparent PNG of
   /// a white-on-nothing pointer tells a human reviewer nothing, and the cursor
   /// has to be judged against BOTH a light and a dark app.
-  func setBackdrop(_ hex: String?) {
+  /// Largest a backdrop may ever be. the user's rule stands whatever the caller
+  /// asks for: "I just saw the whole screen turn blank for a second" — so an
+  /// explicit rect is honoured up to a card-sized area and no further.
+  private static let BACKDROP_MAX = CGSize(width: 900, height: 700)
+
+  func setBackdrop(_ hex: String?, over ax: CGRect? = nil) {
     guard let hex = hex, hex.count >= 6 else {
       backdrop.isHidden = true
       backdrop.backgroundColor = nil
@@ -1783,8 +1788,30 @@ final class OverlayController: NSObject {
        at root.bounds IS a blanked screen. Clamped to the pill's own
        neighbourhood, the worst a forgotten backdrop can do is put a small dark
        card behind the phantom. */
-    let around = (bubble.presentation() ?? bubble).frame.insetBy(dx: -90, dy: -70)
-    backdrop.frame = around.isEmpty ? CGRect(x: 0, y: 0, width: 420, height: 260) : around
+    /* …but around the WHOLE phantom, not just the pill. Anchoring on the bubble
+       alone left the cursor outside the painted ground whenever the two are
+       apart — which is most of the time, and which made the overlay probe count
+       bare desktop as phantom pixels (22,400 of them: a 320x70 band of white
+       above a backdrop that stopped short). The union is still local; it just
+       includes the thing the backdrop exists to sit behind. */
+    /* An explicit rect wins, because a caller measuring a REGION needs the
+       ground painted under that region — following the phantom cannot promise
+       that, and the overlay probe was counting bare desktop as phantom pixels
+       because of it. Still bounded: a rect bigger than a card is clamped, so
+       "never the whole desktop" holds for a caller that asks for too much. */
+    if let ax = ax, ax.width > 0, ax.height > 0 {
+      let want = local(ax)
+      backdrop.frame = CGRect(
+        x: want.minX, y: want.minY,
+        width: min(want.width, Self.BACKDROP_MAX.width),
+        height: min(want.height, Self.BACKDROP_MAX.height))
+    } else {
+      let pill = (bubble.presentation() ?? bubble).frame
+      let glyph = (cursorGroup.presentation() ?? cursorGroup).frame
+      let both = pill.isEmpty ? glyph : (glyph.isEmpty ? pill : pill.union(glyph))
+      let around = both.insetBy(dx: -90, dy: -70)
+      backdrop.frame = around.isEmpty ? CGRect(x: 0, y: 0, width: 420, height: 260) : around
+    }
     backdrop.backgroundColor = cgColor(
       CGFloat((v >> 16) & 0xFF) / 255, CGFloat((v >> 8) & 0xFF) / 255, CGFloat(v & 0xFF) / 255, 1)
     backdrop.isHidden = false
@@ -2049,7 +2076,13 @@ private func handleOverlay(
     controller.setOccluders(rectsFrom(params["rects"]))
     return ["ok": true]
   case "backdrop":
-    controller.setBackdrop(params["color"] as? String)
+    var over: CGRect?
+    if let x = doubleValue(params["x"]), let y = doubleValue(params["y"]),
+      let w = doubleValue(params["w"]), let h = doubleValue(params["h"]), w > 0, h > 0
+    {
+      over = CGRect(x: x, y: y, width: w, height: h)
+    }
+    controller.setBackdrop(params["color"] as? String, over: over)
     return ["ok": true]
   case "render":
     guard let path = params["path"] as? String, !path.isEmpty else {

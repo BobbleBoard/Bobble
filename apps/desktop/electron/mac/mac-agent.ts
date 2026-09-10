@@ -1064,7 +1064,19 @@ function registerE2eDebugChannel(): void {
             return { ok: true };
           }
           case 'overlay-backdrop': {
-            await macOverlay.debugBackdrop(typeof params.color === 'string' ? params.color : null);
+            const r =
+              typeof params.w === 'number' && typeof params.h === 'number'
+                ? {
+                    x: Number(params.x ?? 0),
+                    y: Number(params.y ?? 0),
+                    w: Number(params.w),
+                    h: Number(params.h),
+                  }
+                : undefined;
+            await macOverlay.debugBackdrop(
+              typeof params.color === 'string' ? params.color : null,
+              r,
+            );
             return { ok: true };
           }
           case 'overlay-controls-hover': {
