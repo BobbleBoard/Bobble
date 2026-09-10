@@ -203,8 +203,10 @@ private let TEXT_MAX_RUNS = 2500
 /// Total characters of read text in one snapshot. MEASURED: a full Apple
 /// product page is 23,555 characters, which is worth more than a screenshot but
 /// not worth four of them — this keeps the top of the page and leaves the rest
-/// to `find`.
-private let TEXT_TOTAL_MAX = 4000
+/// to `find`. Lowered from 4,000 after a run: the whole snapshot went past the
+/// bash tool's own output limit and arrived TRIMMED, and the model spent two
+/// turns saving it to a file to read it back.
+private let TEXT_TOTAL_MAX = 2600
 
 func cleanText(_ s: String) -> String {
   let collapsed = s.replacingOccurrences(
@@ -486,6 +488,16 @@ func collectSnapshot(
 
     let name = accessibleName(el, role: role)
     if name.isEmpty && !editable { continue }  // nameless non-field control → skip
+    /*
+     * A BOX IS NOT A BUTTON.
+     *
+     * Chrome reports its layout boxes as AXGroup, named "group", and marks them
+     * EDITABLE — so they sailed past the nameless-control test and filled a
+     * sixteenth of the indexed list with `[3] AXGroup "group" (editable)`. There
+     * is nothing a model can do with one, and on a page whose real controls are
+     * already truncated they cost the things it could have used.
+     */
+    if role == "AXGroup", !pressable, name.isEmpty || name.lowercased() == "group" { continue }
 
     let pos = axPoint(el, kAXPositionAttribute) ?? CGPoint(x: -1, y: -1)
     let size = axSize(el, kAXSizeAttribute) ?? CGSize(width: 0, height: 0)
