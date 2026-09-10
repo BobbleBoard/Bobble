@@ -18,6 +18,10 @@ const loadedName = (r: QueueReason): string => r.loadedModelName ?? 'the current
 export function queuedLineText(reason: QueueReason | undefined): string {
   if (reason === undefined) return 'Queued · sends after this reply';
   switch (reason.kind) {
+    case 'model-loading':
+      return reason.targetModelName !== undefined
+        ? `Queued. ${reason.targetModelName} is still loading`
+        : 'Queued. The model is still loading';
     case 'busy-switch-model':
       return reason.targetModelName !== undefined
         ? `Queued. Switching to ${reason.targetModelName} first`
@@ -48,6 +52,13 @@ export function queueExplainer(reason: QueueReason | undefined): QueueExplainer 
     };
   }
   switch (reason.kind) {
+    case 'model-loading':
+      return {
+        blurb: `${targetName(
+          reason,
+        )} is still starting up on this computer. Your message is safe — it sends by itself the moment the model is ready, which usually takes a few seconds.`,
+        hint: 'Nothing to do: the bar at the top shows how long it has been.',
+      };
     case 'busy-switch-model':
       return {
         blurb: `This message uses ${targetName(reason)}, but ${loadedName(

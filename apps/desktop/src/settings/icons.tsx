@@ -44,6 +44,23 @@ function Svg({
   );
 }
 
+/**
+ * A box with an arrow leaving it — "this opens outside the app".
+ *
+ * the user asked for it by shape rather than by name, twice: "a Learn more <square
+ * with top right arrow>" and "Open <app icon> <app name> <square with top right
+ * arrow>". Same glyph both times, so it lives with the rest of the set.
+ */
+export function IconExternal(props: LocalIconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M9.5 2.5H13.5V6.5" />
+      <path d="M13.5 2.5 8 8" />
+      <path d="M12.2 9.6v3.1a.8.8 0 0 1-.8.8H3.3a.8.8 0 0 1-.8-.8V4.6a.8.8 0 0 1 .8-.8h3.1" />
+    </Svg>
+  );
+}
+
 export function IconDownload(props: LocalIconProps) {
   return (
     <Svg {...props}>

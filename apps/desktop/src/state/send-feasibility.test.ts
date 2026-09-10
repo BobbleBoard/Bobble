@@ -196,3 +196,46 @@ describe('resolveTargetModel', () => {
     expect(t).toBeNull();
   });
 });
+
+/*
+ * the user: "I wanted while a model is loading now (not prefill) for messages to
+ * appear as queued." A model that has not finished coming up cannot answer, so
+ * it is a reason in its own right — and it outranks "a turn is running",
+ * because it is true whether or not one is.
+ */
+describe('a model that is still loading', () => {
+  const base = {
+    totalRamGB: 64,
+    target: null,
+    loadedModelId: null,
+    loadedModelName: null,
+  };
+
+  it('queues a send even when nothing else is happening', () => {
+    const f = assessSendFeasibility({ ...base, turnInFlight: false, modelLoading: true });
+    expect(f.kind).toBe('model-loading');
+  });
+
+  it('outranks a turn in flight, so the reason names the real wait', () => {
+    const f = assessSendFeasibility({ ...base, turnInFlight: true, modelLoading: true });
+    expect(f.kind).toBe('model-loading');
+  });
+
+  it('is gone the moment the model is up', () => {
+    const f = assessSendFeasibility({ ...base, turnInFlight: false, modelLoading: false });
+    expect(f.kind).toBe('ready');
+  });
+
+  /* A model too big for the machine is still the stronger signal: waiting for it
+     to load will not help. */
+  it('does not mask a model that cannot fit at all', () => {
+    const f = assessSendFeasibility({
+      ...base,
+      totalRamGB: 1,
+      target: { modelId: 'big', displayName: 'Big', weightsBytes: 900e9 } as never,
+      turnInFlight: false,
+      modelLoading: true,
+    });
+    expect(f.kind).toBe('insufficient-ram');
+  });
+});

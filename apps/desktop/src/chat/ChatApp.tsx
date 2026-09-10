@@ -66,6 +66,7 @@ import { SessionSidebar } from './SessionSidebar';
 import { StageAnnouncer } from './StageAnnouncer';
 import { useSiteIcon } from './site-icons';
 import { ToastHost } from './ToastHost';
+import { TopBarStatus } from './TopBarStatus';
 import { UiRequestDialogs } from './UiRequestDialogs';
 import { WhyQueuedModal } from './WhyQueuedModal';
 import { WindowDropOverlay } from './WindowDropOverlay';
@@ -698,6 +699,11 @@ export function ChatApp({
                     />
                   )
                 }
+                /* The app's own state — starting up, getting ready — lives in
+                   the middle of the bar, between the chat's name and the
+                   canvas/advanced controls. It is on screen whatever route you
+                   are looking at, which the composer pill never was. */
+                center={<TopBarStatus />}
                 right={
                   // The canvas toggle (round-8 #11/#16) plus, for power users only,
                   // the brain/gear advanced-params entry to its left. In simple mode

@@ -12,7 +12,12 @@
  */
 import { useMemo } from 'react';
 import { create } from 'zustand';
-import { PREFILL_STATUS_KEY, parsePrefillPercent } from '../chat/harness-status';
+import {
+  PREFILL_STATUS_KEY,
+  PREFIX_WARM_STATUS,
+  parsePrefillPercent,
+  showLoadingModel,
+} from '../chat/harness-status';
 import { useLlmStore } from './llm-store';
 import { usePiStore } from './pi-slice';
 import {
@@ -205,6 +210,13 @@ export function assessCurrentSend(turnInFlight: boolean): {
     loadedModelId: loaded?.id ?? null,
     loadedModelName: loaded?.displayName ?? null,
     turnInFlight,
+    /* The same wait the top bar is showing. the user: "while a model is loading now
+       (not prefill) ... messages [should] appear as queued" — so the two say the
+       same thing off the same state rather than disagreeing on screen. */
+    modelLoading: showLoadingModel(
+      llm.status.phase,
+      usePiStore.getState().extensionStatus[PREFIX_WARM_STATUS],
+    ),
   });
   return { feasibility, reason: feasibilityToReason(feasibility) };
 }

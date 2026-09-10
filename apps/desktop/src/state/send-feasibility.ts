@@ -52,6 +52,11 @@ export interface ModelFit {
  */
 export type QueueReasonKind =
   | 'ready'
+  /* The model itself is still coming up. the user: "I wanted while a model is
+     loading now (not prefill) for messages to appear as queued." A send during
+     that window used to look accepted and then sit there; queueing says the
+     true thing — it will go, and it is waiting on the machine, not on you. */
+  | 'model-loading'
   | 'busy-same-model'
   | 'busy-switch-model'
   | 'insufficient-ram';
@@ -78,6 +83,10 @@ export interface AssessSendInput {
   readonly loadedModelName: string | null;
   /** Whether a turn is currently in flight (streaming OR dispatching). */
   readonly turnInFlight: boolean;
+  /** Whether the model is still coming up (llama-server starting, or the
+   * system-prompt warm-up still running). Optional so existing callers and
+   * their tests keep their meaning. */
+  readonly modelLoading?: boolean;
 }
 
 /**
@@ -144,6 +153,9 @@ export function assessSendFeasibility(inp: AssessSendInput): SendFeasibility {
   } as const;
 
   if (!fits) return { ...base, kind: 'insufficient-ram' };
+  /* Before "is a turn running": a model that has not finished loading cannot
+     answer whether or not anything else is going on. */
+  if (inp.modelLoading === true) return { ...base, kind: 'model-loading' };
   if (!inp.turnInFlight) return { ...base, kind: 'ready' };
 
   // A turn is running. If the target is unknown (Auto, pre-classify) or matches

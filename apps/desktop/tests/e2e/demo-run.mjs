@@ -382,7 +382,46 @@ export async function demoRun(o) {
       (t) => window.piDesktop.invoke('pi:set-model', { provider: t.provider, modelId: t.id }),
       target,
     );
-    say(`model: ${target.id}`);
+
+    /*
+     * AND MAKE THE SELECTOR SAY IT.
+     *
+     * the user: "ensure model is selected via the UI and model selector accurately
+     * at the start of each video is used and reflects the model being used."
+     * Every video so far showed "Balanced" in the composer's model chip while a
+     * named model was doing the work — because the run set the model through the
+     * engine (llm:start-server + pi:set-model) and never touched the SELECTION,
+     * which is a separate setting and was still on a tier. Anyone watching had
+     * no way to tell which of the three models they were looking at.
+     *
+     * So the run writes the same selection the picker writes, and then READS THE
+     * CHIP BACK. The write alone would be the same class of mistake as before —
+     * a thing that was set but never seen.
+     */
+    await page.evaluate(
+      (id) =>
+        window.useSettingsStore?.getState?.().update?.({
+          modelSelection: { mode: 'model', modelId: id },
+        }) ??
+        window.piDesktop.invoke('settings:set', {
+          patch: { modelSelection: { mode: 'model', modelId: id } },
+        }),
+      o.model,
+    );
+    await sleep(700);
+    const chip = await page
+      .evaluate(
+        () => document.querySelector('[data-testid="footer-model-chip"]')?.textContent ?? '',
+      )
+      .catch(() => '');
+    const shortId = o.model.split('/').pop() ?? o.model;
+    const chipNames =
+      chip.toLowerCase().includes(shortId.toLowerCase().split('-')[0] ?? shortId.toLowerCase()) ||
+      chip.toLowerCase().includes(shortId.toLowerCase());
+    say(
+      `model: ${target.id} · selector shows ${JSON.stringify(chip.trim())}` +
+        (chipNames ? '' : ' — WARNING: the chip does not name this model'),
+    );
     await sleep(2500);
 
     /*

@@ -5830,6 +5830,149 @@ body[data-media-expanded="true"] .pd-studio-compose {
  * layout space pushed the composer down and back up on a state change nobody
  * asked for — which is the jitter the whole round is about.
  */
+/*
+ * THE APP'S OWN STATE, in the middle of the top bar.
+ *
+ * the user: "remove the 'starting up' pill and put it instead in the top bar
+ * centered." Quieter than the composer pill it replaces — it is on screen for
+ * every route now, so it has to sit in the bar rather than announce itself
+ * over it: no border, no raised background, just the spinner and the words in
+ * secondary text, fading in so it never appears as a jump.
+ */
+.pd-topbar-status {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 3px 10px;
+  border-radius: var(--pd-radius-full);
+  background: var(--pd-bg-subtle, transparent);
+  color: var(--pd-text-secondary);
+  font-size: var(--pd-font-size-caption);
+  line-height: var(--pd-leading-caption);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  /* Hoverable — see TopBarStatus. It used to be inert like the pill it
+     replaced, which made the card the user asked for unreachable. */
+  cursor: default;
+  animation: pd-topbar-status-in var(--pd-duration-base) var(--pd-easing-standard);
+}
+
+.pd-topbar-status:hover,
+.pd-topbar-status:focus-visible {
+  background: var(--pd-bg-hover);
+  outline: none;
+}
+
+/*
+ * THE CARD UNDER THE STATUS: two halves and a rule between them.
+ *
+ * the user: "a little popout of the model card, who it's by, a split line the
+ * engine being run on (both with logos name quick description and then a Learn
+ * more <square with top right arrow>> big blue button for both top and bottom
+ * parts."
+ */
+.pd-modelcard {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 40;
+  width: 300px;
+  padding: 14px;
+  border: 1px solid var(--pd-border-subtle);
+  border-radius: var(--pd-radius-lg);
+  background: var(--pd-bg-raised);
+  box-shadow: var(--pd-shadow-hairline), var(--pd-shadow-lg);
+  text-align: left;
+  white-space: normal;
+  cursor: auto;
+  animation: pd-modelcard-in var(--pd-duration-base) var(--pd-easing-standard);
+}
+
+@keyframes pd-modelcard-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -4px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+.pd-modelcard-half {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pd-modelcard-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.pd-modelcard-names {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.pd-modelcard-name {
+  overflow: hidden;
+  color: var(--pd-text-primary);
+  font-size: var(--pd-font-size-body);
+  font-weight: 600;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pd-modelcard-by {
+  color: var(--pd-text-tertiary);
+  font-size: var(--pd-font-size-caption);
+  line-height: var(--pd-leading-caption);
+}
+
+.pd-modelcard-desc {
+  margin: 0;
+  color: var(--pd-text-secondary);
+  font-size: var(--pd-font-size-caption);
+  line-height: 1.45;
+}
+
+/* "big blue button", the user's words — the one emphatic thing in each half, and
+   the SAME one twice so neither half reads as the more important. It is the
+   app's own accent button (.pd-btn--accent) rather than a blue invented here:
+   a second definition of the primary action is how two blues end up in one
+   product. This rule only makes an anchor sit like a button. */
+.pd-modelcard-cta {
+  width: 100%;
+  justify-content: center;
+  gap: 6px;
+  text-decoration: none;
+}
+
+.pd-modelcard-rule {
+  height: 1px;
+  margin: 14px -14px;
+  background: var(--pd-border-subtle);
+}
+
+@keyframes pd-topbar-status-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 .pd-composer-pill {
   position: absolute;
   bottom: calc(100% + 8px);

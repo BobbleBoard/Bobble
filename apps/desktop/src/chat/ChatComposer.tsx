@@ -1263,12 +1263,22 @@ export function ChatComposer({
     // must queue (and drain once that chat finishes + pi switches here), never
     // dispatch into the background session.
     const bgBusy = piState.bgRun?.streaming === true;
-    if (piState.promptInFlight || streamEmpty || bgBusy) {
+    /*
+     * A MODEL THAT IS STILL LOADING IS A REASON TO QUEUE TOO.
+     *
+     * the user: "I wanted while a model is loading now (not prefill) for messages to
+     * appear as queued." Before this, a send during the load looked accepted and
+     * then sat in the composer's own limbo — the message was gone from the box
+     * and nothing had happened to it. Queued says the true thing: it will go,
+     * and what it is waiting on is the machine.
+     */
+    const modelLoading = assessCurrentSend(piState.promptInFlight).reason.kind === 'model-loading';
+    if (piState.promptInFlight || streamEmpty || bgBusy || modelLoading) {
       // Snapshot WHY it's waiting (same-model wait vs a model swap vs a model that
       // won't fit) so the faded queued line + the "Why isn't my message sending?"
       // modal can explain it instead of leaving a non-technical user on a silent
       // cooldown. A turn is in flight here, so turnInFlight = true.
-      const { reason } = assessCurrentSend(true);
+      const { reason } = assessCurrentSend(piState.promptInFlight || streamEmpty || bgBusy);
       piState.enqueueSend({
         text: echo,
         images: imageUris,

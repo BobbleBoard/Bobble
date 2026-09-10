@@ -267,8 +267,23 @@ export function ThreadActivityChain({
       data-testid="activity-chain"
       steps={steps.map((s) => s.data)}
       defaultExpanded={false}
-      // Expanded + live while this run streams; collapses the moment it's done.
-      active={turnStreaming ?? streaming}
+      /*
+       * EXPANDED WHILE THIS CHAIN IS THE LIVE ONE — not for the whole turn.
+       *
+       * This read `turnStreaming ?? streaming`, which is a fact about the TURN,
+       * so a chain stayed open while the model typed its reply underneath it,
+       * and stayed open again while the NEXT chain ran. the user: "thinking / tool
+       * chains need to collapse when they finish and the model starts typing
+       * actual response, even if a new one starts right after, the old one is
+       * then collapsed."
+       *
+       * `streaming` is already the segment's own answer (AssistantGroup passes
+       * `streaming && seg === lastSegment`), so the moment any later segment
+       * exists — the reply, or a fresh chain — this one is no longer live and
+       * folds. `complete` still asks the turn, because "Done" is a claim about
+       * the work finishing rather than about who is on screen.
+       */
+      active={streaming}
       /* The turn's own answer to "is this over", so Done is never inferred from
          rows going quiet between two tool calls (the user: "done is a final thing"). */
       complete={!(turnStreaming ?? streaming)}

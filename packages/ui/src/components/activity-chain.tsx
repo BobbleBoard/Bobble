@@ -1719,7 +1719,23 @@ export const ActivityChain = forwardRef<HTMLDivElement, ActivityChainProps>(func
    * flight, or a caller that says the turn is not over — holds it open unless
    * the user has chosen otherwise.
    */
-  const live = active || running || prefill !== undefined || complete === false;
+  /*
+   * LIVE MEANS THIS CHAIN, NOT THIS TURN.
+   *
+   * `complete === false` was in here so a chain would not fold while the turn
+   * was still going — but the turn is still going while the model TYPES ITS
+   * REPLY, and while the NEXT chain runs, so a finished chain sat open through
+   * both. the user: "thinking / tool chains need to collapse when they finish and
+   * the model starts typing actual response, even if a new one starts right
+   * after, the old one is then collapsed."
+   *
+   * The other three terms are all about this chain and stay: `active` (the
+   * caller says this is the live one), `running` (a step of ITS own is going),
+   * and a prefill in flight. `complete` keeps its real job, which is deciding
+   * when "Done" may be printed — a claim about the work, not about who is on
+   * screen.
+   */
+  const live = active || running || prefill !== undefined;
   const isExpanded = expanded ?? (userChose || !live ? internalExpanded : true);
   /* A PREFILLING turn is not a settled one. Without this the chain has no
    * running step, goes quiet, and prints "Done" over a model that is still
@@ -1876,7 +1892,7 @@ export const ActivityChain = forwardRef<HTMLDivElement, ActivityChainProps>(func
                   </span>
                   <ShimmerText className="pd-chain-step-label">
                     {prefill.percent === null
-                      ? `${prefill.label ?? 'Processing the prompt'}…`
+                      ? `${prefill.label ?? 'Processing'}…`
                       : `${Math.round(prefill.percent)}% · ${prefill.label ?? 'processing the prompt'}`}
                   </ShimmerText>
                 </div>

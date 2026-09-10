@@ -39,6 +39,10 @@ function mount(props: { steps: ActivityStepData[]; complete?: boolean; active?: 
   act(() => root?.render(<ActivityChain {...props} />));
   return {
     text: () => host?.textContent ?? '',
+    /* Collapsing is a CSS state, not an unmount — the steps stay in the DOM
+       either way — so the chain's own `data-expanded` is the only honest read. */
+    expanded: () =>
+      host?.querySelector('[data-expanded]')?.getAttribute('data-expanded') === 'true',
     rerender: (next: typeof props) => act(() => root?.render(<ActivityChain {...next} />)),
   };
 }
@@ -87,5 +91,37 @@ describe('ActivityChain — Done never covers a live turn', () => {
     expect(ui.text()).toMatch(/Done/);
     ui.rerender({ steps: [step()], complete: true, active: false });
     expect(ui.text()).toMatch(/Done/);
+  });
+});
+
+/*
+ * COLLAPSING is a separate question from Done, and they were tangled: the chain
+ * stayed expanded for as long as the TURN ran, so a finished chain sat open
+ * through the model's reply and through the next chain's work. the user: "thinking
+ * / tool chains need to collapse when they finish and the model starts typing
+ * actual response, even if a new one starts right after, the old one is then
+ * collapsed."
+ */
+describe('ActivityChain — a finished chain folds even while the turn runs on', () => {
+  const steps = [step(), step({ id: 's2', kind: 'thinking', label: 'Thinking' })];
+  it('is open while it is the live chain', () => {
+    const ui = mount({ steps, complete: false, active: true });
+    expect(ui.expanded()).toBe(true);
+  });
+
+  it('folds the moment it stops being the live one, though the turn is not over', () => {
+    const ui = mount({ steps, complete: false, active: true });
+    expect(ui.expanded()).toBe(true);
+    // The model starts typing its reply: a later segment exists, so this chain
+    // is no longer the live one — but the TURN is still streaming, which is
+    // exactly the case that used to hold it open.
+    ui.rerender({ steps, complete: false, active: false });
+    expect(ui.expanded()).toBe(false);
+  });
+
+  it('folds when the turn ends too', () => {
+    const ui = mount({ steps, complete: false, active: true });
+    ui.rerender({ steps, complete: true, active: false });
+    expect(ui.expanded()).toBe(false);
   });
 });

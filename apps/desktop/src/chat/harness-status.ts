@@ -59,7 +59,10 @@ export function prefillLabel(inp: {
   const cap = inp.loadingCapability ?? null;
   if (cap !== null && cap !== '') return `Loading ${CAPABILITY_LABEL[cap] ?? cap} tools`;
   if (inp.firstOfSession === true) return 'Starting up';
-  return inp.generic ?? 'Processing the prompt';
+  /* the user: "change 'processing the prompt' to just 'Processing'". The long
+     form named the mechanism; by the time a person reads it they only want to
+     know the machine is busy. */
+  return inp.generic ?? 'Processing';
 }
 
 /** Human label for a task class (falls back to the raw id, dashes → spaces). */
