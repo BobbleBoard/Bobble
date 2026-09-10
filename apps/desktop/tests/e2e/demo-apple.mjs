@@ -71,22 +71,29 @@ await demoRun({
      * which matters because Chrome refuses those on this Mac.
      */
     /*
-     * WHAT ACCESSIBILITY CAN AND CANNOT SETTLE HERE.
+     * WHAT ACCESSIBILITY CAN SETTLE HERE — which is more than I said it was.
      *
-     * MEASURED, sweeping the whole page 26 scrolls from the top: Chrome exposes
-     * about SIXTY Accessibility elements for an Apple configure page and they
-     * barely change as it scrolls — there is no DOM behind this, just a sparse
-     * summary of what the browser felt like publishing. So when the storage
-     * radios happen to be in it, they are a real and cheap answer; when they are
-     * not, no amount of scrolling produces them, and scrolling the user's page
-     * to hunt for them is a side effect with nothing to show for it.
+     * This used to read: "Chrome exposes about SIXTY Accessibility elements for
+     * an Apple configure page ... there is no DOM behind this, just a sparse
+     * summary of what the browser felt like publishing." That was wrong, and it
+     * was our own bug wearing a theory. Chrome's tree for this page is 2,295
+     * nodes, 922 of them text; sixty was the size of one PAGE of our own
+     * snapshot's control list. The page's own words were being dropped for
+     * being zero pixels tall (see dedupeReadText).
      *
-     * Hence: read what is there, and when it cannot answer, say so and let the
-     * screenshot settle it. For Chrome the picture IS the ground truth.
+     * So the tree can answer, and the way to reach an answer that is not in the
+     * first sixty controls is to ASK for it: `find` narrows the control list and
+     * the page text to a needle, which is exactly what this needs.
      */
-    const radios = (snap.elements ?? []).filter(
-      (e) => e.role === 'AXRadioButton' && /\b\d+\s*(GB|TB)\b/i.test(e.name ?? ''),
-    );
+    const found = await dbg('snapshot', { app: 'Google Chrome', find: 'TB', cap: 60 });
+    const pool = [...(snap.elements ?? []), ...(found.elements ?? [])];
+    const seenIdx = new Set();
+    const radios = pool.filter((e) => {
+      if (e.role !== 'AXRadioButton' || !/\b\d+\s*(GB|TB)\b/i.test(e.name ?? '')) return false;
+      if (seenIdx.has(e.index)) return false;
+      seenIdx.add(e.index);
+      return true;
+    });
     const chosen = radios
       .filter((e) => String(e.value ?? '0') !== '0')
       .map((e) => (e.name ?? '').match(/\b\d+\s*(?:GB|TB)\b/i)?.[0] ?? '?');
@@ -116,6 +123,12 @@ await demoRun({
       // What the PAGE says — the verdict, and why it says that.
       verdict,
       storageOffered: radios.length,
+      // The page's own words, so a run that cannot be settled by the radios has
+      // something better than a guess next to its screenshot.
+      pageSaysTB: (found.text ?? [])
+        .map((t) => (typeof t === 'string' ? t : t.text))
+        .filter((t) => /\bTB\b/i.test(t))
+        .slice(0, 4),
       storageSelected: chosen,
       selected2TB: verdict === 'pass',
       // What the MODEL said, kept beside it so the two can disagree in the log.

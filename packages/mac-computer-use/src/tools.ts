@@ -506,9 +506,12 @@ export function registerMacComputerUseTools(
     name: MAC_SNAPSHOT_TOOL,
     label: 'Mac: Snapshot',
     description:
-      'Look at a Mac app: a compact, indexed list of its controls, which you then act on by ' +
-      '[index]. Defaults to the app you are controlling; name another running app to switch to ' +
-      'it.\n' +
+      'Look at a Mac app: a compact, indexed list of its controls, plus the text it is showing, ' +
+      "which you then act on by [index] or at a line's point. Defaults to the app you are " +
+      'controlling — and before you control anything, to whatever happens to be in FRONT, which ' +
+      'is usually not the app the user meant. MEASURED: a run asked to work in Chrome ' +
+      "snapshotted the user's chat app and spent two turns working that out. If the user named " +
+      'an app, name it here too, or `mac launch` it first (background, takes no focus).\n' +
       'BIG APPS: only the first 60 controls come back. find:"save" lists just the matching ones ' +
       'and from:60 continues the list — indexes never change, so anything you find is clickable ' +
       'straight away.\n' +
