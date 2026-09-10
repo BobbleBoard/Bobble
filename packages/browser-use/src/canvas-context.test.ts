@@ -151,3 +151,18 @@ describe('registerCanvasContext', () => {
     expect(out?.messages.some(isCanvasStateMessage)).toBe(true);
   });
 });
+
+describe('the block says it is not the user talking', () => {
+  it('leads with what it is, before what it says', () => {
+    const out = formatCanvasSummary({
+      active: { kind: 'browser', title: 'Shop iPhone', url: 'https://apple.com' },
+      others: [],
+    } as never);
+    expect(out).not.toBeNull();
+    const body = String(out);
+    expect(body).toContain('NOT a message from the user');
+    // And it comes FIRST — a model that stops reading at "The user is looking
+    // at" is exactly the one that needs telling.
+    expect(body.indexOf('Automatic status')).toBeLessThan(body.indexOf('The user is looking at'));
+  });
+});

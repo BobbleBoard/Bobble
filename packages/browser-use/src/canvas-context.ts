@@ -95,6 +95,20 @@ export function formatCanvasSummary(state: CanvasState): string | null {
   if (active === null && others.length === 0) return null;
 
   const lines: string[] = [];
+  /*
+   * SAY WHAT THIS IS, because of where it has to live.
+   *
+   * `Message` has no system role, so the block rides in a USER message — and a
+   * user message that opens "The user is looking at…" reads, to a model, as the
+   * user having just said something. MEASURED in demo runs: "The user sent a
+   * canvas_state update. I should continue…" and, worse, "The user resent the
+   * same message." Both are the model spending a turn on a status line and one
+   * of them is it believing it was interrupted.
+   */
+  lines.push(
+    'Automatic status of the app, refreshed every turn. NOT a message from the ' +
+      'user and never a new request — if it is all that changed, nothing was asked of you.',
+  );
   lines.push(
     active !== null
       ? `The user is looking at: ${describeSurface(active)}`
