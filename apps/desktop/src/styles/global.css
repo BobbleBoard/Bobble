@@ -5890,8 +5890,15 @@ body[data-media-expanded="true"] .pd-studio-compose {
  * over it: no border, no raised background, just the spinner and the words in
  * secondary text, fading in so it never appears as a jump.
  */
-.pd-topbar-status {
+/* The card hangs off THIS, not off the button — see TopBarStatus. */
+.pd-topbar-status-wrap {
   position: relative;
+  display: inline-block;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.pd-topbar-status {
   display: inline-flex;
   align-items: center;
   gap: 7px;

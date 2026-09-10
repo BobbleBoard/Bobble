@@ -42,31 +42,43 @@ export function TopBarStatus() {
 
   return (
     /*
-     * HOVERABLE, so it has to stop being pointer-transparent — the user: "hover this
-     * pill at the top for a bit of model information". Focus opens it too: a
-     * card that only exists under a pointer does not exist for anyone driving
-     * this from the keyboard.
+     * A WRAPPER, because the card cannot live inside the button.
+     *
+     * The button is an inline-flex box, and an absolutely positioned child of a
+     * flex container falls back to its STATIC position when the offsets do not
+     * take — MEASURED, the card came back centred on the button at y=-120
+     * (button centre 24, half the card 144) instead of at y=43 under it, and
+     * did so intermittently, which is the worst version of that bug. Hanging it
+     * off a plain relative wrapper removes the question.
+     *
+     * HOVERABLE, and focusable: the user asked for hover — "hover this pill at the
+     * top for a bit of model information" — but a card that exists only under a
+     * pointer does not exist for anyone on a keyboard.
      */
-    <button
-      type="button"
-      className="pd-topbar-status"
-      data-kind={view.kind}
-      data-testid="topbar-status"
-      /* A BUTTON, not a div with handlers on it. The card has to be reachable
-         without a pointer — the user asked for hover, but a status you can only see
-         by hovering does not exist for anyone on a keyboard — and a real button
-         is what already answers to focus, Enter and a screen reader. */
-      aria-expanded={open}
-      aria-label={`${view.text}. Show model and engine details`}
+    <span
+      className="pd-topbar-status-wrap"
       onMouseEnter={() => setOpen(true)}
       onMouseLeave={() => setOpen(false)}
-      onFocus={() => setOpen(true)}
-      onBlur={() => setOpen(false)}
-      onClick={() => setOpen((v) => !v)}
     >
-      <Spinner size={12} />
-      <span data-testid="topbar-status-text">{view.text}</span>
+      <button
+        type="button"
+        className="pd-topbar-status"
+        data-kind={view.kind}
+        data-testid="topbar-status"
+        /* A real button, so focus, Enter and a screen reader all already work. */
+        aria-expanded={open}
+        aria-label={`${view.text}. Show model and engine details`}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setOpen(false)}
+        /* NO click toggle. A pointer entering already opened the card, so a
+           toggle on click shut it again — MEASURED, aria-expanded came back
+           false immediately after a click. Hover and focus are the two ways in,
+           and they agree. */
+      >
+        <Spinner size={12} />
+        <span data-testid="topbar-status-text">{view.text}</span>
+      </button>
       {open ? <TopBarModelCard /> : null}
-    </button>
+    </span>
   );
 }
