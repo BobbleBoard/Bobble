@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { coercedWriteRefusal, isCoercedToolCall } from './coerced-write';
+import {
+  coercedEditRefusal,
+  coercedWriteRefusal,
+  isCoercedEdit,
+  isCoercedToolCall,
+} from './coerced-write';
 
 const CHROME = 'Google Chrome';
 
@@ -44,5 +49,29 @@ describe('a write that is really a tool call', () => {
     );
     expect(r).toContain('"read the URL of Google Chrome"');
     expect(r).toContain('mac chrome snapshot');
+  });
+});
+
+describe('the same mistake wearing edit', () => {
+  /* The one the 4B made 73 times in matrix run 4. */
+  it('catches "File Apple Maps"', () => {
+    expect(isCoercedEdit('File Apple Maps', 'Maps')).toBe(true);
+  });
+
+  it('leaves real edit targets alone', () => {
+    for (const p of ['src/index.ts', './README.md', 'Makefile', '/tmp/notes.txt', 'package.json']) {
+      expect(isCoercedEdit(p, 'Maps'), p).toBe(false);
+    }
+  });
+
+  it('does nothing when no app is being driven', () => {
+    expect(isCoercedEdit('File Apple Maps', null)).toBe(false);
+  });
+
+  it('names the typing the model was actually asking for', () => {
+    const r = coercedEditRefusal('Colosseum, Rome', 'Apple Maps', 'Maps', '`mac snapshot`');
+    expect(r).toContain('"Colosseum, Rome"');
+    expect(r).toContain('"Apple Maps"');
+    expect(r).toContain('mac snapshot');
   });
 });

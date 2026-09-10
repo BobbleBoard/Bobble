@@ -82,3 +82,54 @@ export function coercedWriteRefusal(content: string, app: string, how: string): 
     `${how}. Run that now.`
   );
 }
+
+/**
+ * The same mistake wearing `edit` instead of `write`.
+ *
+ * MEASURED, matrix run 4 (Maps, 4B) — 73 of 81 calls were this:
+ *
+ *   edit { path: "File Apple Maps",
+ *          edits: [{ oldText: "Apple Maps", newText: "Colosseum, Rome" }] }
+ *
+ * Read it as a file operation and it is nonsense. Read it as the call the model
+ * wanted and it is precise: TYPE "Colosseum, Rome" into the field that
+ * currently reads "Apple Maps". `edit`'s replace-this-with-that shape is a
+ * near-perfect landing spot for a `type` verb that does not exist as a tool
+ * name in bash-cli mode, so the grammar put it there — 73 times, each dying on
+ * EISDIR or File-not-found.
+ *
+ * The tell is the PATH: a real edit target carries a directory separator or a
+ * file extension. "File Apple Maps" has neither, and names the app instead —
+ * which is what separates it from a genuine `edit` of `README` or `Makefile`.
+ */
+export function isCoercedEdit(filePath: string, app: string | null): boolean {
+  if (app === null) return false;
+  const p = filePath.trim();
+  if (p === '' || p.length > 120) return false;
+  if (p.includes('/') || p.includes('\\') || /\.[A-Za-z0-9]{1,8}$/.test(p)) return false;
+  const names = app
+    .toLowerCase()
+    .split(/\s+/)
+    .filter((w) => w.length > 2);
+  const hay = p.toLowerCase();
+  /* A space or the app's own name: either says this is prose about the app
+     rather than a filename someone meant to type. */
+  return names.some((n) => hay.includes(n)) || /\s/.test(p);
+}
+
+/** What to say instead of failing on it 73 times. */
+export function coercedEditRefusal(
+  newText: string,
+  oldText: string,
+  app: string,
+  how: string,
+): string {
+  const want = newText.trim().slice(0, 80);
+  const was = oldText.trim().slice(0, 40);
+  return (
+    `Not edited — that is not a file, it is ${app}. You are trying to replace ` +
+    `"${was}" with "${want}", which is TYPING into ${app}, not editing a file on disk. ` +
+    `Read it with ${how} to get the [index] of the field holding "${was}", then type into ` +
+    `that index. Nothing you write to disk reaches ${app}.`
+  );
+}

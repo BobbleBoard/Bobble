@@ -97,7 +97,12 @@ import {
 } from './title/conversation-title.js';
 import { registerAskUser } from './tools/ask-user.js';
 import { registerCapabilityTool } from './tools/capability-tool.js';
-import { coercedWriteRefusal, isCoercedToolCall } from './tools/coerced-write.js';
+import {
+  coercedEditRefusal,
+  coercedWriteRefusal,
+  isCoercedEdit,
+  isCoercedToolCall,
+} from './tools/coerced-write.js';
 import { degenerateCommandRefusal } from './tools/degenerate-command.js';
 import { diagnoseEditFailure } from './tools/edit-diagnosis.js';
 import { wouldHang } from './tools/hang-guard.js';
@@ -3333,6 +3338,27 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
         pi.appendEntry(HARNESS_LOOP_ENTRY, { action: 'block', cause: 'coerced-write' });
         return { block: true, reason: coercedWriteRefusal(body, controlledApp, drivingHowTo()) };
       }
+      /* …and the `edit` spelling of it, which is the one a model reaches for
+         when what it wants is to TYPE — see isCoercedEdit. */
+      const target = (event.input as { path?: unknown })?.path;
+      const first = (event.input as { edits?: { oldText?: unknown; newText?: unknown }[] })
+        ?.edits?.[0];
+      if (
+        typeof target === 'string' &&
+        typeof first?.newText === 'string' &&
+        isCoercedEdit(target, controlledApp)
+      ) {
+        pi.appendEntry(HARNESS_LOOP_ENTRY, { action: 'block', cause: 'coerced-edit' });
+        return {
+          block: true,
+          reason: coercedEditRefusal(
+            first.newText,
+            typeof first.oldText === 'string' ? first.oldText : '',
+            controlledApp,
+            drivingHowTo(),
+          ),
+        };
+      }
     }
     // Remember files this turn writes/edits (for verify's syntax fallback, fix #4).
     /* A subagent's own commands never reach `runtime.ranCommands`, so remember
@@ -3480,7 +3506,20 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     if (FILE_TOOLS.has(event.toolName) && controlledApp !== null) {
       const said = event.content.map((p) => (p.type === 'text' ? p.text : '')).join('');
       const fenced = event.isError === true && /outside the workspace|Refusing to /.test(said);
-      if (fenced || event.isError !== true) {
+      /*
+       * EVERY OUTCOME, not two of the three.
+       *
+       * This gate first read "refused by the sandbox", then "refused, or
+       * succeeded" — and the case it still missed was the ordinary failure,
+       * which turned out to be the big one. MEASURED, matrix run 4 (Maps, 4B):
+       * 73 of 81 calls were `edit`, every one dying on `EISDIR` or `File not
+       * found`, which match neither the fence pattern nor success. So the
+       * redirect said nothing for 73 consecutive dead-end calls.
+       *
+       * Refused, failed, succeeded: none of them reach the window, so the note
+       * is owed in all three. `fenced` survives only to pick the wording.
+       */
+      {
         const how = toolCliMode
           ? `\`mac click --x <x> --y <y>\` (screen points, read off the screenshot)`
           : 'the mac_click tool';
@@ -3505,12 +3544,16 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
           `app itself: ${drivingHowTo()} to read it, then ${how}. If you just ` +
           `said what you were about to click, click it.`;
         if (fencedWhileDriving >= 3) {
-          /* Say what actually happened. A successful write reaching this branch
-             HAS landed on disk, and calling that "refused" would teach the model
-             something false about the run it is in. */
+          /* Say what actually happened — all three outcomes reach here now, and
+             telling a model its failed edit "was written" (or that its written
+             file was "refused") teaches it something false about the run it is
+             in, which is the opposite of the point. */
+          const nth = `${fencedWhileDriving}${fencedWhileDriving === 3 ? 'rd' : 'th'}`;
           const what = fenced
-            ? `Refused, for the ${fencedWhileDriving}${fencedWhileDriving === 3 ? 'rd' : 'th'} time this turn.`
-            : `That file was written, and it is the ${fencedWhileDriving}${fencedWhileDriving === 3 ? 'rd' : 'th'} one this turn that changes nothing.`;
+            ? `Refused, for the ${nth} time this turn.`
+            : event.isError === true
+              ? `That failed, and it is the ${nth} file call this turn that could not have helped either way.`
+              : `That file was written, and it is the ${nth} one this turn that changes nothing.`;
           return {
             content: [
               {
