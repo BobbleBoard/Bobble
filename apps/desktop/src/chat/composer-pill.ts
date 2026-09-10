@@ -48,8 +48,23 @@ function clock(ms: number): string {
  * guessing. Before that, it says nothing rather than inventing one.
  */
 function waitText(name: string, elapsedMs: number | null, typicalSec: number | null): string {
+  /*
+   * AN ESTIMATE REALITY HAS ALREADY PASSED IS NOT AN ESTIMATE.
+   *
+   * SEEN on a benchmark frame: "Getting ready — usually about 8s on this Mac ·
+   * 5:27". The clock was doing its job and the estimate beside it had become a
+   * flat contradiction — which is the exact failure this pill exists to avoid,
+   * by its own rule that the app reports what it measured rather than insisting
+   * on a guess. Past twice the expected wait the honest thing is that this one
+   * is not going as usual, so say that and let the clock carry the number.
+   */
+  const overrun = typicalSec !== null && elapsedMs !== null && elapsedMs > typicalSec * 2000;
   const head =
-    typicalSec === null ? name : `${name} — usually about ${Math.round(typicalSec)}s on this Mac`;
+    typicalSec === null
+      ? name
+      : overrun
+        ? `${name} — longer than usual`
+        : `${name} — usually about ${Math.round(typicalSec)}s on this Mac`;
   // Under a second there is nothing to say yet, and a "0:00" sitting there reads
   // as stopped — which is the failure this exists to avoid.
   if (elapsedMs === null || elapsedMs < 1000) return head;

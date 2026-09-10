@@ -97,6 +97,8 @@ import {
 } from './title/conversation-title.js';
 import { registerAskUser } from './tools/ask-user.js';
 import { registerCapabilityTool } from './tools/capability-tool.js';
+import { coercedWriteRefusal, isCoercedToolCall } from './tools/coerced-write.js';
+import { degenerateCommandRefusal } from './tools/degenerate-command.js';
 import { diagnoseEditFailure } from './tools/edit-diagnosis.js';
 import { wouldHang } from './tools/hang-guard.js';
 import { registerImageTools } from './tools/image-tools.js';
@@ -3276,6 +3278,27 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
         const hang = wouldHang(cmd, runtime.workspaceRoot ?? undefined);
         if (hang !== null) return { block: true, reason: hang };
         /*
+         * …AND A COMMAND THAT IS ONE TOKEN REPEATED IS NOT A COMMAND.
+         *
+         * MEASURED in the 12-run matrix: the 4B, working in Chrome, emitted
+         * `readreadreadreadread…` as a bash command and we RAN it — 36 seconds
+         * of a timed run, the activity terminal filling with one word. That is
+         * a decoding slip, not an intention, and nothing downstream recovers a
+         * run that spends its remaining minutes on it.
+         *
+         * Deliberately narrow (see degenerate-command.ts): refusing a real
+         * command would be far worse than running a silly one, so the WHOLE
+         * command has to be a single short unit tiled exactly, many times.
+         * The refusal names the repetition, because a model in this state can
+         * act on "you repeated 'read' 40 times" where "invalid command" just
+         * invites a variation of the same thing.
+         */
+        const degenerate = degenerateCommandRefusal(cmd);
+        if (degenerate !== null) {
+          pi.appendEntry(HARNESS_LOOP_ENTRY, { action: 'block', cause: 'degenerate-command' });
+          return { block: true, reason: degenerate };
+        }
+        /*
          * …AND A COMMAND THAT DELETES THE PLACE THE WORK LIVES.
          *
          * The checkpoint below covers `write` and `edit` — that is the whole
@@ -3292,6 +3315,23 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
           pi.appendEntry(HARNESS_LOOP_ENTRY, { action: 'block', cause: 'workspace-delete' });
           return { block: true, reason: destroy };
         }
+      }
+    }
+    /*
+     * A WRITE THAT IS REALLY A TOOL CALL — see coerced-write.ts.
+     *
+     * MEASURED, matrix run 1: `write { path: "read_chrome_url.txt", content:
+     * "read the URL of Google Chrome" }`. The grammar had no chrome verb to emit
+     * (in bash-cli mode they are commands, not tool names) so the call landed on
+     * the nearest advertised name. Blocked HERE rather than annotated after the
+     * fact, because the write succeeding is the actual harm: "Successfully wrote
+     * 30 bytes" rewards the one action that cannot reach the window.
+     */
+    if (FILE_TOOLS.has(event.toolName) && controlledApp !== null) {
+      const body = (event.input as { content?: unknown })?.content;
+      if (typeof body === 'string' && isCoercedToolCall(body, controlledApp)) {
+        pi.appendEntry(HARNESS_LOOP_ENTRY, { action: 'block', cause: 'coerced-write' });
+        return { block: true, reason: coercedWriteRefusal(body, controlledApp, drivingHowTo()) };
       }
     }
     // Remember files this turn writes/edits (for verify's syntax fallback, fix #4).
@@ -3377,6 +3417,22 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
    * refusal with something better than more path advice; see FILE_TOOLS below.
    */
   let controlledApp: string | null = null;
+  /**
+   * The command that READS the app currently being driven — Chrome through its
+   * DOM, everything else through Accessibility.
+   *
+   * Kept next to `controlledApp` because it is only ever meaningful relative to
+   * it, and shared by the two redirects below so they cannot drift apart and
+   * name different commands for the same situation.
+   */
+  function drivingHowTo(): string {
+    const app = controlledApp ?? '';
+    const chrome = /^(?:google\s+)?chrome(?:\s+canary)?$/i.test(app.trim());
+    const tool = chrome ? 'chrome_snapshot' : 'mac_snapshot';
+    const cli = cliCommandForTool?.(tool) ?? null;
+    if (cli === null) return chrome ? 'the chrome_snapshot tool' : 'the mac_snapshot tool';
+    return chrome ? `\`${cli}\`` : `\`${cli} --app "${app}"\``;
+  }
   /** File-tool refusals in THIS turn while an app was being driven — see the
    * escalation in the tool_result hook. Reset per turn, not per session: a
    * later turn deserves the full explanation again. */
@@ -3407,9 +3463,24 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
      * sentence, not a replacement, because the fence still has to be explained
      * to a model that really was trying to write a file.
      */
-    if (FILE_TOOLS.has(event.toolName) && event.isError === true && controlledApp !== null) {
+    /*
+     * …AND THE SAME REDIRECT WHEN THE WRITE SUCCEEDS.
+     *
+     * This fired only on a sandbox REFUSAL, which meant it depended on where the
+     * workspace happened to be. MEASURED, matrix run 1: the workspace was
+     * writable, so five plan-and-notes files landed on disk and the model was
+     * told "Successfully wrote 136 bytes" each time — the dead end confirmed
+     * rather than corrected, while Chrome sat untouched for the whole run.
+     *
+     * A file written while driving an app is no closer to the task than a file
+     * refused, so the note is owed in both cases. The write still HAPPENS (the
+     * note is appended, nothing is destroyed) — only the blatant tool-call-shaped
+     * ones are blocked outright, up in the call hook.
+     */
+    if (FILE_TOOLS.has(event.toolName) && controlledApp !== null) {
       const said = event.content.map((p) => (p.type === 'text' ? p.text : '')).join('');
-      if (/outside the workspace|Refusing to /.test(said)) {
+      const fenced = event.isError === true && /outside the workspace|Refusing to /.test(said);
+      if (fenced || event.isError !== true) {
         const how = toolCliMode
           ? `\`mac click --x <x> --y <y>\` (screen points, read off the screenshot)`
           : 'the mac_click tool';
@@ -3431,18 +3502,23 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
         const note =
           `\n\nYou are driving "${controlledApp}" right now. Writing or editing a file does ` +
           `NOT do anything to it — nothing you put on disk reaches that window. Act on the ` +
-          `app itself: \`mac snapshot --screenshot\` to see it, then ${how}. If you just ` +
+          `app itself: ${drivingHowTo()} to read it, then ${how}. If you just ` +
           `said what you were about to click, click it.`;
         if (fencedWhileDriving >= 3) {
+          /* Say what actually happened. A successful write reaching this branch
+             HAS landed on disk, and calling that "refused" would teach the model
+             something false about the run it is in. */
+          const what = fenced
+            ? `Refused, for the ${fencedWhileDriving}${fencedWhileDriving === 3 ? 'rd' : 'th'} time this turn.`
+            : `That file was written, and it is the ${fencedWhileDriving}${fencedWhileDriving === 3 ? 'rd' : 'th'} one this turn that changes nothing.`;
           return {
             content: [
               {
                 type: 'text',
                 text:
-                  `Refused, for the ${fencedWhileDriving}${fencedWhileDriving === 3 ? 'rd' : 'th'} ` +
-                  `time this turn. Nothing written to disk reaches "${controlledApp}", and the ` +
-                  `task is in that window. Your next call must act on it — ${how} — or say ` +
-                  `plainly that you cannot.`,
+                  `${what} Nothing written to disk reaches "${controlledApp}", and the ` +
+                  `task is in that window. Your next call must act on it — ${drivingHowTo()} ` +
+                  `to read it, then ${how} — or say plainly that you cannot.`,
               },
             ],
           };
@@ -3480,6 +3556,44 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
                 `works. Reading a file is a TOOL CALL, not a shell command: call the read tool ` +
                 `with a path. \`mac\`, \`chrome\` and \`media\` are real commands; \`read\`, ` +
                 `\`write\` and \`edit\` are not.`,
+            },
+          ],
+        };
+      }
+    }
+    /*
+     * `activate` RETURNS SUCCESS AND DOES NOTHING — and we knew that.
+     *
+     * MEASURED this session, written down in Actions.swift: macOS refuses
+     * cross-app activation from a BACKGROUND process, and both routes
+     * (AppleScript `activate` and setting AXFrontmost) report success while
+     * changing nothing. Bobble drives every app from the background by design —
+     * the user's standing rule is that a run never takes his screen — so this
+     * command can only ever be a silent no-op here.
+     *
+     * MEASURED, matrix run 1: the 4B ran it four times, got "(no output)" each
+     * time, and reasonably read empty output as "Chrome is frontmost now".
+     * Nothing had moved. An empty success is the least readable failure there
+     * is, so it gets said out loud — together with the thing the model actually
+     * needs to hear, which is that it does not need focus at all.
+     */
+    if (event.toolName === 'bash' && event.isError !== true) {
+      const ran =
+        typeof lastCallInput?.input === 'object' && lastCallInput?.tool === 'bash'
+          ? String((lastCallInput.input as { command?: unknown })?.command ?? '')
+          : '';
+      if (/osascript/.test(ran) && /\bto\s+activate\b|\bactivate\s*'/.test(ran)) {
+        const said = event.content.map((p) => (p.type === 'text' ? p.text : '')).join('');
+        return {
+          content: [
+            {
+              type: 'text',
+              text:
+                `${said}\n\n[That reported success and changed nothing. macOS refuses ` +
+                `cross-app activation from a background process, and Bobble runs in the ` +
+                `background on purpose — the user's screen is theirs. You do NOT need the app ` +
+                `to be frontmost: ${drivingHowTo()} reads it, and the click/type commands act ` +
+                `on it, all while it stays in the background. Stop trying to focus it.]`,
             },
           ],
         };

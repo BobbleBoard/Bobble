@@ -19,7 +19,7 @@ import {
   isChromeProfilePicker,
   snapshotRect,
 } from './format';
-import type { MacSnapshot } from './protocol';
+import type { MacElement, MacSnapshot } from './protocol';
 import { MAC_COMPUTER_USE_TOOL_NAMES } from './tool-names';
 
 const snap = (over: Partial<MacSnapshot> = {}): MacSnapshot =>
@@ -716,16 +716,23 @@ describe('an app that exposes nothing USEFUL is treated like one that exposes no
    * selection screen might be proving a bit challenging, perhaps visual control
    * is needed there?"
    */
-  const el = (over: Record<string, unknown>) =>
-    ({ index: 1, role: 'AXGroup', name: '', x: 0, y: 0, w: 10, h: 10, ...over }) as never;
+  /* Typed, not `as never`. The cast these were written with hid the fact that
+     the fixtures had a FLAT x/y/w/h while a real MacElement carries `bbox` —
+     so the tests were asserting against a shape the code never receives. */
+  const el = (over: Partial<MacElement>): MacElement => ({
+    index: 1,
+    role: 'AXGroup',
+    name: '',
+    bbox: { x: 0, y: 0, w: 10, h: 10 },
+    ...over,
+  });
 
-  const snap = (elements: unknown[]) =>
-    ({
-      app: 'Google Chrome',
-      window: "Who's using Chrome?",
-      elements,
-      summary: { app: '', window: '', elementCount: elements.length, truncated: false },
-    }) as never;
+  const snap = (elements: MacElement[]): MacSnapshot => ({
+    app: 'Google Chrome',
+    window: "Who's using Chrome?",
+    elements,
+    summary: { app: '', window: '', elementCount: elements.length, truncated: false },
+  });
 
   it('calls the profile picker opaque, so it gets a picture', () => {
     const picker = snap([
@@ -771,12 +778,12 @@ describe("Chrome's profile chooser is named, not just photographed", () => {
    * WHICH screen it is buys the thing a picture cannot: five anonymous rounded
    * rectangles are a puzzle, "this is the profile chooser" is not.
    */
-  const picker = {
+  const picker: MacSnapshot = {
     app: 'Google Chrome',
     window: "Who's using Chrome?",
     elements: [],
     summary: { app: 'Google Chrome', window: '', elementCount: 0, truncated: false },
-  } as never;
+  };
 
   it('recognises it', () => {
     expect(isChromeProfilePicker(picker)).toBe(true);

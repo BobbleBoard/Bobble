@@ -57,6 +57,20 @@ describe('composerPill', () => {
     ).toBe('Getting ready — usually about 8s on this Mac · 0:03');
   });
 
+  /* An estimate the wait has already blown past contradicts the clock beside
+     it — seen live as "usually about 8s on this Mac · 5:27". */
+  it('drops the estimate once the wait has clearly overrun it', () => {
+    expect(
+      composerPill({ ...base, readyStage: 'preparing', elapsedMs: 327_000, typicalSec: 8 })?.text,
+    ).toBe('Getting ready — longer than usual · 5:27');
+  });
+
+  it('keeps the estimate while the wait is merely a bit over', () => {
+    expect(
+      composerPill({ ...base, readyStage: 'preparing', elapsedMs: 12_000, typicalSec: 8 })?.text,
+    ).toBe('Getting ready — usually about 8s on this Mac · 0:12');
+  });
+
   it('says nothing about typical before it has happened twice', () => {
     expect(composerPill({ ...base, readyStage: 'preparing', elapsedMs: 3_000 })?.text).toBe(
       'Getting ready · 0:03',

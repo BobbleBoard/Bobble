@@ -42,22 +42,47 @@ const PLAN = [
 
 const run = (cmd, args, env) =>
   new Promise((resolve) => {
-    execFile(cmd, args, { env: { ...process.env, ...env }, maxBuffer: 64 * 1024 * 1024 },
-      (err, stdout, stderr) => resolve({ ok: err === null, stdout, stderr }));
+    execFile(
+      cmd,
+      args,
+      { env: { ...process.env, ...env }, maxBuffer: 64 * 1024 * 1024 },
+      (err, stdout, stderr) => resolve({ ok: err === null, stdout, stderr }),
+    );
   });
+
+/**
+ * A run that never had tools is retried, not recorded.
+ *
+ * demo-run marks it `INVALID` (see the note there): pi died at startup, the app
+ * degraded to a session with no tools and no generation, and the model never
+ * emitted a token. Scoring that as `fail` would put a lie in the ledger that is
+ * indistinguishable, read later, from a model that tried. It is also transient —
+ * it follows memory pressure — so one retry usually gets a real run.
+ */
+const MAX_ATTEMPTS = 3;
 
 const started = Date.now();
 for (const [i, job] of PLAN.entries()) {
   const name = `matrix-${String(i + 1).padStart(2, '0')}-${job.app}-${job.model}${job.take === undefined ? '' : `-${job.take}`}`;
   const t0 = Date.now();
   console.log(`\n[${i + 1}/${PLAN.length}] ${name}`);
-  const res = await run('node', [`apps/desktop/tests/e2e/${job.demo}`], {
-    MAC_CU_MODEL: job.model,
-    RUN_NAME: name,
-    POWER: 'low',
-    ...(job.noSplash === true ? { NO_SPLASH: '1' } : {}),
-  });
-  const log = `${res.stdout}\n${res.stderr}`;
+  let res;
+  let log = '';
+  let attempts = 0;
+  while (attempts < MAX_ATTEMPTS) {
+    attempts += 1;
+    res = await run('node', [`apps/desktop/tests/e2e/${job.demo}`], {
+      MAC_CU_MODEL: job.model,
+      RUN_NAME: name,
+      POWER: 'low',
+      ...(job.noSplash === true ? { NO_SPLASH: '1' } : {}),
+    });
+    log = `${res.stdout}\n${res.stderr}`;
+    if (!/^INVALID: /m.test(log)) break;
+    console.log(
+      `    INVALID (attempt ${attempts}/${MAX_ATTEMPTS}) — the session had no tools; retrying`,
+    );
+  }
   writeFileSync(path.join(OUT, `${name}.log`), log);
   const pick = (re) => (log.match(re) ?? [])[1] ?? null;
   const row = {
@@ -74,10 +99,16 @@ for (const [i, job] of PLAN.entries()) {
     frames: pick(/(\d+) frames, captured at/),
     fps: pick(/captured at ([\d.]+)\/s/),
     prefill: pick(/prefill: (.*)/),
+    attempts,
+    invalid: /^INVALID: /m.test(log) ? (log.match(/^INVALID: (.*)$/m) ?? [])[1] : null,
   };
   appendFileSync(LEDGER, `${JSON.stringify(row)}\n`);
   console.log(
-    `    ${row.ok ? 'ok' : 'FAILED'} in ${row.seconds}s · verdict ${row.verdict ?? '?'} · focus ${row.focus ?? '?'}`,
+    `    ${row.ok ? 'ok' : 'FAILED'} in ${row.seconds}s · verdict ${row.verdict ?? '?'} · focus ${row.focus ?? '?'}` +
+      (row.attempts > 1 ? ` · ${row.attempts} attempts` : '') +
+      (row.invalid === null ? '' : ' · INVALID'),
   );
 }
-console.log(`\nall ${PLAN.length} runs done in ${Math.round((Date.now() - started) / 60000)} min → ${LEDGER}`);
+console.log(
+  `\nall ${PLAN.length} runs done in ${Math.round((Date.now() - started) / 60000)} min → ${LEDGER}`,
+);

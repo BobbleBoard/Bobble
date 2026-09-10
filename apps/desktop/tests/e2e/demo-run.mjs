@@ -16,7 +16,15 @@
  * behave exactly as they do under the spawned probes.
  */
 import { execFile } from 'node:child_process';
-import { existsSync, mkdirSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { homedir } from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
@@ -26,6 +34,64 @@ import { probeHome } from './harness.mjs';
 const run = promisify(execFile);
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const osa = (s) => run('osascript', ['-e', s]).catch(() => undefined);
+
+/**
+ * Wait for Bobble's process to actually be gone.
+ *
+ * The AppleScript quit RETURNS as soon as the app accepts it, not when it has
+ * finished quitting — and the whole point of quitting rather than closing is to
+ * give the quit-hold time to reap the inference process and its llama-server
+ * grandchild. Returning early and then calling `electronApp.close()` would put
+ * the bug straight back.
+ */
+async function waitForBobbleToExit(timeoutMs = 20000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const out = await run('pgrep', ['-f', 'Bobble.app/Contents/MacOS/Bobble']).catch(() => null);
+    if (out === null || out.stdout.trim() === '') return true;
+    await sleep(250);
+  }
+  return false;
+}
+
+/**
+ * Kill llama-servers that no longer have a parent, and say so.
+ *
+ * A benchmark is only worth reading if the machine it ran on was the same each
+ * time. An orphaned server holds a model and a port, and the power policy reads
+ * the resulting pressure as "memory is tight" and quietly drops the whole run to
+ * `gentle` — smaller context, one slot. That is a silent, run-to-run-varying
+ * change to what is being measured, so it is swept before AND after every run
+ * rather than trusted not to happen.
+ *
+ * ppid === 1 is the whole test: a live run's server is a child of the app, so
+ * this can never touch one. Nothing is killed by name alone.
+ */
+async function reapOrphanServers(when) {
+  const found = await run('pgrep', ['-f', 'llama-server']).catch(() => null);
+  const pids = (found?.stdout ?? '')
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean);
+  const killed = [];
+  for (const pid of pids) {
+    const ps = await run('ps', ['-o', 'ppid=', '-p', pid]).catch(() => null);
+    if (ps === null || ps.stdout.trim() !== '1') continue;
+    try {
+      process.kill(Number(pid), 'SIGTERM');
+      killed.push(pid);
+    } catch {
+      /* already gone between the listing and the kill — nothing to do */
+    }
+  }
+  if (killed.length > 0) {
+    console.log(
+      `[demo] reaped ${killed.length} orphaned llama-server(s) ${when}: ${killed.join(', ')}`,
+    );
+    await sleep(1500);
+  }
+  return killed.length;
+}
 
 /**
  * Drive one demo end to end and write an MP4.
@@ -97,6 +163,10 @@ export async function demoRun(o) {
     await sleep(500);
   }
   await sleep(1500);
+  /* Nothing from a previous run may still be holding a model — see
+     reapOrphanServers. Swept here, with Bobble confirmed gone, so any survivor
+     is unambiguously an orphan. */
+  await reapOrphanServers('before');
   if (o.attach === true) {
     // Make sure there IS something to attach to, without stealing the screen.
     await run('open', ['-g', '-a', o.app]).catch(() => undefined);
@@ -403,9 +473,12 @@ export async function demoRun(o) {
        instead left the chip on "Balanced", which the read-back below caught. */
     await page.evaluate(
       (id) =>
-        window.__settings_store?.().getState?.().update?.({
-          modelSelection: { mode: 'model', modelId: id },
-        }) ??
+        window
+          .__settings_store?.()
+          .getState?.()
+          .update?.({
+            modelSelection: { mode: 'model', modelId: id },
+          }) ??
         window.piDesktop.invoke('settings:set', {
           patch: { modelSelection: { mode: 'model', modelId: id } },
         }),
@@ -627,9 +700,39 @@ export async function demoRun(o) {
     say(`tool calls (${last.tools.length}): ${JSON.stringify(last.tools)}`);
     say(`model said: ${JSON.stringify(last.text.slice(0, 400))}`);
 
+    /*
+     * A SESSION WITH NO TOOLS IS NOT A RESULT, AND MUST NOT BE SCORED LIKE ONE.
+     *
+     * pi can die at startup, and when it does the app deliberately degrades —
+     * it respawns with every extension disabled so a broken extension cannot
+     * crash-loop the whole app. That is right for a person sitting in front of
+     * it. For a benchmark it is poison: the model then has no tools and cannot
+     * generate at all, so the run produces zero tool calls and an empty reply,
+     * and `verify` faithfully reports that nothing on screen changed.
+     *
+     * MEASURED, matrix run 2 (9B): `pi exited at startup; retrying WITHOUT ANY
+     * EXTENSIONS … this session has NO TOOLS — no browser, no files, no
+     * generation`, then 392 seconds of nothing, recorded in the ledger as
+     * `verdict: fail`. Read cold, that is a model that tried and failed. It
+     * never ran. A benchmark that cannot tell those apart is worse than no
+     * benchmark, so this is checked BEFORE the verdict and overrides it.
+     */
+    let invalid = null;
+    try {
+      const mainErr = readFileSync(path.join(OUT, 'main-stderr.log'), 'utf8');
+      if (/pi exited at startup|NO TOOLS — no browser/.test(mainErr)) {
+        invalid =
+          'pi exited at startup — the session had NO TOOLS, so nothing about the model was measured';
+      }
+    } catch {
+      /* no stderr captured (LIVE/attached runs) — nothing to check */
+    }
+    if (invalid !== null) say(`INVALID: ${invalid}`);
+
     if (o.verify !== undefined) {
       try {
         const evidence = await o.verify(dbg, last);
+        if (invalid !== null) evidence.verdict = 'invalid';
         say(`VERIFY: ${JSON.stringify(evidence)}`);
       } catch (err) {
         say(`verify failed: ${String(err).slice(0, 140)}`);
@@ -657,9 +760,33 @@ export async function demoRun(o) {
        over, and at 30/s there is almost always one in flight. */
     await camera.catch(() => {});
     await browser?.close().catch(() => {});
-    await electronApp?.close().catch(() => {});
+    /*
+     * QUIT FIRST, THEN CLOSE THE HANDLE. The order here was the other way round
+     * and it orphaned a llama-server on every single run.
+     *
+     * Playwright's `electronApp.close()` terminates Electron abruptly, so the
+     * quit-hold never opens — and the quit-hold is where main.ts runs
+     * `reapChildProcesses()` (its `extraTeardown`), which is the only thing that
+     * stops the inference utilityProcess and its llama-server GRANDCHILD. Kill
+     * the app first and that grandchild is reparented to launchd and lives
+     * forever.
+     *
+     * MEASURED: `llama-server … Qwen3.5-4B-Q8_0.gguf`, ppid=1, still resident
+     * 17 minutes after its run ended, from a demo two runs earlier. The next
+     * runs then booted into `[pi-power] gentle: memory is tight`, and on the 9B
+     * pi itself died at startup — "this session has NO TOOLS" — so the model
+     * never emitted a token and the matrix recorded `verdict: fail` as though it
+     * had tried. One orphan, four symptoms, all of them ours.
+     *
+     * So: AppleScript quit, WAIT for the process to actually go (that is the
+     * reap happening), and keep `close()` only as the fallback for an app that
+     * would not quit.
+     */
     await osa('tell application "Bobble" to quit');
+    await waitForBobbleToExit();
+    await electronApp?.close().catch(() => {});
     if (o.attach !== true) await osa(`tell application "${o.app}" to quit`);
+    await reapOrphanServers('after');
   }
 
   const dir = path.join(OUT, 'frames');
