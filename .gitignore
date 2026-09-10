@@ -34,6 +34,10 @@ scratchpad/mac-video/frames.txt
 # went in on one `git add -A`.
 scratchpad/mac-video-*/frames/
 scratchpad/mac-video-*/frames.txt
+# Demo runs are the same shape. MEASURED: 97 GB of intermediate JPEGs had piled
+# up under scratchpad/demos — the mp4 beside them is the artefact.
+scratchpad/demos/*/frames/
+scratchpad/demos/*/frames.txt
 
 
 # Session screenshot dumps. Probes produce hundreds of megabytes of PNGs; the
