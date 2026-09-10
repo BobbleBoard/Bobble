@@ -221,6 +221,17 @@ class MacOverlayController {
     if (client === null) return;
     this.#brakeBound = true;
     client.onEvent((event, data) => {
+      /*
+       * ACCESSIBILITY SAW THE WINDOW MOVE, or an app came forward and changed
+       * the z-order. Either way whatever we last read is stale RIGHT NOW, and
+       * waiting up to 250ms for the next poll is what the user saw as the phantom
+       * lagging a drag and then "inexplicably" sitting on top again. Re-tick
+       * immediately instead.
+       */
+      if (event === 'overlay-retrack') {
+        if (this.#target !== null) this.#scheduleTrack(0);
+        return;
+      }
       if (event !== 'overlay-brake') return;
       const action = typeof data.action === 'string' ? data.action : '';
       if (action !== '') this.#brake?.(action);
@@ -367,7 +378,11 @@ class MacOverlayController {
   /** Tell the panel which window the phantom belongs to, so the pill stays
    * inside it instead of spilling onto whatever app is beside it. */
   async #pushTarget(rect: OverlayRect | null): Promise<void> {
-    await this.#push('target', rect === null ? {} : { x: rect.x, y: rect.y, w: rect.w, h: rect.h });
+    const pid = this.#target?.pid ?? null;
+    await this.#push(
+      'target',
+      rect === null ? {} : { x: rect.x, y: rect.y, w: rect.w, h: rect.h, ...(pid === null ? {} : { pid }) },
+    );
   }
 
   async #applyVisibility(show: boolean): Promise<void> {

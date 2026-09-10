@@ -61,6 +61,20 @@ await demoRun({
      * choice can be read straight out of the tree — no Apple Events needed,
      * which matters because Chrome refuses those on this Mac.
      */
+    /*
+     * WHAT ACCESSIBILITY CAN AND CANNOT SETTLE HERE.
+     *
+     * MEASURED, sweeping the whole page 26 scrolls from the top: Chrome exposes
+     * about SIXTY Accessibility elements for an Apple configure page and they
+     * barely change as it scrolls — there is no DOM behind this, just a sparse
+     * summary of what the browser felt like publishing. So when the storage
+     * radios happen to be in it, they are a real and cheap answer; when they are
+     * not, no amount of scrolling produces them, and scrolling the user's page
+     * to hunt for them is a side effect with nothing to show for it.
+     *
+     * Hence: read what is there, and when it cannot answer, say so and let the
+     * screenshot settle it. For Chrome the picture IS the ground truth.
+     */
     const radios = (snap.elements ?? []).filter(
       (e) => e.role === 'AXRadioButton' && /\b\d+\s*(GB|TB)\b/i.test(e.name ?? ''),
     );

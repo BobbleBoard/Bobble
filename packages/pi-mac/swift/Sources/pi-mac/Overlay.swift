@@ -371,6 +371,74 @@ final class OverlayControlsView: NSView {
   }
 }
 
+/*
+ * WATCHING THE TARGET INSTEAD OF ASKING IT.
+ *
+ * the user: "why can't you pin it literally one level on top of the window you want
+ * to target and pin it such that dragging the window ... mirrors the movements
+ * of the target at all times and mirroring the layering so it's always one level
+ * above the target."
+ *
+ * Half of that is not available. `addChildWindow:` — the API that makes macOS
+ * move one window with another and keep it exactly one level above — only works
+ * between windows of the SAME process; a window belonging to Chrome cannot be
+ * given ours as a child. Ordering relative to a window we do not own needs
+ * SkyLight's private CGSOrderWindow with the universal-owner privilege, which we
+ * do not have. So the LAYERING has to stay a mask (see setOccluders).
+ *
+ * The MOVEMENT half is available, and this is it. Accessibility will push a
+ * notification the instant a window moves or resizes, so the phantom can ride a
+ * drag exactly rather than sampling for it every 16ms — and an app activating
+ * changes the z-order, which is the "clicking on the window then off it" case
+ * where a stale mask let the phantom paint over something on top of the app.
+ */
+private var axObserver: AXObserver?
+private var axWatchedPid: pid_t = 0
+
+private let axChanged: AXObserverCallback = { _, _, _, _ in
+  // The panel re-reads bounds and occluders when Node asks; asking is the point.
+  emitEvent("overlay-retrack")
+}
+
+/// Start (or move) the Accessibility watch to `pid`. Idempotent per pid.
+func watchWindowChanges(pid: pid_t) {
+  if pid == axWatchedPid { return }
+  stopWatchingWindowChanges()
+  guard pid > 0 else { return }
+  var obs: AXObserver?
+  guard AXObserverCreate(pid, axChanged, &obs) == .success, let observer = obs else { return }
+  let app = AXUIElementCreateApplication(pid)
+  for name in [
+    kAXWindowMovedNotification, kAXWindowResizedNotification,
+    kAXFocusedWindowChangedNotification, kAXMainWindowChangedNotification,
+  ] {
+    AXObserverAddNotification(observer, app, name as CFString, nil)
+  }
+  CFRunLoopAddSource(
+    CFRunLoopGetMain(), AXObserverGetRunLoopSource(observer), .defaultMode)
+  axObserver = observer
+  axWatchedPid = pid
+}
+
+func stopWatchingWindowChanges() {
+  if let observer = axObserver {
+    CFRunLoopRemoveSource(
+      CFRunLoopGetMain(), AXObserverGetRunLoopSource(observer), .defaultMode)
+  }
+  axObserver = nil
+  axWatchedPid = 0
+}
+
+/// A different app coming forward changes the z-order — the mask is stale the
+/// moment it happens, which is the "inexplicably on top again" report.
+func watchActivationChanges() {
+  NSWorkspace.shared.notificationCenter.addObserver(
+    forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main
+  ) { _ in
+    emitEvent("overlay-retrack")
+  }
+}
+
 /// A panel that can never become key or main. `.nonactivatingPanel` already
 /// stops a click from activating us — but nothing is ever going to click it
 /// (`ignoresMouseEvents`), and this makes the guarantee structural rather than
@@ -1423,8 +1491,12 @@ private func handleOverlay(
       let w = doubleValue(params["w"]), let h = doubleValue(params["h"])
     {
       controller.setWindowRect(CGRect(x: x, y: y, width: w, height: h))
+      /* Watch the app itself from here: a move or resize is then pushed to us
+         the instant it happens, instead of being sampled for. */
+      if let pid = doubleValue(params["pid"]) { watchWindowChanges(pid: pid_t(pid)) }
     } else {
       controller.setWindowRect(nil)
+      stopWatchingWindowChanges()
     }
     return ["ok": true]
   case "pill":
@@ -1493,6 +1565,7 @@ func runOverlay() {
   /* The pill's buttons are the one thing in the overlay a person can press, so
      they are the one thing that talks back. */
   controller.onBrake = { action in emitEvent("overlay-brake", data: ["action": action]) }
+  watchActivationChanges()
 
   let pump = Thread {
     while let line = readLine(strippingNewline: true) {
