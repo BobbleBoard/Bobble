@@ -32,24 +32,58 @@ import { useRePrefillWarning } from './use-reprefill-warning';
  * reassures me"), and finishing is where the estimate for NEXT time comes from,
  * so both live in one hook: it counts up, then writes the result down.
  */
+/** A blink shorter than this is the same wait resuming, not a new one. */
+const SAME_WAIT_GAP_MS = 2500;
+
 function useWaitClock(stage: 'loading' | 'preparing' | null): number | null {
   const [since, setSince] = useState<number | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const prev = useRef<'loading' | 'preparing' | null>(null);
 
+  /*
+   * ONE WAIT, ONE CLOCK.
+   *
+   * the user, watching a run start: "getting ready shows for 10s, then dissapears
+   * for a second then immeidately reappears and counts to 10 again."
+   *
+   * The stage really does blink — the prefix warm-up can run more than once
+   * around a model switch — and every blink restarted the counter, so a single
+   * 20-second wait was shown as two 10-second ones and nothing looked like it
+   * was making progress. A gap shorter than {@link SAME_WAIT_GAP_MS} is treated
+   * as the SAME wait: the clock keeps running and the measurement is not
+   * recorded until the wait has actually finished.
+   */
+  const endedAt = useRef<number | null>(null);
   useEffect(() => {
     if (stage === prev.current) return;
-    // A wait that just ENDED is a measurement — this is where "usually about 8s
-    // on this Mac" comes from, two launches later.
-    if (prev.current !== null && since !== null) {
+    if (stage === null) {
+      // Do not conclude anything yet — it may come straight back.
+      endedAt.current = Date.now();
+      prev.current = stage;
+      return;
+    }
+    const resumed = endedAt.current !== null && Date.now() - endedAt.current < SAME_WAIT_GAP_MS;
+    endedAt.current = null;
+    prev.current = stage;
+    if (!resumed) {
+      setSince(Date.now());
+      setNow(Date.now());
+    }
+  }, [stage]);
+
+  /* The wait is over once the gap outlives the grace period — that is the point
+     at which it is a measurement worth keeping ("usually about 8s on this Mac"). */
+  useEffect(() => {
+    if (stage !== null || since === null) return;
+    const t = setTimeout(() => {
+      if (endedAt.current === null) return;
       recordBootWait(
         prev.current === 'loading' ? 'model-load' : 'prompt-load',
-        (Date.now() - since) / 1000,
+        (endedAt.current - since) / 1000,
       );
-    }
-    prev.current = stage;
-    setSince(stage === null ? null : Date.now());
-    setNow(Date.now());
+      setSince(null);
+    }, SAME_WAIT_GAP_MS);
+    return () => clearTimeout(t);
   }, [stage, since]);
 
   useEffect(() => {

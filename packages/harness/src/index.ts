@@ -1477,10 +1477,23 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
         const ctx = runtime.currentCtx;
         if (ctx?.hasUI !== true) return;
         const done = !Number.isFinite(fraction) || fraction >= 1;
-        ctx.ui.setStatus(
-          'harness-prefill',
-          done ? '' : String(Math.min(99, Math.round(fraction * 100))),
-        );
+        /*
+         * THE NUMBER IS THE NUMBER. the user: "it lingers at 99% for the last few
+         * seconds which seems like a lie to me and not actual prefill % being
+         * reported... just a suspicsion."
+         *
+         * Half right, and worth having measured. Traced straight off
+         * llama-server on a 9,805-token prompt, it reports in 2048-token
+         * batches — 0, 20.9, 41.8, 62.7, 83.5, 94.7, 100 — so the STEPS are
+         * real and coarse, and the last one is small and can be slow on a big
+         * prompt. That is where "it sat at 99" comes from.
+         *
+         * But the clamp WAS a lie: `Math.min(99, round(...))` turned a genuine
+         * 99.96% and a genuine 100% into the same "99". Flooring reports what
+         * was actually measured and still never shows 100 before it is true,
+         * which is the property the clamp was there for.
+         */
+        ctx.ui.setStatus('harness-prefill', done ? '' : String(Math.floor(fraction * 100)));
       },
     };
   }
@@ -3388,9 +3401,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
      * to a model that really was trying to write a file.
      */
     if (FILE_TOOLS.has(event.toolName) && event.isError === true && controlledApp !== null) {
-      const said = event.content
-        .map((p) => (p.type === 'text' ? p.text : ''))
-        .join('');
+      const said = event.content.map((p) => (p.type === 'text' ? p.text : '')).join('');
       if (/outside the workspace|Refusing to /.test(said)) {
         const how = toolCliMode
           ? `\`mac click --x <x> --y <y>\` (screen points, read off the screenshot)`
