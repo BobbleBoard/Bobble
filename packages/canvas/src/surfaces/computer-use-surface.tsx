@@ -66,17 +66,32 @@ export interface ComputerUseSurfaceProps {
 }
 
 /**
- * The shared Pi agent cursor. SYNC: apps/desktop/electron/mac/overlay.html and
- * apps/desktop/electron/canvas/agent-cursor.ts — one glyph for "Pi is driving",
- * whether it is driving a web page, a Mac app, or the picture of one in here.
+ * THE SHARED AGENT CURSOR — the user's artwork, the same path the native overlay
+ * draws (pi-mac Overlay.swift `pointerGlyph`).
+ *
+ * He sent one SVG for "the fake cursor", and there are two of them: the panel
+ * painted over his real screen, and this one painted over a picture of the
+ * window. They have to be the same drawing or the monitor is showing something
+ * that is not what is happening — so this is his path verbatim, arcs and all,
+ * because SVG is what a canvas Path2D speaks anyway.
  */
 const CURSOR_PATH =
-  'M 10.01 13.12 Q 8.00 8.00 13.04 10.21 L 30.55 17.89 Q 36.50 20.50 30.03 21.17 ' +
-  'L 25.48 21.64 Q 22.00 22.00 20.85 25.31 L 19.64 28.78 Q 18.00 33.50 16.17 28.85 Z';
-/** overlay.html renders the 26.56×24.21 viewBox at 34×31 with the tip inset. */
-const CURSOR_VIEWBOX = { x: 8.14, y: 8.24, w: 26.56, h: 24.21 };
-const CURSOR_BOX = { w: 34, h: 31 };
-const CURSOR_TIP = { x: 2.9, y: 1.6 };
+  'M 58.48 87.06 A 24.06 25.11 -36 0 1 93.89 61.34 L 223.67 137.27 ' +
+  'A 18.23 19.02 -36 0 1 218.85 171.89 A 117.23 122.31 -36 0 0 131.29 247.95 ' +
+  'A 19.66 20.51 -36 0 1 92.88 244.4 Z';
+/** His stroke, in his viewBox units, so it scales with the glyph. */
+const CURSOR_STROKE_W = 13.79;
+/** Body and keyline, straight off the SVG. */
+const CURSOR_BODY = '#78BFE5';
+const CURSOR_KEYLINE = '#FFFFFF';
+const CURSOR_GLOW = '#95F9E5';
+/** The anchors' bounds grown by half the keyline — what is actually drawn. */
+const CURSOR_VIEWBOX = { x: 51.59, y: 54.45, w: 188.56, h: 213.37 };
+/** Drawn size in CSS px, pinned by HEIGHT to match the panel's 22pt. */
+const CURSOR_BOX = { w: 19.44, h: 22 };
+/** The point of the pointer, in drawn-box units — the rounded corner between
+ * the first arc's ends, pulled out along the diagonal by half the keyline. */
+const CURSOR_TIP = { x: 1.15, y: 0.31 };
 /** Matches CURSOR_TRAVEL_MS in overlay-controller.ts. */
 const CURSOR_TRAVEL_MS = 300;
 /** How long a click ripple lives (overlay.html's .ripple transition). */
@@ -2180,49 +2195,27 @@ function drawCursor(
   ctx.scale(CURSOR_BOX.w / CURSOR_VIEWBOX.w, CURSOR_BOX.h / CURSOR_VIEWBOX.h);
   ctx.translate(-CURSOR_VIEWBOX.x, -CURSOR_VIEWBOX.y);
 
-  // The three drop-shadows overlay.html stacks on #cursor, in the same order:
-  // a tight dark one (which is what keeps a pearl-white glyph legible over a
-  // WHITE document — without it the cursor dissolves into the page it is
-  // pointing at), then two luminous rims.
-  //
-  // EVERY NUMBER BELOW IS overlay.html's. They had drifted: the body was
-  // rgb(231,230,246)/rgb(195,194,228) — hue 244°/241°, R≈G, i.e. periwinkle —
-  // against the overlay's #e6ecf6/#c2cfe4 at hue 214°/213°, and the glows and
-  // the dark shadow were all off too. Not a purple VIOLATION (R never exceeds
-  // G), but the closest thing in the app to one, and it meant the phantom on
-  // screen and the phantom in this tab were not the same object. A comment
-  // claiming a synchronisation the code does not have is how the no-purple rule
-  // gets broken by accident, so: SYNC with overlay.html's #cursor filter and
-  // #pi-cur-body stops, and nowhere else.
+  /*
+   * HIS PAINT, and the panel's: a #95F9E5 glow, a solid #78BFE5 body, a white
+   * keyline. The old stack was a pearl gradient with two luminous rims tuned to
+   * match overlay.html — a file that no longer exists, for a glyph that no
+   * longer exists. Matching the NATIVE panel is what matters now: the phantom on
+   * screen and the phantom in this tab have to be the same object.
+   */
   ctx.save();
-  ctx.fillStyle = 'rgba(255,255,255,0.9)';
-  ctx.shadowColor = 'rgba(120, 165, 255, 0.55)';
-  ctx.shadowBlur = 11;
+  ctx.shadowColor = CURSOR_GLOW;
+  ctx.shadowBlur = 13;
+  ctx.fillStyle = CURSOR_GLOW;
+  ctx.globalAlpha = 0.38;
   ctx.fill(path);
-  ctx.shadowColor = 'rgba(214, 226, 255, 0.9)';
-  ctx.shadowBlur = 4;
-  ctx.fill(path);
-  ctx.shadowColor = 'rgba(10, 12, 40, 0.42)';
-  ctx.shadowBlur = 2;
-  ctx.shadowOffsetY = 1;
-  ctx.fill(path);
+  ctx.globalAlpha = 1;
   ctx.restore();
 
-  const body = ctx.createLinearGradient(10, 9, 30, 30);
-  body.addColorStop(0, 'rgba(255,255,255,0.97)');
-  body.addColorStop(0.45, 'rgba(230,236,246,0.9)');
-  body.addColorStop(1, 'rgba(194,207,228,0.86)');
-  ctx.fillStyle = body;
+  ctx.fillStyle = CURSOR_BODY;
   ctx.fill(path);
 
-  const sheen = ctx.createLinearGradient(10, 9, 22, 23);
-  sheen.addColorStop(0, 'rgba(255,255,255,0.54)');
-  sheen.addColorStop(1, 'rgba(255,255,255,0)');
-  ctx.fillStyle = sheen;
-  ctx.fill(path);
-
-  ctx.strokeStyle = 'rgba(255,255,255,0.85)';
-  ctx.lineWidth = 1.4;
+  ctx.strokeStyle = CURSOR_KEYLINE;
+  ctx.lineWidth = CURSOR_STROKE_W;
   ctx.lineJoin = 'round';
   ctx.stroke(path);
   ctx.restore();

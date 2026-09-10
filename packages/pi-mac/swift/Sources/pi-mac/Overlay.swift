@@ -52,29 +52,22 @@ import UniformTypeIdentifiers
 // need such glow I don't think, but sizing down and making ours cleaner and more
 // rounded without such protruding 'fins'".
 //
-// So: a compact rounded pointer, drawn as a four-vertex polygon (tip → right
-// shoulder → waist → tail) with every corner smoothed. The old dart's two long
-// thin points — the "fins" — are gone; what is left of the tail notch is the
-// WAIST, a single shallow concave corner that keeps the silhouette reading as a
-// pointer instead of a leaf. MEASURED, the drawn glyph is 18.1×22.1pt against
-// the old dart's 34×31 — 38% of the area, close to the system arrow's own size.
-// The glow is gone too: one soft neutral drop shadow carries the glyph on a
-// light app and the white body carries it on a dark one.
-private let GLYPH_TIP = CGPoint(x: 2.60, y: 1.80)
-private let GLYPH_SHOULDER = CGPoint(x: 17.40, y: 12.60)
-private let GLYPH_WAIST = CGPoint(x: 12.30, y: 15.30)
-private let GLYPH_TAIL = CGPoint(x: 10.60, y: 20.40)
-/// Corner radii, in the same design units. The tip stays nearly sharp (it is
-/// the hotspot and must still read as a point); the shoulder, waist and tail
-/// are generously rounded — that is the whole "rounder, no fins" ask.
-private let GLYPH_RADII: [CGFloat] = [1.40, 2.40, 2.60, 2.40]
-/// How far each rounded corner's Bézier controls sit toward the vertex. 0.5523
-/// would draw a circular arc; pulling it back to 0.46 flattens the corner into
-/// a continuous-curvature blend (the same trick that makes an Apple squircle
-/// read smoother than a rounded rect) — this is the "extra extra smooth".
-private let GLYPH_CORNER_K: CGFloat = 0.46
-/// Design units → points. 1.05 lands the glyph at 18.1×22.1pt (measured).
-private let OVERLAY_GLYPH_SCALE: CGFloat = 1.05
+// THE GLYPH IS THE USER'S ARTWORK NOW, not a polygon we tuned. He sent the SVG —
+// a single path, a blue body (#78BFE5) under a white keyline, with a teal glow
+// behind it — so the shape lives in pointerGlyph() as his own curves and these
+// constants only say how big it is drawn and how it is painted.
+/// Body fill and keyline, straight off his SVG.
+private let GLYPH_BODY = cgColor(0x78 / 255.0, 0xBF / 255.0, 0xE5 / 255.0, 1)
+private let GLYPH_KEYLINE = cgColor(1, 1, 1, 1)
+/// The glow colour behind it (#95F9E5), at his two opacities.
+private let GLYPH_GLOW = cgColor(0x95 / 255.0, 0xF9 / 255.0, 0xE5 / 255.0, 1)
+/// His stroke width, in the 291-wide viewBox the path is written in — so it
+/// scales WITH the glyph rather than going fat as the cursor shrinks.
+private let GLYPH_STROKE_W: CGFloat = 13.79
+/// How tall the drawn cursor is, in points. The previous glyph measured
+/// 18.1x22.1 and the user asked for that size ("tiny"); his artwork is a little
+/// wider in proportion, so height is the honest thing to pin.
+private let OVERLAY_GLYPH_HEIGHT: CGFloat = 22.0
 
 /// Travel time for a cursor glide, mirrored by CURSOR_TRAVEL_MS on the Node
 /// side so a tool act can wait the animation out before it fires.
@@ -178,30 +171,58 @@ private func smoothPolygonPath(_ pts: [CGPoint], radii: [CGFloat], k: CGFloat) -
 /// The pointer outline in LAYER space (y up), scaled, with the tip at the top.
 /// Returned alongside the box it lives in and the tip's position inside that
 /// box, so the cursor layer can anchor exactly on the hotspot.
-private func pointerGlyph() -> (path: CGPath, box: CGSize, tip: CGPoint) {
-  let design = [GLYPH_TIP, GLYPH_SHOULDER, GLYPH_WAIST, GLYPH_TAIL]
-  let rawRadii = GLYPH_RADII
-  let cornerK = GLYPH_CORNER_K
-  let glyphScale = OVERLAY_GLYPH_SCALE
-  // The stroked keyline straddles the outline, so the box carries a hair of
-  // padding on every side; without it the keyline is shaved by masksToBounds.
-  let pad: CGFloat = 1.2
-  let minX = design.map(\.x).min()! - pad
-  let minY = design.map(\.y).min()! - pad
-  let maxX = design.map(\.x).max()! + pad
-  let maxY = design.map(\.y).max()! + pad
-  let h = maxY - minY
-  // Design space is y-down (it reads like the on-screen glyph); layer space is
-  // y-up, so mirror as we translate into the box.
-  let pts = design.map {
-    CGPoint(x: ($0.x - minX) * glyphScale, y: (h - ($0.y - minY)) * glyphScale)
+private func pointerGlyph() -> (path: CGPath, box: CGSize, tip: CGPoint, strokeWidth: CGFloat) {
+  /*
+   * THE USER'S CURSOR, traced exactly.
+   *
+   * He sent the SVG; this is its single path with the elliptical arcs converted
+   * to cubics (W3C F.6 endpoint parameterisation), in the artwork's own y-down
+   * viewBox coordinates. Keeping his numbers rather than re-drawing something
+   * "equivalent" means the shape on screen is the shape he approved, and a
+   * future tweak is a re-run of the same conversion.
+   *
+   * The keyline is his too — a white 13.79 stroke in a 291-wide viewBox — so it
+   * scales with the glyph instead of being a fixed hairline that goes fat as the
+   * cursor shrinks.
+   */
+  let art = CGMutablePath()
+  do {
+    let p = art
+    p.move(to: CGPoint(x: 58.480, y: 87.060))
+    p.addCurve(to: CGPoint(x: 67.563, y: 62.329), control1: CGPoint(x: 56.394, y: 77.528), control2: CGPoint(x: 59.944, y: 67.863))
+    p.addCurve(to: CGPoint(x: 93.890, y: 61.340), control1: CGPoint(x: 75.182, y: 56.795), control2: CGPoint(x: 85.470, y: 56.409))
+    p.addLine(to: CGPoint(x: 223.670, y: 137.270))
+    p.addCurve(to: CGPoint(x: 233.247, y: 156.770), control1: CGPoint(x: 230.500, y: 141.260), control2: CGPoint(x: 234.323, y: 149.043))
+    p.addCurve(to: CGPoint(x: 218.850, y: 171.890), control1: CGPoint(x: 232.171, y: 164.498), control2: CGPoint(x: 226.425, y: 170.533))
+    p.addCurve(to: CGPoint(x: 131.290, y: 247.950), control1: CGPoint(x: 177.831, y: 179.267), control2: CGPoint(x: 144.559, y: 208.170))
+    p.addCurve(to: CGPoint(x: 111.340, y: 260.923), control1: CGPoint(x: 128.454, y: 256.445), control2: CGPoint(x: 120.294, y: 261.751))
+    p.addCurve(to: CGPoint(x: 92.880, y: 244.400), control1: CGPoint(x: 102.386, y: 260.096), control2: CGPoint(x: 94.836, y: 253.337))
+    p.closeSubpath()
   }
-  let radii = rawRadii.map { $0 * glyphScale }
-  return (
-    smoothPolygonPath(pts, radii: radii, k: cornerK),
-    CGSize(width: (maxX - minX) * glyphScale, height: h * glyphScale),
-    pts[0]
-  )
+
+  /* The stroke straddles the outline, so the visual bounds are the path's
+     bounds grown by half the line width; anything less shaves the keyline. */
+  let half = GLYPH_STROKE_W / 2
+  let b = art.boundingBox.insetBy(dx: -half, dy: -half)
+  let scale = OVERLAY_GLYPH_HEIGHT / b.height
+
+  /* Design space is y-down (it reads like the artwork); layer space is y-up, so
+     mirror on the way into the box. */
+  var t = CGAffineTransform(scaleX: scale, y: -scale)
+    .concatenating(CGAffineTransform(translationX: -b.minX * scale, y: b.maxY * scale))
+  let path = art.copy(using: &t) ?? art
+
+  /*
+   * THE HOT SPOT: the point of the pointer, which is the rounded corner between
+   * the first arc's ends — the extreme along the up-left diagonal the glyph
+   * points down. Measured off his own anchors rather than guessed: (67.56,
+   * 62.33) is the apex, pulled out along the diagonal by half the keyline so the
+   * tip is the tip of what is DRAWN, not of the centre line.
+   */
+  let apex = CGPoint(x: 67.563 - half * 0.7, y: 62.329 - half * 0.7)
+  let tip = CGPoint(x: (apex.x - b.minX) * scale, y: (b.maxY - apex.y) * scale)
+
+  return (path, CGSize(width: b.width * scale, height: b.height * scale), tip, GLYPH_STROKE_W * scale)
 }
 
 // ── the panel ────────────────────────────────────────────────────────────────
@@ -224,7 +245,8 @@ final class OverlayController: NSObject {
   /// place to bite.
   private let stage = CALayer()
   private let cursorGroup = CALayer()
-  private let glyphFill = CAGradientLayer()
+  private let glyphFill = CAShapeLayer()
+  private let glyphGlowSoft = CAShapeLayer()
   private let glyphStroke = CAShapeLayer()
   /*
    * THE PILL'S LOOK, in one place because the user specified it in one breath:
@@ -259,7 +281,7 @@ final class OverlayController: NSObject {
   /// a white glyph on nothing is unreadable. Painted behind `stage`.
   private let backdrop = CALayer()
 
-  private let glyph: (path: CGPath, box: CGSize, tip: CGPoint)
+  private let glyph: (path: CGPath, box: CGSize, tip: CGPoint, strokeWidth: CGFloat)
   private var cursorAX: CGPoint?
   private var bubbleStatus = ""
   /** The pill's collapsed width — dots only, no words. */
@@ -362,31 +384,41 @@ final class OverlayController: NSObject {
     let fillMask = CAShapeLayer()
     fillMask.path = glyph.path
     fillMask.fillColor = CGColor(gray: 0, alpha: 1)
+    /*
+     * HIS PAINT, NOT OURS: a solid #78BFE5 body under a white #FFFFFF keyline,
+     * with the #95F9E5 glow behind. The old pearl gradient and dark hairline
+     * were tuned for a glyph that no longer exists — keeping them would have
+     * made his artwork a different picture.
+     */
+    glyphGlowSoft.frame = cursorGroup.bounds
+    glyphGlowSoft.contentsScale = scale
+    glyphGlowSoft.path = glyph.path
+    glyphGlowSoft.fillColor = GLYPH_GLOW
+    glyphGlowSoft.strokeColor = GLYPH_GLOW
+    glyphGlowSoft.lineWidth = glyph.strokeWidth * 1.42
+    glyphGlowSoft.lineJoin = .round
+    glyphGlowSoft.opacity = 0.383
+    glyphGlowSoft.shadowColor = GLYPH_GLOW
+    glyphGlowSoft.shadowOpacity = 1
+    glyphGlowSoft.shadowRadius = glyph.strokeWidth * 1.0
+    glyphGlowSoft.shadowOffset = .zero
+    cursorGroup.addSublayer(glyphGlowSoft)
+
     glyphFill.frame = cursorGroup.bounds
     glyphFill.contentsScale = scale
-    // Pearl → cool grey-lavender down the length of the glyph: the frosted Pi
-    // identity survives the redesign, just without the halo carrying it.
-    glyphFill.colors = [
-      cgColor(1, 1, 1, 1), cgColor(0.965, 0.968, 0.988, 0.99),
-      cgColor(0.886, 0.894, 0.945, 0.98),
-    ]
-    glyphFill.locations = [0, 0.5, 1]
-    glyphFill.startPoint = CGPoint(x: 0.15, y: 1)
-    glyphFill.endPoint = CGPoint(x: 0.9, y: 0)
-    glyphFill.mask = fillMask
+    glyphFill.path = glyph.path
+    glyphFill.fillColor = GLYPH_BODY
+    glyphFill.strokeColor = GLYPH_KEYLINE
+    glyphFill.lineWidth = glyph.strokeWidth
+    glyphFill.lineJoin = .round
     cursorGroup.addSublayer(glyphFill)
 
     glyphStroke.frame = cursorGroup.bounds
     glyphStroke.contentsScale = scale
     glyphStroke.path = glyph.path
     glyphStroke.fillColor = nil
-    // MEASURED on rendered crops: a WHITE keyline (what the old dart used, on
-    // top of its blue halo) left the pointer all but invisible against a white
-    // app. A cool DARK hairline is the pair that works on both grounds — it
-    // draws the silhouette on light, and on dark it disappears into the
-    // background while the white body does the separating.
-    glyphStroke.strokeColor = cgColor(0.18, 0.20, 0.29, 0.34)
-    glyphStroke.lineWidth = 1.0
+    glyphStroke.strokeColor = GLYPH_KEYLINE
+    glyphStroke.lineWidth = glyph.strokeWidth * 0.34
     glyphStroke.lineJoin = .round
     cursorGroup.addSublayer(glyphStroke)
 
