@@ -269,7 +269,7 @@ export function HarnessPanel() {
  * their own three ways of being exposed.
  */
 function ToolInterfaceSection() {
-  const value = useSettingsStore((s) => s.settings.toolInterface ?? 'schemas');
+  const value = useSettingsStore((s) => s.settings.toolInterface ?? 'bash-cli');
   const update = useSettingsStore((s) => s.update);
   return (
     <SettingSection
@@ -280,8 +280,8 @@ function ToolInterfaceSection() {
         label="Tools as"
         hint={
           value === 'bash-cli'
-            ? 'Every tool is a command on PATH. One tool is advertised (bash) and the whole registry is discoverable with `tools`, `tools search` and `--help`. Experimental.'
-            : 'Each tool is a JSON schema in the request, chosen per turn. The default.'
+            ? 'Every tool is a command on PATH. One tool is advertised (bash) and the whole registry is discoverable with `tools`, `tools search` and `--help`. The default — it keeps the request far smaller.'
+            : 'Each tool is a JSON schema in the request, chosen per turn. Heavier, but the model can only ever emit a tool that exists.'
         }
       >
         <SegmentedControl

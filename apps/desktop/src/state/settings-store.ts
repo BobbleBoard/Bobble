@@ -39,7 +39,7 @@ const DEFAULTS: DesktopSettings = {
   effortMode: 'auto',
   search: { brave: '', tavily: '' },
   mcpMode: 'lite',
-  toolInterface: 'schemas',
+  toolInterface: 'bash-cli',
   workMode: 'chat',
   powerMode: 'auto',
   showComputerUseStatusPill: true,

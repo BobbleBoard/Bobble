@@ -6,6 +6,7 @@ import {
   mergeSettingsPatch,
   seedFromOnboarding,
 } from './settings-logic';
+import { effectiveMcpMode } from './settings-main';
 
 describe('clampSettings', () => {
   it('returns defaults for junk input', () => {
@@ -280,5 +281,30 @@ describe('quick menu settings', () => {
       },
     }).modelQuickMenu;
     expect(got?.slots[0]?.tier).toBeUndefined();
+  });
+});
+
+describe('the tool interface a fresh install gets', () => {
+  /* the user: "I want cli mode to be by default". Pinned so that changing it back
+     has to be a decision someone makes on purpose, not a merge artefact. */
+  it('is the bash CLI', () => {
+    expect(DEFAULT_SETTINGS.toolInterface).toBe('bash-cli');
+  });
+
+  /* The two settings are coupled on purpose — the user: "all capabilities / mcp
+     when in bash mode should be translated" — so the default connector mode
+     has to follow the default interface, or a fresh install is the mixed state
+     that comment warns about: a model that can see one JSON tool reaches for it
+     and never learns the commands. */
+  it('leaves connectors in their CLI translation too', () => {
+    expect(effectiveMcpMode(DEFAULT_SETTINGS.mcpMode, DEFAULT_SETTINGS.toolInterface)).toBe(
+      'bash-cli',
+    );
+  });
+
+  /* A stored choice still wins — this changes what a NEW install starts with,
+     not what anyone who has already picked gets. */
+  it('does not overwrite a user who chose schemas', () => {
+    expect(clampSettings({ toolInterface: 'schemas' }).toolInterface).toBe('schemas');
   });
 });
