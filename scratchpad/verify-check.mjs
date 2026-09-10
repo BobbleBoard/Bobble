@@ -1,0 +1,22 @@
+/** Read the page's own verdict right now, without running a model. */
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+import { chromium } from '@playwright/test';
+const run = promisify(execFile);
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const PORT = 9416;
+await run('osascript', ['-e', 'tell application "Bobble" to quit']).catch(() => {});
+while (await run('pgrep', ['-f', 'Bobble.app/Contents/MacOS/Bobble']).then((r) => r.stdout.trim() !== '', () => false)) await sleep(500);
+await run('open', ['-g', '--env', 'PI_E2E=1', '-a', '/Applications/Bobble.app', '--args', `--remote-debugging-port=${PORT}`]);
+await sleep(8000);
+const browser = await chromium.connectOverCDP(`http://127.0.0.1:${PORT}`);
+const page = (browser.contexts()[0]?.pages() ?? []).find((p) => !p.url().startsWith('devtools://'));
+await page.waitForFunction(() => typeof window.piDesktop?.invoke === 'function', { timeout: 40_000 });
+const r = await page.evaluate((x) => window.piDesktop.invoke('mac:debug', x), { op: 'snapshot', params: { app: 'Google Chrome' } });
+const els = r?.result?.elements ?? [];
+const radios = els.filter((e) => e.role === 'AXRadioButton' && /\b\d+\s*(GB|TB)\b/i.test(e.name ?? ''));
+const chosen = radios.filter((e) => String(e.value ?? '0') !== '0').map((e) => (e.name ?? '').match(/\b\d+\s*(?:GB|TB)\b/i)?.[0]);
+console.log('offered:', radios.map((e) => (e.name ?? '').match(/\b\d+\s*(?:GB|TB)\b/i)?.[0]).join(', '));
+console.log('SELECTED:', JSON.stringify(chosen));
+await browser.close().catch(() => {});
+await run('osascript', ['-e', 'tell application "Bobble" to quit']).catch(() => {});
