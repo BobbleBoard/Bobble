@@ -88,6 +88,10 @@ export interface OverlayVisibilityState {
   /** The model is actively driving the app right now (a tool act in flight or
    * within the recent activity window). */
   readonly driving: boolean;
+  /** The helper is cutting the occlusion mask itself, from the window server's
+   * own z-order, at display rate. When it is, "what is covered" is answered
+   * pixel-exactly and instantly, so none of the coarse rules below apply. */
+  readonly nativeMask?: boolean;
   /** Z-ORDER TRUTH from the helper (CGWindowList): is the controlled window
    * meaningfully covered by OTHER apps' windows above it? `null`/undefined =
    * unknown (old helper / no windowId) → fall back to the driving/frontmost
@@ -98,15 +102,21 @@ export interface OverlayVisibilityState {
 /**
  * Should the phantom cursor overlay be VISIBLE AT ALL?
  *
- * macOS window levels are global bands, not per-app, so a click-through panel
- * can't be truly z-sandwiched between the controlled app and whatever else is
- * on screen. Two things scope it instead, and this is the COARSE one: a
- * whole-overlay show/hide tied to the controlled app, so the phantom never
- * floats over an app the user has turned to on their own. The FINE one is the
- * occluder mask the native panel applies (see occludersDiffer), which stops the
- * cursor painting on individual windows above the app long before their
- * coverage trips the hide threshold.
+ * WITH THE NATIVE MASK, THIS RULE ALMOST ENTIRELY GOES AWAY.
  *
+ * The helper now re-cuts the occlusion mask from the window server's own
+ * z-order at 30 Hz (see refreshOcclusion), so the phantom is already absent
+ * from every pixel another window covers — including all of them. Deciding to
+ * hide on top of that is not just redundant, it is the thing the user could see:
+ * "when an app switches away from focus there's a ~1s delay until the cursor
+ * disappears as well, this breaks the immersion that it's actually part of,
+ * actually on the window." A rule that decides can only decide late, and it
+ * decides all-or-nothing; the mask does neither.
+ *
+ * So with the native mask the only reason left to hide is that there is nothing
+ * to sit on: the window is minimised, on another space, or gone.
+ *
+ * Without it (older helper) the coarse rules still apply:
  *   - The window must exist at all (`appVisible`) — nothing to overlay
  *     otherwise.
  *   - OCCLUSION IS TRUTH when the helper reports it: a controlled window
@@ -120,6 +130,7 @@ export interface OverlayVisibilityState {
  */
 export function overlayShouldShow(s: OverlayVisibilityState): boolean {
   if (!s.appVisible) return false;
+  if (s.nativeMask === true) return true;
   if (s.occluded === true) return false;
   if (s.occluded === false) return true;
   return s.driving || s.controlledFrontmost;

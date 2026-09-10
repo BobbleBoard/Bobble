@@ -400,7 +400,20 @@ async function snapshotWithOverlay(params: Record<string, unknown>): Promise<Mac
       }
     }
     const wb = snap.windowBounds;
-    await macOverlay.control(snap.pid, wb ? { x: wb.x, y: wb.y, w: wb.w, h: wb.h } : null);
+    /* The window NUMBER travels with the rect: the panel pins itself directly
+       above that window, which is the layering (see pinAbove). */
+    await macOverlay.control(
+      snap.pid,
+      wb
+        ? {
+            x: wb.x,
+            y: wb.y,
+            w: wb.w,
+            h: wb.h,
+            ...(typeof snap.windowId === 'number' ? { windowId: snap.windowId } : {}),
+          }
+        : null,
+    );
     // The monitor tab follows the SAME target the overlay just took (one
     // controlled app at a time); the app name is what titles the tab.
     macMonitor.setSession(snap.pid, String(snap.app ?? params.app ?? ''));
@@ -972,6 +985,16 @@ function registerE2eDebugChannel(): void {
           // any more, so the panel reports on itself.
           case 'overlay-native-info':
             return { ok: true, result: await macOverlay.nativeInfo() };
+          /* the user's challenge, measured: can we sit directly above another app's
+             window? See OverlayController.orderRelativeTest. */
+          case 'overlay-order-test':
+            return {
+              ok: true,
+              result: await macOverlay.orderTest(
+                Number(params.windowId ?? 0),
+                String(params.mode ?? 'read-only'),
+              ),
+            };
           case 'overlay-hide-panel': {
             await macOverlay.debugHidePanel();
             return { ok: true };
@@ -984,6 +1007,13 @@ function registerE2eDebugChannel(): void {
           }
           case 'overlay-backdrop': {
             await macOverlay.debugBackdrop(typeof params.color === 'string' ? params.color : null);
+            return { ok: true };
+          }
+          case 'overlay-controls-hover': {
+            await macOverlay.debugControlsHover(
+              params.on !== false,
+              typeof params.hot === 'number' ? params.hot : undefined,
+            );
             return { ok: true };
           }
           case 'overlay-render': {
@@ -1013,6 +1043,29 @@ function registerE2eDebugChannel(): void {
             e2eFakeBounds = { ...frame, frontmost: e2eFakeBounds?.frontmost !== false };
             await macOverlay.debugRetarget(frame);
             return { ok: true, result: macOverlay.info() };
+          }
+          /* Real control of a real app: the live bounds reader, the real
+             window number, the real pin — the only way to check the stacking
+             claim against the window server rather than against a fake. */
+          case 'overlay-live-control': {
+            const app = String(params.app ?? '');
+            const b = (await getHelper().request('bounds', { app })) as {
+              pid?: number;
+              x?: number;
+              y?: number;
+              w?: number;
+              h?: number;
+              windowId?: number;
+            };
+            if (typeof b?.pid !== 'number') return { ok: false, error: `no window for ${app}` };
+            await macOverlay.control(b.pid, {
+              x: Number(b.x ?? 0),
+              y: Number(b.y ?? 0),
+              w: Number(b.w ?? 0),
+              h: Number(b.h ?? 0),
+              ...(typeof b.windowId === 'number' ? { windowId: b.windowId } : {}),
+            });
+            return { ok: true, result: { ...macOverlay.info(), windowId: b.windowId, pid: b.pid } };
           }
           case 'overlay-fake-control': {
             // Drive the REAL tracking loop off a synthetic bounds source.

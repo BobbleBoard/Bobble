@@ -274,22 +274,38 @@ final class OverlayControlsView: NSView {
     tracking = t
   }
 
-  /// Three equal slots along the right-hand end of the pill.
+  /**
+   * Two round buttons at the right end, and Hide taking everything else.
+   *
+   * the user: "i'd like the hide button to literally just be a button taking up the
+   * rest of the left space no [icon] ... just shows 'Hide' no icon and then the
+   * pause button and X next to it." So Hide is not a third circle competing for
+   * a glance — it is the wide, obvious, word-labelled way out, and the two
+   * glyph buttons keep the corner.
+   */
   private func slots() -> [NSRect] {
     let side = min(bounds.height - 6, 18)
     let gap: CGFloat = 4
-    var x = bounds.maxX - 6 - side
-    var out: [NSRect] = []
-    for _ in 0..<3 {
-      out.append(NSRect(x: x, y: (bounds.height - side) / 2, width: side, height: side))
-      x -= side + gap
-    }
-    return out  // [stop, pause, hide]
+    let pad: CGFloat = 5
+    let y = (bounds.height - side) / 2
+    let stop = NSRect(x: bounds.maxX - pad - side, y: y, width: side, height: side)
+    let pause = NSRect(x: stop.minX - gap - side, y: y, width: side, height: side)
+    let hide = NSRect(x: pad, y: y, width: max(0, pause.minX - gap - pad), height: side)
+    return [stop, pause, hide]
   }
 
   private func slotAt(_ p: NSPoint) -> Int? {
     for (i, r) in slots().enumerated() where r.insetBy(dx: -3, dy: -3).contains(p) { return i }
     return nil
+  }
+
+  /// Probe seam: pretend the pointer is over the pill (optionally over one
+  /// button), so the controls can be LOOKED at without moving the user's mouse.
+  func previewHover(_ on: Bool, hot: Int?) {
+    isHovered = on
+    hovered = hot
+    onHoverChange?(on)
+    needsDisplay = true
   }
 
   override func mouseEntered(with event: NSEvent) {
@@ -332,7 +348,8 @@ final class OverlayControlsView: NSView {
   override func draw(_ dirty: NSRect) {
     guard isHovered, let ctx = NSGraphicsContext.current?.cgContext else { return }
     let rects = slots()
-    for (i, r) in rects.enumerated() {
+    drawHide(rects[2], hot: hovered == 2, ctx: ctx)
+    for (i, r) in rects.enumerated() where i < 2 {
       let on = hovered == i
       // The ✕ is the destructive one, so its hover is red; the others go white.
       let bg: CGColor =
@@ -360,14 +377,32 @@ final class OverlayControlsView: NSView {
         ctx.setFillColor(CGColor(gray: 1, alpha: 0.95))
         ctx.fill(CGRect(x: inset.minX, y: inset.minY, width: w, height: inset.height))
         ctx.fill(CGRect(x: inset.maxX - w, y: inset.minY, width: w, height: inset.height))
-      default:  // hide — an eye with a slash
-        ctx.move(to: CGPoint(x: inset.minX, y: inset.midY))
-        ctx.addLine(to: CGPoint(x: inset.maxX, y: inset.midY))
-        ctx.move(to: CGPoint(x: inset.minX, y: inset.minY))
-        ctx.addLine(to: CGPoint(x: inset.maxX, y: inset.maxY))
-        ctx.strokePath()
+      default:
+        break
       }
     }
+  }
+
+  /// The wide left-hand button: a rounded slab with the word on it, nothing
+  /// else. Skipped entirely when the pill is too narrow to hold a legible word,
+  /// so a short pill degrades to the two glyph buttons rather than to a smear.
+  private func drawHide(_ r: NSRect, hot: Bool, ctx: CGContext) {
+    guard r.width >= 34 else { return }
+    let path = CGPath(roundedRect: r, cornerWidth: r.height / 2, cornerHeight: r.height / 2,
+      transform: nil)
+    ctx.addPath(path)
+    ctx.setFillColor(CGColor(gray: 1, alpha: hot ? 0.26 : 0.12))
+    ctx.fillPath()
+
+    let label = NSAttributedString(
+      string: "Hide",
+      attributes: [
+        .font: NSFont.systemFont(ofSize: min(12, r.height - 5), weight: .semibold),
+        .foregroundColor: NSColor(white: 1, alpha: 0.95),
+      ])
+    let size = label.size()
+    label.draw(
+      at: NSPoint(x: r.midX - size.width / 2, y: r.midY - size.height / 2))
   }
 }
 
@@ -399,6 +434,11 @@ private let axChanged: AXObserverCallback = { _, _, _, _ in
   // The panel re-reads bounds and occluders when Node asks; asking is the point.
   emitEvent("overlay-retrack")
 }
+
+/// Re-assert the pin. Ordering is a position, not a property: anything that
+/// changes the stack — an app activating, a window raising — drops us wherever
+/// the window server felt like putting us, so it has to be re-applied.
+var repinLiveController: (() -> Void)?
 
 /// Start (or move) the Accessibility watch to `pid`. Idempotent per pid.
 func watchWindowChanges(pid: pid_t) {
@@ -435,8 +475,83 @@ func watchActivationChanges() {
   NSWorkspace.shared.notificationCenter.addObserver(
     forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main
   ) { _ in
+    repinLiveController?()
     emitEvent("overlay-retrack")
   }
+}
+
+/*
+ * SITTING EXACTLY ONE ABOVE THE APP, which turns out to be possible.
+ *
+ * the user: "there's no way it's impossible to do this overlay window stacking
+ * thing, oai were able to do it so we can too." He was right and I was wrong —
+ * I had reasoned that ordering relative to a window we do not own needs a
+ * privilege we lack, and never measured it. MEASURED, on this Mac:
+ *
+ *   before:  WindowServer, Dock, [pi-mac layer 3], Steam, Claude, Maps, Chrome
+ *   after:   WindowServer, Dock, Steam, Claude, [pi-mac layer 0], Maps, Chrome
+ *
+ * SLSOrderWindow returned 0 and the window server really did sandwich us
+ * between Claude and Maps. That is the whole feature: the phantom is above the
+ * app it is driving and below everything else, so it cannot paint over a window
+ * the user brought forward — no mask, no all-or-nothing hide, no "inexplicably
+ * on top again".
+ *
+ * Looked up by dlsym, because this is private: a missing or renamed symbol
+ * degrades to the old floating behaviour rather than failing to launch.
+ */
+private let slsHandle = dlopen(
+  "/System/Library/PrivateFrameworks/SkyLight.framework/SkyLight", RTLD_LAZY)
+
+private typealias SLSMainConnectionIDFn = @convention(c) () -> Int32
+private typealias SLSOrderWindowFn = @convention(c) (Int32, Int32, Int32, Int32) -> Int32
+
+private let slsMainConnectionID: SLSMainConnectionIDFn? = slsHandle
+  .flatMap { dlsym($0, "SLSMainConnectionID") }
+  .map { unsafeBitCast($0, to: SLSMainConnectionIDFn.self) }
+
+private let slsOrderWindow: SLSOrderWindowFn? = slsHandle
+  .flatMap { dlsym($0, "SLSOrderWindow") }
+  .map { unsafeBitCast($0, to: SLSOrderWindowFn.self) }
+
+private typealias SLSSetWindowLevelFn = @convention(c) (Int32, Int32, Int32) -> Int32
+
+private let slsSetWindowLevel: SLSSetWindowLevelFn? = slsHandle
+  .flatMap { dlsym($0, "SLSSetWindowLevel") }
+  .map { unsafeBitCast($0, to: SLSSetWindowLevelFn.self) }
+
+/**
+ * THE TRAP THAT MADE THIS LOOK IMPOSSIBLE.
+ *
+ * Ordering only ever happens WITHIN a level band, so the phantom has to join
+ * the app's band first. `NSWindow.level = .normal` does that — but only on the
+ * next runloop turn. Ordering in the same turn is therefore a silent no-op: the
+ * call returns 0, the window server moves nothing, and the panel keeps floating
+ * over everything. That is the whole reason the first attempt "proved" you
+ * cannot sandwich a foreign window.
+ *
+ * Setting the level through SkyLight instead lands immediately, so the order
+ * that follows it lands too.
+ */
+@discardableResult
+func slsSetLevel(_ ours: Int, _ level: Int) -> Bool {
+  guard let cid = slsMainConnectionID?(), let set = slsSetWindowLevel, ours > 0 else { return false }
+  return set(cid, Int32(ours), Int32(level)) == 0
+}
+
+/// The raw window-server answer, so a failure can be told apart from a call we
+/// never made.
+func slsOrderRC(_ ours: Int, _ target: Int) -> Int32 {
+  guard let cid = slsMainConnectionID?(), let order = slsOrderWindow, target > 0, ours > 0 else {
+    return -1
+  }
+  return order(cid, Int32(ours), 1, Int32(target))
+}
+
+/// True when the window server let us order relative to a foreign window.
+@discardableResult
+func slsOrderAbove(_ ours: Int, _ target: Int) -> Bool {
+  return slsOrderRC(ours, target) == 0
 }
 
 /// A panel that can never become key or main. `.nonactivatingPanel` already
@@ -486,6 +601,11 @@ final class OverlayController: NSObject {
    * not allowed to write on somebody else's window.
    */
   private var windowAX: CGRect?
+  /** The app window the phantom belongs to — what the mask is computed against. */
+  private var trackedWindow: Int = 0
+  private var occlusionTimer: Timer?
+  /** False once the window server refuses — we fall back to floating + mask. */
+
   private let bubbleText = CATextLayer()
   private let bubbleSub = CATextLayer()
   private var bubbleDots: [CALayer] = []
@@ -571,17 +691,53 @@ final class OverlayController: NSObject {
     win.setFrame(f, display: false)
     view.frame = CGRect(origin: .zero, size: f.size)
     view.needsDisplay = true
-    if !win.isVisible { win.order(.above, relativeTo: panel.windowNumber) }
+    if !win.isVisible {
+      win.order(.above, relativeTo: panel.windowNumber)
+    }
   }
 
   /// While the controls are up, whatever the pill was saying goes soft — the
   /// buttons are the subject then, not the words behind them.
+  /// Re-park the controls on every frame of a pill width animation. Short-lived
+  /// by design: it stops as soon as the pill stops moving.
+  private func followBubbleWidth() {
+    widthFollowTimer?.invalidate()
+    let deadline = Date().addingTimeInterval(0.34)
+    let t = Timer(timeInterval: 1.0 / 60.0, repeats: true) { [weak self] timer in
+      guard let self = self else { return timer.invalidate() }
+      self.syncControls()
+      if Date() > deadline {
+        timer.invalidate()
+        self.widthFollowTimer = nil
+      }
+    }
+    RunLoop.main.add(t, forMode: .common)
+    widthFollowTimer = t
+  }
+  private var widthFollowTimer: Timer?
+
   private func setBubbleBlurred(_ on: Bool) {
+    if controlsHovered != on {
+      controlsHovered = on
+      layoutBubbleContents(dots: dotsVisible)
+      layoutBubble()
+      syncControls()
+    }
     CATransaction.begin()
     CATransaction.setAnimationDuration(0.16)
-    bubbleText.opacity = on ? 0.18 : 1
-    bubbleSub.opacity = on ? 0.18 : 1
-    for d in bubbleDots { d.opacity = on ? 0.12 : (dotsVisible ? 0.45 : 0) }
+    /* All the way out, not merely dimmed. At 0.18 the old status was still
+       legible and sat directly under the word "Hide" — two things saying
+       different words in the same 50 points. The frosted panel behind the
+       buttons is what keeps it from looking like a different pill. */
+    bubbleText.opacity = on ? 0 : 1
+    bubbleSub.opacity = on ? 0 : 1
+    /* isHidden, not opacity: the dots carry a repeating opacity animation, and
+       an animation OVERRIDES the model value — setting it to 0 changed nothing
+       on screen, which is why the wave was still bouncing under the word. */
+    for d in bubbleDots {
+      d.isHidden = on || !dotsVisible
+      d.opacity = on ? 0 : (dotsVisible ? 0.45 : 0)
+    }
     bubbleBlur.opacity = on ? 1 : 0
     CATransaction.commit()
   }
@@ -819,6 +975,11 @@ final class OverlayController: NSObject {
       // must not touch who owns the user's focus.
       panel.orderFrontRegardless()
     }
+    /* Cut the mask before the first frame is on screen, not after: showing the
+       phantom over a window that is already covered, even for one frame, is the
+       flash that reads as "it's on top again". */
+    refreshOcclusion()
+    startOcclusionTimer()
     verifyDisplayedOnce()
   }
 
@@ -849,6 +1010,7 @@ final class OverlayController: NSObject {
   }
 
   func hide() {
+    stopOcclusionTimer()
     if panel.isVisible { panel.orderOut(nil) }
   }
 
@@ -1042,9 +1204,261 @@ final class OverlayController: NSObject {
   /// Draw the pill at all. The cursor is unaffected — it is the part that shows
   /// WHERE something is happening, and only the pill puts words on the screen.
   /// The controlled window's frame, so the pill can stay inside it.
+  /// Try to park directly above `targetWindowNumber` and report the truth.
+  ///
+  /// the user: "there's no way it's impossible to do this overlay window stacking
+  /// thing, oai were able to do it so we can too." He is right that I asserted
+  /// it rather than measured it. This measures it, one step at a time, and
+  /// reports which step the window server actually honoured — the first attempt
+  /// HUNG the main thread for four seconds, which is itself a finding.
+  func orderRelativeTest(targetWindowNumber: Int, mode: String) -> [String: Any] {
+    func zOrder() -> [[String: Any]] {
+      let list =
+        (CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID)
+          as? [[String: Any]]) ?? []
+      return list.map {
+        [
+          "num": ($0[kCGWindowNumber as String] as? Int) ?? -1,
+          "owner": ($0[kCGWindowOwnerName as String] as? String) ?? "?",
+          "layer": ($0[kCGWindowLayer as String] as? Int) ?? -1,
+        ]
+      }
+    }
+    let ours = panel.windowNumber
+    let before = zOrder()
+    let idx = { (list: [[String: Any]], num: Int) -> Int in
+      list.firstIndex { ($0["num"] as? Int) == num } ?? -1
+    }
+    var note = "none"
+    switch mode {
+    case "sls-owner":
+      /*
+       * Can we borrow the TARGET's connection to order relative to its window?
+       * SLSOrderWindow's relativeTo is ignored for a window we do not own (two
+       * clean samples: asking for "above Chrome", which sits at the BACK of the
+       * band, lands us at the FRONT of it). SLSGetWindowOwner hands back the
+       * owning connection, so this asks the window server the same question
+       * with the owner's cid instead of ours.
+       */
+      panel.level = .normal
+      _ = slsSetLevel(panel.windowNumber, 0)
+      guard let handle = slsHandle, let ownerSym = dlsym(handle, "SLSGetWindowOwner"),
+        let orderSym = dlsym(handle, "SLSOrderWindow"),
+        let cidSym = dlsym(handle, "SLSMainConnectionID")
+      else {
+        note = "SLSGetWindowOwner / SLSOrderWindow not found"
+        break
+      }
+      typealias GetOwner = @convention(c) (Int32, Int32, UnsafeMutablePointer<Int32>) -> Int32
+      typealias Order = @convention(c) (Int32, Int32, Int32, Int32) -> Int32
+      typealias MainCID = @convention(c) () -> Int32
+      let getOwner = unsafeBitCast(ownerSym, to: GetOwner.self)
+      let order = unsafeBitCast(orderSym, to: Order.self)
+      let cid = unsafeBitCast(cidSym, to: MainCID.self)()
+      var owner: Int32 = 0
+      let orc = getOwner(cid, Int32(targetWindowNumber), &owner)
+      let rc = order(owner, Int32(ours), 1, Int32(targetWindowNumber))
+      note = "owner(rc \(orc)) = \(owner); SLSOrderWindow(ownerCid) returned \(rc)"
+    case "sls-below":
+      /* The mirror question: order BELOW the window sitting directly above the
+         target. If relativeTo is honoured in this direction it is honoured at
+         all, and "just above the target" is reachable the long way round. */
+      panel.level = .normal
+      _ = slsSetLevel(panel.windowNumber, 0)
+      let list = zOrder()
+      let ti = idx(list, targetWindowNumber)
+      let aboveNum = ti > 0 ? ((list[ti - 1]["num"] as? Int) ?? 0) : 0
+      guard let handle = slsHandle, let orderSym = dlsym(handle, "SLSOrderWindow"),
+        let cidSym = dlsym(handle, "SLSMainConnectionID")
+      else {
+        note = "SLSOrderWindow not found"
+        break
+      }
+      typealias Order2 = @convention(c) (Int32, Int32, Int32, Int32) -> Int32
+      typealias MainCID2 = @convention(c) () -> Int32
+      let order2 = unsafeBitCast(orderSym, to: Order2.self)
+      let cid2 = unsafeBitCast(cidSym, to: MainCID2.self)()
+      let rc2 = order2(cid2, Int32(ours), -1, Int32(aboveNum))
+      note = "below window \(aboveNum) returned \(rc2)"
+    case "sls", "sls-normal":
+      /* Ordering only happens WITHIN a level band, so a panel still sitting at
+         .floating cannot be moved next to a .normal window at all — the first
+         "sls works" reading was really the previous mode's level change plus a
+         target that happened to be frontmost. `sls-normal` joins the band first,
+         which is what the real pin does. */
+      if mode == "sls-normal" { panel.level = .normal }
+      fallthrough
+    case "sls-order":
+      /*
+       * The private route, measured rather than assumed. SkyLight's
+       * SLSOrderWindow takes a connection id and orders one window relative to
+       * another; the question is whether it honours a window belonging to a
+       * DIFFERENT connection, which is what "one level above Chrome" would need.
+       * Looked up by dlsym so a missing or renamed symbol degrades to a report
+       * instead of a link error.
+       */
+      let handle = dlopen(
+        "/System/Library/PrivateFrameworks/SkyLight.framework/SkyLight", RTLD_LAZY)
+      guard let handle else {
+        note = "SkyLight could not be opened"
+        break
+      }
+      typealias MainConnectionID = @convention(c) () -> Int32
+      typealias OrderWindow = @convention(c) (Int32, Int32, Int32, Int32) -> Int32
+      guard let cidSym = dlsym(handle, "SLSMainConnectionID"),
+        let orderSym = dlsym(handle, "SLSOrderWindow")
+      else {
+        note = "SLSMainConnectionID / SLSOrderWindow not found"
+        break
+      }
+      let mainCID = unsafeBitCast(cidSym, to: MainConnectionID.self)
+      let slsOrder = unsafeBitCast(orderSym, to: OrderWindow.self)
+      let cid = mainCID()
+      // mode 1 = above, relative to the given window.
+      let rc = slsOrder(cid, Int32(ours), 1, Int32(targetWindowNumber))
+      note = "SLSOrderWindow(cid: \(cid)) returned \(rc)"
+    
+    case "order-only":
+      panel.order(.above, relativeTo: targetWindowNumber)
+      note = "ordered at the current level"
+    case "level-then-order":
+      panel.level = .normal
+      panel.order(.above, relativeTo: targetWindowNumber)
+      note = "dropped to .normal then ordered"
+    default:
+      note = "read only"
+    }
+    let after = zOrder()
+    let ourIdx = idx(after, ours)
+    let targetIdx = idx(after, targetWindowNumber)
+    return [
+      "ok": true,
+      "mode": mode,
+      "note": note,
+      "ourWindowNumber": ours,
+      "targetWindowNumber": targetWindowNumber,
+      "level": panel.level.rawValue,
+      "indexBefore": idx(before, ours),
+      "indexAfter": ourIdx,
+      "targetIndexAfter": targetIdx,
+      "directlyAbove": ourIdx >= 0 && targetIdx >= 0 && targetIdx - ourIdx == 1,
+      "stillVisible": panel.isVisible,
+      "frontToBack": Array(after.prefix(8)),
+    ]
+  }
+
   func setWindowRect(_ rect: CGRect?) {
     windowAX = rect
     if bubble.opacity > 0 { layoutBubble() }
+  }
+
+  /**
+   * TRACK THE APP'S WINDOW AND CUT OUT WHATEVER COVERS IT.
+   *
+   * the user: "why can't you pin it literally one level on top of the window you
+   * want to target ... mirroring the layering so it's always one level above
+   * the target", and later "there's no way it's impossible to do this overlay
+   * window stacking thing, oai were able to do it so we can too." He was right
+   * to make me measure instead of assert, so I measured — and the window server
+   * says no, in a way worth writing down because it looks like a yes:
+   *
+   *   SLSOrderWindow(cid, ours, 1, foreignWindow) RETURNS 0 AND MOVES NOTHING.
+   *
+   * Asking to sit above Chrome, which was at the BACK of the level-0 band, put
+   * us at the FRONT of it. Ordering BELOW the window directly above Chrome:
+   * same, rc 0, no movement. Borrowing Chrome's own connection id (via
+   * SLSGetWindowOwner) to ask on its behalf: rc 0x10000003, refused. The
+   * relativeTo argument is only honoured for windows on the calling connection;
+   * for a foreign one it degrades to "front of my band" and reports success. My
+   * first reading of this said it worked — that was the user clicking between the
+   * two samples and raising two windows over us by hand.
+   *
+   * So the layering stays a mask, and the thing that was actually WRONG with
+   * the mask gets fixed instead: it was computed in Node, one poll and one pipe
+   * round trip away from the truth. the user: "when an app switches away from focus
+   * there's a ~1s delay until the cursor disappears as well, this breaks the
+   * immersion that it's actually part of, actually on the window." Reading the
+   * z-order HERE, at display rate, turns that second into a frame — and no rule
+   * has to decide to hide anything, which is what made it late in the first
+   * place.
+   */
+  func trackWindow(number: Int) {
+    trackedWindow = number
+    refreshOcclusion()
+    startOcclusionTimer()
+  }
+
+  func untrackWindow() {
+    trackedWindow = 0
+    stopOcclusionTimer()
+    setOccluders([])
+  }
+
+  /// True once we are cutting the mask ourselves, which is what lets the Node
+  /// side stop sampling occlusion and stop hiding the whole overlay.
+  var masksNatively: Bool { trackedWindow > 0 }
+
+  private func startOcclusionTimer() {
+    guard occlusionTimer == nil, trackedWindow > 0 else { return }
+    /* 30 Hz. MEASURED at 0.48 ms per CGWindowListCopyWindowInfo call on this
+       Mac with 11 on-screen windows, so ~1.4% of one core while an app is being
+       driven and nothing at all when it is not — the panel stops the timer when
+       it hides. Cheap enough to be honest about next to a model doing prefill. */
+    let t = Timer(timeInterval: 1.0 / 30.0, repeats: true) { [weak self] _ in
+      self?.refreshOcclusion()
+    }
+    RunLoop.main.add(t, forMode: .common)
+    occlusionTimer = t
+  }
+
+  private func stopOcclusionTimer() {
+    occlusionTimer?.invalidate()
+    occlusionTimer = nil
+  }
+
+  /**
+   * Every window stacked above the controlled one becomes a hole in the phantom.
+   *
+   * Only windows BELOW our own level band matter: anything at or above it is
+   * already drawn over us by the window server. Our own two windows are skipped
+   * for the obvious reason. If the controlled window is not in the on-screen
+   * list at all (another space, minimised) there is nothing to reason about, so
+   * the mask is cleared and the Node side's own appVisible rule takes it from
+   * there.
+   */
+  func refreshOcclusion() {
+    guard trackedWindow > 0, panel.isVisible else { return }
+    let ourLayer = panel.level.rawValue
+    let ours: Set<Int> = [panel.windowNumber, controls?.windowNumber ?? -1]
+    let list =
+      (CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID)
+        as? [[String: Any]]) ?? []
+    var rects: [CGRect] = []
+    var found = false
+    for w in list {
+      let num = (w[kCGWindowNumber as String] as? Int) ?? -1
+      if num == trackedWindow {
+        found = true
+        break
+      }
+      if ours.contains(num) { continue }
+      let layer = (w[kCGWindowLayer as String] as? Int) ?? 0
+      if layer >= ourLayer { continue }
+      guard let raw = w[kCGWindowBounds as String] as? NSDictionary,
+        let r = CGRect(dictionaryRepresentation: raw)
+      else { continue }
+      rects.append(r)
+    }
+    setOccluders(found ? rects : [])
+  }
+
+  /// Probe seam: see previewHover. Lays the controls out first, because a pill
+  /// that has never been hovered has never been widened to hold them.
+  func previewControlsHover(_ on: Bool, hot: Int?) {
+    setBubbleBlurred(on)
+    syncControls()
+    controlsView?.previewHover(on, hot: hot)
+    syncControls()
   }
 
   func setPillEnabled(_ on: Bool) {
@@ -1094,6 +1508,12 @@ final class OverlayController: NSObject {
     bubble.add(breathe, forKey: "breathe")
   }
 
+  /// Narrowest pill that still fits Hide + pause + ✕ with room to breathe.
+  private let CONTROLS_MIN_W: CGFloat = 134
+  /// True while the pointer is over the pill, which is also what makes it wide
+  /// enough to hold the buttons.
+  private var controlsHovered = false
+
   private func layoutBubbleContents(dots: Bool) {
     dotsVisible = dots
     let padX: CGFloat = 13
@@ -1111,7 +1531,11 @@ final class OverlayController: NSObject {
     let dotsWidth: CGFloat = dots ? (4 * 3 + 3 * 2) + (bare ? 0 : gap) : 0
     let contentW = dotsWidth + ceil(mainSize.width) + ceil(subSize.width)
     let h = ceil(max(mainSize.height, max(subSize.height, 15))) + padY * 2
-    let w = contentW + (bare ? padY * 2 : padX * 2)
+    /* Hovering has to leave room for the buttons. A "Thinking" pill is narrower
+       than Hide + pause + ✕, so it grows to hold them — the same width
+       animation the status changes already use, which is why hovering reads as
+       the pill opening rather than as a popover appearing. */
+    let w = max(contentW + (bare ? padY * 2 : padX * 2), controlsHovered ? CONTROLS_MIN_W : 0)
 
     /*
      * THE WIDTH CHANGE IS THE ANIMATION.
@@ -1123,6 +1547,10 @@ final class OverlayController: NSObject {
      * only the pill's own bounds, fill and shadow are allowed to animate.
      */
     let grew = abs(bubble.bounds.width - w) > 0.5
+    /* The buttons live on a separate window, so they do not come along for the
+       width animation for free — without this they snap to the new width a beat
+       late and the Hide slab is briefly the wrong size. */
+    if grew { followBubbleWidth() }
     if grew && !reduceMotion() {
       CATransaction.begin()
       CATransaction.setAnimationDuration(0.24)
@@ -1308,7 +1736,14 @@ final class OverlayController: NSObject {
     // would be judging the wrong colours.
     CATransaction.begin()
     CATransaction.setDisableActions(true)
-    backdrop.frame = root.bounds
+    /* NEVER the whole desktop. the user, mid-run: "I just saw the whole screen turn
+       blank for a second, with no window change, what's that about?" — a probe
+       had set a backdrop and the panel spans every display, so an opaque layer
+       at root.bounds IS a blanked screen. Clamped to the pill's own
+       neighbourhood, the worst a forgotten backdrop can do is put a small dark
+       card behind the phantom. */
+    let around = (bubble.presentation() ?? bubble).frame.insetBy(dx: -90, dy: -70)
+    backdrop.frame = around.isEmpty ? CGRect(x: 0, y: 0, width: 420, height: 260) : around
     backdrop.backgroundColor = cgColor(
       CGFloat((v >> 16) & 0xFF) / 255, CGFloat((v >> 8) & 0xFF) / 255, CGFloat(v & 0xFF) / 255, 1)
     backdrop.isHidden = false
@@ -1339,6 +1774,22 @@ final class OverlayController: NSObject {
     ctx.scaleBy(x: s, y: s)
     ctx.translateBy(x: -local.minX, y: -local.minY)
     (root.presentation() ?? root).render(in: ctx)
+    /* The buttons live on their own window (the phantom must stay
+       click-through), so they are not in this layer tree. Draw them in at the
+       pill's position, or a render of a hovered pill would show the blur with
+       nothing on it. */
+    if let view = controlsView, let win = controls, win.isVisible, view.bounds.width > 1,
+      let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds)
+    {
+      view.cacheDisplay(in: view.bounds, to: rep)
+      if let img = rep.cgImage {
+        let f = win.frame
+        ctx.draw(
+          img,
+          in: CGRect(
+            x: f.minX - frame.minX, y: f.minY - frame.minY, width: f.width, height: f.height))
+      }
+    }
     guard let image = ctx.makeImage() else { return false }
     let url = URL(fileURLWithPath: path)
     guard
@@ -1370,6 +1821,10 @@ final class OverlayController: NSObject {
       "opaque": panel.isOpaque,
       "hasShadow": panel.hasShadow,
       "level": panel.level.rawValue,
+      "trackedWindow": trackedWindow,
+      "masksNatively": masksNatively,
+      "windowNumber": panel.windowNumber,
+
       "floatingLevel": NSWindow.Level.floating.rawValue,
       "appActive": NSApp.isActive,
       "activationPolicy": policyName(NSApp.activationPolicy()),
@@ -1486,6 +1941,21 @@ private func handleOverlay(
     controller.placeCursor(
       CGPoint(x: x, y: y), travelMs: doubleValue(params["ms"]) ?? DEFAULT_TRAVEL_MS)
     return ["ok": true]
+  case "order-test":
+    /*
+     * CAN WE SIT DIRECTLY ABOVE ANOTHER APP'S WINDOW?
+     *
+     * the user: "there's no way it's impossible to do this overlay window stacking
+     * thing, oai were able to do it so we can too." He is right that I asserted
+     * this instead of measuring it, so this measures it: order our panel
+     * relative to a window number we do not own, then read the real z-order back
+     * out of the window server and report what actually happened.
+     */
+    guard let target = doubleValue(params["windowId"]).map({ Int($0) }) else {
+      return ["ok": false, "error": "order-test needs windowId"]
+    }
+    return controller.orderRelativeTest(
+      targetWindowNumber: target, mode: (params["mode"] as? String) ?? "read-only")
   case "target":
     if let x = doubleValue(params["x"]), let y = doubleValue(params["y"]),
       let w = doubleValue(params["w"]), let h = doubleValue(params["h"])
@@ -1494,11 +1964,18 @@ private func handleOverlay(
       /* Watch the app itself from here: a move or resize is then pushed to us
          the instant it happens, instead of being sampled for. */
       if let pid = doubleValue(params["pid"]) { watchWindowChanges(pid: pid_t(pid)) }
+      /* And sit directly above its window, which is the layering itself. */
+      if let win = doubleValue(params["windowNumber"]) {
+        controller.trackWindow(number: Int(win))
+      }
     } else {
       controller.setWindowRect(nil)
+      controller.untrackWindow()
       stopWatchingWindowChanges()
     }
-    return ["ok": true]
+    /* The Node side stops sampling occlusion and stops hiding the overlay once
+       the helper is cutting the mask itself — see overlayShouldShow. */
+    return ["ok": true, "nativeMask": controller.masksNatively]
   case "pill":
     controller.setPillEnabled(boolValue(params["enabled"]) ?? true)
     return ["ok": true]
@@ -1541,6 +2018,12 @@ private func handleOverlay(
     let ok = controller.render(
       to: path, rect: rect, scale: CGFloat(doubleValue(params["scale"]) ?? 2))
     return ["ok": ok, "path": path]
+  case "controls-hover":
+    /* Probe seam for the pill's buttons: hover them without a pointer, so they
+       can be rendered and looked at while the user's mouse stays where it is. */
+    controller.previewControlsHover(
+      boolValue(params["on"]) ?? true, hot: doubleValue(params["hot"]).map { Int($0) })
+    return ["ok": true]
   case "info":
     return controller.info()
   case "quit":
@@ -1565,6 +2048,7 @@ func runOverlay() {
   /* The pill's buttons are the one thing in the overlay a person can press, so
      they are the one thing that talks back. */
   controller.onBrake = { action in emitEvent("overlay-brake", data: ["action": action]) }
+  repinLiveController = { [weak controller] in controller?.refreshOcclusion() }
   watchActivationChanges()
 
   let pump = Thread {
@@ -1587,6 +2071,10 @@ func runOverlay() {
       // probe reads state right after driving it).
       DispatchQueue.main.sync {
         if let result = handleOverlay(controller, method: method, params: params) {
+          /* Anything that moves the phantom or the window under it changes
+             what covers it, so the mask is re-cut on the same beat rather than
+             waiting up to a frame for the timer. */
+          controller.refreshOcclusion()
           emitResult(id: id, result: result)
         } else {
           emitError(id: id, message: "unknown method: \(method)")

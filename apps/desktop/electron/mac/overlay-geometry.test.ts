@@ -74,6 +74,42 @@ describe('overlayShouldShow (app-scoped visibility rule)', () => {
       true,
     );
   });
+  /* With the native mask, hiding is the mask's job — and a rule that decides
+     can only decide late, which is what the user saw as "a ~1s delay until the
+     cursor disappears" every time he switched apps. */
+  it('stays up under the native mask even when another app is covering it', () => {
+    expect(
+      overlayShouldShow({
+        controlledFrontmost: false,
+        appVisible: true,
+        driving: false,
+        nativeMask: true,
+        occluded: true,
+      }),
+    ).toBe(true);
+  });
+  it('still hides under the native mask when there is no window to sit on', () => {
+    expect(
+      overlayShouldShow({
+        controlledFrontmost: false,
+        appVisible: false,
+        driving: true,
+        nativeMask: true,
+      }),
+    ).toBe(false);
+  });
+  it('falls back to the sampled occlusion rule when the helper cannot mask', () => {
+    expect(
+      overlayShouldShow({
+        controlledFrontmost: false,
+        appVisible: true,
+        driving: true,
+        nativeMask: false,
+        occluded: true,
+      }),
+    ).toBe(false);
+  });
+
   it('tucks away when backgrounded AND idle (user is working elsewhere)', () => {
     expect(
       overlayShouldShow({ controlledFrontmost: false, appVisible: true, driving: false }),

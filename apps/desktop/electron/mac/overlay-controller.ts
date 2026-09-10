@@ -103,6 +103,8 @@ export type BoundsSample = OverlayRect & {
   readonly onScreen?: boolean;
   readonly occluded?: boolean | null;
   readonly occluders?: OverlayOccluders;
+  /** The window server's number for this window — what the panel pins above. */
+  readonly windowId?: number;
 };
 
 /** Injected read of the controlled window's live frame (null = no window). */
@@ -124,7 +126,11 @@ class MacOverlayController {
   #client: MacHelperClient | null = null;
   #helperPath: string | undefined;
   #boundsReader: BoundsReader | null = null;
-  #target: { pid: number | null; rect: OverlayRect } | null = null;
+  #target: { pid: number | null; rect: OverlayRect; windowId?: number } | null = null;
+  /** Whether the helper is cutting the occlusion mask itself, off the window
+   * server's own z-order at display rate. When it is, this side stops sampling
+   * occlusion and stops hiding the overlay — see trackWindow in Overlay.swift. */
+  #nativeMask = false;
   #trackTimer: ReturnType<typeof setTimeout> | null = null;
   #missingSince: number | null = null;
   #lastActivityAt: number | null = null;
@@ -241,11 +247,18 @@ class MacOverlayController {
   /** Show the overlay for `pid`'s window and track it. Idempotent per pid; a
    * new pid re-targets the overlay. `rect` is the caller's already-known frame
    * (a snapshot/launch ack) to save a round-trip. */
-  async control(pid: number, rect: OverlayRect | null | undefined): Promise<void> {
+  async control(
+    pid: number,
+    rect: (OverlayRect & { windowId?: number }) | null | undefined,
+  ): Promise<void> {
     if (process.platform !== 'darwin') return;
     const known = rect ?? (await this.#readBounds(pid));
     if (known === null) return; // no window yet — a later snapshot will retry
-    this.#target = { pid, rect: { x: known.x, y: known.y, w: known.w, h: known.h } };
+    this.#target = {
+      pid,
+      rect: { x: known.x, y: known.y, w: known.w, h: known.h },
+      ...(known.windowId === undefined ? {} : { windowId: known.windowId }),
+    };
     this.#missingSince = null;
     this.#markActivity(); // control() means the model just acted → show
     await this.#pushTarget(this.#target.rect);
@@ -307,6 +320,17 @@ class MacOverlayController {
   /** Probe seam: order the panel OUT without tearing tracking down, so a
    * screenshot can be rendered with the (opaque, full-desktop) probe backdrop
    * painted and no chance of it reaching a real screen. */
+  /** E2E seam for the cross-process ordering experiment. */
+  async orderTest(windowId: number, mode = 'read-only'): Promise<unknown> {
+    // Deliberately NOT through #push: that swallows errors so a cosmetic
+    // failure cannot break a tool call, which is wrong for an experiment.
+    try {
+      return await this.#panel().request('order-test', { windowId, mode });
+    } catch (err) {
+      return { ok: false, error: String(err instanceof Error ? err.message : err) };
+    }
+  }
+
   async debugHidePanel(): Promise<void> {
     await this.#push('hide');
     this.#visible = false;
@@ -319,6 +343,12 @@ class MacOverlayController {
   async debugOccluders(rects: OverlayRect[]): Promise<void> {
     this.#lastOccluders = rects;
     await this.#push('occluders', { rects });
+  }
+
+  /** Probe seam: hover the pill's buttons without a pointer, so a render can
+   * show them. See previewControlsHover in Overlay.swift. */
+  async debugControlsHover(on: boolean, hot?: number): Promise<void> {
+    await this.#push('controls-hover', { on, ...(hot === undefined ? {} : { hot }) });
   }
 
   async debugRender(
@@ -379,10 +409,22 @@ class MacOverlayController {
    * inside it instead of spilling onto whatever app is beside it. */
   async #pushTarget(rect: OverlayRect | null): Promise<void> {
     const pid = this.#target?.pid ?? null;
-    await this.#push(
+    const windowNumber = this.#target?.windowId ?? null;
+    const reply = await this.#push(
       'target',
-      rect === null ? {} : { x: rect.x, y: rect.y, w: rect.w, h: rect.h, ...(pid === null ? {} : { pid }) },
+      rect === null
+        ? {}
+        : {
+            x: rect.x,
+            y: rect.y,
+            w: rect.w,
+            h: rect.h,
+            ...(pid === null ? {} : { pid }),
+            // The panel masks itself against this window's z-order — see trackWindow.
+            ...(windowNumber === null ? {} : { windowNumber }),
+          },
     );
+    this.#nativeMask = (reply as { nativeMask?: boolean } | null)?.nativeMask === true;
   }
 
   async #applyVisibility(show: boolean): Promise<void> {
@@ -437,9 +479,15 @@ class MacOverlayController {
       }
     } else {
       this.#missingSince = null;
+      if (sample.windowId !== undefined && sample.windowId !== target.windowId) {
+        // A new window for the same app (a tab torn off, a dialog) is a new
+        // thing to sit above.
+        this.#target = { ...target, windowId: sample.windowId };
+        await this.#pushTarget(this.#target.rect);
+      }
       if (rectsDiffer(target.rect, sample)) await this.#follow(sample);
       this.#lastOccluded = typeof sample.occluded === 'boolean' ? sample.occluded : null;
-      await this.#applyOccluders(sample.occluders);
+      if (!this.#nativeMask) await this.#applyOccluders(sample.occluders);
       visible = overlayShouldShow({
         controlledFrontmost: sample.frontmost === true,
         // onScreen === false means the helper SAW the window off the current
@@ -447,6 +495,7 @@ class MacOverlayController {
         // phantom must not haunt the space the user switched to.
         appVisible: sample.onScreen !== false,
         driving: this.#isDriving(),
+        nativeMask: this.#nativeMask,
         occluded: this.#lastOccluded,
       });
       await this.#applyVisibility(visible);
