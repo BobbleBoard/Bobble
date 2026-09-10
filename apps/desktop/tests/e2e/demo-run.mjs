@@ -36,6 +36,23 @@ export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const osa = (s) => run('osascript', ['-e', s]).catch(() => undefined);
 
 /**
+ * Quit the app under test WITHOUT it asking to save.
+ *
+ * the user: "blender came back because of a 'save or not' popup when it got quit."
+ * A plain `quit` on an app with unsaved changes puts a modal on screen and
+ * brings that app to the front — so the teardown itself takes the user's screen,
+ * and the run reports a focus violation it caused on the way out.
+ *
+ * `quit saving no` is the standard-suite form and says exactly that. The plain
+ * quit stays as the fallback for an app that does not implement it.
+ */
+async function quitTarget(app) {
+  if (typeof app !== 'string' || app === '') return;
+  const r = await osa(`tell application "${app}" to quit saving no`);
+  if (r === undefined) await osa(`tell application "${app}" to quit`);
+}
+
+/**
  * Wait for Bobble's process to actually be gone.
  *
  * The AppleScript quit RETURNS as soon as the app accepts it, not when it has
@@ -152,7 +169,7 @@ export async function demoRun(o) {
    * need it then right?" — right, and attaching is also the case the tools are
    * built for, with the user's logins and their session.
    */
-  if (o.attach !== true) await osa(`tell application "${o.app}" to quit`);
+  if (o.attach !== true) await quitTarget(o.app);
   await osa('tell application "Bobble" to quit');
   /*
    * AND WAIT FOR IT TO ACTUALLY BE GONE.
@@ -880,17 +897,30 @@ export async function demoRun(o) {
      * somebody is using their computer. The before/after pair is kept as context
      * because it is genuinely useful when the answer is yes.
      */
-    const tookScreen = stole.length > 0;
+    /*
+     * …AND IT ONLY COUNTS IF IT WASN'T ALREADY THERE.
+     *
+     * My first cut at this said "the controlled app was ever frontmost", which
+     * immediately mis-reported the Chrome demo: it ATTACHES to the browser the
+     * user already has in front, so Chrome is frontmost 599/599 samples and none
+     * of them are a theft. Taking the screen means BECOMING frontmost when you
+     * were not — that is the thing the user would notice.
+     */
+    const alreadyThere = new RegExp(o.app, 'i').test(String(focusBefore ?? ''));
+    const tookScreen = stole.length > 0 && !alreadyThere;
     say(
       tookScreen
         ? `FOCUS MOVED: ${o.app} was frontmost ${stole.length}/${frontSamples.length} samples ` +
             `— the run took the user's screen ("${focusBefore}" -> "${focusAfter ?? '?'}").`
-        : focusAfter === null
-          ? `FOCUS HELD: ${o.app} was never frontmost (the app was gone before the final read).`
-          : focusBefore === focusAfter
-            ? `FOCUS HELD: "${focusAfter}" was in front before the run and still is.`
-            : `FOCUS HELD: ${o.app} was never frontmost; the user moved from ` +
-              `"${focusBefore}" to "${focusAfter}" themselves.`,
+        : alreadyThere
+          ? `FOCUS HELD: ${o.app} was already in front before the run (attached), and the run ` +
+            'did not move it.'
+          : focusAfter === null
+            ? `FOCUS HELD: ${o.app} was never frontmost (the app was gone before the final read).`
+            : focusBefore === focusAfter
+              ? `FOCUS HELD: "${focusAfter}" was in front before the run and still is.`
+              : `FOCUS HELD: ${o.app} was never frontmost; the user moved from ` +
+                `"${focusBefore}" to "${focusAfter}" themselves.`,
     );
     await sleep(1200);
   } finally {
@@ -926,7 +956,7 @@ export async function demoRun(o) {
     await osa('tell application "Bobble" to quit');
     await waitForBobbleToExit();
     await electronApp?.close().catch(() => {});
-    if (o.attach !== true) await osa(`tell application "${o.app}" to quit`);
+    if (o.attach !== true) await quitTarget(o.app);
     await reapOrphanServers('after');
   }
 
