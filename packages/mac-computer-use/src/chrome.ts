@@ -106,7 +106,10 @@ export function explainChromeFailure(stderr: string): string {
       'the user can turn it on — do NOT try). The chrome_* commands all go through it, ' +
       'so none of them will work in this session. DRIVE CHROME AS AN APP INSTEAD, which ' +
       'needs no setting: mac_key "cmd+l" to focus the address bar, mac_type the URL with ' +
-      'submit, then mac_snapshot to read the page. The window title carries the page title.'
+      'submit, then mac_snapshot to read the page. The window title carries the page title. ' +
+      "A snapshot of Chrome carries the PAGE'S OWN TEXT, not just its controls — headings, " +
+      'prices, labels, whatever is written on it — so you can read a page without a ' +
+      'screenshot. Use `find` to jump to a word that is further down it.'
     );
   }
   if (s.includes("can't get") || s.includes('front window')) {

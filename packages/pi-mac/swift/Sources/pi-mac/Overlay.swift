@@ -430,10 +430,35 @@ final class OverlayControlsView: NSView {
 private var axObserver: AXObserver?
 private var axWatchedPid: pid_t = 0
 
-private let axChanged: AXObserverCallback = { _, _, _, _ in
-  // The panel re-reads bounds and occluders when Node asks; asking is the point.
+private let axChanged: AXObserverCallback = { _, element, _, _ in
+  /*
+   * RIDE THE DRAG HERE, NOT IN NODE.
+   *
+   * the user, after the layering was fixed: "dragging/resizing still has a little
+   * lag and cursor snappying". Same disease as the mask was: the notification
+   * went to Node, Node polled the frame back over the pipe, then pushed a shift
+   * — three hops behind the window, and the shift's delta was computed against
+   * whatever Node last believed, so a late one moved the cursor twice and
+   * yanked it back. The notification already carries the window that moved, so
+   * read its frame right here and move with it in the same turn.
+   */
+  var pos: CFTypeRef?
+  var size: CFTypeRef?
+  var p = CGPoint.zero
+  var sz = CGSize.zero
+  if AXUIElementCopyAttributeValue(element, kAXPositionAttribute as CFString, &pos) == .success,
+    AXUIElementCopyAttributeValue(element, kAXSizeAttribute as CFString, &size) == .success,
+    AXValueGetValue(pos as! AXValue, .cgPoint, &p),
+    AXValueGetValue(size as! AXValue, .cgSize, &sz), sz.width > 1, sz.height > 1
+  {
+    followLiveController?(CGRect(origin: p, size: sz), axWindowID(element).map { Int($0) })
+  }
+  // Node still keeps its own copy of the frame; this is what tells it to.
   emitEvent("overlay-retrack")
 }
+
+/// Move the phantom with the window that just moved or resized.
+var followLiveController: ((CGRect, Int?) -> Void)?
 
 /// Re-assert the pin. Ordering is a position, not a property: anything that
 /// changes the stack — an app activating, a window raising — drops us wherever
@@ -1353,6 +1378,32 @@ final class OverlayController: NSObject {
   }
 
   /**
+   * The window moved or resized: carry the phantom the same distance.
+   *
+   * The cursor is meant to be ON the window, so a drag has to move it by the
+   * window's own delta — not re-derive a position, which is what produced the
+   * snap when a stale delta landed. A resize moves nothing but re-clamps the
+   * pill, which layoutBubble does off the new rect.
+   */
+  func followWindow(to rect: CGRect, windowNumber: Int?) {
+    if let n = windowNumber, trackedWindow > 0, n != trackedWindow { return }
+    let prev = windowAX
+    windowAX = rect
+    if let prev = prev {
+      let dx = rect.minX - prev.minX
+      let dy = rect.minY - prev.minY
+      if dx != 0 || dy != 0 {
+        shiftCursor(dx: dx, dy: dy)
+      } else if bubble.opacity > 0 {
+        layoutBubble()
+      }
+    } else if bubble.opacity > 0 {
+      layoutBubble()
+    }
+    refreshOcclusion()
+  }
+
+  /**
    * TRACK THE APP'S WINDOW AND CUT OUT WHATEVER COVERS IT.
    *
    * the user: "why can't you pin it literally one level on top of the window you
@@ -1975,7 +2026,12 @@ private func handleOverlay(
     }
     /* The Node side stops sampling occlusion and stops hiding the overlay once
        the helper is cutting the mask itself — see overlayShouldShow. */
-    return ["ok": true, "nativeMask": controller.masksNatively]
+    return [
+      "ok": true, "nativeMask": controller.masksNatively,
+      // The helper rides window moves itself now, so Node must stop pushing its
+      // own (later, staler) shift on top — that double-move WAS the snap.
+      "nativeFollow": controller.masksNatively,
+    ]
   case "pill":
     controller.setPillEnabled(boolValue(params["enabled"]) ?? true)
     return ["ok": true]
@@ -2049,6 +2105,9 @@ func runOverlay() {
      they are the one thing that talks back. */
   controller.onBrake = { action in emitEvent("overlay-brake", data: ["action": action]) }
   repinLiveController = { [weak controller] in controller?.refreshOcclusion() }
+  followLiveController = { [weak controller] rect, num in
+    controller?.followWindow(to: rect, windowNumber: num)
+  }
   watchActivationChanges()
 
   let pump = Thread {

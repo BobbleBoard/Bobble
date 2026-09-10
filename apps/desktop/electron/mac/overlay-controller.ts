@@ -131,6 +131,11 @@ class MacOverlayController {
    * server's own z-order at display rate. When it is, this side stops sampling
    * occlusion and stops hiding the overlay — see trackWindow in Overlay.swift. */
   #nativeMask = false;
+  /** Whether the helper rides window moves off the Accessibility notification
+   * itself. When it does, pushing our own shift from here lands LATER with a
+   * delta measured against a frame that has already moved on — which is the
+   * cursor snap the user saw while dragging. */
+  #nativeFollow = false;
   #trackTimer: ReturnType<typeof setTimeout> | null = null;
   #missingSince: number | null = null;
   #lastActivityAt: number | null = null;
@@ -399,7 +404,7 @@ class MacOverlayController {
     if (target === null) return;
     const { dx, dy } = rectDelta(target.rect, fresh);
     target.rect = { x: fresh.x, y: fresh.y, w: fresh.w, h: fresh.h };
-    if (dx !== 0 || dy !== 0) await this.#push('shift', { dx, dy });
+    if (!this.#nativeFollow && (dx !== 0 || dy !== 0)) await this.#push('shift', { dx, dy });
     // The panel keeps the pill inside this rect, so a resize matters as much as
     // a move — send it whenever either changed.
     await this.#pushTarget(target.rect);
@@ -424,7 +429,9 @@ class MacOverlayController {
             ...(windowNumber === null ? {} : { windowNumber }),
           },
     );
-    this.#nativeMask = (reply as { nativeMask?: boolean } | null)?.nativeMask === true;
+    const r = reply as { nativeMask?: boolean; nativeFollow?: boolean } | null;
+    this.#nativeMask = r?.nativeMask === true;
+    this.#nativeFollow = r?.nativeFollow === true;
   }
 
   async #applyVisibility(show: boolean): Promise<void> {

@@ -34,11 +34,20 @@ await demoRun({
   attach: true,
   model: MODEL,
   mode: MODE,
+  /*
+   * "navigate anywhere else" was doing damage. MEASURED on the first run: the
+   * open tab is Apple's iPhone LANDING page, where storage is not offered at
+   * all — you reach it by pressing the page's own Buy button. The model read
+   * "do not navigate" as "do not follow links either", made 14 tool calls, and
+   * finished with nothing chosen. The intent was never "don't move", it was
+   * "stay in the user's tab", so say that.
+   */
   prompt:
     'In the Google Chrome tab that is already open on this Mac, configure the ' +
-    'Apple product shown on screen with 2TB of storage. Do not open a new tab ' +
-    'or navigate anywhere else — work in the tab that is already there. Tell me ' +
-    'what you selected when you are done.',
+    'Apple product shown on screen with 2TB of storage. Stay in that tab — do ' +
+    "not open a new tab or a new window — but following the page's own links " +
+    'and buttons to reach the storage options is exactly right. Tell me what ' +
+    'you selected when you are done.',
   verify: async (dbg, last) => {
     const snap = await dbg('snapshot', { app: 'Google Chrome' });
     const shot = await dbg('screenshot', { app: 'Google Chrome' }).catch(() => null);

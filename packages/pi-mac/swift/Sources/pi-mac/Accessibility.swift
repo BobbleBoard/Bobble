@@ -193,9 +193,18 @@ private let TEXT_ROLES: Set<String> = [
 private let NAME_MAX = 120
 private let MAX_NODES = 4000
 /// Read text is a summary, not a transcript — enough to see what the app is
-/// saying, capped so a document-shaped window cannot flood the result.
-private let TEXT_MAX_ITEMS = 40
+/// saying, capped so a document-shaped window cannot flood the result. The cap
+/// is on LINES, after the runs on each line have been joined: a web page is
+/// thousands of one-word runs and forty of those is not a sentence.
+private let TEXT_MAX_ITEMS = 200
 private let TEXT_ITEM_MAX = 200
+/// Raw runs collected before joining. Generous, because they collapse hard.
+private let TEXT_MAX_RUNS = 2500
+/// Total characters of read text in one snapshot. MEASURED: a full Apple
+/// product page is 23,555 characters, which is worth more than a screenshot but
+/// not worth four of them — this keeps the top of the page and leaves the rest
+/// to `find`.
+private let TEXT_TOTAL_MAX = 4000
 
 func cleanText(_ s: String) -> String {
   let collapsed = s.replacingOccurrences(
@@ -434,7 +443,7 @@ func collectSnapshot(
     let interactive = INTERACTIVE_ROLES.contains(role)
     if !editable && !pressable && !interactive {
       // Not something to act on — but possibly something the app is SAYING.
-      if TEXT_ROLES.contains(role), readText.count < TEXT_MAX_ITEMS {
+      if TEXT_ROLES.contains(role), readText.count < TEXT_MAX_RUNS {
         /*
          * FOR A LABEL, THE VALUE IS THE TEXT. `accessibleName` prefers title,
          * then description — right for a control, wrong here: Calculator's
@@ -447,10 +456,28 @@ func collectSnapshot(
         if !shown.isEmpty {
           let pos = axPoint(el, kAXPositionAttribute) ?? CGPoint(x: -1, y: -1)
           let size = axSize(el, kAXSizeAttribute) ?? CGSize(width: 0, height: 0)
-          // A zero-sized label is laid out but not shown; reading it back would
-          // report text the user cannot see.
-          if size.width > 1, size.height > 1 {
-            readText.append((CGRect(origin: pos, size: size), truncate(shown, TEXT_ITEM_MAX)))
+          /*
+           * A RUN WITH NO HEIGHT IS STILL TEXT ON THE SCREEN.
+           *
+           * This used to require both dimensions > 1, on the reasoning that a
+           * zero-sized label is laid out but not shown. MEASURED against
+           * Chrome: of 850 text runs on an Apple product page, 799 come back
+           * with a real width and a height of ZERO — "Storage. [95x0]", "How
+           * much space do you need? [314x0]", "$1999 [36x0]". They are exactly
+           * the words the user is reading. The old rule threw 94% of the page
+           * away, which is the whole reason Chrome looked like it had nothing
+           * in it and every model reached for a screenshot instead.
+           *
+           * So: reject only the genuinely unlaid-out (both dimensions gone),
+           * and let being ON SCREEN decide the rest — which is what the rule
+           * was really trying to ask.
+           */
+          if size.width > 1 || size.height > 1 {
+            let r = CGRect(
+              x: pos.x, y: pos.y, width: max(size.width, 1), height: max(size.height, 1))
+            if r.intersects(bounds) {
+              readText.append((r, truncate(shown, TEXT_ITEM_MAX)))
+            }
           }
         }
       }
@@ -540,6 +567,39 @@ func collectSnapshot(
 ///
 /// Order is preserved: an app's static text reads top-to-bottom, and that order
 /// is most of its meaning ("Total:" then "48.20").
+/**
+ * Join runs that sit on one visual line before anything else looks at them.
+ *
+ * A native label is one run. A web page is not: Chrome hands back "256", "GB",
+ * "Buy from", "$1999" as four separate elements on the same baseline, and a
+ * list of those reads like shredded paper. Same baseline and touching
+ * horizontally means it was one sentence to the person reading it, so it is one
+ * line here.
+ */
+func joinTextRuns(_ runs: [(rect: CGRect, text: String)]) -> [(rect: CGRect, text: String)] {
+  /* Band the rows FIRST, then sort inside a band. Comparing "close enough in y"
+     pairwise is not a valid ordering — a < b and b < c without a < c — and Swift
+     is entitled to return anything at all for one. */
+  func band(_ r: CGRect) -> Int { Int((r.minY / 6).rounded(.down)) }
+  let sorted = runs.sorted {
+    band($0.rect) == band($1.rect) ? $0.rect.minX < $1.rect.minX : band($0.rect) < band($1.rect)
+  }
+  var out: [(rect: CGRect, text: String)] = []
+  for run in sorted {
+    if var last = out.last, band(last.rect) == band(run.rect),
+      run.rect.minX >= last.rect.minX, run.rect.minX - last.rect.maxX <= 40,
+      last.text.count + run.text.count < TEXT_ITEM_MAX * 3
+    {
+      last.text += (last.text.hasSuffix(" ") || run.text.hasPrefix(" ") ? "" : " ") + run.text
+      last.rect = last.rect.union(run.rect)
+      out[out.count - 1] = last
+      continue
+    }
+    out.append(run)
+  }
+  return out
+}
+
 func dedupeReadText(_ text: [(rect: CGRect, text: String)], against controls: [SnapEl]) -> [String]
 {
   // Spelled out rather than inlined: the one-line version defeats the Swift
@@ -551,14 +611,28 @@ func dedupeReadText(_ text: [(rect: CGRect, text: String)], against controls: [S
     let y = CGFloat(c.y) - h / 2
     return CGRect(x: x, y: y, width: w, height: h)
   }
+  let labels = Set(controls.map { $0.name.lowercased() }.filter { !$0.isEmpty })
   var seen = Set<String>()
   var out: [String] = []
-  for item in text {
+  var chars = 0
+  for item in joinTextRuns(text) {
+    /* A whole web page of text is worth having, an entire legal appendix is
+       not. Document order means the cap keeps the top of the page, which is
+       what the person is looking at; `find` reaches the rest. */
+    if out.count >= TEXT_MAX_ITEMS || chars >= TEXT_TOTAL_MAX { break }
     let key = item.text.lowercased()
     if key.isEmpty || seen.contains(key) { continue }
-    // Inside a control's box → it is that control's own label, already listed.
-    if frames.contains(where: { $0.insetBy(dx: -1, dy: -1).contains(item.rect) }) { continue }
+    /*
+     * A CONTROL'S OWN LABEL MEANS THE SAME WORDS, not merely the same corner of
+     * the screen. Containment alone dropped an entire web page: one page-sized
+     * AXGroup is listed as a control, and every line of text is inside it, so
+     * all 62 lines of an Apple product page were discarded as "already listed"
+     * when nothing listed them at all.
+     */
+    if labels.contains(key), frames.contains(where: { $0.insetBy(dx: -1, dy: -1).contains(item.rect) })
+    { continue }
     seen.insert(key)
+    chars += item.text.count
     out.append(item.text)
   }
   return out
