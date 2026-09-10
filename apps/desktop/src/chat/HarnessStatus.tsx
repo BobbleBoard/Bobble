@@ -105,7 +105,11 @@ function ProcessingRing({
            "loading computer use" tells you the same nothing the word
            "processing" did; the mark is what makes the wait legible at a
            glance. */
-        <span className="pd-processing-cap" aria-label={text}>
+        /* No aria-label on this span: a bare span has no role to carry one,
+           and it would be the THIRD announcement of the same string — the gauge
+           below already takes `label={text}` and pd-working-label renders it
+           visibly. This element is layout. */
+        <span className="pd-processing-cap">
           <ContextGauge
             value={value}
             size={19}

@@ -55,6 +55,7 @@ export function TopBarStatus() {
      * top for a bit of model information" — but a card that exists only under a
      * pointer does not exist for anyone on a keyboard.
      */
+    // biome-ignore lint/a11y/noStaticElementInteractions: hover belongs on the wrapper because the card renders OUTSIDE the button — putting it on the button would read moving onto the card as leaving, and close what is being read. The keyboard path is the button's own onFocus/onBlur below, so nothing here is pointer-only.
     <span
       className="pd-topbar-status-wrap"
       onMouseEnter={() => setOpen(true)}
