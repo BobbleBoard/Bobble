@@ -679,15 +679,38 @@ export async function demoRun(o) {
     const deadline = Date.now() + DEADLINE_MS;
     let seen = 0;
     let last = await readState();
+    /* The app going away mid-run is not a result. MEASURED twice while the user's
+       machine locked and slept under a running suite: `readState` threw "Target
+       page, context or browser has been closed" and the run died with a stack
+       trace, which in a ledger is indistinguishable from a model that failed.
+       Recorded as INVALID instead, the same as a session that came up with no
+       tools. */
+    let vanished = null;
     while (Date.now() < deadline) {
-      last = await readState();
+      try {
+        last = await readState();
+      } catch (err) {
+        vanished = `the app went away mid-run (${String(err).slice(0, 70)})`;
+        break;
+      }
       if (last.tools.length > seen) {
         for (const n of last.tools.slice(seen)) say(`model called ${n}`);
         seen = last.tools.length;
       }
-      if (!last.streaming && last.tools.length > 0 && last.text.trim().length > 0) break;
+      /*
+       * A TASK THAT NEEDS NO TOOLS CAN STILL BE FINISHED.
+       *
+       * This waited for `tools.length > 0`, so a question answered in prose —
+       * which is a whole category of task — could never break early and always
+       * burned the entire deadline. MEASURED: two recall runs that were done in
+       * seconds were recorded at 355s and 361s, i.e. the 300s cap plus setup,
+       * which makes a fast model look slow for a reason that has nothing to do
+       * with it. `!streaming` with text already means the turn is over.
+       */
+      if (!last.streaming && last.text.trim().length > 0) break;
       await sleep(800);
     }
+    if (vanished !== null) say(`INVALID: ${vanished}`);
     clearInterval(watcher);
     clearInterval(prefillWatch);
 
@@ -840,12 +863,34 @@ export async function demoRun(o) {
     } catch {
       /* fall through to the unknown case below */
     }
+    /*
+     * THE QUESTION IS WHETHER THE RUN TOOK THE SCREEN, not whether the frontmost
+     * app is the same one as before.
+     *
+     * MEASURED: a Blender run reported `FOCUS MOVED: "loginwindow" -> "Safari"`
+     * while the same line said `Blender was frontmost 0` of 601 samples. The
+     * machine had been LOCKED when the run began and the user unlocked it partway
+     * through — so the guard was comparing "nobody, the screen is locked" with
+     * "the user's own browser" and calling that a theft. The run never came
+     * near the screen.
+     *
+     * `stole` is the authoritative signal and was already being counted: did the
+     * controlled app EVER become frontmost. It cannot be confused by the user
+     * doing their own thing, which is the entire point of a guard that runs while
+     * somebody is using their computer. The before/after pair is kept as context
+     * because it is genuinely useful when the answer is yes.
+     */
+    const tookScreen = stole.length > 0;
     say(
-      focusAfter === null
-        ? `FOCUS UNKNOWN: the app was gone before it could be read (was "${focusBefore}").`
-        : focusBefore === focusAfter
-          ? `FOCUS HELD: "${focusAfter}" was in front before the run and still is.`
-          : `FOCUS MOVED: "${focusBefore}" -> "${focusAfter}" — the run took the user's screen.`,
+      tookScreen
+        ? `FOCUS MOVED: ${o.app} was frontmost ${stole.length}/${frontSamples.length} samples ` +
+            `— the run took the user's screen ("${focusBefore}" -> "${focusAfter ?? '?'}").`
+        : focusAfter === null
+          ? `FOCUS HELD: ${o.app} was never frontmost (the app was gone before the final read).`
+          : focusBefore === focusAfter
+            ? `FOCUS HELD: "${focusAfter}" was in front before the run and still is.`
+            : `FOCUS HELD: ${o.app} was never frontmost; the user moved from ` +
+              `"${focusBefore}" to "${focusAfter}" themselves.`,
     );
     await sleep(1200);
   } finally {
