@@ -441,6 +441,11 @@ private let axChanged: AXObserverCallback = { _, element, _, _ in
    * whatever Node last believed, so a late one moved the cursor twice and
    * yanked it back. The notification already carries the window that moved, so
    * read its frame right here and move with it in the same turn.
+   *
+   * MEASURED after: 44ms from asking a window to move to the phantom being at
+   * the new position, of which 5ms is the probe's own round trip — about two
+   * display frames. And the snap is gone outright, because there is no second,
+   * later shift computed against a frame that has already moved.
    */
   var pos: CFTypeRef?
   var size: CFTypeRef?
