@@ -219,7 +219,9 @@ describe('what dropping stale screenshots is worth', () => {
         ],
       }) as unknown as Message;
 
-    const before = { messages: Array.from({ length: 12 }, (_, i) => shot(i)) } as unknown as Context;
+    const before = {
+      messages: Array.from({ length: 12 }, (_, i) => shot(i)),
+    } as unknown as Context;
     const after = dropStaleScreenshots(before).context;
 
     const bytes = (c: Context) => JSON.stringify(c.messages).length;

@@ -1202,7 +1202,6 @@ export const K2_HORIZON_0_9B: CatalogModel = {
   quantRange: 'BF16 only (no quants published)',
 };
 
-
 /**
  * MiniCPM5 2B — the user's first queued small model.
  *

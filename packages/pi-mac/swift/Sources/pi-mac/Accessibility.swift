@@ -553,7 +553,7 @@ func collectSnapshot(
      * survives is the text that belongs to no control — which is exactly the
      * part the model could not see.
      */
-    text: dedupeReadText(readText, against: all))
+    text: dedupeReadText(readText, against: all, find: needle, viewport: windowBounds))
 }
 
 /// Read text minus the labels that BELONG to a listed control.
@@ -576,7 +576,9 @@ func collectSnapshot(
  * horizontally means it was one sentence to the person reading it, so it is one
  * line here.
  */
-func joinTextRuns(_ runs: [(rect: CGRect, text: String)]) -> [(rect: CGRect, text: String)] {
+func joinTextRuns(_ runs: [(rect: CGRect, text: String)]) -> [(
+  rect: CGRect, text: String, anchor: CGPoint
+)] {
   /* Band the rows FIRST, then sort inside a band. Comparing "close enough in y"
      pairwise is not a valid ordering — a < b and b < c without a < c — and Swift
      is entitled to return anything at all for one. */
@@ -584,7 +586,7 @@ func joinTextRuns(_ runs: [(rect: CGRect, text: String)]) -> [(rect: CGRect, tex
   let sorted = runs.sorted {
     band($0.rect) == band($1.rect) ? $0.rect.minX < $1.rect.minX : band($0.rect) < band($1.rect)
   }
-  var out: [(rect: CGRect, text: String)] = []
+  var out: [(rect: CGRect, text: String, anchor: CGPoint)] = []
   for run in sorted {
     if var last = out.last, band(last.rect) == band(run.rect),
       run.rect.minX >= last.rect.minX, run.rect.minX - last.rect.maxX <= 40,
@@ -595,7 +597,11 @@ func joinTextRuns(_ runs: [(rect: CGRect, text: String)]) -> [(rect: CGRect, tex
       out[out.count - 1] = last
       continue
     }
-    out.append(run)
+    /* The anchor is the FIRST run's centre, not the joined line's. MEASURED: the
+       joined line "Buy from $3199 or $133.29 per month for 24 months Footnote †"
+       centres on "$133.29", which is not the link — clicking it does nothing.
+       A line's clickable part is almost always where it starts. */
+    out.append((rect: run.rect, text: run.text, anchor: CGPoint(x: run.rect.midX, y: run.rect.midY)))
   }
   return out
 }
@@ -609,8 +615,10 @@ struct ReadLine {
   let y: Int
 }
 
-func dedupeReadText(_ text: [(rect: CGRect, text: String)], against controls: [SnapEl]) -> [ReadLine]
-{
+func dedupeReadText(
+  _ text: [(rect: CGRect, text: String)], against controls: [SnapEl], find needle: String = "",
+  viewport: CGRect? = nil
+) -> [ReadLine] {
   // Spelled out rather than inlined: the one-line version defeats the Swift
   // type checker (SnapEl's Ints and CGFloat in one CGRect literal).
   let frames: [CGRect] = controls.map { (c: SnapEl) -> CGRect in
@@ -624,7 +632,21 @@ func dedupeReadText(_ text: [(rect: CGRect, text: String)], against controls: [S
   var seen = Set<String>()
   var out: [ReadLine] = []
   var chars = 0
+  /*
+   * `find` HAS TO SEARCH THE WORDS, not just the controls.
+   *
+   * MEASURED in a run: the model read "Storage. How much space do you need?" off
+   * the page, asked `mac snapshot find:"2TB"`, and got nothing — because find
+   * filtered the indexed control list, and a storage option that Chrome exposes
+   * only as text is not in it. It had done exactly the right thing and the tool
+   * told it the page did not contain the word.
+   *
+   * Filtering happens BEFORE the character cap, so a match far down a long page
+   * is reachable — which is the whole point of asking for one.
+   */
+  let wanted = needle.trimmingCharacters(in: .whitespaces).lowercased()
   for item in joinTextRuns(text) {
+    if !wanted.isEmpty, !item.text.lowercased().contains(wanted) { continue }
     /* A whole web page of text is worth having, an entire legal appendix is
        not. Document order means the cap keeps the top of the page, which is
        what the person is looking at; `find` reaches the rest. */
@@ -642,8 +664,29 @@ func dedupeReadText(_ text: [(rect: CGRect, text: String)], against controls: [S
     { continue }
     seen.insert(key)
     chars += item.text.count
+    /*
+     * A POINT THAT IS A LIE IS WORSE THAN NO POINT.
+     *
+     * Chrome does not report off-screen text as off-screen: it CLAMPS it to the
+     * window's bottom edge. MEASURED on an 867pt window, every line below the
+     * fold comes back at y=901 — so "How much space do you need?", which is a
+     * scroll away, sits at the same coordinate as everything else down there,
+     * and clicking it presses whatever really is at the bottom of the window.
+     *
+     * The words are still worth having (they are what the page says, and `find`
+     * is how you learn the page HAS a storage section). The coordinate is not,
+     * so it does not get one, and the formatter prints the line without a point.
+     */
+    let onScreen =
+      viewport.map { v in
+        item.anchor.y > v.minY + 1 && item.anchor.y < v.maxY - 1 && item.anchor.x > v.minX - 1
+          && item.anchor.x < v.maxX + 1
+      } ?? true
     out.append(
-      ReadLine(text: item.text, x: Int(item.rect.midX.rounded()), y: Int(item.rect.midY.rounded())))
+      ReadLine(
+        text: item.text,
+        x: onScreen ? Int(item.anchor.x.rounded()) : -1,
+        y: onScreen ? Int(item.anchor.y.rounded()) : -1))
   }
   return out
 }

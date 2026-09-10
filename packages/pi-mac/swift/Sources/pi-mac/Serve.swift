@@ -396,7 +396,7 @@ private func doScroll(_ params: [String: Any]) -> [String: Any] {
 
 /// How long to let the target app apply a posted scroll before reading the
 /// scroll bar back to VERIFY content actually moved (per ladder rung).
-private let SCROLL_VERIFY_DELAY_US: UInt32 = 130_000
+private let SCROLL_VERIFY_DELAY_US: UInt32 = 200_000
 /// Heuristic pixels→scroll-bar-fraction mapping for the AX last resort (a
 /// 600px ask moves ~20% of the document — coarse, but actually moves).
 private let AX_SCROLL_PIXELS_PER_UNIT = 3000.0
@@ -427,6 +427,41 @@ private func doScrollLadder(
   let bar = scrollArea.flatMap { scrollBarOf($0, horizontal: dx != 0) }
   func barValue() -> Double? { bar.flatMap { scrollBarValue($0) } }
 
+  /*
+   * A SECOND SIGNAL, for everything with no scroll bar to read.
+   *
+   * Without one the ladder fired its first rung blind and reported success, so
+   * an app that ignores wheel events (Chrome) was indistinguishable from one
+   * that scrolled. Any laid-out text in the window works as a marker: if the
+   * content moved, it moved. Budgeted, because this runs up to four times per
+   * scroll.
+   */
+  func contentMark() -> Double? {
+    var stack: [AXUIElement] = [root]
+    var seen = 0
+    var found: [Double] = []
+    /*
+     * SEVERAL markers, and the LAST ones found, not the first.
+     *
+     * A single marker can be furniture that never moves. MEASURED twice: the
+     * first static text in a browser is the URL in its toolbar, which sits
+     * perfectly still through a scroll that moved four screens — so the ladder
+     * concluded nothing had happened and fired every remaining rung on top of a
+     * scroll that had already worked. Document order puts the app's chrome
+     * first and the CONTENT after it, so sampling from the end of the budget
+     * lands in the thing that is supposed to move.
+     */
+    while let el = stack.popLast(), seen < 400 {
+      seen += 1
+      for kid in axChildren(el).reversed() { stack.append(kid) }
+      guard axString(el, kAXRoleAttribute) == "AXStaticText",
+        let p = axPoint(el, kAXPositionAttribute), p.y > rect.minY, p.y < rect.maxY
+      else { continue }
+      found.append(p.y * 100_000 + p.x)
+    }
+    return found.isEmpty ? nil : found.suffix(5).reduce(0, +)
+  }
+
   func result(_ mode: String, moved: Bool?) -> [String: Any] {
     var d: [String: Any] = [
       "ok": true, "background": true, "mode": mode,
@@ -437,11 +472,52 @@ private func doScrollLadder(
     return d
   }
 
-  let rungs: [(name: String, fire: () -> Void)] = [
+  /*
+   * KEYS, WHEN THE WHEEL IS IGNORED.
+   *
+   * MEASURED against a backgrounded Chrome: every wheel rung posts fine and
+   * moves NOTHING — the page is exactly where it was, to the pixel. A Page Down
+   * posted to the same pid moves it a full screen. Chrome does not take wheel
+   * events it did not get through the window server, and it has no AXScrollBar
+   * to drive either, so the whole ladder used to end in a shrug. Three demo
+   * runs stalled on this: the model asked to scroll, was told "Scrolled", read
+   * the same page back, and concluded the page had no more content.
+   *
+   * A page is ~800pt, so the ask is converted to that many presses (at least
+   * one), and horizontal falls back to arrow keys.
+   */
+  let pages = max(1, Int((Double(abs(dy)) / 800.0).rounded()))
+  let vertical = abs(dy) >= abs(dx)
+  let keyCode: CGKeyCode = vertical ? (dy < 0 ? 121 : 116) : (dx < 0 ? 124 : 123)
+  let presses = vertical ? pages : max(1, Int((Double(abs(dx)) / 60.0).rounded()))
+
+  let wheelRungs: [(name: String, fire: () -> Void)] = [
     ("pixelBurstToPid", { postScrollToPid(pid, dx: dx, dy: dy, at: at) }),
     ("gestureToPid", { postScrollGestureToPid(pid, dx: dx, dy: dy, at: at) }),
     ("lineToPid", { postLineScrollToPid(pid, dx: dx, dy: dy, at: at) }),
   ]
+  let keyRung: (name: String, fire: () -> Void) = (
+      "keysToPid",
+      {
+        for _ in 0..<min(12, presses) {
+          postKeyToPid(pid, flags: [], key: keyCode)
+          usleep(20_000)
+        }
+      }
+  )
+
+  /*
+   * WHICH RUNGS, AND HOW MANY.
+   *
+   * With a scroll bar to read, every wheel rung is verifiable and the ladder can
+   * safely try all of them. Without one, verification is a heuristic (see
+   * contentMark) and a false "did not move" fires the NEXT rung on top of a
+   * scroll that already worked — MEASURED as a page moving four screens for an
+   * 800pt ask. So a bar-less app gets two rungs at most: the wheel, then the
+   * keys that a browser actually listens to. Worst case is one extra page
+   * instead of three.
+   */
+  let rungs = bar == nil ? [wheelRungs[0], keyRung] : wheelRungs + [keyRung]
 
   // A forced mode (live-tuning seam for the probes) fires exactly one rung.
   let forced = stringOf(params["mode"])
@@ -456,17 +532,22 @@ private func doScrollLadder(
     return result(rung.name, moved: barValue().map { abs($0 - v0) > 1e-6 })
   }
 
-  if let v0 = barValue() {
+  let bar0 = barValue()
+  let mark0 = bar0 == nil ? contentMark() : nil
+  func movedSince() -> Bool? {
+    if let v0 = bar0 { return barValue().map { abs($0 - v0) > 1e-6 } }
+    if let m0 = mark0 { return contentMark().map { abs($0 - m0) > 0.5 } }
+    return nil
+  }
+  if bar0 != nil || mark0 != nil {
     // Verified ladder: stop at the first rung that actually moves content.
     for rung in rungs {
       rung.fire()
       usleep(SCROLL_VERIFY_DELAY_US)
-      if let v1 = barValue(), abs(v1 - v0) > 1e-6 {
-        return result(rung.name, moved: true)
-      }
+      if movedSince() == true { return result(rung.name, moved: true) }
     }
   } else if forced != "axValue" {
-    // No scroll bar to verify against: fire the burst blind (stacking rungs
+    // Nothing readable to verify against: fire the burst blind (stacking rungs
     // unverified would multi-scroll a working app).
     rungs[0].fire()
     return result(rungs[0].name, moved: nil)

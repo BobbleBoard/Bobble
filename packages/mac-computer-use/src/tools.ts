@@ -966,7 +966,16 @@ export function registerMacComputerUseTools(
          * only said "Scroll direction" left the model to guess the four words. */
         { description: 'Scroll direction: up, down, left or right.' },
       ),
-      amount: Type.Optional(Type.Number({ description: 'Pixels to scroll (default ~300).' })),
+      amount: Type.Optional(
+        Type.Number({
+          /* MEASURED in a run: a model asked for `scroll down 10` meaning ten
+             notches of a wheel, got ten PIXELS, saw nothing move, and concluded
+             the page had no more content. Saying what a screenful is costs one
+             clause and removes the whole misreading. */
+          description:
+            'How far, in PIXELS — not wheel clicks (default ~300; a screenful is roughly 800).',
+        }),
+      ),
     }),
     async execute(_id, params, _signal, _upd, ctx): Promise<AgentToolResult<MacDetails>> {
       if (bridge === null) return unavailable('mac_scroll');
