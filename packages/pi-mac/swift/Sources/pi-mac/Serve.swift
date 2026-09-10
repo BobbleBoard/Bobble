@@ -518,6 +518,7 @@ private func dispatch(method: String, params: [String: Any]) -> [String: Any]? {
   case "screenshot": return doScreenshot(params)
   case "bounds": return doBounds(params)
   case "frontmost": return doFrontmost()
+  case "appIcon": return doAppIcon(params)
   case "moveWindow": return doMoveWindow(params)
   case "windows": return doWindows(params)
   case "wallpaper": return doWallpaper(params)
@@ -528,6 +529,57 @@ private func dispatch(method: String, params: [String: Any]) -> [String: Any]? {
   case "recordStop": return recordStop()
   default: return nil
   }
+}
+
+/**
+ * THE APP'S REAL ICON, as a PNG.
+ *
+ * the user: "you can get the real app icon of any program being used right? so just
+ * use that no emoji." macOS already has it — every bundle carries one and
+ * NSWorkspace hands it over — so a row that says what was done to an app can
+ * show the app, not a stand-in that looks the same for Chrome and Blender.
+ *
+ * By pid when the app is running (which is the case that matters: we are
+ * driving it), or by name as a fallback. 64pt, which is two Retina pixels per
+ * point at the size a chat row draws it.
+ */
+func doAppIcon(_ params: [String: Any]) -> [String: Any] {
+  let side = CGFloat(intOf(params["size"]) ?? 64)
+  var icon: NSImage?
+  if let pid = intOf(params["pid"]),
+    let app = NSRunningApplication(processIdentifier: pid_t(pid))
+  {
+    icon = app.icon
+  }
+  if icon == nil, let name = params["app"] as? String, !name.isEmpty {
+    let ws = NSWorkspace.shared
+    if let url = ws.urlForApplication(withBundleIdentifier: name)
+      ?? ws.runningApplications.first(where: { $0.localizedName == name })?.bundleURL
+    {
+      icon = ws.icon(forFile: url.path)
+    }
+  }
+  guard let image = icon else { return ["ok": false, "error": "no icon for that app"] }
+
+  let box = NSRect(x: 0, y: 0, width: side, height: side)
+  guard let cg = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+    return ["ok": false, "error": "icon has no bitmap"]
+  }
+  let rep = NSBitmapImageRep(
+    bitmapDataPlanes: nil, pixelsWide: Int(side), pixelsHigh: Int(side),
+    bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+    colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)
+  guard let bitmap = rep, let ctx = NSGraphicsContext(bitmapImageRep: bitmap) else {
+    return ["ok": false, "error": "could not rasterise the icon"]
+  }
+  NSGraphicsContext.saveGraphicsState()
+  NSGraphicsContext.current = ctx
+  ctx.cgContext.draw(cg, in: box)
+  NSGraphicsContext.restoreGraphicsState()
+  guard let png = bitmap.representation(using: .png, properties: [:]) else {
+    return ["ok": false, "error": "could not encode the icon"]
+  }
+  return ["ok": true, "base64": png.base64EncodedString(), "mimeType": "image/png", "size": Int(side)]
 }
 
 /// `moveWindow` method: AX-reposition the target's window. The deterministic

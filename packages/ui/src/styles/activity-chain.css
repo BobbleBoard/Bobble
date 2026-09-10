@@ -750,3 +750,13 @@ button.pd-chain-step-row:hover .pd-chain-step-chevron {
   line-height: var(--pd-leading-caption);
   font-style: italic;
 }
+
+/* A real app icon in a step row: same box as the tool glyph it replaces, with
+   the corner rounding macOS icons expect. */
+.pd-chain-app-icon {
+  width: 15px;
+  height: 15px;
+  border-radius: 3px;
+  object-fit: contain;
+  display: block;
+}

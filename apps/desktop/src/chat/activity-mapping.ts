@@ -24,6 +24,7 @@ import type {
 import { connectorIconSvg } from '../../../../packages/mcp-lite/src/connector-icons.ts';
 import { type DetectedArtifact, segmentMessageText } from './canvas/artifacts';
 import { pdFileUrl } from './canvas/file-preview';
+import { cliCommandLabel } from './cli-command-label';
 import { editDiffFile } from './edit-diff';
 import { COMMAND_KEYS, CONTENT_KEYS, PATH_KEYS, partialJsonString } from './partial-json';
 import { MEDIA_TOOLS } from './thread-media';
@@ -1012,10 +1013,25 @@ function mapToolStepData(
   const url = str(args.url) ?? str(args.href) ?? str(args.link);
 
   switch (kind) {
-    case 'bash':
+    case 'bash': {
+      /*
+       * A Bobble command reads as what it DID; anything else keeps the honest
+       * "Ran a command". The raw line stays as the detail either way, so
+       * opening the row still shows exactly what was typed.
+       */
+      const cli = cliCommandLabel(command);
       return {
-        data: { kind, label, status, detail: command, command, output: str(result?.text) },
+        data: {
+          kind,
+          label: cli === null ? label : status === 'running' ? cli.running : cli.done,
+          status,
+          detail: command,
+          command,
+          output: str(result?.text),
+          ...(cli?.app === undefined ? {} : { app: cli.app }),
+        },
       };
+    }
     case 'python':
       return {
         data: { kind, label, status, detail: command, command, output: str(result?.text) },

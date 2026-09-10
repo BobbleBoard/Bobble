@@ -1004,50 +1004,69 @@ export function ComputerUseSurface({ feed, className }: ComputerUseSurfaceProps)
     lastDrawn.current = { drawn, rect, painted };
     if (painted && scrubShot === null) {
       /*
-       * A MISTY GLOW AROUND THE EDGE, NOT A LINE ON IT.
+       * A MIST, NOT A BAR.
        *
-       * the user: "that blue translucent looking line at the end of the window ...
-       * i'd just like it to be a misty glow that sits around the window making
-       * it seem like it is being 'propped up' ... never over on on top of the
-       * window or it's content, just the outer edge."
+       * the user, on the first attempt: "see this latest image you showed, exact
+       * same bar as before, what I would have wanted is no border at all on the
+       * left and right then on the top and bottom (because we can see the app
+       * edges on those sides) ... a mist, a subtly animating glow that's misty
+       * and fades out getting further from the edge."
        *
-       * So it is painted OUTSIDE the window: the window's own rectangle is
-       * punched out with `destination-out`-style clipping (evenodd against the
-       * viewport), which means not one pixel of the glow can land on the
-       * picture. And an edge that is CUT OFF gets none of it — a window running
-       * past the rail has no outer edge there to prop up, and a glow drawn along
-       * the crop would read as a border.
+       * The first try still STROKED the outline, and a stroke is a line however
+       * softly you shadow it. There is no stroke here at all: the window's own
+       * rounded rect is filled with the window clipped OUT, so only the fill's
+       * SHADOW survives — a halo that is brightest against the edge and fades to
+       * nothing outward, which is what mist is.
+       *
+       * And only on edges that exist. An edge running past the rail has been
+       * CUT, not seen, and a glow along a crop is exactly the border he did not
+       * want.
        */
-      const glowPad = Math.max(6, 10 * drawn.scale);
+      const glowPad = Math.max(10, 16 * drawn.scale);
       const cut = 1.5;
-      const openLeft = drawn.x > cut;
-      const openTop = drawn.y > cut;
-      const openRight = drawn.x + drawn.w < viewport.w - cut;
-      const openBottom = drawn.y + drawn.h < viewport.h - cut;
-      if (openLeft || openTop || openRight || openBottom) {
+      const open = {
+        left: drawn.x > cut,
+        top: drawn.y > cut,
+        right: drawn.x + drawn.w < viewport.w - cut,
+        bottom: drawn.y + drawn.h < viewport.h - cut,
+      };
+      if (open.left || open.top || open.right || open.bottom) {
+        /* A slow breath, so it reads as alive without ever pulling the eye off
+           the app. Reduce Motion holds it at the middle of the swing. */
+        const breath = reduced ? 0.5 : 0.5 + 0.5 * Math.sin(now / 1400);
         ctx.save();
-        // Clip to everything EXCEPT the window, so the glow can only be outside.
+
+        // 1. Never on the window or its content.
         ctx.beginPath();
         ctx.rect(0, 0, viewport.w, viewport.h);
         roundRect(ctx, drawn.x, drawn.y, drawn.w, drawn.h, radius);
         ctx.clip('evenodd');
-        // Only the edges that actually exist: an off-canvas side is excluded so
-        // nothing is drawn along a crop.
+
+        // 2. Only beside the edges that are actually visible.
         ctx.beginPath();
-        ctx.rect(
-          openLeft ? drawn.x - glowPad : drawn.x,
-          openTop ? drawn.y - glowPad : drawn.y,
-          drawn.w + (openLeft ? glowPad : 0) + (openRight ? glowPad : 0),
-          drawn.h + (openTop ? glowPad : 0) + (openBottom ? glowPad : 0),
-        );
+        for (const [side, isOpen] of Object.entries(open)) {
+          if (!isOpen) continue;
+          if (side === 'top')
+            ctx.rect(drawn.x - glowPad, drawn.y - glowPad, drawn.w + glowPad * 2, glowPad);
+          if (side === 'bottom')
+            ctx.rect(drawn.x - glowPad, drawn.y + drawn.h, drawn.w + glowPad * 2, glowPad);
+          if (side === 'left')
+            ctx.rect(drawn.x - glowPad, drawn.y - glowPad, glowPad, drawn.h + glowPad * 2);
+          if (side === 'right')
+            ctx.rect(drawn.x + drawn.w, drawn.y - glowPad, glowPad, drawn.h + glowPad * 2);
+        }
         ctx.clip();
-        ctx.shadowColor = CURSOR_GLOW;
+
+        // 3. The halo IS a shadow: its source is inside the window, which the
+        //    clip above removed, so only the soft falloff is ever painted.
+        ctx.shadowColor = `rgba(149, 249, 229, ${(0.3 + 0.16 * breath).toFixed(3)})`;
         ctx.shadowBlur = glowPad;
-        ctx.strokeStyle = 'rgba(149, 249, 229, 0.34)';
-        ctx.lineWidth = 2;
-        roundRect(ctx, drawn.x + 1, drawn.y + 1, drawn.w - 2, drawn.h - 2, radius);
-        ctx.stroke();
-        ctx.stroke();
+        ctx.fillStyle = 'rgba(0, 0, 0, 1)';
+        roundRect(ctx, drawn.x, drawn.y, drawn.w, drawn.h, radius);
+        ctx.fill();
+        // A second, tighter pass so the mist is densest right at the edge.
+        ctx.shadowBlur = glowPad * 0.45;
+        ctx.fill();
         ctx.restore();
       }
     }

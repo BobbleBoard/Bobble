@@ -91,6 +91,13 @@ interface ActivityStepCommon {
    * no inline arg (the row falls back to just the verb).
    */
   detail?: string;
+  /**
+   * The Mac app this step acted on, when it acted on one — the row shows its
+   * REAL icon beside the verb. the user: "you can get the real app icon of any
+   * program being used right? so just use that no emoji." The renderer resolves
+   * the name to a picture; the chain only has to carry the name.
+   */
+  app?: string;
   /** Small pill/subtitle ("Script", or a filename). */
   tag?: ReactNode;
   /** Drives the file-extension icon badge and the default pill/tag. */
@@ -1264,6 +1271,8 @@ export function hasInlineContent(step: ActivityStepData): boolean {
 /* ------------------------------------------------------------------ */
 
 export interface ActivityStepProps {
+  /** Host-supplied app-name → picture, for a step that acted on an app. */
+  resolveAppIcon?: (app: string) => string | undefined;
   data: ActivityStepData;
   /** Toggles a pill-gated step's content (bash/edit/read/file). */
   expanded?: boolean;
@@ -1340,7 +1349,7 @@ function RunningFor({ since, stepId }: { since?: number; stepId?: string }) {
 
 /** One row of the expanded chain: icon + verb + inline arg, then a disclosure reveal. */
 export const ActivityStep = forwardRef<HTMLDivElement, ActivityStepProps>(function ActivityStep(
-  { data, expanded = false, live = false, onToggle, onOpenCanvas, onOpenFile },
+  { data, expanded = false, live = false, onToggle, onOpenCanvas, onOpenFile, resolveAppIcon },
   ref,
 ) {
   const running = data.status === 'running';
@@ -1370,10 +1379,16 @@ export const ActivityStep = forwardRef<HTMLDivElement, ActivityStepProps>(functi
   // A file-op row (read/edit/skill with a path) can open that file in the canvas.
   const canOpen = onOpenFile !== undefined && SUBLINE_KINDS.has(data.kind) && detail !== undefined;
 
+  /* The app's own icon when this step acted on an app and the host could find
+     one — otherwise the generic tool glyph, which is still better than a wrong
+     picture. */
+  const appIcon = data.app === undefined ? undefined : resolveAppIcon?.(data.app);
   const iconEl = (
     <span className="pd-chain-step-icon">
       {running ? (
         <Spinner size={14} />
+      ) : appIcon !== undefined ? (
+        <img className="pd-chain-app-icon" src={appIcon} alt="" width={15} height={15} />
       ) : (
         <ToolIcon
           kind={data.kind}
@@ -1617,6 +1632,9 @@ export interface ActivityChainProps extends Omit<HTMLAttributes<HTMLDivElement>,
    * because "processing the prompt" describes the mechanism to somebody who is
    * waiting to know why. */
   prefill?: { percent: number | null; label?: string };
+  /** Turn an app name into a picture of it. Supplied by the host, because only
+   * the host can ask macOS; the chain just carries the name. */
+  resolveAppIcon?: (app: string) => string | undefined;
 }
 
 /**
@@ -1660,6 +1678,7 @@ export const ActivityChain = forwardRef<HTMLDivElement, ActivityChainProps>(func
     complete,
     onExpandedChange,
     defaultOpenStep,
+    resolveAppIcon,
     summary,
     onOpenCanvas,
     onOpenFile,
@@ -1836,6 +1855,7 @@ export const ActivityChain = forwardRef<HTMLDivElement, ActivityChainProps>(func
                 live={active}
                 onToggle={() => toggleStep(index)}
                 onOpenCanvas={() => onOpenCanvas?.(step, index)}
+                {...(resolveAppIcon === undefined ? {} : { resolveAppIcon })}
                 {...(onOpenFile !== undefined ? { onOpenFile: () => onOpenFile(step, index) } : {})}
               />
             ))}

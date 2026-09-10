@@ -29,6 +29,7 @@ import {
   mapThinkingStep,
   mapToolStep,
 } from './activity-mapping';
+import { appIconSrc, useAppIconStore } from './app-icons';
 // Local module (NOT a package barrel) — keep the open-in-canvas action off the
 // renderer-forbidden barrels (the gotcha); `openFileInCanvas` reads via IPC.
 import { openFileInCanvas } from './canvas/file-tabs';
@@ -187,6 +188,8 @@ export function ThreadActivityChain({
   const harness = useHarnessStatus();
   /* "Starting up" belongs to the FIRST reply of a conversation — after that the
      model is resident and the wait is something else. */
+  // Subscribe so a newly-arrived icon repaints the rows that wanted it.
+  useAppIconStore((st) => st.icons);
   const firstAssistantTurn = usePiStore(
     (st) => st.messages.filter((m) => m.kind === 'assistant').length <= 1,
   );
@@ -305,6 +308,9 @@ export function ThreadActivityChain({
        * tool call is what says the model has not started answering yet, so the
        * text streaming in is never talked over.
        */
+      /* Real app icons: subscribing to the cache is what re-renders the row
+         when the picture arrives, since it is fetched after the first paint. */
+      resolveAppIcon={appIconSrc}
       {...(streaming &&
       !runningFlags.some(Boolean) &&
       (prefillPct === null ? blocks.at(-1)?.type === 'toolCall' : prefillPct < 100)

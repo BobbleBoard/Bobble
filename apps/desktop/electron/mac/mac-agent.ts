@@ -895,6 +895,20 @@ function registerE2eDebugChannel(): void {
              grant. the user: "if I move the map around the cursor does not move
              with it" — reproducing that needs a real move, and a probe's own
              shell cannot make one (System Events refuses without the grant). */
+          /* The app's REAL icon, as a data URL — the user: "you can get the real
+             app icon of any program being used right? so just use that no
+             emoji." Cached by the renderer; this is the only place that knows
+             how to ask macOS. */
+          case 'app-icon': {
+            const res = await getHelper().request<{ base64?: string; mimeType?: string }>(
+              'appIcon',
+              {
+                app: String(params.app ?? ''),
+                ...(params.pid === undefined ? {} : { pid: params.pid }),
+              },
+            );
+            return { ok: true, result: res };
+          }
           case 'move-window': {
             const pid = Number(params.pid ?? 0);
             const x = Number(params.x ?? 0);
