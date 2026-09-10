@@ -23,7 +23,20 @@ const dbg = async (op, params) => {
 };
 await run('open', ['-g', '-a', 'Maps']);
 await sleep(4000);
+const before = await dbg('bounds', { app: 'Maps' });
+console.log('bounds BEFORE:', JSON.stringify({ x: before.x, y: before.y, w: before.w, h: before.h }));
+// Push it off the right edge first, which is the condition the nudge exists for
+// (macOS renders only what is on screen, so the off-screen strip comes back
+// blank — the white bar).
+await dbg('move-window', { pid: before.pid, x: 700, y: 132 });
+await sleep(1500);
+const off = await dbg('bounds', { app: 'Maps' });
+console.log('bounds OFF   :', JSON.stringify({ x: off.x, w: off.w, right: off.x + off.w }));
+// A real run SNAPSHOTS the app — that is the take-control path the nudge is on.
+await dbg('snapshot', { app: 'Maps' });
+await sleep(2500);
 const b = await dbg('bounds', { app: 'Maps' });
+console.log('bounds AFTER :', JSON.stringify({ x: b.x, y: b.y, w: b.w, h: b.h }));
 await dbg('monitor-session', { pid: b.pid, app: 'Maps' });
 await sleep(6000);
 await page.screenshot({ path: `${OUT}/monitor.png` });

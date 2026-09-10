@@ -1002,81 +1002,14 @@ export function ComputerUseSurface({ feed, className }: ComputerUseSurfaceProps)
       painted = true;
     }
     lastDrawn.current = { drawn, rect, painted };
-    if (painted && scrubShot === null) {
-      /*
-       * A MIST, NOT A BAR.
-       *
-       * the user, on the first attempt: "see this latest image you showed, exact
-       * same bar as before, what I would have wanted is no border at all on the
-       * left and right then on the top and bottom (because we can see the app
-       * edges on those sides) ... a mist, a subtly animating glow that's misty
-       * and fades out getting further from the edge."
-       *
-       * The first try still STROKED the outline, and a stroke is a line however
-       * softly you shadow it. There is no stroke here at all: the window's own
-       * rounded rect is filled with the window clipped OUT, so only the fill's
-       * SHADOW survives — a halo that is brightest against the edge and fades to
-       * nothing outward, which is what mist is.
-       *
-       * And only on edges that exist. An edge running past the rail has been
-       * CUT, not seen, and a glow along a crop is exactly the border he did not
-       * want.
-       */
-      const glowPad = Math.max(10, 16 * drawn.scale);
-      /* The band the mist is allowed into has to be WIDER than the blur, or the
-         clip cuts the falloff and leaves the hard outer edge this was meant to
-         remove — which is exactly what the first attempt did. */
-      const band = glowPad * 2.4;
-      const cut = 1.5;
-      const open = {
-        left: drawn.x > cut,
-        top: drawn.y > cut,
-        right: drawn.x + drawn.w < viewport.w - cut,
-        bottom: drawn.y + drawn.h < viewport.h - cut,
-      };
-      if (open.left || open.top || open.right || open.bottom) {
-        /* A slow breath, so it reads as alive without ever pulling the eye off
-           the app. Reduce Motion holds it at the middle of the swing. */
-        const breath = reduced ? 0.5 : 0.5 + 0.5 * Math.sin(now / 1400);
-        ctx.save();
-
-        // 1. Never on the window or its content.
-        ctx.beginPath();
-        ctx.rect(0, 0, viewport.w, viewport.h);
-        roundRect(ctx, drawn.x, drawn.y, drawn.w, drawn.h, radius);
-        ctx.clip('evenodd');
-
-        // 2. Only beside the edges that are actually visible.
-        ctx.beginPath();
-        for (const [side, isOpen] of Object.entries(open)) {
-          if (!isOpen) continue;
-          if (side === 'top') ctx.rect(drawn.x - band, drawn.y - band, drawn.w + band * 2, band);
-          if (side === 'bottom')
-            ctx.rect(drawn.x - band, drawn.y + drawn.h, drawn.w + band * 2, band);
-          if (side === 'left') ctx.rect(drawn.x - band, drawn.y - band, band, drawn.h + band * 2);
-          if (side === 'right')
-            ctx.rect(drawn.x + drawn.w, drawn.y - band, band, drawn.h + band * 2);
-        }
-        ctx.clip();
-
-        // 3. The halo IS a shadow: its source is inside the window, which the
-        //    clip above removed, so only the soft falloff is ever painted.
-        /* Three passes, widest and faintest first: the falloff is their sum,
-           so it thins gradually instead of stopping at one blur radius. */
-        ctx.fillStyle = 'rgba(0, 0, 0, 1)';
-        for (const [blur, alpha] of [
-          [glowPad * 1.9, 0.1 + 0.06 * breath],
-          [glowPad * 0.95, 0.14 + 0.07 * breath],
-          [glowPad * 0.4, 0.16 + 0.08 * breath],
-        ] as const) {
-          ctx.shadowColor = `rgba(149, 249, 229, ${alpha.toFixed(3)})`;
-          ctx.shadowBlur = blur;
-          roundRect(ctx, drawn.x, drawn.y, drawn.w, drawn.h, radius);
-          ctx.fill();
-        }
-        ctx.restore();
-      }
-    }
+    /*
+     * NO EDGE TREATMENT AT ALL.
+     *
+     * There was a translucent keyline, then a glow, then a mist. the user, having
+     * looked at each: "no that's not what I was looking for, why don't we just
+     * remove the border." The window's own drop shadow already lifts it off the
+     * wallpaper, which was the job an edge was being asked to do.
+     */
 
     // 5. A modal is up: the room goes quiet. macOS's own composition dims the
     //    window behind a sheet, and a "Save changes?" answered wrongly is the

@@ -68,15 +68,33 @@ await demoRun({
       .filter((e) => String(e.value ?? '0') !== '0')
       .map((e) => (e.name ?? '').match(/\b\d+\s*(?:GB|TB)\b/i)?.[0] ?? '?');
 
+    /*
+     * THREE ANSWERS, NOT TWO — because "I cannot see it" is not "it failed".
+     *
+     * MEASURED: a run that genuinely selected 2TB in the already-open "Shop
+     * iPhone Duo" tab was scored a FAILURE, because by verification time a
+     * different tab was frontmost and a Chrome window only exposes its ACTIVE
+     * tab to Accessibility. A false failure is worse than no answer: across a
+     * twelve-run matrix it would quietly mark good models as bad.
+     *
+     * So the verdict is `pass` only on evidence, `fail` only on evidence
+     * (the options are right there and 2TB is not the chosen one), and
+     * `unseen` when the page that would answer is not on screen — which the
+     * saved screenshot then settles by eye.
+     */
+    const verdict =
+      radios.length === 0 ? 'unseen' : chosen.some((c) => /2\s*TB/i.test(c)) ? 'pass' : 'fail';
+
     return {
       finalScreenshot: shotPath,
       window: snap.window,
       windowTitles: titles,
       axElements: (snap.elements ?? []).length,
-      // What the PAGE says is selected — the verdict.
+      // What the PAGE says — the verdict, and why it says that.
+      verdict,
       storageOffered: radios.length,
       storageSelected: chosen,
-      selected2TB: chosen.some((c) => /2\s*TB/i.test(c)),
+      selected2TB: verdict === 'pass',
       // What the MODEL said, kept beside it so the two can disagree in the log.
       modelSaidSomething: last.text.trim().length > 0,
       modelMentions2TB: /2\s*tb/i.test(last.text),

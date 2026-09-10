@@ -226,6 +226,151 @@ private func pointerGlyph() -> (path: CGPath, box: CGSize, tip: CGPoint, strokeW
 
 // ── the panel ────────────────────────────────────────────────────────────────
 
+/**
+ * THE ONE PART OF THE OVERLAY THAT TAKES A CLICK.
+ *
+ * the user: "hovering the pill should show an X on the right red circle highlight
+ * on hover, a pause button to the left of it, and a hide button to the left of
+ * that, blurring whatever's actually in the pill."
+ *
+ * The phantom panel is click-through end to end and must stay that way — it is
+ * paint, and paint that eats a mouse event meant for the app underneath is a
+ * bug. So the controls live on their own small panel, parked exactly over the
+ * pill, which is the only surface in the overlay that is allowed to be UI.
+ *
+ * It is still non-activating: clicking it must not pull focus away from
+ * whatever the user is doing.
+ */
+final class OverlayControlsPanel: NSPanel {
+  override var canBecomeKey: Bool { false }
+  override var canBecomeMain: Bool { false }
+}
+
+/**
+ * The three controls, drawn over a blur of whatever the pill was saying.
+ *
+ * Order is the user's, right to left: ✕ (red on hover), pause, hide. They appear
+ * only while the pointer is over the pill, so the resting state is still just
+ * a small pill with a bouncing "…".
+ */
+final class OverlayControlsView: NSView {
+  var onStop: (() -> Void)?
+  var onPause: (() -> Void)?
+  var onHide: (() -> Void)?
+  private var hovered: Int?
+  private var tracking: NSTrackingArea?
+  /// True while the pointer is inside — the pill asks, so it can blur itself.
+  private(set) var isHovered = false
+  var onHoverChange: ((Bool) -> Void)?
+
+  override var isFlipped: Bool { false }
+
+  override func updateTrackingAreas() {
+    super.updateTrackingAreas()
+    if let t = tracking { removeTrackingArea(t) }
+    let t = NSTrackingArea(
+      rect: bounds, options: [.mouseEnteredAndExited, .mouseMoved, .activeAlways], owner: self)
+    addTrackingArea(t)
+    tracking = t
+  }
+
+  /// Three equal slots along the right-hand end of the pill.
+  private func slots() -> [NSRect] {
+    let side = min(bounds.height - 6, 18)
+    let gap: CGFloat = 4
+    var x = bounds.maxX - 6 - side
+    var out: [NSRect] = []
+    for _ in 0..<3 {
+      out.append(NSRect(x: x, y: (bounds.height - side) / 2, width: side, height: side))
+      x -= side + gap
+    }
+    return out  // [stop, pause, hide]
+  }
+
+  private func slotAt(_ p: NSPoint) -> Int? {
+    for (i, r) in slots().enumerated() where r.insetBy(dx: -3, dy: -3).contains(p) { return i }
+    return nil
+  }
+
+  override func mouseEntered(with event: NSEvent) {
+    isHovered = true
+    onHoverChange?(true)
+    needsDisplay = true
+  }
+
+  override func mouseExited(with event: NSEvent) {
+    isHovered = false
+    hovered = nil
+    onHoverChange?(false)
+    needsDisplay = true
+  }
+
+  override func mouseMoved(with event: NSEvent) {
+    let next = slotAt(convert(event.locationInWindow, from: nil))
+    if next != hovered {
+      hovered = next
+      needsDisplay = true
+    }
+  }
+
+  override func mouseDown(with event: NSEvent) {
+    switch slotAt(convert(event.locationInWindow, from: nil)) {
+    case 0: onStop?()
+    case 1: onPause?()
+    case 2: onHide?()
+    default: break
+    }
+  }
+
+  /// Only the buttons swallow a click; the rest of the pill stays click-through
+  /// so the app underneath still gets the event.
+  override func hitTest(_ point: NSPoint) -> NSView? {
+    let local = convert(point, from: superview)
+    return slotAt(local) == nil && !bounds.contains(local) ? nil : self
+  }
+
+  override func draw(_ dirty: NSRect) {
+    guard isHovered, let ctx = NSGraphicsContext.current?.cgContext else { return }
+    let rects = slots()
+    for (i, r) in rects.enumerated() {
+      let on = hovered == i
+      // The ✕ is the destructive one, so its hover is red; the others go white.
+      let bg: CGColor =
+        on
+        ? (i == 0
+          ? CGColor(srgbRed: 0.91, green: 0.27, blue: 0.29, alpha: 1)
+          : CGColor(gray: 1, alpha: 0.26))
+        : CGColor(gray: 1, alpha: 0.12)
+      ctx.setFillColor(bg)
+      ctx.fillEllipse(in: r)
+
+      ctx.setStrokeColor(CGColor(gray: 1, alpha: 0.95))
+      ctx.setLineWidth(1.6)
+      ctx.setLineCap(.round)
+      let inset = r.insetBy(dx: r.width * 0.32, dy: r.height * 0.32)
+      switch i {
+      case 0:  // ✕
+        ctx.move(to: CGPoint(x: inset.minX, y: inset.minY))
+        ctx.addLine(to: CGPoint(x: inset.maxX, y: inset.maxY))
+        ctx.move(to: CGPoint(x: inset.minX, y: inset.maxY))
+        ctx.addLine(to: CGPoint(x: inset.maxX, y: inset.minY))
+        ctx.strokePath()
+      case 1:  // pause
+        let w = inset.width * 0.3
+        ctx.setFillColor(CGColor(gray: 1, alpha: 0.95))
+        ctx.fill(CGRect(x: inset.minX, y: inset.minY, width: w, height: inset.height))
+        ctx.fill(CGRect(x: inset.maxX - w, y: inset.minY, width: w, height: inset.height))
+      default:  // hide — an eye with a slash
+        ctx.move(to: CGPoint(x: inset.minX, y: inset.midY))
+        ctx.addLine(to: CGPoint(x: inset.maxX, y: inset.midY))
+        ctx.move(to: CGPoint(x: inset.minX, y: inset.minY))
+        ctx.addLine(to: CGPoint(x: inset.maxX, y: inset.maxY))
+        ctx.strokePath()
+      }
+    }
+  }
+}
+
 /// A panel that can never become key or main. `.nonactivatingPanel` already
 /// stops a click from activating us — but nothing is ever going to click it
 /// (`ignoresMouseEvents`), and this makes the guarantee structural rather than
@@ -292,6 +437,12 @@ final class OverlayController: NSObject {
   private var maskHoles = 0
   private var liveRipples = 0
   private var displayVerified = false
+  /* The controls live on their own tiny panel — see OverlayControlsPanel. */
+  private var controls: OverlayControlsPanel?
+  private var controlsView: OverlayControlsView?
+  /** Blurs the pill's own contents while the controls are showing. */
+  private let bubbleBlur = CALayer()
+  var onBrake: ((String) -> Void)?
 
   override init() {
     glyph = pointerGlyph()
@@ -303,9 +454,68 @@ final class OverlayController: NSObject {
     super.init()
     configurePanel()
     buildLayers()
+    buildControls()
     NotificationCenter.default.addObserver(
       self, selector: #selector(screensChanged),
       name: NSApplication.didChangeScreenParametersNotification, object: nil)
+  }
+
+  /// The hit-testable panel that carries the pill's three buttons. Separate
+  /// from the phantom because the phantom must stay click-through.
+  private func buildControls() {
+    let win = OverlayControlsPanel(
+      contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel],
+      backing: .buffered, defer: false)
+    win.isOpaque = false
+    win.backgroundColor = .clear
+    win.hasShadow = false
+    win.level = .floating
+    win.collectionBehavior = [.canJoinAllSpaces, .transient, .ignoresCycle, .fullScreenAuxiliary]
+    win.hidesOnDeactivate = false
+    win.ignoresMouseEvents = false
+    win.acceptsMouseMovedEvents = true
+    let view = OverlayControlsView(frame: .zero)
+    view.onStop = { [weak self] in self?.onBrake?("stop") }
+    view.onPause = { [weak self] in self?.onBrake?("pause") }
+    view.onHide = { [weak self] in
+      self?.setPillEnabled(false)
+      self?.onBrake?("hide-pill")
+    }
+    view.onHoverChange = { [weak self] on in self?.setBubbleBlurred(on) }
+    win.contentView = view
+    controls = win
+    controlsView = view
+  }
+
+  /// Park the controls exactly over the pill, and show them only when there IS
+  /// a pill to put them on.
+  private func syncControls() {
+    guard let win = controls, let view = controlsView else { return }
+    let showing = pillEnabled && bubble.opacity > 0.4 && panel.isVisible
+    if !showing {
+      if win.isVisible { win.orderOut(nil) }
+      return
+    }
+    /* The pill's frame in Cocoa screen points — the same conversion info()
+       reports it with, so the controls sit exactly on it. */
+    let local = (bubble.presentation() ?? bubble).frame
+    let f = local.offsetBy(dx: panel.frame.minX, dy: panel.frame.minY)
+    win.setFrame(f, display: false)
+    view.frame = CGRect(origin: .zero, size: f.size)
+    view.needsDisplay = true
+    if !win.isVisible { win.order(.above, relativeTo: panel.windowNumber) }
+  }
+
+  /// While the controls are up, whatever the pill was saying goes soft — the
+  /// buttons are the subject then, not the words behind them.
+  private func setBubbleBlurred(_ on: Bool) {
+    CATransaction.begin()
+    CATransaction.setAnimationDuration(0.16)
+    bubbleText.opacity = on ? 0.18 : 1
+    bubbleSub.opacity = on ? 0.18 : 1
+    for d in bubbleDots { d.opacity = on ? 0.12 : (dotsVisible ? 0.45 : 0) }
+    bubbleBlur.opacity = on ? 1 : 0
+    CATransaction.commit()
   }
 
   private func configurePanel() {
@@ -784,6 +994,7 @@ final class OverlayController: NSObject {
 
   func hideBubble() {
     setPulsing(false)
+    syncControls()
     guard bubble.opacity > 0 else { return }
     let fade = CABasicAnimation(keyPath: "opacity")
     fade.fromValue = bubble.opacity
@@ -964,6 +1175,7 @@ final class OverlayController: NSObject {
     bubble.anchorPoint = CGPoint(x: bubbleFlipX ? 1 : 0, y: bubbleFlipY ? 0 : 1)
     bubble.position = CGPoint(x: bx, y: by)
     CATransaction.commit()
+    syncControls()
   }
 
   // ── occlusion mask ───────────────────────────────────────────────────────
@@ -1121,6 +1333,16 @@ final class OverlayController: NSObject {
           flipBase: flipBase),
       ],
     ]
+    /* The controls panel is a SEPARATE window, so overlay-render cannot
+       photograph it — reporting where it is parked is how it gets verified. */
+    if let win = controls {
+      d["controls"] = [
+        "visible": win.isVisible,
+        "clickThrough": win.ignoresMouseEvents,
+        "hovered": controlsView?.isHovered ?? false,
+        "frame": axRect(win.frame, flipBase: flipBase),
+      ]
+    }
     if let c = cursorAX { d["cursor"] = ["x": Double(c.x), "y": Double(c.y)] }
     // Where the tip is actually DRAWN, in screen points. Differs from `cursor`
     // only for a point off every display, which the panel clamps to its edge
@@ -1268,6 +1490,9 @@ private func handleOverlay(
 func runOverlay() {
   NSApplication.shared.setActivationPolicy(.prohibited)
   let controller = OverlayController()
+  /* The pill's buttons are the one thing in the overlay a person can press, so
+     they are the one thing that talks back. */
+  controller.onBrake = { action in emitEvent("overlay-brake", data: ["action": action]) }
 
   let pump = Thread {
     while let line = readLine(strippingNewline: true) {

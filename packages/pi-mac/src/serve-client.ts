@@ -98,6 +98,23 @@ export class MacHelperClient {
     } catch {
       return; // ignore non-JSON noise on stdout
     }
+    /*
+     * AN EVENT, not an answer. The overlay panel's pill has buttons on it now
+     * (stop / pause / hide), and a button press has no request to reply to — it
+     * originates in the helper. A line with an `event` and no `id` is that, and
+     * anything else without an id is still ignored as noise.
+     */
+    const evt = (msg as { event?: unknown }).event;
+    if (typeof evt === 'string' && msg.id === undefined) {
+      for (const fn of this.#eventListeners) {
+        try {
+          fn(evt, (msg as { data?: Record<string, unknown> }).data ?? {});
+        } catch {
+          /* a listener that throws must not break the pipe */
+        }
+      }
+      return;
+    }
     if (typeof msg.id !== 'number') return;
     const pending = this.#pending.get(msg.id);
     if (pending === undefined) return;
@@ -105,6 +122,15 @@ export class MacHelperClient {
     clearTimeout(pending.timer);
     if (msg.ok === true) pending.resolve(msg.result);
     else pending.reject(new Error(msg.error ?? 'pi-mac helper error'));
+  }
+
+  #eventListeners = new Set<(event: string, data: Record<string, unknown>) => void>();
+
+  /** Listen for helper-originated events (the pill's buttons). Returns an
+   * unsubscribe. */
+  onEvent(fn: (event: string, data: Record<string, unknown>) => void): () => void {
+    this.#eventListeners.add(fn);
+    return () => this.#eventListeners.delete(fn);
   }
 
   /** Issue one RPC. Rejects on transport/timeout/helper error. */

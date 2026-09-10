@@ -29,15 +29,28 @@ if (existsSync(real) && !existsSync(path.join(HOME, '.cache/pi-desktop'))) {
 await run('osascript', ['-e', 'tell application "Bobble" to quit']).catch(() => {});
 await sleep(2500);
 await run('open', [
-  '-g', '--env', `HOME=${HOME}`, '--env', 'PI_E2E=1', '--env', 'PI_E2E_BACKGROUND=1',
-  '-a', '/Applications/Bobble.app', '--args', `--remote-debugging-port=${PORT}`,
+  '-g',
+  '--env',
+  `HOME=${HOME}`,
+  '--env',
+  'PI_E2E=1',
+  '--env',
+  'PI_E2E_BACKGROUND=1',
+  '-a',
+  '/Applications/Bobble.app',
+  '--args',
+  `--remote-debugging-port=${PORT}`,
 ]);
 await sleep(7000);
 
 const browser = await chromium.connectOverCDP(`http://127.0.0.1:${PORT}`);
 try {
-  const page = (browser.contexts()[0]?.pages() ?? []).find((p) => !p.url().startsWith('devtools://'));
-  await page.waitForFunction(() => typeof window.piDesktop?.invoke === 'function', { timeout: 30000 });
+  const page = (browser.contexts()[0]?.pages() ?? []).find(
+    (p) => !p.url().startsWith('devtools://'),
+  );
+  await page.waitForFunction(() => typeof window.piDesktop?.invoke === 'function', {
+    timeout: 30000,
+  });
   await page.evaluate(() =>
     window.piDesktop.invoke('settings:set', { patch: { toolInterface: 'bash-cli' } }),
   );

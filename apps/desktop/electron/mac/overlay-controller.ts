@@ -174,6 +174,8 @@ class MacOverlayController {
    * respawns after a crash, so a panel that dies mid-run comes back on the next
    * push rather than leaving the run blind. */
   #panel(): MacHelperClient {
+    /* The client is created lazily, so the brake binding has to be retried
+       whenever it is asked for rather than once at construction. */
     if (this.#client === null) {
       this.#client = new MacHelperClient({
         helperPath: this.#helperPath,
@@ -181,6 +183,7 @@ class MacOverlayController {
         requestTimeoutMs: OVERLAY_REQUEST_TIMEOUT_MS,
       });
     }
+    this.#bindBrake();
     return this.#client;
   }
 
@@ -196,6 +199,33 @@ class MacOverlayController {
   }
 
   // ── control / tracking ─────────────────────────────────────────────────
+
+  /**
+   * What a press on the pill's own buttons should do.
+   *
+   * The phantom is paint everywhere except here: the pill carries stop, pause
+   * and hide, and those are the only controls that exist while the user is in
+   * ANOTHER app looking at the thing being driven. The panel reports the press
+   * as an event; this is where it becomes an action.
+   */
+  onBrake(fn: (action: string) => void): void {
+    this.#brake = fn;
+    this.#bindBrake();
+  }
+  #brake: ((action: string) => void) | null = null;
+  #brakeBound = false;
+
+  #bindBrake(): void {
+    if (this.#brakeBound) return;
+    const client = this.#client;
+    if (client === null) return;
+    this.#brakeBound = true;
+    client.onEvent((event, data) => {
+      if (event !== 'overlay-brake') return;
+      const action = typeof data.action === 'string' ? data.action : '';
+      if (action !== '') this.#brake?.(action);
+    });
+  }
 
   /** Show the overlay for `pid`'s window and track it. Idempotent per pid; a
    * new pid re-targets the overlay. `rect` is the caller's already-known frame

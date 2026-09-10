@@ -80,6 +80,9 @@ let helper: MacHelperClient | null = null;
  * echoed x,y covers stale/unknown indices afterwards. Snapshot bbox x,y are
  * element CENTRES (screen points) by the pi-mac wire contract. */
 const elementCenters = new Map<number, Map<number, { x: number; y: number; name: string }>>();
+/** Windows already pulled fully on-screen this session — once each, so a window
+ * the user moves afterwards is left where they put it. */
+const nudgedPids = new Set<number>();
 
 let tccCache: { at: number; status: MacTccStatus } | null = null;
 /** PI_E2E-only: a synthetic window frame the overlay's real tracking loop reads
@@ -379,6 +382,23 @@ async function snapshotWithOverlay(params: Record<string, unknown>): Promise<Mac
   const snap = await getHelper().request<MacSnapshot>('snapshot', params);
   cacheSnapshot(snap);
   if (typeof snap.pid === 'number') {
+    /*
+     * AND AN APP WE TAKE OVER, not only one we launched.
+     *
+     * The nudge lived on the launch path alone, so a window that was ALREADY
+     * open when the model took control of it kept whatever position it had —
+     * MEASURED, reproduced while photographing the monitor: Maps hanging 153pt
+     * off the right edge, the white unrendered strip back, and that strip
+     * unclickable. Once per pid, so a window the user deliberately moves later
+     * is left where they put it rather than being dragged back every snapshot.
+     */
+    if (!nudgedPids.has(snap.pid)) {
+      nudgedPids.add(snap.pid);
+      const wb = snap.windowBounds;
+      if (wb !== undefined) {
+        void nudgeOnScreen({ ...wb, pid: snap.pid } as MacWindowBounds);
+      }
+    }
     const wb = snap.windowBounds;
     await macOverlay.control(snap.pid, wb ? { x: wb.x, y: wb.y, w: wb.w, h: wb.h } : null);
     // The monitor tab follows the SAME target the overlay just took (one
@@ -723,6 +743,16 @@ export function registerMacAgentIpc(): void {
    * panel that is click-through except for its button rect.
    */
   setMacControlHandler(applyControl);
+  /*
+   * The pill's own buttons. the user asked for them back — an ✕, a pause and a
+   * hide, on the one surface that exists while the user is in another app
+   * watching the thing being driven. They route to the SAME brake as the
+   * surface's buttons and the global Escape; there is still only one.
+   */
+  macOverlay.onBrake((action) => {
+    if (action === 'stop') applyControl('stopped');
+    else if (action === 'pause') applyControl('user');
+  });
   // An app being driven is exactly when the global Escape brake should exist,
   // and the overlay's own engagement is the app's single truth for that.
   macOverlay.watch((state) => armEscBrake(state.engaged));

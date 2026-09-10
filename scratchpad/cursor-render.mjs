@@ -30,6 +30,8 @@ const g = info.cursorGlyph ?? { x: 400, y: 320, w: 24, h: 24 };
 console.log('glyph at', JSON.stringify(g), 'pill', JSON.stringify(info.bubble?.frame));
 const pad = 26;
 const crop = { x: Math.round(g.x - pad), y: Math.round(g.y - pad), w: Math.round(g.w + pad * 2), h: Math.round(g.h + pad * 2) };
+// Put a pill up so the controls have something to sit on.
+await dbg('overlay-page', {}).catch(() => {});
 for (const [name, color] of [['light', '#ffffff'], ['dark', '#1b1c22']]) {
   await dbg('overlay-backdrop', { color });
   await sleep(400);

@@ -25,6 +25,17 @@ func emitResult(id: Int?, result: [String: Any]) {
   emit(obj)
 }
 
+/**
+ * An unsolicited `{ event, data }` line — something the helper ORIGINATED.
+ *
+ * The pill's buttons have no request to answer: a person clicked stop, and the
+ * Node side has to hear about it. Deliberately carries no `id`, which is how
+ * the client tells an event from a reply.
+ */
+func emitEvent(_ event: String, data: [String: Any] = [:]) {
+  emit(["event": event, "data": data])
+}
+
 /// A `{ id?, ok: false, error }` response line. Never throws across the boundary
 /// — every failure becomes one of these so the Node side can degrade.
 func emitError(id: Int?, message: String) {
