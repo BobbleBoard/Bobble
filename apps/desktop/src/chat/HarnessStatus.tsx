@@ -30,6 +30,7 @@ import {
   PREFILL_STATUS_KEY,
   PREFIX_WARM_STATUS,
   parsePrefillPercent,
+  prefillLabel,
   showProcessing,
   useHarnessStatus,
 } from './harness-status';
@@ -173,6 +174,11 @@ export function ThreadStatusIndicator(): ReactElement | null {
   /* Why this prefill is happening, when the harness knows: a capability whose
      tools just landed at the front of the prompt. */
   const harness = useHarnessStatus();
+  /* "Starting up" belongs to a session's FIRST reply; after that the model is
+     resident and the wait is something else. */
+  const firstOfSession = usePiStore(
+    (s) => s.messages.filter((m) => m.kind === 'assistant').length <= 1,
+  );
   const readyStage = useLlmStore((s) => modelReadyStage(s.status.phase, prefixWarm));
   const serverStarting = readyStage !== null;
   /* The two waits read differently because they ARE different: one is weights
@@ -422,7 +428,19 @@ export function ThreadStatusIndicator(): ReactElement | null {
      */
     <ProcessingRing
       percent={percent}
-      label={percent === null ? 'Working' : 'Reading your conversation'}
+      /*
+       * the user, on the very first wait of a run: "i'd like to say 'starting up'
+       * or something like that if it's the first message or 'loading model' or
+       * changing between the two accurately." Both are true at different
+       * moments — the weights really are loading, and then the session really
+       * is starting — so one function decides, and the thread and the tool
+       * chain now read from it rather than each naming the wait themselves.
+       */
+      label={prefillLabel({
+        modelPhase: readyStage === 'loading' ? 'loading' : 'ready',
+        firstOfSession,
+        generic: percent === null ? 'Working' : 'Reading your conversation',
+      })}
       fading={fading}
       elapsedMs={elapsedMs}
     />

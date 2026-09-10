@@ -49,13 +49,17 @@ export function prefillLabel(inp: {
   readonly modelPhase?: string | null;
   readonly loadingCapability?: string | null;
   readonly firstOfSession?: boolean;
+  /** What to say when the wait is just the prompt — the caller's own wording,
+   * because the thread says "Reading your conversation" (a name the tester
+   * earned) and the chain says something shorter. */
+  readonly generic?: string;
 }): string {
   const phase = inp.modelPhase ?? null;
   if (phase !== null && phase !== 'ready' && phase !== 'idle') return 'Loading model';
   const cap = inp.loadingCapability ?? null;
   if (cap !== null && cap !== '') return `Loading ${CAPABILITY_LABEL[cap] ?? cap} tools`;
   if (inp.firstOfSession === true) return 'Starting up';
-  return 'Processing the prompt';
+  return inp.generic ?? 'Processing the prompt';
 }
 
 /** Human label for a task class (falls back to the raw id, dashes → spaces). */
