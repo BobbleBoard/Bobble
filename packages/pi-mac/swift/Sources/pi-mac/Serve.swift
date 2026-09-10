@@ -486,10 +486,26 @@ private func doScrollLadder(
    * A page is ~800pt, so the ask is converted to that many presses (at least
    * one), and horizontal falls back to arrow keys.
    */
-  let pages = max(1, Int((Double(abs(dy)) / 800.0).rounded()))
+  /*
+   * PAGES ARE TOO COARSE ON THEIR OWN.
+   *
+   * MEASURED in a run: the model asked to scroll 400 — half a screen, to bring
+   * a section it could see the top of fully into view — and Page Down took it
+   * a whole screen past. Below about three quarters of a screen the arrow keys
+   * are the right instrument: roughly 40pt each, so a few hundred points is a
+   * few presses rather than a jump.
+   */
   let vertical = abs(dy) >= abs(dx)
-  let keyCode: CGKeyCode = vertical ? (dy < 0 ? 121 : 116) : (dx < 0 ? 124 : 123)
-  let presses = vertical ? pages : max(1, Int((Double(abs(dx)) / 60.0).rounded()))
+  let span = vertical ? abs(dy) : abs(dx)
+  let byPage = vertical && span >= 600
+  let keyCode: CGKeyCode =
+    vertical
+    ? (byPage ? (dy < 0 ? 121 : 116) : (dy < 0 ? 125 : 126))
+    : (dx < 0 ? 124 : 123)
+  let presses =
+    byPage
+    ? max(1, Int((Double(span) / 800.0).rounded()))
+    : max(1, Int((Double(span) / 40.0).rounded()))
 
   let wheelRungs: [(name: String, fire: () -> Void)] = [
     ("pixelBurstToPid", { postScrollToPid(pid, dx: dx, dy: dy, at: at) }),
@@ -499,7 +515,7 @@ private func doScrollLadder(
   let keyRung: (name: String, fire: () -> Void) = (
       "keysToPid",
       {
-        for _ in 0..<min(12, presses) {
+        for _ in 0..<min(byPage ? 12 : 40, presses) {
           postKeyToPid(pid, flags: [], key: keyCode)
           usleep(20_000)
         }
