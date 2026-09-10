@@ -51,7 +51,9 @@ describe('formatCanvasSummary', () => {
     );
     expect(block).toContain('Also open:');
     expect(block).toContain('File src/App.tsx (unsaved)');
-    expect(block).toContain('Terminal (cwd ~/proj, last: `npm test`)');
+    expect(block).toContain(
+      'Terminal — YOUR OWN command output, not something to act on (cwd ~/proj, last: `npm test`)',
+    );
   });
 
   it('includes a capped excerpt when the active file has one', () => {
@@ -164,5 +166,20 @@ describe('the block says it is not the user talking', () => {
     // And it comes FIRST — a model that stops reading at "The user is looking
     // at" is exactly the one that needs telling.
     expect(body.indexOf('Automatic status')).toBeLessThan(body.indexOf('The user is looking at'));
+  });
+});
+
+/*
+ * A 4B spent four turns trying to "read Terminal" because the block said the
+ * user was looking at one — a terminal its own failing bash commands had just
+ * opened. The surface is the agent's output; saying so costs six words.
+ */
+describe('the activity terminal is the agent looking at itself', () => {
+  it('says whose output it is', () => {
+    const out = formatCanvasSummary({
+      active: { kind: 'terminal', lastCommand: 'read --help' },
+      others: [],
+    } as never);
+    expect(String(out)).toContain('YOUR OWN command output');
   });
 });

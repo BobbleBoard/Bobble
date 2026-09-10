@@ -62,10 +62,21 @@ function describeSurface(s: CanvasSurfaceState): string {
       return `File ${label}${s.dirty === true ? ' (unsaved)' : ''}`;
     }
     case 'terminal': {
+      /*
+       * SAY WHOSE TERMINAL THIS IS.
+       *
+       * MEASURED on a matrix run: a 4B's own failing bash commands opened the
+       * activity terminal, the block then reported "The user is looking at:
+       * Terminal", and the model spent four turns trying to read Terminal — "the
+       * user is looking at Terminal. I need to use the read tool ... to read the
+       * Chrome tab." It was chasing its own reflection. The surface is the
+       * agent's OUTPUT, not a thing the user chose to open.
+       */
       const parts: string[] = [];
       if (s.cwd) parts.push(`cwd ${s.cwd}`);
       if (s.lastCommand) parts.push(`last: \`${s.lastCommand}\``);
-      return parts.length > 0 ? `Terminal (${parts.join(', ')})` : 'Terminal';
+      const detail = parts.length > 0 ? ` (${parts.join(', ')})` : '';
+      return `Terminal — YOUR OWN command output, not something to act on${detail}`;
     }
     case 'image':
       return `Image${title ? ` "${title}"` : ''}`;

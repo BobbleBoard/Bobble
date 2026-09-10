@@ -3454,6 +3454,37 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
         };
       }
     }
+    /*
+     * `read --help` IS BASH'S OWN `read`, AND ALWAYS WILL BE.
+     *
+     * MEASURED on a matrix run: a 4B knew it wanted the read tool, typed `read
+     * --help` into bash the way it types `mac --help`, and got "/bin/bash: line
+     * 0: read: --: invalid option" — four times in a row, reasoning about
+     * Terminal in between. In CLI mode most tools ARE commands on PATH, so
+     * assuming this one is too is the reasonable guess; it is just wrong, and
+     * unfixably so, because a shell BUILTIN beats anything on PATH. A shim
+     * cannot win that fight, so the failure gets a signpost instead — the same
+     * treatment `open` gets, for the same reason: a dead end invites a
+     * workaround, a signpost does not.
+     */
+    if (event.toolName === 'bash' && event.isError !== false) {
+      const said = event.content.map((p) => (p.type === 'text' ? p.text : '')).join('');
+      if (/\bread: (--|-[a-z]?): invalid option|read: usage: read \[/.test(said)) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text:
+                `${said}\n\nThat is the SHELL's built-in \`read\`, not a Bobble command — a ` +
+                `builtin always wins over anything on PATH, so there is no version of this that ` +
+                `works. Reading a file is a TOOL CALL, not a shell command: call the read tool ` +
+                `with a path. \`mac\`, \`chrome\` and \`media\` are real commands; \`read\`, ` +
+                `\`write\` and \`edit\` are not.`,
+            },
+          ],
+        };
+      }
+    }
     if (event.toolName === 'bash' && cliImages.length > 0) {
       const attached = cliImages.map((c) => ({
         type: 'image' as const,
