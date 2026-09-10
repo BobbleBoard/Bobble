@@ -513,6 +513,18 @@ async function dispatch(method: MacAgentMethod, params: Record<string, unknown>)
       if (ack.listed !== true) await macOverlay.thinking();
       return ack;
     }
+    /* The window AROUND the page — see MAC_TABS_TOOL. Listing and switching are
+       background; opening and closing take the user's screen and say so in the
+       helper's own answer. */
+    case 'tabs':
+      return getHelper().request('tabs', params);
+    case 'tabSelect':
+    case 'tabNew':
+    case 'tabClose': {
+      const ack = await getHelper().request(method, params);
+      await macOverlay.thinking();
+      return ack;
+    }
     case 'windows':
       return getHelper().request('windows', params);
     case 'screenshot':
@@ -832,6 +844,10 @@ function registerE2eDebugChannel(): void {
           case 'scroll':
           case 'launch':
           case 'menuClick':
+          case 'tabs':
+          case 'tabSelect':
+          case 'tabNew':
+          case 'tabClose':
           case 'windows':
           case 'setDriving':
             return { ok: true, result: await dispatch(req.op as MacAgentMethod, params) };
