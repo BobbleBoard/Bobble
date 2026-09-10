@@ -465,7 +465,30 @@ export function resolveCli(cli: CliModel, argv: readonly string[]): CliResolutio
      stayed a raw string would be rejected by the tool's own `typeof !== number`
      guard — on the very form the help advertises as
      `click "index"  (positional: fills --index)`. */
-  const spare = bare;
+  /*
+   * `[2]` IS AN INDEX — because that is how the snapshot prints it.
+   *
+   * MEASURED, MiniCPM5 driving Maps: the element list says `[2] Apple Maps`, so
+   * the model wrote `mac type [2] "Table Mountain"` — the notation it had just
+   * been shown. The CLI did not recognise it, dropped it, and the tool refused
+   * with "refusing to type without an index", which the model read as plainly
+   * wrong: it HAD passed [2]. It burned four calls arguing with that before
+   * running `mac type --help` and rewriting the same line as
+   * `--text "…" --index 2`.
+   *
+   * Teaching one notation in the output and accepting only another in the input
+   * is the harness's mistake, not the model's. A bracketed number fills `index`
+   * wherever the tool has one, and never competes for an ordinary positional
+   * slot.
+   */
+  let spare = bare;
+  if (schema?.properties?.index !== undefined && args.index === undefined) {
+    const bracketed = spare.find((a) => /^\[\d+\]$/.test(a));
+    if (bracketed !== undefined) {
+      args.index = Number(bracketed.slice(1, -1));
+      spare = spare.filter((a) => a !== bracketed);
+    }
+  }
   if (spare.length > 0) {
     const keys = positionalKeys(schema, spare.length).filter((k) => args[k] === undefined);
     const raw: Record<string, string> = {};

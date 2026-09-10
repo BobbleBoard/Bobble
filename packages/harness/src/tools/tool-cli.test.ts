@@ -424,3 +424,26 @@ describe('the word a model reaches for', () => {
     expect(coerceArgs({ nonsense: 'x' }, schema)).toEqual({ nonsense: 'x' });
   });
 });
+
+describe('the notation the snapshot prints', () => {
+  const call = (line: string) => resolveCli(cli, line.split(' ').filter(Boolean));
+
+  /* MEASURED, MiniCPM5 driving Maps: the element list prints `[2] Apple Maps`,
+     so the model wrote `mac type [2] "Table Mountain"` — the notation it had
+     just been shown — and was told "refusing to type without an index". It
+     burned four calls arguing with that before reading --help and rewriting the
+     identical line as `--text "…" --index 2`. Teaching one notation in the
+     output and accepting only another in the input is our mistake. */
+  it('reads [2] as the index', () => {
+    expect(call('browser click [2]')).toEqual({
+      kind: 'call',
+      tool: 'browser_click',
+      args: { index: 2 },
+    });
+  });
+
+  it('still accepts the bare number and the flag form', () => {
+    expect(call('browser click 7')).toMatchObject({ args: { index: 7 } });
+    expect(call('browser click --index 7')).toMatchObject({ args: { index: 7 } });
+  });
+});

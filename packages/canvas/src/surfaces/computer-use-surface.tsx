@@ -1509,7 +1509,11 @@ export function identity(app: string, title: string): { text: string; edited: bo
   const edited = / [—-] Edited$/.test(title);
   const clean = edited ? title.replace(/ [—-] Edited$/, '') : title;
   if (app === '') return { text: clean, edited };
-  return { text: clean === '' ? app : `${app} — ${clean}`, edited };
+  /* "Maps — Maps" says nothing twice. An app whose window carries the app's own
+     name (Maps, Calculator, anything single-window) was rendering both halves,
+     which spends a line of the footer restating the tab it is under. */
+  if (clean === '' || clean.toLowerCase() === app.toLowerCase()) return { text: app, edited };
+  return { text: `${app} — ${clean}`, edited };
 }
 
 /**

@@ -214,3 +214,24 @@ describe('which window the footer is about', () => {
     expect(mainWindowOf([])).toBeUndefined();
   });
 });
+
+describe('the footer does not say the same word twice', () => {
+  /* SEEN on a Maps run: "Maps — Maps". Single-window apps title their window
+     after themselves, and repeating it spends a line restating the tab above. */
+  it('collapses a window titled after its own app', () => {
+    expect(identity('Maps', 'Maps').text).toBe('Maps');
+    expect(identity('Calculator', 'calculator').text).toBe('Calculator');
+  });
+
+  it('still names a window that says something', () => {
+    expect(identity('Google Chrome', 'Shop iPhone Duo').text).toBe(
+      'Google Chrome — Shop iPhone Duo',
+    );
+  });
+
+  it('leaves the edited marker alone', () => {
+    const r = identity('TextEdit', 'TextEdit — Edited');
+    expect(r.edited).toBe(true);
+    expect(r.text).toBe('TextEdit');
+  });
+});
