@@ -12,6 +12,11 @@
  * and logins. No extension to install, which the user rightly called "a very odd
  * process for a lot of users".
  *
+ * THE GATES BELOW ARE ONLY FOR `execute javascript`, and reading this header as
+ * if they gated all of Chrome's AppleScript cost months of capability. MEASURED
+ * with the flag OFF: `count of tabs`, `title of tab` and `URL of tab` all
+ * answer. See chromeTabs at the bottom of this file.
+ *
  * TWO GATES, AND WE ASK BEFORE EITHER:
  *  1. Chrome ships with `AllowJavaScriptAppleEvents` off. Turning it on is a
  *     `defaults write` against ANOTHER application's preferences plus a Chrome
@@ -172,4 +177,74 @@ export function chromeActionJs(index: number, action: 'click' | 'focus', text?: 
   if (!el) return "ERROR: no element [${Math.max(0, Math.floor(index))}] — re-snapshot, the page may have changed";
   ${body}
 })()`;
+}
+
+// ── tabs, without the JavaScript gate ────────────────────────────────────────
+
+/**
+ * THE FLAG ONLY GATES `execute javascript`. Everything else in Chrome's
+ * AppleScript dictionary works without it.
+ *
+ * the user: "again remember this is totally possible (and for chrome possible
+ * without asking the user to download an extension, that's not an option)."
+ * He was right, and the assumption in this file's own header — that the DOM
+ * gate is the gate for all of it — is what hid it. MEASURED against a Chrome
+ * with `AllowJavaScriptAppleEvents` OFF:
+ *
+ *   count of tabs / title of tab / URL of tab   → answered
+ *   execute javascript                          → refused
+ *
+ * So the tab strip is readable with no setting, no restart and no extension —
+ * and better than the Accessibility route it replaces, which knew titles but
+ * never URLs and could only see the frontmost window.
+ */
+export interface ChromeTabInfo {
+  readonly window: number;
+  readonly index: number;
+  readonly title: string;
+  readonly url: string;
+  readonly active: boolean;
+}
+
+/** One record per line, unit-separated, so a title containing a comma or a
+ * newline cannot be mistaken for a field or a row boundary. */
+const TABS_SCRIPT = `tell application "Google Chrome"
+  set out to ""
+  repeat with w from 1 to (count of windows)
+    set act to active tab index of window w
+    repeat with t from 1 to (count of tabs of window w)
+      set out to out & w & "\t" & t & "\t" & (act = t) & "\t" & (title of tab t of window w) & "\t" & (URL of tab t of window w) & "\n"
+    end repeat
+  end repeat
+  return out
+end tell`;
+
+export function parseChromeTabs(raw: string): ChromeTabInfo[] {
+  const out: ChromeTabInfo[] = [];
+  for (const line of raw.split('\n')) {
+    const parts = line.split('\t');
+    if (parts.length < 5) continue;
+    const w = Number(parts[0]);
+    const i = Number(parts[1]);
+    if (!Number.isFinite(w) || !Number.isFinite(i)) continue;
+    out.push({
+      window: w,
+      index: i,
+      active: (parts[2] ?? '').trim() === 'true',
+      title: (parts[3] ?? '').trim(),
+      /* A URL cannot contain a tab, so anything after the fourth separator is
+         still the URL — rejoined rather than dropped. */
+      url: parts.slice(4).join('\t').trim(),
+    });
+  }
+  return out;
+}
+
+/** Every open tab in every Chrome window, or null when Chrome will not answer
+ * (not running, or Automation permission refused — NOT the JavaScript flag). */
+export async function chromeTabs(): Promise<ChromeTabInfo[] | null> {
+  const res = await run('osascript', ['-e', TABS_SCRIPT]);
+  if (!res.ok) return null;
+  const tabs = parseChromeTabs(res.stdout);
+  return tabs.length === 0 ? null : tabs;
 }

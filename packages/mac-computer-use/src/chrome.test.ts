@@ -18,6 +18,7 @@ import {
   chromeActionJs,
   chromeEvalScript,
   explainChromeFailure,
+  parseChromeTabs,
   parseDefaultsBool,
 } from './chrome';
 
@@ -133,5 +134,33 @@ describe('the Apple Events refusal names a route that works', () => {
     expect(msg).toContain('mac_key');
     expect(msg).toContain('cmd+l');
     expect(msg).toMatch(/do NOT try|only the user/i);
+  });
+});
+
+describe('the tab strip, read without the JavaScript gate', () => {
+  it('parses a window/index/active/title/url record', () => {
+    const tabs = parseChromeTabs(
+      '1\t1\tfalse\tApple unveils iPhone Duo\thttps://www.apple.com/newsroom/\n' +
+        '1\t2\ttrue\tShop iPhone Duo\thttps://www.apple.com/shop/buy-iphone/iphone-duo\n',
+    );
+    expect(tabs).toHaveLength(2);
+    expect(tabs[1]).toEqual({
+      window: 1,
+      index: 2,
+      active: true,
+      title: 'Shop iPhone Duo',
+      url: 'https://www.apple.com/shop/buy-iphone/iphone-duo',
+    });
+  });
+
+  /* A title is user content: it can contain anything, and the separator has to
+     survive it. Tabs cannot appear in a URL, so the tail is rejoined. */
+  it('keeps a URL that contains the separator character', () => {
+    const tabs = parseChromeTabs('2\t1\tfalse\tOdd\thttps://x.test/a\tb\n');
+    expect(tabs[0]?.url).toBe('https://x.test/a\tb');
+  });
+
+  it('ignores lines that are not records', () => {
+    expect(parseChromeTabs('\n\nnot a record\n')).toEqual([]);
   });
 });

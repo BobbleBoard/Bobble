@@ -22,9 +22,11 @@ import { Type } from '@sinclair/typebox';
 import type { MacBridge } from './bridge-client.js';
 import {
   CHROME_SNAPSHOT_JS,
+  type ChromeTabInfo,
   chromeActionJs,
   chromeEval,
   chromeJsAllowed,
+  chromeTabs,
   enableChromeJs,
 } from './chrome.js';
 import {
@@ -141,6 +143,21 @@ interface MacTabsAck {
 /** `app` only when one was named — an absent app means "the one being driven". */
 function appParam(app: string | undefined): Record<string, unknown> {
   return app === undefined || app === '' ? {} : { app };
+}
+
+/** The Apple-Events answer, which knows URLs and every window. */
+function formatChromeTabs(tabs: readonly ChromeTabInfo[]): string {
+  const windows = new Set(tabs.map((t) => t.window));
+  const lines = tabs.map((t) => {
+    const where = windows.size > 1 ? `w${t.window}/` : '';
+    const title = t.title === '' ? '(untitled)' : t.title;
+    return `${t.active ? '*' : ' '} [${where}${t.index}] ${title}\n      ${t.url}`;
+  });
+  return [
+    `Google Chrome — ${tabs.length} tab${tabs.length === 1 ? '' : 's'}` +
+      `${windows.size > 1 ? ` across ${windows.size} windows` : ''} (* = front):`,
+    ...lines,
+  ].join('\n');
 }
 
 /** The tab strip as the user sees it: numbered, with the front one marked. */
@@ -1021,6 +1038,29 @@ export function registerMacComputerUseTools(
       const blocked = await gate('chrome_tabs', ctx);
       if (blocked !== null) return blocked;
       try {
+        /*
+         * APPLE EVENTS FIRST, and it needs no setting.
+         *
+         * the user: "for chrome possible without asking the user to download an
+         * extension, that's not an option." MEASURED against a Chrome with
+         * AllowJavaScriptAppleEvents OFF: `count of tabs`, `title of tab` and
+         * `URL of tab` all answer — that flag only ever gated `execute
+         * javascript`, and this file's own header assumed otherwise, which is
+         * what hid the route. It knows the URLs and sees EVERY window; the
+         * Accessibility tab strip below knows neither, so it is the fallback.
+         */
+        const wanted = params.app ?? CHROME_APP;
+        if (/chrome/i.test(wanted)) {
+          const viaEvents = await chromeTabs();
+          if (viaEvents !== null) {
+            return textResult(formatChromeTabs(viaEvents), {
+              action: 'tabs',
+              ok: true,
+              app: CHROME_APP,
+              mode: 'apple-events',
+            });
+          }
+        }
         const res = await bridge.request<MacTabsAck>('tabs', withTarget(appParam(params.app)));
         if (res.ok !== true) {
           return errResult('chrome_tabs', res.error ?? 'no tab strip in that window.');
