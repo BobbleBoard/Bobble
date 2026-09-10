@@ -33,9 +33,10 @@ export * from './tools.js';
 /** Register the mac tool set with an explicit bridge (test / app seam). */
 export function registerMacComputerUse(pi: ExtensionAPI, options: MacComputerUseOptions): void {
   registerMacComputerUseTools(pi, options);
-  // Chrome gets real DOM control alongside the coordinate-based path — it needs
-  // no bridge (it drives Chrome over Apple Events), so it registers regardless.
-  registerChromeTools(pi);
+  /* Chrome's own set. It prefers the real DOM over Apple Events and falls back
+     to Accessibility when Chrome refuses those — which is the usual case — so
+     it takes the bridge as well. */
+  registerChromeTools(pi, options.bridge);
 }
 
 /** pi extension factory (zero-config; reads the bridge socket from env).
@@ -47,5 +48,5 @@ export default function activate(pi: ExtensionAPI): void {
   const bridge: MacBridge | null = MacAgentClient.fromEnv();
   const preConsented = process.env.PI_MAC_PRECONSENT === '1';
   registerMacComputerUseTools(pi, { bridge, consent: createMacConsentGate({ preConsented }) });
-  registerChromeTools(pi);
+  registerChromeTools(pi, bridge);
 }

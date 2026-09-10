@@ -41,6 +41,7 @@ import type { MacConsentGate } from './permissions.js';
 import { createMacConsentGate } from './permissions.js';
 import type {
   MacActAck,
+  MacAgentMethod,
   MacLaunchAck,
   MacMenuAck,
   MacMenuEntry,
@@ -1296,8 +1297,34 @@ export async function checkMacTcc(bridge: MacBridge): Promise<MacTccStatus> {
  * so it is never made silently — the same confirm the Mac-control gate uses asks
  * first, and a refusal is reported honestly rather than retried.
  */
-export function registerChromeTools(pi: ExtensionAPI): void {
+/** The user's own Chrome, by the name macOS knows it by. */
+const CHROME_APP = 'Google Chrome';
+
+export function registerChromeTools(pi: ExtensionAPI, bridge: MacBridge | null = null): void {
   let askedThisSession = false;
+
+  /**
+   * THE ROUTE THAT ACTUALLY WORKS.
+   *
+   * Apple Events gives the real DOM and is better when it is available. It
+   * usually is not: the Chrome setting behind it is off by default and only the
+   * user can turn it on, so MEASURED across every demo run, `chrome snapshot`
+   * came back "Chrome is refusing JavaScript from Apple Events" and the model
+   * spent a turn discovering that its own connector could not read a page.
+   *
+   * Accessibility can read the same page — its text with a click point per
+   * line, and every control including the ones below the fold — so when the DOM
+   * is shut, these fall through to it rather than failing. The tools stay one
+   * set, which is what the user asked for: "have chrome be its own set".
+   */
+  async function ax<T>(method: MacAgentMethod, params: Record<string, unknown>): Promise<T | null> {
+    if (bridge === null) return null;
+    try {
+      return await bridge.request<T>(method, { app: CHROME_APP, ...params });
+    } catch {
+      return null;
+    }
+  }
 
   /** Make sure Chrome will run our JavaScript, asking the user once if not. */
   async function ensureChromeJs(ctx: ExtensionContext): Promise<string | null> {
@@ -1349,10 +1376,28 @@ export function registerChromeTools(pi: ExtensionAPI): void {
       'over computer-use screenshots whenever the work is in Chrome. Act on what it lists with ' +
       'chrome_click / chrome_type by [index].',
     promptSnippet: "See the page in the user's Chrome as an indexed element list",
-    parameters: Type.Object({}),
-    async execute(_id, _params, _signal, _upd, ctx) {
+    parameters: Type.Object({
+      find: Type.Optional(
+        Type.String({
+          description:
+            'Only what matches this word — searches the controls AND the page text, including ' +
+            'what is below the fold, so you can reach a control without scrolling to it.',
+        }),
+      ),
+    }),
+    async execute(_id, params, _signal, _upd, ctx) {
       const out = await evalInChrome(ctx, CHROME_SNAPSHOT_JS);
-      return { content: [{ type: 'text', text: out.text }], details: undefined };
+      if (out.ok) return { content: [{ type: 'text', text: out.text }], details: undefined };
+      const snap = await ax<MacSnapshot>('snapshot', {
+        ...(params.find === undefined || params.find === '' ? {} : { find: params.find }),
+      });
+      if (snap === null) {
+        return { content: [{ type: 'text', text: out.text }], details: undefined };
+      }
+      return {
+        content: [{ type: 'text', text: formatMacSnapshot(snap) }],
+        details: undefined,
+      };
     },
   });
 
@@ -1368,7 +1413,21 @@ export function registerChromeTools(pi: ExtensionAPI): void {
     }),
     async execute(_id, params, _signal, _upd, ctx) {
       const out = await evalInChrome(ctx, chromeActionJs(params.index, 'click'));
-      return { content: [{ type: 'text', text: out.text }], details: undefined };
+      if (out.ok) return { content: [{ type: 'text', text: out.text }], details: undefined };
+      const ack = await ax<{ found?: boolean; mode?: string }>('click', { index: params.index });
+      if (ack === null) return { content: [{ type: 'text', text: out.text }], details: undefined };
+      return {
+        content: [
+          {
+            type: 'text',
+            text:
+              ack.found === true
+                ? `Pressed [${params.index}] (${ack.mode ?? 'AXPress'}, in the background).`
+                : `Nothing at [${params.index}] — take a chrome_snapshot again.`,
+          },
+        ],
+        details: undefined,
+      };
     },
   });
 
@@ -1382,10 +1441,25 @@ export function registerChromeTools(pi: ExtensionAPI): void {
     parameters: Type.Object({
       index: Type.Number({ description: 'The [index] from chrome_snapshot.' }),
       text: Type.String({ description: 'The text to enter.' }),
+      submit: Type.Optional(
+        Type.Boolean({ description: 'Commit the field afterwards (a search box, the URL bar).' }),
+      ),
     }),
     async execute(_id, params, _signal, _upd, ctx) {
       const out = await evalInChrome(ctx, chromeActionJs(params.index, 'focus', params.text));
-      return { content: [{ type: 'text', text: out.text }], details: undefined };
+      if (out.ok) return { content: [{ type: 'text', text: out.text }], details: undefined };
+      const ack = await ax<{ ok?: boolean }>('type', {
+        index: params.index,
+        text: params.text,
+        ...(params.submit === true ? { submit: true } : {}),
+      });
+      if (ack === null) return { content: [{ type: 'text', text: out.text }], details: undefined };
+      return {
+        content: [
+          { type: 'text', text: `Set [${params.index}] to ${JSON.stringify(params.text)}.` },
+        ],
+        details: undefined,
+      };
     },
   });
 
