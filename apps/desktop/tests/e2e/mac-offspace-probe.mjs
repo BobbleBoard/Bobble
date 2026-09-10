@@ -96,17 +96,29 @@ try {
 
   // Vanish the window from the current Space's window list — the same thing
   // the overlay sees when the user switches desktops.
+  /*
+   * HOW FAST it hides is the whole bug. The phantom used to wait two occlusion
+   * ticks before hiding AND clear its mask on the first one, so for ~66ms it sat
+   * unmasked on the desktop the user had just switched to — a flash nobody can
+   * screenshot but everybody sees. Hiding is now immediate and only the RETURN
+   * is debounced, so this measures the gap rather than just the end state.
+   */
+  const vanishedAt = Date.now();
   await osa(`tell application "System Events" to set visible of process "${APP}" to false`);
   let away = null;
-  for (let i = 0; i < 40; i++) {
-    await sleep(100);
+  let hidAfter = null;
+  for (let i = 0; i < 400; i++) {
     away = await native();
-    if (away.behavior?.offSpace === true) break;
+    if (away.behavior?.offSpace === true) {
+      hidAfter = Date.now() - vanishedAt;
+      break;
+    }
+    await sleep(20);
   }
   if (away?.behavior?.offSpace !== true) {
     fail('the phantom kept drawing after its window left this desktop — it would follow the user');
   }
-  console.log('off-desktop OK: the phantom hid itself rather than following');
+  console.log(`off-desktop OK: hid itself ${hidAfter}ms after the window went (not following)`);
 
   // …and comes back on its own when the window returns.
   await osa(`tell application "System Events" to set visible of process "${APP}" to true`);
@@ -118,6 +130,96 @@ try {
   }
   if (back?.behavior?.offSpace !== false) fail('the phantom never came back with its window');
   console.log('return OK: the phantom came back with its window');
+
+  /*
+   * …AND A REAL WINDOW ABOVE THE TRACKED ONE MUST ERASE IT.
+   *
+   * the user, twice: "cursor on top is occurring again". Everything else here is a
+   * proxy; this is the symptom. The probe's OWN Bobble window is a real window
+   * sitting above Maps in the z-order, so parking the phantom inside it is the
+   * cheapest honest reproduction there is — no second app to install, no
+   * synthetic occluder rect standing in for the thing being tested.
+   */
+  const own = await page.evaluate(() => ({
+    x: window.screenX,
+    y: window.screenY,
+    w: window.outerWidth,
+    h: window.outerHeight,
+  }));
+  const tip = { x: Math.round(own.x + own.w / 2), y: Math.round(own.y + own.h / 2) };
+
+  /*
+   * PIXELS DECIDE — but count the PHANTOM, not "anything unlike the backdrop".
+   *
+   * The first version of this painted a flat ground and counted pixels that
+   * differed from it. That cannot work here: the mask cuts the whole stage, and
+   * the backdrop lives inside it, so in exactly the region under test the ground
+   * is erased too and plain white read as 76,800 px of phantom. The panel was
+   * masking correctly the entire time.
+   *
+   * The phantom is blue — a light glyph and a strong pill — and every ground it
+   * can sit on here (white, #eceef2) is grey. So count SATURATED pixels: channel
+   * spread is what separates the cursor from any backdrop, masked or not.
+   *
+   * With a positive control, because a measure that returns zero for the wrong
+   * reason passes this test silently: the same count taken where the phantom is
+   * NOT covered has to come back non-zero, or the measurement is broken rather
+   * than the mask being good.
+   */
+  const saturated = async (name, at) => {
+    const box = { x: at.x - 80, y: at.y - 60, w: 160, h: 120 };
+    const shotPath = path.join(tmpdir(), name);
+    const r = await dbg('overlay-render', { path: shotPath, ...box, scale: 2 });
+    if (r.ok !== true) fail(`could not render ${name}`);
+    return await app.evaluate(({ nativeImage }, p) => {
+      const b = nativeImage.createFromPath(p).toBitmap();
+      let n = 0;
+      for (let i = 0; i < b.length; i += 4) {
+        const mx = Math.max(b[i], b[i + 1], b[i + 2]);
+        const mn = Math.min(b[i], b[i + 1], b[i + 2]);
+        if (mx - mn > 25) n++;
+      }
+      return n;
+    }, shotPath);
+  };
+
+  // Positive control: over the tracked window itself, the phantom must be there.
+  /* The control point has to be over the TRACKED window and clear of the one
+     above it — our own window covers most of the screen, so the first attempt
+     put the control inside the very occluder it was meant to contrast with and
+     read a correctly-masked phantom as a broken measurement. Just above our
+     window's top edge is over Maps and over nothing else. */
+  const homeTip = { x: Math.round(own.x + own.w / 2), y: Math.max(40, own.y - 40) };
+  await dbg('overlay-cursor', { x: homeTip.x, y: homeTip.y, ms: 0 });
+  await sleep(400);
+  const visiblePx = await saturated('offspace-uncovered.png', homeTip);
+  if (visiblePx === 0) {
+    fail(
+      'the phantom did not paint even where it SHOULD — the measurement is broken, not the mask',
+    );
+  }
+
+  // The real check: inside a window that is above the tracked one, nothing.
+  await dbg('overlay-cursor', { x: tip.x, y: tip.y, ms: 0 });
+  await sleep(400);
+  const covered = await native();
+  if (covered.behavior?.offSpace === true) fail('phantom hid entirely instead of being masked');
+  const why = covered.behavior?.unmasked ?? '';
+  if (why !== '') fail(`the panel reports it cannot mask: ${why}`);
+  const coveredPx = await saturated('offspace-covered.png', tip);
+  if (coveredPx !== 0) {
+    const st = await native();
+    console.log(
+      'state:',
+      JSON.stringify({ maskHoles: st.maskHoles, unmasked: st.behavior?.unmasked }),
+    );
+    fail(
+      `${coveredPx} px of phantom painted inside a window ABOVE its own — the "cursor on top" bug`,
+    );
+  }
+  console.log(
+    `covered OK: ${visiblePx} px where it belongs, 0 px inside our own window at ${tip.x},${tip.y}`,
+  );
   console.log('mac-offspace-probe OK');
 } finally {
   await osa(`tell application "System Events" to set visible of process "${APP}" to true`);

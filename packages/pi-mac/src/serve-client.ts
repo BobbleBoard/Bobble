@@ -38,6 +38,10 @@ export interface MacHelperClientOptions {
   readonly spawnFn?: MacSpawnFn;
   /** Per-request timeout (ms). Default 30000. */
   readonly requestTimeoutMs?: number;
+  /** Called for each line the helper writes to stderr. Without it those lines
+   * are still drained (a pipe nobody reads eventually blocks the child) but
+   * dropped. */
+  readonly onStderr?: (line: string) => void;
 }
 
 const DEFAULT_REQUEST_TIMEOUT = 30_000;
@@ -51,12 +55,15 @@ export class MacHelperClient {
   #child: MacChildProcess | null = null;
   #buffer = '';
   #nextId = 1;
+  /** Called with each line the helper writes to stderr — see #ensureChild. */
+  readonly #onStderr: ((line: string) => void) | undefined;
 
   constructor(opts: MacHelperClientOptions = {}) {
     this.#bin = helperPath(opts.helperPath);
     this.#args = opts.helperArgs ?? ['--serve'];
     this.#spawnFn = opts.spawnFn ?? defaultSpawn;
     this.#requestTimeoutMs = opts.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT;
+    this.#onStderr = opts.onStderr;
   }
 
   #ensureChild(): MacChildProcess {
@@ -65,6 +72,24 @@ export class MacHelperClient {
     this.#child = child;
     this.#buffer = '';
     child.stdout?.on('data', (chunk) => this.#onData(String(chunk)));
+    /*
+     * READ THE CHILD'S STDERR — nobody did, and it is spawned with a PIPE.
+     *
+     * Everything the helper wrote there was therefore invisible, including the
+     * diagnostics it writes precisely when something is wrong ("Screen
+     * Recording is not granted", "no shareable window"). A pipe nobody drains
+     * is also a pipe that eventually fills and blocks the child.
+     *
+     * Handed to the caller rather than logged here, because this package has no
+     * logger and should not acquire one.
+     */
+    child.stderr?.on('data', (chunk) => {
+      const text = String(chunk);
+      for (const line of text.split('\n')) {
+        const t = line.trim();
+        if (t !== '') this.#onStderr?.(t);
+      }
+    });
     child.on('error', (err) => this.#onExit(err));
     child.on('close', () => this.#onExit(new Error('pi-mac helper exited')));
     return child;

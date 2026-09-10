@@ -191,6 +191,15 @@ class MacOverlayController {
       this.#client = new MacHelperClient({
         helperPath: this.#helperPath,
         helperArgs: ['--overlay'],
+        /* The overlay child's stderr was piped and never read, so everything it
+           said about its own health was invisible. the user: "you need to log
+           whenever that's happening". A line starting `overlay:` is the panel
+           reporting that it cannot mask itself — the exact condition behind the
+           phantom drawing over the wrong window. */
+        onStderr: (line) => {
+          if (line.startsWith('overlay: UNMASKED')) log.warn('phantom is unmasked', { line });
+          else log.debug('pi-mac overlay', { line });
+        },
         requestTimeoutMs: OVERLAY_REQUEST_TIMEOUT_MS,
       });
     }

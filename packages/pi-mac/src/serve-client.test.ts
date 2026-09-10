@@ -122,3 +122,33 @@ describe('MacHelperClient', () => {
     client.dispose();
   });
 });
+
+describe("the helper's stderr", () => {
+  /* It was spawned with a pipe and never read: every diagnostic the helper
+     wrote — including the ones it writes precisely when something is wrong —
+     went nowhere, and a pipe nobody drains eventually blocks the child. */
+  it('reaches the caller, one line at a time', () => {
+    const lines: string[] = [];
+    const handlers: Record<string, (chunk: string) => void> = {};
+    const child = {
+      stdout: { on: () => undefined },
+      stderr: {
+        on: (ev: string, fn: (chunk: string) => void) => {
+          handlers[ev] = fn;
+        },
+      },
+      on: () => undefined,
+      kill: () => undefined,
+      pid: 1,
+    };
+    const client = new MacHelperClient({
+      helperPath: '/bin/true',
+      spawnFn: () => child as never,
+      onStderr: (l) => lines.push(l),
+    });
+    // Force the spawn: any request will do, and it never has to succeed.
+    void client.request('info', {}).catch(() => undefined);
+    handlers.data?.('overlay: UNMASKED — no tracked window\nsecond line\n\n');
+    expect(lines).toEqual(['overlay: UNMASKED — no tracked window', 'second line']);
+  });
+});

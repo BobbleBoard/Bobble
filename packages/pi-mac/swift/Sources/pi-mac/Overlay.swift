@@ -1467,7 +1467,50 @@ final class OverlayController: NSObject {
    * the mask is cleared and the Node side's own appVisible rule takes it from
    * there.
    */
+  /// "x,y wxh" — short enough to sit in a log line.
+  private func rectText(_ r: CGRect) -> String {
+    "\(Int(r.origin.x)),\(Int(r.origin.y)) \(Int(r.width))x\(Int(r.height))"
+  }
+
+  /// The last reason the phantom could not be masked, so the log fires on a
+  /// CHANGE rather than 30 times a second.
+  private var unmaskedReason: String?
+
+  /// the user: "you need to log whenever that's happening". Reports on transition
+  /// only, and says which window is over the cursor so the next person does not
+  /// have to guess.
+  private func noteUnmasked(_ why: String) {
+    if unmaskedReason == why { return }
+    unmaskedReason = why
+    writeStderr("overlay: UNMASKED — \(why)\n")
+  }
+
+  private func clearUnmasked() {
+    guard let was = unmaskedReason else { return }
+    unmaskedReason = nil
+    writeStderr("overlay: masked again (was: \(was))\n")
+  }
+
+  /// Is the phantom actually being drawn right now? An invisible cursor cannot
+  /// be on top of anything, and reporting it would drown the real cases.
+  private var phantomShowing: Bool {
+    panel.isVisible && panel.alphaValue > 0.01
+      && (cursorGroup.presentation() ?? cursorGroup).opacity > 0.5
+  }
+
   func refreshOcclusion() {
+    /* Reported BEFORE the guard, because the guard is itself one of the ways
+       this goes wrong: with no tracked window there is nothing to sit behind,
+       native masking is off, and the phantom is left to the Node poll — the
+       slow path whose lag the user reported in the first place. */
+    if trackedWindow <= 0 && phantomShowing {
+      noteUnmasked("no tracked window — nothing to sit behind, so nothing can be cut out")
+    } else if trackedWindow > 0 && phantomShowing && occlusionTimer == nil {
+      /* The mask is only as fresh as this timer. Without it the holes are
+         whatever they were when it stopped, which is a mask that describes a
+         z-order from some earlier moment. */
+      noteUnmasked("the occlusion timer is not running — the mask is frozen")
+    }
     guard trackedWindow > 0, panel.isVisible else { return }
     let ourLayer = panel.level.rawValue
     let ours: Set<Int> = [panel.windowNumber, controls?.windowNumber ?? -1]
@@ -1490,7 +1533,39 @@ final class OverlayController: NSObject {
       else { continue }
       rects.append(r)
     }
-    setOccluders(found ? rects : [])
+    /*
+     * NEVER CLEAR THE MASK BECAUSE WE LOST THE WINDOW.
+     *
+     * `found ? rects : []` cleared every hole the moment the tracked window
+     * dropped out of the z-order — which is exactly the moment the phantom is
+     * most likely to be over something it does not belong to. The old mask is
+     * stale by then, but stale-and-covering is strictly safer than none, and it
+     * only has to hold for the frame or two before the hide below takes over.
+     */
+    if found { setOccluders(rects) }
+    /*
+     * DID THE MASK ACTUALLY COVER THE CURSOR? — the symptom, checked directly.
+     *
+     * the user, twice: the phantom draws on top of a window that is above the one
+     * it belongs to. Everything else here is a proxy for that; this is the
+     * thing itself. The cursor's own point is tested against the windows we
+     * just decided are ABOVE the tracked window, and if one of them covers it
+     * while our occluder set does not, the phantom is being painted over
+     * somebody else's window right now — so say so, and name the window.
+     */
+    if found {
+      clearUnmasked()
+    } else if phantomShowing {
+      /*
+       * The tracked window is not in the z-order at all. Either it is on
+       * another desktop (handled just below by hiding) or the number is STALE —
+       * the app closed that window and opened another, and we are still masking
+       * against a window that no longer exists. Both leave the phantom with
+       * nothing to sit behind, which is the state the user keeps seeing, so both
+       * get said out loud with the number that failed to resolve.
+       */
+      noteUnmasked("tracked window \(trackedWindow) is not in this desktop's z-order")
+    }
     /*
      * THE WINDOW IS ON ANOTHER DESKTOP, SO THE PHANTOM MUST NOT BE ON THIS ONE.
      *
@@ -1514,13 +1589,31 @@ final class OverlayController: NSObject {
      * momentarily incomplete window list cannot make the phantom blink during a
      * normal drag.
      */
-    offSpaceStreak = found ? 0 : min(offSpaceStreak + 1, 3)
-    setOffSpace(offSpaceStreak >= 2)
+    /*
+     * ASYMMETRIC ON PURPOSE: hide at once, come back slowly.
+     *
+     * The hysteresis was symmetric — two ticks either way — which meant that on
+     * a desktop switch the phantom stayed on screen, unmasked, for 66ms before
+     * hiding. 66ms of a cursor sitting on top of the wrong window is exactly
+     * what the user keeps reporting, and it is a flash nobody can screenshot.
+     *
+     * Being wrong in the two directions costs very different things: hiding a
+     * frame too early is invisible, showing a frame too late is the bug. So
+     * hiding is immediate and only the RETURN waits for two consecutive ticks,
+     * which is what stops an incomplete window list from making it blink.
+     */
+    if found {
+      onSpaceStreak = min(onSpaceStreak + 1, 3)
+      if onSpaceStreak >= 2 { setOffSpace(false) }
+    } else {
+      onSpaceStreak = 0
+      setOffSpace(true)
+    }
   }
 
-  /// Consecutive occlusion ticks on which the tracked window was not on this
-  /// Space. Hysteresis — see refreshOcclusion.
-  private var offSpaceStreak = 0
+  /// Consecutive occlusion ticks on which the tracked window WAS on this Space.
+  /// Only the return is debounced — see refreshOcclusion.
+  private var onSpaceStreak = 0
   private var offSpace = false
 
   /// Hide the whole phantom while the window it belongs to is on another Space,
@@ -1943,6 +2036,7 @@ final class OverlayController: NSObject {
         "transient": behavior.contains(.transient),
         "canJoinAllSpaces": behavior.contains(.canJoinAllSpaces),
         "offSpace": offSpace,
+        "unmasked": unmaskedReason ?? "",
         "ignoresCycle": behavior.contains(.ignoresCycle),
         "fullScreenAuxiliary": behavior.contains(.fullScreenAuxiliary),
         "managed": behavior.contains(.managed),

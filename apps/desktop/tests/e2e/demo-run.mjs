@@ -210,6 +210,13 @@ export async function demoRun(o) {
     PI_MAC_PRECONSENT: '1',
     PI_MAC_OVERLAY: '1',
     ...(LIVE ? {} : { PI_E2E_BACKGROUND: '1' }),
+    /* Diagnostic passthrough: with PI_ADV_DEBUG_TOOLS set to a file path the
+       provider appends the EXACT tool list sent to llama-server each request.
+       It is the only ground truth for "which tools does the model actually
+       know about", and a run is the only place to observe it. */
+    ...(process.env.PI_ADV_DEBUG_TOOLS === undefined
+      ? {}
+      : { PI_ADV_DEBUG_TOOLS: process.env.PI_ADV_DEBUG_TOOLS }),
   };
   let browser = null;
   let electronApp = null;
