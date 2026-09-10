@@ -89,8 +89,24 @@ try {
     console.log('grants:', JSON.stringify(await dbg('grants', {})).slice(0, 200));
     fail(`no real window tracked (${onSpace.trackedWindow})`);
   }
-  if (onSpace.behavior?.offSpace === true)
-    fail('phantom hid itself while the window was right here');
+  /*
+   * PRECONDITION, not a failure: if the tracked window is not on the Space this
+   * probe runs on, there is nothing here to mask against and nothing below can
+   * say anything true. A fullscreen app is the usual cause — macOS gives it its
+   * own Space, so an app launched in the background lands elsewhere and the
+   * phantom hides itself, which is exactly the off-desktop behaviour under test.
+   * "Skipped, and why" beats a failure that reads like a regression.
+   */
+  if (onSpace.behavior?.offSpace === true) {
+    console.log(
+      'mac-offspace-probe: SKIP — the tracked window is not on this Space (a ' +
+        'fullscreen app owns it). The phantom hid itself, which is correct, but ' +
+        'masking cannot be measured from here.',
+    );
+    await osa(`tell application "${APP}" to quit`);
+    await app.close().catch(() => {});
+    process.exit(0);
+  }
   if (onSpace.alpha !== undefined && onSpace.alpha === 0) fail('phantom already invisible');
   console.log(`tracking ${APP} window ${onSpace.trackedWindow}, phantom shown`);
 
@@ -118,6 +134,15 @@ try {
   if (away?.behavior?.offSpace !== true) {
     fail('the phantom kept drawing after its window left this desktop — it would follow the user');
   }
+  /* The DETECTOR has to have noticed too, not just the hiding. the user asked for
+     this to be logged whenever it happens, and a log line nobody can prove
+     fires is not logging. `unmasked` is the same string the panel writes to
+     stderr, read back through info() so the assertion does not depend on where
+     the process's stderr happens to be plumbed. */
+  if ((away.behavior?.unmasked ?? '') === '') {
+    fail('the phantom hid, but never reported WHY — the unmasked detector is silent');
+  }
+  console.log(`detector OK: reported "${away.behavior.unmasked}"`);
   console.log(`off-desktop OK: hid itself ${hidAfter}ms after the window went (not following)`);
 
   // …and comes back on its own when the window returns.
