@@ -705,9 +705,25 @@ export async function demoRun(o) {
     let vanished = null;
     while (Date.now() < deadline) {
       try {
-        last = await readState();
+        /*
+         * THE DEADLINE HAS TO BOUND THE CALL, NOT JUST THE LOOP.
+         *
+         * `while (Date.now() < deadline)` is only checked BETWEEN iterations, so
+         * one `page.evaluate` that never comes back overruns it by however long
+         * it hangs. MEASURED: a Maps run recorded 1173s against a 300s deadline —
+         * 42,374 frames at 42.8/s, sixteen minutes of capture — because a single
+         * read stalled inside the loop. Every run after it in a suite pays that
+         * time too.
+         */
+        const left = Math.max(1000, deadline - Date.now());
+        last = await Promise.race([
+          readState(),
+          new Promise((_r, reject) =>
+            setTimeout(() => reject(new Error('readState stalled')), left),
+          ),
+        ]);
       } catch (err) {
-        vanished = `the app went away mid-run (${String(err).slice(0, 70)})`;
+        vanished = `the app stopped answering mid-run (${String(err).slice(0, 70)})`;
         break;
       }
       if (last.tools.length > seen) {
