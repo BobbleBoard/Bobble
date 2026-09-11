@@ -32,8 +32,16 @@ export const BASE_EXTENSION_PACKAGE_DIRS = [
  * The bridge env (PI_GEN_SOCK/_TOKEN) is published by main.ts's `registerGenIpc`
  * under the same gate, so the tool always finds its bridge when loaded.
  */
-export function extensionPackageDirs(genEnabled: boolean): readonly string[] {
-  return genEnabled ? [...BASE_EXTENSION_PACKAGE_DIRS, 'gen-tools'] : BASE_EXTENSION_PACKAGE_DIRS;
+export function extensionPackageDirs(_genEnabled: boolean): readonly string[] {
+  /*
+   * gen-tools ALWAYS loads now. It used to be the experiment's own switch, and
+   * that made the OmniSVG connector impossible in a default build: the `svg`
+   * tool lives in this extension, and a person who has just downloaded 5 GB
+   * from the Connectors page would find no command. The experiment flag still
+   * decides which tools the extension REGISTERS (PI_DESKTOP_GEN_MEDIA) — image,
+   * video and audio stay behind it; `svg` follows the connector's install.
+   */
+  return [...BASE_EXTENSION_PACKAGE_DIRS, 'gen-tools'];
 }
 
 /**

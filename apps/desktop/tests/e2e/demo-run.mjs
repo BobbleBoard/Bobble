@@ -872,7 +872,7 @@ export async function demoRun(o) {
 
     if (o.verify !== undefined) {
       try {
-        const evidence = await o.verify(dbg, last);
+        const evidence = await o.verify(dbg, last, { home: HOME });
         if (invalid !== null) evidence.verdict = 'invalid';
         say(`VERIFY: ${JSON.stringify(evidence)}`);
       } catch (err) {

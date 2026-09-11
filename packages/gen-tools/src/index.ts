@@ -27,6 +27,14 @@ export function registerGenUse(pi: ExtensionAPI, options: GenToolsOptions): void
 /** pi extension factory (zero-config; reads the bridge socket from env). */
 export default function activate(pi: ExtensionAPI): void {
   const bridge = GenBridgeClient.fromEnv();
-  registerGenTools(pi, { bridge });
-  registerAudioTools(pi, { bridge });
+  /*
+   * WHICH TOOLS, not whether to load. The app always loads this extension now;
+   * the media tools stay behind the generation experiment, and `generate_svg`
+   * appears only once the OmniSVG connector's model is on disk — the app reads
+   * the files at pi's spawn and says so here.
+   */
+  const media = process.env.PI_DESKTOP_GEN_MEDIA === '1';
+  const svg = process.env.PI_OMNISVG_READY === '1';
+  registerGenTools(pi, { bridge, media, svg });
+  if (media) registerAudioTools(pi, { bridge });
 }

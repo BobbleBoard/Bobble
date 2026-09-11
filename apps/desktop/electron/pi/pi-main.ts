@@ -21,6 +21,7 @@ import { createIpcEventSender, createLogger } from '@pi-desktop/shared';
 import { app, type IpcMainInvokeEvent, ipcMain, type WebContents } from 'electron';
 import { resolveBundledPackageAsset } from '../app-paths';
 import { openStillWindow } from '../gen/hyperframes-window';
+import { omniSvgFiles } from '../gen/omnisvg';
 import { registerGen3dBridge } from '../gen3d/gen3d-bridge';
 import { runImageJob } from '../gen3d/gen3d-main';
 import { detectHarnesses } from '../inference/harness-main';
@@ -182,6 +183,12 @@ function buildPiEnv(cwd: string | undefined): Record<string, string | undefined>
      * this is '0' unless the Harness settings panel says otherwise.
      */
     PI_DESKTOP_TOOL_CLI: readSettings().toolInterface === 'bash-cli' ? '1' : '0',
+    /* Which gen-tools register: the media tools only under the experiment, and
+       `svg` only once the OmniSVG connector's model is on disk — a command that
+       can only fail costs prompt and invites a dead end. Read at spawn; the
+       connector install restarts pi so the change is live at once. */
+    PI_DESKTOP_GEN_MEDIA: generationExperimentEnabled() ? '1' : '0',
+    PI_OMNISVG_READY: omniSvgFiles().ready ? '1' : '0',
     // …and the live file, which children re-read. The env value above is a
     // spawn-time snapshot and a subagent outlives it — see serverCanSeeImages.
     PI_DESKTOP_VISION_FILE: visionStateFilePath(),

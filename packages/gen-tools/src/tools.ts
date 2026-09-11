@@ -53,6 +53,12 @@ export interface GenToolsOptions {
   readonly bridge: GenBridge | null;
   /** Injectable image reader (tests). Default: fs.readFile. */
   readonly readImage?: (path: string) => Promise<Buffer>;
+  /** Register the image/video tools. Default true (tests, `registerGenUse`);
+   *  the app passes the generation experiment flag. */
+  readonly media?: boolean;
+  /** Register `generate_svg`. Default true; the app passes whether OmniSVG's
+   *  model is on disk, so a command that can only fail is never advertised. */
+  readonly svg?: boolean;
 }
 
 function messageOf(err: unknown): string {
@@ -121,6 +127,11 @@ function resolveVideoModelId(explicit: string | undefined, prompt: string): stri
 export function registerGenTools(pi: ExtensionAPI, options: GenToolsOptions): void {
   const bridge = options.bridge;
   const readImage = options.readImage ?? ((p: string) => readFile(p));
+  const media = options.media ?? true;
+  const svg = options.svg ?? true;
+
+  if (svg) registerSvgTool(pi, bridge);
+  if (!media) return;
 
   shareTool(pi, {
     name: GENERATE_IMAGE_TOOL,
@@ -500,7 +511,11 @@ export function registerAudioTools(pi: ExtensionAPI, options: GenToolsOptions): 
     },
     SOUND_MODEL_IDS,
   );
+}
 
+/** `generate_svg` — OmniSVG. Registered on its own so the connector can turn it
+ *  on without the generation experiment. See the block below for the ask. */
+function registerSvgTool(pi: ExtensionAPI, bridge: GenBridge | null): void {
   /*
    * SVG — OmniSVG, through the app's own llama-server. the user: "a simple cli tool
    * that essentially calls this as a subagent eg. svg <optional prompt> --image

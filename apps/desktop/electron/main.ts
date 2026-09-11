@@ -768,7 +768,18 @@ function registerAppIpc(): void {
   // NEXT (video pillar): pass `comfyInstall` (a real ComfyInstallManager whose
   // `emit` → `events.send('gen:comfy-install')`) to answer the modular-download
   // UI + drive the download-then-continue gate end-to-end.
-  if (generationExperimentEnabled()) {
+  /*
+   * ALWAYS, not only under the generation experiment.
+   *
+   * This IPC is a socket server and a job queue — no model, no worker, nothing
+   * resident until a job runs — and the OmniSVG connector needs it in a default
+   * build: a person installs OmniSVG from the Connectors page and expects `svg`
+   * to work, experiment flag or no. What the experiment still gates is WHICH
+   * TOOLS pi registers (pi-main publishes that as PI_DESKTOP_GEN_MEDIA), so a
+   * default build's model surface stays exactly as clean as before unless the
+   * user installs something that adds to it.
+   */
+  {
     const genWorker = resolveGenWorkerScript({
       resourcesPath: process.resourcesPath,
       appPath: app.getAppPath(),
