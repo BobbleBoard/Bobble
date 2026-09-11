@@ -27,7 +27,14 @@ const OUT = process.env.OUT ?? '/tmp/chat-gen';
 const FPS = Number(process.env.FPS ?? 10);
 const DEADLINE = Number(process.env.DEADLINE_MS ?? 1_500_000);
 
-rmSync(path.join(OUT, 'frames'), { recursive: true, force: true });
+// maxRetries: a previous run's ffmpeg may still be reading the directory,
+// and an ENOTEMPTY here kills the capture before it has started.
+rmSync(path.join(OUT, 'frames'), {
+  recursive: true,
+  force: true,
+  maxRetries: 10,
+  retryDelay: 200,
+});
 mkdirSync(path.join(OUT, 'frames'), { recursive: true });
 const t0 = Date.now();
 const say = (m) => console.log(`${((Date.now() - t0) / 1000).toFixed(1)}s  ${m}`);
@@ -81,11 +88,34 @@ try {
   );
   await win.evaluate(
     (id) =>
-      window.__settings_store?.().getState?.().update?.({
-        modelSelection: { mode: 'model', modelId: id },
-      }),
+      window
+        .__settings_store?.()
+        .getState?.()
+        .update?.({
+          modelSelection: { mode: 'model', modelId: id },
+        }),
     CHAT_MODEL,
   );
+  /*
+   * TOOL_INTERFACE=schemas puts `generate_image` in the advertised list.
+   *
+   * MEASURED in bash-CLI mode (the default): asked for a picture, MiniCPM5 2B
+   * could not connect "media — Create images…" to "a command you run with
+   * bash" and reasoned in circles about its function list; qwen3.5-4b got the
+   * intent right ("I should use the media tool") and then wrote the request
+   * into image-gen.txt — the coerced-write pattern, where the grammar pins an
+   * unadvertised want to the nearest advertised name. Both are real findings
+   * about the CLI interface and small models, and neither is a reason the
+   * INLINE GENERATION path should go unfilmed.
+   */
+  if (process.env.TOOL_INTERFACE === 'schemas') {
+    await win.evaluate(() =>
+      window.piDesktop.invoke('settings:set', { patch: { toolInterface: 'schemas' } }),
+    );
+    await win.evaluate(() => window.piDesktop.invoke('pi:restart', {}));
+    await win.waitForTimeout(4000);
+    say('tool interface: schemas');
+  }
   await win.evaluate(() => window.__modality_store?.().getState().setView('chat'));
   await win.waitForTimeout(2500);
   say(`chat model up: ${CHAT_MODEL}`);
@@ -93,7 +123,9 @@ try {
   const ready = () =>
     win.evaluate(() => {
       const s = window.__pi_store().getState();
-      return !s.agent.isStreaming && !s.promptInFlight && s.bgRun?.streaming !== true && !s.resuming;
+      return (
+        !s.agent.isStreaming && !s.promptInFlight && s.bgRun?.streaming !== true && !s.resuming
+      );
     });
   for (let i = 0; i < 40 && !(await ready()); i += 1) await win.waitForTimeout(500);
 
@@ -147,7 +179,11 @@ try {
     window
       .__pi_store()
       .getState()
-      .messages.map((m) => ({ kind: m.kind, tool: m.toolName ?? m.name, text: (m.text ?? '').slice(0, 140) })),
+      .messages.map((m) => ({
+        kind: m.kind,
+        tool: m.toolName ?? m.name,
+        text: (m.text ?? '').slice(0, 140),
+      })),
   );
   console.log(JSON.stringify(msgs, null, 1));
 } finally {
@@ -159,9 +195,20 @@ const dir = path.join(OUT, 'frames');
 if (frames > 2) {
   const mp4 = path.join(OUT, 'generation.mp4');
   await run('ffmpeg', [
-    '-y', '-framerate', String(FPS), '-i', path.join(dir, 'f%05d.jpg'),
-    '-vf', 'pad=ceil(iw/2)*2:ceil(ih/2)*2',
-    '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', mp4,
+    '-y',
+    '-framerate',
+    String(FPS),
+    '-i',
+    path.join(dir, 'f%05d.jpg'),
+    '-vf',
+    'pad=ceil(iw/2)*2:ceil(ih/2)*2',
+    '-c:v',
+    'libx264',
+    '-pix_fmt',
+    'yuv420p',
+    '-movflags',
+    '+faststart',
+    mp4,
   ]).catch((e) => console.error('ffmpeg failed', e.message));
   if (existsSync(mp4)) {
     say(`film: ${mp4} (${(statSync(mp4).size / 1e6).toFixed(1)} MB, ${frames} frames)`);

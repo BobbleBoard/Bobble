@@ -19,7 +19,14 @@ const OUT = process.env.OUT ?? '/tmp/cap-3d';
 const FPS = Number(process.env.FPS ?? 6);
 const DEADLINE = Number(process.env.DEADLINE_MS ?? 2_400_000);
 
-rmSync(path.join(OUT, 'frames'), { recursive: true, force: true });
+// maxRetries: a previous run's ffmpeg may still be reading the directory,
+// and an ENOTEMPTY here kills the capture before it has started.
+rmSync(path.join(OUT, 'frames'), {
+  recursive: true,
+  force: true,
+  maxRetries: 10,
+  retryDelay: 200,
+});
 mkdirSync(path.join(OUT, 'frames'), { recursive: true });
 const t0 = Date.now();
 const say = (m) => console.log(`${((Date.now() - t0) / 1000).toFixed(1)}s  ${m}`);
@@ -65,7 +72,19 @@ try {
   await win.waitForTimeout(3000);
   await win.screenshot({ path: path.join(OUT, '00-room.png') });
 
+  /*
+   * TEXT MODE FIRST. The room opens on image input ("Choose or drop image(s)"),
+   * and the prompt box only exists in the text tab — so a probe that types
+   * straight away waits for an element that is not rendered.
+   */
+  await win.evaluate(() => window.__tripo_store?.().getState?.().set?.('inputMode', 'text'));
+  await win.waitForTimeout(800);
   const box = win.locator('[data-testid="tp-prompt"]');
+  if ((await box.count()) === 0) {
+    // No store hook exposed — click the text tab in the segmented header.
+    await win.locator('.tp-seg button, [data-active]').nth(1).click({ force: true });
+    await win.waitForTimeout(800);
+  }
   await box.waitFor({ timeout: 20000 });
   await box.click();
   await win.keyboard.type(PROMPT, { delay: 8 });

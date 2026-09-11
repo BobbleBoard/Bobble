@@ -6415,7 +6415,17 @@ body[data-media-expanded="true"] .pd-studio-compose {
  * leaves once the picture has arrived.
  */
 .pd-bobble-loader-host {
+  /*
+   * WHITE, AND ON SOMETHING DARK ENOUGH TO SEE IT.
+   *
+   * the user: "change the app icon's squares to be totally white". They are — but
+   * SEEN in the light theme, white tiles on the pale loading plate were barely
+   * there. So the mark keeps its colour and brings its own ground: a soft dark
+   * scrim, sized to the blocks, that is a no-op on the dark plates it already
+   * sat on and is what makes the light one readable.
+   */
   --pd-bobble-ink: #ffffff;
+  --pd-bobble-scrim: rgb(0 0 0 / 0%);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -6425,6 +6435,15 @@ body[data-media-expanded="true"] .pd-studio-compose {
 
 .pd-bobble-canvas {
   display: block;
+  border-radius: var(--pd-radius-lg, 14px);
+  background: var(--pd-bobble-scrim);
+  /* The scrim fades with the loader rather than snapping off with it. */
+  transition: background 300ms var(--pd-easing-standard, ease);
+}
+
+/* A light surface needs the ground; a dark one already is one. */
+:root:not([data-mode="dark"]) .pd-bobble-loader-host {
+  --pd-bobble-scrim: rgb(22 22 26 / 72%);
 }
 
 .pd-bobble-progress {

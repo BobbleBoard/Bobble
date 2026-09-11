@@ -38,7 +38,14 @@ const DEADLINE = Number(process.env.DEADLINE_MS ?? 1_500_000);
 const STEPS = process.env.STEPS ?? '';
 const SEED = process.env.SEED ?? '';
 
-rmSync(path.join(OUT, 'frames'), { recursive: true, force: true });
+// maxRetries: a previous run's ffmpeg may still be reading the directory,
+// and an ENOTEMPTY here kills the capture before it has started.
+rmSync(path.join(OUT, 'frames'), {
+  recursive: true,
+  force: true,
+  maxRetries: 10,
+  retryDelay: 200,
+});
 mkdirSync(path.join(OUT, 'frames'), { recursive: true });
 
 const t0 = Date.now();
