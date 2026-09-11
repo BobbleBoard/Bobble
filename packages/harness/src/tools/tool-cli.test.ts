@@ -462,6 +462,7 @@ describe('svg — a group whose one tool IS the command', () => {
           prompt: { type: 'string' },
           image: { type: 'string' },
           candidates: { type: 'number' },
+          out: { type: 'string' },
         },
       },
     },
@@ -493,6 +494,15 @@ describe('svg — a group whose one tool IS the command', () => {
     expect(call('svg a fox --image ref.png')).toMatchObject({
       kind: 'call',
       args: { prompt: 'a fox', image: 'ref.png' },
+    });
+  });
+
+  it('puts the file where a page will reference it: --out', () => {
+    /* the user: a website should "utilize the svgs firsthand" — the graphic has
+       to land beside the page, not in Generated, for <img src> to work. */
+    expect(call('svg a gear icon, single colour --out assets/gear.svg')).toMatchObject({
+      kind: 'call',
+      args: { prompt: 'a gear icon, single colour', out: 'assets/gear.svg' },
     });
   });
 });

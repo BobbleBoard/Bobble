@@ -106,7 +106,13 @@ import {
 } from './tools/coerced-write.js';
 import { degenerateCommandRefusal } from './tools/degenerate-command.js';
 import { diagnoseEditFailure } from './tools/edit-diagnosis.js';
-import { handwrittenSvgRefusal, isHandwrittenSvg } from './tools/handwritten-svg.js';
+import {
+  countInlineDrawnSvgs,
+  handwrittenInlineSvgRefusal,
+  handwrittenSvgRefusal,
+  hasHandwrittenInlineSvg,
+  isHandwrittenSvg,
+} from './tools/handwritten-svg.js';
 import { wouldHang } from './tools/hang-guard.js';
 import { registerImageTools } from './tools/image-tools.js';
 import { applyBias, lastAssistantThought, planBias } from './tools/intent-bias.js';
@@ -3374,34 +3380,72 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     }
     /*
      * AN SVG WRITTEN BY HAND WHILE THE DRAWING MODEL IS ON — see
-     * handwritten-svg.ts. Refused once per path, with the command; the second
-     * write of the same file goes through.
+     * handwritten-svg.ts. The escape is IDENTICAL bytes, not the same path:
+     * MEASURED on the website scenario, a path-only escape let the model bypass
+     * by re-writing the logo with one hex digit changed (junk on disk). A
+     * genuine fixture author repeats exact bytes; a model flailing past the
+     * guard tweaks and retries — so only a byte-for-byte repeat goes through,
+     * and the refusal does not advertise it (advertising "write it again" made
+     * re-writing the path of least resistance the first time).
      */
-    if (event.toolName === 'write') {
-      const input = event.input as { path?: unknown; content?: unknown };
-      if (typeof input.path === 'string' && typeof input.content === 'string') {
+    if (event.toolName === 'write' || event.toolName === 'edit') {
+      const input = event.input as {
+        path?: unknown;
+        content?: unknown;
+        edits?: { newText?: unknown }[];
+      };
+      const svgCommandAvailable = pi.getAllTools().some((t) => t.name === 'generate_svg');
+      if (typeof input.path === 'string' && svgCommandAvailable) {
         const abs = isAbsolute(input.path)
           ? input.path
           : join(runtime.workspaceRoot ?? ctx.cwd, input.path);
-        let exists = false;
-        try {
-          statSync(abs);
-          exists = true;
-        } catch {
-          exists = false;
-        }
-        if (
-          !svgRefusedPaths.has(abs) &&
-          isHandwrittenSvg({
-            path: input.path,
-            content: input.content,
-            exists,
-            svgCommandAvailable: pi.getAllTools().some((t) => t.name === 'generate_svg'),
-          })
-        ) {
-          svgRefusedPaths.add(abs);
-          pi.appendEntry(HARNESS_LOOP_ENTRY, { action: 'block', cause: 'handwritten-svg' });
-          return { block: true, reason: handwrittenSvgRefusal(input.path) };
+        /* The text this call would put on disk: a write's whole content, or
+           what an edit's replacements add. */
+        const body =
+          event.toolName === 'write'
+            ? typeof input.content === 'string'
+              ? input.content
+              : ''
+            : (input.edits ?? [])
+                .map((e) => (typeof e.newText === 'string' ? e.newText : ''))
+                .join('\n');
+        /* A deliberate identical repeat of a refused body is the escape valve —
+           consumed on use, so a THIRD write re-evaluates rather than sailing
+           through forever. */
+        const deliberateRepeat = body !== '' && svgRefused.get(abs) === body;
+        if (deliberateRepeat) {
+          svgRefused.delete(abs);
+        } else if (body !== '') {
+          let exists = false;
+          try {
+            statSync(abs);
+            exists = true;
+          } catch {
+            exists = false;
+          }
+          if (
+            event.toolName === 'write' &&
+            isHandwrittenSvg({ path: input.path, content: body, exists, svgCommandAvailable })
+          ) {
+            svgRefused.set(abs, body);
+            pi.appendEntry(HARNESS_LOOP_ENTRY, { action: 'block', cause: 'handwritten-svg' });
+            return { block: true, reason: handwrittenSvgRefusal(input.path) };
+          }
+          if (hasHandwrittenInlineSvg({ path: input.path, content: body, svgCommandAvailable })) {
+            svgRefused.set(abs, body);
+            pi.appendEntry(HARNESS_LOOP_ENTRY, {
+              action: 'block',
+              cause: 'handwritten-inline-svg',
+            });
+            return {
+              block: true,
+              reason: handwrittenInlineSvgRefusal(
+                input.path,
+                countInlineDrawnSvgs(body),
+                event.toolName === 'edit',
+              ),
+            };
+          }
         }
       }
     }
@@ -3510,10 +3554,10 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
   let fencedWhileDriving = 0;
   /** Coerced write/edit refusals in THIS turn — see coercedWriteEscalation. */
   let coercedRefusals = 0;
-  /** .svg paths whose hand-written first draft was refused — the second write
-   * of the same file goes through (handwritten-svg.ts). Per session: the
-   * decision to write it by hand, once made, should not be re-litigated. */
-  const svgRefusedPaths = new Set<string>();
+  /** path → the exact hand-drawn body last refused for it (handwritten-svg.ts).
+   * Re-writing those exact bytes is the deliberate escape; a tweaked retry is a
+   * fresh refusal. Per session. */
+  const svgRefused = new Map<string, string>();
   pi.on('tool_result', (event) => {
     /* In CLI mode every call is `bash`, so the real tool name is only known at
        the dispatch (see the CLI host's `call`); tally there instead, or the

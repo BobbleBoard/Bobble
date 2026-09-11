@@ -192,14 +192,22 @@ export const CAPABILITIES: readonly Capability[] = [
        so "make an SVG" read as "write the file". The line has to say that
        hand-writing the markup is the thing NOT to do, or the command is never
        reached for. */
+    /* …and the user, after the first run: "if asked to make a website of some sort
+       utilize the svgs firsthand instead of writing its own or if asked for
+       simple illustrations even without 'svg' mentioned". So the line names
+       the cases where the word never comes up — a site's graphics, "a simple
+       illustration" — and says where a site's file goes. */
     summary:
-      'Draw an SVG — icon, logo, symbol, flat illustration — from a description, a ' +
-      'reference image, or both. Every request for an SVG or a vector goes here; never ' +
-      'write SVG markup yourself.',
+      'Draw any icon, logo, symbol or simple flat illustration as an SVG file — a ' +
+      'website\'s graphics too, and whether or not "SVG" was said. One call per graphic; ' +
+      '--out puts it in the project (assets/logo.svg). Never write SVG markup yourself.',
     guidance:
-      'Use for icons, logos, symbols and simple flat illustrations where the deliverable is a ' +
-      'vector file. Describe the shape and colour plainly; hand it a reference image to trace. ' +
-      'For a raster picture use generation instead.',
+      'Every graphic goes through this: icons, logos, symbols, pictograms, simple flat ' +
+      'illustrations, and the logo and icons of a site or app you are building — whether ' +
+      'or not anyone said "SVG". Draw first, then reference the file (<img src>); never ' +
+      'write SVG markup by hand. One call per graphic; describe subject, shape and colour ' +
+      'plainly, or hand it a reference image to trace. Photos and realistic pictures are ' +
+      'not vectors — those are generation.',
     /* One tool, and in CLI mode it IS the command: `svg <prompt> --image <path>`
        (tool-cli.ts maps generate_svg to an empty path under this group). */
     tools: ['generate_svg'],

@@ -36,7 +36,15 @@ export interface OmniSvgParams {
   readonly images?: readonly string[];
   /** Candidates per input; the best is kept. Default 3. */
   readonly candidates?: number;
+  /** Where the numbered files land (Generated/<slug>/01.svg …). */
   readonly outputDir: string;
+  /**
+   * The model's own destination — a site's `assets/logo.svg`. Already fenced
+   * to the working folder by the tool. One input: this exact file; several:
+   * a folder holding 01.svg, 02.svg …. The Generated copy is still written, so
+   * the drawing is on the canvas and in the gallery either way.
+   */
+  readonly outPath?: string;
 }
 
 export interface OmniSvgOutput {
@@ -188,8 +196,18 @@ export async function generateSvg(params: OmniSvgParams): Promise<{ outputs: Omn
         continue;
       }
       n += 1;
-      const outputPath = path.join(params.outputDir, `${String(n).padStart(2, '0')}.svg`);
-      await writeFile(outputPath, best.svg, 'utf8');
+      const numbered = `${String(n).padStart(2, '0')}.svg`;
+      const generated = path.join(params.outputDir, numbered);
+      await writeFile(generated, best.svg, 'utf8');
+      let outputPath = generated;
+      if (params.outPath !== undefined) {
+        outputPath =
+          jobs.length === 1 && /\.svg$/i.test(params.outPath)
+            ? params.outPath
+            : path.join(params.outPath, numbered);
+        await mkdir(path.dirname(outputPath), { recursive: true });
+        await writeFile(outputPath, best.svg, 'utf8');
+      }
       const { svg: _svg, ...out } = best;
       outputs.push({ ...out, outputPath });
     }

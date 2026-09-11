@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { handwrittenSvgRefusal, isHandwrittenSvg } from './handwritten-svg.js';
+import {
+  countInlineDrawnSvgs,
+  handwrittenInlineSvgRefusal,
+  handwrittenSvgRefusal,
+  hasHandwrittenInlineSvg,
+  isHandwrittenSvg,
+} from './handwritten-svg.js';
 
 const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><path d="M1 1"/></svg>';
 
@@ -57,11 +63,62 @@ describe('isHandwrittenSvg', () => {
   });
 });
 
-describe('handwrittenSvgRefusal', () => {
-  it('names the command, the call shape, and the way through', () => {
+describe('hasHandwrittenInlineSvg', () => {
+  const page = `<!doctype html><header><a class="logo">${svg}</a></header><main>text</main>`;
+
+  it('catches a logo drawn inline in a page — the website shape of the mistake', () => {
+    expect(
+      hasHandwrittenInlineSvg({ path: 'index.html', content: page, svgCommandAvailable: true }),
+    ).toBe(true);
+    expect(countInlineDrawnSvgs(`${page}${svg}<svg viewBox="0 0 1 1"><circle r="1"/></svg>`)).toBe(
+      3,
+    );
+  });
+
+  it('ignores an <svg> that draws nothing: a sprite <use>, an empty wrapper', () => {
+    const sprite = '<svg class="icon"><use href="#gear"/></svg>';
+    expect(
+      hasHandwrittenInlineSvg({ path: 'index.html', content: sprite, svgCommandAvailable: true }),
+    ).toBe(false);
+    expect(
+      hasHandwrittenInlineSvg({
+        path: 'a.tsx',
+        content: '<svg viewBox="0 0 1 1"></svg>',
+        svgCommandAvailable: true,
+      }),
+    ).toBe(false);
+  });
+
+  it('leaves a page alone when the command is off, and leaves .svg files to the other check', () => {
+    expect(
+      hasHandwrittenInlineSvg({ path: 'index.html', content: page, svgCommandAvailable: false }),
+    ).toBe(false);
+    expect(
+      hasHandwrittenInlineSvg({ path: 'logo.svg', content: svg, svgCommandAvailable: true }),
+    ).toBe(false);
+  });
+
+  it('is not fooled by an <img src="x.svg"> — that is the right way', () => {
+    expect(
+      hasHandwrittenInlineSvg({
+        path: 'index.html',
+        content: '<img src="assets/logo.svg" alt="logo">',
+        svgCommandAvailable: true,
+      }),
+    ).toBe(false);
+  });
+});
+
+describe('refusals', () => {
+  it('name the command, the call shape with --out, and the way through', () => {
     const r = handwrittenSvgRefusal('heart.svg');
     expect(r).toContain('svg "a red heart');
-    expect(r).toContain('--image');
-    expect(r).toContain('write the same file again');
+    expect(r).toContain('--out heart.svg');
+    expect(r).toContain('UNCHANGED');
+    const p = handwrittenInlineSvgRefusal('index.html', 2, false);
+    expect(p).toContain('2 SVG graphics drawn by hand');
+    expect(p).toContain('--out assets/logo.svg');
+    expect(p).toContain('<img src="assets/logo.svg"');
+    expect(handwrittenInlineSvgRefusal('index.html', 1, true)).toContain('Not edited');
   });
 });

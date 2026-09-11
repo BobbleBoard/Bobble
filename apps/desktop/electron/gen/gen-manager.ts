@@ -739,7 +739,12 @@ export function registerGenIpc(opts: GenManagerOptions): void {
         /* OmniSVG: its own short-lived llama-server, not the worker queue —
            see omnisvg.ts. The folder is named after the ask like every other
            generation, so it sits beside the images in Generated. */
-        const p = params as { prompt?: string; images?: string[]; candidates?: number };
+        const p = params as {
+          prompt?: string;
+          images?: string[];
+          candidates?: number;
+          outPath?: string;
+        };
         const name = slug(p.prompt ?? p.images?.[0] ?? 'svg', 'svg');
         const outputDir = path.join(outputRoot, uniqueName(outputRoot, name));
         const result = await generateSvg({ ...p, outputDir });

@@ -10,6 +10,7 @@
  * a clear "bridge unavailable" error, so the extension is always safe to load.
  */
 import { readFile } from 'node:fs/promises';
+import path from 'node:path';
 import type { AgentToolResult, ExtensionAPI } from '@mariozechner/pi-coding-agent';
 import {
   defaultImageModel,
@@ -531,12 +532,15 @@ function registerSvgTool(pi: ExtensionAPI, bridge: GenBridge | null): void {
     name: GENERATE_SVG_TOOL,
     label: 'Generate: SVG',
     description:
-      'Make an SVG — a vector drawing — from a short description, a reference image, or both, ' +
-      'on-device with OmniSVG. Best for icons, logos, symbols and simple flat illustrations; ' +
-      'describe the shape and colour plainly ("a red heart with smooth curved edges, centered"). ' +
-      'With an image it traces that image into vector paths. Returns the .svg file and opens ' +
-      'it on the canvas. Needs the OmniSVG connector installed (it downloads the model).',
-    promptSnippet: 'Make an SVG from a description or a reference image (on-device)',
+      'Draw an icon, logo, symbol or simple flat illustration as an SVG file, on-device with ' +
+      'OmniSVG — from a short description, a reference image, or both. Every graphic goes ' +
+      'through this: a website\'s logo and icons, a "simple illustration", a pictogram — ' +
+      'whether or not the word SVG was used. Never write SVG markup by hand. One call per ' +
+      'graphic; describe the shape and colour plainly ("a coffee cup, flat, two colours"). ' +
+      'With an image it traces that image into vector paths. `out` puts the file where a ' +
+      'page references it (assets/logo.svg); otherwise it lands in Generated and opens on ' +
+      'the canvas. Photos and realistic pictures are not vectors — those are generation.',
+    promptSnippet: 'Draw an icon, logo or simple illustration as an SVG (on-device)',
     parameters: Type.Object({
       prompt: Type.Optional(
         Type.String({
@@ -552,6 +556,14 @@ function registerSvgTool(pi: ExtensionAPI, bridge: GenBridge | null): void {
       candidates: Type.Optional(
         Type.Number({
           description: 'Samples per input; the best is kept. Default 3, max 6. More is slower.',
+        }),
+      ),
+      out: Type.Optional(
+        Type.String({
+          description:
+            'Where to put the file, relative to the working folder — assets/logo.svg. Use it ' +
+            'when the SVG belongs to a site or project, so the page can reference it as ' +
+            'written. With several inputs it is a folder.',
         }),
       ),
     }),
@@ -570,6 +582,23 @@ function registerSvgTool(pi: ExtensionAPI, bridge: GenBridge | null): void {
       if ((params.prompt ?? '').trim() === '' && images.length === 0) {
         return errResult('give a prompt, a reference image path, or both');
       }
+      /*
+       * `out` IS FENCED THE WAY `write` IS. The model names a path; the file is
+       * written by the app's main process, which can reach anywhere — so the
+       * destination has to stay inside the working folder, the same rule the
+       * write tool enforces, with the same shape of refusal (name the root,
+       * say what to pass instead).
+       */
+      const root = path.resolve(process.env.PI_DESKTOP_WORKSPACE_ROOT ?? process.cwd());
+      let outPath: string | undefined;
+      if (params.out !== undefined && params.out.trim() !== '') {
+        outPath = path.resolve(root, params.out.trim());
+        if (outPath !== root && !outPath.startsWith(`${root}${path.sep}`)) {
+          return errResult(
+            `out must be inside the working folder (${root}) — pass a relative path such as assets/logo.svg`,
+          );
+        }
+      }
       try {
         const result = await bridge.request<{
           outputs: readonly {
@@ -584,6 +613,7 @@ function registerSvgTool(pi: ExtensionAPI, bridge: GenBridge | null): void {
           prompt: params.prompt,
           images,
           candidates: params.candidates,
+          ...(outPath === undefined ? {} : { outPath }),
         });
         const lines = result.outputs.map(
           (o, i) =>
@@ -591,9 +621,21 @@ function registerSvgTool(pi: ExtensionAPI, bridge: GenBridge | null): void {
             `${o.source === 'prompt' ? '' : ` (from ${o.source})`}` +
             `${o.stop === 'eos' ? '' : ' — hit the length limit; may be incomplete'}`,
         );
+        /* Say how to USE it, in the reply the model reads next: a page references
+           the file by its path; the markup is not pasted back in. */
+        const first = result.outputs[0];
+        const rel =
+          first !== undefined && first.outputPath.startsWith(`${root}${path.sep}`)
+            ? path.relative(root, first.outputPath)
+            : undefined;
+        const usage =
+          rel === undefined
+            ? 'Reference it by its path, or `cp` it into a project; never retype its markup.'
+            : `In a page: <img src="${rel}" alt="…">. Never retype its markup.`;
         const text =
-          `Made ${result.outputs.length} SVG${result.outputs.length === 1 ? '' : 's'} on the canvas:\n` +
-          `${lines.join('\n')}\nModel: OmniSVG 1.1 4B (omnisvg-1.1-4b, Apache-2.0)`;
+          `Made ${result.outputs.length} SVG${result.outputs.length === 1 ? '' : 's'}` +
+          `${outPath === undefined ? ' on the canvas' : ''}:\n` +
+          `${lines.join('\n')}\n${usage}\nModel: OmniSVG 1.1 4B (omnisvg-1.1-4b, Apache-2.0)`;
         return {
           content: [{ type: 'text', text }],
           details: {

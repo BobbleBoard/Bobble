@@ -3,7 +3,13 @@ import { defaultVideoModel, getModel } from '@pi-desktop/gen-service';
 import { describe, expect, it } from 'vitest';
 import type { GenBridge } from './gen-bridge-client.ts';
 import type { GenBridgeMethod } from './gen-contract.ts';
-import { GENERATE_IMAGE_TOOL, GENERATE_VIDEO_TOOL, parseSize, registerGenTools } from './tools.ts';
+import {
+  GENERATE_IMAGE_TOOL,
+  GENERATE_SVG_TOOL,
+  GENERATE_VIDEO_TOOL,
+  parseSize,
+  registerGenTools,
+} from './tools.ts';
 
 type Handler = (params: Record<string, unknown> | undefined) => unknown;
 
@@ -278,5 +284,71 @@ describe('generate_video tool', () => {
     const res = await runVideo(tools, { prompt: 'a wave', model: 'wan2.1-t2v-1.3b' });
     expect(details(res).ok).toBe(false);
     expect(details(res).error).toContain('comfyui not configured');
+  });
+});
+
+function collectSvgTools(bridge: GenBridge | null): Map<string, ToolDefinition> {
+  const tools = new Map<string, ToolDefinition>();
+  const pi = {
+    registerTool: (def: ToolDefinition) => tools.set(def.name, def),
+  } as unknown as ExtensionAPI;
+  registerGenTools(pi, { bridge, svg: true });
+  return tools;
+}
+
+async function runSvg(tools: Map<string, ToolDefinition>, params: Record<string, unknown>) {
+  const tool = tools.get(GENERATE_SVG_TOOL);
+  if (tool === undefined) throw new Error('missing generate_svg tool');
+  // biome-ignore lint/suspicious/noExplicitAny: minimal ctx stub for tests.
+  return tool.execute('call-1', params as any, undefined, undefined, {} as any);
+}
+
+describe('generate_svg tool', () => {
+  const okSvg = (params: Record<string, unknown> | undefined) => ({
+    outputs: [
+      {
+        outputPath: `${(params?.outPath as string) ?? '/Generated/heart'}/01.svg`,
+        paths: 1,
+        source: 'prompt',
+        stop: 'eos',
+        tokPerSec: 60,
+        tokens: 40,
+      },
+    ],
+  });
+
+  it("names the cases where nobody says 'SVG': a site's graphics, a simple illustration", () => {
+    const tool = collectSvgTools(new FakeBridge()).get(GENERATE_SVG_TOOL);
+    expect(tool?.description).toMatch(/website|logo|illustration/i);
+    expect(tool?.description).toContain('Never write SVG markup by hand');
+  });
+
+  it('passes a fenced out path through to the bridge', async () => {
+    const bridge = new FakeBridge().on('generateSvg', okSvg);
+    const root = process.cwd();
+    const tools = collectSvgTools(bridge);
+    const res = await runSvg(tools, { prompt: 'a gear', out: 'assets/gear.svg' });
+    expect(details(res).ok).toBe(true);
+    expect(bridge.calls[0]?.params?.outPath).toBe(`${root}/assets/gear.svg`);
+    // the reply tells the model HOW to use it — an <img>, not the markup.
+    const text = (res.content as Array<{ text?: string }>).map((c) => c.text ?? '').join('');
+    expect(text).toContain('assets/gear.svg');
+    expect(text).toContain('<img');
+  });
+
+  it('refuses an out path that climbs out of the working folder', async () => {
+    const bridge = new FakeBridge().on('generateSvg', okSvg);
+    const res = await runSvg(collectSvgTools(bridge), {
+      prompt: 'a gear',
+      out: '../../etc/evil.svg',
+    });
+    expect(details(res).ok).toBe(false);
+    expect(details(res).error).toContain('inside the working folder');
+    expect(bridge.calls.length).toBe(0);
+  });
+
+  it('needs a prompt or an image', async () => {
+    const res = await runSvg(collectSvgTools(new FakeBridge()), {});
+    expect(details(res).ok).toBe(false);
   });
 });
