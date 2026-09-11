@@ -48,5 +48,15 @@ try {
     }),
   });
 } finally {
+  /*
+   * DESTROY THE CONNECTIONS, not just the listener.
+   *
+   * `server.close()` stops accepting and then WAITS for open connections to end
+   * — and the app's browser holds a keep-alive socket open long after it has
+   * finished reading. MEASURED: three browser runs at 319-325s each whose actual
+   * capture was 23-28 seconds. Five minutes per run, all of it after the work
+   * was done.
+   */
+  server.closeAllConnections?.();
   server.close();
 }
