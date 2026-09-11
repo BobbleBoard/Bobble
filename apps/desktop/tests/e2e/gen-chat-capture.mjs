@@ -67,7 +67,7 @@ async function film(win) {
   }
 }
 
-try {
+async function main() {
   const win = await app.firstWindow();
   await win.waitForFunction(() => typeof window.piDesktop?.invoke === 'function', {
     timeout: 40000,
@@ -193,7 +193,9 @@ try {
         .evaluate(() => {
           const ms = window.__pi_store().getState().messages;
           const m = ms[ms.length - 1];
-          return m === undefined ? null : { kind: m.kind, tool: m.toolName ?? m.name, text: (m.text ?? '').slice(0, 90) };
+          return m === undefined
+            ? null
+            : { kind: m.kind, tool: m.toolName ?? m.name, text: (m.text ?? '').slice(0, 90) };
         })
         .catch(() => null);
       say(`msg ${state.msgs}: ${JSON.stringify(tail)}`);
@@ -211,6 +213,13 @@ try {
   say(`RESULT ${JSON.stringify(state)}`);
   filming = false;
   await filmDone;
+  // The window may be gone — a heavy chat model beside a video engine is enough
+  // for macOS to pick one of them. The frames are still worth keeping, and the
+  // reason is worth printing, so nothing past here may throw out of the run.
+  if (state.gone === true) {
+    say('window closed before the run finished — filming what there was');
+    return;
+  }
   await win.waitForTimeout(800);
   await win.screenshot({ path: path.join(OUT, '03-done.png'), fullPage: true });
   const msgs = await win.evaluate(() =>
@@ -224,6 +233,10 @@ try {
       })),
   );
   console.log(JSON.stringify(msgs, null, 1));
+}
+
+try {
+  await main();
 } finally {
   filming = false;
   await app.close().catch(() => {});
