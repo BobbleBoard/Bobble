@@ -526,7 +526,7 @@ export function ImageStudio(): JSX.Element {
         </>
       }
     >
-      {job !== null ? <StudioJob job={job} onCancel={cancel} /> : null}
+      {job !== null ? <StudioJob job={job} onCancel={cancel} variant="image" /> : null}
       {runs.length === 0 && job === null ? (
         <StudioEmpty
           glyph={<GlyphImage />}

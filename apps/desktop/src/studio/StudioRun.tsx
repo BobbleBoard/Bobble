@@ -16,7 +16,8 @@
  */
 import { Button } from '@pi-desktop/ui';
 import { type JSX, useEffect, useState } from 'react';
-import { BobbleTileLoader } from '../chat/BobbleMark';
+import { BobbleLoader } from '../chat/BobbleLoader';
+import type { LoaderVariant } from '../chat/bobble-anim';
 import type { StudioJobState, StudioRun } from './use-studio';
 
 /** mm:ss, because "127s" is not how anyone reads a wait. */
@@ -63,9 +64,12 @@ export function remainingMs(
 export function StudioJob({
   job,
   onCancel,
+  variant = 'image',
 }: {
   job: StudioJobState;
   onCancel: () => void;
+  /** Which closing act the loader plays — this studio's modality. */
+  variant?: LoaderVariant;
 }): JSX.Element {
   // Elapsed ticks once a second — the one number we can always honestly show.
   const [now, setNow] = useState(() => Date.now());
@@ -112,7 +116,13 @@ export function StudioJob({
            * product. The shimmer stays as the ground underneath it.
            */
           <div className="pd-studio-job-shimmer" aria-hidden="true">
-            <BobbleTileLoader size={40} label="Working" />
+            <BobbleLoader
+              size={64}
+              variant={variant}
+              label="Working"
+              {...(hasSteps ? { progress: frac } : {})}
+              {...(job.note === undefined ? {} : { note: job.note })}
+            />
           </div>
         )}
       </div>

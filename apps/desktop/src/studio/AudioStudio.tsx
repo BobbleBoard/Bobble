@@ -544,7 +544,7 @@ export function AudioStudio(): JSX.Element {
         </>
       }
     >
-      {job !== null ? <StudioJob job={job} onCancel={cancel} /> : null}
+      {job !== null ? <StudioJob job={job} onCancel={cancel} variant="audio" /> : null}
       {shown.length === 0 && job === null ? (
         <StudioEmpty
           glyph={<GlyphAudio />}

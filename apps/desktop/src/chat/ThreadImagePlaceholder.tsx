@@ -46,7 +46,8 @@
  */
 
 import { useEffect, useRef } from 'react';
-import { BobbleTileLoader } from './BobbleMark';
+import { BobbleLoader } from './BobbleLoader';
+import type { LoaderVariant } from './bobble-anim';
 import {
   type DenoiseState,
   EMPTY_DENOISE,
@@ -66,9 +67,18 @@ const EASE_ENTER = 'cubic-bezier(0.165, 0.84, 0.44, 1)';
 export function ThreadImagePlaceholder({
   label = 'Generating an image',
   aspect,
+  variant = 'image',
+  progress,
+  note,
 }: {
   /** Announced to screen readers; also the caption under the card. */
   label?: string;
+  /** Which closing act the loader plays — the modality being generated. */
+  variant?: LoaderVariant;
+  /** 0..1 from the engine's own step counter, when it is counting. */
+  progress?: number;
+  /** What the engine last said it was doing, for the line under the bar. */
+  note?: string;
   /**
    * The shape of the thing being made, when the job already said.
    *
@@ -282,7 +292,13 @@ export function ThreadImagePlaceholder({
           answer rather than an empty rectangle.
         */}
         <div className="pd-denoise-idle" aria-hidden="true">
-          <BobbleTileLoader size={46} label={label} />
+          <BobbleLoader
+            size={54}
+            variant={variant}
+            label={label}
+            {...(progress === undefined ? {} : { progress })}
+            {...(note === undefined ? {} : { note })}
+          />
         </div>
         {/* The unravel's leading edge, travelling with the reveal. */}
         <div ref={edgeRef} className="pd-denoise-edge" aria-hidden="true" />

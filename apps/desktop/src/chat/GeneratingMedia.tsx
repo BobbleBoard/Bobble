@@ -57,9 +57,18 @@ export function GeneratingMedia({
 }): JSX.Element | null {
   const label = LABEL[kind] ?? 'Working';
   if (kind === 'image' || kind === 'video') {
+    /* The bar only claims a number when the engine is actually counting steps;
+       before that it sweeps and says whatever the worker last reported. */
+    const progress =
+      job?.step !== undefined && job.total !== undefined && job.total > 0
+        ? job.step / job.total
+        : undefined;
     return (
       <ThreadImagePlaceholder
         label={label}
+        variant={kind}
+        {...(progress === undefined ? {} : { progress })}
+        {...(job?.note === undefined ? {} : { note: job.note })}
         {...(job?.aspect !== undefined ? { aspect: job.aspect } : {})}
       />
     );

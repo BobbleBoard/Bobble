@@ -323,7 +323,7 @@ export function VideoStudio(): JSX.Element {
         </>
       }
     >
-      {job !== null ? <StudioJob job={job} onCancel={cancel} /> : null}
+      {job !== null ? <StudioJob job={job} onCancel={cancel} variant="video" /> : null}
       {runs.length === 0 && job === null ? (
         <StudioEmpty
           glyph={<GlyphVideo />}
