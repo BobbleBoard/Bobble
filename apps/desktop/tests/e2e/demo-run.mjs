@@ -1079,6 +1079,20 @@ export async function demoRun(o) {
     { maxBuffer: 64 * 1024 * 1024 },
   );
   writeFileSync(path.join(OUT, 'run-log.txt'), log.join('\n'));
+  /*
+   * THE VIDEO IS THE DELIVERABLE. THE FRAMES WERE THE MEANS.
+   *
+   * Every run left its raw JPEGs behind: 781 MB of frames beside a 2.4 MB MP4
+   * for a two-minute run, and 16-18 GB for each of the two runs that stalled.
+   * MEASURED: 183 GB of `frames/` across the demos directory, 2.6 GB free on
+   * the user's disk, and a 15 GB model download dying with "No space left on
+   * device". The frames exist to be encoded; once the MP4 is on disk they are
+   * kept only when someone asks to keep them (KEEP_FRAMES=1), for the case of
+   * reading individual frames off a run.
+   */
+  if (process.env.KEEP_FRAMES !== '1' && existsSync(video)) {
+    rmSync(dir, { recursive: true, force: true });
+  }
   console.log(`\n${frames.length} frames, captured at ${achieved.toFixed(1)}/s → ${video}`);
   return { video, log };
 }
