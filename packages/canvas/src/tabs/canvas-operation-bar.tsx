@@ -114,6 +114,22 @@ export function deriveBreadcrumb(tab: CanvasTab): string[] {
   return label ? [label] : [];
 }
 
+/** The most segments the bar shows before the middle collapses to one "…". */
+export const CRUMB_LIMIT = 4;
+
+/**
+ * What the bar actually draws: the ROOT, an ellipsis standing for everything
+ * between, the parent and the file. SEEN on the first generated SVG opened
+ * with an absolute path — nine segments in a 300 px bar, every one shrunk to a
+ * clipped glyph and its chevron ("›ᵃ… › o › a-r…"), the file name among them.
+ * A breadcrumb that cannot show the file name is not showing a path. The full
+ * path stays on the nav's title for hover.
+ */
+export function visibleCrumbs(crumbs: readonly string[]): readonly string[] {
+  if (crumbs.length <= CRUMB_LIMIT) return crumbs;
+  return [crumbs[0] ?? '', '…', crumbs[crumbs.length - 2] ?? '', crumbs[crumbs.length - 1] ?? ''];
+}
+
 /**
  * Display name for the media/file label — the base filename with its extension
  * stripped so the bar reads "<name> · <TYPE>" ("render.png" + PNG → "render ·
@@ -294,12 +310,17 @@ function FileOps({
 
   useOutsideClose(treeRef, treeOpen, () => setTreeOpen(false));
 
-  const crumbs = deriveBreadcrumb(tab);
+  const fullCrumbs = deriveBreadcrumb(tab);
+  const crumbs = visibleCrumbs(fullCrumbs);
   const showToggle = isRenderableFile(tab);
   const mode = fileViewMode ?? fileViewModeDefault(tab);
   return (
     <>
-      <nav className="pd-canvas-crumbs" aria-label="File path">
+      <nav
+        className="pd-canvas-crumbs"
+        aria-label="File path"
+        title={fullCrumbs.length > crumbs.length ? fullCrumbs.join('/') : undefined}
+      >
         {crumbs.length > 0 ? (
           crumbs.map((segment, index) => {
             const last = index === crumbs.length - 1;

@@ -20,7 +20,7 @@
 import { appendFileSync, statSync } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { isAbsolute, join } from 'node:path';
 import type {
   ExtensionAPI,
   ExtensionCommandContext,
@@ -106,6 +106,7 @@ import {
 } from './tools/coerced-write.js';
 import { degenerateCommandRefusal } from './tools/degenerate-command.js';
 import { diagnoseEditFailure } from './tools/edit-diagnosis.js';
+import { handwrittenSvgRefusal, isHandwrittenSvg } from './tools/handwritten-svg.js';
 import { wouldHang } from './tools/hang-guard.js';
 import { registerImageTools } from './tools/image-tools.js';
 import { applyBias, lastAssistantThought, planBias } from './tools/intent-bias.js';
@@ -3371,6 +3372,39 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
         };
       }
     }
+    /*
+     * AN SVG WRITTEN BY HAND WHILE THE DRAWING MODEL IS ON — see
+     * handwritten-svg.ts. Refused once per path, with the command; the second
+     * write of the same file goes through.
+     */
+    if (event.toolName === 'write') {
+      const input = event.input as { path?: unknown; content?: unknown };
+      if (typeof input.path === 'string' && typeof input.content === 'string') {
+        const abs = isAbsolute(input.path)
+          ? input.path
+          : join(runtime.workspaceRoot ?? ctx.cwd, input.path);
+        let exists = false;
+        try {
+          statSync(abs);
+          exists = true;
+        } catch {
+          exists = false;
+        }
+        if (
+          !svgRefusedPaths.has(abs) &&
+          isHandwrittenSvg({
+            path: input.path,
+            content: input.content,
+            exists,
+            svgCommandAvailable: pi.getAllTools().some((t) => t.name === 'generate_svg'),
+          })
+        ) {
+          svgRefusedPaths.add(abs);
+          pi.appendEntry(HARNESS_LOOP_ENTRY, { action: 'block', cause: 'handwritten-svg' });
+          return { block: true, reason: handwrittenSvgRefusal(input.path) };
+        }
+      }
+    }
     // Remember files this turn writes/edits (for verify's syntax fallback, fix #4).
     /* A subagent's own commands never reach `runtime.ranCommands`, so remember
      * that the turn delegated — see neverExercised(). */
@@ -3476,6 +3510,10 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
   let fencedWhileDriving = 0;
   /** Coerced write/edit refusals in THIS turn — see coercedWriteEscalation. */
   let coercedRefusals = 0;
+  /** .svg paths whose hand-written first draft was refused — the second write
+   * of the same file goes through (handwritten-svg.ts). Per session: the
+   * decision to write it by hand, once made, should not be re-litigated. */
+  const svgRefusedPaths = new Set<string>();
   pi.on('tool_result', (event) => {
     /* In CLI mode every call is `bash`, so the real tool name is only known at
        the dispatch (see the CLI host's `call`); tally there instead, or the

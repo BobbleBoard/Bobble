@@ -107,6 +107,11 @@ interface LlmStoreState {
   pauseDownload: () => Promise<void>;
   resumeDownload: () => Promise<void>;
   cancelDownload: () => Promise<void>;
+  /** Take the bar down for a download that finished OUTSIDE `downloadModel` —
+   * a model connector's install streams the same progress events but resolves
+   * through `connectors:install`, so nothing here saw it end. Scoped to the
+   * model so a concurrent download of another model keeps its bar. */
+  settleDownload: (modelId: string) => void;
   deleteModel: (modelId: string) => Promise<void>;
   verifyModel: (modelId: string, quant?: string) => Promise<LlmVerifyResult>;
   /** Start the server for a model. `launchMode:'multimodal'` requests an
@@ -241,6 +246,9 @@ export const useLlmStore = create<LlmStoreState>((set, get) => ({
    * cancel path — so the UI states the outcome first and lets the plumbing catch
    * up. If the abort somehow failed, the next progress event puts the bar back.
    */
+  settleDownload: (modelId) =>
+    set((s) => (s.download?.modelId === modelId ? { download: null } : {})),
+
   cancelDownload: async () => {
     set({ download: null });
     await window.piDesktop.invoke('llm:cancel-download', undefined);

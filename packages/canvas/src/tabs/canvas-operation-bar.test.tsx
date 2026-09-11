@@ -362,3 +362,23 @@ describe('CanvasOperationBar — media', () => {
     expect(onMediaDownload).toHaveBeenCalledWith('JPG');
   });
 });
+
+describe('visibleCrumbs', () => {
+  it('shows a short path whole', async () => {
+    const { visibleCrumbs } = await import('./canvas-operation-bar.tsx');
+    expect(visibleCrumbs(['Bobble', 'generated', 'heart', '01.svg'])).toEqual([
+      'Bobble',
+      'generated',
+      'heart',
+      '01.svg',
+    ]);
+  });
+  it('collapses the middle of a long one, keeping root, parent and file', async () => {
+    // Nine absolute-path segments in a narrow bar became a strip of clipped
+    // glyphs with the file name lost among them.
+    const { visibleCrumbs } = await import('./canvas-operation-bar.tsx');
+    expect(
+      visibleCrumbs(['var', 'folders', 'T', 'home', 'Bobble', 'generated', 'heart', '01.svg']),
+    ).toEqual(['var', '…', 'heart', '01.svg']);
+  });
+});

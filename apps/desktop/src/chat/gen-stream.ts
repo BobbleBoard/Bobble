@@ -98,8 +98,20 @@ export function useGenStream(): void {
       /* Imported lazily: both modules reach for `window` when they load, and
          this file is unit-tested under node. Same pattern as llm-store's
          vision hook. */
-      void Promise.all([import('../state/canvas-store'), import('./canvas/file-tabs')]).then(
-        ([canvas, tabs]) => tabs.openFileInCanvas(canvas.getCanvasController() as never, path),
+      void Promise.all([
+        import('../state/canvas-store'),
+        import('./canvas/file-tabs'),
+        import('../state/pi-slice'),
+      ]).then(([canvas, tabs, pi]) =>
+        /* With the session's cwd the breadcrumb reads "Bobble › generated › … ›
+           01.svg", the way every other file open does; without it the bar
+           got the whole absolute path — nine segments squeezed into a strip
+           of clipped glyphs (seen on the first generated SVG). */
+        tabs.openFileInCanvas(
+          canvas.getCanvasController() as never,
+          path,
+          pi.usePiStore.getState().session?.cwd ?? undefined,
+        ),
       );
     });
     const unsubUpdate = bridge.onEvent('gen:update', ({ tabId, payload }) => {

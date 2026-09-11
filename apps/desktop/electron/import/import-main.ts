@@ -27,6 +27,8 @@ import {
 } from '@pi-desktop/importers';
 import { createLogger, type IpcHandlers, registerIpcHandlers } from '@pi-desktop/shared';
 import type { IpcMain } from 'electron';
+import type { McpMode } from '../settings/settings-contract';
+import { effectiveMcpMode, readSettings } from '../settings/settings-main';
 import type {
   CodexSessionListEntry,
   ImportInvokeMap,
@@ -151,7 +153,7 @@ interface RegistryServer {
 }
 interface Registry {
   version: 1;
-  mode: 'lite' | 'native';
+  mode: McpMode;
   servers: RegistryServer[];
 }
 
@@ -163,7 +165,13 @@ function loadRegistry(): Registry {
       if (Array.isArray(parsed.servers)) {
         return {
           version: 1,
-          mode: parsed.mode === 'native' ? 'native' : 'lite',
+          /* An import merges SERVERS; the mode is the user's. This narrowed it to
+             native-or-lite, so importing onto a `bash-cli` registry silently
+             put every connector back on the JSON proxy. */
+          mode:
+            parsed.mode === 'native' || parsed.mode === 'bash-cli' || parsed.mode === 'lite'
+              ? parsed.mode
+              : defaultRegistryMode(),
           servers: parsed.servers,
         };
       }
@@ -171,7 +179,14 @@ function loadRegistry(): Registry {
       // fall through to a fresh registry — a hand-broken file can't block import.
     }
   }
-  return { version: 1, mode: 'lite', servers: [] };
+  return { version: 1, mode: defaultRegistryMode(), servers: [] };
+}
+
+/** A registry created by an import starts in the mode the interface implies —
+ * the same derivation settings-main applies — not a hard-coded `lite`. */
+function defaultRegistryMode(): Registry['mode'] {
+  const settings = readSettings();
+  return effectiveMcpMode(settings.mcpMode, settings.toolInterface);
 }
 
 /** Stable, tool-name-safe id from a server name (mcp-lite prefixes tools `<id>_`). */

@@ -612,7 +612,11 @@ export function ToolsSection({
       <SectionTitle aside={aside} action={action}>
         Tools
       </SectionTitle>
-      {tools.length > 0 && item.state !== 'available' ? (
+      {/* A model connector's tool is a command on PATH, not an MCP tool
+          reaching the model as a schema — Lite/Native cost is not its axis. */}
+      {tools.length > 0 &&
+      item.state !== 'available' &&
+      !(item.kind === 'connector' && item.connector.kind === 'model') ? (
         <p className="mb-2 text-caption text-text-muted" data-testid="connector-tool-cost">
           {offCount > 0 ? `${String(cost.on)} on · ` : ''}
           {mode === 'lite'
@@ -861,7 +865,13 @@ export function AboutSection({
         <SectionTitle>About</SectionTitle>
         <dl className="pdc-spec">
           <dt>Kind</dt>
-          <dd>{c.kind === 'builtin' ? 'Built into Bobble' : 'MCP server'}</dd>
+          <dd>
+            {c.kind === 'builtin'
+              ? 'Built into Bobble'
+              : c.kind === 'model'
+                ? 'On-device model — runs under its own llama-server'
+                : 'MCP server'}
+          </dd>
           <dt>By</dt>
           <dd>{developerOf(c)}</dd>
           <dt>Category</dt>

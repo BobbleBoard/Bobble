@@ -684,8 +684,17 @@
   color: var(--pd-text-muted);
 }
 
+/* The FILE is the one segment that must survive a squeeze: ancestors give way
+   first (they are the context, it is the subject), and it only ellipsises once
+   it alone is wider than most of the bar. */
 .pd-canvas-crumb[data-file] {
   color: var(--pd-text-primary);
+  flex-shrink: 0;
+  max-width: 70%;
+}
+
+.pd-canvas-crumb:not([data-file]) {
+  flex-shrink: 1;
 }
 
 .pd-canvas-crumb-sep {

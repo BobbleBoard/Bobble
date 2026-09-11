@@ -187,7 +187,15 @@ export const CAPABILITIES: readonly Capability[] = [
   },
   {
     name: 'svg',
-    summary: 'Make an SVG — a vector drawing — from a description, a reference image, or both.',
+    /* MEASURED: with "Make an SVG — a vector drawing …" a 2B model asked for an
+       SVG heart typed <svg><circle …/></svg> into `write` — it knows the markup,
+       so "make an SVG" read as "write the file". The line has to say that
+       hand-writing the markup is the thing NOT to do, or the command is never
+       reached for. */
+    summary:
+      'Draw an SVG — icon, logo, symbol, flat illustration — from a description, a ' +
+      'reference image, or both. Every request for an SVG or a vector goes here; never ' +
+      'write SVG markup yourself.',
     guidance:
       'Use for icons, logos, symbols and simple flat illustrations where the deliverable is a ' +
       'vector file. Describe the shape and colour plainly; hand it a reference image to trace. ' +

@@ -89,6 +89,15 @@ export const useConnectorsStore = create<ConnectorsStoreState>((set, get) => ({
     set({ busyId: id });
     try {
       const { registry, error } = await window.piDesktop.invoke('connectors:install', { id });
+      /* The download's progress bar in the top bar is the llm store's, fed by the
+         same events the model screen uses — but that screen's own action is what
+         takes the bar down when its invoke resolves, and this one resolves here.
+         MEASURED: the bar sat at 100% with its X for the rest of the session. */
+      const modelId = get().catalog.find((c) => c.id === id)?.modelId;
+      if (modelId !== undefined) {
+        const { useLlmStore } = await import('./llm-store');
+        useLlmStore.getState().settleDownload(modelId);
+      }
       /* A model connector's install is a download; its state is the files, which
          only a fresh list reports. Re-list rather than guess. */
       const list = await window.piDesktop.invoke('connectors:list', undefined);

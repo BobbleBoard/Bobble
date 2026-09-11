@@ -2792,6 +2792,29 @@ body {
   margin-block: 0.5em;
 }
 /* Cards are full of screenshots and badge rows; keep them inside the column. */
+/* A local image in a reply opens on the canvas: the button is the image, no
+   chrome of its own. An SVG has no intrinsic box in <img> without
+   width/height, so give it one. */
+.pd-prose .pd-md-image-open {
+  display: inline-block;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  border-radius: var(--pd-radius-md);
+}
+.pd-prose .pd-md-image-open:focus-visible {
+  outline: 2px solid var(--pd-accent-primary);
+  outline-offset: 2px;
+}
+.pd-prose img.pd-md-image[src$=".svg"],
+.pd-prose img.pd-md-image[src*=".svg?"] {
+  min-width: 96px;
+  min-height: 96px;
+  background: var(--pd-bg-inset);
+  padding: 8px;
+}
+
 .pd-model-card .pd-prose img {
   max-width: 100%;
   height: auto;

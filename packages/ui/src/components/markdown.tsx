@@ -1,7 +1,12 @@
 import { clsx } from 'clsx';
 import type { ComponentPropsWithoutRef, HTMLAttributes, ReactNode } from 'react';
-import { forwardRef, isValidElement } from 'react';
-import ReactMarkdown, { type Components, type ExtraProps, type Options } from 'react-markdown';
+import { forwardRef, isValidElement, useMemo } from 'react';
+import ReactMarkdown, {
+  type Components,
+  defaultUrlTransform,
+  type ExtraProps,
+  type Options,
+} from 'react-markdown';
 import rehypeKatex from 'rehype-katex';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
@@ -187,6 +192,20 @@ const REHYPE_PLUGINS: Options['rehypePlugins'] = [
 export interface MarkdownProps extends Omit<HTMLAttributes<HTMLDivElement>, 'children'> {
   /** The markdown source to render (a plain string). */
   children: string;
+  /** Per-element overrides merged OVER the defaults (a host's `img`, say, that
+   * can reach files the design system cannot know about). */
+  components?: Partial<Components>;
+  /** react-markdown's URL sanitiser; the default drops every scheme but http,
+   * https and mailto. A host with its own media scheme widens it here. */
+  urlTransform?: Options['urlTransform'];
+}
+
+/**
+ * The default sanitiser, letting URLs that match `keep` through untouched — for
+ * a host with its own media scheme. Everything else is judged as before.
+ */
+export function widenUrlTransform(keep: RegExp): NonNullable<Options['urlTransform']> {
+  return (value) => (keep.test(value) ? value : defaultUrlTransform(value));
 }
 
 /**
@@ -195,15 +214,21 @@ export interface MarkdownProps extends Omit<HTMLAttributes<HTMLDivElement>, 'chi
  * hosts should not double-wrap it in `<Prose>`.
  */
 export const Markdown = forwardRef<HTMLDivElement, MarkdownProps>(function Markdown(
-  { children, className, ...rest },
+  { children, className, components, urlTransform, ...rest },
   ref,
 ) {
+  const merged = useMemo(
+    () =>
+      components === undefined ? MARKDOWN_COMPONENTS : { ...MARKDOWN_COMPONENTS, ...components },
+    [components],
+  );
   return (
     <div ref={ref} className={clsx('pd-prose', 'pd-markdown', className)} {...rest}>
       <ReactMarkdown
         remarkPlugins={REMARK_PLUGINS}
         rehypePlugins={REHYPE_PLUGINS}
-        components={MARKDOWN_COMPONENTS}
+        components={merged}
+        {...(urlTransform === undefined ? {} : { urlTransform })}
       >
         {children}
       </ReactMarkdown>

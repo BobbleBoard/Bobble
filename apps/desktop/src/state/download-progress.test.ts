@@ -96,3 +96,27 @@ describe('downloadEtaSeconds / formatEta', () => {
     expect(formatEta(Number.POSITIVE_INFINITY)).toBe('');
   });
 });
+
+describe('settleDownload', () => {
+  /*
+   * A model connector's install streams the same progress events as the model
+   * screen, but resolves through `connectors:install` — so nothing in this store
+   * saw it finish, and the top-bar bar sat at 100% with its X for the rest of
+   * the session (MEASURED on the OmniSVG connector). The install now settles it.
+   */
+  it('takes the bar down for the model that finished, and only that one', async () => {
+    const { useLlmStore } = await import('./llm-store');
+    useLlmStore.getState().applyDownloadProgress({
+      modelId: 'omnisvg-1.1-4b',
+      file: 'OmniSVG1.1_4B-Q8_0.gguf',
+      received: 1,
+      total: 1,
+      fraction: 1,
+    });
+    expect(useLlmStore.getState().download?.modelId).toBe('omnisvg-1.1-4b');
+    useLlmStore.getState().settleDownload('some-other-model');
+    expect(useLlmStore.getState().download?.modelId).toBe('omnisvg-1.1-4b'); // not ours to clear
+    useLlmStore.getState().settleDownload('omnisvg-1.1-4b');
+    expect(useLlmStore.getState().download).toBeNull();
+  });
+});

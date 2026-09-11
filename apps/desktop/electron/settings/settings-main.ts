@@ -11,7 +11,9 @@
  * Seeding is pure/read-only: an absent settings.json yields an in-memory
  * document derived from onboarding.json + the mcp registry, and is only written
  * once the user actually changes something (settings:set) — so read-only E2E
- * probes never mutate the profile. Trusted-sender gated with the shared
+ * probes never mutate the profile. The one startup write is the registry's
+ * `mode`, and only when it disagrees with the interface (see
+ * applySettingsEnvFromDisk). Trusted-sender gated with the shared
  * allowSender, exactly like the import channels.
  */
 import * as fs from 'node:fs';
@@ -172,8 +174,22 @@ function writeSettings(settings: DesktopSettings): void {
  * settings.json exists; never seeds/writes.
  */
 export function applySettingsEnvFromDisk(): void {
-  if (safeRead(SETTINGS_PATH) === null) return;
   const settings = readSettings();
+  /*
+   * THE REGISTRY'S MODE IS DERIVED, SO DERIVE IT BEFORE THE FIRST SPAWN.
+   *
+   * `effectiveMcpMode` only ran inside writeSettings — on the first settings
+   * change. Until then a fresh install had the CLI interface (the default) with
+   * connectors still in `lite`, which is exactly the mixed state the coupling
+   * exists to prevent, and the Connectors page said "Lite" while the model was
+   * being handed commands. Seeding settings.json stays read-only; the registry's
+   * mode is a different file and a derived value, and it is only touched when it
+   * actually differs — so a probe against an already-consistent profile still
+   * writes nothing.
+   */
+  const wanted = effectiveMcpMode(settings.mcpMode, settings.toolInterface);
+  if (readMcpMode() !== wanted) applyMcpMode(wanted);
+  if (safeRead(SETTINGS_PATH) === null) return;
   applySearchEnv(settings);
   // Seed the sampling sidecar so the FIRST pi child already sees a persisted
   // custom sampling profile (mtime-cached in the provider). A no-op-equivalent
