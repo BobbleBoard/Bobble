@@ -697,6 +697,13 @@
   flex-shrink: 1;
 }
 
+/* SEEN after the collapse landed: the "…" standing for the middle shrank to a
+   dot and the root to a stroke of one glyph. The ellipsis is three characters
+   and never needs less; an ancestor keeps enough to read as a word cut short. */
+.pd-canvas-crumb[data-collapsed] {
+  flex-shrink: 0;
+}
+
 .pd-canvas-crumb-sep {
   display: inline-flex;
   flex: 0 0 auto;
@@ -708,6 +715,10 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   padding: 0 2px;
+}
+
+.pd-canvas-crumb:not([data-file]) .pd-canvas-crumb-label {
+  min-width: 3.5ch;
 }
 
 /*

@@ -174,6 +174,11 @@
   font-variant-ligatures: none;
   box-decoration-break: clone;
   -webkit-box-decoration-break: clone;
+  /* A path is one unbreakable word. SEEN: a reply naming a generated file's
+     absolute path ran off the right edge of the chat column and gave the
+     whole thread a horizontal scrollbar. `clone` above already draws the chip
+     correctly across the break. */
+  overflow-wrap: anywhere;
 }
 
 /* Tables break out of the prose column into their own scroll container

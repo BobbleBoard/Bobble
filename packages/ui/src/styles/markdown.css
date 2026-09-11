@@ -19,8 +19,13 @@
 }
 
 /* The swatch rides inside the existing inline-code chip; keep it from wrapping
- * away from its text. */
-.pd-md-code {
+ * away from its text. Only the chip WITH a swatch — a hex colour is short. The
+ * rule used to apply to every inline code, which made a 90-character file path
+ * one unbreakable word: it ran off the right edge of the chat column and gave
+ * the whole thread a horizontal scrollbar (SEEN on a reply naming a generated
+ * SVG). Plain inline code wraps like prose (`overflow-wrap: anywhere` in
+ * prose.css). */
+.pd-md-code:has(> .pd-md-swatch) {
   white-space: nowrap;
 }
 

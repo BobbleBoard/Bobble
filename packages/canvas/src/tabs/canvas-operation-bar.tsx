@@ -326,8 +326,14 @@ function FileOps({
             const last = index === crumbs.length - 1;
             // Cumulative prefix is a stable, unique key even with repeated names.
             const key = crumbs.slice(0, index + 1).join('/');
+            const collapsed = segment === '…' && fullCrumbs.length > crumbs.length;
             return (
-              <span key={key} className="pd-canvas-crumb" data-file={last || undefined}>
+              <span
+                key={key}
+                className="pd-canvas-crumb"
+                data-file={last || undefined}
+                data-collapsed={collapsed || undefined}
+              >
                 {index > 0 ? (
                   <span className="pd-canvas-crumb-sep" aria-hidden="true">
                     <IconChevronRight size={12} />
