@@ -134,6 +134,20 @@ try {
   await win.waitForFunction(() => typeof window.__pi_store === 'function', { timeout: 40000 });
   await win.waitForTimeout(2500);
 
+  /*
+   * FULL POWER, because a capture is exactly when the user wants the machine.
+   *
+   * The power policy holds HEAVY jobs (video) whenever memory is tight — the user
+   * asked for that buffer and it is right. MEASURED here: after reading 73GB of
+   * weights the file cache alone put the machine in "gentle", so a Wan run sat
+   * in the queue and ComfyUI idled with an empty queue and 133MB resident. This
+   * is the product's own knob, not a way round the guard.
+   */
+  await win.evaluate(() =>
+    window.piDesktop.invoke('settings:set', { patch: { powerMode: 'full' } }),
+  );
+  await win.waitForTimeout(600);
+
   await win.evaluate((v) => window.__modality_store?.().getState().setView(v), STUDIO);
   await win.waitForTimeout(1500);
 

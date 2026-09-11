@@ -252,18 +252,33 @@ describe('sceneAt — every frame of every variant', () => {
   });
 
   it('keeps every block physically sane: non-negative size, radius within it', () => {
+    /* Collected and asserted ONCE. Five variants x ~700 frames x 64 blocks is
+       over a million assertions, and an `expect` per field took longer than the
+       suite's timeout on a busy machine — the check is cheap, the bookkeeping
+       around it was not. A violation still names itself. */
+    const bad: string[] = [];
     for (const v of VARIANTS) {
       for (const t of frames(v, 20)) {
-        for (const b of sceneAt(t, v).blocks) {
-          expect(b.size).toBeGreaterThanOrEqual(-1e-9);
-          expect(b.radius).toBeGreaterThanOrEqual(-1e-9);
-          expect(b.radius).toBeLessThanOrEqual(b.size / 2 + 1e-6);
-          expect(b.alpha).toBeGreaterThanOrEqual(0);
-          expect(b.alpha).toBeLessThanOrEqual(1);
-          expect(Number.isFinite(b.lift)).toBe(true);
+        const blocks = sceneAt(t, v).blocks;
+        for (let i = 0; i < blocks.length; i++) {
+          const b = blocks[i] as Block;
+          const why =
+            b.size < -1e-9
+              ? 'negative size'
+              : b.radius < -1e-9
+                ? 'negative radius'
+                : b.radius > b.size / 2 + 1e-6
+                  ? `radius ${b.radius} > half of size ${b.size}`
+                  : b.alpha < 0 || b.alpha > 1
+                    ? `alpha ${b.alpha}`
+                    : !Number.isFinite(b.lift)
+                      ? `lift ${b.lift}`
+                      : null;
+          if (why !== null) bad.push(`${v} t=${Math.round(t)} block ${i}: ${why}`);
         }
       }
     }
+    expect(bad.slice(0, 5)).toEqual([]);
   });
 
   it('flows: no block teleports, at an act join or anywhere else', () => {
