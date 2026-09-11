@@ -196,8 +196,21 @@ try {
     );
   }
 
-  // Settings, so the report can say they were exercised rather than assumed.
+  /*
+   * Settings, so the report can say they were exercised rather than assumed —
+   * and so the job is one a capture can sit through. The Video studio defaults
+   * to 4s at 24fps (96 frames) at the TRAINED size, which on this Mac is tens of
+   * minutes; MEASURED, a 2s 416px clip is ~3 minutes of sampling. SIZE/SECONDS
+   * drive the studio's own pickers, so what the film shows is a person choosing
+   * a cheaper shot, not a probe bypassing the UI.
+   */
   const applied = {};
+  if (process.env.SIZE !== undefined) {
+    applied.size = await pick(win, `${STUDIO}-size`, new RegExp(process.env.SIZE, 'i'));
+  }
+  if (process.env.SECONDS !== undefined) {
+    applied.seconds = await pick(win, `${STUDIO}-seconds`, new RegExp(`^${process.env.SECONDS}`));
+  }
   if (STEPS !== '')
     applied.steps = await pick(win, `${STUDIO}-steps-rail`, new RegExp(`^${STEPS}$`));
   if (SEED !== '') applied.seed = await pick(win, `${STUDIO}-seed-rail`, new RegExp(SEED, 'i'));

@@ -123,9 +123,22 @@ function wanVideoGraph(): ComfyGraph {
      *  - `SaveVideo` takes a VIDEO, not IMAGE: the frames go through
      *    `CreateVideo` (which is where fps lives) first.
      */
+    /*
+     * THE TEXT ENCODER IS THE MEMORY PROBLEM, so it is the one that is quantised.
+     *
+     * Wan's umt5-xxl is 11GB at fp16 and 6.7GB at fp8 — and fp8 is refused on
+     * MPS, so fp16 was the only safetensors option. MEASURED on a 24GB M5 Pro:
+     * with the 11GB encoder resident beside Electron and the sampler, the
+     * machine pages (ComfyUI sat in uninterruptible wait) and a 48-frame clip
+     * took over 45 minutes. The Q5_K_M GGUF is 4.1GB for the same encoder, and
+     * the same job runs in 8.7 minutes at a LARGER size (512x512, 49 frames).
+     *
+     * The encoder runs once per job and is then freed, so quantising it costs
+     * almost nothing in quality and buys the sampler 7GB of headroom.
+     */
     '38': {
-      class_type: 'CLIPLoader',
-      inputs: { clip_name: 'umt5_xxl_fp16.safetensors', type: 'wan' },
+      class_type: 'CLIPLoaderGGUF',
+      inputs: { clip_name: 'umt5-xxl-encoder-Q5_K_M.gguf', type: 'wan' },
     },
     '44': {
       class_type: 'UNETLoader',
@@ -144,7 +157,7 @@ function wanVideoGraph(): ComfyGraph {
     },
     '70': {
       class_type: 'EmptyHunyuanLatentVideo',
-      inputs: { width: 416, height: 416, length: 33, batch_size: 1 },
+      inputs: { width: 512, height: 512, length: 49, batch_size: 1 },
     },
     '73': {
       class_type: 'KSampler',

@@ -221,6 +221,37 @@ export function writeComfyModelPaths(): void {
   writeFileSync(comfyModelPathsYaml(), yaml, 'utf8');
 }
 
+/**
+ * GGUF loaders for ComfyUI, and the two libraries their tokenisers need.
+ *
+ * Not a nicety on this platform: MPS REFUSES fp8 casts, so for anything larger
+ * than a small model the choice is fp16 or nothing — and fp16 is what makes a
+ * 24GB Mac page. Wan's umt5-xxl text encoder is 11GB at fp16 and 4.1GB as
+ * Q5_K_M; MEASURED, that difference is a 48-frame clip taking over 45 minutes
+ * versus a LARGER 49-frame clip taking 8.7. The LTX-2.5 weights the catalog
+ * points at are GGUF for the same reason.
+ *
+ * `sentencepiece` and `protobuf` are separate because the GGUF CLIP loader only
+ * asks for them when it actually builds a tokeniser — so without them the node
+ * installs fine, loads fine, and fails at the first text encode with an
+ * ImportError, which is the worst moment to discover a missing dependency.
+ */
+async function installComfyGguf(uv: string): Promise<void> {
+  const dir = path.join(comfyRoot(), 'custom_nodes', 'ComfyUI-GGUF');
+  if (!existsSync(dir)) {
+    await run(
+      'git',
+      ['clone', '--depth', '1', 'https://github.com/city96/ComfyUI-GGUF.git', dir],
+      10 * 60_000,
+    );
+  }
+  await run(
+    uv,
+    ['pip', 'install', '--python', comfyVenv(), 'gguf>=0.13.0', 'sentencepiece', 'protobuf'],
+    10 * 60_000,
+  );
+}
+
 const OPS: Record<string, EngineOps> = {
   llamacpp: {
     installed: () => existsSync(llamaRoot()) && readdirSync(llamaRoot()).length > 0,
@@ -295,6 +326,7 @@ const OPS: Record<string, EngineOps> = {
         ],
         30 * 60_000,
       );
+      await installComfyGguf(uv);
       writeComfyModelPaths();
     },
     uninstall: async () => {

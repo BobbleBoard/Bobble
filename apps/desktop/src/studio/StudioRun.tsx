@@ -116,13 +116,14 @@ export function StudioJob({
            * product. The shimmer stays as the ground underneath it.
            */
           <div className="pd-studio-job-shimmer" aria-hidden="true">
-            <BobbleLoader
-              size={64}
-              variant={variant}
-              label="Working"
-              {...(hasSteps ? { progress: frac } : {})}
-              {...(job.note === undefined ? {} : { note: job.note })}
-            />
+            {/*
+              `bare`: this row ALREADY has a bar, three inches to the right, with
+              the step count under it. Two bars for one job is how a progress
+              readout stops being read — so the mark keeps the motion and the row
+              keeps the measurement. (The thread's inline card has no other bar,
+              so there the loader carries its own.)
+            */}
+            <BobbleLoader size={64} variant={variant} label="Working" bare />
           </div>
         )}
       </div>
@@ -154,7 +155,9 @@ export function StudioJob({
                  always the same work. */
               (job.note ?? 'Finishing — decoding the picture and saving it')
             : hasSteps
-              ? `Step ${job.step} of ${job.total}`
+              ? /* the user asked for a percentage. The step count is the honest
+                   unit and stays; the percentage is what a glance reads. */
+                `${Math.round(frac * 100)}% · step ${job.step} of ${job.total}`
               : /* MEASURED on an M5 Pro with the weights already cached: 94
                  seconds from pressing Generate to the first step. "Starting…"
                  for a minute and a half is why the user read this room as broken;
