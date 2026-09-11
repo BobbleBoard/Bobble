@@ -187,25 +187,22 @@ try {
     await page.screenshot({ path: path.join(OUT, `${name}.png`) });
     const session = newestSession();
     const { calls, results } = session ? readSession(session) : { calls: [], results: [] };
+    /* `svg` anywhere in a command chain (`cd x && svg …`), not `svg --help` and
+       not a path that merely contains "svg". */
+    const isSvgRun = (cmd) => /(^|[;&|]|\s)svg\s+(?!--help\b|-h\b)\S/.test(String(cmd));
     const svgCalls = calls
-      .filter(
-        (c) =>
-          c.name === 'generate_svg' ||
-          (c.name === 'bash' && /^\s*svg\b/.test(String(c.args?.command ?? ''))),
-      )
+      .filter((c) => c.name === 'generate_svg' || (c.name === 'bash' && isSvgRun(c.args?.command)))
       .map((c) => (c.name === 'bash' ? c.args.command : JSON.stringify(c.args)));
     const refusals = results.filter((r) => /^Not (written|edited):/.test(r)).length;
     const files = walk(HOME, (p) => !before.has(p) && /\.(html?|svg|py|css|js)$/i.test(p));
-    const generated = new Set(
-      walk(path.join(HOME, 'Bobble', 'generated'), (p) => p.endsWith('.svg')).map((p) =>
-        readFileSync(p, 'utf8'),
-      ),
-    );
-    const handwrittenSvgs = files.filter(
-      (p) =>
-        p.endsWith('.svg') &&
-        !p.includes('/Bobble/generated/') &&
-        !generated.has(readFileSync(p, 'utf8')),
+    /* OmniSVG's decoder writes a DECIMAL viewBox ("0.0 0.0 200.0 200.0"); a
+       hand-drawn one is integer ("0 0 100 100"). That signature tells a drawn
+       file from an invented one wherever it landed. */
+    const isOmniSvg = (t) => /viewBox="[^"]*\.\d/.test(t);
+    const newSvgs = files.filter((p) => p.endsWith('.svg'));
+    const drawn = newSvgs.filter((p) => isOmniSvg(readFileSync(p, 'utf8')));
+    const handwrittenSvgs = newSvgs.filter(
+      (p) => !p.includes('/Bobble/generated/') && !isOmniSvg(readFileSync(p, 'utf8')),
     );
     const pages = files.filter((p) => /\.html?$/i.test(p));
     const inlineDrawn = pages.reduce(
@@ -236,6 +233,7 @@ try {
       took: `${took}s`,
       msgs: n,
       svgCalls,
+      drawn: drawn.length,
       refusals,
       files: files.map((f) => path.relative(HOME, f)),
       handwrittenSvgs: handwrittenSvgs.map((f) => path.relative(HOME, f)),
@@ -248,12 +246,14 @@ try {
   }
   console.log('SUMMARY');
   for (const r of report) {
+    /* A pass DRAWS its graphics (an OmniSVG file appeared) and hand-writes none,
+       inline or as a file. The negative must leave svg untouched entirely. */
     const ok =
       r.name === 'negative'
-        ? r.svgCalls.length === 0 && r.refusals === 0
-        : r.svgCalls.length > 0 && r.handwrittenSvgs.length === 0 && r.inlineDrawn === 0;
+        ? r.svgCalls.length === 0 && r.drawn === 0 && r.refusals === 0
+        : r.drawn > 0 && r.handwrittenSvgs.length === 0 && r.inlineDrawn === 0;
     console.log(
-      `  ${ok ? 'PASS' : 'FAIL'} ${r.name.padEnd(13)} svg=${r.svgCalls.length} refused=${r.refusals} handwritten=${r.handwrittenSvgs.length} inline=${r.inlineDrawn} imgRefs=${r.imgRefs.length} ${r.took}`,
+      `  ${ok ? 'PASS' : 'FAIL'} ${r.name.padEnd(13)} drawn=${r.drawn} svgCmd=${r.svgCalls.length} refused=${r.refusals} handwritten=${r.handwrittenSvgs.length} inline=${r.inlineDrawn} imgRefs=${r.imgRefs.length} ${r.took}`,
     );
   }
   console.log(`HOME=${HOME}`);
