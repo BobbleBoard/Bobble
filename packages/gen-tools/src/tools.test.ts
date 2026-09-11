@@ -70,6 +70,15 @@ describe('parseSize', () => {
     expect(parseSize(undefined)).toEqual({ width: 1024, height: 1024 });
     expect(parseSize('big')).toEqual({ width: 1024, height: 1024 });
   });
+
+  it("takes the caller's default, because a clip is not a still", () => {
+    // 1024² is a good picture and a bad video: four times the pixels of a job
+    // already measured at 521s on this machine.
+    const video = { width: 640, height: 352 };
+    expect(parseSize(undefined, video)).toEqual(video);
+    expect(parseSize('nonsense', video)).toEqual(video);
+    expect(parseSize('768x512', video)).toEqual({ width: 768, height: 512 });
+  });
 });
 
 describe('generate_image tool', () => {

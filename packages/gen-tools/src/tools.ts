@@ -80,9 +80,17 @@ function videoErrResult(message: string): AgentToolResult<GenerateDetails> {
   };
 }
 
-/** Parse a `<w>x<h>` size string into even, bounded dimensions. */
-export function parseSize(size: string | undefined): { width: number; height: number } {
-  const fallback = { width: 1024, height: 1024 };
+/**
+ * Parse a `<w>x<h>` size string into even, bounded dimensions.
+ *
+ * The fallback is the CALLER's, because a still and a clip want different ones —
+ * 1024x1024 is a good picture and an hour-long video on this class of machine.
+ * See gen-manager's `VIDEO_DEFAULT_SIZE`.
+ */
+export function parseSize(
+  size: string | undefined,
+  fallback: { width: number; height: number } = { width: 1024, height: 1024 },
+): { width: number; height: number } {
   if (size === undefined) return fallback;
   const m = /^(\d{2,4})\s*[x×]\s*(\d{2,4})$/i.exec(size.trim());
   if (m === null) return fallback;

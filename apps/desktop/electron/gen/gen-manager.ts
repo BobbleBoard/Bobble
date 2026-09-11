@@ -195,9 +195,25 @@ function summariseModel(m: ModalityModel): GenModelSummary {
   };
 }
 
-/** Parse `<w>x<h>` into even, bounded dims (default 1024²). Mirrors gen-tools. */
-function parseSize(size: string | undefined): { width: number; height: number } {
-  const fallback = { width: 1024, height: 1024 };
+/**
+ * Parse `<w>x<h>` into even, bounded dims. Mirrors gen-tools.
+ *
+ * THE DEFAULT IS PER MODALITY, because a still and a clip are not the same ask.
+ * 1024x1024 is a good picture and a bad video: MEASURED on an M5 Pro 24GB, Wan
+ * 2.1 renders 512x512x49 in 521s and the same clip at 1024x1024 is four times
+ * the pixels — a "two second video" that takes the better part of an hour. The
+ * video tool says "Default per model" and the graphs carry 640x352 / 608x352 /
+ * 512x512 for exactly this reason; a caller that names no size should land near
+ * those, not four times above the largest of them.
+ */
+const IMAGE_DEFAULT_SIZE = { width: 1024, height: 1024 };
+/** 0.2 megapixels at 16:9 — the first row of every LTX/H3 resolution table. */
+const VIDEO_DEFAULT_SIZE = { width: 640, height: 352 };
+
+function parseSize(
+  size: string | undefined,
+  fallback: { width: number; height: number } = IMAGE_DEFAULT_SIZE,
+): { width: number; height: number } {
   if (size === undefined) return fallback;
   const m = /^(\d{2,4})\s*[x×]\s*(\d{2,4})$/i.exec(size.trim());
   if (m === null) return fallback;
@@ -477,7 +493,7 @@ export function registerGenIpc(opts: GenManagerOptions): void {
 
     const clamp = (n: number, lo: number, hi: number): number =>
       Math.max(lo, Math.min(hi, Math.round(n)));
-    const { width, height } = parseSize(raw.size);
+    const { width, height } = parseSize(raw.size, VIDEO_DEFAULT_SIZE);
     const seconds = clamp(raw.seconds ?? 5, 1, 60);
     const fps = clamp(raw.fps ?? 24, 1, 60);
     const seed = raw.seed ?? randomInt(0, 1_000_000_000);
