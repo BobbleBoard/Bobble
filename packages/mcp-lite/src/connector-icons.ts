@@ -174,6 +174,11 @@ const NEUTRAL_ICON_SVGS: Record<string, string> = {
   hyperframes: neutralSvg(
     '<rect x="3.5" y="5.5" width="17" height="13" rx="2"/><path d="M7.75 5.5v13M16.25 5.5v13"/><path d="M3.5 9.5h4.25M3.5 14.5h4.25M16.25 9.5h4.25M16.25 14.5h4.25"/>',
   ),
+  // A Bézier: one curve with its two handles — the thing an SVG is made of.
+  omnisvg: neutralSvg(
+    '<path d="M4.5 18.5C6 9 13 6 19.5 5.5"/><path d="M4.5 18.5L9.5 12.5"/><path d="M19.5 5.5L13.5 8.5"/>' +
+      '<circle cx="4.5" cy="18.5" r="1.5"/><circle cx="19.5" cy="5.5" r="1.5"/><circle cx="9.5" cy="12.5" r="1.25"/><circle cx="13.5" cy="8.5" r="1.25"/>',
+  ),
   // Scissors (a typed ffmpeg cut/edit façade).
   'video-editing': neutralSvg(
     '<circle cx="6" cy="6.5" r="2.15"/><circle cx="6" cy="17.5" r="2.15"/><path d="M7.9 7.7 19.5 16.5M7.9 16.3 19.5 7.5M12 12l4-2.9"/>',

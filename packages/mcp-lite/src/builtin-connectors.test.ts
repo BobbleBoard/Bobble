@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { BUILTIN_CONNECTOR_IDS, BUILTIN_CONNECTORS, MAC_CONNECTORS } from './builtin-connectors';
+import {
+  BUILTIN_CONNECTOR_IDS,
+  BUILTIN_CONNECTORS,
+  MAC_CONNECTORS,
+  MODEL_CONNECTORS,
+} from './builtin-connectors';
 import { BRANDED_CONNECTOR_IDS } from './connector-icons';
 import { isBuiltinConnector, KNOWN_CONNECTORS, KNOWN_CONNECTORS_BY_ID } from './detect-apps';
 
@@ -97,5 +102,24 @@ describe('built-in connectors', () => {
     ]) {
       expect(advertised).toContain(name);
     }
+  });
+});
+
+describe('model connectors', () => {
+  /* The edit that put this in the catalog was once asserted, replaced, and
+     never written to disk — three ships went out without the card, and the
+     Connectors page said "Nothing matches OmniSVG". This is the test that
+     would have caught it in the first minute. */
+  it('OmniSVG is in the exported catalog, as an installable model connector', () => {
+    const c = KNOWN_CONNECTORS.find((k) => k.id === 'omnisvg');
+    expect(c).toBeDefined();
+    expect(c?.kind).toBe('model');
+    expect(c?.modelId).toBe('omnisvg-1.1-4b');
+    expect(c?.tools?.map((t) => t.name)).toEqual(['generate_svg']);
+  });
+
+  it('is NOT a builtin: it must be installable', () => {
+    expect(BUILTIN_CONNECTOR_IDS).not.toContain('omnisvg');
+    expect(MODEL_CONNECTORS.map((c) => c.id)).toEqual(['omnisvg']);
   });
 });

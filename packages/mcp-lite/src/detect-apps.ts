@@ -734,9 +734,11 @@ const CATALOG_BASE: KnownConnector[] = [
  * editing) are prepended so they land first in the gallery and cross the
  * connectors IPC in `catalog`.
  */
-export const KNOWN_CONNECTORS: KnownConnector[] = [...BUILTIN_CONNECTORS, ...CATALOG_BASE].map(
-  (c) => ({ ...c, iconSvg: CONNECTOR_ICON_SVGS[c.id] ?? c.iconSvg }),
-);
+export const KNOWN_CONNECTORS: KnownConnector[] = [
+  ...BUILTIN_CONNECTORS,
+  ...MODEL_CONNECTORS,
+  ...CATALOG_BASE,
+].map((c) => ({ ...c, iconSvg: CONNECTOR_ICON_SVGS[c.id] ?? c.iconSvg }));
 
 /** Lookup a known connector by id. */
 export const KNOWN_CONNECTORS_BY_ID: Record<string, KnownConnector> = Object.fromEntries(
