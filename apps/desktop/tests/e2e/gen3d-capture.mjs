@@ -73,22 +73,38 @@ try {
   await win.screenshot({ path: path.join(OUT, '00-room.png') });
 
   /*
-   * TEXT MODE FIRST. The room opens on image input ("Choose or drop image(s)"),
-   * and the prompt box only exists in the text tab — so a probe that types
-   * straight away waits for an element that is not rendered.
+   * IMAGE IN, when one is given — the path TRELLIS is actually built for.
+   *
+   * MEASURED on the text path: the first stage is a text→image pass through
+   * mage-flow, and under memory pressure two mflux workers ended up racing,
+   * both paging, stuck at 17% for 45 minutes. Handing the room a picture skips
+   * that stage entirely and starts at the geometry the model is named for.
    */
-  await win.evaluate(() => window.__tripo_store?.().getState?.().set?.('inputMode', 'text'));
-  await win.waitForTimeout(800);
-  const box = win.locator('[data-testid="tp-prompt"]');
-  if ((await box.count()) === 0) {
-    // No store hook exposed — click the text tab in the segmented header.
-    await win.locator('.tp-seg button, [data-active]').nth(1).click({ force: true });
+  if (process.env.IMAGE !== undefined) {
+    await win.evaluate(() => window.__tripo_store?.().getState?.().set?.('inputMode', 'image'));
+    await win.waitForTimeout(700);
+    await win.setInputFiles('[data-testid="tp-image-input"]', process.env.IMAGE);
+    await win.waitForTimeout(2500);
+    say(`image in: ${path.basename(process.env.IMAGE)}`);
+  } else {
+    /*
+     * TEXT MODE. The room opens on image input ("Choose or drop image(s)"), and
+     * the prompt box only exists in the text tab — so a probe that types straight
+     * away waits for an element that is not rendered.
+     */
+    await win.evaluate(() => window.__tripo_store?.().getState?.().set?.('inputMode', 'text'));
     await win.waitForTimeout(800);
+    const box = win.locator('[data-testid="tp-prompt"]');
+    if ((await box.count()) === 0) {
+      // No store hook exposed — click the text tab in the segmented header.
+      await win.locator('.tp-seg button, [data-active]').nth(1).click({ force: true });
+      await win.waitForTimeout(800);
+    }
+    await box.waitFor({ timeout: 20000 });
+    await box.click();
+    await win.keyboard.type(PROMPT, { delay: 8 });
+    await win.waitForTimeout(600);
   }
-  await box.waitFor({ timeout: 20000 });
-  await box.click();
-  await win.keyboard.type(PROMPT, { delay: 8 });
-  await win.waitForTimeout(600);
   await win.screenshot({ path: path.join(OUT, '01-before.png') });
 
   filming = true;
