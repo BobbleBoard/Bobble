@@ -3655,6 +3655,40 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
         };
       }
     }
+    /*
+     * A PATH THAT IS A COMMAND LINE.
+     *
+     * MEASURED, MiniCPM5: `read { path: "read --help" }`, four times, plus the
+     * URL it wanted and the working directory. The tool answered each with
+     * ENOENT and the path helpfully joined onto the workspace, which reads as
+     * "that file is missing" — so the model kept trying different files. It was
+     * not asking for a file at all; it was asking the read TOOL for its usage,
+     * in the only syntax it had seen work elsewhere.
+     *
+     * Say which of the two things it is holding. Cheap to detect: a real path
+     * does not contain " --", and a real path is not the name of a command.
+     */
+    if (FILE_TOOLS.has(event.toolName) && event.isError === true) {
+      const target = (event.input as { path?: unknown })?.path;
+      const p = typeof target === 'string' ? target.trim() : '';
+      const looksLikeCommand =
+        p !== '' && (/\s--\w/.test(p) || /^(?:read|write|edit|mac|chrome|browser|media)\b/.test(p));
+      if (looksLikeCommand) {
+        const said = event.content.map((c) => (c.type === 'text' ? c.text : '')).join('');
+        return {
+          content: [
+            {
+              type: 'text',
+              text:
+                `${said}\n\n[That is a command line, not a path. \`${event.toolName}\` is a TOOL: ` +
+                `give it a real file path and nothing else. For usage of a COMMAND, run ` +
+                `\`<command> --help\` in bash — \`mac\`, \`chrome\`, \`browser\` and \`media\` are ` +
+                `commands; \`read\`, \`write\` and \`edit\` are not.]`,
+            },
+          ],
+        };
+      }
+    }
     if (event.toolName === 'bash' && cliImages.length > 0) {
       const attached = cliImages.map((c) => ({
         type: 'image' as const,

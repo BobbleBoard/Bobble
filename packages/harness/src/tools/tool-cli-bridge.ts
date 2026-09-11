@@ -250,7 +250,24 @@ export function buildOpenWrapper(): string {
     // The URL form, translated the same way and for the same reason.
     'if [ -n "$url" ] && command -v browser >/dev/null 2>&1; then',
     '  echo "open <url> hands the page to another browser and brings it to the front. Opening it in the app own browser instead (browser navigate). For the user OWN Chrome: mac chrome go --url \\"$url\\"" >&2',
-    '  exec browser navigate --url "$url"',
+    /*
+     * …AND SAY WHAT TO DO WITH THE PAGE NOW THAT IT IS OPEN.
+     *
+     * The app-launch branch below shows the whole toolkit after redirecting, for
+     * exactly this reason. The URL branch did not, so a model that asked for a
+     * page got it opened and no idea how to READ it. MEASURED, MiniCPM5: after
+     * this redirect it spent eleven calls on the `read` tool — directories, the
+     * URL itself, and `read --help` passed as a PATH four times — because
+     * nothing had told it `browser read` exists.
+     *
+     * Not `exec`, so the help follows the navigation's own output: what the
+     * model reads is "the page is open, and here is how to look at it".
+     */
+    '  browser navigate --url "$url"',
+    '  echo "" >&2',
+    '  echo "That page is open in this app\'s browser. It is best read and driven with the commands below — browser read for the text, browser snapshot for the elements." >&2',
+    '  browser --help 2>&1 | sed "s/^/  /" >&2',
+    '  exit 0',
     'fi',
     'if [ -n "$app" ] && command -v mac >/dev/null 2>&1; then',
     '  echo "open -a would take the screen; opening \\"$app\\" in the background instead (mac launch)." >&2',
