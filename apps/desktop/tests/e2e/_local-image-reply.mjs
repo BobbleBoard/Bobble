@@ -23,8 +23,12 @@ writeFileSync(
 );
 const appRoot = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../..');
 const app = await electron.launch({
-  executablePath: DEV ? createRequire(import.meta.url)('electron') : '/Applications/Bobble.app/Contents/MacOS/Bobble',
-  args: DEV ? [appRoot, `--user-data-dir=${path.join(HOME, 'udd')}`] : [`--user-data-dir=${path.join(HOME, 'udd')}`],
+  executablePath: DEV
+    ? createRequire(import.meta.url)('electron')
+    : '/Applications/Bobble.app/Contents/MacOS/Bobble',
+  args: DEV
+    ? [appRoot, `--user-data-dir=${path.join(HOME, 'udd')}`]
+    : [`--user-data-dir=${path.join(HOME, 'udd')}`],
   env: { ...process.env, HOME, PI_E2E: '1', PI_E2E_BACKGROUND: '1' },
 });
 try {
@@ -57,9 +61,15 @@ try {
     const p = code.parentElement;
     const pcs = p ? getComputedStyle(p) : null;
     return {
-      whiteSpace: cs.whiteSpace, overflowWrap: cs.overflowWrap, wordBreak: cs.wordBreak, display: cs.display,
-      codeWidth: code.getBoundingClientRect().width, parentWidth: p?.getBoundingClientRect().width,
-      parentWhiteSpace: pcs?.whiteSpace, parentTag: p?.tagName, parentClass: p?.className,
+      whiteSpace: cs.whiteSpace,
+      overflowWrap: cs.overflowWrap,
+      wordBreak: cs.wordBreak,
+      display: cs.display,
+      codeWidth: code.getBoundingClientRect().width,
+      parentWidth: p?.getBoundingClientRect().width,
+      parentWhiteSpace: pcs?.whiteSpace,
+      parentTag: p?.tagName,
+      parentClass: p?.className,
       proseWidth: code.closest('.pd-prose')?.getBoundingClientRect().width,
     };
   });
@@ -68,7 +78,11 @@ try {
   // Click opens it on the canvas.
   await page.locator('.pd-md-image-open').first().click();
   await page.waitForTimeout(1500);
-  const tabs = await page.evaluate(() => [...document.querySelectorAll('[role="tab"], .pd-canvas-tab')].map((t) => t.textContent?.trim()).filter(Boolean));
+  const tabs = await page.evaluate(() =>
+    [...document.querySelectorAll('[role="tab"], .pd-canvas-tab')]
+      .map((t) => t.textContent?.trim())
+      .filter(Boolean),
+  );
   console.log('canvas tabs:', JSON.stringify(tabs));
   await page.screenshot({ path: path.join(OUT, 'opened.png') });
 } finally {
