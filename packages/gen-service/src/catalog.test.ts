@@ -150,13 +150,23 @@ describe('ComfyUI-backed entries', () => {
 });
 
 describe('minUnifiedMemoryGB hint', () => {
-  it('is present, positive, and never below the on-disk size for every entry', () => {
+  it('is present, positive, and never below what has to be resident at once', () => {
     for (const m of MODALITY_CATALOG) {
       expect(typeof m.minUnifiedMemoryGB).toBe('number');
       const min = m.minUnifiedMemoryGB ?? 0;
       expect(min).toBeGreaterThan(0);
-      // The memory floor is weights + headroom, so it must cover the weights.
-      expect(min).toBeGreaterThanOrEqual(m.approxSizeGB);
+      // The floor covers the weights — except for a STAGED pipeline, where the
+      // download is bigger than anything ever resident (an encoder that is freed
+      // before the transformer loads). Those declare the peak they measured.
+      expect(min).toBeGreaterThanOrEqual(m.peakResidentGB ?? m.approxSizeGB);
+    }
+  });
+
+  it('a declared peak is smaller than the download, or it is not a peak', () => {
+    for (const m of MODALITY_CATALOG) {
+      if (m.peakResidentGB === undefined) continue;
+      expect(m.peakResidentGB, `${m.id} peak`).toBeGreaterThan(0);
+      expect(m.peakResidentGB, `${m.id} peak vs size`).toBeLessThan(m.approxSizeGB);
     }
   });
 });

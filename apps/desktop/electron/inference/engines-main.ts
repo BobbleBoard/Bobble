@@ -21,10 +21,11 @@
  * one-click uninstall honest.
  */
 import { spawn } from 'node:child_process';
-import { existsSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { cacheRoot } from '@pi-desktop/inference';
 import type { EngineState } from '../ipc-contract';
+import { COMFY_H3_SHIM_DIRNAME, COMFY_H3_SHIM_PY } from './comfy-h3-shim';
 
 /** Where the managed Python venv for the MLX engines lives. */
 function pyRoot(): string {
@@ -252,6 +253,20 @@ async function installComfyGguf(uv: string): Promise<void> {
   );
 }
 
+/**
+ * Drop the H3 detection shim beside ComfyUI's other custom nodes.
+ *
+ * Rewritten on every install rather than written once, so a corrected shim
+ * reaches a machine that already has one. See `comfy-h3-shim.ts` for what it
+ * does and for why a file we WRITE is not the custom node §4 forbids us to
+ * AUTHOR into the app.
+ */
+export function writeComfyShim(): void {
+  const dir = path.join(comfyRoot(), 'custom_nodes', COMFY_H3_SHIM_DIRNAME);
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(path.join(dir, '__init__.py'), COMFY_H3_SHIM_PY);
+}
+
 const OPS: Record<string, EngineOps> = {
   llamacpp: {
     installed: () => existsSync(llamaRoot()) && readdirSync(llamaRoot()).length > 0,
@@ -327,6 +342,7 @@ const OPS: Record<string, EngineOps> = {
         30 * 60_000,
       );
       await installComfyGguf(uv);
+      writeComfyShim();
       writeComfyModelPaths();
     },
     uninstall: async () => {

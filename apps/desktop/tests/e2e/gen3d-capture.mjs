@@ -107,6 +107,49 @@ try {
   }
   await win.screenshot({ path: path.join(OUT, '01-before.png') });
 
+  /*
+   * SETTINGS FIRST — and 512 is the point.
+   *
+   * The room defaults to 1024, which is 8x the voxels of 512, and at 1024 the
+   * mesh decode outran the time available on this machine. the user: it has run at
+   * 512 before. RES=512 drives the room's own rail, and TEXTURE=off drops the
+   * texture pass so the proof is the geometry.
+   */
+  if (process.env.RES !== undefined) {
+    const rail = win
+      .locator(`[data-testid="tp-resolution"] button`, {
+        hasText: new RegExp(`^${process.env.RES}$`),
+      })
+      .first();
+    if ((await rail.count()) > 0) {
+      await rail.evaluate((el) => el.click());
+      await win.waitForTimeout(500);
+    }
+    const chosen = await win
+      .locator(
+        '[data-testid="tp-resolution"] [aria-checked="true"], [data-testid="tp-resolution"] [data-state="on"]',
+      )
+      .first()
+      .textContent()
+      .catch(() => null);
+    say(`resolution: asked ${process.env.RES}, rail says ${JSON.stringify(chosen)}`);
+  }
+  if (process.env.TEXTURE === 'off') {
+    const on = await win
+      .evaluate(() => window.__tripo_store?.().getState?.().genAutoTexture)
+      .catch(() => null);
+    if (on === true) {
+      await win
+        .locator('[data-testid="tp-autotexture-toggle"]')
+        .first()
+        .evaluate((el) => el.click());
+      await win.waitForTimeout(400);
+    }
+    say(
+      `auto-texture: ${await win.evaluate(() => window.__tripo_store?.().getState?.().genAutoTexture)}`,
+    );
+  }
+
   filming = true;
   const filmDone = film(win);
 

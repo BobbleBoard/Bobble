@@ -38,8 +38,9 @@ export interface WorkflowTemplate {
   readonly id: string;
   /** API-format base graph with placeholder default values. */
   readonly graph: ComfyGraph;
-  /** catalog param name → dotted node-input path (mirrors the catalog `comfy.paramMap`). */
-  readonly paramMap: Readonly<Record<string, string>>;
+  /** catalog param name → dotted node-input path, or several (mirrors the
+   * catalog `comfy.paramMap`). */
+  readonly paramMap: Readonly<Record<string, string | readonly string[]>>;
 }
 
 // ── graph builders (one per modality family) ────────────────────────────────
@@ -194,6 +195,239 @@ const WAN_PARAM_MAP = {
   length: '70.inputs.length',
   steps: '73.inputs.steps',
   seed: '73.inputs.seed',
+} as const;
+
+/**
+ * LTX-2.5 (text → video WITH audio), the local two-tower cascade's first stage.
+ *
+ * MEASURED on this M5 Pro 24GB against ComfyUI 0.33.0: 640x352, 49 frames (2s at
+ * 24fps), 8 steps, 326s wall, and the clip carries a real 48kHz audio track.
+ *
+ * WHAT IS DIFFERENT ABOUT THIS MODEL, and why the graph looks unlike the others:
+ *
+ *  - it is JOINT audio-video. The sampler runs on one latent that is the video
+ *    and audio latents concatenated (`LTXVConcatAVLatent`), and they are pulled
+ *    apart again (`LTXVSeparateAVLatent`) for two different decoders. The audio
+ *    VAE is not optional scenery: the latent has the wrong shape without it.
+ *  - guidance is `LTXVDualCFGGuider`, which carries SEPARATE cfg scales for the
+ *    video and audio halves. The distilled checkpoint wants 1.0/1.0 — it is
+ *    already guidance-distilled, and raising either burns the picture.
+ *  - conditioning goes through `LTXVConditioning`, which stamps the frame rate
+ *    onto both prompts; the model is trained to read it.
+ *
+ * Upstream's own template runs this stage at half resolution and then adds a
+ * second pass through a latent upscaler. That second stage is a quality step,
+ * not a correctness one, and it needs another model on disk — so this template
+ * is stage one at full size, which is the part that must work first.
+ *
+ * THE TEXT ENCODER IS NOT A GGUF here, unlike Wan's. LTX-2.5's Gemma-4-12B has a
+ * projection head, and the only GGUF conversion of it is behind a gate; the
+ * int8+convrot safetensors release is ungated and, on a machine with no CUDA,
+ * takes ComfyUI's eager quantised path, which is plain torch and runs on MPS.
+ */
+function ltx25Graph(): ComfyGraph {
+  return {
+    '38': {
+      class_type: 'CLIPLoader',
+      inputs: {
+        clip_name: 'gemma4-12b-with-proj-ltx-2.5-comfy-int8-convrot.safetensors',
+        type: 'ltxv',
+      },
+    },
+    '44': {
+      class_type: 'UnetLoaderGGUF',
+      inputs: { unet_name: 'ltx-2.5-22b-distilled-transformer-bf16-Q2_K.gguf' },
+    },
+    '45': { class_type: 'VAELoader', inputs: { vae_name: 'ltx-2.5-video-vae-bf16.safetensors' } },
+    '46': { class_type: 'VAELoader', inputs: { vae_name: 'ltx-2.5-audio-vae-bf16.safetensors' } },
+    '6': {
+      class_type: 'CLIPTextEncode',
+      inputs: { text: '', clip: ['38', 0] },
+      _meta: { title: 'Positive prompt' },
+    },
+    '7': {
+      class_type: 'CLIPTextEncode',
+      inputs: { text: '', clip: ['38', 0] },
+      _meta: { title: 'Negative prompt' },
+    },
+    '60': {
+      class_type: 'LTXVConditioning',
+      inputs: { positive: ['6', 0], negative: ['7', 0], frame_rate: 24 },
+    },
+    '70': {
+      class_type: 'EmptyLTXVLatentVideo',
+      inputs: { width: 640, height: 352, length: 49, batch_size: 1 },
+    },
+    '71': {
+      class_type: 'LTXVEmptyLatentAudio',
+      inputs: { frames_number: 49, frame_rate: 24, batch_size: 1, audio_vae: ['46', 0] },
+    },
+    '72': {
+      class_type: 'LTXVConcatAVLatent',
+      inputs: { video_latent: ['70', 0], audio_latent: ['71', 0] },
+    },
+    '73': {
+      // LTX's own scheduler rather than upstream's hardcoded sigma list, because
+      // a `ManualSigmas` string is not a step count and the studio's steps
+      // control has to reach something. MEASURED side by side at 8 steps: this
+      // is if anything the sharper of the two. The latent is what makes its
+      // shift resolution-aware, so it is wired, not left to a default.
+      class_type: 'LTXVScheduler',
+      inputs: {
+        steps: 8,
+        max_shift: 2.05,
+        base_shift: 0.95,
+        stretch: true,
+        terminal: 0.1,
+        latent: ['72', 0],
+      },
+    },
+    '74': { class_type: 'KSamplerSelect', inputs: { sampler_name: 'euler_ancestral' } },
+    '75': { class_type: 'RandomNoise', inputs: { noise_seed: 0 } },
+    '76': {
+      class_type: 'LTXVDualCFGGuider',
+      inputs: {
+        model: ['44', 0],
+        positive: ['60', 0],
+        negative: ['60', 1],
+        video_cfg: 1,
+        audio_cfg: 1,
+      },
+    },
+    '77': {
+      class_type: 'SamplerCustomAdvanced',
+      inputs: {
+        noise: ['75', 0],
+        guider: ['76', 0],
+        sampler: ['74', 0],
+        sigmas: ['73', 0],
+        latent_image: ['72', 0],
+      },
+    },
+    '78': { class_type: 'LTXVSeparateAVLatent', inputs: { av_latent: ['77', 0] } },
+    '8': {
+      class_type: 'VAEDecodeTiled',
+      inputs: {
+        samples: ['78', 0],
+        vae: ['45', 0],
+        tile_size: 512,
+        overlap: 64,
+        temporal_size: 64,
+        temporal_overlap: 8,
+      },
+    },
+    '79': {
+      class_type: 'LTXVAudioVAEDecode',
+      inputs: { samples: ['78', 1], audio_vae: ['46', 0] },
+    },
+    '80': {
+      class_type: 'CreateVideo',
+      inputs: { images: ['8', 0], fps: 24, audio: ['79', 0] },
+    },
+    '9': {
+      class_type: 'SaveVideo',
+      inputs: { video: ['80', 0], filename_prefix: 'pi-video', format: 'auto', codec: 'auto' },
+    },
+  };
+}
+
+/** LTX-2.5's splice points. The frame count has to reach BOTH halves of the
+ * joint latent — a video latent longer than its audio latent will not concat. */
+const LTX_25_PARAM_MAP = {
+  prompt: '6.inputs.text',
+  negativePrompt: '7.inputs.text',
+  width: '70.inputs.width',
+  height: '70.inputs.height',
+  // Both halves of the joint latent, or `LTXVConcatAVLatent` gets a 49-frame
+  // video and a 49-frame audio track that no longer agree.
+  length: ['70.inputs.length', '71.inputs.frames_number'],
+  steps: '73.inputs.steps',
+  seed: '75.inputs.noise_seed',
+} as const;
+
+/**
+ * MiniMax H3 (text → video), pruned FL2VA at Q3_K_M.
+ *
+ * MEASURED on this M5 Pro 24GB: 608x352, 5 frames, 6 steps, 192s wall, and the
+ * frames are a coherent scene rather than the usual quantisation soup.
+ *
+ * TWO things about H3 shape this graph:
+ *
+ *  - there is NO negative prompt. `MiniMaxH3ImageToVideo` emits a single
+ *    CONDITIONING and upstream drives it with `BasicGuider`, which takes one.
+ *    The model is guidance-distilled; a second tower would cost a full pass
+ *    through a 32B text encoder to be multiplied by zero.
+ *  - `MiniMaxH3ImageToVideo` is the text-to-video node too: `first_frame` is
+ *    optional, and omitting it is how you ask for a clip from nothing. It emits
+ *    the conditioning AND the correctly-shaped empty latent together, which is
+ *    why the size lives on that node instead of an `Empty*` one.
+ *
+ * The text encoder is Qwen3-VL-32B truncated to 50 layers. The GGUF conversion
+ * carries all 64 of the original's layers and no vision tower, and both facts
+ * are fine: ComfyUI builds the 50 it wants and ignores the rest, and text-only
+ * generation never touches the vision half. Recognising that file needs
+ * `bobble_comfy_fixes`, installed with the engine.
+ */
+function minimaxH3Graph(): ComfyGraph {
+  return {
+    '38': {
+      class_type: 'CLIPLoaderGGUF',
+      inputs: { clip_name: 'MiniMax-H3-encoder-Q4_K_M.gguf', type: 'minimax' },
+    },
+    '44': {
+      class_type: 'UnetLoaderGGUF',
+      inputs: { unet_name: 'MiniMax-H3-FL2VA-Pruned-Q3_K_M.gguf' },
+    },
+    '45': {
+      class_type: 'VAELoader',
+      inputs: { vae_name: 'minimax_h3_video_vae_fp16.safetensors' },
+    },
+    '6': {
+      class_type: 'MiniMaxH3ImageToVideo',
+      inputs: {
+        clip: ['38', 0],
+        vae: ['45', 0],
+        prompt: '',
+        width: 608,
+        height: 352,
+        length: 5,
+      },
+      _meta: { title: 'Prompt + empty AV latent' },
+    },
+    '73': {
+      class_type: 'BasicScheduler',
+      inputs: { model: ['44', 0], scheduler: 'simple', steps: 6, denoise: 1 },
+    },
+    '74': { class_type: 'KSamplerSelect', inputs: { sampler_name: 'res_multistep' } },
+    '75': { class_type: 'RandomNoise', inputs: { noise_seed: 0 } },
+    '76': { class_type: 'BasicGuider', inputs: { model: ['44', 0], conditioning: ['6', 0] } },
+    '77': {
+      class_type: 'SamplerCustomAdvanced',
+      inputs: {
+        noise: ['75', 0],
+        guider: ['76', 0],
+        sampler: ['74', 0],
+        sigmas: ['73', 0],
+        latent_image: ['6', 1],
+      },
+    },
+    '8': { class_type: 'VAEDecode', inputs: { samples: ['77', 0], vae: ['45', 0] } },
+    '80': { class_type: 'CreateVideo', inputs: { images: ['8', 0], fps: 24 } },
+    '9': {
+      class_type: 'SaveVideo',
+      inputs: { video: ['80', 0], filename_prefix: 'pi-video', format: 'auto', codec: 'auto' },
+    },
+  };
+}
+
+/** H3's splice points. No `negativePrompt`: the model has no second tower. */
+const MINIMAX_H3_PARAM_MAP = {
+  prompt: '6.inputs.prompt',
+  width: '6.inputs.width',
+  height: '6.inputs.height',
+  length: '6.inputs.length',
+  steps: '73.inputs.steps',
+  seed: '75.inputs.noise_seed',
 } as const;
 
 function aceStepGraph(): ComfyGraph {
@@ -410,6 +644,16 @@ export const WORKFLOW_TEMPLATES: Readonly<Record<string, WorkflowTemplate>> = {
     graph: wanVideoGraph(),
     paramMap: WAN_PARAM_MAP,
   },
+  'ltx-2.5-distilled-gguf': {
+    id: 'ltx-2.5-distilled-gguf',
+    graph: ltx25Graph(),
+    paramMap: LTX_25_PARAM_MAP,
+  },
+  'minimax-h3-t2v-gguf': {
+    id: 'minimax-h3-t2v-gguf',
+    graph: minimaxH3Graph(),
+    paramMap: MINIMAX_H3_PARAM_MAP,
+  },
   'ace-step-music': {
     id: 'ace-step-music',
     graph: aceStepGraph(),
@@ -493,14 +737,17 @@ export function fillWorkflow(
     throw new Error(`unknown ComfyUI workflow template: "${spec.workflowTemplate}"`);
   }
   const graph = structuredClone(tmpl.graph) as unknown as Record<string, unknown>;
+  const spliceAll = (paths: string | readonly string[], value: unknown): void => {
+    for (const p of typeof paths === 'string' ? [paths] : paths) setAtPath(graph, p, value);
+  };
   for (const [param, value] of Object.entries(spec.inputs)) {
     const path = tmpl.paramMap[param];
     if (path === undefined) {
       throw new Error(`template "${tmpl.id}" has no paramMap binding for input "${param}"`);
     }
-    setAtPath(graph, path, value);
+    spliceAll(path, value);
   }
   const seedPath = tmpl.paramMap.seed;
-  if (seedPath !== undefined) setAtPath(graph, seedPath, seed);
+  if (seedPath !== undefined) spliceAll(seedPath, seed);
   return graph as unknown as ComfyGraph;
 }

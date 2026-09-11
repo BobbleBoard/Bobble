@@ -27,7 +27,12 @@ import { cacheRoot } from '@pi-desktop/inference';
 import { listStore, type StoredModel } from '@pi-desktop/model-store';
 import { registerIpcHandlers } from '@pi-desktop/shared';
 import type { IpcMain } from 'electron';
-import { comfyMainPy, comfyModelPathsYaml, writeComfyModelPaths } from '../inference/engines-main';
+import {
+  comfyMainPy,
+  comfyModelPathsYaml,
+  writeComfyModelPaths,
+  writeComfyShim,
+} from '../inference/engines-main';
 import type { StudioInvokeMap, StudioProgress } from './studio-contract';
 import { resolveWorkflow } from './studio-workflow';
 
@@ -77,6 +82,9 @@ export async function comfyOrigin(): Promise<string> {
    * it is already right, and self-healing whenever it is not.
    */
   writeComfyModelPaths();
+  // Same argument for the H3 detection shim: an install that predates it would
+  // otherwise need a reinstall to gain a file whose content is deterministic.
+  writeComfyShim();
   return supervisor().resolveOrigin();
 }
 
@@ -164,7 +172,11 @@ export function registerStudioIpc(
                 inputs: {
                   ...resolved.loaderInputs,
                   prompt: req.prompt,
-                  negativePrompt: '',
+                  // No negative prompt is sent: the studio has no field for one,
+                  // and an invented empty string is not harmless — `fillWorkflow`
+                  // rejects an input a template cannot bind, so this made every
+                  // model WITHOUT a negative tower (MiniMax H3, say) unrunnable
+                  // from the studio for the sake of a value that was always ''.
                   width: req.width ?? 512,
                   height: req.height ?? 512,
                   steps: req.steps ?? 8,

@@ -190,7 +190,10 @@ export interface ComfyBackendConfig {
   /** Id of the parameterized workflow-JSON template in the Phase-A registry. */
   readonly workflowTemplate: string;
   /** catalog param name → node-input path (e.g. `prompt` → `"6.inputs.text"`). */
-  readonly paramMap: Record<string, string>;
+  /** One input may bind to SEVERAL node inputs — a joint audio+video latent has
+   * to be told the same frame count twice, once per half, or the two will not
+   * concatenate. A bare string is the ordinary one-to-one case. */
+  readonly paramMap: Record<string, string | readonly string[]>;
 }
 
 /**

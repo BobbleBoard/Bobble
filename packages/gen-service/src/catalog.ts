@@ -25,6 +25,7 @@ export type License =
   | 'gemma' // EmbeddingGemma (Google) — Gemma terms EULA
   | 'ltx-2-community'
   | 'tencent-community'
+  | 'minimax-community'
   | 'stability-community'
   | 'research-nc';
 
@@ -61,6 +62,16 @@ export interface ModalityModel {
   readonly commercialUse: boolean;
   /** Approx on-disk size (GB) at the listed quantization. */
   readonly approxSizeGB: number;
+  /**
+   * Peak RESIDENT size (GB), when it is smaller than the download.
+   *
+   * A single checkpoint is all in memory at once, so its floor is its size. A
+   * staged pipeline is not: ComfyUI loads a text encoder, encodes, frees it, and
+   * only then loads the transformer, so a 36GB download can peak at 20GB. Set
+   * this ONLY from a measured run — it is what decides whether a machine is
+   * offered the model at all, and guessing it low turns into a swap-storm.
+   */
+  readonly peakResidentGB?: number;
   /**
    * Minimum unified-memory (GB) hint to hold this entry at its listed quant
    * (≈ weights + ~1GB headroom). The model manager uses it to auto-prefer the
@@ -577,6 +588,68 @@ export const MODALITY_CATALOG: readonly ModalityModel[] = [
     },
     notes:
       'Most Mac-realistic diffusion text→video pick: Apache (commercial-clean, NO gate), ~1.3B, runs via native ComfyUI. MEASURED on an M5 Pro 24GB: 416x416, 33 frames (2.06s at 16fps), 20 steps, 178s wall — umt5-xxl fp16 (11GB) + a 2.6GB unet + a 242MB VAE, and fp8 is not an option because MPS refuses the cast. No longer reserved: this graph has run.',
+  },
+  {
+    id: 'ltx-2.5-distilled',
+    modality: 'video',
+    label: 'LTX-2.5 22B distilled (video + audio)',
+    backend: 'comfyui',
+    repo: 'Lightricks/LTX-2.5',
+    license: 'ltx-2-community',
+    commercialUse: false,
+    approxSizeGB: 25,
+    // The encoder (15.4GB) and the transformer (7.3GB at Q2_K) are never
+    // resident together — ComfyUI frees the first before loading the second.
+    peakResidentGB: 16,
+    minUnifiedMemoryGB: 24,
+    runsLocally: true,
+    heavy: true,
+    recommended: true,
+    comfy: {
+      kind: 'comfyui',
+      workflowTemplate: 'ltx-2.5-distilled-gguf',
+      paramMap: {
+        prompt: '6.inputs.text',
+        negativePrompt: '7.inputs.text',
+        width: '70.inputs.width',
+        height: '70.inputs.height',
+        length: ['70.inputs.length', '71.inputs.frames_number'],
+        steps: '73.inputs.steps',
+        seed: '75.inputs.noise_seed',
+      },
+    },
+    notes:
+      "The best local video on this machine, and the only one that comes out with SOUND — the sampler runs on a joint audio+video latent and two decoders pull it apart. MEASURED on an M5 Pro 24GB: 640x352, 49 frames (2s at 24fps), 8 steps — 326s at Q4_K_M and 195s at Q2_K, with a real 48kHz track either way. Q2_K is soft and Q4_K_M is photographic, so the quant is the quality dial here, not the step count. The weights are a 22B transformer as GGUF plus a Gemma-4-12B encoder WITH a projection head: the only GGUF of that encoder is gated, so this uses the ungated int8+convrot safetensors, which falls to ComfyUI's eager quantised path on a machine with no CUDA and runs fine. Upstream adds a second latent-upscaler pass for sharpness; this template is stage one. LTX-2.x community EULA.",
+  },
+  {
+    id: 'minimax-h3',
+    modality: 'video',
+    label: 'MiniMax H3 (pruned, Q3)',
+    backend: 'comfyui',
+    repo: 'Comfy-Org/MiniMax-H3',
+    license: 'minimax-community',
+    commercialUse: false,
+    approxSizeGB: 36,
+    // Peak is the text-encoder stage alone (19.8GB); the 8.9GB transformer
+    // loads after it is freed. MEASURED: the whole job fits 24GB.
+    peakResidentGB: 20,
+    minUnifiedMemoryGB: 24,
+    runsLocally: true,
+    heavy: true,
+    comfy: {
+      kind: 'comfyui',
+      workflowTemplate: 'minimax-h3-t2v-gguf',
+      paramMap: {
+        prompt: '6.inputs.prompt',
+        width: '6.inputs.width',
+        height: '6.inputs.height',
+        length: '6.inputs.length',
+        steps: '73.inputs.steps',
+        seed: '75.inputs.noise_seed',
+      },
+    },
+    notes:
+      "MEASURED on an M5 Pro 24GB: 608x352, 5 frames, 6 steps, 192s — a coherent scene, not quantisation soup. Runs at all only because of two size choices: the FL2VA transformer PRUNED and quantised to Q3_K_M (8.9GB against 66GB at bf16), and the Qwen3-VL-32B text encoder as a Q4_K_M GGUF (19.8GB against 27GB for the smallest official int8, which does not fit 24GB). That GGUF has no vision tower — llama.cpp splits it into a separate mmproj — and ComfyUI identifies this encoder BY a vision key, so recognising it needs the `bobble_comfy_fixes` shim the engine installs; text-to-video never uses the vision half. No negative prompt: H3 is guidance-distilled and its conditioning node emits one tower. MiniMax's own terms (HF `license: other`) — read them before commercial use.",
   },
   {
     id: 'ltx-video-2b-distilled',

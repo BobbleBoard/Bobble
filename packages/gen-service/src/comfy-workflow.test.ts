@@ -119,9 +119,13 @@ describe('workflow registry ↔ catalog consistency', () => {
 
   it('every template graph node referenced by a paramMap path exists in the graph', () => {
     for (const tmpl of Object.values(WORKFLOW_TEMPLATES)) {
-      for (const path of Object.values(tmpl.paramMap)) {
-        const nodeId = path.split('.')[0] ?? '';
-        expect(tmpl.graph[nodeId], `${tmpl.id} missing node ${nodeId}`).toBeDefined();
+      for (const binding of Object.values(tmpl.paramMap)) {
+        // A binding is one path or several — several is how a joint audio+video
+        // latent gets told its frame count once per half.
+        for (const path of typeof binding === 'string' ? [binding] : binding) {
+          const nodeId = path.split('.')[0] ?? '';
+          expect(tmpl.graph[nodeId], `${tmpl.id} missing node ${nodeId}`).toBeDefined();
+        }
       }
     }
   });

@@ -114,6 +114,37 @@ async function pick(win, testid, labelRe) {
   return text.trim();
 }
 
+/**
+ * Steps and Seed are NUMBER FIELDS behind the gears, not pickers on the rail.
+ *
+ * `pick` was being used for them, and `pick` clicks its target and then looks
+ * for a `menuitemradio` — so on an `<input type=number>` it found no menu and
+ * reported null, which read as "no such setting" rather than "wrong kind of
+ * control". Worse, the Advanced knobs live in a DIALOG that is not mounted until
+ * the gears are pressed, so the locator matched nothing at all and a run went
+ * out filmed as "settings exercised" with the studio on its defaults.
+ *
+ * This opens the dialog, types, and READS THE VALUE BACK, so the caller can
+ * refuse to film when what the studio holds is not what was asked for.
+ */
+async function setNumber(win, testid, value) {
+  const field = () => win.locator(`[data-testid="${testid}"]`);
+  if ((await field().count()) === 0) {
+    const gears = win.locator('[data-testid="studio-advanced-toggle"]');
+    if ((await gears.count()) === 0) return null;
+    await gears.click();
+    await win.waitForTimeout(500);
+  }
+  if ((await field().count()) === 0) return null;
+  await field().fill(String(value));
+  await win.waitForTimeout(250);
+  const back = await field().inputValue();
+  // Leave the dialog closed so it is not sitting over the film.
+  await win.keyboard.press('Escape');
+  await win.waitForTimeout(400);
+  return back;
+}
+
 let frames = 0;
 let filming = true;
 async function film(win) {
@@ -218,10 +249,15 @@ try {
   if (process.env.SECONDS !== undefined) {
     applied.seconds = await pick(win, `${STUDIO}-seconds`, new RegExp(`^${process.env.SECONDS}`));
   }
-  if (STEPS !== '')
-    applied.steps = await pick(win, `${STUDIO}-steps-rail`, new RegExp(`^${STEPS}$`));
-  if (SEED !== '') applied.seed = await pick(win, `${STUDIO}-seed-rail`, new RegExp(SEED, 'i'));
+  if (STEPS !== '') applied.steps = await setNumber(win, `${STUDIO}-steps-rail`, STEPS);
+  if (SEED !== '') applied.seed = await setNumber(win, `${STUDIO}-seed-rail`, SEED);
   say(`settings: ${JSON.stringify(applied)}`);
+  if ((STEPS !== '' && applied.steps !== STEPS) || (SEED !== '' && applied.seed !== SEED)) {
+    throw new Error(
+      `asked for steps=${STEPS} seed=${SEED} but the studio reads back ` +
+        `${JSON.stringify(applied)} — refusing to film a run and call the settings applied`,
+    );
+  }
 
   await win.click('[data-testid="studio-prompt"]');
   await win.keyboard.type(PROMPT, { delay: 8 });
