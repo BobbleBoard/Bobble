@@ -378,6 +378,28 @@ function ensureChild(): UtilityProcess {
  * which runs BEFORE `app.exit()`. `app.exit()` does not emit `will-quit`, so the
  * `will-quit` handler below is only a backstop for quit paths that bypass the hold.
  */
+/**
+ * Download a catalog model by id, for a caller that is not the model screen.
+ *
+ * The Connectors page installs a MODEL connector (OmniSVG) by fetching the
+ * model behind it, and the fetch has always lived in the inference utility
+ * process behind this file's private `request`. Progress reaches the renderer
+ * the same way the model screen's does — `llm:download-progress` — so the
+ * connector card can show the same bar without a second mechanism.
+ */
+export async function downloadCatalogModel(
+  modelId: string,
+): Promise<{ success: boolean; error?: string; cancelled?: boolean }> {
+  return request({ type: 'download-model', modelId });
+}
+
+/** Remove a catalog model's files — a MODEL connector's uninstall. */
+export async function deleteCatalogModel(
+  modelId: string,
+): Promise<{ success: boolean; error?: string }> {
+  return request({ type: 'delete-model', modelId });
+}
+
 export async function shutdownInference(timeoutMs = 1500): Promise<void> {
   const proc = child;
   if (proc === null) return;

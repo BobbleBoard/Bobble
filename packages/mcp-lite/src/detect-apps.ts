@@ -16,7 +16,7 @@
 import { execFileSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { BUILTIN_CONNECTORS } from './builtin-connectors';
+import { BUILTIN_CONNECTORS, MODEL_CONNECTORS } from './builtin-connectors';
 import { CONNECTOR_ICON_SVGS } from './connector-icons';
 import type { McpMode, McpServerConfig } from './registry';
 
@@ -72,7 +72,16 @@ export interface KnownConnector {
    * that is always on and never spawns a server). Absent ⇒ `'mcp'`. A builtin is
    * not necessarily authored by us — see {@link firstParty}.
    */
-  kind?: 'mcp' | 'builtin';
+  kind?: 'mcp' | 'builtin' | 'model';
+  /**
+   * For `kind:'model'`: the catalog id of the model this connector IS. Such a
+   * connector never runs a server and never enters the registry — installing it
+   * downloads that model, its state is whether the files are on disk, and its
+   * tools are pi tools that are always registered and simply refuse until the
+   * download has happened. OmniSVG is the first: `svg` is only ever as
+   * available as the 5 GB behind it.
+   */
+  modelId?: string;
   /**
    * Authored by us (Pi Desktop) — drives the gallery's "By us" section. Distinct
    * from both {@link official} (the vendor's own server, e.g. GitHub's) and

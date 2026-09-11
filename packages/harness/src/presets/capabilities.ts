@@ -186,6 +186,17 @@ export const CAPABILITIES: readonly Capability[] = [
     ],
   },
   {
+    name: 'svg',
+    summary: 'Make an SVG — a vector drawing — from a description, a reference image, or both.',
+    guidance:
+      'Use for icons, logos, symbols and simple flat illustrations where the deliverable is a ' +
+      'vector file. Describe the shape and colour plainly; hand it a reference image to trace. ' +
+      'For a raster picture use generation instead.',
+    /* One tool, and in CLI mode it IS the command: `svg <prompt> --image <path>`
+       (tool-cli.ts maps generate_svg to an empty path under this group). */
+    tools: ['generate_svg'],
+  },
+  {
     name: 'connectors',
     summary: 'Anything reachable over MCP — Notion, Slack, Jira, and whatever else is installed.',
     guidance:

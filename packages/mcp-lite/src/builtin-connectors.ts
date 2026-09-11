@@ -70,6 +70,47 @@ function macConnector(
  * extension) are DISCOVERABLE in the gallery. Tool names mirror
  * `@pi-desktop/mac-connectors/tool-names`.
  */
+/**
+ * OmniSVG — a MODEL connector (`kind:'model'`). the user: "add a connector that's
+ * for this model ... the connector can just be called OmniSVG, for making svgs,
+ * and then a simple cli tool ... svg <optional prompt> --image <optional
+ * reference image path(s)>".
+ *
+ * Installing it downloads `omnisvg-1.1-4b` (a Q8_0 GGUF plus its vision tower,
+ * ~5.1 GB) into the ordinary models directory. Nothing else changes: the
+ * `generate_svg` tool is registered whether or not the files are there, and
+ * says so plainly when they are not. In CLI mode the tool IS the `svg` command.
+ */
+export const OMNISVG_CONNECTOR: KnownConnector = {
+  id: 'omnisvg',
+  name: 'OmniSVG',
+  icon: '✒️',
+  category: 'design',
+  description:
+    'Make SVGs — icons, logos, symbols, flat illustrations — from a description or by tracing ' +
+    'a reference image. Runs on-device (OmniSVG 1.1, Apache-2.0). Downloads ~5 GB once.',
+  homepage: 'https://github.com/OmniSVG/OmniSVG',
+  kind: 'model',
+  modelId: 'omnisvg-1.1-4b',
+  firstParty: true,
+  official: false,
+  popular: true,
+  tools: [
+    {
+      name: 'generate_svg',
+      description:
+        'svg <prompt> --image <path> — an SVG from a description, a reference image, or both.',
+    },
+  ],
+  template: {
+    id: 'omnisvg',
+    name: 'OmniSVG',
+    icon: '✒️',
+    description: 'SVG generation, on-device.',
+    command: '',
+  },
+};
+
 export const MAC_CONNECTORS: KnownConnector[] = [
   macConnector({
     id: 'mac-calendar',
@@ -197,3 +238,11 @@ export const BUILTIN_CONNECTORS: KnownConnector[] = [
 
 /** Ids of the built-in connectors (stable set). */
 export const BUILTIN_CONNECTOR_IDS: readonly string[] = BUILTIN_CONNECTORS.map((c) => c.id);
+
+/**
+ * Model connectors — installable, but not servers. Kept apart from
+ * {@link BUILTIN_CONNECTORS} on purpose: "builtin" means preinstalled and
+ * never installed, and the tests hold that line. These are merged to the front
+ * of the catalog beside the builtins.
+ */
+export const MODEL_CONNECTORS: KnownConnector[] = [OMNISVG_CONNECTOR];

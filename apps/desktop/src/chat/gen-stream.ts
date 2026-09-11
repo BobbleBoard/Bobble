@@ -92,6 +92,16 @@ export function useGenStream(): void {
     const unsubOpen = bridge.onEvent('gen:open', ({ tabId, payload }) => {
       open(jobFromPayload(tabId, payload, Date.now()));
     });
+    /* A generated file that IS the deliverable (an SVG): open it as a file tab,
+       the way the file tree or `present` would, so it renders as itself. */
+    const unsubOpenFile = bridge.onEvent('gen:open-file', ({ path }) => {
+      /* Imported lazily: both modules reach for `window` when they load, and
+         this file is unit-tested under node. Same pattern as llm-store's
+         vision hook. */
+      void Promise.all([import('../state/canvas-store'), import('./canvas/file-tabs')]).then(
+        ([canvas, tabs]) => tabs.openFileInCanvas(canvas.getCanvasController() as never, path),
+      );
+    });
     const unsubUpdate = bridge.onEvent('gen:update', ({ tabId, payload }) => {
       const existing = useGenLive.getState().jobs[tabId];
       if (existing === undefined) {
@@ -117,6 +127,7 @@ export function useGenStream(): void {
 
     return () => {
       unsubOpen();
+      unsubOpenFile();
       unsubUpdate();
     };
   }, []);

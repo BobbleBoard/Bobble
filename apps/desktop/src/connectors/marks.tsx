@@ -16,12 +16,14 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  IconDownload,
   IconMore,
   IconPlus,
   Spinner,
   Tooltip,
 } from '@pi-desktop/ui';
 import type { JSX, ReactNode } from 'react';
+import { useLlmStore } from '../state/llm-store';
 import { ConnectorIcon } from './ConnectorIcon';
 import {
   type Actions,
@@ -293,8 +295,36 @@ export function RowControl({
   /** Open the detail with its remove confirm already armed. */
   onRemove?: () => void;
 }): JSX.Element | null {
+  const isModel = item.kind === 'connector' && item.connector.kind === 'model';
+  /*
+   * A MODEL CONNECTOR IS A DOWNLOAD, AND SAYS SO.
+   *
+   * "+" reads as "add this", which is what every other card does in a
+   * millisecond. OmniSVG's install fetches ~5 GB, and a person deciding whether
+   * to click deserves that number before, and the progress during — the same
+   * bar the model screen draws, because it is the same download.
+   */
+  if (isModel && busy) return <ModelDownloadMark modelId={item.connector.modelId ?? ''} />;
   if (busy) return <Spinner size={16} />;
   if (item.state === 'builtin') return null;
+  if (isModel && item.state === 'available') {
+    const label = `Download ${item.name} (about 5 GB, once)`;
+    return (
+      <Tooltip label="Download the model — about 5 GB, once">
+        <button
+          type="button"
+          className="pdc-ctl pd-focusable"
+          aria-label={label}
+          data-testid={`connector-download-${item.id}`}
+          onClick={() => {
+            if (item.kind === 'connector') void actions.add(item);
+          }}
+        >
+          <IconDownload size={16} />
+        </button>
+      </Tooltip>
+    );
+  }
   if (item.state === 'available') {
     const asks = item.kind === 'connector' && needsConfig(item.connector);
     const label =
@@ -404,5 +434,29 @@ function RowMenu({
         ) : null}
       </DropdownMenuContent>
     </DropdownMenu>
+  );
+}
+
+/**
+ * The download behind a model connector, while it runs: a percentage from the
+ * same `llm:download-progress` stream the model screen reads, so the number
+ * here and the number there can never disagree. A spinner until the first
+ * byte, because "0%" sitting still reads as stuck.
+ */
+function ModelDownloadMark({ modelId }: { modelId: string }): JSX.Element {
+  const download = useLlmStore((s) => s.download);
+  const mine = download !== null && download.modelId === modelId ? download : null;
+  const pct = mine?.fraction == null ? null : Math.round(mine.fraction * 100);
+  if (pct === null) return <Spinner size={16} />;
+  return (
+    <Tooltip label={`Downloading ${mine?.file ?? modelId} — ${pct}%`}>
+      <span
+        className="pdc-ctl pdc-ctl--progress"
+        aria-live="polite"
+        aria-label={`Downloading, ${pct}%`}
+      >
+        {pct}%
+      </span>
+    </Tooltip>
   );
 }

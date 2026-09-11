@@ -108,6 +108,15 @@ export function IconPlus(props: IconProps) {
   );
 }
 
+/** An arrow into a tray: fetch something and keep it. Pairs with IconArrowUp. */
+export function IconDownload(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M8 2.5v7.5M4.5 7L8 10.5 11.5 7M3 12.5h10" />
+    </Icon>
+  );
+}
+
 export function IconArrowUp(props: IconProps) {
   return (
     <Icon {...props}>

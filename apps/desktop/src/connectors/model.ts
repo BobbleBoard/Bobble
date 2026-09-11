@@ -106,8 +106,14 @@ export function isSecretField(c: KnownConnector, field: string): boolean {
   return (c.requiresEnv ?? []).includes(field);
 }
 
-function connectorState(c: KnownConnector, server: McpServerConfig | undefined): ItemState {
+function connectorState(
+  c: KnownConnector,
+  server: McpServerConfig | undefined,
+  installedModels: ReadonlySet<string> = new Set(),
+): ItemState {
   if (c.kind === 'builtin') return 'builtin';
+  /* A model connector is never in the registry; its files are its install. */
+  if (c.kind === 'model') return installedModels.has(c.id) ? 'on' : 'available';
   if (server === undefined) return 'available';
   if (server.enabled !== false) return 'on';
   return unfilled(c, server).length > 0 ? 'needs-setup' : 'off';
@@ -430,6 +436,7 @@ export function isRemote(server: Pick<McpServerConfig, 'args'>): boolean {
  * unknown or hand-added server derives one from its first tool.
  */
 const EXAMPLE_PROMPT: Record<string, string> = {
+  omnisvg: 'Make me an SVG icon of a red heart with smooth curved edges, centered.',
   filesystem: 'List the files in my Projects folder and summarise what each project is.',
   git: 'What changed in this repo in the last week? Summarise the commits.',
   memory:
@@ -1098,6 +1105,7 @@ export interface Catalog {
 export function useCatalog(): Catalog {
   const registry = useConnectorsStore((s) => s.registry);
   const catalog = useConnectorsStore((s) => s.catalog);
+  const installedModels = useConnectorsStore((s) => s.installedModels);
   const recommended = useConnectorsStore((s) => s.recommended);
   const loaded = useConnectorsStore((s) => s.loaded);
   const busy = useConnectorsStore((s) => s.busyId);
@@ -1122,6 +1130,7 @@ export function useCatalog(): Catalog {
       const f = failuresById.get(server.id);
       return f !== undefined && f !== null && f.cmd === commandLine(server) ? f : undefined;
     };
+    const installedModelIds = new Set(installedModels);
     const connectors: ConnectorItem[] = catalog.map((c) => {
       const server = installedServer(registry, c.id);
       return {
@@ -1131,7 +1140,7 @@ export function useCatalog(): Catalog {
         description: c.description,
         connector: c,
         server,
-        state: connectorState(c, server),
+        state: connectorState(c, server, installedModelIds),
         reason: reasons.get(c.id),
         failure: server !== undefined ? failureOf(server) : undefined,
       };
@@ -1178,6 +1187,7 @@ export function useCatalog(): Catalog {
   }, [
     registry,
     catalog,
+    installedModels,
     recommended,
     loaded,
     busy,

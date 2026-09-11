@@ -252,6 +252,11 @@ function allModels(): CatalogModel[] {
   const byId = new Map<string, CatalogModel>();
   for (const m of CATALOG) {
     if (!mlxOk && modelEngine(m) === 'mlx') continue;
+    /* A tool's private model (OmniSVG) is not a thing to talk to: it stays out
+       of every list this feeds — the picker, the quick menu, the model screen,
+       pi's registration. `getModel` still resolves it by id, which is all a
+       download or the `svg` command needs. */
+    if (m.purpose !== undefined && m.purpose !== 'chat') continue;
     byId.set(m.id, m);
   }
   for (const m of hfModels.values()) if (!byId.has(m.id)) byId.set(m.id, m);

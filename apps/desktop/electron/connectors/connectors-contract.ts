@@ -45,7 +45,16 @@ export type ConnectorsInvokeMap = {
   /** The configured registry (mode + servers) plus the full catalog of cards. */
   'connectors:list': {
     request: undefined;
-    response: { registry: McpRegistryConfig; catalog: KnownConnector[] };
+    response: {
+      registry: McpRegistryConfig;
+      catalog: KnownConnector[];
+      /**
+       * Ids of `kind:'model'` connectors whose model files are on disk. A model
+       * connector never enters the registry (it is not a server), so this is its
+       * installed state — the files ARE the install.
+       */
+      installedModels: string[];
+    };
   };
   /** Run the /Applications scan → recommended (app-mapped, pinned) + detected. */
   'connectors:scan': {

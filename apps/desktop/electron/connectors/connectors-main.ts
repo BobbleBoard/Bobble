@@ -9,7 +9,10 @@
  * through the settings surface (settings:set → applyMcpMode), keeping the two
  * files coherent. Trusted-sender gated like the other app channels.
  */
+import { existsSync } from 'node:fs';
 import * as os from 'node:os';
+import path from 'node:path';
+import { getCatalogModel, modelDir } from '@pi-desktop/inference';
 import {
   ConnectorHost,
   connectorNeedsConfig,
@@ -19,6 +22,7 @@ import {
   isBuiltinConnector,
   KNOWN_CONNECTORS,
   KNOWN_CONNECTORS_BY_ID,
+  type KnownConnector,
   loadRegistry,
   type McpRegistryConfig,
   type McpServerConfig,
@@ -34,6 +38,7 @@ import {
 } from '@pi-desktop/mcp-lite';
 import { createLogger, type IpcHandlers, registerIpcHandlers } from '@pi-desktop/shared';
 import type { IpcMain } from 'electron';
+import { deleteCatalogModel, downloadCatalogModel } from '../inference/llm-main';
 import type { ConnectorsInvokeMap, ConnectorToolListing } from './connectors-contract';
 
 const log = createLogger('desktop:connectors');
@@ -120,18 +125,59 @@ async function listTools(server: McpServerConfig): Promise<ConnectorToolListing>
   }
 }
 
+/** Are a model connector's files on disk? The whole of its installed state. */
+function modelFilesPresent(c: KnownConnector): boolean {
+  const model = c.modelId === undefined ? undefined : getCatalogModel(c.modelId);
+  if (model === undefined) return false;
+  const dir = modelDir(model.id);
+  const wanted = [model.files[0]?.name, model.mmproj?.name].filter(
+    (n): n is string => n !== undefined,
+  );
+  return wanted.length > 0 && wanted.every((n) => existsSync(path.join(dir, n)));
+}
+
 const handlers: IpcHandlers<ConnectorsInvokeMap> = {
-  'connectors:list': () => ({ registry: read(), catalog: KNOWN_CONNECTORS }),
+  'connectors:list': () => ({
+    registry: read(),
+    catalog: KNOWN_CONNECTORS,
+    installedModels: KNOWN_CONNECTORS.filter((c) => c.kind === 'model' && modelFilesPresent(c)).map(
+      (c) => c.id,
+    ),
+  }),
 
   'connectors:scan': () => {
     const env = scanEnv();
     return { recommended: recommendedConnectors(env), detected: detectedSuggestions(env) };
   },
 
-  'connectors:install': (req) => {
+  'connectors:install': async (req) => {
     const connector = KNOWN_CONNECTORS_BY_ID[req.id];
     if (connector === undefined) {
       return { registry: read(), error: `Unknown connector "${req.id}"` };
+    }
+    /*
+     * A MODEL CONNECTOR INSTALLS BY DOWNLOADING ITS MODEL, and nothing else.
+     *
+     * It never enters the registry: the registry is what `connectAll` spawns at
+     * startup, and a "server" with an empty command would be a phantom error on
+     * every launch. The files on disk are the install — `connectors:list`
+     * reports them as `installedModels` — so this awaits the fetch and returns
+     * only when the card can honestly turn on. Progress streams to the renderer
+     * as `llm:download-progress`, the same event the model screen draws.
+     */
+    if (connector.kind === 'model') {
+      const modelId = connector.modelId ?? '';
+      if (modelId === '') return { registry: read(), error: `"${req.id}" names no model` };
+      const r = await downloadCatalogModel(modelId);
+      if (!r.success) {
+        log.warn('model connector download failed', { id: req.id, error: r.error });
+        return {
+          registry: read(),
+          error: r.error ?? (r.cancelled ? 'download cancelled' : 'download failed'),
+        };
+      }
+      log.info('model connector installed', { id: req.id, modelId });
+      return { registry: read() };
     }
     // Builtins (HyperFrames, Video editing) are always on — never a server in
     // the registry. Installing one is a no-op so the gallery's "Preinstalled"
@@ -150,15 +196,24 @@ const handlers: IpcHandlers<ConnectorsInvokeMap> = {
 
   'connectors:upsert': (req) => ({ registry: write(upsertServer(read(), req.server)) }),
 
-  'connectors:remove': (req) => {
+  'connectors:remove': async (req) => {
     // Builtins can't be removed — guard so a stray remove is inert.
     if (isBuiltinConnector(req.id)) return { registry: read() };
+    // A model connector's uninstall is deleting its model files.
+    const model = KNOWN_CONNECTORS_BY_ID[req.id];
+    if (model?.kind === 'model' && model.modelId !== undefined) {
+      await deleteCatalogModel(model.modelId);
+      return { registry: read() };
+    }
     return { registry: write(removeServer(read(), req.id)) };
   },
 
   'connectors:set-enabled': (req) => {
-    // Builtins are always on; toggling them is a no-op.
-    if (isBuiltinConnector(req.id)) return { registry: read() };
+    // Builtins are always on; toggling them is a no-op. So is a model connector:
+    // it is on exactly when its files exist, and off is "remove".
+    if (isBuiltinConnector(req.id) || KNOWN_CONNECTORS_BY_ID[req.id]?.kind === 'model') {
+      return { registry: read() };
+    }
     return { registry: write(setServerEnabled(read(), req.id, req.enabled)) };
   },
 
@@ -167,6 +222,9 @@ const handlers: IpcHandlers<ConnectorsInvokeMap> = {
     // or an uninstalled card (don't spawn something the user hasn't added).
     if (isBuiltinConnector(req.id)) {
       return { tools: [], error: `"${req.id}" is a built-in (no live server)` };
+    }
+    if (KNOWN_CONNECTORS_BY_ID[req.id]?.kind === 'model') {
+      return { tools: [], error: `"${req.id}" is a model (no live server)` };
     }
     const server = read().servers.find((s) => s.id === req.id);
     if (server === undefined) return { tools: [], error: `"${req.id}" is not installed` };

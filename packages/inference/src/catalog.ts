@@ -300,6 +300,16 @@ export interface CatalogModel {
   readonly publisher?: ModelPublisher;
   /** Coarse tier hint for grouping/sorting in the model manager. */
   readonly tier?: ModelTier;
+  /**
+   * What the model is FOR. Undefined means a chat model — the picker, the
+   * quick menu and the model screen list it, pi registers it, a session can
+   * select it. Anything else is a tool's private model: it downloads through
+   * the same machinery and lives in the same directory, but never appears as a
+   * thing to talk to. OmniSVG is the first — a Qwen2.5-VL fine-tune whose
+   * entire output is SVG tokens, useless as a conversation partner and exactly
+   * right behind the `svg` command.
+   */
+  readonly purpose?: 'chat' | 'svg';
   /** True when the quants are split into multiple shards (needs shard-join on
    * download/launch — a follow-up; reserved entries only for now). */
   readonly sharded?: boolean;
@@ -1265,7 +1275,65 @@ const NANBEIGE42_3B: CatalogModel = {
   quantRange: 'IQ2_M–Q8_0',
 };
 
+// ---------------------------------------------------------------------------
+// OmniSVG — a tool's model, not a chat model (`purpose: 'svg'`).
+// ---------------------------------------------------------------------------
+
+/**
+ * OmniSVG 1.1 4B — text/image → SVG. Qwen2.5-VL-3B with its vocabulary grown to
+ * 197,000 entries: everything it generates is an SVG token (command,
+ * coordinate on a 200×200 grid, arc parameter, 12-bit colour), decoded by
+ * `@pi-desktop/gen-service`'s `decodeOmniSvg`, which is checked byte-for-byte
+ * against the authors' own decoder.
+ *
+ * Converted here from the authors' PyTorch checkpoint (state dict → HF layout →
+ * llama.cpp `convert_hf_to_gguf.py` at the app's pinned release → Q8_0), with
+ * the GGUF's eos set to their end-of-SVG token (196999) rather than the chat
+ * template's <|im_end|>, so the server stops where the model does. The 45k
+ * SVG ids ride along as `[PADn]` tokens — llama.cpp pads a vocab gap that way —
+ * and the server hands back ids with `return_tokens`. MEASURED on this M5 Pro:
+ * 5s load, 58-66 tok/s, a heart in 23 tokens. bf16 was needed for the
+ * PyTorch reference (fp16 on Metal returned a black square); Q8 matches it.
+ *
+ * Text-only conversions of the 8B exist on the Hub; this 4B build with its
+ * vision tower (mmproj) for image-to-SVG is ours. Apache-2.0 upstream.
+ */
+export const OMNISVG_1_1_4B: CatalogModel = {
+  id: 'omnisvg-1.1-4b',
+  displayName: 'OmniSVG 1.1 4B',
+  hfRepo: 'Lavanuke/OmniSVG1.1_4B-GGUF',
+  baseRepo: 'OmniSVG/OmniSVG1.1_4B',
+  files: [
+    {
+      name: 'OmniSVG1.1_4B-Q8_0.gguf',
+      bytes: 3_813_241_984,
+      quant: 'Q8_0',
+      sha256: 'bf9ff5a186c86d0654f28c8da101cf167b4d3776bf8277e2ad433d9a9f192fd6',
+    },
+  ],
+  mmproj: {
+    name: 'mmproj-OmniSVG1.1_4B-F16.gguf',
+    bytes: 1_338_428_000,
+    quant: 'F16',
+    sha256: 'fcb8d6a6b850d389c4906538214adf617735827c65096f56005e7f0856fdff25',
+  },
+  license: 'Apache-2.0',
+  minRamGB: 8,
+  contextWindow: 4_096,
+  input: ['text', 'image'],
+  verified: true,
+  engine: 'llamacpp',
+  // The GGUF lives on the user's account (our conversion); the upstream is
+  // `baseRepo`. A personal account is not on the reliable-publisher list, and
+  // that is the truthful value: this quant is ours, not OmniSVG's.
+  publisher: { handle: 'Lavanuke', reliable: false },
+  tier: 'fast',
+  purpose: 'svg',
+  quantRange: 'Q8_0',
+};
+
 export const CATALOG: readonly CatalogModel[] = [
+  OMNISVG_1_1_4B,
   GEMMA4_E2B,
   GEMMA4_E4B,
   GEMMA4_12B,

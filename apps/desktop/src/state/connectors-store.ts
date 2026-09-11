@@ -21,6 +21,8 @@ import type { ConnectorToolListing } from '../../electron/connectors/connectors-
 interface ConnectorsStoreState {
   registry: McpRegistryConfig;
   catalog: KnownConnector[];
+  /** Ids of model connectors whose files are on disk — their installed state. */
+  installedModels: string[];
   recommended: ConnectorSuggestion[];
   detected: ConnectorSuggestion[];
   loaded: boolean;
@@ -57,6 +59,7 @@ const EMPTY_REGISTRY: McpRegistryConfig = { version: 1, mode: 'lite', servers: [
 export const useConnectorsStore = create<ConnectorsStoreState>((set) => ({
   registry: EMPTY_REGISTRY,
   catalog: [],
+  installedModels: [],
   recommended: [],
   detected: [],
   loaded: false,
@@ -70,6 +73,7 @@ export const useConnectorsStore = create<ConnectorsStoreState>((set) => ({
     set({
       registry: list.registry,
       catalog: list.catalog,
+      installedModels: list.installedModels ?? [],
       recommended: scan.recommended,
       detected: scan.detected,
       loaded: true,
@@ -84,8 +88,12 @@ export const useConnectorsStore = create<ConnectorsStoreState>((set) => ({
   install: async (id) => {
     set({ busyId: id });
     try {
-      const { registry } = await window.piDesktop.invoke('connectors:install', { id });
-      set({ registry });
+      const { registry, error } = await window.piDesktop.invoke('connectors:install', { id });
+      /* A model connector's install is a download; its state is the files, which
+         only a fresh list reports. Re-list rather than guess. */
+      const list = await window.piDesktop.invoke('connectors:list', undefined);
+      set({ registry, installedModels: list.installedModels ?? [] });
+      if (error !== undefined && error !== '') throw new Error(error);
     } finally {
       set({ busyId: null });
     }
@@ -95,7 +103,8 @@ export const useConnectorsStore = create<ConnectorsStoreState>((set) => ({
     set({ busyId: id });
     try {
       const { registry } = await window.piDesktop.invoke('connectors:remove', { id });
-      set({ registry });
+      const list = await window.piDesktop.invoke('connectors:list', undefined);
+      set({ registry, installedModels: list.installedModels ?? [] });
     } finally {
       set({ busyId: null });
     }

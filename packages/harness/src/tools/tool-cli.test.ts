@@ -447,3 +447,52 @@ describe('the notation the snapshot prints', () => {
     expect(call('browser click --index 7')).toMatchObject({ args: { index: 7 } });
   });
 });
+
+describe('svg — a group whose one tool IS the command', () => {
+  /* the user: "svg <optional prompt> --image <optional reference image path(s)>".
+     generate_svg maps to an empty path under the `svg` group, so the group
+     name is the whole command and the prompt is its positional. */
+  const svgTools: CliTool[] = [
+    {
+      name: 'generate_svg',
+      description: 'Make an SVG.',
+      parameters: {
+        type: 'object',
+        properties: {
+          prompt: { type: 'string' },
+          image: { type: 'string' },
+          candidates: { type: 'number' },
+        },
+      },
+    },
+  ];
+  const svgCli = buildCli(
+    [{ name: 'svg', summary: 'Make an SVG.', tools: ['generate_svg'] }],
+    svgTools,
+  );
+  const call = (line: string) => resolveCli(svgCli, line.split(' ').filter(Boolean));
+
+  it('is reached as `svg`, with no sub-word', () => {
+    expect(commandNameFor('svg')).toBe('svg');
+    expect(pathFor('svg', 'generate_svg')).toEqual([]);
+  });
+
+  it('takes the prompt as the positional', () => {
+    expect(call('svg a red heart')).toMatchObject({
+      kind: 'call',
+      tool: 'generate_svg',
+      args: { prompt: 'a red heart' },
+    });
+  });
+
+  it('takes a reference image as a flag, with or without a prompt', () => {
+    expect(call('svg --image ref.png')).toMatchObject({
+      kind: 'call',
+      args: { image: 'ref.png' },
+    });
+    expect(call('svg a fox --image ref.png')).toMatchObject({
+      kind: 'call',
+      args: { prompt: 'a fox', image: 'ref.png' },
+    });
+  });
+});

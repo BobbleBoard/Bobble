@@ -83,6 +83,13 @@ export interface GenSurfacePayload {
 export type GenEventMap = {
   /** A job has started: its first surface state. `tabId` is the stream's id. */
   'gen:open': { tabId: string; payload: GenSurfacePayload };
+  /**
+   * A generated FILE to show on the canvas as itself — no candidates, no
+   * seeds, no progress bar. An SVG from OmniSVG is a vector file the canvas
+   * already knows how to render; the image surface's raster machinery would
+   * only get in its way.
+   */
+  'gen:open-file': { path: string };
   /** Push updated surface data (step preview / candidate done / finished). */
   'gen:update': { tabId: string; payload: GenSurfacePayload };
   /** ComfyUI install progress (consent / venv / torch / per-pack download / config). */
@@ -232,6 +239,7 @@ export type GenInvokeMap = {
 
 export const GEN_EVENT_CHANNELS = [
   'gen:open',
+  'gen:open-file',
   'gen:update',
   'gen:comfy-install',
 ] as const satisfies readonly (keyof GenEventMap)[];

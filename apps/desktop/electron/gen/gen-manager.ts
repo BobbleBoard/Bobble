@@ -78,6 +78,7 @@ import type {
 } from './gen-ipc-contract';
 import { createStillRenderer } from './hyperframes-still';
 import { openStillWindow } from './hyperframes-window';
+import { generateSvg, omniSvgFiles } from './omnisvg';
 import { canEnhance, type EnhancerEndpoint, enhancePrompt } from './prompt-enhancer';
 import {
   buildVideoJob,
@@ -734,6 +735,19 @@ export function registerGenIpc(opts: GenManagerOptions): void {
         return handleGenerateVideo(params as unknown as GenerateVideoParams);
       case 'generateAudio':
         return handleGenerateAudio(params as unknown as GenerateAudioParams);
+      case 'generateSvg': {
+        /* OmniSVG: its own short-lived llama-server, not the worker queue —
+           see omnisvg.ts. The folder is named after the ask like every other
+           generation, so it sits beside the images in Generated. */
+        const p = params as { prompt?: string; images?: string[]; candidates?: number };
+        const name = slug(p.prompt ?? p.images?.[0] ?? 'svg', 'svg');
+        const outputDir = path.join(outputRoot, uniqueName(outputRoot, name));
+        const result = await generateSvg({ ...p, outputDir });
+        for (const o of result.outputs) send('gen:open-file', { path: o.outputPath });
+        return result;
+      }
+      case 'omnisvgStatus':
+        return omniSvgFiles();
       case 'cancel': {
         const jobId = String((params as { jobId?: unknown }).jobId ?? '');
         return { canceled: jobQueue.cancel(jobId) };

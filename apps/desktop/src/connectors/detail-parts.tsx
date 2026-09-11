@@ -146,7 +146,11 @@ export function DetailHeader({
   // The switch: every skill (turning one on is a file copy, instant and
   // reversible), and a server that is on or off. Never a server waiting for a
   // key — the card below is how it gets turned on — nor a built-in.
-  const switchable = item.kind === 'skill' || item.state === 'on' || item.state === 'off';
+  const isModel = item.kind === 'connector' && item.connector.kind === 'model';
+  /* A model connector has no "off": it is downloaded or it is not, and the
+     menu's Remove is what deletes it. A switch here would flip and snap back. */
+  const switchable =
+    !isModel && (item.kind === 'skill' || item.state === 'on' || item.state === 'off');
   const failed = failing(item);
   const menu = onEdit !== undefined || onRemove !== undefined;
   const prompt = examplePrompt(item, tools);
@@ -167,17 +171,21 @@ export function DetailHeader({
             <StateDot state={failed ? 'needs-setup' : item.state} />
             {failed
               ? failureLabel(item)
-              : item.state === 'available'
-                ? item.kind === 'skill'
-                  ? 'Not enabled'
-                  : 'Not added'
-                : item.state === 'builtin'
-                  ? 'Built in, always on'
-                  : item.state === 'on'
-                    ? 'On'
-                    : item.state === 'off'
-                      ? 'Off'
-                      : 'Needs setup'}
+              : isModel
+                ? item.state === 'on'
+                  ? 'Downloaded · ready'
+                  : 'Not downloaded (about 5 GB, once)'
+                : item.state === 'available'
+                  ? item.kind === 'skill'
+                    ? 'Not enabled'
+                    : 'Not added'
+                  : item.state === 'builtin'
+                    ? 'Built in, always on'
+                    : item.state === 'on'
+                      ? 'On'
+                      : item.state === 'off'
+                        ? 'Off'
+                        : 'Needs setup'}
           </p>
         </div>
         <div className="pdc-detail-actions">
@@ -224,7 +232,7 @@ export function DetailHeader({
               onClick={() => void actions.add(item)}
               data-testid={`connector-detail-add-${item.id}`}
             >
-              Add to Bobble
+              {isModel ? 'Download (about 5 GB)' : 'Add to Bobble'}
             </Button>
           ) : usable(item) && onTry !== undefined ? (
             <Button

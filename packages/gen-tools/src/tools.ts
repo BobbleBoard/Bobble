@@ -32,6 +32,7 @@ export const GENERATE_VIDEO_TOOL = 'generate_video';
 export const GENERATE_SPEECH_TOOL = 'generate_speech';
 export const GENERATE_MUSIC_TOOL = 'generate_music';
 export const GENERATE_SFX_TOOL = 'generate_sfx';
+export const GENERATE_SVG_TOOL = 'generate_svg';
 
 /** Attach at most this many candidate images back to the model (context budget). */
 const MAX_ATTACHED_IMAGES = 4;
@@ -499,4 +500,103 @@ export function registerAudioTools(pi: ExtensionAPI, options: GenToolsOptions): 
     },
     SOUND_MODEL_IDS,
   );
+
+  /*
+   * SVG — OmniSVG, through the app's own llama-server. the user: "a simple cli tool
+   * that essentially calls this as a subagent eg. svg <optional prompt> --image
+   * <optional reference image path(s)>". In CLI mode this IS the `svg` command
+   * (tool-cli.ts maps it to an empty path), and the prompt is its positional.
+   *
+   * The result is vector paths, not pixels, so nothing is attached back as an
+   * image: the file opens on the canvas, and the text names it and says how
+   * many paths it has — which is the one number that separates a real drawing
+   * from a stray blob.
+   */
+  shareTool(pi, {
+    name: GENERATE_SVG_TOOL,
+    label: 'Generate: SVG',
+    description:
+      'Make an SVG — a vector drawing — from a short description, a reference image, or both, ' +
+      'on-device with OmniSVG. Best for icons, logos, symbols and simple flat illustrations; ' +
+      'describe the shape and colour plainly ("a red heart with smooth curved edges, centered"). ' +
+      'With an image it traces that image into vector paths. Returns the .svg file and opens ' +
+      'it on the canvas. Needs the OmniSVG connector installed (it downloads the model).',
+    promptSnippet: 'Make an SVG from a description or a reference image (on-device)',
+    parameters: Type.Object({
+      prompt: Type.Optional(
+        Type.String({
+          description:
+            'What to draw, plainly: subject, shape, colour. Optional when an image is given.',
+        }),
+      ),
+      image: Type.Optional(
+        Type.Union([Type.String(), Type.Array(Type.String())], {
+          description: 'Reference image path(s) to trace into SVG. Each becomes its own file.',
+        }),
+      ),
+      candidates: Type.Optional(
+        Type.Number({
+          description: 'Samples per input; the best is kept. Default 3, max 6. More is slower.',
+        }),
+      ),
+    }),
+    async execute(_id, params): Promise<AgentToolResult<GenerateDetails>> {
+      if (bridge === null) {
+        return errResult(
+          'generation bridge unavailable (the gen-tools extension must run inside Pi Desktop)',
+        );
+      }
+      const images =
+        params.image === undefined
+          ? []
+          : Array.isArray(params.image)
+            ? params.image
+            : [params.image];
+      if ((params.prompt ?? '').trim() === '' && images.length === 0) {
+        return errResult('give a prompt, a reference image path, or both');
+      }
+      try {
+        const result = await bridge.request<{
+          outputs: readonly {
+            outputPath: string;
+            paths: number;
+            source: string;
+            stop: string;
+            tokPerSec: number | null;
+            tokens: number;
+          }[];
+        }>('generateSvg', {
+          prompt: params.prompt,
+          images,
+          candidates: params.candidates,
+        });
+        const lines = result.outputs.map(
+          (o, i) =>
+            `  ${i + 1}. ${o.outputPath} — ${o.paths} path${o.paths === 1 ? '' : 's'}` +
+            `${o.source === 'prompt' ? '' : ` (from ${o.source})`}` +
+            `${o.stop === 'eos' ? '' : ' — hit the length limit; may be incomplete'}`,
+        );
+        const text =
+          `Made ${result.outputs.length} SVG${result.outputs.length === 1 ? '' : 's'} on the canvas:\n` +
+          `${lines.join('\n')}\nModel: OmniSVG 1.1 4B (omnisvg-1.1-4b, Apache-2.0)`;
+        return {
+          content: [{ type: 'text', text }],
+          details: {
+            ok: true,
+            model: 'omnisvg-1.1-4b',
+            outputs: result.outputs.map((o) => ({
+              outputPath: o.outputPath,
+              modality: 'image' as const,
+              model: 'omnisvg-1.1-4b',
+            })),
+          },
+        };
+      } catch (err) {
+        return {
+          content: [{ type: 'text', text: `generate_svg failed: ${messageOf(err)}` }],
+          details: { ok: false, error: messageOf(err) },
+        };
+      }
+    },
+  });
 }

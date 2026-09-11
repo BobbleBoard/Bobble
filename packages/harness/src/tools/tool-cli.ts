@@ -127,6 +127,10 @@ const COMMAND_PATH_OVERRIDES: Readonly<Record<string, readonly string[]>> = {
   update_plan: ['plan'],
   spawn_subagent: ['delegate'],
   talk_to_manager: ['manager'],
+  /* the user: "svg <optional prompt> --image <optional reference image path(s)>".
+     The group is `svg` and its one tool has no sub-word, so the command is the
+     group name and the prompt is the positional. */
+  generate_svg: [],
 };
 
 export function pathFor(group: string, toolName: string): string[] {
@@ -403,8 +407,21 @@ export function resolveCli(cli: CliModel, argv: readonly string[]): CliResolutio
     return { kind: 'error', text: lines.join('\n') };
   }
 
+  /*
+   * A GROUP WHOSE ONE COMMAND HAS NO SUB-WORD IS THAT COMMAND.
+   *
+   * `svg --image ref.png` has no words after the group, which used to mean
+   * "show me the group" — right for `media`, where the next word picks among
+   * five things, and wrong for a group that only has one thing and names it
+   * by the group itself. With flags present the model is clearly calling, not
+   * asking; a bare `svg` on its own still gets the help.
+   */
   if (restWords.length === 0) {
-    return { kind: 'text', text: renderGroupHelp(group) };
+    const sole = group.commands.length === 1 ? group.commands[0] : undefined;
+    const hasFlags = Object.keys(parsed.flags).length > 0 || parsed.positionals.length > 0;
+    if (sole === undefined || sole.path.length > 0 || !hasFlags) {
+      return { kind: 'text', text: renderGroupHelp(group) };
+    }
   }
 
   // Longest path wins, so `media generate image` beats a hypothetical

@@ -316,6 +316,9 @@ const TOOL_REGISTRY: Record<string, ToolResolution> = {
   generate_music: { kind: 'music' },
   generate_sfx: { kind: 'sfx' },
   edit_image: { kind: 'image', label: ['Editing an image', 'Edited an image'] },
+  // OmniSVG through the `svg` command — a drawing, so the image glyph, but the
+  // words say what kind: a vector file, not a render.
+  generate_svg: { kind: 'image', label: ['Making an SVG', 'Made an SVG'] },
   // web search
   web_search: { kind: 'search' },
   brave_search: { kind: 'search' },

@@ -36,6 +36,10 @@ export type GenBridgeMethod =
   | 'generate'
   | 'generateVideo'
   | 'generateAudio'
+  /** OmniSVG: text/image → SVG through a short-lived llama-server (omnisvg.ts). */
+  | 'generateSvg'
+  /** Whether OmniSVG's files are on disk — the connector card's install state. */
+  | 'omnisvgStatus'
   | 'cancel'
   | 'listModels';
 

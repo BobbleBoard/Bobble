@@ -54,6 +54,28 @@ export type {
   JobStatus,
 } from './job-queue.js';
 export { JobQueue } from './job-queue.js';
+// OmniSVG — text/image → SVG through the app's own llama-server. Pure halves:
+// the request/reply shape and the token → SVG decoder (checked byte-for-byte
+// against the authors' decoder). The process that runs the server is the app's.
+export type { DecodedPath } from './omnisvg-decode.js';
+export {
+  colorFromToken,
+  decodeOmniSvg,
+  OMNISVG_4B,
+  pathsToSvg,
+  tokensToXY,
+  xyToPaths,
+} from './omnisvg-decode.js';
+export type { OmniSvgCompletion, OmniSvgRequest, OmniSvgSampling } from './omnisvg-request.js';
+export {
+  buildOmniSvgRequest,
+  idsFromCompletion,
+  MEDIA_MARKER,
+  OMNISVG_MAX_TOKENS,
+  OMNISVG_SAMPLING,
+  OMNISVG_SYSTEM_PROMPT,
+  textSubtype,
+} from './omnisvg-request.js';
 export type {
   AudioJobSpec,
   Backend,
