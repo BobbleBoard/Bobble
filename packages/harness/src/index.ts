@@ -3404,7 +3404,17 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
       if (tools.some((t) => t.name === 'generate_video')) generators.add('video');
       if (tools.some((t) => t.name === 'generate_music' || t.name === 'generate_sfx'))
         generators.add('audio');
-      if (typeof input.path === 'string' && svgCommandAvailable) {
+      /*
+       * `svgCommandAvailable` used to gate this whole block, which quietly made
+       * the HAND-MADE MEDIA guard depend on an unrelated tool: with `generate_svg`
+       * absent and `generate_image` present, a Pillow script that draws a picture
+       * sailed through. MEASURED — asked in chat for a two-second video, a 2B
+       * wrote `make_video.py`, drew sixty frames with `ImageDraw`, and nothing
+       * stopped it, because the SVG generator was not installed on that machine.
+       * Each guard now asks its own question: the SVG ones about `generate_svg`,
+       * this one about whether a generator for THAT modality exists.
+       */
+      if (typeof input.path === 'string' && (svgCommandAvailable || generators.size > 0)) {
         const abs = isAbsolute(input.path)
           ? input.path
           : join(runtime.workspaceRoot ?? ctx.cwd, input.path);
@@ -3434,6 +3444,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
           }
           if (
             event.toolName === 'write' &&
+            svgCommandAvailable &&
             isHandwrittenSvg({ path: input.path, content: body, exists, svgCommandAvailable })
           ) {
             svgRefused.set(abs, body);
@@ -3456,7 +3467,10 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
             pi.appendEntry(HARNESS_LOOP_ENTRY, { action: 'block', cause: 'handmade-media' });
             return { block: true, reason: handmadeMediaRefusal(input.path, handmade) };
           }
-          if (hasHandwrittenInlineSvg({ path: input.path, content: body, svgCommandAvailable })) {
+          if (
+            svgCommandAvailable &&
+            hasHandwrittenInlineSvg({ path: input.path, content: body, svgCommandAvailable })
+          ) {
             svgRefused.set(abs, body);
             pi.appendEntry(HARNESS_LOOP_ENTRY, {
               action: 'block',

@@ -116,6 +116,19 @@ try {
     await win.waitForTimeout(4000);
     say('tool interface: schemas');
   }
+  /*
+   * Power mode FULL, for the same reason the studio capture sets it — and here
+   * it is not a nicety. Video is a HEAVY job, and the queue holds a heavy job
+   * for as long as the power policy says the machine is under pressure; with a
+   * chat model resident that can be indefinitely. MEASURED: the inline loader
+   * came up and sat at "Loading" for twelve minutes having never posted a graph
+   * to ComfyUI. This is the product's own knob, not a way round the policy.
+   */
+  await win.evaluate(() =>
+    window.piDesktop.invoke('settings:set', { patch: { powerMode: 'full' } }),
+  );
+  await win.waitForTimeout(600);
+
   await win.evaluate(() => window.__modality_store?.().getState().setView('chat'));
   await win.waitForTimeout(2500);
   say(`chat model up: ${CHAT_MODEL}`);
@@ -140,10 +153,20 @@ try {
   say(`sent: ${PROMPT}`);
 
   let shotLoader = false;
+  let lastMsgs = -1;
   let state = {};
   const deadline = Date.now() + DEADLINE;
   while (Date.now() < deadline) {
-    await win.waitForTimeout(2000);
+    // Every poll can find the window gone — the app quit, or something rebuilt
+    // `dist-electron` underneath it and a lazy import failed. That is worth
+    // saying plainly and keeping the film for, not throwing out of the loop and
+    // losing both the frames and the reason.
+    try {
+      await win.waitForTimeout(2000);
+    } catch {
+      state = { gone: true };
+      break;
+    }
     state = await win
       .evaluate(() => {
         const loader = document.querySelector('[data-testid="bobble-loader"]');
@@ -160,6 +183,21 @@ try {
       })
       .catch(() => ({ gone: true }));
     if (state.gone) break;
+    // Say what the model is DOING while it does it. A run that produces no
+    // loader is either a model that never reached for the tool or a job held
+    // before it was posted, and those need completely different fixes — which
+    // was unknowable from a log that only printed at the end.
+    if (state.msgs !== lastMsgs) {
+      lastMsgs = state.msgs;
+      const tail = await win
+        .evaluate(() => {
+          const ms = window.__pi_store().getState().messages;
+          const m = ms[ms.length - 1];
+          return m === undefined ? null : { kind: m.kind, tool: m.toolName ?? m.name, text: (m.text ?? '').slice(0, 90) };
+        })
+        .catch(() => null);
+      say(`msg ${state.msgs}: ${JSON.stringify(tail)}`);
+    }
     if (!shotLoader && state.loader !== null) {
       await win.screenshot({ path: path.join(OUT, '02-loader.png') });
       shotLoader = true;

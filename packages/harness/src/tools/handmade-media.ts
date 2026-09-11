@@ -64,8 +64,22 @@ const WRITES_MEDIA = /\.(png|jpe?g|webp|gif|bmp|tiff?|wav|mp3|flac|ogg|m4a|mp4|w
 /** Which generator would have made this, if one is installed. */
 export type MediaKind = 'image' | 'audio' | 'video';
 
+/**
+ * A NUMBERED FRAME is a clip, whatever the extension says.
+ *
+ * MEASURED: asked in chat for a two-second video, a 2B wrote a script that drew
+ * sixty PNGs called `frame_0000.png`… and shelled out to ffmpeg afterwards. The
+ * script itself never names an `.mp4`, so on extension alone this is an image
+ * script and the refusal would have offered `media generate image` for something
+ * the user asked to move. The f-string/format placeholder is the tell: nobody
+ * numbers ONE picture.
+ */
+const FRAME_SEQUENCE =
+  /\bframes?[_-]?\{?[a-z]?:?0\d*d\}?|\bframes?[_-]?%0\d*d|\bframe[_-]?\{i|\bframes\.append\b/i;
+
 const KIND_HINT: readonly { kind: MediaKind; re: RegExp }[] = [
   { kind: 'video', re: /\.(mp4|webm|mov)\b|\bmoviepy\b/i },
+  { kind: 'video', re: FRAME_SEQUENCE },
   { kind: 'audio', re: /\.(wav|mp3|flac|ogg|m4a)\b|\bwave\s*\.\s*open\b|\bsoundfile\b/i },
   { kind: 'image', re: /\.(png|jpe?g|webp|gif|bmp|tiff?)\b|\bImageDraw\b/i },
 ];

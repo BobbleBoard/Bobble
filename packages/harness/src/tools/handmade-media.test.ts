@@ -44,6 +44,27 @@ describe('handmadeMediaKind', () => {
     ).toBe('video');
   });
 
+  it('reads a numbered frame sequence as a clip, not a picture', () => {
+    // The script a 2B actually wrote when asked for a two-second video: it draws
+    // frames and never names an mp4, because ffmpeg came afterwards in bash.
+    const frames = `
+from PIL import Image, ImageDraw
+frames = []
+for i in range(60):
+    img = Image.new('RGB', (640, 480))
+    ImageDraw.Draw(img).ellipse([0, 0, 10, 10], fill=(255, 0, 0))
+    frames.append(img)
+for i, frame in enumerate(frames):
+    frame.save(f'frame_{i:04d}.png')
+`;
+    expect(handmadeMediaKind('make_video.py', frames)).toBe('video');
+    expect(handmadeMediaRefusal('make_video.py', 'video')).toContain('media generate video');
+  });
+
+  it('does not call a single drawn picture a clip', () => {
+    expect(handmadeMediaKind('make_mug_morning.py', MUG)).toBe('image');
+  });
+
   it('leaves a chart alone — a rendering of data is not a picture of something', () => {
     const chart = `
 import matplotlib.pyplot as plt
