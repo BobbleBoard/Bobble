@@ -3734,13 +3734,32 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     if (event.toolName === 'bash' && lastOpened !== undefined) {
       const opened = lastOpened;
       lastOpened = undefined;
-      const note = openedAppNote(opened, cliCommandForTool);
-      const withNote = event.content.map((part, i) =>
-        i === 0 && part.type === 'text' ? { ...part, text: `${part.text}${note}` } : part,
-      );
-      const content =
-        withNote.length > 0 ? withNote : [{ type: 'text' as const, text: note.trimStart() }];
-      return { content };
+      /*
+       * DO NOT CONTRADICT THE SHIM.
+       *
+       * In CLI mode the `open` wrapper INTERCEPTS a bare URL and navigates the
+       * app's own browser itself, then prints the browser commands. The stray-
+       * web-page note below was written for the world where that did not happen,
+       * and still fired — so one bash result carried both "Opening it in the app
+       * own browser instead" and "This opened your default browser — NOT the
+       * built-in browser ... Do that now rather than trying to control what just
+       * opened."
+       *
+       * MEASURED, MiniCPM5: it believed the second one, said so in its own words
+       * ("The page opened in the default browser, but I need to use the browser
+       * tool"), and spent calls re-navigating a page it already had. A harness
+       * that tells a model it failed at the thing it just did is worse than one
+       * that says nothing.
+       */
+      if (opened.strayWebPage !== true || !toolCliMode) {
+        const note = openedAppNote(opened, cliCommandForTool);
+        const withNote = event.content.map((part, i) =>
+          i === 0 && part.type === 'text' ? { ...part, text: `${part.text}${note}` } : part,
+        );
+        const content =
+          withNote.length > 0 ? withNote : [{ type: 'text' as const, text: note.trimStart() }];
+        return { content };
+      }
     }
     /*
      * A FAILED EDIT MUST COME BACK WITH THE DIFF ALREADY DONE.
