@@ -34,11 +34,15 @@ const TASKS = [
   { key: 'compute', demo: 'demo-compute.mjs', app: null },
   { key: 'chrome', demo: 'demo-apple.mjs', app: 'Google Chrome' },
   { key: 'maps', demo: 'demo-maps.mjs', app: 'Maps' },
+  { key: 'browser', demo: 'demo-browser.mjs', app: null },
   { key: 'blender', demo: 'demo-blender.mjs', app: 'Blender' },
 ];
 /** The cheap, model-only tasks are repeated: one sample says nothing about a
  *  speed that varies with what else the machine is doing. */
-const REPEATS = { recall: 3, compute: 3 };
+/* Three of everything. A 2B varies enough run to run that one sample cannot
+   tell a harness bug from the model having a bad turn — which is the whole
+   question being asked of this suite. */
+const REPEATS = Number(process.env.SUITE_REPEATS ?? 3);
 
 const run = (cmd, args, env) =>
   new Promise((resolve) => {
@@ -49,7 +53,7 @@ const run = (cmd, args, env) =>
 const started = Date.now();
 for (const model of MODELS) {
   for (const task of TASKS) {
-    const n = REPEATS[task.key] ?? 1;
+    const n = REPEATS;
     for (let i = 1; i <= n; i++) {
       const name = `suite-${model}-${task.key}${n > 1 ? `-${i}` : ''}`;
       const t0 = Date.now();

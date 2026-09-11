@@ -209,6 +209,36 @@ function rectOf(b: MacWindowBounds): (OverlayRect & { windowId?: number }) | nul
   };
 }
 
+/**
+ * The real name of a RUNNING app, given whatever the model called it.
+ *
+ * Exact match first, so nothing is reinterpreted when the model was already
+ * right. Then a case-insensitive substring, which is the same rule the pi-mac
+ * helper uses for `--app`, so `chrome` reaches "Google Chrome" from either side.
+ * Returns null when nothing matches and the caller keeps the original name —
+ * launching something not yet running still has to work.
+ */
+async function resolveRunningAppName(asked: string): Promise<string | null> {
+  const want = asked.trim().toLowerCase();
+  if (want === '') return null;
+  try {
+    const { stdout } = await execFileAsync('osascript', [
+      '-e',
+      'tell application "System Events" to get name of every process whose background only is false',
+    ]);
+    const names = stdout
+      .split(',')
+      .map((n) => n.trim())
+      .filter((n) => n !== '');
+    const exact = names.find((n) => n.toLowerCase() === want);
+    if (exact !== undefined) return exact;
+    const partial = names.find((n) => n.toLowerCase().includes(want));
+    return partial ?? null;
+  } catch {
+    return null;
+  }
+}
+
 /** The app that currently has the screen, or null when we cannot tell. */
 async function frontmostAppName(): Promise<string | null> {
   try {
@@ -265,8 +295,24 @@ async function launchApp(name: string, background = true): Promise<MacLaunchAck>
    * had focus, and if the launch took it, give it back.
    */
   const hadFocus = background ? await frontmostAppName() : null;
+  /*
+   * `chrome` IS Google Chrome, and every other tool here already knows that.
+   *
+   * MEASURED, MiniCPM5 on the Chrome task: `open -a chrome` came back "Unable to
+   * find application named 'chrome'" — macOS wants the exact bundle name — and
+   * the run never recovered: it fell back to the app's OWN browser and
+   * snapshotted about:blank thirty-five times. Three calls later `mac snapshot
+   * --app chrome` resolved "Google Chrome" without trouble, because the helper
+   * matches app names by substring. Two tools, one name, two answers.
+   *
+   * So the launch resolves the same way before asking macOS: if something is
+   * already running whose name contains what was asked for, that IS the app.
+   * Nothing is guessed when the exact name works — this only runs as a repair.
+   */
+  const resolved = await resolveRunningAppName(appName);
+  const nameToOpen = resolved ?? appName;
   try {
-    await execFileAsync('open', background ? ['-g', '-a', appName] : ['-a', appName], {
+    await execFileAsync('open', background ? ['-g', '-a', nameToOpen] : ['-a', nameToOpen], {
       env: userLaunchEnv(),
     });
   } catch (err) {
