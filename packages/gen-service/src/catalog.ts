@@ -451,6 +451,70 @@ export const MODALITY_CATALOG: readonly ModalityModel[] = [
       'Tiny SFX/audio: ARM/CPU-optimized, genuinely light (~1.5GB). Same Stability Community license as the 1.0 row — free commercial under $1M revenue, GATED above. Reserved until the ComfyUI backend lands. Workflow id/node paths [fwd].',
   },
 
+  {
+    /*
+     * Stable Audio 3 small — MUSIC. MEASURED: a 12s stereo 44.1kHz clip in 6
+     * seconds on an M5 Pro, from 2.1GB of weights plus a shared 1.1GB text
+     * encoder. That makes it the only audio model here faster than the wait UI
+     * it shows, which is why it is the recommended music pick over the much
+     * larger ACE-Step.
+     */
+    id: 'stable-audio-3-music',
+    modality: 'audio',
+    label: 'Stable Audio 3 small (music)',
+    backend: 'comfyui',
+    repo: 'Comfy-Org/stable-audio-3',
+    license: 'stability-community',
+    commercialUse: false,
+    approxSizeGB: 3.3,
+    minUnifiedMemoryGB: 8,
+    runsLocally: true,
+    heavy: false,
+    recommended: true,
+    comfy: {
+      kind: 'comfyui',
+      workflowTemplate: 'stable-audio-3-music',
+      paramMap: {
+        prompt: '6.inputs.text',
+        negativePrompt: '7.inputs.text',
+        seconds: '5.inputs.seconds',
+        steps: '3.inputs.steps',
+        seed: '3.inputs.seed',
+      },
+    },
+    notes:
+      'Text→music. The checkpoint carries NO text encoder — t5gemma loads separately, and the conditioning goes through ConditioningStableAudio, without which the model is never told the clip length. Stability Community licence: non-commercial.',
+  },
+  {
+    /** Stable Audio 3 small — SFX. Same stack, the SFX-tuned checkpoint;
+     * MEASURED at 6s of audio in 6s wall. */
+    id: 'stable-audio-3-sfx',
+    modality: 'audio',
+    label: 'Stable Audio 3 small (sound effects)',
+    backend: 'comfyui',
+    repo: 'Comfy-Org/stable-audio-3',
+    license: 'stability-community',
+    commercialUse: false,
+    approxSizeGB: 3.3,
+    minUnifiedMemoryGB: 8,
+    runsLocally: true,
+    heavy: false,
+    recommended: true,
+    comfy: {
+      kind: 'comfyui',
+      workflowTemplate: 'stable-audio-3-sfx',
+      paramMap: {
+        prompt: '6.inputs.text',
+        negativePrompt: '7.inputs.text',
+        seconds: '5.inputs.seconds',
+        steps: '3.inputs.steps',
+        seed: '3.inputs.seed',
+      },
+    },
+    notes:
+      'Text→sound effect. Shares the t5gemma encoder with the music row, so having both on disk costs 2.1GB more, not 3.3GB.',
+  },
+
   // ---- VIDEO (LTX via ComfyUI + the Node/ffmpeg path; reserved) ---------
   {
     id: 'hyperframes',
@@ -497,23 +561,22 @@ export const MODALITY_CATALOG: readonly ModalityModel[] = [
     minUnifiedMemoryGB: 16,
     runsLocally: true,
     heavy: true,
-    reserved: true,
     recommended: true,
     comfy: {
       kind: 'comfyui',
-      workflowTemplate: 'wan2.1-t2v-1.3b', // [fwd]
+      workflowTemplate: 'wan2.1-t2v-1.3b',
       paramMap: {
         prompt: '6.inputs.text',
         negativePrompt: '7.inputs.text',
         width: '70.inputs.width',
         height: '70.inputs.height',
         length: '70.inputs.length',
-        steps: '72.inputs.steps',
-        seed: '73.inputs.noise_seed',
+        steps: '73.inputs.steps',
+        seed: '73.inputs.seed',
       },
     },
     notes:
-      'Most Mac-realistic diffusion text→video pick: Apache (commercial-clean, NO gate), ~1.3B, runs via native ComfyUI. Minutes/clip on Apple Silicon. Reserved until the ComfyUI backend lands. Workflow id/node paths [fwd].',
+      'Most Mac-realistic diffusion text→video pick: Apache (commercial-clean, NO gate), ~1.3B, runs via native ComfyUI. MEASURED on an M5 Pro 24GB: 416x416, 33 frames (2.06s at 16fps), 20 steps, 178s wall — umt5-xxl fp16 (11GB) + a 2.6GB unet + a 242MB VAE, and fp8 is not an option because MPS refuses the cast. No longer reserved: this graph has run.',
   },
   {
     id: 'ltx-video-2b-distilled',

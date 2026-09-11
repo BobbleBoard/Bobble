@@ -109,13 +109,27 @@ const LTX_PARAM_MAP = {
  */
 function wanVideoGraph(): ComfyGraph {
   return {
+    /*
+     * MEASURED, not planned. This graph was run against ComfyUI 0.33.0 on this
+     * Mac and produced a 2.06s 416x416 clip in 178s; the placeholder it replaces
+     * could not have run at all. Three things it got wrong, all load-bearing:
+     *
+     *  - it fed `sigmas` and `noise_seed` to `KSampler`, which takes neither
+     *    (its required inputs are model/seed/steps/cfg/sampler_name/scheduler/
+     *    positive/negative/latent_image/denoise). A scheduler + sigmas belongs
+     *    to SamplerCustom; KSampler carries its own scheduler by name;
+     *  - it asked for `umt5_xxl_fp8_e4m3fn`, and fp8 casts are refused on MPS
+     *    (see the ComfyUI-on-MPS note) — fp16 is the only thing that loads here;
+     *  - `SaveVideo` takes a VIDEO, not IMAGE: the frames go through
+     *    `CreateVideo` (which is where fps lives) first.
+     */
     '38': {
       class_type: 'CLIPLoader',
-      inputs: { clip_name: 'umt5_xxl_fp8_e4m3fn.safetensors', type: 'wan' },
+      inputs: { clip_name: 'umt5_xxl_fp16.safetensors', type: 'wan' },
     },
     '44': {
       class_type: 'UNETLoader',
-      inputs: { unet_name: 'wan2.1_t2v_1.3B_bf16.safetensors', weight_dtype: 'default' },
+      inputs: { unet_name: 'wan2.1_t2v_1.3B_fp16.safetensors', weight_dtype: 'default' },
     },
     '45': { class_type: 'VAELoader', inputs: { vae_name: 'wan_2.1_vae.safetensors' } },
     '6': {
@@ -130,33 +144,45 @@ function wanVideoGraph(): ComfyGraph {
     },
     '70': {
       class_type: 'EmptyHunyuanLatentVideo',
-      inputs: { width: 480, height: 480, length: 33, batch_size: 1 },
-    },
-    '72': {
-      class_type: 'BasicScheduler',
-      inputs: { steps: 20, denoise: 1, scheduler: 'simple', model: ['44', 0], latent: ['70', 0] },
+      inputs: { width: 416, height: 416, length: 33, batch_size: 1 },
     },
     '73': {
       class_type: 'KSampler',
       inputs: {
-        noise_seed: 0,
+        seed: 0,
+        steps: 20,
+        cfg: 6,
+        // Euler: uni_pc diverges into rainbow noise on MPS [measured].
         sampler_name: 'euler',
+        scheduler: 'simple',
+        denoise: 1,
         model: ['44', 0],
         positive: ['6', 0],
         negative: ['7', 0],
         latent_image: ['70', 0],
-        sigmas: ['72', 0],
       },
     },
     '8': { class_type: 'VAEDecode', inputs: { samples: ['73', 0], vae: ['45', 0] } },
+    '80': { class_type: 'CreateVideo', inputs: { images: ['8', 0], fps: 16 } },
     '9': {
       class_type: 'SaveVideo',
-      inputs: { images: ['8', 0], filename_prefix: 'pi-video', format: 'mp4', fps: 16 },
+      inputs: { video: ['80', 0], filename_prefix: 'pi-video', format: 'mp4', codec: 'h264' },
     },
   };
 }
 
-/** ACE-Step (text → music) via native ComfyUI core nodes. */
+/** Wan's own splice points. It does NOT share LTX's map: LTX puts steps on its
+ * scheduler node and calls the seed `noise_seed`; Wan's KSampler owns both. */
+const WAN_PARAM_MAP = {
+  prompt: '6.inputs.text',
+  negativePrompt: '7.inputs.text',
+  width: '70.inputs.width',
+  height: '70.inputs.height',
+  length: '70.inputs.length',
+  steps: '73.inputs.steps',
+  seed: '73.inputs.seed',
+} as const;
+
 function aceStepGraph(): ComfyGraph {
   return {
     '40': {
@@ -229,6 +255,65 @@ function stableAudioGraph(): ComfyGraph {
     '13': { class_type: 'SaveAudio', inputs: { audio: ['12', 0], filename_prefix: 'pi-audio' } },
   };
 }
+
+/**
+ * Stable Audio 3 small (music / SFX) — MEASURED working on this Mac: a 6s stereo
+ * 44.1kHz clip in 6 seconds, from a 2.1GB checkpoint.
+ *
+ * Unlike Stable Audio Open 1.0, the 3-small checkpoints carry NO text encoder:
+ * `CheckpointLoaderSimple` returns a null CLIP and the first encode dies with
+ * "your checkpoint does not contain a valid clip or text encoder model". The
+ * t5gemma encoder is loaded separately, and the pair of conditionings must go
+ * through `ConditioningStableAudio` to carry the clip length — without it the
+ * model has no idea how long a sound it is making.
+ */
+function stableAudio3Graph(): ComfyGraph {
+  return {
+    '1': {
+      class_type: 'CheckpointLoaderSimple',
+      inputs: { ckpt_name: 'stable_audio_3_small_sfx.safetensors' },
+    },
+    '2': {
+      class_type: 'CLIPLoader',
+      inputs: { clip_name: 't5gemma_b_b_ul2.safetensors', type: 'stable_audio' },
+    },
+    '6': { class_type: 'CLIPTextEncode', inputs: { text: '', clip: ['2', 0] } },
+    '7': { class_type: 'CLIPTextEncode', inputs: { text: '', clip: ['2', 0] } },
+    '10': {
+      class_type: 'ConditioningStableAudio',
+      inputs: { positive: ['6', 0], negative: ['7', 0], seconds_start: 0, seconds_total: 8 },
+    },
+    '5': { class_type: 'EmptyLatentAudio', inputs: { seconds: 8, batch_size: 1 } },
+    '3': {
+      class_type: 'KSampler',
+      inputs: {
+        seed: 0,
+        steps: 25,
+        cfg: 6,
+        sampler_name: 'euler',
+        scheduler: 'simple',
+        denoise: 1,
+        model: ['1', 0],
+        positive: ['10', 0],
+        negative: ['10', 1],
+        latent_image: ['5', 0],
+      },
+    },
+    '8': { class_type: 'VAEDecodeAudio', inputs: { samples: ['3', 0], vae: ['1', 2] } },
+    '9': { class_type: 'SaveAudio', inputs: { audio: ['8', 0], filename_prefix: 'pi-audio' } },
+  };
+}
+
+/** Stable Audio 3's splice points. `seconds` lands in TWO places — the empty
+ * latent's length and the conditioning's `seconds_total` — and they have to
+ * agree or the clip is padded with silence to the latent's length. */
+const STABLE_AUDIO_3_PARAM_MAP = {
+  prompt: '6.inputs.text',
+  negativePrompt: '7.inputs.text',
+  seconds: '5.inputs.seconds',
+  steps: '3.inputs.steps',
+  seed: '3.inputs.seed',
+} as const;
 
 const STABLE_AUDIO_PARAM_MAP = {
   prompt: '6.inputs.text',
@@ -310,7 +395,7 @@ export const WORKFLOW_TEMPLATES: Readonly<Record<string, WorkflowTemplate>> = {
   'wan2.1-t2v-1.3b': {
     id: 'wan2.1-t2v-1.3b',
     graph: wanVideoGraph(),
-    paramMap: LTX_PARAM_MAP,
+    paramMap: WAN_PARAM_MAP,
   },
   'ace-step-music': {
     id: 'ace-step-music',
@@ -326,6 +411,22 @@ export const WORKFLOW_TEMPLATES: Readonly<Record<string, WorkflowTemplate>> = {
     id: 'stable-audio-open-small',
     graph: stableAudioGraph(),
     paramMap: STABLE_AUDIO_PARAM_MAP,
+  },
+  'stable-audio-3-music': {
+    id: 'stable-audio-3-music',
+    graph: {
+      ...stableAudio3Graph(),
+      '1': {
+        class_type: 'CheckpointLoaderSimple',
+        inputs: { ckpt_name: 'stable_audio_3_small_music.safetensors' },
+      },
+    },
+    paramMap: STABLE_AUDIO_3_PARAM_MAP,
+  },
+  'stable-audio-3-sfx': {
+    id: 'stable-audio-3-sfx',
+    graph: stableAudio3Graph(),
+    paramMap: STABLE_AUDIO_3_PARAM_MAP,
   },
   'flux1-dev-gguf-q6k': {
     id: 'flux1-dev-gguf-q6k',
