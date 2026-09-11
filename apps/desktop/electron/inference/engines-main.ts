@@ -171,21 +171,51 @@ interface EngineOps {
  * directories means Comfy searches them recursively and finds whatever we have
  * fetched, wherever inside a repo's tree it happens to sit.
  */
+/**
+ * The categories ComfyUI looks up, mirroring `COMFY_MODEL_SUBDIRS` in
+ * comfy-install.ts — the same names that module already creates under the store.
+ */
+const COMFY_CATEGORIES = [
+  'checkpoints',
+  'unet',
+  'diffusion_models',
+  'clip',
+  'clip_vision',
+  'text_encoders',
+  'audio_encoders',
+  'vae',
+  'loras',
+  'controlnet',
+  'upscale_models',
+] as const;
+
 function writeComfyModelPaths(): void {
   const store = path.join(cacheRoot(), 'store');
+  /*
+   * ONE DIRECTORY PER CATEGORY, NAMED THE SAME AS THE CATEGORY.
+   *
+   * This used to write `checkpoints: image|video` for every row, on the theory
+   * that the store is organised by what a model MAKES. Two things were wrong
+   * with that, and together they meant ComfyUI found nothing at all:
+   *
+   *  - the store is NOT organised by modality. comfy-install.ts creates
+   *    `checkpoints/`, `unet/`, `vae/`, `text_encoders/` … under the store and
+   *    every pack's `targetSubdir` is one of those. There has never been an
+   *    `image/` or a `video/` directory to find.
+   *  - `|` is not ComfyUI's separator. A value in extra_model_paths.yaml is one
+   *    path, or several separated by NEWLINES — so `image|video` was read as a
+   *    single directory literally named "image|video".
+   *
+   * VERIFIED after the fix: ComfyUI's /object_info lists our checkpoints, unet,
+   * vae and text_encoders, and the graphs that reference them run.
+   */
   const yaml = [
     '# Written by Bobble. ComfyUI reads its weights from the app model store.',
+    '# Do not edit by hand; rewritten whenever the engine is prepared.',
     'bobble:',
-    `    base_path: ${store}`,
-    '    is_default: true',
-    '    checkpoints: image|video',
-    '    diffusion_models: image|video',
-    '    unet: image|video',
-    '    vae: image|video',
-    '    clip: image|video',
-    '    text_encoders: image|video',
-    '    loras: image|video',
-    '    audio_checkpoints: audio',
+    `  base_path: ${store}`,
+    '  is_default: true',
+    ...COMFY_CATEGORIES.map((c) => `  ${c}: ${c}`),
     '',
   ].join('\n');
   writeFileSync(comfyModelPathsYaml(), yaml, 'utf8');
