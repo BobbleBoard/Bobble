@@ -150,13 +150,22 @@ export const CAPABILITIES: readonly Capability[] = [
   },
   {
     name: 'generation',
+    /* MEASURED: with this line present AND the standing "imaging libraries …
+       are not how this works" below it, a 2B asked for a picture still probed
+       the shell, found Pillow, and wrote a script that draws the subject out of
+       rectangles. So the line names the mistake directly — and handmade-media.ts
+       catches it at the write, because a line among nine abilities does not
+       outweigh what a model already knows how to do. */
     summary:
-      'Create images, video, speech, music and sound effects on-device — including ' +
-      'reading text aloud and cloning a voice from a short sample.',
+      'Create images, video, speech, music and sound effects on-device. Every request for a ' +
+      'picture, a clip or a sound goes here — never draw or synthesise one in code.',
     guidance:
-      'Use when the deliverable IS the media, rather than a description of it. For a picture ' +
-      'that has to be GOOD rather than merely produced, commission the image specialist with ' +
-      'spawn_subagent instead — it works in passes and keeps the best one.',
+      'Use when the deliverable IS the media, rather than a description of it. NEVER write a ' +
+      'script that draws a picture or synthesises a sound (Pillow, cairo, wave, ffmpeg): a ' +
+      'drawing library makes the shapes you described, this makes the thing itself. Code is ' +
+      'right for a CHART or a diagram, which is a rendering of data and not a picture of ' +
+      'something. For a picture that has to be GOOD rather than merely produced, commission ' +
+      'the image specialist with spawn_subagent instead — it works in passes and keeps the best.',
     /*
      * ONLY WHAT IS REGISTERED. This listed nine names; four existed. `image_generate`,
      * `image_edit`, `video_generate`, `video_edit`, `extract_frames`, `probe` and

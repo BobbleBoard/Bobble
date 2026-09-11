@@ -106,6 +106,7 @@ import {
 } from './tools/coerced-write.js';
 import { degenerateCommandRefusal } from './tools/degenerate-command.js';
 import { diagnoseEditFailure } from './tools/edit-diagnosis.js';
+import { handmadeMediaRefusal, isHandmadeMedia, type MediaKind } from './tools/handmade-media.js';
 import {
   countInlineDrawnSvgs,
   handwrittenInlineSvgRefusal,
@@ -3394,7 +3395,15 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
         content?: unknown;
         edits?: { newText?: unknown }[];
       };
-      const svgCommandAvailable = pi.getAllTools().some((t) => t.name === 'generate_svg');
+      const tools = pi.getAllTools();
+      const svgCommandAvailable = tools.some((t) => t.name === 'generate_svg');
+      /* Which generators exist RIGHT NOW. With generation off there is nothing
+         to redirect a script to, and the script is the only way the model has. */
+      const generators = new Set<MediaKind>();
+      if (tools.some((t) => t.name === 'generate_image')) generators.add('image');
+      if (tools.some((t) => t.name === 'generate_video')) generators.add('video');
+      if (tools.some((t) => t.name === 'generate_music' || t.name === 'generate_sfx'))
+        generators.add('audio');
       if (typeof input.path === 'string' && svgCommandAvailable) {
         const abs = isAbsolute(input.path)
           ? input.path
@@ -3430,6 +3439,22 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
             svgRefused.set(abs, body);
             pi.appendEntry(HARNESS_LOOP_ENTRY, { action: 'block', cause: 'handwritten-svg' });
             return { block: true, reason: handwrittenSvgRefusal(input.path) };
+          }
+          /*
+           * …AND A SCRIPT THAT SYNTHESISES A PICTURE OR A SOUND — see
+           * handmade-media.ts. Asked for an image in chat, a 2B wrote a Pillow
+           * script that draws a mug out of rectangles, with `media` in its
+           * command list and "imaging libraries … are not how this works" in
+           * its prompt. Same escape as the SVG guard: identical bytes.
+           */
+          const handmade =
+            event.toolName === 'write'
+              ? isHandmadeMedia({ path: input.path, content: body, available: generators })
+              : null;
+          if (handmade !== null) {
+            svgRefused.set(abs, body);
+            pi.appendEntry(HARNESS_LOOP_ENTRY, { action: 'block', cause: 'handmade-media' });
+            return { block: true, reason: handmadeMediaRefusal(input.path, handmade) };
           }
           if (hasHandwrittenInlineSvg({ path: input.path, content: body, svgCommandAvailable })) {
             svgRefused.set(abs, body);
