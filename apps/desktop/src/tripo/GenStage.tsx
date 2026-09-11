@@ -35,9 +35,11 @@
  * (useEased) interpolates BETWEEN reported values only — it never runs ahead of
  * what the engine actually said.
  */
+
 import type { JSX } from 'react';
 import { useEffect, useRef, useState } from 'react';
 import type { Gen3dRole } from '../../electron/gen3d/gen3d-contract';
+import { BobbleLoader } from '../chat/BobbleLoader';
 import { useGen3dStore } from './gen3d-client';
 import { IcClose } from './icons';
 import { useTripoStore } from './store';
@@ -407,6 +409,25 @@ export function GenStage(): JSX.Element | null {
   return (
     <div className="tp-genhero" data-testid="tp-genstage" data-phase="building">
       <div className="tp-genhero-inner">
+        {/*
+          THE SAME MARK AS EVERY OTHER WAIT, in its 3D act.
+
+          the user: "for 3d maybe make it 3d and dramatically reveal it rotating
+          seamlessly from the 2d animation to 3d." This room is where that act
+          belongs — it plays the shared puzzle → split → cascade opening and then
+          the grid stands up into a field of rotating solids, which is the one
+          loader in the app that is about to be followed by an actual 3D object.
+
+          `bare`: this hero already owns a bar and a percentage below, and two
+          bars stacked is how a loading screen stops being read at all.
+        */}
+        <BobbleLoader
+          size={92}
+          variant="3d"
+          bare
+          label={title}
+          {...(indeterminate ? {} : { progress: shownPercent / 100 })}
+        />
         <div className="tp-genhero-title" data-testid="tp-genstage-title">
           {title}
         </div>

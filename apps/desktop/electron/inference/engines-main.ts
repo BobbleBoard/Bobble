@@ -189,7 +189,7 @@ const COMFY_CATEGORIES = [
   'upscale_models',
 ] as const;
 
-function writeComfyModelPaths(): void {
+export function writeComfyModelPaths(): void {
   const store = path.join(cacheRoot(), 'store');
   /*
    * ONE DIRECTORY PER CATEGORY, NAMED THE SAME AS THE CATEGORY.

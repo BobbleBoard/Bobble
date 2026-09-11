@@ -27,7 +27,7 @@ import { cacheRoot } from '@pi-desktop/inference';
 import { listStore, type StoredModel } from '@pi-desktop/model-store';
 import { registerIpcHandlers } from '@pi-desktop/shared';
 import type { IpcMain } from 'electron';
-import { comfyMainPy, comfyModelPathsYaml } from '../inference/engines-main';
+import { comfyMainPy, comfyModelPathsYaml, writeComfyModelPaths } from '../inference/engines-main';
 import type { StudioInvokeMap, StudioProgress } from './studio-contract';
 import { resolveWorkflow } from './studio-workflow';
 
@@ -63,6 +63,20 @@ export async function comfyOrigin(): Promise<string> {
         'then music, sound effects and photoreal video will run here.',
     );
   }
+  /*
+   * REWRITE THE MODEL-PATHS FILE ON EVERY START, not only at install.
+   *
+   * It was written once, by the installer, and never again — so when the file
+   * turned out to name directories that do not exist (see writeComfyModelPaths),
+   * every machine that had already installed ComfyUI kept the broken copy, and
+   * the only way to get a corrected one was to reinstall the engine to fix a
+   * config file. MEASURED here: the app started ComfyUI against the stale yaml,
+   * ComfyUI saw none of the downloaded weights, and a video job sat there.
+   *
+   * The content is deterministic, so writing it every time is a no-op whenever
+   * it is already right, and self-healing whenever it is not.
+   */
+  writeComfyModelPaths();
   return supervisor().resolveOrigin();
 }
 
