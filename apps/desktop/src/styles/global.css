@@ -334,6 +334,11 @@ body {
  */
 :root {
   --pd-sidebar-rail: calc((32px + var(--pd-icon-size)) * var(--pd-sidebar-scale, 1));
+  /* The sidebar mark's tiles: white on dark, black on light (BobbleMark). */
+  --pd-bobble-mark-ink: #ffffff;
+}
+:root[data-mode="light"] {
+  --pd-bobble-mark-ink: #000000;
 }
 
 /* Rail contents: R14 C1 — this IS the collapsed sidebar's VISIBLE floating card
@@ -2197,40 +2202,6 @@ body {
 .pd-project-picker--fullaccess .pd-project-chip:hover {
   background: var(--pd-status-danger-bg);
   color: var(--pd-status-danger-fg);
-}
-
-/* the user #12 — the subtle shortcut helper line under the empty/home composer. It
- * carries the @ / / / ! affordances demoted out of the (now friendly) placeholder;
- * quiet muted text with small key caps, wrapping + centered under the composer. */
-.pd-composer-hints {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: 14px;
-  margin-top: 10px;
-  font-size: var(--pd-font-size-footnote);
-  color: var(--pd-text-muted);
-  user-select: none;
-}
-.pd-composer-hint {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-}
-.pd-composer-hint kbd {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 16px;
-  height: 16px;
-  padding: 0 4px;
-  border-radius: var(--pd-radius-sm);
-  background: var(--pd-bg-inset);
-  color: var(--pd-text-secondary);
-  font-family: var(--pd-font-mono);
-  font-size: var(--pd-font-size-caption);
-  line-height: 1;
 }
 
 /* ── Sidebar chat "unread" dot: a small circle on the right of a chat row saying
@@ -5700,48 +5671,6 @@ body[data-media-expanded="true"] .pd-studio-compose {
   }
 }
 
-/* ── Opening-screen starter chips ─────────────────────────────────────────
- *
- * Quiet by default and only lit on hover: they are an offer, not a demand. The
- * greeting above them is the loudest thing on an empty screen and should stay
- * that way.
- */
-.pd-starter-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  /* Larger — the user — and a real target: 38px tall, body-size type. */
-  height: 38px;
-  padding: 0 16px;
-  min-width: 0;
-  flex: 0 1 auto;
-  border: 1px solid var(--pd-border-subtle);
-  border-radius: var(--pd-radius-full);
-  background: var(--pd-bg-raised);
-  color: var(--pd-text-secondary);
-  font-size: var(--pd-font-size-body);
-  line-height: var(--pd-leading-body);
-  white-space: nowrap;
-  cursor: pointer;
-  transition:
-    color var(--pd-duration-base) var(--pd-easing-standard),
-    border-color var(--pd-duration-base) var(--pd-easing-standard),
-    background-color var(--pd-duration-base) var(--pd-easing-standard);
-}
-
-.pd-starter-chip:hover {
-  border-color: var(--pd-border-default);
-  background: var(--pd-bg-hover);
-  color: var(--pd-text-primary);
-}
-/* The label gives way before the row does: on a narrow window the words
- * shorten with an ellipsis rather than the four chips folding to two rows. */
-.pd-starter-chip-label {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
 /* ── The long-job card ────────────────────────────────────────────────────
  *
  * Quiet chrome around whatever the job itself has to show. It sits in the chat
@@ -6234,22 +6163,6 @@ body[data-media-expanded="true"] .pd-studio-compose {
 .pd-ac-brand {
   width: 14px;
   height: 14px;
-}
-
-/* The starter chips, under the composer and above the @ / ! hints. As wide as
- * the composer — the 720px cap this had is what folded four chips into two
- * rows. */
-.pd-composer-starters {
-  display: flex;
-  justify-content: center;
-  margin: 14px 0 2px 50%;
-  /* Wider than the composer when the four labels need it: the row is sized to
-   * its content and centred under the box, so "Look something up on the web"
-   * stays readable rather than ellipsising to fit a 700px composer. Only a
-   * window narrower than the row makes the labels give way (see the chip). */
-  width: max-content;
-  max-width: min(100vw - 120px, 1120px);
-  transform: translateX(-50%);
 }
 
 /* ── The @ / / suggestion panel ───────────────────────────────────────────

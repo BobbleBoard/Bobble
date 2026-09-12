@@ -51,7 +51,11 @@ export function BobbleMark({ size = 20 }: { size?: number }) {
             width={BOBBLE_TILE.size}
             height={BOBBLE_TILE.size}
             rx={BOBBLE_TILE.radius}
-            fill={tile.fill}
+            /* White on the dark theme, BLACK on the light one — the user, with
+               the sidebar mark in light mode: "in light mode make these
+               black." The token lives in global.css beside the theme
+               selectors; the tile's own fill is the dark-theme fallback. */
+            fill={`var(--pd-bobble-mark-ink, ${tile.fill})`}
           />
         );
       })}

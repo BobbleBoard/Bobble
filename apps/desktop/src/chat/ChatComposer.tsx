@@ -66,7 +66,6 @@ import { type AcToken, EMPTY_TOKEN } from './composer/tokens';
 import { GEN_ACTION_PLANS } from './composer-gen-actions';
 import { DictationBar } from './DictationBar';
 import { IconWarning } from './icons-pill';
-import { StarterChips } from './StarterChips';
 import { HELP_TEXT, parseSlashCommand } from './slash-commands';
 import { usePrefillPill } from './use-prefill-pill';
 import { useDictation } from './useDictation';
@@ -546,7 +545,7 @@ export function ChatComposer({
     usePiStore.setState({ composerText: '' });
   }, [composerText]);
 
-  // The same drain, for a PILL pushed from outside (a starter chip).
+  // The same drain, for a PILL pushed from outside the editor.
   const composerPill = usePiStore((s) => s.composerPill);
   useEffect(() => {
     if (composerPill === null) return;
@@ -1376,29 +1375,16 @@ export function ChatComposer({
   const discardPaused = (): void => {
     usePiStore.setState({ pausedChat: null });
   };
-  // the user #12: the primary placeholder is friendly for a first-timer — the
-  // developer-jargon @ / ! hints were demoted to the subtle helper line below
-  // (home only), not baked into the placeholder. A single short line also stops
-  // the empty composer from looking oversized (the old 3-line jargon overflowed
-  // and faded, inflating the card).
+  // the user #12: the primary placeholder is friendly for a first-timer — no
+  // developer jargon in it. A single short line also stops the empty composer
+  // from looking oversized (the old 3-line jargon overflowed and faded,
+  // inflating the card).
   const placeholder =
     isStreaming && !bgStreaming
       ? 'Send after this reply…'
       : bashMode
         ? 'Run a shell command…'
         : 'Ask anything…';
-  // Only the empty home screen (no messages yet) shows the shortcut helper line.
-  /*
-   * HOME MEANS THE CENTRED, EMPTY SCREEN — the same test ChatApp uses to centre
-   * the composer — not merely "no messages yet". SEEN: a message queued behind
-   * a restart sat in the thread with the starters and the @ / ! hints stacked
-   * UNDER the docked composer, because `messages` was still empty. the user: "never
-   * show them at the bottom like that … that goes away when the user presses
-   * enter the first time."
-   */
-  const isHome = usePiStore(
-    (s) => s.messages.length === 0 && s.queuedSends.length === 0 && !s.promptInFlight,
-  );
 
   // #19: fade the placeholder's bottom rather than slicing it. We flip the fade
   // ON only when the empty-state placeholder actually overflows the visible
@@ -1698,39 +1684,6 @@ export function ChatComposer({
           >
             Why isn't my message sending?
           </button>
-        </div>
-      ) : null}
-
-      {/*
-        THE STARTERS MOVED DOWN HERE. the user: "put that stuff below the input bar
-        but above the special command instructions."
-
-        They were above the composer, between the greeting and the box, which put
-        the app's four suggestions in the way of the thing someone opened it to
-        use. Below the box they read as an offer beside the keyboard shortcuts
-        rather than an obstacle in front of the cursor — and the two rows are the
-        same KIND of thing: here is what you can ask for, here is how to reach it.
-      */}
-      {isHome && !isStreaming ? (
-        <div className="pd-composer-starters">
-          <StarterChips />
-        </div>
-      ) : null}
-
-      {/* the user #12: the @ / / ! shortcuts, demoted out of the placeholder to a
-          subtle helper line under the composer — shown only on the empty home
-          screen so a first-timer discovers them without jargon in the input. */}
-      {isHome && !isStreaming ? (
-        <div className="pd-composer-hints" data-testid="composer-hints">
-          <span className="pd-composer-hint">
-            <kbd>@</kbd> files
-          </span>
-          <span className="pd-composer-hint">
-            <kbd>/</kbd> commands
-          </span>
-          <span className="pd-composer-hint">
-            <kbd>!</kbd> bash
-          </span>
         </div>
       ) : null}
     </div>
