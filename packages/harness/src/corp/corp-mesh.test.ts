@@ -167,7 +167,9 @@ describe('the producing specialists (the user's presets)', () => {
     expect(specialistToolsFor('motion')).toContain('generate_video'); // HyperFrames path
     expect(specialistToolsFor('motion')).toContain('mcp_call'); // + the ffmpeg façade
     expect(specialistToolsFor('ui-critic')).toContain('browser_navigate');
-    expect(specialistToolsFor('research')).toContain('browser_screenshot');
+    // The eyes: the snapshot (there is no browser_screenshot tool — that name had drifted).
+    expect(specialistToolsFor('research')).toContain('browser_snapshot');
+    expect(specialistToolsFor('research')).toContain('browser_type');
     // A critic has no shell — it judges an interface, it does not run builds.
     expect(specialistToolsFor('ui-critic')).not.toContain('bash');
     // An unknown kind still gets a workable default rather than nothing.

@@ -315,6 +315,16 @@ function createChildBridge(
          * packages/harness subagent/specialist-env.ts.
          */
         ...(opts.specialist !== undefined ? { PI_DESKTOP_SPECIALIST: opts.specialist } : {}),
+        /*
+         * A CHILD'S TOOL INTERFACE IS ITS OWN SETTING. the user: "ensure there is
+         * a cli connector for the specialists that is by default there and
+         * enabled, cli tools are a good context saver". The chat may run
+         * schemas; a specialist running one pinned job takes the CLI (the
+         * default) and pays a fraction of the prompt for the same reach —
+         * `cliVisibleTools` narrows the commands to its kit, and the harness's
+         * coverage test guarantees every tool it may hold has a command.
+         */
+        PI_DESKTOP_TOOL_CLI: readSettings().specialistToolInterface === 'bash-cli' ? '1' : '0',
       },
       noSession: true,
       extensionPaths: EXTENSION_PATHS,

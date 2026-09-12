@@ -11,6 +11,7 @@ import { isBuiltinConnector, KNOWN_CONNECTORS, KNOWN_CONNECTORS_BY_ID } from './
 describe('built-in connectors', () => {
   it('ships HyperFrames, Video editing, and the first-party macOS connectors', () => {
     expect(BUILTIN_CONNECTOR_IDS).toEqual([
+      'cli-tools',
       'hyperframes',
       'video-editing',
       'mac-calendar',
@@ -53,8 +54,9 @@ describe('built-in connectors', () => {
   });
 
   it('is merged to the FRONT of the exported catalog', () => {
-    expect(KNOWN_CONNECTORS[0]?.id).toBe('hyperframes');
-    expect(KNOWN_CONNECTORS[1]?.id).toBe('video-editing');
+    expect(KNOWN_CONNECTORS[0]?.id).toBe('cli-tools');
+    expect(KNOWN_CONNECTORS[1]?.id).toBe('hyperframes');
+    expect(KNOWN_CONNECTORS[2]?.id).toBe('video-editing');
   });
 
   it('renders a neutral (non-brand, currentColor) inline SVG mark', () => {

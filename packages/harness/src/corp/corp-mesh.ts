@@ -19,6 +19,7 @@
  * Pure roster + orchestration; the model work is behind the injected seam.
  */
 
+import { BROWSER_TOOL_NAMES } from '@pi-desktop/browser-use/tool-names';
 import { CHECK_FIX_CHECK, RIGOROUS_VERIFICATION_INSTRUCTION } from '../verification-language.js';
 import {
   MANAGER_PLANNING_TOOLS,
@@ -507,16 +508,15 @@ const RESEARCH_TOOLS = ['web_search', 'web_fetch'];
  * it: a manager testing as a user, and the visual specialist, which otherwise has
  * no way to establish that anything appears at all.
  */
-const BROWSER_TOOLS = [
-  'browser_navigate',
-  'browser_read',
-  'browser_snapshot',
-  'browser_click',
-  'browser_key',
-  'browser_scroll',
-  'browser_screenshot',
-  'browser_back',
-];
+/*
+ * THE REGISTERED NAMES, imported. This list was hand-typed and had drifted:
+ * `browser_screenshot` is a tool nothing registers (browser-use's tool-names
+ * module warns about exactly that name), and `browser_type` — TYPING — was
+ * missing, so a specialist could open a page and click but never fill a field.
+ * Found by the CLI-parity guard (cli-coverage.test.ts), which asks that every
+ * tool a kit names be a command a specialist can actually run.
+ */
+const BROWSER_TOOLS = [...BROWSER_TOOL_NAMES];
 /** Everything needed to work in a real tree: see it, search it, read it, change it. */
 const FILE_TOOLS = ['read', 'write', 'edit', 'ls', 'grep', 'find'];
 

@@ -128,3 +128,36 @@ describe('every schema tool is reachable as a command', () => {
     for (const t of PINNED_AS_SCHEMAS) expect(commandReachable().has(t)).toBe(true);
   });
 });
+
+/**
+ * SPECIALISTS RUN ON THE CLI BY DEFAULT, AND LOSE NOTHING BY IT.
+ *
+ * the user: "ensure there is a cli connector for the specialists that is by
+ * default there and enabled, cli tools are a good context saver so it's
+ * important that they're just the same power as schemas." The desktop spawns
+ * every specialist child with PI_DESKTOP_TOOL_CLI=1 (its own setting), and
+ * `cliVisibleTools` narrows the commands to that specialist's kit — so every
+ * tool a kit names has to have a command, or the kit is quietly smaller in the
+ * mode it now runs in.
+ */
+describe('every specialist kit is reachable as commands', () => {
+  it('names no tool that CLI mode cannot offer a specialist', async () => {
+    const { MESH_SPECIALIST_KINDS, specialistToolsFor } = await import('../corp/corp-mesh');
+    const commands = commandReachable();
+    const gaps: string[] = [];
+    for (const kind of MESH_SPECIALIST_KINDS) {
+      for (const t of specialistToolsFor(kind)) {
+        if (
+          !commands.has(t) &&
+          !INTERFACE_TOOLS.has(t) &&
+          !PINNED_AS_SCHEMAS.has(t) &&
+          !CONNECTOR_PROVIDED.has(t) &&
+          !NOT_REGISTERED_HERE.has(t)
+        ) {
+          gaps.push(`${kind}: ${t}`);
+        }
+      }
+    }
+    expect(gaps).toEqual([]);
+  });
+});

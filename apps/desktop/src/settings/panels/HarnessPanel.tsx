@@ -270,12 +270,35 @@ export function HarnessPanel() {
  */
 function ToolInterfaceSection() {
   const value = useSettingsStore((s) => s.settings.toolInterface ?? 'bash-cli');
+  const specialists = useSettingsStore((s) => s.settings.specialistToolInterface ?? 'bash-cli');
   const update = useSettingsStore((s) => s.update);
   return (
     <SettingSection
       title="Tool interface"
       description="How the model reaches everything it can do."
     >
+      {/* the user: "ensure there is a cli connector for the specialists that is by
+          default there and enabled". Specialists and subagents get their own
+          switch, CLI by default, whatever the chat itself uses. */}
+      <SettingRow
+        label="Specialists use"
+        hint={
+          specialists === 'bash-cli'
+            ? 'Subagents and specialists reach every tool in their kit as a command — the same reach as schemas at a fraction of the prompt. The default.'
+            : 'Subagents and specialists get their kit as JSON schemas, like the chat when it is set to Schemas.'
+        }
+      >
+        <SegmentedControl
+          aria-label="Specialist tool interface"
+          data-testid="settings-specialist-tool-interface"
+          value={specialists}
+          onValueChange={(v) => void update({ specialistToolInterface: v as ToolInterface })}
+          options={[
+            { value: 'schemas', label: 'Schemas' },
+            { value: 'bash-cli', label: 'Bash CLI' },
+          ]}
+        />
+      </SettingRow>
       <SettingRow
         label="Tools as"
         hint={

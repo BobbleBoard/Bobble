@@ -180,7 +180,45 @@ export const MAC_CONNECTORS: KnownConnector[] = [
  * never runs as a server) and a static tool list for the detail view. Icons are
  * neutral line-art glyphs from `connector-icons`.
  */
+const CLI_TOOLS_DESCRIPTION =
+  'Every tool as a command behind `bash` — `tools`, `tools search`, `<command> --help`. ' +
+  'Specialists and subagents run on it by default: the same reach as the JSON schemas at a ' +
+  'fraction of the prompt. Switch it in Settings → Harness → Tool interface.';
+
 export const BUILTIN_CONNECTORS: KnownConnector[] = [
+  {
+    /*
+     * THE CLI, AS A CONNECTOR CARD. the user: "ensure there is a cli connector for
+     * the specialists that is by default there and enabled, cli tools are a
+     * good context saver so it's important that they're just the same power
+     * as schemas." The mode itself is the harness's (tool-cli-bridge.ts) and
+     * the switch lives in Settings; this card is where a person discovers that
+     * it exists and that it is on. Its "tools" are the three ways in.
+     */
+    id: 'cli-tools',
+    name: 'CLI tools',
+    kind: 'builtin',
+    firstParty: true,
+    official: true,
+    category: 'dev',
+    icon: '⌨️',
+    description: CLI_TOOLS_DESCRIPTION,
+    tools: [
+      { name: 'tools', description: 'List every command group the session has on PATH.' },
+      { name: 'tools search', description: 'Find a command by what it does.' },
+      {
+        name: '<command> --help',
+        description: 'The arguments of any command, from its own schema.',
+      },
+    ],
+    template: {
+      id: 'cli-tools',
+      name: 'CLI tools',
+      icon: '⌨️',
+      description: CLI_TOOLS_DESCRIPTION,
+      command: '',
+    },
+  },
   {
     id: 'hyperframes',
     name: 'HyperFrames',

@@ -170,6 +170,10 @@ const NEUTRAL_ICON_SVGS: Record<string, string> = {
     '<path d="M12 3.5 20 8v8l-8 4.5L4 16V8z"/><path d="M4 8l8 4.5L20 8"/><path d="M12 12.5V20.5"/>',
   ),
   // ── First-party builtins ("By us") ──────────────────────────────────────────
+  // A terminal prompt: the CLI tool interface.
+  'cli-tools': neutralSvg(
+    '<rect x="3.5" y="5" width="17" height="14" rx="2"/><path d="m7.5 9.5 3 2.5-3 2.5"/><path d="M12.5 14.5h4"/>',
+  ),
   // Film strip / frames (motion-graphics render).
   hyperframes: neutralSvg(
     '<rect x="3.5" y="5.5" width="17" height="13" rx="2"/><path d="M7.75 5.5v13M16.25 5.5v13"/><path d="M3.5 9.5h4.25M3.5 14.5h4.25M16.25 9.5h4.25M16.25 14.5h4.25"/>',

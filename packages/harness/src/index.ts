@@ -859,7 +859,18 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     );
     // Zero matches means this build registered none of the specialist's tools;
     // an agent with an empty CLI can do nothing, so leave it whole.
-    return allowed.size > 0 ? registered.filter((t) => allowed.has(t.name)) : registered;
+    const narrowed = allowed.size > 0 ? registered.filter((t) => allowed.has(t.name)) : registered;
+    if (dbg !== undefined && dbg.length > 0) {
+      try {
+        appendFileSync(
+          dbg,
+          `  specialist(${specialist}) commands(${narrowed.length})=${narrowed.map((t) => t.name).join(',')}\n`,
+        );
+      } catch {
+        /* diagnostic only */
+      }
+    }
+    return narrowed;
   }
   const toolCliMode = process.env.PI_DESKTOP_TOOL_CLI === '1';
   /** The call in flight, so a result can tell whether it is a verbatim repeat. */

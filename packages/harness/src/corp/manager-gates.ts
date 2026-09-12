@@ -54,7 +54,9 @@ export const TEST_TOOL_KITS = {
       'browser_snapshot',
       'browser_click',
       'browser_type',
-      'browser_screenshot',
+      // `browser_screenshot` was named here and registered nowhere; the
+      // snapshot is the model's eyes (browser-use/tool-names).
+      'browser_scroll',
     ],
   },
   shell: {
