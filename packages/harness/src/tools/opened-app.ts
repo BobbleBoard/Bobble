@@ -174,3 +174,22 @@ export function openedAppNote(
     'automatically; read that and act by x,y coordinates.]'
   );
 }
+
+/**
+ * Did the `open` actually open anything? Read from the RESULT, not the command.
+ *
+ * The wrapper blocks `open <file>` ("Nothing was opened"), a consent gate can
+ * decline the app ("user declined Mac control"), the launch can fail, or the
+ * target can simply not exist. Every one of those used to get the "[This opened
+ * …]" note anyway, and a model that trusts the harness repeated it to the user
+ * as fact. Any of these markers means: say nothing.
+ */
+export function openDidNotHappen(resultText: string): boolean {
+  return (
+    /hands the file to a GUI app|Nothing was opened|user declined Mac control|Mac control needs a one-time consent/i.test(
+      resultText,
+    ) ||
+    /Command exited with code [1-9]/.test(resultText) ||
+    /does not exist|No such file or directory|Unable to find application/i.test(resultText)
+  );
+}

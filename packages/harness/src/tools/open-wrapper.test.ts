@@ -70,6 +70,24 @@ describe('the open wrapper', () => {
     const res = spawnSync(installed(), [file], { encoding: 'utf8' });
     expect(res.status).toBe(1);
     expect(res.stderr).toContain('read tool');
+    // …and says plainly that nothing happened, which the note-appender reads.
+    expect(res.stderr).toContain('Nothing was opened');
+  });
+
+  it('names the way to SHOW the file to the user, when there is one', () => {
+    // MEASURED: "open it so I can see it" became `open index.html` twice; the
+    // block pointed only at reading, and `present` went uncalled in 23 asks.
+    const dir = mkdtempSync(path.join(tmpdir(), 'pi-openwrap-present-'));
+    const shim = path.join(dir, 'open');
+    writeFileSync(shim, buildOpenWrapper('coordinate present'), { mode: 0o755 });
+    const file = path.join(dir, 'page.html');
+    writeFileSync(file, '<h1>hi</h1>');
+    const res = spawnSync(shim, [file], { encoding: 'utf8' });
+    expect(res.status).toBe(1);
+    expect(res.stderr).toContain(`coordinate present "${file}"`);
+    expect(res.stderr).toContain('SHOW it to the user');
+    // Without a present command (a subagent), the redirect stays honest.
+    expect(buildOpenWrapper(null)).not.toContain('SHOW it to the user');
   });
 
   it('treats a bare app name as a launch, not a missing file', () => {

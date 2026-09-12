@@ -117,9 +117,9 @@ import {
 import { wouldHang } from './tools/hang-guard.js';
 import { registerImageTools } from './tools/image-tools.js';
 import { applyBias, lastAssistantThought, planBias } from './tools/intent-bias.js';
-import { detectOpenedApp, openedAppNote } from './tools/opened-app.js';
+import { detectOpenedApp, openDidNotHappen, openedAppNote } from './tools/opened-app.js';
 import { registerPlanTool } from './tools/plan-tool.js';
-import { registerPresentTool } from './tools/present.js';
+import { PRESENT_TOOL_NAME, registerPresentTool } from './tools/present.js';
 import { presentBridgeFromEnv } from './tools/present-bridge.js';
 import { withRepeatNotice } from './tools/repeat-notice.js';
 import { registerSandboxFileTools, resolveWorkspaceRoot } from './tools/sandbox-fs.js';
@@ -2050,6 +2050,8 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
          * the bash tool uses, so raising one cannot silently strand the other.
          */
         dispatchTimeoutMs: (DEFAULT_BASH_TIMEOUT_S + 120) * 1000,
+        // So the `open` wrapper can name the way to SHOW a file to the user.
+        presentCommand: cliCommandForTool?.(PRESENT_TOOL_NAME) ?? null,
       },
     );
     /* pi's ExtensionAPI has no shutdown hook, so the disposer rides the process
@@ -3872,6 +3874,19 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
        * that tells a model it failed at the thing it just did is worse than one
        * that says nothing.
        */
+      /*
+       * AND DO NOT CLAIM WHAT DID NOT HAPPEN. The note describes the command's
+       * SHAPE; whether anything opened is in the RESULT. MEASURED in the canvas
+       * assessment: the wrapper blocked `open ./media/mug.png` (exit 1, "nothing
+       * was opened"), consent for Preview was declined, the file in one case did
+       * not even exist — and this note still said "[This opened Preview…]". The
+       * model believed the note over the result and told the user "all three
+       * files have been successfully opened in their respective apps".
+       */
+      const resultText = event.content
+        .map((part) => (part.type === 'text' ? part.text : ''))
+        .join('\n');
+      if (openDidNotHappen(resultText)) return undefined;
       if (opened.strayWebPage !== true || !toolCliMode) {
         const note = openedAppNote(opened, cliCommandForTool);
         const withNote = event.content.map((part, i) =>

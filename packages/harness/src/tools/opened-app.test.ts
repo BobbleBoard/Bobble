@@ -8,7 +8,7 @@
  * to the BUILT-IN browser — a different browser, different logins, different page.
  */
 import { describe, expect, it } from 'vitest';
-import { detectOpenedApp, openedAppNote } from './opened-app';
+import { detectOpenedApp, openDidNotHappen, openedAppNote } from './opened-app';
 
 describe('spotting that a command opened an app', () => {
   it('reads `open -a` with a quoted app and a URL', () => {
@@ -142,5 +142,34 @@ describe('AppleScript is the other way into a Mac app', () => {
 
   it('ignores osascript that is not telling an application anything', () => {
     expect(detectOpenedApp(`osascript -e 'return 1 + 1'`)).toBeUndefined();
+  });
+});
+
+describe('whether anything actually opened', () => {
+  // MEASURED in the canvas assessment: every one of these results still got
+  // the "[This opened …]" note, and the model told the user the files were open.
+  it('reads the wrapper block as nothing opened', () => {
+    expect(
+      openDidNotHappen(
+        'open <file> hands the file to a GUI app and brings that app to the front… Nothing was opened.\n\nCommand exited with code 1',
+      ),
+    ).toBe(true);
+  });
+
+  it('reads a declined consent as nothing opened', () => {
+    expect(openDidNotHappen('user declined Mac control for Preview')).toBe(true);
+    expect(openDidNotHappen('Mac control needs a one-time consent, but there is no UI')).toBe(true);
+  });
+
+  it('reads a missing target as nothing opened', () => {
+    expect(openDidNotHappen('The file /x/beat.flac does not exist.')).toBe(true);
+    expect(openDidNotHappen('ls: ./media/mug.glb: No such file or directory')).toBe(true);
+  });
+
+  it('reads a clean launch as opened', () => {
+    expect(openDidNotHappen('')).toBe(false);
+    expect(
+      openDidNotHappen('Launched Preview in the background.\n\nCommand exited with code 0'),
+    ).toBe(false);
   });
 });

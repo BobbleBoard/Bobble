@@ -60,6 +60,9 @@ export interface ToolCliOptions {
   readonly onLog?: (m: string) => void;
   /** Must exceed the bash tool's timeout. See DEFAULT_DISPATCH_TIMEOUT_MS. */
   readonly dispatchTimeoutMs?: number;
+  /** The command that shows a file to the user (`coordinate present`), for the
+   * `open` wrapper's redirect. Absent when `present` is not registered. */
+  readonly presentCommand?: string | null;
 }
 
 export interface ToolCliHandle {
@@ -134,7 +137,22 @@ function shellQuote(v: string): string {
   return `'${v.replaceAll("'", `'\\''`)}'`;
 }
 
-export function buildOpenWrapper(): string {
+/**
+ * The wrapper for `open`.
+ *
+ * `presentCommand` is what the model should have typed when it meant "show the
+ * user": `coordinate present <path>`. MEASURED in the canvas assessment — asked
+ * "open it so I can see it" for a page it had just written, a model ran `open`
+ * twice, was told to use the read tool, and told the user the file was "open in
+ * your default editor". The block message pointed only at READING; the tool
+ * that shows a file to the person was never mentioned, and in 23 asks it was
+ * never called.
+ */
+export function buildOpenWrapper(presentCommand: string | null = null): string {
+  const show =
+    presentCommand === null
+      ? ''
+      : ` To SHOW it to the user, run: ${presentCommand} \\"$target\\" — it opens the file in the app canvas and hands you a preview back.`;
   return [
     '#!/bin/sh',
     "# open — wrapped while Bobble's tool commands are on PATH.",
@@ -239,7 +257,7 @@ export function buildOpenWrapper(): string {
     '    echo "open <folder> opens a Finder window in front of the user. Listing it instead (ls -la)." >&2',
     '    exec ls -la "$target"',
     '  elif [ -e "$target" ]; then',
-    '    echo "open <file> hands the file to a GUI app and brings that app to the front, taking the screen from the user. Use the read tool on "$target" — it is a normal tool, not a command — or act on the file with the shell." >&2',
+    `    echo "open <file> hands the file to a GUI app and brings that app to the front, taking the screen from the user. Nothing was opened.${show} To read it yourself, use the read tool on "$target" — a normal tool, not a command." >&2`,
     '    exit 1',
     '  fi',
     '  [ -n "$flagged" ] || exec /usr/bin/open "$@"',
@@ -435,7 +453,9 @@ export function registerToolCli(host: ToolCliHost, opts: ToolCliOptions = {}): T
   }
   // `open` is wrapped, not shadowed: only the form that steals the screen is
   // redirected (see buildOpenWrapper).
-  fs.writeFileSync(path.join(shimDir, 'open'), buildOpenWrapper(), { mode: 0o755 });
+  fs.writeFileSync(path.join(shimDir, 'open'), buildOpenWrapper(opts.presentCommand ?? null), {
+    mode: 0o755,
+  });
   for (const [decoy, suggestion] of Object.entries(DECOYS)) {
     // Only where a real command of that name is not already the point — these
     // sit FIRST on PATH, so they shadow the system one for this session only.
