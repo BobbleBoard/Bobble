@@ -173,6 +173,19 @@ def watch_steps(job_id, cand_idx, step_dir, total, stop):
         time.sleep(0.25)
 
 
+TAIL_LINES = 12
+
+
+def tail_text(keep):
+    """The last lines a child printed, as one clause for an error message — the
+    difference between "exited with code 1" and knowing why. tqdm frames and
+    blank lines are dropped; a traceback's last line is what usually matters."""
+    lines = [l for l in (keep or []) if l and not re.match(r"^\s*\d+%\|", l)]
+    if not lines:
+        return ""
+    return " — last output: " + " | ".join(lines[-4:])
+
+
 def drain_output(job_id, stream, keep=None):
     """Drain the merged child output so tqdm never blocks on backpressure, and
     surface a coarse `download` event while weights are fetched. tqdm redraws with
@@ -199,6 +212,10 @@ def drain_output(job_id, stream, keep=None):
             low = line.lower()
             if not ("fetching" in low or "downloading" in low):
                 text = line.strip()
+                if text and keep is not None:
+                    # The tail that explains a non-zero exit (see tail_text).
+                    keep.append(text[:240])
+                    del keep[:-TAIL_LINES]
                 now = time.time()
                 if text and now - last_log_at >= 0.75:
                     last_log_at = now
@@ -338,8 +355,9 @@ def run_one(job_id, spec, seed, cand_idx, out_dir, total_steps):
         # A `log` line is what the card shows as its note (the manager keeps the
         # last one), so the user sees WHY this run is slower than the last.
         emit({"event": "log", "jobId": job_id, "text": pacing_note(pacer.pace)})
+    tail = []
     try:
-        drain_output(job_id, proc.stdout)
+        drain_output(job_id, proc.stdout, keep=tail)
     finally:
         pacer.close()
         proc.wait()
@@ -347,7 +365,12 @@ def run_one(job_id, spec, seed, cand_idx, out_dir, total_steps):
         watcher.join(timeout=1.0)
 
     if proc.returncode != 0:
-        raise RuntimeError(f"{spec['mfluxCommand']} exited with code {proc.returncode}")
+        # SEEN: "mflux-generate exited with code 1" and nothing else, so the
+        # model that asked for the picture guessed at a cause and picked another
+        # model. The child said why; it goes in the message.
+        raise RuntimeError(
+            f"{spec['mfluxCommand']} exited with code {proc.returncode}{tail_text(tail)}"
+        )
     if not os.path.exists(out_path):
         raise RuntimeError(f"mflux produced no output at {out_path}")
     # Final full-resolution step is done — emit the terminal progress tick.
@@ -618,7 +641,7 @@ def synthesize_3d(job_id, spec, seed, cand_idx, out_dir, pipeline=None):
         )
     rc = drive_subprocess(job_id, cmd, pace=spec.get("pace", 0))
     if rc != 0:
-        raise RuntimeError(f"3D generation exited with code {rc}")
+        raise RuntimeError(f"3D generation exited with code {rc}{tail_text(_LAST_OUTPUT)}")
     if not os.path.exists(out_path):
         raise RuntimeError(f"3D generation produced no output at {out_path}")
     return out_path

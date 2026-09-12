@@ -81,7 +81,11 @@ function readMcpMode(): McpMode | null {
 
 /** Current document: the persisted file when present, else a pure seed (no
  * write) from onboarding + the mcp registry. */
+/** What a fenced run (see settingsWriteIsFenced) has set, in memory only. */
+let fencedOverlay: DesktopSettings | null = null;
+
 export function readSettings(): DesktopSettings {
+  if (fencedOverlay !== null) return fencedOverlay;
   const raw = safeRead(SETTINGS_PATH);
   if (raw === null) return seedFromOnboarding(readOnboardingChoices(), readMcpMode());
   try {
@@ -159,7 +163,46 @@ function writeSamplingSidecar(settings: DesktopSettings): void {
   }
 }
 
+/**
+ * A PROBE MUST NEVER WRITE THE PERSON'S SETTINGS.
+ *
+ * `~/.pi/desktop/settings.json` is shared with the real app. Twice now a
+ * headless probe launched without a throwaway HOME has set what it needed for
+ * its run — `powerMode: 'full'` before the freeze of 2026-09-11, and
+ * `toolInterface: 'schemas'` + `powerMode: 'full'` (gen-chat-capture) — and
+ * left it there, so the user's Bobble came up in a mode he never chose: "cli should
+ * be default mode, so why is it not in the shipped applications build?" It was;
+ * his file said otherwise.
+ *
+ * So under PI_E2E the document is kept in memory only when HOME is the
+ * account's real home — `os.userInfo().homedir` reads the passwd entry, which a
+ * probe's `HOME=` override does not touch — and the refusal is logged where the
+ * probe's author will see it. A probe with its own HOME writes as before.
+ */
+export function settingsWriteIsFenced(
+  env: NodeJS.ProcessEnv = process.env,
+  realHome: () => string = () => os.userInfo().homedir,
+  home: string = HOME,
+): boolean {
+  if (env.PI_E2E !== '1') return false;
+  try {
+    return path.resolve(realHome()) === path.resolve(home);
+  } catch {
+    return false;
+  }
+}
+
 function writeSettings(settings: DesktopSettings): void {
+  if (settingsWriteIsFenced()) {
+    log.warn('settings write REFUSED: PI_E2E run aimed at the real home — give the probe its own HOME', {
+      path: SETTINGS_PATH,
+    });
+    // The run still gets what it asked for — for as long as it runs.
+    fencedOverlay = settings;
+    applySearchEnv(settings);
+    applyMcpMode(effectiveMcpMode(settings.mcpMode, settings.toolInterface));
+    return;
+  }
   fs.mkdirSync(path.dirname(SETTINGS_PATH), { recursive: true });
   // 0600: the document carries web-search API keys.
   fs.writeFileSync(SETTINGS_PATH, `${JSON.stringify(settings, null, 2)}\n`, { mode: 0o600 });

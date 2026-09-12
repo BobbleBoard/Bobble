@@ -969,7 +969,22 @@ export function mapToolStep(
       ? { ...step, data: { ...step.data, durationMs: measured } }
       : step;
   if (result?.isError !== true) return withDuration;
-  return { ...withDuration, data: { ...withDuration.data, failed: true } };
+  return {
+    ...withDuration,
+    data: { ...withDuration.data, failed: true, label: failedLabel(withDuration.data.label) },
+  };
+}
+
+/**
+ * A FAILED WRITE DID NOT WRITE. The row read "Wrote a file · fox-under-oak-tree.png
+ * +12" in red (SEEN) for a write the guard had refused — the colour said no
+ * and the verb said yes, and the verb is what gets read. Only the edit family
+ * is reworded: "Ran a command" that failed still ran.
+ */
+export function failedLabel(label: string): string {
+  if (label === 'Wrote a file') return 'Could not write the file';
+  if (label === 'Edited a file') return 'Could not edit the file';
+  return label;
 }
 
 /** Map one tool-call block (+ its result) to a chain step and optional canvas tab. */

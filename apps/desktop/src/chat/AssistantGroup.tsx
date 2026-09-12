@@ -26,7 +26,7 @@ import { InlineArtifact } from './canvas/InlineArtifacts';
 import { useGeneratingJob } from './GeneratingMedia';
 import { jobSamples, recordJobDuration } from './job-history';
 import { LongJobCard } from './LongJobCard';
-import { estimateFor, type JobKind, jobKindForTool, jobView } from './long-job';
+import { effectiveToolName, estimateFor, type JobKind, jobKindForTool, jobView } from './long-job';
 import { Markdown } from './markdown';
 import { ThreadActivityChain } from './ThreadActivity';
 import { ThreadMedia } from './ThreadMedia';
@@ -48,6 +48,14 @@ function pendingKindFor(kind: JobKind): PendingKind | null {
   return null;
 }
 
+/** The arguments of the tool call `callId` in this group, for effectiveToolName. */
+function callArgsFor(group: readonly AssistantMsg[], callId: string | undefined): unknown {
+  if (callId === undefined) return undefined;
+  for (const m of group)
+    for (const b of m.blocks) if (b.type === 'toolCall' && b.id === callId) return b.arguments;
+  return undefined;
+}
+
 function mediaForSegment(
   seg: { kind: string; blocks?: readonly ContentBlock[] },
   resultForBlock: Map<string, ToolResultMsg>,
@@ -58,7 +66,9 @@ function mediaForSegment(
     if (b.type !== 'toolCall') continue;
     const result = resultForBlock.get(b.id);
     if (result === undefined) continue;
-    out.push(...mediaFromToolResult(result.toolName, result.text, result.isError));
+    // A `bash media generate …` result is the generation tool's result.
+    const toolName = effectiveToolName(result.toolName, b.arguments);
+    out.push(...mediaFromToolResult(toolName, result.text, result.isError));
   }
   return out;
 }
@@ -152,7 +162,7 @@ export function AssistantGroup({
       for (const b of m.blocks) {
         if (b.type !== 'toolCall' || runningJob !== null) continue;
         if (!runningToolCalls.includes(b.id) || resultForBlock.has(b.id)) continue;
-        const kind = jobKindForTool(b.name);
+        const kind = jobKindForTool(effectiveToolName(b.name, b.arguments));
         if (kind === null) continue;
         runningJob = { kind, callId: b.id, startedAt: m.timestamp };
       }
@@ -189,7 +199,7 @@ export function AssistantGroup({
   for (const m of group) {
     for (const b of m.blocks) {
       if (b.type !== 'toolCall') continue;
-      const kind = jobKindForTool(b.name);
+      const kind = jobKindForTool(effectiveToolName(b.name, b.arguments));
       if (kind === null) continue;
       const result = resultForBlock.get(b.id);
       if (result === undefined) continue;
@@ -235,7 +245,11 @@ export function AssistantGroup({
   const handingItem =
     handingResult === undefined
       ? undefined
-      : mediaFromToolResult(handingResult.toolName, handingResult.text, handingResult.isError)[0];
+      : mediaFromToolResult(
+          effectiveToolName(handingResult.toolName, callArgsFor(group, handing?.callId)),
+          handingResult.text,
+          handingResult.isError,
+        )[0];
   const handingLive = handingItem !== undefined && !revealed.has(handingItem.path);
 
   const segments = segmentGroup(group);

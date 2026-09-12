@@ -46,6 +46,7 @@ import {
   jobFootprintGB,
   MODALITY_CATALOG,
   type ModalityModel,
+  modelsForModality,
   previewCostGB,
 } from '@pi-desktop/gen-service';
 import {
@@ -466,7 +467,13 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
   async function handleGenerate(raw: GenerateImageParams): Promise<GenerateImageResult> {
     const model = getModel(raw.model ?? defaultImageModel().id);
     if (model === undefined || model.modality !== 'image' || model.mflux === undefined) {
-      throw new Error(`unknown or non-image model "${raw.model ?? ''}"`);
+      const runnable = modelsForModality('image')
+        .filter((m) => m.mflux !== undefined)
+        .map((m) => m.id)
+        .join(', ');
+      throw new Error(
+        `unknown or non-image model "${raw.model ?? ''}" — image models that can run here: ${runnable}`,
+      );
     }
     const jobId = `gen_${Date.now()}_${randomBytes(3).toString('hex')}`;
     // The FOLDER is named after what was asked for; jobId stays the internal id.

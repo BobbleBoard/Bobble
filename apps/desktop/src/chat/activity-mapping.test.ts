@@ -1163,3 +1163,25 @@ describe('a running command says what it is', () => {
     expect(running('{"cw').command).toBeUndefined();
   });
 });
+
+describe('a failed write says it could not write', () => {
+  it('rewords the edit family only', () => {
+    const write = call('w1', 'write', { path: 'fox.png', content: 'x' });
+    const refused: ToolResultMsg = {
+      ...result('w1', 'Not written: fox.png is a picture'),
+      toolName: 'write',
+      isError: true,
+    };
+    const step = mapToolStep(write, refused, false);
+    expect(step.data.failed).toBe(true);
+    expect(step.data.label).toBe('Could not write the file');
+    const ok = mapToolStep(write, { ...refused, isError: false }, false);
+    expect(ok.data.label).toBe('Wrote a file');
+    const ran = mapToolStep(
+      call('b1', 'bash', { command: 'ls' }),
+      { ...refused, toolName: 'bash' },
+      false,
+    );
+    expect(ran.data.label).toBe('Ran a command');
+  });
+});

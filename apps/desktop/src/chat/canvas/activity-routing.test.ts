@@ -214,6 +214,39 @@ describe('detectActivity — newest wins, across kinds', () => {
   });
 });
 
+describe('detectActivity — a refused write is not a file', () => {
+  it('yields no surface at all once the only write in the turn has failed', () => {
+    // While the write streams, the tab shows it…
+    const streaming = detectActivity(
+      [
+        assistant('a1', [
+          call('w1', 'write', { path: '/Users/user/Pictures/fox.png', content: '<html>' }),
+        ]),
+      ],
+      {},
+      CWD,
+    );
+    expect(streaming.focus?.kind).toBe('file');
+    // …and once the guard has refused it there is nothing to show: the hook
+    // closes a file Activity tab in that state (SEEN: the refused HTML stayed up
+    // under "Pictures › fox-test › fox-storybook.png" and the model read the
+    // canvas report as success).
+    const refused = detectActivity(
+      [
+        assistant('a1', [
+          call('w1', 'write', { path: '/Users/user/Pictures/fox.png', content: '<html>' }),
+        ]),
+        { ...result('w1', 'Not written: fox.png is a picture'), toolName: 'write', isError: true },
+      ],
+      {},
+      CWD,
+      { settled: true },
+    );
+    expect(refused.focus).toBeUndefined();
+    expect(activitySpec(refused, CWD)).toBeUndefined();
+  });
+});
+
 describe('activityMirrorText — nothing is lost', () => {
   const ls = { callId: 'c1', command: 'ls -la', output: '', running: true };
 

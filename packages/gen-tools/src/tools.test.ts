@@ -1,3 +1,6 @@
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import type { ExtensionAPI, ToolDefinition } from '@mariozechner/pi-coding-agent';
 import { defaultVideoModel, getModel } from '@pi-desktop/gen-service';
 import { describe, expect, it } from 'vitest';
@@ -9,6 +12,7 @@ import {
   GENERATE_VIDEO_TOOL,
   parseSize,
   registerGenTools,
+  saveOutputs,
 } from './tools.ts';
 
 type Handler = (params: Record<string, unknown> | undefined) => unknown;
@@ -82,11 +86,14 @@ describe('parseSize', () => {
 });
 
 describe('generate_image tool', () => {
-  it('registers the tool and advertises the catalog models', () => {
+  it('registers the tool and advertises the catalog models it can actually run', () => {
     const tools = collectTools(new FakeBridge());
     const tool = tools.get(GENERATE_IMAGE_TOOL);
     expect(tool?.label).toBe('Generate: Image');
     expect(tool?.description).toContain('z-image-turbo');
+    // A ComfyUI-backed image model is not one the mflux path can run — SEEN
+    // offered and then refused in the same turn.
+    expect(tool?.description).not.toContain('flux1-dev-gguf');
   });
 
   it('reports unavailable when no bridge (loaded outside Pi Desktop)', async () => {
@@ -158,6 +165,28 @@ describe('generate_image tool', () => {
     const images = res.content.filter((c) => c.type === 'image');
     expect(images).toHaveLength(2);
     expect(reads).toEqual(['/out/a.png', '/out/b.png']);
+  });
+
+  it('saves the picture where the user said (save_to), and says so', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'gen-tools-save-'));
+    const src = path.join(dir, 'cand0.png');
+    writeFileSync(src, 'png-bytes');
+    const bridge = new FakeBridge().on('generate', (params) => ({
+      jobId: 'job-2',
+      outputs: [{ outputPath: src, modality: 'image', model: params?.model, seed: 1 }],
+    }));
+    const tools = collectTools(bridge, async () => Buffer.from('x'));
+    const folder = path.join(dir, 'book', 'pages');
+    // A trailing slash says "folder" — a bare name with one picture is the file.
+    const res = await run(tools, {
+      prompt: 'Title slide: a tree with a hidden forest',
+      save_to: `${folder}/`,
+    });
+    const text = (res.content.find((c) => c.type === 'text') as { text: string }).text;
+    const saved = path.join(folder, 'title-slide-a-tree-with-a-hidden-forest.png');
+    expect(text).toContain(`Saved to:\n  1. ${saved}`);
+    expect(readFileSync(saved, 'utf8')).toBe('png-bytes');
+    rmSync(dir, { recursive: true, force: true });
   });
 
   it('defaults to the catalog default model when none is given', async () => {
@@ -359,5 +388,97 @@ describe('generate_svg tool', () => {
   it('needs a prompt or an image', async () => {
     const res = await runSvg(collectSvgTools(new FakeBridge()), {});
     expect(details(res).ok).toBe(false);
+  });
+});
+
+describe('saveOutputs', () => {
+  const fake = () => {
+    const copies: Array<[string, string]> = [];
+    const dirs: string[] = [];
+    return {
+      copies,
+      dirs,
+      deps: {
+        copy: async (from: string, to: string) => void copies.push([from, to]),
+        ensureDir: async (d: string) => void dirs.push(d),
+        isDir: async () => false,
+      },
+    };
+  };
+
+  it('does nothing without a destination', async () => {
+    const f = fake();
+    expect(await saveOutputs(['/g/a.png'], undefined, 'x', f.deps)).toEqual({ paths: [] });
+    expect(f.copies).toEqual([]);
+  });
+
+  it('treats a .png path as the file, numbering further candidates beside it', async () => {
+    const f = fake();
+    const r = await saveOutputs(['/g/a.png', '/g/b.png'], '/pics/fox.png', 'a fox', f.deps);
+    expect(r.paths).toEqual(['/pics/fox.png', '/pics/fox-2.png']);
+    expect(f.dirs).toEqual(['/pics']);
+    expect(f.copies).toEqual([
+      ['/g/a.png', '/pics/fox.png'],
+      ['/g/b.png', '/pics/fox-2.png'],
+    ]);
+  });
+
+  it('treats anything else as a folder and names the pictures from the prompt', async () => {
+    const f = fake();
+    const r = await saveOutputs(
+      ['/g/a.png', '/g/b.png'],
+      '/pics/book/',
+      "Bramble's discovery — a fox looking up",
+      f.deps,
+    );
+    expect(r.paths).toEqual([
+      '/pics/book/bramble-s-discovery-a-fox-looking-up-1.png',
+      '/pics/book/bramble-s-discovery-a-fox-looking-up-2.png',
+    ]);
+    expect(f.dirs).toEqual(['/pics/book']);
+  });
+
+  it('reads a bare name (no extension, one picture) as the file, and a trailing slash as a folder', async () => {
+    const f = fake();
+    const one = await saveOutputs(['/g/a.png'], '/pics/book/title-slide', 'title', f.deps);
+    expect(one.paths).toEqual(['/pics/book/title-slide.png']);
+    const many = await saveOutputs(
+      ['/g/a.png', '/g/b.png'],
+      '/pics/book/title-slide',
+      'title',
+      f.deps,
+    );
+    expect(many.paths).toEqual([
+      '/pics/book/title-slide/title-1.png',
+      '/pics/book/title-slide/title-2.png',
+    ]);
+    const slash = await saveOutputs(['/g/a.png'], '/pics/book/', 'title', f.deps);
+    expect(slash.paths).toEqual(['/pics/book/title.png']);
+    const existing = await saveOutputs(['/g/a.png'], '/pics/book', 'title', {
+      ...f.deps,
+      isDir: async () => true,
+    });
+    expect(existing.paths).toEqual(['/pics/book/title.png']);
+  });
+
+  it('keeps the name but not a wrong extension: the bytes are PNG', async () => {
+    const f = fake();
+    const r = await saveOutputs(['/g/cand0.png'], '/pics/fox-storybook.jpg', 'fox', f.deps);
+    expect(r.paths).toEqual(['/pics/fox-storybook.png']);
+  });
+
+  it('expands ~ and reports a destination it could not write instead of throwing', async () => {
+    const f = fake();
+    const r = await saveOutputs(['/g/a.png'], '~/Pictures/x', 'p', {
+      ...f.deps,
+      copy: async () => {
+        throw new Error('EACCES: permission denied');
+      },
+    });
+    expect(f.dirs[0]?.startsWith('/')).toBe(true);
+    // One picture, a bare name: the file is x.png and its folder is made.
+    expect(f.dirs[0]?.endsWith('/Pictures')).toBe(true);
+    expect(r.error).toContain('EACCES');
+    expect(r.paths).toEqual([]);
   });
 });

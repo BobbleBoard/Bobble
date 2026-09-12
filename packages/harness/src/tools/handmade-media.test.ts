@@ -11,6 +11,8 @@ import {
   handmadeMediaRefusal,
   isHandmadeMedia,
   type MediaKind,
+  mediaFileKind,
+  mediaFileRefusal,
 } from './handmade-media.js';
 
 const ALL: ReadonlySet<MediaKind> = new Set<MediaKind>(['image', 'audio', 'video']);
@@ -129,5 +131,32 @@ describe('handmadeMediaRefusal', () => {
     expect(schema).toContain('Do NOT run this script');
     expect(handmadeMediaRefusal('t.py', 'audio', { cli: true })).toContain('media generate music');
     expect(handmadeMediaRefusal('c.py', 'video', { cli: true })).toContain('media generate video');
+  });
+});
+
+describe('a media file written as text', () => {
+  it('knows a picture, a sound and a clip by their extension, and nothing else', () => {
+    expect(mediaFileKind('fox_under_oak_tree.png')).toBe('image');
+    expect(mediaFileKind('/Users/x/Pictures/a.JPG')).toBe('image');
+    expect(mediaFileKind('song.mp3')).toBe('audio');
+    expect(mediaFileKind('clip.mp4')).toBe('video');
+    expect(mediaFileKind('logo.svg')).toBeNull(); // text — the SVG guard's business
+    expect(mediaFileKind('make.py')).toBeNull();
+    expect(mediaFileKind('notes.png.txt')).toBeNull();
+  });
+
+  it('refuses with the generator aimed at the path the model chose, in the mode it speaks', () => {
+    const cli = mediaFileRefusal('/Users/x/Pictures/fox-test/fox.png', 'image', { cli: true });
+    expect(cli).toContain('Not written: /Users/x/Pictures/fox-test/fox.png is a picture');
+    expect(cli).toContain(
+      'media generate image "<describe the picture>" --save-to "/Users/x/Pictures/fox-test/fox.png"',
+    );
+    expect(cli).toContain('bash tool');
+    const schemas = mediaFileRefusal('fox.png', 'image');
+    expect(schemas).toContain(
+      'generate_image { prompt: "<describe the picture>", save_to: "fox.png" }',
+    );
+    expect(schemas).toContain('capability("generation")');
+    expect(mediaFileRefusal('a.wav', 'audio', { cli: true })).toContain('media generate music');
   });
 });

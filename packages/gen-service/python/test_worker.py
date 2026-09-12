@@ -596,3 +596,41 @@ class PacerTests(unittest.TestCase):
         with capture_events() as events:
             worker.drive_subprocess("j1", [sys.executable, "-c", "print('hi')"])
         self.assertFalse(any("Low power" in e.get("text", "") for e in events), events)
+
+
+class TailTests(unittest.TestCase):
+    """A failed child's last lines travel with the error — "exited with code 1"
+    alone sent the asking model off to try another model (SEEN)."""
+
+    def test_drain_keeps_a_bounded_tail_without_progress_frames(self):
+        import io
+
+        keep = []
+        stream = io.StringIO("loading\n" + "\n".join(f"line {i}" for i in range(30)) + "\n 50%|#####     | 2/4\nTraceback: boom\n")
+        with capture_events():
+            worker.drain_output("j", stream, keep=keep)
+        self.assertLessEqual(len(keep), worker.TAIL_LINES)
+        self.assertEqual(keep[-1], "Traceback: boom")
+        text = worker.tail_text(keep)
+        self.assertIn("Traceback: boom", text)
+        self.assertNotIn("50%|", text)
+
+    def test_run_one_error_names_the_cause(self):
+        import subprocess as sp
+
+        spec = {"mfluxCommand": sys.executable, "prompt": "p"}
+        # A "generator" that prints a reason and fails.
+        real_build = worker.build_mflux_cmd
+        worker.build_mflux_cmd = lambda *_a, **_k: [
+            sys.executable,
+            "-c",
+            "import sys; print('ValueError: weights for flux1-schnell not found'); sys.exit(1)",
+        ]
+        try:
+            with tempfile.TemporaryDirectory() as out_dir, capture_events():
+                with self.assertRaises(RuntimeError) as ctx:
+                    worker.run_one("j", spec, 7, 0, out_dir, 4)
+            self.assertIn("exited with code 1", str(ctx.exception))
+            self.assertIn("weights for flux1-schnell not found", str(ctx.exception))
+        finally:
+            worker.build_mflux_cmd = real_build

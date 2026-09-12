@@ -9,7 +9,8 @@
  * Loaded outside Pi Desktop (no bridge env) the tool still registers but reports
  * a clear "bridge unavailable" error, so the extension is always safe to load.
  */
-import { readFile } from 'node:fs/promises';
+import { copyFile, mkdir, readFile, stat } from 'node:fs/promises';
+import { homedir } from 'node:os';
 import path from 'node:path';
 import type { AgentToolResult, ExtensionAPI } from '@mariozechner/pi-coding-agent';
 import {
@@ -98,7 +99,16 @@ export function parseSize(
   return { width: clamp(Number(m[1])), height: clamp(Number(m[2])) };
 }
 
-const IMAGE_MODEL_IDS = modelsForModality('image').map((m) => m.id);
+/*
+ * ONLY THE MODELS THE IMAGE PATH CAN RUN. The catalog also lists a ComfyUI-
+ * backed image model, and the manager's image path is mflux-only — so a list
+ * taken from the modality alone advertised `flux1-dev-gguf`, the 4B chose it
+ * for "high-quality", and was told "unknown or non-image model" by the very
+ * tool that had offered it (SEEN). An offer has to be one the tool can keep.
+ */
+const IMAGE_MODEL_IDS = modelsForModality('image')
+  .filter((m) => m.mflux !== undefined)
+  .map((m) => m.id);
 const VIDEO_MODEL_IDS = modelsForModality('video').map((m) => m.id);
 const AUDIO_MODELS = modelsForModality('audio');
 /* Speech runs on the uv worker; music and SFX run ComfyUI graphs. The split is
@@ -150,12 +160,20 @@ export function registerGenTools(pi: ExtensionAPI, options: GenToolsOptions): vo
       'image(s) and opens them on the canvas with a live progress bar. Every result is footnoted ' +
       `with the model that made it. Available models: ${IMAGE_MODEL_IDS.join(', ')} ` +
       '(default is a fast, Apache-licensed model). Use size like "512x512" or "1024x1024"; higher ' +
-      'sizes and step counts are slower.',
+      'sizes and step counts are slower. When the user names a folder or file for the picture, ' +
+      'pass it as save_to — the finished image is saved there for you; no copying afterwards.',
     promptSnippet: 'Generate an image from a text prompt (on-device)',
     parameters: Type.Object({
       prompt: Type.String({
         description: 'What to draw. Be specific about subject, style, lighting.',
       }),
+      save_to: Type.Optional(
+        Type.String({
+          description:
+            'Where the user wants the picture: a folder (the file gets a descriptive name) or a ' +
+            'full path ending in .png. Created if missing. Omit to keep it in the generated folder.',
+        }),
+      ),
       model: Type.Optional(
         Type.String({
           description: `Model id. One of: ${IMAGE_MODEL_IDS.join(', ')}. Default: fast model.`,
@@ -208,9 +226,26 @@ export function registerGenTools(pi: ExtensionAPI, options: GenToolsOptions): vo
         const lines = outputs.map(
           (o, i) => `  ${i + 1}. ${o.outputPath}${o.seed !== undefined ? ` (seed ${o.seed})` : ''}`,
         );
+        /*
+         * WHERE THE USER SAID. SEEN (children's book, 4B): eight pictures made
+         * cleanly, then 38 failed `cp`s of a long generated-folder path, typed
+         * from memory, to get them where the brief said. The destination is
+         * part of the request; the tool carries it to the end.
+         */
+        const saved = await saveOutputs(
+          outputs.map((o) => o.outputPath),
+          params.save_to,
+          params.prompt,
+        );
+        const savedLines =
+          saved.paths.length > 0
+            ? `\nSaved to:\n${saved.paths.map((p, i) => `  ${i + 1}. ${p}`).join('\n')}`
+            : '';
+        const saveNote =
+          saved.error !== undefined ? `\nCould not save to ${params.save_to}: ${saved.error}` : '';
         const text =
           `Generated ${outputs.length} image${outputs.length === 1 ? '' : 's'} on the canvas:\n` +
-          `${lines.join('\n')}\n${footnote}`;
+          `${lines.join('\n')}${savedLines}${saveNote}\n${footnote}`;
 
         const content: AgentToolResult<GenerateDetails>['content'] = [{ type: 'text', text }];
         // Attach the pixels so a vision-capable model can see its output.
@@ -664,4 +699,99 @@ function registerSvgTool(pi: ExtensionAPI, bridge: GenBridge | null): void {
       }
     },
   });
+}
+
+/** A short file-safe name from the prompt, for a picture saved into a folder. */
+export function pictureName(prompt: string, index: number, count: number): string {
+  const slug =
+    prompt
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 60)
+      .replace(/-+$/, '') || 'image';
+  return count > 1 ? `${slug}-${index + 1}.png` : `${slug}.png`;
+}
+
+/**
+ * Copy the finished pictures to where the user asked. A path ending in .png is
+ * a FILE (the first candidate takes it, the rest sit beside it numbered); any
+ * other path is a FOLDER, created if missing, and each picture gets a name from
+ * its prompt. `~` is the home directory. Never throws: a destination that
+ * cannot be written is reported in the tool text, with the pictures still in
+ * the generated folder.
+ */
+export async function saveOutputs(
+  outputPaths: readonly string[],
+  saveTo: string | undefined,
+  prompt: string,
+  deps: {
+    copy?: (from: string, to: string) => Promise<void>;
+    ensureDir?: (dir: string) => Promise<void>;
+    isDir?: (p: string) => Promise<boolean>;
+  } = {},
+): Promise<{ paths: string[]; error?: string }> {
+  if (saveTo === undefined || saveTo.trim() === '' || outputPaths.length === 0)
+    return { paths: [] };
+  const copy = deps.copy ?? ((from, to) => copyFile(from, to));
+  const ensureDir = deps.ensureDir ?? (async (dir) => void (await mkdir(dir, { recursive: true })));
+  const isDir =
+    deps.isDir ??
+    (async (p: string) => {
+      try {
+        return (await stat(p)).isDirectory();
+      } catch {
+        return false;
+      }
+    });
+  let target = saveTo.trim();
+  if (target === '~' || target.startsWith('~/')) target = path.join(homedir(), target.slice(1));
+  const trailingSlash = /[\\/]$/.test(target);
+  target = path.resolve(target);
+  /*
+   * FILE OR FOLDER. Named with an image extension: a file. A trailing slash,
+   * or a directory that already exists: a folder. Otherwise — SEEN (4B): eight
+   * pictures each sent to ".../childrens-book/title-slide" and the like, a name
+   * with no extension meant as the file — a single picture takes the name and
+   * gets ".png"; several pictures make it a folder.
+   */
+  const named = /\.(png|jpe?g|webp)$/i.test(target);
+  const asFile =
+    (named && !(await isDir(target))) ||
+    (!named &&
+      !trailingSlash &&
+      outputPaths.length === 1 &&
+      path.extname(target) === '' &&
+      !(await isDir(target)));
+  if (asFile && !named) target = `${target}.png`;
+  /*
+   * THE BYTES ARE PNG. A name ending in .jpg keeps its name and gets the
+   * extension the file really has (SEEN: `--save-to fox-storybook.jpg`, 2.2 MB
+   * of PNG under a .jpg name) — a lie in the extension outlives the chat.
+   */
+  const produced = path.extname(outputPaths[0] ?? '').toLowerCase() || '.png';
+  if (asFile && path.extname(target).toLowerCase() !== produced) {
+    target = target.replace(/\.[a-z0-9]+$/i, produced);
+  }
+  const paths: string[] = [];
+  try {
+    if (asFile) {
+      await ensureDir(path.dirname(target));
+      for (let i = 0; i < outputPaths.length; i += 1) {
+        const dest = i === 0 ? target : target.replace(/\.png$/i, `-${i + 1}.png`);
+        await copy(outputPaths[i] as string, dest);
+        paths.push(dest);
+      }
+    } else {
+      await ensureDir(target);
+      for (let i = 0; i < outputPaths.length; i += 1) {
+        const dest = path.join(target, pictureName(prompt, i, outputPaths.length));
+        await copy(outputPaths[i] as string, dest);
+        paths.push(dest);
+      }
+    }
+    return { paths };
+  } catch (err) {
+    return { paths, error: err instanceof Error ? err.message : String(err) };
+  }
 }

@@ -352,6 +352,18 @@ describe('coerceArgs', () => {
     // explain.
     expect(coerceArgs({ nope: 'x' }, schema)).toEqual({ nope: 'x' });
   });
+
+  it('reads a kebab-case flag as the snake_case property it names', () => {
+    // `--save-to` is what a command line teaches; `save_to` is what the schema
+    // has. Only when the snake spelling really exists — nothing is invented.
+    const media = {
+      type: 'object',
+      properties: { prompt: { type: 'string' }, save_to: { type: 'string' } },
+    };
+    expect(coerceArgs({ 'save-to': '/pics/fox.png' }, media)).toEqual({ save_to: '/pics/fox.png' });
+    expect(coerceArgs({ save_to: '/pics/fox.png' }, media)).toEqual({ save_to: '/pics/fox.png' });
+    expect(coerceArgs({ 'no-such': 'x' }, media)).toEqual({ 'no-such': 'x' });
+  });
 });
 
 describe('delegation is reachable from the CLI', () => {

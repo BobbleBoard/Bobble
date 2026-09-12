@@ -107,7 +107,13 @@ import {
 import { degenerateCommandRefusal } from './tools/degenerate-command.js';
 import { diskWalkRefusal, wouldWalkDisk } from './tools/disk-walk.js';
 import { diagnoseEditFailure } from './tools/edit-diagnosis.js';
-import { handmadeMediaRefusal, isHandmadeMedia, type MediaKind } from './tools/handmade-media.js';
+import {
+  handmadeMediaRefusal,
+  isHandmadeMedia,
+  type MediaKind,
+  mediaFileKind,
+  mediaFileRefusal,
+} from './tools/handmade-media.js';
 import { handmadeOfficeRefusal, isHandmadeOffice } from './tools/handmade-office.js';
 import {
   countInlineDrawnSvgs,
@@ -3626,6 +3632,23 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
         const abs = isAbsolute(input.path)
           ? input.path
           : join(runtime.workspaceRoot ?? ctx.cwd, input.path);
+        /*
+         * A MEDIA FILE WRITTEN AS TEXT — a `.png` "placeholder" (SEEN, twelve
+         * times in a row), an empty one, an HTML canvas saved as .png. Before
+         * anything reads the body, because an EMPTY body is this mistake too
+         * — and it used to fall through to the workspace fence, whose answer
+         * ("pass a relative path") was the wrong lesson. Not crossable: there
+         * is no right version of this write. Only while the generator for it
+         * is registered.
+         */
+        const mediaFile = event.toolName === 'write' ? mediaFileKind(input.path) : null;
+        if (mediaFile !== null && generators.has(mediaFile)) {
+          pi.appendEntry(HARNESS_LOOP_ENTRY, { action: 'block', cause: 'media-file-as-text' });
+          return {
+            block: true,
+            reason: mediaFileRefusal(input.path, mediaFile, { cli: toolCliMode }),
+          };
+        }
         /* The text this call would put on disk: a write's whole content, or
            what an edit's replacements add. */
         const body =

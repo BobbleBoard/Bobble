@@ -187,6 +187,40 @@ export function jobView(kind: JobKind, elapsedMs: number, est: JobEstimate): Job
   };
 }
 
+/**
+ * The generation tool a shell command is really running, or null.
+ *
+ * In the bash-CLI tool interface (the default) a picture is asked for as
+ * `media generate image --prompt …` inside a `bash` call, and the thread used
+ * to read only the tool's NAME — so the card that shows the picture being
+ * made never appeared, and the finished picture never landed in the thread
+ * (SEEN: the children's book in CLI mode, eight pictures, nothing to look at
+ * but "Ran a command"). The command says what the tool name does not.
+ */
+export function mediaToolOfCommand(command: string | undefined): string | null {
+  if (typeof command !== 'string' || command.length === 0) return null;
+  const gen = /(?:^|[\s;&|(`])media\s+generate\s+(image|video|speech|music|sfx)\b/.exec(command);
+  if (gen !== null) return `generate_${gen[1]}`;
+  if (/(?:^|[\s;&|(`])media\s+edit\s+image\b/.test(command)) return 'edit_image';
+  return null;
+}
+
+/** The `command` of a bash call's arguments, whatever shape the block carries. */
+export function commandOfArgs(args: unknown): string | undefined {
+  if (args === null || typeof args !== 'object') return undefined;
+  const c = (args as { command?: unknown }).command;
+  return typeof c === 'string' ? c : undefined;
+}
+
+/**
+ * What a tool call is FOR: its own name, or — for a shell call running one of
+ * the media commands — the generation tool behind that command.
+ */
+export function effectiveToolName(name: string | undefined, args: unknown): string | undefined {
+  if (name === 'bash') return mediaToolOfCommand(commandOfArgs(args)) ?? name;
+  return name;
+}
+
 /** Map a tool name to a job kind (null = not a job worth a card). */
 export function jobKindForTool(name: string | undefined): JobKind | null {
   const n = (name ?? '').toLowerCase();

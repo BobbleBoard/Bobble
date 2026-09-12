@@ -135,12 +135,33 @@ const PATH_RX = /(\/[^\s()]+\.([A-Za-z0-9]+))/g;
  */
 export function mediaFromToolResult(
   toolName: string | undefined,
-  text: string | undefined,
+  textIn: string | undefined,
   isError?: boolean,
 ): ThreadMediaItem[] {
+  let text = textIn;
   if (toolName === undefined || !MEDIA_TOOLS.has(toolName)) return [];
   if (isError === true) return [];
   if (typeof text !== 'string' || text.length === 0) return [];
+
+  /*
+   * "SAVED TO:" IS THE SAME PICTURE, WHERE THE USER ASKED FOR IT. The image
+   * tool's text lists the generated file, then — when `save_to` was given —
+   * the copy it made. Both are paths; mounting both showed the picture twice,
+   * and the second one broken: the copy lives outside the app's media root,
+   * which pd-file:// does not serve (SEEN: "fox-under-oak-tree.png · 9 B").
+   * So the copies are read for their NAMES, the generated files for their
+   * pixels, and the card is one card called what the user called it.
+   */
+  const savedIdx = text.indexOf('\nSaved to:');
+  const savedNames: string[] = [];
+  if (savedIdx !== -1) {
+    const savedBlock = text.slice(savedIdx).split('\nModel:')[0] ?? '';
+    for (const m of savedBlock.matchAll(PATH_RX)) {
+      const p = m[1];
+      if (p !== undefined) savedNames.push(p.split('/').pop() ?? p);
+    }
+    text = text.slice(0, savedIdx);
+  }
 
   const seen = new Set<string>();
   const out: ThreadMediaItem[] = [];
@@ -175,7 +196,10 @@ export function mediaFromToolResult(
     if (path === undefined) continue;
     add(path, match[2] ?? '');
   }
-  return out;
+  return out.map((item, i) => {
+    const name = savedNames[i];
+    return name !== undefined ? { ...item, name } : item;
+  });
 }
 
 /** Bytes → a short human size for the presentation card. */

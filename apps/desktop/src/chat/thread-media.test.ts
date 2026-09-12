@@ -55,6 +55,37 @@ describe('mounting the media a turn produced', () => {
   });
 });
 
+describe('a picture saved where the user asked', () => {
+  // VERBATIM from generate_image with `save_to` (gen-tools/tools.ts).
+  const SAVED = `Generated 1 image on the canvas:
+  1. /Users/j/Bobble/generated/a-small-red-fox/cand0_seed616131892.png (seed 616131892)
+Saved to:
+  1. /Users/j/Pictures/fox-test/fox-under-oak-tree.png
+Model: FLUX.2 klein (4B) (flux2-klein-4b, apache-2.0)`;
+
+  it('is ONE card: the generated pixels, under the name the user gave it', () => {
+    const items = mediaFromToolResult('generate_image', SAVED);
+    expect(items).toHaveLength(1);
+    expect(items[0]?.path).toBe(
+      '/Users/j/Bobble/generated/a-small-red-fox/cand0_seed616131892.png',
+    );
+    expect(items[0]?.name).toBe('fox-under-oak-tree.png');
+  });
+
+  it('names each candidate after its own copy', () => {
+    const two = `Generated 2 images on the canvas:
+  1. /g/a/cand0_seed1.png (seed 1)
+  2. /g/a/cand1_seed2.png (seed 2)
+Saved to:
+  1. /pics/fox-1.png
+  2. /pics/fox-2.png
+Model: X (x, mit)`;
+    const items = mediaFromToolResult('generate_image', two);
+    expect(items.map((i) => i.name)).toEqual(['fox-1.png', 'fox-2.png']);
+    expect(items.map((i) => i.path)).toEqual(['/g/a/cand0_seed1.png', '/g/a/cand1_seed2.png']);
+  });
+});
+
 describe('what it refuses to mount', () => {
   it('ignores tools we do not own', () => {
     // A bash call that happens to print a .png must not become a player.

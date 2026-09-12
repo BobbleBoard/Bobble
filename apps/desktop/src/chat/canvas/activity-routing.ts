@@ -575,7 +575,21 @@ export function useActivityCanvasRouting(controller: CanvasController): void {
 
     const stream = detectActivity(messages, partials, cwd, { settled: !streaming });
     const spec = activitySpec(stream, cwd);
-    if (spec === undefined) return;
+    if (spec === undefined) {
+      /*
+       * NOTHING TO SHOW — and if the tab is still up, it is showing something
+       * that is no longer true. SEEN: a `write` of fox-storybook.png streamed
+       * into the Activity tab, was REFUSED (a picture written as text), and the
+       * tab kept the refused HTML under "Pictures › fox-test › fox-storybook.png"
+       * for good. The canvas report then told the model the user was looking
+       * at that file, and the model told the user the picture was saved. A
+       * file tab whose write is not in the record comes down; a terminal or
+       * browser surface is a real thing that happened and stays.
+       */
+      const stale = controller.getState().tabs.find((t) => t.key === ACTIVITY_TAB_KEY);
+      if (stale !== undefined && stale.kind === 'file') controller.closeTab(stale.id);
+      return;
+    }
 
     const present = controller.getState().tabs.some((t) => t.key === ACTIVITY_TAB_KEY);
     if (!present && opened.current) return; // dismissed this turn — respect it.

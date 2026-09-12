@@ -191,7 +191,15 @@ export const MODALITY_CATALOG: readonly ModalityModel[] = [
     residentFloorGB: 4.5,
     peakResidentGB: 6,
     runsLocally: true,
-    heavy: false,
+    /*
+     * ONE AT A TIME. Image models were "light" from the days of the 4.95 GB MLX
+     * peak; the OS-level cost is 5-8 GB even with --low-ram, and SEEN (the
+     * children's book, eight pictures asked for at once): two klein jobs
+     * admitted side by side took the machine to swapping at 16% free and both
+     * were shed. On unified memory two pictures at once are not faster
+     * anyway — they share one GPU — so every image model is heavy: serial.
+     */
+    heavy: true,
     recommended: true,
     // Correction #1: point --model at the PRE-QUANTIZED 4-bit mflux repo and do
     // NOT pass -q (mflux expects the pre-quant weights, not on-the-fly quantize).
@@ -234,7 +242,7 @@ export const MODALITY_CATALOG: readonly ModalityModel[] = [
     peakResidentGB: 6.5,
     minUnifiedMemoryGB: 16,
     runsLocally: true,
-    heavy: false,
+    heavy: true, // serial — see the klein entry
     recommended: true,
     // Correction #1: dedicated command REQUIRED (unified mflux-generate mis-routes
     // Z-Image → FLUX loader). --model points at the PRE-QUANTIZED 4-bit repo; no -q.
@@ -276,7 +284,7 @@ export const MODALITY_CATALOG: readonly ModalityModel[] = [
     approxSizeGB: 8,
     minUnifiedMemoryGB: 10,
     runsLocally: true,
-    heavy: false,
+    heavy: true, // serial — see the klein entry
     mflux: { kind: 'mflux', command: 'mflux-generate', model: 'schnell' },
     defaultSteps: 4,
     defaultQuantize: 4,

@@ -245,6 +245,11 @@ const FLAG_ALIASES: Readonly<Record<string, readonly string[]>> = {
 /** Resolve one flag name onto a schema property, or return it unchanged. */
 export function resolveFlagName(key: string, props: Readonly<Record<string, unknown>>): string {
   if (key in props) return key;
+  /* `--save-to` for a `save_to` property: the kebab spelling is the one a
+     command line teaches, and a model that writes it is not wrong. Only when
+     the snake spelling is really a property, so nothing is invented. */
+  const snake = key.replace(/-/g, '_');
+  if (snake !== key && snake in props) return snake;
   for (const [real, synonyms] of Object.entries(FLAG_ALIASES)) {
     if (real in props && synonyms.includes(key)) return real;
   }

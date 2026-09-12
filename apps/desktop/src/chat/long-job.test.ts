@@ -2,10 +2,12 @@ import { describe, expect, it } from 'vitest';
 import {
   CARD_AFTER_MS,
   DEFAULT_ESTIMATES,
+  effectiveToolName,
   estimateFor,
   estimateText,
   jobKindForTool,
   jobView,
+  mediaToolOfCommand,
   shouldShowCard,
   timerText,
 } from './long-job';
@@ -141,5 +143,32 @@ describe('jobKindForTool', () => {
     expect(jobKindForTool('bash')).toBeNull();
     expect(jobKindForTool(undefined)).toBeNull();
     expect(jobKindForTool('')).toBeNull();
+  });
+});
+
+describe('a shell call running a media command IS the generation (bash-CLI mode)', () => {
+  it('reads the generation tool off the command', () => {
+    expect(mediaToolOfCommand('media generate image --prompt "a fox"')).toBe('generate_image');
+    expect(mediaToolOfCommand('cd /x && media generate video "a clip"')).toBe('generate_video');
+    expect(mediaToolOfCommand('media generate speech --text hi')).toBe('generate_speech');
+    expect(mediaToolOfCommand('media generate music "lofi"')).toBe('generate_music');
+    expect(mediaToolOfCommand('media generate sfx "door"')).toBe('generate_sfx');
+    expect(mediaToolOfCommand('media edit image --path a.png "make it red"')).toBe('edit_image');
+    expect(mediaToolOfCommand('media --help')).toBeNull();
+    expect(mediaToolOfCommand('ls ~/Pictures/media')).toBeNull();
+    expect(mediaToolOfCommand(undefined)).toBeNull();
+  });
+
+  it('gives a bash call the card its command earns, and leaves other calls alone', () => {
+    expect(effectiveToolName('bash', { command: 'media generate image "a fox"' })).toBe(
+      'generate_image',
+    );
+    expect(jobKindForTool(effectiveToolName('bash', { command: 'media generate image "x"' }))).toBe(
+      'image',
+    );
+    expect(effectiveToolName('bash', { command: 'ls' })).toBe('bash');
+    expect(effectiveToolName('bash', undefined)).toBe('bash');
+    expect(effectiveToolName('generate_image', { prompt: 'x' })).toBe('generate_image');
+    expect(effectiveToolName('read', { command: 'media generate image' })).toBe('read');
   });
 });

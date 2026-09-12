@@ -107,17 +107,71 @@ export function isHandmadeMedia(input: {
 }
 
 const COMMAND: Record<MediaKind, string> = {
-  image: 'media generate image "a hand-thrown ceramic mug on a windowsill, morning light"',
+  image:
+    'media generate image "a hand-thrown ceramic mug on a windowsill, morning light" --save-to <folder or file the user named>',
   audio: 'media generate music "warm lo-fi beat, mellow rhodes"',
   video: 'media generate video "a red paper boat drifting across calm water"',
 };
 
 /** The same three, as the tools a schemas-mode model calls by name. */
 const TOOL_CALL: Record<MediaKind, string> = {
-  image: 'generate_image { prompt: "a hand-thrown ceramic mug on a windowsill, morning light" }',
+  image:
+    'generate_image { prompt: "a hand-thrown ceramic mug on a windowsill, morning light", save_to: "<folder or file the user named>" }',
   audio: 'generate_music { prompt: "warm lo-fi beat, mellow rhodes" }',
   video: 'generate_video { prompt: "a red paper boat drifting across calm water" }',
 };
+
+/**
+ * A MEDIA FILE WRITTEN AS TEXT. `write` puts characters in a file; a `.png`
+ * made that way is broken by construction, whatever is in it. SEEN (4B,
+ * bash-CLI, "make one picture of a fox and save it to ~/Pictures/fox-test/"):
+ * a Pillow script was refused, and the next move was `write
+ * fox_under_oak_tree.png "placeholder"` — twelve times, against the workspace
+ * fence, before giving up and telling the user the picture was there. The
+ * path it chose is the one useful thing in the call: it is where the picture
+ * was meant to go, so the refusal hands it straight to the generator.
+ */
+const MEDIA_FILE: readonly { kind: MediaKind; re: RegExp }[] = [
+  { kind: 'image', re: /\.(png|jpe?g|webp|gif|bmp|tiff?)$/i },
+  { kind: 'audio', re: /\.(wav|mp3|flac|ogg|m4a)$/i },
+  { kind: 'video', re: /\.(mp4|webm|mov)$/i },
+];
+
+/** The modality of a media file a `write` is about to fill with text, or null. */
+export function mediaFileKind(path: string): MediaKind | null {
+  const p = path.trim();
+  return MEDIA_FILE.find((m) => m.re.test(p))?.kind ?? null;
+}
+
+/** The refusal for a media file written as text: the generator, aimed at that path. */
+export function mediaFileRefusal(
+  path: string,
+  kind: MediaKind,
+  opts: { cli?: boolean } = {},
+): string {
+  const dest = path.trim();
+  const call =
+    kind === 'image'
+      ? opts.cli === true
+        ? `media generate image "<describe the picture>" --save-to ${JSON.stringify(dest)}`
+        : `generate_image { prompt: "<describe the picture>", save_to: ${JSON.stringify(dest)} }`
+      : opts.cli === true
+        ? COMMAND[kind]
+        : TOOL_CALL[kind];
+  const how =
+    opts.cli === true
+      ? 'Make it with the generator — run this command with the bash tool:'
+      : 'Make it with the generator — call this tool (if it is not in your list, call capability("generation") first):';
+  return [
+    `Not written: ${dest} is ${NOUN[kind]}, and \`write\` only writes text — a media file made this way is broken whatever it contains. This machine has a generator for that.`,
+    '',
+    how,
+    `  ${call}`,
+    kind === 'image'
+      ? 'It saves the finished picture at that path for you; then tell the user where it is.'
+      : 'Then use the file it produces, and tell the user where it is.',
+  ].join('\n');
+}
 
 const NOUN: Record<MediaKind, string> = {
   image: 'a picture',
