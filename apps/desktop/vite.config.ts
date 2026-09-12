@@ -192,5 +192,9 @@ export default defineConfig({
      */
     assetsInlineLimit: (filePath: string) =>
       filePath.endsWith('pcm-worklet.js') ? false : undefined,
+    /* PI_BUILD_READABLE=1: an unminified renderer with React's real error
+       messages, for reading a component stack out of a probe. Never the
+       default — the shipped bundle stays minified. */
+    ...(process.env.PI_BUILD_READABLE === '1' ? { minify: false, sourcemap: true } : {}),
   },
 });

@@ -66,13 +66,15 @@ const JUMP_THRESHOLD_PX = 120;
 
 /** Concatenated visible text of an assistant response group (for copy). */
 function groupPlainText(group: AssistantMsg[]): string {
-  return group
-    .flatMap((m) => m.blocks)
-    .filter((b): b is Extract<ContentBlock, { type: 'text' }> => b.type === 'text')
-    // Only what IS text: the reply that failed to draw may have failed on a
-    // block whose text is not a string, and "[object Object]" is not it.
-    .map((b) => (typeof b.text === 'string' ? b.text : ''))
-    .join('');
+  return (
+    group
+      .flatMap((m) => m.blocks)
+      .filter((b): b is Extract<ContentBlock, { type: 'text' }> => b.type === 'text')
+      // Only what IS text: the reply that failed to draw may have failed on a
+      // block whose text is not a string, and "[object Object]" is not it.
+      .map((b) => (typeof b.text === 'string' ? b.text : ''))
+      .join('')
+  );
 }
 
 /** One rendered row in the thread. */
@@ -395,17 +397,52 @@ export function ChatThread() {
    * false at the bottom, so the control appears exactly when it is useful.
    */
   const [away, setAway] = useState(false);
-  const syncAway = (): void => {
-    const el = scrollRef.current;
-    if (el === null) return;
-    setAway(el.scrollHeight - el.scrollTop - el.clientHeight > JUMP_THRESHOLD_PX);
+  const awayRef = useRef(false);
+  const awayFrame = useRef<number | null>(null);
+  /*
+   * READ THE LAYOUT AFTER IT HAS SETTLED, NEVER INSIDE THE COMMIT.
+   *
+   * This used to set `away` synchronously from the render effect below, on
+   * every render. A thread that is growing — a burst of tool rows, markdown
+   * measuring, the Activity tab morphing beside it — lays out differently
+   * from one commit to the next, so the reading flipped across the threshold
+   * on consecutive renders, each flip a state change that scheduled the next
+   * render: React's nested-update limit, error #185, "Bobble hit a rendering
+   * error" over the whole window. REPRODUCED with a thirty-write storm
+   * (tests/e2e/write-storm-probe.mjs) at 60 writes, and it is the crash from
+   * the canvas assessment the user said cannot happen.
+   *
+   * So the read is deferred to the next animation frame — layout is done by
+   * then, and a state change from there is an ordinary update, not one nested
+   * in a commit — coalesced to one read per frame, and applied only when the
+   * value actually changed.
+   */
+  const applyAway = (next: boolean): void => {
+    if (awayRef.current === next) return;
+    awayRef.current = next;
+    setAway(next);
   };
+  const syncAway = (): void => {
+    if (awayFrame.current !== null) return;
+    awayFrame.current = requestAnimationFrame(() => {
+      awayFrame.current = null;
+      const el = scrollRef.current;
+      if (el === null) return;
+      applyAway(el.scrollHeight - el.scrollTop - el.clientHeight > JUMP_THRESHOLD_PX);
+    });
+  };
+  useEffect(
+    () => () => {
+      if (awayFrame.current !== null) cancelAnimationFrame(awayFrame.current);
+    },
+    [],
+  );
   const jumpToLatest = (): void => {
     const el = scrollRef.current;
     if (el === null) return;
     el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
     pinnedRef.current = true;
-    setAway(false);
+    applyAway(false);
   };
 
   // Keep the newest content in view ONLY while pinned (never fights a scroll-up).
@@ -413,7 +450,7 @@ export function ChatThread() {
     const el = scrollRef.current;
     if (el !== null && pinnedRef.current) el.scrollTop = el.scrollHeight;
     // Streaming grows the content, so "am I away from the bottom" changes
-    // without anyone scrolling.
+    // without anyone scrolling — read it once the frame has settled.
     syncAway();
   });
 

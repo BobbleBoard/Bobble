@@ -16,6 +16,7 @@
 import type { CanvasState, CanvasSurfaceState } from '@pi-desktop/browser-use/protocol';
 import type { CanvasController, CanvasTab } from '@pi-desktop/canvas';
 import { useEffect } from 'react';
+import { ACTIVITY_TAB_KEY } from './activity-tab';
 
 /** Cap the injected file excerpt so the report (and the model's block) stay tiny. */
 const EXCERPT_MAX_CHARS = 240;
@@ -28,6 +29,8 @@ type MutableSurface = { -readonly [K in keyof CanvasSurfaceState]: CanvasSurface
 function surfaceOf(tab: CanvasTab): CanvasSurfaceState {
   const s: MutableSurface = { kind: tab.kind };
   if (tab.title) s.title = tab.title;
+  // The Activity tab is the agent's own output landing — see CanvasSurfaceState.own.
+  if (tab.key === ACTIVITY_TAB_KEY) s.own = true;
   switch (tab.kind) {
     case 'browser': {
       // Report the tab id so main can enrich url/title from the live view — the

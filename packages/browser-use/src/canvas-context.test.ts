@@ -69,6 +69,24 @@ describe('formatCanvasSummary', () => {
   it('returns null for an empty canvas (nothing to inject)', () => {
     expect(formatCanvasSummary({ active: null, others: [] })).toBeNull();
   });
+
+  it('says a file the agent itself just wrote is its own, and does not quote it back', () => {
+    // SEEN: "The user is looking at: File illustration1.md" + an excerpt of
+    // the model's own text → "I see you're viewing the illustration
+    // descriptions I created", five turns running.
+    const block = formatCanvasSummary({
+      active: {
+        kind: 'file',
+        filePath: 'illustration1.md',
+        own: true,
+        excerpt: 'Illustration 1 - Title Slide',
+      },
+      others: [],
+    });
+    expect(block).toContain('On screen: File illustration1.md — YOUR OWN write as it landed');
+    expect(block).not.toContain('The user is looking at');
+    expect(block).not.toContain('Excerpt:');
+  });
 });
 
 describe('withCanvasBlock / dedupe', () => {

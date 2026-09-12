@@ -102,6 +102,13 @@ export interface CanvasSurfaceState {
   readonly lastCommand?: string;
   /** Media (image/pdf): the media MIME/type label. */
   readonly mediaType?: string;
+  /**
+   * The surface is the AGENT'S OWN output landing (the Activity tab: the file
+   * it is writing, the command it is running) — not something the user chose
+   * to open. Rendered as such, so a model never reads its own last write as
+   * the user "viewing" it.
+   */
+  readonly own?: boolean;
 }
 
 /**

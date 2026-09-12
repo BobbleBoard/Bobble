@@ -59,6 +59,18 @@ function describeSurface(s: CanvasSurfaceState): string {
     case 'file':
     case 'code': {
       const label = s.filePath?.trim() || title || 'a file';
+      /*
+       * THE SAME REFLECTION, ONE SURFACE OVER. The Activity tab morphs into
+       * whatever the agent last wrote; reported as "The user is looking at:
+       * File illustration1.md" it became, to a 4B, the user reading its
+       * description files — "I see you're viewing the illustration
+       * descriptions I created" — five times in a row, each time writing
+       * another file the tab then showed (SEEN, the children's book in CLI
+       * mode; the renderer froze under the churn). It is the agent's output.
+       */
+      if (s.own === true) {
+        return `File ${label} — YOUR OWN write as it landed, not something the user opened or asked about`;
+      }
       return `File ${label}${s.dirty === true ? ' (unsaved)' : ''}`;
     }
     case 'terminal': {
@@ -122,13 +134,17 @@ export function formatCanvasSummary(state: CanvasState): string | null {
   );
   lines.push(
     active !== null
-      ? `The user is looking at: ${describeSurface(active)}`
+      ? active.own === true
+        ? `On screen: ${describeSurface(active)}`
+        : `The user is looking at: ${describeSurface(active)}`
       : 'The canvas is open (no surface focused).',
   );
   if (others.length > 0) {
     lines.push(`Also open: ${others.map(describeSurface).join(' · ')}`);
   }
-  const excerpt = active?.excerpt?.trim();
+  // No excerpt of the agent's own write: it knows what it wrote, and quoting
+  // it back is what made it read as the user having opened the file.
+  const excerpt = active?.own === true ? undefined : active?.excerpt?.trim();
   if (excerpt) {
     const clipped =
       excerpt.length > EXCERPT_MAX_CHARS ? `${excerpt.slice(0, EXCERPT_MAX_CHARS)}…` : excerpt;
