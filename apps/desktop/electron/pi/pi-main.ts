@@ -32,6 +32,7 @@ import {
   visionStateFilePath,
 } from '../inference/llm-main';
 import type { AppEventMap } from '../ipc-contract';
+import { officeGenEnv, primeOfficeGen } from '../office/office-gen-env';
 import {
   activeProjectFullAccess,
   activeProjectPath,
@@ -189,6 +190,10 @@ function buildPiEnv(cwd: string | undefined): Record<string, string | undefined>
        connector install restarts pi so the change is live at once. */
     PI_DESKTOP_GEN_MEDIA: generationExperimentEnabled() ? '1' : '0',
     PI_OMNISVG_READY: omniSvgFiles().ready ? '1' : '0',
+    /* The document pipeline — where `office.py` is, a Python that has its
+       libraries, and a scratch dir — so the harness's `office` tool registers
+       and runs in every chat, not only inside a corp run. See office-gen-env.ts. */
+    ...officeGenEnv(),
     // …and the live file, which children re-read. The env value above is a
     // spawn-time snapshot and a subagent outlives it — see serverCanSeeImages.
     PI_DESKTOP_VISION_FILE: visionStateFilePath(),
@@ -468,6 +473,10 @@ export function registerPiIpc(
    * over unlooked-at. HTML is captured with the same offscreen window HyperFrames
    * uses; env must be live before the first pi spawn, like its siblings.
    */
+  /* Find (or build) the interpreter the office pipeline runs on. Async and
+     never awaited: the first pi spawn may see only the `python3` default, which
+     is what the harness falls back to anyway. */
+  void primeOfficeGen();
   if (opts.getWindow !== undefined) {
     registerPresentBridge({
       getWindow: opts.getWindow,

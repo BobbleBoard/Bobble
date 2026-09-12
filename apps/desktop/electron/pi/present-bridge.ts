@@ -30,6 +30,7 @@ import type { WebContents } from 'electron';
 import { getInferenceVisionReady } from '../inference/llm-main';
 import { wantVision } from '../inference/vision-want';
 import type { AppEventMap } from '../ipc-contract';
+import { captureViewForFile } from '../office/office-manager';
 
 const log = createLogger('desktop:present');
 /*
@@ -175,6 +176,8 @@ export async function buildPreview(
   kind: string,
   deps: {
     renderPage?: ((p: string) => Promise<string | null>) | null;
+    /** Injected for tests; default is the live office-manager capture. */
+    captureOffice?: (p: string) => Promise<string | null>;
   } = {},
 ): Promise<{ imageBase64?: string; mimeType?: string; text?: string; error?: string }> {
   try {
@@ -233,6 +236,28 @@ export async function buildPreview(
           return { imageBase64: frame, mimeType: 'image/png', text: described };
         }
         return { text: described };
+      }
+      case 'office': {
+        /*
+         * A DOCUMENT IS SHOWN, NOT DESCRIBED — the same standard as a game.
+         * `show` has just asked the renderer to open the file in the canvas's
+         * office editor; this waits for that editor to draw and hands back its
+         * capture, which is exactly what the user is looking at. Without it a
+         * deck was "104 KB, .pptx" to the model that made it.
+         */
+        const capture = deps.captureOffice ?? captureViewForFile;
+        const dataUrl = await capture(target);
+        const st = await stat(target);
+        const size = `${target} — ${Math.max(1, Math.round(st.size / 1024))} KB.`;
+        if (dataUrl === null) {
+          return { text: `${size} It is open in the canvas, but no capture could be taken yet.` };
+        }
+        const comma = dataUrl.indexOf(',');
+        return {
+          imageBase64: dataUrl.slice(comma + 1),
+          mimeType: 'image/png',
+          text: `${size} The capture is the first page/slide as the canvas shows it.`,
+        };
       }
       case 'text': {
         const body = await readFile(target, 'utf8');

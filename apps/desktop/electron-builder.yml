@@ -36,6 +36,12 @@ extraResources:
   - from: ../../packages/gen-service/python
     to: gen-worker
     filter: ['**/*']
+  # The document pipeline (`office make|edit|inspect`): python-pptx/docx/openpyxl
+  # renderers a Python interpreter runs as real files. mesh-host.ts and
+  # office-gen-env.ts resolve <Resources>/office-gen when packaged.
+  - from: ../../tools/office-gen
+    to: office-gen
+    filter: ['*.py', 'README.md']
 asarUnpack:
   # pi is spawned as a real child process (ELECTRON_RUN_AS_NODE). Its cli.js is
   # read through the asar shim, but its native transitive dep koffi (loaded via

@@ -14,10 +14,10 @@ pretty-printed JSON and ~2k as lines, and the lines are what the model actually
 reads well — a nested object costs attention on braces that should go on the
 edit itself.
 """
-import os
 from __future__ import annotations
 
 import json
+import os
 import re
 import sys
 import time
@@ -26,6 +26,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 import office_edit  # noqa: E402
+from scratch import post_json, scratch_dir  # noqa: E402
 
 HERE = Path(__file__).parent
 # The server is NOT a fixed port. The app's supervisor picks a free one per
@@ -44,10 +45,7 @@ SERVER = _server()
 
 
 def post(payload, timeout=600):
-    r = urllib.request.Request(f"{SERVER}/v1/chat/completions",
-                               data=json.dumps(payload).encode(),
-                               headers={"Content-Type": "application/json"})
-    return json.loads(urllib.request.urlopen(r, timeout=timeout).read())
+    return post_json(f"{SERVER}/v1/chat/completions", payload, timeout)
 
 
 def ask(system, user, max_tokens=1800):
@@ -131,7 +129,7 @@ Table cells use their own ids: {"op":"set_text","id":"t0.r1.c2","text":"..."}
 
 
 def parse(raw: str) -> list[dict]:
-    (HERE / "raw_edit.txt").write_text(raw)
+    (scratch_dir() / "raw_edit.txt").write_text(raw)
     m = re.search(r"\{.*\}", raw.strip(), re.S)
     s = m.group(0) if m else raw
     try:
@@ -161,7 +159,7 @@ def main() -> None:
     t0 = time.time()
     o = office_edit.INSPECT[kind](src)
     text = outline_text(o)
-    (HERE / "outline.txt").write_text(text)
+    (scratch_dir() / "outline.txt").write_text(text)
 
     sysp = (
         f"You edit {kind.upper()} documents by emitting operations. Reply as JSON only:\n"
@@ -178,7 +176,7 @@ def main() -> None:
     user = f"DOCUMENT OUTLINE\n{text}\n\nINSTRUCTION\n{instruction}"
 
     ops = parse(ask(sysp, user))
-    (HERE / "ops.json").write_text(json.dumps(ops, indent=1))
+    (scratch_dir() / "ops.json").write_text(json.dumps(ops, indent=1))
     print(f"[{kind}] {len(ops)} ops in {time.time() - t0:.0f}s")
     for line in office_edit.APPLY[kind](src, ops, dst):
         print(" ", line)

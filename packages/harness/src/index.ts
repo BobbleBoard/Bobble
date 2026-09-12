@@ -105,8 +105,10 @@ import {
   isCoercedToolCall,
 } from './tools/coerced-write.js';
 import { degenerateCommandRefusal } from './tools/degenerate-command.js';
+import { diskWalkRefusal, wouldWalkDisk } from './tools/disk-walk.js';
 import { diagnoseEditFailure } from './tools/edit-diagnosis.js';
 import { handmadeMediaRefusal, isHandmadeMedia, type MediaKind } from './tools/handmade-media.js';
+import { handmadeOfficeRefusal, isHandmadeOffice } from './tools/handmade-office.js';
 import {
   countInlineDrawnSvgs,
   handwrittenInlineSvgRefusal,
@@ -117,6 +119,12 @@ import {
 import { wouldHang } from './tools/hang-guard.js';
 import { registerImageTools } from './tools/image-tools.js';
 import { applyBias, lastAssistantThought, planBias } from './tools/intent-bias.js';
+import {
+  OFFICE_MAKE_TOOL,
+  officeGenDir,
+  registerOfficeTools,
+  withOfficeFormats,
+} from './tools/office-tool.js';
 import { detectOpenedApp, openDidNotHappen, openedAppNote } from './tools/opened-app.js';
 import { registerPlanTool } from './tools/plan-tool.js';
 import { PRESENT_TOOL_NAME, registerPresentTool } from './tools/present.js';
@@ -124,8 +132,8 @@ import { presentBridgeFromEnv } from './tools/present-bridge.js';
 import { withRepeatNotice } from './tools/repeat-notice.js';
 import { registerSandboxFileTools, resolveWorkspaceRoot } from './tools/sandbox-fs.js';
 import { buildCli, commandNameFor, pathFor } from './tools/tool-cli.js';
-import { registerToolCli } from './tools/tool-cli-bridge.js';
-import { toolCliGroups } from './tools/tool-cli-groups.js';
+import { protectShimDollars, registerToolCli } from './tools/tool-cli-bridge.js';
+import { toolCliGroups, toolCliShimCommands } from './tools/tool-cli-groups.js';
 import { truncateToolOutput } from './tools/tool-output-truncate.js';
 import { type CapturedTool, captureRegisteredTools } from './tools/tool-registry.js';
 import { registerUseTool } from './tools/use-tool.js';
@@ -1862,6 +1870,21 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
   registerSandboxFileTools(pi, {
     getRoot: (ctx) =>
       runtime.workspaceRoot ?? resolveWorkspaceRoot(ctx.cwd, process.env, homedir()),
+    /*
+     * …AND THEY KNOW THE OFFICE FORMATS. `write deck.pptx <text>` makes the
+     * deck through the pipeline, `edit deck.pptx` edits it there, `read
+     * deck.pptx` is its outline — see withOfficeFormats for the twelve `edit`
+     * calls that made this necessary.
+     */
+    ...(officeGenDir() !== null
+      ? {
+          wrap: (tool) =>
+            withOfficeFormats(tool as never, {
+              bridge: readSubagentDepth(process.env) === 0 ? presentBridgeFromEnv() : null,
+              root: (ctxCwd) => runtime.workspaceRoot ?? resolveWorkspaceRoot(ctxCwd),
+            }) as never,
+        }
+      : {}),
   });
 
   /*
@@ -1897,7 +1920,16 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
       withDefaultTimeout(
         withBackgroundOption(
           createBashToolDefinition(process.cwd(), {
-            spawnHook: (c) => ({ ...c, cwd: liveRoot(), env: cleanChildEnv(c.env) }),
+            spawnHook: (c) => ({
+              ...c,
+              /* `$412,000` in an `office` brief must reach the pipeline as
+                 written — see protectShimDollars. Only our own commands. */
+              command: toolCliMode
+                ? protectShimDollars(c.command, toolCliShimCommands(toolCliGroups()))
+                : c.command,
+              cwd: liveRoot(),
+              env: cleanChildEnv(c.env),
+            }),
           }),
         ),
       ),
@@ -2012,7 +2044,9 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
             isError?: boolean;
           };
           noteResult(modality, name, args, res.content ?? []);
-          if (name === 'mac_launch' && typeof args.app === 'string') controlledApp = args.app;
+          if (name === 'mac_launch' && typeof args.app === 'string' && res.isError !== true) {
+            controlledApp = args.app;
+          }
           /*
            * AND THE PICTURE HAS TO SURVIVE THE PIPE.
            *
@@ -2315,6 +2349,22 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
           return null;
         }
       },
+    });
+  }
+
+  /*
+   * `office` — the document pipeline (tools/office-gen) as a tool in EVERY
+   * chat, not only inside a corp run. the user: "model should not be using
+   * python-pptx, there is a dedicated subagent for each pptx/docx/xlsx creation
+   * and editing right?" Registered only where the scripts exist, so a plain pi
+   * never advertises a command that can only fail. A child agent gets the tool
+   * without the canvas half: presenting is the top-level model's alone, so the
+   * child reports the file up and its parent shows it.
+   */
+  if (officeGenDir() !== null) {
+    registerOfficeTools(pi, {
+      bridge: readSubagentDepth(process.env) === 0 ? presentBridgeFromEnv() : null,
+      root: (ctxCwd) => resolveWorkspaceRoot(ctxCwd),
     });
   }
 
@@ -3258,10 +3308,6 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     // Kept for the result hook: a repeat is only a repeat if the ARGUMENTS
     // matched too, and the result event does not carry them.
     lastCallInput = { tool: event.toolName, input: event.input };
-    if (event.toolName === 'mac_launch') {
-      const app = (event.input as { app?: unknown } | undefined)?.app;
-      if (typeof app === 'string') controlledApp = app;
-    }
     /*
      * A TOOL THIS RUN MAY NOT CALL, whatever it thinks.
      *
@@ -3331,6 +3377,35 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
         if (destroy !== null) {
           pi.appendEntry(HARNESS_LOOP_ENTRY, { action: 'block', cause: 'workspace-delete' });
           return { block: true, reason: destroy };
+        }
+        /*
+         * …AND A DECK BUILT WITH python-pptx IN A HEREDOC WHILE THE PIPELINE
+         * IS ONE COMMAND AWAY — see handmade-office.ts. MEASURED in the canvas
+         * assessment: twelve `python3 << 'EOF' / from pptx import Presentation`
+         * calls in a row, with the document pipeline installed and unreachable
+         * from the chat. Now it is reachable, and the reflex is answered with
+         * the command that does the job.
+         */
+        /*
+         * …AND A `find /` — see disk-walk.ts. Spotlight is one command away and
+         * the walk was still running when the assessment's turn timed out.
+         */
+        const walk = wouldWalkDisk(cmd);
+        if (walk !== null) {
+          pi.appendEntry(HARNESS_LOOP_ENTRY, { action: 'block', cause: 'disk-walk' });
+          const spotlight = pi.getAllTools().some((t) => t.name === 'spotlight_search')
+            ? (cliCommandForTool?.('spotlight_search') ?? 'the spotlight_search tool with')
+            : null;
+          return { block: true, reason: diskWalkRefusal(walk, spotlight) };
+        }
+        const officeAvailable = pi.getAllTools().some((t) => t.name === OFFICE_MAKE_TOOL);
+        const handmadeOffice = isHandmadeOffice({ content: cmd, officeAvailable });
+        if (handmadeOffice !== null) {
+          pi.appendEntry(HARNESS_LOOP_ENTRY, { action: 'block', cause: 'handmade-office' });
+          return {
+            block: true,
+            reason: handmadeOfficeRefusal(handmadeOffice, { cli: toolCliMode }),
+          };
         }
       }
     }
@@ -3416,7 +3491,11 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
        * Each guard now asks its own question: the SVG ones about `generate_svg`,
        * this one about whether a generator for THAT modality exists.
        */
-      if (typeof input.path === 'string' && (svgCommandAvailable || generators.size > 0)) {
+      const officeAvailable = tools.some((t) => t.name === OFFICE_MAKE_TOOL);
+      if (
+        typeof input.path === 'string' &&
+        (svgCommandAvailable || generators.size > 0 || officeAvailable)
+      ) {
         const abs = isAbsolute(input.path)
           ? input.path
           : join(runtime.workspaceRoot ?? ctx.cwd, input.path);
@@ -3468,6 +3547,19 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
             svgRefused.set(abs, body);
             pi.appendEntry(HARNESS_LOOP_ENTRY, { action: 'block', cause: 'handmade-media' });
             return { block: true, reason: handmadeMediaRefusal(input.path, handmade) };
+          }
+          /*
+           * …AND A SCRIPT THAT WRITES AN OFFICE FILE WITH A LIBRARY — see
+           * handmade-office.ts. Same escape as the two above: identical bytes.
+           */
+          const handmadeOffice = isHandmadeOffice({ content: body, officeAvailable });
+          if (handmadeOffice !== null) {
+            svgRefused.set(abs, body);
+            pi.appendEntry(HARNESS_LOOP_ENTRY, { action: 'block', cause: 'handmade-office' });
+            return {
+              block: true,
+              reason: handmadeOfficeRefusal(handmadeOffice, { cli: toolCliMode }),
+            };
           }
           if (
             svgCommandAvailable &&
@@ -3607,6 +3699,20 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     const mctx = runtime.currentCtx;
     if (mctx?.hasUI === true) {
       mctx.ui.setStatus('harness-modality', JSON.stringify(modality));
+    }
+    /*
+     * AN APP IS "BEING DRIVEN" ONLY ONCE IT ACTUALLY LAUNCHED.
+     *
+     * This was set at the CALL. MEASURED: `open -a "Microsoft PowerPoint"
+     * deck.pptx` on a Mac with no PowerPoint became a `mac_launch` that failed
+     * ("Unable to find application") — and from then on every write in the
+     * turn was answered with "Nothing written to disk reaches Microsoft
+     * PowerPoint, and the task is in that window", about a window that never
+     * existed. The result is where the answer is.
+     */
+    if (event.toolName === 'mac_launch' && !toolCliMode) {
+      const app = (lastCallInput?.input as { app?: unknown } | undefined)?.app;
+      if (typeof app === 'string' && event.isError !== true) controlledApp = app;
     }
     /*
      * A FILE TOOL REFUSED WHILE AN APP IS BEING DRIVEN IS NOT A PATH PROBLEM.

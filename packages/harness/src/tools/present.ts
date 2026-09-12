@@ -45,6 +45,8 @@ export type PreviewKind =
   | 'text'
   /** List what is inside, plus the entry point if there is an obvious one. */
   | 'project'
+  /** Open it in the canvas's office editor and capture what it draws. */
+  | 'office'
   /** Nothing better available: report type and size honestly. */
   | 'describe';
 
@@ -55,6 +57,10 @@ export interface PreviewPlan {
 }
 
 const IMAGE_EXT = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.svg']);
+/* The formats the canvas opens in a real editor: the preview is a capture of
+   that editor, which is exactly what the user sees. `read` on any of these
+   returns zip bytes, which is what the assessment watched a model do. */
+const OFFICE_EXT = new Set(['.pptx', '.docx', '.xlsx', '.pdf']);
 const RENDER_EXT = new Set(['.html', '.htm']);
 const RUN_EXT = new Set(['.py', '.sh', '.mjs', '.js', '.ts']);
 const TEXT_EXT = new Set([
@@ -102,6 +108,12 @@ export function previewPlanFor(target: { path: string; isDirectory: boolean }): 
     return { kind: 'render', because: 'a page — opening it and capturing what renders' };
   }
   if (RUN_EXT.has(ext)) return { kind: 'run', because: `a script (${ext}) — running it` };
+  if (OFFICE_EXT.has(ext)) {
+    return {
+      kind: 'office',
+      because: `a document (${ext}) — opening it in the canvas and capturing it`,
+    };
+  }
   if (TEXT_EXT.has(ext) || ext === '') {
     return {
       kind: 'text',

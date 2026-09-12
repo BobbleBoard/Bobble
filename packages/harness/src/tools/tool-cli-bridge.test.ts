@@ -19,7 +19,9 @@ import {
   buildDecoy,
   buildShim,
   dispatchToolCli,
+  protectShimDollars,
   registerToolCli,
+  shimFallthroughFor,
   type ToolCliHost,
 } from './tool-cli-bridge';
 
@@ -386,5 +388,57 @@ describe('a result speaks commands, because that is all the model can run', () =
     const body = 'function demo() { /* see mac_click */ }';
     const r = await dispatchToolCli(hostWith(body), ['file', 'read', '--path', 'a.ts']);
     expect(r.text).toBe(body);
+  });
+});
+
+describe('a group that shadows a Unix command keeps the Unix command', () => {
+  const groups = [
+    { name: 'file', summary: 'files', tools: ['read', 'write', 'edit', 'ls'] },
+    { name: 'media', summary: 'media', tools: ['generate_image'] },
+  ];
+  it('hands `file <path>` to /usr/bin/file and keeps `file read` for itself', () => {
+    const ft = shimFallthroughFor('file', groups, () => true);
+    expect(ft).toEqual({ subcommands: ['read', 'write', 'edit', 'ls'], real: '/usr/bin/file' });
+    const shim = buildShim('/App/Bobble', '/tmp/d.js', 'file', ft);
+    expect(shim).toContain('read|write|edit|ls|help|-h|--help|"") ;;');
+    expect(shim).toContain('*) exec "/usr/bin/file" "$@" ;;');
+    expect(shim).toContain('exec "/App/Bobble" "/tmp/d.js" file "$@"');
+  });
+  it('does nothing for a group with no Unix namesake', () => {
+    expect(shimFallthroughFor('media', groups, (p) => p === '/usr/bin/file')).toBeUndefined();
+    expect(buildShim('/App/Bobble', '/tmp/d.js', 'media')).not.toContain('case "$1"');
+  });
+});
+
+describe('a dollar amount in one of our commands survives the shell', () => {
+  const shims = ['tools', 'office', 'media', 'svg'];
+  it('escapes $ before a digit in an office brief', () => {
+    const cmd =
+      'office make pptx --brief "Revenue was $412,000, up 14% on Q2 ($361,000)." --out d.pptx';
+    expect(protectShimDollars(cmd, shims)).toBe(
+      'office make pptx --brief "Revenue was \\$412,000, up 14% on Q2 (\\$361,000)." --out d.pptx',
+    );
+  });
+  it('leaves an already-escaped dollar, $HOME, and $(…) alone', () => {
+    const cmd = 'office make docx --out "$HOME/x.docx" --brief "costs \\$5 each, see $(date)"';
+    expect(protectShimDollars(cmd, shims)).toBe(cmd);
+  });
+  it('does not touch a command that is not ours', () => {
+    const cmd = 'awk \'{print $1}\' data.txt && bash script.sh "$1"';
+    expect(protectShimDollars(cmd, shims)).toBe(cmd);
+  });
+  it('covers our command after a cd', () => {
+    expect(protectShimDollars('cd docs && office make pdf --brief "$9 fee"', shims)).toBe(
+      'cd docs && office make pdf --brief "\\$9 fee"',
+    );
+  });
+});
+
+describe('a player is redirected to present, with the file it was given', () => {
+  it('names present and the file, and exits non-zero', () => {
+    const shim = buildDecoy('ffplay', 'coordinate present <file>');
+    expect(shim).toContain("coordinate present '$1'");
+    expect(shim).toContain('blocks until a person closes it');
+    expect(shim).toContain('exit 127');
   });
 });

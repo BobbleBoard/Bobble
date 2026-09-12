@@ -26,8 +26,10 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageEnhance, ImageFilter
 
-CACHE = Path(__file__).parent / "img-cache"
-CACHE.mkdir(exist_ok=True)
+from scratch import offline, scratch_dir
+
+CACHE = scratch_dir() / "img-cache"
+CACHE.mkdir(parents=True, exist_ok=True)
 UA = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)"}
 
 
@@ -47,6 +49,10 @@ def fetch_photo(query: str, w=1600, h=900, *, timeout=12) -> Path | None:
     dest = CACHE / f"{key}.jpg"
     if dest.exists() and dest.stat().st_size > 4096:
         return dest
+    # Nothing leaves the Mac by default (scratch.offline); the caller paints a
+    # gradient ground instead, which is what an offline deck always got.
+    if offline():
+        return None
     # source.unsplash.com was retired; picsum serves keyless stock photography
     # and takes a deterministic seed, so the same query always yields the same
     # picture — a deck that reshuffles its imagery on every rebuild is not a

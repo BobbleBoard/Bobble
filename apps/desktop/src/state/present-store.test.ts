@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { beforeEach, describe, expect, it } from 'vitest';
 import { classifyPresented, extOf, usePresentStore } from './present-store';
 

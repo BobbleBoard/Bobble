@@ -855,16 +855,15 @@ function officeGenNote(): string {
   const env = base.length > 0 ? `PI_OFFICE_GEN_SERVER=${base} ` : '';
   return [
     ``,
-    `THE RENDERERS ARE AT ${dir} — use that absolute path, and read its README.md`,
-    `before your first run. They talk to the local model server, which is NOT on a`,
-    `fixed port, so run them exactly like this:`,
+    `Your office_make / office_edit / office_inspect tools ARE the pipeline; use them.`,
+    `Should you ever need the scripts directly, they are at ${dir} and the one entry`,
+    `point is office.py — the local model server is NOT on a fixed port, so:`,
     ``,
-    `  ${env}python3 ${dir}/make_deck.py "<what you want>"`,
-    `  ${env}python3 ${dir}/make_doc.py <docx|xlsx|pdf> "<what you want>"`,
+    `  ${env}python3 ${dir}/office.py make pptx --brief "<everything it should say>" --out <path>`,
+    `  ${env}python3 ${dir}/office.py edit <file> --instruction "<the change>"`,
     ``,
-    `If a run of one of these fails, report what it printed. Do NOT fall back to`,
-    `writing the file format yourself — that has never once produced a file that`,
-    `opens.`,
+    `If a run fails, report what it printed. Do NOT fall back to writing the file`,
+    `format yourself — that has never once produced a file that opens.`,
   ].join('\n');
 }
 

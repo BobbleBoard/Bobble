@@ -16,7 +16,7 @@
  */
 import { existsSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { join } from 'node:path';
+import { join, resolve as resolvePath } from 'node:path';
 import { createLogger } from '@pi-desktop/shared';
 import { app, BrowserWindow, type WebContents, type WebContentsView } from 'electron';
 import { officeChromeCss, officeChromeScript } from './office-chrome';
@@ -490,6 +490,55 @@ export async function captureView(tabId: string): Promise<string | null> {
     log.warn('office capture failed', { tabId, err: String(err) });
     return null;
   }
+}
+
+/**
+ * Capture the editor showing `filePath`, for the model's own look at what it
+ * made — `present` and the `office` tool both end here.
+ *
+ * The renderer opens the tab (present:show → office:create) a beat after the
+ * bridge is asked, so this WAITS for the view to appear and for its editor to
+ * finish drawing: Univer lays the document out after `did-finish-load`, and a
+ * capture taken on load is a blank sheet. Same paint-forcing toggle the create
+ * path uses, because the FIRST office view of a session otherwise never gets a
+ * surface (see createOfficeView).
+ */
+export async function captureViewForFile(
+  filePath: string,
+  opts: { waitMs?: number; settleMs?: number } = {},
+): Promise<string | null> {
+  const want = resolvePath(filePath);
+  const deadline = Date.now() + (opts.waitMs ?? 10_000);
+  let entry: Entry | undefined;
+  while (Date.now() < deadline) {
+    entry = [...entries.values()].find((e) => resolvePath(e.filePath) === want);
+    if (entry !== undefined) break;
+    await new Promise((r) => setTimeout(r, 150));
+  }
+  if (entry === undefined) {
+    lastCaptureError = `no office view opened for ${filePath}`;
+    return null;
+  }
+  const wc = entry.view.webContents;
+  if (wc.isLoading()) {
+    await new Promise<void>((resolve) => {
+      const done = (): void => resolve();
+      wc.once('did-finish-load', done);
+      wc.once('did-fail-load', done);
+      setTimeout(done, 8_000);
+    });
+  }
+  await new Promise((r) => setTimeout(r, opts.settleMs ?? 1_800));
+  const tabId = [...entries.entries()].find(([, e]) => e === entry)?.[0];
+  if (tabId === undefined) return null;
+  const first = await captureView(tabId);
+  if (first !== null) return first;
+  // No surface yet — force one, the way the create path does, and try again.
+  entry.view.setVisible(false);
+  entry.view.setVisible(true);
+  wc.invalidate();
+  await new Promise((r) => setTimeout(r, 600));
+  return captureView(tabId);
 }
 
 export async function isDirty(tabId: string): Promise<boolean> {

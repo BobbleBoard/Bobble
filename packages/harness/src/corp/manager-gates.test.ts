@@ -118,15 +118,17 @@ describe('the document specialist', () => {
     expect(tools.some((t) => t.startsWith('browser_'))).toBe(true);
   });
 
-  it('is told to drive the renderers and never hand-write the format', () => {
+  it('is told to drive the pipeline and never hand-write the format', () => {
     // The whole reason this specialist exists. Two runs died on a model
     // inventing a file format from memory; the prompt has to close that door
-    // explicitly, and name the scripts that replace it.
+    // explicitly, and name the tools that replace it. (It used to name
+    // make_deck.py and friends — commands that, as written, did not exist.)
     const p = specialistPrompt('document');
     expect(p).toMatch(/NEVER HAND-WRITE THE FILE FORMAT/);
-    expect(p).toMatch(/make_deck\.py/);
-    expect(p).toMatch(/make_doc\.py/);
-    expect(p).toMatch(/office_edit\.py/);
+    expect(p).toMatch(/python-pptx/);
+    expect(p).toMatch(/office_make/);
+    expect(p).toMatch(/office_edit/);
+    expect(p).toMatch(/office_inspect/);
   });
 
   it('must put the real product in a document about the product, and look at the result', () => {

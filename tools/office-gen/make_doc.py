@@ -11,6 +11,7 @@ the renderers own every pixel.
 import os
 import json, re, sys, time, urllib.request
 from pathlib import Path
+from scratch import post_json, scratch_dir
 HERE = Path(__file__).parent
 # The server is NOT a fixed port. The app's supervisor picks a free one per
 # launch, so a hardcoded 8099 is connection-refused inside a real run — which is
@@ -52,9 +53,7 @@ bullets  — short list. {"type":"bullets","items":[...]}
 }
 
 def post(payload, timeout=600):
-    r = urllib.request.Request(f"{SERVER}/v1/chat/completions",
-        data=json.dumps(payload).encode(), headers={"Content-Type":"application/json"})
-    return json.loads(urllib.request.urlopen(r, timeout=timeout).read())
+    return post_json(f"{SERVER}/v1/chat/completions", payload, timeout)
 
 def ask(system, user, max_tokens=2600):
     return post({"messages":[{"role":"system","content":system},{"role":"user","content":user}],
@@ -64,7 +63,7 @@ def ask(system, user, max_tokens=2600):
     })["choices"][0]["message"]["content"]
 
 def parse(raw, tag):
-    (HERE/f"raw_{tag}.txt").write_text(raw)
+    (scratch_dir()/f"raw_{tag}.txt").write_text(raw)
     m = re.search(r"\{.*\}", raw.strip(), re.S)
     s = m.group(0) if m else raw
     try: return json.loads(s)
@@ -104,7 +103,7 @@ if __name__ == "__main__":
     kind, prompt = sys.argv[1], sys.argv[2]
     t0 = time.time()
     spec = generate(kind, prompt)
-    (HERE/f"spec_{kind}.json").write_text(json.dumps(spec, indent=1))
+    (scratch_dir()/f"spec_{kind}.json").write_text(json.dumps(spec, indent=1))
     pal = spec.get("palette", {})
     n = len(spec.get("blocks", spec.get("rows", [])))
     print(f"[{kind}] {n} items, palette {pal.get('primary')}/{pal.get('accent')} in {time.time()-t0:.0f}s")

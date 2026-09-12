@@ -194,7 +194,7 @@ interface UtilityEndpoint {
 }
 
 /** Read the live endpoint file, or undefined when absent/unreadable/empty. */
-function readUtilityFile(
+export function readUtilityFile(
   file: string,
 ): { baseUrl: string; model: string; apiKey?: string } | undefined {
   try {
@@ -225,6 +225,28 @@ function readUtilityFile(
  * usable without respawning the child. Callers that ran before the server
  * existed should call this again rather than caching `undefined` forever.
  */
+/**
+ * The utility endpoint itself — for a caller that speaks to the server on its
+ * own (a Python pipeline handed a base URL) rather than through {@link CallModel}.
+ * Same precedence as {@link callModelFromEnv}: the spawn-time env, then the live file.
+ */
+export function utilityEndpointFromEnv(
+  env: Record<string, string | undefined> = process.env,
+): { baseUrl: string; model: string; apiKey?: string } | undefined {
+  const envUrl = env[UTILITY_BASE_URL_ENV];
+  if (envUrl !== undefined && envUrl.length > 0) {
+    const apiKey = env[UTILITY_API_KEY_ENV];
+    return {
+      baseUrl: envUrl,
+      model: env[UTILITY_MODEL_ENV] ?? 'utility',
+      ...(apiKey !== undefined ? { apiKey } : {}),
+    };
+  }
+  const file = env[UTILITY_FILE_ENV];
+  if (file === undefined || file.length === 0) return undefined;
+  return readUtilityFile(file);
+}
+
 export function callModelFromEnv(
   env: Record<string, string | undefined> = process.env,
   fetchImpl?: typeof fetch,

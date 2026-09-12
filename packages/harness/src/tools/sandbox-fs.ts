@@ -387,7 +387,7 @@ export function allowedWriteRoots(root: string, home: string = os.homedir()): st
 
 /** A ToolDefinition with the default (widest) generics — what `registerTool`
  * accepts, and what pi's `createXToolDefinition` factories widen to. */
-type AnyToolDef = ToolDefinition;
+export type AnyToolDef = ToolDefinition;
 
 /** Read the `path` field off raw tool args (write/edit/read use `path`, ls omits). */
 function argPath(params: unknown): string | undefined {
@@ -703,6 +703,13 @@ export interface SandboxFsOptions {
   readonly getRoot?: (ctx: ExtensionContext) => string;
   /** Injected HOME (tests). */
   readonly home?: string;
+  /**
+   * A last layer over each fenced tool, applied at registration — the office
+   * formats hang here (office-tool.ts withOfficeFormats): a `write` to a .pptx
+   * becomes the pipeline making one, an `edit` of it a pipeline edit, a `read`
+   * its outline. The fence underneath is unchanged.
+   */
+  readonly wrap?: (tool: AnyToolDef) => AnyToolDef;
 }
 
 /**
@@ -738,7 +745,7 @@ export function registerSandboxFileTools(
   const env = options.env ?? process.env;
   if (env[FS_FENCE_ENV] !== '1') return false;
   for (const tool of createSandboxFileTools(options)) {
-    pi.registerTool(tool);
+    pi.registerTool(options.wrap !== undefined ? options.wrap(tool) : tool);
   }
   return true;
 }

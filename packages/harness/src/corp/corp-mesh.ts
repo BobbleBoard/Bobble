@@ -433,14 +433,13 @@ CITE EVERYTHING AND MARK YOUR CONFIDENCE. Every claim gets its source. Where sou
 
     document: `You are the DOCUMENT SPECIALIST. Somebody needs a real .pptx, .docx, .xlsx or .pdf — a deck, a report, a workbook, a brief — and you produce it.
 
-NEVER HAND-WRITE THE FILE FORMAT. Not the XML, not the zip, not a .tscn-style guess at what the inside of an Office file looks like. Every attempt at that in this project has produced a file that will not open, and the model that wrote it could not repair it. The renderers already exist and they own every byte:
+NEVER HAND-WRITE THE FILE FORMAT. Not the XML, not the zip, not python-pptx, not a .tscn-style guess at what the inside of an Office file looks like. Every attempt at that in this project has produced a file that will not open, and the model that wrote it could not repair it. The pipeline already exists and it owns every byte — it is your \`office\` tools:
 
-  \`tools/office-gen/make_doc.py <docx|xlsx|pdf> "<what you want>"\`   generate + render
-  \`tools/office-gen/make_deck.py "<what you want>"\`                  a slide deck
-  \`tools/office-gen/make_edit.py <file> "<instruction>"\`             edit an EXISTING file
-  \`tools/office-gen/office_edit.py inspect <file>\`                   see what is in one
+  office_make    kind + a BRIEF → a designed .pptx / .docx / .xlsx / .pdf, rendered and summarised back to you
+  office_edit    an existing file + an instruction → wording, style, position, slide order changed in place
+  office_inspect an existing file → its outline, with the ids office_edit takes
 
-Read \`tools/office-gen/README.md\` first — it says what each script takes. You write a small JSON spec and prose; the renderer writes the file. If a format needs something the renderer cannot yet do, SAY SO rather than working around it by hand: a gap fixed in the renderer is fixed for everyone, forever.
+You write the BRIEF — everything the file should say, in order, with the real numbers and names — and the pipeline writes the file. It invents nothing, so a thin brief makes a thin file. If a format needs something the pipeline cannot yet do, SAY SO rather than working around it by hand: a gap fixed in the pipeline is fixed for everyone, forever.
 
 REAL CONTENT, NOT LOREM IPSUM. Numbers come from the actual thing — read the files, run the command, take the figure off what exists. A deck of invented statistics about a real product is worse than no deck.
 
@@ -670,13 +669,24 @@ export function specialistToolsFor(kind: string): readonly string[] {
     // a written report — so it needs the browser, the web, and somewhere to write.
     case 'research':
       return ['write', 'read', 'ls', 'bash', ...RESEARCH_TOOLS, ...BROWSER_TOOLS];
-    // Makes documents. `bash` is the load-bearing one: the renderers in
-    // tools/office-gen are what actually write the file, and `write` is for the
-    // JSON spec it hands them. The browser is for CAPTURING the real screens a
-    // deck about a product has to contain — an unillustrated deck about a
-    // working app is the failure this specialist exists to avoid.
+    // Makes documents. The three `office` tools ARE the pipeline — a brief in, a
+    // rendered file out — so the specialist never has to find the scripts or the
+    // server. `bash` stays for gathering the facts the brief is made of; the
+    // browser is for CAPTURING the real screens a deck about a product has to
+    // contain — an unillustrated deck about a working app is the failure this
+    // specialist exists to avoid.
     case 'document':
-      return ['write', 'read', 'ls', 'bash', ...BROWSER_TOOLS, ...RESEARCH_TOOLS];
+      return [
+        'office_make',
+        'office_edit',
+        'office_inspect',
+        'write',
+        'read',
+        'ls',
+        'bash',
+        ...BROWSER_TOOLS,
+        ...RESEARCH_TOOLS,
+      ];
     default:
       return DEFAULT_SPECIALIST_TOOLS;
   }

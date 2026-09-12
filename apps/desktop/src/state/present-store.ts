@@ -11,9 +11,11 @@ import type { OpenWithChoice } from '@pi-desktop/ui';
  * the tool must stay electron-free and the canvas surfaces live on this side.
  */
 
-import type { CanvasTabKind } from '@pi-desktop/canvas';
+import type { CanvasController, CanvasTabKind } from '@pi-desktop/canvas';
 import type { PresentKind } from '@pi-desktop/ui';
 import { create } from 'zustand';
+import { previewKindForExt } from '../chat/canvas/file-preview';
+import { fileTabKey, openFileInCanvas } from '../chat/canvas/file-tabs';
 import { getCanvasController } from './canvas-store';
 import { usePiStore } from './pi-slice';
 
@@ -167,6 +169,26 @@ export async function openPresented(
   if (controller === null) return;
   const { tab } = classifyPresented(item.path);
   const title = item.path.split(/[\\/]/).pop() ?? item.path;
+  /*
+   * A DECK OPENS AS A DECK. This used to read every presented file as TEXT and
+   * put it in a file tab — so a .pptx the model had just made arrived in the
+   * canvas as two pages of zip bytes, and a FLAC as garbage (SEEN, in the
+   * canvas assessment and in the office run). The `+ › Files` menu already
+   * knows which surface a file wants — the office editor, the audio/video/3D
+   * players, the PDF viewer — so a presented file goes through the same door.
+   * Text and pages keep the path below: the html tab renders, the file tab
+   * shows the note.
+   */
+  if (previewKindForExt(extOf(item.path)) !== null && tab === 'file') {
+    await openFileInCanvas(controller as unknown as CanvasController, item.path);
+    const opened = (controller as unknown as CanvasController)
+      .getState()
+      .tabs.find((t) => t.filePath === item.path || t.key === fileTabKey(item.path));
+    if (opened !== undefined && item.note !== undefined) {
+      (controller as unknown as CanvasController).updateTab(opened.id, { subtitle: item.note });
+    }
+    return;
+  }
   /*
    * A CANVAS ARTIFACT IS `content: { kind, text }` — the file's TEXT, not a path.
    *

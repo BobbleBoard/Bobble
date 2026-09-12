@@ -31,6 +31,8 @@ import {
   type CliGroupSpec,
   type CliModel,
   type CliTool,
+  commandNameFor,
+  pathFor,
   resolveCli,
 } from './tool-cli.js';
 import { toolCliShimCommands } from './tool-cli-groups.js';
@@ -79,13 +81,86 @@ export interface ToolCliHandle {
  * through, and ELECTRON_RUN_AS_NODE so the app's own binary can act as the Node
  * that runs the dispatcher — there is no system Node to depend on.
  */
-export function buildShim(execPath: string, dispatcherPath: string, command: string): string {
+/**
+ * A group whose name is ALSO a Unix command keeps the Unix command.
+ *
+ * MEASURED: `file docs/q3-review.pptx` — the ordinary way to ask what a file
+ * is — answered "file docs/q3-review.pptx: no such command" eight times in one
+ * turn, because the `file` group's shim sat ahead of /usr/bin/file on PATH.
+ * The shim knows its own sub-words; anything else is the real command's.
+ */
+export interface ShimFallthrough {
+  /** The words that belong to the group (`read`, `write`, …) plus help. */
+  readonly subcommands: readonly string[];
+  /** The real binary to hand everything else to. */
+  readonly real: string;
+}
+
+export function buildShim(
+  execPath: string,
+  dispatcherPath: string,
+  command: string,
+  fallthrough?: ShimFallthrough,
+): string {
+  const gate =
+    fallthrough === undefined
+      ? []
+      : [
+          'case "$1" in',
+          `  ${[...fallthrough.subcommands, 'help', '-h', '--help', '""'].join('|')}) ;;`,
+          `  *) exec "${fallthrough.real}" "$@" ;;`,
+          'esac',
+        ];
   return [
     '#!/bin/sh',
     `# ${command} — a Bobble tool, reachable as a command.`,
+    ...gate,
     `ELECTRON_RUN_AS_NODE=1 exec "${execPath}" "${dispatcherPath}" ${command} "$@"`,
     '',
   ].join('\n');
+}
+
+/**
+ * `$412,000` IN A BRIEF IS NOT A POSITIONAL PARAMETER.
+ *
+ * MEASURED: the model wrote
+ *   office make pptx --brief "Revenue was $412,000, up 14% …"
+ * and the pipeline made a deck about "12,000" — bash expanded `$4` (the fourth
+ * positional argument, empty) inside the double quotes before the shim ever
+ * saw the text. Every number with a dollar sign in front of it lost its first
+ * digit, silently, in a document whose whole point was the numbers.
+ *
+ * A command that starts with one of OUR commands never means `$1`…`$9` as a
+ * shell variable — there are no positional parameters on a one-line tool
+ * call — so `$` before a digit is escaped there and only there. The rest of
+ * the shell (`$HOME`, `$(…)`) is untouched; a script the model runs on its own
+ * is untouched.
+ */
+export function protectShimDollars(command: string, shimCommands: readonly string[]): string {
+  if (!/\$\d/.test(command)) return command;
+  const segments = command.split(/&&|\|\||;|\|/);
+  const leads = segments.map((seg) => seg.trim().split(/\s+/)[0] ?? '');
+  const ours = leads.some((w) => shimCommands.includes(w));
+  if (!ours) return command;
+  return command.replace(/(^|[^\\])\$(?=\d)/g, '$1\\$');
+}
+
+/** The real command a group name shadows, when one exists on this machine. */
+export function shimFallthroughFor(
+  command: string,
+  groups: readonly CliGroupSpec[],
+  exists: (p: string) => boolean = fs.existsSync,
+): ShimFallthrough | undefined {
+  const real = `/usr/bin/${command}`;
+  if (!exists(real)) return undefined;
+  const spec = groups.find((g) => commandNameFor(g.name) === command);
+  if (spec === undefined) return undefined;
+  const subcommands = [
+    ...new Set(
+      spec.tools.map((t) => pathFor(command, t)[0]).filter((w): w is string => w !== undefined),
+    ),
+  ];
+  return { subcommands, real };
 }
 
 /**
@@ -96,10 +171,16 @@ export function buildShim(execPath: string, dispatcherPath: string, command: str
  * refusing — a dead end invites a workaround, a signpost does not.
  */
 export function buildDecoy(name: string, suggestion: string): string {
+  // A player is not MAKING media; it is showing it, and that is what `present`
+  // does — in the canvas, without a window or the speakers.
+  const player = /<file>/.test(suggestion);
+  const line = player
+    ? `${name} opens a window (or the speakers) and blocks until a person closes it. To show the user a clip or a track, use: ${suggestion.replace('<file>', "'$1'")}`
+    : `${name} is not how this app makes media. Use: ${suggestion}`;
   return [
     '#!/bin/sh',
     `# ${name} — shadowed while Bobble's tool commands are on PATH.`,
-    `echo "${name} is not how this app makes media. Use: ${suggestion}" >&2`,
+    `echo "${line}" >&2`,
     `echo "Run \`${suggestion.split(' ')[0]} --help\` to see what it can do." >&2`,
     'exit 127',
     '',
@@ -449,14 +530,36 @@ export function registerToolCli(host: ToolCliHost, opts: ToolCliOptions = {}): T
   };
   for (const command of commands) {
     const p = path.join(shimDir, command);
-    fs.writeFileSync(p, buildShim(execPath, dispatcherPath, command), { mode: 0o755 });
+    fs.writeFileSync(
+      p,
+      buildShim(execPath, dispatcherPath, command, shimFallthroughFor(command, host.groups())),
+      { mode: 0o755 },
+    );
   }
   // `open` is wrapped, not shadowed: only the form that steals the screen is
   // redirected (see buildOpenWrapper).
   fs.writeFileSync(path.join(shimDir, 'open'), buildOpenWrapper(opts.presentCommand ?? null), {
     mode: 0o755,
   });
-  for (const [decoy, suggestion] of Object.entries(DECOYS)) {
+  /*
+   * PLAYERS, TOO — because there is somewhere to go. SEEN in the canvas
+   * assessment: "open clip.mp4" became `ffplay ./media/clip.mp4`, a window
+   * that blocks until closed (300 s, the whole turn); "open beat.flac" became
+   * `ffplay beat.flac`, which played through the speakers. `present` shows the
+   * clip or the track in the canvas, which is what "open it" means here, and
+   * hands back a preview — so the redirect is true, the same way `say` →
+   * `media generate speech` is true.
+   */
+  const players: Record<string, string> =
+    opts.presentCommand !== null && opts.presentCommand !== undefined
+      ? Object.fromEntries(
+          ['afplay', 'ffplay', 'mpv', 'vlc', 'mplayer'].map((name) => [
+            name,
+            `${opts.presentCommand} <file>`,
+          ]),
+        )
+      : {};
+  for (const [decoy, suggestion] of Object.entries({ ...DECOYS, ...players })) {
     // Only where a real command of that name is not already the point — these
     // sit FIRST on PATH, so they shadow the system one for this session only.
     fs.writeFileSync(path.join(shimDir, decoy), buildDecoy(decoy, suggestion), { mode: 0o755 });

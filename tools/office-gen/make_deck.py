@@ -16,16 +16,18 @@ earlier today.
 JSON is enforced by llama.cpp's grammar, not by asking politely. A 4B model
 asked for "only JSON" will still occasionally open with "Here is the JSON:".
 """
-import os
 from __future__ import annotations
 
 import json
+import os
 import re
 import sys
 import time
 import urllib.error
 import urllib.request
 from pathlib import Path
+
+from scratch import post_json, scratch_dir
 
 HERE = Path(__file__).parent
 # The server is NOT a fixed port. The app's supervisor picks a free one per
@@ -64,13 +66,7 @@ closing     — numbered takeaways. {"title","points":[...]}
 
 
 def post(payload: dict, timeout=600) -> dict:
-    req = urllib.request.Request(
-        f"{SERVER}/v1/chat/completions",
-        data=json.dumps(payload).encode(),
-        headers={"Content-Type": "application/json"},
-    )
-    with urllib.request.urlopen(req, timeout=timeout) as r:
-        return json.loads(r.read())
+    return post_json(f"{SERVER}/v1/chat/completions", payload, timeout)
 
 
 def ask(system: str, user: str, *, schema_hint: str = "", max_tokens=900) -> str:
@@ -97,7 +93,7 @@ def ask(system: str, user: str, *, schema_hint: str = "", max_tokens=900) -> str
 
 
 def parse_json(raw: str, tag: str = "x"):
-    (HERE / f"raw_{tag}.txt").write_text(raw)
+    (scratch_dir() / f"raw_{tag}.txt").write_text(raw)
     raw = raw.strip()
     m = re.search(r"\{.*\}", raw, re.S)
     if m:
@@ -209,7 +205,7 @@ def main():
         "running_title": plan.get("running_title", ""),
         "slides": filled,
     }
-    out = HERE / "deck_spec.json"
+    out = scratch_dir() / "deck_spec.json"
     out.write_text(json.dumps(spec, indent=1))
     print(f"\n[done] {len(filled)} slides in {time.time()-t0:.0f}s -> {out}")
 
