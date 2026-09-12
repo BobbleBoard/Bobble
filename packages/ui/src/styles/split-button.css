@@ -82,3 +82,36 @@
   z-index: 30;
   min-width: 160px;
 }
+
+/*
+ * PRIMARY TONE — the present card's Open. the user: "open could be blue". The
+ * accent fills both segments; the divider is a lighter line through it so the
+ * caret still reads as a second target.
+ */
+.pd-split-root[data-tone="primary"] .pd-split {
+  border-color: transparent;
+  background: var(--pd-accent-primary);
+}
+.pd-split-root[data-tone="primary"] .pd-split-main,
+.pd-split-root[data-tone="primary"] .pd-split-caret {
+  color: var(--pd-text-on-accent);
+  font-weight: 550;
+}
+.pd-split-root[data-tone="primary"] .pd-split-app-icon {
+  color: var(--pd-text-on-accent);
+}
+.pd-split-root[data-tone="primary"] .pd-split-main:hover,
+.pd-split-root[data-tone="primary"] .pd-split-caret:hover {
+  background: var(--pd-accent-hover);
+}
+.pd-split-root[data-tone="primary"] .pd-split-divider {
+  background: color-mix(in srgb, var(--pd-text-on-accent) 35%, transparent);
+}
+
+/* The "Open with" heading at the top of the dropdown. */
+.pd-menu-heading {
+  padding: 6px 12px 4px;
+  font-size: var(--pd-font-size-caption);
+  color: var(--pd-text-muted);
+  user-select: none;
+}

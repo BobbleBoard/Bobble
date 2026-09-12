@@ -1,3 +1,5 @@
+import { fileTypeOf } from './file-type.ts';
+import { FileTypeGlyph } from './file-type-glyph.tsx';
 import { OpenSplitButton, type OpenWithChoice } from './open-split-button.tsx';
 /**
  * The card `present` puts in the thread: here is the finished thing.
@@ -15,7 +17,7 @@ import { OpenSplitButton, type OpenWithChoice } from './open-split-button.tsx';
  */
 
 import clsx from 'clsx';
-import { forwardRef, type HTMLAttributes, type ReactNode } from 'react';
+import { forwardRef, type HTMLAttributes } from 'react';
 
 /** What kind of thing was presented — drives the glyph and the `Kind · EXT` line. */
 export type PresentKind = 'image' | 'page' | 'code' | 'document' | 'project' | 'media' | 'file';
@@ -47,19 +49,35 @@ const KIND_LABEL: Record<PresentKind, string> = {
   file: 'File',
 };
 
+/** Every application that can open it, the OS default first. */
+export function openWithApps(item: PresentedItem): OpenWithChoice[] {
+  const apps = [...(item.openApps ?? [])];
+  const def = item.defaultApp;
+  if (def === undefined) return apps;
+  return [def, ...apps.filter((a) => a.id !== def.id)];
+}
+
 /** basename without assuming a platform separator. */
 export function baseName(p: string): string {
   const parts = p.split(/[\\/]/).filter(Boolean);
   return parts[parts.length - 1] ?? p;
 }
 
-/** `Document · MD` — the reference's second line, from our own metadata. */
+/**
+ * `Slides · PPTX` — the second line, from the file's own identity.
+ *
+ * The family's word rather than the coarse present-kind: "File · PPTX" said
+ * nothing the extension did not; "Slides · PPTX" is what a person calls it.
+ * A project (no extension) keeps the present-kind's word.
+ */
 export function kindLine(item: PresentedItem): string {
   const base = baseName(item.path);
   const dot = base.lastIndexOf('.');
   const ext = dot > 0 ? base.slice(dot + 1).toUpperCase() : '';
-  const label = KIND_LABEL[item.kind];
-  return ext === '' ? label : `${label} · ${ext}`;
+  if (ext === '') return KIND_LABEL[item.kind];
+  const type = fileTypeOf(item.path, { folder: item.kind === 'project' });
+  const label = type.family === 'file' ? KIND_LABEL[item.kind] : type.label;
+  return `${label} · ${ext}`;
 }
 
 /*
@@ -87,78 +105,16 @@ function FolderGlyph() {
   );
 }
 
-/** Glyphs, one per kind. Inline so the card needs no icon dependency. */
-function KindGlyph({ kind }: { kind: PresentKind }): ReactNode {
-  const common = {
-    /*
-     * DECORATIVE, and marked so. Each glyph sits immediately beside the item's
-     * name in text (`pd-present-name`), so a <title> would make a screen reader
-     * announce the kind twice — "image, image, fox.png". `aria-hidden` is the
-     * correct answer for an icon that duplicates adjacent text, and it satisfies
-     * the a11y lint for the right reason rather than by adding noise.
-     */
-    'aria-hidden': true,
-    width: 20,
-    height: 20,
-    viewBox: '0 0 24 24',
-    fill: 'none',
-    stroke: 'currentColor',
-    strokeWidth: 1.6,
-    strokeLinecap: 'round' as const,
-    strokeLinejoin: 'round' as const,
-  };
-  switch (kind) {
-    case 'image':
-      return (
-        <svg {...common} aria-hidden="true">
-          <rect x="3" y="4" width="18" height="16" rx="2" />
-          <circle cx="8.5" cy="9.5" r="1.5" />
-          <path d="M21 16l-5-5-9 9" />
-        </svg>
-      );
-    case 'page':
-      return (
-        <svg {...common} aria-hidden="true">
-          <rect x="3" y="4" width="18" height="16" rx="2" />
-          <path d="M3 9h18" />
-        </svg>
-      );
-    case 'code':
-      return (
-        <svg {...common} aria-hidden="true">
-          <path d="M9 8l-4 4 4 4M15 8l4 4-4 4" />
-        </svg>
-      );
-    case 'project':
-      return (
-        <svg {...common} aria-hidden="true">
-          <path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
-        </svg>
-      );
-    case 'media':
-      return (
-        <svg {...common} aria-hidden="true">
-          <rect x="3" y="5" width="18" height="14" rx="2" />
-          <path d="M10 9.5l5 2.5-5 2.5z" />
-        </svg>
-      );
-    default:
-      return (
-        <svg {...common} aria-hidden="true">
-          <path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8z" />
-          <path d="M14 3v5h5" />
-        </svg>
-      );
-  }
-}
-
 export interface PresentCardProps extends Omit<HTMLAttributes<HTMLElement>, 'onSelect'> {
   item: PresentedItem;
-  /** Open it in the canvas beside the conversation. The row's own action. */
+  /**
+   * The Open button — the canvas, beside the conversation. the user: "by default it
+   * opens in the canvas or it should". The same thing the card body does.
+   */
   onOpen?: (item: PresentedItem) => void;
   /** Show it in Finder. Secondary. */
   onReveal?: (item: PresentedItem) => void;
-  /** A specific app chosen from the Open dropdown. */
+  /** An application chosen from the "Open with" dropdown. */
   onOpenWith?: (item: PresentedItem, appId: string) => void;
   /** The card BODY was clicked — bring the artefact into the canvas. */
   onActivate?: (item: PresentedItem) => void;
@@ -176,6 +132,7 @@ export const PresentCard = forwardRef<HTMLDivElement, PresentCardProps>(function
   ref,
 ) {
   const name = item.name ?? baseName(item.path);
+  const type = fileTypeOf(item.path, { folder: item.kind === 'project' });
   return (
     <div ref={ref} className={clsx('pd-present-card', className)} {...rest}>
       {/*
@@ -194,11 +151,27 @@ export const PresentCard = forwardRef<HTMLDivElement, PresentCardProps>(function
         title={item.path}
         onClick={onActivate === undefined ? undefined : () => onActivate(item)}
       >
-        <span className="pd-present-thumb" aria-hidden>
+        {/*
+         * THE TILE IS THE FILE'S COLOUR. the user: "more color and unique icons
+         * for file types, not just the generic and not anything that just has
+         * the generic with 'pptx' under it." A deck is vermilion with a chart,
+         * a document blue with lines, a sheet green with a grid — read before
+         * the name is, the way every file browser does it.
+         */}
+        <span
+          className="pd-present-thumb"
+          data-family={type.family}
+          /* The glyph is white on every tile, whatever the flavour's on-accent
+           * colour is — these are the file's colours, not the theme's. */
+          style={
+            item.thumbnailUrl === undefined ? { background: type.color, color: '#fff' } : undefined
+          }
+          aria-hidden
+        >
           {item.thumbnailUrl !== undefined ? (
             <img className="pd-present-thumb-img" src={item.thumbnailUrl} alt="" />
           ) : (
-            <KindGlyph kind={item.kind} />
+            <FileTypeGlyph family={type.family} />
           )}
         </span>
         <span className="pd-present-text">
@@ -233,11 +206,18 @@ export const PresentCard = forwardRef<HTMLDivElement, PresentCardProps>(function
          * same thing as the 'open' button inside the canvas when you have a file
          * open. with the little dropdown also." Literally the same component the
          * canvas operation bar renders — not a lookalike.
+         *
+         * Then: "open could be blue also that open should have a dropdown
+         * that's open with (because by default it opens in the canvas or it
+         * should)." So here the primary segment is the accent colour and opens
+         * the canvas; every application — the OS default included — lives in
+         * the "Open with" dropdown.
          */}
         {onOpen !== undefined ? (
           <OpenSplitButton
-            {...(item.defaultApp !== undefined ? { defaultApp: item.defaultApp } : {})}
-            {...(item.openApps !== undefined ? { apps: item.openApps } : {})}
+            tone="primary"
+            menuHeading="Open with"
+            apps={openWithApps(item)}
             onOpen={() => onOpen(item)}
             {...(onOpenWith !== undefined
               ? { onOpenWith: (appId: string) => onOpenWith(item, appId) }

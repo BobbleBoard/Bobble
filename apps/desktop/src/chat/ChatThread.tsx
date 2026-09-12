@@ -280,12 +280,11 @@ export function ChatThread() {
         <PresentCard
           key={item.path}
           item={item}
-          /* Body → the canvas. Split button → an application. Two
-           * different verbs, deliberately not sharing a handler. */
+          /* Body AND the blue Open → the canvas (the user: "by default it opens
+           * in the canvas or it should"). The dropdown is "Open with": every
+           * application, the OS default among them. */
           onActivate={() => void openPresented(canvasController, item)}
-          onOpen={() => {
-            void window.piDesktop.invoke('canvas:open-default', { path: item.path });
-          }}
+          onOpen={() => void openPresented(canvasController, item)}
           onOpenWith={(_it, appId) => {
             void window.piDesktop.invoke('canvas:open-with', { path: item.path, appId });
           }}

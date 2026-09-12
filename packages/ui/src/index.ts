@@ -153,6 +153,9 @@ export type { EffortSliderProps } from './components/effort-slider.tsx';
 export { EffortSlider, pointerToIndex } from './components/effort-slider.tsx';
 export type { FileDropZoneProps } from './components/file-input.tsx';
 export { FileDropZone } from './components/file-input.tsx';
+export type { FileFamily, FileType } from './components/file-type.ts';
+export { extensionOf as fileExtensionOf, fileTypeOf } from './components/file-type.ts';
+export { FileTypeGlyph } from './components/file-type-glyph.tsx';
 export type { IconStrokeControlProps } from './components/icon-stroke-control.tsx';
 export {
   clampIconStroke,

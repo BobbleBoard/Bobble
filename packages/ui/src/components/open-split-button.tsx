@@ -41,6 +41,14 @@ export interface OpenSplitButtonProps {
    */
   readonly extraItem?: { readonly label: string; readonly onSelect: () => void };
   readonly className?: string;
+  /**
+   * `primary` paints the control in the accent colour — the present card's
+   * Open, which is the one thing to do with a finished file. The canvas
+   * operation bar keeps the quiet default: there the file is already open.
+   */
+  readonly tone?: 'default' | 'primary';
+  /** A heading row at the top of the dropdown ("Open with"). */
+  readonly menuHeading?: string;
 }
 
 /** Dismiss on any pointer-down outside the control. */
@@ -100,6 +108,27 @@ function AppIcon({ app, inMenu = false }: { app?: OpenWithChoice; inMenu?: boole
  * one connected, rounded control. With no other apps to offer, the caret is
  * omitted rather than opening an empty menu.
  */
+/** The canvas mark for a primary Open: the panel beside the chat, not an app. */
+function CanvasGlyph() {
+  return (
+    <svg
+      width={16}
+      height={16}
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.5}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="pd-icon"
+      aria-hidden="true"
+    >
+      <rect x="2" y="3" width="12" height="10" rx="2" />
+      <path d="M9.5 3v10" />
+    </svg>
+  );
+}
+
 export function OpenSplitButton({
   defaultApp,
   apps,
@@ -107,22 +136,33 @@ export function OpenSplitButton({
   onOpenWith,
   extraItem,
   className,
+  tone = 'default',
+  menuHeading,
 }: OpenSplitButtonProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useOutsideClose(ref, open, () => setOpen(false));
   const others = (apps ?? []).filter((app) => app.id !== defaultApp?.id);
+  const primary = tone === 'primary';
 
   return (
-    <div ref={ref} className={clsx('pd-split-root', className)}>
+    <div ref={ref} className={clsx('pd-split-root', className)} data-tone={tone}>
       <div className="pd-split">
         <button
           type="button"
           className="pd-split-main pd-focusable"
-          aria-label={defaultApp !== undefined ? `Open with ${defaultApp.name}` : 'Open'}
+          aria-label={
+            !primary && defaultApp !== undefined ? `Open with ${defaultApp.name}` : 'Open'
+          }
           onClick={() => onOpen?.()}
         >
-          <AppIcon app={defaultApp} />
+          {primary ? (
+            <span className="pd-split-app-icon" aria-hidden="true">
+              <CanvasGlyph />
+            </span>
+          ) : (
+            <AppIcon app={defaultApp} />
+          )}
           Open
         </button>
         {others.length > 0 || extraItem !== undefined ? (
@@ -143,6 +183,11 @@ export function OpenSplitButton({
       </div>
       {open && (others.length > 0 || extraItem !== undefined) ? (
         <div className="pd-menu pd-split-menu" role="menu">
+          {menuHeading !== undefined ? (
+            <div className="pd-menu-heading" aria-hidden="true">
+              {menuHeading}
+            </div>
+          ) : null}
           {others.map((app) => (
             <button
               key={app.id}

@@ -58,6 +58,8 @@
   height: 44px;
   border: 1px solid var(--pd-border-subtle);
   border-radius: var(--pd-radius-md);
+  /* The family's colour is set inline (file-type.ts); this is the fallback
+   * for a thumbnail, whose image covers it; the glyph colour rides inline too. */
   background: var(--pd-bg-hover);
   color: var(--pd-text-secondary);
   overflow: hidden;
