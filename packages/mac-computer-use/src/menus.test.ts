@@ -27,15 +27,19 @@ class FakeBridge implements MacBridge {
   }
 }
 
-const handlers = new Map<string, () => void>();
+const handlers = new Map<string, (event?: unknown, ctx?: unknown) => void>();
+/** What the extension appended to the session, in order. */
+const entries: { customType: string; data: unknown }[] = [];
 
 function toolsOf(bridge: MacBridge, session?: MacSessionState): Map<string, ToolDefinition> {
   const tools = new Map<string, ToolDefinition>();
   handlers.clear();
+  entries.length = 0;
   registerMacComputerUseTools(
     {
       registerTool: (def: ToolDefinition) => tools.set(def.name, def),
-      on: (event: string, fn: () => void) => handlers.set(event, fn),
+      on: (event: string, fn: (event?: unknown, ctx?: unknown) => void) => handlers.set(event, fn),
+      appendEntry: (customType: string, data: unknown) => entries.push({ customType, data }),
     } as unknown as ExtensionAPI,
     { bridge, consent: createMacConsentGate({ preConsented: true }), session },
   );
@@ -193,7 +197,7 @@ describe('an act reports what it opened', () => {
 });
 
 describe('the end of a turn', () => {
-  it('lets go of the app, so the phantom cursor does not float there forever', async () => {
+  it('stops the driving but KEEPS the app, so the next turn starts where this one left off', async () => {
     const bridge = new FakeBridge()
       .on('setDriving', () => ({ ok: true }))
       .on('snapshot', () => ({
@@ -214,7 +218,60 @@ describe('the end of a turn', () => {
     handlers.get('agent_end')?.();
     await Promise.resolve();
     expect(bridge.lastParams('setDriving')).toEqual({ driving: false });
-    expect(session.controlled()).toBeNull();
+    /*
+     * SEEN (the user, Chrome): the old handler released control here, so a bare
+     * `mac snapshot` on the next message fell back to whatever was in front —
+     * the app HE was using, not the one the model had been driving.
+     */
+    expect(session.controlled()?.pid).toBe(42);
+    expect(session.targetParams()).toEqual({ pid: 42, app: 'TextEdit' });
+  });
+
+  it('records which app is under control, and a restarted session takes it back', async () => {
+    const bridge = new FakeBridge()
+      .on('setDriving', () => ({ ok: true }))
+      .on('snapshot', () => ({
+        app: 'Google Chrome',
+        pid: 8131,
+        windowId: 2661,
+        window: 'Example',
+        elements: [],
+        summary: { app: 'Google Chrome', window: 'Example', elementCount: 0, truncated: false },
+      }));
+    const session = createMacSessionState();
+    const tools = toolsOf(bridge, session);
+    const snapshot = tools.get('mac_snapshot');
+    if (snapshot === undefined) throw new Error('missing mac_snapshot');
+    // biome-ignore lint/suspicious/noExplicitAny: minimal execute args for tests.
+    await snapshot.execute('c', {} as any, undefined, undefined, ctx);
+    // biome-ignore lint/suspicious/noExplicitAny: minimal execute args for tests.
+    await snapshot.execute('c', {} as any, undefined, undefined, ctx);
+    // Once per change of control, not once per look.
+    expect(entries).toEqual([
+      { customType: 'mac-control', data: { app: 'Google Chrome', pid: 8131, windowId: 2661 } },
+    ]);
+
+    // The pi child restarts (a vision relaunch, a reopened chat): a fresh
+    // extension instance, the session's entries handed to session_start.
+    const again = createMacSessionState();
+    toolsOf(bridge, again);
+    expect(again.controlled()).toBeNull();
+    handlers.get('session_start')?.(undefined, {
+      ...ctx,
+      sessionManager: {
+        getEntries: () => [
+          { type: 'message', message: {} },
+          {
+            type: 'custom',
+            customType: 'mac-control',
+            data: { app: 'Google Chrome', pid: 8131, windowId: 2661 },
+          },
+        ],
+      },
+    });
+    expect(again.controlled()).toEqual({ app: 'Google Chrome', pid: 8131, windowId: 2661 });
+    // …and a bare snapshot now goes to Chrome, not to whatever is in front.
+    expect(again.targetParams()).toEqual({ pid: 8131, app: 'Google Chrome' });
   });
 
   it('says nothing when no app was being driven', async () => {

@@ -112,6 +112,18 @@ interface MacDetails {
 /** How the model reads a background vs foreground act, appended to tool text so
  * the trace shows focus-free vs focus-stealing steps. */
 function backgroundNote(ack: MacActAck): string {
+  /*
+   * THE APP TOOK THE FRONT ITSELF. The act was delivered in the background,
+   * and the app activated anyway — Chrome does on ⌘L, on a new tab, on a new
+   * window. The helper's focus guard hands the user's app straight back
+   * (Serve.swift, handBackFocus); the model hears which, so it neither
+   * believes it changed nothing nor keeps reaching for the same chord.
+   */
+  if (ack.tookFocus === true) {
+    return ack.focusRestored === true
+      ? ` (${ack.note ?? 'the app came to the front for a moment; focus was handed back'} — prefer acting by [index], which does not do that)`
+      : ` (${ack.note ?? 'the app took the front and it could not be handed back'})`;
+  }
   if (ack.background === true)
     return ` (background via ${ack.mode ?? 'Accessibility'}, no focus change)`;
   if (ack.background === false) return ` (foreground ${ack.mode ?? 'CGEvent'} — took focus)`;
@@ -302,20 +314,73 @@ export function registerMacComputerUseTools(
   const session = options.session ?? createMacSessionState();
 
   /*
-   * END THE SESSION WHEN THE TURN ENDS.
+   * THE CONTROLLED APP IS REMEMBERED ACROSS TURNS AND RESTARTS.
+   *
+   * SEEN (the user, Chrome): "if the model executes mac snapshot without any
+   * arguments it gives it the current app that I am using … where it should
+   * give the one that it was controlling, the last one that it used." The
+   * turn-end handler below used to RELEASE control along with the overlay, so
+   * the next message started from nothing and a bare snapshot fell back to
+   * whatever was in front — the user's own app. Driving stops at the end of a
+   * turn (the cursor and the capture must not outlive the work); knowing which
+   * app the work was in does not.
+   *
+   * And it survives the pi child being restarted (a vision relaunch, a chat
+   * reopened): each change of control is appended to the session as a
+   * `mac-control` entry and the last one is restored at session start. A pid
+   * that has quit since resolves by the name that rides with it.
+   */
+  const MAC_CONTROL_ENTRY = 'mac-control';
+  let recordedPid: number | null = null;
+  const recordControl = (): void => {
+    const c = session.controlled();
+    if (c === null || c.pid === recordedPid) return;
+    recordedPid = c.pid;
+    try {
+      pi.appendEntry?.(MAC_CONTROL_ENTRY, {
+        app: c.app,
+        pid: c.pid,
+        ...(c.windowId !== undefined ? { windowId: c.windowId } : {}),
+      });
+    } catch {
+      /* a record is a convenience; the act already happened */
+    }
+  };
+  pi.on?.('session_start', (_event, ctx) => {
+    recordedPid = null;
+    session.release?.();
+    const sm = (ctx as { sessionManager?: { getEntries?: () => unknown[] } }).sessionManager;
+    const entries = sm?.getEntries?.() ?? [];
+    let last: { app: string; pid: number; windowId?: number } | null = null;
+    for (const e of entries) {
+      const entry = e as { type?: string; customType?: string; data?: unknown };
+      if (entry.type !== 'custom' || entry.customType !== MAC_CONTROL_ENTRY) continue;
+      const d = entry.data as { app?: unknown; pid?: unknown; windowId?: unknown } | undefined;
+      if (typeof d?.app === 'string' && typeof d?.pid === 'number') {
+        last = {
+          app: d.app,
+          pid: d.pid,
+          ...(typeof d.windowId === 'number' ? { windowId: d.windowId } : {}),
+        };
+      }
+    }
+    if (last !== null) {
+      session.restore?.(last);
+      recordedPid = last.pid;
+    }
+  });
+
+  /*
+   * END THE DRIVING WHEN THE TURN ENDS — not the control.
    *
    * Nothing was ever telling the app that driving had stopped, so the phantom
    * cursor kept floating over the user's app and the screen capture kept
    * running — indefinitely, long after the model had finished and the user had
    * moved on. A "Thinking…" bubble hovering over an app nobody is driving is
    * the most alarming thing this feature can do, and it costs battery to say it.
-   *
-   * Control resumes by itself: the next look or act takes the app again. So
-   * releasing at the end of a turn is free, and holding on is not.
    */
   pi.on?.('agent_end', () => {
     if (bridge === null || session.controlled() === null) return;
-    session.release?.();
     void bridge.request('setDriving', { driving: false }).catch(() => {
       /* the app may already be gone; nothing to release */
     });
@@ -409,6 +474,7 @@ export function registerMacComputerUseTools(
         ...(e.bbox !== undefined ? { bbox: e.bbox } : {}),
       })),
     });
+    recordControl();
     /* A FILTERED OR PAGED LOOK ADDS; A PLAIN ONE REPLACES.
      *
      * `find` and `from` are continuations of one look at one app — the helper
@@ -1070,13 +1136,17 @@ export function registerMacComputerUseTools(
       const blocked = await gate('mac_key', ctx);
       if (blocked !== null) return blocked;
       try {
-        const ack = await bridge.request<{ ok: boolean; background?: boolean }>(
+        const ack = await bridge.request<MacActAck & { ok: boolean }>(
           'key',
           withTarget({ combo: params.combo }),
         );
         await sleep(SETTLE_MS);
         const note =
-          ack.background === true ? ' (delivered to the controlled app, no focus change)' : '';
+          ack.tookFocus === true
+            ? backgroundNote(ack)
+            : ack.background === true
+              ? ' (delivered to the controlled app, no focus change)'
+              : '';
         session.noteAct(`pressed ${params.combo}`);
         return textResult(`Pressed ${params.combo}.${note}`, {
           action: 'key',
@@ -1333,6 +1403,7 @@ export function registerMacComputerUseTools(
         // this app unambiguously.
         if (typeof ack.pid === 'number') {
           session.noteLaunched(ack.app ?? params.app, ack.pid, ack.bounds?.windowId);
+          recordControl();
         }
         await sleep(SETTLE_MS);
 

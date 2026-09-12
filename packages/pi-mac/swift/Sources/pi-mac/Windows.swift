@@ -347,15 +347,53 @@ func makeWindowMain(pid: pid_t) -> Bool {
 /// Borrowing the focus for the length of one command is therefore the only way
 /// those commands run at all. It is never done silently — the caller asks for
 /// it, and the result says the focus was borrowed and returned.
+/// Bring `app` to the front the way `open -a` does: a LaunchServices activation
+/// request, which the system honours for any process. `NSRunningApplication
+/// .activate()` from a background process reports success and does nothing on
+/// macOS 26 (MEASURED — and re-measured with a fresh frontmost read, see
+/// frontmostApplicationNow); this route works. Synchronous, bounded.
+func activateApp(_ app: NSRunningApplication) -> Bool {
+  guard let url = app.bundleURL else { return false }
+  let done = DispatchSemaphore(value: 0)
+  var ok = false
+  let cfg = NSWorkspace.OpenConfiguration()
+  cfg.activates = true
+  cfg.createsNewApplicationInstance = false
+  NSWorkspace.shared.openApplication(at: url, configuration: cfg) { running, error in
+    ok = running != nil && error == nil
+    done.signal()
+  }
+  _ = done.wait(timeout: .now() + 1.5)
+  if !ok {
+    let proc = Process()
+    proc.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+    proc.arguments = ["-a", url.path]
+    try? proc.run()
+    proc.waitUntilExit()
+    ok = proc.terminationStatus == 0
+  }
+  return ok
+}
+
+/// Wait (bounded) until `pid` is the app in front. True when it is.
+func waitForFront(_ pid: pid_t, upTo ms: Int) -> Bool {
+  var waited = 0
+  while waited <= ms {
+    if frontmostApplicationNow()?.processIdentifier == pid { return true }
+    usleep(50_000)
+    waited += 50
+  }
+  return false
+}
+
 func withBorrowedFocus<T>(pid: pid_t, _ body: () -> T) -> (value: T, restored: Bool) {
-  let previous = NSWorkspace.shared.frontmostApplication
-  let target = NSRunningApplication(processIdentifier: pid)
-  target?.activate(options: [])
+  let previous = frontmostApplicationNow()
+  if let target = NSRunningApplication(processIdentifier: pid) { _ = activateApp(target) }
   // Activation is asynchronous; a command sent before it lands validates
   // against the old state and is silently dropped, which is the whole bug.
   var waited = 0
   while waited < 900,
-    NSWorkspace.shared.frontmostApplication?.processIdentifier != pid
+    frontmostApplicationNow()?.processIdentifier != pid
   {
     usleep(50_000)
     waited += 50
@@ -364,7 +402,7 @@ func withBorrowedFocus<T>(pid: pid_t, _ body: () -> T) -> (value: T, restored: B
   usleep(150_000)
   var restored = true
   if let previous, previous.processIdentifier != pid {
-    restored = previous.activate(options: [])
+    restored = activateApp(previous) && waitForFront(previous.processIdentifier, upTo: 900)
   }
   return (value, restored)
 }

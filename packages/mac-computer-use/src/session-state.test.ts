@@ -21,7 +21,8 @@ describe('createMacSessionState (controlled-app state machine)', () => {
       windowId: 99,
       lastAct: 'opened TextEdit',
     });
-    expect(s.targetParams()).toEqual({ pid: 4242 });
+    // The name rides with the pid: a pid that quits since resolves by name.
+    expect(s.targetParams()).toEqual({ pid: 4242, app: 'TextEdit' });
     expect(s.describe()).toContain('"TextEdit"');
     expect(s.describe()).toContain('4242');
   });
@@ -37,7 +38,7 @@ describe('createMacSessionState (controlled-app state machine)', () => {
       visualOnly: false,
       dialogKey: '',
     });
-    expect(s.targetParams()).toEqual({ pid: 7777 });
+    expect(s.targetParams()).toEqual({ pid: 7777, app: 'Maps' });
   });
 
   it('a same-pid snapshot refreshes without losing the known windowId', () => {
@@ -72,6 +73,15 @@ describe('createMacSessionState (controlled-app state machine)', () => {
     expect(s.controlled()).toBeNull();
     expect(s.targetParams()).toEqual({});
     expect(s.describe()).toBe('');
+  });
+
+  it('restore takes control back from a record, knowing nothing else', () => {
+    // The app this session was driving before the pi child restarted (tools.ts
+    // writes a `mac-control` entry; session_start reads the last one back).
+    const s = createMacSessionState();
+    s.restore({ app: 'Google Chrome', pid: 8131, windowId: 2661 });
+    expect(s.controlled()).toEqual({ pid: 8131, app: 'Google Chrome', windowId: 2661 });
+    expect(s.targetParams()).toEqual({ pid: 8131, app: 'Google Chrome' });
   });
 });
 

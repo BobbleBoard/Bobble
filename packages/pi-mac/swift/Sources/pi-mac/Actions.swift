@@ -237,25 +237,23 @@ func typeTextToPid(_ pid: pid_t, _ text: String) {
 /// Post a key chord (modifiers + one key) to `pid` only. Unlike the HID tap,
 /// pid delivery honors the event's own `.flags`, so chords land correctly.
 /**
- * THE USER'S FOCUS CANNOT BE HANDED BACK. Measured, so nobody tries again.
+ * THE USER'S FOCUS CAN BE HANDED BACK — through LaunchServices. (This note
+ * used to say it could not. It measured NSRunningApplication.activate() and
+ * AXFrontmost, both of which report success and change nothing from a
+ * background process on macOS 26 — and it measured them with a frontmost
+ * reader that never refreshed without a run loop, see
+ * frontmostApplicationNow.) The route `open -a` takes —
+ * NSWorkspace.openApplication(at:configuration:) with `activates` — is
+ * honoured for any process. MEASURED: Chrome brought to the front by a ⌘L
+ * delivered to its pid, and the user's app back in front within the act.
  *
  * the user, twice in one session: "chrome took focus right now again", and "opened
- * a tab, and switched to a different tab but it took focus again". The obvious
- * fix is to remember who was in front and put them back afterwards. It does not
- * work: from a background process, BOTH
- *
- *   NSRunningApplication.activate()                       -> returns true
- *   AXUIElementSetAttributeValue(app, AXFrontmost, true)   -> returns .success
- *
- * and NEITHER changes the frontmost app on macOS 26 — verified from a process
- * that holds Accessibility, which is the strongest grant we have. macOS simply
- * does not let a background process decide what the user is looking at, which
- * is the right call and is also the rule this whole subsystem is built on.
- *
- * So the answer is not to take focus in the first place, and where an app takes
- * it for us — Chrome activates itself whenever a tab is created, by its own
- * button as much as by ⌘T — the only honest thing left is to SAY so. See the
- * tookFocus flag on the tab verbs.
+ * a tab, and switched to a different tab but it took focus again" — and later,
+ * on the address bar: "chrome steals focus whenever the model attempts to do
+ * something like click into the web address bar". So the rule is now: never
+ * take focus in the first place, and where an app takes it for us — Chrome
+ * activates itself on ⌘L, on a new tab, on a new window — the guard around
+ * every act (Serve.swift, handBackFocus) puts the user's app back and says so.
  *
  * What was checked, so the split is known rather than guessed:
  *   Page Down / arrow keys posted to a pid   — focus stays put.

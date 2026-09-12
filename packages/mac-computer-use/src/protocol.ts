@@ -240,6 +240,16 @@ export interface MacActAck {
   /** The act was refused because it aimed at a window a modal is covering;
    * macOS would have dropped the input and reported nothing. */
   readonly blocked?: boolean;
+  /**
+   * The app brought itself to the front in response to the act (a browser
+   * does on ⌘L, ⌘T, a new window…). The helper watches every act for this and
+   * puts the user's app back through LaunchServices; `focusRestored` says
+   * whether that landed, `note` says it in words. Absent from an older helper.
+   */
+  readonly tookFocus?: boolean;
+  readonly focusRestored?: boolean;
+  readonly focusRestoredTo?: string;
+  readonly note?: string;
   readonly error?: string;
 }
 

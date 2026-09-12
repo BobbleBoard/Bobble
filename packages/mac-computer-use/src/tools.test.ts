@@ -471,8 +471,9 @@ describe('registerMacComputerUseTools', () => {
     await run(tools, 'mac_launch', { app: 'TextEdit' });
     await run(tools, 'mac_snapshot', {});
     const second = bridge.calls.filter((c) => c.method === 'snapshot')[1];
-    expect(second?.params).toMatchObject({ pid: 4242 });
-    expect(second?.params?.app).toBeUndefined();
+    // The pid targets the running app; its name rides along so a pid that has
+    // quit since (a relaunch) still resolves instead of failing the look.
+    expect(second?.params).toMatchObject({ pid: 4242, app: 'TextEdit' });
   });
 
   it('launch degrades to text-only (still ok) when the post-open snapshot fails', async () => {
@@ -675,12 +676,12 @@ describe('registerMacComputerUseTools', () => {
 
     const inSheet = { x: SHEET_RECT.x + 20, y: SHEET_RECT.y + 20 };
     await run(tools, 'mac_click', inSheet);
-    expect(bridge.lastParams('click')).toEqual({ ...inSheet, pid: 4242 });
+    expect(bridge.lastParams('click')).toMatchObject({ ...inSheet, pid: 4242 });
 
     // ...and a point OUTSIDE the parent window is not pulled back into it.
     const faraway = { x: DOC_RECT.x + DOC_RECT.w + 500, y: DOC_RECT.y + DOC_RECT.h + 400 };
     await run(tools, 'mac_click', faraway);
-    expect(bridge.lastParams('click')).toEqual({ ...faraway, pid: 4242 });
+    expect(bridge.lastParams('click')).toMatchObject({ ...faraway, pid: 4242 });
   });
 
   it('degrades silently for a helper that reports no windows/dialog at all', async () => {

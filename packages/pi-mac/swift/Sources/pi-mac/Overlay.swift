@@ -633,6 +633,9 @@ final class OverlayController: NSObject {
   private var windowAX: CGRect?
   /** The app window the phantom belongs to — what the mask is computed against. */
   private var trackedWindow: Int = 0
+  /// The pid that owns the tracked window: its OWN windows — a popup, a sheet,
+  /// a suggestion list — are never occluders (see refreshOcclusion).
+  private var trackedPid: pid_t = 0
   private var occlusionTimer: Timer?
   /** False once the window server refuses — we fall back to floating + mask. */
 
@@ -783,13 +786,17 @@ final class OverlayController: NSObject {
     // pill has no ✕ brake here (see the note in overlay-controller.ts).
     panel.ignoresMouseEvents = true
     panel.acceptsMouseMovedEvents = false
-    // `.floating` — NOT `.screenSaver`. macOS window levels are global bands,
-    // not per-app, so nothing at this layer can be truly z-sandwiched between
-    // the controlled app and the rest of the desktop; parking at the LOWEST
-    // level that still reads over a normal window keeps the phantom out of the
-    // way of system UI, and the occluder mask (see setOccluders) does the real
-    // z-scoping.
-    panel.level = .floating
+    // ONE ABOVE THE POP-UP MENU LEVEL. macOS window levels are global bands,
+    // not per-app, so nothing at any level can be truly z-sandwiched between
+    // the controlled app and the rest of the desktop — the occluder mask (see
+    // refreshOcclusion) is what scopes the cursor to the app it drives. The
+    // level only decides which of the APP'S OWN surfaces the cursor can paint
+    // over: at `.floating` it sat under the app's menus and pop-ups (level
+    // 101), so a cursor aimed at a context-menu item disappeared behind the
+    // menu it was pointing at. Every other app's window above the target, at
+    // any level, is cut out by the mask — the user: the cursor is on top of the
+    // controlled app only, never of what he is using while it works.
+    panel.level = NSWindow.Level(rawValue: NSWindow.Level.popUpMenu.rawValue + 1)
     // `.transient` is the whole point of going native: it is what excludes the
     // panel from Mission Control and Exposé, so the overlay stops being laid
     // out as a window of its own beside the app it is painted on. The rest:
@@ -1423,14 +1430,16 @@ final class OverlayController: NSObject {
    * has to decide to hide anything, which is what made it late in the first
    * place.
    */
-  func trackWindow(number: Int) {
+  func trackWindow(number: Int, pid: pid_t = 0) {
     trackedWindow = number
+    trackedPid = pid
     refreshOcclusion()
     startOcclusionTimer()
   }
 
   func untrackWindow() {
     trackedWindow = 0
+    trackedPid = 0
     stopOcclusionTimer()
     setOccluders([])
   }
@@ -1512,26 +1521,53 @@ final class OverlayController: NSObject {
       noteUnmasked("the occlusion timer is not running — the mask is frozen")
     }
     guard trackedWindow > 0, panel.isVisible else { return }
-    let ourLayer = panel.level.rawValue
     let ours: Set<Int> = [panel.windowNumber, controls?.windowNumber ?? -1]
     let list =
       (CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID)
         as? [[String: Any]]) ?? []
+    /*
+     * WHAT COVERS THE CURSOR: every window ABOVE the tracked one (front-to-back
+     * order, any level) that belongs to SOMEONE ELSE. The app's own windows
+     * never do, whatever their level.
+     *
+     * SEEN (the user, Chrome): the fake cursor went under the address bar. Chrome's
+     * suggestion list is a second window of Chrome's, ordered above the main
+     * one, at the normal level — so the old rule ("anything above the tracked
+     * window that is below our level") cut a hole for it and the cursor
+     * vanished behind the app it was driving. An app's own popups, sheets,
+     * tooltips and menus are part of the app; the cursor paints over them.
+     * Another app's window over the target, at any level — the user's browser
+     * dragged across, a menu of theirs — still cuts a hole, which is the rule
+     * that keeps the cursor off what the user is looking at.
+     */
     var rects: [CGRect] = []
     var found = false
+    var above: [[String: Any]] = []
     for w in list {
       let num = (w[kCGWindowNumber as String] as? Int) ?? -1
       if num == trackedWindow {
         found = true
+        // The owner is the truth about which pid this is, whatever we were told.
+        if let owner = (w[kCGWindowOwnerPID as String] as? Int), owner > 0 {
+          trackedPid = pid_t(owner)
+        }
         break
       }
-      if ours.contains(num) { continue }
-      let layer = (w[kCGWindowLayer as String] as? Int) ?? 0
-      if layer >= ourLayer { continue }
-      guard let raw = w[kCGWindowBounds as String] as? NSDictionary,
-        let r = CGRect(dictionaryRepresentation: raw)
-      else { continue }
-      rects.append(r)
+      above.append(w)
+    }
+    if found {
+      for w in above {
+        let num = (w[kCGWindowNumber as String] as? Int) ?? -1
+        if ours.contains(num) { continue }
+        if let owner = (w[kCGWindowOwnerPID as String] as? Int), pid_t(owner) == trackedPid {
+          continue
+        }
+        if let alpha = (w[kCGWindowAlpha as String] as? Double), alpha < 0.05 { continue }
+        guard let raw = w[kCGWindowBounds as String] as? NSDictionary,
+          let r = CGRect(dictionaryRepresentation: raw)
+        else { continue }
+        rects.append(r)
+      }
     }
     /*
      * NEVER CLEAR THE MASK BECAUSE WE LOST THE WINDOW.
@@ -2170,7 +2206,8 @@ private func handleOverlay(
       if let pid = doubleValue(params["pid"]) { watchWindowChanges(pid: pid_t(pid)) }
       /* And sit directly above its window, which is the layering itself. */
       if let win = doubleValue(params["windowNumber"]) {
-        controller.trackWindow(number: Int(win))
+        controller.trackWindow(
+          number: Int(win), pid: doubleValue(params["pid"]).map { pid_t($0) } ?? 0)
       }
     } else {
       controller.setWindowRect(nil)

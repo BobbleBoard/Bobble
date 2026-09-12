@@ -40,8 +40,13 @@ private func boolOf(_ v: Any?) -> Bool {
 }
 
 private func targetFrom(_ params: [String: Any]) -> SnapshotTarget {
-  if let pid = intOf(params["pid"]) { return .pid(pid_t(pid)) }
+  // A pid that has quit since it was recorded (a relaunched app, a session
+  // restored after a restart) falls through to the name that rides with it.
+  if let pid = intOf(params["pid"]), NSRunningApplication(processIdentifier: pid_t(pid)) != nil {
+    return .pid(pid_t(pid))
+  }
   if let app = stringOf(params["app"]), !app.isEmpty { return .app(app) }
+  if let pid = intOf(params["pid"]) { return .pid(pid_t(pid)) }
   return .frontmost
 }
 
@@ -129,10 +134,13 @@ private func resolveElement(_ params: [String: Any], _ index: Int) -> (el: SnapE
 /// fallback — the tool layer stamps the controlled pid explicitly; an
 /// unstamped act keeps the legacy foreground (frontmost) behavior.
 private func actTargetPid(_ params: [String: Any]) -> pid_t? {
-  if let pid = intOf(params["pid"]) { return pid_t(pid) }
+  if let pid = intOf(params["pid"]), NSRunningApplication(processIdentifier: pid_t(pid)) != nil {
+    return pid_t(pid)
+  }
   if let app = stringOf(params["app"]), !app.isEmpty, let r = resolveTargetPid(.app(app)) {
     return r.pid
   }
+  if let pid = intOf(params["pid"]) { return pid_t(pid) }
   return nil
 }
 
@@ -668,17 +676,15 @@ private func doTabAct(_ params: [String: Any], act: String) -> [String: Any] {
     return ok
       ? [
         "ok": true, "app": resolved.name,
-        /* MEASURED, and worth saying out loud every time: Chrome brings itself
-           to the front when a tab is created — by its own button as much as by
-           ⌘T — and a background process cannot put the user back
-           (NSRunningApplication.activate() and AXFrontmost both return success
-           and change nothing on macOS 26). Listing and switching stay in the
-           background; creating does not. */
+        /* Chrome brings itself to the front when a tab is created — by its own
+           button as much as by ⌘T. The focus guard around every act
+           (handBackFocus) puts the user's app back and rewrites this note with
+           what actually happened; this wording stands only when the guard had
+           nothing to do (the user was already in the browser). */
         "tookFocus": true,
         "note":
-          "\(resolved.name) came to the front — a browser activates itself when it opens a tab, "
-          + "and that cannot be undone from the background. Listing and switching tabs do not do "
-          + "this, so prefer those when the user is working.",
+          "\(resolved.name) came to the front — a browser activates itself when it opens a tab. "
+          + "Listing and switching tabs do not do this, so prefer those when the user is working.",
         "tabs": browserTabs(pid: resolved.pid).map { tabDict($0) },
       ]
       : ["ok": false, "error": "\(resolved.name) has no New Tab button in its window."]
@@ -721,8 +727,9 @@ private func doTabAct(_ params: [String: Any], act: String) -> [String: Any] {
    * this borrows the focus for exactly one keystroke and hands it straight back,
    * which is the pattern the capability text already describes for File > Save.
    */
-  NSRunningApplication(processIdentifier: resolved.pid)?.activate()
-  usleep(240_000)
+  if let app = NSRunningApplication(processIdentifier: resolved.pid) {
+    _ = activateApp(app) && waitForFront(resolved.pid, upTo: 900)
+  }
   postKeyToPid(resolved.pid, flags: .maskCommand, key: 13)  // w
   usleep(260_000)
   let after = browserTabs(pid: resolved.pid)
@@ -731,7 +738,7 @@ private func doTabAct(_ params: [String: Any], act: String) -> [String: Any] {
     "tookFocus": true,
     "note":
       "\(resolved.name) came to the front: closing a tab is a document command and macOS runs "
-      + "those only for the frontmost app. That cannot be undone from the background.",
+      + "those only for the frontmost app.",
     "tabs": after.map { tabDict($0) },
   ]
 }
@@ -748,16 +755,83 @@ private func doFocus(_ params: [String: Any]) -> [String: Any] {
     let ln = (app.localizedName ?? "").lowercased()
     let bid = (app.bundleIdentifier ?? "").lowercased()
     if ln == q || bid == q || ln.contains(q) {
-      app.activate()
-      return ["ok": true, "app": app.localizedName ?? name]
+      let ok = activateApp(app) && waitForFront(app.processIdentifier, upTo: 900)
+      return ["ok": ok, "app": app.localizedName ?? name]
     }
   }
   return ["ok": false, "error": "app not running: \(name)"]
 }
 
+// ── the focus guard ──────────────────────────────────────────────────────────
+//
+// THE USER'S FOCUS CAN BE HANDED BACK AFTER ALL — by LaunchServices.
+//
+// The note on Actions.swift is right about what it measured: from a background
+// process NSRunningApplication.activate() and AXFrontmost both report success
+// and change nothing on macOS 26. What it did not try is the route `open -a`
+// takes: an activation request through LaunchServices, which the system
+// honours for any process. MEASURED here: Chrome, brought to the front by a
+// ⌘L delivered to its pid, and the previous app back in front 200 ms later.
+//
+// So instead of knowing which chords and buttons make which app activate
+// itself — ⌘L, ⌘T, ⌘W, a new-window button, a profile picker, whatever the
+// next app does — every act aimed at a pid is watched: if the TARGET is in
+// front afterwards and the user was somewhere else before, the user's app is
+// put back and the result says so. the user: "spend the time digging for root
+// fixes rather than fixing a few specific keyboard shortcuts".
+//
+// The user's own choice is respected: if they were already in the target app,
+// or switched to some third app meanwhile, nothing is moved.
+
+/// The app in front before an act: the one to put back.
+func frontBefore() -> NSRunningApplication? { frontmostApplicationNow() }
+
+/// Acts that are aimed at an app and may make it activate itself. Explicit
+/// focus verbs (`focus`, `focusWindow`) are the user asking for the front and
+/// stay out of it.
+private let FOCUS_GUARDED: Set<String> = [
+  "click", "type", "key", "scroll", "menuClick", "tabNew", "tabSelect", "tabClose",
+]
+
+/// After an act on `target`: hand the front back if the act took it. Returns
+/// the fields to merge into the act's result (empty when nothing happened).
+func handBackFocus(_ before: NSRunningApplication?, target: pid_t?) -> [String: Any] {
+  guard let before = before, let target = target, before.processIdentifier != target else {
+    return [:]
+  }
+  // The act's own settle has usually run by now; one short look more, because
+  // an activation is dispatched by the app after the event lands.
+  guard waitForFront(target, upTo: 300) else { return [:] }
+  let back = activateApp(before) && waitForFront(before.processIdentifier, upTo: 900)
+  let targetName = NSRunningApplication(processIdentifier: target)?.localizedName ?? "The app"
+  let userName = before.localizedName ?? "your app"
+  return [
+    "tookFocus": true,
+    "focusRestored": back,
+    "focusRestoredTo": userName,
+    "note": back
+      ? "\(targetName) came to the front for a moment; focus was handed back to \(userName)."
+      : "\(targetName) took the front and it could not be handed back this time.",
+  ]
+}
+
 // ── serve loop ───────────────────────────────────────────────────────────────
 
 private func dispatch(method: String, params: [String: Any]) -> [String: Any]? {
+  guard FOCUS_GUARDED.contains(method) else { return dispatchInner(method: method, params: params) }
+  let before = frontBefore()
+  guard var result = dispatchInner(method: method, params: params) else { return nil }
+  let target = actTargetPid(params) ?? resolveTargetPid(targetFrom(params))?.pid
+  let guardResult = handBackFocus(before, target: target)
+  if !guardResult.isEmpty {
+    // The guard knows what actually happened; an act's own "cannot be undone"
+    // note is superseded by it.
+    for (k, v) in guardResult { result[k] = v }
+  }
+  return result
+}
+
+private func dispatchInner(method: String, params: [String: Any]) -> [String: Any]? {
   switch method {
   case "check": return tccStatusDict()
   case "promptGrants": return promptTccGrants()
@@ -882,7 +956,7 @@ private func doFocusWindow(_ params: [String: Any]) -> [String: Any] {
     return ["ok": false, "error": "no such app"]
   }
   let ok = makeWindowMain(pid: resolved.pid)
-  let front = NSWorkspace.shared.frontmostApplication?.processIdentifier
+  let front = frontmostApplicationNow()?.processIdentifier
   return ["ok": ok, "frontmostUnchanged": front != resolved.pid]
 }
 
@@ -1059,7 +1133,7 @@ private func doWallpaper(_ params: [String: Any]) -> [String: Any] {
 
 /// `frontmost` method: which app currently owns the user's focus.
 private func doFrontmost() -> [String: Any] {
-  guard let app = NSWorkspace.shared.frontmostApplication else {
+  guard let app = frontmostApplicationNow() else {
     return ["ok": false, "error": "no frontmost application"]
   }
   return [

@@ -99,8 +99,15 @@ export interface MacSessionState {
   noteAct(act: string): void;
   /** Drop control (controlled app quit / explicit reset). */
   release(): void;
-  /** Params every act must be stamped with: `{ pid }` while controlling, `{}`
-   * before control exists (legacy frontmost behavior). */
+  /**
+   * Take control back from a record — the app this session was driving before
+   * the pi child was restarted or the chat reopened (see the `mac-control`
+   * entry in tools.ts). Nothing is known about its windows or its last act.
+   */
+  restore(record: { app: string; pid: number; windowId?: number }): void;
+  /** Params every act must be stamped with: `{ pid, app }` while controlling
+   * (the name is the fallback for a pid that has since quit), `{}` before
+   * control exists (legacy frontmost behavior). */
   targetParams(): Record<string, unknown>;
   /** One human/model-readable line naming the controlled target ('' if none). */
   describe(): string;
@@ -186,8 +193,15 @@ export function createMacSessionState(): MacSessionState {
       current = null;
     },
 
+    restore(record: { app: string; pid: number; windowId?: number }): void {
+      current = { pid: record.pid, app: record.app, windowId: record.windowId };
+    },
+
     targetParams(): Record<string, unknown> {
-      return current === null ? {} : { pid: current.pid };
+      if (current === null) return {};
+      // The name rides along: a pid that has quit since (a restart, a relaunch
+      // of the app) resolves by name instead of failing the look.
+      return current.app !== '' ? { pid: current.pid, app: current.app } : { pid: current.pid };
     },
 
     missAt(x: number, y: number): string | null {

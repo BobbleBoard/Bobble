@@ -103,6 +103,21 @@ func axWindowID(_ el: AXUIElement) -> CGWindowID? {
 
 // ── target resolution ────────────────────────────────────────────────────────
 
+/// The app in front RIGHT NOW.
+///
+/// `NSWorkspace.shared.frontmostApplication` is a cached value refreshed by
+/// workspace notifications on the main run loop — and `--serve` has no run
+/// loop, it blocks in readLine. MEASURED: with Chrome activated for two
+/// seconds, a loop-less process read "Claude" the whole time. Every "did the
+/// app take the front?" check in this helper read that stale value, which is
+/// why "activate() does nothing" and "focus cannot be handed back" measured
+/// the way they did. Pumping the loop for a few milliseconds delivers the
+/// pending notification; the CG window order agrees with it afterwards.
+func frontmostApplicationNow() -> NSRunningApplication? {
+  RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.006))
+  return NSWorkspace.shared.frontmostApplication
+}
+
 /// A snapshot target the caller can name: the frontmost app, a specific pid, or
 /// an app matched by (case-insensitive) localized name / bundle id.
 enum SnapshotTarget {
@@ -114,7 +129,7 @@ enum SnapshotTarget {
 func resolveTargetPid(_ target: SnapshotTarget) -> (pid: pid_t, name: String)? {
   switch target {
   case .frontmost:
-    guard let app = NSWorkspace.shared.frontmostApplication else { return nil }
+    guard let app = frontmostApplicationNow() else { return nil }
     return (app.processIdentifier, app.localizedName ?? "frontmost")
   case .pid(let pid):
     let running = NSRunningApplication(processIdentifier: pid)
@@ -793,7 +808,7 @@ func windowBoundsInfo(target: SnapshotTarget) -> [String: Any]? {
     "y": Int(frame.origin.y.rounded()),
     "w": Int(frame.width.rounded()),
     "h": Int(frame.height.rounded()),
-    "frontmost": NSWorkspace.shared.frontmostApplication?.processIdentifier == resolved.pid,
+    "frontmost": frontmostApplicationNow()?.processIdentifier == resolved.pid,
     "windowTitle": active?.title ?? (axString(root, kAXTitleAttribute) ?? ""),
     "surfaces": surfaces.count,
   ]
