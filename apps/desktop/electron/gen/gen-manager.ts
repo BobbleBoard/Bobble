@@ -258,6 +258,8 @@ function toSrc(p: string): string {
 export interface GenQueueControl {
   /** Any generation running — the guardian samples every second while one is. */
   readonly running: () => boolean;
+  /** Jobs waiting to start — a hold is only worth announcing when there is one. */
+  readonly queued: () => number;
   readonly shedRunning: (reason: string) => string[];
   readonly reconsider: () => void;
 }
@@ -1080,6 +1082,7 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
 
   return {
     running: () => jobQueue.runningCount > 0,
+    queued: () => jobQueue.queuedCount,
     shedRunning: (reason) => jobQueue.shedRunning(reason),
     reconsider: () => jobQueue.reconsider(),
   };

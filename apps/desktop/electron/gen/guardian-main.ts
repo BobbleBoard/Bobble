@@ -50,6 +50,7 @@ export interface GuardianMainOptions {
     reason: string;
     memoryFree?: number;
     shed?: readonly string[];
+    queued?: number;
   }) => void;
   readonly log?: (line: string) => void;
 }
@@ -140,6 +141,10 @@ export function startGuardian(opts: GuardianMainOptions): GuardianMain {
           verdict,
           reason,
           ...(reading.memoryFree !== undefined ? { memoryFree: reading.memoryFree } : {}),
+          // SEEN: "Waiting to generate — 11% of memory is free" over a chat with
+          // nothing queued. A hold is the machine's state; the banner is for the
+          // person waiting on a job, and only makes sense when one is waiting.
+          queued: q?.queued() ?? 0,
         });
       }
       // Breathing again: a job held at admission should not wait for the next

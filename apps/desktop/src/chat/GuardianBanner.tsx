@@ -25,7 +25,7 @@ export function GuardianBanner() {
   const [notice, setNotice] = useState<Notice | null>(null);
 
   useEffect(() => {
-    const off = window.piDesktop.onEvent('gen:guardian', ({ verdict, reason, shed }) => {
+    const off = window.piDesktop.onEvent('gen:guardian', ({ verdict, reason, shed, queued }) => {
       if (verdict === 'shed') {
         const n = shed?.length ?? 0;
         // At the wall with nothing of ours running there is nothing to stop —
@@ -41,6 +41,12 @@ export function GuardianBanner() {
         return;
       }
       if (verdict === 'hold') {
+        // A hold with nothing waiting is the machine's business, not the
+        // person's — SEEN as "Waiting to generate" over an idle chat.
+        if ((queued ?? 0) === 0) {
+          setNotice((cur) => (cur?.kind === 'hold' ? null : cur));
+          return;
+        }
         // A hold replaces nothing more important: a recent shed keeps its line.
         setNotice((cur) =>
           cur?.kind === 'shed' && Date.now() - cur.at < LINGER_MS

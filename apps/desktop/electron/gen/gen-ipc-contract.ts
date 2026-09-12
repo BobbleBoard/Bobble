@@ -111,6 +111,8 @@ export interface GuardianEvent {
   readonly memoryFree?: number;
   /** Job ids cancelled by this verdict (shed only). */
   readonly shed?: readonly string[];
+  /** Jobs waiting at the time — a hold with none waiting is not worth a banner. */
+  readonly queued?: number;
 }
 
 /**
