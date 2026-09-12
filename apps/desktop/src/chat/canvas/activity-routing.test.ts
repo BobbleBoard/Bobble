@@ -114,6 +114,58 @@ describe('detectActivity — which bash is bash', () => {
   });
 });
 
+describe('detectActivity — when the turn is over, a look is not the work', () => {
+  /* m03 in the canvas assessment: the page was in the tab, the user asked for a
+   * change, the model edited index.html and ran `cat index.html` — and the tab
+   * showed the cat output for good. */
+  const messages: ChatMsg[] = [
+    user('u1'),
+    assistant('a1', [
+      call('c1', 'edit', { path: 'site/index.html', oldText: 'Count', newText: 'Clicks' }),
+    ]),
+    result('c1', 'ok'),
+    assistant('a2', [call('c2', 'bash', { command: 'cat site/index.html' })]),
+    result('c2', '<html>…'),
+  ];
+
+  it('while the model works, newest still wins — the cat shows', () => {
+    const stream = detectActivity(messages, {}, CWD, { settled: false });
+    expect(stream.focus?.kind).toBe('terminal');
+  });
+
+  it('once settled, a trailing look-only command gives way to what was made', () => {
+    const stream = detectActivity(messages, {}, CWD, { settled: true });
+    expect(stream.focus?.kind).toBe('file');
+    expect(stream.focus?.kind === 'file' && stream.focus.write.path).toBe(`${CWD}/site/index.html`);
+    // …and the cat is still in the terminal's scrollback.
+    expect(stream.commands.map((c) => c.command)).toEqual(['cat site/index.html']);
+  });
+
+  it('a trailing command that DOES something keeps the terminal', () => {
+    const stream = detectActivity(
+      [
+        ...messages,
+        assistant('a3', [call('c3', 'bash', { command: 'npm run build' })]),
+        result('c3', 'built'),
+      ],
+      {},
+      CWD,
+      { settled: true },
+    );
+    expect(stream.focus?.kind).toBe('terminal');
+  });
+
+  it('a look with nothing made before it stays a look', () => {
+    const stream = detectActivity(
+      [assistant('a1', [call('c1', 'bash', { command: 'ls -la' })]), result('c1', 'a b')],
+      {},
+      CWD,
+      { settled: true },
+    );
+    expect(stream.focus?.kind).toBe('terminal');
+  });
+});
+
 describe('detectActivity — newest wins, across kinds', () => {
   const messages: ChatMsg[] = [
     assistant('a1', [call('c1', 'bash', { command: 'ls -la' })]),

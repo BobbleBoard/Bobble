@@ -160,19 +160,71 @@ export function resolvePath(cwd: string | undefined, p: string): string {
  * numeric fds.
  */
 export function bashRedirectTarget(command: string): string | undefined {
+  /*
+   * ONLY OUTSIDE QUOTES, AND NOT INSIDE A HEREDOC.
+   *
+   * SEEN in the canvas assessment: `python3 -c "print(len([u for u in d if
+   * u['age'] > 60]))"` opened a file tab called `60])}` ("Could not read this
+   * file") — a comparison operator inside the quoted program, lifted as a
+   * redirect target, while the file the person asked about never opened. The
+   * shell never saw a redirect there, and neither should this: what is quoted
+   * is an argument, and what follows `<<` is a document.
+   */
+  const unquoted = shellUnquotedSpans(command);
   let last: string | undefined;
   // `>`/`>>` not preceded by `&`/digit (fd dup), capturing an optional-quoted path.
   const redirect = /(?<![&\d])>>?\s*(['"]?)([^\s'"|&;<>]+)\1/g;
-  for (const m of command.matchAll(redirect)) {
+  for (const m of unquoted.matchAll(redirect)) {
     const target = m[2];
-    if (target && target !== '/dev/null' && !/^&?\d+$/.test(target)) last = target;
+    if (target && target !== '/dev/null' && !/^&?\d+$/.test(target) && looksLikePath(target)) {
+      last = target;
+    }
   }
   const tee = /\btee\b\s+(?:-a\s+)?(['"]?)([^\s'"|&;<>]+)\1/g;
-  for (const m of command.matchAll(tee)) {
+  for (const m of unquoted.matchAll(tee)) {
     const target = m[2];
-    if (target && target !== '/dev/null') last = target;
+    if (target && target !== '/dev/null' && looksLikePath(target)) last = target;
   }
   return last;
+}
+
+/** A redirect target a shell would create a file for — not a fragment of code. */
+function looksLikePath(target: string): boolean {
+  return !/[()[\]{}]/.test(target);
+}
+
+/**
+ * The command with everything inside quotes blanked (same length, so match
+ * offsets stay meaningful) and everything from a heredoc's body onward dropped.
+ * A light scan, not a shell parser: single quotes, double quotes with backslash
+ * escapes, and `<<` followed by the rest of the line as the last thing read.
+ */
+export function shellUnquotedSpans(command: string): string {
+  let out = '';
+  let quote: '"' | "'" | null = null;
+  let heredoc = false;
+  for (let i = 0; i < command.length; i += 1) {
+    const ch = command[i] as string;
+    if (quote !== null) {
+      if (quote === '"' && ch === '\\') {
+        out += '  ';
+        i += 1;
+        continue;
+      }
+      if (ch === quote) quote = null;
+      out += ' ';
+      continue;
+    }
+    if (ch === '"' || ch === "'") {
+      quote = ch;
+      out += ' ';
+      continue;
+    }
+    if (ch === '<' && command[i + 1] === '<') heredoc = true;
+    if (ch === '\n' && heredoc) break;
+    out += ch;
+  }
+  return out;
 }
 
 /** Whether this tool call writes a file, and (path, contentHint | edit) if so. */

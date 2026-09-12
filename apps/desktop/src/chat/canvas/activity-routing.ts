@@ -56,7 +56,7 @@ import { usePiStore } from '../../state/pi-slice';
 import { useProjectStore } from '../../state/project-store';
 import { toolStepKind } from '../activity-mapping';
 import { COMMAND_KEYS, partialJsonString } from '../partial-json';
-import { isTerminalCommand } from './activity-cli';
+import { firstCommandWord, isTerminalCommand } from './activity-cli';
 // The tab's identity lives in a leaf module so the browser bridge can ask which
 // tab to drive without importing this one (and dragging the file surface with
 // it). Re-exported below: this module is where it is used.
@@ -157,10 +157,59 @@ export function browserLabel(block: ToolCallBlock): string {
  * wins the tie, because what the user asked for was the file, and the command is
  * still in the terminal's scrollback either way.
  */
+/**
+ * Commands that only LOOK. When the turn is over and the last thing the model
+ * did was one of these, the tab has nothing to show for it but a listing — and
+ * whatever it was working on is what the person wants back.
+ */
+const READ_ONLY_COMMANDS = new Set([
+  'cat',
+  'ls',
+  'head',
+  'tail',
+  'less',
+  'more',
+  'grep',
+  'rg',
+  'find',
+  'wc',
+  'file',
+  'stat',
+  'pwd',
+  'echo',
+  'which',
+  'type',
+  'tree',
+  'du',
+  'df',
+  'diff',
+  'xxd',
+  'hexdump',
+]);
+
+export function isReadOnlyCommand(command: string): boolean {
+  const word = firstCommandWord(command);
+  return word !== undefined && READ_ONLY_COMMANDS.has(word);
+}
+
+export interface DetectActivityOptions {
+  /**
+   * The turn is over — nothing streaming, nothing running. SEEN (m03 in the
+   * canvas assessment): a page rendered in the Activity tab, the user asked
+   * for a change, the model edited the file and then ran `cat index.html` to
+   * check it — and the tab stayed on the `cat` output for good. "Newest wins"
+   * is right WHILE the model works; once it has stopped, a look-only command
+   * at the end is noise, and the tab settles back on the newest thing that was
+   * actually made or shown.
+   */
+  readonly settled?: boolean;
+}
+
 export function detectActivity(
   messages: ChatMsg[],
   partials: Readonly<Record<string, string>> = {},
   cwd?: string,
+  opts: DetectActivityOptions = {},
 ): ActivityStream {
   const resultByCall = new Map<string, string>();
   for (const m of messages) {
@@ -217,6 +266,17 @@ export function detectActivity(
   }
   if (fileFocus !== undefined && (focus === undefined || fileFocus.at >= focus.at)) {
     focus = fileFocus;
+  }
+  if (
+    opts.settled === true &&
+    focus?.kind === 'terminal' &&
+    !focus.command.running &&
+    isReadOnlyCommand(focus.command.command)
+  ) {
+    const made = [fileFocus, browserFocus]
+      .filter((c): c is ActivityFocus => c !== undefined)
+      .sort((a, b) => b.at - a.at)[0];
+    if (made !== undefined) focus = made;
   }
   return { commands, ...(focus !== undefined ? { focus } : {}) };
 }
@@ -445,6 +505,7 @@ export function useActivityCanvasRouting(controller: CanvasController): void {
   const partials = usePiStore((s) => s.toolOutputPartials);
   const cwd = usePiStore((s) => s.session?.cwd ?? undefined);
   const bgStreaming = usePiStore((s) => s.bgRun?.streaming === true);
+  const streaming = usePiStore((s) => s.agent.isStreaming);
   const corpActive = useCorpStore((s) => s.taskId !== null);
   /* Every session boundary — new chat, chat switch, rehydrate — bumps this. It
    * is the reset signal for everything below: the open-once latch, and the
@@ -512,7 +573,7 @@ export function useActivityCanvasRouting(controller: CanvasController): void {
         opened.current = false;
     }
 
-    const stream = detectActivity(messages, partials, cwd);
+    const stream = detectActivity(messages, partials, cwd, { settled: !streaming });
     const spec = activitySpec(stream, cwd);
     if (spec === undefined) return;
 
@@ -629,5 +690,5 @@ export function useActivityCanvasRouting(controller: CanvasController): void {
     }
     // (`sessionEpoch` is deliberately NOT a dependency here: the reset effect
     // above owns it, and a session boundary always hands us a new `messages`.)
-  }, [messages, partials, cwd, corpActive, bgStreaming, controller, baseTick]);
+  }, [messages, partials, cwd, corpActive, bgStreaming, streaming, controller, baseTick]);
 }

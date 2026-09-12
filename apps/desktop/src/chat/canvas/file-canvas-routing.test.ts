@@ -60,6 +60,23 @@ describe('bashRedirectTarget', () => {
   it('returns undefined for a command with no redirect', () => {
     expect(bashRedirectTarget('ls -la /tmp')).toBeUndefined();
   });
+  /* SEEN: a python one-liner's `> 60]))` opened a tab called `60])}` — a
+   * comparison inside the quoted program, read as a redirect. */
+  it('ignores a `>` inside quotes — a comparison is not a redirect', () => {
+    expect(
+      bashRedirectTarget(`python3 -c "print(len([u for u in d if u['age'] > 60]))"`),
+    ).toBeUndefined();
+    expect(bashRedirectTarget("awk '$3 > 100 {print}' data.csv")).toBeUndefined();
+    // …while a real redirect after the quoted program still counts.
+    expect(bashRedirectTarget(`python3 -c "print(1 > 0)" > result.txt`)).toBe('result.txt');
+  });
+  it('ignores everything inside a heredoc body', () => {
+    expect(bashRedirectTarget("python3 << 'EOF'\nx = 3 > 2\nprint(x)\nEOF")).toBeUndefined();
+    expect(bashRedirectTarget("cat << 'EOF' > notes.md\na > b\nEOF")).toBe('notes.md');
+  });
+  it('does not take a code fragment for a path', () => {
+    expect(bashRedirectTarget('echo x > out[1].txt')).toBeUndefined();
+  });
 });
 
 describe('detectFileWrites', () => {
