@@ -217,3 +217,40 @@ describe('detectBashTerminals', () => {
     expect(events[0]?.running).toBe(false);
   });
 });
+
+describe('detectFileWrites — a refused write is not a file', () => {
+  /* SEEN: the handmade-media guard refused create_illustrations.py and the
+   * Activity tab opened "Could not read this file" for it anyway. */
+  it('drops a whole-file write whose result was an error, keeps a failed edit', () => {
+    const msgs: ChatMsg[] = [
+      assistant('a1', [
+        call('c1', 'write', { path: 'create_illustrations.py', content: 'from PIL import Image' }),
+      ]),
+      {
+        kind: 'toolResult',
+        id: 'r1',
+        toolCallId: 'c1',
+        assistantId: 'a1',
+        toolName: 'write',
+        text: 'Not written: …',
+        isError: true,
+        timestamp: 0,
+      } as ChatMsg,
+      assistant('a2', [
+        call('c2', 'edit', { path: 'app.py', edits: [{ oldText: 'a', newText: 'b' }] }),
+      ]),
+      {
+        kind: 'toolResult',
+        id: 'r2',
+        toolCallId: 'c2',
+        assistantId: 'a2',
+        toolName: 'edit',
+        text: 'Could not find the exact text',
+        isError: true,
+        timestamp: 0,
+      } as ChatMsg,
+    ];
+    const paths = detectFileWrites(msgs, '/proj').map((e) => e.path);
+    expect(paths).toEqual(['/proj/app.py']);
+  });
+});

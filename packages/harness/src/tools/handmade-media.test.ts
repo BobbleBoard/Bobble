@@ -58,7 +58,9 @@ for i, frame in enumerate(frames):
     frame.save(f'frame_{i:04d}.png')
 `;
     expect(handmadeMediaKind('make_video.py', frames)).toBe('video');
-    expect(handmadeMediaRefusal('make_video.py', 'video')).toContain('media generate video');
+    expect(handmadeMediaRefusal('make_video.py', 'video', { cli: true })).toContain(
+      'media generate video',
+    );
   });
 
   it('does not call a single drawn picture a clip', () => {
@@ -113,11 +115,19 @@ describe('isHandmadeMedia', () => {
 });
 
 describe('handmadeMediaRefusal', () => {
-  it('names the command, the call, and the way through', () => {
-    const r = handmadeMediaRefusal('make_mug_morning.py', 'image');
+  it('names the generator in the mode’s own shape, the call, and the way through', () => {
+    const r = handmadeMediaRefusal('make_mug_morning.py', 'image', { cli: true });
     expect(r).toContain('media generate image');
     expect(r).toContain('UNCHANGED');
-    expect(handmadeMediaRefusal('t.py', 'audio')).toContain('media generate music');
-    expect(handmadeMediaRefusal('c.py', 'video')).toContain('media generate video');
+    // Schemas mode: the TOOL, and how to get it — a command the model cannot
+    // run is a dead end. SEEN: "Run it with the bash tool" read as "run the
+    // script with bash".
+    const schema = handmadeMediaRefusal('make_mug_morning.py', 'image');
+    expect(schema).toContain('generate_image {');
+    expect(schema).toContain('capability("generation")');
+    expect(schema).not.toContain('media generate');
+    expect(schema).toContain('Do NOT run this script');
+    expect(handmadeMediaRefusal('t.py', 'audio', { cli: true })).toContain('media generate music');
+    expect(handmadeMediaRefusal('c.py', 'video', { cli: true })).toContain('media generate video');
   });
 });

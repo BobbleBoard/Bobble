@@ -141,13 +141,34 @@ describe('resolveSessionCwd — a projectless conversation lands in ~/Bobble', (
     expect(cwd).toBe(path.join(home, 'Bobble'));
   });
 
-  it('defers to the resumed session (returns undefined) so pi restores its cwd', () => {
+  it('resumes at the session’s own recorded cwd, returned so the process starts there', () => {
+    const project = path.join(home, 'work', 'site');
+    fs.mkdirSync(project, { recursive: true });
+    const session = path.join(home, 'session.jsonl');
+    fs.writeFileSync(session, `${JSON.stringify({ type: 'session', cwd: project })}\n`);
+    expect(resolveSessionCwd({ sessionPath: session, conversationId: 'fresh' }, home)).toBe(
+      project,
+    );
+  });
+
+  it('roots a NEW chat’s not-yet-written session at ~/Bobble, never HOME', () => {
+    // SEEN: "Current working directory: /Users/user" in every fresh chat's
+    // prompt. The session path names a file pi has not created yet; deferring
+    // to it handed the bridge no cwd, and the bridge's fallback is HOME.
     const cwd = resolveSessionCwd(
-      { sessionPath: '/some/session.jsonl', conversationId: 'fresh' },
+      { sessionPath: path.join(home, 'nope', 'session.jsonl'), conversationId: 'fresh' },
       home,
     );
-    expect(cwd).toBeUndefined();
+    expect(cwd).toBe(path.join(home, 'Bobble'));
     expect(fs.existsSync(sandboxPathFor('fresh', home))).toBe(false);
+  });
+
+  it('refuses a resumed session whose recorded cwd is HOME', () => {
+    const session = path.join(home, 'home-session.jsonl');
+    fs.writeFileSync(session, `${JSON.stringify({ type: 'session', cwd: home })}\n`);
+    expect(resolveSessionCwd({ sessionPath: session, conversationId: 'c' }, home)).toBe(
+      path.join(home, 'Bobble'),
+    );
   });
 
   it('falls back to a shared sandbox, NEVER pi’s HOME default, with nothing to root at', () => {
@@ -193,19 +214,26 @@ describe('resolveSessionCwd — a projectless conversation lands in ~/Bobble', (
       path.join(home, 'Bobble'),
     );
 
-    // A session recorded in a REAL folder still defers to pi as before — and the
-    // cwd is read from the FILE, so a folder name containing hyphens (which pi's
-    // directory encoding cannot round-trip) is still read correctly.
-    const realSession = write('sessions/work/s.jsonl', '/Users/user/my-work-dir');
-    expect(
-      resolveSessionCwd({ sessionPath: realSession, conversationId: 'c3' }, home),
-    ).toBeUndefined();
-    expect(cwdFromSessionPath(realSession)).toBe('/Users/user/my-work-dir');
+    // A session recorded in a REAL folder resumes THERE, explicitly — the cwd
+    // is read from the FILE, so a folder name containing hyphens (which pi's
+    // directory encoding cannot round-trip) is still read correctly. A folder
+    // that no longer exists cannot be resumed at and falls back to ~/Bobble.
+    const realDir = path.join(home, 'my-work-dir');
+    fs.mkdirSync(realDir, { recursive: true });
+    const realSession = write('sessions/work/s.jsonl', realDir);
+    expect(resolveSessionCwd({ sessionPath: realSession, conversationId: 'c3' }, home)).toBe(
+      realDir,
+    );
+    expect(cwdFromSessionPath(realSession)).toBe(realDir);
+    const goneSession = write('sessions/gone/s.jsonl', '/Users/user/no-such-dir-anymore');
+    expect(resolveSessionCwd({ sessionPath: goneSession, conversationId: 'c5' }, home)).toBe(
+      path.join(home, 'Bobble'),
+    );
 
-    // An unreadable session is not assumed to be HOME — defer to pi as before.
+    // An unreadable session has nothing to resume at: ~/Bobble, never HOME.
     expect(
       resolveSessionCwd({ sessionPath: '/nope/missing.jsonl', conversationId: 'c4' }, home),
-    ).toBeUndefined();
+    ).toBe(path.join(home, 'Bobble'));
   });
 
   it('integration: a projectless spawn hands pi the sandbox as its cwd', () => {

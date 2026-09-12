@@ -194,7 +194,22 @@ export class PiBridge {
     for (const extension of opts.extensionPaths ?? []) args.push('-e', extension);
     if (opts.extraArgs) args.push(...opts.extraArgs);
 
-    const cwd = opts.cwd !== undefined && fs.existsSync(opts.cwd) ? opts.cwd : os.homedir();
+    /*
+     * A REQUESTED FOLDER IS AN INTENT. This swapped a missing `opts.cwd` for
+     * HOME without a word, which is how an agent ended up working in `~` —
+     * the one directory the app promises never to root it at. A folder the
+     * caller named is created; only a caller that named nothing gets HOME,
+     * which is pi's own default.
+     */
+    let cwd = os.homedir();
+    if (opts.cwd !== undefined && opts.cwd.length > 0) {
+      try {
+        fs.mkdirSync(opts.cwd, { recursive: true });
+        cwd = opts.cwd;
+      } catch {
+        cwd = fs.existsSync(opts.cwd) ? opts.cwd : os.homedir();
+      }
+    }
 
     const spawnFn: PiSpawnFn = opts.spawnFn ?? ((cmd, a, o) => spawn(cmd, a, o));
     this.child = spawnFn(this.spawnPlan.command, args, {

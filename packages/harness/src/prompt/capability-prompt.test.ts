@@ -247,3 +247,15 @@ describe('bash-CLI prompt is about commands, not tools', () => {
     );
   });
 });
+
+describe('the working directory the model is told', () => {
+  it('is the tools’ root, not the directory pi was launched in', () => {
+    const base =
+      'Guidelines:\n- Be concise\n\nCurrent date: 2026-09-12\nCurrent working directory: /Users/user';
+    const out = augmentSystemPrompt(base, {
+      workingDirectory: '/Users/user/Bobble/lighthouse-story',
+    });
+    expect(out).toContain('Current working directory: /Users/user/Bobble/lighthouse-story');
+    expect(out).not.toContain('Current working directory: /Users/user\n');
+  });
+});

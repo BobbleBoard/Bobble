@@ -155,13 +155,27 @@ export function resolveSessionCwd(
   const resuming =
     !cwdRequested && typeof req.sessionPath === 'string' && req.sessionPath.length > 0;
   if (resuming) {
-    // Defer to the session's own recorded cwd — UNLESS that cwd is HOME. Those
-    // sessions exist (40 of them on this machine): anything that reached pi
-    // without a usable cwd got pi's own `existsSync(cwd) ? cwd : os.homedir()`
-    // fallback, and re-opening one would go on writing into `~` forever. Re-root
-    // those at the conversation sandbox instead.
+    /*
+     * RESUME AT THE SESSION'S OWN RECORDED CWD — returned explicitly, so the
+     * child process is actually started there.
+     *
+     * This used to return `undefined` to "defer to pi", and pi did restore the
+     * session's cwd for its own bookkeeping — but the bridge spawns the child
+     * with `opts.cwd ?? HOME`, so the PROCESS ran in `~`, and pi's system
+     * prompt said so: "Current working directory: /Users/user" on every fresh
+     * chat (the user: "the working directory is by default users/the user when in no
+     * project??? not a sandbox..."). The session path of a NEW chat names a
+     * file that does not exist yet, which read as "nothing recorded, defer" —
+     * the exact case with nothing to defer to.
+     *
+     * A recorded cwd that is HOME is still refused (40 such sessions existed
+     * on this machine); an unreadable or missing file falls through to
+     * ~/Bobble, where a new chat belongs.
+     */
     const recorded = cwdFromSessionPath(req.sessionPath as string);
-    if (!isHomeDir(recorded, home)) return undefined;
+    if (recorded !== null && !isHomeDir(recorded, home) && directoryExists(recorded)) {
+      return recorded;
+    }
   }
   /*
    * No usable cwd anywhere — which, at boot, is every chat that has not been

@@ -34,6 +34,7 @@
  *
  * Kept deliberately tight — a system-prompt change affects all behavior.
  */
+import { attributeGuidelines, type GuidelineSource } from './guidelines.js';
 
 /**
  * First line of {@link CAPABILITY_PROMPT}; used as the idempotency marker so a
@@ -111,7 +112,7 @@ export const MANAGER_PROMPT_MARKER = 'YOU HAVE A MANAGER AND A TEAM';
  * then wrote a temp file. It had the tools and no idea they were the answer.
  */
 export const CAPABILITY_REACH_SCHEMAS =
-  'Only a few tools are in your list at any moment. To reach the rest, call `capability` — with no argument to see what is on offer, or with a name (browser, computer-use, personal, web-research, generation, connectors) to turn that group on. Its tools then appear in your list and you call them normally. A tool you cannot see is one `capability` call away, never a capability you lack. NEVER type a tool name at the shell — `mac_snapshot` is a tool, not a command.';
+  'Only a few tools are in your list at any moment. To reach the rest, call `capability` — with no argument to see what is on offer, or with a name (browser, computer-use, personal, web-research, generation, office, connectors) to turn that group on. Its tools then appear in your list and you call them normally. A tool you cannot see is one `capability` call away, never a capability you lack. NEVER type a tool name at the shell — `mac_snapshot` is a tool, not a command.';
 
 export const CAPABILITY_REACH_CLI =
   "Every one of these is a COMMAND already on your PATH — nothing to turn on, nothing to wait for. Run `<command> --help` the first time you use one and it will tell you its verbs and flags. Reach for them rather than improvising with general shell tools: `open -a` hands an app to the user's foreground instead of to you, and a file written and opened is not the same as having used the app.";
@@ -390,9 +391,35 @@ export function augmentSystemPrompt(
     toolInterface?: 'schemas' | 'bash-cli';
     /** Tool name → the command that runs it, for {@link retargetToolNames}. */
     commandFor?: ReadonlyMap<string, string>;
+    /**
+     * Whose guideline is whose, and which tools the model has — so pi's
+     * "Guidelines:" bullets come out named and pruned (see ./guidelines.ts).
+     * Absent ⇒ the block is left as pi wrote it.
+     */
+    guidelines?: { sources: readonly GuidelineSource[]; active: ReadonlySet<string> };
+    /**
+     * Where the tools actually work. pi prints the directory it was STARTED
+     * in; the harness roots every tool at the chat's folder, which for a
+     * projectless chat is decided on its first message. When they differ the
+     * model must be told the folder, not the launch dir.
+     */
+    workingDirectory?: string;
   } = {},
 ): string {
   let trimmed = stripPiIdentity(stripToolCatalog((base ?? '').trim()));
+  if (opts.workingDirectory !== undefined && opts.workingDirectory.length > 0) {
+    trimmed = trimmed.replace(
+      /^Current working directory: .*$/m,
+      `Current working directory: ${opts.workingDirectory}`,
+    );
+  }
+  if (opts.guidelines !== undefined) {
+    const cmd = opts.commandFor;
+    trimmed = attributeGuidelines(trimmed, opts.guidelines.sources, {
+      active: opts.guidelines.active,
+      ...(cmd !== undefined ? { nameFor: (t: string): string => `\`${cmd.get(t) ?? t}\`` } : {}),
+    });
+  }
   if (opts.toolInterface === 'bash-cli') {
     // STRIP BEFORE RETARGETING. These are matched as literals, and retargeting
     // rewrites them first ("Use `read` …" → "Use `file read` …") so the literal

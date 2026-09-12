@@ -282,8 +282,12 @@ function classifyWrite(
  */
 export function detectFileWrites(messages: ChatMsg[], cwd: string | undefined): FileWriteEvent[] {
   const completed = new Set<string>();
+  const failed = new Set<string>();
   for (const m of messages) {
-    if (m.kind === 'toolResult') completed.add(m.toolCallId);
+    if (m.kind === 'toolResult') {
+      completed.add(m.toolCallId);
+      if (m.isError === true) failed.add(m.toolCallId);
+    }
   }
   const byPath = new Map<string, FileWriteEvent>();
   for (const m of messages) {
@@ -292,6 +296,16 @@ export function detectFileWrites(messages: ChatMsg[], cwd: string | undefined): 
       if (block.type !== 'toolCall') continue;
       const write = classifyWrite(block);
       if (write === undefined) continue;
+      /*
+       * A WRITE THAT WAS REFUSED WROTE NOTHING. SEEN (the user's screenshot): the
+       * handmade-media guard refused `create_illustrations.py`, and the
+       * Activity tab opened a file tab for it anyway — "Could not read this
+       * file … It may have been written somewhere else, moved, or removed" —
+       * about a file that never existed, while the thread's own row already
+       * said why. A failed whole-file write is not a file; a failed EDIT still
+       * names a file that exists, so that one stays.
+       */
+      if (failed.has(block.id) && write.edit === undefined && write.hunks === undefined) continue;
       const path = resolvePath(cwd, write.path);
       byPath.set(path, {
         callId: block.id,

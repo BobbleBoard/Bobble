@@ -112,19 +112,46 @@ const COMMAND: Record<MediaKind, string> = {
   video: 'media generate video "a red paper boat drifting across calm water"',
 };
 
+/** The same three, as the tools a schemas-mode model calls by name. */
+const TOOL_CALL: Record<MediaKind, string> = {
+  image: 'generate_image { prompt: "a hand-thrown ceramic mug on a windowsill, morning light" }',
+  audio: 'generate_music { prompt: "warm lo-fi beat, mellow rhodes" }',
+  video: 'generate_video { prompt: "a red paper boat drifting across calm water" }',
+};
+
 const NOUN: Record<MediaKind, string> = {
   image: 'a picture',
   audio: 'a sound',
   video: 'a clip',
 };
 
-/** The refusal: name the command, give the call, and say how to get through. */
-export function handmadeMediaRefusal(path: string, kind: MediaKind): string {
+/**
+ * The refusal: name the generator in the shape THIS mode calls it, and say
+ * plainly that the script is not to be run.
+ *
+ * SEEN (the user's screenshot, a subagent asked for eight illustrations): the old
+ * wording "Run it with the bash tool: media generate image …" was read as
+ * "run the script with bash" — the model's next line was "Let me run the
+ * script using bash instead, as the system suggests." It was also the CLI
+ * form, handed to a model in schemas mode that has no such command. "It" is
+ * now the generator, by name, in the mode's own syntax; the script is named
+ * as the thing NOT to run.
+ */
+export function handmadeMediaRefusal(
+  path: string,
+  kind: MediaKind,
+  opts: { cli?: boolean } = {},
+): string {
+  const call = opts.cli === true ? COMMAND[kind] : TOOL_CALL[kind];
+  const how =
+    opts.cli === true
+      ? `Make ${NOUN[kind]} with the generator instead — run this command with the bash tool (one call per ${NOUN[kind].replace(/^an? /, '')}):`
+      : `Make ${NOUN[kind]} with the generator instead — call this tool (one call per ${NOUN[kind].replace(/^an? /, '')}; if it is not in your list, call capability("generation") first):`;
   return [
-    `Not written: ${path} synthesises ${NOUN[kind]} in code, and this machine has a generator for that. A drawing library makes shapes you described; the generator makes the thing itself, on-device.`,
+    `Not written: ${path} synthesises ${NOUN[kind]} in code, and this machine has a generator for that. A drawing library makes shapes you described; the generator makes the thing itself, on-device. Do NOT run this script, with bash or otherwise.`,
     '',
-    'Run it with the bash tool:',
-    `  ${COMMAND[kind]}`,
+    how,
+    `  ${call}`,
     'Then use the file it produces, and tell the user where it is.',
     '',
     `If the SCRIPT is genuinely the deliverable (a chart, a diagram, a fixture — something a generator cannot make), write it again UNCHANGED.`,

@@ -17,7 +17,7 @@
  * CLI pi users can consume the pieces directly.
  */
 
-import { appendFileSync, statSync } from 'node:fs';
+import { appendFileSync, realpathSync, statSync } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { isAbsolute, join } from 'node:path';
@@ -298,6 +298,12 @@ interface HarnessRuntime {
    * resolution is the fallback, never the override.
    */
   workspaceRoot: string | null;
+  /**
+   * The working folder the model has been TOLD — by the frozen prompt's own
+   * line, or by the note a turn carried when the folder moved. Compared against
+   * `workspaceRoot` at every turn start; see the note in before_agent_start.
+   */
+  announcedWorkspace: string | null;
   /** The capability just switched on, named while its re-prefill runs. */
   loadingCapability: string | null;
   /** Conversation title, produced by the background titler (computed once). */
@@ -728,6 +734,9 @@ interface ResidentPrefix {
  * and a well-known symbol is the only place with that lifetime. Nothing else
  * belongs here — this is a note about ONE server's KV, not a store.
  */
+/** The custom message that tells the model its working folder moved. */
+const HARNESS_WORKSPACE_NOTE = 'harness-workspace';
+
 const RESIDENT = Symbol.for('pi-desktop.harness.residentPrefix');
 const processGlobals = globalThis as unknown as Record<symbol, ResidentPrefix | undefined>;
 function processResidentPrefix(): ResidentPrefix {
@@ -907,6 +916,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
   const runtime: HarnessRuntime = {
     config: DEFAULT_CONFIG,
     workspaceRoot: null,
+    announcedWorkspace: null,
     title: null,
     canonicalSystemPrompt: null,
     activeTools: [],
@@ -1254,6 +1264,10 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
       );
     }
     const canonical = runtime.canonicalSystemPrompt;
+    if (runtime.announcedWorkspace === null) {
+      runtime.announcedWorkspace =
+        /^Current working directory: (.*)$/m.exec(canonical)?.[1] ?? null;
+    }
     // Build the tool list in the SAME ORDER a real turn does (applyPreset unions
     // resolveBaseTools' order), NOT pi.getAllTools() registry order.
     /*
@@ -2557,13 +2571,60 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
    * priming a DIFFERENT string means turn one pays the full cold prefill the
    * warm-up was added to avoid.
    */
+  /**
+   * Whose guideline is whose: every tool this extension registered, with the
+   * bullets it contributes to pi's "Guidelines:" block — so the block can be
+   * rebuilt with each tool NAMED and the absent ones pruned (guidelines.ts).
+   * The captured definition is the original object, guidelines and all.
+   */
+  function guidelineSources(): { name: string; guidelines: string[] }[] {
+    return toolRegistry.names().map((name) => {
+      const def = toolRegistry.get(name) as { promptGuidelines?: unknown } | undefined;
+      const raw = def?.promptGuidelines;
+      const list = Array.isArray(raw)
+        ? raw.filter((g): g is string => typeof g === 'string')
+        : typeof raw === 'string'
+          ? [raw]
+          : [];
+      return { name, guidelines: list };
+    });
+  }
+
+  /** The tools a turn will advertise — the same list the warm-up uses. */
+  function advertisedNow(): Set<string> {
+    const available = pi.getAllTools().map((t) => t.name);
+    const names =
+      runtime.activeTools.length > 0 ? runtime.activeTools.slice() : resolveBaseTools(available);
+    if (toolCliMode) for (const t of cliVisibleTools()) names.push(t.name);
+    return new Set(names);
+  }
+
   function canonicalPrompt(base: string): string {
+    {
+      const dbg = process.env.PI_ADV_DEBUG_TOOLS;
+      if (dbg !== undefined && dbg.length > 0) {
+        try {
+          appendFileSync(
+            dbg,
+            `cwd: process=${process.cwd()} workspace=${runtime.workspaceRoot ?? '-'} env=${process.env.PI_DESKTOP_WORKSPACE_ROOT ?? '-'} promptLine=${/Current working directory: (.*)$/m.exec(base)?.[1] ?? '-'}\n`,
+          );
+        } catch {
+          /* diagnostic */
+        }
+      }
+    }
     const augmented = augmentSystemPrompt(base, {
       toolInterface: toolCliMode ? 'bash-cli' : 'schemas',
       // In CLI mode, pi's own guidance names tools by their TOOL name — it
       // renders usage lines for every registered tool, advertised or not — so
       // it is retargeted onto the commands that actually reach them.
       ...(toolCliMode ? { commandFor: toolCliCommandNames() } : {}),
+      /* the user, reading the block: "so much explanation which I can't figure out
+         what it's explaining about" — every bullet said "it" about a different
+         tool, two of which the model did not have. Named and pruned. */
+      guidelines: { sources: guidelineSources(), active: advertisedNow() },
+      /* The tools' root, not pi's boot directory — see the workspace command. */
+      ...(runtime.workspaceRoot !== null ? { workingDirectory: runtime.workspaceRoot } : {}),
     });
     /*
      * THE COMMAND LIST GOES FIRST.
@@ -2964,6 +3025,8 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
      */
     runtime.canonicalSystemPrompt = null;
     pendingCanonicalPrompt = null;
+    // …and what the model has been told about its folder starts over with it.
+    runtime.announcedWorkspace = null;
     runtime.config = restoreConfig(getEntries(ctx));
     runtime.permission.setMode(runtime.config.mode);
     // A new / switched session must NOT inherit the previous session's live
@@ -3082,6 +3145,25 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     const augmentedSystemPrompt =
       runtime.canonicalSystemPrompt ?? canonicalPrompt(event.systemPrompt);
     runtime.canonicalSystemPrompt = augmentedSystemPrompt;
+    if (runtime.announcedWorkspace === null) {
+      runtime.announcedWorkspace =
+        /^Current working directory: (.*)$/m.exec(augmentedSystemPrompt)?.[1] ?? null;
+    }
+    /*
+     * THE FOLDER MOVED SINCE THE MODEL WAS LAST TOLD — say so, in the turn.
+     *
+     * the user, reading a fresh chat's prompt: "the working directory is by
+     * default users/the user when in no project??? not a sandbox..." Two things
+     * were wrong. pi was spawned in HOME (fixed in the app's cwd resolver:
+     * a new chat's not-yet-written session read as "nothing to defer to"),
+     * and a projectless chat gets its own folder — `~/Bobble/<first words>` —
+     * on its FIRST message, after the prompt has been frozen and warmed with
+     * the boot folder. Rewriting the frozen prompt would say the truth at the
+     * price of the whole warmed prefix (MEASURED: 6.3 s first token against
+     * 2 s). A note beside the user's message says the same truth for ~30
+     * tokens, persists in the conversation, and leaves the prefix alone.
+     */
+    const workspaceNote = workspaceMoveNote();
     // Classification REMOVED from the turn path (the user: "we seldom use it at all,
     // let's just completely remove"). The turn-1 {title,class} piggyback cost
     // ~2.5s of TTFT — an awaited utility call before the model could even start.
@@ -3111,8 +3193,42 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     // A new turn starts at no-ingest, not at whatever the last one reached.
     clearPrefillStatus(ctx);
     // Replace the turn's system prompt with the capability-affirming version.
-    return { systemPrompt: augmentedSystemPrompt };
+    return {
+      systemPrompt: augmentedSystemPrompt,
+      ...(workspaceNote !== null
+        ? {
+            message: {
+              customType: HARNESS_WORKSPACE_NOTE,
+              content: workspaceNote,
+              display: false,
+            },
+          }
+        : {}),
+    };
   });
+
+  /** The note for a folder the model has not been told about yet, or null. */
+  function workspaceMoveNote(): string | null {
+    const root = runtime.workspaceRoot;
+    if (root === null) return null;
+    const same = (a: string, b: string | null): boolean => {
+      if (b === null) return false;
+      const real = (p: string): string => {
+        try {
+          return realpathSync(p);
+        } catch {
+          return p;
+        }
+      };
+      return real(a) === real(b);
+    };
+    if (same(root, runtime.announcedWorkspace)) return null;
+    runtime.announcedWorkspace = root;
+    return (
+      `Working folder: ${root}. Relative paths resolve there, and that is where files ` +
+      'belong unless the user names somewhere else.'
+    );
+  }
 
   // Running-task timer.
   pi.on('agent_start', (_event, ctx) => {
@@ -3557,7 +3673,10 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
           if (handmade !== null) {
             svgRefused.set(abs, body);
             pi.appendEntry(HARNESS_LOOP_ENTRY, { action: 'block', cause: 'handmade-media' });
-            return { block: true, reason: handmadeMediaRefusal(input.path, handmade) };
+            return {
+              block: true,
+              reason: handmadeMediaRefusal(input.path, handmade, { cli: toolCliMode }),
+            };
           }
           /*
            * …AND A SCRIPT THAT WRITES AN OFFICE FILE WITH A LIBRARY — see
@@ -4208,6 +4327,9 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
             return;
           }
           runtime.workspaceRoot = dir;
+          /* The model learns of the move at its next turn — as a note in the
+             conversation, not a rewrite of the frozen prompt (see
+             before_agent_start: the prefix the server holds stays reusable). */
           publishStatus(ctx);
           ctx.ui.notify(`workspace → ${dir}`);
           return;
