@@ -30,6 +30,8 @@ export interface JobProgress extends DownloadProgress {
 }
 
 export interface ModelDownloadOptions {
+  /** Leave the DFlash / DSpark drafters out (the bare weights only). */
+  readonly skipDrafters?: boolean;
   /** Which quant to fetch (defaults to the first file listed). */
   readonly quant?: string;
   /** Launch mode decides whether the mmproj / MTP sibling is fetched too. */
@@ -149,6 +151,21 @@ export async function downloadModel(
   if ((all || mode === 'fast-text') && model.spec === 'eagle3' && model.draftModel !== undefined) {
     // The EAGLE-3 draft usually lives in a separate repo (draftRepo).
     plan.push({ kind: 'draft', repo: model.draftRepo ?? model.hfRepo, file: model.draftModel });
+  }
+  /*
+   * …AND EVERY OTHER DRAFTER THE MODEL HAS A FILE FOR. the user: "when downloading
+   * any models from the recommended tab, applicable drafter(s) should also be
+   * downloaded right there and then." A DFlash or DSpark draft is a few hundred
+   * megabytes beside a multi-gigabyte model, and it is what lets calibration
+   * measure those methods with no network at all. `skipDrafters` is the
+   * opt-out for a caller that wants the bare weights.
+   */
+  if ((all || mode === 'fast-text') && opts.skipDrafters !== true) {
+    for (const v of model.variants ?? []) {
+      if (v.draftModel === undefined || v.draftRepo === undefined) continue;
+      if (plan.some((p) => p.file.name === v.draftModel?.name)) continue;
+      plan.push({ kind: 'draft', repo: v.draftRepo, file: v.draftModel });
+    }
   }
 
   /*

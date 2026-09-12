@@ -8,7 +8,7 @@ import { CrashSeam } from './crash-seam';
 import { connectChildAgents } from './state/child-agent-store';
 import { connectGen } from './state/gen-store';
 import { connectHf } from './state/hf-store';
-import { connectLlm } from './state/llm-store';
+import { connectLlm, ensureDefaultEngines } from './state/llm-store';
 import { connectPi } from './state/pi-connect';
 import { connectSettings } from './state/settings-store';
 import { connectStoreModels } from './state/store-models';
@@ -30,6 +30,8 @@ if (!new URLSearchParams(window.location.search).has('canvasPopout')) {
   connectPi();
   connectChildAgents();
   connectLlm();
+  // The default engines for this machine, in the background (see llm-store).
+  setTimeout(() => void ensureDefaultEngines(), 8_000);
   connectHf();
   connectGen();
   connectStoreModels();

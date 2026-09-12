@@ -25,7 +25,7 @@
 import type { LaunchMode } from '@pi-desktop/inference';
 import { useLlmStore } from './llm-store';
 import { useModelSelectionStore } from './model-selection-store';
-import { getModels, restartPi, setModel } from './pi-connect';
+import { getModels, getPiState, restartPi, setModel } from './pi-connect';
 import { usePiStore } from './pi-slice';
 import { applySavedHarnessConfig, useSettingsStore } from './settings-store';
 
@@ -141,23 +141,60 @@ async function activate(
   const started = await store.startServer(modelId, quant, launchMode);
   if (!started.success) return started;
 
+  await repointPiAtRunningServer(modelId);
+  return { success: true };
+}
+
+/**
+ * POINT PI AT THE SERVER THAT IS UP NOW.
+ *
+ * A (re)launch moves the server to a new port and, since calibration, possibly
+ * to a different ENGINE — so the models.json block pi should read is the one
+ * the supervisor says it registered (`status.provider`: `llamacpp` for
+ * llama-server, `mlx` for every OpenAI-compatible engine), not the one the
+ * catalogue implies for the model. Respawns pi on the same session so the
+ * thread is kept, then re-applies the saved harness config a fresh session
+ * drops. Shared by the model switch, the vision relaunch, calibration and a
+ * hand-picked engine, so the four cannot drift.
+ */
+export async function repointPiAtRunningServer(modelId?: string): Promise<void> {
   // Graceful restart preserving the current session so the chat is not
   // dead-ended (see file header). Respawn on the same session file when one
   // exists; the rendered thread in the store stays put.
   const sessionFile = usePiStore.getState().session?.sessionFile;
   await restartPi(sessionFile !== undefined ? { sessionPath: sessionFile } : undefined);
 
-  // Re-point pi at the freshly-registered provider model, engine-aware: an MLX
-  // model is served under the 'mlx' provider (provider-mlx / mlx-stream), a GGUF
-  // under 'llamacpp'.
-  const providerName = providerForEngine(engineFor(modelId));
+  const status = useLlmStore.getState().status;
+  const providerName =
+    status.provider ?? providerForEngine(engineFor(modelId ?? status.model?.id ?? ''));
   const models = await getModels();
   const target = models.models.find((m) => m.provider === providerName);
-  if (target !== undefined) await setModel(target.provider, target.id);
+  // eslint-disable-next-line no-console
+  console.log(
+    `[pi-diag] repoint: want provider=${providerName} (engine ${status.profile?.engine ?? '?'}); pi lists ${models.models.map((m) => `${m.provider}/${m.id}`).join(', ') || 'nothing'}; target=${target === undefined ? 'NONE' : `${target.provider}/${target.id}`}`,
+  );
+  if (target !== undefined) {
+    const ack = await setModel(target.provider, target.id);
+    // eslint-disable-next-line no-console
+    console.log(`[pi-diag] repoint: set_model → ${JSON.stringify(ack)}`);
+    /*
+     * MIRROR THE SWITCH. pi 0.68 answers `set_model` without a `model_change`
+     * event, so the store's `agent.model` — the footer chip, the engine menu's
+     * "pi is on …" — kept naming the model the child STARTED with. MEASURED
+     * after a calibration swap to llama.cpp: pi answered on llama.cpp while the
+     * store still said `mlx`. Read the state back once and say what is true.
+     */
+    const state = await getPiState().catch(() => null);
+    const m = state?.state?.model;
+    if (m != null) {
+      usePiStore.setState((s) => ({
+        agent: { ...s.agent, model: { id: m.id, name: m.name, provider: m.provider } },
+      }));
+    }
+  }
 
   // A fresh session drops the harness runtime config — re-apply the saved one.
   applySavedHarnessConfig();
-  return { success: true };
 }
 
 // ---------------------------------------------------------------------------

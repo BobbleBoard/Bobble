@@ -206,6 +206,12 @@ export interface ServerFeatures {
   readonly parallel: boolean;
   /** Draft-model speculative decoding via `--model-draft`/`-md`. */
   readonly draftModel: boolean;
+  /**
+   * Every `--spec-type` the build lists, verbatim (`draft-dflash`,
+   * `ngram-mod`, …). Calibration plans a method only when its type is here,
+   * so a pin that predates one never launches with a flag it will refuse.
+   */
+  readonly specTypes: readonly string[];
 }
 
 /**
@@ -232,11 +238,14 @@ export async function probeServerFeatures(
     help = `${e.stdout ?? ''}\n${e.stderr ?? ''}`;
     if (help.trim().length === 0) throw err;
   }
+  const specLine = help.match(/--spec-type\s+([a-z0-9,-]+)/);
+  const specTypes = specLine?.[1]?.split(',').filter((t) => t.length > 0) ?? [];
   return {
     mtp: help.includes('draft-mtp'),
     eagle3: help.includes('draft-eagle3'),
     mmproj: help.includes('--mmproj'),
     parallel: help.includes('--parallel') || help.includes('-np'),
     draftModel: help.includes('--model-draft') || /(^|\s)-md(\s|,)/.test(help),
+    specTypes,
   };
 }

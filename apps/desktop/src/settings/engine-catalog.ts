@@ -54,7 +54,16 @@ export type EnginePlatform = 'darwin' | 'win32' | 'linux';
 export type EngineModality = 'text' | 'image' | 'video' | 'audio' | '3d';
 
 /** Weight formats an engine can load. */
-export type EngineFormat = 'gguf' | 'safetensors' | 'mlx' | 'exl3' | 'onnx' | 'trt' | 'diffusers';
+export type EngineFormat =
+  | 'gguf'
+  | 'safetensors'
+  | 'mlx'
+  | 'exl3'
+  | 'onnx'
+  | 'trt'
+  | 'diffusers'
+  /** NInfer's own container (tokenizer + template + weights in one file). */
+  | 'ninfer';
 
 /** What an engine is good FOR — the panel groups and sorts on this. */
 export type EngineRole = 'general' | 'single-user' | 'concurrency' | 'npu';
@@ -83,6 +92,17 @@ export interface EngineSpec {
   readonly minCudaMajor?: number;
   /** Needs a dedicated NPU (Copilot+, Ryzen AI). */
   readonly requiresNpu?: boolean;
+  /**
+   * BUILT FOR ONE CARD. NInfer hard-codes `sm_120a` — it is not "NVIDIA", it
+   * is an RTX 5090, and its 3090 fork is an RTX 3090. The row says so, and a
+   * box with a different card (or one we could not identify) is told which
+   * card it would need rather than offered a build that rejects itself.
+   */
+  readonly requiresGpu?: {
+    readonly vendor: GpuVendor;
+    readonly match: RegExp;
+    readonly label: string;
+  };
   /**
    * WEIGHT FORMATS it can load. The axis that answers the user's "for any model on
    * the hf hub, what is the optimal engine" — a GGUF cannot run on vLLM and a
@@ -175,7 +195,7 @@ export const ENGINES: readonly EngineSpec[] = [
   {
     id: 'dflash-mlx',
     name: 'MLX DFlash',
-    blurb: 'Fastest for a single chat, around 1.4-1.6x. Needs a draft model.',
+    blurb: 'Fastest for a single chat, around 1.4-1.6x. Its drafter arrives with the model.',
     role: 'single-user',
     platforms: ['darwin'],
     formats: ['mlx'],
@@ -187,6 +207,65 @@ export const ENGINES: readonly EngineSpec[] = [
     // The package is 1.8 MB; what actually costs disk is the drafter it needs.
     approxBytes: 1.2 * GB,
     requires: ['rapid-mlx'],
+  },
+  {
+    /*
+     * MLX-DSPARK: DSpark (DFlash's successor), DFlash and a drafter-free lookup
+     * mode behind one OpenAI-compatible server. DSpark is CUDA-first upstream;
+     * this is the MLX port, and which of its modes wins on a given model is
+     * exactly what Calibrate measures rather than assumes.
+     */
+    id: 'mlx-dspark',
+    name: 'mlx-dspark',
+    blurb: 'DSpark and DFlash speculative decoding on MLX; also a model-free lookup mode.',
+    role: 'single-user',
+    platforms: ['darwin'],
+    formats: ['mlx'],
+    gpuVendors: ['apple'],
+    wired: true,
+    modalities: ['text'],
+    rank: 38,
+    requiresAppleSilicon: true,
+    approxBytes: undefined,
+    requires: ['rapid-mlx'],
+  },
+  {
+    /*
+     * OMLX: a multi-model MLX server with an LRU over loaded models and a paged
+     * SSD prompt cache. Installed from source (it is not on PyPI). Its strength
+     * is keeping several models warm; Calibrate measures it as one more way to
+     * run the one you are talking to.
+     */
+    id: 'omlx',
+    name: 'oMLX',
+    blurb: 'Multi-model MLX server with an SSD prompt cache. Built from source.',
+    role: 'general',
+    platforms: ['darwin'],
+    formats: ['mlx'],
+    gpuVendors: ['apple'],
+    wired: true,
+    modalities: ['text'],
+    rank: 25,
+    requiresAppleSilicon: true,
+    approxBytes: undefined,
+    requires: ['rapid-mlx'],
+  },
+  {
+    /* Apple's reference server, brought in by rapid-mlx. The plain MLX floor
+       Calibrate compares the others against; never installed on its own. */
+    id: 'mlx-lm',
+    name: 'mlx-lm',
+    blurb: 'The reference MLX server. Comes with rapid-mlx.',
+    role: 'general',
+    platforms: ['darwin'],
+    formats: ['mlx'],
+    gpuVendors: ['apple'],
+    wired: true,
+    modalities: ['text'],
+    rank: 20,
+    requiresAppleSilicon: true,
+    requires: ['rapid-mlx'],
+    autoInstalls: true,
   },
   {
     /*
@@ -403,16 +482,102 @@ export const ENGINES: readonly EngineSpec[] = [
     platforms: ['linux'],
     formats: ['safetensors'],
     gpuVendors: ['nvidia', 'amd'],
+    wired: true,
     modalities: ['text'],
     rank: 20,
     approxBytes: 2 * GB,
   },
+  {
+    /*
+     * NINFER — the user: "a really popular one that is very useful because it
+     * targets the most popular and best 24gb vram model to date qwen3.8-27b on
+     * 1x 5090, for 1x5090, this is the thing that just gets downloaded, this
+     * is the best" (github.com/Neroued/ninfer).
+     *
+     * Verified 2026-09-12: a from-scratch C++/CUDA engine for registered Qwen
+     * checkpoints on ONE RTX 5090 (the build rejects every other arch), Linux,
+     * CUDA 13.1+, source build only (no wheel, no releases), its own `.ninfer`
+     * weights (Qwen3.8-27B, Qwen3.6-27B, Qwen3.6-35B-A3B), OpenAI + Anthropic
+     * APIs on :8080, `--spec mtp|dflash|dflash2`. Its own numbers on a 5090:
+     * 71 tok/s plain → 144 MTP → 121–357 DFlash2, 8,340 tok/s prefill.
+     *
+     * NOT WIRED: the launch path needs its weight container and a card this
+     * project has not had in hand; the row is catalogued so a 5090 box sees
+     * it, and the install (clone + cmake) is in engines-main for that box.
+     */
+    id: 'ninfer',
+    name: 'NInfer',
+    blurb:
+      'Built for one RTX 5090: Qwen3.8-27B at 140–350 tok/s with MTP or DFlash2. Built from source.',
+    role: 'single-user',
+    platforms: ['linux'],
+    formats: ['ninfer'],
+    gpuVendors: ['nvidia'],
+    minCudaMajor: 12,
+    requiresGpu: { vendor: 'nvidia', match: /5090/i, label: 'RTX 5090 (Linux)' },
+    modalities: ['text'],
+    rank: 60,
+  },
+  {
+    /* The Ampere port (github.com/Don-Chad/ninfer-3090, release/v0.6.x): same
+       artifacts via INT4/5/6 + W8, INT8 KV, MTP only (no DFlash2), CUDA 12.8+,
+       Linux source build or a Windows zip; ~70 tok/s C1 / 161 tok/s C8 on
+       Qwen3.8-27B. Same not-wired status as upstream. */
+    id: 'ninfer-3090',
+    name: 'NInfer 3090',
+    blurb: 'The RTX 3090 port of NInfer: Qwen3.8-27B at ~70 tok/s with MTP on 24 GB.',
+    role: 'single-user',
+    platforms: ['linux', 'win32'],
+    formats: ['ninfer'],
+    gpuVendors: ['nvidia'],
+    minCudaMajor: 8,
+    requiresGpu: { vendor: 'nvidia', match: /3090/i, label: 'RTX 3090' },
+    modalities: ['text'],
+    rank: 55,
+  },
 ];
+
+/**
+ * THE ENGINES A FRESH INSTALL FETCHES ON ITS OWN, so Calibrate has something
+ * to compare with no network at the time.
+ *
+ * the user: "download a few generally good engines at the start of downloading the
+ * app eg. if on apple silicon mac, omlx rapidmlx and dflashmlx (always llamacpp
+ * also, on any machine we always have llamacpp first and foremost), on some
+ * other machines like big linux boxes, vllm would be part of this set, mac
+ * especially has a lot of special treatment."
+ *
+ * llama.cpp is not listed: the model launch fetches it, first and always. The
+ * order is install order (rapid-mlx carries the MLX runtime the rest share).
+ */
+export function defaultEngineSet(
+  host: HostCapabilities,
+  engines: readonly EngineSpec[] = ENGINES,
+): string[] {
+  const ids =
+    host.platform === 'darwin' && host.appleSilicon
+      ? ['rapid-mlx', 'dflash-mlx', 'mlx-dspark', 'omlx']
+      : host.platform === 'linux'
+        ? ['vllm', 'ninfer', 'ninfer-3090']
+        : host.platform === 'win32'
+          ? ['ninfer-3090']
+          : [];
+  /* NInfer is the one exception to "wired only": it is fetched for the card
+     it was built for (the support check keeps it off every other box) so it
+     is on disk the day its launch path lands. */
+  return ids.filter((id) => {
+    const spec = engines.find((e) => e.id === id);
+    if (spec === undefined || !engineSupport(spec, host).supported) return false;
+    return spec.wired === true || spec.id.startsWith('ninfer');
+  });
+}
 
 export interface HostCapabilities {
   readonly platform: EnginePlatform;
   /** arm64 on darwin means Apple Silicon. */
   readonly appleSilicon: boolean;
+  /** The accelerator, when the probe has reported one (see LlmHardware). */
+  readonly gpu?: { readonly vendor: GpuVendor; readonly name?: string } | null;
 }
 
 export type EngineSupport = { supported: true } | { supported: false; reason: string };
@@ -430,6 +595,14 @@ export function engineSupport(spec: EngineSpec, host: HostCapabilities): EngineS
     };
     const where = spec.platforms.map((p) => names[p]).join(' and ');
     return { supported: false, reason: `${where} only` };
+  }
+  if (spec.requiresGpu !== undefined) {
+    const gpu = host.gpu ?? null;
+    const ok =
+      gpu !== null &&
+      gpu.vendor === spec.requiresGpu.vendor &&
+      spec.requiresGpu.match.test(gpu.name ?? '');
+    if (!ok) return { supported: false, reason: `Needs an ${spec.requiresGpu.label}` };
   }
   if (spec.requiresAppleSilicon === true && !host.appleSilicon) {
     return { supported: false, reason: 'Needs Apple Silicon' };

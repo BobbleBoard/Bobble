@@ -32,6 +32,7 @@ import {
   REPLY_MARGIN_TOKENS,
   trimContextForOverflow,
 } from './context-trim.js';
+import { createLiveTpsReporter } from './live-tps.js';
 import {
   fuzzyMatchToolName,
   type RepairRung,
@@ -721,142 +722,159 @@ export function createLlamaCppStream(deps: LlamaCppStreamDeps = {}): LlamaCppStr
         // prefill (the latest message). A big `reused` + small `new` on a
         // follow-up means the cache is working and we're not re-prefilling.
         let kvLogged = false;
-        for await (const payload of parseSSE(await readBody(res))) {
-          let chunk: OAIChunk;
-          try {
-            chunk = JSON.parse(payload) as OAIChunk;
-          } catch {
-            continue; // skip non-JSON keep-alives
-          }
-          if (chunk.timings !== undefined) lastTimings = chunk.timings;
-          if (chunk.usage != null) {
-            output.usage.input = chunk.usage.prompt_tokens ?? output.usage.input;
-            output.usage.output = chunk.usage.completion_tokens ?? output.usage.output;
-          }
-
-          // Prefill progress: emitted during prompt ingestion (before the first
-          // token), typically on a frame with an empty `choices` array. Observe
-          // it here — ahead of the per-choice delta logic below, which `continue`s
-          // past choice-less frames — and hand it to the host's "Processing N%"
-          // seam.
-          if (chunk.prompt_progress !== undefined) {
-            const pp = chunk.prompt_progress;
-            if (!kvLogged && (pp.total ?? 0) > 0) {
-              kvLogged = true;
-              const total = pp.total ?? 0;
-              const reused = pp.cache ?? 0;
-              const pctReused = total > 0 ? Math.round((reused / total) * 100) : 0;
-              // Fingerprint the cached PREFIX so a churn is visible: the tool count
-              // + system-prompt length are what the chat template renders BEFORE the
-              // messages. A follow-up with the SAME fingerprint but LOW reuse means
-              // the prefix moved for another reason; a CHANGED fingerprint (tools/
-              // sys grew or shrank) is the churn itself. Healthy follow-up = high
-              // reuse% + unchanged fingerprint (the user: "view actual context changes").
-              const nTools = context.tools?.length ?? 0;
-              const sysLen = context.systemPrompt?.length ?? 0;
-              // eslint-disable-next-line no-console
-              console.log(
-                `[pi-kv] context=${total} tok · reused=${reused} (${pctReused}%) · new=${Math.max(0, total - reused)} · prefix{tools=${nTools} sys=${sysLen}ch}`,
-              );
+        // The live readout: counted here, read by the app off stderr (live-tps.ts).
+        const liveTps = createLiveTpsReporter();
+        try {
+          for await (const payload of parseSSE(await readBody(res))) {
+            let chunk: OAIChunk;
+            try {
+              chunk = JSON.parse(payload) as OAIChunk;
+            } catch {
+              continue; // skip non-JSON keep-alives
             }
-            const fraction = promptProgressFraction(pp);
-            deps.onPromptProgress?.({
-              processed: pp.processed ?? 0,
-              total: pp.total ?? 0,
-              fraction,
-            });
-            // The LIVE (harness-provided) sink — the harness has the per-turn ctx
-            // to publish `harness-prefill` for the desktop ring, which the static
-            // provider deps can't reach. Best-effort; absent off-harness.
-            deps.repairProvider?.()?.onPromptProgress?.(fraction);
-          }
-
-          const choice = chunk.choices?.[0];
-          if (choice === undefined) continue;
-          const delta = choice.delta;
-
-          if (delta?.reasoning_content != null && delta.reasoning_content.length > 0) {
-            if (thinkingIndex === undefined) {
-              output.content.push({ type: 'thinking', thinking: '' });
-              thinkingIndex = output.content.length - 1;
-              stream.push({ type: 'thinking_start', contentIndex: thinkingIndex, partial: output });
+            if (chunk.timings !== undefined) lastTimings = chunk.timings;
+            if (chunk.usage != null) {
+              output.usage.input = chunk.usage.prompt_tokens ?? output.usage.input;
+              output.usage.output = chunk.usage.completion_tokens ?? output.usage.output;
             }
-            const block = output.content[thinkingIndex];
-            if (block?.type === 'thinking') block.thinking += delta.reasoning_content;
-            stream.push({
-              type: 'thinking_delta',
-              contentIndex: thinkingIndex,
-              delta: delta.reasoning_content,
-              partial: output,
-            });
-          }
 
-          if (delta?.content != null && delta.content.length > 0) {
-            if (textIndex === undefined) {
-              output.content.push({ type: 'text', text: '' });
-              textIndex = output.content.length - 1;
-              stream.push({ type: 'text_start', contentIndex: textIndex, partial: output });
-            }
-            const block = output.content[textIndex];
-            if (block?.type === 'text') block.text += delta.content;
-            stream.push({
-              type: 'text_delta',
-              contentIndex: textIndex,
-              delta: delta.content,
-              partial: output,
-            });
-          }
-
-          for (const tc of delta?.tool_calls ?? []) {
-            const key = tc.index ?? toolStates.size;
-            let state = toolStates.get(key);
-            if (state === undefined) {
-              const block: ToolCall = {
-                type: 'toolCall',
-                id: tc.id ?? `call_${key}`,
-                name: tc.function?.name ?? '',
-                arguments: {},
-              };
-              output.content.push(block);
-              state = {
-                contentIndex: output.content.length - 1,
-                id: block.id,
-                name: block.name,
-                argStr: '',
-              };
-              toolStates.set(key, state);
-              stream.push({
-                type: 'toolcall_start',
-                contentIndex: state.contentIndex,
-                partial: output,
-              });
-            }
-            if (tc.function?.name !== undefined && state.name.length === 0) {
-              state.name = tc.function.name;
-              const block = output.content[state.contentIndex];
-              if (block?.type === 'toolCall') block.name = state.name;
-            }
-            const argDelta = tc.function?.arguments;
-            if (argDelta !== undefined && argDelta.length > 0) {
-              state.argStr += argDelta;
-              const block = output.content[state.contentIndex];
-              if (block?.type === 'toolCall') {
-                try {
-                  block.arguments = JSON.parse(state.argStr) as Record<string, unknown>;
-                } catch {
-                  // partial JSON; finalized at toolcall_end
-                }
+            // Prefill progress: emitted during prompt ingestion (before the first
+            // token), typically on a frame with an empty `choices` array. Observe
+            // it here — ahead of the per-choice delta logic below, which `continue`s
+            // past choice-less frames — and hand it to the host's "Processing N%"
+            // seam.
+            if (chunk.prompt_progress !== undefined) {
+              const pp = chunk.prompt_progress;
+              if (!kvLogged && (pp.total ?? 0) > 0) {
+                kvLogged = true;
+                const total = pp.total ?? 0;
+                const reused = pp.cache ?? 0;
+                const pctReused = total > 0 ? Math.round((reused / total) * 100) : 0;
+                // Fingerprint the cached PREFIX so a churn is visible: the tool count
+                // + system-prompt length are what the chat template renders BEFORE the
+                // messages. A follow-up with the SAME fingerprint but LOW reuse means
+                // the prefix moved for another reason; a CHANGED fingerprint (tools/
+                // sys grew or shrank) is the churn itself. Healthy follow-up = high
+                // reuse% + unchanged fingerprint (the user: "view actual context changes").
+                const nTools = context.tools?.length ?? 0;
+                const sysLen = context.systemPrompt?.length ?? 0;
+                // eslint-disable-next-line no-console
+                console.log(
+                  `[pi-kv] context=${total} tok · reused=${reused} (${pctReused}%) · new=${Math.max(0, total - reused)} · prefix{tools=${nTools} sys=${sysLen}ch}`,
+                );
               }
+              const fraction = promptProgressFraction(pp);
+              deps.onPromptProgress?.({
+                processed: pp.processed ?? 0,
+                total: pp.total ?? 0,
+                fraction,
+              });
+              // The LIVE (harness-provided) sink — the harness has the per-turn ctx
+              // to publish `harness-prefill` for the desktop ring, which the static
+              // provider deps can't reach. Best-effort; absent off-harness.
+              deps.repairProvider?.()?.onPromptProgress?.(fraction);
+            }
+
+            const choice = chunk.choices?.[0];
+            if (choice === undefined) continue;
+            const delta = choice.delta;
+            if (
+              (delta?.content != null && delta.content.length > 0) ||
+              (delta?.reasoning_content != null && delta.reasoning_content.length > 0) ||
+              (delta?.tool_calls?.length ?? 0) > 0
+            ) {
+              liveTps.tick();
+            }
+
+            if (delta?.reasoning_content != null && delta.reasoning_content.length > 0) {
+              if (thinkingIndex === undefined) {
+                output.content.push({ type: 'thinking', thinking: '' });
+                thinkingIndex = output.content.length - 1;
+                stream.push({
+                  type: 'thinking_start',
+                  contentIndex: thinkingIndex,
+                  partial: output,
+                });
+              }
+              const block = output.content[thinkingIndex];
+              if (block?.type === 'thinking') block.thinking += delta.reasoning_content;
               stream.push({
-                type: 'toolcall_delta',
-                contentIndex: state.contentIndex,
-                delta: argDelta,
+                type: 'thinking_delta',
+                contentIndex: thinkingIndex,
+                delta: delta.reasoning_content,
                 partial: output,
               });
             }
-          }
 
-          if (choice.finish_reason != null) finishReason = mapFinishReason(choice.finish_reason);
+            if (delta?.content != null && delta.content.length > 0) {
+              if (textIndex === undefined) {
+                output.content.push({ type: 'text', text: '' });
+                textIndex = output.content.length - 1;
+                stream.push({ type: 'text_start', contentIndex: textIndex, partial: output });
+              }
+              const block = output.content[textIndex];
+              if (block?.type === 'text') block.text += delta.content;
+              stream.push({
+                type: 'text_delta',
+                contentIndex: textIndex,
+                delta: delta.content,
+                partial: output,
+              });
+            }
+
+            for (const tc of delta?.tool_calls ?? []) {
+              const key = tc.index ?? toolStates.size;
+              let state = toolStates.get(key);
+              if (state === undefined) {
+                const block: ToolCall = {
+                  type: 'toolCall',
+                  id: tc.id ?? `call_${key}`,
+                  name: tc.function?.name ?? '',
+                  arguments: {},
+                };
+                output.content.push(block);
+                state = {
+                  contentIndex: output.content.length - 1,
+                  id: block.id,
+                  name: block.name,
+                  argStr: '',
+                };
+                toolStates.set(key, state);
+                stream.push({
+                  type: 'toolcall_start',
+                  contentIndex: state.contentIndex,
+                  partial: output,
+                });
+              }
+              if (tc.function?.name !== undefined && state.name.length === 0) {
+                state.name = tc.function.name;
+                const block = output.content[state.contentIndex];
+                if (block?.type === 'toolCall') block.name = state.name;
+              }
+              const argDelta = tc.function?.arguments;
+              if (argDelta !== undefined && argDelta.length > 0) {
+                state.argStr += argDelta;
+                const block = output.content[state.contentIndex];
+                if (block?.type === 'toolCall') {
+                  try {
+                    block.arguments = JSON.parse(state.argStr) as Record<string, unknown>;
+                  } catch {
+                    // partial JSON; finalized at toolcall_end
+                  }
+                }
+                stream.push({
+                  type: 'toolcall_delta',
+                  contentIndex: state.contentIndex,
+                  delta: argDelta,
+                  partial: output,
+                });
+              }
+            }
+
+            if (choice.finish_reason != null) finishReason = mapFinishReason(choice.finish_reason);
+          }
+        } finally {
+          liveTps.end();
         }
 
         // --- finalize blocks ------------------------------------------------

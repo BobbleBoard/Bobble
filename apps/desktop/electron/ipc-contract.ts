@@ -334,13 +334,70 @@ export interface LlmStatus {
    * text is what to show for it.
    */
   parked?: string;
+  /**
+   * How the running server was launched: which engine and which speculative
+   * method. Absent while nothing is up. `provider` is the models.json key the
+   * server was registered under — `llamacpp` for llama-server, `mlx` for every
+   * OpenAI-compatible engine (they all bind to the mlx-stream provider) — so
+   * the renderer points pi at the right block after a swap.
+   */
+  profile?: { engine: string; spec: string };
+  provider?: 'llamacpp' | 'mlx';
+  /** A calibration is running: the server is being swapped in and out. */
+  calibrating?: boolean;
   error?: string;
 }
 
-/** A speed variant a model can launch with (MTP / EAGLE3 / DFlash), surfaced for
- * the model-manager variant dropdown. */
+/** One measured (engine, method), as the menu shows it. */
+export interface LlmCalibrationRow {
+  id: string;
+  engine: string;
+  spec: string;
+  ok: boolean;
+  error?: string;
+  prefillTps: number;
+  decodeTps: number;
+  ttftMs: number;
+  startupMs: number;
+  /** Relative to llama.cpp plain (1.0 = the same). */
+  score: number;
+}
+
+/** A calibration's verdict, persisted per model on this machine. */
+export interface LlmCalibrationRecord {
+  modelId: string;
+  quant: string;
+  hardwareKey: string;
+  engineBuild: string;
+  at: string;
+  ranked: LlmCalibrationRow[];
+  skips: Array<{ id: string; engine: string; spec: string; reason: string }>;
+  chosen: { engine: string; spec: string } | null;
+}
+
+export type LlmCalibrationProgress =
+  | {
+      stage: 'planned';
+      candidates: Array<{ id: string; engine: string; spec: string; label: string }>;
+      skips: Array<{ id: string; engine: string; spec: string; label: string; reason: string }>;
+    }
+  | { stage: 'starting'; id: string; index: number; total: number }
+  | { stage: 'measuring'; id: string; index: number; total: number }
+  | {
+      stage: 'result';
+      result: Omit<LlmCalibrationRow, 'score' | 'engine' | 'spec'>;
+      index: number;
+      total: number;
+    }
+  | { stage: 'switching'; chosen: { engine: string; spec: string } }
+  | { stage: 'done'; record: LlmCalibrationRecord }
+  | { stage: 'cancelled' }
+  | { stage: 'failed'; error: string };
+
+/** A speed variant a model can launch with (MTP / EAGLE3 / DFlash / DSpark),
+ * surfaced for the model-manager variant dropdown. */
 export interface LlmSpecVariant {
-  method: 'mtp' | 'eagle3' | 'dflash';
+  method: 'mtp' | 'eagle3' | 'dflash' | 'dspark';
   /** HF repo the draft GGUF lives in (EAGLE3/DFlash), when separate. */
   draftRepo?: string;
   /** True when the head is embedded in the main GGUF (no separate draft). */
@@ -358,7 +415,7 @@ export interface LlmCatalogEntry {
   /** Multi-token-prediction speedup (embedded head or sibling file). */
   mtp: boolean;
   /** DEFAULT speculative-decoding speed method this entry launches with, if any. */
-  spec?: 'mtp' | 'eagle3' | 'dflash';
+  spec?: 'mtp' | 'eagle3' | 'dflash' | 'dspark';
   /** All speed variants available (for the [MTP / EAGLE3 / DFlash] dropdown). */
   variants?: LlmSpecVariant[];
   vision: boolean;
@@ -434,7 +491,7 @@ export interface LlmSimplePick {
   quant: string;
   launchMode: 'fast-text' | 'multimodal';
   /** Speed method this pick runs with (fast-text picks only). */
-  spec?: 'mtp' | 'eagle3' | 'dflash';
+  spec?: 'mtp' | 'eagle3' | 'dflash' | 'dspark';
   vision: boolean;
 }
 
@@ -445,7 +502,7 @@ export interface LlmTierPick {
   displayName: string;
   quant: string;
   launchMode: 'fast-text' | 'multimodal';
-  spec?: 'mtp' | 'eagle3' | 'dflash';
+  spec?: 'mtp' | 'eagle3' | 'dflash' | 'dspark';
   vision: boolean;
   /** Download size in bytes (0 = unverified) for the "N GB" auto-download copy. */
   bytes: number;
@@ -507,6 +564,25 @@ export type LlmInvokeMap = {
     response: { success: boolean; baseUrl?: string; error?: string };
   };
   'llm:stop-server': { request: undefined; response: { success: boolean } };
+  /**
+   * Measure every engine + speculative method that can run the model from
+   * what is on disk, keep the verdict, and come back up on the winner.
+   * Progress arrives as `llm:calibration` events; the reply is the record.
+   */
+  'llm:calibrate': {
+    request: { modelId?: string; quant?: string };
+    response: { ok: boolean; error?: string; record?: LlmCalibrationRecord };
+  };
+  'llm:calibrate-cancel': { request: undefined; response: { ok: boolean } };
+  'llm:calibration-record': {
+    request: { modelId: string; quant?: string };
+    response: { record: LlmCalibrationRecord | null };
+  };
+  /** Relaunch the running model on an engine + method the user picked. */
+  'llm:use-profile': {
+    request: { engine: string; spec: string };
+    response: { success: boolean; error?: string };
+  };
 };
 
 // ---------------------------------------------------------------------------
@@ -531,12 +607,22 @@ export type EngineInvokeMap = {
   'engines:list': { request: undefined; response: { engines: EngineState[] } };
   'engines:install': { request: { id: string }; response: { success: boolean; error?: string } };
   'engines:uninstall': { request: { id: string }; response: { success: boolean; error?: string } };
+  /**
+   * Install whichever of these are missing, one after another. The renderer
+   * decides the set (engine-catalog `defaultEngineSet`, per platform); main
+   * does the installing and reports what landed and what did not.
+   */
+  'engines:ensure': {
+    request: { ids: string[] };
+    response: { installed: string[]; failed: Array<{ id: string; error: string }> };
+  };
 };
 
 export const ENGINE_INVOKE_CHANNELS = [
   'engines:list',
   'engines:install',
   'engines:uninstall',
+  'engines:ensure',
 ] as const satisfies readonly (keyof EngineInvokeMap)[];
 
 /** What we found on this machine for one coding harness. */
@@ -648,6 +734,10 @@ export const LLM_INVOKE_CHANNELS = [
   'llm:verify-model',
   'llm:start-server',
   'llm:stop-server',
+  'llm:calibrate',
+  'llm:calibrate-cancel',
+  'llm:calibration-record',
+  'llm:use-profile',
 ] as const satisfies readonly (keyof LlmInvokeMap)[];
 
 // ---------------------------------------------------------------------------
@@ -971,6 +1061,11 @@ export type AppEventMap = {
   'app:notification-click': { sessionFile: string };
   /** Inference supervisor state (server/model/TPS) for the composer footer. */
   'llm:status': LlmStatus;
+  /**
+   * One step of a running calibration, for the engine menu: the plan, each
+   * candidate starting / measuring / measured, the switch, the verdict.
+   */
+  'llm:calibration': LlmCalibrationProgress;
   /**
    * A tool produced an image the running (text-only) server cannot read, so the
    * renderer should switch vision on.

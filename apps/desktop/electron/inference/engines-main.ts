@@ -26,10 +26,11 @@ import path from 'node:path';
 import { cacheRoot } from '@pi-desktop/inference';
 import type { EngineState } from '../ipc-contract';
 import { COMFY_H3_SHIM_DIRNAME, COMFY_H3_SHIM_PY } from './comfy-h3-shim';
+import { engineInstalled, mlxVenvRoot, vllmVenvRoot } from './engine-paths';
 
 /** Where the managed Python venv for the MLX engines lives. */
 function pyRoot(): string {
-  return path.join(cacheRoot(), 'engines', 'mlx-venv');
+  return mlxVenvRoot();
 }
 
 /** ComfyUI's checkout, and the venv that runs it. */
@@ -49,6 +50,11 @@ export function comfyModelPathsYaml(): string {
 
 function llamaRoot(): string {
   return path.join(cacheRoot(), 'llamacpp');
+}
+
+/** A NInfer checkout (upstream or the 3090 fork), built in place. */
+function ninferRoot(id: 'ninfer' | 'ninfer-3090'): string {
+  return path.join(cacheRoot(), 'engines', id);
 }
 
 /** Recursive size, capped in effort — this is for a UI chip, not accounting. */
@@ -283,7 +289,7 @@ const OPS: Record<string, EngineOps> = {
     },
   },
   'rapid-mlx': {
-    installed: () => venvHasPackage('rapid_mlx'),
+    installed: () => engineInstalled('rapid-mlx') || venvHasPackage('rapid_mlx'),
     bytes: () => (existsSync(pyRoot()) ? dirBytes(pyRoot()) : undefined),
     install: async () => {
       const uv = await ensureVenv();
@@ -350,7 +356,7 @@ const OPS: Record<string, EngineOps> = {
     },
   },
   'dflash-mlx': {
-    installed: () => venvHasPackage('dflash_mlx'),
+    installed: () => engineInstalled('dflash-mlx') || venvHasPackage('dflash_mlx'),
     // The package is trivial; the drafter is the cost, and it is downloaded on
     // first use into the HF cache rather than here.
     bytes: () => undefined,
@@ -364,6 +370,178 @@ const OPS: Record<string, EngineOps> = {
       await run(uv, ['pip', 'uninstall', '--python', pyRoot(), 'dflash-mlx']).catch(
         () => undefined,
       );
+    },
+  },
+  /*
+   * MLX-DSPARK: the DSpark / DFlash / lookup speculative server for MLX. One pip
+   * package; the drafters it needs are fetched with the model (model-downloader),
+   * never here, so calibration has them without a network.
+   */
+  'mlx-dspark': {
+    installed: () => engineInstalled('mlx-dspark'),
+    bytes: () => undefined,
+    install: async () => {
+      const uv = await ensureVenv();
+      await run(uv, ['pip', 'install', '--python', pyRoot(), 'mlx-dspark']);
+    },
+    uninstall: async () => {
+      const uv = uvPath();
+      if (uv === null) return;
+      await run(uv, ['pip', 'uninstall', '--python', pyRoot(), 'mlx-dspark']).catch(
+        () => undefined,
+      );
+    },
+  },
+  /*
+   * OMLX is not on PyPI — `pip install omlx` resolves to nothing — so it is
+   * installed from its source repository. Same venv, so it shares the MLX
+   * runtime the others already paid for.
+   */
+  omlx: {
+    installed: () => engineInstalled('omlx'),
+    bytes: () => undefined,
+    install: async () => {
+      const uv = await ensureVenv();
+      await run(
+        uv,
+        ['pip', 'install', '--python', pyRoot(), 'omlx @ git+https://github.com/jundot/omlx'],
+        30 * 60_000,
+      );
+    },
+    uninstall: async () => {
+      const uv = uvPath();
+      if (uv === null) return;
+      await run(uv, ['pip', 'uninstall', '--python', pyRoot(), 'omlx']).catch(() => undefined);
+    },
+  },
+  /*
+   * MLX-LM arrives as a dependency of rapid-mlx; its `mlx_lm.server` is the
+   * plain reference server calibration measures as the MLX floor. Reported,
+   * never installed on its own.
+   */
+  'mlx-lm': {
+    installed: () => engineInstalled('mlx-lm'),
+    bytes: () => undefined,
+    install: async () => {
+      const uv = await ensureVenv();
+      await run(uv, ['pip', 'install', '--python', pyRoot(), 'mlx-lm']);
+    },
+    uninstall: async () => {
+      const uv = uvPath();
+      if (uv === null) return;
+      await run(uv, ['pip', 'uninstall', '--python', pyRoot(), 'mlx-lm']).catch(() => undefined);
+    },
+  },
+  /*
+   * VLLM (Linux): its own venv, because the CUDA / ROCm wheels are several
+   * gigabytes and nothing else here wants them. `uv` picks the wheel for the
+   * machine's accelerator from the default index.
+   */
+  vllm: {
+    installed: () => engineInstalled('vllm'),
+    bytes: () => (existsSync(vllmVenvRoot()) ? dirBytes(vllmVenvRoot(), 400_000) : undefined),
+    install: async () => {
+      if (process.platform !== 'linux') throw new Error('vLLM runs on Linux only');
+      const uv = uvPath();
+      if (uv === null) throw new Error('uv is required to install vLLM and was not found');
+      if (!existsSync(vllmVenvRoot())) await run(uv, ['venv', vllmVenvRoot(), '--python', '3.12']);
+      await run(uv, ['pip', 'install', '--python', vllmVenvRoot(), 'vllm'], 60 * 60_000);
+    },
+    uninstall: async () => {
+      rmSync(vllmVenvRoot(), { recursive: true, force: true });
+    },
+  },
+  /*
+   * NINFER (RTX 5090, Linux) and its RTX 3090 port: C++/CUDA engines with no
+   * wheel and no install target — "run NInfer from its source build tree". So
+   * the install IS the clone and the cmake build, under the app cache like
+   * everything else, and the panel reports the compiler's last lines when the
+   * box lacks CUDA 13.1 / 12.8, Ninja or a C++20 compiler. The catalogue keeps
+   * both rows off every other card (engine-catalog `requiresGpu`); this only
+   * refuses the platform it cannot build on. Not exercised on a 5090 here —
+   * the build recipe is the upstream README's, verbatim.
+   */
+  ninfer: {
+    installed: () => existsSync(path.join(ninferRoot('ninfer'), 'build', 'apps', 'ninfer-serve')),
+    bytes: () =>
+      existsSync(ninferRoot('ninfer')) ? dirBytes(ninferRoot('ninfer'), 200_000) : undefined,
+    install: async () => {
+      if (process.platform !== 'linux') throw new Error('NInfer builds on Linux only');
+      const root = ninferRoot('ninfer');
+      if (!existsSync(path.join(root, 'CMakeLists.txt'))) {
+        rmSync(root, { recursive: true, force: true });
+        await run(
+          'git',
+          ['clone', '--depth', '1', 'https://github.com/Neroued/ninfer.git', root],
+          20 * 60_000,
+        );
+      }
+      await run(
+        'cmake',
+        ['-S', root, '-B', path.join(root, 'build'), '-G', 'Ninja', '-DCMAKE_BUILD_TYPE=Release'],
+        20 * 60_000,
+      );
+      await run('cmake', ['--build', path.join(root, 'build'), '-j'], 90 * 60_000);
+    },
+    uninstall: async () => {
+      rmSync(ninferRoot('ninfer'), { recursive: true, force: true });
+    },
+  },
+  'ninfer-3090': {
+    installed: () =>
+      existsSync(path.join(ninferRoot('ninfer-3090'), 'build-sm86', 'apps', 'ninfer-serve')),
+    bytes: () =>
+      existsSync(ninferRoot('ninfer-3090'))
+        ? dirBytes(ninferRoot('ninfer-3090'), 200_000)
+        : undefined,
+    install: async () => {
+      if (process.platform !== 'linux') {
+        throw new Error(
+          'On Windows, NInfer 3090 ships as a zip: github.com/Don-Chad/ninfer-3090/releases',
+        );
+      }
+      const root = ninferRoot('ninfer-3090');
+      if (!existsSync(path.join(root, 'CMakeLists.txt'))) {
+        rmSync(root, { recursive: true, force: true });
+        await run(
+          'git',
+          [
+            'clone',
+            '--depth',
+            '1',
+            '--branch',
+            'release/v0.6.0-rtx3090',
+            'https://github.com/Don-Chad/ninfer-3090.git',
+            root,
+          ],
+          20 * 60_000,
+        );
+      }
+      await run(
+        'cmake',
+        [
+          '-S',
+          root,
+          '-B',
+          path.join(root, 'build-sm86'),
+          '-G',
+          'Ninja',
+          '-DCMAKE_BUILD_TYPE=Release',
+          '-DCMAKE_CUDA_ARCHITECTURES=86',
+          '-DNINFER_BUILD_APPS=ON',
+          '-DBUILD_TESTING=OFF',
+          '-DNINFER_BUILD_BENCHMARKS=OFF',
+        ],
+        20 * 60_000,
+      );
+      await run(
+        'cmake',
+        ['--build', path.join(root, 'build-sm86'), '--parallel', '2'],
+        120 * 60_000,
+      );
+    },
+    uninstall: async () => {
+      rmSync(ninferRoot('ninfer-3090'), { recursive: true, force: true });
     },
   },
 };
@@ -426,4 +604,43 @@ export async function uninstallEngine(id: string): Promise<{ success: boolean; e
   } finally {
     busy.delete(id);
   }
+}
+
+/**
+ * Install whatever of a set is missing, one at a time.
+ *
+ * the user: "download a few generally good engines at the start of downloading the
+ * app eg. if on apple silicon mac, omlx rapidmlx and dflashmlx (always llamacpp
+ * also, on any machine we always have llamacpp first and foremost), on some
+ * other machines like big linux boxes, vllm would be part of this set."
+ *
+ * WHICH engines is the catalogue's call (settings/engine-catalog.ts
+ * `defaultEngineSet`, per platform); this is only the doing. llama.cpp is never
+ * in the set because the model launch path fetches it, and a second fetcher
+ * here would be a second opinion on which build is current. Never throws — a
+ * machine without uv, or offline, stays as it is and the Engines panel says so
+ * per row. `onChange` fires after every row settles so a menu can redraw.
+ */
+export async function ensureEngines(
+  ids: readonly string[],
+  onChange?: () => void,
+): Promise<{ installed: string[]; failed: Array<{ id: string; error: string }> }> {
+  const installed: string[] = [];
+  const failed: Array<{ id: string; error: string }> = [];
+  for (const id of ids) {
+    const ops = OPS[id];
+    if (ops === undefined) continue;
+    let present = false;
+    try {
+      present = ops.installed();
+    } catch {
+      present = false;
+    }
+    if (present) continue;
+    const res = await installEngine(id);
+    if (res.success) installed.push(id);
+    else failed.push({ id, error: res.error ?? 'install failed' });
+    onChange?.();
+  }
+  return { installed, failed };
 }

@@ -69,7 +69,7 @@ export interface CatalogFile {
  * All three run on stock upstream llama.cpp (`draft-mtp` / `draft-eagle3` /
  * `draft-dflash`); DFlash landed upstream 2026-06-28 (b9831+), no fork.
  */
-export type SpecMethod = 'mtp' | 'eagle3' | 'dflash';
+export type SpecMethod = 'mtp' | 'eagle3' | 'dflash' | 'dspark';
 
 /** One speed variant a model can launch with (surfaced in the manager's
  * [MTP / EAGLE3 / DFlash] variant dropdown). */
@@ -279,6 +279,16 @@ export interface CatalogModel {
    * speed options a model supports (what the manager's variant dropdown offers).
    */
   readonly spec?: SpecMethod;
+  /**
+   * THE MLX TWIN: the same model as MLX weights (an `mlx-community` quant),
+   * which is what the MLX engines — mlx-lm, rapid-mlx, DFlash, mlx-dspark,
+   * oMLX — load. Fetched beside the GGUF on Apple Silicon so a calibration can
+   * compare engines with no network at all (the user: "ensure this doesn't
+   * require internet to run the calibration").
+   */
+  readonly mlxRepo?: string;
+  /** MLX drafters for the twin, by method (z-lab DFlash adapters, DSpark heads). */
+  readonly mlxDrafts?: readonly { readonly method: SpecMethod; readonly repo: string }[];
   /** HF repo the (EAGLE-3) draft lives in, when different from {@link hfRepo}. */
   readonly draftRepo?: string;
   /** EAGLE-3/DFlash draft GGUF (paired via `--model-draft`); undefined for MTP. */
@@ -338,6 +348,7 @@ export interface CatalogModel {
 export const GEMMA4_E2B: CatalogModel = {
   id: 'gemma-4-e2b-it',
   displayName: 'Gemma 4 E2B Instruct',
+  mlxRepo: 'mlx-community/gemma-4-e2b-it-4bit',
   hfRepo: 'unsloth/gemma-4-E2B-it-GGUF',
   baseRepo: 'google/gemma-4-E2B-it',
   // SUB-12B QUANT POLICY: a model under 12B params never ships a Q4 default — a
@@ -388,6 +399,7 @@ export const GEMMA4_E2B: CatalogModel = {
 const GEMMA4_E4B: CatalogModel = {
   id: 'gemma-4-e4b-it',
   displayName: 'Gemma 4 E4B Instruct',
+  mlxRepo: 'mlx-community/gemma-4-e4b-it-4bit',
   hfRepo: 'unsloth/gemma-4-E4B-it-GGUF',
   baseRepo: 'google/gemma-4-E4B-it',
   // Sub-12B quant policy (see GEMMA4_E2B): Q8_0 default, UD-Q6_K_XL dynamic floor.
@@ -433,6 +445,7 @@ const GEMMA4_E4B: CatalogModel = {
 const GEMMA4_12B: CatalogModel = {
   id: 'gemma-4-12b-it',
   displayName: 'Gemma 4 12B Instruct',
+  mlxRepo: 'mlx-community/gemma-4-12B-it-4bit',
   hfRepo: 'unsloth/gemma-4-12b-it-GGUF',
   baseRepo: 'google/gemma-4-12b-it',
   files: [
@@ -465,7 +478,12 @@ const GEMMA4_12B: CatalogModel = {
   // MTP sibling + a late-June DFlash draft (upstream draft-dflash).
   variants: [
     { method: 'mtp' },
-    { method: 'dflash', draftRepo: 'williamliao/gemma-4-12B-it-DFlash-GGUF' },
+    {
+      method: 'dflash',
+      draftRepo: 'williamliao/gemma-4-12B-it-DFlash-GGUF',
+      // Q8_0 of the draft: sized on HF 2026-09-12; fetched beside the model.
+      draftModel: { name: 'gemma-4-12B-it-DFlash-Q8_0.gguf', bytes: 788_889_376, quant: 'Q8_0' },
+    },
   ],
   license: 'Gemma',
   minRamGB: 16,
@@ -482,6 +500,8 @@ const GEMMA4_12B: CatalogModel = {
 const GEMMA4_26B_A4B: CatalogModel = {
   id: 'gemma-4-26b-a4b-it',
   displayName: 'Gemma 4 26B-A4B Instruct',
+  mlxRepo: 'mlx-community/gemma-4-26b-a4b-it-4bit',
+  mlxDrafts: [{ method: 'dflash', repo: 'z-lab/gemma-4-26B-A4B-it-DFlash' }],
   hfRepo: 'unsloth/gemma-4-26B-A4B-it-GGUF',
   baseRepo: 'google/gemma-4-26B-A4B-it',
   // Repo ships only UD-quants at the Q4/Q6 tiers (no plain Q4_K_M/Q6_K).
@@ -518,7 +538,20 @@ const GEMMA4_26B_A4B: CatalogModel = {
   variants: [
     { method: 'mtp' },
     { method: 'eagle3', draftRepo: 'RedHatAI/gemma-4-26B-A4B-it-speculator.eagle3' },
-    { method: 'dflash', draftRepo: 'Anbeeld/gemma-4-26B-A4B-it-DFlash-GGUF' },
+    {
+      method: 'dflash',
+      draftRepo: 'Anbeeld/gemma-4-26B-A4B-it-DFlash-GGUF',
+      // Q8_0 of the draft: sized on HF 2026-09-12; fetched beside the model.
+      draftModel: { name: 'gemma4-26b-a4b-it-dflash-Q8_0.gguf', bytes: 472_433_632, quant: 'Q8_0' },
+    },
+    {
+      /* Community-trained DSpark head (makora-ai), converted after llama.cpp
+         #26275 merged; its converter recommends --spec-draft-n-max 5 and
+         measured DFlash still ahead on this MoE — kept as a row for Calibrate. */
+      method: 'dspark',
+      draftRepo: 'williamliao/dspark_gemma4_26b-a4b-it-GGUF',
+      draftModel: { name: 'gemma4_26b-a4b-DSpark-Q8_0.gguf', bytes: 1_297_022_720, quant: 'Q8_0' },
+    },
   ],
   license: 'Gemma',
   minRamGB: 24,
@@ -535,6 +568,8 @@ const GEMMA4_26B_A4B: CatalogModel = {
 const GEMMA4_31B: CatalogModel = {
   id: 'gemma-4-31b-it',
   displayName: 'Gemma 4 31B Instruct',
+  mlxRepo: 'mlx-community/gemma-4-31b-it-4bit',
+  mlxDrafts: [{ method: 'dflash', repo: 'z-lab/gemma-4-31B-it-DFlash' }],
   hfRepo: 'unsloth/gemma-4-31B-it-GGUF',
   baseRepo: 'google/gemma-4-31B-it',
   files: [
@@ -567,7 +602,20 @@ const GEMMA4_31B: CatalogModel = {
   variants: [
     { method: 'mtp' },
     { method: 'eagle3', draftRepo: 'RedHatAI/gemma-4-31B-it-speculator.eagle3' },
-    { method: 'dflash', draftRepo: 'williamliao/gemma-4-31B-it-DFlash-GGUF' },
+    {
+      method: 'dflash',
+      draftRepo: 'williamliao/gemma-4-31B-it-DFlash-GGUF',
+      // Q8_0 of the draft: sized on HF 2026-09-12; fetched beside the model.
+      draftModel: { name: 'gemma-4-31B-it-DFlash-Q8_0.gguf', bytes: 1_647_943_744, quant: 'Q8_0' },
+    },
+    {
+      /* RedHat's official DSpark speculator; williamliao's llama.cpp bench on
+         this model: DSpark n=3 1.70× vs DFlash 1.65× vs the native MTP head
+         2.13×. 4.5 GB — the largest drafter in the catalogue. */
+      method: 'dspark',
+      draftRepo: 'williamliao/dspark_gemma4_31b-it-GGUF',
+      draftModel: { name: 'gemma-4-31B-it-dspark-Q8_0.gguf', bytes: 4_474_371_872, quant: 'Q8_0' },
+    },
   ],
   license: 'Gemma',
   minRamGB: 24,
@@ -652,6 +700,15 @@ const QWEN35_2B_MTP: CatalogModel = {
 const QWEN35_4B_MTP: CatalogModel = {
   id: 'qwen3.5-4b-mtp',
   displayName: 'Qwen3.5 4B (MTP)',
+  mlxRepo: 'mlx-community/Qwen3.5-4B-MLX-8bit',
+  /* The MTP head is a SIDECAR on MLX: mlx-community's trunk conversions drop
+     the `mtp.*` tensors (MEASURED: rapid-mlx refuses MTP on the twin alone),
+     and publish them as a ~240 MB repo of their own. bf16 beside an 8-bit
+     trunk; rapid-mlx handles the precision difference. */
+  mlxDrafts: [
+    { method: 'dflash', repo: 'z-lab/Qwen3.5-4B-DFlash' },
+    { method: 'mtp', repo: 'mlx-community/Qwen3.5-4B-MTP-bf16' },
+  ],
   hfRepo: 'unsloth/Qwen3.5-4B-MTP-GGUF',
   baseRepo: 'Qwen/Qwen3.5-4B',
   // Sub-12B quant policy (see GEMMA4_E2B): Q8_0 (~4.3GB) is the DEFAULT worker
@@ -681,7 +738,12 @@ const QWEN35_4B_MTP: CatalogModel = {
   // Smallest DFlash target in-family is 4B (late-June draft).
   variants: [
     { method: 'mtp', embedded: true },
-    { method: 'dflash', draftRepo: 'Anbeeld/Qwen3.5-4B-DFlash-GGUF' },
+    {
+      method: 'dflash',
+      draftRepo: 'Anbeeld/Qwen3.5-4B-DFlash-GGUF',
+      // Q8_0 of the draft: sized on HF 2026-09-12; fetched beside the model.
+      draftModel: { name: 'qwen35-4b-dflash-Q8_0.gguf', bytes: 685_133_504, quant: 'Q8_0' },
+    },
   ],
   license: 'Apache-2.0',
   minRamGB: 6,
@@ -698,6 +760,11 @@ const QWEN35_4B_MTP: CatalogModel = {
 const QWEN35_9B_MTP: CatalogModel = {
   id: 'qwen3.5-9b-mtp',
   displayName: 'Qwen3.5 9B (MTP)',
+  mlxRepo: 'mlx-community/Qwen3.5-9B-MLX-8bit',
+  mlxDrafts: [
+    { method: 'dflash', repo: 'z-lab/Qwen3.5-9B-DFlash' },
+    { method: 'mtp', repo: 'mlx-community/Qwen3.5-9B-MTP-bf16' },
+  ],
   hfRepo: 'unsloth/Qwen3.5-9B-MTP-GGUF',
   // Sub-12B quant policy (see GEMMA4_E2B): Q8_0 default, UD-Q6_K_XL dynamic floor.
   files: [
@@ -733,7 +800,12 @@ const QWEN35_9B_MTP: CatalogModel = {
   spec: 'mtp',
   variants: [
     { method: 'mtp', embedded: true },
-    { method: 'dflash', draftRepo: 'Anbeeld/Qwen3.5-9B-DFlash-GGUF' },
+    {
+      method: 'dflash',
+      draftRepo: 'Anbeeld/Qwen3.5-9B-DFlash-GGUF',
+      // Q8_0 of the draft: sized on HF 2026-09-12; fetched beside the model.
+      draftModel: { name: 'qwen35-9b-dflash-Q8_0.gguf', bytes: 1_383_767_744, quant: 'Q8_0' },
+    },
   ],
   license: 'Apache-2.0',
   minRamGB: 12,
@@ -760,7 +832,18 @@ const QWEN35_122B_A10B_MTP: CatalogModel = {
   mmproj: { name: 'mmproj-F16.gguf', bytes: 0, quant: 'F16' },
   mtpEmbedded: true,
   spec: 'mtp',
-  variants: [{ method: 'mtp', embedded: true }],
+  variants: [
+    { method: 'mtp', embedded: true },
+    {
+      method: 'dflash',
+      draftRepo: 'Anbeeld/Qwen3.5-122B-A10B-DFlash-GGUF',
+      draftModel: {
+        name: 'Qwen3.5-122B-A10B-DFlash-Q8_0.gguf',
+        bytes: 833_339_712,
+        quant: 'Q8_0',
+      },
+    },
+  ],
   license: 'Apache-2.0',
   minRamGB: 80,
   contextWindow: 65_536,
@@ -780,6 +863,11 @@ const QWEN35_122B_A10B_MTP: CatalogModel = {
 const QWEN36_27B_MTP: CatalogModel = {
   id: 'qwen3.6-27b-mtp',
   displayName: 'Qwen3.6 27B (MTP)',
+  mlxRepo: 'mlx-community/Qwen3.6-27B-OptiQ-4bit',
+  mlxDrafts: [
+    { method: 'dflash', repo: 'z-lab/Qwen3.6-27B-DFlash' },
+    { method: 'mtp', repo: 'mlx-community/Qwen3.6-27B-MTP-4bit' },
+  ],
   hfRepo: 'unsloth/Qwen3.6-27B-MTP-GGUF',
   files: [
     {
@@ -802,7 +890,21 @@ const QWEN36_27B_MTP: CatalogModel = {
   variants: [
     { method: 'mtp', embedded: true },
     { method: 'eagle3', draftRepo: 'gelim/Qwen3.6-27B-PRISM-EAGLE3-GGUF' },
-    { method: 'dflash', draftRepo: 'williamliao/qwen3.6-27B-DFlash-GGUF' },
+    {
+      method: 'dflash',
+      draftRepo: 'williamliao/qwen3.6-27B-DFlash-GGUF',
+      // Q8_0 of the draft: sized on HF 2026-09-12; fetched beside the model.
+      draftModel: { name: 'Qwen3.6-27B-DFlash-Q8_0.gguf', bytes: 1_849_481_536, quant: 'Q8_0' },
+    },
+    {
+      /* satgeze's DSpark head (community, the converter's own example checkpoint):
+         measured with llama.cpp at 1.39× on an M3 Max (12.3 → 17.2 tok/s) and
+         2.5–2.7× on an RTX Pro 6000. BF16, 3.7 GB — Calibrate decides whether it
+         earns its place against the embedded MTP head here. */
+      method: 'dspark',
+      draftRepo: 'satgeze/Qwen3.6-27B-DSpark',
+      draftModel: { name: 'Qwen3.6-27B-DSpark.gguf', bytes: 3_725_787_840, quant: 'BF16' },
+    },
   ],
   license: 'Apache-2.0',
   minRamGB: 24,
@@ -850,6 +952,15 @@ const QWEN36_27B_MTP: CatalogModel = {
 const QWEN38_27B_MTP: CatalogModel = {
   id: 'qwen3.8-27b-mtp',
   displayName: 'Qwen3.8 27B (MTP)',
+  /* The 4-bit MLX twin is what a 24 GB Mac can hold beside a KV cache; its
+     MTP head is the matching 4-bit sidecar, and the DFlash2 head is z-lab's
+     own (the user: "https://huggingface.co/z-lab/Qwen3.8-27B-DFlash2"). Whether
+     DFlash2 beats MTP on this hybrid architecture is Calibrate's to say. */
+  mlxRepo: 'mlx-community/Qwen3.8-27B-4bit',
+  mlxDrafts: [
+    { method: 'mtp', repo: 'mlx-community/Qwen3.8-27B-MTP-4bit' },
+    { method: 'dflash', repo: 'z-lab/Qwen3.8-27B-DFlash2' },
+  ],
   hfRepo: 'unsloth/Qwen3.8-27B-GGUF',
   baseRepo: 'froggeric/Qwen-Fixed-Chat-Templates',
   files: [
@@ -900,10 +1011,34 @@ const QWEN38_27B_MTP: CatalogModel = {
    * they are unaffected.
    */
   specDisabled: true,
-  /* MTP only. The DSpark / DFlash / EAGLE-3 repos that exist for this model are
-     community re-uploads in non-GGUF formats today; naming one here would
-     advertise a launch that cannot resolve. */
-  variants: [{ method: 'mtp', embedded: true }],
+  /*
+   * THE DRAFTERS FOR THIS MODEL, 2026-09-12 (research sweep, every repo
+   * verified with the hub API):
+   *   - DFlash2: z-lab's OWN GGUF (z-lab/Qwen3.8-27B-DFlash2-GGUF, 593k
+   *     downloads). llama.cpp has no separate spec-type for DFlash2 — `draft-
+   *     dflash` flips into DFlash2 mode when the GGUF carries
+   *     `dflash.selector_top_k > 0` (merged 2026-08-27).
+   *   - DSpark: only Anbeeld's conversion (2026-09-06) is of the CURRENT
+   *     RadixArk v2 head; the magnitudedev / erlidev GGUFs are stale v1 exports
+   *     (40 heads, ff 10240) and load nothing useful.
+   *   - EAGLE-3: none exists for Qwen3.8 anywhere.
+   * The measured head-to-head (SGLang, H200, one stream): MTP 2.2–2.6×, DSpark
+   * 2.0–3.2×, DFlash2 2.7–3.4× — and on this Mac, MTP was a LOSS (above). Which
+   * of the three pays on Metal is exactly what Calibrate is for.
+   */
+  variants: [
+    { method: 'mtp', embedded: true },
+    {
+      method: 'dflash',
+      draftRepo: 'z-lab/Qwen3.8-27B-DFlash2-GGUF',
+      draftModel: { name: 'Qwen3.8-27B-DFlash2-Q8_0.gguf', bytes: 2_056_414_816, quant: 'Q8_0' },
+    },
+    {
+      method: 'dspark',
+      draftRepo: 'Anbeeld/Qwen3.8-27B-DSpark-GGUF',
+      draftModel: { name: 'Qwen3.8-27B-DSpark-Q8_0.gguf', bytes: 1_984_580_288, quant: 'Q8_0' },
+    },
+  ],
   license: 'Apache-2.0',
   minRamGB: 24,
   /* The model allows 256k. This is what a 24 GB machine can actually hold, and
@@ -920,6 +1055,11 @@ const QWEN38_27B_MTP: CatalogModel = {
 const QWEN36_35B_A3B_MTP: CatalogModel = {
   id: 'qwen3.6-35b-a3b-mtp',
   displayName: 'Qwen3.6 35B-A3B (MTP)',
+  mlxRepo: 'mlx-community/Qwen3.6-35B-A3B-4bit',
+  mlxDrafts: [
+    { method: 'dflash', repo: 'z-lab/Qwen3.6-35B-A3B-DFlash' },
+    { method: 'mtp', repo: 'mlx-community/Qwen3.6-35B-A3B-MTP-4bit' },
+  ],
   hfRepo: 'unsloth/Qwen3.6-35B-A3B-MTP-GGUF',
   // Repo ships only UD-quants; plain Q4_K_M/Q6_K do not exist. UD-Q4_K_M is the
   // Q4-class pick, UD-Q6_K the Q6-class pick.
@@ -943,7 +1083,24 @@ const QWEN36_35B_A3B_MTP: CatalogModel = {
   // DFlash on a quantized MoE target can regress on weak GPUs (#25117) — MTP safe.
   variants: [
     { method: 'mtp', embedded: true },
-    { method: 'dflash', draftRepo: 'Anbeeld/Qwen3.6-35B-A3B-DFlash-GGUF' },
+    {
+      method: 'dflash',
+      draftRepo: 'Anbeeld/Qwen3.6-35B-A3B-DFlash-GGUF',
+      // Q8_0 of the draft: sized on HF 2026-09-12; fetched beside the model.
+      draftModel: { name: 'qwen36-35b-a3b-dflash-Q8_0.gguf', bytes: 421_060_320, quant: 'Q8_0' },
+    },
+    {
+      /* RedHat's official DSpark speculator (llama.cpp reads the speculators
+         format since #26275); no published llama.cpp number for it — measured
+         here by Calibrate, never assumed. */
+      method: 'dspark',
+      draftRepo: 'adriabama06/Qwen3.6-35B-A3B-speculator.dspark-GGUF',
+      draftModel: {
+        name: 'Qwen3.6-35B-A3B-DSpark-Q8_0.gguf',
+        bytes: 1_020_631_456,
+        quant: 'Q8_0',
+      },
+    },
   ],
   license: 'Apache-2.0',
   minRamGB: 28,
@@ -1002,7 +1159,12 @@ const QWEN36_27B_EAGLE3: CatalogModel = {
         sha256: '296550cca35276756a7f8c45787f0a21d53f769ea13cea4ff25e5346d75a512c',
       },
     },
-    { method: 'dflash', draftRepo: 'williamliao/qwen3.6-27B-DFlash-GGUF' },
+    {
+      method: 'dflash',
+      draftRepo: 'williamliao/qwen3.6-27B-DFlash-GGUF',
+      // Q8_0 of the draft: sized on HF 2026-09-12; fetched beside the model.
+      draftModel: { name: 'Qwen3.6-27B-DFlash-Q8_0.gguf', bytes: 1_849_481_536, quant: 'Q8_0' },
+    },
   ],
   license: 'Apache-2.0',
   minRamGB: 24,
@@ -1223,6 +1385,8 @@ export const K2_HORIZON_0_9B: CatalogModel = {
 const MINICPM5_2B: CatalogModel = {
   id: 'minicpm5-2b',
   displayName: 'MiniCPM5 2B',
+  mlxRepo: 'mlx-community/MiniCPM5-2B-8bit',
+  mlxDrafts: [{ method: 'dspark', repo: 'openbmb/MiniCPM5-2B-DSpark' }],
   hfRepo: 'openbmb/MiniCPM5-2B-GGUF',
   files: [
     {
@@ -1230,6 +1394,19 @@ const MINICPM5_2B: CatalogModel = {
       bytes: 2_679_710_688,
       quant: 'Q8_0',
       sha256: 'c5415f8989bf88a8288f1b55a3cc371af53c07b0faa220a63bd7a990cfaba078',
+    },
+  ],
+  /* openbmb's OWN DSpark head as a GGUF (2026-09-09); their card launches it
+     with `--spec-type draft-dspark --spec-draft-n-max 7`, and a community
+     measurement on a 3090 is 1.66×. DSpark is CUDA-first upstream — the user:
+     "dspark is a cuda first … but improvement over dflash" — so on Metal it
+     is measured, not presumed. */
+  spec: 'dspark',
+  variants: [
+    {
+      method: 'dspark',
+      draftRepo: 'openbmb/MiniCPM5-2B-DSpark-GGUF',
+      draftModel: { name: 'MiniCPM5-2.6B-DSpark.gguf', bytes: 652_730_240, quant: 'BF16' },
     },
   ],
   license: 'Apache-2.0',

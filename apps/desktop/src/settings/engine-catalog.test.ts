@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 import {
   baselineEngine,
   bestKnownEngine,
+  defaultEngineSet,
   ENGINES,
   type EngineSpec,
   engineSupport,
@@ -96,6 +97,47 @@ describe('what onboarding installs on its own', () => {
   it('falls back to the portable engine where MLX cannot run', () => {
     expect(recommendedEngine(intelMac).id).toBe('llamacpp');
     expect(recommendedEngine(windows).id).toBe('llamacpp');
+  });
+
+  it('offers NInfer only to the card it was built for, and names the card otherwise', () => {
+    const ninfer = byId('ninfer');
+    const box5090: HostCapabilities = {
+      platform: 'linux',
+      appleSilicon: false,
+      gpu: { vendor: 'nvidia', name: 'NVIDIA GeForce RTX 5090' },
+    };
+    const box4090: HostCapabilities = {
+      ...box5090,
+      gpu: { vendor: 'nvidia', name: 'NVIDIA GeForce RTX 4090' },
+    };
+    expect(engineSupport(ninfer, box5090)).toEqual({ supported: true });
+    expect(engineSupport(ninfer, box4090)).toEqual({
+      supported: false,
+      reason: 'Needs an RTX 5090 (Linux)',
+    });
+    // An unidentified card is not a 5090 either.
+    expect(engineSupport(ninfer, linux).supported).toBe(false);
+    expect(
+      engineSupport(byId('ninfer-3090'), {
+        ...box5090,
+        gpu: { vendor: 'nvidia', name: 'RTX 3090' },
+      }).supported,
+    ).toBe(true);
+    expect(defaultEngineSet(box5090)).toEqual(['vllm', 'ninfer']);
+    expect(defaultEngineSet({ ...box5090, gpu: { vendor: 'nvidia', name: 'RTX 3090' } })).toEqual([
+      'vllm',
+      'ninfer-3090',
+    ]);
+  });
+
+  it('fetches the MLX set on Apple Silicon, vLLM on Linux, nothing extra elsewhere', () => {
+    // the user: "omlx rapidmlx and dflashmlx (always llamacpp also …) on some other
+    // machines like big linux boxes, vllm". llama.cpp is fetched by the launch.
+    expect(defaultEngineSet(mac)).toEqual(['rapid-mlx', 'dflash-mlx', 'mlx-dspark', 'omlx']);
+    expect(defaultEngineSet(linux)).toEqual(['vllm']);
+    expect(defaultEngineSet(intelMac)).toEqual([]);
+    expect(defaultEngineSet(windows)).toEqual([]);
+    for (const id of defaultEngineSet(mac)) expect(byId(id).wired).toBe(true);
   });
 });
 

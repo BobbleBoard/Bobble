@@ -60,6 +60,7 @@ import { CanvasErrorBoundary } from './canvas/CanvasErrorBoundary';
 import { CanvasTabsPanel } from './canvas/CanvasTabsPanel';
 import { trackChromeCorner } from './chrome-corner';
 import { CorpDebugHud } from './corp/CorpDebugHud';
+import { EngineMenu } from './EngineMenu';
 import { GuardianBanner } from './GuardianBanner';
 import { useHarnessTitleSync } from './harness-title';
 import { InputNeededBanner } from './InputNeededBanner';
@@ -684,22 +685,28 @@ export function ChatApp({
                    * noise, and mine did not route. So the subagent's name simply
                    * becomes the title while you are looking at it.
                    */
-                  inStudio || contentTitle !== undefined ? (
-                    /* A studio's or a content route's name is fixed, so the title
-                       is plain text here rather than the renameable ChatTitle —
-                       the same slot, saying where you are, with nothing to edit.
-                       Without this the top bar said "New chat" over the Model
-                       hub, Scheduled and Connectors: the route was on screen and
-                       the bar was still naming a conversation behind it. */
-                    <span className="pd-topbar-title" data-testid="studio-title">
-                      {inStudio ? STUDIO_TITLES[modality] : contentTitle}
-                    </span>
-                  ) : (
-                    <ChatTitle
-                      title={viewedChildId !== null ? (viewedChildTitle ?? 'Subagent') : title}
-                      onRename={(name) => void setSessionName(name)}
-                    />
-                  )
+                  <>
+                    {inStudio || contentTitle !== undefined ? (
+                      /* A studio's or a content route's name is fixed, so the title
+                         is plain text here rather than the renameable ChatTitle —
+                         the same slot, saying where you are, with nothing to edit.
+                         Without this the top bar said "New chat" over the Model
+                         hub, Scheduled and Connectors: the route was on screen and
+                         the bar was still naming a conversation behind it. */
+                      <span className="pd-topbar-title" data-testid="studio-title">
+                        {inStudio ? STUDIO_TITLES[modality] : contentTitle}
+                      </span>
+                    ) : (
+                      <ChatTitle
+                        title={viewedChildId !== null ? (viewedChildTitle ?? 'Subagent') : title}
+                        onRename={(name) => void setSessionName(name)}
+                      />
+                    )}
+                    {/* Right of the name, whatever the route: the running model is
+                        one thing for the whole app, and so is its speed. the user:
+                        "to the right of the chat name, show a little icon". */}
+                    <EngineMenu />
+                  </>
                 }
                 /* The app's own state — starting up, getting ready — lives in
                    the middle of the bar, between the chat's name and the

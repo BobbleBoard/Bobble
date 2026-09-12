@@ -31,6 +31,7 @@ import {
 } from '@mariozechner/pi-ai';
 import {
   buildChatCompletionsRequest,
+  createLiveTpsReporter,
   headersToRecord,
   parseSSE,
   type RepairRung,
@@ -190,107 +191,124 @@ export function createMlxStream(deps: MlxStreamDeps = {}): MlxStreamFn {
           throw new Error(`mlx_lm.server HTTP ${res.status}: ${detail.slice(0, 500)}`);
         }
 
-        for await (const payload of parseSSE(await readBody(res))) {
-          let chunk: OAIChunk;
-          try {
-            chunk = JSON.parse(payload) as OAIChunk;
-          } catch {
-            continue; // skip non-JSON keep-alives
-          }
-          if (chunk.usage != null) {
-            output.usage.input = chunk.usage.prompt_tokens ?? output.usage.input;
-            output.usage.output = chunk.usage.completion_tokens ?? output.usage.output;
-          }
-
-          const choice = chunk.choices?.[0];
-          if (choice === undefined) continue;
-          const delta = choice.delta;
-
-          if (delta?.reasoning_content != null && delta.reasoning_content.length > 0) {
-            if (firstTokenAt === undefined) firstTokenAt = Date.now();
-            if (thinkingIndex === undefined) {
-              output.content.push({ type: 'thinking', thinking: '' });
-              thinkingIndex = output.content.length - 1;
-              stream.push({ type: 'thinking_start', contentIndex: thinkingIndex, partial: output });
+        // The live readout, read by the app off stderr (provider-llamacpp/live-tps).
+        const liveTps = createLiveTpsReporter();
+        try {
+          for await (const payload of parseSSE(await readBody(res))) {
+            let chunk: OAIChunk;
+            try {
+              chunk = JSON.parse(payload) as OAIChunk;
+            } catch {
+              continue; // skip non-JSON keep-alives
             }
-            const block = output.content[thinkingIndex];
-            if (block?.type === 'thinking') block.thinking += delta.reasoning_content;
-            stream.push({
-              type: 'thinking_delta',
-              contentIndex: thinkingIndex,
-              delta: delta.reasoning_content,
-              partial: output,
-            });
-          }
+            if (chunk.usage != null) {
+              output.usage.input = chunk.usage.prompt_tokens ?? output.usage.input;
+              output.usage.output = chunk.usage.completion_tokens ?? output.usage.output;
+            }
 
-          if (delta?.content != null && delta.content.length > 0) {
-            if (firstTokenAt === undefined) firstTokenAt = Date.now();
-            if (textIndex === undefined) {
-              output.content.push({ type: 'text', text: '' });
-              textIndex = output.content.length - 1;
-              stream.push({ type: 'text_start', contentIndex: textIndex, partial: output });
+            const choice = chunk.choices?.[0];
+            if (choice === undefined) continue;
+            const delta = choice.delta;
+            if (
+              (delta?.content != null && delta.content.length > 0) ||
+              (delta?.reasoning_content != null && delta.reasoning_content.length > 0) ||
+              (delta?.tool_calls?.length ?? 0) > 0
+            ) {
+              liveTps.tick();
             }
-            const block = output.content[textIndex];
-            if (block?.type === 'text') block.text += delta.content;
-            stream.push({
-              type: 'text_delta',
-              contentIndex: textIndex,
-              delta: delta.content,
-              partial: output,
-            });
-          }
 
-          for (const tc of delta?.tool_calls ?? []) {
-            if (firstTokenAt === undefined) firstTokenAt = Date.now();
-            const key = tc.index ?? toolStates.size;
-            let state = toolStates.get(key);
-            if (state === undefined) {
-              const block: ToolCall = {
-                type: 'toolCall',
-                id: tc.id ?? `call_${key}`,
-                name: tc.function?.name ?? '',
-                arguments: {},
-              };
-              output.content.push(block);
-              state = {
-                contentIndex: output.content.length - 1,
-                id: block.id,
-                name: block.name,
-                argStr: '',
-              };
-              toolStates.set(key, state);
-              stream.push({
-                type: 'toolcall_start',
-                contentIndex: state.contentIndex,
-                partial: output,
-              });
-            }
-            if (tc.function?.name !== undefined && state.name.length === 0) {
-              state.name = tc.function.name;
-              const block = output.content[state.contentIndex];
-              if (block?.type === 'toolCall') block.name = state.name;
-            }
-            const argDelta = tc.function?.arguments;
-            if (argDelta !== undefined && argDelta.length > 0) {
-              state.argStr += argDelta;
-              const block = output.content[state.contentIndex];
-              if (block?.type === 'toolCall') {
-                try {
-                  block.arguments = JSON.parse(state.argStr) as Record<string, unknown>;
-                } catch {
-                  // partial JSON; finalized at toolcall_end
-                }
+            if (delta?.reasoning_content != null && delta.reasoning_content.length > 0) {
+              if (firstTokenAt === undefined) firstTokenAt = Date.now();
+              if (thinkingIndex === undefined) {
+                output.content.push({ type: 'thinking', thinking: '' });
+                thinkingIndex = output.content.length - 1;
+                stream.push({
+                  type: 'thinking_start',
+                  contentIndex: thinkingIndex,
+                  partial: output,
+                });
               }
+              const block = output.content[thinkingIndex];
+              if (block?.type === 'thinking') block.thinking += delta.reasoning_content;
               stream.push({
-                type: 'toolcall_delta',
-                contentIndex: state.contentIndex,
-                delta: argDelta,
+                type: 'thinking_delta',
+                contentIndex: thinkingIndex,
+                delta: delta.reasoning_content,
                 partial: output,
               });
             }
-          }
 
-          if (choice.finish_reason != null) finishReason = mapFinishReason(choice.finish_reason);
+            if (delta?.content != null && delta.content.length > 0) {
+              if (firstTokenAt === undefined) firstTokenAt = Date.now();
+              if (textIndex === undefined) {
+                output.content.push({ type: 'text', text: '' });
+                textIndex = output.content.length - 1;
+                stream.push({ type: 'text_start', contentIndex: textIndex, partial: output });
+              }
+              const block = output.content[textIndex];
+              if (block?.type === 'text') block.text += delta.content;
+              stream.push({
+                type: 'text_delta',
+                contentIndex: textIndex,
+                delta: delta.content,
+                partial: output,
+              });
+            }
+
+            for (const tc of delta?.tool_calls ?? []) {
+              if (firstTokenAt === undefined) firstTokenAt = Date.now();
+              const key = tc.index ?? toolStates.size;
+              let state = toolStates.get(key);
+              if (state === undefined) {
+                const block: ToolCall = {
+                  type: 'toolCall',
+                  id: tc.id ?? `call_${key}`,
+                  name: tc.function?.name ?? '',
+                  arguments: {},
+                };
+                output.content.push(block);
+                state = {
+                  contentIndex: output.content.length - 1,
+                  id: block.id,
+                  name: block.name,
+                  argStr: '',
+                };
+                toolStates.set(key, state);
+                stream.push({
+                  type: 'toolcall_start',
+                  contentIndex: state.contentIndex,
+                  partial: output,
+                });
+              }
+              if (tc.function?.name !== undefined && state.name.length === 0) {
+                state.name = tc.function.name;
+                const block = output.content[state.contentIndex];
+                if (block?.type === 'toolCall') block.name = state.name;
+              }
+              const argDelta = tc.function?.arguments;
+              if (argDelta !== undefined && argDelta.length > 0) {
+                state.argStr += argDelta;
+                const block = output.content[state.contentIndex];
+                if (block?.type === 'toolCall') {
+                  try {
+                    block.arguments = JSON.parse(state.argStr) as Record<string, unknown>;
+                  } catch {
+                    // partial JSON; finalized at toolcall_end
+                  }
+                }
+                stream.push({
+                  type: 'toolcall_delta',
+                  contentIndex: state.contentIndex,
+                  delta: argDelta,
+                  partial: output,
+                });
+              }
+            }
+
+            if (choice.finish_reason != null) finishReason = mapFinishReason(choice.finish_reason);
+          }
+        } finally {
+          liveTps.end();
         }
 
         // --- finalize blocks ------------------------------------------------

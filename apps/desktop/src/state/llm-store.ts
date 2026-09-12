@@ -4,13 +4,19 @@
  * wrappers the composer footer + the full Model Manager (W10) call — download
  * with pause/resume/cancel/verify, delete, and start/stop.
  */
+import { parseLiveTpsLine } from '@pi-desktop/provider-llamacpp/live-tps';
 import { create } from 'zustand';
 import type {
+  EngineState,
+  LlmCalibrationProgress,
+  LlmCalibrationRecord,
   LlmCatalogEntry,
   LlmHardware,
   LlmRecommendation,
   LlmStatus,
 } from '../../electron/ipc-contract';
+import { defaultEngineSet } from '../settings/engine-catalog';
+import { hostGpuOf } from '../settings/host-gpu';
 import { useSettingsStore } from './settings-store';
 
 export interface LlmDownloadState {
@@ -80,6 +86,44 @@ export interface LlmVerifyResult {
   error?: string;
 }
 
+/**
+ * Tokens per second of the reply being generated RIGHT NOW, from the
+ * provider's `[pi-tps]` stderr lines (provider-llamacpp/live-tps.ts). `done`
+ * flips when the stream ends and the last figure stays up as "last reply".
+ */
+export interface LiveTps {
+  tps: number;
+  tokens: number;
+  done: boolean;
+  at: number;
+}
+
+/** What the engine menu draws while (and after) a calibration runs. */
+export interface CalibrationView {
+  running: boolean;
+  candidates: Array<{ id: string; engine: string; spec: string; label: string }>;
+  skips: Array<{ id: string; engine: string; spec: string; label: string; reason: string }>;
+  /** Per candidate id: measured, failed, or in progress. */
+  rows: Record<
+    string,
+    | { state: 'starting' | 'measuring' }
+    | {
+        state: 'done';
+        ok: boolean;
+        error?: string;
+        decodeTps: number;
+        prefillTps: number;
+        ttftMs: number;
+        startupMs: number;
+      }
+  >;
+  index: number;
+  total: number;
+  chosen: { engine: string; spec: string } | null;
+  record: LlmCalibrationRecord | null;
+  error: string | null;
+}
+
 interface LlmStoreState {
   status: LlmStatus;
   catalog: LlmCatalogEntry[];
@@ -87,8 +131,25 @@ interface LlmStoreState {
   recommendedModelId: string | null;
   recommendation: LlmRecommendation | null;
   download: LlmDownloadState | null;
+  /** The reply streaming now (or the last one), see LiveTps. */
+  live: LiveTps | null;
+  /** Engines as main reports them (installed / busy / error), by id. */
+  engines: Record<string, EngineState>;
+  calibration: CalibrationView | null;
+  /** The stored verdict for the running model, when one exists. */
+  record: LlmCalibrationRecord | null;
 
   applyStatus: (status: LlmStatus) => void;
+  applyLiveTps: (line: string) => void;
+  applyCalibration: (p: LlmCalibrationProgress) => void;
+  refreshEngines: () => Promise<void>;
+  installEngine: (id: string) => Promise<{ success: boolean; error?: string }>;
+  refreshRecord: () => Promise<void>;
+  /** Measure every engine + method for the running model, then swap to the winner. */
+  calibrate: () => Promise<{ ok: boolean; error?: string }>;
+  cancelCalibration: () => Promise<void>;
+  /** Relaunch the running model on an engine + method picked by hand. */
+  switchProfile: (engine: string, spec: string) => Promise<{ success: boolean; error?: string }>;
   applyDownloadProgress: (p: {
     modelId: string;
     file: string;
@@ -154,11 +215,185 @@ export const useLlmStore = create<LlmStoreState>((set, get) => ({
   recommendedModelId: null,
   recommendation: null,
   download: null,
+  live: null,
+  engines: {},
+  calibration: null,
+  record: null,
 
   // The download lifecycle is owned by the actions (which resolve on
   // finish/pause/cancel), so status transitions must NOT clear the bar — a
   // paused download settles the supervisor to idle while the bar stays up.
-  applyStatus: (status) => set({ status }),
+  applyStatus: (status) => {
+    const before = get().status;
+    set({ status });
+    // A different model (or launch) came up: the stored verdict shown is for
+    // the model that is running, so fetch its own.
+    if (
+      status.model?.id !== before.model?.id ||
+      status.model?.quant !== before.model?.quant ||
+      (status.phase === 'ready' && before.phase !== 'ready')
+    ) {
+      void get().refreshRecord();
+    }
+  },
+
+  applyLiveTps: (line) => {
+    const parsed = parseLiveTpsLine(line);
+    if (parsed === null) return;
+    // The first line arrives with the first token (ms=0): nothing to divide by yet.
+    if (parsed.ms < 150 && !parsed.done) return;
+    const tps = parsed.ms > 0 ? (parsed.tokens / parsed.ms) * 1000 : 0;
+    set({ live: { tps, tokens: parsed.tokens, done: parsed.done, at: Date.now() } });
+  },
+
+  applyCalibration: (p) =>
+    set((s) => {
+      const base: CalibrationView = s.calibration ?? {
+        running: true,
+        candidates: [],
+        skips: [],
+        rows: {},
+        index: 0,
+        total: 0,
+        chosen: null,
+        record: null,
+        error: null,
+      };
+      switch (p.stage) {
+        case 'planned':
+          return {
+            calibration: {
+              ...base,
+              running: true,
+              candidates: p.candidates,
+              skips: p.skips,
+              rows: {},
+              total: p.candidates.length,
+              index: 0,
+              chosen: null,
+              record: null,
+              error: null,
+            },
+          };
+        case 'starting':
+        case 'measuring':
+          return {
+            calibration: {
+              ...base,
+              running: true,
+              index: p.index,
+              total: p.total,
+              rows: { ...base.rows, [p.id]: { state: p.stage } },
+            },
+          };
+        case 'result':
+          return {
+            calibration: {
+              ...base,
+              rows: {
+                ...base.rows,
+                [p.result.id]: {
+                  state: 'done',
+                  ok: p.result.ok,
+                  ...(p.result.error !== undefined ? { error: p.result.error } : {}),
+                  decodeTps: p.result.decodeTps,
+                  prefillTps: p.result.prefillTps,
+                  ttftMs: p.result.ttftMs,
+                  startupMs: p.result.startupMs,
+                },
+              },
+            },
+          };
+        case 'switching':
+          return { calibration: { ...base, chosen: p.chosen } };
+        case 'done':
+          return {
+            calibration: { ...base, running: false, record: p.record, chosen: p.record.chosen },
+            record: p.record,
+          };
+        case 'cancelled':
+          return { calibration: { ...base, running: false, error: 'cancelled' } };
+        case 'failed':
+          return { calibration: { ...base, running: false, error: p.error } };
+        default:
+          return {};
+      }
+    }),
+
+  refreshEngines: async () => {
+    const res = await window.piDesktop.invoke('engines:list', undefined).catch(() => null);
+    if (res === null) return;
+    set({ engines: Object.fromEntries(res.engines.map((e) => [e.id, e])) });
+  },
+
+  installEngine: async (id) => {
+    const res = await window.piDesktop
+      .invoke('engines:install', { id })
+      .catch((e: unknown) => ({ success: false, error: String(e) }));
+    await get().refreshEngines();
+    return res;
+  },
+
+  refreshRecord: async () => {
+    const m = get().status.model;
+    if (m === null || m === undefined) {
+      set({ record: null });
+      return;
+    }
+    const res = await window.piDesktop
+      .invoke('llm:calibration-record', { modelId: m.id, quant: m.quant })
+      .catch(() => null);
+    set({ record: res?.record ?? null });
+  },
+
+  calibrate: async () => {
+    const m = get().status.model;
+    if (m === null || m === undefined) return { ok: false, error: 'no model is running' };
+    set({
+      calibration: {
+        running: true,
+        candidates: [],
+        skips: [],
+        rows: {},
+        index: 0,
+        total: 0,
+        chosen: null,
+        record: null,
+        error: null,
+      },
+    });
+    const res = await window.piDesktop
+      .invoke('llm:calibrate', { modelId: m.id, quant: m.quant })
+      .catch((e: unknown) => ({ ok: false, error: String(e) }));
+    if (!res.ok) {
+      set((s) => ({
+        calibration: s.calibration
+          ? { ...s.calibration, running: false, error: res.error ?? 'failed' }
+          : null,
+      }));
+      return { ok: false, error: res.error };
+    }
+    // The server was swapped underneath pi; point it at the winner.
+    const { repointPiAtRunningServer } = await import('./local-model');
+    await repointPiAtRunningServer(m.id);
+    await get().refreshRecord();
+    return { ok: true };
+  },
+
+  cancelCalibration: async () => {
+    await window.piDesktop.invoke('llm:calibrate-cancel', undefined).catch(() => undefined);
+  },
+
+  switchProfile: async (engine, spec) => {
+    const res = await window.piDesktop
+      .invoke('llm:use-profile', { engine, spec })
+      .catch((e: unknown) => ({ success: false, error: String(e) }));
+    if (res.success) {
+      const { repointPiAtRunningServer } = await import('./local-model');
+      await repointPiAtRunningServer();
+    }
+    return res;
+  },
 
   applyDownloadProgress: (p) =>
     set((s) => ({
@@ -285,6 +520,21 @@ export function connectLlm(): void {
   if (connected) return;
   connected = true;
   window.piDesktop.onEvent('llm:status', (status) => useLlmStore.getState().applyStatus(status));
+  window.piDesktop.onEvent('llm:calibration', (p) => useLlmStore.getState().applyCalibration(p));
+  /*
+   * The live tok/s readout rides on pi's stderr: the provider prints a
+   * `[pi-tps]` line a few times a second while a reply streams (see
+   * provider-llamacpp/live-tps.ts), and pi's stderr already reaches the
+   * renderer as `_stderr` events. No new event type, no polling.
+   */
+  window.piDesktop.onEvent('pi:event', (event) => {
+    const e = event as { type?: string; text?: string };
+    if (e.type === '_stderr' && typeof e.text === 'string' && e.text.includes('[pi-tps]')) {
+      for (const line of e.text.split('\n')) {
+        if (line.includes('[pi-tps]')) useLlmStore.getState().applyLiveTps(line);
+      }
+    }
+  });
 
   /*
    * A tool produced an image the text-only server could not read. Main raises this
@@ -319,5 +569,40 @@ export function connectLlm(): void {
   // download-progress + status deterministically, without a real download.
   if (new URLSearchParams(window.location.search).has('piE2E')) {
     window.__llm_store = () => useLlmStore;
+  }
+}
+
+/**
+ * THE FIRST-RUN ENGINE SET, fetched in the background once the app is up.
+ *
+ * the user: "download a few generally good engines at the start of downloading the
+ * app". Which ones is the catalogue's per-platform answer (`defaultEngineSet`);
+ * main installs whatever of them is missing, one after another, and the
+ * engine menu's rows fill in as they land. Skipped offline (there is nothing
+ * to fetch from) and under the e2e flag (a probe must not write a venv into
+ * the real cache). Never throws: a machine that cannot install stays as it is
+ * and Settings → Engines says so per row.
+ */
+export async function ensureDefaultEngines(): Promise<void> {
+  try {
+    if (!navigator.onLine) return;
+    if (new URLSearchParams(window.location.search).has('piE2E')) return;
+    const info = await window.piDesktop.invoke('app:get-info', undefined);
+    // The card matters for the set (NInfer is fetched for the card it was built
+    // for): make sure the hardware probe has answered before deciding.
+    if (useLlmStore.getState().hardware === null) await useLlmStore.getState().refreshCatalog();
+    const ids = defaultEngineSet({
+      platform: info.platform === 'darwin' || info.platform === 'win32' ? info.platform : 'linux',
+      appleSilicon: info.platform === 'darwin' && info.arch === 'arm64',
+      gpu: hostGpuOf(useLlmStore.getState().hardware),
+    });
+    if (ids.length === 0) return;
+    const listed = await window.piDesktop.invoke('engines:list', undefined);
+    const missing = ids.filter((id) => listed.engines.find((e) => e.id === id)?.installed !== true);
+    if (missing.length === 0) return;
+    await window.piDesktop.invoke('engines:ensure', { ids: missing });
+    await useLlmStore.getState().refreshEngines();
+  } catch {
+    // Best effort by design.
   }
 }

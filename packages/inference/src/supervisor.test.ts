@@ -105,6 +105,46 @@ describe('assembleServerArgs', () => {
     expect(args).toContain('--parallel');
   });
 
+  it('assembles every spec type the server has: none, dflash, dspark, ngram', () => {
+    const none = assembleServerArgs({
+      ...base,
+      launchMode: 'fast-text',
+      specType: 'none',
+      mtpSupported: true,
+      mtpEmbedded: true,
+    });
+    expect(none).not.toContain('--spec-type');
+    const dflash = assembleServerArgs({
+      ...base,
+      launchMode: 'fast-text',
+      specType: 'draft-dflash',
+      draftPath: '/d/dflash.gguf',
+    });
+    expect(dflash.join(' ')).toContain(
+      '--spec-type draft-dflash --spec-draft-n-max 7 --model-draft /d/dflash.gguf',
+    );
+    const dspark = assembleServerArgs({
+      ...base,
+      launchMode: 'fast-text',
+      specType: 'draft-dspark',
+      draftPath: '/d/dspark.gguf',
+      specDraftNMax: 5,
+    });
+    expect(dspark.join(' ')).toContain(
+      '--spec-type draft-dspark --spec-draft-n-max 5 --model-draft /d/dspark.gguf',
+    );
+    // Without its draft on disk a drafted type is silently plain, never a broken launch.
+    const missing = assembleServerArgs({
+      ...base,
+      launchMode: 'fast-text',
+      specType: 'draft-dspark',
+    });
+    expect(missing).not.toContain('--spec-type');
+    const ngram = assembleServerArgs({ ...base, launchMode: 'fast-text', specType: 'ngram-mod' });
+    expect(ngram.join(' ')).toContain('--spec-type ngram-mod');
+    expect(ngram).not.toContain('--model-draft');
+  });
+
   it('multimodal enables --mmproj, never draft-mtp, and honours --parallel', () => {
     const args = assembleServerArgs({
       ...base,
@@ -221,6 +261,35 @@ describe('LlamaServerSupervisor lifecycle', () => {
     expect(events.some((e) => e.type === 'ready')).toBe(true);
     expect(child).toBeDefined();
     await sup.dispose();
+  });
+
+  it('fails FAST when the child dies during startup, instead of polling out the health timeout', async () => {
+    // An engine that exits at import (missing wheel, bad drafter) used to cost
+    // the full health timeout per calibration candidate. The death is the answer.
+    let spawns = 0;
+    const sup = new LlamaServerSupervisor({
+      serverPath: '/venv/bin/rapid-mlx',
+      modelPath: '/store/x',
+      launchMode: 'fast-text',
+      port: 9111,
+      healthIntervalMs: 1,
+      healthTimeoutMs: 60_000,
+      maxRestarts: 0,
+      spawnFn: () => {
+        spawns += 1;
+        const child = new FakeChild();
+        setTimeout(() => child.emit('exit', 1, null), 5);
+        return asChild(child);
+      },
+      fetchImpl: okFetch(() => false),
+    });
+    const events = collect(sup);
+    const t0 = Date.now();
+    await expect(sup.start()).rejects.toThrow(/never became healthy/);
+    expect(Date.now() - t0).toBeLessThan(2000);
+    // start() owns its retries: the exit must not have spawned a second child.
+    expect(spawns).toBe(1);
+    expect(events.some((e) => e.type === 'exit' && e.reason === 'failed')).toBe(true);
   });
 
   it('extracts TPS from timings via recordTimings', async () => {

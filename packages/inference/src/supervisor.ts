@@ -19,6 +19,7 @@
  */
 import { spawn as spawnCb } from 'node:child_process';
 import { createServer } from 'node:net';
+import { basename } from 'node:path';
 import type { LaunchMode } from './catalog.js';
 import type { WatchdogHandle } from './watchdog.js';
 
@@ -71,6 +72,15 @@ export type SupervisorEvent =
 
 export type SupervisorListener = (event: SupervisorEvent) => void;
 
+/** llama-server `--spec-type` values this launcher knows how to assemble. */
+export type LlamaSpecType =
+  | 'none'
+  | 'draft-mtp'
+  | 'draft-eagle3'
+  | 'draft-dflash'
+  | 'draft-dspark'
+  | 'ngram-mod';
+
 export interface LaunchConfig {
   readonly modelPath: string;
   readonly host: string;
@@ -85,7 +95,7 @@ export interface LaunchConfig {
   /** Whether the model embeds its MTP head (Qwen3.6). */
   readonly mtpEmbedded?: boolean;
   /** Speculative-decoding method for a fast-text launch (default 'draft-mtp'). */
-  readonly specType?: 'draft-mtp' | 'draft-eagle3';
+  readonly specType?: LlamaSpecType;
   /** EAGLE-3 draft model path (paired via `--model-draft`). */
   readonly draftPath?: string;
   /** Whether the build advertises `draft-eagle3` (from probeServerFeatures). */
@@ -275,18 +285,32 @@ export function assembleServerArgs(cfg: LaunchConfig): string[] {
     // (each getting the full `-c / K` context — the caller sizes `-c` to
     // perSlot × K), while KEEPING speculative decoding on across the slots.
     args.push('--parallel', String(cfg.parallel ?? 1));
-    if ((cfg.specType ?? 'draft-mtp') === 'draft-eagle3') {
-      // EAGLE-3 always needs a separate draft model.
-      if (cfg.eagle3Supported === true && cfg.draftPath !== undefined) {
+    const spec = cfg.specType ?? 'draft-mtp';
+    if (spec === 'none') {
+      // Plain decoding — the calibration baseline, and the answer for a model
+      // whose heads measured slower on this machine.
+    } else if (spec === 'draft-eagle3' || spec === 'draft-dflash' || spec === 'draft-dspark') {
+      /*
+       * A SEPARATE DRAFT MODEL, three ways. EAGLE-3 needs the build's
+       * support flag (older builds refuse the type); DFlash and DSpark are
+       * upstream since b9831 / b10xxx and take the same shape: the draft
+       * GGUF via --model-draft, the block size as the draft count (the server
+       * clamps it to what the draft was trained with).
+       */
+      const supported = spec === 'draft-eagle3' ? cfg.eagle3Supported === true : true;
+      if (supported && cfg.draftPath !== undefined) {
         args.push(
           '--spec-type',
-          'draft-eagle3',
+          spec,
           '--spec-draft-n-max',
-          String(cfg.specDraftNMax ?? 3),
+          String(cfg.specDraftNMax ?? (spec === 'draft-eagle3' ? 3 : 7)),
           '--model-draft',
           cfg.draftPath,
         );
       }
+    } else if (spec === 'ngram-mod') {
+      // Model-free: the server's own n-gram pool. No draft file, no extra memory.
+      args.push('--spec-type', 'ngram-mod');
     } else {
       // MTP: an embedded head, or a sibling head passed via --model-draft.
       const mtpAvailable = cfg.mtpEmbedded === true || cfg.mtpPath !== undefined;
@@ -339,7 +363,7 @@ export interface SupervisorOptions {
   readonly mtpPath?: string;
   readonly mtpSupported?: boolean;
   readonly mtpEmbedded?: boolean;
-  readonly specType?: 'draft-mtp' | 'draft-eagle3';
+  readonly specType?: LlamaSpecType;
   readonly draftPath?: string;
   readonly eagle3Supported?: boolean;
   readonly specDraftNMax?: number;
@@ -405,6 +429,8 @@ const KILL_CONFIRM_MS = 5_000;
 
 export class LlamaServerSupervisor {
   private readonly listeners = new Set<SupervisorListener>();
+  /** True while `start()` runs its attempt loop (see handleExit). */
+  private startingUp = false;
   private readonly host: string;
   private readonly maxRestarts: number;
   private readonly restartBaseDelayMs: number;
@@ -523,6 +549,14 @@ export class LlamaServerSupervisor {
     const deadline = this.now() + this.healthTimeoutMs;
     while (this.now() < deadline) {
       if (this.disposed) return false;
+      /*
+       * A CHILD THAT DIED IS NOT "NOT UP YET". An engine that fails at import
+       * (a missing wheel, a bad drafter) exits in a second, and this kept
+       * polling a port nobody would ever open for the whole health timeout —
+       * five minutes per failed calibration candidate. `handleExit` nulls the
+       * child; seeing that here turns a five-minute wait into the truth.
+       */
+      if (this.child === null) return false;
       try {
         const res = await this.fetchImpl(this.healthUrl);
         if (res.ok) return true;
@@ -576,6 +610,9 @@ export class LlamaServerSupervisor {
     this.disarmWatchdog();
     if (this.disposed || this.isParked) return;
     this.emit({ type: 'crash', code, signal });
+    // While `start()` is still in its own attempt loop it owns the retries; a
+    // second spawner here would race it into two servers holding one model.
+    if (this.startingUp) return;
     void this.attemptRestart();
   }
 
@@ -633,22 +670,28 @@ export class LlamaServerSupervisor {
 
     // Initial attempt + backoff retries, but here we surface failure to the
     // caller instead of the fire-and-forget crash loop.
-    for (let attempt = 0; attempt <= this.maxRestarts; attempt++) {
-      if (this.disposed) throw new Error('supervisor disposed during start');
-      if (attempt > 0) {
-        const delayMs = this.restartBaseDelayMs * 2 ** (attempt - 1);
-        this.restartCount = attempt;
-        this.emit({ type: 'restart', attempt, delayMs });
-        await sleep(delayMs);
+    this.startingUp = true;
+    try {
+      for (let attempt = 0; attempt <= this.maxRestarts; attempt++) {
+        if (this.disposed) throw new Error('supervisor disposed during start');
+        if (attempt > 0) {
+          const delayMs = this.restartBaseDelayMs * 2 ** (attempt - 1);
+          this.restartCount = attempt;
+          this.emit({ type: 'restart', attempt, delayMs });
+          await sleep(delayMs);
+        }
+        const ok = await this.spawnOnce();
+        if (ok) {
+          this.restartCount = 0; // reset budget for ongoing supervision
+          return { baseUrl: this.baseUrl, port: this.port, pid: this.child?.pid ?? -1 };
+        }
       }
-      const ok = await this.spawnOnce();
-      if (ok) {
-        this.restartCount = 0; // reset budget for ongoing supervision
-        return { baseUrl: this.baseUrl, port: this.port, pid: this.child?.pid ?? -1 };
-      }
+    } finally {
+      this.startingUp = false;
     }
     this.emit({ type: 'exit', reason: 'failed', detail: 'server never became healthy' });
-    throw new Error(`llama-server never became healthy on port ${this.port}`);
+    // Named after what was launched: this supervisor runs the other engines too.
+    throw new Error(`${basename(this.opts.serverPath)} never became healthy on port ${this.port}`);
   }
 
   /**

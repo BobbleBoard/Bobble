@@ -7,10 +7,12 @@
 export const packageName = '@pi-desktop/inference';
 
 export * from './accelerator.js';
+export * from './calibrate.js';
 export * from './catalog.js';
 export * from './chat-template.js';
 export * from './context-cap.js';
 export * from './download.js';
+export * from './engine-launch.js';
 export * from './engine-select.js';
 export * from './guardian.js';
 export * from './hardware.js';

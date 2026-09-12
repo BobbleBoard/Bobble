@@ -3,10 +3,13 @@
  * "inference-supervisor" utilityProcess (supervisor-entry.ts). Kept in its own
  * electron-free module so both bundles share exactly one set of types.
  */
+import type { LaunchProfile } from '@pi-desktop/inference';
 import type {
   HfGgufFileDTO,
   HfModelHitDTO,
   HfSortOption,
+  LlmCalibrationProgress,
+  LlmCalibrationRecord,
   LlmCatalogEntry,
   LlmHardware,
   LlmRecommendation,
@@ -29,8 +32,26 @@ export type LlmRequestBody =
       /** Fast-text slot count (`--parallel`). The server is launched with
        * `-c = perSlot × parallel` so each slot keeps the full context. Default 1. */
       parallel?: number;
+      /**
+       * Which engine and speculative method to launch with. Omitted = the
+       * calibrated choice for this model on this machine when one is stored,
+       * else llama.cpp with the model's declared method.
+       */
+      profile?: LaunchProfile;
     }
   | { type: 'stop-server' }
+  /**
+   * CALIBRATE: measure every (engine, method) that can run this model from
+   * what is on disk, persist the verdict, and come back up on the winner.
+   * Progress streams out as `calibration` messages; the reply carries the
+   * record. Defaults to the running model.
+   */
+  | { type: 'calibrate'; modelId?: string; quant?: string }
+  | { type: 'calibrate-cancel' }
+  /** The stored verdict for a model, if any. */
+  | { type: 'calibration-record'; modelId: string; quant?: string }
+  /** Relaunch the running model on a profile the user picked by hand. */
+  | { type: 'use-profile'; profile: LaunchProfile }
   /**
    * MAKE ROOM. Stop the running server's process and keep everything needed
    * to bring it back on the same port — for a generation that fits without the
@@ -112,6 +133,12 @@ export interface HfRegisterReply {
   entry: LlmCatalogEntry;
 }
 
+export interface LlmCalibrateReply {
+  ok: boolean;
+  error?: string;
+  record?: LlmCalibrationRecord;
+}
+
 export interface LlmDownloadProgress {
   modelId: string;
   file: string;
@@ -131,6 +158,8 @@ export type LlmOutbound =
   | { id: number; kind: 'error'; error: string }
   | { kind: 'status'; status: LlmStatus }
   | { kind: 'download-progress'; progress: LlmDownloadProgress }
+  /** One step of a running calibration, already in the renderer's shape. */
+  | { kind: 'calibration'; progress: LlmCalibrationProgress }
   /**
    * The power policy changed its mind about how hard to push this machine.
    *

@@ -8,7 +8,7 @@
 import { execFileSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { cacheRoot } from '@pi-desktop/inference';
+import { cacheRoot, type LaunchProfile } from '@pi-desktop/inference';
 import {
   createIpcEventSender,
   createLogger,
@@ -29,7 +29,7 @@ import type {
 } from '../ipc-contract';
 import { readSettings } from '../settings/settings-main';
 import { searchDatasets } from './dataset-search-main';
-import { installEngine, listEngines, uninstallEngine } from './engines-main';
+import { ensureEngines, installEngine, listEngines, uninstallEngine } from './engines-main';
 import { detectHarnesses } from './harness-main';
 import { fetchModelCard } from './modelcard-main';
 import { cacheRemoteImage, fetchOrgAvatar } from './org-avatar-main';
@@ -37,6 +37,7 @@ import type {
   HfListFilesReply,
   HfRegisterReply,
   HfSearchReply,
+  LlmCalibrateReply,
   LlmCatalogReply,
   LlmOutbound,
   LlmRequestBody,
@@ -352,6 +353,10 @@ function ensureChild(): UtilityProcess {
       broadcast('llm:download-progress', message.progress);
       return;
     }
+    if (message.kind === 'calibration') {
+      broadcast('llm:calibration', message.progress);
+      return;
+    }
     const waiter = pending.get(message.id);
     if (waiter === undefined) return;
     pending.delete(message.id);
@@ -534,6 +539,28 @@ const handlers: IpcHandlers<LlmInvokeMap> = {
     });
   },
   'llm:stop-server': () => request({ type: 'stop-server' }),
+  'llm:calibrate': (req) => {
+    log.info('llm:calibrate requested', { modelId: req.modelId, quant: req.quant });
+    return request<LlmCalibrateReply>({
+      type: 'calibrate',
+      modelId: req.modelId,
+      quant: req.quant,
+    }).then((res) => {
+      if (res.ok) log.info('llm:calibrate done', { chosen: res.record?.chosen });
+      else log.warn('llm:calibrate FAILED', { error: res.error });
+      return res;
+    });
+  },
+  'llm:calibrate-cancel': () => request({ type: 'calibrate-cancel' }),
+  'llm:calibration-record': (req) =>
+    request({ type: 'calibration-record', modelId: req.modelId, quant: req.quant }),
+  // The strings come from the renderer; the supervisor validates them
+  // (`profileOf`) before launching anything.
+  'llm:use-profile': (req) =>
+    request({
+      type: 'use-profile',
+      profile: { engine: req.engine, spec: req.spec } as LaunchProfile,
+    }),
 };
 
 /** Hugging Face browse/register channels — proxied to the same supervisor, which
@@ -603,6 +630,7 @@ const engineHandlers: IpcHandlers<EngineInvokeMap> = {
   'engines:list': () => ({ engines: listEngines(KNOWN_ENGINE_IDS) }),
   'engines:install': (req) => installEngine(req.id),
   'engines:uninstall': (req) => uninstallEngine(req.id),
+  'engines:ensure': (req) => ensureEngines(req.ids),
 };
 
 /** Ids main can report on. Mirrors settings/engine-catalog.ts. */
@@ -610,9 +638,14 @@ const KNOWN_ENGINE_IDS = [
   'llamacpp',
   'rapid-mlx',
   'dflash-mlx',
+  'mlx-dspark',
+  'omlx',
+  'mlx-lm',
   'comfyui',
   'lemonade',
   'vllm',
+  'ninfer',
+  'ninfer-3090',
 ] as const;
 
 export function registerLlmIpc(ipcMain: IpcMain, allowSender: (event: unknown) => boolean): void {

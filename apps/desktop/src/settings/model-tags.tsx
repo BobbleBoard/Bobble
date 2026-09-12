@@ -35,6 +35,7 @@ export type ModelTagKind =
   | 'mtp'
   | 'eagle3'
   | 'dflash'
+  | 'dspark'
   | 'reliable'
   | 'engine'
   | 'gated'
@@ -96,6 +97,7 @@ const SPEC_TITLE: Record<SpecMethod, string> = {
   mtp: 'Multi-token prediction (faster decode)',
   eagle3: 'EAGLE-3 speculative decoding (faster)',
   dflash: 'DFlash speculative decoding (faster)',
+  dspark: 'DSpark speculative decoding (faster; the successor to DFlash)',
 };
 
 /** A colored speed-method pill (MTP / DFlash / EAGLE-3). The `data-pill-kind`

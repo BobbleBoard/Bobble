@@ -16,7 +16,10 @@ import {
   mkdirSync,
   readdirSync,
   readFileSync,
+  rmSync,
+  statfsSync,
   statSync,
+  symlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { readFile as readFileAsync, rm, unlink } from 'node:fs/promises';
@@ -24,14 +27,21 @@ import { freemem, homedir, loadavg, totalmem } from 'node:os';
 import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
 import {
+  assembleEngineLaunch,
+  benchPrompts,
   buildMlxProviderBlock,
   buildProviderBlock,
   CATALOG,
+  type CalibrationInput,
+  type CalibrationRecord,
+  type CalibrationResult,
   type CatalogFile,
   type CatalogModel,
+  cacheRoot,
   chatTemplatePath,
   chatTemplateSupported,
   chooseContextCap,
+  chooseProfile,
   chooseServerPerfArgs,
   classifyBottleneck,
   createMlxSupervisor,
@@ -48,33 +58,62 @@ import {
   type HfGgufFile,
   type HfModelHit,
   type HfSort,
+  hardwareKey,
   hfModelToCatalogEntry,
   isMlxSupported,
   type LaunchMode,
+  type LaunchProfile,
   LlamaServerSupervisor,
+  type LlamaSpecType,
   listHfGgufFiles,
+  listHfRepoFiles,
   mmprojFileFor,
   modelDir,
   modelEngine,
+  PINNED_LLAMACPP,
+  planCandidates,
   powerBudgetGB,
   probeServerFeatures,
+  profileOf,
   recommend,
   resolveTierModels,
+  type SpecMethod,
+  sampleFromServerTimings,
+  sampleFromTimings,
   searchHfModels,
+  summarise,
   type TierPick,
   usableMemoryGB,
   writeModelsJson,
 } from '@pi-desktop/inference';
+import {
+  discardRepo,
+  downloadRepo,
+  entryDir,
+  readManifest,
+  selectFiles,
+} from '@pi-desktop/model-store';
 import type {
   HfGgufFileDTO,
   HfModelHitDTO,
   HfSortOption,
+  LlmCalibrationProgress,
+  LlmCalibrationRecord,
   LlmCatalogEntry,
   LlmHardware,
   LlmStatus,
   LlmTierPick,
 } from '../ipc-contract';
 import { DownloadCancellation, discardPartials, partialPaths } from './download-cancellation';
+import {
+  calibrationDir,
+  engineCommand,
+  engineInstalled,
+  installedVenvEngines,
+  mlxVenvRoot,
+  omlxModelRoot,
+  type VenvEngine,
+} from './engine-paths';
 import { dedupeFlags } from './launch-args';
 import { modelFitsInRam } from './model-fit';
 import { fastTextSlotLaunch } from './parallel-launch';
@@ -83,6 +122,7 @@ import type {
   HfListFilesReply,
   HfRegisterReply,
   HfSearchReply,
+  LlmCalibrateReply,
   LlmCatalogReply,
   LlmOutbound,
   LlmRequest,
@@ -289,6 +329,12 @@ interface CurrentServer {
    * could not.
    */
   visionReady: boolean;
+  /** How this server was launched — the engine and the speculative method. */
+  profile: LaunchProfile;
+  /** The models.json block it is registered under (see LlmStatus.provider). */
+  provider: 'llamacpp' | 'mlx';
+  /** The model id requests to this server must carry. */
+  servedModelId: string;
 }
 
 let current: CurrentServer | null = null;
@@ -328,20 +374,27 @@ function isDownloaded(model: CatalogModel, file: CatalogFile): boolean {
  * on the disk and deleting the model reclaims them too.
  */
 function downloadedBytesFor(model: CatalogModel): number {
-  const dir = modelDir(model.id);
-  if (!existsSync(dir)) return 0;
+  const dirs = [
+    modelDir(model.id),
+    // The MLX twin and drafters fetched with it, which a delete frees too.
+    ...(model.mlxRepo !== undefined ? [entryDir('text', model.mlxRepo)] : []),
+    ...(model.mlxDrafts ?? []).map((d) => entryDir('text', d.repo)),
+  ];
   let total = 0;
-  try {
-    for (const name of readdirSync(dir)) {
-      try {
-        const s = statSync(join(dir, name));
-        if (s.isFile()) total += s.size;
-      } catch {
-        /* raced with a delete — skip it */
+  for (const dir of dirs) {
+    if (!existsSync(dir)) continue;
+    try {
+      for (const name of readdirSync(dir)) {
+        try {
+          const s = statSync(join(dir, name));
+          if (s.isFile()) total += s.size;
+        } catch {
+          /* raced with a delete — skip it */
+        }
       }
+    } catch {
+      /* unreadable — counts as nothing */
     }
-  } catch {
-    return 0;
   }
   return total;
 }
@@ -379,6 +432,8 @@ function status(): LlmStatus {
     /* A projector was attached → the server can read an image, whatever mode it
        was launched in. MLX has no projector path, so it reports false. */
     visionReady: current?.visionReady ?? false,
+    ...(current !== null ? { profile: current.profile, provider: current.provider } : {}),
+    ...(calibration !== null ? { calibrating: true } : {}),
     error: lastError,
   };
 }
@@ -674,6 +729,70 @@ function settleDownloadPhase(): void {
   phase = current?.supervisor.running === true ? 'ready' : 'idle';
 }
 
+/**
+ * WHAT ELSE A MODEL NEEDS SO THE OTHER ENGINES CAN BE MEASURED OFFLINE.
+ *
+ * On Apple Silicon a model's download also brings its MLX twin and the MLX
+ * drafters the catalogue names — the user: "when downloading any models from
+ * recommended tab if applicable drafter(s) should also be downloaded right
+ * there and then", and calibration "doesn't require internet to run". They go
+ * to the model store (`store/text/<repo>`), which every engine is then pointed
+ * at as a local path. Repos already complete on disk are not listed again.
+ *
+ * Best-effort in both directions: with no network the list is empty and the
+ * GGUF download proceeds exactly as before; a twin that fails never fails the
+ * weights. `total` per repo is what the tree API reports, so the ONE job bar
+ * can be sized before the first byte.
+ */
+async function planMlxExtras(
+  model: CatalogModel,
+  hfToken: string | undefined,
+  signal: AbortSignal,
+): Promise<Array<{ repo: string; total: number; fileCount: number; what: string }>> {
+  if (!isMlxSupported() || modelEngine(model) === 'mlx') return [];
+  const wanted: Array<{ repo: string; what: string }> = [];
+  if (model.mlxRepo !== undefined) wanted.push({ repo: model.mlxRepo, what: 'MLX weights' });
+  for (const d of model.mlxDrafts ?? []) {
+    const what =
+      d.method === 'mtp'
+        ? 'MTP head (MLX)'
+        : `${d.method === 'dflash' ? 'DFlash' : d.method === 'dspark' ? 'DSpark' : d.method} drafter (MLX)`;
+    wanted.push({
+      repo: d.repo,
+      what,
+    });
+  }
+  const out: Array<{ repo: string; total: number; fileCount: number; what: string }> = [];
+  for (const w of wanted) {
+    if ((await storedRepoDir(w.repo)) !== undefined) continue;
+    try {
+      const files = selectFiles(
+        await listHfRepoFiles(w.repo, {
+          ...(hfToken === undefined ? {} : { hfToken }),
+          signal,
+        }),
+      );
+      const total = files.reduce((sum, f) => sum + (f.sizeBytes ?? 0), 0);
+      if (files.length > 0) out.push({ ...w, total, fileCount: files.length });
+    } catch (error) {
+      console.log(
+        `[download] skipping ${w.what} ${w.repo}: ${String(error instanceof Error ? error.message : error).slice(0, 160)}`,
+      );
+    }
+  }
+  return out;
+}
+
+/** Free bytes on the volume the store lives on, or null when unknowable. */
+function freeDiskBytes(dir: string): number | null {
+  try {
+    const st = statfsSync(dir);
+    return Number(st.bavail) * Number(st.bsize);
+  } catch {
+    return null;
+  }
+}
+
 async function downloadOne(
   modelId: string,
   quant?: string,
@@ -704,6 +823,23 @@ async function downloadOne(
   phase = 'downloading';
   lastError = undefined;
   emitStatus();
+  /* The MLX twin and drafters, sized up front so the job bar covers them. A
+     volume without room for them keeps the GGUF and drops the extras. */
+  let extras = await planMlxExtras(model, hfToken, signal).catch(() => []);
+  const extrasTotal = extras.reduce((sum, e) => sum + e.total, 0);
+  const extrasFiles = extras.reduce((sum, e) => sum + e.fileCount, 0);
+  const free = freeDiskBytes(modelDir(model.id));
+  const modelBytes = pickFile(model, quant)?.bytes ?? 0;
+  if (extras.length > 0 && free !== null && free < modelBytes + extrasTotal + 4 * 1024 ** 3) {
+    console.log(
+      `[download] not enough disk for the MLX extras of ${model.id} (${(extrasTotal / 1024 ** 3).toFixed(1)} GB); fetching the GGUF only`,
+    );
+    extras = [];
+  }
+  let ggufDone = 0;
+  let ggufTotal: number | null = 0;
+  let ggufFiles = 1;
+  let extrasRepo: string | null = null;
   try {
     await downloadModel(model, {
       quant,
@@ -717,7 +853,10 @@ async function downloadOne(
       allCompanions: true,
       signal,
       hfToken,
-      onProgress: (file, p) =>
+      onProgress: (file, p) => {
+        ggufDone = p.jobReceived;
+        ggufTotal = p.jobTotal;
+        ggufFiles = p.fileCount;
         post({
           kind: 'download-progress',
           progress: {
@@ -727,16 +866,67 @@ async function downloadOne(
             total: p.total ?? null,
             fraction: p.fraction ?? null,
             fileIndex: p.fileIndex,
-            fileCount: p.fileCount,
+            fileCount: p.fileCount + extrasFiles,
             jobReceived: p.jobReceived,
-            jobTotal: p.jobTotal,
+            jobTotal: p.jobTotal === null ? null : p.jobTotal + extrasTotal,
           },
-        }),
+        });
+      },
     });
     // Opportunistically warm the chat-template cache while the user's HF token
     // is in hand (base repos are gated) so the launcher finds it without a
     // network round-trip. Best-effort — never fails the download.
     if (model.baseRepo !== undefined) await prefetchChatTemplate(model.baseRepo, hfToken);
+    /*
+     * THEN THE EXTRAS, one repo at a time, on the same bar. A failure here is
+     * logged and the weights stay downloaded: the GGUF is what the user asked
+     * for, and a twin that did not arrive only means calibration has fewer
+     * rows to measure.
+     */
+    let extrasDone = 0;
+    let fileOffset = ggufFiles;
+    for (const e of extras) {
+      if (signal.aborted) break;
+      extrasRepo = e.repo;
+      try {
+        await downloadRepo({
+          repo: e.repo,
+          kind: 'text',
+          name: `${model.displayName} — ${e.what}`,
+          family: model.id,
+          backend: 'mlx',
+          notes: `Fetched with ${model.id} so the MLX engines can be calibrated offline.`,
+          signal,
+          ...(hfToken === undefined ? {} : { hfToken }),
+          onProgress: (p) =>
+            post({
+              kind: 'download-progress',
+              progress: {
+                modelId,
+                file: `${e.what}: ${p.file}`,
+                received: p.received,
+                total: p.total,
+                fraction: p.fraction,
+                fileIndex: fileOffset + p.fileIndex,
+                fileCount: ggufFiles + extrasFiles,
+                jobReceived: ggufDone + extrasDone + p.received,
+                jobTotal: ggufTotal === null ? null : ggufTotal + extrasTotal,
+              },
+            }),
+        });
+        extrasDone += e.total;
+        fileOffset += e.fileCount;
+        console.log(
+          `[download] ${e.what} for ${model.id}: ${e.repo} (${(e.total / 1024 ** 3).toFixed(2)} GB)`,
+        );
+      } catch (error) {
+        if (signal.aborted) throw error;
+        console.log(
+          `[download] ${e.what} ${e.repo} failed: ${String(error instanceof Error ? error.message : error).slice(0, 200)}`,
+        );
+      }
+    }
+    extrasRepo = null;
     settleDownloadPhase();
     emitStatus();
     return { success: true };
@@ -751,6 +941,8 @@ async function downloadOne(
       await discardPartials(partialPaths(modelDir(model.id), model.files, quant, join), (p) =>
         unlink(p),
       );
+      // A twin cut mid-way is not a model; the finished GGUF stays.
+      if (extrasRepo !== null) await discardRepo('text', extrasRepo).catch(() => undefined);
       settleDownloadPhase();
       emitStatus();
       return { success: false, cancelled: true };
@@ -780,6 +972,15 @@ async function deleteModel(modelId: string): Promise<{ success: boolean; error?:
     return { success: false, error: 'model is running; stop it first' };
   try {
     await rm(modelDir(modelId), { recursive: true, force: true });
+    // Its MLX twin and drafters were fetched for it and are useless without it.
+    const repos = [
+      ...(model.mlxRepo !== undefined ? [model.mlxRepo] : []),
+      ...(model.mlxDrafts ?? []).map((d) => d.repo),
+    ];
+    for (const repo of repos) await discardRepo('text', repo).catch(() => undefined);
+    for (const f of model.files) {
+      await rm(recordPath(modelId, f.quant), { force: true }).catch(() => undefined);
+    }
     emitStatus();
     return { success: true };
   } catch (error) {
@@ -894,6 +1095,9 @@ async function startMlxServer(
       launchMode: 'fast-text',
       // mlx_lm.server takes no projector, so this engine cannot read an image.
       visionReady: false,
+      profile: { engine: 'mlx-lm', spec: 'none' },
+      provider: 'mlx',
+      servedModelId: model.hfRepo,
     };
     phase = 'ready';
     await writeModelsJson(
@@ -910,6 +1114,726 @@ async function startMlxServer(
     emitStatus();
     return { success: false, error: lastError };
   }
+}
+
+// ── engines and profiles ─────────────────────────────────────────────────────
+
+/**
+ * The launch a model gets when nothing has been measured: llama.cpp, with the
+ * method the catalogue declares — exactly the launch that existed before
+ * calibration did. `specDisabled` is honoured further down (mtpSupported).
+ */
+function defaultProfile(model: CatalogModel): LaunchProfile {
+  return { engine: 'llamacpp', spec: model.spec === 'eagle3' ? 'eagle3' : 'mtp' };
+}
+
+function sameProfile(a: LaunchProfile, b: LaunchProfile): boolean {
+  return a.engine === b.engine && a.spec === b.spec;
+}
+
+/** A profile's method as llama-server spells it, plus which draft file it needs. */
+function llamaSpecFor(
+  spec: LaunchProfile['spec'],
+  model: CatalogModel,
+): { specType: LlamaSpecType; draftMethod?: SpecMethod } {
+  switch (spec) {
+    case 'none':
+      return { specType: 'none' };
+    case 'eagle3':
+      return { specType: 'draft-eagle3', draftMethod: 'eagle3' };
+    case 'dflash':
+      return { specType: 'draft-dflash', draftMethod: 'dflash' };
+    case 'dspark':
+      return { specType: 'draft-dspark', draftMethod: 'dspark' };
+    case 'ngram':
+      return { specType: 'ngram-mod' };
+    default:
+      // 'mtp' and 'auto': the model's own heads, when it has them.
+      return model.spec === 'eagle3' && spec === 'auto'
+        ? { specType: 'draft-eagle3', draftMethod: 'eagle3' }
+        : { specType: 'draft-mtp' };
+  }
+}
+
+/** The draft GGUF for a method, if the catalogue names one and it is on disk. */
+function draftPathFor(model: CatalogModel, method: SpecMethod): string | undefined {
+  const dir = modelDir(model.id);
+  const candidates: string[] = [];
+  if (method === 'eagle3' && model.spec === 'eagle3' && model.draftModel !== undefined) {
+    candidates.push(join(dir, model.draftModel.name));
+  }
+  for (const v of model.variants ?? []) {
+    if (v.method === method && v.draftModel !== undefined)
+      candidates.push(join(dir, v.draftModel.name));
+  }
+  return candidates.find((c) => existsSync(c));
+}
+
+/** Which draft methods have their GGUF on disk for this model. */
+function draftsOnDisk(model: CatalogModel): ('eagle3' | 'dflash' | 'dspark')[] {
+  return (['eagle3', 'dflash', 'dspark'] as const).filter(
+    (m) => draftPathFor(model, m) !== undefined,
+  );
+}
+
+/** The model's MLX twin repo: its own repo for an MLX entry, the catalogued twin otherwise. */
+function mlxRepoFor(model: CatalogModel): string | undefined {
+  return modelEngine(model) === 'mlx' ? model.hfRepo : model.mlxRepo;
+}
+
+/**
+ * A repo's directory in the model store, only when the download FINISHED —
+ * the manifest is written `incomplete` first and rewritten clean at the end,
+ * so a half-fetched tree never looks like weights.
+ */
+async function storedRepoDir(repo: string): Promise<string | undefined> {
+  const dir = entryDir('text', repo);
+  const manifest = await readManifest(dir).catch(() => undefined);
+  if (manifest === undefined || manifest.incomplete === true) return undefined;
+  return dir;
+}
+
+async function mlxDirFor(model: CatalogModel): Promise<string | undefined> {
+  const repo = mlxRepoFor(model);
+  return repo === undefined ? undefined : storedRepoDir(repo);
+}
+
+async function mlxDraftDirFor(
+  model: CatalogModel,
+  method: 'dflash' | 'dspark' | 'mtp',
+): Promise<string | undefined> {
+  const d = model.mlxDrafts?.find((x) => x.method === method);
+  return d === undefined ? undefined : storedRepoDir(d.repo);
+}
+
+/**
+ * Does the MLX twin itself carry MTP heads? mlx-community conversions
+ * usually drop them (`mtp.*` tensors are not part of the trunk) — MEASURED:
+ * rapid-mlx refused MTP on Qwen3.5-4B-MLX-8bit, "MTP weights missing from the
+ * target checkpoint" — which is why the catalogue names a separate MTP
+ * sidecar. A twin that kept them needs none. Read from the safetensors
+ * index, never from the model's name.
+ */
+function mlxTwinHasMtp(dir: string): boolean {
+  try {
+    const index = JSON.parse(readFileSync(join(dir, 'model.safetensors.index.json'), 'utf8')) as {
+      weight_map?: Record<string, string>;
+    };
+    return Object.keys(index.weight_map ?? {}).some((k) => k.startsWith('mtp.'));
+  } catch {
+    return false;
+  }
+}
+
+/** The hub cache the engines are given (see startExternalEngine's env). */
+function engineHfHome(): string {
+  const dir = join(cacheRoot(), 'hf');
+  mkdirSync(join(dir, 'hub'), { recursive: true });
+  return dir;
+}
+
+// ── calibration records ──────────────────────────────────────────────────────
+
+function recordPath(modelId: string, quant: string): string {
+  const safe = (x: string) => x.replace(/[^A-Za-z0-9._-]+/g, '_');
+  return join(calibrationDir(), `${safe(modelId)}--${safe(quant)}.json`);
+}
+
+let hardwareKeyCache: string | null = null;
+function currentHardwareKey(): string | null {
+  return hardwareKeyCache;
+}
+async function ensureHardwareKey(): Promise<string> {
+  if (hardwareKeyCache === null) {
+    const hw = await getHardware();
+    hardwareKeyCache = hardwareKey({
+      platform: process.platform,
+      arch: process.arch,
+      chip: hw.chip,
+      totalRamGB: hw.totalRamGB,
+    });
+  }
+  return hardwareKeyCache;
+}
+
+/**
+ * The stored verdict for a model, when it was taken on THIS machine with THIS
+ * llama.cpp build. A record from another Mac, or from before a pin bump, is
+ * not wrong so much as unknown — it is left on disk and ignored.
+ */
+function readRecord(modelId: string, quant: string): CalibrationRecord | null {
+  try {
+    const raw = JSON.parse(readFileSync(recordPath(modelId, quant), 'utf8')) as CalibrationRecord;
+    if (raw.chosen === undefined || raw.ranked === undefined) return null;
+    const hwKey = currentHardwareKey();
+    if (hwKey !== null && raw.hardwareKey !== hwKey) return null;
+    if (raw.engineBuild !== PINNED_LLAMACPP.tag) return null;
+    return raw;
+  } catch {
+    return null;
+  }
+}
+
+function writeRecord(record: CalibrationRecord): void {
+  mkdirSync(calibrationDir(), { recursive: true });
+  writeFileSync(recordPath(record.modelId, record.quant), JSON.stringify(record, null, 2));
+}
+
+/** The record as the renderer draws it (engine/spec split out of each id). */
+function recordDto(record: CalibrationRecord): LlmCalibrationRecord {
+  const split = (id: string) => {
+    const p = profileOf(id);
+    return { engine: p?.engine ?? id, spec: p?.spec ?? '' };
+  };
+  return {
+    modelId: record.modelId,
+    quant: record.quant,
+    hardwareKey: record.hardwareKey,
+    engineBuild: record.engineBuild,
+    at: record.at,
+    ranked: record.ranked.map((r) => ({
+      id: r.id,
+      ...split(r.id),
+      ok: r.ok,
+      ...(r.error !== undefined ? { error: r.error } : {}),
+      prefillTps: r.prefillTps,
+      decodeTps: r.decodeTps,
+      ttftMs: r.ttftMs,
+      startupMs: r.startupMs,
+      score: r.score,
+    })),
+    skips: record.skips.map((k) => ({
+      id: k.id,
+      engine: k.engine,
+      spec: k.spec,
+      reason: k.reason,
+    })),
+    chosen: record.chosen,
+  };
+}
+
+// ── the other engines ────────────────────────────────────────────────────────
+
+/**
+ * Bring the model up on one of the OpenAI-compatible engines (rapid-mlx,
+ * dflash-mlx, mlx-dspark, oMLX, mlx-lm; vLLM on Linux) from LOCAL weights.
+ *
+ * Nothing here reaches the network: the engines are told the store directory
+ * and run with the hub offline, so a launch either has its files or says which
+ * one is missing. The server registers under the `mlx` provider block — every
+ * one of these speaks the same SSE shape provider-mlx already parses, and
+ * throughput is timed client-side there because none of them emit llama.cpp's
+ * `timings`.
+ */
+async function startExternalEngine(
+  model: CatalogModel,
+  file: CatalogFile,
+  profile: LaunchProfile,
+): Promise<{ success: boolean; baseUrl?: string; error?: string }> {
+  const engine = profile.engine as VenvEngine;
+  if (engine !== 'vllm' && !isMlxSupported()) {
+    return { success: false, error: `${engine} needs Apple Silicon` };
+  }
+  if (!engineInstalled(engine)) return { success: false, error: `${engine} is not installed` };
+  const modelDirPath = await mlxDirFor(model);
+  if (modelDirPath === undefined) {
+    return { success: false, error: 'MLX weights are not downloaded for this model' };
+  }
+  const draftMethod =
+    profile.spec === 'dflash' || profile.spec === 'dspark' || profile.spec === 'mtp'
+      ? profile.spec
+      : undefined;
+  const draftDir = draftMethod === undefined ? undefined : await mlxDraftDirFor(model, draftMethod);
+  // MTP is the one method that may need no file: a twin that kept its heads.
+  if (draftMethod !== undefined && draftDir === undefined) {
+    if (draftMethod !== 'mtp' || !mlxTwinHasMtp(modelDirPath)) {
+      return {
+        success: false,
+        error: `no ${draftMethod === 'mtp' ? 'MTP head' : `${draftMethod} drafter`} is downloaded for this model`,
+      };
+    }
+  }
+  if (
+    current !== null &&
+    current.model.id === model.id &&
+    current.file.quant === file.quant &&
+    sameProfile(current.profile, profile)
+  ) {
+    return { success: true, baseUrl: current.baseUrl };
+  }
+
+  phase = 'starting';
+  lastError = undefined;
+  metrics = null;
+  emitStatus();
+  try {
+    if (current !== null) {
+      await current.supervisor.dispose();
+      current = null;
+    }
+    /*
+     * ONE ID PER ENGINE. The llama.cpp block registers the model under the
+     * catalogue id; if the `mlx` block did too, pi would hold two models with
+     * one id and `set_model('mlx', id)` could land on the llama.cpp one — the
+     * server that had just been stopped. MEASURED: a reply that never arrived
+     * after a swap to rapid-mlx. The served name carries the engine, so the
+     * two can never be confused (and the menu can say which one pi is on).
+     */
+    const servedName = `${model.id}@${engine}`;
+    /* oMLX serves a directory of models named by subdirectory: give it one
+       with a link to the weights, named after the served name. */
+    if (engine === 'omlx') {
+      mkdirSync(omlxModelRoot(), { recursive: true });
+      const link = join(omlxModelRoot(), servedName);
+      try {
+        if (existsSync(link)) rmSync(link, { recursive: false, force: true });
+        symlinkSync(modelDirPath, link, 'dir');
+      } catch (error) {
+        return { success: false, error: `could not link weights for oMLX: ${String(error)}` };
+      }
+    }
+    const hw = await getHardware();
+    const contextWindow = chooseContextCap({
+      modelBytes: file.bytes,
+      modelMaxContext: model.contextWindow,
+      totalRamGB: hw.totalRamGB,
+    });
+    const host = '127.0.0.1';
+    let servedModelId = servedName;
+    const supervisor = new LlamaServerSupervisor({
+      serverPath: engineCommand(engine),
+      modelPath: modelDirPath,
+      launchMode: 'fast-text',
+      host,
+      healthPath: '/v1/models',
+      // Loading multi-GB weights into unified memory, plus a drafter, plus
+      // whatever graph compile the engine does on first request.
+      healthTimeoutMs: 300_000,
+      maxRestarts: 0,
+      buildArgsFn: (port) => {
+        const launch = assembleEngineLaunch(profile, {
+          command: engineCommand(engine),
+          modelDir: modelDirPath,
+          servedModelId: servedName,
+          host,
+          port,
+          ...(draftDir !== undefined ? { draftDir } : {}),
+          modelRoot: omlxModelRoot(),
+        });
+        servedModelId = launch.servedModelId;
+        return launch.args;
+      },
+      env: {
+        ...process.env,
+        PATH: `${join(mlxVenvRoot(), 'bin')}:${process.env.PATH ?? ''}`,
+        // The whole point: a launch that would fetch from the hub fails
+        // instead, with the hub's own message.
+        HF_HUB_OFFLINE: '1',
+        TRANSFORMERS_OFFLINE: '1',
+        TOKENIZERS_PARALLELISM: 'false',
+        /* A hub cache of our own. mlx_lm.server's `/v1/models` scans the HF
+           cache and throws when the directory does not exist — MEASURED under
+           a fresh HOME — so give every engine one that does, under the app's
+           root rather than the user's. */
+        HF_HOME: engineHfHome(),
+      },
+    });
+    supervisor.on((event) => {
+      if (event.type === 'log' && event.stream === 'stderr') {
+        const tail = event.text.trim().split('\n').slice(-1)[0] ?? '';
+        if (tail.length > 0) {
+          console.log(`[${engine}] ${tail.slice(0, 300)}`);
+          // The engine's own last words, for a bench failure to quote.
+          if (/error|exception|failed|traceback/i.test(tail))
+            lastEngineComplaint = tail.slice(0, 200);
+        }
+      } else if (event.type === 'exit' && event.reason === 'failed') {
+        phase = 'error';
+        lastError = event.detail ?? `${engine} failed`;
+        current = null;
+        emitStatus();
+      }
+    });
+    const started = await supervisor.start();
+    const baseUrl = supervisor.baseUrl;
+    current = {
+      supervisor,
+      model,
+      file,
+      contextWindow,
+      baseUrl,
+      launchMode: 'fast-text',
+      visionReady: false,
+      profile,
+      provider: 'mlx',
+      servedModelId,
+    };
+    phase = 'ready';
+    console.log(
+      `[engine] ${model.id} up on ${engine} · ${profile.spec} (${baseUrl}) as ${servedModelId}`,
+    );
+    await writeModelsJson(
+      MODELS_JSON,
+      MLX_PROVIDER_NAME,
+      buildMlxProviderBlock(model, { baseUrl, servedModelId }),
+    );
+    emitStatus();
+    return { success: true, baseUrl: started.baseUrl };
+  } catch (error) {
+    phase = 'error';
+    lastError = String(error instanceof Error ? error.message : error);
+    current = null;
+    emitStatus();
+    return { success: false, error: lastError };
+  }
+}
+
+// ── calibration ──────────────────────────────────────────────────────────────
+
+let calibration: { abort: AbortController; modelId: string } | null = null;
+/** The last error-looking line an external engine printed (see startExternalEngine). */
+let lastEngineComplaint: string | null = null;
+
+function postCalibration(progress: LlmCalibrationProgress): void {
+  post({ kind: 'calibration', progress });
+}
+
+/** A result without its raw samples — what the menu draws per row. */
+function resultDto(
+  r: CalibrationResult,
+): Extract<LlmCalibrationProgress, { stage: 'result' }>['result'] {
+  return {
+    id: r.id,
+    ok: r.ok,
+    ...(r.error !== undefined ? { error: r.error } : {}),
+    prefillTps: r.prefillTps,
+    decodeTps: r.decodeTps,
+    ttftMs: r.ttftMs,
+    startupMs: r.startupMs,
+  };
+}
+
+/**
+ * One timed request against the running server. Streams so the first token's
+ * arrival is observable; llama.cpp's own `timings` are used when present
+ * (measured inside the server), wall-clock otherwise.
+ */
+async function timedRequest(
+  baseUrl: string,
+  servedModelId: string,
+  prompt: { system: string; user: string; maxTokens: number },
+  nonce: string,
+  signal: AbortSignal,
+): Promise<ReturnType<typeof sampleFromTimings>> {
+  const body = {
+    model: servedModelId,
+    messages: [
+      // The nonce defeats every engine's prefix cache, so prefill is real.
+      { role: 'system', content: `${prompt.system}\n(session ${nonce})` },
+      { role: 'user', content: prompt.user },
+    ],
+    max_tokens: prompt.maxTokens,
+    /*
+     * THE APP'S OWN SAMPLING, not greedy. Speculative decoding accepts more
+     * drafts at temperature 0 than under the temperature 0.8 / top-p 0.9 a
+     * chat actually runs with (supervisor.ts server defaults), so a greedy
+     * bench flatters every drafted method. Sent explicitly so every engine
+     * samples the same way whatever its own defaults are.
+     */
+    temperature: 0.8,
+    top_p: 0.9,
+    stream: true,
+    stream_options: { include_usage: true },
+    // llama.cpp: no prefix reuse, so prefill is measured every time.
+    cache_prompt: false,
+    /*
+     * THINKING OFF, everywhere. A thinking model spends the whole 96-token
+     * budget inside <think>, and the engines disagree about what to stream
+     * for it: llama.cpp and rapid-mlx send `reasoning_content` deltas (and
+     * rapid-mlx switches thinking off by itself for a casual request),
+     * mlx_lm.server holds the block back until it closes — MEASURED as "no
+     * tokens came back" on a request that had generated 16 of them. One
+     * setting on every engine is what makes the rows comparable; the switch
+     * is honoured by the Qwen / Gemma templates and ignored elsewhere.
+     */
+    chat_template_kwargs: { enable_thinking: false },
+  };
+  const sentAt = Date.now();
+  const res = await fetch(`${baseUrl.replace(/\/$/, '')}/chat/completions`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+    signal: AbortSignal.any([signal, AbortSignal.timeout(180_000)]),
+  });
+  if (!res.ok || res.body === null) {
+    throw new Error(`HTTP ${res.status} ${(await res.text().catch(() => '')).slice(0, 200)}`);
+  }
+  let firstTokenAt: number | undefined;
+  let lastTokenAt = sentAt;
+  let chunks = 0;
+  let usage: { prompt_tokens?: number; completion_tokens?: number } | undefined;
+  let timings: Parameters<typeof sampleFromServerTimings>[0] | undefined;
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let nl = buffer.indexOf('\n');
+    while (nl >= 0) {
+      const line = buffer.slice(0, nl).trim();
+      buffer = buffer.slice(nl + 1);
+      nl = buffer.indexOf('\n');
+      if (!line.startsWith('data:')) continue;
+      const data = line.slice(5).trim();
+      if (data === '[DONE]') continue;
+      let chunk: {
+        choices?: Array<{ delta?: { content?: string | null; reasoning_content?: string | null } }>;
+        usage?: { prompt_tokens?: number; completion_tokens?: number } | null;
+        timings?: Parameters<typeof sampleFromServerTimings>[0];
+      };
+      try {
+        chunk = JSON.parse(data);
+      } catch {
+        continue;
+      }
+      const delta = chunk.choices?.[0]?.delta;
+      const text = `${delta?.content ?? ''}${delta?.reasoning_content ?? ''}`;
+      if (text.length > 0) {
+        const now = Date.now();
+        firstTokenAt ??= now;
+        lastTokenAt = now;
+        chunks += 1;
+      }
+      if (chunk.usage != null) usage = chunk.usage;
+      if (chunk.timings !== undefined) timings = chunk.timings;
+    }
+  }
+  const fromServer = timings === undefined ? null : sampleFromServerTimings(timings);
+  if (fromServer !== null) return fromServer;
+  if (firstTokenAt === undefined) {
+    throw new Error(
+      usage?.completion_tokens !== undefined && usage.completion_tokens > 0
+        ? `generated ${usage.completion_tokens} tokens but streamed none of them`
+        : 'no tokens came back',
+    );
+  }
+  const completionTokens = usage?.completion_tokens ?? chunks;
+  const promptTokens =
+    usage?.prompt_tokens ??
+    // No usage from this engine: a rough count so the row is not empty.
+    Math.round((prompt.system.length + prompt.user.length) / 3.8);
+  return sampleFromTimings({ sentAt, firstTokenAt, lastTokenAt, promptTokens, completionTokens });
+}
+
+/** Warm the server once (graph compile, first-request paths), then measure. */
+async function benchServer(
+  baseUrl: string,
+  servedModelId: string,
+  signal: AbortSignal,
+): Promise<CalibrationResult['samples']> {
+  const prompts = benchPrompts();
+  const nonce = () => Math.random().toString(16).slice(2, 10);
+  const warm = prompts[0];
+  if (warm !== undefined) {
+    // Graph compile, lazy loads, first-request paths. Its outcome is not a
+    // measurement, so a warm-up that streams nothing is not a failure either.
+    await timedRequest(baseUrl, servedModelId, { ...warm, maxTokens: 24 }, nonce(), signal).catch(
+      () => undefined,
+    );
+  }
+  const samples: ReturnType<typeof sampleFromTimings>[] = [];
+  for (let rep = 0; rep < 2; rep++) {
+    for (const p of prompts) {
+      if (signal.aborted) throw new Error('cancelled');
+      samples.push(await timedRequest(baseUrl, servedModelId, p, nonce(), signal));
+    }
+  }
+  return samples;
+}
+
+/**
+ * CALIBRATE: try every (engine, method) that can run this model from what is
+ * on disk, in turn, timing the app's own prompt shapes on each; keep the
+ * verdict; come back up on the winner. the user: "clicking calibrate pauses
+ * anything running in the current chat, then runs the calibration and swaps to
+ * the proper engine and speculative method, ensure this doesn't require
+ * internet to run the calibration".
+ *
+ * The chat's pause is the renderer's (it owns the turn); this owns the
+ * servers. Every step is posted as it happens so the menu can show a row
+ * filling in, and a cancel puts the previous launch back.
+ */
+async function calibrate(modelId?: string, quant?: string): Promise<LlmCalibrateReply> {
+  if (calibration !== null) return { ok: false, error: 'a calibration is already running' };
+  const id = modelId ?? current?.model.id;
+  if (id === undefined) return { ok: false, error: 'no model is running' };
+  const model = getModel(id);
+  if (model === undefined) return { ok: false, error: `unknown model: ${id}` };
+  const file = pickFile(
+    model,
+    quant ?? (current?.model.id === id ? current.file.quant : undefined),
+  );
+  if (file === undefined) return { ok: false, error: `unknown quant for ${id}` };
+
+  const abort = new AbortController();
+  calibration = { abort, modelId: model.id };
+  const previous = current !== null && current.model.id === model.id ? current.profile : null;
+  emitStatus();
+  try {
+    const hw = await getHardware();
+    const hwKey = await ensureHardwareKey();
+    const gguf = modelEngine(model) !== 'mlx' && existsSync(modelPathFor(model, file));
+    let specTypes: readonly string[] = [];
+    let mtpSupported = false;
+    if (gguf) {
+      const install = await ensureEngineFor(model, { execFileImpl: execFileAsync });
+      const features = await probeServerFeatures(install.serverPath);
+      specTypes = features.specTypes;
+      mtpSupported = features.mtp;
+    }
+    const mtpSibling =
+      model.mtpFile !== undefined && model.mtpEmbedded !== true
+        ? existsSync(join(modelDir(model.id), model.mtpFile.name))
+        : false;
+    const supportsType = (t: string) => specTypes.includes(t);
+    const drafts = draftsOnDisk(model).filter((m) => supportsType(`draft-${m}`));
+    const mlxDir = await mlxDirFor(model);
+    const mlxDrafts = (
+      await Promise.all(
+        (['dflash', 'dspark'] as const).map(async (m) =>
+          (await mlxDraftDirFor(model, m)) === undefined ? null : m,
+        ),
+      )
+    ).filter((m): m is 'dflash' | 'dspark' => m !== null);
+    const mlxMtp =
+      mlxDir !== undefined &&
+      ((await mlxDraftDirFor(model, 'mtp')) !== undefined || mlxTwinHasMtp(mlxDir));
+    const input: CalibrationInput = {
+      platform:
+        process.platform === 'darwin' || process.platform === 'linux' ? process.platform : 'win32',
+      appleSilicon: hw.isAppleSilicon,
+      installedEngines: ['llamacpp', ...installedVenvEngines()],
+      ggufPresent: gguf,
+      mtpAvailable: gguf && mtpSupported && (model.mtpEmbedded === true || mtpSibling),
+      draftsPresent: drafts,
+      mlxPresent: mlxDir !== undefined,
+      mlxDraftsPresent: mlxDrafts,
+      mlxMtpAvailable: mlxMtp,
+    };
+    const { candidates, skips } = planCandidates(input);
+    postCalibration({
+      stage: 'planned',
+      candidates: candidates.map((c) => ({
+        id: c.id,
+        engine: c.engine,
+        spec: c.spec,
+        label: c.label,
+      })),
+      skips: skips.map((k) => ({
+        id: k.id,
+        engine: k.engine,
+        spec: k.spec,
+        label: k.label,
+        reason: k.reason,
+      })),
+    });
+    if (candidates.length === 0) {
+      const error = 'nothing to measure: no engine can run this model from disk';
+      postCalibration({ stage: 'failed', error });
+      return { ok: false, error };
+    }
+
+    const results: CalibrationResult[] = [];
+    for (const [index, c] of candidates.entries()) {
+      if (abort.signal.aborted) break;
+      const total = candidates.length;
+      postCalibration({ stage: 'starting', id: c.id, index, total });
+      const t0 = Date.now();
+      lastEngineComplaint = null;
+      const started = await startServer(model.id, file.quant, 'fast-text', 1, {
+        engine: c.engine,
+        spec: c.spec,
+      });
+      const startupMs = Date.now() - t0;
+      let result: CalibrationResult;
+      if (!started.success || current === null) {
+        result = summarise(c.id, [], startupMs, started.error ?? 'did not start');
+      } else {
+        postCalibration({ stage: 'measuring', id: c.id, index, total });
+        try {
+          const samples = await benchServer(current.baseUrl, current.servedModelId, abort.signal);
+          result = summarise(c.id, samples, startupMs);
+        } catch (error) {
+          /* "no tokens came back" says what we saw; the engine's own last
+             error line says why — MEASURED: a Metal out-of-memory that the
+             stream reported as an empty 200. */
+          const seen = String(error instanceof Error ? error.message : error).slice(0, 200);
+          result = summarise(
+            c.id,
+            [],
+            startupMs,
+            lastEngineComplaint === null ? seen : `${seen} — ${lastEngineComplaint}`,
+          );
+        }
+      }
+      console.log(
+        `[calibrate] ${c.id}: ${result.ok ? `${result.decodeTps.toFixed(1)} tok/s decode · ${result.prefillTps.toFixed(0)} tok/s prefill · ttft ${result.ttftMs.toFixed(0)} ms` : `failed: ${result.error}`} (up in ${startupMs} ms)`,
+      );
+      results.push(result);
+      postCalibration({ stage: 'result', result: resultDto(result), index, total });
+    }
+    if (abort.signal.aborted) {
+      postCalibration({ stage: 'cancelled' });
+      if (previous !== null) await startServer(model.id, file.quant, 'fast-text', 1, previous);
+      return { ok: false, error: 'cancelled' };
+    }
+    const { ranked, chosen } = chooseProfile(results);
+    const record: CalibrationRecord = {
+      modelId: model.id,
+      quant: file.quant,
+      hardwareKey: hwKey,
+      engineBuild: PINNED_LLAMACPP.tag,
+      at: new Date().toISOString(),
+      ranked,
+      skips,
+      chosen: chosen === null ? null : profileOf(chosen.id),
+    };
+    writeRecord(record);
+    const target = record.chosen ?? previous ?? defaultProfile(model);
+    postCalibration({ stage: 'switching', chosen: target });
+    const up = await startServer(model.id, file.quant, 'fast-text', 1, target);
+    if (!up.success) {
+      const error = `calibrated, but the winner failed to start: ${up.error ?? 'unknown'}`;
+      postCalibration({ stage: 'failed', error });
+      return { ok: false, error, record: recordDto(record) };
+    }
+    postCalibration({ stage: 'done', record: recordDto(record) });
+    return { ok: true, record: recordDto(record) };
+  } catch (error) {
+    const message = String(error instanceof Error ? error.message : error);
+    postCalibration({ stage: 'failed', error: message });
+    return { ok: false, error: message };
+  } finally {
+    calibration = null;
+    emitStatus();
+  }
+}
+
+function cancelCalibration(): { ok: boolean } {
+  if (calibration === null) return { ok: false };
+  calibration.abort.abort();
+  return { ok: true };
+}
+
+/** Relaunch the running model on a profile the user picked from the menu. */
+async function applyProfile(profile: LaunchProfile): Promise<{ success: boolean; error?: string }> {
+  const valid = profileOf(`${profile.engine}/${profile.spec}`);
+  if (valid === null) return { success: false, error: 'unknown engine or method' };
+  if (current === null) return { success: false, error: 'no model is running' };
+  const res = await startServer(current.model.id, current.file.quant, 'fast-text', 1, valid);
+  return { success: res.success, ...(res.error !== undefined ? { error: res.error } : {}) };
 }
 
 /*
@@ -935,9 +1859,10 @@ function startServer(
   quant?: string,
   launchMode: LaunchMode = 'fast-text',
   parallel?: number,
+  profile?: LaunchProfile,
 ): Promise<{ success: boolean; baseUrl?: string; error?: string }> {
   const run = (startInFlight ?? Promise.resolve()).then(() =>
-    startServerExclusive(modelId, quant, launchMode, parallel),
+    startServerExclusive(modelId, quant, launchMode, parallel, profile),
   );
   // Keep the chain alive even when a start fails, so one failure cannot wedge
   // every later start behind a rejected promise.
@@ -950,11 +1875,40 @@ async function startServerExclusive(
   quant?: string,
   launchMode: LaunchMode = 'fast-text',
   parallel?: number,
+  requestedProfile?: LaunchProfile,
 ): Promise<{ success: boolean; baseUrl?: string; error?: string }> {
   const model = getModel(modelId);
   if (model === undefined) return { success: false, error: `unknown model: ${modelId}` };
   const file = pickFile(model, quant);
   if (file === undefined) return { success: false, error: `unknown quant for ${modelId}` };
+  /*
+   * WHICH ENGINE, WHICH METHOD. An explicit ask (a calibration step, a row the
+   * user clicked) wins; otherwise the calibrated verdict for this model on this
+   * machine; otherwise llama.cpp with the model's declared method — the launch
+   * exactly as it was before calibration existed. A vision launch is llama.cpp
+   * whatever was chosen: none of the other engines takes a projector.
+   */
+  await ensureHardwareKey();
+  const calibrated =
+    requestedProfile === undefined ? readRecord(model.id, file.quant)?.chosen : null;
+  const profile: LaunchProfile =
+    launchMode === 'multimodal'
+      ? { engine: 'llamacpp', spec: requestedProfile?.spec ?? defaultProfile(model).spec }
+      : (requestedProfile ?? calibrated ?? defaultProfile(model));
+  if (profile.engine !== 'llamacpp' && modelEngine(model) !== 'mlx') {
+    const external = await startExternalEngine(model, file, profile);
+    /*
+     * A VERDICT THAT CAN NO LONGER BE HONOURED must not stop the model. The
+     * calibrated engine may have been uninstalled or its weights deleted since
+     * the measurement; an implicit launch falls back to llama.cpp and says so,
+     * and only an explicit ask (a row the user clicked) reports the failure.
+     */
+    if (external.success || requestedProfile !== undefined) return external;
+    console.log(
+      `[engine] calibrated ${profile.engine}/${profile.spec} for ${model.id} cannot start (${external.error ?? 'unknown'}); falling back to llama.cpp`,
+    );
+    return startServerExclusive(modelId, quant, launchMode, parallel, defaultProfile(model));
+  }
 
   /*
    * A MULTI-SHARD MODEL CANNOT START, so say so instead of trying.
@@ -998,7 +1952,8 @@ async function startServerExclusive(
     current !== null &&
     current.model.id === model.id &&
     current.file.quant === file.quant &&
-    current.launchMode === launchMode
+    current.launchMode === launchMode &&
+    sameProfile(current.profile, profile)
   ) {
     return { success: true, baseUrl: current.baseUrl };
   }
@@ -1209,9 +2164,17 @@ async function startServerExclusive(
       launchMode === 'fast-text' && model.mtpFile !== undefined && model.mtpEmbedded !== true
         ? join(dir, model.mtpFile.name)
         : undefined;
+    /*
+     * THE METHOD IS THE PROFILE'S, and the draft file follows from it: EAGLE-3,
+     * DFlash and DSpark each have their own GGUF beside the weights
+     * (model-downloader fetches every one the catalogue names). A method whose
+     * file is missing launches plain rather than failing — the calibration
+     * planner never proposes one, and a stale record cannot break a launch.
+     */
+    const launchSpec = llamaSpecFor(profile.spec, model);
     const draftPath =
-      launchMode === 'fast-text' && model.spec === 'eagle3' && model.draftModel !== undefined
-        ? join(dir, model.draftModel.name)
+      launchMode === 'fast-text' && launchSpec.draftMethod !== undefined
+        ? draftPathFor(model, launchSpec.draftMethod)
         : undefined;
 
     // Force the model's OFFICIAL chat template (from its base repo) so llama.cpp
@@ -1282,12 +2245,15 @@ async function startServerExclusive(
       // set only when vision was explicitly requested — the lazy guarantee.
       mmprojPath,
       /* `specDisabled` models keep their declared head and simply do not launch
-         with it — measured slower on this hardware. See CatalogModel. */
-      mtpSupported: features.mtp && model.specDisabled !== true,
+         with it by DEFAULT — measured slower on this hardware (see CatalogModel).
+         A calibration or a hand-picked profile that asks for MTP outranks that
+         table: it is the measurement the table was standing in for. */
+      mtpSupported:
+        features.mtp && (model.specDisabled !== true || requestedProfile?.spec === 'mtp'),
       mtpEmbedded: launchMode === 'fast-text' ? model.mtpEmbedded : undefined,
       mtpPath:
         mtpSiblingPath !== undefined && existsSync(mtpSiblingPath) ? mtpSiblingPath : undefined,
-      specType: model.spec === 'eagle3' ? 'draft-eagle3' : 'draft-mtp',
+      specType: launchSpec.specType,
       eagle3Supported: features.eagle3,
       draftPath: draftPath !== undefined && existsSync(draftPath) ? draftPath : undefined,
       extraArgs: launchExtraArgs.length > 0 ? launchExtraArgs : undefined,
@@ -1345,8 +2311,12 @@ async function startServerExclusive(
       baseUrl,
       launchMode,
       visionReady: mmprojPath !== undefined,
+      profile,
+      provider: 'llamacpp',
+      servedModelId: model.id,
     };
     phase = 'ready';
+    console.log(`[engine] ${model.id} up on llama.cpp · ${profile.spec} (${baseUrl})`);
 
     await writeModelsJson(
       MODELS_JSON,
@@ -1452,9 +2422,21 @@ async function handle(req: LlmRequest): Promise<unknown> {
     case 'verify-model':
       return verifyModel(req.modelId, req.quant);
     case 'start-server':
-      return startServer(req.modelId, req.quant, req.launchMode, req.parallel);
+      return startServer(req.modelId, req.quant, req.launchMode, req.parallel, req.profile);
     case 'stop-server':
       return stopServer();
+    case 'calibrate':
+      return calibrate(req.modelId, req.quant);
+    case 'calibrate-cancel':
+      return cancelCalibration();
+    case 'calibration-record': {
+      const model = getModel(req.modelId);
+      const file = model === undefined ? undefined : pickFile(model, req.quant);
+      const record = file === undefined ? null : readRecord(req.modelId, file.quant);
+      return { record: record === null ? null : recordDto(record) };
+    }
+    case 'use-profile':
+      return applyProfile(req.profile);
     case 'park-server':
       return parkServer();
     case 'resume-server':

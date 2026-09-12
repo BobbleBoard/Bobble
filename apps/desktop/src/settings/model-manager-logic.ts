@@ -318,20 +318,21 @@ export { isReliablePublisher, RELIABLE_PUBLISHERS } from '@pi-desktop/inference/
 // ---------------------------------------------------------------------------
 
 /** Speculative-decoding speed method (mirror of the catalog `SpecMethod`). */
-export type SpecMethod = 'mtp' | 'eagle3' | 'dflash';
+export type SpecMethod = 'mtp' | 'eagle3' | 'dflash' | 'dspark';
 
-/** Order the variant dropdown offers methods in: [MTP / DFlash / EAGLE-3]. */
-export const VARIANT_ORDER: readonly SpecMethod[] = ['mtp', 'dflash', 'eagle3'];
+/** Order the variant dropdown offers methods in: [MTP / DFlash / DSpark / EAGLE-3]. */
+export const VARIANT_ORDER: readonly SpecMethod[] = ['mtp', 'dflash', 'dspark', 'eagle3'];
 
 /** Human label per speed method. */
 export const VARIANT_LABEL: Record<SpecMethod, string> = {
   mtp: 'MTP',
   dflash: 'DFlash',
+  dspark: 'DSpark',
   eagle3: 'EAGLE-3',
 };
 
-/** Trailing "(MTP)" / "(EAGLE-3)" / "(DFlash)" suffix on a display name. */
-const VARIANT_SUFFIX_RE = /\s*\((?:MTP|EAGLE-?3|DFlash)\)\s*$/i;
+/** Trailing "(MTP)" / "(EAGLE-3)" / "(DFlash)" / "(DSpark)" suffix on a display name. */
+const VARIANT_SUFFIX_RE = /\s*\((?:MTP|EAGLE-?3|DFlash|DSpark)\)\s*$/i;
 
 /** A model size token, e.g. `E2B`, `12B`, `0.8B`, `26B-A4B`, `30B-A3B`. */
 const SIZE_TOKEN_RE = /^E?\d+(?:\.\d+)?B(?:-A\d+B)?$/i;

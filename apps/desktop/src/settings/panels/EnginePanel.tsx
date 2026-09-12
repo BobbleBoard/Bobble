@@ -19,6 +19,7 @@ import { SegmentedControl, Spinner } from '@pi-desktop/ui';
 import { useCallback, useEffect, useState } from 'react';
 import type { EngineState } from '../../../electron/ipc-contract';
 import { cx } from '../../onboarding/cx';
+import { useLlmStore } from '../../state/llm-store';
 import { useSettingsStore } from '../../state/settings-store';
 import {
   ENGINES,
@@ -29,6 +30,7 @@ import {
   orderEnginesForDisplay,
   recommendedEngine,
 } from '../engine-catalog';
+import { hostGpuOf } from '../host-gpu';
 import { SettingRow, SettingSection } from '../parts';
 
 /** Bytes actually measured on disk beat the catalog's estimate once installed. */
@@ -52,6 +54,7 @@ export function EnginePanel() {
     setStates(Object.fromEntries(res.engines.map((e) => [e.id, e])));
   }, []);
 
+  const hardware = useLlmStore((s) => s.hardware);
   useEffect(() => {
     void window.piDesktop
       .invoke('app:get-info', undefined)
@@ -60,11 +63,12 @@ export function EnginePanel() {
           platform:
             info.platform === 'darwin' || info.platform === 'win32' ? info.platform : 'linux',
           appleSilicon: info.platform === 'darwin' && info.arch === 'arm64',
+          gpu: hostGpuOf(hardware),
         });
       })
-      .catch(() => setHost({ platform: 'linux', appleSilicon: false }));
+      .catch(() => setHost({ platform: 'linux', appleSilicon: false, gpu: hostGpuOf(hardware) }));
     void refresh();
-  }, [refresh]);
+  }, [refresh, hardware]);
 
   const act = async (id: string, kind: 'install' | 'uninstall') => {
     setPending(id);

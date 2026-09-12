@@ -9,7 +9,8 @@
     ".": "./src/index.ts",
     "./repair": "./src/repair.ts",
     "./resume": "./src/resume-completion.ts",
-    "./prefill": "./src/prefill-completion.ts"
+    "./prefill": "./src/prefill-completion.ts",
+    "./live-tps": "./src/live-tps.ts"
   },
   "scripts": {
     "lint": "biome check .",
