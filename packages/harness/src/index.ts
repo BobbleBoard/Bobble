@@ -1306,9 +1306,24 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
      * after 46.8 seconds, on a TWO-MESSAGE conversation. The turn after it,
      * with the set settled, was 306ms.
      */
+    /*
+     * IN CLI MODE THE TURN ADVERTISES THE FOUR PINNED TOOLS AND NOTHING ELSE
+     * (applyPreset) — the manager is reached as `coordinate manager`, a
+     * command. The warm-up used to add `talk_to_manager` here anyway, so it
+     * primed a five-tool prefix the four-tool turn could never hit: MEASURED
+     * on a fresh CLI chat, `reused=0 (0%)`, first token at 5.7 s against 3.3 s
+     * in schemas mode with a 98% hit — and the useless prime, started late,
+     * held the single slot while the real turn queued behind it.
+     */
+    const cliPinned = toolCliMode ? TOOL_CLI_PINNED.filter((t) => available.includes(t)) : [];
     const warmNames =
-      runtime.activeTools.length > 0 ? runtime.activeTools.slice() : resolveBaseTools(available);
+      cliPinned.length > 0
+        ? cliPinned.slice()
+        : runtime.activeTools.length > 0
+          ? runtime.activeTools.slice()
+          : resolveBaseTools(available);
     if (
+      cliPinned.length === 0 &&
       corpToolEnabled(runtime.config.effort) &&
       available.includes(CREATE_PRODUCTION_HIERARCHY) &&
       !warmNames.includes(CREATE_PRODUCTION_HIERARCHY)
@@ -3091,6 +3106,10 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
   // utility model is configured, ambiguous heuristics escalate to a tier-2
   // double-check (classifyWithEscalation); otherwise the pure heuristic stands.
   pi.on('before_agent_start', async (event, ctx) => {
+    /* PI_ADV_DEBUG_TIMING=1: how long this hook holds the turn before the
+       provider is even asked — the part of TTFT that is ours, not the model's. */
+    const hookT0 = Date.now();
+    const timing = (process.env.PI_ADV_DEBUG_TIMING ?? '').length > 0;
     /* A new turn deserves the full explanation again — the escalation is about
        one turn's refusal to take an answer, not a grudge. */
     fencedWhileDriving = 0;
@@ -3198,6 +3217,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     applyPreset(ctx);
     // A new turn starts at no-ingest, not at whatever the last one reached.
     clearPrefillStatus(ctx);
+    if (timing) console.error(`[pi-timing] before_agent_start ${Date.now() - hookT0}ms`);
     // Replace the turn's system prompt with the capability-affirming version.
     return {
       systemPrompt: augmentedSystemPrompt,

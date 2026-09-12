@@ -163,6 +163,18 @@ export function registerGenTools(pi: ExtensionAPI, options: GenToolsOptions): vo
       'sizes and step counts are slower. When the user names a folder or file for the picture, ' +
       'pass it as save_to — the finished image is saved there for you; no copying afterwards.',
     promptSnippet: 'Generate an image from a text prompt (on-device)',
+    /*
+     * A LINE IN THE GUIDELINES, like office_make has. SEEN (4B, bash-CLI, the
+     * children's book): the model read "media — Create images…" in its command
+     * list, reasoned "the media tool is what I should use", ran `ls` and
+     * `mkdir` instead, and then told the user it had no way to make pictures.
+     * The office tool never suffers this, and the difference is this bullet:
+     * a guideline that names the call, in the mode's own syntax (the harness
+     * rewrites the tool name to the command in CLI mode).
+     */
+    promptGuidelines: [
+      'Every picture the user asks for is made with generate_image — one call per picture, the description as the prompt, and the folder or file they named as save_to. You can always make pictures; never say you cannot, and never draw one in code.',
+    ],
     parameters: Type.Object({
       prompt: Type.String({
         description: 'What to draw. Be specific about subject, style, lighting.',
