@@ -34,12 +34,13 @@
  * the column under the reader at the exact moment they are looking at the result;
  * the user allowed "a quick smooth resize", and this is it.
  */
-import { type CSSProperties, type JSX, useRef, useState } from 'react';
+import { type CSSProperties, type JSX, useEffect, useRef, useState } from 'react';
 import { BobbleLoader } from '../chat/BobbleLoader';
 import type { LoaderVariant } from '../chat/bobble-anim';
 import { pdFileUrl } from '../chat/canvas/file-preview';
 import { ThreadAudio } from '../chat/ThreadAudio';
 import type { ThreadMediaItem } from '../chat/thread-media';
+import { subscribeToDenoise } from '../chat/useDenoisePreview';
 import { ModelSurface } from './ModelSurface';
 import { VideoSurface } from './VideoSurface';
 
@@ -84,6 +85,7 @@ export function PendingMediaCard({
   kind,
   aspect,
   width,
+  live,
   progress,
   note,
   label = 'Working',
@@ -103,12 +105,53 @@ export function PendingMediaCard({
   label?: string;
   /** The finished media. Its arrival is what starts the closing sweep. */
   item?: ThreadMediaItem;
+  /**
+   * Show the engine's own decoded steps as they arrive (the thread's live
+   * denoise). The FIRST frame starts the sweep — the picture resolving is a
+   * better answer than the mark once there is one — and later frames replace
+   * it in place. Off for the studio, which has its own preview rail.
+   */
+  live?: boolean;
   /** Called once the sweep has cleared the board and the result is fully out. */
   onRevealed?: () => void;
 }): JSX.Element {
   const frameRef = useRef<HTMLDivElement | null>(null);
   const [swept, setSwept] = useState(false);
-  const revealing = item !== undefined;
+  /*
+   * THE LATEST DECODED STEP, when the engine sends them. Local state on
+   * purpose: only this card re-renders when a frame lands (~1.3 s apart),
+   * never the thread around it — the reason the old placeholder drove its DOM
+   * by hand. The canvas effect's deps do not include this, so the loop is
+   * untouched by a frame.
+   */
+  const [preview, setPreview] = useState<string | undefined>(undefined);
+  useEffect(() => {
+    if (live !== true) return;
+    let latest = -1;
+    const off = subscribeToDenoise({
+      onFrame: (_jobId, frame) => {
+        if (frame.step <= latest) return;
+        latest = frame.step;
+        setPreview(frame.dataUri);
+      },
+      onDone: () => undefined,
+    });
+    return () => off?.();
+  }, [live]);
+
+  // The first thing that can be shown — the result, or a decoded step — is
+  // what starts the sweep. After it the card is content, not a loader.
+  const revealing = item !== undefined || preview !== undefined;
+
+  /* Revealed means the RESULT is out from under a finished sweep — whether the
+     sweep ran over the result itself or over a step preview the result then
+     replaced. One place decides that, once. */
+  const revealedRef = useRef(false);
+  useEffect(() => {
+    if (!swept || item === undefined || revealedRef.current) return;
+    revealedRef.current = true;
+    onRevealed?.();
+  }, [swept, item, onRevealed]);
 
   const pct =
     progress === undefined ? undefined : Math.round(Math.max(0, Math.min(1, progress)) * 100);
@@ -141,6 +184,18 @@ export function PendingMediaCard({
           <div className="pd-pending-reveal">
             <RevealSurface item={item} />
           </div>
+        ) : preview !== undefined ? (
+          <div className="pd-pending-reveal">
+            {/* A step, not the picture: the same layer, so the sweep uncovers it
+                the same way, and the finished file replaces it in place. */}
+            <img
+              className="pd-media-image"
+              data-testid="pending-preview"
+              src={preview}
+              alt=""
+              draggable={false}
+            />
+          </div>
         ) : null}
         <BobbleLoader
           fill
@@ -154,10 +209,7 @@ export function PendingMediaCard({
                hundred times during a one-second reveal. */
             frameRef.current?.style.setProperty('--pd-pending-sweep', p.toFixed(4));
           }}
-          onExitDone={() => {
-            setSwept(true);
-            onRevealed?.();
-          }}
+          onExitDone={() => setSwept(true)}
         />
       </div>
       {/*

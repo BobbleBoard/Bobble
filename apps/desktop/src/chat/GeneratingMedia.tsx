@@ -1,83 +1,22 @@
 /**
- * WHAT A GENERATION LOOKS LIKE WHILE IT IS STILL A GENERATION.
+ * WHICH LIVE STREAM A RUNNING TOOL CALL BELONGS TO.
  *
- * One component, three modalities, and — this is the part that matters — it
- * lives in the THREAD, in the box the finished thing will occupy. the user, round
- * 21: "image/video/audio/media generation tools DO NOT GET SHOWN IN THE
- * CANVAS…. they get shown inline, the large card, same as each studio would
- * show. we need to have custom animations for when these are generating."
- *
- * Each modality gets the animation that is honest about what its engine can
- * actually tell us:
- *
- *   image  the app's own mark as a sliding-tile puzzle, replaced the instant a
- *          real decoded step arrives — mflux and the gen3d sidecar both publish
- *          them, so the wait ends in the picture resolving rather than in a cut.
- *   video  the same, and it keeps the tiles for the whole run: ComfyUI publishes
- *          step COUNTS and no step images, so there is nothing to unblur. Said
- *          here rather than pretended around.
- *   audio  pulsing bars at the exact geometry of the transport that replaces
- *          them, resolving onto the real waveform as soon as the clip exists.
- *
- * A 3D build gets no bespoke animation: it is a multi-stage pipeline with its
- * own progress vocabulary, and the card's title, estimate and clock already say
- * more about it than a loop could.
+ * The component that used to live here — a per-modality placeholder inside a
+ * card with a title, a clock and a Cancel — is gone. the user: "just the same final
+ * video card, same final image card, same final 3d card … and then below it,
+ * just floating, a white progress bar." The thread now mounts
+ * media/PendingMediaCard, the same card the studios use, and this file keeps
+ * the one thing the thread still needs from here: the engine's own account of
+ * the job that is running.
  */
-import type { JSX } from 'react';
 import { type GenLiveJob, type GenLiveModality, useLiveGen } from '../state/gen-live';
 import type { JobKind } from './long-job';
-import { ThreadAudioPlaceholder } from './ThreadAudioPlaceholder';
-import { ThreadImagePlaceholder } from './ThreadImagePlaceholder';
 
 /** The generation stream's modality for a job kind, or null when it has none. */
 export function genModalityFor(kind: JobKind | null | undefined): GenLiveModality | null {
   if (kind === 'image') return 'image';
   if (kind === 'video') return 'video';
   if (kind === 'music' || kind === 'speech' || kind === 'sfx') return 'audio';
-  return null;
-}
-
-/** The verb the placeholder announces to a screen reader. */
-const LABEL: Partial<Record<JobKind, string>> = {
-  image: 'Generating an image',
-  video: 'Generating a video',
-  music: 'Composing music',
-  speech: 'Recording the audio',
-  sfx: 'Generating a sound',
-};
-
-export function GeneratingMedia({
-  kind,
-  job,
-}: {
-  kind: JobKind;
-  /** The live stream for this job, when one is reporting. Absent is normal:
-   * the gen3d image path publishes frames without opening a gen stream. */
-  job?: GenLiveJob | null;
-}): JSX.Element | null {
-  const label = LABEL[kind] ?? 'Working';
-  if (kind === 'image' || kind === 'video') {
-    /* The bar only claims a number when the engine is actually counting steps;
-       before that it sweeps and says whatever the worker last reported. */
-    const progress =
-      job?.step !== undefined && job.total !== undefined && job.total > 0
-        ? job.step / job.total
-        : undefined;
-    return (
-      <ThreadImagePlaceholder
-        label={label}
-        variant={kind}
-        {...(progress === undefined ? {} : { progress })}
-        {...(job?.note === undefined ? {} : { note: job.note })}
-        {...(job?.aspect !== undefined ? { aspect: job.aspect } : {})}
-      />
-    );
-  }
-  if (kind === 'music' || kind === 'speech' || kind === 'sfx') {
-    /* The first finished clip is what the bars resolve onto. With `n > 1` the
-       rest arrive as their own cards; a waveform can only be one sound's. */
-    return <ThreadAudioPlaceholder label={label} resolveSrc={job?.outputs[0]} />;
-  }
   return null;
 }
 

@@ -18,14 +18,15 @@ import {
   cleanErrorText,
   type ToolResultMsg,
 } from '@pi-desktop/engine';
-import { type ReactNode, useEffect } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { type PendingKind, PendingMediaCard } from '../media/PendingMediaCard';
 import { abortPi } from '../state/pi-connect';
 import { segmentGroup } from './activity-mapping';
 import { InlineArtifact } from './canvas/InlineArtifacts';
-import { GeneratingMedia, useGeneratingJob } from './GeneratingMedia';
-import { recordJobDuration } from './job-history';
+import { useGeneratingJob } from './GeneratingMedia';
+import { jobSamples, recordJobDuration } from './job-history';
 import { LongJobCard } from './LongJobCard';
-import { type JobKind, jobKindForTool } from './long-job';
+import { estimateFor, type JobKind, jobKindForTool, jobView } from './long-job';
 import { Markdown } from './markdown';
 import { ThreadActivityChain } from './ThreadActivity';
 import { ThreadMedia } from './ThreadMedia';
@@ -38,6 +39,15 @@ import { mediaFromToolResult, type ThreadMediaItem } from './thread-media';
  * or that failed, has produced nothing to show, and mounting a player for it
  * would be a broken box in the transcript.
  */
+/** The pending card's kind for a job kind, or null for jobs with no media. */
+function pendingKindFor(kind: JobKind): PendingKind | null {
+  if (kind === 'image') return 'image';
+  if (kind === 'video') return 'video';
+  if (kind === 'model3d') return 'model';
+  if (kind === 'music' || kind === 'speech' || kind === 'sfx') return 'audio';
+  return null;
+}
+
 function mediaForSegment(
   seg: { kind: string; blocks?: readonly ContentBlock[] },
   resultForBlock: Map<string, ToolResultMsg>,
@@ -196,6 +206,38 @@ export function AssistantGroup({
     }
   }, [finishedKey]);
 
+  /*
+   * THE HANDOVER, IN THE THREAD.
+   *
+   * the user: "just the same final video card, same final image card, same final 3d
+   * card … as it goes reveal the actual produced image/video/3d. seamless."
+   * The pending card (PendingMediaCard) IS the finished card's frame; when the
+   * tool result lands, the first file it produced is handed to that same card,
+   * which plays the closing sweep over it and only then reports `revealed` —
+   * at which point ThreadMedia takes over with identical pixels. Until then
+   * the first item is held back from ThreadMedia, or the picture would appear
+   * twice: once coming out from under the sweep and once below it.
+   *
+   * `lastRunning` remembers which call the card was standing in for, because
+   * by the time the result exists `runningJob` is already null.
+   */
+  const lastRunning = useRef<{ kind: JobKind; callId: string } | null>(null);
+  if (runningJob !== null)
+    lastRunning.current = { kind: runningJob.kind, callId: runningJob.callId };
+  const [revealed, setRevealed] = useState<ReadonlySet<string>>(() => new Set());
+  const handing =
+    runningJob === null &&
+    lastRunning.current !== null &&
+    resultForBlock.has(lastRunning.current.callId)
+      ? lastRunning.current
+      : null;
+  const handingResult = handing === null ? undefined : resultForBlock.get(handing.callId);
+  const handingItem =
+    handingResult === undefined
+      ? undefined
+      : mediaFromToolResult(handingResult.toolName, handingResult.text, handingResult.isError)[0];
+  const handingLive = handingItem !== undefined && !revealed.has(handingItem.path);
+
   const segments = segmentGroup(group);
   const lastSegment = segments[segments.length - 1];
   const groupId = group[0]?.id ?? 'g';
@@ -290,15 +332,53 @@ export function AssistantGroup({
               chain that started the work, and the finished result replaces it
               in place.
             */}
-            {jobHere !== null ? (
+            {jobHere !== null && pendingKindFor(jobHere.kind) !== null ? (
+              /*
+               * THE CARD THE RESULT WILL OCCUPY, mounted early — the same one the
+               * studios use. No title, no clock, no Cancel: the row above says
+               * what is being made, the composer's Stop stops it, and the one
+               * line under the bar is the engine's own note or, before it has
+               * said anything, how long this usually takes on this Mac.
+               */
+              <PendingMediaCard
+                kind={pendingKindFor(jobHere.kind) as PendingKind}
+                live={jobHere.kind === 'image'}
+                label={`Generating ${jobHere.kind}`}
+                note={
+                  generating?.note ??
+                  jobView(
+                    jobHere.kind,
+                    Math.max(0, Date.now() - jobHere.startedAt),
+                    estimateFor(jobHere.kind, jobSamples(jobHere.kind)),
+                  ).estimate
+                }
+                {...(generating?.step !== undefined &&
+                generating.total !== undefined &&
+                generating.total > 0
+                  ? { progress: generating.step / generating.total }
+                  : {})}
+                {...(generating?.aspect !== undefined ? { aspect: generating.aspect } : {})}
+              />
+            ) : jobHere !== null ? (
               <LongJobCard
                 kind={jobHere.kind}
                 startedAt={jobHere.startedAt}
                 onCancel={() => void abortPi()}
                 {...(generating?.note !== undefined ? { note: generating.note } : {})}
-              >
-                <GeneratingMedia kind={jobHere.kind} job={generating} />
-              </LongJobCard>
+              />
+            ) : null}
+            {/* The result, coming out from under the sweep — see `handing`. */}
+            {handing !== null &&
+            handingLive &&
+            handingItem !== undefined &&
+            seg.kind === 'chain' &&
+            seg.blocks.some((b) => b.type === 'toolCall' && b.id === handing.callId) ? (
+              <PendingMediaCard
+                kind={pendingKindFor(handing.kind) ?? 'image'}
+                live={handing.kind === 'image'}
+                item={handingItem}
+                onRevealed={() => setRevealed((cur) => new Set([...cur, handingItem.path]))}
+              />
             ) : null}
             {/* WHAT THE TURN MADE, under the chain that made it. Generated
                 images used to reach the thread only as a 414px markdown embed
@@ -306,7 +386,11 @@ export function AssistantGroup({
                 every produced file embedded at full quality with a card to
                 reveal it. Keyed off the tool RESULT, so it appears when the
                 file exists rather than when the model mentions one. */}
-            <ThreadMedia items={mediaForSegment(seg, resultForBlock)} />
+            <ThreadMedia
+              items={mediaForSegment(seg, resultForBlock).filter(
+                (item) => !(handingLive && item.path === handingItem?.path),
+              )}
+            />
           </div>
         );
       })}

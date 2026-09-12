@@ -46,6 +46,7 @@ const app = await _electron.launch({
 });
 
 let frames = 0;
+let previousReserve;
 let filming = false;
 async function film(win) {
   const period = 1000 / FPS;
@@ -129,6 +130,19 @@ async function main() {
   );
   await win.waitForTimeout(600);
 
+  /*
+   * RESERVE_GB: the user's own knob, for a machine that is busy. settings.json
+   * is SHARED with the real app, so whatever this changes is put back below.
+   */
+  if (process.env.RESERVE_GB) {
+    previousReserve = (await win.evaluate(() => window.piDesktop.invoke('settings:get', undefined)))
+      ?.powerReserveGB;
+    await win.evaluate(
+      (gb) => window.piDesktop.invoke('settings:set', { patch: { powerReserveGB: gb } }),
+      Number(process.env.RESERVE_GB),
+    );
+    say(`reserve: ${process.env.RESERVE_GB} GB (was ${previousReserve ?? 'default'})`);
+  }
   await win.evaluate(() => window.__modality_store?.().getState().setView('chat'));
   await win.waitForTimeout(2500);
   say(`chat model up: ${CHAT_MODEL}`);
@@ -153,6 +167,7 @@ async function main() {
   say(`sent: ${PROMPT}`);
 
   let shotLoader = false;
+  let shotSweep = false;
   let lastMsgs = -1;
   let state = {};
   const deadline = Date.now() + DEADLINE;
@@ -170,9 +185,17 @@ async function main() {
     state = await win
       .evaluate(() => {
         const loader = document.querySelector('[data-testid="bobble-loader"]');
+        const frame = document.querySelector('[data-testid="pending-media-card"] .pd-media-frame');
         return {
           loader: loader?.dataset?.variant ?? null,
-          pct: document.querySelector('[data-testid="bobble-pct"]')?.textContent ?? null,
+          pct:
+            document.querySelector('[data-testid="pending-pct"]')?.textContent ??
+            document.querySelector('[data-testid="bobble-pct"]')?.textContent ??
+            null,
+          sweep:
+            frame === null
+              ? null
+              : Number(getComputedStyle(frame).getPropertyValue('--pd-pending-sweep') || 0),
           media: document.querySelectorAll(
             '.pd-thread-media img, .pd-thread-media video, [data-testid="thread-audio"], .pd-prose img',
           ).length,
@@ -204,6 +227,11 @@ async function main() {
       await win.screenshot({ path: path.join(OUT, '02-loader.png') });
       shotLoader = true;
       say(`inline loader up (variant=${state.loader}, ${state.pct})`);
+    }
+    if (state.sweep !== null && state.sweep > 0.1 && state.sweep < 0.9 && !shotSweep) {
+      shotSweep = true;
+      await win.screenshot({ path: path.join(OUT, '02b-sweep.png') });
+      say(`inline sweep ${state.sweep.toFixed(2)}`);
     }
     if (!state.streaming && (state.media > 0 || state.cards > 0) && state.msgs > 1) {
       const settled = await ready();
@@ -239,6 +267,22 @@ try {
   await main();
 } finally {
   filming = false;
+  if (process.env.RESERVE_GB) {
+    try {
+      const win = await app.firstWindow();
+      await win.evaluate(
+        (prev) =>
+          window.piDesktop.invoke('settings:set', {
+            // 0 normalises to "derive from the machine" — the same as absent.
+            patch: { powerReserveGB: prev === undefined ? 0 : prev },
+          }),
+        previousReserve,
+      );
+      say(`reserve restored (${previousReserve ?? 'default'})`);
+    } catch {
+      /* the window is gone; check ~/.pi/desktop/settings.json by hand */
+    }
+  }
   await app.close().catch(() => {});
 }
 

@@ -6482,9 +6482,12 @@ body[data-media-expanded="true"] .pd-studio-compose {
   display: block;
 }
 .pd-media-card--pending .pd-bobble-loader-host[data-fill="true"] .pd-bobble-canvas {
-  /* The scrim belongs to a small mark on a pale plate; at card scale the frame
-     IS the ground and a second one inside it is a box within a box. */
-  background: none;
+  /* The scrim STAYS. In fill mode the canvas is the whole frame, so its ground
+     is the frame's ground — no box within a box — and on the light theme that
+     ground is what makes white blocks visible at all. SEEN in the thread: a
+     white frame with nothing in it. (`--pd-bobble-scrim` is transparent on the
+     dark theme, where the frame is already dark.) The radius is the frame's,
+     which clips. */
   border-radius: 0;
 }
 
