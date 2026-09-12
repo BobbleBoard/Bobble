@@ -34,9 +34,13 @@ export type JobQueueListener = (event: JobQueueEvent) => void;
 /** Queue-level observability (distinct from per-job worker {@link GenEvent}s). */
 export type JobQueueEvent =
   | { readonly type: 'status'; readonly jobId: string; readonly status: JobStatus }
-  | { readonly type: 'event'; readonly jobId: string; readonly event: GenEvent };
+  | { readonly type: 'event'; readonly jobId: string; readonly event: GenEvent }
+  /** A heavy job at the head is being held by the MACHINE, and this is why. */
+  | { readonly type: 'held'; readonly jobId: string; readonly reason: string };
 
 export interface EnqueueOptions {
+  /** Expected resident footprint of the job's model, GB — see `heavyAllowed`. */
+  readonly footprintGB?: number;
   /** Serialize this job exclusively (unified-memory budget). From catalog `heavy`. */
   readonly heavy?: boolean;
   /** Extra `uv --with` deps for the backend. */
@@ -57,6 +61,9 @@ interface Entry {
   readonly extraWith?: readonly string[];
   readonly onEvent?: (event: GenEvent) => void;
   readonly controller: AbortController;
+  footprintGB?: number;
+  /** Why it was cancelled, when it was not the user — see `cancel`. */
+  cancelReason?: string;
   status: JobStatus;
   resolve(outputs: GenOutput[]): void;
   reject(err: Error): void;
@@ -70,8 +77,13 @@ export interface JobQueueOptions {
   /**
    * May a HEAVY job start right now? Consulted at admission, so the answer can
    * change with the machine. Default: always. See `JobQueue.#heavyAllowed`.
+   *
+   * Given the job's expected resident footprint (GB) when the caller knows it,
+   * so the answer can be "not THIS one" rather than "nothing heavy": a machine
+   * with 9 GB to spare can run a 5 GB video job and should hold a 12 GB image
+   * one. The reason, when refused, is kept for the job's own status.
    */
-  readonly heavyAllowed?: () => boolean;
+  readonly heavyAllowed?: (footprintGB?: number) => boolean | { ok: boolean; reason?: string };
 }
 
 export class JobQueue {
@@ -93,7 +105,9 @@ export class JobQueue {
    * Generate wants. Defaults to "always", so a caller that does not care behaves
    * exactly as before.
    */
-  #heavyAllowed: () => boolean = () => true;
+  #heavyAllowed: (footprintGB?: number) => boolean | { ok: boolean; reason?: string } = () => true;
+  /** Why the heavy job at the head is being held, for whoever is watching it. */
+  #holdReason: string | undefined;
 
   constructor(opts: JobQueueOptions = {}) {
     this.#maxConcurrent = Math.max(1, opts.maxConcurrent ?? 2);
@@ -145,6 +159,31 @@ export class JobQueue {
     return this.#queue.length;
   }
 
+  /** Is a heavy job running right now? */
+  get runningHeavy(): boolean {
+    return this.#runningHeavy;
+  }
+
+  /**
+   * Cancel every RUNNING job — the guardian's lever. Heavy ones first, because
+   * they are the likeliest cause, but all of them: at the wall a "light" 2 GB
+   * audio job is still 2 GB the machine does not have, and the cost of stopping
+   * it is a retry. Queued jobs stay queued — they are not the problem, and
+   * admission holds them until the machine is breathing again. Returns the ids
+   * it stopped.
+   */
+  shedRunning(reason: string): string[] {
+    const running = [...this.#running]
+      .map((id) => this.#entries.get(id))
+      .filter((e): e is Entry => e !== undefined)
+      .sort((a, b) => Number(b.heavy) - Number(a.heavy));
+    const stopped: string[] = [];
+    for (const entry of running) {
+      if (this.cancel(entry.job.id, reason)) stopped.push(entry.job.id);
+    }
+    return stopped;
+  }
+
   /** Enqueue a job. Returns a handle whose `result` settles on completion. */
   enqueue(job: GenJob, options: EnqueueOptions = {}): JobHandle {
     if (this.#entries.has(job.id)) {
@@ -159,6 +198,7 @@ export class JobQueue {
     const entry: Entry = {
       job,
       heavy: options.heavy === true,
+      footprintGB: options.footprintGB,
       extraWith: options.extraWith,
       onEvent: options.onEvent,
       controller: new AbortController(),
@@ -173,19 +213,31 @@ export class JobQueue {
     return { id: job.id, result };
   }
 
-  /** Cancel a queued or running job. No-op for unknown / already-settled jobs. */
-  cancel(jobId: string): boolean {
+  /**
+   * Cancel a queued or running job. No-op for unknown / already-settled jobs.
+   *
+   * `reason` is what the job's owner will be told. The user pressing Stop needs
+   * none; the machine stopping a job on their behalf owes them one — "generation
+   * canceled" after a job they did not cancel reads as a bug, where "stopped:
+   * only 7% of memory was free" reads as the app looking after the computer.
+   */
+  cancel(jobId: string, reason?: string): boolean {
     const entry = this.#entries.get(jobId);
     if (entry === undefined) return false;
+    if (reason !== undefined) entry.cancelReason = reason;
     if (entry.status === 'queued') {
       const idx = this.#queue.indexOf(entry);
       if (idx !== -1) this.#queue.splice(idx, 1);
       this.#setStatus(entry, 'canceled');
-      entry.reject(new Error('generation canceled'));
+      entry.reject(new Error(reason ?? 'generation canceled'));
       this.#entries.delete(jobId);
       return true;
     }
     if (entry.status === 'running') {
+      // Already on its way out: the worker is being killed and the promise
+      // will reject on its own. Saying "cancelled" again would count one job
+      // as several — the guardian logs and announces what this returns.
+      if (entry.controller.signal.aborted) return false;
       // Abort → the runner SIGKILLs the worker → its promise rejects, which
       // #finish() maps to 'canceled'.
       entry.controller.abort();
@@ -194,14 +246,35 @@ export class JobQueue {
     return false;
   }
 
+  /** The machine's answer for one entry, normalised. */
+  #machineAllows(entry: Entry): boolean {
+    const answer = this.#heavyAllowed(entry.footprintGB);
+    const ok = typeof answer === 'boolean' ? answer : answer.ok;
+    const reason = typeof answer === 'boolean' ? undefined : answer.reason;
+    if (!ok && reason !== undefined && reason !== this.#holdReason) {
+      this.#holdReason = reason;
+      this.#emit({ type: 'held', jobId: entry.job.id, reason });
+    }
+    if (ok) this.#holdReason = undefined;
+    return ok;
+  }
+
   /** Whether the entry at the head can start given the memory-budget rule. */
   #canStart(entry: Entry): boolean {
     if (this.#runningHeavy) return false; // a heavy job owns the machine
     if (entry.heavy) {
       // The machine has to be empty AND willing — see `#heavyAllowed`.
-      return this.#running.size === 0 && this.#heavyAllowed();
+      return this.#running.size === 0 && this.#machineAllows(entry);
     }
-    return this.#running.size < this.#maxConcurrent;
+    /*
+     * LIGHT JOBS ASK TOO. "Light" is a catalog word for "may share the machine
+     * with another job"; it is not a promise about size — a 2 GB music render
+     * is light — and the reading that holds a 12 GB image should hold that
+     * render when the same 2 GB is what the machine has left. The footprint
+     * makes the answer proportionate: a 300 MB speech job passes where the
+     * render does not.
+     */
+    return this.#running.size < this.#maxConcurrent && this.#machineAllows(entry);
   }
 
   #pump(): void {
@@ -224,7 +297,9 @@ export class JobQueue {
       const next = this.#queue[index];
       if (next === undefined) break;
       if (!this.#canStart(next)) {
-        if (next.heavy && this.#running.size === 0 && !this.#heavyAllowed()) {
+        // Held by the MACHINE rather than by the queue: step over it — a
+        // smaller job behind it may fit (see the note above).
+        if (!this.#runningHeavy && !this.#machineAllows(next)) {
           index += 1;
           continue;
         }
@@ -264,7 +339,7 @@ export class JobQueue {
       entry.resolve(result.outputs);
     } else if (entry.controller.signal.aborted) {
       this.#setStatus(entry, 'canceled');
-      entry.reject(new Error('generation canceled'));
+      entry.reject(new Error(entry.cancelReason ?? 'generation canceled'));
     } else {
       this.#setStatus(entry, 'error');
       entry.reject(result.err);

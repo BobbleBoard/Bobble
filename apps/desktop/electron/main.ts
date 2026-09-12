@@ -2,6 +2,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import path from 'node:path';
 import { claudePaths, parseClaudeWindowState } from '@pi-desktop/importers';
+import { excludeCacheFromIndexing } from '@pi-desktop/inference';
 import { createIpcEventSender, createLogger, registerIpcHandlers } from '@pi-desktop/shared';
 import {
   app,
@@ -33,7 +34,13 @@ import {
 import { registerConnectorsIpc } from './connectors/connectors-main';
 import { registerCorpIpc } from './corp/corp-main';
 import { fsHandlers } from './fs-handlers';
-import { disposeGen, registerGenCatalogIpc, registerGenIpc } from './gen/gen-manager';
+import {
+  disposeGen,
+  type GenQueueControl,
+  registerGenCatalogIpc,
+  registerGenIpc,
+} from './gen/gen-manager';
+import { startGuardian } from './gen/guardian-main';
 import { genWorkerCandidates, resolveGenWorkerScript } from './gen/worker-path';
 import { registerGen3dIpc } from './gen3d/gen3d-main';
 import { registerImportIpc } from './import/import-main';
@@ -780,6 +787,24 @@ function registerAppIpc(): void {
    * user installs something that adds to it.
    */
   {
+    /*
+     * THE GUARDIAN — see gen/guardian-main.ts. Started before the queue exists
+     * and handed it lazily, because admission closes over the guardian and the
+     * guardian's levers close over the queue.
+     */
+    let genQueueRef: GenQueueControl | null = null;
+    const guardian = startGuardian({
+      queue: () => genQueueRef,
+      mode: () => readSettings().powerMode,
+      reserveGB: () => readSettings().powerReserveGB,
+      announce: (event) => {
+        const wc = mainWindow?.webContents ?? null;
+        if (wc !== null && !wc.isDestroyed()) events.send(wc, 'gen:guardian', event);
+      },
+      log: (line) => log.info('guardian', { line }),
+    });
+    app.on('before-quit', () => guardian.stop());
+
     const genWorker = resolveGenWorkerScript({
       resourcesPath: process.resourcesPath,
       appPath: app.getAppPath(),
@@ -792,7 +817,7 @@ function registerAppIpc(): void {
         }),
       });
     }
-    registerGenIpc({
+    const genQueue = registerGenIpc({
       /*
        * Hold a heavy generation while the machine is struggling.
        *
@@ -802,8 +827,17 @@ function registerAppIpc(): void {
        * already-resident chat model, and under real pressure it is the single
        * worst thing to start — so it WAITS rather than being refused, and light
        * jobs still go through. See packages/inference/src/power-policy.ts.
+       *
+       * TWO GATES, both must open. The inference worker's slow policy (its
+       * `allowHeavyJobs`, cached here) and the guardian's fast one — which also
+       * asks whether THIS job's footprint fits right now (gen/guardian-main.ts).
+       * The guardian is what turns "the machine froze under a generation" into
+       * "the generation waited, or was stopped, and said why".
        */
-      heavyAllowed: () => heavyJobsAllowed(),
+      heavyAllowed: (footprintGB) => {
+        if (!heavyJobsAllowed()) return { ok: false, reason: 'the machine is under pressure' };
+        return guardian.admit(footprintGB);
+      },
       getWindow: () => (mainWindow !== null ? mainWindow.webContents : null),
       ...(genWorker !== undefined ? { workerScript: genWorker } : {}),
       comfyResolveOrigin: comfyOrigin,
@@ -834,6 +868,7 @@ function registerAppIpc(): void {
         return getInferenceUtility();
       },
     });
+    genQueueRef = genQueue;
     log.info('experimental generation stack wired (gen bridge live)');
   }
 
@@ -923,6 +958,20 @@ if (!hasSingleInstanceLock) {
   applySettingsEnvFromDisk();
 
   void app.whenReady().then(() => {
+    /*
+     * Spotlight must not index 376 GB of model weights — see
+     * packages/inference/src/paths.ts. Done here, once per launch, because the
+     * cache root is created lazily by whichever engine first needs it.
+     */
+    void excludeCacheFromIndexing({
+      mkdir: (dir) => fs.promises.mkdir(dir, { recursive: true }),
+      writeFile: (file, data) => fs.promises.writeFile(file, data),
+      exists: (file) =>
+        fs.promises.access(file).then(
+          () => true,
+          () => false,
+        ),
+    }).then((r) => log.info('spotlight exclusion', { marker: r }));
     // Dev dock icon: show the Pi caret mark on macOS (packaged uses the .icns
     // bundle icon; this covers the unsigned dev/electron-run window).
     if (process.platform === 'darwin' && app.dock !== undefined) {

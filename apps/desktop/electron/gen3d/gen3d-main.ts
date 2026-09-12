@@ -45,6 +45,7 @@ import {
 } from '@pi-desktop/shared';
 import { ensureUv } from '@pi-desktop/web-tools';
 import { app, BrowserWindow, type IpcMain, type WebContents } from 'electron';
+import { tieredSpawn } from '../inference/worker-tier';
 import type { AppEventMap } from '../ipc-contract';
 import { DictationSession, transcribe } from './dictation-main';
 import type {
@@ -217,6 +218,8 @@ async function startSidecar(): Promise<Gen3dSidecar | null> {
   const instance = new Gen3dSidecar({
     uvPath,
     serverScript,
+    // Behind the pointer — see inference/worker-tier.ts.
+    spawnFn: tieredSpawn,
     cacheDir,
     sandboxDir,
     registryPath,

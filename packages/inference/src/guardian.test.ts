@@ -1,0 +1,213 @@
+/**
+ * The guardian is the part of the power policy that ACTS, so every rule here is
+ * one that, wrong, either freezes the machine (too lax) or cancels a fine job
+ * (too eager). Both are things a person notices.
+ */
+import { describe, expect, it, vi } from 'vitest';
+import {
+  BUSY_INTERVAL_MS,
+  createGuardian,
+  fits,
+  IDLE_INTERVAL_MS,
+  judge,
+  limitsFor,
+  settle,
+} from './guardian.js';
+
+const AUTO = limitsFor('auto');
+const LOW = limitsFor('low');
+
+describe('judge', () => {
+  it('is calm on a healthy machine', () => {
+    expect(judge({ memoryFree: 0.66, memory: 'normal', sources: ['sysctl'] }, AUTO).verdict).toBe(
+      'calm',
+    );
+  });
+
+  it('holds while memory is tight, and sheds at the wall', () => {
+    expect(judge({ memoryFree: 0.18, sources: [] }, AUTO).verdict).toBe('hold');
+    expect(judge({ memoryFree: 0.07, sources: [] }, AUTO).verdict).toBe('shed');
+  });
+
+  it("takes the OS's own verdict over any number", () => {
+    // Plenty free by the percentage, but the kernel says critical: it knows
+    // something about wired and compressor pages that the percentage does not.
+    expect(judge({ memoryFree: 0.4, memory: 'critical', sources: [] }, AUTO).verdict).toBe('shed');
+    expect(judge({ memoryFree: 0.4, memory: 'warn', sources: [] }, AUTO).verdict).toBe('hold');
+  });
+
+  it('sheds on real swap traffic — the flow, not the stock', () => {
+    expect(judge({ memoryFree: 0.4, swapIoPerSec: 9000, sources: [] }, AUTO).verdict).toBe('shed');
+    // Housekeeping-level traffic is not a thrash (MEASURED idle: 0-71 pages/s).
+    expect(judge({ memoryFree: 0.4, swapIoPerSec: 60, sources: [] }, AUTO).verdict).toBe('calm');
+  });
+
+  it('reads a main-thread stall as thrashing only when memory is also tight', () => {
+    // A long synchronous call with memory to spare is not the machine freezing.
+    expect(judge({ memoryFree: 0.5, stallMs: 2400, sources: [] }, AUTO).verdict).toBe('calm');
+    // The pointer freezing, measured from the inside.
+    expect(judge({ memoryFree: 0.19, stallMs: 2400, sources: [] }, AUTO).verdict).toBe('shed');
+    expect(judge({ memoryFree: 0.19, stallMs: 400, sources: [] }, AUTO).verdict).toBe('hold');
+  });
+
+  it('does not act on a machine that would not say', () => {
+    expect(judge({ sources: [] }, AUTO).verdict).toBe('calm');
+  });
+
+  it('keeps a wider margin in low power mode', () => {
+    // 25% free: fine at full/auto, already held in low.
+    expect(judge({ memoryFree: 0.25, sources: [] }, AUTO).verdict).toBe('calm');
+    expect(judge({ memoryFree: 0.25, sources: [] }, LOW).verdict).toBe('hold');
+    // 12% free: held at auto, shed in low.
+    expect(judge({ memoryFree: 0.12, sources: [] }, AUTO).verdict).toBe('hold');
+    expect(judge({ memoryFree: 0.12, sources: [] }, LOW).verdict).toBe('shed');
+  });
+
+  it('says why, in words a person can act on', () => {
+    expect(judge({ memoryFree: 0.05, sources: [] }, AUTO).reason).toMatch(/5% of memory/);
+    expect(judge({ memoryFree: 0.4, swapIoPerSec: 9000, sources: [] }, AUTO).reason).toMatch(
+      /swapping/,
+    );
+  });
+});
+
+describe('settle', () => {
+  it('acts at once on a bad reading', () => {
+    expect(settle({ verdict: 'shed', reason: 'x' }, 'calm', 0, AUTO).verdict).toBe('shed');
+    expect(settle({ verdict: 'hold', reason: 'x' }, 'calm', 0, AUTO).verdict).toBe('hold');
+  });
+
+  it('lifts a hold only after several calm readings in a row', () => {
+    let state = { verdict: 'hold' as const, calmStreak: 0 };
+    for (let i = 1; i < AUTO.recoveryReadings; i++) {
+      const s = settle({ verdict: 'calm', reason: 'fine' }, state.verdict, state.calmStreak, AUTO);
+      expect(s.verdict).toBe('hold');
+      state = { verdict: s.verdict as 'hold', calmStreak: s.calmStreak };
+    }
+    const lifted = settle({ verdict: 'calm', reason: 'fine' }, 'hold', state.calmStreak, AUTO);
+    expect(lifted.verdict).toBe('calm');
+  });
+
+  it('resets the streak on any dip', () => {
+    const s = settle({ verdict: 'hold', reason: 'tight' }, 'hold', 3, AUTO);
+    expect(s.calmStreak).toBe(0);
+  });
+
+  it('a shed is not sticky — it becomes an ordinary hold that recovers', () => {
+    const s = settle({ verdict: 'calm', reason: 'fine' }, 'shed', 0, AUTO);
+    expect(s.verdict).toBe('hold');
+    expect(s.calmStreak).toBe(1);
+  });
+});
+
+describe('fits', () => {
+  it('admits a job with room to spare and names the numbers', () => {
+    const r = fits({ footprintGB: 5.2, totalGB: 24, freeFraction: 0.66, reserveGB: 6 });
+    expect(r.ok).toBe(true);
+    expect(r.reason).toMatch(/GB needed/);
+  });
+
+  it('holds a job that would eat the reserve', () => {
+    // 24 GB, 40% free = 9.6 GB available; a 12 GB image model needs ~14.8 GB.
+    const r = fits({ footprintGB: 12, totalGB: 24, freeFraction: 0.4, reserveGB: 6 });
+    expect(r.ok).toBe(false);
+    expect(r.reason).toMatch(/needs about 14\.8 GB/);
+    expect(r.reason).toMatch(/keeping 6 GB/);
+  });
+
+  it('holds a job that fits only by spending the reserve', () => {
+    // 16 GB available, 7 GB needed leaves 9 — fine with a 6 GB reserve, not with 10.
+    expect(fits({ footprintGB: 5.2, totalGB: 24, freeFraction: 0.66, reserveGB: 6 }).ok).toBe(true);
+    expect(fits({ footprintGB: 5.2, totalGB: 24, freeFraction: 0.66, reserveGB: 10 }).ok).toBe(
+      false,
+    );
+  });
+
+  it('never holds a job on a guess', () => {
+    expect(fits({ footprintGB: 40, totalGB: 24, freeFraction: undefined, reserveGB: 6 }).ok).toBe(
+      true,
+    );
+  });
+});
+
+describe('createGuardian', () => {
+  function harness(readings: Array<{ memoryFree?: number; swapIoPerSec?: number }>) {
+    let i = 0;
+    const timers: Array<{ fn: () => void; ms: number }> = [];
+    const verdicts: Array<{ verdict: string; reason: string }> = [];
+    let busy = true;
+    const g = createGuardian({
+      sample: async () => ({
+        ...(readings[Math.min(i++, readings.length - 1)] ?? {}),
+        sources: ['t'],
+      }),
+      busy: () => busy,
+      limits: () => AUTO,
+      onVerdict: (verdict, reason) => verdicts.push({ verdict, reason }),
+      setTimeout: (fn, ms) => {
+        timers.push({ fn, ms });
+        return timers.length;
+      },
+      clearTimeout: () => undefined,
+    });
+    return { g, timers, verdicts, setBusy: (b: boolean) => (busy = b) };
+  }
+
+  it('samples every second while heavy work runs, and slowly when idle', async () => {
+    const h = harness([{ memoryFree: 0.6 }]);
+    h.g.start();
+    await vi.waitFor(() => expect(h.timers.length).toBe(1));
+    expect(h.timers[0]?.ms).toBe(BUSY_INTERVAL_MS);
+    h.setBusy(false);
+    h.timers[0]?.fn();
+    await vi.waitFor(() => expect(h.timers.length).toBe(2));
+    expect(h.timers[1]?.ms).toBe(IDLE_INTERVAL_MS);
+    h.g.stop();
+  });
+
+  it('sheds the moment a reading crosses the line', async () => {
+    const h = harness([{ memoryFree: 0.6 }, { memoryFree: 0.05 }]);
+    expect(await h.g.poke()).toBe('calm');
+    expect(await h.g.poke()).toBe('shed');
+    expect(h.verdicts[1]?.reason).toMatch(/5% of memory/);
+  });
+
+  it('takes an immediate reading when the host reports a long stall while busy', async () => {
+    const h = harness([{ memoryFree: 0.15 }]);
+    h.g.start();
+    await vi.waitFor(() => expect(h.verdicts.length).toBe(1));
+    h.g.heartbeat(2000);
+    await vi.waitFor(() => expect(h.verdicts.length).toBe(2));
+    // Tight memory + a 2s stall = the pointer freezing.
+    expect(h.verdicts[1]?.verdict).toBe('shed');
+    h.g.stop();
+  });
+
+  it('carries the worst stall into the next reading rather than the latest', async () => {
+    const h = harness([{ memoryFree: 0.15 }]);
+    h.g.heartbeat(1900);
+    h.g.heartbeat(20);
+    expect(await h.g.poke()).toBe('shed');
+    // …and clears it, so one old stall does not shed twice.
+    expect(await h.g.poke()).toBe('hold');
+  });
+
+  it('turns raw swap counters into a rate across two readings', async () => {
+    let n = 0;
+    const g = createGuardian({
+      sample: async () => {
+        n += 1;
+        return {
+          memoryFree: 0.5,
+          swapCounters: { ins: n === 1 ? 0 : 20000, outs: 0, at: n === 1 ? 0 : 1000 },
+          sources: ['t'],
+        };
+      },
+      busy: () => true,
+      limits: () => AUTO,
+      onVerdict: () => undefined,
+    });
+    expect(await g.poke()).toBe('calm'); // a rate needs two readings
+    expect(await g.poke()).toBe('shed'); // 20,000 pages in one second
+  });
+});

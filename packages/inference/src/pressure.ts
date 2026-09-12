@@ -325,6 +325,15 @@ export interface PressureProbes {
   readonly previousSwap?: { readonly ins: number; readonly outs: number; readonly at: number };
   /** Clock, injectable for tests. */
   readonly now?: () => number;
+  /**
+   * Memory and swap only — skip the probes that cannot change in a second.
+   *
+   * The guardian reads the machine every second while heavy work runs, and
+   * thermal state and the power source do not move at that rate; `pmset` is
+   * also the slowest of these to answer. The full reading still runs on the
+   * power manager's own slow clock.
+   */
+  readonly quick?: boolean;
 }
 
 /**
@@ -384,17 +393,19 @@ export async function samplePressure(probes: PressureProbes): Promise<SystemPres
         sources.push('macos-swap-rate');
       }
     }
-    const therm = await probes.run('pmset', ['-g', 'therm']);
-    const throttled = therm === null ? undefined : parseMacThermal(therm);
-    if (throttled !== undefined) {
-      out.throttled = throttled;
-      sources.push('macos-thermal');
-    }
-    const ps = await probes.run('pmset', ['-g', 'ps']);
-    const onBattery = ps === null ? undefined : parseMacPowerSource(ps);
-    if (onBattery !== undefined) {
-      out.onBattery = onBattery;
-      sources.push('macos-power');
+    if (probes.quick !== true) {
+      const therm = await probes.run('pmset', ['-g', 'therm']);
+      const throttled = therm === null ? undefined : parseMacThermal(therm);
+      if (throttled !== undefined) {
+        out.throttled = throttled;
+        sources.push('macos-thermal');
+      }
+      const ps = await probes.run('pmset', ['-g', 'ps']);
+      const onBattery = ps === null ? undefined : parseMacPowerSource(ps);
+      if (onBattery !== undefined) {
+        out.onBattery = onBattery;
+        sources.push('macos-power');
+      }
     }
   } else if (probes.platform === 'linux') {
     const psi = await probes.readFile('/proc/pressure/memory');

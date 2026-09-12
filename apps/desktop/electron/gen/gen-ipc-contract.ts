@@ -94,7 +94,24 @@ export type GenEventMap = {
   'gen:update': { tabId: string; payload: GenSurfacePayload };
   /** ComfyUI install progress (consent / venv / torch / per-pack download / config). */
   'gen:comfy-install': ComfyInstallEvent;
+  /**
+   * The machine's own state, as the guardian judges it (gen/guardian-main.ts).
+   *
+   * `calm` / `hold` on every change, and `shed` when a running heavy job was
+   * just cancelled to keep the computer responsive — with the ids it stopped and
+   * the reason, which is what the person who pressed Generate is owed.
+   */
+  'gen:guardian': GuardianEvent;
 };
+
+export interface GuardianEvent {
+  readonly verdict: 'calm' | 'hold' | 'shed';
+  readonly reason: string;
+  /** The OS's own free fraction at the reading, 0..1, when it said. */
+  readonly memoryFree?: number;
+  /** Job ids cancelled by this verdict (shed only). */
+  readonly shed?: readonly string[];
+}
 
 /**
  * A plain, JSON-serializable mirror of one `@pi-desktop/gen-service`

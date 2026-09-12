@@ -35,6 +35,7 @@ import path from 'node:path';
 import {
   activeModels,
   ComfyClient,
+  defaultGenSpawn,
   defaultImageModel,
   defaultVideoModel,
   type GenEvent,
@@ -61,6 +62,7 @@ import {
 import { createLogger, registerIpcHandlers } from '@pi-desktop/shared';
 import { type IpcMain, type IpcMainInvokeEvent, ipcMain, type WebContents } from 'electron';
 import { bobbleDir, GENERATED_DIR, slug, uniqueName } from '../bobble-paths';
+import { tierChild } from '../inference/worker-tier';
 import {
   type AssetConsent,
   type EnsureAssetFn,
@@ -119,7 +121,7 @@ export interface GenManagerOptions {
    * begin — so it is HELD until the machine is breathing again, never refused.
    * Light jobs still go through. Default: always allowed.
    */
-  readonly heavyAllowed?: () => boolean;
+  readonly heavyAllowed?: (footprintGB?: number) => boolean | { ok: boolean; reason?: string };
   /**
    * ComfyUI http origin resolver for `comfyui`-backed video (LTX/Wan) jobs.
    * Default REJECTS (ComfyUI not configured) — the real app starts the supervisor
@@ -241,7 +243,22 @@ function toSrc(p: string): string {
   return `pd-file://f${p.split('/').map(encodeURIComponent).join('/')}`;
 }
 
-export function registerGenIpc(opts: GenManagerOptions): void {
+/**
+ * What main gets back: the guardian's levers on the queue.
+ *
+ * The queue is private to this file for every other purpose; these three are
+ * the only things a process watching the machine needs — is heavy work running
+ * (sample faster), stop it (with the reason the user will read), and re-ask
+ * admission when the machine is breathing again.
+ */
+export interface GenQueueControl {
+  /** Any generation running — the guardian samples every second while one is. */
+  readonly running: () => boolean;
+  readonly shedRunning: (reason: string) => string[];
+  readonly reconsider: () => void;
+}
+
+export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
   /*
    * ~/Bobble/generated, not the OS temp tree. the user: "no complicated
    * var/askldfjh;lkh/... types of things". A rendered animation used to land in
@@ -270,6 +287,12 @@ export function registerGenIpc(opts: GenManagerOptions): void {
   const client = new GenServiceClient({
     resolveUv: opts.resolveUv,
     ...(opts.workerScript !== undefined ? { workerScript: opts.workerScript } : {}),
+    // Behind the pointer — see inference/worker-tier.ts.
+    spawnFn: (command, args, o) => {
+      const child = defaultGenSpawn(command, args, o);
+      tierChild(child, 'gen worker');
+      return child;
+    },
   });
   // Video routes to a persistent ComfyUI server (LTX/Wan) or the Node HyperFrames
   // runner — never the uv worker. Both default to a clear "not configured" error
@@ -308,6 +331,18 @@ export function registerGenIpc(opts: GenManagerOptions): void {
     const wc = opts.getWindow();
     if (wc !== null && !wc.isDestroyed()) opts.sendEvent(wc, channel, payload);
   };
+
+  /*
+   * A JOB HELD BY THE MACHINE SAYS SO. The queue steps over a heavy job that
+   * does not fit (job-queue.ts) and, without this, the room would show the mark
+   * animating over "Loading" indefinitely — the same picture as a hang. Each
+   * handler registers where its own note goes; the queue's `held` event lands
+   * there as the line under the bar.
+   */
+  const noteSinks = new Map<string, (line: string) => void>();
+  jobQueue.on((e) => {
+    if (e.type === 'held') noteSinks.get(e.jobId)?.(`Waiting for memory — ${e.reason}`);
+  });
 
   // ── download-then-continue gate (asset-gate.ts) ─────────────────────────────
   // A job whose ComfyUI pack is missing PROMPTS the user, downloads on accept,
@@ -467,8 +502,13 @@ export function registerGenIpc(opts: GenManagerOptions): void {
       // a no-op here; the seam is uniform so a future comfyui-backed image gates too.
       const need = needForModel(model);
       if (need !== undefined && ensureAsset !== undefined) await ensureAsset(need);
+      noteSinks.set(jobId, (line) => {
+        note = line;
+        send('gen:update', { tabId, payload: payload('generating') });
+      });
       const outputs = await jobQueue.enqueue(job, {
         heavy: model.heavy,
+        footprintGB: model.peakResidentGB ?? model.approxSizeGB,
         onEvent,
       }).result;
       progress = undefined;
@@ -478,6 +518,8 @@ export function registerGenIpc(opts: GenManagerOptions): void {
       const message = err instanceof Error ? err.message : String(err);
       send('gen:update', { tabId, payload: payload('error', message) });
       throw err;
+    } finally {
+      noteSinks.delete(jobId);
     }
   }
 
@@ -523,6 +565,8 @@ export function registerGenIpc(opts: GenManagerOptions): void {
     // surface payload shape (candidate.finalSrc carries the produced MP4 url).
     let candidate: GenSurfacePayload['candidates'][number] = { seed, status: 'pending' };
     let progress: GenSurfacePayload['progress'];
+    // What the machine last said about this job — the held-for-memory line.
+    let note: string | undefined;
 
     const payload = (status: GenSurfacePayload['status'], error?: string): GenSurfacePayload => ({
       modality: 'video',
@@ -533,6 +577,7 @@ export function registerGenIpc(opts: GenManagerOptions): void {
       progress,
       status,
       error,
+      note,
     });
 
     send('gen:open', { tabId, payload: payload('generating') });
@@ -553,8 +598,13 @@ export function registerGenIpc(opts: GenManagerOptions): void {
       // pack is missing PROMPTS the user, downloads on accept, then continues here.
       const need = needForModel(model);
       if (need !== undefined && ensureAsset !== undefined) await ensureAsset(need);
+      noteSinks.set(jobId, (line) => {
+        note = line;
+        send('gen:update', { tabId, payload: payload('generating') });
+      });
       const outputs = await jobQueue.enqueue(job, {
         heavy: model.heavy,
+        footprintGB: model.peakResidentGB ?? model.approxSizeGB,
         onEvent,
         /*
          * THE MODEL'S OWN EXTRA DEPENDENCIES.
@@ -582,6 +632,8 @@ export function registerGenIpc(opts: GenManagerOptions): void {
       const message = err instanceof Error ? err.message : String(err);
       send('gen:update', { tabId, payload: payload('error', message) });
       throw err;
+    } finally {
+      noteSinks.delete(jobId);
     }
   }
 
@@ -660,6 +712,8 @@ export function registerGenIpc(opts: GenManagerOptions): void {
       status: 'pending' as const,
     }));
     let progress: GenSurfacePayload['progress'];
+    // What the machine last said about this job — the held-for-memory line.
+    let note: string | undefined;
 
     const payload = (status: GenSurfacePayload['status'], error?: string): GenSurfacePayload => ({
       modality: 'audio',
@@ -669,6 +723,7 @@ export function registerGenIpc(opts: GenManagerOptions): void {
       progress,
       status,
       error,
+      note,
     });
 
     /*
@@ -710,8 +765,13 @@ export function registerGenIpc(opts: GenManagerOptions): void {
       // or SFX model whose weights pack is missing prompts, downloads, continues.
       const need = needForModel(model);
       if (need !== undefined && ensureAsset !== undefined) await ensureAsset(need);
+      noteSinks.set(jobId, (line) => {
+        note = line;
+        send('gen:update', { tabId, payload: payload('generating') });
+      });
       const outputs = await jobQueue.enqueue(job, {
         heavy: model.heavy,
+        footprintGB: model.peakResidentGB ?? model.approxSizeGB,
         onEvent,
         /*
          * THE MODEL'S OWN EXTRA DEPENDENCIES.
@@ -740,6 +800,8 @@ export function registerGenIpc(opts: GenManagerOptions): void {
       const message = err instanceof Error ? err.message : String(err);
       canvasPush('gen:update', payload('error', message));
       throw err;
+    } finally {
+      noteSinks.delete(jobId);
     }
   }
 
@@ -992,6 +1054,12 @@ export function registerGenIpc(opts: GenManagerOptions): void {
       },
     );
   }
+
+  return {
+    running: () => jobQueue.runningCount > 0,
+    shedRunning: (reason) => jobQueue.shedRunning(reason),
+    reconsider: () => jobQueue.reconsider(),
+  };
 }
 
 /**

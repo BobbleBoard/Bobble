@@ -33,6 +33,7 @@ import {
   writeComfyModelPaths,
   writeComfyShim,
 } from '../inference/engines-main';
+import { tieredSpawn } from '../inference/worker-tier';
 import type { StudioInvokeMap, StudioProgress } from './studio-contract';
 import { resolveWorkflow } from './studio-workflow';
 
@@ -104,6 +105,8 @@ function supervisor(): ComfySupervisorHandle {
   handle ??= createComfySupervisor({
     pythonPath: comfyVenvPython(),
     mainPy: comfyMainPy(),
+    // Behind the pointer — see inference/worker-tier.ts.
+    spawnFn: tieredSpawn,
     ...(existsSync(comfyModelPathsYaml()) ? { extraModelPathsYaml: comfyModelPathsYaml() } : {}),
   });
   return handle;

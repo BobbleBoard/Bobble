@@ -12,6 +12,7 @@ export * from './chat-template.js';
 export * from './context-cap.js';
 export * from './download.js';
 export * from './engine-select.js';
+export * from './guardian.js';
 export * from './hardware.js';
 export * from './hf-search.js';
 export * from './llamacpp-manager.js';

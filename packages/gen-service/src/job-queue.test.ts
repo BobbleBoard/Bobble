@@ -215,13 +215,98 @@ describe('a heavy job waits for a machine that can take it', () => {
     expect(started).toEqual(['a']);
   });
 
-  it('lets LIGHT jobs through while a heavy one is held', async () => {
+  it('lets a light job through while a heavy one is held — when it fits', async () => {
+    // The machine holds the 12 GB job and passes the 300 MB one behind it. A
+    // blanket "no" would hold both: every job asks now, proportionately.
     const { runner, started } = controllableRunner();
-    const q = new JobQueue({ runner, heavyAllowed: () => false });
-    q.enqueue(imageJob('heavy'), { heavy: true });
-    q.enqueue(imageJob('light'));
+    const q = new JobQueue({ runner, heavyAllowed: (fp) => (fp ?? 0) < 1 });
+    q.enqueue(imageJob('heavy'), { heavy: true, footprintGB: 12 });
+    q.enqueue(imageJob('light'), { footprintGB: 0.3 });
     await tick();
     expect(started).toEqual(['light']);
+  });
+
+  it('holds a light job too, when the machine says it does not fit', async () => {
+    const { runner, started } = controllableRunner();
+    const q = new JobQueue({ runner, heavyAllowed: () => ({ ok: false, reason: 'tight' }) });
+    q.enqueue(imageJob('render'), { footprintGB: 2 });
+    await tick();
+    expect(started).toEqual([]);
+  });
+
+  it('asks about THIS job, not about heavy jobs in general', async () => {
+    // A machine with room for a 5 GB video and not a 12 GB image should run the
+    // one that fits — the gate is a footprint question, not a switch.
+    const { runner, started } = controllableRunner();
+    const q = new JobQueue({
+      runner,
+      heavyAllowed: (footprintGB) => (footprintGB ?? 0) <= 8,
+    });
+    q.enqueue(imageJob('big'), { heavy: true, footprintGB: 12 });
+    q.enqueue(imageJob('small'), { heavy: true, footprintGB: 5 });
+    await tick();
+    // The big one is held by the machine and stepped over; the small one runs.
+    expect(started).toEqual(['small']);
+  });
+
+  it('says why a job is being held, once per reason', async () => {
+    const { runner } = controllableRunner();
+    const q = new JobQueue({
+      runner,
+      heavyAllowed: () => ({
+        ok: false,
+        reason: 'needs about 14.8 GB and only 9.6 GB is available',
+      }),
+    });
+    const held: string[] = [];
+    q.on((e) => {
+      if (e.type === 'held') held.push(e.reason);
+    });
+    q.enqueue(imageJob('a'), { heavy: true, footprintGB: 12 });
+    await tick();
+    q.reconsider();
+    q.reconsider();
+    await tick();
+    expect(held).toEqual(['needs about 14.8 GB and only 9.6 GB is available']);
+  });
+
+  it('sheds the running job with the reason, and leaves the queue alone', async () => {
+    const { runner, started } = controllableRunner();
+    const q = new JobQueue({ runner });
+    const a = q.enqueue(imageJob('a'), { heavy: true });
+    q.enqueue(imageJob('b'), { heavy: true });
+    await tick();
+    expect(started).toEqual(['a']);
+    expect(q.runningHeavy).toBe(true);
+    expect(q.shedRunning('only 7% of memory was free')).toEqual(['a']);
+    await expect(a.result).rejects.toThrow(/7% of memory/);
+    // b was never the problem; it starts (admission permitting) once a is gone.
+    await tick();
+    expect(started).toEqual(['a', 'b']);
+  });
+
+  it('counts a job once, however many readings arrive while its worker dies', async () => {
+    const { runner, started } = controllableRunner();
+    const q = new JobQueue({ runner });
+    q.enqueue(imageJob('a'), { heavy: true }).result.catch(() => undefined);
+    await tick();
+    expect(started).toEqual(['a']);
+    expect(q.shedRunning('critical')).toEqual(['a']);
+    expect(q.shedRunning('critical')).toEqual([]);
+    expect(q.cancel('a')).toBe(false);
+  });
+
+  it('sheds light jobs too, heavy first — at the wall every job is the wrong one', async () => {
+    const { runner, started } = controllableRunner();
+    const q = new JobQueue({ runner, maxConcurrent: 2 });
+    q.enqueue(imageJob('l1')).result.catch(() => undefined);
+    q.enqueue(imageJob('l2')).result.catch(() => undefined);
+    await tick();
+    expect(started).toEqual(['l1', 'l2']);
+    expect(q.shedRunning('critical').sort()).toEqual(['l1', 'l2']);
+    // The abort lands on the runner's own tick.
+    await tick();
+    expect(q.runningCount).toBe(0);
   });
 
   it('behaves exactly as before when no policy is supplied', async () => {

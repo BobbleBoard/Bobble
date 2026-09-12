@@ -26,6 +26,50 @@ const run = promisify(execFile);
 
 /** Nice value for a backgrounded server on Linux. 10 is "yield readily". */
 const LINUX_NICE = 10;
+/** …and for a heavy worker that should merely lose ties to the user. */
+const LINUX_NICE_UTILITY = 5;
+
+/**
+ * THE TIER A HEAVY GENERATION WORKER RUNS AT, ALWAYS.
+ *
+ * the user, after a generation froze his Mac: "trackpad unresponsive to clicks and
+ * movement, screen totally frozen". Memory was most of that (see guardian.ts),
+ * but the other half is the CPU: a diffusion worker on a 12-core machine will
+ * happily run twelve threads flat out, and the window server then queues
+ * behind it for every pointer move. This is a hint that makes the pointer win
+ * those ties. It costs the worker nothing while the user is idle.
+ *
+ *   'utility'    macOS `taskpolicy -c utility` — lower CPU priority, NOT the
+ *                disk-throttled background tier. The default for heavy work:
+ *                a video render still loads its 15 GB of weights at full speed.
+ *   'background' macOS `taskpolicy -b` — CPU and I/O both yield. Low power mode.
+ */
+export type WorkerTier = 'utility' | 'background';
+
+export async function setWorkerTier(
+  pid: number,
+  tier: WorkerTier,
+  deps: PriorityDeps = { platform: process.platform, exec: (c, a) => run(c, [...a]) },
+): Promise<'applied' | 'unsupported' | 'failed'> {
+  if (!Number.isFinite(pid) || pid <= 0) return 'failed';
+  try {
+    if (deps.platform === 'darwin') {
+      await deps.exec(
+        'taskpolicy',
+        tier === 'background' ? ['-b', '-p', String(pid)] : ['-c', 'utility', '-p', String(pid)],
+      );
+      return 'applied';
+    }
+    if (deps.platform === 'linux') {
+      const nice = tier === 'background' ? LINUX_NICE : LINUX_NICE_UTILITY;
+      await deps.exec('renice', ['-n', String(nice), '-p', String(pid)]);
+      return 'applied';
+    }
+    return 'unsupported';
+  } catch {
+    return 'failed';
+  }
+}
 
 export interface PriorityDeps {
   readonly platform: NodeJS.Platform;

@@ -59,6 +59,7 @@ import { CommandPalette, type PaletteAction } from './CommandPalette';
 import { CanvasTabsPanel } from './canvas/CanvasTabsPanel';
 import { trackChromeCorner } from './chrome-corner';
 import { CorpDebugHud } from './corp/CorpDebugHud';
+import { GuardianBanner } from './GuardianBanner';
 import { useHarnessTitleSync } from './harness-title';
 import { InputNeededBanner } from './InputNeededBanner';
 import { ModeToggle } from './ModeToggle';
@@ -888,6 +889,7 @@ export function ChatApp({
 
             <UiRequestDialogs />
             <InputNeededBanner />
+            <GuardianBanner />
             <WhyQueuedModal />
             <ToastHost />
             <WindowDropOverlay />

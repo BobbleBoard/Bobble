@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { setBackgroundPriority } from './process-priority';
+import { setBackgroundPriority, setWorkerTier } from './process-priority';
 
 const okExec = () => vi.fn(async () => undefined);
 
@@ -47,5 +47,30 @@ describe('setBackgroundPriority', () => {
       'failed',
     );
     expect(exec).not.toHaveBeenCalled();
+  });
+});
+
+describe('setWorkerTier', () => {
+  it('clamps a heavy worker to utility on macOS — lower CPU priority, disk untouched', async () => {
+    const exec = vi.fn(async () => undefined);
+    const r = await setWorkerTier(4242, 'utility', { platform: 'darwin', exec });
+    expect(r).toBe('applied');
+    expect(exec).toHaveBeenCalledWith('taskpolicy', ['-c', 'utility', '-p', '4242']);
+  });
+
+  it('uses the fully backgrounded tier for low power mode', async () => {
+    const exec = vi.fn(async () => undefined);
+    await setWorkerTier(4242, 'background', { platform: 'darwin', exec });
+    expect(exec).toHaveBeenCalledWith('taskpolicy', ['-b', '-p', '4242']);
+  });
+
+  it('is a gentler nice on Linux for utility than for background', async () => {
+    const exec = vi.fn(async () => undefined);
+    await setWorkerTier(7, 'utility', { platform: 'linux', exec });
+    await setWorkerTier(7, 'background', { platform: 'linux', exec });
+    expect(exec.mock.calls.map((c) => (c as unknown[])[1])).toEqual([
+      ['-n', '5', '-p', '7'],
+      ['-n', '10', '-p', '7'],
+    ]);
   });
 });
