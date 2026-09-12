@@ -86,10 +86,11 @@ export const TOOL_INTERFACES = ['schemas', 'bash-cli'] as const satisfies readon
  * the user can use computer as normal while generation and such occurs … this
  * could be dynamic even tracking what the current user memory/cpu/gpu usage is."
  *
- *   'auto' — the dynamic one, and the default: watch the machine and ease off
- *            when it is actually struggling, come back when it is not.
+ *   'auto' — the dynamic one: watch the machine and ease off when it is
+ *            actually struggling, come back when it is not.
  *   'full' — never ease off. For a run you are watching and want finished.
- *   'low'  — always ease off, even on an idle machine.
+ *   'low'  — always ease off, even on an idle machine. THE DEFAULT (the user,
+ *            after the 2026-09-11 freeze): the Mac stays a Mac first.
  *
  * What "ease off" MEANS depends on which wall the machine is nearest — see
  * packages/inference/src/power-policy.ts, which is where that decision lives.
@@ -273,6 +274,15 @@ export interface DesktopSettings {
   mcpMode: McpMode;
   /** How tools are offered to the model (see {@link ToolInterface}). */
   toolInterface: ToolInterface;
+  /**
+   * How tools are offered to SPECIALISTS and subagents — its own switch, not
+   * the chat's. the user: "ensure there is a cli connector for the specialists that
+   * is by default there and enabled, cli tools are a good context saver so it's
+   * important that they're just the same power as schemas." A specialist runs
+   * one job with a pinned kit; the CLI keeps its prompt small and loses nothing
+   * (every tool it may have is a command — see the harness's coverage test).
+   */
+  specialistToolInterface: ToolInterface;
   /** Chat box, or chat box plus the working ledge (see {@link WorkMode}). */
   workMode: WorkMode;
   /** How hard the app may push this machine (see {@link PowerMode}). */
@@ -366,6 +376,7 @@ export interface DesktopSettingsPatch {
   search?: Partial<SearchKeys>;
   mcpMode?: McpMode;
   toolInterface?: ToolInterface;
+  specialistToolInterface?: ToolInterface;
   workMode?: WorkMode;
   powerMode?: PowerMode;
   showComputerUseStatusPill?: boolean;

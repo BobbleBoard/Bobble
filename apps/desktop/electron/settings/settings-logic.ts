@@ -116,8 +116,12 @@ export const DEFAULT_SETTINGS: DesktopSettings = {
   search: { brave: '', tavily: '' },
   mcpMode: 'lite',
   toolInterface: 'bash-cli',
+  specialistToolInterface: 'bash-cli',
   workMode: 'chat',
-  powerMode: 'auto',
+  /* 'low' by default — the user, after the freeze that took the trackpad with it:
+     "switch default to low power mode". The machine stays usable out of the
+     box; a person who wants a run pushed picks 'full' for it. */
+  powerMode: 'low',
   showComputerUseStatusPill: true,
   capabilities: { image: true, video: true, audio: true, threeD: true },
   customInstructions: '',
@@ -274,6 +278,11 @@ export function clampSettings(raw: unknown): DesktopSettings {
     search: { brave: str(search.brave, ''), tavily: str(search.tavily, '') },
     mcpMode: oneOf(o.mcpMode, MCP_MODES, d.mcpMode),
     toolInterface: oneOf(o.toolInterface, TOOL_INTERFACES, d.toolInterface),
+    specialistToolInterface: oneOf(
+      o.specialistToolInterface,
+      TOOL_INTERFACES,
+      d.specialistToolInterface,
+    ),
     workMode: oneOf(o.workMode, WORK_MODES, d.workMode),
     powerMode: oneOf(o.powerMode, POWER_MODES, d.powerMode),
     showComputerUseStatusPill: bool(o.showComputerUseStatusPill, d.showComputerUseStatusPill),

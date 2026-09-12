@@ -42,10 +42,18 @@ export const BOBBLE_CELLS: readonly TileCell[] = [
  * leaves the hole at BL, where the only mover is BR — and so on. Yellow, then
  * pink, then teal, one per beat, forever.
  */
+/*
+ * ALL WHITE. the user: "make the app icon rounded corner squares all 100% white in
+ * the app and the dock icon." The ids keep their old colour names because the
+ * puzzle's beat order is written in terms of them (yellow, then pink, then
+ * teal) and the tests read them; the fill is the only thing that changed.
+ */
+export const BOBBLE_TILE_FILL = '#FFFFFF';
+
 export const BOBBLE_TILES = [
-  { id: 'teal', fill: '#10BDBD', from: 'tr', phase: 2 },
-  { id: 'yellow', fill: '#FBC52B', from: 'bl', phase: 0 },
-  { id: 'pink', fill: '#F73E9C', from: 'br', phase: 1 },
+  { id: 'teal', fill: BOBBLE_TILE_FILL, from: 'tr', phase: 2 },
+  { id: 'yellow', fill: BOBBLE_TILE_FILL, from: 'bl', phase: 0 },
+  { id: 'pink', fill: BOBBLE_TILE_FILL, from: 'br', phase: 1 },
 ] as const;
 
 /**

@@ -40,8 +40,9 @@ const DEFAULTS: DesktopSettings = {
   search: { brave: '', tavily: '' },
   mcpMode: 'lite',
   toolInterface: 'bash-cli',
+  specialistToolInterface: 'bash-cli',
   workMode: 'chat',
-  powerMode: 'auto',
+  powerMode: 'low',
   showComputerUseStatusPill: true,
   /*
    * ON BY DEFAULT — and they now MEAN something.

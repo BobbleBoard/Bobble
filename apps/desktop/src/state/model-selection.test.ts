@@ -36,6 +36,7 @@ const base: DesktopSettings = {
   harnessId: 'pi-bundled',
   harnessConfigPath: '',
   toolInterface: 'schemas',
+  specialistToolInterface: 'bash-cli',
   workMode: 'chat',
   powerMode: 'auto',
   showComputerUseStatusPill: true,
