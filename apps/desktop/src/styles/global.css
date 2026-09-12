@@ -5709,15 +5709,18 @@ body[data-media-expanded="true"] .pd-studio-compose {
 .pd-starter-chip {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  height: 28px;
-  padding: 0 10px;
+  gap: 8px;
+  /* Larger — the user — and a real target: 38px tall, body-size type. */
+  height: 38px;
+  padding: 0 16px;
+  min-width: 0;
+  flex: 0 1 auto;
   border: 1px solid var(--pd-border-subtle);
   border-radius: var(--pd-radius-full);
   background: var(--pd-bg-raised);
   color: var(--pd-text-secondary);
-  font-size: var(--pd-font-size-footnote);
-  line-height: var(--pd-leading-footnote);
+  font-size: var(--pd-font-size-body);
+  line-height: var(--pd-leading-body);
   white-space: nowrap;
   cursor: pointer;
   transition:
@@ -5730,6 +5733,13 @@ body[data-media-expanded="true"] .pd-studio-compose {
   border-color: var(--pd-border-default);
   background: var(--pd-bg-hover);
   color: var(--pd-text-primary);
+}
+/* The label gives way before the row does: on a narrow window the words
+ * shorten with an ellipsis rather than the four chips folding to two rows. */
+.pd-starter-chip-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* ── The long-job card ────────────────────────────────────────────────────
@@ -6226,12 +6236,20 @@ body[data-media-expanded="true"] .pd-studio-compose {
   height: 14px;
 }
 
-/* The starter chips, under the composer and above the @ / ! hints. */
+/* The starter chips, under the composer and above the @ / ! hints. As wide as
+ * the composer — the 720px cap this had is what folded four chips into two
+ * rows. */
 .pd-composer-starters {
   display: flex;
   justify-content: center;
-  margin: 12px auto 2px;
-  max-width: 720px;
+  margin: 14px 0 2px 50%;
+  /* Wider than the composer when the four labels need it: the row is sized to
+   * its content and centred under the box, so "Look something up on the web"
+   * stays readable rather than ellipsising to fit a 700px composer. Only a
+   * window narrower than the row makes the labels give way (see the chip). */
+  width: max-content;
+  max-width: min(100vw - 120px, 1120px);
+  transform: translateX(-50%);
 }
 
 /* ── The @ / / suggestion panel ───────────────────────────────────────────

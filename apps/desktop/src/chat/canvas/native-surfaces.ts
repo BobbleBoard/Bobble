@@ -28,6 +28,7 @@ import { officeKindForExt } from '../../../electron/office/office-contract';
 import { usePiStore } from '../../state/pi-slice';
 import { useThemeStore } from '../../store/theme';
 import { browserBoundsForPanel, rectToBounds } from './browser-bounds';
+import { isDarkColor } from './color-luma';
 import { setOfficeEditorsAvailable } from './file-preview';
 import { fileArtifactFromText, openFileInCanvas } from './file-tabs';
 import { freezeFrame } from './freeze-frame';
@@ -840,12 +841,9 @@ export function useNativeSurfaces(controller: CanvasController): NativeSurfacesA
         fontSans: read('--pd-font-sans'),
       };
       // Decide dark from the RESOLVED background rather than the mode name:
-      // 'system' resolves either way, and a flavor may be dark-only.
-      const rgb = tokens.bgBase.match(/\d+/g);
-      const dark =
-        rgb !== null && rgb.length >= 3
-          ? (Number(rgb[0]) * 299 + Number(rgb[1]) * 587 + Number(rgb[2]) * 114) / 1000 < 128
-          : /^#[0-3]/.test(tokens.bgBase);
+      // 'system' resolves either way, and a flavor may be dark-only. Parsed,
+      // not scraped — see color-luma.ts for the light theme that read as dark.
+      const dark = isDarkColor(tokens.bgBase);
       void window.piDesktop.invoke('office:set-theme', { tokens, dark }).catch(() => undefined);
     };
     // Next frame: the theme attributes are applied in a sibling effect, and

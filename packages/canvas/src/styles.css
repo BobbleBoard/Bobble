@@ -305,7 +305,9 @@
   padding: 0 4px 0 10px;
   /* No box of its own — an unselected tab is a label, not a container. The
    * transparent border keeps the active tab's own border from changing the
-   * layout when selection moves. */
+   * layout when selection moves. The SELECTED tab's hairline is not this
+   * border either — see `::before` below — because a border runs the full
+   * height of the box and the hairline has to stop where the flare takes over. */
   border: 1px solid transparent;
   /* Rounded on all four corners while unselected — an object on the strip. The
    * selected tab squares off the bottom two and folds into the pane instead;
@@ -329,16 +331,58 @@
 }
 
 /*
+ * ONE HAIRLINE, ALL THE WAY ROUND. the user: "the border needs to seamlessly flow
+ * up its edges and back down rather than being a straight line under the tab
+ * as well as a different one around it."
+ *
+ * What it was, SEEN at 3× in both themes: the selected tab's own border ran
+ * straight down its sides to the strip's bottom, the flares beneath it were
+ * FILL with no stroke, and the strip's seam ran along the bottom on either
+ * side — three different edges meeting at two corners. Chrome draws one line:
+ * along the strip, up the fillet, up the side, over the top, and back down.
+ *
+ * So the hairline lives on this `::before`, whose sides END exactly where the
+ * fillet's arc leaves them (the flare's height above the bottom, where the arc
+ * is vertical), and the flare's gradient below carries the same hairline round
+ * the arc to the strip's seam, which it meets tangentially. The tab's own
+ * border stays transparent on all four sides for the selected state; it never
+ * drew anything the ::before does not draw better.
+ */
+.pd-canvas-tab::before {
+  content: "";
+  position: absolute;
+  top: -1px;
+  right: -1px;
+  /* The padding box's bottom is 1px above the border box's; the arc departs
+   * the side one flare-height above the border box's bottom. */
+  bottom: calc(var(--pd-canvas-tab-flare) - 1px);
+  left: -1px;
+  border: 1px solid var(--pd-canvas-rule);
+  border-bottom: 0;
+  border-radius: var(--pd-radius-md) var(--pd-radius-md) 0 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--pd-duration-fast) var(--pd-easing-standard);
+}
+
+.pd-canvas-tab[data-active]::before {
+  opacity: 1;
+}
+
+/*
  * THE TWO FLARES UNDER THE SELECTED TAB — the half of Chrome's shape that a
  * border-radius cannot draw. Each is a concave fillet in the PANE's own colour,
  * so the tab's fill does not stop at its own edge: it runs out sideways, curves
  * down and becomes the pane. Without them a squared-off bottom is just a tab
  * that has lost its corners.
  *
- * One element carrying two corner gradients rather than ::before + ::after,
- * because a single free pseudo is worth keeping. It is declared on EVERY tab
- * (hidden at opacity 0) so the fold animates in both directions — a rule that
- * only exists while [data-active] has nothing to fade back out of.
+ * Each fillet also carries the HAIRLINE round its arc — a 1px ring at the
+ * circle's edge — so the line that came down the tab's side (the ::before
+ * above) continues round the curve and lands on the strip's seam.
+ *
+ * It is declared on EVERY tab (hidden at opacity 0) so the fold animates in
+ * both directions — a rule that only exists while [data-active] has nothing to
+ * fade back out of.
  */
 .pd-canvas-tab::after {
   content: "";
@@ -361,13 +405,17 @@
   background-image:
     radial-gradient(
       circle var(--pd-canvas-tab-flare) at top left,
-      transparent 96%,
-      var(--pd-bg-raised) 100%
+      transparent calc(var(--pd-canvas-tab-flare) - 1.5px),
+      var(--pd-canvas-rule) calc(var(--pd-canvas-tab-flare) - 1px),
+      var(--pd-canvas-rule) calc(var(--pd-canvas-tab-flare) - 0.25px),
+      var(--pd-bg-raised) calc(var(--pd-canvas-tab-flare) + 0.25px)
     ),
     radial-gradient(
       circle var(--pd-canvas-tab-flare) at top right,
-      transparent 96%,
-      var(--pd-bg-raised) 100%
+      transparent calc(var(--pd-canvas-tab-flare) - 1.5px),
+      var(--pd-canvas-rule) calc(var(--pd-canvas-tab-flare) - 1px),
+      var(--pd-canvas-rule) calc(var(--pd-canvas-tab-flare) - 0.25px),
+      var(--pd-bg-raised) calc(var(--pd-canvas-tab-flare) + 0.25px)
     );
   background-position:
     left bottom,
@@ -413,15 +461,17 @@
  * the tab was already flush with the strip's bottom (MEASURED: 0px between
  * them), so nothing has to move for the two surfaces to become one.
  *
- * `border-bottom-color: transparent` rather than `border-bottom: 0`: the border
+ * The border stays a transparent 1px on every side rather than `0`: the border
  * box must keep its 1px or the tab changes height as it is selected, and the
  * tab's own fill paints under a transparent border — which is also what covers
- * the strip's seam where it crosses.
+ * the strip's seam where it crosses. The hairline itself is drawn by the
+ * `::before` (sides + top, stopping where the flare's arc departs) and the
+ * `::after` (the arcs), so it is one line rather than three.
  */
 .pd-canvas-tab[data-active] {
   background: var(--pd-bg-raised);
-  border-color: var(--pd-canvas-rule);
-  border-bottom-color: transparent;
+  /* The hairline is the ::before's; this border stays out of the way. */
+  border-color: transparent;
   border-bottom-right-radius: 0;
   border-bottom-left-radius: 0;
   color: var(--pd-text-primary);

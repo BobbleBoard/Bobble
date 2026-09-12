@@ -148,7 +148,13 @@ main.app-shell, .sheet-body, .doc-body, .slide-body { box-sizing: border-box !im
   --text-caption: ${t.textMuted} !important;
 }
 
-body { background: ${t.bgBase} !important; color: ${t.textPrimary} !important; font-family: ${t.fontSans} !important; }
+/* The view's own ground is the PANE's colour (bg-raised), not the app base:
+   the canvas tab folds into the pane, and a view whose top band was a shade
+   darker drew a straight line right under the selected tab (the user: "a straight
+   line under the tab"). The editor's chrome strips pick their own colours
+   below; the ground and the reserved toolbar band match the tab. */
+html { background: ${t.bgRaised} !important; }
+body { background: ${t.bgRaised} !important; color: ${t.textPrimary} !important; font-family: ${t.fontSans} !important; }
 
 /* The PAGE stays paper. See the note at the top of this file — a dark Word page
    reads as a broken document, not as a themed one.

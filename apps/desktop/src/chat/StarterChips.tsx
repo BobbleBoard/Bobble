@@ -27,7 +27,10 @@ export function StarterChips(): React.ReactElement {
      * so the label is carried by a legend rather than an aria-label a screen
      * reader may or may not honour. */
     <fieldset
-      className="flex flex-wrap items-center justify-center gap-2 border-0 p-0"
+      /* ONE ROW, ALWAYS. the user: "the suggestion popups need to be larger and
+       * never show two rows of them." No wrap; a chip that runs out of room
+       * shortens its label instead of dropping to a second line. */
+      className="flex flex-nowrap items-center justify-center gap-2.5 border-0 p-0 max-w-full min-w-0"
       data-testid="starter-chips"
     >
       <legend className="sr-only">Things you can ask for</legend>
@@ -52,8 +55,8 @@ export function StarterChips(): React.ReactElement {
               })
             }
           >
-            <Icon size={13} />
-            <span>{s.label}</span>
+            <Icon size={16} />
+            <span className="pd-starter-chip-label">{s.label}</span>
           </button>
         );
       })}

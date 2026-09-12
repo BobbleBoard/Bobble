@@ -1388,7 +1388,17 @@ export function ChatComposer({
         ? 'Run a shell command…'
         : 'Ask anything…';
   // Only the empty home screen (no messages yet) shows the shortcut helper line.
-  const isHome = usePiStore((s) => s.messages.length === 0);
+  /*
+   * HOME MEANS THE CENTRED, EMPTY SCREEN — the same test ChatApp uses to centre
+   * the composer — not merely "no messages yet". SEEN: a message queued behind
+   * a restart sat in the thread with the starters and the @ / ! hints stacked
+   * UNDER the docked composer, because `messages` was still empty. the user: "never
+   * show them at the bottom like that … that goes away when the user presses
+   * enter the first time."
+   */
+  const isHome = usePiStore(
+    (s) => s.messages.length === 0 && s.queuedSends.length === 0 && !s.promptInFlight,
+  );
 
   // #19: fade the placeholder's bottom rather than slicing it. We flip the fade
   // ON only when the empty-state placeholder actually overflows the visible
