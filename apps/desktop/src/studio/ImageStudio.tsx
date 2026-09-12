@@ -23,10 +23,10 @@
  *   chore: nobody wants to enumerate what should not be in their picture. Say
  *   what you want instead.
  */
-import { type JSX, useCallback, useMemo, useState } from 'react';
+import { type JSX, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ThreadMedia } from '../chat/ThreadMedia';
 import { useGenStore } from '../state/gen-store';
-import { RunHeader, StudioJob } from './StudioRun';
+import { aspectOf, RunHeader, StudioJob, widthOf } from './StudioRun';
 import {
   Knob,
   RailGroup,
@@ -82,8 +82,20 @@ const SHAPES = [
 ] as const;
 
 /** The long edge. Named by what it is for, because that is how the choice is made. */
+/*
+ * THE LONG EDGE — and a size a 24 GB Mac can actually run.
+ *
+ * MEASURED 2026-09-11 as the OS's own free-memory drop: FLUX.2 klein and
+ * Z-Image both take ~10.5 GB at 512² and 14 GB or more at 768², ~19 GB at
+ * 1024². Beside the app's 6 GB reserve on a 24 GB machine, 768² is admitted
+ * only on an empty machine and 1024² never (the guardian refuses it with the
+ * reason, rather than freezing the Mac as it did before the guardian existed).
+ * 512² is the size that reliably runs there — eleven seconds — and the studio
+ * had no way to ask for it.
+ */
 const SIZES = [
-  { value: 768, label: 'Draft', hint: 'Fastest' },
+  { value: 512, label: 'Quick', hint: 'Runs on 16 GB' },
+  { value: 768, label: 'Draft', hint: 'Fast' },
   { value: 1024, label: 'Standard', hint: 'Trained size' },
   { value: 1536, label: 'Large', hint: 'Slowest' },
 ] as const;
@@ -139,6 +151,31 @@ export function ImageStudio(): JSX.Element {
   const [model, setModel] = useState('');
   const [shape, setShape] = useState<Shape>('square');
   const [long, setLong] = useState<number>(1024);
+  /*
+   * THE DEFAULT SIZE IS THE MACHINE'S, not the model's.
+   *
+   * 1024² is the trained size and the right default on a machine that can hold
+   * it. On a 24 GB Mac it is ~19 GB of the OS's memory for either default
+   * model (MEASURED, see SIZES) and the guardian now refuses it outright — so a
+   * default of 1024 there would be a studio whose first Generate is a refusal.
+   * Until the reader picks a size, the machine picks: 512² under 32 GB, 768²
+   * under 48, 1024² above. `app:get-info` is the same fact the model hub reads.
+   */
+  const sizeTouched = useRef(false);
+  const pickLong = useCallback((v: number) => {
+    sizeTouched.current = true;
+    setLong(v);
+  }, []);
+  useEffect(() => {
+    void window.piDesktop
+      .invoke('app:get-info', undefined)
+      .then((info) => {
+        if (sizeTouched.current) return;
+        const gb = info.totalMemoryBytes / 1024 ** 3;
+        setLong(gb < 32 ? 512 : gb < 48 ? 768 : 1024);
+      })
+      .catch(() => undefined);
+  }, []);
   const [style, setStyle] = useState<string>('');
   const [count, setCount] = useState(1);
   const [steps, setSteps] = useState<number | ''>('');
@@ -146,7 +183,7 @@ export function ImageStudio(): JSX.Element {
   const [seed, setSeed] = useState<number | ''>('');
 
   const catalog = useGenStore((s) => s.catalog);
-  const { busy, error, runs, job, run, cancel } = useStudio('image');
+  const { busy, error, runs, job, run, cancel, finishReveal } = useStudio('image');
   const models = useMemo(() => catalog.filter((m) => m.modality === 'image'), [catalog]);
   const blocked = studioBlockedReason(models, 'image');
   const size = (SHAPES.find((x) => x.value === shape) ?? SHAPES[0]).of(long);
@@ -292,6 +329,7 @@ export function ImageStudio(): JSX.Element {
       placeholder={handoff.input !== null ? 'What should change?…' : 'Describe a picture…'}
       onRun={() => void onRun()}
       busy={busy || enhancer.enhancing}
+      {...(job?.cancellable === true ? { onStop: cancel } : {})}
       runLabel={enhancer.enhancing ? 'Enhancing…' : handoff.input !== null ? 'Edit' : 'Generate'}
       {...(blocked !== undefined ? { blocked } : {})}
       error={error}
@@ -322,7 +360,7 @@ export function ImageStudio(): JSX.Element {
             testid="image-size"
             label="Size"
             value={long}
-            onChange={setLong}
+            onChange={pickLong}
             options={SIZES.map((x) => ({ value: x.value, label: x.label, hint: x.hint }))}
           />
           <StudioPicker
@@ -414,7 +452,7 @@ export function ImageStudio(): JSX.Element {
               <Segmented
                 testid="image-size-rail"
                 value={long}
-                onChange={setLong}
+                onChange={pickLong}
                 options={SIZES.map((s) => ({ value: s.value, label: s.label, hint: s.hint }))}
               />
             </Knob>
@@ -526,7 +564,16 @@ export function ImageStudio(): JSX.Element {
         </>
       }
     >
-      {job !== null ? <StudioJob job={job} onCancel={cancel} variant="image" /> : null}
+      {job !== null ? (
+        <StudioJob
+          job={job}
+          variant="image"
+          aspect={aspectOf(size)}
+          width={widthOf(size)}
+          model={model}
+          onRevealed={finishReveal}
+        />
+      ) : null}
       {runs.length === 0 && job === null ? (
         <StudioEmpty
           glyph={<GlyphImage />}

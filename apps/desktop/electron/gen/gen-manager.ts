@@ -43,8 +43,10 @@ import {
   GenServiceClient,
   getModel,
   JobQueue,
+  jobFootprintGB,
   MODALITY_CATALOG,
   type ModalityModel,
+  previewCostGB,
 } from '@pi-desktop/gen-service';
 import {
   GEN_SOCK_ENV,
@@ -121,7 +123,9 @@ export interface GenManagerOptions {
    * begin — so it is HELD until the machine is breathing again, never refused.
    * Light jobs still go through. Default: always allowed.
    */
-  readonly heavyAllowed?: (footprintGB?: number) => boolean | { ok: boolean; reason?: string };
+  readonly heavyAllowed?: (
+    footprintGB?: number,
+  ) => boolean | { ok: boolean; reason?: string; never?: boolean };
   /**
    * ComfyUI http origin resolver for `comfyui`-backed video (LTX/Wan) jobs.
    * Default REJECTS (ComfyUI not configured) — the real app starts the supervisor
@@ -408,6 +412,24 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
     // every caller that does not open the gears wants.
     const guidance = raw.guidance;
 
+    /*
+     * PREVIEWS, IF THE MACHINE CAN AFFORD THEM.
+     *
+     * The card's real denoise comes from a decode at every step, and MEASURED
+     * that is ~4.5 GB on top of the job at 512² (catalog: previewCostGB) —
+     * exactly the margin between a job that fits beside the reserve and one
+     * that takes the machine to 20% free and gets shed. So the job is admitted
+     * with previews when they fit, and without them when only the picture
+     * does; the pending card plays the mark in that case, which is what it is
+     * for. The user gets the picture either way, which is the point.
+     */
+    const bare = jobFootprintGB(model, width * height);
+    const withPreviews = bare + previewCostGB(width * height);
+    const previewsAllowed = opts.heavyAllowed?.(withPreviews) ?? true;
+    const stepPreviews =
+      typeof previewsAllowed === 'boolean' ? previewsAllowed : previewsAllowed.ok;
+    const footprintGB = stepPreviews ? withPreviews : bare;
+
     const job: GenJob = {
       id: jobId,
       modality: 'image',
@@ -422,6 +444,7 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
         height,
         steps,
         seeds,
+        stepPreviews,
         negativePrompt: raw.negativePrompt,
         ...(guidance !== undefined ? { guidance } : {}),
         // An edit rather than a fresh generation — see ImageJobSpec.imagePath.
@@ -508,7 +531,7 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
       });
       const outputs = await jobQueue.enqueue(job, {
         heavy: model.heavy,
-        footprintGB: model.peakResidentGB ?? model.approxSizeGB,
+        footprintGB,
         onEvent,
       }).result;
       progress = undefined;
@@ -604,7 +627,7 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
       });
       const outputs = await jobQueue.enqueue(job, {
         heavy: model.heavy,
-        footprintGB: model.peakResidentGB ?? model.approxSizeGB,
+        footprintGB: jobFootprintGB(model, width * height),
         onEvent,
         /*
          * THE MODEL'S OWN EXTRA DEPENDENCIES.
@@ -771,7 +794,7 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
       });
       const outputs = await jobQueue.enqueue(job, {
         heavy: model.heavy,
-        footprintGB: model.peakResidentGB ?? model.approxSizeGB,
+        footprintGB: jobFootprintGB(model),
         onEvent,
         /*
          * THE MODEL'S OWN EXTRA DEPENDENCIES.

@@ -66,6 +66,9 @@ export interface GuardianLimits {
   readonly thrashingPagesPerSec: number;
   /** Consecutive calm readings before a hold is lifted. */
   readonly recoveryReadings: number;
+  /** Consecutive swap-hot readings (with memory to spare) before that counts as
+   * a thrash. A load burst is one or two; a thrash is all of them. */
+  readonly hotReadings: number;
 }
 
 /*
@@ -90,6 +93,7 @@ export function limitsFor(mode: PowerMode): GuardianLimits {
     stallMs: 1500,
     thrashingPagesPerSec: 2000,
     recoveryReadings: 4,
+    hotReadings: 4,
   };
 }
 
@@ -97,6 +101,9 @@ export interface GuardianJudgement {
   readonly verdict: GuardianVerdict;
   /** One line, for the log and for the person whose job was stopped. */
   readonly reason: string;
+  /** Swapping hard with memory to spare — a burst that becomes a thrash if it
+   * lasts. `settle` counts these. */
+  readonly hot?: boolean;
 }
 
 /** The verdict a single reading argues for, before any hysteresis. */
@@ -111,10 +118,21 @@ export function judge(reading: GuardianReading, limits: GuardianLimits): Guardia
   if (free !== undefined && free <= limits.shedFree) {
     return { verdict: 'shed', reason: `only ${pct}% of memory is free` };
   }
-  if ((reading.swapIoPerSec ?? 0) >= limits.thrashingPagesPerSec) {
+  /*
+   * A SWAP BURST IS NOT YET A THRASH. Loading 10 GB of wired GPU memory on a
+   * unified-memory Mac evicts that much file cache and compresses whatever is
+   * in the way, and MEASURED (FLUX.2 klein at 512², 84% free) that shows as
+   * 33,000 pages/s for a second or two with memory still to spare — the load,
+   * not the freeze. Shedding on that reading would mean no large model ever
+   * finishes loading. So heavy swap alone is a HOLD; it becomes a shed when
+   * memory is also gone (the burst had nowhere to go) or when it persists —
+   * `settle` counts the streak, because a burst ends and a thrash does not.
+   */
+  const swapping = (reading.swapIoPerSec ?? 0) >= limits.thrashingPagesPerSec;
+  if (swapping && free !== undefined && free <= limits.holdFree) {
     return {
       verdict: 'shed',
-      reason: `the machine is swapping hard (${Math.round(reading.swapIoPerSec ?? 0)} pages/s)`,
+      reason: `the machine is swapping hard (${Math.round(reading.swapIoPerSec ?? 0)} pages/s) with ${pct}% of memory free`,
     };
   }
   /*
@@ -127,6 +145,13 @@ export function judge(reading: GuardianReading, limits: GuardianLimits): Guardia
     return {
       verdict: 'shed',
       reason: `the app stalled for ${Math.round((reading.stallMs ?? 0) / 100) / 10}s with ${pct}% of memory free`,
+    };
+  }
+  if (swapping) {
+    return {
+      verdict: 'hold',
+      reason: `the machine is swapping (${Math.round(reading.swapIoPerSec ?? 0)} pages/s)`,
+      hot: true,
     };
   }
   if (reading.memory === 'warn') {
@@ -151,17 +176,39 @@ export function settle(
   previous: GuardianVerdict,
   calmStreak: number,
   limits: GuardianLimits,
-): { verdict: GuardianVerdict; calmStreak: number; reason: string } {
-  if (next.verdict === 'shed') return { verdict: 'shed', calmStreak: 0, reason: next.reason };
-  if (next.verdict === 'hold') return { verdict: 'hold', calmStreak: 0, reason: next.reason };
+  hotStreak = 0,
+): { verdict: GuardianVerdict; calmStreak: number; hotStreak: number; reason: string } {
+  if (next.verdict === 'shed') {
+    return { verdict: 'shed', calmStreak: 0, hotStreak: 0, reason: next.reason };
+  }
+  if (next.verdict === 'hold') {
+    if (next.hot === true) {
+      const hot = hotStreak + 1;
+      // A burst that will not end is a thrash, whatever the free figure says.
+      if (hot >= limits.hotReadings) {
+        return {
+          verdict: 'shed',
+          calmStreak: 0,
+          hotStreak: 0,
+          reason: `${next.reason} for ${hot} readings running`,
+        };
+      }
+      return { verdict: 'hold', calmStreak: 0, hotStreak: hot, reason: next.reason };
+    }
+    return { verdict: 'hold', calmStreak: 0, hotStreak: 0, reason: next.reason };
+  }
   // calm
-  if (previous === 'calm') return { verdict: 'calm', calmStreak: 0, reason: next.reason };
+  if (previous === 'calm') {
+    return { verdict: 'calm', calmStreak: 0, hotStreak: 0, reason: next.reason };
+  }
   const streak = calmStreak + 1;
-  if (streak >= limits.recoveryReadings)
-    return { verdict: 'calm', calmStreak: 0, reason: next.reason };
+  if (streak >= limits.recoveryReadings) {
+    return { verdict: 'calm', calmStreak: 0, hotStreak: 0, reason: next.reason };
+  }
   return {
     verdict: 'hold',
     calmStreak: streak,
+    hotStreak: 0,
     reason: `${next.reason}; waiting for it to stay that way (${streak}/${limits.recoveryReadings})`,
   };
 }
@@ -195,14 +242,28 @@ export const HEADROOM_GB = 1;
  * mmap'd shows as mostly reclaimable and does not block a job that would fit
  * beside it. Its KV cache is anonymous and does count, as it should.
  */
-export function fits(input: FitInput): { ok: boolean; reason: string } {
+export function fits(input: FitInput): { ok: boolean; reason: string; never?: boolean } {
+  const needGB = input.footprintGB * HEADROOM_FACTOR + HEADROOM_GB;
+  const r = (n: number): string => (Math.round(n * 10) / 10).toFixed(1);
+  /*
+   * NEVER, NOT LATER. A job that would not fit with every other program closed
+   * is not waiting for memory — there is no reading that admits it. Holding it
+   * would leave the mark animating over "Waiting for memory" for as long as the
+   * person cared to watch, which is how "the app hangs" gets reported. Say what
+   * would change the answer instead: a smaller picture, or a smaller reserve.
+   */
+  if (needGB + input.reserveGB > input.totalGB) {
+    return {
+      ok: false,
+      never: true,
+      reason: `needs about ${r(needGB)} GB and this Mac has ${r(input.totalGB)} GB — try a smaller size, or lower the memory reserve in Settings (currently ${input.reserveGB} GB)`,
+    };
+  }
   if (input.freeFraction === undefined) {
     return { ok: true, reason: 'memory not measured; not holding the job on a guess' };
   }
   const availableGB = input.totalGB * input.freeFraction;
-  const needGB = input.footprintGB * HEADROOM_FACTOR + HEADROOM_GB;
   const leftGB = availableGB - needGB;
-  const r = (n: number): string => (Math.round(n * 10) / 10).toFixed(1);
   if (leftGB >= input.reserveGB) {
     return {
       ok: true,
@@ -257,6 +318,7 @@ export function createGuardian(options: GuardianOptions): Guardian {
 
   let verdict: GuardianVerdict = 'calm';
   let calmStreak = 0;
+  let hotStreak = 0;
   let last: GuardianReading | null = null;
   let timer: unknown = null;
   let running = false;
@@ -301,9 +363,10 @@ export function createGuardian(options: GuardianOptions): Guardian {
       worstStallMs = 0;
       last = reading;
       const limits = options.limits();
-      const settled = settle(judge(reading, limits), verdict, calmStreak, limits);
+      const settled = settle(judge(reading, limits), verdict, calmStreak, limits, hotStreak);
       verdict = settled.verdict;
       calmStreak = settled.calmStreak;
+      hotStreak = settled.hotStreak;
       options.onVerdict(verdict, settled.reason, reading);
       return verdict;
     } finally {

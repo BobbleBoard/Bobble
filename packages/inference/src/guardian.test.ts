@@ -36,10 +36,18 @@ describe('judge', () => {
     expect(judge({ memoryFree: 0.4, memory: 'warn', sources: [] }, AUTO).verdict).toBe('hold');
   });
 
-  it('sheds on real swap traffic — the flow, not the stock', () => {
-    expect(judge({ memoryFree: 0.4, swapIoPerSec: 9000, sources: [] }, AUTO).verdict).toBe('shed');
-    // Housekeeping-level traffic is not a thrash (MEASURED idle: 0-71 pages/s).
+  it('reads heavy swap with memory to spare as a load burst — a hold, marked hot', () => {
+    // MEASURED: FLUX.2 klein loading at 512² from 84% free — 33,000 pages/s for
+    // a second or two, memory still at 43%. The load, not the freeze.
+    const j = judge({ memoryFree: 0.43, swapIoPerSec: 33000, sources: [] }, AUTO);
+    expect(j.verdict).toBe('hold');
+    expect(j.hot).toBe(true);
+    // Housekeeping-level traffic is not even that (MEASURED idle: 0-71 pages/s).
     expect(judge({ memoryFree: 0.4, swapIoPerSec: 60, sources: [] }, AUTO).verdict).toBe('calm');
+  });
+
+  it('sheds on heavy swap once memory is gone too — the burst had nowhere to go', () => {
+    expect(judge({ memoryFree: 0.15, swapIoPerSec: 9000, sources: [] }, AUTO).verdict).toBe('shed');
   });
 
   it('reads a main-thread stall as thrashing only when memory is also tight', () => {
@@ -93,6 +101,28 @@ describe('settle', () => {
     expect(s.calmStreak).toBe(0);
   });
 
+  it('turns a swap burst that will not end into a shed', () => {
+    const hot = { verdict: 'hold' as const, reason: 'swapping', hot: true };
+    let previous: 'calm' | 'hold' = 'calm';
+    let hotStreak = 0;
+    for (let i = 1; i < AUTO.hotReadings; i++) {
+      const s = settle(hot, previous, 0, AUTO, hotStreak);
+      expect(s.verdict).toBe('hold');
+      previous = 'hold';
+      hotStreak = s.hotStreak;
+    }
+    const s = settle(hot, 'hold', 0, AUTO, hotStreak);
+    expect(s.verdict).toBe('shed');
+    expect(s.reason).toMatch(/readings running/);
+  });
+
+  it('a burst that ends resets the count', () => {
+    const hot = { verdict: 'hold' as const, reason: 'swapping', hot: true };
+    const a = settle(hot, 'calm', 0, AUTO, 0);
+    const b = settle({ verdict: 'hold', reason: 'tight' }, 'hold', 0, AUTO, a.hotStreak);
+    expect(b.hotStreak).toBe(0);
+  });
+
   it('a shed is not sticky — it becomes an ordinary hold that recovers', () => {
     const s = settle({ verdict: 'calm', reason: 'fine' }, 'shed', 0, AUTO);
     expect(s.verdict).toBe('hold');
@@ -123,9 +153,28 @@ describe('fits', () => {
     );
   });
 
+  it('refuses outright, with advice, a job that could not fit with everything else closed', () => {
+    // FLUX.2 klein at 1024² on a 24 GB Mac: ~19 GB + headroom + a 6 GB reserve
+    // is more than the machine. No reading will ever admit that — say so.
+    const r = fits({ footprintGB: 19, totalGB: 24, freeFraction: 0.9, reserveGB: 6 });
+    expect(r.ok).toBe(false);
+    expect(r.never).toBe(true);
+    expect(r.reason).toMatch(/smaller size/);
+    expect(r.reason).toMatch(/reserve/);
+    // …while the same job on a 48 GB machine is an ordinary question.
+    expect(
+      fits({ footprintGB: 19, totalGB: 48, freeFraction: 0.9, reserveGB: 6 }).never,
+    ).toBeUndefined();
+  });
+
   it('never holds a job on a guess', () => {
-    expect(fits({ footprintGB: 40, totalGB: 24, freeFraction: undefined, reserveGB: 6 }).ok).toBe(
+    // Unmeasured free memory admits a job that COULD fit; one that could not
+    // is still refused, because that answer needs no reading.
+    expect(fits({ footprintGB: 5, totalGB: 24, freeFraction: undefined, reserveGB: 6 }).ok).toBe(
       true,
+    );
+    expect(fits({ footprintGB: 40, totalGB: 24, freeFraction: undefined, reserveGB: 6 }).ok).toBe(
+      false,
     );
   });
 });
@@ -208,6 +257,6 @@ describe('createGuardian', () => {
       onVerdict: () => undefined,
     });
     expect(await g.poke()).toBe('calm'); // a rate needs two readings
-    expect(await g.poke()).toBe('shed'); // 20,000 pages in one second
+    expect(await g.poke()).toBe('hold'); // 20,000 pages in one second with memory to spare: a burst
   });
 });

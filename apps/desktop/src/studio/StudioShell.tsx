@@ -93,6 +93,15 @@ export interface StudioShellProps {
   readonly multiline?: boolean;
   readonly onRun: () => void;
   readonly busy: boolean;
+  /**
+   * Cancel the run in flight.
+   *
+   * Stop used to live on the job card. the user asked for that card to be nothing
+   * but the frame and a bar, and a run still has to be stoppable — so it is on
+   * the button that started it, which is where a reader's hand already is and
+   * the one control that cannot be mistaken for part of the result.
+   */
+  readonly onStop?: () => void;
   readonly runLabel: string;
   /** Blocks the run button with a reason, when the studio cannot run at all. */
   readonly blocked?: string;
@@ -145,6 +154,7 @@ export function StudioShell({
   multiline = false,
   onRun,
   busy,
+  onStop,
   runLabel,
   blocked,
   error,
@@ -155,6 +165,9 @@ export function StudioShell({
   testid = 'studio',
 }: StudioShellProps): JSX.Element {
   const canRun = !busy && blocked === undefined && promptText.trim().length > 0;
+  /* Only while there is something to stop — before the job reports itself there
+     is no id to cancel, and a Stop that does nothing is worse than none. */
+  const stoppable = busy && onStop !== undefined;
 
   /*
    * `null` = nothing being dragged, `true` = we can take it, `false` = we
@@ -333,13 +346,14 @@ export function StudioShell({
               variant="accent"
               className="pd-studio-run"
               data-testid="studio-run"
-              disabled={!canRun}
+              disabled={!canRun && !stoppable}
               title={blocked}
-              onClick={onRun}
+              onClick={stoppable ? onStop : onRun}
+              data-stop={stoppable ? 'true' : undefined}
             >
               {busy ? (
                 <span className="flex items-center gap-1.5">
-                  <Spinner size={12} /> Working…
+                  <Spinner size={12} /> {stoppable ? 'Stop' : 'Working…'}
                 </span>
               ) : (
                 runLabel

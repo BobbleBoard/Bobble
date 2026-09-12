@@ -56,7 +56,7 @@ export interface GuardianMainOptions {
 
 export interface GuardianMain {
   /** Admission: may a heavy job of this footprint start right now? */
-  readonly admit: (footprintGB?: number) => { ok: boolean; reason?: string };
+  readonly admit: (footprintGB?: number) => { ok: boolean; reason?: string; never?: boolean };
   readonly verdict: () => GuardianVerdict;
   readonly stop: () => void;
   /** For diagnostics and the probe: the last reading's free fraction. */
@@ -168,6 +168,13 @@ export function startGuardian(opts: GuardianMainOptions): GuardianMain {
   return {
     admit: (footprintGB) => {
       const verdict = guardian.verdict();
+      const reserveGB = opts.reserveGB() ?? defaultReserveGB(TOTAL_GB);
+      // A job that could not fit on this Mac at all is refused before any
+      // reading is consulted — that answer does not depend on one.
+      if (footprintGB !== undefined) {
+        const ever = fits({ footprintGB, totalGB: TOTAL_GB, freeFraction: undefined, reserveGB });
+        if (ever.never === true) return { ok: false, reason: ever.reason, never: true };
+      }
       // At the wall nothing starts, whatever its size.
       if (verdict === 'shed') return { ok: false, reason: lastReason };
       // A job of unknown size is admitted only on a calm machine; one of known
@@ -181,9 +188,10 @@ export function startGuardian(opts: GuardianMainOptions): GuardianMain {
         footprintGB,
         totalGB: TOTAL_GB,
         freeFraction: reading?.memoryFree,
-        reserveGB: opts.reserveGB() ?? defaultReserveGB(TOTAL_GB),
+        reserveGB,
       });
-      return fit.ok ? { ok: true } : { ok: false, reason: fit.reason };
+      if (fit.ok) return { ok: true };
+      return { ok: false, reason: fit.reason, ...(fit.never === true ? { never: true } : {}) };
     },
     verdict: () => guardian.verdict(),
     stop: () => {

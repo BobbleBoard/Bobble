@@ -14,8 +14,10 @@ export {
   defaultImageModel,
   defaultVideoModel,
   getModel,
+  jobFootprintGB,
   MODALITY_CATALOG,
   modelsForModality,
+  previewCostGB,
   requiresLicenseGate,
 } from './catalog.js';
 export type {

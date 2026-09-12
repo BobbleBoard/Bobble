@@ -134,7 +134,11 @@ def build_mflux_cmd(spec, seed, out_path, step_dir):
             keep = max(0.0, min(1.0, 1.0 - float(change)))
             cmd += ["--image-strength", str(round(keep, 3))]
     cmd += ["--seed", str(seed)]
-    cmd += ["--stepwise-image-output-dir", step_dir]
+    # Per-step previews cost ~4.5 GB of peak memory at 512² (MEASURED) — the
+    # app decides at admission whether the machine can afford them. Absent
+    # means yes, as it always did.
+    if spec.get("stepPreviews", True):
+        cmd += ["--stepwise-image-output-dir", step_dir]
     cmd += ["--output", out_path]
     return cmd
 

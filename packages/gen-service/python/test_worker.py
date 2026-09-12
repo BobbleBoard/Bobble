@@ -503,3 +503,18 @@ class MainServeFlagTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestStepPreviews:
+    """Per-step previews are an admission decision now (~4.5 GB at 512², MEASURED)."""
+
+    BASE = {"mfluxCommand": "mflux-generate", "prompt": "p"}
+
+    def test_default_keeps_previews(self):
+        cmd = worker.build_mflux_cmd(dict(self.BASE), 7, "/out.png", "/steps")
+        assert "--stepwise-image-output-dir" in cmd
+
+    def test_off_when_the_machine_cannot_afford_them(self):
+        cmd = worker.build_mflux_cmd({**self.BASE, "stepPreviews": False}, 7, "/out.png", "/steps")
+        assert "--stepwise-image-output-dir" not in cmd
+        assert "--output" in cmd

@@ -4,6 +4,7 @@ import {
   defaultImageModel,
   defaultVideoModel,
   getModel,
+  jobFootprintGB,
   type License,
   MODALITY_CATALOG,
   type ModalityModel,
@@ -155,18 +156,29 @@ describe('minUnifiedMemoryGB hint', () => {
       expect(typeof m.minUnifiedMemoryGB).toBe('number');
       const min = m.minUnifiedMemoryGB ?? 0;
       expect(min).toBeGreaterThan(0);
-      // The floor covers the weights — except for a STAGED pipeline, where the
-      // download is bigger than anything ever resident (an encoder that is freed
-      // before the transformer loads). Those declare the peak they measured.
-      expect(min).toBeGreaterThanOrEqual(m.peakResidentGB ?? m.approxSizeGB);
+      // The hint covers what has to be resident BEFORE any pixels: the measured
+      // floor where there is one, else the peak a staged pipeline measured
+      // (smaller than its download), else the download. Not the 1024² peak —
+      // a 16 GB Mac runs Z-Image at 512² (10.5 GB), and the hint is what
+      // decides whether it is offered the model at all.
+      expect(min).toBeGreaterThanOrEqual(m.residentFloorGB ?? m.peakResidentGB ?? m.approxSizeGB);
     }
   });
 
-  it('a declared peak is smaller than the download, or it is not a peak', () => {
+  it('a declared peak is a measured number, on either side of the download', () => {
+    // Below for a staged pipeline (encoder freed before the transformer loads),
+    // above for a single-pass image model whose activations scale with the
+    // picture — FLUX.2 klein: 4.3 GB on disk, 12.4 GB at 1024². The old rule
+    // (`peak < size`) encoded only the first case, and admission then read the
+    // download size for the second and let a 12 GB job onto a machine that
+    // could not hold it.
     for (const m of MODALITY_CATALOG) {
       if (m.peakResidentGB === undefined) continue;
       expect(m.peakResidentGB, `${m.id} peak`).toBeGreaterThan(0);
-      expect(m.peakResidentGB, `${m.id} peak vs size`).toBeLessThan(m.approxSizeGB);
+      // Not wildly off the download in either direction: a 10× ratio is a typo.
+      const ratio = m.peakResidentGB / m.approxSizeGB;
+      expect(ratio, `${m.id} peak/size ratio`).toBeGreaterThan(0.2);
+      expect(ratio, `${m.id} peak/size ratio`).toBeLessThan(5);
     }
   });
 });
@@ -391,5 +403,36 @@ describe('defaultVideoModel prefers something runnable', () => {
 
   it('picks the local, no-weights motion path', () => {
     expect(defaultVideoModel().backend).toBe('hyperframes');
+  });
+});
+
+describe('jobFootprintGB', () => {
+  // FLUX.2 klein, MEASURED 2026-09-11 as the OS free-memory drop: ~10.5 GB at
+  // 512², ≥14 GB at 768² (cut by the watchdog), fitted to ~19 GB at 1024².
+  const klein = { approxSizeGB: 4.3, residentFloorGB: 7.7, peakResidentGB: 19 };
+
+  it('is the measured peak at the reference size', () => {
+    expect(jobFootprintGB(klein, 1024 * 1024)).toBeCloseTo(19, 5);
+  });
+
+  it('reproduces the measured points, on the safe side of each', () => {
+    expect(jobFootprintGB(klein, 512 * 512)).toBeGreaterThanOrEqual(10.4);
+    expect(jobFootprintGB(klein, 768 * 768)).toBeGreaterThanOrEqual(14);
+    // …and grows past the reference for a bigger ask.
+    expect(jobFootprintGB(klein, 1536 * 1536)).toBeGreaterThan(19);
+  });
+
+  it('starts from the floor, never from the download size, when a floor was measured', () => {
+    expect(jobFootprintGB(klein, 1)).toBeCloseTo(7.7, 1);
+  });
+
+  it('falls back to the size when nothing was measured', () => {
+    expect(jobFootprintGB({ approxSizeGB: 3.5 }, 1024 * 1024)).toBe(3.5);
+    expect(jobFootprintGB(klein)).toBe(19);
+  });
+
+  it('never reports less than the floor for a staged pipeline whose peak is below its download', () => {
+    // A ComfyUI pipeline: 36 GB download, 20 GB measured peak, no floor.
+    expect(jobFootprintGB({ approxSizeGB: 36, peakResidentGB: 20 }, 1024 * 1024)).toBe(36);
   });
 });

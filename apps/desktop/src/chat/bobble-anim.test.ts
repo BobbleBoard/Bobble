@@ -16,6 +16,10 @@ import {
   cellOf,
   clamp01,
   DOT,
+  EXIT_MS,
+  exitReveal,
+  exitSceneAt,
+  exitT,
   GRID,
   gridCell,
   type LoaderVariant,
@@ -409,5 +413,69 @@ describe('sceneAt — every frame of every variant', () => {
   it('clamps and eases the way the acts assume', () => {
     expect(clamp01(-1)).toBe(0);
     expect(clamp01(2)).toBe(1);
+  });
+});
+
+/*
+ * THE EXIT. It is the only part of the arc the user is guaranteed to see all of
+ * — every generation ends with it — and the thing it is covering up is arriving
+ * underneath as it goes, so "did every block actually leave" is not cosmetic.
+ */
+describe('the closing sweep', () => {
+  it('starts with the board intact and ends with nothing on it', () => {
+    const first = exitSceneAt(0);
+    expect(first.blocks).toHaveLength(TOTAL);
+    // Nothing has been passed yet: the line is still off the corner.
+    expect(Math.min(...first.blocks.map((b) => b.alpha))).toBeGreaterThan(0.99);
+    const last = exitSceneAt(1);
+    expect(Math.max(...last.blocks.map((b) => b.alpha))).toBeLessThan(0.01);
+  });
+
+  it('lets go of the board in one direction and never takes a block back', () => {
+    // A block that has faded must stay faded: a sweep that un-erases part of the
+    // card would uncover the picture and then cover it again.
+    let previous = exitSceneAt(0).blocks.map((b) => b.alpha);
+    for (let i = 1; i <= 60; i++) {
+      const now = exitSceneAt(i / 60).blocks.map((b) => b.alpha);
+      for (let k = 0; k < TOTAL; k++) {
+        expect((now[k] as number) - (previous[k] as number)).toBeLessThan(1e-6);
+      }
+      previous = now;
+    }
+  });
+
+  it('uncovers the card monotonically, and completely', () => {
+    expect(exitReveal(0)).toBe(0);
+    expect(exitReveal(1)).toBe(1);
+    let last = -1;
+    for (let i = 0; i <= 40; i++) {
+      const r = exitReveal(i / 40);
+      expect(r).toBeGreaterThanOrEqual(last);
+      last = r;
+    }
+  });
+
+  it('sweeps the same diagonal the cascade does, in one pass', () => {
+    // Across the whole board, not a fraction of it, and one direction only.
+    expect(exitT(0)).toBeGreaterThan(BOARD);
+    expect(exitT(1)).toBeLessThan(-BOARD);
+    expect(exitT(0.5)).toBeGreaterThan(exitT(0.6));
+  });
+
+  it('blooms a block into a rounded square as the line reaches it, before it goes', () => {
+    // Pick the block the line meets in the middle of the pass and watch it: it
+    // must get BIGGER before it gets smaller, or the "cascade doing its thing"
+    // is just a fade.
+    const sizes: number[] = [];
+    for (let i = 0; i <= 40; i++)
+      sizes.push((exitSceneAt(i / 40).blocks[27] as { size: number }).size);
+    const peak = Math.max(...sizes);
+    expect(peak).toBeGreaterThan((sizes[0] as number) * 1.5);
+    expect(sizes[sizes.length - 1] as number).toBeLessThan(peak);
+  });
+
+  it('is long enough to read and short enough not to delay the result', () => {
+    expect(EXIT_MS).toBeGreaterThan(600);
+    expect(EXIT_MS).toBeLessThan(1800);
   });
 });

@@ -63,15 +63,28 @@ export interface ModalityModel {
   /** Approx on-disk size (GB) at the listed quantization. */
   readonly approxSizeGB: number;
   /**
-   * Peak RESIDENT size (GB), when it is smaller than the download.
+   * Peak RESIDENT size (GB), MEASURED — whichever side of the download it lands.
    *
-   * A single checkpoint is all in memory at once, so its floor is its size. A
-   * staged pipeline is not: ComfyUI loads a text encoder, encodes, frees it, and
-   * only then loads the transformer, so a 36GB download can peak at 20GB. Set
-   * this ONLY from a measured run — it is what decides whether a machine is
-   * offered the model at all, and guessing it low turns into a swap-storm.
+   * Below it for a staged pipeline: ComfyUI loads a text encoder, encodes,
+   * frees it, and only then loads the transformer, so a 36GB download can peak
+   * at 20GB. Above it for a single-pass image model, whose activations scale
+   * with the picture: FLUX.2 klein is 4.3GB on disk and 12.4GB at 1024². For
+   * image models it is the 1024² figure, and admission scales it by the pixels
+   * actually asked for (`jobFootprintGB`).
+   *
+   * Set this ONLY from a measured run — it is what decides whether a job is
+   * admitted right now (the guardian's `fits`) and what a machine is offered,
+   * and guessing it low is exactly the swap-storm this exists to prevent.
    */
   readonly peakResidentGB?: number;
+  /**
+   * What the job costs BEFORE activations — weights, encoder, VAE and the
+   * runtime, resident together — MEASURED as the OS's own free-memory drop.
+   * With `peakResidentGB` (the 1024² figure) it fixes the line admission
+   * scales along; absent, the download size stands in, which is too low for
+   * any model that loads an encoder beside its weights.
+   */
+  readonly residentFloorGB?: number;
   /**
    * Minimum unified-memory (GB) hint to hold this entry at its listed quant
    * (≈ weights + ~1GB headroom). The model manager uses it to auto-prefer the
@@ -137,8 +150,33 @@ export const MODALITY_CATALOG: readonly ModalityModel[] = [
      * 1024², so 12.4GB plus the OS and this app is the floor a machine actually
      * needs — and this number is what the model card's RAM verdict reads, so a
      * 6 here told someone with 8GB they were fine.
+     *
+     * …and 16 told someone with 16GB they were fine, from the same MLX figure.
+     * The OS-level measurement below puts 1024² at ~19GB of the machine's own
+     * free memory, so the honest hint for the default size is 24. A 16GB Mac
+     * still has Z-Image at 3.5GB, which is why that one is recommended too.
      */
-    minUnifiedMemoryGB: 16,
+    minUnifiedMemoryGB: 24,
+    /*
+     * THE NUMBERS ADMISSION READS — and they are NOT the MLX peaks above.
+     *
+     * MEASURED 2026-09-11 (M5 Pro 24GB) as the drop in `kern.memorystatus_level`
+     * — the OS's own free memory, the figure jetsam steers by — while the job
+     * ran under a watchdog (tests: /tmp/measure-mflux.sh):
+     *
+     *   512²   RSS 3.65 GB   OS free 84% → 43%   ≈ 10.5 GB taken
+     *   768²                 OS free 84% → 29%   ≥ 14 GB, still falling at the cut
+     *
+     * Twice that day the studio ran this model with 20 GB "available" and the
+     * OS went critical (51,457 pages/s of swap) within ten seconds; the guardian
+     * cancelled both. The MLX active-memory peaks (4.95 / 12.4 GB) are real but
+     * measure the wrong thing: wired GPU allocations do not show in RSS and the
+     * encoder and runtime sit beside them. Fitting the two points: a ~7.7 GB
+     * floor plus ~10.7 GB per megapixel, so ~19 GB at 1024² — which is why 1024²
+     * cannot be admitted beside a 6 GB reserve on a 24 GB machine, and 512² can.
+     */
+    residentFloorGB: 7.7,
+    peakResidentGB: 19,
     runsLocally: true,
     heavy: false,
     recommended: true,
@@ -162,7 +200,20 @@ export const MODALITY_CATALOG: readonly ModalityModel[] = [
     license: 'apache-2.0',
     commercialUse: true,
     approxSizeGB: 3.5,
-    minUnifiedMemoryGB: 5,
+    /*
+     * MEASURED 2026-09-11 (M5 Pro 24GB) as the drop in the OS's own free
+     * memory under a watchdog, like FLUX.2 klein above:
+     *
+     *   512²    RSS 5.3 GB   OS free 85% → 44%   ≈ 10.5 GB taken, 9.2 s
+     *   1024²                OS free 85% → 29%   ≥ 14.4 GB and still loading
+     *                                            when the watchdog cut it
+     *
+     * The 1024² figure is a lower bound, so the peak here is set above it. The
+     * old hint of 5 GB described the download; the job is three times that.
+     */
+    residentFloorGB: 8.5,
+    peakResidentGB: 17,
+    minUnifiedMemoryGB: 16,
     runsLocally: true,
     heavy: false,
     recommended: true,
@@ -842,4 +893,46 @@ export function defaultVideoModel(): ModalityModel {
 /** Whether a model needs an install-EULA / commercial gate before use. */
 export function requiresLicenseGate(model: ModalityModel): boolean {
   return model.commercialUse === false;
+}
+
+/**
+ * WHAT A JOB WILL ACTUALLY HOLD, for admission — scaled by the picture.
+ *
+ * A model's weights sit still; its activations scale with the pixels. So the
+ * footprint is a floor plus a slope: what the job costs before it draws
+ * anything (`residentFloorGB`, or the download size when nothing better was
+ * measured) plus the measured 1024² excess in proportion to the pixels asked
+ * for.
+ *
+ * MEASURED for FLUX.2 klein as the OS's own free-memory drop: ~10.5 GB at 512²,
+ * ≥14 GB at 768² — a 7.7 GB floor and ~10.7 GB per megapixel, ~19 GB at 1024².
+ * From the download size alone (4.3 GB) admission let it onto a machine with
+ * 20 GB spare and the OS went critical; the floor is what was missing. A model
+ * without a measured peak is admitted on its size, which is the best number
+ * there is and what the guardian's shed is behind.
+ */
+export function jobFootprintGB(
+  model: Pick<ModalityModel, 'approxSizeGB' | 'peakResidentGB' | 'residentFloorGB'>,
+  pixels?: number,
+): number {
+  const floor = model.residentFloorGB ?? model.approxSizeGB;
+  const peak = model.peakResidentGB;
+  if (peak === undefined) return floor;
+  if (pixels === undefined || !(pixels > 0) || peak <= floor) return Math.max(peak, floor);
+  return floor + (peak - floor) * (pixels / (1024 * 1024));
+}
+
+/**
+ * What per-step previews add to a job's peak, GB, scaled by the picture.
+ *
+ * MEASURED (FLUX.2 klein, 512², M5 Pro 24GB): the same job troughs at 43% of
+ * the machine's memory without `--stepwise-image-output-dir` and at 26% with
+ * it — ~4.5 GB, because the VAE decodes a full frame at every step while the
+ * transformer's activations are still live. One point, so the scaling with
+ * pixels is the only honest assumption; it errs high for big pictures, where
+ * the answer is "no previews" anyway.
+ */
+export const PREVIEW_GB_AT_512 = 4.5;
+export function previewCostGB(pixels: number): number {
+  return PREVIEW_GB_AT_512 * (Math.max(pixels, 1) / (512 * 512));
 }

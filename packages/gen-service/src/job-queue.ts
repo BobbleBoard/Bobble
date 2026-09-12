@@ -83,7 +83,9 @@ export interface JobQueueOptions {
    * with 9 GB to spare can run a 5 GB video job and should hold a 12 GB image
    * one. The reason, when refused, is kept for the job's own status.
    */
-  readonly heavyAllowed?: (footprintGB?: number) => boolean | { ok: boolean; reason?: string };
+  readonly heavyAllowed?: (
+    footprintGB?: number,
+  ) => boolean | { ok: boolean; reason?: string; never?: boolean };
 }
 
 export class JobQueue {
@@ -105,7 +107,9 @@ export class JobQueue {
    * Generate wants. Defaults to "always", so a caller that does not care behaves
    * exactly as before.
    */
-  #heavyAllowed: (footprintGB?: number) => boolean | { ok: boolean; reason?: string } = () => true;
+  #heavyAllowed: (
+    footprintGB?: number,
+  ) => boolean | { ok: boolean; reason?: string; never?: boolean } = () => true;
   /** Why the heavy job at the head is being held, for whoever is watching it. */
   #holdReason: string | undefined;
 
@@ -246,11 +250,26 @@ export class JobQueue {
     return false;
   }
 
-  /** The machine's answer for one entry, normalised. */
+  /**
+   * The machine's answer for one entry, normalised.
+   *
+   * `never` is the answer that no future reading changes — the job would not fit
+   * with everything else closed — and holding it would be a hang with a mark
+   * animating over it. It is rejected here, with the advice the policy attached.
+   */
   #machineAllows(entry: Entry): boolean {
     const answer = this.#heavyAllowed(entry.footprintGB);
     const ok = typeof answer === 'boolean' ? answer : answer.ok;
     const reason = typeof answer === 'boolean' ? undefined : answer.reason;
+    const never = typeof answer === 'boolean' ? false : answer.never === true;
+    if (never) {
+      const idx = this.#queue.indexOf(entry);
+      if (idx !== -1) this.#queue.splice(idx, 1);
+      this.#setStatus(entry, 'error');
+      entry.reject(new Error(reason ?? 'this job cannot fit on this machine'));
+      this.#entries.delete(entry.job.id);
+      return false;
+    }
     if (!ok && reason !== undefined && reason !== this.#holdReason) {
       this.#holdReason = reason;
       this.#emit({ type: 'held', jobId: entry.job.id, reason });
@@ -298,9 +317,11 @@ export class JobQueue {
       if (next === undefined) break;
       if (!this.#canStart(next)) {
         // Held by the MACHINE rather than by the queue: step over it — a
-        // smaller job behind it may fit (see the note above).
+        // smaller job behind it may fit (see the note above). A job the
+        // machine REJECTED has already left the queue, so the same index now
+        // holds the next one.
         if (!this.#runningHeavy && !this.#machineAllows(next)) {
-          index += 1;
+          if (this.#queue[index] === next) index += 1;
           continue;
         }
         break;

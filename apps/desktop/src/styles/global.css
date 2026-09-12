@@ -3504,10 +3504,16 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
  * .pd-media-frame), and the tint is gone with the gap it was filling. `contain`
  * stays for the max-height case, where it is doing real work.
  */
+/* ONE cap for the picture and for the pending frame that stands in for it —
+   the handover must not change the card's size (see .pd-media-card--pending). */
+:root {
+  --pd-media-max-h: 480px;
+}
+
 .pd-media-image {
   width: auto;
   max-width: 100%;
-  max-height: 480px;
+  max-height: var(--pd-media-max-h);
   object-fit: contain;
   display: block;
 }
@@ -3671,7 +3677,8 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
 }
 .pd-media-video-el {
   width: 100%;
-  max-height: 460px;
+  /* The same cap as a picture, so a clip's pending frame is its final frame. */
+  max-height: var(--pd-media-max-h);
   display: block;
   background: #000;
   cursor: pointer;
@@ -6414,6 +6421,157 @@ body[data-media-expanded="true"] .pd-studio-compose {
  * the frame around it: the bar, the percentage, and the way the whole thing
  * leaves once the picture has arrived.
  */
+/*
+ * THE CARD WHILE IT IS STILL BEING MADE.
+ *
+ * Same `pd-media-card` and `pd-media-frame` as the finished thing — these rules
+ * only give the frame a box to be before there is anything to fit, and put a
+ * bare bar under it. the user: "just the same final video card, same final image
+ * card, same final 3d card … and then below it, just floating, a white progress
+ * bar."
+ */
+.pd-media-card--pending {
+  gap: 9px;
+  align-items: stretch;
+}
+
+.pd-media-card--pending .pd-media-frame {
+  position: relative;
+  /* `fit-content` has nothing to fit yet, so the pending frame states its own
+     box: the width that was asked for, capped exactly as the finished picture
+     will be — by the column, and by the same max height (`--pd-media-max-h`,
+     through the aspect ratio). SEEN: a 512² request rendered as a 512px
+     pending frame and a 480px picture, a 30px step at the handover. */
+  width: min(
+    var(--pd-pending-w, 440px),
+    calc(var(--pd-media-max-h) * var(--pd-pending-aspect, 1)),
+    100%
+  );
+  /* The finished frame is `fit-content` around the picture — its width is the
+     picture plus the border. This width has to mean the same thing, or the
+     card is 2px narrower while it waits (MEASURED: 480 → 482 at the handover). */
+  box-sizing: content-box;
+  aspect-ratio: var(--pd-pending-aspect, 1);
+  /* THE QUICK SMOOTH RESIZE the user allowed. The job reports its shape a beat after
+     the card appears, and video corrects nothing later — so the box eases into
+     the aspect ratio rather than jumping to it under the reader. */
+  transition:
+    aspect-ratio 380ms var(--pd-easing-standard, ease),
+    width 380ms var(--pd-easing-standard, ease);
+}
+
+/* A sound has no picture, and the transport it becomes is a strip — so its
+   pending card is that strip's shape rather than a tall square that would
+   collapse to a third of its height the moment the audio landed. */
+.pd-media-card--pending[data-kind="audio"] .pd-media-frame {
+  aspect-ratio: auto;
+  height: 132px;
+}
+
+/* 3D results are a fixed-height viewport rather than an aspect box (see
+   .pd-media-card[data-kind="model"]), so the pending one is the same height. */
+.pd-media-card--pending[data-kind="model"] .pd-media-frame {
+  aspect-ratio: auto;
+  height: 320px;
+}
+
+/* The mark fills the frame; the canvas is sized by the loader itself. */
+.pd-media-card--pending .pd-bobble-loader-host[data-fill="true"] {
+  position: absolute;
+  inset: 0;
+  display: block;
+}
+.pd-media-card--pending .pd-bobble-loader-host[data-fill="true"] .pd-bobble-canvas {
+  /* The scrim belongs to a small mark on a pale plate; at card scale the frame
+     IS the ground and a second one inside it is a box within a box. */
+  background: none;
+  border-radius: 0;
+}
+
+/*
+ * THE REVEAL. The finished media sits under the canvas and is uncovered along
+ * the same diagonal the blocks are leaving on — `--pd-pending-sweep` is
+ * `exitReveal`, handed up from the loop that is drawing the blocks.
+ *
+ * 225deg is toward the bottom-left, so the uncovering starts at the TOP-RIGHT:
+ * the corner the sweep's line clears first (`cx - cy` largest). The soft band is
+ * what keeps it from reading as a wipe.
+ */
+.pd-pending-reveal {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  --pd-pending-edge: calc(var(--pd-pending-sweep, 0) * 132% - 16%);
+  -webkit-mask-image: linear-gradient(
+    225deg,
+    #000 var(--pd-pending-edge),
+    transparent calc(var(--pd-pending-edge) + 15%)
+  );
+  mask-image: linear-gradient(
+    225deg,
+    #000 var(--pd-pending-edge),
+    transparent calc(var(--pd-pending-edge) + 15%)
+  );
+}
+
+.pd-pending-reveal > * {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Reduced motion has no sweep to follow, so the picture is simply there. */
+@media (prefers-reduced-motion: reduce) {
+  .pd-pending-reveal {
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+}
+
+/*
+ * THE BAR. Floating — no trough card, no panel, no border. It is the only other
+ * thing on screen while the card waits, and it leaves the moment the sweep
+ * starts, because a progress bar over a finished picture is measuring nothing.
+ */
+.pd-pending-bar {
+  position: relative;
+  width: min(var(--pd-pending-w, 440px), 100%);
+  height: 3px;
+  border-radius: var(--pd-radius-full);
+  overflow: hidden;
+  background: color-mix(in srgb, var(--pd-text-primary) 12%, transparent);
+  transition: opacity 260ms var(--pd-easing-standard, ease);
+}
+
+.pd-pending-fill {
+  height: 100%;
+  border-radius: inherit;
+  /* White, as asked — and white on both themes, because it sits under a card
+     whose ground is dark in either. */
+  background: color-mix(in srgb, var(--pd-text-primary) 88%, transparent);
+  transition: width 320ms var(--pd-easing-standard, ease-out);
+}
+
+.pd-pending-fill[data-indeterminate="true"] {
+  width: 38%;
+  transition: none;
+  animation: pd-bobble-sweep 1450ms ease-in-out infinite;
+}
+
+.pd-pending-pct {
+  font-size: var(--pd-font-size-caption);
+  font-variant-numeric: tabular-nums;
+  color: var(--pd-text-tertiary, var(--pd-text-secondary));
+  transition: opacity 260ms var(--pd-easing-standard, ease);
+}
+
+/* Handing over: the measurement goes, the picture stays. */
+.pd-media-card--pending[data-revealing="true"] .pd-pending-bar,
+.pd-media-card--pending[data-revealing="true"] .pd-pending-pct {
+  opacity: 0;
+  pointer-events: none;
+}
+
 .pd-bobble-loader-host {
   /*
    * WHITE, AND ON SOMETHING DARK ENOUGH TO SEE IT.

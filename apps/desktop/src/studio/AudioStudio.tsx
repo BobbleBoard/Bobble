@@ -129,7 +129,7 @@ export function AudioStudio(): JSX.Element {
   const fileInput = useRef<HTMLInputElement>(null);
 
   const catalog = useGenStore((s) => s.catalog);
-  const { busy, error, runs, job, run, cancel } = useStudio('audio');
+  const { busy, error, runs, job, run, cancel, finishReveal } = useStudio('audio');
 
   /** Models that can serve this mode — speech on the TTS backends, sound on Comfy. */
   const models = useMemo(() => {
@@ -253,6 +253,7 @@ export function AudioStudio(): JSX.Element {
       }
       onRun={() => void onRun()}
       busy={busy || enhancer.enhancing}
+      {...(job?.cancellable === true ? { onStop: cancel } : {})}
       runLabel={
         enhancer.enhancing
           ? 'Enhancing…'
@@ -544,7 +545,9 @@ export function AudioStudio(): JSX.Element {
         </>
       }
     >
-      {job !== null ? <StudioJob job={job} onCancel={cancel} variant="audio" /> : null}
+      {job !== null ? (
+        <StudioJob job={job} variant="audio" model={model} onRevealed={finishReveal} />
+      ) : null}
       {shown.length === 0 && job === null ? (
         <StudioEmpty
           glyph={<GlyphAudio />}

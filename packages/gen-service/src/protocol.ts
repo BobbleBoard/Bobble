@@ -74,6 +74,18 @@ export interface ImageJobSpec {
   /** mflux `-q` weight quantization (3|4|5|6|8); omitted → full precision. */
   readonly quantize?: 3 | 4 | 5 | 6 | 8;
   /**
+   * Decode a preview at every step (`--stepwise-image-output-dir`).
+   *
+   * The thread's card shows the real denoise from these, and they are not
+   * free: MEASURED (FLUX.2 klein, 512²), decoding at each step takes the
+   * machine's free memory from 43% to 26% — about 4.5 GB on top of the job,
+   * live at the same moment as the transformer's activations. So whether to
+   * ask for them is decided at admission against what the machine has
+   * (gen-manager), not assumed. Absent means yes, which is what every caller
+   * before this flag existed got.
+   */
+  readonly stepPreviews?: boolean;
+  /**
    * An existing picture to work FROM — mflux `--image-path`.
    *
    * Present ⇒ this is an edit, not a fresh generation: the model starts from

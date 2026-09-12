@@ -350,6 +350,87 @@ export function cascadeT(progress: number): number {
   return lerp(reach, -reach, s);
 }
 
+// ─── the exit: the sweep that hands the card over ────────────────────────────
+
+/**
+ * THE END OF THE WAIT IS NOT A FADE-OUT, IT IS THE LAST SWEEP.
+ *
+ * the user: "it can simply smoothly fade out with one of the animations eg. the
+ * diagonal cascade when it's ready can do it's thing, but as it goes reveal the
+ * actual produced image/video/3d. seamless besides a quick smooth resize."
+ *
+ * So the loader does not stop and get replaced — the same diagonal that has been
+ * sweeping the grid all along makes one final pass, and the blocks it has passed
+ * are gone. What is behind them is the finished picture, uncovered along the very
+ * same line. The card never blinks and nothing is swapped underneath the reader.
+ *
+ * It starts from the grid the cascade act already hands over (`cascadeBlocks` at
+ * the line's own start), so whatever act was on screen, the first exit frame is
+ * a pose the loop itself passes through — there is nothing to cut between.
+ */
+export const EXIT_MS = 1150;
+
+/** How far past the corner the line starts and ends, so the sweep enters and
+ * leaves the board rather than appearing mid-grid. */
+function reach(): number {
+  return BOARD + BAND * Math.SQRT2;
+}
+
+/** The line's position at exit progress `p` — the same `y = x - t` as the
+ * cascade, travelling once, all the way across. */
+export function exitT(p: number): number {
+  return lerp(reach(), -reach(), clamp01(p));
+}
+
+/**
+ * How much of the card the sweep has uncovered, 0..1.
+ *
+ * The card and the board are not the same box — the blocks live in a centred
+ * square and the picture fills the whole frame — so this cannot be a pixel-exact
+ * shared edge. What it CAN be is one number: the mask over the media and the
+ * blocks' own fade are both driven from here, so they sweep together and neither
+ * can lead the other.
+ */
+export function exitReveal(p: number): number {
+  return smooth(clamp01(p));
+}
+
+/** Half-width of the band a block dissolves across, once the line is past it. */
+const EXIT_BAND = BAND * 0.62;
+
+/**
+ * The board mid-exit: dots ahead of the line, a rounded square ON it, nothing
+ * behind it.
+ *
+ * The bloom is the cascade's own `cascadeHeat`, so a block's last act is the
+ * same one it has been performing all along; it simply does not come back down
+ * the far side, because by then it has been let go.
+ */
+export function exitSceneAt(p: number): Scene {
+  const t = exitT(p);
+  const blocks: Block[] = [];
+  for (let index = 0; index < TOTAL; index++) {
+    const seat = seatOf(index);
+    const heat = cascadeHeat(seat.cx, seat.cy, t);
+    const cellSize = seat.size / (1 - AIR);
+    /* Signed, not absolute: which SIDE of the line a block is on is the whole
+       question here, where the cascade only ever cared how far. */
+    const past = clamp01((seat.cx - seat.cy - t) / EXIT_BAND);
+    const leaving = smooth(past);
+    const size = lerp(cellSize * DOT, seat.size, heat) * (1 - 0.45 * leaving);
+    blocks.push({
+      cx: seat.cx,
+      cy: seat.cy,
+      size,
+      radius: size * roundnessAt(heat),
+      alpha: 1 - leaving,
+      lift: 0,
+    });
+  }
+  /* `cascade`, because that is what it IS — the same act, not coming back. */
+  return { blocks, act: 'cascade', yaw: 0, pitch: 0, solidity: 0 };
+}
+
 // ─── the scene ───────────────────────────────────────────────────────────────
 
 /** The flat grid state every post-split act starts from: dots where the wave is

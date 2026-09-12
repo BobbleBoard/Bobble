@@ -29,11 +29,23 @@
  */
 
 import { type CSSProperties, useEffect, useRef } from 'react';
-import { BOARD, type LoaderVariant, sceneAt } from './bobble-anim';
+import {
+  BOARD,
+  EXIT_MS,
+  exitReveal,
+  exitSceneAt,
+  type LoaderVariant,
+  sceneAt,
+} from './bobble-anim';
 
 /** Camera distance for the 3D act, in board units. Far enough that the
  * perspective reads as depth rather than as a fisheye. */
 const CAMERA = 78;
+
+/** How much of a filled frame's short side the square board takes. Not 1: the
+ * cascade's blocks bloom past their cells, and a board flush to the edge clips
+ * them at the exact moment they are largest. */
+const BOARD_FILL = 0.82;
 
 export interface BobbleLoaderProps {
   /** Rendered size in CSS px. */
@@ -49,6 +61,36 @@ export interface BobbleLoaderProps {
   label?: string;
   /** Hide the bar entirely (small inline placements). */
   bare?: boolean;
+  /**
+   * Take the whole box instead of a fixed square.
+   *
+   * the user: "just that part that does all the animations … but scaled to a rounded
+   * corner large square/rect". The card the result will occupy is the frame, and
+   * the mark plays at card scale inside it rather than as a stamp in the middle
+   * of an empty plate. The BOARD stays square whatever shape the box is — the
+   * mark is the app's icon and a stretched icon is a broken icon — so on a 16:9
+   * frame it is a large centred square, which is what it should be.
+   */
+  fill?: boolean;
+  /**
+   * The result exists: play the closing sweep and then stop.
+   *
+   * Flipping this is what ends the loader. It does not unmount and get replaced
+   * by the picture; it uncovers the picture (see `exitSceneAt`) and tells the
+   * card when it has finished doing so.
+   */
+  exit?: boolean;
+  /** Called once, when the sweep has cleared the board. */
+  onExitDone?: () => void;
+  /**
+   * The sweep's position, 0..1, every frame of the exit.
+   *
+   * The thing being uncovered is a SIBLING, not a descendant, so a custom
+   * property set on this host would never reach it. Handing the number up means
+   * the card can put it on the box they share — and it is the same number the
+   * blocks are fading on, so the two edges cannot drift apart.
+   */
+  onSweep?: (reveal: number) => void;
 }
 
 /** Draw one rounded square, flat. The 2D path and the 3D top face share it. */
@@ -104,9 +146,22 @@ export function BobbleLoader({
   note,
   label = 'Working',
   bare = false,
+  fill = false,
+  exit = false,
+  onExitDone,
+  onSweep,
 }: BobbleLoaderProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const hostRef = useRef<HTMLDivElement | null>(null);
+  /* The exit is driven from a ref, not from state: the effect that draws must
+     not be torn down and rebuilt at the exact moment the sweep begins, or the
+     scene jumps. `exit` flipping only has to reach the running loop. */
+  const exitRef = useRef(false);
+  const doneRef = useRef(onExitDone);
+  doneRef.current = onExitDone;
+  const sweepRef = useRef(onSweep);
+  sweepRef.current = onSweep;
+  exitRef.current = exit;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -121,8 +176,33 @@ export function BobbleLoader({
 
     // Device pixels, so the rounded corners are not soft on a retina panel.
     const dpr = Math.min(window.devicePixelRatio || 1, 3);
-    canvas.width = Math.round(size * dpr);
-    canvas.height = Math.round(size * dpr);
+    /* The box: fixed for a stamp, measured for a card. Measured rather than read
+       once, because the frame it fills is `fit-content` and settles a beat after
+       mount — sized once, every card would draw at whatever width the frame had
+       before its own min-width applied. */
+    let boxW = size;
+    let boxH = size;
+    const resize = (): void => {
+      canvas.width = Math.max(1, Math.round(boxW * dpr));
+      canvas.height = Math.max(1, Math.round(boxH * dpr));
+      canvas.style.width = `${boxW}px`;
+      canvas.style.height = `${boxH}px`;
+    };
+    let ro: ResizeObserver | undefined;
+    if (fill) {
+      const measure = (): void => {
+        const r = host.getBoundingClientRect();
+        if (r.width < 1 || r.height < 1) return;
+        boxW = r.width;
+        boxH = r.height;
+        resize();
+      };
+      measure();
+      ro = new ResizeObserver(measure);
+      ro.observe(host);
+    } else {
+      resize();
+    }
 
     const ink = getComputedStyle(host).getPropertyValue('--pd-bobble-ink').trim() || '#ffffff';
 
@@ -130,13 +210,37 @@ export function BobbleLoader({
     let running = true;
     const started = performance.now();
 
+    /* Set when the sweep begins, so its clock is its own and starts at zero
+       wherever in the loop the result happened to land. */
+    let exitStarted: number | undefined;
+    let finished = false;
+
     const draw = (now: number) => {
-      const scene = sceneAt(reduced ? 0 : now - started, variant);
+      if (exitStarted === undefined && exitRef.current) exitStarted = now;
+      let scene = sceneAt(reduced ? 0 : now - started, variant);
+      if (exitStarted !== undefined) {
+        const p = reduced ? 1 : Math.min(1, (now - exitStarted) / EXIT_MS);
+        scene = exitSceneAt(p);
+        // The card masks the finished media with this same number — see
+        // `exitReveal`. One value, so the blocks and the picture cannot
+        // disagree about where the edge of the sweep is.
+        const reveal = exitReveal(p);
+        host.style.setProperty('--pd-bobble-sweep', reveal.toFixed(4));
+        sweepRef.current?.(reveal);
+        if (p >= 1 && !finished) {
+          finished = true;
+          running = false;
+          doneRef.current?.();
+        }
+      }
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      // One transform for the whole scene: board units in, device pixels out.
-      const k = (size * dpr) / BOARD;
-      ctx.setTransform(k, 0, 0, k, 0, 0);
+      /* One transform for the whole scene: board units in, device pixels out.
+         The board is square and centred, so a wide frame gets a large centred
+         mark rather than a stretched one. */
+      const board = Math.min(boxW, boxH) * (fill ? BOARD_FILL : 1);
+      const k = (board * dpr) / BOARD;
+      ctx.setTransform(k, 0, 0, k, ((boxW - board) / 2) * dpr, ((boxH - board) / 2) * dpr);
       ctx.fillStyle = ink;
 
       const flat = scene.solidity <= 0.001;
@@ -187,7 +291,9 @@ export function BobbleLoader({
         }
       }
       ctx.globalAlpha = 1;
-      if (running && !reduced) raf = requestAnimationFrame(draw);
+      // The sweep runs even under reduced motion — it is how the card hands over,
+      // and skipping it would leave the blocks sitting on top of the result.
+      if (running && (!reduced || exitStarted !== undefined)) raf = requestAnimationFrame(draw);
     };
 
     raf = requestAnimationFrame(draw);
@@ -210,8 +316,9 @@ export function BobbleLoader({
       running = false;
       cancelAnimationFrame(raf);
       io.disconnect();
+      ro?.disconnect();
     };
-  }, [size, variant]);
+  }, [size, variant, fill]);
 
   const pct =
     progress === undefined ? undefined : Math.round(Math.max(0, Math.min(1, progress)) * 100);
@@ -221,6 +328,8 @@ export function BobbleLoader({
       ref={hostRef}
       className="pd-bobble-loader-host"
       data-variant={variant}
+      data-fill={fill ? 'true' : undefined}
+      data-exiting={exit ? 'true' : undefined}
       data-testid="bobble-loader"
       style={{ '--pd-bobble-size': `${size}px` } as CSSProperties}
     >
@@ -229,7 +338,9 @@ export function BobbleLoader({
         className="pd-bobble-canvas"
         role="img"
         aria-label={label}
-        style={{ width: size, height: size }}
+        /* In fill mode the effect owns the element's size, because only it has
+           measured the box. */
+        style={fill ? undefined : { width: size, height: size }}
       />
       {bare ? null : (
         <div className="pd-bobble-progress" data-testid="bobble-progress">

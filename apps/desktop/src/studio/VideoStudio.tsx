@@ -22,7 +22,7 @@
 import { type JSX, useCallback, useMemo, useState } from 'react';
 import { ThreadMedia } from '../chat/ThreadMedia';
 import { useGenStore } from '../state/gen-store';
-import { RunHeader, StudioJob } from './StudioRun';
+import { aspectOf, RunHeader, StudioJob, widthOf } from './StudioRun';
 import {
   Knob,
   RailGroup,
@@ -88,7 +88,7 @@ export function VideoStudio(): JSX.Element {
   const [seed, setSeed] = useState<number | ''>('');
 
   const catalog = useGenStore((s) => s.catalog);
-  const { busy, error, runs, job, run, cancel } = useStudio('video');
+  const { busy, error, runs, job, run, cancel, finishReveal } = useStudio('video');
   const models = useMemo(() => catalog.filter((m) => m.modality === 'video'), [catalog]);
   const blocked = studioBlockedReason(models, 'video');
   const size = (SHAPES.find((x) => x.value === shape) ?? SHAPES[0]).of(long);
@@ -165,6 +165,7 @@ export function VideoStudio(): JSX.Element {
       placeholder="Describe a shot…"
       onRun={() => void onRun()}
       busy={busy || enhancer.enhancing}
+      {...(job?.cancellable === true ? { onStop: cancel } : {})}
       runLabel={enhancer.enhancing ? 'Enhancing…' : 'Generate'}
       {...(blocked !== undefined ? { blocked } : {})}
       error={error}
@@ -323,7 +324,16 @@ export function VideoStudio(): JSX.Element {
         </>
       }
     >
-      {job !== null ? <StudioJob job={job} onCancel={cancel} variant="video" /> : null}
+      {job !== null ? (
+        <StudioJob
+          job={job}
+          variant="video"
+          aspect={aspectOf(size)}
+          width={widthOf(size)}
+          model={model}
+          onRevealed={finishReveal}
+        />
+      ) : null}
       {runs.length === 0 && job === null ? (
         <StudioEmpty
           glyph={<GlyphVideo />}

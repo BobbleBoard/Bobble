@@ -16,7 +16,7 @@
  * made. The files were still on disk; the room simply had no memory of them.
  * A module-level store per modality survives the unmount.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { MediaKind, ThreadMediaItem } from '../chat/thread-media';
 import { useGenStore } from '../state/gen-store';
 import { type StudioModality, useStudioRuns } from '../state/studio-runs';
@@ -89,6 +89,16 @@ export interface StudioJobState {
   /** The latest decoded preview frame, when there is one. */
   readonly previewSrc?: string;
   readonly cancellable: boolean;
+  /**
+   * The finished media, while the card is still uncovering it.
+   *
+   * The job does not end the instant the bytes exist — it ends when the closing
+   * sweep has finished showing them (see PendingMediaCard). Clearing the job at
+   * the moment the promise resolved is what made the result a SWAP: one card
+   * unmounted and a different one appeared in its place. Holding the items here
+   * for that second is what makes it a reveal instead.
+   */
+  readonly items?: readonly ThreadMediaItem[];
 }
 
 type Req = Parameters<typeof window.piDesktop.invoke<'gen:generate'>>[1];
@@ -101,6 +111,8 @@ export interface UseStudio {
   readonly run: (req: Req) => Promise<void>;
   readonly cancel: () => void;
   readonly clearError: () => void;
+  /** The card has finished uncovering the result: file it and clear the job. */
+  readonly finishReveal: () => void;
 }
 
 /** Extension → the kind a result renders as. */
@@ -132,6 +144,25 @@ export function useStudio(modality: StudioModality): UseStudio {
   const [error, setError] = useState<string | null>(null);
   const [job, setJob] = useState<StudioJobState | null>(null);
   const [jobId, setJobId] = useState<string | null>(null);
+  /* The finished run, between the bytes existing and the card having shown them.
+     A ref rather than state: nothing renders from it, and it must survive the
+     re-render that puts the items on the job. */
+  const pendingRun = useRef<StudioRun | null>(null);
+
+  const file = useCallback((): void => {
+    const held = pendingRun.current;
+    pendingRun.current = null;
+    if (held !== null) addRun(modality, held);
+  }, [addRun, modality]);
+
+  const finishReveal = useCallback((): void => {
+    file();
+    setJob(null);
+  }, [file]);
+
+  /* Leaving the room mid-reveal must not lose the result — it is on disk and it
+     is the whole point of the run. */
+  useEffect(() => () => file(), [file]);
 
   /*
    * THE PROGRESS THAT WAS ALREADY FLOWING PAST THIS WINDOW.
@@ -178,57 +209,67 @@ export function useStudio(modality: StudioModality): UseStudio {
     };
   }, [busy]);
 
-  const run = useCallback(
-    async (req: Req): Promise<void> => {
-      setBusy(true);
-      setError(null);
-      setJobId(null);
-      setJob({ prompt: req.prompt, startedAt: Date.now(), cancellable: false });
-      try {
-        const res = await window.piDesktop.invoke('gen:generate', req);
-        if (res.error !== undefined && res.error !== '') {
-          setError(res.error);
-          return;
-        }
-        if (res.outputs.length === 0) {
-          setError('the generator produced nothing');
-          return;
-        }
-        const first = res.outputs[0];
-        addRun(modality, {
-          prompt: req.prompt,
-          at: Date.now(),
-          ...(first?.seed !== undefined ? { seed: first.seed } : {}),
-          ...(first?.model !== undefined ? { model: first.model } : {}),
-          items: res.outputs.map((o) => ({
-            path: o.path,
-            kind: kindOf(o.path),
-            name: o.path.split('/').pop() ?? o.path,
-          })),
-        });
-      } catch (err) {
-        setError(err instanceof Error ? err.message : String(err));
-      } finally {
-        /*
-         * NO LIVENESS GUARD. There was one — a `live` flag flipped on unmount —
-         * and it could never work: the callback closes over the value from the
-         * render that created it, and setting state on an unmounted component
-         * is a no-op anyway. Results go to the store now, so a run that finishes
-         * after you have left the room lands where the room will look for it.
-         */
-        setBusy(false);
-        setJob(null);
+  const run = useCallback(async (req: Req): Promise<void> => {
+    let revealed = false;
+    setBusy(true);
+    setError(null);
+    setJobId(null);
+    setJob({ prompt: req.prompt, startedAt: Date.now(), cancellable: false });
+    try {
+      const res = await window.piDesktop.invoke('gen:generate', req);
+      if (res.error !== undefined && res.error !== '') {
+        setError(res.error);
+        return;
       }
-    },
-    [addRun, modality],
-  );
+      if (res.outputs.length === 0) {
+        setError('the generator produced nothing');
+        return;
+      }
+      const first = res.outputs[0];
+      /*
+       * HELD, NOT FILED. The run is what the room keeps; the reveal is what the
+       * reader watches. Filing it here would put the finished card in the list
+       * while the pending card above is still showing the same result coming
+       * out from under the sweep — the same picture twice, a second apart.
+       * `finishReveal` files it; the unmount effect files it if the reader
+       * leaves first, so it can never be lost.
+       */
+      pendingRun.current = {
+        prompt: req.prompt,
+        at: Date.now(),
+        ...(first?.seed !== undefined ? { seed: first.seed } : {}),
+        ...(first?.model !== undefined ? { model: first.model } : {}),
+        items: res.outputs.map((o) => ({
+          path: o.path,
+          kind: kindOf(o.path),
+          name: o.path.split('/').pop() ?? o.path,
+        })),
+      };
+      setJob((cur) => (cur === null ? cur : { ...cur, items: pendingRun.current?.items ?? [] }));
+      revealed = true;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      /* A run that produced nothing has nothing to uncover, so its card goes
+           now rather than sitting there animating over an empty frame. */
+      if (!revealed) setJob(null);
+      /*
+       * NO LIVENESS GUARD. There was one — a `live` flag flipped on unmount —
+       * and it could never work: the callback closes over the value from the
+       * render that created it, and setting state on an unmounted component
+       * is a no-op anyway. Results go to the store now, so a run that finishes
+       * after you have left the room lands where the room will look for it.
+       */
+      setBusy(false);
+    }
+  }, []);
 
   const cancel = useCallback((): void => {
     if (jobId === null) return;
     void window.piDesktop.invoke('gen:cancel', { jobId }).catch(() => undefined);
   }, [jobId]);
 
-  return { busy, error, runs, job, run, cancel, clearError: () => setError(null) };
+  return { busy, error, runs, job, run, cancel, finishReveal, clearError: () => setError(null) };
 }
 
 interface GenPayload {

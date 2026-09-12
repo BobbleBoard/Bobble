@@ -309,6 +309,27 @@ describe('a heavy job waits for a machine that can take it', () => {
     expect(q.runningCount).toBe(0);
   });
 
+  it('rejects, with the advice, a job the machine says can never fit', async () => {
+    const { runner, started } = controllableRunner();
+    const q = new JobQueue({
+      runner,
+      heavyAllowed: (fp) =>
+        (fp ?? 0) > 20
+          ? {
+              ok: false,
+              never: true,
+              reason: 'needs about 22.9 GB and this Mac has 24 GB — try a smaller size',
+            }
+          : true,
+    });
+    const big = q.enqueue(imageJob('big'), { footprintGB: 22 });
+    q.enqueue(imageJob('small'), { footprintGB: 5 });
+    await expect(big.result).rejects.toThrow(/smaller size/);
+    await tick();
+    expect(q.statusOf('big')).toBeUndefined();
+    expect(started).toEqual(['small']);
+  });
+
   it('behaves exactly as before when no policy is supplied', async () => {
     const { runner, started } = controllableRunner();
     const q = new JobQueue({ runner });
