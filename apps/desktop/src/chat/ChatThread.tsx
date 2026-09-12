@@ -51,6 +51,7 @@ import { useDropStore } from './composer/drop-store';
 import { corpChatView } from './corp/corp-thread-view';
 import { HarnessChecklistPanel, ThreadStatusIndicator } from './HarnessStatus';
 import { HistoryPole } from './HistoryPole';
+import { MessageErrorBoundary } from './MessageErrorBoundary';
 import { awaitingReplyAfterLatestTurn, sentAttachmentsPrefilling } from './sent-prefill';
 import { BlindImageNote, UserImage } from './UserImage';
 
@@ -68,7 +69,9 @@ function groupPlainText(group: AssistantMsg[]): string {
   return group
     .flatMap((m) => m.blocks)
     .filter((b): b is Extract<ContentBlock, { type: 'text' }> => b.type === 'text')
-    .map((b) => b.text)
+    // Only what IS text: the reply that failed to draw may have failed on a
+    // block whose text is not a string, and "[object Object]" is not it.
+    .map((b) => (typeof b.text === 'string' ? b.text : ''))
     .join('');
 }
 
@@ -739,12 +742,14 @@ export function ChatThread() {
                       />
                     }
                   >
-                    <AssistantGroup
-                      group={group}
-                      resultByCallId={resultByCallId}
-                      runningToolCalls={runningToolCalls}
-                      tps={streaming ? undefined : tps}
-                    />
+                    <MessageErrorBoundary fallbackText={groupPlainText(group)}>
+                      <AssistantGroup
+                        group={group}
+                        resultByCallId={resultByCallId}
+                        runningToolCalls={runningToolCalls}
+                        tps={streaming ? undefined : tps}
+                      />
+                    </MessageErrorBoundary>
                   </MessageRow>
                 );
               }

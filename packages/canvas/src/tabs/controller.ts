@@ -70,7 +70,22 @@ export class CanvasController {
   #commit(next: CanvasState): void {
     if (next === this.#state) return;
     this.#state = next;
-    for (const listener of this.#listeners) listener();
+    /*
+     * ONE LISTENER MAY NOT TAKE THE OTHERS DOWN. A subscriber that throws —
+     * a native-surface reconcile, a mirror terminal mid-teardown — used to
+     * propagate out of whichever mutation was in flight, which is usually a
+     * React effect or event handler: the state was already committed, the
+     * remaining subscribers never heard, and React was handed an exception
+     * from inside its own update. The subscriber's failure is logged where it
+     * happened and the commit finishes.
+     */
+    for (const listener of this.#listeners) {
+      try {
+        listener();
+      } catch (err) {
+        console.error('canvas listener failed', err);
+      }
+    }
   }
 
   /**

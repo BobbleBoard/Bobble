@@ -6664,3 +6664,35 @@ body[data-media-expanded="true"] .pd-studio-compose {
     animation: none;
   }
 }
+
+/*
+ * THE CANVAS FAILED AND WAS RESET — a small card in the rail, not a dead
+ * window. See chat/canvas/CanvasErrorBoundary.tsx.
+ */
+.pd-canvas-crash {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 18px;
+  margin: 12px;
+  border-radius: var(--pd-radius-lg, 14px);
+  background: var(--pd-bg-raised);
+  border: 1px solid color-mix(in oklab, var(--pd-text-primary) 10%, transparent);
+}
+.pd-canvas-crash-copy {
+  margin: 0;
+  font-size: var(--pd-font-size-body);
+  color: var(--pd-text-primary);
+}
+.pd-canvas-crash-detail {
+  margin: 0;
+  max-width: 100%;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: var(--pd-font-size-caption);
+  color: var(--pd-text-muted);
+}
+.pd-message-crash {
+  padding: 6px 0;
+}

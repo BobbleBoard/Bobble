@@ -96,6 +96,38 @@ function canvasShellInvoke(channel: string, req: unknown): void {
   void window.piDesktop.invoke(channel as any, req as any);
 }
 
+/**
+ * Dispose an xterm AFTER its own pending frames have run.
+ *
+ * REPRODUCED (tests/e2e/activity-burst-probe.mjs): write a burst into a mirror
+ * terminal and reset the canvas in the same tick — the way a new chat or a chat
+ * switch does — and xterm's queued animation-frame callback fires against a
+ * disposed renderer:
+ *   TypeError: Cannot read properties of undefined (reading 'dimensions')
+ *     at Viewport.syncScrollArea
+ * Four of those preceded both renderer crashes in the canvas assessment. The
+ * terminal comes off the page now (nothing can see it), and the dispose waits
+ * two frames so every callback xterm already queued runs against a live
+ * instance. Disposal itself is guarded: a terminal that cannot be torn down
+ * cleanly must not take the caller's commit with it.
+ */
+function disposeTerminalSafely(entry: TerminalEntry): void {
+  entry.container.parentNode?.removeChild(entry.container);
+  const { term } = entry;
+  const dispose = (): void => {
+    try {
+      term.dispose();
+    } catch {
+      // xterm's own teardown threw; the instance is unreachable either way.
+    }
+  };
+  if (typeof requestAnimationFrame !== 'function') {
+    dispose();
+    return;
+  }
+  requestAnimationFrame(() => requestAnimationFrame(dispose));
+}
+
 interface BrowserEntry {
   lastBounds: BrowserBounds;
   /** The mounted slot element, kept so bounds can be RE-MEASURED rather than
@@ -728,7 +760,7 @@ export class NativeSurfaces {
       if (!live.has(tabId)) {
         this.#terminals.delete(tabId);
         entry.onDataDispose?.();
-        entry.term.dispose();
+        disposeTerminalSafely(entry);
         // Mirror terminals never spawned a PTY; kill is a no-op for them.
         if (!entry.mirror) void window.piDesktop.invoke('pty:kill', { tabId });
       }
@@ -747,7 +779,7 @@ export class NativeSurfaces {
     this.#offices.clear();
     for (const [tabId, entry] of this.#terminals) {
       entry.onDataDispose?.();
-      entry.term.dispose();
+      disposeTerminalSafely(entry);
       if (!entry.mirror) void window.piDesktop.invoke('pty:kill', { tabId });
     }
     this.#terminals.clear();

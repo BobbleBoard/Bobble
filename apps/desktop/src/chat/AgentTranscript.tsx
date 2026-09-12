@@ -20,6 +20,7 @@ import type { AssistantMsg, ChatMsg, ToolResultMsg } from '@pi-desktop/engine';
 import { MessageRow } from '@pi-desktop/ui';
 import type { ReactNode } from 'react';
 import { AssistantGroup } from './AssistantGroup';
+import { MessageErrorBoundary } from './MessageErrorBoundary';
 
 /** A user turn, or a run of assistant messages with no user turn between them. */
 type Item =
@@ -124,17 +125,19 @@ export function AgentTranscript({
         ) : (
           // biome-ignore lint/suspicious/noArrayIndexKey: positional, read-only list
           <MessageRow key={`g${i}`} kind="assistant">
-            <AssistantGroup
-              group={item.group}
-              resultByCallId={resultByCallId}
-              runningToolCalls={[...(runningToolCalls ?? [])]}
-              tps={undefined}
-              /* Only the LAST group can be the one in flight; earlier groups are
+            <MessageErrorBoundary>
+              <AssistantGroup
+                group={item.group}
+                resultByCallId={resultByCallId}
+                runningToolCalls={[...(runningToolCalls ?? [])]}
+                tps={undefined}
+                /* Only the LAST group can be the one in flight; earlier groups are
                  settled history and must keep their own Done. */
-              {...(live === true && i === items.length - 1 ? { live: true } : {})}
-              {...(suppressInlineArtifacts === true ? { suppressInlineArtifacts: true } : {})}
-              {...(onOpenFile !== undefined ? { onOpenFile } : {})}
-            />
+                {...(live === true && i === items.length - 1 ? { live: true } : {})}
+                {...(suppressInlineArtifacts === true ? { suppressInlineArtifacts: true } : {})}
+                {...(onOpenFile !== undefined ? { onOpenFile } : {})}
+              />
+            </MessageErrorBoundary>
           </MessageRow>
         ),
       )}

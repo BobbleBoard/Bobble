@@ -56,6 +56,7 @@ import { ChatThread } from './ChatThread';
 import { ChatTitle } from './ChatTitle';
 import { ChildChatView } from './ChildChatView';
 import { CommandPalette, type PaletteAction } from './CommandPalette';
+import { CanvasErrorBoundary } from './canvas/CanvasErrorBoundary';
 import { CanvasTabsPanel } from './canvas/CanvasTabsPanel';
 import { trackChromeCorner } from './chrome-corner';
 import { CorpDebugHud } from './corp/CorpDebugHud';
@@ -885,7 +886,9 @@ export function ChatApp({
               <ModeToggle />
             </div>
 
-            <CanvasTabsPanel suppressed={contentOverride !== undefined} />
+            <CanvasErrorBoundary>
+              <CanvasTabsPanel suppressed={contentOverride !== undefined} />
+            </CanvasErrorBoundary>
 
             <UiRequestDialogs />
             <InputNeededBanner />

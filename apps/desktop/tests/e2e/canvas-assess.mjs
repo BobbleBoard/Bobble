@@ -168,6 +168,7 @@ const app = await _electron.launch({
 });
 
 const consoleErrors = [];
+const fullErrors = [];
 const report = [];
 let scenarioLog = [];
 // The main process's own log — where "fetch failed" and a server restart would
@@ -184,9 +185,14 @@ try {
       const line = `[${m.type()}] ${m.text().slice(0, 300)}`;
       consoleErrors.push(line);
       scenarioLog.push(line);
+      // The whole thing too, for mapping a minified stack after a crash.
+      if (m.type() === 'error') fullErrors.push(m.text());
     }
   });
-  win.on('pageerror', (e) => scenarioLog.push(`[pageerror] ${String(e).slice(0, 300)}`));
+  win.on('pageerror', (e) => {
+    scenarioLog.push(`[pageerror] ${String(e).slice(0, 300)}`);
+    fullErrors.push(String(e.stack ?? e));
+  });
 
   await win.waitForFunction(() => typeof window.piDesktop?.invoke === 'function', {
     timeout: 60000,
@@ -514,6 +520,7 @@ try {
 } finally {
   writeFileSync(path.join(OUT, 'console.txt'), consoleErrors.join('\n'));
   writeFileSync(path.join(OUT, 'main.log'), mainLog.join('\n'));
+  writeFileSync(path.join(OUT, 'errors-full.txt'), fullErrors.join('\n\n=====\n\n'));
   await app.close().catch(() => {});
 }
 say('assessment run complete');
