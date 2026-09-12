@@ -350,10 +350,17 @@ function pickFile(model: CatalogModel, quant?: string): CatalogFile | undefined 
   return quant !== undefined ? getCatalogFile(model, quant) : model.files[0];
 }
 
+/** What the status says while the chat model is parked for a generation. */
+const PARKED_NOTE = 'Paused to make room for a generation — back when it finishes';
+
 function status(): LlmStatus {
+  const parked = current?.supervisor.parked === true;
   return {
     phase,
-    serverRunning: current?.supervisor.running ?? false,
+    // Parked counts as running: the URL is still the URL and the model comes
+    // back on it — see LlmStatus.parked.
+    serverRunning: (current?.supervisor.running ?? false) || parked,
+    ...(parked ? { parked: PARKED_NOTE } : {}),
     baseUrl: current?.baseUrl ?? null,
     model: current
       ? {
@@ -496,7 +503,8 @@ async function power(): Promise<ReturnType<typeof createPowerManager>> {
       post({
         kind: 'power',
         level: decision.level,
-        allowHeavyJobs: decision.allowHeavyJobs,
+        heavyJobPace: decision.heavyJobPace,
+        heavyJobPreviews: decision.heavyJobPreviews,
         reason: decision.reason,
       });
     },
@@ -1374,6 +1382,59 @@ async function stopServer(): Promise<{ success: boolean }> {
   return { success: true };
 }
 
+/**
+ * Is any slot of the running server mid-request? llama-server's `/slots` (on
+ * by default in the builds we ship) lists them with `is_processing`; a server
+ * that cannot answer is treated as busy — parking on a guess would cut a turn.
+ */
+async function serverBusy(baseUrl: string): Promise<boolean> {
+  try {
+    const origin = baseUrl.replace(/\/v1\/?$/, '');
+    const res = await fetch(`${origin}/slots`, { signal: AbortSignal.timeout(1500) });
+    if (!res.ok) return true;
+    const slots = (await res.json()) as Array<{ is_processing?: boolean }>;
+    return !Array.isArray(slots) || slots.some((s) => s.is_processing === true);
+  } catch {
+    return true;
+  }
+}
+
+/**
+ * Stop the server's process to give its memory to a generation, keeping the
+ * port and the launch. See LlamaServerSupervisor.park. `bytes` is the model
+ * file's size — the floor of what parking gives back, so the caller can tell
+ * whether it is worth asking before it asks.
+ */
+async function parkServer(): Promise<{ ok: boolean; reason?: string; bytes?: number }> {
+  if (current === null) return { ok: false, reason: 'no server' };
+  if (current.supervisor.parked) return { ok: true, bytes: current.file.bytes };
+  if (phase !== 'ready') return { ok: false, reason: `server is ${phase}` };
+  if (await serverBusy(current.baseUrl)) return { ok: false, reason: 'a request is in flight' };
+  await current.supervisor.park();
+  metrics = null;
+  emitStatus();
+  return { ok: true, bytes: current.file.bytes };
+}
+
+async function resumeServer(): Promise<{ ok: boolean; reason?: string }> {
+  if (current === null) return { ok: false, reason: 'no server' };
+  if (!current.supervisor.parked) return { ok: true };
+  try {
+    const back = await current.supervisor.resume();
+    if ((await power()).current().backgroundPriority) {
+      await setBackgroundPriority(back.pid, true);
+    }
+    emitStatus();
+    return { ok: true };
+  } catch (error) {
+    phase = 'error';
+    lastError = String(error instanceof Error ? error.message : error);
+    current = null;
+    emitStatus();
+    return { ok: false, reason: lastError };
+  }
+}
+
 async function handle(req: LlmRequest): Promise<unknown> {
   switch (req.type) {
     case 'get-status':
@@ -1394,6 +1455,10 @@ async function handle(req: LlmRequest): Promise<unknown> {
       return startServer(req.modelId, req.quant, req.launchMode, req.parallel);
     case 'stop-server':
       return stopServer();
+    case 'park-server':
+      return parkServer();
+    case 'resume-server':
+      return resumeServer();
     case 'set-power': {
       /*
        * The user's choice, applied from the NEXT launch. A running server keeps

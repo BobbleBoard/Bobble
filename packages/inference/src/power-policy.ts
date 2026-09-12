@@ -106,8 +106,27 @@ export interface PowerDecision {
   /** Run the inference process at background priority so the OS schedules the
    * user first. macOS `taskpolicy -b`, Linux `nice`. */
   readonly backgroundPriority: boolean;
-  /** Start a heavy generation job (image / video / 3D) right now? */
-  readonly allowHeavyJobs: boolean;
+  /**
+   * NO "may a heavy job start" answer lives here. the user, correcting the first
+   * cut: "low can't stop image generation requests, it just has to lessen
+   * compute intensivity in some way sacrificing speed to keep headroom."
+   * Whether a job FITS is the guardian's question, answered by measurement per
+   * job; the policy's answer is how hard to run it — {@link heavyJobPace} and
+   * {@link heavyJobPreviews}.
+   */
+  /**
+   * How much of the time a heavy job's process is PAUSED — 0 runs flat out,
+   * 0.35 rests a third of every second. That is the compute lever for a
+   * generation: the GPU and the cores get a breath between command buffers,
+   * the machine stays usable, the picture arrives later rather than never.
+   */
+  readonly heavyJobPace: number;
+  /**
+   * Per-step previews for image jobs, or only the finished picture. Previews
+   * cost ~4.5 GB of peak memory at 512² (MEASURED); under pressure that is
+   * the headroom worth keeping, and the pending card animates instead.
+   */
+  readonly heavyJobPreviews: boolean;
   /** Consecutive calm readings after this one — pass back in next time. */
   readonly calmStreak: number;
   /** Why, in one line, for the UI and the log. Never empty. */
@@ -249,7 +268,8 @@ export function decidePower(inputs: PowerInputs): PowerDecision {
       quantizeKv: false,
       maxParallel: 4,
       backgroundPriority: false,
-      allowHeavyJobs: true,
+      heavyJobPace: 0,
+      heavyJobPreviews: true,
       calmStreak,
       reason: `full speed, holding ${reserveGB} GB back for you`,
     };
@@ -268,9 +288,10 @@ export function decidePower(inputs: PowerInputs): PowerDecision {
     memoryFraction: Math.max(0.3, base - (gentle ? 0.2 : 0.1)),
     maxParallel: gentle ? 1 : 2,
     backgroundPriority: true,
-    // A heavy generation job is gigabytes of extra resident memory; under real
-    // pressure it is the single worst thing to start.
-    allowHeavyJobs: !gentle,
+    // A generation is never refused by the policy — it is run gentler: paused
+    // a share of every second, and without the previews that cost 4.5 GB.
+    heavyJobPace: gentle ? 0.35 : 0.15,
+    heavyJobPreviews: !gentle,
     calmStreak,
   };
 
@@ -323,7 +344,7 @@ export function decidePower(inputs: PowerInputs): PowerDecision {
     ...common,
     quantizeKv: false,
     reason: gentle
-      ? 'memory is tight: smaller context, one slot, no heavy jobs'
+      ? 'memory is tight: smaller context, one slot, generations paced and without previews'
       : 'easing off: a smaller context to leave you room',
   };
 }

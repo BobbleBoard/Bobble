@@ -78,8 +78,17 @@ export interface GuardianLimits {
  * the day of the freeze the two jetsam reports fired with free at roughly 8-10%
  * — so 8% is where the OS itself starts killing, and shedding there is choosing
  * the victim, not being cautious. 20% for hold is the point the earlier policy
- * already called "pressure building". Low mode keeps a wider margin on both,
- * because "low power" means "I am using this computer for something else".
+ * already called "pressure building".
+ *
+ * Low mode keeps a wider margin on HOLD, because "low power" means "I am using
+ * this computer for something else" — a hold is a wait for what has not
+ * started. It does NOT shed earlier. It did (15%), and a first-run weights
+ * download took the level through 15% while the picture was still to come:
+ * the job was stopped for being in low power. the user: "low can't stop image
+ * generation requests, it just has to lessen compute intensivity in some way
+ * sacrificing speed to keep headroom" — the mode's levers are the pace, the
+ * previews and the low-RAM run (power-policy.ts, ImageJobSpec); the shed line
+ * is the OS's own, in every mode.
  *
  * The thrashing rate is power-policy's own calibrated line (see
  * THRASHING_PAGES_PER_SEC there: real thrash MEASURED at 8,800-63,000 pages/s,
@@ -89,7 +98,7 @@ export function limitsFor(mode: PowerMode): GuardianLimits {
   const low = mode === 'low';
   return {
     holdFree: low ? 0.3 : 0.2,
-    shedFree: low ? 0.15 : 0.08,
+    shedFree: 0.08,
     stallMs: 1500,
     thrashingPagesPerSec: 2000,
     recoveryReadings: 4,

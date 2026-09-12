@@ -82,6 +82,7 @@ import type {
 } from './gen-ipc-contract';
 import { createStillRenderer } from './hyperframes-still';
 import { openStillWindow } from './hyperframes-window';
+import { createRoomKeeper, type RoomKeeper } from './make-room';
 import { generateSvg, omniSvgFiles } from './omnisvg';
 import { canEnhance, type EnhancerEndpoint, enhancePrompt } from './prompt-enhancer';
 import {
@@ -126,6 +127,34 @@ export interface GenManagerOptions {
   readonly heavyAllowed?: (
     footprintGB?: number,
   ) => boolean | { ok: boolean; reason?: string; never?: boolean };
+  /**
+   * How gently to run the next heavy job — the power policy's lever, read at
+   * admission. `pace` is the share of every second the worker's child rests;
+   * `previews` false drops the per-step decode (≈4.5 GB of peak). Default: flat
+   * out with previews.
+   */
+  readonly eco?: () => { pace: number; previews: boolean };
+  /**
+   * MAKE ROOM (make-room.ts): the chat model is the largest thing in memory,
+   * and a job the machine holds for want of memory usually fits without it.
+   * `park` stops the chat server's process (refused mid-request), `resume`
+   * brings it back on the same URL, `refresh` takes a fresh pressure reading
+   * so the queue's next look sees the memory that came back. Absent: jobs
+   * that do not fit wait, as before.
+   */
+  readonly room?: {
+    readonly park: () => Promise<{ ok: boolean; reason?: string }>;
+    readonly resume: () => Promise<{ ok: boolean; reason?: string }>;
+    readonly refresh: () => Promise<unknown>;
+  };
+  /**
+   * A fresh pressure reading, awaited before a heavy job is offered to the
+   * queue. The guardian looks every 15 s while nothing runs, and SEEN: a
+   * picture admitted on a reading taken before the chat model had finished
+   * loading (80% free on paper, 28% in fact) took the machine to 8% and was
+   * shed. Admission is the one moment the number has to be current.
+   */
+  readonly freshReading?: () => Promise<unknown>;
   /**
    * ComfyUI http origin resolver for `comfyui`-backed video (LTX/Wan) jobs.
    * Default REJECTS (ComfyUI not configured) — the real app starts the supervisor
@@ -346,9 +375,48 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
    * there as the line under the bar.
    */
   const noteSinks = new Map<string, (line: string) => void>();
+  const room = opts.room;
+  const keeper: RoomKeeper | null =
+    room === undefined
+      ? null
+      : createRoomKeeper({
+          park: room.park,
+          resume: room.resume,
+          reconsider: async () => {
+            /*
+             * The memory comes back as the server's address space is torn
+             * down — most of it at once, the rest over the next second — and
+             * the guardian's own cadence while nothing runs is 15 s. Two looks,
+             * a breath apart, so the queue decides on what is actually free.
+             */
+            await room.refresh();
+            jobQueue.reconsider();
+            await new Promise<void>((resolve) => setTimeout(resolve, 1500));
+            await room.refresh();
+            jobQueue.reconsider();
+          },
+          graceMs: 6_000,
+          busy: () => jobQueue.runningCount > 0 || jobQueue.queuedCount > 0,
+          log: (message, extra) => log.info(`make room: ${message}`, extra ?? {}),
+        });
   jobQueue.on((e) => {
-    if (e.type === 'held') noteSinks.get(e.jobId)?.(`Waiting for memory — ${e.reason}`);
+    if (e.type === 'held') {
+      noteSinks.get(e.jobId)?.(`Waiting for memory — ${e.reason}`);
+      keeper?.held(e.jobId);
+    } else if (e.type === 'status' && e.status === 'running') {
+      keeper?.started(e.jobId);
+      if (keeper?.parked === true) {
+        noteSinks.get(e.jobId)?.('Made room — the chat model is paused while this renders');
+      }
+    } else if (
+      e.type === 'status' &&
+      (e.status === 'done' || e.status === 'error' || e.status === 'canceled')
+    ) {
+      keeper?.finished(e.jobId);
+    }
   });
+  /** The caller gets its answer only once a chat model we parked is back. */
+  const settleRoom = (): Promise<void> => keeper?.settle() ?? Promise.resolve();
 
   // ── download-then-continue gate (asset-gate.ts) ─────────────────────────────
   // A job whose ComfyUI pack is missing PROMPTS the user, downloads on accept,
@@ -427,7 +495,10 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
      */
     const bare = jobFootprintGB(model, width * height);
     const withPreviews = bare + previewCostGB(width * height);
-    const previewsAllowed = opts.heavyAllowed?.(withPreviews) ?? true;
+    const eco = opts.eco?.() ?? { pace: 0, previews: true };
+    // Under 'low' the policy has already said no to previews — the 4.5 GB is
+    // the headroom the user asked to keep — so the guardian is not even asked.
+    const previewsAllowed = eco.previews ? (opts.heavyAllowed?.(withPreviews) ?? true) : false;
     const stepPreviews =
       typeof previewsAllowed === 'boolean' ? previewsAllowed : previewsAllowed.ok;
     const footprintGB = stepPreviews ? withPreviews : bare;
@@ -447,6 +518,7 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
         steps,
         seeds,
         stepPreviews,
+        ...(eco.pace > 0 ? { pace: eco.pace } : {}),
         negativePrompt: raw.negativePrompt,
         ...(guidance !== undefined ? { guidance } : {}),
         // An edit rather than a fresh generation — see ImageJobSpec.imagePath.
@@ -531,6 +603,7 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
         note = line;
         send('gen:update', { tabId, payload: payload('generating') });
       });
+      await opts.freshReading?.();
       const outputs = await jobQueue.enqueue(job, {
         heavy: model.heavy,
         footprintGB,
@@ -545,6 +618,7 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
       throw err;
     } finally {
       noteSinks.delete(jobId);
+      await settleRoom();
     }
   }
 
@@ -627,6 +701,7 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
         note = line;
         send('gen:update', { tabId, payload: payload('generating') });
       });
+      await opts.freshReading?.();
       const outputs = await jobQueue.enqueue(job, {
         heavy: model.heavy,
         footprintGB: jobFootprintGB(model, width * height),
@@ -659,6 +734,7 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
       throw err;
     } finally {
       noteSinks.delete(jobId);
+      await settleRoom();
     }
   }
 
@@ -794,6 +870,7 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
         note = line;
         send('gen:update', { tabId, payload: payload('generating') });
       });
+      await opts.freshReading?.();
       const outputs = await jobQueue.enqueue(job, {
         heavy: model.heavy,
         footprintGB: jobFootprintGB(model),
@@ -827,6 +904,7 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
       throw err;
     } finally {
       noteSinks.delete(jobId);
+      await settleRoom();
     }
   }
 
@@ -1080,6 +1158,8 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
     );
   }
 
+  roomKeepers.add(() => keeper?.dispose());
+
   return {
     running: () => jobQueue.runningCount > 0,
     queued: () => jobQueue.queuedCount,
@@ -1087,6 +1167,9 @@ export function registerGenIpc(opts: GenManagerOptions): GenQueueControl {
     reconsider: () => jobQueue.reconsider(),
   };
 }
+
+/** Parked chat models to bring back at teardown — see make-room.ts. */
+const roomKeepers = new Set<() => void>();
 
 /**
  * Surface the vetted modality catalog to the renderer as plain DTOs
@@ -1114,6 +1197,8 @@ export function registerGenCatalogIpc(
 
 /** Test/lifecycle hook: close the socket server. */
 export function disposeGen(): void {
+  for (const dispose of roomKeepers) dispose();
+  roomKeepers.clear();
   server?.close();
   server = null;
 }

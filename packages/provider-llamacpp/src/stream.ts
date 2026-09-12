@@ -96,6 +96,13 @@ export function promptProgressFraction(p: LlamaPromptProgress): number {
 export interface LlamaCppStreamDeps {
   /** Injectable fetch (tests / proxies). Defaults to global fetch. */
   readonly fetchImpl?: typeof fetch;
+  /**
+   * How long a request waits for a server that refuses the connection to come
+   * back (parked to make room, or restarting after a crash) before the refusal
+   * is treated as the error it looks like. 0 disables the wait. See fetchWhenBack.
+   */
+  readonly serverReturnWaitMs?: number;
+  readonly serverReturnPollMs?: number;
   /** Rung-2 fixer-model call (optional; injected by W5 harness in prod). */
   readonly fixer?: ToolCallFixer;
   /** W5 rungs 3–5. */
@@ -467,6 +474,23 @@ async function readBody(res: Response): Promise<AsyncIterable<Uint8Array>> {
 
 /** Flatten a `Headers` object to a plain record for pi's `onResponse` hook. Best-
  * effort: a mock/non-standard headers object degrades to an empty record. */
+/** How long a request waits for a parked or restarting server (see fetchWhenBack). */
+export const SERVER_RETURN_WAIT_MS = 180_000;
+export const SERVER_RETURN_POLL_MS = 500;
+
+/** undici's `fetch failed` with ECONNREFUSED (or a reset) underneath: nobody is listening. */
+export function isConnectionRefused(error: unknown): boolean {
+  const seen = new Set<unknown>();
+  let e: unknown = error;
+  while (e !== null && typeof e === 'object' && !seen.has(e)) {
+    seen.add(e);
+    const code = (e as { code?: unknown }).code;
+    if (code === 'ECONNREFUSED' || code === 'ECONNRESET' || code === 'UND_ERR_SOCKET') return true;
+    e = (e as { cause?: unknown }).cause;
+  }
+  return false;
+}
+
 /**
  * `Headers` → a plain record, because pi's `ProviderResponse` wants one.
  *
@@ -493,6 +517,43 @@ export function headersToRecord(headers: Headers | undefined): Record<string, st
  */
 export function createLlamaCppStream(deps: LlamaCppStreamDeps = {}): LlamaCppStreamFn {
   const doFetch = deps.fetchImpl ?? fetch;
+  const waitMs = deps.serverReturnWaitMs ?? SERVER_RETURN_WAIT_MS;
+  const pollMs = deps.serverReturnPollMs ?? SERVER_RETURN_POLL_MS;
+  /**
+   * The request, waiting for a server that is on its way back.
+   *
+   * A connection refused here is not "no model": the app parks the chat
+   * server's process to make room for a generation and brings it back on the
+   * same port when the picture is done (gen/make-room.ts), and the supervisor
+   * respawns a crashed one on the same port too. Either gap is seconds. A turn
+   * that failed with "fetch failed" in it would hand the user an error for the
+   * app's own housekeeping, so the request waits — polling /health — up to
+   * `waitMs`, and only then is the refusal real.
+   */
+  const fetchWhenBack: typeof doFetch = async (url, init) => {
+    try {
+      return await doFetch(url, init);
+    } catch (error) {
+      if (!isConnectionRefused(error) || waitMs <= 0) throw error;
+      const health = `${String(url).replace(/\/v1\/chat\/completions$/, '')}/health`;
+      const deadline = Date.now() + waitMs;
+      // eslint-disable-next-line no-console
+      console.log(
+        `[pi-llm] server not answering — waiting up to ${Math.round(waitMs / 1000)}s for it to come back`,
+      );
+      while (Date.now() < deadline) {
+        if (init?.signal?.aborted === true) throw error;
+        await new Promise<void>((resolve) => setTimeout(resolve, pollMs));
+        try {
+          const h = await doFetch(health, { signal: init?.signal ?? null });
+          if (h.ok) return await doFetch(url, init);
+        } catch {
+          // still away
+        }
+      }
+      throw error;
+    }
+  };
 
   return (model, context, options) => {
     const stream = createAssistantMessageEventStream();
@@ -609,7 +670,7 @@ export function createLlamaCppStream(deps: LlamaCppStreamDeps = {}): LlamaCppStr
           if (replaced !== null && typeof replaced === 'object') {
             body = replaced as Record<string, unknown>;
           }
-          res = await doFetch(`${model.baseUrl}/chat/completions`, {
+          res = await fetchWhenBack(`${model.baseUrl}/chat/completions`, {
             method: 'POST',
             headers: { 'content-type': 'application/json', ...(model.headers ?? {}) },
             body: JSON.stringify(body),

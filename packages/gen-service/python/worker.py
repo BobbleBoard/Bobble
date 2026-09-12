@@ -49,6 +49,7 @@ import json
 import os
 import re
 import runpy
+import signal
 import subprocess
 import sys
 import threading
@@ -139,6 +140,14 @@ def build_mflux_cmd(spec, seed, out_path, step_dir):
     # means yes, as it always did.
     if spec.get("stepPreviews", True):
         cmd += ["--stepwise-image-output-dir", step_dir]
+    # mflux's own memory saver: the text encoders are dropped once the prompt
+    # is encoded, the VAE decodes in tiles and MLX's buffer cache is capped at
+    # 1 GB instead of growing without bound. MEASURED (klein, M5 Pro 24GB, the
+    # OS's own free-memory drop): 512² 9.1 → 4.8 GB, 1024² ~19 → 5.8 GB, the
+    # same pixels, no slower (11.8 s → 10.4 s). Absent means on: every job we
+    # spawn is a fresh process, so nothing the saver frees is wanted again.
+    if spec.get("lowRam", True):
+        cmd += ["--low-ram"]
     cmd += ["--output", out_path]
     return cmd
 
@@ -213,7 +222,64 @@ def drain_output(job_id, stream, keep=None):
         emit({"event": "download", "jobId": job_id, "ratio": 1.0, "detail": "weights ready"})
 
 
-def drive_subprocess(job_id, cmd, env=None):
+class Pacer:
+    """Rest a child process for `pace` of every second — SIGSTOP, then SIGCONT.
+
+    the user: "low can't stop image generation requests, it just has to lessen
+    compute intensivity in some way sacrificing speed to keep headroom." The
+    generators are subprocesses (mflux, ComfyUI, TRELLIS) whose inner loops we
+    cannot slow from outside, but a stopped process submits no GPU work and
+    holds no core, so a duty cycle IS the lever: at 0.35 the machine gets a
+    third of every second back and the picture takes ~50% longer.
+
+    A 1 s period is long enough that a Metal command buffer in flight finishes
+    before the stop lands, and short enough that the UI never waits on the
+    GPU for more than the run slice."""
+
+    PERIOD = 1.0
+
+    def __init__(self, proc, pace):
+        self.proc = proc
+        self.pace = max(0.0, min(0.8, float(pace or 0)))
+        self.stop = threading.Event()
+        self.thread = None
+        if self.pace > 0:
+            self.thread = threading.Thread(target=self._run, daemon=True)
+            self.thread.start()
+
+    def _run(self):
+        run_for = self.PERIOD * (1.0 - self.pace)
+        rest_for = self.PERIOD * self.pace
+        while not self.stop.wait(run_for):
+            if self.proc.poll() is not None:
+                return
+            try:
+                self.proc.send_signal(signal.SIGSTOP)
+                if self.stop.wait(rest_for):
+                    pass
+            finally:
+                try:
+                    self.proc.send_signal(signal.SIGCONT)
+                except OSError:
+                    return
+
+    def close(self):
+        self.stop.set()
+        if self.thread is not None:
+            self.thread.join(timeout=2.0)
+        # Never leave a child stopped.
+        try:
+            if self.proc.poll() is None:
+                self.proc.send_signal(signal.SIGCONT)
+        except OSError:
+            pass
+
+
+def pacing_note(pace):
+    return f"Low power: pacing the generation ({int(round(pace * 100))}% rest)"
+
+
+def drive_subprocess(job_id, cmd, env=None, pace=0):
     """Spawn a child, drain its merged stdout/stderr (emitting `download` events),
     wait, and return its exit code. The generic runner behind run_audio / run_3d;
     run_image has its own variant because it also runs a step-watcher thread."""
@@ -232,9 +298,13 @@ def drive_subprocess(job_id, cmd, env=None):
     # failure. Bounded so a chatty run cannot balloon the error.
     global _LAST_OUTPUT
     _LAST_OUTPUT = []
+    pacer = Pacer(proc, pace)
+    if pacer.pace > 0:
+        emit({"event": "log", "jobId": job_id, "text": pacing_note(pacer.pace)})
     try:
         drain_output(job_id, proc.stdout, keep=_LAST_OUTPUT)
     finally:
+        pacer.close()
         proc.wait()
     return proc.returncode
 
@@ -262,9 +332,16 @@ def run_one(job_id, spec, seed, cand_idx, out_dir, total_steps):
         target=watch_steps, args=(job_id, cand_idx, step_dir, total_steps, stop), daemon=True
     )
     watcher.start()
+    # The power policy's compute lever — see Pacer. `pace` rides in the spec.
+    pacer = Pacer(proc, spec.get("pace", 0))
+    if pacer.pace > 0:
+        # A `log` line is what the card shows as its note (the manager keeps the
+        # last one), so the user sees WHY this run is slower than the last.
+        emit({"event": "log", "jobId": job_id, "text": pacing_note(pacer.pace)})
     try:
         drain_output(job_id, proc.stdout)
     finally:
+        pacer.close()
         proc.wait()
         stop.set()
         watcher.join(timeout=1.0)
@@ -539,7 +616,7 @@ def synthesize_3d(job_id, spec, seed, cand_idx, out_dir, pipeline=None):
             "3D synthesis not yet wired: real TripoSR / trellis2-mlx weights are a "
             "deferred gate (supply `command` in the 3d spec to drive a repo script)"
         )
-    rc = drive_subprocess(job_id, cmd)
+    rc = drive_subprocess(job_id, cmd, pace=spec.get("pace", 0))
     if rc != 0:
         raise RuntimeError(f"3D generation exited with code {rc}")
     if not os.path.exists(out_path):

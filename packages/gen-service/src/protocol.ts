@@ -86,6 +86,21 @@ export interface ImageJobSpec {
    */
   readonly stepPreviews?: boolean;
   /**
+   * Share of every second the generating process is PAUSED (SIGSTOP/SIGCONT
+   * by the worker) — the power policy's compute lever under 'low': the picture
+   * arrives slower and the machine stays usable. Absent or 0 runs flat out.
+   */
+  readonly pace?: number;
+  /**
+   * mflux `--low-ram`: text encoders dropped after encoding, tiled VAE decode,
+   * MLX buffer cache capped at 1 GB. MEASURED (FLUX.2 klein, M5 Pro 24GB, the
+   * OS's own free-memory drop): 512² 9.1 → 4.8 GB, 1024² ~19 → 5.8 GB — the
+   * same pixels, and no slower (every job is a fresh process, so nothing the
+   * saver frees would have been reused). Absent means ON; `false` is for
+   * measuring the plain run.
+   */
+  readonly lowRam?: boolean;
+  /**
    * An existing picture to work FROM — mflux `--image-path`.
    *
    * Present ⇒ this is an edit, not a fresh generation: the model starts from

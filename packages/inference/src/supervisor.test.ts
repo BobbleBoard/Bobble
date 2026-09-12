@@ -288,6 +288,83 @@ describe('LlamaServerSupervisor lifecycle', () => {
     await sup.dispose();
   });
 
+  it('park stops the child without a restart, and resume brings it back on the same port', async () => {
+    let spawnCount = 0;
+    const children: FakeChild[] = [];
+    const sup = new LlamaServerSupervisor({
+      serverPath: '/bin/llama-server',
+      modelPath: '/m.gguf',
+      launchMode: 'fast-text',
+      port: 9102,
+      healthIntervalMs: 1,
+      restartBaseDelayMs: 5,
+      spawnFn: () => {
+        spawnCount += 1;
+        const c = new FakeChild(6000 + spawnCount);
+        children.push(c);
+        return asChild(c);
+      },
+      fetchImpl: okFetch(() => true),
+    });
+    const events = collect(sup);
+    const first = await sup.start();
+
+    await sup.park();
+    expect(children[0]?.killed).toEqual(['SIGTERM']);
+    expect(sup.parked).toBe(true);
+    expect(sup.running).toBe(false);
+    // The exit the park caused is not a crash, so nothing restarts on its own.
+    await new Promise((r) => setTimeout(r, 30));
+    expect(spawnCount).toBe(1);
+    expect(events.some((e) => e.type === 'crash')).toBe(false);
+    expect(events.some((e) => e.type === 'parked')).toBe(true);
+    // The URL everyone holds is still the URL.
+    expect(sup.baseUrl).toBe(first.baseUrl);
+
+    const back = await sup.resume();
+    expect(spawnCount).toBe(2);
+    expect(back.port).toBe(first.port);
+    expect(back.baseUrl).toBe(first.baseUrl);
+    expect(sup.parked).toBe(false);
+    expect(sup.running).toBe(true);
+    expect(events.some((e) => e.type === 'resumed')).toBe(true);
+
+    // A crash AFTER resuming is supervised again.
+    const restarted = new Promise<void>((resolve) => {
+      const off = sup.on((e) => {
+        if (e.type === 'ready' && spawnCount >= 3) {
+          off();
+          resolve();
+        }
+      });
+    });
+    children[1]?.emit('exit', 1, null);
+    await restarted;
+    expect(spawnCount).toBe(3);
+    await sup.dispose();
+  });
+
+  it('park and resume are idempotent and a disposed supervisor refuses to resume', async () => {
+    const sup = new LlamaServerSupervisor({
+      serverPath: '/bin/llama-server',
+      modelPath: '/m.gguf',
+      launchMode: 'fast-text',
+      port: 9103,
+      healthIntervalMs: 1,
+      spawnFn: () => asChild(new FakeChild()),
+      fetchImpl: okFetch(() => true),
+    });
+    await sup.start();
+    const r0 = await sup.resume(); // not parked: a no-op that reports the running server
+    expect(r0.port).toBe(9103);
+    await sup.park();
+    await sup.park();
+    expect(sup.parked).toBe(true);
+    await sup.dispose();
+    expect(sup.parked).toBe(false);
+    await expect(sup.resume()).rejects.toThrow(/disposed/);
+  });
+
   /**
    * A child that ignores BOTH signals. Real llama-server does not, but a process
    * stuck in uninterruptible I/O while unmapping tens of gigabytes behaves

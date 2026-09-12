@@ -47,6 +47,8 @@ export function useHarnessStatus(): HarnessStatus | null {
  */
 export function prefillLabel(inp: {
   readonly modelPhase?: string | null;
+  /** The chat server is parked to make room for a generation (LlmStatus.parked). */
+  readonly parked?: boolean;
   readonly loadingCapability?: string | null;
   readonly firstOfSession?: boolean;
   /** What to say when the wait is just the prompt — the caller's own wording,
@@ -54,6 +56,9 @@ export function prefillLabel(inp: {
    * earned) and the chain says something shorter. */
   readonly generic?: string;
 }): string {
+  // The most specific cause first. A model stopped on purpose for a picture
+  // is not "loading" — it is making room, and comes back when the picture does.
+  if (inp.parked === true) return 'Making room for a generation';
   const phase = inp.modelPhase ?? null;
   if (phase !== null && phase !== 'ready' && phase !== 'idle') return 'Loading model';
   const cap = inp.loadingCapability ?? null;

@@ -62,6 +62,12 @@ export interface GuardianMain {
   readonly stop: () => void;
   /** For diagnostics and the probe: the last reading's free fraction. */
   readonly memoryFree: () => number | undefined;
+  /**
+   * Take a reading NOW rather than at the next tick — the idle cadence is 15 s,
+   * and a chat model parked to make room (make-room.ts) gives its memory back
+   * in one; the queue's next look must see it.
+   */
+  readonly refresh: () => Promise<GuardianVerdict>;
 }
 
 const TOTAL_GB = totalmem() / 1024 ** 3;
@@ -199,6 +205,7 @@ export function startGuardian(opts: GuardianMainOptions): GuardianMain {
       return { ok: false, reason: fit.reason, ...(fit.never === true ? { never: true } : {}) };
     },
     verdict: () => guardian.verdict(),
+    refresh: () => guardian.poke(),
     stop: () => {
       clearInterval(beat);
       guardian.stop();

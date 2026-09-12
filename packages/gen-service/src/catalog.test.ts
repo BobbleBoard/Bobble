@@ -9,6 +9,7 @@ import {
   MODALITY_CATALOG,
   type ModalityModel,
   modelsForModality,
+  previewCostGB,
   requiresLicenseGate,
 } from './catalog.ts';
 
@@ -434,5 +435,27 @@ describe('jobFootprintGB', () => {
   it('never reports less than the floor for a staged pipeline whose peak is below its download', () => {
     // A ComfyUI pipeline: 36 GB download, 20 GB measured peak, no floor.
     expect(jobFootprintGB({ approxSizeGB: 36, peakResidentGB: 20 }, 1024 * 1024)).toBe(36);
+  });
+
+  it('reads the catalog: klein at the default size fits beside a chat model on 24 GB', () => {
+    /*
+     * MEASURED 2026-09-12 with --low-ram (every job now): 4.8 GB at 512²,
+     * 5.8 GB at 1024². Before it, the same picture was ~19 GB and could not be
+     * admitted beside a 6 GB reserve on a 24 GB machine with a chat model
+     * resident — which is what "low power stops image generation" looked like.
+     */
+    const klein = getModel('flux2-klein-4b');
+    if (klein === undefined) throw new Error('klein missing');
+    expect(jobFootprintGB(klein, 1024 * 1024)).toBeLessThanOrEqual(6);
+    expect(jobFootprintGB(klein, 512 * 512)).toBeGreaterThanOrEqual(4.8);
+    expect(jobFootprintGB(klein, 512 * 512)).toBeLessThan(5.5);
+  });
+});
+
+describe('previewCostGB', () => {
+  it('is what low-RAM previews measured: about nothing at 512², ~1.4 GB at a megapixel', () => {
+    expect(previewCostGB(512 * 512)).toBeLessThan(0.5);
+    expect(previewCostGB(1024 * 1024)).toBeGreaterThanOrEqual(1.4);
+    expect(previewCostGB(1024 * 1024)).toBeLessThan(2);
   });
 });

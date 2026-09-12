@@ -196,8 +196,10 @@ export function ThreadActivityChain({
   /* The real server phase, from the inference store — 'starting' while weights
      load, which is the 27-second wait the user saw on the first message. */
   const llmPhase = useLlmStore((st) => st.status.phase);
+  const llmParked = useLlmStore((st) => st.status.parked !== undefined);
   const label = prefillLabel({
     modelPhase: llmPhase ?? null,
+    parked: llmParked,
     loadingCapability: harness?.loadingCapability ?? null,
     firstOfSession: firstAssistantTurn,
   });

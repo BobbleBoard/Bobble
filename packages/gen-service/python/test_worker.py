@@ -518,3 +518,81 @@ class TestStepPreviews:
         cmd = worker.build_mflux_cmd({**self.BASE, "stepPreviews": False}, 7, "/out.png", "/steps")
         assert "--stepwise-image-output-dir" not in cmd
         assert "--output" in cmd
+
+
+class TestLowRam:
+    """mflux's memory saver is on for every job (MEASURED: half the memory,
+    the same pixels, no slower); the flag exists so a caller can measure without it."""
+
+    BASE = {"mfluxCommand": "mflux-generate-flux2", "prompt": "p"}
+
+    def test_default_is_low_ram(self):
+        cmd = worker.build_mflux_cmd(dict(self.BASE), 7, "/out.png", "/steps")
+        assert "--low-ram" in cmd
+        assert cmd.index("--low-ram") < cmd.index("--output")
+
+    def test_can_be_switched_off(self):
+        cmd = worker.build_mflux_cmd({**self.BASE, "lowRam": False}, 7, "/out.png", "/steps")
+        assert "--low-ram" not in cmd
+
+
+class PacerTests(unittest.TestCase):
+    """The 'low' power lever: a child is rested for `pace` of every second and
+    never left stopped — the user: "low can't stop image generation requests, it
+    just has to lessen compute intensivity … sacrificing speed to keep headroom"."""
+
+    def test_pace_zero_starts_no_thread(self):
+        import subprocess
+
+        proc = subprocess.Popen([sys.executable, "-c", "pass"])
+        pacer = worker.Pacer(proc, 0)
+        self.assertIsNone(pacer.thread)
+        pacer.close()
+        self.assertEqual(proc.wait(timeout=5), 0)
+
+    def test_pace_is_clamped(self):
+        import subprocess
+
+        proc = subprocess.Popen([sys.executable, "-c", "pass"])
+        pacer = worker.Pacer(proc, 5)
+        self.assertEqual(pacer.pace, 0.8)
+        pacer.close()
+        proc.wait(timeout=5)
+
+    def test_paced_child_is_rested_and_finishes(self):
+        """A child that counts wall-clock ticks sees fewer of its own CPU
+        seconds when paced, and still exits cleanly with SIGCONT delivered."""
+        import subprocess
+        import time
+
+        script = (
+            "import time,os\n"
+            "t0=time.process_time(); w0=time.monotonic()\n"
+            "while time.monotonic()-w0 < 2.4:\n"
+            "    sum(range(20000))\n"
+            "print(time.process_time()-t0)\n"
+        )
+        proc = subprocess.Popen(
+            [sys.executable, "-c", script], stdout=subprocess.PIPE, text=True
+        )
+        pacer = worker.Pacer(proc, 0.5)
+        out, _ = proc.communicate(timeout=30)
+        pacer.close()
+        self.assertEqual(proc.returncode, 0)
+        cpu = float(out.strip())
+        # Half of every second stopped: well under the 2.4 s of wall time it
+        # spun for (flat out it uses ~all of it).
+        self.assertLess(cpu, 1.9, f"child used {cpu:.2f}s CPU in 2.4s wall — not paced")
+        self.assertGreater(cpu, 0.3)
+
+    def test_drive_subprocess_emits_pacing_log(self):
+        with capture_events() as events:
+            rc = worker.drive_subprocess("j1", [sys.executable, "-c", "print('hi')"], pace=0.35)
+        self.assertEqual(rc, 0)
+        logs = [e for e in events if e.get("event") == "log"]
+        self.assertTrue(any("Low power" in e["text"] and "35%" in e["text"] for e in logs), logs)
+
+    def test_drive_subprocess_flat_out_has_no_pacing_log(self):
+        with capture_events() as events:
+            worker.drive_subprocess("j1", [sys.executable, "-c", "print('hi')"])
+        self.assertFalse(any("Low power" in e.get("text", "") for e in events), events)

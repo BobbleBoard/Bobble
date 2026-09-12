@@ -62,13 +62,16 @@ describe('judge', () => {
     expect(judge({ sources: [] }, AUTO).verdict).toBe('calm');
   });
 
-  it('keeps a wider margin in low power mode', () => {
+  it('holds earlier in low power mode, but never sheds earlier', () => {
     // 25% free: fine at full/auto, already held in low.
     expect(judge({ memoryFree: 0.25, sources: [] }, AUTO).verdict).toBe('calm');
     expect(judge({ memoryFree: 0.25, sources: [] }, LOW).verdict).toBe('hold');
-    // 12% free: held at auto, shed in low.
+    // 12% free: held in both. the user: "low can't stop image generation requests"
+    // — a running job is stopped only where the OS itself would start killing.
     expect(judge({ memoryFree: 0.12, sources: [] }, AUTO).verdict).toBe('hold');
-    expect(judge({ memoryFree: 0.12, sources: [] }, LOW).verdict).toBe('shed');
+    expect(judge({ memoryFree: 0.12, sources: [] }, LOW).verdict).toBe('hold');
+    expect(judge({ memoryFree: 0.07, sources: [] }, LOW).verdict).toBe('shed');
+    expect(LOW.shedFree).toBe(AUTO.shedFree);
   });
 
   it('says why, in words a person can act on', () => {

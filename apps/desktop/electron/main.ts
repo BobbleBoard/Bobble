@@ -47,9 +47,11 @@ import { registerImportIpc } from './import/import-main';
 import {
   getInferenceUtility,
   getLoadedModel,
-  heavyJobsAllowed,
+  heavyJobEco,
+  parkChatModel,
   pushPowerSettings,
   registerLlmIpc,
+  resumeChatModel,
   shutdownInference,
 } from './inference/llm-main';
 import type { AppEventMap, CoreInvokeMap, FsInvokeMap } from './ipc-contract';
@@ -63,7 +65,6 @@ import { createRendererRecovery } from './renderer-recovery';
 import { registerScheduledHandlers } from './scheduled/scheduled-main';
 import {
   applySettingsEnvFromDisk,
-  generationExperimentEnabled,
   readSettings,
   registerSettingsIpc,
 } from './settings/settings-main';
@@ -828,16 +829,29 @@ function registerAppIpc(): void {
        * worst thing to start — so it WAITS rather than being refused, and light
        * jobs still go through. See packages/inference/src/power-policy.ts.
        *
-       * TWO GATES, both must open. The inference worker's slow policy (its
-       * `allowHeavyJobs`, cached here) and the guardian's fast one — which also
-       * asks whether THIS job's footprint fits right now (gen/guardian-main.ts).
-       * The guardian is what turns "the machine froze under a generation" into
-       * "the generation waited, or was stopped, and said why".
        */
-      heavyAllowed: (footprintGB) => {
-        if (!heavyJobsAllowed()) return { ok: false, reason: 'the machine is under pressure' };
-        return guardian.admit(footprintGB);
+      /*
+       * NOT A GATE ANY MORE. the user: "low can't stop image generation requests,
+       * it just has to lessen compute intensivity in some way sacrificing
+       * speed to keep headroom." The policy's `allowHeavyJobs` used to refuse
+       * every generation under 'low' with "the machine is under pressure";
+       * now the policy says how GENTLY to run (`eco` below) and only the
+       * guardian's per-job measurement — does THIS footprint fit beside the
+       * reserve right now — can hold a job, or refuse one that can never fit.
+       */
+      heavyAllowed: (footprintGB) => guardian.admit(footprintGB),
+      eco: () => heavyJobEco(),
+      /*
+       * …and when a job does not fit beside the chat model, the chat model is
+       * the thing to give up for it (gen/make-room.ts): parked for the render,
+       * back on the same URL before the caller hears the result.
+       */
+      room: {
+        park: () => parkChatModel(),
+        resume: () => resumeChatModel(),
+        refresh: () => guardian.refresh(),
       },
+      freshReading: () => guardian.refresh(),
       getWindow: () => (mainWindow !== null ? mainWindow.webContents : null),
       ...(genWorker !== undefined ? { workerScript: genWorker } : {}),
       comfyResolveOrigin: comfyOrigin,

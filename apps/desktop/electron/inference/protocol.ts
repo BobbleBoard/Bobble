@@ -32,6 +32,14 @@ export type LlmRequestBody =
     }
   | { type: 'stop-server' }
   /**
+   * MAKE ROOM. Stop the running server's process and keep everything needed
+   * to bring it back on the same port — for a generation that fits without the
+   * chat model and not beside it. Refused when a request is in flight (the
+   * server's /slots say so): a turn is never cut. `resume-server` respawns it.
+   */
+  | { type: 'park-server' }
+  | { type: 'resume-server' }
+  /**
    * How hard the app may push this machine, and how much memory to hold back.
    *
    * The policy lives in the worker (it is the process that launches servers, so
@@ -133,7 +141,9 @@ export type LlmOutbound =
   | {
       kind: 'power';
       level: 'full' | 'easy' | 'gentle';
-      allowHeavyJobs: boolean;
+      /** How gently a heavy generation runs — see PowerDecision.heavyJobPace. */
+      heavyJobPace: number;
+      heavyJobPreviews: boolean;
       reason: string;
     };
 

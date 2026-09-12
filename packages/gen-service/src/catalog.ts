@@ -173,10 +173,23 @@ export const MODALITY_CATALOG: readonly ModalityModel[] = [
      * measure the wrong thing: wired GPU allocations do not show in RSS and the
      * encoder and runtime sit beside them. Fitting the two points: a ~7.7 GB
      * floor plus ~10.7 GB per megapixel, so ~19 GB at 1024² — which is why 1024²
-     * cannot be admitted beside a 6 GB reserve on a 24 GB machine, and 512² can.
+     * could not be admitted beside a 6 GB reserve on a 24 GB machine.
+     *
+     * THEN `--low-ram` (2026-09-12, same machine, same method, no previews):
+     *
+     *   512²   OS free 82% → 60%   ≈ 4.8 GB   10.4 s   (plain the same day: 9.1 GB, 11.8 s)
+     *   768²             80% → 60%   ≈ 4.8 GB   12.9 s
+     *   1024²            80% → 56%   ≈ 5.8 GB   16.7 s
+     *
+     * Identical pixels, no slower, a third of the memory at the default size —
+     * so every job runs that way (ImageJobSpec.lowRam) and THESE are the
+     * numbers admission reads: a ~4.5 GB floor plus ~1.5 GB per megapixel.
+     * the user: "low can't stop image generation requests, it just has to lessen
+     * compute intensivity in some way sacrificing speed to keep headroom" —
+     * this is the memory half of that; the pace is the compute half.
      */
-    residentFloorGB: 7.7,
-    peakResidentGB: 19,
+    residentFloorGB: 4.5,
+    peakResidentGB: 6,
     runsLocally: true,
     heavy: false,
     recommended: true,
@@ -211,8 +224,14 @@ export const MODALITY_CATALOG: readonly ModalityModel[] = [
      * The 1024² figure is a lower bound, so the peak here is set above it. The
      * old hint of 5 GB described the download; the job is three times that.
      */
-    residentFloorGB: 8.5,
-    peakResidentGB: 17,
+    /*
+     * …and with `--low-ram` (2026-09-12, same method, no previews): 512² took
+     * 5.8 GB (80% → 56%), 1024² 3.8 GB (81% → 65%) — the drop is noisy to about
+     * a gigabyte, so the larger figure is the floor and the peak sits just
+     * above it. Every job runs low-RAM now (see the klein entry).
+     */
+    residentFloorGB: 6,
+    peakResidentGB: 6.5,
     minUnifiedMemoryGB: 16,
     runsLocally: true,
     heavy: false,
@@ -925,14 +944,18 @@ export function jobFootprintGB(
 /**
  * What per-step previews add to a job's peak, GB, scaled by the picture.
  *
- * MEASURED (FLUX.2 klein, 512², M5 Pro 24GB): the same job troughs at 43% of
- * the machine's memory without `--stepwise-image-output-dir` and at 26% with
- * it — ~4.5 GB, because the VAE decodes a full frame at every step while the
- * transformer's activations are still live. One point, so the scaling with
- * pixels is the only honest assumption; it errs high for big pictures, where
- * the answer is "no previews" anyway.
+ * MEASURED (FLUX.2 klein, 512², M5 Pro 24GB), plain: the same job troughs at
+ * 43% of the machine's memory without `--stepwise-image-output-dir` and at 26%
+ * with it — ~4.5 GB, because the VAE decodes a full frame at every step while
+ * the transformer's activations are still live.
+ *
+ * Under `--low-ram` (2026-09-12, every job now) the VAE decodes in tiles and
+ * the cost all but goes: 512² 4.8 GB with previews and without; 1024² 7.2 GB
+ * with, 5.8 without — ~1.4 GB at a megapixel. What previews still cost at
+ * 1024² is TIME (30.1 s against 16.7 s), which is the power policy's reason
+ * for dropping them under 'low', not the guardian's.
  */
-export const PREVIEW_GB_AT_512 = 4.5;
+export const PREVIEW_GB_PER_MEGAPIXEL = 1.5;
 export function previewCostGB(pixels: number): number {
-  return PREVIEW_GB_AT_512 * (Math.max(pixels, 1) / (512 * 512));
+  return PREVIEW_GB_PER_MEGAPIXEL * (Math.max(pixels, 1) / (1024 * 1024));
 }

@@ -335,12 +335,17 @@ function ensureChild(): UtilityProcess {
     }
     if (message.kind === 'power') {
       /*
-       * The worker re-decided. Cache the part MAIN needs synchronously (whether
-       * a heavy generation may start) and say so once, at the level change —
-       * not on every sample, which would be a line every fifteen seconds.
+       * The worker re-decided. Cache the part MAIN needs synchronously (how
+       * gently the next heavy generation runs) and say so once, at the level
+       * change — not on every sample, which would be a line every fifteen seconds.
        */
-      setHeavyJobsAllowed(message.allowHeavyJobs);
-      log.info('power policy', { level: message.level, reason: message.reason });
+      setHeavyJobEco({ pace: message.heavyJobPace, previews: message.heavyJobPreviews });
+      log.info('power policy', {
+        level: message.level,
+        pace: message.heavyJobPace,
+        previews: message.heavyJobPreviews,
+        reason: message.reason,
+      });
       return;
     }
     if (message.kind === 'download-progress') {
@@ -439,20 +444,52 @@ export function pushPowerSettings(): void {
 }
 
 /**
- * May a HEAVY generation start right now?
- *
- * Read by the gen manager at admission (gen-manager's `heavyAllowed`). Cached
- * from the worker's last decision rather than asked synchronously, because
- * admission happens on a hot path and a round-trip there would stall the queue.
- * Defaults to true — a machine we have not heard from is not a machine in
- * trouble.
+ * MAKE ROOM for a generation: park the chat server (its process stops, its
+ * URL stays) and bring it back afterwards. See gen/make-room.ts for when, and
+ * supervisor-entry's parkServer for the mid-request refusal.
  */
-let heavyAllowedCache = true;
-export function heavyJobsAllowed(): boolean {
-  return heavyAllowedCache;
+export async function parkChatModel(): Promise<{ ok: boolean; reason?: string }> {
+  try {
+    const r = await request<{ ok: boolean; reason?: string; bytes?: number }>({
+      type: 'park-server',
+    });
+    log.info('park chat model', { ok: r.ok, reason: r.reason, bytes: r.bytes });
+    return r;
+  } catch (err) {
+    return { ok: false, reason: err instanceof Error ? err.message : String(err) };
+  }
 }
-export function setHeavyJobsAllowed(allowed: boolean): void {
-  heavyAllowedCache = allowed;
+export async function resumeChatModel(): Promise<{ ok: boolean; reason?: string }> {
+  try {
+    const r = await request<{ ok: boolean; reason?: string }>({ type: 'resume-server' });
+    log.info('resume chat model', { ok: r.ok, reason: r.reason });
+    return r;
+  } catch (err) {
+    return { ok: false, reason: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+/**
+ * How gently the next heavy generation runs — the policy's answer, cached
+ * here for the gen queue's hot path. the user: "low can't stop image generation
+ * requests, it just has to lessen compute intensivity in some way sacrificing
+ * speed to keep headroom."
+ */
+export interface HeavyJobEco {
+  /** Share of every second the job's process rests (0 = flat out). */
+  readonly pace: number;
+  /** Per-step previews (≈4.5 GB of peak at 512²), or the picture alone. */
+  readonly previews: boolean;
+}
+let heavyEcoCache: HeavyJobEco = { pace: 0, previews: true };
+export function heavyJobEco(): HeavyJobEco {
+  return heavyEcoCache;
+}
+export function setHeavyJobEco(eco: HeavyJobEco): void {
+  heavyEcoCache = {
+    pace: Number.isFinite(eco.pace) ? Math.max(0, Math.min(0.8, eco.pace)) : 0,
+    previews: eco.previews !== false,
+  };
 }
 
 function request<T>(req: LlmRequestBody): Promise<T> {

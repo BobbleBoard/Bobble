@@ -132,7 +132,10 @@ describe('the lever matches the machine', () => {
     expect(d.maxParallel).toBe(1);
     expect(d.threads).toBeUndefined(); // MEASURED useless on Metal
     expect(d.keepKvOnHost).toBeUndefined();
-    expect(d.allowHeavyJobs).toBe(false);
+    // the user: "low can't stop image generation requests, it just has to lessen
+    // compute intensivity" — the job runs, paced, and without previews.
+    expect(d.heavyJobPace).toBeCloseTo(0.35, 2);
+    expect(d.heavyJobPreviews).toBe(false);
   });
 
   it('gives VRAM back BEFORE a discrete card spills', () => {
@@ -185,7 +188,7 @@ describe('auto', () => {
   it('steps down the moment a reading is bad', () => {
     const d = decidePower(at({ pressure: { memory: 'critical', sources: [] } }));
     expect(d.level).toBe('gentle');
-    expect(d.allowHeavyJobs).toBe(false);
+    expect(d.heavyJobPace).toBeGreaterThan(0);
   });
 
   it('eases off by one step on battery even when nothing is complaining', () => {
@@ -235,7 +238,8 @@ describe('the manual modes ignore the readings, which is what manual means', () 
   it('full stays full under critical pressure', () => {
     const d = decidePower(at({ mode: 'full', pressure: { memory: 'critical', sources: [] } }));
     expect(d.level).toBe('full');
-    expect(d.allowHeavyJobs).toBe(true);
+    expect(d.heavyJobPace).toBe(0);
+    expect(d.heavyJobPreviews).toBe(true);
   });
 
   it('low stays low on an idle machine', () => {

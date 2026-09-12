@@ -172,6 +172,80 @@ describe('promptProgressFraction (pure)', () => {
   });
 });
 
+describe('createLlamaCppStream — a server on its way back', () => {
+  /**
+   * The chat server is parked to make room for a generation and comes back on
+   * the same port (gen/make-room.ts); a request in that gap must wait for it,
+   * not hand the user "fetch failed" for the app's own housekeeping.
+   */
+  function refusedThenBack(refusals: number, chunks: unknown[]) {
+    const urls: string[] = [];
+    let left = refusals;
+    const fetchImpl = (async (url: string, init: RequestInit) => {
+      urls.push(url);
+      if (url.endsWith('/health')) {
+        return { ok: left <= 0, status: left <= 0 ? 200 : 503 } as unknown as Response;
+      }
+      if (left > 0) {
+        left -= 1;
+        const err = new TypeError('fetch failed');
+        (err as { cause?: unknown }).cause = Object.assign(new Error('connect ECONNREFUSED'), {
+          code: 'ECONNREFUSED',
+        });
+        throw err;
+      }
+      void init;
+      async function* body(): AsyncGenerator<Uint8Array> {
+        const enc = new TextEncoder();
+        for (const c of chunks) yield enc.encode(`data: ${JSON.stringify(c)}\n\n`);
+        yield enc.encode('data: [DONE]\n\n');
+      }
+      return { ok: true, status: 200, body: body() } as unknown as Response;
+    }) as unknown as typeof fetch;
+    return { fetchImpl, urls };
+  }
+
+  it('waits on /health for a refused connection and then sends the request', async () => {
+    const { fetchImpl, urls } = refusedThenBack(1, [
+      { choices: [{ delta: { content: 'back' } }] },
+      { choices: [{ delta: {}, finish_reason: 'stop' }] },
+    ]);
+    const stream = createLlamaCppStream({
+      fetchImpl,
+      serverReturnWaitMs: 2000,
+      serverReturnPollMs: 5,
+    })(makeModel(), emptyContext());
+    const { final } = await consume(stream);
+    const text = final.content.find((c) => c.type === 'text');
+    expect(text?.type === 'text' && text.text).toBe('back');
+    expect(urls.filter((u) => u.endsWith('/health')).length).toBeGreaterThanOrEqual(1);
+    expect(urls[0]).toBe('http://127.0.0.1:8080/v1/chat/completions');
+    expect(urls[urls.length - 1]).toBe('http://127.0.0.1:8080/v1/chat/completions');
+  });
+
+  it('gives up with the original error once the wait is over', async () => {
+    const { fetchImpl } = refusedThenBack(99, []);
+    const stream = createLlamaCppStream({
+      fetchImpl,
+      serverReturnWaitMs: 30,
+      serverReturnPollMs: 5,
+    })(makeModel(), emptyContext());
+    const { events } = await consume(stream);
+    expect(events.some((e) => e.type === 'error')).toBe(true);
+  });
+
+  it('is off when the wait is 0', async () => {
+    const { fetchImpl, urls } = refusedThenBack(1, []);
+    const stream = createLlamaCppStream({ fetchImpl, serverReturnWaitMs: 0 })(
+      makeModel(),
+      emptyContext(),
+    );
+    const { events } = await consume(stream);
+    expect(events.some((e) => e.type === 'error')).toBe(true);
+    expect(urls.some((u) => u.endsWith('/health'))).toBe(false);
+  });
+});
+
 describe('createLlamaCppStream — text', () => {
   it('streams text deltas, extracts usage, and reports TPS from timings', async () => {
     const timings: LlamaCppTimings = { predicted_per_second: 88.5, predicted_n: 2 };

@@ -64,7 +64,10 @@ export type SupervisorEvent =
   | { type: 'crash'; code: number | null; signal: string | null }
   | { type: 'restart'; attempt: number; delayMs: number }
   | { type: 'exit'; reason: 'disposed' | 'failed'; detail?: string }
-  | { type: 'metrics'; metrics: ServerMetrics };
+  | { type: 'metrics'; metrics: ServerMetrics }
+  /** The child was stopped on purpose to give its memory back; see park(). */
+  | { type: 'parked' }
+  | { type: 'resumed'; baseUrl: string; port: number; pid: number };
 
 export type SupervisorListener = (event: SupervisorEvent) => void;
 
@@ -417,6 +420,8 @@ export class LlamaServerSupervisor {
   private port = 0;
   private disposed = false;
   private started = false;
+  /** Stopped on purpose, not crashed: handleExit must not restart it. */
+  private isParked = false;
   private restartCount = 0;
   private killTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -469,6 +474,10 @@ export class LlamaServerSupervisor {
   }
   get running(): boolean {
     return this.child !== null && !this.disposed;
+  }
+  /** Stopped to make room, and able to come back on the same port. */
+  get parked(): boolean {
+    return this.isParked && !this.disposed;
   }
 
   /** Feed a llama.cpp `timings` block to update TPS (called by the provider). */
@@ -565,7 +574,7 @@ export class LlamaServerSupervisor {
     this.child = null;
     // The child is gone — its watchdog has nothing left to guard.
     this.disarmWatchdog();
-    if (this.disposed) return;
+    if (this.disposed || this.isParked) return;
     this.emit({ type: 'crash', code, signal });
     void this.attemptRestart();
   }
@@ -672,6 +681,61 @@ export class LlamaServerSupervisor {
       this.emit({ type: 'exit', reason: 'disposed' });
       return;
     }
+    await this.stopChild(child);
+    this.child = null;
+    this.disarmWatchdog();
+    this.emit({ type: 'exit', reason: 'disposed' });
+  }
+
+  /**
+   * PARK: give the model's memory back without forgetting how to come back.
+   *
+   * A generation that does not fit beside the resident chat model fits without
+   * it — on a 24 GB Mac the chat model is the single largest thing in memory
+   * (MEASURED 6.5 GB for a 4B at Q8 with its context), and the picture the
+   * user asked for needs about that much. Holding the picture "until there is
+   * room" would be holding it forever. So the chat is stopped for the duration
+   * — the same graceful ladder as dispose(), awaited to the real exit because
+   * only that proves the memory is back — and {@link resume} respawns it on
+   * the SAME port, so nothing that holds the base URL (models.json, pi's
+   * provider) has to learn anything. the user: "sacrificing speed to keep
+   * headroom" — the speed given up is one reload and one re-prefill.
+   *
+   * Nothing checks here whether a request is in flight; the caller does
+   * (supervisor-entry asks the server's /slots), because this class does not
+   * see requests.
+   */
+  async park(): Promise<void> {
+    if (this.disposed || this.isParked) return;
+    this.isParked = true;
+    const child = this.child;
+    if (child !== null) {
+      await this.stopChild(child);
+      this.child = null;
+    }
+    this.disarmWatchdog();
+    this.emit({ type: 'parked' });
+  }
+
+  /** Bring a parked server back on the same port. Rejects when it will not come up. */
+  async resume(): Promise<StartResult> {
+    if (this.disposed) throw new Error('supervisor disposed');
+    if (!this.isParked)
+      return { baseUrl: this.baseUrl, port: this.port, pid: this.child?.pid ?? -1 };
+    this.isParked = false;
+    this.restartCount = 0;
+    const ok = await this.spawnOnce();
+    if (!ok) {
+      this.emit({ type: 'exit', reason: 'failed', detail: 'server never came back after parking' });
+      throw new Error(`llama-server never became healthy again on port ${this.port}`);
+    }
+    const result = { baseUrl: this.baseUrl, port: this.port, pid: this.child?.pid ?? -1 };
+    this.emit({ type: 'resumed', ...result });
+    return result;
+  }
+
+  /** SIGTERM, then SIGKILL after killGraceMs; resolves only once the process is gone. */
+  private async stopChild(child: LlamaChildProcess): Promise<void> {
     try {
       child.kill('SIGTERM');
     } catch {
@@ -720,9 +784,6 @@ export class LlamaServerSupervisor {
       }, this.killGraceMs);
       this.killTimer.unref?.();
     });
-    this.child = null;
-    this.disarmWatchdog();
-    this.emit({ type: 'exit', reason: 'disposed' });
   }
 
   /**

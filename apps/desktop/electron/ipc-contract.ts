@@ -326,6 +326,14 @@ export interface LlmStatus {
    * note says what is actually happening and that it happens once.
    */
   engineBuild?: { variantId: string; note: string };
+  /**
+   * The server's process is stopped ON PURPOSE to make room for a generation
+   * and comes back on the same URL when it finishes. `serverRunning` stays
+   * true and `phase` stays `ready` while parked: nothing that decides on those
+   * (the auto-router above all) should start another model into the gap. The
+   * text is what to show for it.
+   */
+  parked?: string;
   error?: string;
 }
 
