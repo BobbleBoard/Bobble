@@ -644,7 +644,15 @@ export function useActivityCanvasRouting(controller: CanvasController): void {
       if (tab !== undefined && base !== undefined && tab.artifact === undefined) {
         controller.updateTab(tab.id, { artifact: fileArtifactFromText(path, base) });
       }
-      const ready = write.hunks !== undefined && !editReading.current.has(write.callId);
+      /*
+       * AN EDIT THAT IS HISTORY IS NOT REPLAYED. Once the turn is over, the
+       * tab settling back onto this file wants the file — and staging the
+       * diff now would land AFTER the settled read that clears it (SEEN: the
+       * settle rule brought index.html back as "− Count / + Clicks" instead of
+       * the page). While the model is still working, the motion plays as before.
+       */
+      const ready =
+        write.hunks !== undefined && !editReading.current.has(write.callId) && streaming;
       if (tab !== undefined && ready && !editStaged.current.has(write.callId)) {
         editStaged.current.add(write.callId);
         const shown = presentEdit(path, base, write.hunks, write.edit);

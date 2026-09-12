@@ -812,6 +812,19 @@ export function createPiSink(
           runningToolCalls: [],
           toolOutputPartials: {},
           uiRequests: [],
+          /*
+           * A DEAD RUN IS NOT STILL RUNNING. MEASURED (the assessment's m04,
+           * then four for four in new-chat-fetch-probe.mjs): New chat while a
+           * reply streamed, pi restarted for the new chat's cwd, and the old
+           * chat's turn died — with `bgRun.streaming` and `promptInFlight` left
+           * true. `canDrainQueue` read the store as busy forever, so the new
+           * chat's first message sat at "Queued — why isn't my message
+           * sending?" for the rest of the session, and the dead chat's sidebar
+           * spinner never stopped. An exit ends every run there was, the
+           * same way agentEnd does; the notice below says a reply was lost.
+           */
+          promptInFlight: false,
+          ...(s.bgRun?.streaming ? { bgRun: { ...s.bgRun, streaming: false } } : {}),
         };
         // Deliberate dispose (restart): consume the flag and drop the notice, but
         // still clear transient run state as a real exit would.

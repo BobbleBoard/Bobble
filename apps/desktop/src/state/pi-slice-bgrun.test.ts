@@ -78,6 +78,31 @@ describe('sink thread routing with a background run', () => {
     expect(flat(st.bgRun?.messages ?? [])).toContain('done reply');
   });
 
+  /* m04 in the canvas assessment, reproduced 4/4 by new-chat-fetch-probe.mjs:
+   * New chat while a reply streamed → pi restarted → the queue never drained. */
+  it('a bridge exit ends the background run and the in-flight prompt, so the queue can drain', () => {
+    usePiStore.setState({ bgRun: bg(), promptInFlight: true });
+    createPiSink().bridgeExit?.({ code: null, signal: 'SIGTERM', interrupted: true });
+    const st = usePiStore.getState();
+    expect(st.bgRun?.streaming).toBe(false);
+    expect(st.promptInFlight).toBe(false);
+    expect(st.bridgeExited).not.toBeNull();
+  });
+
+  it('an intentional restart mid-run clears the same flags without the notice', () => {
+    usePiStore.setState({
+      bgRun: bg(),
+      promptInFlight: true,
+      intentionalRestart: true,
+      bridgeExited: null,
+    });
+    createPiSink().bridgeExit?.({ code: 0, signal: null, interrupted: true });
+    const st = usePiStore.getState();
+    expect(st.bgRun?.streaming).toBe(false);
+    expect(st.promptInFlight).toBe(false);
+    expect(st.bridgeExited).toBeNull();
+  });
+
   it('once the bg run is no longer streaming, writes fall back to the viewed thread', () => {
     usePiStore.setState({ bgRun: bg({ streaming: false }) });
     const sink = createPiSink();
