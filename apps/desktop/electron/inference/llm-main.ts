@@ -8,7 +8,7 @@
 import { execFileSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { cacheRoot, type LaunchProfile } from '@pi-desktop/inference';
+import { cacheRoot, getCatalogModel, type LaunchProfile } from '@pi-desktop/inference';
 import {
   createIpcEventSender,
   createLogger,
@@ -35,6 +35,7 @@ import type {
   OrgAvatarInvokeMap,
 } from '../ipc-contract';
 import { readSettings } from '../settings/settings-main';
+import { spaceRefusal } from '../storage/storage-main';
 import { searchDatasets } from './dataset-search-main';
 import { ensureEngines, installEngine, listEngines, uninstallEngine } from './engines-main';
 import { detectHarnesses } from './harness-main';
@@ -536,13 +537,22 @@ function request<T>(req: LlmRequestBody): Promise<T> {
 const handlers: IpcHandlers<LlmInvokeMap> = {
   'llm:get-status': () => request<LlmStatus>({ type: 'get-status' }),
   'llm:list-catalog': () => request<LlmCatalogReply>({ type: 'list-catalog' }),
-  'llm:download-model': (req) =>
-    request({
+  'llm:download-model': async (req) => {
+    // The catalog knows the file's size; the disk is asked before a byte moves.
+    const model = getCatalogModel(req.modelId);
+    const file =
+      model === undefined
+        ? undefined
+        : (model.files.find((f) => f.quant === req.quant) ?? model.files[0]);
+    const refusal = await spaceRefusal(file?.bytes);
+    if (refusal !== null) return { success: false, error: refusal };
+    return request({
       type: 'download-model',
       modelId: req.modelId,
       quant: req.quant,
       hfToken: req.hfToken,
-    }),
+    });
+  },
   'llm:pause-download': () => request({ type: 'pause-download' }),
   'llm:cancel-download': () => request({ type: 'cancel-download' }),
   'llm:delete-model': (req) => request({ type: 'delete-model', modelId: req.modelId }),

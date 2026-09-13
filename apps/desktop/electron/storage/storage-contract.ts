@@ -32,6 +32,12 @@ export interface StorageNode {
     readonly quant?: string;
     readonly modality?: string;
     readonly repo?: string;
+    /** One line on what it is for, from whichever catalog knows it. */
+    readonly blurb?: string;
+    /** The in→out jobs, or the 3D engine's role. */
+    readonly tasks?: readonly string[];
+    /** A friendlier name than the folder's, when a catalog has one. */
+    readonly label?: string;
   };
 }
 
@@ -57,6 +63,21 @@ export interface StorageOverview {
 
 export type StorageInvokeMap = {
   'storage:overview': { request: { fresh?: boolean } | undefined; response: StorageOverview };
+  /** Free / total bytes on the library's volume — cheap (one statfs), for the hub's strip and download checks. */
+  'storage:disk': {
+    request: undefined;
+    response: { free: number; total: number; root: string };
+  };
+  /**
+   * "Would `bytes` more fit?" — the same answer the download handlers give
+   * when they refuse, asked BEFORE a click queues anything, so the hub can say
+   * so on the spot instead of a download that silently never starts. `refusal`
+   * is the sentence to show, or null when there is room.
+   */
+  'storage:check-space': {
+    request: { bytes: number };
+    response: { ok: boolean; refusal: string | null; free: number };
+  };
   /** Finder, with the item selected. */
   'storage:reveal': { request: { path: string }; response: { ok: boolean; error?: string } };
   /** To the Trash — recoverable, and each one's hub link (if any) removed with it. */
@@ -113,6 +134,8 @@ export type StorageEventMap = {
 
 export const STORAGE_INVOKE_CHANNELS = [
   'storage:overview',
+  'storage:disk',
+  'storage:check-space',
   'storage:reveal',
   'storage:trash',
   'storage:export',

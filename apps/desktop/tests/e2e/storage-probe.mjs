@@ -186,8 +186,9 @@ try {
   );
   log('migration on disk OK');
 
-  // 2. The page: tree collapsed by default, no blurbs, Reveal + Delete on every
-  //    row, the summary card on the right, the modalities in sidebar order.
+  // 2. The page: tree collapsed by default, no blurbs, a bare "…" on every row
+  //    (Reveal / Delete live in its menu), the summary card on the right, the
+  //    modalities in sidebar order, no edge fade over the pinned toolbar.
   await win.click('[data-testid="nav-model-management"]');
   await win.waitForSelector('[data-testid="models-tab-storage"]', { timeout: 15000 });
   await win.click('[data-testid="models-tab-storage"]');
@@ -207,22 +208,31 @@ try {
       name: r.querySelector('.pd-storage-name-text')?.textContent,
       size: r.querySelector('[data-testid="storage-size"]')?.textContent,
       tone: r.querySelector('[data-testid="storage-size"]')?.getAttribute('data-tone'),
-      reveal: r.querySelector('[data-testid="storage-reveal"]') !== null,
-      del: r.querySelector('[data-testid="storage-delete"]') !== null,
+      more: r.querySelector('[data-testid="storage-more"]') !== null,
+      buttons: [...r.querySelectorAll('button')].map((b) => b.textContent?.trim()).filter(Boolean),
+      rest: getComputedStyle(r).backgroundImage,
       expanded: r.querySelector('.pd-storage-twisty')?.getAttribute('aria-expanded'),
     }));
-    const reveal = document.querySelector('[data-testid="storage-reveal"]');
-    const cs = reveal ? getComputedStyle(reveal) : null;
+    const dots = document.querySelector('[data-testid="storage-more"]');
+    const cs = dots ? getComputedStyle(dots) : null;
+    const scroll = document.querySelector('[data-testid="storage-scroll"]');
+    const inverse = document.querySelector('[data-testid="storage-reveal-root"]');
+    const ics = inverse ? getComputedStyle(inverse) : null;
     return {
-      root: document.querySelector('[data-testid="storage-root"]')?.textContent,
+      root: document.querySelector('[data-testid="storage-root"]')?.getAttribute('title'),
+      rootShown: document.querySelector('[data-testid="storage-root"]')?.textContent,
       rows,
       blurbs: document.querySelectorAll('.pd-storage-note-line').length,
       summary: document
         .querySelector('[data-testid="storage-summary"]')
         ?.textContent?.slice(0, 120),
-      revealRadius: cs?.borderRadius,
-      revealBg: cs?.backgroundColor,
-      revealFg: cs?.color,
+      dotsBorder: cs?.borderStyle,
+      dotsBg: cs?.backgroundColor,
+      fadeClass: scroll?.className ?? '',
+      maskImage: scroll ? getComputedStyle(scroll).maskImage : null,
+      revealRadius: ics?.borderRadius,
+      toolbarSticky: getComputedStyle(document.querySelector('.pd-storage-toolbar')).position,
+      diskChip: document.querySelector('[data-testid="hub-disk-free"]')?.textContent,
       noTopLabel: !/YOUR MODELS LIVE IN/i.test(document.body.textContent ?? ''),
       layout: (() => {
         const tree = document.querySelector('.pd-storage-tree')?.getBoundingClientRect();
@@ -250,12 +260,30 @@ try {
     'every folder is collapsed by default',
   );
   check(
-    page.rows.every((r) => r.reveal),
-    'every row has Reveal',
+    page.rows.every((r) => r.more),
+    'every row has a "…"',
   );
   check(
-    page.rows.filter((r) => r.name !== 'Engines & tools').every((r) => r.del),
-    'every library row has Delete',
+    page.rows.every((r) => !r.buttons.includes('Reveal') && !r.buttons.includes('Delete')),
+    `no Reveal / Delete buttons on the rows themselves (${JSON.stringify(page.rows[0]?.buttons)})`,
+  );
+  check(
+    page.dotsBorder === 'none' && /rgba\(0, 0, 0, 0\)|transparent/.test(page.dotsBg ?? ''),
+    `the "…" is a bare glyph, no box (${page.dotsBorder} / ${page.dotsBg})`,
+  );
+  check(
+    page.rows.every((r) => /linear-gradient/.test(r.rest)),
+    'rows carry the resting gradient wash',
+  );
+  check(
+    !/pd-scroll-fade/.test(page.fadeClass) &&
+      (page.maskImage === 'none' || page.maskImage === null),
+    `no edge fade over the storage page (${page.fadeClass.trim()} / ${page.maskImage})`,
+  );
+  check(page.toolbarSticky === 'sticky', 'the search + sort toolbar is pinned');
+  check(
+    /GB free/.test(page.diskChip ?? ''),
+    `free disk space sits in the top-right strip (${page.diskChip})`,
   );
   check(page.blurbs === 0, 'no blurbs under the names');
   check(page.noTopLabel, 'the "your models live in" label is gone');
@@ -264,6 +292,13 @@ try {
       !/999|9999/.test(page.revealRadius) &&
       page.revealRadius !== '0px',
     `Reveal is a rounded rectangle, not a pill (${page.revealRadius})`,
+  );
+  check(
+    typeof page.rootShown === 'string' &&
+      (page.root?.startsWith('/Users/')
+        ? page.rootShown.startsWith('~')
+        : page.rootShown === page.root),
+    `the root reads with a tilde when it is under the home folder (${page.rootShown})`,
   );
   check(
     page.layout !== null &&
@@ -324,15 +359,42 @@ try {
     buttons: [...document.querySelectorAll('.pd-storage-card-actions button')].map((b) =>
       b.textContent?.trim(),
     ),
+    avatar: document
+      .querySelector('[data-testid="storage-inspector"] [data-testid^="org-avatar-"]')
+      ?.getAttribute('data-testid'),
+    blurb: document.querySelector('[data-testid="inspector-blurb"]')?.textContent,
+    chips: [...document.querySelectorAll('[data-testid="inspector-chips"] .pd-storage-chip')].map(
+      (c) => c.textContent?.trim(),
+    ),
+    location: document.querySelector('[data-testid="inspector-location"]')?.textContent,
+    absolute: /\/Users\/|\/var\/folders|\/private\//.test(
+      document.querySelector('[data-testid="storage-inspector"]')?.textContent ?? '',
+    ),
   }));
   log('inspector:', JSON.stringify(insp));
   check(
-    insp.name === 'microsoft/TRELLIS.2-4B',
-    `the card names the repo as its org spells it (${insp.name})`,
+    /TRELLIS/.test(insp.name ?? '') && !/__/.test(insp.name ?? ''),
+    `the card names the model as the catalog does, not as the folder does (${insp.name})`,
   );
   check(
     /4B/.test(insp.meta ?? '') && /microsoft/.test(insp.meta ?? ''),
     `parameters and org on the card (${insp.meta})`,
+  );
+  check(
+    insp.avatar === 'org-avatar-microsoft',
+    `the card wears the publisher's avatar, as the picker does (${insp.avatar})`,
+  );
+  check(
+    typeof insp.blurb === 'string' && insp.blurb.length > 20,
+    `a short blurb on what it is for (${insp.blurb})`,
+  );
+  check(
+    insp.chips.some((c) => /3D/.test(c ?? '')),
+    `modality as a chip (${insp.chips.join(' | ')})`,
+  );
+  check(
+    /Models\s*›\s*3D\s*›\s*Generation\s*›/.test(insp.location ?? '') && !insp.absolute,
+    `location reads as a breadcrumb, never an absolute path (${insp.location})`,
   );
   check(
     insp.buttons?.join(',') === 'Delete,Reveal,Export',
@@ -349,8 +411,36 @@ try {
   check(outside.ok === false, 'Reveal refuses a path outside Bobble’s folders');
   writeFileSync(path.join(SHOT_DIR, '03-inspector.png'), await win.screenshot());
 
-  // 4. Delete from the row: a dialog, not raw text; "don't show again" sticks.
-  await trellisRow.locator('[data-testid="storage-delete"]').click();
+  // 4. Delete from the row's "…" menu (the universal menu, edge-shadowed): a
+  //    dialog, not raw text; "don't show again" sticks.
+  await trellisRow.locator('[data-testid="storage-more"]').click();
+  await win.waitForSelector('[data-testid="storage-menu-delete"]', { timeout: 3000 });
+  const menu = await win.evaluate(() => {
+    const m = document.querySelector('.pd-storage-menu');
+    const cs = m ? getComputedStyle(m) : null;
+    return {
+      universal: m?.classList.contains('pd-menu') ?? false,
+      items: [...(m?.querySelectorAll('[role="menuitem"]') ?? [])].map((b) =>
+        b.textContent?.trim(),
+      ),
+      shadowLayers: ((cs?.boxShadow ?? '').match(/rgb|#/g) ?? []).length,
+      edge: getComputedStyle(document.documentElement).getPropertyValue('--pd-shadow-edge').trim(),
+      dangerColor: getComputedStyle(document.querySelector('[data-testid="storage-menu-delete"]'))
+        .color,
+    };
+  });
+  log('row menu:', JSON.stringify(menu));
+  check(menu.universal, 'the row menu is the universal .pd-menu');
+  check(
+    menu.items.join(',') === 'Reveal in Finder,Export…,Copy path,Delete',
+    `Reveal · Export · Copy path · Delete in the menu (${menu.items.join(',')})`,
+  );
+  check(
+    menu.shadowLayers >= 3 && menu.edge !== '',
+    `the menu carries the edge shadow layer (${menu.shadowLayers} layers; edge=${menu.edge})`,
+  );
+  writeFileSync(path.join(SHOT_DIR, '03b-row-menu.png'), await win.screenshot());
+  await win.click('[data-testid="storage-menu-delete"]');
   await win.waitForSelector('[data-testid="delete-model-dialog"]', { timeout: 5000 });
   await win.waitForTimeout(350); // the dialog fades in
   const dlg = await win.evaluate(
@@ -459,11 +549,42 @@ try {
   const settings = await win.evaluate(() => window.piDesktop.invoke('settings:get', undefined));
   check(settings.modelsRoot === moved, `the setting remembers it (${settings.modelsRoot})`);
   await win.waitForTimeout(800);
-  const rootShown = await win.locator('[data-testid="storage-root"]').textContent();
+  const rootShown = await win.locator('[data-testid="storage-root"]').getAttribute('title');
   check(rootShown === moved, `the page shows the new root (${rootShown})`);
   writeFileSync(path.join(SHOT_DIR, '06-moved.png'), await win.screenshot());
 
-  // 7. Export a model to a folder (the picker is native; the handler is driven
+  // 7. Room is asked for BEFORE a download: a request bigger than the disk is
+  //    refused with a sentence, one that fits is allowed.
+  const disk = await win.evaluate(() => window.piDesktop.invoke('storage:disk', undefined));
+  const tooBig = await win.evaluate(
+    (b) => window.piDesktop.invoke('storage:check-space', { bytes: b }),
+    disk.free + 10 * 1024 ** 3,
+  );
+  const fits = await win.evaluate(() =>
+    window.piDesktop.invoke('storage:check-space', { bytes: 1024 }),
+  );
+  log('space:', JSON.stringify({ free: disk.free, tooBig, fits }));
+  check(
+    tooBig.ok === false && /Not enough space/.test(tooBig.refusal ?? ''),
+    `a download that cannot fit is refused with the reason (${tooBig.refusal})`,
+  );
+  check(fits.ok === true && fits.refusal === null, 'a download that fits is allowed');
+  const storeRefusal = await win.evaluate(
+    (b) =>
+      window.piDesktop.invoke('store:download', {
+        repo: 'nobody/never',
+        kind: 'image',
+        name: 'never',
+        approxBytes: b,
+      }),
+    disk.free + 10 * 1024 ** 3,
+  );
+  check(
+    storeRefusal.ok !== true && /Not enough space/.test(storeRefusal.error ?? ''),
+    `the store refuses to start a download that cannot fit (${storeRefusal.error})`,
+  );
+
+  // 8. Export a model to a folder (the picker is native; the handler is driven
   //    with a destination through the same copy path).
   const exportDest = path.join(world, 'Exported');
   mkdirSync(exportDest, { recursive: true });

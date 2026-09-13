@@ -23,7 +23,7 @@
   );
   -webkit-backdrop-filter: blur(var(--pd-blur-overlay));
   backdrop-filter: blur(var(--pd-blur-overlay));
-  box-shadow: var(--pd-shadow-hairline), var(--pd-shadow-popover);
+  box-shadow: var(--pd-shadow-hairline), var(--pd-shadow-edge), var(--pd-shadow-popover);
   transform-origin: center bottom;
   animation: pd-menu-enter var(--pd-duration-menu) var(--pd-easing-enter);
 }

@@ -18,6 +18,18 @@
  * mode with checkboxes for bulk Delete/Export, counted in the top-right; and
  * nothing that is only a button once you hover it.
  *
+ * And on the second (2026-09-13, later): the per-row Reveal / Delete pair was
+ * two boxes on every line — "no white box around the … put the reveal and
+ * [delete] in a dropdown in the … rather than showing them for each row". So
+ * a row is name · size · a bare "…", and Reveal, Export, Copy path and Delete
+ * live in that menu (the universal `.pd-menu`, so it looks like every other
+ * menu). The card on the right got the model's real face — the publisher's
+ * Hugging Face avatar, as the picker shows it ("trellis should show
+ * microsoft") — a one-line blurb, its modality and jobs, and a location that
+ * reads as a path a person would say (Models › 3D › Generation › …) rather
+ * than /Users/…/var/folders. Rows carry the universal resting wash so the list
+ * is rows, not hanging text.
+ *
  * The tree is the library's own folders, so what the page shows is what
  * Finder shows when Reveal is pressed — there is no second model of the disk
  * to disagree with the first.
@@ -32,6 +44,7 @@ import {
   DialogTitle,
   IconBrain,
   IconChevronRight,
+  IconCopy,
   IconFile,
   IconFolderOpen,
   IconGears,
@@ -39,14 +52,24 @@ import {
   IconMore,
   IconPuzzle,
   IconRefresh,
+  IconShare,
   IconTrash,
   IconVideo,
   IconWaveform,
 } from '@pi-desktop/ui';
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { StorageNode, StorageOverview } from '../../electron/storage/storage-contract';
+import { OrgAvatar } from '../settings/brand-icons';
 import { formatBytes } from '../settings/model-manager-logic';
 import { useSettingsStore } from '../state/settings-store';
+import {
+  type ModelTask,
+  OUTPUT_LABEL,
+  RECOMMENDED_FAMILIES,
+  type RecommendedFamily,
+  type RecommendedVariant,
+  TASK_LABEL,
+} from './recommended-catalog';
 import { useOutsideClose } from './use-outside-close';
 
 const cx = (...c: (string | false | undefined | null)[]) => c.filter(Boolean).join(' ');
@@ -116,6 +139,68 @@ function when(ms: number | undefined): string {
 /** Every path under `node`, itself included — what selecting a folder selects. */
 function pathsUnder(node: StorageNode): string[] {
   return [node.path, ...(node.children ?? []).flatMap(pathsUnder)];
+}
+
+/** The Recommended-tab entry for a repo, when there is one: the blurb and jobs come from it. */
+export function recommendedFor(
+  repo: string | undefined,
+): { family: RecommendedFamily; variant: RecommendedVariant } | null {
+  if (repo === undefined) return null;
+  const want = repo.toLowerCase();
+  for (const family of RECOMMENDED_FAMILIES) {
+    const variant = family.variants.find((v) => v.repo.toLowerCase() === want);
+    if (variant !== undefined) return { family, variant };
+  }
+  return null;
+}
+
+/** The 3D engine's roles, said as jobs. */
+const ROLE_LABEL: Record<string, string> = {
+  geometry: 'image → 3D',
+  image: 'text → image',
+  texture: 'texturing',
+  segment: 'part segmentation',
+  retopo: 'retopology',
+  rig: 'rigging',
+  motion: 'text → motion',
+  audio: 'audio',
+};
+
+/** "image → 3D" for a task the catalog names; the raw word otherwise. */
+export function taskLabel(task: string): string {
+  if (task in TASK_LABEL) return TASK_LABEL[task as ModelTask];
+  return ROLE_LABEL[task] ?? task.replace(/-/g, ' ');
+}
+
+/**
+ * Where something is, as a person would say it: `Models › 3D › Generation ›
+ * microsoft/TRELLIS.2-4B` — the segments under the library (or the tools
+ * folder), never the absolute path. the user: "no complex var/folders path,
+ * should be simple and readable". The real path stays one "Copy path" away.
+ */
+export function breadcrumb(
+  p: string,
+  roots: { library: string; support: string },
+  names: Map<string, string>,
+): string[] {
+  const under = (root: string, label: string): string[] | null => {
+    if (p !== root && !p.startsWith(`${root}/`)) return null;
+    const rel = p === root ? '' : p.slice(root.length + 1);
+    const out = [label];
+    let at = root;
+    for (const seg of rel === '' ? [] : rel.split('/')) {
+      at = `${at}/${seg}`;
+      out.push(names.get(at) ?? seg);
+    }
+    return out;
+  };
+  return under(roots.library, 'Models') ?? under(roots.support, 'Engines & tools') ?? [p];
+}
+
+/** `~/Bobble/Models` for the summary card, not the whole home path. */
+function tildify(p: string): string {
+  const m = p.match(/^\/Users\/[^/]+(\/.*)?$/);
+  return m === null ? p : `~${m[1] ?? ''}`;
 }
 
 export function StorageView() {
@@ -317,7 +402,7 @@ export function StorageView() {
     return (
       <div key={node.path} className="pd-storage-node" data-kind={node.kind} data-depth={depth}>
         <div
-          className={cx('pd-storage-row', focused && 'pd-storage-row--focused')}
+          className={cx('pd-storage-row pd-row-rest', focused && 'pd-storage-row--focused')}
           data-testid={`storage-row-${node.kind}`}
           data-path={node.path}
         >
@@ -364,49 +449,48 @@ export function StorageView() {
           >
             {bytesLabel(node.bytes)}
           </span>
-          <div className="pd-storage-actions">
-            <button
-              type="button"
-              className="pd-btn-reveal"
-              onClick={() => void reveal(node.path)}
-              data-testid="storage-reveal"
-              title={node.path}
-            >
-              <IconFolderOpen size={13} />
-              Reveal
-            </button>
-            {deletable ? (
-              <button
-                type="button"
-                className="pd-btn-delete"
-                onClick={() => requestDelete([node])}
-                disabled={node.inUse === true}
-                title={
-                  node.inUse === true
-                    ? 'Being served right now — stop it first'
-                    : 'Move to the Trash'
-                }
-                data-testid="storage-delete"
-              >
-                <IconTrash size={13} />
-                Delete
-              </button>
-            ) : null}
-            {deletable ? (
-              <RowMenu
-                open={menuFor === node.path}
-                onOpen={() => setMenuFor(menuFor === node.path ? null : node.path)}
-                onClose={() => setMenuFor(null)}
-                items={[
-                  { label: 'Export…', onSelect: () => void exportNodes([node]) },
-                  {
-                    label: 'Copy path',
-                    onSelect: () => void navigator.clipboard.writeText(node.path).catch(() => {}),
-                  },
-                ]}
-              />
-            ) : null}
-          </div>
+          <RowMenu
+            open={menuFor === node.path}
+            onOpen={() => setMenuFor(menuFor === node.path ? null : node.path)}
+            onClose={() => setMenuFor(null)}
+            items={[
+              {
+                id: 'reveal',
+                label: 'Reveal in Finder',
+                icon: <IconFolderOpen size={14} />,
+                onSelect: () => void reveal(node.path),
+              },
+              ...(deletable
+                ? [
+                    {
+                      id: 'export',
+                      label: 'Export…',
+                      icon: <IconShare size={14} />,
+                      onSelect: () => void exportNodes([node]),
+                    },
+                  ]
+                : []),
+              {
+                id: 'copy',
+                label: 'Copy path',
+                icon: <IconCopy size={14} />,
+                onSelect: () => void navigator.clipboard.writeText(node.path).catch(() => {}),
+              },
+              ...(deletable
+                ? [
+                    {
+                      id: 'delete',
+                      label: 'Delete',
+                      icon: <IconTrash size={14} />,
+                      danger: true,
+                      disabled: node.inUse === true,
+                      hint: node.inUse === true ? 'serving now' : undefined,
+                      onSelect: () => requestDelete([node]),
+                    },
+                  ]
+                : []),
+            ]}
+          />
         </div>
         {hasKids && open ? (
           <div className="pd-storage-children">
@@ -533,102 +617,18 @@ export function StorageView() {
 
         <aside className="pd-storage-side">
           {focus !== null ? (
-            <div className="pd-storage-card" data-testid="storage-inspector">
-              <div className="pd-storage-card-head">
-                <span className="pd-storage-card-icon">{modalityIcon(focus, 22)}</span>
-                <div className="pd-storage-card-title">
-                  <div className="pd-storage-card-name">{focus.name}</div>
-                  <div className="pd-storage-card-meta">
-                    {[
-                      focus.meta?.params,
-                      focus.meta?.quant,
-                      focus.meta?.org,
-                      focus.kind === 'modality' || focus.kind === 'shelf' || focus.kind === 'dir'
-                        ? `${focus.children?.length ?? 0} items`
-                        : undefined,
-                    ]
-                      .filter((x): x is string => typeof x === 'string' && x !== '')
-                      .join(' · ')}
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  className="pd-storage-card-close"
-                  aria-label="Close"
-                  onClick={() => setFocusPath(null)}
-                >
-                  ×
-                </button>
-              </div>
-              <div className="pd-storage-card-size" data-tone={sizeTone(focus.bytes)}>
-                {bytesLabel(focus.bytes)}
-              </div>
-              <div className="pd-storage-card-actions">
-                {focus.kind !== 'dir' ? (
-                  <button
-                    type="button"
-                    className="pd-btn-delete pd-btn-delete--solid"
-                    onClick={() => requestDelete([focus])}
-                    disabled={focus.inUse === true}
-                    data-testid="inspector-delete"
-                  >
-                    <IconTrash size={14} />
-                    Delete
-                  </button>
-                ) : null}
-                <button
-                  type="button"
-                  className="pd-btn-reveal"
-                  onClick={() => void reveal(focus.path)}
-                  data-testid="inspector-reveal"
-                >
-                  <IconFolderOpen size={14} />
-                  Reveal
-                </button>
-                <button
-                  type="button"
-                  className="pd-btn-plain"
-                  onClick={() => void exportNodes([focus])}
-                  data-testid="inspector-export"
-                >
-                  Export
-                </button>
-              </div>
-              <dl className="pd-storage-card-facts">
-                {focus.fileCount !== undefined ? (
-                  <>
-                    <dt>Files</dt>
-                    <dd>{focus.fileCount}</dd>
-                  </>
-                ) : null}
-                {when(focus.mtime) !== '' ? (
-                  <>
-                    <dt>Modified</dt>
-                    <dd>{when(focus.mtime)}</dd>
-                  </>
-                ) : null}
-                {focus.meta?.repo !== undefined ? (
-                  <>
-                    <dt>Repo</dt>
-                    <dd>{focus.meta.repo}</dd>
-                  </>
-                ) : null}
-                <dt>Path</dt>
-                <dd className="pd-storage-card-path">{focus.path}</dd>
-                {focus.hubLinked ? (
-                  <>
-                    <dt>Note</dt>
-                    <dd>The engine reaches it through a link; deleting here removes both.</dd>
-                  </>
-                ) : null}
-                {focus.inUse ? (
-                  <>
-                    <dt>Note</dt>
-                    <dd>Being served right now — stop the model before deleting.</dd>
-                  </>
-                ) : null}
-              </dl>
-            </div>
+            <Inspector
+              node={focus}
+              crumbs={breadcrumb(
+                focus.path,
+                { library: overview.libraryRoot, support: overview.supportRoot },
+                new Map([...byPath].map(([k, v]) => [k, v.name])),
+              )}
+              onClose={() => setFocusPath(null)}
+              onDelete={() => requestDelete([focus])}
+              onReveal={() => void reveal(focus.path)}
+              onExport={() => void exportNodes([focus])}
+            />
           ) : (
             <div className="pd-storage-card" data-testid="storage-summary">
               <div className="pd-storage-sum">
@@ -670,8 +670,9 @@ export function StorageView() {
               <code
                 className="pd-storage-card-path pd-storage-card-path--root"
                 data-testid="storage-root"
+                title={overview.libraryRoot}
               >
-                {overview.libraryRoot}
+                {tildify(overview.libraryRoot)}
               </code>
               <div className="pd-storage-card-actions">
                 <button
@@ -791,7 +792,183 @@ export function StorageView() {
   );
 }
 
-/** The row's "…": Export and Copy path, in a small menu that closes on an outside press. */
+/**
+ * The card for the thing you clicked.
+ *
+ * Its face is the publisher's Hugging Face avatar — what the model picker shows
+ * — and only when no org is known does the modality glyph stand in. Below the
+ * name: the parameters, the quant, the org; then one line on what it is for
+ * (the store manifest, the 3D engine's spec, or the Recommended tab's blurb,
+ * whichever knows it), what it makes and the jobs it does as chips, the size
+ * loud and coloured, the three actions, and the facts — with the location as a
+ * breadcrumb, not a path.
+ */
+function Inspector({
+  node,
+  crumbs,
+  onClose,
+  onDelete,
+  onReveal,
+  onExport,
+}: {
+  node: StorageNode;
+  crumbs: readonly string[];
+  onClose: () => void;
+  onDelete: () => void;
+  onReveal: () => void;
+  onExport: () => void;
+}) {
+  const meta = node.meta;
+  const rec = recommendedFor(meta?.repo);
+  const org = meta?.org ?? rec?.family.org;
+  const title = meta?.label ?? node.name;
+  const blurb = meta?.blurb ?? rec?.variant.note ?? rec?.family.blurb;
+  const modality =
+    meta?.modality ??
+    (rec !== null ? OUTPUT_LABEL[rec.family.output] : undefined) ??
+    (node.kind === 'modality' ? node.name : undefined);
+  const tasks = [...new Set([...(meta?.tasks ?? []), ...(rec?.variant.tasks ?? [])])];
+  const isFolder = node.kind === 'modality' || node.kind === 'shelf' || node.kind === 'dir';
+  const subtitle = [
+    meta?.params,
+    meta?.quant,
+    org,
+    isFolder ? `${node.children?.length ?? 0} items` : undefined,
+  ].filter((x): x is string => typeof x === 'string' && x !== '');
+  return (
+    <div className="pd-storage-card" data-testid="storage-inspector">
+      <div className="pd-storage-card-head">
+        {org !== undefined && org !== '' ? (
+          <OrgAvatar org={org} size={40} className="pd-storage-card-avatar" />
+        ) : (
+          <span className="pd-storage-card-icon">{modalityIcon(node, 22)}</span>
+        )}
+        <div className="pd-storage-card-title">
+          <div className="pd-storage-card-name" data-testid="inspector-name">
+            {title}
+          </div>
+          {subtitle.length > 0 ? (
+            <div className="pd-storage-card-meta">{subtitle.join(' · ')}</div>
+          ) : null}
+        </div>
+        <button
+          type="button"
+          className="pd-storage-card-close"
+          aria-label="Close"
+          onClick={onClose}
+        >
+          ×
+        </button>
+      </div>
+      {blurb !== undefined && blurb !== '' ? (
+        <p className="pd-storage-card-blurb" data-testid="inspector-blurb">
+          {blurb}
+        </p>
+      ) : null}
+      {modality !== undefined || tasks.length > 0 ? (
+        <div className="pd-storage-card-chips" data-testid="inspector-chips">
+          {modality !== undefined ? (
+            <span className="pd-storage-chip pd-storage-chip--modality">
+              {modalityIcon(node, 11)}
+              {modality}
+            </span>
+          ) : null}
+          {tasks.map((t) => (
+            <span key={t} className="pd-storage-chip">
+              {taskLabel(t)}
+            </span>
+          ))}
+        </div>
+      ) : null}
+      <div className="pd-storage-card-size" data-tone={sizeTone(node.bytes)}>
+        {bytesLabel(node.bytes)}
+      </div>
+      <div className="pd-storage-card-actions">
+        {node.kind !== 'dir' ? (
+          <button
+            type="button"
+            className="pd-btn-delete pd-btn-delete--solid"
+            onClick={onDelete}
+            disabled={node.inUse === true}
+            data-testid="inspector-delete"
+          >
+            <IconTrash size={14} />
+            Delete
+          </button>
+        ) : null}
+        <button
+          type="button"
+          className="pd-btn-reveal"
+          onClick={onReveal}
+          data-testid="inspector-reveal"
+        >
+          <IconFolderOpen size={14} />
+          Reveal
+        </button>
+        <button
+          type="button"
+          className="pd-btn-plain"
+          onClick={onExport}
+          data-testid="inspector-export"
+        >
+          Export
+        </button>
+      </div>
+      <dl className="pd-storage-card-facts">
+        {node.fileCount !== undefined ? (
+          <>
+            <dt>Files</dt>
+            <dd>{node.fileCount}</dd>
+          </>
+        ) : null}
+        {when(node.mtime) !== '' ? (
+          <>
+            <dt>Modified</dt>
+            <dd>{when(node.mtime)}</dd>
+          </>
+        ) : null}
+        {meta?.repo !== undefined ? (
+          <>
+            <dt>Repo</dt>
+            <dd>{meta.repo}</dd>
+          </>
+        ) : null}
+        <dt>Location</dt>
+        <dd className="pd-storage-card-crumbs" data-testid="inspector-location">
+          {crumbs.map((c, i) => {
+            // A crumb's identity is its place in the path, not its text (two
+            // levels can share a name).
+            const at = crumbs.slice(0, i + 1).join('/');
+            return (
+              <span key={at} className="pd-storage-crumb">
+                {i > 0 ? <span className="pd-storage-crumb-sep">›</span> : null}
+                {c}
+              </span>
+            );
+          })}
+        </dd>
+        {node.hubLinked ? (
+          <>
+            <dt>Note</dt>
+            <dd>The engine reaches it through a link; deleting here removes both.</dd>
+          </>
+        ) : null}
+        {node.inUse ? (
+          <>
+            <dt>Note</dt>
+            <dd>Being served right now — stop the model before deleting.</dd>
+          </>
+        ) : null}
+      </dl>
+    </div>
+  );
+}
+
+/**
+ * The row's "…" — a bare glyph (no box: the user, "no white box around the …")
+ * that opens the universal menu recipe. Reveal, Export, Copy path and a red
+ * Delete live here now instead of as two buttons on every line.
+ */
 function RowMenu({
   open,
   onOpen,
@@ -801,7 +978,15 @@ function RowMenu({
   open: boolean;
   onOpen: () => void;
   onClose: () => void;
-  items: readonly { label: string; onSelect: () => void }[];
+  items: readonly {
+    id: string;
+    label: string;
+    icon?: ReactNode;
+    danger?: boolean;
+    disabled?: boolean;
+    hint?: string;
+    onSelect: () => void;
+  }[];
 }) {
   const ref = useRef<HTMLDivElement>(null);
   useOutsideClose(open, ref, onClose);
@@ -809,30 +994,44 @@ function RowMenu({
     <div className="pd-storage-more" ref={ref}>
       <button
         type="button"
-        className="pd-btn-plain pd-btn-plain--icon"
+        className="pd-storage-dots"
         aria-label="More"
+        aria-haspopup="menu"
         aria-expanded={open}
+        data-state={open ? 'open' : 'closed'}
         onClick={onOpen}
         data-testid="storage-more"
       >
-        <IconMore size={14} />
+        <IconMore size={15} />
       </button>
       {open ? (
-        <div className="pd-storage-menu" role="menu">
-          {items.map((it) => (
-            <button
-              key={it.label}
-              type="button"
-              role="menuitem"
-              className="pd-storage-menu-item"
-              onClick={() => {
-                onClose();
-                it.onSelect();
-              }}
-            >
-              {it.label}
-            </button>
-          ))}
+        <div className="pd-menu pd-menu--instant pd-storage-menu" role="menu">
+          {items.map((it, i) => {
+            const prev = items[i - 1];
+            return (
+              <div key={it.id} className="contents">
+                {it.danger === true && prev !== undefined && prev.danger !== true ? (
+                  <hr className="pd-menu-separator" />
+                ) : null}
+                <button
+                  type="button"
+                  role="menuitem"
+                  className={cx('pd-menu-item', it.danger === true && 'pd-menu-item--danger')}
+                  aria-disabled={it.disabled === true}
+                  disabled={it.disabled === true}
+                  data-testid={`storage-menu-${it.id}`}
+                  onClick={() => {
+                    onClose();
+                    it.onSelect();
+                  }}
+                >
+                  {it.icon !== undefined ? <span className="pd-menu-icon">{it.icon}</span> : null}
+                  <span className="pd-menu-item-title">{it.label}</span>
+                  {it.hint !== undefined ? <span className="pd-menu-hint">{it.hint}</span> : null}
+                </button>
+              </div>
+            );
+          })}
         </div>
       ) : null}
     </div>

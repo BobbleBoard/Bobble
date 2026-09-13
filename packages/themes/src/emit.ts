@@ -110,6 +110,7 @@ export function flattenTheme(t: ThemeTokens): Array<[name: string, value: string
   push('shadow-md', t.shadow.md);
   push('shadow-lg', t.shadow.lg);
   push('shadow-popover', t.shadow.popover);
+  push('shadow-edge', t.shadow.edge);
   push('shadow-hairline', t.shadow.hairline);
 
   push('surface-translucency', t.surface.translucency);

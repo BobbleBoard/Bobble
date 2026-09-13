@@ -20,6 +20,8 @@ export interface StoreDownloadRequest {
   readonly notes?: string;
   /** `*`-globs limiting what to fetch; omit for the whole repo. */
   readonly allow?: readonly string[];
+  /** What the selection weighs, when the catalog knows — checked against free disk before a byte moves. */
+  readonly approxBytes?: number;
 }
 
 export interface StoreDownloadUpdate {

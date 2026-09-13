@@ -196,8 +196,6 @@ try {
     stillUp !== null && stillUp.fromBottom > 200,
     `reading up is not yanked back down (${stillUp?.fromBottom}px from the bottom)`,
   );
-  const jump = await page.$('[data-testid="chat-jump-latest"]');
-  check(jump !== null, 'and there is a way back down');
   await shot('04-scrolled-up');
 
   console.log(`\nshots → ${shotDir}`);

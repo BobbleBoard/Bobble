@@ -5296,7 +5296,7 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
      ring menu earlier"). Compositing the overlay colour over a solid base keeps
      the intended tint and makes it readable wherever it opens. */
   background: linear-gradient(var(--pd-bg-overlay), var(--pd-bg-overlay)), var(--pd-bg-raised);
-  box-shadow: var(--pd-shadow-hairline), var(--pd-shadow-popover);
+  box-shadow: var(--pd-shadow-hairline), var(--pd-shadow-edge), var(--pd-shadow-popover);
 }
 
 .pd-palette-field {
@@ -7422,7 +7422,6 @@ body[data-media-expanded="true"] .pd-studio-compose {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding-top: 2px;
 }
 .pd-storage-empty {
   margin: 0;
@@ -7430,10 +7429,20 @@ body[data-media-expanded="true"] .pd-studio-compose {
   font-size: var(--pd-font-size-footnote);
   color: var(--pd-text-secondary);
 }
+/* Pinned to the top of the scroll: the search and the sort stay in reach on a
+   long library. It paints the page's own ground so rows slide under it — the
+   scroll area's edge fade is off on this tab (see ModelsView), because that
+   mask was what faded the toolbar and the card at the top. */
 .pd-storage-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 6;
   display: flex;
   align-items: center;
   gap: 8px;
+  margin: 0 -8px;
+  padding: 4px 8px 8px;
+  background: var(--pd-bg-base);
 }
 .pd-storage-toolbar-gap {
   flex: 1;
@@ -7566,20 +7575,27 @@ body[data-media-expanded="true"] .pd-studio-compose {
 }
 .pd-storage-side {
   position: sticky;
-  top: 0;
+  /* Under the pinned toolbar (its height plus the row gap). */
+  top: 50px;
 }
+/* A row rests on the universal `.pd-row-rest` wash (ui/styles/rows.css) —
+   the same rectangle the hover fills, a fraction as strong — so the tree
+   reads as rows and not as hanging text. Hover and the focused wash paint
+   over it. */
 .pd-storage-row {
   display: flex;
   align-items: center;
   gap: 6px;
   min-height: 30px;
-  padding: 2px 6px 2px 4px;
+  padding: 2px 4px 2px 4px;
   border-radius: 6px;
+  transition: background-color var(--pd-duration-fast) var(--pd-easing-standard);
 }
 .pd-storage-row:hover {
   background: var(--pd-bg-hover);
 }
-.pd-storage-row--focused {
+.pd-storage-row--focused,
+.pd-storage-row--focused:hover {
   background: var(--pd-bg-active);
 }
 .pd-storage-children {
@@ -7681,43 +7697,42 @@ body[data-media-expanded="true"] .pd-studio-compose {
 .pd-storage-card-size[data-tone="red"] {
   color: var(--pd-status-danger-fg);
 }
-.pd-storage-actions {
-  display: flex;
-  flex: none;
-  align-items: center;
-  gap: 5px;
-  margin-left: 4px;
-}
+/* The "…": a bare glyph with a hover fill, no box (the user: "no white box
+   around the …"). Its menu is the universal `.pd-menu`, opened under it. */
 .pd-storage-more {
   position: relative;
+  flex: none;
+  margin-left: 2px;
+}
+.pd-storage-dots {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--pd-text-secondary);
+  cursor: pointer;
+  transition:
+    background-color var(--pd-duration-fast) var(--pd-easing-standard),
+    color var(--pd-duration-fast) var(--pd-easing-standard);
+}
+.pd-storage-dots:hover,
+.pd-storage-dots[data-state="open"] {
+  background: var(--pd-bg-active);
+  color: var(--pd-text-primary);
 }
 .pd-storage-menu {
   position: absolute;
   right: 0;
-  top: 30px;
-  z-index: 5;
-  display: flex;
-  flex-direction: column;
-  min-width: 140px;
-  padding: 4px;
-  border: 1px solid var(--pd-border-default);
-  border-radius: var(--pd-radius-md);
-  background: var(--pd-bg-overlay);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  top: calc(100% + 2px);
+  min-width: 176px;
 }
-.pd-storage-menu-item {
-  padding: 6px 10px;
-  border: 0;
-  border-radius: 5px;
-  background: transparent;
-  color: var(--pd-text-primary);
-  font: inherit;
-  font-size: var(--pd-font-size-caption);
-  text-align: left;
-  cursor: pointer;
-}
-.pd-storage-menu-item:hover {
-  background: var(--pd-bg-hover);
+.pd-storage-menu .pd-menu-item:disabled {
+  opacity: calc(var(--pd-menu-item-resting-opacity) / 2);
+  pointer-events: none;
 }
 
 /* The right-hand card: the disk summary, or the model you clicked. */
@@ -7800,9 +7815,56 @@ body[data-media-expanded="true"] .pd-studio-compose {
   background: var(--pd-bg-inset);
   color: var(--pd-text-primary);
 }
+.pd-storage-card-avatar {
+  flex: none;
+}
 .pd-storage-card-title {
   flex: 1;
   min-width: 0;
+}
+.pd-storage-card-blurb {
+  margin: -4px 0 0;
+  font-size: var(--pd-font-size-caption);
+  line-height: 1.45;
+  color: var(--pd-text-secondary);
+}
+.pd-storage-card-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: -4px;
+}
+.pd-storage-card-chips .pd-storage-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 8px;
+  line-height: 19px;
+  font-size: 11px;
+}
+.pd-storage-chip--modality {
+  color: var(--pd-text-primary);
+  border-color: var(--pd-border-default);
+}
+/* Where it is, as a person would say it: Models › 3D › Generation › name. */
+.pd-storage-card-crumbs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 0;
+}
+.pd-storage-crumb {
+  display: inline-flex;
+  align-items: center;
+  color: var(--pd-text-secondary);
+}
+.pd-storage-crumb:last-child {
+  color: var(--pd-text-primary);
+  font-weight: 500;
+}
+.pd-storage-crumb-sep {
+  margin: 0 5px;
+  color: var(--pd-text-muted);
 }
 .pd-storage-card-name {
   font-size: var(--pd-font-size-body);

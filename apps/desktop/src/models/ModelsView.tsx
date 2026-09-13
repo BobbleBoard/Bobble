@@ -673,6 +673,19 @@ export function ModelsView() {
      this page is made against these numbers. */
   const [hw, setHw] = useState<{ ramGiB: number; cpus: number } | null>(null);
   /*
+   * FREE DISK, beside the RAM and the cores. the user: "show available storage
+   * space in the top right as well as the other specs" — a download is decided
+   * against this number as much as against memory. Re-read whenever this page
+   * regains the eye (a tab switch, a finished download) rather than polled.
+   */
+  const [disk, setDisk] = useState<{ free: number; total: number } | null>(null);
+  const refreshDisk = useCallback(() => {
+    void window.piDesktop
+      .invoke('storage:disk', undefined)
+      .then((d) => setDisk(d.total > 0 ? { free: d.free, total: d.total } : null))
+      .catch(() => {});
+  }, []);
+  /*
    * ONE FILTER SET PER KIND, both remembered.
    *
    * the user: "searching for datasets seeming to not work because filters for gguf
@@ -892,6 +905,14 @@ export function ModelsView() {
       clearTimeout(t);
     };
   }, [kind, filters.query, filters.sort]);
+
+  // How many store downloads are in flight — changes when one starts or ends,
+  // not on every progress tick (statfs on each tick would be silly).
+  const storeInFlight = Object.keys(storeProgress).length;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: these ARE the triggers — a tab switch, a download starting or ending
+  useEffect(() => {
+    refreshDisk();
+  }, [refreshDisk, tab, busyId, storeInFlight]);
 
   useEffect(() => {
     void refreshCatalog();
@@ -1239,12 +1260,38 @@ export function ModelsView() {
    * hands back the real id, which is what the existing Browse-HF flow does; we
    * reuse that store rather than reimplementing the adaptation.
    */
+  /*
+   * ROOM FIRST. the user: "don't allow / warn of disk space issues when downloading
+   * a model that there isn't enough space for." The main process refuses a
+   * download that would not fit (`spaceRefusal`, with a margin kept back), but
+   * a refusal that arrives after the click is a bar that never appears; so the
+   * same question is asked here, before anything is queued, and the answer is
+   * shown where the download was asked for. Nothing is queued when it says no.
+   */
+  const roomFor = async (bytes: number | undefined): Promise<boolean> => {
+    if (bytes === undefined || bytes <= 0) return true;
+    const r = await window.piDesktop
+      .invoke('storage:check-space', { bytes })
+      .catch(() => ({ ok: true, refusal: null, free: 0 }));
+    if (r.ok) return true;
+    setError(r.refusal ?? 'Not enough disk space for this download.');
+    refreshDisk();
+    return false;
+  };
+
   const download = async (id: string, quant?: string) => {
     setBusyId(id);
     setError(null);
     try {
       const local = catalog.find((e) => e.id === id);
       if (local !== undefined) {
+        // The quant asked for, else the first — the same choice the supervisor
+        // makes when none is named, so this asks about the file that will move.
+        const want = local.quants.find((q) => q.quant === quant) ?? local.quants[0];
+        if (!(await roomFor(want?.bytes))) {
+          setBusyId(null);
+          return;
+        }
         const res = await window.piDesktop.invoke(
           'llm:download-model',
           quant === undefined ? { modelId: id } : { modelId: id, quant },
@@ -1295,7 +1342,7 @@ export function ModelsView() {
               ? `${id} publishes no GGUF weights. The generation stack fetches it on first use.`
               : 'Could not resolve a file to download for this model.',
           );
-        } else {
+        } else if (await roomFor((file.sizeBytes ?? 0) + (quants?.mmproj?.sizeBytes ?? 0))) {
           await useHfStore.getState().addAndDownload(hit, file, {
             mmproj: quants?.mmproj,
             mtpFile: files.find((f) => f.mtp === true),
@@ -1331,6 +1378,8 @@ export function ModelsView() {
      * primary — the store runs one at a time, so this is a queue rather than a
      * race, and the top-bar bar shows whichever is moving.
      */
+    setError(null);
+    if (!(await roomFor(variant.approxBytes))) return;
     const primary = {
       repo: variant.repo,
       kind: family.output,
@@ -1339,8 +1388,16 @@ export function ModelsView() {
       ...(variant.tasks === undefined ? {} : { tasks: variant.tasks }),
       ...(variant.allow === undefined ? {} : { allow: variant.allow }),
       ...(variant.note === undefined ? {} : { notes: variant.note }),
+      // The whole recipe's size, so the main-side guard judges the recipe.
+      ...(variant.approxBytes === undefined ? {} : { approxBytes: variant.approxBytes }),
     };
     await storeDownload(primary);
+    // The store's refusal (no room, no repo, …) used to stay inside the store.
+    const refused = useStoreModels.getState().error;
+    if (refused !== null) {
+      setError(refused);
+      return;
+    }
     for (const part of variant.parts ?? []) {
       await storeDownload({
         repo: part.repo,
@@ -1469,7 +1526,16 @@ export function ModelsView() {
   const capabilityOptions = CAPABILITY_OPTIONS;
 
   return (
-    <div className="flex h-full flex-col bg-bg-base" data-testid="models-view">
+    /*
+     * `flex-1 min-h-0`, NOT `h-full`. The hub sits under the 48px top bar
+     * inside the main surface's column; `h-full` measured against the whole
+     * surface, so the page ran 48px past the bottom of the window (MEASURED:
+     * root 48→915 in an 867px window) and the last row of every list was cut
+     * off behind the edge — the "stable 3 audio is cut off" report, which had
+     * been treated with extra bottom padding. The column's own remaining
+     * height is the honest size.
+     */
+    <div className="flex min-h-0 flex-1 flex-col bg-bg-base" data-testid="models-view">
       {/* No traffic-light strip: the hub renders INSIDE the chat shell now, which
           already owns the drag region and the top bar. A second one here left a
           dead 44px band and a back button under the real title. */}
@@ -1511,6 +1577,11 @@ export function ModelsView() {
               <Chip label="GB RAM" value={String(hw.ramGiB)} />
               <Chip label={hw.cpus === 1 ? 'CPU core' : 'CPU cores'} value={String(hw.cpus)} />
             </>
+          ) : null}
+          {disk !== null ? (
+            <span data-testid="hub-disk-free" title={`${compactBytes(disk.total)} disk`}>
+              <Chip label="GB free" value={String(Math.round(disk.free / 1024 ** 3))} />
+            </span>
           ) : null}
         </div>
       </div>
@@ -1880,7 +1951,15 @@ export function ModelsView() {
       ) : null}
 
       {tab === 'storage' ? (
-        <ScrollArea className="min-h-0 flex-1">
+        /*
+         * NO EDGE FADE HERE. The scroll-driven mask paints 16px of transparency
+         * over the top of the viewport once the page has moved, and this page
+         * pins its toolbar and its card to that very edge — so the search box,
+         * the sort and the top of the card were being faded out (the user: "fix the
+         * cutoff / fade out that shouldn't be happening at the top"). The
+         * toolbar carries its own background instead, and rows slide under it.
+         */
+        <ScrollArea className="min-h-0 flex-1" fade={false} data-testid="storage-scroll">
           <div className="px-6 pb-16">
             <StorageView />
           </div>
@@ -1894,6 +1973,12 @@ export function ModelsView() {
           paints a 16px bottom fade over that, so the final card was landing in
           a 40px gap with a gradient across half of it. The last row of a long
           list should end well clear of the edge, not just barely inside it.
+
+          FOUND LATER (2026-09-13): the bigger reason was the hub's root being
+          `h-full` under the 48px top bar — the whole page ran 48px past the
+          window, so the bottom of every list was behind the edge, fade or no
+          fade. That is fixed at the root (`flex-1 min-h-0`); the padding stays
+          because the last row still deserves air.
         */}
           <div className="px-6 pb-16">
             {(

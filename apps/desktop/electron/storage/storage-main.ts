@@ -23,9 +23,10 @@ import {
   unlinkSync,
   writeFileSync,
 } from 'node:fs';
-import { cp, readdir, rm, stat } from 'node:fs/promises';
+import { cp, readdir, readFile, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { GEN3D_MODEL_SPECS } from '@pi-desktop/gen3d-engine';
 import { cacheRoot, getCatalogModel, legacyCacheRoot, libraryRoot } from '@pi-desktop/inference';
 import {
   defaultLibraryRoot,
@@ -206,6 +207,38 @@ export function runLibraryMigration(opts: { readonly skipRepos?: readonly string
   }
 }
 
+/** Free / total bytes on the volume that holds the library. */
+export async function diskSpace(): Promise<{ free: number; total: number; root: string }> {
+  const root = libraryRoot();
+  try {
+    const { statfs } = await import('node:fs/promises');
+    const s = await statfs(existsSync(root) ? root : path.dirname(root));
+    return { free: s.bavail * s.bsize, total: s.blocks * s.bsize, root };
+  } catch {
+    return { free: 0, total: 0, root };
+  }
+}
+
+/** Kept back so a download never fills the disk to the last byte. */
+export const DISK_MARGIN_BYTES = 2 * 1024 ** 3;
+
+/**
+ * "Not enough space" before a byte moves, or null when it fits. the user
+ * (2026-09-13): "don't allow / warn of disk space issues when downloading a
+ * model that there isn't enough space for." The margin is what the OS and the
+ * next generation need to keep breathing.
+ */
+export async function spaceRefusal(bytes: number | undefined): Promise<string | null> {
+  if (bytes === undefined || bytes <= 0) return null;
+  const { free, total } = await diskSpace();
+  if (total === 0) return null;
+  if (free - bytes < DISK_MARGIN_BYTES) {
+    const gb = (n: number) => `${(n / 1e9).toFixed(n >= 10e9 ? 0 : 1)} GB`;
+    return `Not enough space: this needs ${gb(bytes)} and the disk has ${gb(free)} free (Bobble keeps ${gb(DISK_MARGIN_BYTES)} back). Delete something in Model management → Manage Storage first.`;
+  }
+  return null;
+}
+
 // ── the tree ────────────────────────────────────────────────────────────────
 
 /** Bytes under `dir`, files only, symlinks not followed (they are the engines' view, not weight). */
@@ -254,6 +287,28 @@ async function sizeOf(p: string): Promise<{ bytes: number; files: number; mtime:
   }
   await walk(p);
   return { bytes, files, mtime };
+}
+
+/** The store's manifest beside a repo's files, when there is one — the fields the card shows. */
+async function readManifestLite(
+  dir: string,
+): Promise<{ name?: string; notes?: string; tasks?: readonly string[] } | null> {
+  try {
+    const raw = JSON.parse(await readFile(path.join(dir, 'model.json'), 'utf8')) as {
+      name?: unknown;
+      notes?: unknown;
+      tasks?: unknown;
+    };
+    return {
+      ...(typeof raw.name === 'string' ? { name: raw.name } : {}),
+      ...(typeof raw.notes === 'string' ? { notes: raw.notes } : {}),
+      ...(Array.isArray(raw.tasks)
+        ? { tasks: raw.tasks.filter((t): t is string => typeof t === 'string') }
+        : {}),
+    };
+  } catch {
+    return null;
+  }
 }
 
 /** "4B" out of "Qwen3.5 4B (MTP)" or "Meta-Llama-3-8B-Instruct"; nothing when there is none. */
@@ -341,8 +396,21 @@ async function modelNode(
   const catalog = repo === null ? getCatalogModel(base) : undefined;
   const name = repo ?? catalog?.displayName ?? base;
   const shelf = shelfOf(p);
+  // What a catalog says about it: the 3D engine's spec for a hub repo, the
+  // store's manifest for a repo it downloaded.
+  const spec =
+    repo === null ? undefined : GEN3D_MODEL_SPECS.find((m) => m.repos.some((r) => r.repo === repo));
+  const manifest = await readManifestLite(p);
   const meta = {
     ...(repo !== null ? { org: repo.split('/')[0] ?? '', repo } : {}),
+    ...(spec !== undefined ? { blurb: spec.note, tasks: [spec.role], label: spec.label } : {}),
+    ...(manifest !== null
+      ? {
+          ...(manifest.notes !== undefined ? { blurb: manifest.notes } : {}),
+          ...(manifest.tasks !== undefined ? { tasks: manifest.tasks } : {}),
+          ...(manifest.name !== undefined ? { label: manifest.name } : {}),
+        }
+      : {}),
     ...(catalog !== undefined
       ? {
           org: catalog.hfRepo.split('/')[0] ?? '',
@@ -545,14 +613,8 @@ async function overview(fresh: boolean): Promise<StorageOverview> {
   if (!fresh && cached !== null && Date.now() - cached.at < 30_000) return cached.overview;
   const t0 = Date.now();
   const [library, support] = await Promise.all([libraryTree(), supportTree()]);
-  let disk = { free: 0, total: 0 };
-  try {
-    const { statfs } = await import('node:fs/promises');
-    const s = await statfs(existsSync(libraryRoot()) ? libraryRoot() : path.dirname(libraryRoot()));
-    disk = { free: s.bavail * s.bsize, total: s.blocks * s.bsize };
-  } catch {
-    /* no statfs — the page shows sizes without the bar */
-  }
+  const { free, total } = await diskSpace();
+  const disk = { free, total };
   const out: StorageOverview = {
     libraryRoot: libraryRoot(),
     defaultLibraryRoot: defaultLibraryRoot(),
@@ -765,6 +827,12 @@ export function registerStorageIpc(
     ipcMain,
     {
       'storage:overview': (req) => overview(req?.fresh === true),
+      'storage:disk': () => diskSpace(),
+      'storage:check-space': async ({ bytes }) => {
+        const refusal = await spaceRefusal(bytes);
+        const { free } = await diskSpace();
+        return { ok: refusal === null, refusal, free };
+      },
       'storage:reveal': async ({ path: p }) => {
         if (!underOurRoots(p)) return { ok: false, error: 'not a Bobble folder' };
         if (!existsSync(p)) return { ok: false, error: 'gone' };

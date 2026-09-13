@@ -314,9 +314,11 @@
   }
 }
 
-/* ---- a row: mark · name · one line · one control. No border, no fill. ----
-   The 8px the hover fill reaches past the column is a negative margin, so
-   the mark's left edge sits on the heading's. */
+/* ---- a row: mark · name · one line · one control. No border; at rest the
+   universal `.pd-row-rest` wash (ui/styles/rows.css) over the rectangle the
+   hover fill paints, so the list is rows and not hanging text (the user). The 8px
+   the fill reaches past the column is a negative margin, so the mark's left
+   edge sits on the heading's. */
 .pdc-row {
   display: flex;
   align-items: center;

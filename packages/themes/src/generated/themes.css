@@ -109,6 +109,7 @@
   --pd-shadow-md: 0 2px 4px 0 rgba(11, 11, 11, 0.07), 0 6px 16px 0 rgba(11, 11, 11, 0.08);
   --pd-shadow-lg: 0 4px 8px 0 rgba(11, 11, 11, 0.08), 0 12px 28px -2px rgba(11, 11, 11, 0.08);
   --pd-shadow-popover: 0 8px 24px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0, 0, 0, 0.08);
+  --pd-shadow-edge: 0 0 12px rgba(0, 0, 0, 0.08);
   --pd-shadow-hairline: 0 0 0 0.5px rgba(0, 0, 0, 0.1);
   --pd-surface-translucency: 1;
   --pd-blur-overlay: 0px;
@@ -270,6 +271,7 @@
   --pd-shadow-md: 0 2px 4px 0 rgba(0, 0, 0, 0.07), 0 6px 16px 0 rgba(0, 0, 0, 0.24);
   --pd-shadow-lg: 0 4px 8px 0 rgba(0, 0, 0, 0.08), 0 12px 28px -2px rgba(0, 0, 0, 0.24);
   --pd-shadow-popover: 0 8px 24px rgba(0, 0, 0, 0.32), 0 2px 6px rgba(0, 0, 0, 0.2);
+  --pd-shadow-edge: 0 0 14px rgba(0, 0, 0, 0.28);
   --pd-shadow-hairline: 0 0 0 0.5px rgba(234, 221, 216, 0.1);
   --pd-surface-translucency: 1;
   --pd-blur-overlay: 0px;
@@ -431,6 +433,7 @@
   --pd-shadow-md: 0 2px 4px -1px rgba(0, 0, 0, 0.08);
   --pd-shadow-lg: 0 8px 16px -4px rgba(0, 0, 0, 0.12);
   --pd-shadow-popover: 0 16px 32px -8px rgba(0, 0, 0, 0.19);
+  --pd-shadow-edge: 0 0 12px rgba(0, 0, 0, 0.10);
   --pd-shadow-hairline: 0 0 0 0.5px rgba(26, 28, 31, 0.12);
   --pd-surface-translucency: 0.9;
   --pd-blur-overlay: 8px;
@@ -592,6 +595,7 @@
   --pd-shadow-md: 0 2px 4px -1px rgba(0, 0, 0, 0.08);
   --pd-shadow-lg: 0 8px 16px -4px rgba(0, 0, 0, 0.12);
   --pd-shadow-popover: 0 16px 32px -8px rgba(0, 0, 0, 0.19);
+  --pd-shadow-edge: 0 0 12px rgba(0, 0, 0, 0.10);
   --pd-shadow-hairline: 0 0 0 0.5px rgba(255, 255, 255, 0.12);
   --pd-surface-translucency: 0.9;
   --pd-blur-overlay: 8px;
@@ -753,6 +757,7 @@
   --pd-shadow-md: 0 4px 14px rgba(0, 0, 0, 0.09);
   --pd-shadow-lg: 0 12px 32px -6px rgba(0, 0, 0, 0.14);
   --pd-shadow-popover: 0 18px 50px -10px rgba(0, 0, 0, 0.22);
+  --pd-shadow-edge: 0 0 14px rgba(0, 0, 0, 0.08);
   --pd-shadow-hairline: 0 0 0 0.5px rgba(0, 0, 0, 0.10);
   --pd-surface-translucency: 0.78;
   --pd-blur-overlay: 20px;
@@ -914,6 +919,7 @@
   --pd-shadow-md: 0 4px 14px rgba(0, 0, 0, 0.34);
   --pd-shadow-lg: 0 12px 32px -6px rgba(0, 0, 0, 0.45);
   --pd-shadow-popover: 0 18px 50px -10px rgba(0, 0, 0, 0.55);
+  --pd-shadow-edge: 0 0 16px rgba(0, 0, 0, 0.32);
   --pd-shadow-hairline: 0 0 0 0.5px rgba(255, 255, 255, 0.14);
   --pd-surface-translucency: 0.78;
   --pd-blur-overlay: 20px;

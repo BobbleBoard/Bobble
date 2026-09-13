@@ -42,6 +42,7 @@
 @import "./styles/file-input.css";
 @import "./styles/question-card.css";
 @import "./styles/icon-stroke-control.css";
+@import "./styles/rows.css";
 /* One-shot reverse-on-leave hover system — imported last so its :hover
  * transform/wash rules layer over each family's own hover grammar. */
 @import "./styles/hover.css";

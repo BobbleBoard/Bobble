@@ -29,6 +29,7 @@ import {
 } from '@pi-desktop/model-store';
 import { registerIpcHandlers } from '@pi-desktop/shared';
 import type { IpcMain } from 'electron';
+import { spaceRefusal } from '../storage/storage-main';
 import type { StoreDownloadUpdate, StoreInvokeMap } from './store-contract';
 
 type Emit = (channel: 'store:download', payload: StoreDownloadUpdate) => void;
@@ -188,6 +189,8 @@ export function registerStoreIpc(
 
       'store:download': async (req) => {
         if (inFlight.has(req.repo)) return { ok: true };
+        const refusal = await spaceRefusal(req.approxBytes);
+        if (refusal !== null) return { ok: false, error: refusal };
         const controller = new AbortController();
         inFlight.set(req.repo, controller);
         const token = hfToken();

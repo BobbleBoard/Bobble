@@ -57,7 +57,13 @@
   background: linear-gradient(var(--pd-bg-overlay), var(--pd-bg-overlay)), var(--pd-bg-raised);
   -webkit-backdrop-filter: blur(var(--pd-blur-overlay));
   backdrop-filter: blur(var(--pd-blur-overlay));
-  box-shadow: var(--pd-shadow-hairline), var(--pd-shadow-popover);
+  /*
+   * Three layers: the hairline ring, an offset-free ambient lift around the
+   * WHOLE outline (the user: "add to the universal dropdown styling a subtle shadow
+   * effect around the edges" — the popover shadow alone throws downward, so the
+   * top and sides sat flush on the page), then the flavor's popover throw.
+   */
+  box-shadow: var(--pd-shadow-hairline), var(--pd-shadow-edge), var(--pd-shadow-popover);
   color: var(--pd-text-primary);
   font-family: var(--pd-font-sans);
   font-size: calc(var(--pd-font-size-body) * var(--pd-menu-scale, 1));
@@ -352,6 +358,9 @@
 .pd-menu-separator {
   height: 1px;
   margin: 4px calc(-1 * var(--pd-menu-padding));
+  /* Also an <hr>, whose UA/preflight border would otherwise draw a bright
+     currentColor rule over the hairline this is meant to be. */
+  border: 0;
   background: var(--pd-border-default);
 }
 

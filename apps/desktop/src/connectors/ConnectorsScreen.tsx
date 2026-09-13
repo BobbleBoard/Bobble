@@ -112,7 +112,7 @@ function Row({
   const text = line ?? cardLine(item);
   return (
     <div
-      className="pdc-row"
+      className="pdc-row pd-row-rest"
       data-state={item.state}
       data-attention={warn !== null}
       data-testid={`connector-card-${item.id}`}
@@ -305,7 +305,7 @@ function Installed({
           <button
             ref={addRef}
             type="button"
-            className="pdc-addrow pd-focusable"
+            className="pdc-addrow pd-row-rest pd-focusable"
             onClick={onAdd}
             data-testid="connectors-add-server"
           >

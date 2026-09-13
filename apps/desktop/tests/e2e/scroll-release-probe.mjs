@@ -13,7 +13,11 @@
  * was (its distance from the bottom GROWS as lines arrive). Then a wheel down
  * to the bottom — the view must follow the next lines again.
  *
+ *   LINES=80 node apps/desktop/tests/e2e/fixtures/make-stream-fixture.mjs > /tmp/stream-fixture.json
  *   FIXTURE=/tmp/stream-fixture.json node apps/desktop/tests/e2e/scroll-release-probe.mjs
+ *
+ * (80 lines, not 40: the checks assert they ran MID-stream, and a 40-line
+ * stream at 120ms is over before the last of them on a fast machine.)
  */
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -59,7 +63,6 @@ const pos = () => ({
       top: Math.round(el.scrollTop),
       height: el.scrollHeight,
       streaming: window.__pi_store().getState().agent.isStreaming,
-      jump: document.querySelector('[data-testid="chat-jump-latest"]') !== null,
     };
   })(),
 });

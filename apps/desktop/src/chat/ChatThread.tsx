@@ -25,7 +25,6 @@ import {
   ActivityRow,
   BranchSwitcher,
   EditableMessage,
-  IconChevronDown,
   IconTerminal,
   MessageActions,
   MessageRow,
@@ -60,15 +59,6 @@ import { HistoryPole } from './HistoryPole';
 import { MessageErrorBoundary } from './MessageErrorBoundary';
 import { awaitingReplyAfterLatestTurn, sentAttachmentsPrefilling } from './sent-prefill';
 import { BlindImageNote, UserImage } from './UserImage';
-
-/**
- * How far from the bottom counts as "away", for the jump-to-latest control.
- *
- * Generous next to the 16 px stick threshold on purpose: the stick asks "should
- * I follow?" and wants to be strict, while this asks "is there anything below
- * worth a button?" and should not blink on and off during a stream.
- */
-const JUMP_THRESHOLD_PX = 120;
 
 /** Concatenated visible text of an assistant response group (for copy). */
 function groupPlainText(group: AssistantMsg[]): string {
@@ -357,24 +347,16 @@ export function ChatThread() {
    * 16px of the bottom. The next streamed line snapped the view down. So the
    * re-arm now needs BOTH the bottom itself (2px, not 16) and a downward
    * gesture since the last upward one: a scroll-up of any size stays released
-   * until the user comes back down to the bottom, or presses the jump.
+   * until the user comes back down to the bottom.
    */
   const intentRef = useRef<'up' | 'down'>('down');
-  /** Until when a smooth jump-to-latest is in flight: its intermediate scroll
-   * positions are not the user leaving the bottom. */
-  const jumpUntilRef = useRef(0);
 
   const onScroll = () => {
     const el = scrollRef.current;
     if (el === null) return;
     const gap = el.scrollHeight - el.scrollTop - el.clientHeight;
-    if (gap > 2) {
-      if (Date.now() > jumpUntilRef.current) pinnedRef.current = false;
-    } else if (intentRef.current === 'down') {
-      pinnedRef.current = true;
-      jumpUntilRef.current = 0;
-    }
-    syncAway();
+    if (gap > 2) pinnedRef.current = false;
+    else if (intentRef.current === 'down') pinnedRef.current = true;
   };
 
   // Release the stick on any explicit upward intent BEFORE the next streaming
@@ -425,75 +407,18 @@ export function ChatThread() {
   }, []);
 
   /*
-   * THE WAY BACK DOWN.
-   *
-   * Releasing the stick is deliberately easy — one upward wheel tick, an arrow
-   * key, a touch drag — and until now there was no way to re-arm it except
-   * scrolling all the way to the bottom by hand. Someone who glanced up during a
-   * long generation had to chase the stream down to get it following again.
-   *
-   * Mirrored into state (the stick itself stays a ref, so a streaming render
-   * never re-runs on it) and only while there is somewhere to go: `away` is
-   * false at the bottom, so the control appears exactly when it is useful.
+   * NO WAY-BACK-DOWN BUTTON. There was one — a chevron that appeared when the
+   * view was 120px or more above the bottom — and the user had it removed
+   * (2026-09-13: "remove … the go to bottom button"). The stick re-arms the
+   * way it always did: scroll to the bottom with a downward intent and the
+   * thread follows again (see the handlers above). Dropping it also drops the
+   * per-render layout read that used to feed it.
    */
-  const [away, setAway] = useState(false);
-  const awayRef = useRef(false);
-  const awayFrame = useRef<number | null>(null);
-  /*
-   * READ THE LAYOUT AFTER IT HAS SETTLED, NEVER INSIDE THE COMMIT.
-   *
-   * This used to set `away` synchronously from the render effect below, on
-   * every render. A thread that is growing — a burst of tool rows, markdown
-   * measuring, the Activity tab morphing beside it — lays out differently
-   * from one commit to the next, so the reading flipped across the threshold
-   * on consecutive renders, each flip a state change that scheduled the next
-   * render: React's nested-update limit, error #185, "Bobble hit a rendering
-   * error" over the whole window. REPRODUCED with a thirty-write storm
-   * (tests/e2e/write-storm-probe.mjs) at 60 writes, and it is the crash from
-   * the canvas assessment the user said cannot happen.
-   *
-   * So the read is deferred to the next animation frame — layout is done by
-   * then, and a state change from there is an ordinary update, not one nested
-   * in a commit — coalesced to one read per frame, and applied only when the
-   * value actually changed.
-   */
-  const applyAway = (next: boolean): void => {
-    if (awayRef.current === next) return;
-    awayRef.current = next;
-    setAway(next);
-  };
-  const syncAway = (): void => {
-    if (awayFrame.current !== null) return;
-    awayFrame.current = requestAnimationFrame(() => {
-      awayFrame.current = null;
-      const el = scrollRef.current;
-      if (el === null) return;
-      applyAway(el.scrollHeight - el.scrollTop - el.clientHeight > JUMP_THRESHOLD_PX);
-    });
-  };
-  useEffect(
-    () => () => {
-      if (awayFrame.current !== null) cancelAnimationFrame(awayFrame.current);
-    },
-    [],
-  );
-  const jumpToLatest = (): void => {
-    const el = scrollRef.current;
-    if (el === null) return;
-    intentRef.current = 'down';
-    jumpUntilRef.current = Date.now() + 700;
-    el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
-    pinnedRef.current = true;
-    applyAway(false);
-  };
 
   // Keep the newest content in view ONLY while pinned (never fights a scroll-up).
   useEffect(() => {
     const el = scrollRef.current;
     if (el !== null && pinnedRef.current) el.scrollTop = el.scrollHeight;
-    // Streaming grows the content, so "am I away from the bottom" changes
-    // without anyone scrolling — read it once the frame has settled.
-    syncAway();
   });
 
   // Index tool results by both the assistant-scoped id and the bare callId so a
@@ -992,18 +917,6 @@ export function ChatThread() {
           <div className="h-6 shrink-0" aria-hidden data-testid="thread-tail-space" />
         </Thread>
       </ScrollArea>
-      {away ? (
-        <button
-          type="button"
-          className="pd-jump-latest pd-focusable"
-          onClick={jumpToLatest}
-          aria-label="Jump to latest"
-          title="Jump to latest"
-          data-testid="chat-jump-latest"
-        >
-          <IconChevronDown size={16} />
-        </button>
-      ) : null}
     </div>
   );
 }

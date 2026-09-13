@@ -187,6 +187,14 @@ export interface ThemeTokens {
     md: string;
     lg: string;
     popover: string;
+    /**
+     * Ambient, offset-free lift around a floating panel's whole outline — the
+     * "subtle shadow effect around the edges" the user asked every dropdown to
+     * carry. `popover` throws its weight downward, so a menu's TOP and sides
+     * used to sit flush on whatever was behind them; this layer is what makes
+     * the panel read as lifted on all four sides.
+     */
+    edge: string;
     /** The shared hairline-as-0.5px-box-shadow idiom (cross-cutting DNA). */
     hairline: string;
   };
@@ -518,6 +526,7 @@ const codexShadowBase = {
   md: '0 2px 4px -1px rgba(0, 0, 0, 0.08)',
   lg: '0 8px 16px -4px rgba(0, 0, 0, 0.12)',
   popover: '0 16px 32px -8px rgba(0, 0, 0, 0.19)',
+  edge: '0 0 12px rgba(0, 0, 0, 0.10)',
 };
 
 /* ------------------------------------------------------------------ */
@@ -617,6 +626,7 @@ const claudeLight: ThemeTokens = {
     md: '0 2px 4px 0 rgba(11, 11, 11, 0.07), 0 6px 16px 0 rgba(11, 11, 11, 0.08)',
     lg: '0 4px 8px 0 rgba(11, 11, 11, 0.08), 0 12px 28px -2px rgba(11, 11, 11, 0.08)',
     popover: '0 8px 24px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0, 0, 0, 0.08)',
+    edge: '0 0 12px rgba(0, 0, 0, 0.08)',
     hairline: '0 0 0 0.5px rgba(0, 0, 0, 0.1)', // shadow-element hairline
   },
   surface: claudeSurface,
@@ -713,6 +723,7 @@ const claudeDark: ThemeTokens = {
     md: '0 2px 4px 0 rgba(0, 0, 0, 0.07), 0 6px 16px 0 rgba(0, 0, 0, 0.24)',
     lg: '0 4px 8px 0 rgba(0, 0, 0, 0.08), 0 12px 28px -2px rgba(0, 0, 0, 0.24)',
     popover: '0 8px 24px rgba(0, 0, 0, 0.32), 0 2px 6px rgba(0, 0, 0, 0.2)',
+    edge: '0 0 14px rgba(0, 0, 0, 0.28)',
     hairline: '0 0 0 0.5px rgba(234, 221, 216, 0.1)', // warm white hairline dark
   },
   surface: claudeSurface,
@@ -1027,6 +1038,7 @@ const bobbleShadowBase = {
   md: '0 4px 14px rgba(0, 0, 0, 0.09)',
   lg: '0 12px 32px -6px rgba(0, 0, 0, 0.14)',
   popover: '0 18px 50px -10px rgba(0, 0, 0, 0.22)',
+  edge: '0 0 14px rgba(0, 0, 0, 0.08)',
 };
 
 const bobbleLight: ThemeTokens = {
@@ -1200,6 +1212,7 @@ const bobbleDark: ThemeTokens = {
     md: '0 4px 14px rgba(0, 0, 0, 0.34)',
     lg: '0 12px 32px -6px rgba(0, 0, 0, 0.45)',
     popover: '0 18px 50px -10px rgba(0, 0, 0, 0.55)',
+    edge: '0 0 16px rgba(0, 0, 0, 0.32)',
     hairline: '0 0 0 0.5px rgba(255, 255, 255, 0.14)',
   },
   surface: bobbleSurface,

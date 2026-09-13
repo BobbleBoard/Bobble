@@ -921,7 +921,7 @@
   border: 1px solid var(--pd-border-default);
   border-radius: var(--pd-radius-popover);
   background: var(--pd-bg-overlay);
-  box-shadow: var(--pd-shadow-popover);
+  box-shadow: var(--pd-shadow-edge), var(--pd-shadow-popover);
   overflow: hidden;
 }
 
@@ -1770,31 +1770,13 @@
   transition: background var(--pd-duration-fast) var(--pd-easing-standard);
 }
 
-/* the grabber: a compact 3-dot cluster, centred both ways in the grab strip.
-   `color` drives the dot fill (currentColor) so hover is a single-token swap. */
-.pd-canvas-rail-handle::after {
-  content: "";
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 2px;
-  height: 18px;
-  color: var(--pd-border-strong);
-  background-image: radial-gradient(circle at center, currentColor 0.9px, transparent 1.3px);
-  background-size: 2px 6px;
-  background-repeat: repeat-y;
-  transition: color var(--pd-duration-fast) var(--pd-easing-standard);
-}
-
+/* No grabber. There used to be a 3-dot cluster centred on the line; the user
+   (2026-09-13): "remove that vertical … shown in the canvas". The divider
+   itself, brightening on hover and while dragging, is the whole affordance —
+   the col-resize cursor says the rest. */
 .pd-canvas-rail-handle:hover::before,
 .pd-canvas-rail-handle[data-dragging="true"]::before {
   background: var(--pd-border-strong);
-}
-
-.pd-canvas-rail-handle:hover::after,
-.pd-canvas-rail-handle[data-dragging="true"]::after {
-  color: var(--pd-text-muted);
 }
 
 /* ------------------------------------------------------------------ */

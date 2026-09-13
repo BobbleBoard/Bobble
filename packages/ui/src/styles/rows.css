@@ -1,0 +1,30 @@
+/*
+ * THE RESTING ROW — a faint wash over the rectangle the hover fill will paint.
+ *
+ * the user (2026-09-13): "hanging text is a bit of a pet peeve of mine … put a
+ * subtle gradient in the same area that the hover animation highlights so that
+ * it shows some slight distinction tastefully and unintrusively showing where
+ * the card is but without a border that appears everywhere, also add to the
+ * universal."
+ *
+ * A list whose rows are bare text until hovered reads as words floating on the
+ * page: nothing says where one item ends and the next begins, or that the words
+ * are a thing you can act on. A border on every row is the usual answer and the
+ * one he does not want. So the row carries, at rest, a vertical wash built from
+ * the flavor's OWN hover colour at a fraction of its strength — the same tone,
+ * the same rectangle, the same radius — and the hover wash simply completes it.
+ * Because it is derived from `--pd-bg-hover`, it is light ink on the dark
+ * flavors and dark ink on the light ones, and any flavor that retunes its hover
+ * retunes this with it.
+ *
+ * Use it on rows that already have a `:hover { background: var(--pd-bg-hover) }`
+ * rule of their own; that rule wins on hover because it comes later in the
+ * cascade for the same element, so nothing else has to change.
+ */
+.pd-row-rest {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--pd-bg-hover) 62%, transparent),
+    color-mix(in srgb, var(--pd-bg-hover) 30%, transparent)
+  );
+}

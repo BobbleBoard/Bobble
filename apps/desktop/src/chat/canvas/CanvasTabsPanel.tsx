@@ -519,11 +519,11 @@ export function CanvasTabsPanel({ suppressed = false }: { suppressed?: boolean }
       data-testid="canvas-tabs-panel"
     >
       {open ? (
-        // Resize grip (round-11 #4a, refined round-16): a thin divider line + a
-        // small CENTRED 3-dot grip (not a scrollbar-like pill), stepping up to a
-        // subtle neutral tone on hover/drag. The hit area is wider than the
-        // visible line for a comfortable col-resize grab. Styling lives in
-        // `.pd-canvas-rail-handle` (canvas styles.css).
+        // Resize grip (round-11 #4a, refined round-16, dots dropped 2026-09-13):
+        // a thin divider line that steps up to a subtle neutral tone on
+        // hover/drag. The hit area is wider than the visible line for a
+        // comfortable col-resize grab. Styling lives in `.pd-canvas-rail-handle`
+        // (canvas styles.css).
         // biome-ignore lint/a11y/noStaticElementInteractions: pointer-only resize affordance
         <div
           className="pd-canvas-rail-handle"
