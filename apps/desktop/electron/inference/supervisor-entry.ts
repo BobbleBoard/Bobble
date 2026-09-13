@@ -108,6 +108,7 @@ import type {
   LlmCalibrationProgress,
   LlmCalibrationRecord,
   LlmCatalogEntry,
+  LlmCompanion,
   LlmHardware,
   LlmStatus,
   LlmTierPick,
@@ -1247,7 +1248,12 @@ function userProfileFor(model: CatalogModel): LaunchProfile | null {
  * calibration did. `specDisabled` is honoured further down (mtpSupported).
  */
 function defaultProfile(model: CatalogModel): LaunchProfile {
-  return { engine: 'llamacpp', spec: model.spec === 'eagle3' ? 'eagle3' : 'mtp' };
+  if (model.spec === 'eagle3') return { engine: 'llamacpp', spec: 'eagle3' };
+  // "MTP" only when the model HAS a head: the launch never passed MTP flags to
+  // a model without one, but the profile said MTP and the engine menu showed
+  // "Nanbeige 4.2 3B · llama.cpp · MTP" for a model that has no such thing.
+  const hasMtp = model.mtpEmbedded === true || model.mtpFile !== undefined;
+  return { engine: 'llamacpp', spec: hasMtp ? 'mtp' : 'none' };
 }
 
 function sameProfile(a: LaunchProfile, b: LaunchProfile): boolean {
@@ -1305,6 +1311,75 @@ function draftsOnDisk(model: CatalogModel): ('eagle3' | 'dflash' | 'dspark')[] {
   return (['eagle3', 'dflash', 'dspark'] as const).filter(
     (m) => draftPathFor(model, m) !== undefined,
   );
+}
+
+/**
+ * Everything the catalogue names beside a model, with whether each is on disk.
+ *
+ * the user: "when I go to minicpm 5 2b in bobble there's no fetch missing button
+ * that fetches drafters and models" — the button used to hide inside a
+ * finished calibration's skip list, so a model that was never calibrated (or
+ * whose companions were catalogued after it was downloaded) had no way to ask
+ * for them. This is the honest input for that button: nothing on the list →
+ * no button.
+ */
+async function companionsOf(modelId: string, quant?: string): Promise<LlmCompanion[]> {
+  const model = getModel(modelId);
+  if (model === undefined) return [];
+  const out: LlmCompanion[] = [];
+  const isMlxEntry = modelEngine(model) === 'mlx';
+  if (!isMlxEntry && model.mmproj !== undefined) {
+    out.push({
+      kind: 'mmproj',
+      what: 'vision projector',
+      source: model.mmproj.name,
+      present: existsSync(join(modelDir(model.id), model.mmproj.name)),
+    });
+  }
+  if (!isMlxEntry && model.mtpFile !== undefined && model.mtpEmbedded !== true) {
+    out.push({
+      kind: 'mtp',
+      what: 'MTP head (GGUF)',
+      source: model.mtpFile.name,
+      present: existsSync(join(modelDir(model.id), model.mtpFile.name)),
+    });
+  }
+  if (!isMlxEntry) {
+    for (const m of ['eagle3', 'dflash', 'dspark'] as const) {
+      const v = model.variants?.find((x) => x.method === m && x.draftModel !== undefined);
+      if (v?.draftModel === undefined) continue;
+      out.push({
+        kind: `gguf-${m}`,
+        what: `${m === 'eagle3' ? 'EAGLE-3' : m === 'dflash' ? 'DFlash' : 'DSpark'} drafter (GGUF)`,
+        source: v.draftRepo ?? model.hfRepo,
+        present: draftPathFor(model, m) !== undefined,
+      });
+    }
+  }
+  if (isMlxSupported()) {
+    const twin = mlxRepoFor(model);
+    if (twin !== undefined && !isMlxEntry) {
+      out.push({
+        kind: 'mlx',
+        what: 'MLX weights',
+        source: twin,
+        present: (await storedRepoDir(twin)) !== undefined,
+      });
+    }
+    for (const d of model.mlxDrafts ?? []) {
+      out.push({
+        kind: `mlx-${d.method}`,
+        what:
+          d.method === 'mtp'
+            ? 'MTP head (MLX)'
+            : `${d.method === 'dflash' ? 'DFlash' : d.method === 'dspark' ? 'DSpark' : d.method} drafter (MLX)`,
+        source: d.repo,
+        present: (await storedRepoDir(d.repo)) !== undefined,
+      });
+    }
+  }
+  void quant;
+  return out;
 }
 
 /** The model's MLX twin repo: its own repo for an MLX entry, the catalogued twin otherwise. */
@@ -2710,6 +2785,8 @@ async function handle(req: LlmRequest): Promise<unknown> {
       return calibrate(req.modelId, req.quant);
     case 'calibrate-cancel':
       return cancelCalibration();
+    case 'companions':
+      return { companions: await companionsOf(req.modelId, req.quant) };
     case 'calibration-record': {
       const model = getModel(req.modelId);
       const file = model === undefined ? undefined : pickFile(model, req.quant);

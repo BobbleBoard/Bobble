@@ -380,6 +380,20 @@ export interface LlmCalibrationRow {
 }
 
 /** A calibration's verdict, persisted per model on this machine. */
+/**
+ * One thing the catalogue names beside a model. `present` is whether its
+ * download FINISHED (a half-fetched tree never counts).
+ */
+export interface LlmCompanion {
+  /** `mlx` twin, `mlx-mtp` / `mlx-dflash` / `mlx-dspark` heads, `gguf-eagle3|dflash|dspark` drafters, `mtp` sidecar, `mmproj`. */
+  kind: string;
+  /** What to call it in a sentence: "MLX weights", "DFlash drafter (MLX)". */
+  what: string;
+  /** The repo (or file) it comes from. */
+  source: string;
+  present: boolean;
+}
+
 export interface LlmCalibrationRecord {
   modelId: string;
   quant: string;
@@ -596,6 +610,11 @@ export type LlmInvokeMap = {
     request: { modelId: string; quant?: string };
     response: { record: LlmCalibrationRecord | null };
   };
+  /** The companions the catalogue names for a model, and which are on disk. */
+  'llm:companions': {
+    request: { modelId: string; quant?: string };
+    response: { companions: LlmCompanion[] };
+  };
   /** Relaunch the running model on an engine + method the user picked. */
   'llm:use-profile': {
     request: { engine: string; spec: string };
@@ -803,6 +822,7 @@ export const LLM_INVOKE_CHANNELS = [
   'llm:calibrate',
   'llm:calibrate-cancel',
   'llm:calibration-record',
+  'llm:companions',
   'llm:use-profile',
   'llm:relaunch',
   'llm:engine-flags',

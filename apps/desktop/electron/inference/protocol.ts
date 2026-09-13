@@ -55,6 +55,12 @@ export type LlmRequestBody =
   | { type: 'calibrate-cancel' }
   /** The stored verdict for a model, if any. */
   | { type: 'calibration-record'; modelId: string; quant?: string }
+  /**
+   * What the catalogue names beside a model (MLX twin, MLX drafters, GGUF
+   * drafters, MTP sidecar, vision projector) and which of them are on disk —
+   * what a "Fetch missing" button has to know before it is worth showing.
+   */
+  | { type: 'companions'; modelId: string; quant?: string }
   /** Relaunch the running model on a profile the user picked by hand. */
   | { type: 'use-profile'; profile: LaunchProfile }
   /**

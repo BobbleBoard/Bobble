@@ -26,7 +26,7 @@
  */
 import { IconButton, IconSpeed, Popover, PopoverContent, PopoverTrigger } from '@pi-desktop/ui';
 import { useEffect, useMemo, useState } from 'react';
-import type { EngineState } from '../../electron/ipc-contract';
+import type { EngineState, LlmCompanion } from '../../electron/ipc-contract';
 import {
   ENGINES,
   type EngineSpec,
@@ -104,11 +104,9 @@ function ThroughputLine() {
       </span>
     );
   }
-  return (
-    <span className="pd-engine-tps pd-engine-tps--idle" data-testid="engine-menu-tps">
-      tok/s shows while a reply streams
-    </span>
-  );
+  // Nothing to say until there is a number — the user: the user knows the tok/s
+  // shows up; a line announcing that it will is noise.
+  return null;
 }
 
 /** One measured (or measuring, or failed) candidate row. */
@@ -267,34 +265,74 @@ function CalibrationSection({ onUse }: { onUse: (engine: string, spec: string) =
               <span className="pd-engine-row-sub">{k.reason}</span>
             </div>
           ))}
-          {/* A skip for a missing FILE is a download away: fetch what the
-              catalogue names for this model (drafters, MLX twin, MTP head) and
-              the next calibration measures those rows too. */}
-          {rows.skips.some((k) => /not downloaded|on disk/.test(k.reason)) ? (
-            <FetchMissingButton />
-          ) : null}
         </details>
       ) : null}
     </div>
   );
 }
 
-/** Download every companion the catalogue names for the running model. */
-function FetchMissingButton() {
+/**
+ * FETCH MISSING — the companions the catalogue names for the running model
+ * that are not on disk yet (MLX twin, MLX and GGUF drafters, MTP head, vision
+ * projector), one small button under Calibrate.
+ *
+ * the user (2026-09-13): "when I go to minicpm 5 2b in bobble there's no fetch
+ * missing button that fetches drafters and models. i'd prefer this as a little
+ * button under the recalibrate". It used to live inside a finished
+ * calibration's "not measured" list, so a model that was never calibrated —
+ * or one whose twins were catalogued after it was downloaded — had no way to
+ * ask. The button now asks the supervisor what is missing whenever the menu
+ * opens and after a download settles, and is simply absent when nothing is.
+ *
+ * The fetch is the model's own download job: the GGUF is skipped as already
+ * present and the extras come down on the one bar in the top bar.
+ */
+function FetchMissingButton({ open }: { open: boolean }) {
   const model = useLlmStore((s) => s.status.model);
   const download = useLlmStore((s) => s.download);
   const downloadModel = useLlmStore((s) => s.downloadModel);
-  if (model === null || model === undefined) return null;
-  const busy = download !== null && download.modelId === model.id;
+  const [missing, setMissing] = useState<LlmCompanion[]>([]);
+  const modelId = model?.id ?? null;
+  const quant = model?.quant;
+  const busy = download !== null && modelId !== null && download.modelId === modelId;
+  // Re-asked when a download of this model settles (`busy` flips false).
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `busy` IS a trigger — the answer changes when a download ends
+  useEffect(() => {
+    if (!open || modelId === null) {
+      setMissing([]);
+      return;
+    }
+    let live = true;
+    void window.piDesktop
+      .invoke('llm:companions', quant === undefined ? { modelId } : { modelId, quant })
+      .then((r) => {
+        if (live) setMissing(r.companions.filter((c) => !c.present));
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [open, modelId, quant, busy]);
+  if (modelId === null) return null;
+  const list = missing.map((c) => c.what).join(', ');
+  const nothing = missing.length === 0 && !busy;
   return (
     <button
       type="button"
-      className="pd-engine-install"
+      className="pd-engine-install pd-engine-fetch"
       data-testid="engine-fetch-missing"
-      disabled={busy}
-      onClick={() => void downloadModel(model.id, model.quant)}
+      data-missing={missing.length}
+      disabled={busy || nothing}
+      title={
+        busy
+          ? 'Fetching…'
+          : nothing
+            ? 'Every twin and drafter the catalogue names for this model is on disk'
+            : `Download: ${list}`
+      }
+      onClick={() => void downloadModel(modelId, quant)}
     >
-      {busy ? 'Fetching…' : 'Fetch the missing drafters'}
+      {busy ? 'Fetching…' : nothing ? 'Nothing missing' : `Fetch missing · ${missing.length}`}
     </button>
   );
 }
@@ -464,31 +502,34 @@ export function EngineMenu() {
               </span>
               <ThroughputLine />
             </div>
-            {running ? (
-              <button
-                type="button"
-                className="pd-engine-calibrate pd-engine-calibrate--cancel"
-                data-testid="engine-calibrate-cancel"
-                onClick={() => void cancelCalibration()}
-              >
-                Cancel
-              </button>
-            ) : (
-              <button
-                type="button"
-                className="pd-engine-calibrate"
-                data-testid="engine-calibrate"
-                disabled={!canCalibrate}
-                title={
-                  canCalibrate
-                    ? 'Measure every engine and method for this model, then switch to the fastest'
-                    : 'Start a model first'
-                }
-                onClick={() => void onCalibrate()}
-              >
-                {record !== null ? 'Recalibrate' : 'Calibrate'}
-              </button>
-            )}
+            <div className="pd-engine-head-actions">
+              {running ? (
+                <button
+                  type="button"
+                  className="pd-engine-calibrate pd-engine-calibrate--cancel"
+                  data-testid="engine-calibrate-cancel"
+                  onClick={() => void cancelCalibration()}
+                >
+                  Cancel
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="pd-engine-calibrate"
+                  data-testid="engine-calibrate"
+                  disabled={!canCalibrate}
+                  title={
+                    canCalibrate
+                      ? 'Measure every engine and method for this model, then switch to the fastest'
+                      : 'Start a model first'
+                  }
+                  onClick={() => void onCalibrate()}
+                >
+                  {record !== null ? 'Recalibrate' : 'Calibrate'}
+                </button>
+              )}
+              <FetchMissingButton open={open} />
+            </div>
           </div>
           {model !== null && model !== undefined && record === null && !running ? (
             /* Per model: a model that has never been measured says so, whatever
