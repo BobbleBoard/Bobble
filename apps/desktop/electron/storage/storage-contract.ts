@@ -23,6 +23,16 @@ export interface StorageNode {
   readonly children?: readonly StorageNode[];
   /** Files directly inside, for a model folder (name + bytes), capped. */
   readonly fileCount?: number;
+  /** Newest file inside, ms since the epoch — what "Recent" sorts on. */
+  readonly mtime?: number;
+  /** What the inspector says about a model, when the catalog or the repo knows. */
+  readonly meta?: {
+    readonly org?: string;
+    readonly params?: string;
+    readonly quant?: string;
+    readonly modality?: string;
+    readonly repo?: string;
+  };
 }
 
 export interface StorageOverview {
@@ -49,10 +59,23 @@ export type StorageInvokeMap = {
   'storage:overview': { request: { fresh?: boolean } | undefined; response: StorageOverview };
   /** Finder, with the item selected. */
   'storage:reveal': { request: { path: string }; response: { ok: boolean; error?: string } };
-  /** To the Trash — recoverable, and its hub link (if any) removed with it. */
+  /** To the Trash — recoverable, and each one's hub link (if any) removed with it. */
   'storage:trash': {
-    request: { path: string };
-    response: { ok: boolean; error?: string; freed?: number };
+    request: { paths: readonly string[] };
+    response: {
+      ok: boolean;
+      freed: number;
+      failed: readonly { path: string; error: string }[];
+    };
+  };
+  /**
+   * Copy models or folders somewhere the user picks (a native folder dialog);
+   * progress on `storage:export`. Nothing is removed.
+   */
+  'storage:export': {
+    /** `dest` is a probe seam (honoured under PI_E2E only): the folder the picker would return. */
+    request: { paths: readonly string[]; dest?: string };
+    response: { ok: boolean; error?: string; dest?: string; cancelled?: boolean };
   };
   /** A native folder picker for a new library location. */
   'storage:pick-root': { request: undefined; response: { path: string | null } };
@@ -74,16 +97,27 @@ export interface StorageMoveProgress {
   readonly error?: string;
 }
 
+export interface StorageExportProgress {
+  readonly phase: 'copying' | 'done' | 'failed';
+  readonly copied: number;
+  readonly total: number;
+  /** What is being copied right now. */
+  readonly current?: string;
+  readonly error?: string;
+}
+
 export type StorageEventMap = {
   'storage:move': StorageMoveProgress;
+  'storage:export': StorageExportProgress;
 };
 
 export const STORAGE_INVOKE_CHANNELS = [
   'storage:overview',
   'storage:reveal',
   'storage:trash',
+  'storage:export',
   'storage:pick-root',
   'storage:set-root',
 ] as const;
 
-export const STORAGE_EVENT_CHANNELS = ['storage:move'] as const;
+export const STORAGE_EVENT_CHANNELS = ['storage:move', 'storage:export'] as const;

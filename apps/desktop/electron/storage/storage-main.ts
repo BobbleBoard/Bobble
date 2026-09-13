@@ -26,8 +26,13 @@ import {
 import { cp, readdir, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { cacheRoot, getCatalogModel, libraryRoot } from '@pi-desktop/inference';
-import { defaultLibraryRoot, MODALITY_FOLDERS, repoFromHubEntry } from '@pi-desktop/model-store';
+import { cacheRoot, getCatalogModel, legacyCacheRoot, libraryRoot } from '@pi-desktop/inference';
+import {
+  defaultLibraryRoot,
+  MODALITY_FOLDERS,
+  repoFromHubEntry,
+  shelfOf,
+} from '@pi-desktop/model-store';
 import { createLogger, registerIpcHandlers } from '@pi-desktop/shared';
 import { dialog, type IpcMain, shell } from 'electron';
 import { getLoadedModel } from '../inference/llm-main';
@@ -50,6 +55,45 @@ const log = createLogger('desktop:storage');
 
 /** What the last migration did, for the page. */
 let lastMigration: (MigrationResult & { ranAt: string; unsorted: readonly string[] }) | null = null;
+
+/**
+ * `~/.cache/pi-desktop` → `~/.cache/bobble`, once, with a symlink left at the
+ * old name.
+ *
+ * the user (2026-09-13): "purge any 'pi desktop' branding totally". The support
+ * root's name was the last place it showed — on the Manage Storage page, in
+ * every engine's path. A rename is instant on the same volume; the symlink is
+ * what keeps every venv under it working, since a venv bakes its absolute
+ * path into each script it installs (`#!/Users/…/.cache/pi-desktop/engines/
+ * mlx-venv/bin/python3`) and into pyvenv.cfg. Through the link those paths
+ * still resolve; nothing is reinstalled. The hub-cache links into the library
+ * are relative, so they move with the folder unchanged.
+ *
+ * Skipped when the support root is overridden (a probe, a test), when the new
+ * name already exists, or when the old one is not a real directory.
+ */
+export function renameSupportRoot(): void {
+  if (process.env.PI_DESKTOP_CACHE_DIR !== undefined && process.env.PI_DESKTOP_CACHE_DIR !== '') {
+    return;
+  }
+  const next = cacheRoot();
+  const old = legacyCacheRoot();
+  if (existsSync(next)) return;
+  let oldIsDir = false;
+  try {
+    oldIsDir = lstatSync(old).isDirectory();
+  } catch {
+    oldIsDir = false;
+  }
+  if (!oldIsDir) return;
+  try {
+    renameSync(old, next);
+    symlinkSync(path.basename(next), old);
+    log.info('support root renamed', { from: old, to: next, link: 'left at the old name' });
+  } catch (err) {
+    log.error('could not rename the support root; the old name stays', { error: String(err) });
+  }
+}
 
 /**
  * The library root, from the setting, onto the environment — BEFORE any child
@@ -148,7 +192,7 @@ export function runLibraryMigration(opts: { readonly skipRepos?: readonly string
         '  Unsorted/              weights Bobble could not place, kept as they were',
         '',
         'A folder named org__name is a Hugging Face repo; the engines reach it through a',
-        'link in ~/.cache/pi-desktop, so move or delete these from Bobble (Model management',
+        'link in ~/.cache/bobble, so move or delete these from Bobble (Model management',
         '→ Manage Storage) rather than by hand, or the link is left dangling.',
         '',
         `Last migration: ${lastMigration.ranAt} — ${result.moved.length} moved, ${result.skipped.length} left as they were.`,
@@ -165,9 +209,10 @@ export function runLibraryMigration(opts: { readonly skipRepos?: readonly string
 // ── the tree ────────────────────────────────────────────────────────────────
 
 /** Bytes under `dir`, files only, symlinks not followed (they are the engines' view, not weight). */
-async function sizeOf(p: string): Promise<{ bytes: number; files: number }> {
+async function sizeOf(p: string): Promise<{ bytes: number; files: number; mtime: number }> {
   let bytes = 0;
   let files = 0;
+  let mtime = 0;
   const walk = async (dir: string): Promise<void> => {
     let entries: import('node:fs').Dirent[];
     try {
@@ -192,6 +237,7 @@ async function sizeOf(p: string): Promise<{ bytes: number; files: number }> {
             const s = await stat(full);
             bytes += s.size;
             files += 1;
+            if (s.mtimeMs > mtime) mtime = s.mtimeMs;
           } catch {
             /* vanished mid-walk */
           }
@@ -201,13 +247,19 @@ async function sizeOf(p: string): Promise<{ bytes: number; files: number }> {
   };
   try {
     const s = lstatSync(p);
-    if (s.isSymbolicLink()) return { bytes: 0, files: 0 };
-    if (s.isFile()) return { bytes: s.size, files: 1 };
+    if (s.isSymbolicLink()) return { bytes: 0, files: 0, mtime: 0 };
+    if (s.isFile()) return { bytes: s.size, files: 1, mtime: s.mtimeMs };
   } catch {
-    return { bytes: 0, files: 0 };
+    return { bytes: 0, files: 0, mtime: 0 };
   }
   await walk(p);
-  return { bytes, files };
+  return { bytes, files, mtime };
+}
+
+/** "4B" out of "Qwen3.5 4B (MTP)" or "Meta-Llama-3-8B-Instruct"; nothing when there is none. */
+function paramsIn(text: string): string | undefined {
+  const m = text.match(/(\d+(?:\.\d+)?)\s?[bB](?![a-z])/);
+  return m === null ? undefined : `${m[1]}B`;
 }
 
 const SHELF_NOTES: Record<string, string> = {
@@ -272,7 +324,7 @@ async function modelNode(
   inUse: Set<string>,
 ): Promise<StorageNode> {
   const base = path.basename(p);
-  const { bytes, files } = await sizeOf(p);
+  const { bytes, files, mtime } = await sizeOf(p);
   let linked = false;
   let linkName: string | null = null;
   try {
@@ -288,6 +340,22 @@ async function modelNode(
   // A catalog id reads as the catalog names it.
   const catalog = repo === null ? getCatalogModel(base) : undefined;
   const name = repo ?? catalog?.displayName ?? base;
+  const shelf = shelfOf(p);
+  const meta = {
+    ...(repo !== null ? { org: repo.split('/')[0] ?? '', repo } : {}),
+    ...(catalog !== undefined
+      ? {
+          org: catalog.hfRepo.split('/')[0] ?? '',
+          repo: catalog.hfRepo,
+          ...(catalog.files[0]?.quant !== undefined ? { quant: catalog.files[0].quant } : {}),
+        }
+      : {}),
+    ...(() => {
+      const params = paramsIn(catalog?.displayName ?? repo ?? base);
+      return params === undefined ? {} : { params };
+    })(),
+    ...(shelf === null ? {} : { modality: shelf.split('/')[0] ?? '' }),
+  };
   const isFile = ((): boolean => {
     try {
       return statSync(p).isFile();
@@ -310,6 +378,8 @@ async function modelNode(
     ...(linked ? { hubLinked: true } : {}),
     ...(inUse.has(p) ? { inUse: true } : {}),
     fileCount: files,
+    mtime,
+    meta,
   };
 }
 
@@ -351,8 +421,16 @@ async function shelfNode(
       }
       for (const f of files) {
         const fp = path.join(p, f);
-        const { bytes } = await sizeOf(fp);
-        children.push({ name: f, path: fp, bytes, kind: 'file', note: `ComfyUI ${n}` });
+        const { bytes, mtime } = await sizeOf(fp);
+        children.push({
+          name: f,
+          path: fp,
+          bytes,
+          kind: 'file',
+          note: `ComfyUI ${n}`,
+          mtime,
+          meta: { modality: shelf.split('/')[0] ?? '' },
+        });
       }
       continue;
     }
@@ -366,6 +444,8 @@ async function shelfNode(
     kind: 'shelf',
     ...(SHELF_NOTES[shelf] === undefined ? {} : { note: SHELF_NOTES[shelf] }),
     children,
+    mtime: children.reduce((m, c) => Math.max(m, c.mtime ?? 0), 0),
+    fileCount: children.reduce((n, c) => n + (c.fileCount ?? 0), 0),
   };
 }
 
@@ -405,6 +485,8 @@ async function libraryTree(): Promise<StorageNode> {
       kind: 'modality',
       note: m.blurb,
       children: shelves,
+      mtime: shelves.reduce((t, c) => Math.max(t, c.mtime ?? 0), 0),
+      fileCount: shelves.reduce((n, c) => n + (c.fileCount ?? 0), 0),
     });
   }
   return {
@@ -442,7 +524,7 @@ async function supportTree(): Promise<StorageNode[]> {
   const out: StorageNode[] = [];
   for (const n of names) {
     const p = path.join(root, n);
-    const { bytes, files } = await sizeOf(p);
+    const { bytes, files, mtime } = await sizeOf(p);
     out.push({
       name: n,
       path: p,
@@ -450,6 +532,7 @@ async function supportTree(): Promise<StorageNode[]> {
       kind: 'tool',
       ...(SUPPORT_NOTES[n] === undefined ? {} : { note: SUPPORT_NOTES[n] }),
       fileCount: files,
+      mtime,
     });
   }
   out.sort((a, b) => b.bytes - a.bytes);
@@ -667,10 +750,16 @@ function relinkAfterMove(from: string, to: string): void {
   }
 }
 
+/** Two channels, each with its own payload — spelled out so main's typed sender accepts it. */
+type Emit = {
+  (channel: 'storage:move', payload: StorageEventMap['storage:move']): void;
+  (channel: 'storage:export', payload: StorageEventMap['storage:export']): void;
+};
+
 export function registerStorageIpc(
   ipcMain: IpcMain,
   allowSender: (event: unknown) => boolean,
-  emit: <K extends keyof StorageEventMap>(channel: K, payload: StorageEventMap[K]) => void,
+  emit: Emit,
 ): void {
   registerIpcHandlers<StorageInvokeMap>(
     ipcMain,
@@ -682,35 +771,103 @@ export function registerStorageIpc(
         shell.showItemInFolder(p);
         return { ok: true };
       },
-      'storage:trash': async ({ path: p }) => {
-        if (!underOurRoots(p)) return { ok: false, error: 'not a Bobble folder' };
-        if (
-          path.resolve(p) === path.resolve(libraryRoot()) ||
-          path.resolve(p) === path.resolve(cacheRoot())
-        ) {
-          return { ok: false, error: 'that is the whole library' };
-        }
-        if (inUsePaths().has(p)) {
-          return { ok: false, error: 'this model is being served right now — stop it first' };
-        }
-        const { bytes } = await sizeOf(p);
-        // The links are found BEFORE the trash: a dangling link no longer
-        // resolves to anything that could be matched.
-        const links = linksPointingAt(p);
-        try {
-          await shell.trashItem(p);
-        } catch (err) {
-          return { ok: false, error: String(err) };
-        }
-        for (const at of links) {
-          try {
-            unlinkSync(at);
-          } catch {
-            /* already gone */
+      'storage:trash': async ({ paths }) => {
+        let freed = 0;
+        const failed: { path: string; error: string }[] = [];
+        const busy = inUsePaths();
+        for (const p of paths) {
+          if (!underOurRoots(p)) {
+            failed.push({ path: p, error: 'not a Bobble folder' });
+            continue;
           }
+          if (
+            path.resolve(p) === path.resolve(libraryRoot()) ||
+            path.resolve(p) === path.resolve(cacheRoot())
+          ) {
+            failed.push({ path: p, error: 'that is the whole library' });
+            continue;
+          }
+          if ([...busy].some((b) => b === p || b.startsWith(`${p}/`))) {
+            failed.push({
+              path: p,
+              error: 'a model in here is being served right now — stop it first',
+            });
+            continue;
+          }
+          const { bytes } = await sizeOf(p);
+          // The links are found BEFORE the trash: a dangling link no longer
+          // resolves to anything that could be matched.
+          const links = linksPointingAt(p);
+          try {
+            await shell.trashItem(p);
+          } catch (err) {
+            failed.push({ path: p, error: String(err) });
+            continue;
+          }
+          for (const at of links) {
+            try {
+              unlinkSync(at);
+            } catch {
+              /* already gone */
+            }
+          }
+          freed += bytes;
         }
         cached = null;
-        return { ok: true, freed: bytes };
+        return { ok: failed.length === 0, freed, failed };
+      },
+      'storage:export': async ({ paths, dest: seam }) => {
+        const wanted = paths.filter((p) => underOurRoots(p) && existsSync(p));
+        if (wanted.length === 0) return { ok: false, error: 'nothing to export' };
+        let dest: string;
+        if (process.env.PI_E2E === '1' && typeof seam === 'string' && seam.length > 0) {
+          dest = seam; // a probe cannot drive the native picker
+        } else {
+          const picked = await dialog.showOpenDialog({
+            title:
+              wanted.length === 1
+                ? `Export ${path.basename(wanted[0] ?? '')} to…`
+                : `Export ${wanted.length} items to…`,
+            properties: ['openDirectory', 'createDirectory'],
+            buttonLabel: 'Export here',
+          });
+          if (picked.canceled || picked.filePaths.length === 0) {
+            return { ok: false, cancelled: true };
+          }
+          dest = picked.filePaths[0] ?? '';
+        }
+        let total = 0;
+        for (const p of wanted) total += (await sizeOf(p)).bytes;
+        let copied = 0;
+        let current = '';
+        let stop = false;
+        const ticker = setInterval(() => {
+          void (async () => {
+            let sum = 0;
+            for (const p of wanted) sum += (await sizeOf(path.join(dest, path.basename(p)))).bytes;
+            copied = sum;
+            if (!stop) emit('storage:export', { phase: 'copying', copied, total, current });
+          })();
+        }, 1000);
+        try {
+          for (const p of wanted) {
+            current = path.basename(p);
+            const target = path.join(dest, current);
+            if (existsSync(target)) throw new Error(`${current} already exists there`);
+            // Through the links, not the links: an export is for another
+            // machine, which has no hub cache of ours to point at.
+            await cp(p, target, { recursive: true, dereference: true, errorOnExist: true });
+          }
+        } catch (err) {
+          stop = true;
+          clearInterval(ticker);
+          emit('storage:export', { phase: 'failed', copied, total, error: String(err) });
+          return { ok: false, error: String(err), dest };
+        }
+        stop = true;
+        clearInterval(ticker);
+        emit('storage:export', { phase: 'done', copied: total, total });
+        return { ok: true, dest };
       },
       'storage:pick-root': async () => {
         const picked = await dialog.showOpenDialog({

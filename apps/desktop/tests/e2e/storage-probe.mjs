@@ -6,7 +6,7 @@
  * model manager that says 'Manage Storage' … view and delete models, sorted
  * the same way, always with a 'Reveal' button".
  *
- * Builds a tiny replica of ~/.cache/pi-desktop (the same names, 1-byte files,
+ * Builds a tiny replica of ~/.cache/bobble (the same names, 1-byte files,
  * HF-shaped repo dirs with relative blob links), lets the app migrate it at
  * boot (PI_DESKTOP_MIGRATE_LIBRARY=1 lifts the probe guard — on a scratch
  * cache and a scratch library only), then drives the page: the tree by
@@ -52,7 +52,7 @@ const touch = (p, bytes = 1) => {
   mkdirSync(path.dirname(p), { recursive: true });
   writeFileSync(p, Buffer.alloc(bytes, 120));
 };
-const REAL = path.join(homedir(), '.cache', 'pi-desktop');
+const REAL = path.join(homedir(), '.cache', 'bobble');
 const realNames = (dir) => {
   try {
     return readdirSync(dir).filter((n) => !n.startsWith('.'));
@@ -186,69 +186,158 @@ try {
   );
   log('migration on disk OK');
 
-  // 2. The page.
+  // 2. The page: tree collapsed by default, no blurbs, Reveal + Delete on every
+  //    row, the summary card on the right, the modalities in sidebar order.
   await win.click('[data-testid="nav-model-management"]');
   await win.waitForSelector('[data-testid="models-tab-storage"]', { timeout: 15000 });
   await win.click('[data-testid="models-tab-storage"]');
   await win.waitForSelector(
     '[data-testid="storage-library"] [data-testid="storage-row-modality"]',
-    { timeout: 20000 },
+    {
+      timeout: 20000,
+    },
   );
   await win.waitForTimeout(400);
   const page = await win.evaluate(() => {
-    const rows = [...document.querySelectorAll('[data-testid="storage-row-modality"]')].map(
-      (r) => ({
-        name: r.querySelector('.pd-storage-name span')?.textContent,
-        size: r.querySelector('[data-testid="storage-size"]')?.textContent,
-        reveal: r.querySelector('[data-testid="storage-reveal"]') !== null,
-      }),
-    );
+    const rows = [
+      ...document.querySelectorAll(
+        '[data-testid="storage-library"] > .pd-storage-node > .pd-storage-row',
+      ),
+    ].map((r) => ({
+      name: r.querySelector('.pd-storage-name-text')?.textContent,
+      size: r.querySelector('[data-testid="storage-size"]')?.textContent,
+      tone: r.querySelector('[data-testid="storage-size"]')?.getAttribute('data-tone'),
+      reveal: r.querySelector('[data-testid="storage-reveal"]') !== null,
+      del: r.querySelector('[data-testid="storage-delete"]') !== null,
+      expanded: r.querySelector('.pd-storage-twisty')?.getAttribute('aria-expanded'),
+    }));
+    const reveal = document.querySelector('[data-testid="storage-reveal"]');
+    const cs = reveal ? getComputedStyle(reveal) : null;
     return {
       root: document.querySelector('[data-testid="storage-root"]')?.textContent,
       rows,
-      revealButtons: document.querySelectorAll('[data-testid="storage-reveal"]').length,
-      migration: document.querySelector('[data-testid="storage-migration"]')?.textContent ?? null,
-      support: document.querySelectorAll(
-        '[data-testid="storage-support"] [data-testid="storage-row-tool"]',
-      ).length,
+      blurbs: document.querySelectorAll('.pd-storage-note-line').length,
+      summary: document
+        .querySelector('[data-testid="storage-summary"]')
+        ?.textContent?.slice(0, 120),
+      revealRadius: cs?.borderRadius,
+      revealBg: cs?.backgroundColor,
+      revealFg: cs?.color,
+      noTopLabel: !/YOUR MODELS LIVE IN/i.test(document.body.textContent ?? ''),
+      layout: (() => {
+        const tree = document.querySelector('.pd-storage-tree')?.getBoundingClientRect();
+        const side = document.querySelector('.pd-storage-side')?.getBoundingClientRect();
+        return tree && side
+          ? {
+              treeLeft: Math.round(tree.left),
+              treeRight: Math.round(tree.right),
+              sideLeft: Math.round(side.left),
+              sideWidth: Math.round(side.width),
+            }
+          : null;
+      })(),
     };
   });
   log('page:', JSON.stringify(page));
-  check(page.root === library, `the page names the library (${page.root})`);
+  check(page.root === library, `the summary card names the library (${page.root})`);
+  const names = page.rows.map((r) => r.name);
   check(
-    page.rows.map((r) => r.name).join(',') === 'LLM,Image,Video,3D,Audio,Support,Unsorted' ||
-      page.rows.length >= 5,
-    `modalities in sidebar order (${page.rows.map((r) => r.name).join(',')})`,
+    names.includes('LLM') && names.includes('Video') && names.includes('Engines & tools'),
+    `modalities + tools as top rows (${names.join(',')})`,
+  );
+  check(
+    page.rows.every((r) => r.expanded === 'false'),
+    'every folder is collapsed by default',
   );
   check(
     page.rows.every((r) => r.reveal),
-    'every modality row has Reveal',
+    'every row has Reveal',
   );
-  check(page.revealButtons > page.rows.length, 'Reveal on the rows inside too');
   check(
-    page.migration !== null && /Moved \d+ items/.test(page.migration),
-    `the page says what the migration did (${page.migration})`,
+    page.rows.filter((r) => r.name !== 'Engines & tools').every((r) => r.del),
+    'every library row has Delete',
   );
-  check(page.support >= 2, `engines & tools listed (${page.support})`);
+  check(page.blurbs === 0, 'no blurbs under the names');
+  check(page.noTopLabel, 'the "your models live in" label is gone');
+  check(
+    page.revealRadius !== undefined &&
+      !/999|9999/.test(page.revealRadius) &&
+      page.revealRadius !== '0px',
+    `Reveal is a rounded rectangle, not a pill (${page.revealRadius})`,
+  );
+  check(
+    page.layout !== null &&
+      page.layout.sideLeft > page.layout.treeRight &&
+      page.layout.sideWidth >= 260,
+    `the tree sits left with the card on the right (${JSON.stringify(page.layout)})`,
+  );
   writeFileSync(path.join(SHOT_DIR, '01-manage-storage.png'), await win.screenshot());
 
-  // Expand 3D → Generation and Reveal a model (the IPC answers; Finder is the OS's).
-  const threeD = win.locator('[data-testid="storage-row-modality"][data-path$="/3D"]').first();
-  const twisty = threeD.locator('.pd-storage-twisty').first();
-  if ((await twisty.getAttribute('aria-expanded')) !== 'true') await twisty.click();
+  // Sizes are coloured by size, sort flips, search finds a nested model.
+  const smallTone = page.rows.find((r) => r.name === 'Support')?.tone;
+  check(smallTone === 'green', `a sub-GB folder reads green (${smallTone})`);
+  await win.click('[data-testid="storage-sort-name"]');
+  await win.waitForTimeout(150);
+  const byName = await win.evaluate(() =>
+    [
+      ...document.querySelectorAll(
+        '[data-testid="storage-library"] > .pd-storage-node > .pd-storage-row .pd-storage-name-text',
+      ),
+    ].map((n) => n.textContent),
+  );
+  check(
+    byName.join(',') === [...byName].sort((a, b) => a.localeCompare(b)).join(','),
+    `sort by name orders A→Z (${byName.join(',')})`,
+  );
+  await win.click('[data-testid="storage-sort-size"]');
+  await win.fill('[data-testid="storage-search"]', 'trellis');
+  await win.waitForTimeout(250);
+  const found = await win.evaluate(() =>
+    [...document.querySelectorAll('[data-testid="storage-row-model"]')].map(
+      (r) => r.querySelector('.pd-storage-name-text')?.textContent,
+    ),
+  );
+  check(
+    found.length === 1 && /TRELLIS/i.test(found[0] ?? ''),
+    `search opens the folders down to the match (${found.join(',')})`,
+  );
+  writeFileSync(path.join(SHOT_DIR, '02-search.png'), await win.screenshot());
+  await win.fill('[data-testid="storage-search"]', '');
+  await win.waitForTimeout(150);
+
+  // 3. Click a model → the card on the right shows it; its Reveal answers.
+  await win.click('[data-testid="storage-row-modality"][data-path$="/3D"] .pd-storage-twisty');
+  await win.click(
+    '[data-testid="storage-row-shelf"][data-path$="/3D/Generation"] .pd-storage-twisty',
+  );
   await win.waitForTimeout(200);
-  const shelf = win
-    .locator('[data-testid="storage-row-shelf"][data-path$="/3D/Generation"]')
-    .first();
-  const shelfTwisty = shelf.locator('.pd-storage-twisty').first();
-  if ((await shelfTwisty.getAttribute('aria-expanded')) !== 'true') await shelfTwisty.click();
-  await win.waitForTimeout(300);
   const trellisRow = win
     .locator('[data-testid="storage-row-model"][data-path$="microsoft__trellis.2-4b"]')
     .first();
   check((await trellisRow.count()) === 1, 'TRELLIS is a row under 3D → Generation');
-  const chips = await trellisRow.locator('.pd-storage-chip').allTextContents();
-  check(chips.includes('linked'), `the row says the engine reaches it through a link (${chips})`);
+  await trellisRow.locator('[data-testid="storage-name"]').click();
+  await win.waitForSelector('[data-testid="storage-inspector"]', { timeout: 3000 });
+  const insp = await win.evaluate(() => ({
+    name: document.querySelector('.pd-storage-card-name')?.textContent,
+    meta: document.querySelector('.pd-storage-card-meta')?.textContent,
+    size: document.querySelector('.pd-storage-card-size')?.textContent,
+    buttons: [...document.querySelectorAll('.pd-storage-card-actions button')].map((b) =>
+      b.textContent?.trim(),
+    ),
+  }));
+  log('inspector:', JSON.stringify(insp));
+  check(
+    insp.name === 'microsoft/TRELLIS.2-4B',
+    `the card names the repo as its org spells it (${insp.name})`,
+  );
+  check(
+    /4B/.test(insp.meta ?? '') && /microsoft/.test(insp.meta ?? ''),
+    `parameters and org on the card (${insp.meta})`,
+  );
+  check(
+    insp.buttons?.join(',') === 'Delete,Reveal,Export',
+    `Delete · Reveal · Export on the card (${insp.buttons})`,
+  );
   const revealed = await win.evaluate(
     (p) => window.piDesktop.invoke('storage:reveal', { path: p }),
     path.join(library, '3D', 'Generation', 'microsoft__trellis.2-4b'),
@@ -258,13 +347,22 @@ try {
     window.piDesktop.invoke('storage:reveal', { path: '/etc' }),
   );
   check(outside.ok === false, 'Reveal refuses a path outside Bobble’s folders');
-  writeFileSync(path.join(SHOT_DIR, '02-3d-shelf.png'), await win.screenshot());
+  writeFileSync(path.join(SHOT_DIR, '03-inspector.png'), await win.screenshot());
 
-  // 3. Trash a model from the page: gone from the shelf, its link gone too.
-  await trellisRow.locator('[data-testid="storage-trash"]').click();
-  await win.waitForSelector('[data-testid="storage-confirm"]', { timeout: 5000 });
-  writeFileSync(path.join(SHOT_DIR, '03-trash-confirm.png'), await win.screenshot());
-  await win.click('[data-testid="storage-trash-confirm"]');
+  // 4. Delete from the row: a dialog, not raw text; "don't show again" sticks.
+  await trellisRow.locator('[data-testid="storage-delete"]').click();
+  await win.waitForSelector('[data-testid="delete-model-dialog"]', { timeout: 5000 });
+  await win.waitForTimeout(350); // the dialog fades in
+  const dlg = await win.evaluate(
+    () => document.querySelector('[data-testid="delete-model-dialog"]')?.textContent ?? '',
+  );
+  check(
+    /Delete microsoft\/TRELLIS\.2-4B\?/.test(dlg) && /Don.t show again/.test(dlg),
+    `the dialog names the model and offers don't-show-again (${dlg.slice(0, 80)})`,
+  );
+  writeFileSync(path.join(SHOT_DIR, '04-delete-dialog.png'), await win.screenshot());
+  await win.click('[data-testid="delete-model-dontask"]');
+  await win.click('[data-testid="delete-model-confirm"]');
   await win.waitForTimeout(1500);
   check(
     !existsSync(path.join(library, '3D', 'Generation', 'microsoft__trellis.2-4b')),
@@ -276,8 +374,66 @@ try {
     .textContent()
     .catch(() => '');
   check(/Trash/.test(noteText ?? ''), `the page says it went to the Trash (${noteText})`);
+  const setting = await win.evaluate(() => window.piDesktop.invoke('settings:get', undefined));
+  check(setting.hideDeleteModelConfirm === true, 'don’t-show-again is remembered');
 
-  // 4. Move the library to another folder on the same volume: renamed, links re-pointed.
+  // 5. Select mode: tick a whole folder and a model, Delete (n) in the toolbar;
+  //    with the confirmation off it goes straight to the Trash.
+  await win.click('[data-testid="storage-select-mode"]');
+  await win.waitForTimeout(150);
+  await win.click('[data-testid="storage-row-modality"][data-path$="/Audio"] .pd-storage-twisty');
+  await win.waitForTimeout(150);
+  await win
+    .locator(
+      '[data-testid="storage-row-modality"][data-path$="/Audio"] [data-testid="storage-select"]',
+    )
+    .click();
+  await win
+    .locator(
+      '[data-testid="storage-row-modality"][data-path$="/Unsorted"] [data-testid="storage-select"]',
+    )
+    .click();
+  await win.waitForTimeout(150);
+  const sel = await win.evaluate(() => ({
+    del: document.querySelector('[data-testid="storage-delete-selected"]')?.textContent?.trim(),
+    exp: document.querySelector('[data-testid="storage-export-selected"]')?.textContent?.trim(),
+    bar: document.querySelector('[data-testid="storage-selection-bar"]')?.textContent,
+    inherited: [
+      ...document.querySelectorAll(
+        '[data-testid="storage-row-shelf"][data-path*="/Audio/"] [data-testid="storage-select"]',
+      ),
+    ].map((c) => `${c.getAttribute('data-state')}:${c.hasAttribute('disabled')}`),
+  }));
+  log('selection:', JSON.stringify(sel));
+  check(
+    sel.del === 'Delete (2)' && sel.exp === 'Export (2)',
+    `the toolbar counts the selection (${sel.del} / ${sel.exp})`,
+  );
+  check(
+    sel.inherited.length > 0 && sel.inherited.every((s) => s === 'checked:true'),
+    `rows inside a selected folder show ticked and inert (${sel.inherited})`,
+  );
+  writeFileSync(path.join(SHOT_DIR, '05-select-mode.png'), await win.screenshot());
+  await win.click('[data-testid="storage-delete-selected"]');
+  await win.waitForTimeout(1500);
+  check(
+    !existsSync(path.join(library, 'Audio')) && !existsSync(path.join(library, 'Unsorted')),
+    'both selected folders went to the Trash without a dialog',
+  );
+  const parakeetLink0 = path.join(
+    cache,
+    'gen3d',
+    'hf',
+    'hub',
+    'models--mlx-community--parakeet-tdt-0.6b-v3',
+  );
+  check(
+    !existsSync(parakeetLink0) && !isLink(parakeetLink0),
+    'a link into the deleted folder went too',
+  );
+  await win.click('[data-testid="storage-select-done"]');
+
+  // 6. Move the library to another folder on the same volume: renamed, links re-pointed.
   const moved = path.join(world, 'Elsewhere', 'Models');
   const res = await win.evaluate(
     (p) => window.piDesktop.invoke('storage:set-root', { path: p }),
@@ -289,23 +445,40 @@ try {
     existsSync(path.join(moved, 'LLM')) && !existsSync(path.join(library, 'LLM')),
     'the shelves are at the new root only',
   );
-  const parakeetLink = path.join(
+  const dinoLink = path.join(
     cache,
     'gen3d',
     'hf',
     'hub',
-    'models--mlx-community--parakeet-tdt-0.6b-v3',
+    'models--camenduru--dinov3-vitl16-pretrain-lvd1689m',
   );
   check(
-    realpathSync(parakeetLink).startsWith(realpathSync(moved)),
-    `a hub link now points into the new root (${readlinkSync(parakeetLink)})`,
+    realpathSync(dinoLink).startsWith(realpathSync(moved)),
+    `a hub link now points into the new root (${readlinkSync(dinoLink)})`,
   );
   const settings = await win.evaluate(() => window.piDesktop.invoke('settings:get', undefined));
   check(settings.modelsRoot === moved, `the setting remembers it (${settings.modelsRoot})`);
   await win.waitForTimeout(800);
   const rootShown = await win.locator('[data-testid="storage-root"]').textContent();
   check(rootShown === moved, `the page shows the new root (${rootShown})`);
-  writeFileSync(path.join(SHOT_DIR, '04-moved.png'), await win.screenshot());
+  writeFileSync(path.join(SHOT_DIR, '06-moved.png'), await win.screenshot());
+
+  // 7. Export a model to a folder (the picker is native; the handler is driven
+  //    with a destination through the same copy path).
+  const exportDest = path.join(world, 'Exported');
+  mkdirSync(exportDest, { recursive: true });
+  const exp = await win.evaluate(
+    ({ p, d }) => window.piDesktop.invoke('storage:export', { paths: [p], dest: d }),
+    { p: path.join(moved, 'LLM', 'MLX', 'mlx-community__qwen3.5-4b-mlx-8bit'), d: exportDest },
+  );
+  log('export:', JSON.stringify(exp));
+  check(
+    exp.ok === true &&
+      existsSync(
+        path.join(exportDest, 'mlx-community__qwen3.5-4b-mlx-8bit', 'weights.safetensors'),
+      ),
+    'export copied the model folder',
+  );
 } finally {
   await app.close().catch(() => {});
 }

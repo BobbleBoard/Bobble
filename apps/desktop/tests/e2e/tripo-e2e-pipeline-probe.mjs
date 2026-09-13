@@ -13,7 +13,7 @@
  * a time and this probe never dispatches a second before the first reports
  * `end`.
  *
- * Usage (needs the models installed under ~/.cache/pi-desktop/gen3d):
+ * Usage (needs the models installed under ~/.cache/bobble/gen3d):
  *   node apps/desktop/tests/e2e/tripo-e2e-pipeline-probe.mjs
  *   TRIPO_E2E_STAGES=image,imageedit,img3d node …    # subset, RUN in this order
  *   TRIPO_E2E_OUT=/tmp/shots TRIPO_E2E_RES=low node …

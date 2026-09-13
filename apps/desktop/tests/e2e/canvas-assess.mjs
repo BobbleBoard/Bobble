@@ -162,9 +162,9 @@ const app = await _electron.launch({
     ...process.env,
     HOME: home,
     // The real models, in an otherwise clean house.
-    PI_DESKTOP_CACHE_DIR: path.join(homedir(), '.cache', 'pi-desktop'),
+    PI_DESKTOP_CACHE_DIR: path.join(homedir(), '.cache', 'bobble'),
     PI_DESKTOP_MODELS_DIR: process.env.PI_DESKTOP_MODELS_DIR ?? REAL_LIBRARY_DEFAULT,
-    HF_HOME: path.join(homedir(), '.cache', 'pi-desktop', 'gen3d', 'hf'),
+    HF_HOME: path.join(homedir(), '.cache', 'bobble', 'gen3d', 'hf'),
     PI_E2E: '1',
     PI_E2E_BACKGROUND: '1',
     PI_DESKTOP_GEN: '1',

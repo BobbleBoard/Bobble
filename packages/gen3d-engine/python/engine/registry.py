@@ -2,7 +2,7 @@
 TypeScript catalog via the --registry JSON; this module owns PATHS and the
 installed-state checks against them.
 
-Layout under the cache root (~/.cache/pi-desktop/gen3d):
+Layout under the cache root (~/.cache/bobble/gen3d):
   hf/         HF_HOME for every weight download (standard hub cache)
   src/        cloned tool repos + their venvs (trellis-mac, Mage, cube, ...)
   bin/        the AutoRemesher .app

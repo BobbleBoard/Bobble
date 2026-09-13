@@ -381,7 +381,9 @@ export function specTotalBytes(spec: Gen3dModelSpec): number {
 /** Root for everything the engine stores: weights (hf/), tool sources+venvs
  * (src/), binaries (bin/), install stamps (installed/). */
 export function engineCacheDir(home: string = os.homedir()): string {
-  return path.join(home, '.cache', 'pi-desktop', 'gen3d');
+  const override = process.env.PI_DESKTOP_CACHE_DIR;
+  if (override !== undefined && override.length > 0) return path.join(override, 'gen3d');
+  return path.join(home, '.cache', 'bobble', 'gen3d');
 }
 
 /** Job artifacts must live inside the renderer-readable sandbox fence:

@@ -16,7 +16,7 @@ import { join } from 'node:path';
 export function cacheRoot(): string {
   const override = process.env.PI_DESKTOP_CACHE_DIR;
   if (override !== undefined && override.length > 0) return override;
-  return join(homedir(), '.cache', 'pi-desktop');
+  return join(homedir(), '.cache', 'bobble');
 }
 
 /** Directory for a specific pinned uv release, e.g. `.../uv/0.11.28`. */

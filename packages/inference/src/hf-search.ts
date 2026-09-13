@@ -153,7 +153,7 @@ function asRecord(v: unknown): Record<string, unknown> {
 
 function authHeaders(hfToken: string | undefined): Record<string, string> {
   const headers: Record<string, string> = {
-    'user-agent': 'pi-desktop',
+    'user-agent': 'bobble',
     accept: 'application/json',
   };
   if (hfToken !== undefined && hfToken.length > 0) headers.authorization = `Bearer ${hfToken}`;

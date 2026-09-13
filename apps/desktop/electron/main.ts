@@ -70,7 +70,12 @@ import {
   registerSettingsIpc,
 } from './settings/settings-main';
 import { registerSkillsIpc } from './skills/skills-main';
-import { applyLibraryEnv, registerStorageIpc, runLibraryMigration } from './storage/storage-main';
+import {
+  applyLibraryEnv,
+  registerStorageIpc,
+  renameSupportRoot,
+  runLibraryMigration,
+} from './storage/storage-main';
 import { comfyOrigin, disposeStudio, registerStudioIpc } from './studio/studio-main';
 import { disposeAllPtys, registerPtyIpc } from './terminal/pty-manager';
 import {
@@ -985,6 +990,7 @@ if (!hasSingleInstanceLock) {
    * ~/.cache is moved onto the shelves — renames, so it is instant, and the
    * engines keep their view through links (see storage/library-migration.ts).
    */
+  renameSupportRoot();
   applyLibraryEnv();
   try {
     runLibraryMigration();

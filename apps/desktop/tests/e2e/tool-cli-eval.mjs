@@ -340,8 +340,8 @@ const asOpenAiTools = (tools) =>
 
 // ── the model under test ────────────────────────────────────────────────────
 
-const MODELS_DIR = path.join(homedir(), '.cache/pi-desktop/models');
-const TEMPLATES = path.join(homedir(), '.cache/pi-desktop/chat-templates');
+const MODELS_DIR = path.join(homedir(), '.cache/bobble/models');
+const TEMPLATES = path.join(homedir(), '.cache/bobble/chat-templates');
 const SERVER_BIN = findServerBin();
 const PORT = Number(process.env.PORT ?? 8099);
 
@@ -355,7 +355,7 @@ const PORT = Number(process.env.PORT ?? 8099);
  * ran on the wrong binary too. Compare the numbers, not the strings.
  */
 function findServerBin() {
-  const root = path.join(homedir(), '.cache/pi-desktop/llamacpp');
+  const root = path.join(homedir(), '.cache/bobble/llamacpp');
   const builds = readdirSync(root)
     .map((name) => ({ name, n: Number(/^b(\d+)$/.exec(name)?.[1] ?? '-1') }))
     .sort((a, b) => b.n - a.n);

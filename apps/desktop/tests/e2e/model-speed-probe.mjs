@@ -30,7 +30,7 @@ const exec = promisify(execFile);
 
 const MODEL_ID = process.env.MODEL ?? 'qwen3.8-27b-mtp';
 const CTX = Number(process.env.CTX ?? 65_536);
-const modelsDir = path.join(homedir(), '.cache/pi-desktop/models', MODEL_ID);
+const modelsDir = path.join(homedir(), '.cache/bobble/models', MODEL_ID);
 const PORT = Number(process.env.PORT ?? 18099);
 
 /** The prompts. Short in, long out — generation speed is what is being asked. */
@@ -41,7 +41,7 @@ const PROMPTS = [
 ];
 
 function findServer() {
-  const root = path.join(homedir(), '.cache/pi-desktop/llamacpp');
+  const root = path.join(homedir(), '.cache/bobble/llamacpp');
   if (!existsSync(root)) return null;
   for (const build of readdirSync(root)) {
     for (const inner of readdirSync(path.join(root, build))) {
@@ -205,7 +205,7 @@ console.log(`context:  ${CTX}`);
  * `<owner>--<repo>.jinja` (see chat-template.ts `repoSlug`).
  */
 const TEMPLATE_REPO = process.env.TEMPLATE_REPO ?? 'froggeric/Qwen-Fixed-Chat-Templates';
-const templates = path.join(homedir(), '.cache/pi-desktop/chat-templates');
+const templates = path.join(homedir(), '.cache/bobble/chat-templates');
 let template;
 if (process.env.NO_TEMPLATE !== '1') {
   const want = path.join(templates, `${TEMPLATE_REPO.replace(/[/\\]/g, '--')}.jinja`);

@@ -74,6 +74,7 @@ const DEFAULTS: DesktopSettings = {
   modelsRoot: null,
   chatOrg: { projects: [], assignments: {}, pinned: [], titles: {} },
   hideDeleteChatConfirm: false,
+  hideDeleteModelConfirm: false,
   harnessId: 'pi-bundled',
   harnessConfigPath: '',
 };

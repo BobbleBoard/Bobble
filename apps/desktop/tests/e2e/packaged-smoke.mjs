@@ -130,7 +130,7 @@ await proveExtensionsLoad();
 const MODEL_ID = 'gemma-4-e2b-it';
 const modelPath = path.join(
   homedir(),
-  '.cache/pi-desktop/models',
+  '.cache/bobble/models',
   MODEL_ID,
   'gemma-4-E2B-it-Q4_K_M.gguf',
 );

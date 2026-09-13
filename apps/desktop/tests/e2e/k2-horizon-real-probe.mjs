@@ -18,7 +18,7 @@
  *     a reasoning model, so a working template shows up as reasoning content
  *     rather than as literal `<think>` in the reply).
  *
- * The build is cached in `~/.cache/pi-desktop/llamacpp/k2-horizon`; the first run
+ * The build is cached in `~/.cache/bobble/llamacpp/k2-horizon`; the first run
  * on a machine compiles llama.cpp and takes minutes, later runs seconds. Weights
  * come from the real cache (`realCache`), because they are 2.16GB and shared.
  *

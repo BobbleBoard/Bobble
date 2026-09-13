@@ -189,7 +189,7 @@ export async function buildVariant(opts: BuildVariantOptions): Promise<VariantIn
 
   note('fetch', `Fetching ${variant.source.repo} at ${variant.source.commit.slice(0, 8)}`);
   const res = await fetchImpl(variantArchiveUrl(variant), {
-    headers: { 'user-agent': 'pi-desktop' },
+    headers: { 'user-agent': 'bobble' },
     ...(signal !== undefined ? { signal } : {}),
   });
   if (!res.ok) {

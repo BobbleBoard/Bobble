@@ -8,8 +8,8 @@ import { probeHome } from './harness.mjs';
 const BUNDLE = '/Applications/Bobble.app';
 const HOME = probeHome('grant-probe');
 mkdirSync(path.join(HOME, '.cache'), { recursive: true });
-const real = path.join(homedir(), '.cache/pi-desktop');
-if (existsSync(real)) symlinkSync(real, path.join(HOME, '.cache/pi-desktop'));
+const real = path.join(homedir(), '.cache/bobble');
+if (existsSync(real)) symlinkSync(real, path.join(HOME, '.cache/bobble'));
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const app = await electron.launch({

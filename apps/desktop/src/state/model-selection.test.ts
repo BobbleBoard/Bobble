@@ -33,6 +33,7 @@ const base: DesktopSettings = {
   advanced: DEFAULT_ADVANCED,
   chatOrg: { projects: [], assignments: {}, pinned: [], titles: {} },
   hideDeleteChatConfirm: false,
+  hideDeleteModelConfirm: false,
   harnessId: 'pi-bundled',
   harnessConfigPath: '',
   toolInterface: 'schemas',

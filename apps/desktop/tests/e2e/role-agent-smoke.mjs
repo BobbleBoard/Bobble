@@ -26,9 +26,9 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const HOME = os.homedir();
-const SERVER_BIN = `${HOME}/.cache/pi-desktop/llamacpp/b9934/llama-b9934/llama-server`;
-const MODEL_GGUF = `${HOME}/.cache/pi-desktop/models/qwen3.5-4b-mtp/Qwen3.5-4B-Q8_0.gguf`;
-const CHAT_TEMPLATE = `${HOME}/.cache/pi-desktop/chat-templates/Qwen--Qwen3.5-4B.jinja`;
+const SERVER_BIN = `${HOME}/.cache/bobble/llamacpp/b9934/llama-b9934/llama-server`;
+const MODEL_GGUF = `${HOME}/.cache/bobble/models/qwen3.5-4b-mtp/Qwen3.5-4B-Q8_0.gguf`;
+const CHAT_TEMPLATE = `${HOME}/.cache/bobble/chat-templates/Qwen--Qwen3.5-4B.jinja`;
 const HOST = '127.0.0.1';
 const PORT = 8172;
 const BASE_URL = `http://${HOST}:${PORT}/v1`;

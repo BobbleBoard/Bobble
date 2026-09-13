@@ -47,7 +47,7 @@ const app = await electron.launch({
     PI_E2E: '1',
     PI_DESKTOP_TRIPO: '1',
     // The REAL engine cache — we want autoremesher + the rigger installed.
-    GEN3D_CACHE_DIR: path.join(homedir(), '.cache/pi-desktop/gen3d'),
+    GEN3D_CACHE_DIR: path.join(homedir(), '.cache/bobble/gen3d'),
   },
 });
 

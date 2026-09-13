@@ -208,9 +208,9 @@ export async function demoRun(o) {
      cache is linked in, or the run dies on "model not downloaded". */
   const HOME = probeHome(`demo-${o.name}`);
   mkdirSync(path.join(HOME, '.cache'), { recursive: true });
-  const realCache = path.join(homedir(), '.cache/pi-desktop');
-  if (existsSync(realCache) && !existsSync(path.join(HOME, '.cache/pi-desktop'))) {
-    symlinkSync(realCache, path.join(HOME, '.cache/pi-desktop'));
+  const realCache = path.join(homedir(), '.cache/bobble');
+  if (existsSync(realCache) && !existsSync(path.join(HOME, '.cache/bobble'))) {
+    symlinkSync(realCache, path.join(HOME, '.cache/bobble'));
   }
 
   /*

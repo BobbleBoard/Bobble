@@ -30,7 +30,7 @@
  * same class of guarantee as the focus one. The app keeps almost everything a
  * person owns under their home: `~/.pi/desktop/settings.json`,
  * `~/.pi/agent/sessions/**` (their actual conversations), `~/Bobble/generated`,
- * and `~/.cache/pi-desktop` (gigabytes of weights). `--user-data-dir` isolates
+ * and `~/.cache/bobble` (gigabytes of weights). `--user-data-dir` isolates
  * none of that; it only covers Electron's own profile.
  *
  * What that cost, before this existed:
@@ -54,7 +54,7 @@
  */
 
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { homedir, tmpdir } from 'node:os';
 import path from 'node:path';
@@ -79,7 +79,14 @@ export const TOOL_USE_FIXTURE = path.join(
  * of a home (see @pi-desktop/inference paths.ts), which is what lets a probe
  * have a throwaway profile AND real weights: `launchApp(name, { realCache: true })`.
  */
-export const REAL_CACHE = path.join(homedir(), '.cache', 'pi-desktop');
+export const REAL_CACHE = (() => {
+  // The support root was renamed on 2026-09-13; a machine the app has not
+  // relaunched since still has the old name (and nothing at the new one —
+  // pointing a probe at an empty root makes it install engines into it).
+  const next = path.join(homedir(), '.cache', 'bobble');
+  const old = path.join(homedir(), '.cache', 'pi-desktop');
+  return existsSync(next) ? next : existsSync(old) ? old : next;
+})();
 /**
  * The real MODEL LIBRARY — where the weights live now (`~/Bobble/Models`,
  * storage/library-migration.ts). A probe with a throwaway HOME would otherwise

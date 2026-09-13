@@ -66,7 +66,7 @@ writeFileSync(
 );
 writeFileSync(path.join(home, '.pi', 'desktop', 'onboarding.json'), JSON.stringify({ done: true }));
 
-const realCache = path.join(homedir(), '.cache', 'pi-desktop');
+const realCache = path.join(homedir(), '.cache', 'bobble');
 
 const app = await electron.launch({
   executablePath: electronBinary,

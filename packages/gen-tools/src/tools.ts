@@ -208,7 +208,7 @@ export function registerGenTools(pi: ExtensionAPI, options: GenToolsOptions): vo
     async execute(_id, params): Promise<AgentToolResult<GenerateDetails>> {
       if (bridge === null) {
         return errResult(
-          'generation bridge unavailable (the gen-tools extension must run inside Pi Desktop)',
+          'generation bridge unavailable (the gen-tools extension must run inside Bobble)',
         );
       }
       // Resolve + validate the model against the catalog.
@@ -326,7 +326,7 @@ export function registerGenTools(pi: ExtensionAPI, options: GenToolsOptions): vo
     async execute(_id, params): Promise<AgentToolResult<GenerateDetails>> {
       if (bridge === null) {
         return videoErrResult(
-          'generation bridge unavailable (the gen-tools extension must run inside Pi Desktop)',
+          'generation bridge unavailable (the gen-tools extension must run inside Bobble)',
         );
       }
       // Resolve + validate the model against the catalog.
@@ -449,7 +449,7 @@ export function registerAudioTools(pi: ExtensionAPI, options: GenToolsOptions): 
         if (bridge === null) {
           return audioErrResult(
             name,
-            'generation bridge unavailable (the gen-tools extension must run inside Pi Desktop)',
+            'generation bridge unavailable (the gen-tools extension must run inside Bobble)',
           );
         }
         const p = params as Record<string, unknown>;
@@ -625,7 +625,7 @@ function registerSvgTool(pi: ExtensionAPI, bridge: GenBridge | null): void {
     async execute(_id, params): Promise<AgentToolResult<GenerateDetails>> {
       if (bridge === null) {
         return errResult(
-          'generation bridge unavailable (the gen-tools extension must run inside Pi Desktop)',
+          'generation bridge unavailable (the gen-tools extension must run inside Bobble)',
         );
       }
       const images =

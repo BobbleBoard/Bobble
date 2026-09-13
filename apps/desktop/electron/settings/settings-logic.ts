@@ -142,6 +142,7 @@ export const DEFAULT_SETTINGS: DesktopSettings = {
   modelsRoot: null,
   chatOrg: { projects: [], assignments: {}, pinned: [], titles: {} },
   hideDeleteChatConfirm: false,
+  hideDeleteModelConfirm: false,
   harnessId: 'pi-bundled',
   harnessConfigPath: '',
 };
@@ -387,6 +388,7 @@ export function clampSettings(raw: unknown): DesktopSettings {
         : null,
     chatOrg: clampChatOrg(o.chatOrg),
     hideDeleteChatConfirm: bool(o.hideDeleteChatConfirm, d.hideDeleteChatConfirm),
+    hideDeleteModelConfirm: bool(o.hideDeleteModelConfirm, d.hideDeleteModelConfirm),
   };
 }
 

@@ -31,7 +31,7 @@ const CALIBRATED = process.env.CALIBRATED ?? 'qwen3.5-4b-mtp';
 const OTHER = process.env.OTHER ?? 'minicpm5-2b';
 const SHOT_DIR = process.env.SHOT_DIR ?? path.join(tmpdir(), 'engset');
 mkdirSync(SHOT_DIR, { recursive: true });
-const CACHE = process.env.PI_DESKTOP_CACHE_DIR ?? path.join(homedir(), '.cache', 'pi-desktop');
+const CACHE = process.env.PI_DESKTOP_CACHE_DIR ?? path.join(homedir(), '.cache', 'bobble');
 const home = probeHome('engine-settings');
 mkdirSync(path.join(home, '.pi', 'desktop'), { recursive: true });
 writeFileSync(

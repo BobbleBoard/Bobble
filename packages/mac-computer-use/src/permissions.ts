@@ -67,6 +67,7 @@ export function riskLabel(app: string | undefined): string | null {
 
 /** Case-insensitive app name / bundle-id fragments Pi refuses to drive. */
 export const DEFAULT_MAC_DENYLIST: readonly string[] = [
+  'bobble',
   'pi desktop',
   'app.pidesktop.desktop',
   'keychain access',

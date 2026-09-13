@@ -92,7 +92,7 @@ export interface EnsureChatTemplateOptions {
 }
 
 function authHeaders(hfToken: string | undefined): Record<string, string> {
-  const headers: Record<string, string> = { 'user-agent': 'pi-desktop' };
+  const headers: Record<string, string> = { 'user-agent': 'bobble' };
   if (hfToken !== undefined && hfToken.length > 0) headers.authorization = `Bearer ${hfToken}`;
   return headers;
 }

@@ -312,7 +312,7 @@ def main() -> None:
 
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    os.environ.setdefault("HF_HOME", str(Path.home() / ".cache" / "pi-desktop" / "gen3d" / "hf"))
+    os.environ.setdefault("HF_HOME", str(Path.home() / ".cache" / "bobble" / "gen3d" / "hf"))
 
     if args.op in ("tts", "sfx") and not args.text.strip():
         raise SystemExit("--text is required for tts and sfx")

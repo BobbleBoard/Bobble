@@ -75,7 +75,7 @@ function errResult(action: string, message: string): AgentToolResult<BrowserDeta
 function unavailable(action: string): AgentToolResult<BrowserDetails> {
   return errResult(
     action,
-    'browser bridge unavailable (the browser-use extension must run inside Pi Desktop)',
+    'browser bridge unavailable (the browser-use extension must run inside Bobble)',
   );
 }
 

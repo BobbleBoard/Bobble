@@ -104,7 +104,7 @@ writeFileSync(
     effortMode: 'manual',
   }),
 );
-const realCache = path.join(homedir(), '.cache', 'pi-desktop');
+const realCache = path.join(homedir(), '.cache', 'bobble');
 
 /** The recorder, installed in the page before the card exists. It waits for the
  * plate to appear and then samples on every animation frame until stopped. */

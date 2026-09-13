@@ -91,7 +91,7 @@ async function fetchOne(
   onProgress?: (p: DownloadProgress) => void,
 ): Promise<string> {
   const dest = join(dir, file.name);
-  const headers: Record<string, string> = { 'user-agent': 'pi-desktop' };
+  const headers: Record<string, string> = { 'user-agent': 'bobble' };
   if (opts.hfToken !== undefined) headers.authorization = `Bearer ${opts.hfToken}`;
   await downloadFile({
     url: hfResolveUrl(repo, file.name),

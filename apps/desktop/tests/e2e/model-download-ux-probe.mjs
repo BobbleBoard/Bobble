@@ -50,7 +50,7 @@ const fixture = path.join(repoRoot, 'packages/engine/tools/mock-pi/fixtures/simp
 
 const MODEL_ID = process.env.MODEL_ID ?? 'qwen3.8-27b-mtp';
 const MAX_MIN = Number(process.env.MAX_MIN ?? 25);
-const modelsDir = path.join(homedir(), '.cache/pi-desktop/models', MODEL_ID);
+const modelsDir = path.join(homedir(), '.cache/bobble/models', MODEL_ID);
 
 const failures = [];
 const notes = [];

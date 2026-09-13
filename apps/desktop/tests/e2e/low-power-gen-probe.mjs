@@ -46,7 +46,7 @@ const app = await _electron.launch({
   env: {
     ...process.env,
     HOME: home,
-    PI_DESKTOP_CACHE_DIR: path.join(homedir(), '.cache', 'pi-desktop'),
+    PI_DESKTOP_CACHE_DIR: path.join(homedir(), '.cache', 'bobble'),
     PI_DESKTOP_MODELS_DIR: process.env.PI_DESKTOP_MODELS_DIR ?? REAL_LIBRARY_DEFAULT,
     // mflux and uv key their caches off HOME: without these the probe pulls a
     // 4 GB model and a Python into the throwaway HOME (SEEN, 6.5 GB in /tmp).

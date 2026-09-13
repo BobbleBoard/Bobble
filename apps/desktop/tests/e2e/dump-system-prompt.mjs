@@ -21,9 +21,9 @@ const OUT = process.argv[2] ?? '/Users/user/Desktop/OSS-harness/scratchpad/syste
 
 const HOME = probeHome('prompt-dump');
 mkdirSync(path.join(HOME, '.cache'), { recursive: true });
-const real = path.join(homedir(), '.cache/pi-desktop');
-if (existsSync(real) && !existsSync(path.join(HOME, '.cache/pi-desktop'))) {
-  symlinkSync(real, path.join(HOME, '.cache/pi-desktop'));
+const real = path.join(homedir(), '.cache/bobble');
+if (existsSync(real) && !existsSync(path.join(HOME, '.cache/bobble'))) {
+  symlinkSync(real, path.join(HOME, '.cache/bobble'));
 }
 
 await run('osascript', ['-e', 'tell application "Bobble" to quit']).catch(() => {});

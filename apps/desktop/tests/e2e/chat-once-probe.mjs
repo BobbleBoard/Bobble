@@ -33,7 +33,7 @@ const app = await _electron.launch({
   env: {
     ...process.env,
     HOME: home,
-    PI_DESKTOP_CACHE_DIR: path.join(homedir(), '.cache', 'pi-desktop'),
+    PI_DESKTOP_CACHE_DIR: path.join(homedir(), '.cache', 'bobble'),
     PI_DESKTOP_MODELS_DIR:
       process.env.PI_DESKTOP_MODELS_DIR ?? path.join(homedir(), 'Bobble', 'Models'),
     PI_E2E: '1',

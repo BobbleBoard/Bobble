@@ -110,7 +110,7 @@ async function resolveDigestFromApi(
   signal?: AbortSignal,
 ): Promise<{ sha256?: string; size?: number }> {
   const res = await fetchImpl(releaseApiUrl(release), {
-    headers: { accept: 'application/vnd.github+json', 'user-agent': 'pi-desktop' },
+    headers: { accept: 'application/vnd.github+json', 'user-agent': 'bobble' },
     signal,
   });
   if (!res.ok) return {};
@@ -174,7 +174,7 @@ export async function ensureLlamaCpp(opts: EnsureLlamaCppOptions = {}): Promise<
     onProgress: opts.onProgress,
     signal: opts.signal,
     fetchImpl,
-    headers: { 'user-agent': 'pi-desktop' },
+    headers: { 'user-agent': 'bobble' },
   });
 
   await extract(archivePath, dir);

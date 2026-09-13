@@ -702,17 +702,21 @@ export function ChatApp({
                         onRename={(name) => void setSessionName(name)}
                       />
                     )}
-                    {/* Right of the name, whatever the route: the running model is
-                        one thing for the whole app, and so is its speed. the user:
-                        "to the right of the chat name, show a little icon". */}
-                    <EngineMenu />
+                    {/* Right of the name, on the chat and in the studios: the
+                        running model is one thing for the whole app, and so is
+                        its speed. the user: "to the right of the chat name, show a
+                        little icon" — and, of the Model hub: "the starting up
+                        and speed dial in the top bar is out of place here". A
+                        content route (the hub, Scheduled, Connectors) is not
+                        about a conversation, so neither the dial nor the model's
+                        state belongs in its bar. */}
+                    {contentTitle === undefined ? <EngineMenu /> : null}
                   </>
                 }
                 /* The app's own state — starting up, getting ready — lives in
                    the middle of the bar, between the chat's name and the
-                   canvas/advanced controls. It is on screen whatever route you
-                   are looking at, which the composer pill never was. */
-                center={<TopBarStatus />}
+                   canvas/advanced controls, on the chat and in the studios. */
+                center={contentTitle === undefined ? <TopBarStatus /> : null}
                 right={
                   // The canvas toggle (round-8 #11/#16) plus, for power users only,
                   // the brain/gear advanced-params entry to its left. In simple mode

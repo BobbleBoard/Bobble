@@ -31,7 +31,7 @@ mkdirSync(OUT, { recursive: true });
 
 const HOME = mkdtempSync(path.join(tmpdir(), 'omni-flow-home-'));
 const CACHE = path.join(HOME, 'cache');
-const real = path.join(homedir(), '.cache/pi-desktop');
+const real = path.join(homedir(), '.cache/bobble');
 mkdirSync(path.join(CACHE, 'models'), { recursive: true });
 for (const e of readdirSync(real)) {
   if (e === 'models') continue;

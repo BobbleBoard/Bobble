@@ -44,7 +44,7 @@ const say = (m) => console.log(`${((Date.now() - t0) / 1000).toFixed(1)}s  ${m}`
 /* A scratch cache: the real models linked in, OmniSVG from the parked copy. */
 const HOME = mkdtempSync(path.join(tmpdir(), 'svg-scn-home-'));
 const CACHE = path.join(HOME, 'cache');
-const real = path.join(homedir(), '.cache/pi-desktop');
+const real = path.join(homedir(), '.cache/bobble');
 mkdirSync(path.join(CACHE, 'models'), { recursive: true });
 for (const e of readdirSync(real))
   if (e !== 'models') symlinkSync(path.join(real, e), path.join(CACHE, e));

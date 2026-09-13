@@ -23,7 +23,7 @@ from engine.registry import Registry  # noqa: E402
 def _catalog_envs() -> set[str]:
     """The envs the SHIPPED catalog actually uses (registry.json is written from
     catalog.ts, so this tracks the real product rather than a copy)."""
-    path = Path.home() / ".cache" / "pi-desktop" / "gen3d" / "registry.json"
+    path = Path.home() / ".cache" / "bobble" / "gen3d" / "registry.json"
     if not path.exists():
         return set()
     return {m["env"] for m in json.loads(path.read_text())["models"]}

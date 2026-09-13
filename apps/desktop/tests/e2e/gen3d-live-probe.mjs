@@ -23,7 +23,7 @@ import { validateGlb } from './gen3d-glb-check.mjs';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, '..', '..', '..', '..');
 const pyDir = path.join(repoRoot, 'packages', 'gen3d-engine', 'python');
-const cacheDir = path.join(os.homedir(), '.cache', 'pi-desktop', 'gen3d');
+const cacheDir = path.join(os.homedir(), '.cache', 'bobble', 'gen3d');
 const sandboxDir = path.join(os.homedir(), '.pi', 'desktop', 'sandbox', 'gen3d');
 
 const log = (...a) => console.log('[gen3d-probe]', ...a);
@@ -35,7 +35,7 @@ const fail = (msg) => {
 function findUv() {
   for (const p of [
     ...(process.env.PATH ?? '').split(':').map((d) => path.join(d, 'uv')),
-    path.join(os.homedir(), '.cache', 'pi-desktop', 'uv', 'uv'),
+    path.join(os.homedir(), '.cache', 'bobble', 'uv', 'uv'),
     path.join(os.homedir(), '.local', 'bin', 'uv'),
   ]) {
     if (existsSync(p)) return p;
@@ -242,7 +242,7 @@ async function main() {
     const testImage = path.join(
       os.homedir(),
       '.cache',
-      'pi-desktop',
+      'bobble',
       'gen3d',
       'src',
       'trellis-mac',

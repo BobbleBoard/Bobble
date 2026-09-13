@@ -398,6 +398,8 @@ export interface DesktopSettings {
   chatOrg: ChatOrganization;
   /** Skip the delete-chat confirmation dialog (set via its "don't ask again"). */
   hideDeleteChatConfirm: boolean;
+  /** Manage Storage's delete confirmation, once "don't show again" is ticked. */
+  hideDeleteModelConfirm: boolean;
   /**
    * Which pi drives the chat (Settings -> Harness). `pi-bundled` is the default
    * and means "whatever ships in the app"; `pi-system` resolves the one on PATH;
@@ -458,6 +460,7 @@ export interface DesktopSettingsPatch {
   harnessConfigPath?: string;
   /** Skip the delete-chat confirmation dialog. */
   hideDeleteChatConfirm?: boolean;
+  hideDeleteModelConfirm?: boolean;
 }
 
 /** Icon-stroke bounds — mirrors the IconStrokeControl slider range. */

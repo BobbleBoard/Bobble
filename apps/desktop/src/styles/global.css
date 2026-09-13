@@ -7409,182 +7409,196 @@ body[data-media-expanded="true"] .pd-studio-compose {
 }
 
 /* ── Manage Storage (Model management → Manage Storage) ─────────────────── */
+/*
+ * the user on the first cut: "these buttons you only know are buttons when you
+ * hover (because they're just floating text) don't seem nice to me, I don't
+ * want to make everything a card either though." So: three button voices,
+ * each visible at rest. Reveal is a rounded rectangle in the theme's INVERSE
+ * (white on dark, black on light) — the one thing you reach for most, said
+ * loudest. Delete is red text with a red hairline. Everything else is a plain
+ * bordered rectangle. No pills, no ghosts.
+ */
 .pd-storage {
   display: flex;
   flex-direction: column;
-  gap: 18px;
-  padding-top: 4px;
+  gap: 10px;
+  padding-top: 2px;
 }
-.pd-storage-head {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 16px 18px;
-  border: 1px solid var(--pd-border-subtle);
-  border-radius: var(--pd-radius-lg, 14px);
-  background: var(--pd-bg-raised);
-}
-.pd-storage-title {
-  font-size: var(--pd-font-size-caption);
+.pd-storage-empty {
+  margin: 0;
+  padding: 10px 0;
+  font-size: var(--pd-font-size-footnote);
   color: var(--pd-text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
 }
-.pd-storage-path {
-  display: block;
-  margin-top: 4px;
-  font-family: var(--pd-font-mono);
-  font-size: var(--pd-font-size-body);
-  color: var(--pd-text-primary);
-  word-break: break-all;
-}
-.pd-storage-path-inline {
-  font-family: var(--pd-font-mono);
-  font-size: 0.92em;
-}
-.pd-storage-where-actions {
+.pd-storage-toolbar {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
-  margin-top: 10px;
 }
-/* REVEAL IS THE BUTTON. the user: "always with a 'Reveal' button easy to see and
-   use if desired" — filled, not a ghost, on every row and at the top. */
-.pd-storage-reveal {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 11px;
-  border-radius: 999px;
-  border: 1px solid transparent;
-  background: var(--pd-accent-primary);
-  color: var(--pd-text-on-accent);
-  font-size: var(--pd-font-size-caption);
-  font-weight: 600;
-  cursor: pointer;
-  white-space: nowrap;
+.pd-storage-toolbar-gap {
+  flex: 1;
 }
-.pd-storage-reveal:hover {
-  filter: brightness(1.08);
-}
-.pd-storage-reveal--big {
-  padding: 7px 14px;
-  font-size: var(--pd-font-size-footnote);
-}
-.pd-storage-quiet {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 10px;
-  border-radius: 999px;
+.pd-storage-search {
+  width: 260px;
+  padding: 6px 10px;
   border: 1px solid var(--pd-border-subtle);
-  background: var(--pd-bg-inset);
-  color: var(--pd-text-secondary);
-  font-size: var(--pd-font-size-caption);
-  cursor: pointer;
-}
-.pd-storage-quiet:hover:not(:disabled) {
-  color: var(--pd-text-primary);
-  background: var(--pd-bg-hover);
-}
-.pd-storage-quiet:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-.pd-storage-danger {
-  padding: 4px 10px;
-  border-radius: 999px;
-  border: 1px solid transparent;
-  background: var(--pd-color-danger, #c0392b);
-  color: #fff;
-  font-size: var(--pd-font-size-caption);
-  font-weight: 600;
-  cursor: pointer;
-}
-.pd-storage-disk-line {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 18px;
-  font-size: var(--pd-font-size-footnote);
-  color: var(--pd-text-secondary);
-}
-.pd-storage-disk-line strong {
-  color: var(--pd-text-primary);
-}
-.pd-storage-diskbar {
-  display: flex;
-  height: 8px;
-  margin-top: 8px;
-  border-radius: 999px;
-  overflow: hidden;
-  background: var(--pd-bg-inset);
-}
-.pd-storage-diskbar-lib {
-  background: var(--pd-accent-primary);
-}
-.pd-storage-diskbar-support {
-  background: color-mix(in srgb, var(--pd-accent-primary) 45%, var(--pd-bg-inset));
-}
-.pd-storage-diskbar-other {
-  background: var(--pd-border-default);
-}
-.pd-storage-banner {
-  padding: 8px 12px;
   border-radius: var(--pd-radius-md);
-  border: 1px solid var(--pd-border-subtle);
-  background: var(--pd-bg-inset);
-  font-size: var(--pd-font-size-footnote);
+  background: var(--pd-bg-raised);
   color: var(--pd-text-primary);
-}
-.pd-storage-banner--quiet {
-  color: var(--pd-text-secondary);
-}
-.pd-storage-section {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.pd-storage-h3 {
-  margin: 8px 0 2px;
+  font: inherit;
   font-size: var(--pd-font-size-footnote);
-  font-weight: 600;
-  color: var(--pd-text-primary);
 }
-.pd-storage-note {
-  margin: 0 0 6px;
-  font-size: var(--pd-font-size-caption);
-  color: var(--pd-text-secondary);
-}
-.pd-storage-foot {
-  margin: 6px 0 0;
-  font-size: var(--pd-font-size-caption);
+.pd-storage-search::placeholder {
   color: var(--pd-text-muted);
 }
-.pd-storage-row {
-  display: grid;
-  grid-template-columns: 22px minmax(0, 1fr) 84px auto;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 10px;
+.pd-storage-seg {
+  display: inline-flex;
+  margin: 0;
+  padding: 2px;
+  border: 1px solid var(--pd-border-subtle);
   border-radius: var(--pd-radius-md);
+  background: var(--pd-bg-inset);
+}
+.pd-storage-seg-btn {
+  padding: 4px 10px;
+  border: 0;
+  border-radius: calc(var(--pd-radius-md) - 2px);
+  background: transparent;
+  color: var(--pd-text-secondary);
+  font: inherit;
+  font-size: var(--pd-font-size-caption);
+  cursor: pointer;
+}
+.pd-storage-seg-btn--on {
+  background: var(--pd-bg-raised);
+  color: var(--pd-text-primary);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+
+/* The three voices. */
+.pd-btn-reveal,
+.pd-btn-delete,
+.pd-btn-plain {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 7px;
+  font: inherit;
+  font-size: var(--pd-font-size-caption);
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.pd-btn-reveal {
+  border: 1px solid var(--pd-text-primary);
+  background: var(--pd-text-primary);
+  color: var(--pd-bg-base);
+}
+.pd-btn-reveal:hover {
+  filter: brightness(0.92);
+}
+.pd-btn-delete {
+  border: 1px solid color-mix(in srgb, var(--pd-status-danger-fg) 45%, transparent);
+  background: color-mix(in srgb, var(--pd-status-danger-fg) 8%, transparent);
+  color: var(--pd-status-danger-fg);
+}
+.pd-btn-delete:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--pd-status-danger-fg) 16%, transparent);
+}
+.pd-btn-delete--solid {
+  background: var(--pd-status-danger-fg);
+  border-color: var(--pd-status-danger-fg);
+  color: #fff;
+}
+.pd-btn-delete--solid:hover:not(:disabled) {
+  background: var(--pd-status-danger-fg);
+  filter: brightness(1.08);
+}
+.pd-btn-plain {
+  border: 1px solid var(--pd-border-default);
+  background: var(--pd-bg-raised);
+  color: var(--pd-text-primary);
+  font-weight: 500;
+}
+.pd-btn-plain:hover:not(:disabled) {
+  background: var(--pd-bg-hover);
+}
+.pd-btn-plain--icon {
+  width: 26px;
+  padding: 0;
+}
+.pd-btn-reveal:disabled,
+.pd-btn-delete:disabled,
+.pd-btn-plain:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.pd-storage-banner {
+  padding: 7px 10px;
+  border-radius: var(--pd-radius-md);
+  border: 1px solid var(--pd-border-subtle);
+  background: var(--pd-bg-inset);
+  font-size: var(--pd-font-size-caption);
+  color: var(--pd-text-primary);
+}
+
+/* Tree left, card right — "push everything to the left". */
+.pd-storage-body {
+  display: grid;
+  /* Capped: the sizes and buttons sit by the names instead of a screen away
+     — "push everything to the left to remove all this extra excessive space
+     in the middle". The card follows the tree; the rest of the width is air. */
+  grid-template-columns: minmax(0, 700px) 300px;
+  justify-content: start;
+  gap: 18px;
+  align-items: start;
+}
+.pd-storage-tree {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.pd-storage-side {
+  position: sticky;
+  top: 0;
+}
+.pd-storage-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 2px 6px 2px 4px;
+  border-radius: 6px;
 }
 .pd-storage-row:hover {
   background: var(--pd-bg-hover);
 }
+.pd-storage-row--focused {
+  background: var(--pd-bg-active);
+}
 .pd-storage-children {
-  margin-left: 22px;
+  margin-left: 18px;
+  padding-left: 4px;
   border-left: 1px solid var(--pd-border-subtle);
-  padding-left: 6px;
+}
+.pd-storage-check {
+  flex: none;
 }
 .pd-storage-twisty {
   display: inline-flex;
+  flex: none;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
+  width: 18px;
+  height: 18px;
   border: 0;
-  border-radius: 6px;
+  border-radius: 4px;
   background: transparent;
   color: var(--pd-text-muted);
   cursor: pointer;
@@ -7602,75 +7616,270 @@ body[data-media-expanded="true"] .pd-studio-compose {
 .pd-storage-twisty--open {
   transform: rotate(90deg);
 }
-.pd-storage-main {
-  min-width: 0;
-}
 .pd-storage-name {
   display: flex;
+  flex: 1;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   min-width: 0;
-  font-size: var(--pd-font-size-footnote);
+  padding: 3px 4px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
   color: var(--pd-text-primary);
+  font: inherit;
+  font-size: var(--pd-font-size-footnote);
+  text-align: left;
+  cursor: pointer;
 }
-.pd-storage-name > span:first-child {
+.pd-storage-name-text {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.pd-storage-node[data-depth="0"] > .pd-storage-row .pd-storage-name-text {
+  font-weight: 600;
 }
 .pd-storage-chip {
   flex: none;
-  padding: 1px 7px;
+  padding: 0 6px;
   border-radius: 999px;
-  background: var(--pd-bg-inset);
   border: 1px solid var(--pd-border-subtle);
-  font-size: 10.5px;
+  background: var(--pd-bg-inset);
+  font-size: 10px;
+  line-height: 15px;
   color: var(--pd-text-secondary);
 }
 .pd-storage-chip--live {
-  color: var(--pd-accent-primary);
-  border-color: color-mix(in srgb, var(--pd-accent-primary) 40%, transparent);
+  color: var(--pd-status-success-fg);
+  border-color: var(--pd-status-success-border);
 }
-.pd-storage-note-line {
-  font-size: var(--pd-font-size-caption);
-  color: var(--pd-text-muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.pd-storage-bar {
-  height: 4px;
-  margin-top: 6px;
-  border-radius: 999px;
-  background: var(--pd-bg-inset);
-  overflow: hidden;
-  max-width: 420px;
-}
-.pd-storage-bar-fill {
-  height: 100%;
-  background: var(--pd-accent-primary);
-  border-radius: 999px;
-}
+/* The size is the point of the page; it is the loudest text in the row and
+   says what it means by colour: green under a gigabyte, yellow under ten, red
+   above. the user: "make file size more prominent … color the NGB text". */
 .pd-storage-size {
+  flex: none;
+  min-width: 64px;
   font-family: var(--pd-font-mono);
-  font-size: var(--pd-font-size-caption);
-  color: var(--pd-text-secondary);
+  font-size: var(--pd-font-size-footnote);
+  font-weight: 700;
   text-align: right;
   white-space: nowrap;
 }
+.pd-storage-size[data-tone="green"],
+.pd-storage-sum-big[data-tone="green"],
+.pd-storage-card-size[data-tone="green"] {
+  color: var(--pd-status-success-fg);
+}
+.pd-storage-size[data-tone="yellow"],
+.pd-storage-sum-big[data-tone="yellow"],
+.pd-storage-card-size[data-tone="yellow"] {
+  color: var(--pd-status-warning-fg);
+}
+.pd-storage-size[data-tone="red"],
+.pd-storage-sum-big[data-tone="red"],
+.pd-storage-card-size[data-tone="red"] {
+  color: var(--pd-status-danger-fg);
+}
 .pd-storage-actions {
   display: flex;
+  flex: none;
   align-items: center;
-  gap: 6px;
-  justify-content: flex-end;
-  min-width: 128px;
+  gap: 5px;
+  margin-left: 4px;
 }
-.pd-storage-confirm {
-  display: inline-flex;
-  align-items: center;
+.pd-storage-more {
+  position: relative;
+}
+.pd-storage-menu {
+  position: absolute;
+  right: 0;
+  top: 30px;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  min-width: 140px;
+  padding: 4px;
+  border: 1px solid var(--pd-border-default);
+  border-radius: var(--pd-radius-md);
+  background: var(--pd-bg-overlay);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+}
+.pd-storage-menu-item {
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--pd-text-primary);
+  font: inherit;
+  font-size: var(--pd-font-size-caption);
+  text-align: left;
+  cursor: pointer;
+}
+.pd-storage-menu-item:hover {
+  background: var(--pd-bg-hover);
+}
+
+/* The right-hand card: the disk summary, or the model you clicked. */
+.pd-storage-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--pd-border-subtle);
+  border-radius: var(--pd-radius-lg, 14px);
+  background: var(--pd-bg-raised);
+}
+.pd-storage-sum {
+  display: flex;
+  flex-direction: column;
   gap: 6px;
+}
+.pd-storage-sum-line {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
   font-size: var(--pd-font-size-caption);
   color: var(--pd-text-secondary);
+}
+.pd-storage-sum-big {
+  font-family: var(--pd-font-mono);
+  font-size: var(--pd-font-size-body);
+  font-weight: 700;
+  color: var(--pd-text-primary);
+}
+.pd-storage-diskbar {
+  display: flex;
+  height: 6px;
+  margin-top: 4px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--pd-bg-inset);
+}
+.pd-storage-diskbar-lib {
+  background: var(--pd-accent-primary);
+}
+.pd-storage-diskbar-support {
+  background: color-mix(in srgb, var(--pd-accent-primary) 45%, var(--pd-bg-inset));
+}
+.pd-storage-diskbar-other {
+  background: var(--pd-border-default);
+}
+.pd-storage-card-path {
+  font-family: var(--pd-font-mono);
+  font-size: 11px;
+  color: var(--pd-text-secondary);
+  word-break: break-all;
+}
+.pd-storage-card-path--root {
+  display: block;
+}
+.pd-storage-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.pd-storage-card-foot {
+  margin: 0;
+  font-size: var(--pd-font-size-caption);
+  color: var(--pd-text-muted);
+}
+.pd-storage-card-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.pd-storage-card-icon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: var(--pd-bg-inset);
+  color: var(--pd-text-primary);
+}
+.pd-storage-card-title {
+  flex: 1;
+  min-width: 0;
+}
+.pd-storage-card-name {
+  font-size: var(--pd-font-size-body);
+  font-weight: 600;
+  color: var(--pd-text-primary);
+  word-break: break-word;
+}
+.pd-storage-card-meta {
+  margin-top: 2px;
+  font-size: var(--pd-font-size-caption);
+  color: var(--pd-text-secondary);
+}
+.pd-storage-card-close {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--pd-text-muted);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+.pd-storage-card-close:hover {
+  background: var(--pd-bg-hover);
+  color: var(--pd-text-primary);
+}
+.pd-storage-card-size {
+  font-family: var(--pd-font-mono);
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.pd-storage-card-facts {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 4px 12px;
+  margin: 0;
+  font-size: var(--pd-font-size-caption);
+}
+.pd-storage-card-facts dt {
+  color: var(--pd-text-muted);
+}
+.pd-storage-card-facts dd {
+  margin: 0;
+  min-width: 0;
+  color: var(--pd-text-secondary);
+  word-break: break-word;
+}
+.pd-storage-dialog-list {
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--pd-font-size-caption);
+  color: var(--pd-text-secondary);
+}
+.pd-storage-dialog-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 2px 0;
+}
+.pd-storage-dialog-list li span {
+  font-family: var(--pd-font-mono);
+}
+.pd-storage-selbar {
+  position: sticky;
+  bottom: 8px;
+  align-self: flex-start;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--pd-border-default);
+  background: var(--pd-bg-overlay);
+  font-size: var(--pd-font-size-caption);
+  color: var(--pd-text-primary);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.16);
 }
 .pd-storage-spin {
   animation: pd-storage-spin 1s linear infinite;
@@ -7679,12 +7888,4 @@ body[data-media-expanded="true"] .pd-studio-compose {
   to {
     transform: rotate(360deg);
   }
-}
-/* The modality rows read as headings; after the row/name rules so they win. */
-.pd-storage-node[data-depth="0"] > .pd-storage-row {
-  padding: 12px 10px;
-}
-.pd-storage-node[data-depth="0"] > .pd-storage-row .pd-storage-name {
-  font-size: var(--pd-font-size-body);
-  font-weight: 600;
 }

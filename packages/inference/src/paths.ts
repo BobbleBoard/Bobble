@@ -10,10 +10,25 @@ import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
-/** Root of the Pi Desktop download cache (`~/.cache/pi-desktop` by default). */
+/**
+ * THE SUPPORT ROOT — `~/.cache/bobble`: engines, venvs, tool binaries, the
+ * workers' Hugging Face cache, scratch. Models are NOT here any more (see
+ * `libraryRoot`). `PI_DESKTOP_CACHE_DIR` overrides it (tests and probes point
+ * it at a scratch dir, or at the real one from a throwaway HOME).
+ *
+ * It was `~/.cache/pi-desktop` until 2026-09-13 (the user: "purge any 'pi desktop'
+ * branding"). The app renames the old folder on first launch and leaves a
+ * symlink at the old name, because every venv under it has the old absolute
+ * path baked into its scripts — see storage-main's `renameSupportRoot`.
+ */
 export function cacheRoot(): string {
   const override = process.env.PI_DESKTOP_CACHE_DIR;
   if (override !== undefined && override.length > 0) return override;
+  return join(homedir(), '.cache', 'bobble');
+}
+
+/** The pre-rename support root, for the one-time rename and for reading a machine not yet renamed. */
+export function legacyCacheRoot(): string {
   return join(homedir(), '.cache', 'pi-desktop');
 }
 

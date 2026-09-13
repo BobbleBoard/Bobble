@@ -69,6 +69,7 @@ export async function resolveUv(opts: {
     if (dir.length > 0) candidates.push(join(dir, 'uv'));
   }
   if (opts.home !== undefined && opts.home.length > 0) {
+    candidates.push(join(opts.home, '.cache', 'bobble', 'uv', 'uv'));
     candidates.push(join(opts.home, '.cache', 'pi-desktop', 'uv', 'uv'));
     candidates.push(join(opts.home, '.local', 'bin', 'uv'));
   }

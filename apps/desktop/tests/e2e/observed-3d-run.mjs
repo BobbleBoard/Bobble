@@ -60,7 +60,7 @@ if (
 }
 const modelPath = path.join(
   homedir(),
-  '.cache/pi-desktop/models',
+  '.cache/bobble/models',
   'qwen3.5-4b-mtp',
   'Qwen3.5-4B-Q8_0.gguf',
 );

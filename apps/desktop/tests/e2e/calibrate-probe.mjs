@@ -36,7 +36,7 @@ const QUANT = process.env.QUANT ?? 'Q8_0';
 const SHOT_DIR = process.env.SHOT_DIR ?? path.join(tmpdir(), 'calib');
 const SKIP_DOWNLOAD = process.env.SKIP_DOWNLOAD === '1';
 mkdirSync(SHOT_DIR, { recursive: true });
-const CACHE = process.env.PI_DESKTOP_CACHE_DIR ?? path.join(homedir(), '.cache', 'pi-desktop');
+const CACHE = process.env.PI_DESKTOP_CACHE_DIR ?? path.join(homedir(), '.cache', 'bobble');
 const home = probeHome('calibrate');
 mkdirSync(path.join(home, '.pi', 'desktop'), { recursive: true });
 writeFileSync(

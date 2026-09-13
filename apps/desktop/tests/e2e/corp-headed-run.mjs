@@ -57,7 +57,7 @@ const electronBinary = require('electron');
  * covered rather than just the one someone remembered.
  */
 function reapOrphanedServers() {
-  const root = path.join(os.homedir(), '.cache/pi-desktop/llamacpp');
+  const root = path.join(os.homedir(), '.cache/bobble/llamacpp');
   try {
     const rows = execSync('ps -axo pid=,ppid=,command=', { encoding: 'utf8' });
     const pids = rows

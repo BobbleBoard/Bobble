@@ -164,7 +164,7 @@ def main() -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
 
     progress(STAGE, "Locating CubePart weights…")
-    os.environ.setdefault("HF_HOME", str(Path.home() / ".cache" / "pi-desktop" / "gen3d" / "hf"))
+    os.environ.setdefault("HF_HOME", str(Path.home() / ".cache" / "bobble" / "gen3d" / "hf"))
     from huggingface_hub import snapshot_download
 
     weights = Path(snapshot_download("Roblox/cubepart", local_files_only=True))

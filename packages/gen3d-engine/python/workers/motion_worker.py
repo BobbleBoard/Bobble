@@ -57,7 +57,7 @@ DEFAULT_MODEL = "core"
 #: Prompt -> LLM2Vec embedding. Lives beside the weights rather than in the job
 #: output dir: it is worth keeping across jobs, and it is derived data that can
 #: be deleted at any time with no worse consequence than one slow generation.
-CACHE_DIR = Path.home() / ".cache" / "pi-desktop" / "gen3d" / "ardy-text"
+CACHE_DIR = Path.home() / ".cache" / "bobble" / "gen3d" / "ardy-text"
 
 # Longest clip worth generating in one call. ARDY is autoregressive, so cost is
 # linear in duration and there is no quality cliff — this is a guard against a

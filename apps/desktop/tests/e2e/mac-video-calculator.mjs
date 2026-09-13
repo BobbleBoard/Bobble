@@ -171,8 +171,8 @@ await sleep(1200);
  */
 const HOME = probeHome('mac-video-calculator');
 mkdirSync(path.join(HOME, '.cache'), { recursive: true });
-const realCache = path.join(homedir(), '.cache/pi-desktop');
-if (existsSync(realCache)) symlinkSync(realCache, path.join(HOME, '.cache/pi-desktop'));
+const realCache = path.join(homedir(), '.cache/bobble');
+if (existsSync(realCache)) symlinkSync(realCache, path.join(HOME, '.cache/bobble'));
 
 const app = await electron.launch({
   executablePath: path.join(BUNDLE, 'Contents/MacOS/Bobble'),

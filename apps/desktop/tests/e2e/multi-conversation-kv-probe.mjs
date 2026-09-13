@@ -76,7 +76,7 @@ const TURNS = Number(process.env.TURNS ?? 14);
 const BASE_PORT = Number(process.env.PORT ?? 18190);
 
 function findServer() {
-  const root = path.join(homedir(), '.cache/pi-desktop/llamacpp');
+  const root = path.join(homedir(), '.cache/bobble/llamacpp');
   if (!existsSync(root)) return null;
   for (const build of readdirSync(root)) {
     for (const inner of readdirSync(path.join(root, build))) {
@@ -88,7 +88,7 @@ function findServer() {
 }
 
 function findModel() {
-  const dir = path.join(homedir(), '.cache/pi-desktop/models', MODEL_ID);
+  const dir = path.join(homedir(), '.cache/bobble/models', MODEL_ID);
   if (!existsSync(dir)) return null;
   const f = readdirSync(dir).find((n) => n.endsWith('.gguf') && !n.includes('mmproj'));
   return f === undefined ? null : path.join(dir, f);

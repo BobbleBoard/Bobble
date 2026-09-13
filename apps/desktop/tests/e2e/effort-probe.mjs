@@ -48,7 +48,7 @@ const REAL_LIBRARY_DEFAULT = path.join(homedir(), 'Bobble', 'Models');
  */
 const home = mkdtempSync(path.join(tmpdir(), 'pd-effort-home-'));
 mkdirSync(path.join(home, '.pi', 'agent', 'sessions', 'proj'), { recursive: true });
-const realCache = path.join(homedir(), '.cache', 'pi-desktop');
+const realCache = path.join(homedir(), '.cache', 'bobble');
 
 /** Smallest downloaded model that can classify + answer "hi". */
 const MODEL = process.env.MODEL ?? 'gemma-4-e2b-it';

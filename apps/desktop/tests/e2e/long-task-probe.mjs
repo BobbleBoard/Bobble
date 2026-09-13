@@ -56,7 +56,7 @@ const EFFORT = process.env.EFFORT ?? 'max';
 const CAP_MS = Number(process.env.MAX_MIN ?? 30) * 60_000;
 const PARTS = Number(process.env.PARTS ?? 8);
 
-const realCache = path.join(homedir(), '.cache', 'pi-desktop');
+const realCache = path.join(homedir(), '.cache', 'bobble');
 if (!existsSync(path.join(realCache, 'models', MODEL))) {
   console.log(`long-task-probe: SKIP — ${MODEL} is not downloaded`);
   process.exit(0);

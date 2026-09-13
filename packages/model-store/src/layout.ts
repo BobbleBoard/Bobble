@@ -46,7 +46,7 @@ export const MODEL_KINDS: readonly ModelKind[] = ['text', 'image', 'video', 'aud
 export function cacheRoot(): string {
   const override = process.env.PI_DESKTOP_CACHE_DIR;
   if (override !== undefined && override.length > 0) return override;
-  return join(homedir(), '.cache', 'pi-desktop');
+  return join(homedir(), '.cache', 'bobble');
 }
 
 /**
