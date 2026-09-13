@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { excludeCacheFromIndexing } from './paths.js';
+import { excludeCacheFromIndexing, rerootRecorded } from './paths.js';
 
 describe('excludeCacheFromIndexing', () => {
   it('writes the marker once and reports which it did', async () => {
@@ -30,5 +30,26 @@ describe('excludeCacheFromIndexing', () => {
       exists: async () => false,
     });
     expect(r).toBe('failed');
+  });
+});
+
+describe('rerootRecorded', () => {
+  it('re-roots a marker path recorded under the old support-root name', () => {
+    expect(
+      rerootRecorded(
+        '/Users/me/.cache/pi-desktop/llamacpp/b10603/llama-b10603/llama-server',
+        '/Users/me/.cache/bobble/llamacpp/b10603',
+      ),
+    ).toBe('/Users/me/.cache/bobble/llamacpp/b10603/llama-b10603/llama-server');
+  });
+  it('leaves a path that already lives under the dir unchanged', () => {
+    expect(rerootRecorded('/c/llamacpp/x/build/bin/llama-server', '/c/llamacpp/x')).toBe(
+      '/c/llamacpp/x/build/bin/llama-server',
+    );
+  });
+  it('returns the recorded path when it does not share the dir’s last segment', () => {
+    expect(rerootRecorded('/elsewhere/llama-server', '/c/llamacpp/x')).toBe(
+      '/elsewhere/llama-server',
+    );
   });
 });

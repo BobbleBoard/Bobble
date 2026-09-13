@@ -110,3 +110,21 @@ export function modelDir(modelId: string): string {
   const legacy = join(legacyModelsDir(), modelId);
   return existsSync(legacy) ? legacy : here;
 }
+
+/**
+ * A path recorded in an install marker, re-rooted under the directory the
+ * marker lives in. Markers wrote ABSOLUTE paths, and the support root has
+ * since been renamed (`~/.cache/pi-desktop` → `~/.cache/bobble`); the old
+ * spelling still resolves through the symlink left behind, but it would then
+ * show up on every launch command line. `dir` is the marker's directory; the
+ * recorded path is expected to lie under it by the same trailing segments.
+ */
+export function rerootRecorded(recorded: string, dir: string): string {
+  const tail = recorded.split('/');
+  const base = dir.split('/');
+  // Longest suffix of `recorded` whose leading segment matches `dir`'s last one.
+  for (let i = tail.length - 1; i >= 0; i--) {
+    if (tail[i] === base[base.length - 1]) return join(dir, ...tail.slice(i + 1));
+  }
+  return recorded;
+}

@@ -18,7 +18,7 @@ import {
   PINNED_LLAMACPP,
   releaseApiUrl,
 } from './llamacpp-manifest.js';
-import { llamacppDir } from './paths.js';
+import { llamacppDir, rerootRecorded } from './paths.js';
 
 const execFile = promisify(execFileCb);
 
@@ -140,11 +140,14 @@ export async function ensureLlamaCpp(opts: EnsureLlamaCppOptions = {}): Promise<
   if (await pathExists(markerPath)) {
     try {
       const marker = JSON.parse(await readFile(markerPath, 'utf8')) as InstallMarker;
-      if (await pathExists(marker.serverPath)) {
+      // Re-rooted under `dir`: the marker's absolute path may spell the
+      // support root by its old name (see rerootRecorded).
+      const serverPath = rerootRecorded(marker.serverPath, dir);
+      if (await pathExists(serverPath)) {
         return {
           tag: release.tag,
           dir,
-          serverPath: marker.serverPath,
+          serverPath,
           archiveSha256: marker.archiveSha256,
         };
       }

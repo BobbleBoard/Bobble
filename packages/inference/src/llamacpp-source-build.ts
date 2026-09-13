@@ -34,7 +34,7 @@ import { mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { join } from 'node:path';
 import type { ExecFileFn } from './llamacpp-manager.js';
 import type { LlamaCppVariant } from './llamacpp-variants.js';
-import { llamacppDir } from './paths.js';
+import { llamacppDir, rerootRecorded } from './paths.js';
 
 /** Source archive URL for a pinned commit. Stable for the life of the commit. */
 export function variantArchiveUrl(variant: LlamaCppVariant): string {
@@ -170,16 +170,19 @@ export async function buildVariant(opts: BuildVariantOptions): Promise<VariantIn
   const existing = await readFile(marker, 'utf8')
     .then((t) => JSON.parse(t) as VariantMarker)
     .catch(() => undefined);
+  const existingServer =
+    existing === undefined ? undefined : rerootRecorded(existing.serverPath, dir);
   if (
     existing !== undefined &&
+    existingServer !== undefined &&
     existing.commit === variant.source.commit &&
-    (await pathExists(existing.serverPath))
+    (await pathExists(existingServer))
   ) {
     return {
       variantId: variant.id,
       commit: existing.commit,
       dir,
-      serverPath: existing.serverPath,
+      serverPath: existingServer,
       archiveSha256: existing.archiveSha256,
     };
   }
