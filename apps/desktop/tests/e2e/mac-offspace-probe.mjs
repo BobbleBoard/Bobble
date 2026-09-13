@@ -214,14 +214,45 @@ try {
      put the control inside the very occluder it was meant to contrast with and
      read a correctly-masked phantom as a broken measurement. Just above our
      window's top edge is over Maps and over nothing else. */
-  const homeTip = { x: Math.round(own.x + own.w / 2), y: Math.max(40, own.y - 40) };
-  await dbg('overlay-cursor', { x: homeTip.x, y: homeTip.y, ms: 0 });
-  await sleep(400);
-  const visiblePx = await saturated('offspace-uncovered.png', homeTip);
-  if (visiblePx === 0) {
-    fail(
-      'the phantom did not paint even where it SHOULD — the measurement is broken, not the mask',
+  /* …and "just above our window" is only over the tracked window and nothing
+     else on an EMPTY desktop. On a working one (2026-09-12: Bobble, Claude and
+     Safari all spanning the screen) every point of the tracked window can be
+     under someone, and a correctly-masked phantom read as a broken measurement.
+     So the control point comes from the live z-order the panel itself holds:
+     the first point of the tracked window's rect that no hole covers. None →
+     the positive control is SKIPPED and said so, never faked. */
+  const live = await native();
+  const holes = live.occluders ?? [];
+  const twin = await dbg('bounds', { app: APP });
+  const tw = twin.result ?? twin;
+  let homeTip = null;
+  if (typeof tw?.x === 'number') {
+    outer: for (let y = tw.y + 30; y < tw.y + tw.h - 30; y += 24) {
+      for (let x = tw.x + 30; x < tw.x + tw.w - 30; x += 24) {
+        const inHole = holes.some(
+          (h) => x >= h.x - 90 && x <= h.x + h.w + 90 && y >= h.y - 70 && y <= h.y + h.h + 70,
+        );
+        if (!inHole) {
+          homeTip = { x, y };
+          break outer;
+        }
+      }
+    }
+  }
+  if (homeTip === null) {
+    console.log(
+      `positive control SKIPPED: every point of the ${APP} window is under another window on this desktop (${holes.length} holes)`,
     );
+  } else {
+    await dbg('overlay-cursor', { x: homeTip.x, y: homeTip.y, ms: 0 });
+    await sleep(400);
+    const visiblePx = await saturated('offspace-uncovered.png', homeTip);
+    if (visiblePx === 0) {
+      fail(
+        'the phantom did not paint even where it SHOULD — the measurement is broken, not the mask',
+      );
+    }
+    console.log(`positive control OK: ${visiblePx} phantom px at an uncovered point`);
   }
 
   // The real check: inside a window that is above the tracked one, nothing.
@@ -242,8 +273,15 @@ try {
       `${coveredPx} px of phantom painted inside a window ABOVE its own — the "cursor on top" bug`,
     );
   }
+  // The real path check as well: the tip is inside the mask's cut, per the
+  // path the compositor fills (see cursorMaskedByPath) — not just per the rects.
+  if (covered.cursorMasked !== true) {
+    fail(
+      `the mask PATH does not cut the tip at ${tip.x},${tip.y} (rects say covered=${covered.cursorCovered})`,
+    );
+  }
   console.log(
-    `covered OK: ${visiblePx} px where it belongs, 0 px inside our own window at ${tip.x},${tip.y}`,
+    `covered OK: 0 px of phantom inside our own window at ${tip.x},${tip.y}; the mask path cuts the tip`,
   );
   console.log('mac-offspace-probe OK');
 } finally {

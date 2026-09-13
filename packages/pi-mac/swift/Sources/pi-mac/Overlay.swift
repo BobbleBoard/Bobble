@@ -584,6 +584,108 @@ func slsOrderAbove(_ ours: Int, _ target: Int) -> Bool {
   return slsOrderRC(ours, target) == 0
 }
 
+/**
+ * THE UNION OF THE HOLES, AS RECTS THAT DO NOT OVERLAP.
+ *
+ * the user, 2026-09-12, with a screenshot of the phantom drawn over Bobble while
+ * Notes sat behind it: "can confirm visually that the bug is NOT FIXED. fake
+ * cursor frequently appears on top of undesired apps." The mask was one path —
+ * the whole panel plus one rect per covering window — filled EVEN-ODD. Even-odd
+ * counts crossings: a point under ONE covering window is inside two rects
+ * (panel + hole) → even → cut out, correct; a point under TWO covering windows
+ * is inside three → odd → PAINTED. Every hole that overlapped another hole
+ * flipped the cursor back on. And one hole overlaps everything: the Dock owns a
+ * screen-sized window (layer 20, hollow) that is on every desktop's list, so
+ * with it in the set the parity of every point was off by one — visible under
+ * exactly one real window, invisible under none. That is "randomly on top".
+ *
+ * MEASURED on this desktop (Notes under Safari, Claude, Bobble and the Dock's
+ * window): the rect arithmetic said covered, the path said visible, and the
+ * shipped 61b45ee7 proof only ever asked the rects.
+ *
+ * So the holes are first reduced to a set of rects that cannot overlap (a
+ * vertical band sweep: every x-edge starts a band, the y-intervals of the
+ * rects spanning a band are merged), and only then cut. Even-odd over disjoint
+ * holes is exact, whatever the window list looks like.
+ */
+func disjointUnion(_ rects: [CGRect]) -> [CGRect] {
+  let rs = rects.filter { !$0.isNull && $0.width > 0 && $0.height > 0 }
+  if rs.count <= 1 { return rs }
+  var xs = Set<CGFloat>()
+  for r in rs {
+    xs.insert(r.minX)
+    xs.insert(r.maxX)
+  }
+  let edges = xs.sorted()
+  /* Per band, the merged y-intervals; consecutive bands with the same
+     intervals are then joined, so a hole inside another hole costs nothing and
+     two overlapping windows become three rects rather than a picket fence of
+     seams. */
+  var bands: [(x0: CGFloat, x1: CGFloat, ys: [(lo: CGFloat, hi: CGFloat)])] = []
+  for i in 0..<(edges.count - 1) {
+    let x0 = edges[i]
+    let x1 = edges[i + 1]
+    if x1 <= x0 { continue }
+    var ys = rs.filter { $0.minX <= x0 && $0.maxX >= x1 }.map { (lo: $0.minY, hi: $0.maxY) }
+    if ys.isEmpty { continue }
+    ys.sort { $0.lo < $1.lo }
+    var merged: [(lo: CGFloat, hi: CGFloat)] = []
+    var cur = ys[0]
+    for y in ys.dropFirst() {
+      if y.lo <= cur.hi {
+        cur.hi = max(cur.hi, y.hi)
+      } else {
+        merged.append(cur)
+        cur = y
+      }
+    }
+    merged.append(cur)
+    if let last = bands.last, last.x1 == x0, last.ys.count == merged.count,
+      zip(last.ys, merged).allSatisfy({ $0.lo == $1.lo && $0.hi == $1.hi })
+    {
+      bands[bands.count - 1].x1 = x1
+    } else {
+      bands.append((x0: x0, x1: x1, ys: merged))
+    }
+  }
+  var out: [CGRect] = []
+  for b in bands {
+    for y in b.ys { out.append(CGRect(x: b.x0, y: y.lo, width: b.x1 - b.x0, height: y.hi - y.lo)) }
+  }
+  return out
+}
+
+/**
+ * WHERE THE DOCK ACTUALLY IS, in AX screen points.
+ *
+ * The Dock's window is the size of the screen and empty except for its tiles,
+ * so taking its bounds as a hole would blank the whole phantom. The tiles live
+ * in the strip the screen reserves for them — the part of `frame` that is not
+ * `visibleFrame` — and that strip is the hole. With the Dock auto-hidden the
+ * strip is empty and a Dock sliding in is painted under the phantom for the
+ * moment it is there, which is the right side to be wrong on.
+ */
+func dockStrips() -> [CGRect] {
+  let flipBase = NSScreen.screens.first?.frame.maxY ?? 0
+  var out: [CGRect] = []
+  for s in NSScreen.screens {
+    let f = s.frame
+    let v = s.visibleFrame
+    // Left / right / bottom of the screen, outside the visible area. The top is
+    // the menu bar, which is a window of its own in the list.
+    if v.minX > f.minX {
+      out.append(CGRect(x: f.minX, y: flipBase - f.maxY, width: v.minX - f.minX, height: f.height))
+    }
+    if v.maxX < f.maxX {
+      out.append(CGRect(x: v.maxX, y: flipBase - f.maxY, width: f.maxX - v.maxX, height: f.height))
+    }
+    if v.minY > f.minY {
+      out.append(CGRect(x: f.minX, y: flipBase - v.minY, width: f.width, height: v.minY - f.minY))
+    }
+  }
+  return out
+}
+
 /// A panel that can never become key or main. `.nonactivatingPanel` already
 /// stops a click from activating us — but nothing is ever going to click it
 /// (`ignoresMouseEvents`), and this makes the guarantee structural rather than
@@ -659,6 +761,8 @@ final class OverlayController: NSObject {
   private var bubbleFlipX = false
   private var bubbleFlipY = false
   private var maskHoles = 0
+  /// How many non-overlapping rects the holes reduced to (see disjointUnion).
+  private var maskRects = 0
   /// The holes as last cut, in AX (top-left) screen points — reported by `info`
   /// so a probe can say whether the cursor's own point is under one.
   private var lastOccluders: [CGRect] = []
@@ -720,7 +824,13 @@ final class OverlayController: NSObject {
   /// a pill to put them on.
   private func syncControls() {
     guard let win = controls, let view = controlsView else { return }
-    let showing = pillEnabled && bubble.opacity > 0.4 && panel.isVisible
+    /* THE BUTTONS ARE A WINDOW, AND A WINDOW HAS NO MASK.
+       The phantom's pill is cut out where another app covers it; its buttons
+       live on this separate, hit-testable, floating panel — which stayed
+       ordered in over that other app, transparent, eating its clicks, and
+       drawing ✕/pause over it on hover. So the controls exist only while the
+       pill is actually being shown: on this Space, and not under any hole. */
+    let showing = pillEnabled && bubble.opacity > 0.4 && panel.isVisible && !offSpace && !pillCovered
     if !showing {
       if win.isVisible { win.orderOut(nil) }
       return
@@ -729,9 +839,12 @@ final class OverlayController: NSObject {
        reports it with, so the controls sit exactly on it. */
     let local = (bubble.presentation() ?? bubble).frame
     let f = local.offsetBy(dx: panel.frame.minX, dy: panel.frame.minY)
-    win.setFrame(f, display: false)
-    view.frame = CGRect(origin: .zero, size: f.size)
-    view.needsDisplay = true
+    // Called on every mask tick now, so only a moved pill costs a relayout.
+    if win.frame != f {
+      win.setFrame(f, display: false)
+      view.frame = CGRect(origin: .zero, size: f.size)
+      view.needsDisplay = true
+    }
     if !win.isVisible {
       win.order(.above, relativeTo: panel.windowNumber)
     }
@@ -1057,6 +1170,9 @@ final class OverlayController: NSObject {
   func hide() {
     stopOcclusionTimer()
     if panel.isVisible { panel.orderOut(nil) }
+    // The controls are a window of their own; a hidden phantom must not leave
+    // an invisible click-eating panel behind over whatever is there.
+    syncControls()
   }
 
   /// Put the phantom away entirely: hidden panel, no cursor, no pill. The next
@@ -1380,6 +1496,15 @@ final class OverlayController: NSObject {
     if bubble.opacity > 0 { layoutBubble() }
   }
 
+  /// Whether a window rect is held — the precondition for riding a move.
+  var hasWindowRect: Bool { windowAX != nil }
+
+  /// True when `number` names a window other than the one being tracked (a
+  /// known-on-screen number); a stale or unknown tracked number never counts.
+  func isTrackingOtherWindow(than number: Int) -> Bool {
+    trackedWindow > 0 && trackedNumberOnScreen && number != trackedWindow
+  }
+
   /**
    * The window moved or resized: carry the phantom the same distance.
    *
@@ -1509,6 +1634,26 @@ final class OverlayController: NSObject {
     writeStderr("overlay: masked again (was: \(was))\n")
   }
 
+  private var hollowNoted: Set<String> = []
+  private func noteHollow(_ owner: String, layer: Int) {
+    let key = "\(owner)@\(layer)"
+    if hollowNoted.contains(key) { return }
+    hollowNoted.insert(key)
+    writeStderr("overlay: not cutting \(owner)'s screen-sized window at level \(layer) — hollow\n")
+  }
+
+  /// A window that spans (nearly) a whole display.
+  private func coversAScreen(_ r: CGRect) -> Bool {
+    let flipBase = cocoaFlipBase()
+    for s in NSScreen.screens {
+      let f = s.frame
+      let ax = CGRect(x: f.minX, y: flipBase - f.maxY, width: f.width, height: f.height)
+      let inter = ax.intersection(r)
+      if !inter.isNull, inter.width * inter.height >= 0.9 * ax.width * ax.height { return true }
+    }
+    return false
+  }
+
   /// Is the phantom actually being drawn right now? An invisible cursor cannot
   /// be on top of anything, and reporting it would drown the real cases.
   private var phantomShowing: Bool {
@@ -1599,6 +1744,27 @@ final class OverlayController: NSObject {
         guard let raw = w[kCGWindowBounds as String] as? NSDictionary,
           let r = CGRect(dictionaryRepresentation: raw)
         else { continue }
+        /* The Dock's screen-sized window covers nothing but its tiles — see
+           dockStrips. Only the screen-sized one is hollow; a smaller Dock
+           window (an app switcher, a bounce) is what it says it is. */
+        let layer = (w[kCGWindowLayer as String] as? Int) ?? 0
+        let ownerName = (w[kCGWindowOwnerName as String] as? String) ?? ""
+        if ownerName == "Dock", coversAScreen(r) {
+          for strip in dockStrips() {
+            let cut = strip.intersection(r)
+            if !cut.isNull, cut.width > 0, cut.height > 0 { rects.append(cut) }
+          }
+          continue
+        }
+        /* Any OTHER screen-sized window above the normal band is an overlay of
+           someone's (a screen-share border, a recorder's frame, a window
+           manager's hints) — hollow by construction, since a real fullscreen
+           app lives at layer 0 on a Space of its own. Cutting it would blank
+           the phantom on the whole display. Said once per owner. */
+        if layer > 0, coversAScreen(r) {
+          noteHollow(ownerName, layer: layer)
+          continue
+        }
         rects.append(r)
       }
     }
@@ -1680,6 +1846,19 @@ final class OverlayController: NSObject {
     }
   }
 
+  /// The pill's frame in AX (top-left) screen points, as drawn right now.
+  private var pillAXFrame: CGRect {
+    let f = (bubble.presentation() ?? bubble).frame.offsetBy(dx: panel.frame.minX, dy: panel.frame.minY)
+    return CGRect(x: f.minX, y: cocoaFlipBase() - f.maxY, width: f.width, height: f.height)
+  }
+
+  /// Whether any hole touches the pill — the controls window must not exist then.
+  private var pillCovered: Bool {
+    guard bubble.opacity > 0.4 else { return false }
+    let f = pillAXFrame
+    return lastOccluders.contains { $0.intersects(f) }
+  }
+
   /// Consecutive occlusion ticks on which the tracked window WAS on this Space.
   /// Only the return is debounced — see refreshOcclusion.
   private var onSpaceStreak = 0
@@ -1693,7 +1872,9 @@ final class OverlayController: NSObject {
     if away == offSpace { return }
     offSpace = away
     panel.alphaValue = away ? 0 : 1
-    controls?.alphaValue = away ? 0 : 1
+    // The controls are ordered out rather than faded: an alpha-0 window still
+    // takes the clicks meant for the app under it.
+    syncControls()
   }
 
   /// Probe seam: see previewHover. Lays the controls out first, because a pill
@@ -1932,18 +2113,34 @@ final class OverlayController: NSObject {
   /// occluder rect leaves the phantom visible everywhere except on top of them.
   /// Cheap (a handful of rects, one CAShapeLayer, no rasterization) and exact,
   /// where the old whole-overlay hide was all-or-nothing at 15% coverage.
+  /// Whether the cursor's tip is CUT OUT by the mask as it will be composited:
+  /// false when there is no mask or the tip lies in the mask's filled region.
+  func cursorMaskedByPath() -> Bool {
+    guard let c = cursorAX, let mask = stage.mask as? CAShapeLayer, let path = mask.path else {
+      return false
+    }
+    let p = local(c)
+    return !path.contains(p, using: mask.fillRule == .evenOdd ? .evenOdd : .winding)
+  }
+
   func setOccluders(_ rects: [CGRect]) {
     maskHoles = rects.count
     lastOccluders = rects
     guard !rects.isEmpty else {
       stage.mask = nil
+      maskRects = 0
+      syncControls()
       return
     }
     let path = CGMutablePath()
     path.addRect(stage.bounds)
     let flipBase = cocoaFlipBase()
     let frame = panel.frame
-    for r in rects {
+    /* Disjoint first — see disjointUnion for the parity trap that made
+       overlapping holes paint the cursor back on. */
+    let holes = disjointUnion(rects)
+    maskRects = holes.count
+    for r in holes {
       // Occluder rects arrive top-left-origin like everything else on the wire.
       let cocoaY = flipBase - (r.origin.y + r.height)
       path.addRect(
@@ -1958,6 +2155,7 @@ final class OverlayController: NSObject {
     mask.path = path
     stage.mask = mask
     CATransaction.commit()
+    syncControls()
   }
 
   // ── probe seams ──────────────────────────────────────────────────────────
@@ -2115,9 +2313,15 @@ final class OverlayController: NSObject {
       ],
       "cursorVisible": (cursorGroup.presentation() ?? cursorGroup).opacity > 0.5,
       "maskHoles": maskHoles,
+      "maskRects": maskRects,
+      "pillCovered": pillCovered,
       /* The truth a screenshot would show, computed in the mask's own terms:
          is the cursor's tip inside one of the holes right now? */
       "cursorCovered": cursorAX.map { c in lastOccluders.contains { $0.contains(c) } } ?? false,
+      /* And the truth the COMPOSITOR shows: is the cursor's tip inside the
+         mask's filled region? Computed off the mask path itself, not the
+         rects — the two disagreed for a whole release (see setOccluders). */
+      "cursorMasked": cursorMaskedByPath(),
       "occluders": lastOccluders.prefix(24).map {
         ["x": Double($0.minX), "y": Double($0.minY), "w": Double($0.width), "h": Double($0.height)]
       },
@@ -2242,18 +2446,38 @@ private func handleOverlay(
     if let x = doubleValue(params["x"]), let y = doubleValue(params["y"]),
       let w = doubleValue(params["w"]), let h = doubleValue(params["h"])
     {
-      controller.setWindowRect(CGRect(x: x, y: y, width: w, height: h))
+      let rect = CGRect(x: x, y: y, width: w, height: h)
+      let win = doubleValue(params["windowNumber"]).map { Int($0) }
+      /* A re-targeting of the SAME window at a new place is a move the Node
+         tracker saw — it rides it here, by the delta against the rect we hold,
+         exactly as the AX watcher does. Both sources converge on the same rect,
+         so a move both of them report shifts the phantom once. (The watcher can
+         miss a move — an app that never posts kAXMovedNotification — and then
+         this is the only ride there is.) A different window number is a new
+         window, not a move: nothing shifts. */
+      let sameWindow = win == nil || !controller.isTrackingOtherWindow(than: win!)
+      if controller.masksNatively, controller.hasWindowRect, sameWindow {
+        // Node was told `nativeFollow` and pushes no shift of its own — see the
+        // reply below — so this ride is the only one. Without native masking
+        // Node shifts, and a ride here on top of it would be the double move.
+        controller.followWindow(to: rect, windowNumber: win)
+      } else {
+        controller.setWindowRect(rect)
+      }
       /* Watch the app itself from here: a move or resize is then pushed to us
          the instant it happens, instead of being sampled for. */
-      if let pid = doubleValue(params["pid"]) { watchWindowChanges(pid: pid_t(pid)) }
+      if let pid = doubleValue(params["pid"]), pid > 0 { watchWindowChanges(pid: pid_t(pid)) }
       /* And sit directly above its window, which is the layering itself. The
          pid alone is enough to mask by (see refreshOcclusion); the number, when
          known, is the fallback anchor. */
       let pid = doubleValue(params["pid"]).map { pid_t($0) } ?? 0
-      if let win = doubleValue(params["windowNumber"]) {
-        controller.trackWindow(number: Int(win), pid: pid)
+      if let win = win {
+        controller.trackWindow(number: win, pid: pid)
       } else if pid > 0 {
         controller.trackWindow(number: 0, pid: pid)
+      } else {
+        // Nothing to anchor on: the Node side masks (and follows) from here.
+        controller.untrackWindow()
       }
     } else {
       controller.setWindowRect(nil)

@@ -213,8 +213,11 @@ try {
   // NSPanel defaults hidesOnDeactivate to true, and we are never active — left
   // alone it would hide the overlay permanently.
   if (info.hidesOnDeactivate !== false) fail('panel hides on deactivate (it would never show)');
-  if (info.level !== info.floatingLevel) {
-    fail(`panel level ${info.level} != floating ${info.floatingLevel}`);
+  // One above the pop-up-menu level (101): the cursor must paint over the
+  // controlled app's own menus and pop-ups; everything of anyone else's above
+  // the app is cut out by the mask instead (see refreshOcclusion).
+  if (info.level !== 102) {
+    fail(`panel level ${info.level} != popUpMenu + 1 (102)`);
   }
   // THE Mission Control fix. `.transient` is what excludes a window from
   // Mission Control/Exposé, and it is the flag Electron never exposed.
@@ -449,6 +452,13 @@ try {
   // The helper reports every window stacked above the controlled one; the panel
   // masks those rects out, so the phantom stops painting on a window the user
   // dragged over the app long before coverage trips the whole-overlay hide.
+  //
+  // This is the NODE-DRIVEN path — the fallback the panel takes when it has no
+  // pid or window number to anchor on (a fake app has no z-order). With a pid
+  // the panel cuts the mask itself from the live window list; that path is
+  // proven against real windows in overlay-parity-probe.mjs.
+  await dbg('overlay-fake-control', { ...C, pid: 0 });
+  await sleep(200);
   const holes = [
     { x: C.x + 400, y: C.y + 40, w: 220, h: 160 },
     { x: C.x + 40, y: C.y + 380, w: 180, h: 120 },
