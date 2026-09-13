@@ -107,6 +107,20 @@ describe('segmentGroup (A1 — inline artifact interleaving)', () => {
     expect(ids).toEqual(['m1-a0', 'm1-a1']);
   });
 
+  it('holds a written tool call back while the message streams, shows it settled', () => {
+    // MiniCPM5 on the MLX engines types its call into the content. Streaming:
+    // the prose before the opener shows, the markup does not (it becomes an
+    // activity row when the provider makes it a real call). Settled with the
+    // markup still there (rung 0 did not fire): shown as it is — honest.
+    const written = 'On it.\n<function name="bash"><param name="command">ls</param>';
+    const live = segmentGroup([assistant('m1', [text(written)], true)]);
+    expect(live).toEqual([{ kind: 'text', text: 'On it.' }]);
+    const onlyCall = segmentGroup([assistant('m1', [text('<tool_call>{"name":"bash"')], true)]);
+    expect(onlyCall).toEqual([]);
+    const settled = segmentGroup([assistant('m1', [text(written)])]);
+    expect(settled[0]?.kind === 'text' && settled[0].text).toBe(written);
+  });
+
   it('leaves a plain (non-artifact) code fence inside the markdown run', () => {
     const seg = segmentGroup([assistant('m1', [text('text\n```js\nconst x = 1;\n```')])]);
     expect(seg.map((s) => s.kind)).toEqual(['text']);

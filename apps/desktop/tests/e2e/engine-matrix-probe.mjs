@@ -301,6 +301,15 @@ try {
               total: Number(cacheLine[2]),
               reused: cacheLine[1] === 'HIT' ? Number(cacheLine[3] ?? 0) : 0,
             };
+      // What the thread SHOWS (not what the store holds): a call the model wrote
+      // in its own tags must never appear as raw XML in the bubble.
+      const shown = await win.evaluate(
+        () => document.querySelector('[data-testid="chat-scroll"]')?.innerText ?? '',
+      );
+      const rawTag = /<\/?(?:function|param(?:eter)?|tool_call)\b/i.exec(shown)?.[0] ?? null;
+      if (turn.id === 'tool') {
+        writeFileSync(path.join(OUT, `${engine}-${spec}-tool.png`), await win.screenshot());
+      }
       const t = {
         id: turn.id,
         ttft,
@@ -309,6 +318,7 @@ try {
         text: text.slice(0, 160),
         error,
         tools,
+        rawTag,
         reuse: reuse ?? engineReuse,
         lines,
       };
@@ -321,7 +331,7 @@ try {
           error !== null
             ? `ERROR: ${String(error).slice(0, 140)}`
             : `→ ${text.slice(0, 80).replace(/\n/g, ' ')}`
-        }`,
+        }${rawTag === null ? '' : ` RAW TAG SHOWN: ${rawTag}`}`,
       );
       for (const l of lines) log(`      · ${l.slice(0, 160)}`);
       if (!finished) {
@@ -343,7 +353,7 @@ for (const r of results) {
       (t) =>
         `${t.id}:${t.error !== null ? 'ERR' : t.ttft === null ? 'none' : `${t.ttft}ms`}${t.tools > 0 ? '+tool' : ''}${
           t.reuse ? `(${t.reuse.reused}/${t.reuse.total})` : ''
-        }`,
+        }${t.rawTag ? '!RAW' : ''}`,
     )
     .join(' ');
   console.log(

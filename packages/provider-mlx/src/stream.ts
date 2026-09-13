@@ -40,6 +40,7 @@ import {
   type ToolCallFixer,
   type ToolSchemaLike,
   validateAgainstSchema,
+  withoutWrittenToolCall,
 } from '@pi-desktop/provider-llamacpp';
 
 export interface MlxStreamDeps {
@@ -421,6 +422,12 @@ export function createMlxStream(deps: MlxStreamDeps = {}): MlxStreamFn {
           const assistantText = textBlock?.type === 'text' ? textBlock.text : '';
           const reconstructed = reconstructToolCallFromContent(assistantText, registeredNames);
           if (reconstructed !== undefined) {
+            // The call is a real tool call now, so the text stops carrying it
+            // (see provider-llamacpp: no raw markup in the thread, and the next
+            // prompt carries the call once).
+            if (textBlock?.type === 'text') {
+              textBlock.text = withoutWrittenToolCall(assistantText, reconstructed);
+            }
             const block: ToolCall = {
               type: 'toolCall',
               id: `call_rung0_${output.content.length}`,

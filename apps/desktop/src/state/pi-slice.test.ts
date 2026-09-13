@@ -605,6 +605,66 @@ describe('a run that ends without a turn_end still closes its row', () => {
     expect(assistant.blocks).toEqual([{ type: 'thinking', thinking: 'weighing…' }]);
   });
 
+  it('takes the settled text from turn_end when the provider rewrote it', () => {
+    // SEEN 2026-09-13 (MiniCPM5 on rapid-mlx): the model typed its tool call as
+    // `<function name="bash">…</function>`; rung 0 made it a real call and took
+    // the markup out of the text — but the thread had already accumulated the
+    // deltas, so the bubble kept the raw XML above "Ran a command".
+    const written = '<function name="bash"><param name="command">ls</param></function>';
+    route([
+      { type: 'agent_start' },
+      { type: 'turn_start' },
+      {
+        type: 'message_update',
+        message: { role: 'assistant', content: [] },
+        assistantMessageEvent: { type: 'text_delta', contentIndex: 0, delta: 'On it.\n' },
+      } as unknown as PiBridgeEvent,
+      {
+        type: 'message_update',
+        message: { role: 'assistant', content: [] },
+        assistantMessageEvent: { type: 'text_delta', contentIndex: 0, delta: written },
+      } as unknown as PiBridgeEvent,
+      {
+        type: 'turn_end',
+        message: {
+          role: 'assistant',
+          content: [
+            { type: 'text', text: 'On it.' },
+            { type: 'toolCall', id: 'call_rung0_1', name: 'bash', arguments: { command: 'ls' } },
+          ],
+          stopReason: 'toolUse',
+        },
+      } as unknown as PiBridgeEvent,
+    ]);
+    const assistant = usePiStore.getState().messages[0];
+    if (assistant?.kind !== 'assistant') throw new Error('expected assistant');
+    expect(assistant.blocks.find((b) => b.type === 'text')).toEqual({
+      type: 'text',
+      text: 'On it.',
+    });
+    // Unchanged text (the usual case) is left exactly as it streamed.
+    route([
+      { type: 'turn_start' },
+      {
+        type: 'message_update',
+        message: { role: 'assistant', content: [] },
+        assistantMessageEvent: { type: 'text_delta', contentIndex: 0, delta: 'ls ran.' },
+      } as unknown as PiBridgeEvent,
+      {
+        type: 'turn_end',
+        message: {
+          role: 'assistant',
+          content: [{ type: 'text', text: 'ls ran.' }],
+          stopReason: 'stop',
+        },
+      } as unknown as PiBridgeEvent,
+      { type: 'agent_end', messages: [] } as unknown as PiBridgeEvent,
+    ]);
+    const second = usePiStore.getState().messages[1];
+    if (second?.kind !== 'assistant') throw new Error('expected assistant');
+    expect(second.blocks).toEqual([{ type: 'text', text: 'ls ran.' }]);
+  });
+
   it('leaves a normally-ended turn alone (turn_end already closed it)', () => {
     route([
       { type: 'agent_start' },

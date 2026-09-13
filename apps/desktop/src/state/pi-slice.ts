@@ -19,7 +19,7 @@ import {
 import { create } from 'zustand';
 import { useCorpStore } from './corp-store';
 import type { QueueReason } from './send-feasibility';
-import { appendOrMergeBlock, mutateAssistant } from './transcript-fold';
+import { adoptFinalText, appendOrMergeBlock, mutateAssistant } from './transcript-fold';
 
 export interface PiNotification {
   id: string;
@@ -580,6 +580,7 @@ export function createPiSink(
       threadSet((msgs) =>
         mutateAssistant(msgs, id, (m) => ({
           ...m,
+          blocks: adoptFinalText(m.blocks, message?.content),
           isStreaming: false,
           stopReason,
           errorMessage: message?.errorMessage,

@@ -496,6 +496,13 @@ export interface ReconstructedToolCall {
   /** Parsed arguments (the guard requires these to parse before reconstructing). */
   readonly arguments: Record<string, unknown>;
   readonly shape: ReconstructedShape;
+  /**
+   * Where the written call sits in the content (`start` inclusive, `end`
+   * exclusive), widened over an enclosing `<tool_call>` wrapper or code fence,
+   * so a caller can take the call OUT of the text once it has become a real
+   * tool call — see {@link withoutWrittenToolCall}.
+   */
+  readonly span: { readonly start: number; readonly end: number };
 }
 
 /** Keys a text tool-call envelope uses to name the tool. */
@@ -585,6 +592,7 @@ function reconstruct(
   parsedArgs: Record<string, unknown> | undefined,
   registered: readonly string[],
   shape: ReconstructedShape,
+  span: { start: number; end: number },
 ): ReconstructedToolCall | undefined {
   const toolName = resolveRegistered(rawName, registered);
   if (toolName === undefined) return undefined;
@@ -595,12 +603,57 @@ function reconstruct(
       argsText: argsText ?? JSON.stringify(parsedArgs),
       arguments: parsedArgs,
       shape,
+      span,
     };
   }
   if (argsText === undefined) return undefined;
   const parsed = repairToolCallJson(argsText);
   if (parsed === undefined) return undefined;
-  return { toolName, rawName, argsText, arguments: parsed, shape };
+  return { toolName, rawName, argsText, arguments: parsed, shape, span };
+}
+
+/**
+ * Widen a written call's extent over the markup that merely wraps it — a
+ * `<tool_call>` … `</tool_call>` envelope, a ```json fence — plus the
+ * whitespace between, so removing the span leaves no orphan wrapper behind.
+ */
+function widenSpan(content: string, start: number, end: number): { start: number; end: number } {
+  let s = start;
+  let e = end;
+  for (;;) {
+    const before = content.slice(0, s);
+    const after = content.slice(e);
+    const open = /(?:<tool_call\s*>|```[a-zA-Z]*)\s*$/.exec(before);
+    const close = /^\s*(?:<\/tool_call\s*>|```)/.exec(after);
+    // Only a PAIR widens (a lone opener above is the stream's, not this call's),
+    // except the closer of an envelope whose opener the tag itself carried.
+    if (open !== null && close !== null) {
+      s -= open[0].length;
+      e += close[0].length;
+      continue;
+    }
+    if (close !== null && /<\/tool_call\s*>/.test(close[0]) && /<tool_call\s*>/.test(before)) {
+      e += close[0].length;
+      continue;
+    }
+    return { start: s, end: e };
+  }
+}
+
+/**
+ * The content with a reconstructed call taken OUT: the prose before and after
+ * it (any stray scaffolding scrubbed), joined by a blank line when both exist.
+ * Once rung 0 has turned the written call into a real tool call this is what
+ * the assistant message's text should read — the thread shows the call as an
+ * activity row instead of raw XML, and the next prompt carries it once (as the
+ * template's tool call), not twice.
+ */
+export function withoutWrittenToolCall(content: string, call: ReconstructedToolCall): string {
+  const before = stripToolCallScaffolding(content.slice(0, call.span.start)).trim();
+  const after = stripToolCallScaffolding(content.slice(call.span.end)).trim();
+  if (before.length === 0) return after;
+  if (after.length === 0) return before;
+  return `${before}\n\n${after}`;
 }
 
 /** Strategy A — a JSON envelope `{name|tool|function: …, arguments|args|…: {…}}`. */
@@ -608,7 +661,10 @@ function fromEnvelope(
   content: string,
   registered: readonly string[],
 ): ReconstructedToolCall | undefined {
+  let from = 0;
   for (const objText of scanJsonObjects(content)) {
+    const at = content.indexOf(objText, from);
+    from = at + objText.length;
     const parsed = repairToolCallJson(objText);
     if (parsed === undefined) continue;
 
@@ -656,7 +712,14 @@ function fromEnvelope(
     }
     if (args === undefined) continue;
 
-    const built = reconstruct(rawName, args.argsText, args.arguments, registered, 'envelope-json');
+    const built = reconstruct(
+      rawName,
+      args.argsText,
+      args.arguments,
+      registered,
+      'envelope-json',
+      widenSpan(content, at, at + objText.length),
+    );
     if (built !== undefined) return built;
   }
   return undefined;
@@ -715,6 +778,7 @@ function fromFunctionTag(
     const rawName = m[1];
     const body = m[2];
     if (rawName === undefined || body === undefined) continue;
+    const span = widenSpan(content, m.index, m.index + m[0].length);
     // Prefer explicit <parameter=…> tags: they are unambiguous, and reading them
     // FIRST avoids mis-parsing a brace inside a code-valued parameter (e.g. a
     // `write` whose content is TS with `{…}`) as the args JSON via scanJsonObjects.
@@ -726,6 +790,7 @@ function fromFunctionTag(
         paramArgs,
         registered,
         'function-tag',
+        span,
       );
       if (built !== undefined) return built;
     }
@@ -737,6 +802,7 @@ function fromFunctionTag(
       objText === undefined ? {} : undefined,
       registered,
       'function-tag',
+      span,
     );
     if (built !== undefined) return built;
   }
@@ -755,7 +821,14 @@ function fromNameTag(
     if (m?.[1] === undefined) continue;
     const objText = scanJsonObjects(m[1])[0];
     if (objText === undefined) continue;
-    const built = reconstruct(tool, objText, undefined, registered, 'name-tag');
+    const built = reconstruct(
+      tool,
+      objText,
+      undefined,
+      registered,
+      'name-tag',
+      widenSpan(content, m.index, m.index + m[0].length),
+    );
     if (built !== undefined) return built;
   }
   return undefined;
@@ -771,10 +844,11 @@ function fromParenCall(
     const rawName = m[1];
     if (rawName === undefined) continue;
     const objText = m[2];
+    const span = widenSpan(content, m.index, m.index + m[0].length);
     const built =
       objText === undefined
-        ? reconstruct(rawName, '{}', {}, registered, 'paren-call')
-        : reconstruct(rawName, objText, undefined, registered, 'paren-call');
+        ? reconstruct(rawName, '{}', {}, registered, 'paren-call', span)
+        : reconstruct(rawName, objText, undefined, registered, 'paren-call', span);
     if (built !== undefined) return built;
   }
   return undefined;
@@ -796,7 +870,14 @@ function fromProse(
     if (bracePos === -1) continue;
     const objText = scanJsonObjects(content.slice(bracePos))[0];
     if (objText === undefined) continue;
-    const built = reconstruct(tool, objText, undefined, registered, 'prose-json');
+    const built = reconstruct(
+      tool,
+      objText,
+      undefined,
+      registered,
+      'prose-json',
+      widenSpan(content, m.index, bracePos + objText.length),
+    );
     if (built !== undefined) return built;
   }
   return undefined;

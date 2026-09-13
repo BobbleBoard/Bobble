@@ -104,11 +104,22 @@ export function mirrorCommandText(
     where === ''
       ? `${SGR.dim}$${SGR.reset}`
       : `${SGR.bold}${SGR.green}bobble${SGR.reset} ${SGR.bold}${SGR.blue}${where}${SGR.reset} ${SGR.dim}$${SGR.reset}`;
-  const head = `${prompt} ${SGR.bold}${command}${SGR.reset}\n\n`;
+  const line = `${prompt} ${SGR.bold}${command}`;
+  /*
+   * A command with nothing printed yet is left as an OPEN line — no reset, no
+   * newline — because it may still be being typed: a bash call's `command`
+   * streams in with its arguments, and each tick used to close the line
+   * (`echo`⏎⏎, then `echo hello`⏎⏎, …), so the text was never an extension of
+   * the previous one and the xterm rebuilt itself per keystroke — SEEN
+   * 2026-09-13 as four half-typed `$ echo …` lines stacked up for one command.
+   * Left open, the next characters append, exactly as typing does.
+   */
+  if (running && output.length === 0) return line;
+  const head = `${line}${SGR.reset}\n\n`;
   if (output.length > 0) {
     return opts.failed === true ? `${head}${SGR.red}${output}${SGR.reset}\n` : `${head}${output}\n`;
   }
-  return running ? head : `${head}${SGR.dim}(no output)${SGR.reset}\n`;
+  return `${head}${SGR.dim}(no output)${SGR.reset}\n`;
 }
 
 /** The tail of a path, the way a shell prompt shows it: `~` for home, else the

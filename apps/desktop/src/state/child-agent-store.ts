@@ -17,7 +17,12 @@ import {
   type StoreSink,
 } from '@pi-desktop/engine';
 import { create } from 'zustand';
-import { appendOrMergeBlock, mutateAssistant, upsertToolResultMsg } from './transcript-fold';
+import {
+  adoptFinalText,
+  appendOrMergeBlock,
+  mutateAssistant,
+  upsertToolResultMsg,
+} from './transcript-fold';
 
 /** Whether to expose the E2E store hook (probes read the folded transcript). */
 const IS_E2E =
@@ -183,6 +188,7 @@ export function makeChildSink(childId: string): StoreSink {
       upd((msgs) =>
         mutateAssistant(msgs, id, (m) => ({
           ...m,
+          blocks: adoptFinalText(m.blocks, message?.content),
           isStreaming: false,
           stopReason,
           errorMessage: message?.errorMessage,

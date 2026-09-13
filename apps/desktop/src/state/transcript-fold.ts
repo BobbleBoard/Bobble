@@ -4,7 +4,13 @@
  * (pi-slice) and the child-agent store (child-agent-store) so a subagent/role
  * renders through the EXACT same fold as the main chat, not a parallel copy.
  */
-import type { AssistantMsg, ChatMsg, ToolResultMsg } from '@pi-desktop/engine';
+import type {
+  AssistantMessage,
+  AssistantMsg,
+  ChatMsg,
+  ContentBlock,
+  ToolResultMsg,
+} from '@pi-desktop/engine';
 
 /** Map the assistant message with `id`, leaving every other row untouched. */
 export function mutateAssistant(
@@ -39,6 +45,35 @@ export function appendOrMergeBlock(
     }
     return { ...m, blocks };
   });
+}
+
+/**
+ * The streamed text blocks, with their text taken from pi's FINAL message where
+ * the two differ. What streamed is what the model typed; what turn_end carries
+ * is what the provider settled on — and a provider may rewrite a text block
+ * after streaming it (rung 0 takes a written tool call out of the text once it
+ * has become a real call, so the thread shows an activity row, not raw
+ * `<function …>` markup). Text blocks pair up in order; when the counts differ
+ * the stream is kept as it was (nothing here guesses a mapping).
+ */
+export function adoptFinalText(
+  blocks: ContentBlock[],
+  content: AssistantMessage['content'] | undefined,
+): ContentBlock[] {
+  if (content === undefined) return blocks;
+  const finalTexts = content.filter((c) => c.type === 'text').map((c) => c.text);
+  const streamed = blocks.filter((b) => b.type === 'text');
+  if (finalTexts.length !== streamed.length) return blocks;
+  let i = 0;
+  let changed = false;
+  const out = blocks.map((b) => {
+    if (b.type !== 'text') return b;
+    const text = finalTexts[i++] ?? b.text;
+    if (text === b.text) return b;
+    changed = true;
+    return { ...b, text };
+  });
+  return changed ? out : blocks;
 }
 
 /** Insert-or-replace a tool result keyed by its (assistant-scoped) row id —

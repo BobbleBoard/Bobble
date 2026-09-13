@@ -41,6 +41,7 @@ import {
   type ToolCallFixer,
   type ToolSchemaLike,
   validateAgainstSchema,
+  withoutWrittenToolCall,
 } from './repair.js';
 import { parseSSE } from './sse.js';
 
@@ -893,6 +894,12 @@ export function createLlamaCppStream(deps: LlamaCppStreamDeps = {}): LlamaCppStr
           const assistantText = textBlock?.type === 'text' ? textBlock.text : '';
           const reconstructed = reconstructToolCallFromContent(assistantText, registeredNames);
           if (reconstructed !== undefined) {
+            // The call is a real tool call now, so the text stops carrying it:
+            // the thread shows an activity row instead of raw markup, and the
+            // next prompt has the call once (the template's), not also as prose.
+            if (textBlock?.type === 'text') {
+              textBlock.text = withoutWrittenToolCall(assistantText, reconstructed);
+            }
             const block: ToolCall = {
               type: 'toolCall',
               id: `call_rung0_${output.content.length}`,

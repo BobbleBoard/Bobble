@@ -81,10 +81,39 @@ const NO_THINKING = { chat_template_kwargs: { enable_thinking: false } } as cons
  * so only a handful of uncached tokens follow the (reused) transcript.
  */
 const HEADER_INSTRUCTION = [
-  'Before continuing, respond with ONLY a JSON object naming this conversation:',
-  '{"title": "<a 3-6 word title>"}',
+  'Before continuing, respond with ONLY a JSON object naming this conversation',
+  "after what the user asked for — the user's topic or task, in 3-6 words:",
+  '{"title": "<3-6 words: the user\'s topic or task>"}',
   'Output the JSON object and nothing else.',
 ].join('\n');
+
+/**
+ * Titles that name nothing: the instruction's own words handed back, or a stock
+ * placeholder. SEEN 2026-09-13 with MiniCPM5 2B — a chat about running a shell
+ * command sat in the sidebar as "Conversation Title". A reply like this is no
+ * title (the caller keeps the first-message summary), and the instruction above
+ * now says what the title is ABOUT so a small model has something to name.
+ */
+const GENERIC_TITLES = new Set([
+  'conversation title',
+  'conversation',
+  'title',
+  'chat title',
+  'chat',
+  'new chat',
+  'untitled',
+  'topic or task',
+  'the users topic or task',
+]);
+
+function isGenericTitle(title: string): boolean {
+  const norm = title
+    .toLowerCase()
+    .replace(/[<>"'`.!?:]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return norm.length === 0 || GENERIC_TITLES.has(norm) || /^(?:a )?3-6 words?\b/.test(norm);
+}
 
 /**
  * A JSON-schema response format constraining the reply to exactly `{title}`.
@@ -111,13 +140,13 @@ function titleResponseFormat(): Record<string, unknown> {
  * Parse `{title}` out of the model reply. Tolerates prose around the JSON (a
  * small model may still wrap it) by extracting the first balanced object.
  */
-function parseTitle(text: string): string | undefined {
+export function parseTitle(text: string): string | undefined {
   const raw = extractFirstJsonObject(text);
   if (raw === undefined) return undefined;
   try {
     const obj = JSON.parse(raw) as Record<string, unknown>;
     const title = typeof obj.title === 'string' ? obj.title.trim() : '';
-    return title.length > 0 ? title : undefined;
+    return title.length > 0 && !isGenericTitle(title) ? title : undefined;
   } catch {
     return undefined;
   }

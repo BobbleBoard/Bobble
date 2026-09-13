@@ -10,6 +10,7 @@
 
 import type { CanvasTabSpec } from '@pi-desktop/canvas';
 import type { AssistantMsg, ContentBlock, ToolResultMsg } from '@pi-desktop/engine';
+import { findToolCallOpener } from '@pi-desktop/provider-llamacpp/repair';
 import type {
   ActivityStepData,
   ActivityStepKind,
@@ -106,10 +107,12 @@ export function segmentGroup(group: AssistantMsg[]): GroupSegment[] {
     for (const block of message.blocks) {
       if (block.type === 'text') {
         flush();
-        if (block.text.length === 0) continue;
+        const text =
+          message.isStreaming === true ? streamingTextWithoutWrittenCall(block.text) : block.text;
+        if (text.length === 0) continue;
         const start = fenceCounts.get(message.id) ?? 0;
         const { segments: parts, nextIndex } = segmentMessageText(
-          block.text,
+          text,
           message.id,
           message.isStreaming === true,
           start,
@@ -126,6 +129,20 @@ export function segmentGroup(group: AssistantMsg[]): GroupSegment[] {
   }
   flush();
   return segments;
+}
+
+/**
+ * A STREAMING text block, cut at the first written tool-call opener
+ * (`<tool_call>`, `<function=…>`, `<function name=…>`). A model that writes its
+ * call into the content (MiniCPM5 on the MLX engines does) would otherwise type
+ * raw markup into the bubble until the turn ends; from the opener on the text
+ * is the call, which becomes an activity row once the provider has made it a
+ * real one (the settled text is then taken from pi's final message — see
+ * `adoptFinalText`). Prose before the opener still shows as it streams.
+ */
+function streamingTextWithoutWrittenCall(text: string): string {
+  const at = findToolCallOpener(text);
+  return at === -1 ? text : text.slice(0, at).trimEnd();
 }
 
 /** A mapped step plus the optional canvas tab it opens (image/pdf/preview). */

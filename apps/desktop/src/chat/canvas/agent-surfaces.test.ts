@@ -17,8 +17,23 @@ import {
 describe('a mirror only ever grows', () => {
   it('a running command is its prompt line and nothing else', () => {
     // What a real terminal shows while something works — and it means the output
-    // that follows is an APPEND, not a rewrite.
-    expect(plainMirrorText(mirrorCommandText('npm test', '', true))).toBe('$ npm test\n\n');
+    // that follows is an APPEND, not a rewrite. The line stays OPEN (no newline)
+    // because the command itself may still be arriving.
+    expect(plainMirrorText(mirrorCommandText('npm test', '', true))).toBe('$ npm test');
+  });
+
+  it('a command being TYPED extends its own line', () => {
+    // A bash call's command streams in with its arguments; every tick must be an
+    // extension of the last, or the xterm rebuilds per keystroke (2026-09-13:
+    // `$ echo` / `$ echo hello` / `$ echo hello-from` stacked as four lines).
+    const typed = ['echo', 'echo hello', 'echo hello-from', 'echo hello-from-tool'].map((c) =>
+      mirrorCommandText(c, '', true, '/w/proj'),
+    );
+    for (let i = 1; i < typed.length; i++) {
+      expect(typed[i]?.startsWith(typed[i - 1] as string)).toBe(true);
+    }
+    const ran = mirrorCommandText('echo hello-from-tool', 'hello-from-tool', false, '/w/proj');
+    expect(ran.startsWith(typed[typed.length - 1] as string)).toBe(true);
   });
 
   it('output arriving EXTENDS the running text', () => {

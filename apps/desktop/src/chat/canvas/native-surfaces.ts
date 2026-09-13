@@ -692,9 +692,15 @@ export class NativeSurfaces {
     const previous = entry.lastMirrorText ?? '';
     const grew = !force && previous !== '' && text.startsWith(previous);
     entry.lastMirrorText = text;
-    const chunk = grew ? text.slice(previous.length) : text;
-    if (!grew) entry.term.reset();
-    if (chunk !== '') entry.term.write(chunk.replace(/\r?\n/g, '\r\n'));
+    /*
+     * The reset rides IN the write stream (ESC c — xterm's fullReset) rather
+     * than as `term.reset()`: writes are queued and parsed later, a reset call
+     * is immediate, so a rewrite issued between two ticks reset the screen
+     * BEFORE the previous tick's text had been parsed — that text then landed
+     * after the reset, under the new text, and every rewrite stacked up.
+     */
+    const chunk = grew ? text.slice(previous.length) : `\x1bc${text}`;
+    entry.term.write(chunk.replace(/\r?\n/g, '\r\n'));
   }
 
   /** Push new mirror text into any mounted mirror terminals (called on each

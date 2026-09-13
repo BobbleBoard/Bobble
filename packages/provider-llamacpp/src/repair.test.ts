@@ -500,3 +500,54 @@ describe("MiniCPM5's own tool contract — <function name=…><param name=…>",
     expect(stripToolCallScaffolding(text).trim()).toBe('Sure.\nls');
   });
 });
+
+describe('once a written call is a real tool call, the text stops carrying it', () => {
+  // SEEN 2026-09-13 (engine-matrix-look, MiniCPM5 on rapid-mlx): the tool ran,
+  // and the bubble above "Ran a command" still read
+  // `<function name="bash"><param name="command">echo …</param></function>`.
+  const registered = ['bash', 'read', 'web_search'];
+
+  it("MiniCPM5's tag goes, the prose around it stays", async () => {
+    const { reconstructToolCallFromContent, withoutWrittenToolCall } = await import('./repair.js');
+    const text =
+      'Running it now.\n<function name="bash"><param name="command">echo hi</param></function>\nDone.';
+    const call = reconstructToolCallFromContent(text, registered);
+    expect(call?.span).toEqual({ start: 16, end: text.length - 6 });
+    expect(withoutWrittenToolCall(text, call as NonNullable<typeof call>)).toBe(
+      'Running it now.\n\nDone.',
+    );
+  });
+
+  it('a call that was the whole message leaves an empty text', async () => {
+    const { reconstructToolCallFromContent, withoutWrittenToolCall } = await import('./repair.js');
+    const text = '<function name="bash"><param name="command">ls</param></function>';
+    const call = reconstructToolCallFromContent(text, registered);
+    expect(withoutWrittenToolCall(text, call as NonNullable<typeof call>)).toBe('');
+  });
+
+  it('a <tool_call> wrapper and a ```json fence go with the call they wrapped', async () => {
+    const { reconstructToolCallFromContent, withoutWrittenToolCall } = await import('./repair.js');
+    for (const text of [
+      'Sure.\n<tool_call>\n{"name":"read","arguments":{"path":"/x"}}\n</tool_call>',
+      'Sure.\n```json\n{"name":"read","arguments":{"path":"/x"}}\n```',
+      'Sure.\n<tool_call><function=read><parameter=path>/x</parameter></function></tool_call>',
+    ]) {
+      const call = reconstructToolCallFromContent(text, registered);
+      expect(call?.toolName).toBe('read');
+      expect(withoutWrittenToolCall(text, call as NonNullable<typeof call>)).toBe('Sure.');
+    }
+  });
+
+  it('a paren call and a prose call are cut out as tightly', async () => {
+    const { reconstructToolCallFromContent, withoutWrittenToolCall } = await import('./repair.js');
+    const paren = 'Let me look: web_search({"query":"cats"}) — one moment.';
+    const p = reconstructToolCallFromContent(paren, registered);
+    expect(withoutWrittenToolCall(paren, p as NonNullable<typeof p>)).toBe(
+      'Let me look:\n\n— one moment.',
+    );
+    const prose = 'I will call web_search with {"query":"dogs"} now.';
+    const q = reconstructToolCallFromContent(prose, registered);
+    expect(q?.shape).toBe('prose-json');
+    expect(withoutWrittenToolCall(prose, q as NonNullable<typeof q>)).toBe('I will call\n\nnow.');
+  });
+});
