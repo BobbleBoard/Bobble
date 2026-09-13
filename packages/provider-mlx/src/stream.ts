@@ -35,6 +35,7 @@ import {
   headersToRecord,
   parseSSE,
   type RepairRung,
+  reconstructToolCallFromContent,
   repairToolCallArguments,
   type ToolCallFixer,
   type ToolSchemaLike,
@@ -398,6 +399,50 @@ export function createMlxStream(deps: MlxStreamDeps = {}): MlxStreamFn {
             content: block?.type === 'text' ? block.text : '',
             partial: output,
           });
+        }
+
+        /*
+         * RUNG 0 — a tool call WRITTEN INTO THE CONTENT, the same rung
+         * provider-llamacpp has and this provider did not.
+         *
+         * MEASURED 2026-09-13 (engine-matrix probe, MiniCPM5 2B): on mlx-lm,
+         * rapid-mlx and oMLX the model's call came back as the text
+         * `<function name="bash"><param name="command">echo …</param></function>`
+         * — MiniCPM5's own contract, which those engines' parsers do not know
+         * (rapid-mlx auto-picked hermes) — so no tool ran and the model then
+         * made the output up. llama.cpp and mlx-dspark parsed it. The heuristics
+         * are guarded to a registered tool name + parseable args, so prose that
+         * merely mentions a tool never fires; the synthesized call then goes
+         * through the same validate → repair path as a structured one.
+         */
+        const registeredNames = context.tools?.map((t) => t.name) ?? [];
+        if (toolStates.size === 0 && registeredNames.length > 0 && textIndex !== undefined) {
+          const textBlock = output.content[textIndex];
+          const assistantText = textBlock?.type === 'text' ? textBlock.text : '';
+          const reconstructed = reconstructToolCallFromContent(assistantText, registeredNames);
+          if (reconstructed !== undefined) {
+            const block: ToolCall = {
+              type: 'toolCall',
+              id: `call_rung0_${output.content.length}`,
+              name: reconstructed.toolName,
+              arguments: {},
+            };
+            output.content.push(block);
+            const contentIndex = output.content.length - 1;
+            toolStates.set(toolStates.size, {
+              contentIndex,
+              id: block.id,
+              name: reconstructed.toolName,
+              argStr: reconstructed.argsText,
+            });
+            stream.push({ type: 'toolcall_start', contentIndex, partial: output });
+            const live = deps.repairProvider?.();
+            (live?.onRepair ?? deps.onRepair)?.({
+              toolName: reconstructed.toolName,
+              rung: 0,
+              ok: true,
+            });
+          }
         }
 
         for (const state of toolStates.values()) {

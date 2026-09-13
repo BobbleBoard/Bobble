@@ -472,3 +472,31 @@ describe('written tool-call scaffolding (display salvage)', () => {
     expect(findWrittenToolCallRegion('no scaffolding at all')).toBeNull();
   });
 });
+
+describe("MiniCPM5's own tool contract — <function name=…><param name=…>", () => {
+  it('reconstructs the call the MLX engines hand over as text', async () => {
+    const { reconstructToolCallFromContent } = await import('./repair.js');
+    const text =
+      '<function name="bash"><param name="command">echo hello-from-tool</param></function>';
+    const r = reconstructToolCallFromContent(text, ['read', 'write', 'edit', 'bash']);
+    expect(r?.toolName).toBe('bash');
+    expect(JSON.parse(r?.argsText ?? '{}')).toEqual({ command: 'echo hello-from-tool' });
+  });
+
+  it('still reads the Llama/Qwen <function=NAME><parameter=KEY> form', async () => {
+    const { reconstructToolCallFromContent } = await import('./repair.js');
+    const r = reconstructToolCallFromContent(
+      '<function=web_fetch><parameter=url>https://x/</parameter></function>',
+      ['web_fetch'],
+    );
+    expect(r?.toolName).toBe('web_fetch');
+    expect(JSON.parse(r?.argsText ?? '{}')).toEqual({ url: 'https://x/' });
+  });
+
+  it('the opener and the scaffolding scrub know the attribute form too', async () => {
+    const { findToolCallOpener, stripToolCallScaffolding } = await import('./repair.js');
+    const text = 'Sure.\n<function name="bash"><param name="command">ls</param></function>';
+    expect(findToolCallOpener(text)).toBe(6);
+    expect(stripToolCallScaffolding(text).trim()).toBe('Sure.\nls');
+  });
+});

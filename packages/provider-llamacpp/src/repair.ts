@@ -680,8 +680,13 @@ function fromEnvelope(
  * behavior is unchanged).
  */
 function parseParameterTags(body: string): Record<string, unknown> | undefined {
+  // `<parameter=KEY>`, `<parameter name="KEY">` (Hermes/Qwen) and `<param
+  // name="KEY">` — MiniCPM5's own contract (`<function name="NAME"><param
+  // name="KEY">VALUE</param></function>`), which the MLX engines' parsers do
+  // not know and hand over as text. MEASURED 2026-09-13 on mlx-lm, rapid-mlx
+  // and oMLX: the whole call arrived as content and no tool ran.
   const re =
-    /<parameter(?:\s*=\s*|\s+name\s*=\s*)["']?([a-zA-Z0-9_.-]+)["']?\s*>([\s\S]*?)<\/parameter\s*>/g;
+    /<param(?:eter)?(?:\s*=\s*|\s+name\s*=\s*)["']?([a-zA-Z0-9_.-]+)["']?\s*>([\s\S]*?)<\/param(?:eter)?\s*>/g;
   const args: Record<string, unknown> = {};
   let found = false;
   for (const m of body.matchAll(re)) {
@@ -703,7 +708,9 @@ function fromFunctionTag(
   content: string,
   registered: readonly string[],
 ): ReconstructedToolCall | undefined {
-  const re = /<function\s*=\s*["']?([a-zA-Z0-9_.-]+)["']?\s*>([\s\S]*?)<\/function>/g;
+  // `<function=NAME>` (Llama/Qwen) and `<function name="NAME">` (MiniCPM5).
+  const re =
+    /<function(?:\s*=\s*|\s+name\s*=\s*)["']?([a-zA-Z0-9_.-]+)["']?\s*>([\s\S]*?)<\/function\s*>/g;
   for (const m of content.matchAll(re)) {
     const rawName = m[1];
     const body = m[2];
@@ -841,7 +848,7 @@ export function reconstructToolCallFromContent(
  * The opener of a written tool call: a `<tool_call>` wrapper or a `<function=`
  * tag. A match means a call has STARTED even before it closes.
  */
-const TOOL_CALL_OPENER_RE = /<tool_call\s*>|<function\s*=/i;
+const TOOL_CALL_OPENER_RE = /<tool_call\s*>|<function(?:\s*=|\s+name\s*=)/i;
 
 /**
  * Every standalone tool-call scaffolding token — the `<tool_call>`/`</tool_call>`
@@ -850,7 +857,7 @@ const TOOL_CALL_OPENER_RE = /<tool_call\s*>|<function\s*=/i;
  * scrub stray/orphan tokens so none render as literal text.
  */
 const TOOL_CALL_SCAFFOLD_RE =
-  /<\/?tool_call\s*>|<\/?function(?:\s*=\s*["']?[a-zA-Z0-9_.-]*["']?)?\s*>|<\/?parameter(?:(?:\s*=\s*|\s+name\s*=\s*)["']?[a-zA-Z0-9_.-]*["']?)?\s*>/gi;
+  /<\/?tool_call\s*>|<\/?function(?:(?:\s*=\s*|\s+name\s*=\s*)["']?[a-zA-Z0-9_.-]*["']?)?\s*>|<\/?param(?:eter)?(?:(?:\s*=\s*|\s+name\s*=\s*)["']?[a-zA-Z0-9_.-]*["']?)?\s*>/gi;
 
 /**
  * Index of the first tool-call opener (`<tool_call>` or `<function=`) in `text`,
