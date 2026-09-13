@@ -162,6 +162,87 @@ try {
     console.log('Notes not running — live window-list case skipped');
   }
   serve.p.kill();
+
+  // 4. THE WINDOW BEHIND, ANOTHER OF THE SAME APP IN FRONT. the user: "the cursor
+  //    being on top while the window is behind". Anchoring on the app's
+  //    FRONTMOST window put every foreign window between the two below the
+  //    anchor — no hole for it, phantom painted over it. MEASURED with Finder
+  //    (three windows, Bobble between them): old helper → occluders = menubar
+  //    only, tip unmasked; number-first anchor → Bobble is a hole, tip masked.
+  //    Found on whatever desktop this runs on: an app with two real windows and
+  //    a foreign real window between them in z-order; skipped when there is none.
+  const z = (await overlay.req('zorder')).result?.windows ?? [];
+  const real = (w) => w.layer === 0 && w.w >= 64 && w.h >= 64 && w.alpha >= 0.05;
+  let layout = null;
+  for (let i = 0; i < z.length && layout === null; i++) {
+    const front = z[i];
+    if (!real(front)) continue;
+    for (let j = i + 1; j < z.length && layout === null; j++) {
+      const w = z[j];
+      if (!real(w)) continue;
+      if (w.pid === front.pid) break; // no foreign window between → keep looking from i
+      // a foreign window; is there a later window of `front`'s app behind it?
+      for (let k = j + 1; k < z.length; k++) {
+        const back = z[k];
+        if (!real(back) || back.pid !== front.pid) continue;
+        const inter = {
+          x: Math.max(w.x, back.x),
+          y: Math.max(w.y, back.y),
+          r: Math.min(w.x + w.w, back.x + back.w),
+          b: Math.min(w.y + w.h, back.y + back.h),
+        };
+        if (inter.r - inter.x > 20 && inter.b - inter.y > 20) {
+          layout = {
+            front,
+            between: w,
+            back,
+            tip: { x: Math.round((inter.x + inter.r) / 2), y: Math.round((inter.y + inter.b) / 2) },
+          };
+        }
+        break;
+      }
+    }
+  }
+  if (layout === null) {
+    console.log(
+      'no two-window layout with a foreign window between on this desktop — case skipped',
+    );
+  } else {
+    const { front, between, back, tip } = layout;
+    console.log(
+      `two-window layout: ${front.owner} #${front.number} in front, ${between.owner} #${between.number} between, ${front.owner} #${back.number} behind; tip ${tip.x},${tip.y}`,
+    );
+    await overlay.req('target', {
+      x: back.x,
+      y: back.y,
+      w: back.w,
+      h: back.h,
+      pid: back.pid,
+      windowNumber: back.number,
+    });
+    await overlay.req('cursor', { x: tip.x, y: tip.y, ms: 0 });
+    await sleep(300);
+    const i = (await overlay.req('info')).result;
+    const hole = (i.occluders ?? []).some(
+      (r) =>
+        Math.abs(r.x - between.x) <= 1 &&
+        Math.abs(r.y - between.y) <= 1 &&
+        Math.abs(r.w - between.w) <= 1,
+    );
+    check(
+      hole,
+      `${between.owner}'s window between the two is a hole (occluders=${JSON.stringify(i.occluders)})`,
+    );
+    check(
+      i.cursorMasked === true,
+      `the tip over ${between.owner} is masked (masked=${i.cursorMasked}, covered=${i.cursorCovered})`,
+    );
+    check(
+      i.trackedWindow === back.number,
+      `the anchor is the window being driven (#${i.trackedWindow})`,
+    );
+    await overlay.req('target', {});
+  }
 } finally {
   await overlay.req('hide').catch(() => {});
   overlay.p.kill();

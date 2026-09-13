@@ -741,6 +741,8 @@ final class OverlayController: NSObject {
   /// Whether the number we were told is in the current desktop's z-order at
   /// all — false means it is stale and the pid is doing the anchoring.
   private var trackedNumberOnScreen = false
+  /// Where in the last on-screen list the anchor sat (front-to-back), for `info`.
+  private var anchorIndex: Int?
   private var occlusionTimer: Timer?
   /** False once the window server refuses — we fall back to floating + mask. */
 
@@ -1711,61 +1713,95 @@ final class OverlayController: NSObject {
      * desktop. A wrong anchor now needs a wrong pid, and a wrong pid is the
      * Node side's whole notion of which app it is driving.
      */
+    /*
+     * …BUT THE NUMBER FIRST WHEN IT NAMES A REAL WINDOW. (2026-09-13.) Anchoring
+     * on the pid's FRONTMOST window has its own failure, and it is the one the user
+     * describes as "the cursor being on top while the window is behind": the
+     * app has two ordinary windows — the one being driven, behind Bobble, and
+     * another the user opened in front of Bobble — so the frontmost-by-pid
+     * anchor is the window in front, Bobble falls BELOW the anchor, and the
+     * phantom (sitting on the window behind) is painted straight over Bobble.
+     * The Node side re-reads the app's focused window every tick and re-sends
+     * its number, so the number is fresh; what made it unsafe was only the case
+     * where it names a utility window at a higher level. So: the number when
+     * it is a layer-0 window of real size, the pid's frontmost real window
+     * otherwise, and the bare number as the last resort.
+     */
     var rects: [CGRect] = []
     var anchor: Int?
     var byNumber: Int?
+    var byRealNumber: Int?
     for (i, w) in list.enumerated() {
       let num = (w[kCGWindowNumber as String] as? Int) ?? -1
       let owner = (w[kCGWindowOwnerPID as String] as? Int) ?? -1
+      let layer = (w[kCGWindowLayer as String] as? Int) ?? 0
+      let real: Bool = {
+        guard layer == 0, let raw = w[kCGWindowBounds as String] as? NSDictionary,
+          let r = CGRect(dictionaryRepresentation: raw)
+        else { return false }
+        return r.width >= 64 && r.height >= 64
+      }()
       if num == trackedWindow {
         byNumber = i
+        if real { byRealNumber = i }
         // The owner is the truth about which pid this is, whatever we were told.
         if trackedPid <= 0, owner > 0 { trackedPid = pid_t(owner) }
       }
-      if anchor == nil, trackedPid > 0, pid_t(owner) == trackedPid, !ours.contains(num),
-        ((w[kCGWindowLayer as String] as? Int) ?? 0) == 0,
-        let raw = w[kCGWindowBounds as String] as? NSDictionary,
-        let r = CGRect(dictionaryRepresentation: raw), r.width >= 64, r.height >= 64
-      {
+      if anchor == nil, trackedPid > 0, pid_t(owner) == trackedPid, !ours.contains(num), real {
         anchor = i
       }
     }
-    let at = anchor ?? byNumber
+    let at = byRealNumber ?? anchor ?? byNumber
     let found = at != nil
     trackedNumberOnScreen = byNumber != nil
+    anchorIndex = at
+    /*
+     * What a window above the anchor contributes to the mask — nil when it is
+     * not an occluder at all. ONE rule, used both to cut the holes and to check
+     * the cut afterwards, so the check cannot disagree with the cut.
+     *
+     * Anything at or above our own level is drawn over us by the window server
+     * and needs no hole (the lock screen at 2004, the camera dot at the top of
+     * the level range); it used to be cut anyway, which was harmless for the
+     * mask and a false alarm for the check.
+     */
+    let ourLevel = panel.level.rawValue
+    let holeRects: ([String: Any]) -> [CGRect]? = { w in
+      let num = (w[kCGWindowNumber as String] as? Int) ?? -1
+      if ours.contains(num) { return nil }
+      if let owner = (w[kCGWindowOwnerPID as String] as? Int), pid_t(owner) == self.trackedPid {
+        return nil
+      }
+      if let alpha = (w[kCGWindowAlpha as String] as? Double), alpha < 0.05 { return nil }
+      guard let raw = w[kCGWindowBounds as String] as? NSDictionary,
+        let r = CGRect(dictionaryRepresentation: raw)
+      else { return nil }
+      let layer = (w[kCGWindowLayer as String] as? Int) ?? 0
+      if layer >= ourLevel { return nil }
+      let ownerName = (w[kCGWindowOwnerName as String] as? String) ?? ""
+      /* The Dock's screen-sized window covers nothing but its tiles — see
+         dockStrips. Only the screen-sized one is hollow; a smaller Dock
+         window (an app switcher, a bounce) is what it says it is. */
+      if ownerName == "Dock", self.coversAScreen(r) {
+        return dockStrips().compactMap { strip -> CGRect? in
+          let cut = strip.intersection(r)
+          return (!cut.isNull && cut.width > 0 && cut.height > 0) ? cut : nil
+        }
+      }
+      /* Any OTHER screen-sized window above the normal band is an overlay of
+         someone's (a screen-share border, a recorder's frame, a window
+         manager's hints) — hollow by construction, since a real fullscreen
+         app lives at layer 0 on a Space of its own. Cutting it would blank
+         the phantom on the whole display. Said once per owner. */
+      if layer > 0, self.coversAScreen(r) {
+        self.noteHollow(ownerName, layer: layer)
+        return nil
+      }
+      return [r]
+    }
     if let at = at {
       for w in list.prefix(at) {
-        let num = (w[kCGWindowNumber as String] as? Int) ?? -1
-        if ours.contains(num) { continue }
-        if let owner = (w[kCGWindowOwnerPID as String] as? Int), pid_t(owner) == trackedPid {
-          continue
-        }
-        if let alpha = (w[kCGWindowAlpha as String] as? Double), alpha < 0.05 { continue }
-        guard let raw = w[kCGWindowBounds as String] as? NSDictionary,
-          let r = CGRect(dictionaryRepresentation: raw)
-        else { continue }
-        /* The Dock's screen-sized window covers nothing but its tiles — see
-           dockStrips. Only the screen-sized one is hollow; a smaller Dock
-           window (an app switcher, a bounce) is what it says it is. */
-        let layer = (w[kCGWindowLayer as String] as? Int) ?? 0
-        let ownerName = (w[kCGWindowOwnerName as String] as? String) ?? ""
-        if ownerName == "Dock", coversAScreen(r) {
-          for strip in dockStrips() {
-            let cut = strip.intersection(r)
-            if !cut.isNull, cut.width > 0, cut.height > 0 { rects.append(cut) }
-          }
-          continue
-        }
-        /* Any OTHER screen-sized window above the normal band is an overlay of
-           someone's (a screen-share border, a recorder's frame, a window
-           manager's hints) — hollow by construction, since a real fullscreen
-           app lives at layer 0 on a Space of its own. Cutting it would blank
-           the phantom on the whole display. Said once per owner. */
-        if layer > 0, coversAScreen(r) {
-          noteHollow(ownerName, layer: layer)
-          continue
-        }
-        rects.append(r)
+        if let hs = holeRects(w) { rects.append(contentsOf: hs) }
       }
     }
     /*
@@ -1783,12 +1819,30 @@ final class OverlayController: NSObject {
      *
      * the user, twice: the phantom draws on top of a window that is above the one
      * it belongs to. Everything else here is a proxy for that; this is the
-     * thing itself. The cursor's own point is tested against the windows we
-     * just decided are ABOVE the tracked window, and if one of them covers it
-     * while our occluder set does not, the phantom is being painted over
-     * somebody else's window right now — so say so, and name the window.
+     * thing itself. The cursor's own point is tested against every window that
+     * is ABOVE the anchor in the z-order and belongs to someone else, and if
+     * one of them contains the tip while the mask PATH (what the compositor
+     * fills) does not cut it out, the phantom is being painted over somebody
+     * else's window right now — so say so, and name the window, so the next
+     * report carries the culprit instead of a guess.
      */
-    if found {
+    var caught = false
+    if found, phantomShowing, let at = at, let tip = cursorAX, !cursorMaskedByPath() {
+      for w in list.prefix(at) {
+        guard let hs = holeRects(w), let r = hs.first(where: { $0.contains(tip) }) else { continue }
+        let num = (w[kCGWindowNumber as String] as? Int) ?? -1
+        let ownerName = (w[kCGWindowOwnerName as String] as? String) ?? "?"
+        let layer = (w[kCGWindowLayer as String] as? Int) ?? 0
+        noteUnmasked(
+          "tip \(Int(tip.x)),\(Int(tip.y)) is over \(ownerName)'s window #\(num) (level \(layer), \(rectText(r))) and the mask has no hole there — holes=\(rects.count)"
+        )
+        caught = true
+        break
+      }
+    }
+    if caught {
+      // said above
+    } else if found {
       clearUnmasked()
     } else if phantomShowing {
       /*
@@ -2294,6 +2348,7 @@ final class OverlayController: NSObject {
       "trackedWindow": trackedWindow,
       "trackedPid": Int(trackedPid),
       "trackedNumberOnScreen": trackedNumberOnScreen,
+      "anchorIndex": anchorIndex ?? -1,
       "masksNatively": masksNatively,
       "windowNumber": panel.windowNumber,
 
@@ -2548,6 +2603,33 @@ private func handleOverlay(
     return ["ok": true]
   case "info":
     return controller.info()
+  case "zorder":
+    /* What the mask sees: the on-screen list front-to-back, as the occlusion
+       pass reads it — for probes that need a real two-window layout and for a
+       field report that has to say which window was over the phantom. */
+    let list =
+      (CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID)
+        as? [[String: Any]]) ?? []
+    let rows: [[String: Any]] = list.map { w in
+      var d: [String: Any] = [
+        "number": (w[kCGWindowNumber as String] as? Int) ?? -1,
+        "pid": (w[kCGWindowOwnerPID as String] as? Int) ?? -1,
+        "owner": (w[kCGWindowOwnerName as String] as? String) ?? "",
+        "layer": (w[kCGWindowLayer as String] as? Int) ?? 0,
+        "alpha": (w[kCGWindowAlpha as String] as? Double) ?? 1,
+      ]
+      if let raw = w[kCGWindowBounds as String] as? NSDictionary,
+        let r = CGRect(dictionaryRepresentation: raw)
+      {
+        // CG bounds are already top-left origin; nothing to flip.
+        d["x"] = Double(r.minX)
+        d["y"] = Double(r.minY)
+        d["w"] = Double(r.width)
+        d["h"] = Double(r.height)
+      }
+      return d
+    }
+    return ["ok": true, "windows": rows]
   case "quit":
     DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { exit(0) }
     return ["ok": true]

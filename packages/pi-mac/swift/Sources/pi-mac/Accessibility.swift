@@ -827,8 +827,21 @@ func windowBoundsInfo(target: SnapshotTarget) -> [String: Any]? {
     // occluders, or the overlay would hide exactly when a dialog opens.
     let ownPids = Set(surfaces.map { $0.hostPid })
     let z = zOrderInfo(windowId: wid, pid: resolved.pid, fallbackFrame: frame)
+    /*
+     * A surface of the app's hosted by ANOTHER process (a sandboxed Open/Save
+     * panel) is the app's own, not an occluder. It used to be recognised by
+     * its ORIGIN falling inside one of the app's windows — and so was every
+     * other app's window whose top-left corner happened to be over ours.
+     * MEASURED (2026-09-13): Bobble at 36,33 over Safari at 0,33 → reported
+     * covered 0, occluders [] — the whole Node-side visibility fallback fed a
+     * lie. A hosted panel is the same WINDOW as one of the surfaces, so match
+     * frames (to the point), not corners.
+     */
     let foreign = z.occluders.filter { r in
-      !surfaces.contains { $0.frame.insetBy(dx: -2, dy: -2).contains(r.origin) }
+      !surfaces.contains { sfc in
+        abs(sfc.frame.minX - r.minX) <= 2 && abs(sfc.frame.minY - r.minY) <= 2
+          && abs(sfc.frame.width - r.width) <= 2 && abs(sfc.frame.height - r.height) <= 2
+      }
     }
     let covered = ownFrame.map { own -> Double in
       let area = own.width * own.height
