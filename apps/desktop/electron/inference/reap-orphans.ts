@@ -46,25 +46,42 @@ export function parseProcessRows(psOutput: string): ProcessRow[] {
 /**
  * Which rows are ours, orphaned, and not us.
  *
- * `ownRoot` is the app's llama binary directory: matching on it means a
- * llama-server a user launched by hand from elsewhere is never in scope. `self`
- * excludes the current process defensively — reaping is a kill loop, and it
- * should be impossible for it to reach this process even by accident.
+ * `roots` are the app's own binary directories: the llama.cpp build dir (a
+ * `llama-server` there is ours) and the engines dir (`<cache>/engines/…`,
+ * where every external engine — `rapid-mlx serve`, `dflash serve`,
+ * `mlx-dspark serve`, `omlx serve`, `mlx_lm.server`, `vllm serve` — runs out
+ * of a venv of ours). Matching on the root means a server a user launched by
+ * hand from elsewhere is never in scope. `self` excludes the current process
+ * defensively — reaping is a kill loop, and it should be impossible for it
+ * to reach this process even by accident.
+ *
+ * MEASURED 2026-09-12: three `rapid-mlx serve` stubs reparented to init after
+ * headless probes closed the app mid-launch — the llama-server-only rule
+ * walked straight past them.
  */
 export function orphanedServers(
   rows: readonly ProcessRow[],
-  ownRoot: string,
+  roots: string | readonly string[],
   self: number = process.pid,
 ): ProcessRow[] {
   const live = new Set(rows.map((r) => r.pid));
+  const list = typeof roots === 'string' ? [roots] : roots;
   return rows.filter(
     (r) =>
       r.pid !== self &&
-      r.command.includes('llama-server') &&
-      r.command.includes(ownRoot) &&
+      list.some((root) => r.command.includes(root)) &&
+      isServerCommand(r.command) &&
       // Reparented to init, or the parent is simply gone from the table.
       (r.ppid === 1 || !live.has(r.ppid)),
   );
+}
+
+/** A model server, as opposed to a pip install or a `--help` we ran from the same venv. */
+function isServerCommand(command: string): boolean {
+  if (command.includes('llama-server')) return true;
+  if (/\bmlx_lm\.server\b/.test(command)) return true;
+  // `<venv>/bin/rapid-mlx serve …`, `…/dflash serve …`, `…/vllm serve …`
+  return /\/bin\/[\w.-]+\s+serve(\s|$)/.test(command);
 }
 
 /**
@@ -73,7 +90,7 @@ export function orphanedServers(
  * from starting. Returns the pids it stopped, for the log and for tests.
  */
 export function reapOrphanedServers(
-  ownRoot: string,
+  ownRoot: string | readonly string[],
   deps: {
     ps: () => string;
     kill: (pid: number) => void;
@@ -96,7 +113,7 @@ export function reapOrphanedServers(
     }
   }
   if (stopped.length > 0) {
-    deps.log?.('reaped orphaned llama-server(s) from a previous run', { pids: stopped });
+    deps.log?.('reaped orphaned model server(s) from a previous run', { pids: stopped });
   }
   return stopped;
 }

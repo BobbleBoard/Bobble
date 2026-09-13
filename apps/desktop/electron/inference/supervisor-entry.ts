@@ -83,6 +83,7 @@ import {
   recommend,
   resolveTierModels,
   type SpecMethod,
+  type StartResult,
   sampleFromServerTimings,
   sampleFromTimings,
   searchHfModels,
@@ -349,6 +350,23 @@ interface CurrentServer {
 }
 
 let current: CurrentServer | null = null;
+/**
+ * A supervisor whose child is spawned but not yet healthy. `current` is only
+ * set once `start()` resolves, and an engine can take minutes to load — a
+ * teardown in that window (the app quit, a probe closed) found nothing to
+ * kill and left the half-started server reparented to init. MEASURED
+ * 2026-09-12: three `rapid-mlx serve` orphans from three probes.
+ */
+let launching: LlamaServerSupervisor | null = null;
+/** `await supervisor.start()`, with the child reachable by the teardown meanwhile. */
+async function startTracked(supervisor: LlamaServerSupervisor): Promise<StartResult> {
+  launching = supervisor;
+  try {
+    return await supervisor.start();
+  } finally {
+    if (launching === supervisor) launching = null;
+  }
+}
 /** The pinned build's `--spec-type` list, learned at the first llama.cpp launch. */
 let engineSpecTypes: readonly string[] = [];
 let phase: LlmStatus['phase'] = 'idle';
@@ -1107,7 +1125,7 @@ async function startMlxServer(
         emitStatus();
       }
     });
-    const started = await supervisor.start();
+    const started = await startTracked(supervisor);
     const baseUrl = supervisor.baseUrl;
     current = {
       supervisor,
@@ -1542,7 +1560,7 @@ async function startExternalEngine(
         emitStatus();
       }
     });
-    const started = await supervisor.start();
+    const started = await startTracked(supervisor);
     const baseUrl = supervisor.baseUrl;
     current = {
       supervisor,
@@ -2516,7 +2534,7 @@ async function startServerExclusive(
       }
     });
 
-    const started = await supervisor.start();
+    const started = await startTracked(supervisor);
     const baseUrl = supervisor.baseUrl;
     /*
      * ASK THE SCHEDULER TO PUT THE USER FIRST.
@@ -2735,21 +2753,27 @@ function reapAndExit(): void {
   if (reaped) return;
   reaped = true;
   const c = current;
+  const l = launching;
   current = null;
-  try {
-    c?.supervisor.killImmediately();
-  } catch {
-    // best-effort — a dead child is exactly the outcome we want
+  launching = null;
+  for (const sup of [c?.supervisor, l]) {
+    try {
+      sup?.killImmediately();
+    } catch {
+      // best-effort — a dead child is exactly the outcome we want
+    }
   }
   process.exit(0);
 }
 process.once('SIGTERM', reapAndExit);
 process.once('SIGINT', reapAndExit);
 process.on('exit', () => {
-  try {
-    current?.supervisor.killImmediately();
-  } catch {
-    // best-effort
+  for (const sup of [current?.supervisor, launching]) {
+    try {
+      sup?.killImmediately();
+    } catch {
+      // best-effort
+    }
   }
 });
 

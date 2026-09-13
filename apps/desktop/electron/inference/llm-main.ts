@@ -772,7 +772,7 @@ export function registerLlmIpc(ipcMain: IpcMain, allowSender: (event: unknown) =
    * so. A server belonging to a LIVE app always has a live parent, so a second
    * window or a concurrent run is never touched.
    */
-  reapOrphanedServers(path.join(cacheRoot(), 'llamacpp'), {
+  reapOrphanedServers([path.join(cacheRoot(), 'llamacpp'), path.join(cacheRoot(), 'engines')], {
     ps: () => execFileSync('ps', ['-axo', 'pid=,ppid=,command='], { encoding: 'utf8' }),
     kill: (pid) => process.kill(pid),
     log: (message, meta) => log.info(message, meta),

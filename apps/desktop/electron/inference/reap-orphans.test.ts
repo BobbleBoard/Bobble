@@ -52,6 +52,31 @@ describe('orphanedServers', () => {
     expect(orphanedServers(rows, ROOT).map((r) => r.pid)).toEqual([4242]);
   });
 
+  it('reaps the external engines run out of our venvs, not a pip install', () => {
+    const engines = '/c/engines';
+    const rows = [
+      {
+        pid: 5,
+        ppid: 1,
+        command: `/c/engines/mlx-venv/bin/python3 /c/engines/mlx-venv/bin/rapid-mlx serve /c/store/x --port 1`,
+      },
+      {
+        pid: 6,
+        ppid: 1,
+        command: `/c/engines/mlx-venv/bin/python3 -m mlx_lm.server --model /c/store/x`,
+      },
+      { pid: 7, ppid: 1, command: `/c/engines/vllm-venv/bin/vllm serve /c/store/x` },
+      { pid: 8, ppid: 1, command: `/c/engines/mlx-venv/bin/python3 -m pip install rapid-mlx` },
+      { pid: 9, ppid: 1, command: `/c/engines/mlx-venv/bin/rapid-mlx serve --help` },
+      { pid: 10, ppid: 2, command: `/c/engines/mlx-venv/bin/rapid-mlx serve /c/store/y` },
+      { pid: 2, ppid: 1, command: 'Bobble' },
+      { pid: 11, ppid: 1, command: `/Users/me/own-venv/bin/rapid-mlx serve /c/store/x` },
+    ];
+    expect(orphanedServers(rows, ['/c/llamacpp', engines], 999).map((r) => r.pid)).toEqual([
+      5, 6, 7, 9,
+    ]);
+  });
+
   it('cannot select the current process', () => {
     const rows = parseProcessRows(`${process.pid} 1 ${ROOT}/llama-server -m x.gguf`);
     expect(orphanedServers(rows, ROOT)).toEqual([]);
