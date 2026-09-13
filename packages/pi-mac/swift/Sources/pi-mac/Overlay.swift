@@ -636,6 +636,9 @@ final class OverlayController: NSObject {
   /// The pid that owns the tracked window: its OWN windows — a popup, a sheet,
   /// a suggestion list — are never occluders (see refreshOcclusion).
   private var trackedPid: pid_t = 0
+  /// Whether the number we were told is in the current desktop's z-order at
+  /// all — false means it is stale and the pid is doing the anchoring.
+  private var trackedNumberOnScreen = false
   private var occlusionTimer: Timer?
   /** False once the window server refuses — we fall back to floating + mask. */
 
@@ -656,6 +659,9 @@ final class OverlayController: NSObject {
   private var bubbleFlipX = false
   private var bubbleFlipY = false
   private var maskHoles = 0
+  /// The holes as last cut, in AX (top-left) screen points — reported by `info`
+  /// so a probe can say whether the cursor's own point is under one.
+  private var lastOccluders: [CGRect] = []
   /// Press animations in flight — the observable signal a probe can assert on,
   /// now that there is no ring to count.
   private var livePress = 0
@@ -1383,7 +1389,10 @@ final class OverlayController: NSObject {
    * pill, which layoutBubble does off the new rect.
    */
   func followWindow(to rect: CGRect, windowNumber: Int?) {
-    if let n = windowNumber, trackedWindow > 0, n != trackedWindow { return }
+    /* Only the tracked window's moves move the cursor — unless the number we
+       were told is not on this desktop (stale), in which case any window of
+       the app is a better guide than none. */
+    if let n = windowNumber, trackedWindow > 0, trackedNumberOnScreen, n != trackedWindow { return }
     let prev = windowAX
     windowAX = rect
     if let prev = prev {
@@ -1446,10 +1455,10 @@ final class OverlayController: NSObject {
 
   /// True once we are cutting the mask ourselves, which is what lets the Node
   /// side stop sampling occlusion and stop hiding the whole overlay.
-  var masksNatively: Bool { trackedWindow > 0 }
+  var masksNatively: Bool { trackedWindow > 0 || trackedPid > 0 }
 
   private func startOcclusionTimer() {
-    guard occlusionTimer == nil, trackedWindow > 0 else { return }
+    guard occlusionTimer == nil, trackedWindow > 0 || trackedPid > 0 else { return }
     /* 30 Hz. MEASURED at 0.48 ms per CGWindowListCopyWindowInfo call on this
        Mac with 11 on-screen windows, so ~1.4% of one core while an app is being
        driven and nothing at all when it is not — the panel stops the timer when
@@ -1512,15 +1521,15 @@ final class OverlayController: NSObject {
        this goes wrong: with no tracked window there is nothing to sit behind,
        native masking is off, and the phantom is left to the Node poll — the
        slow path whose lag the user reported in the first place. */
-    if trackedWindow <= 0 && phantomShowing {
-      noteUnmasked("no tracked window — nothing to sit behind, so nothing can be cut out")
-    } else if trackedWindow > 0 && phantomShowing && occlusionTimer == nil {
+    if trackedWindow <= 0 && trackedPid <= 0 && phantomShowing {
+      noteUnmasked("no tracked app — nothing to sit behind, so nothing can be cut out")
+    } else if (trackedWindow > 0 || trackedPid > 0) && phantomShowing && occlusionTimer == nil {
       /* The mask is only as fresh as this timer. Without it the holes are
          whatever they were when it stopped, which is a mask that describes a
          z-order from some earlier moment. */
       noteUnmasked("the occlusion timer is not running — the mask is frozen")
     }
-    guard trackedWindow > 0, panel.isVisible else { return }
+    guard trackedWindow > 0 || trackedPid > 0, panel.isVisible else { return }
     let ours: Set<Int> = [panel.windowNumber, controls?.windowNumber ?? -1]
     let list =
       (CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID)
@@ -1540,23 +1549,47 @@ final class OverlayController: NSObject {
      * dragged across, a menu of theirs — still cuts a hole, which is the rule
      * that keeps the cursor off what the user is looking at.
      */
+    /*
+     * WHICH WINDOW THE PHANTOM SITS BEHIND — the app's, by PID, not by number.
+     *
+     * the user, 2026-09-12: "the fake cursor … seems to be only drawn on the bobble
+     * app window now instead of on top of the app being used … it's appearing
+     * on the claude app and sometimes bobble." The anchor was the window NUMBER
+     * the Node side handed over, and a number is only as good as the moment it
+     * was read: the app opens another window, the number now names a utility
+     * window of the app's that sits at a higher level than the user's windows,
+     * and everything the user is looking at falls BELOW the anchor — no holes,
+     * a cursor painted over every app on the desktop. The controlled app's pid
+     * cannot go stale that way, so the anchor is now the app's frontmost real
+     * window (level 0, big enough to be a window) found by pid, with the number
+     * we were told as the fallback when the app has no such window on this
+     * desktop. A wrong anchor now needs a wrong pid, and a wrong pid is the
+     * Node side's whole notion of which app it is driving.
+     */
     var rects: [CGRect] = []
-    var found = false
-    var above: [[String: Any]] = []
-    for w in list {
+    var anchor: Int?
+    var byNumber: Int?
+    for (i, w) in list.enumerated() {
       let num = (w[kCGWindowNumber as String] as? Int) ?? -1
+      let owner = (w[kCGWindowOwnerPID as String] as? Int) ?? -1
       if num == trackedWindow {
-        found = true
+        byNumber = i
         // The owner is the truth about which pid this is, whatever we were told.
-        if let owner = (w[kCGWindowOwnerPID as String] as? Int), owner > 0 {
-          trackedPid = pid_t(owner)
-        }
-        break
+        if trackedPid <= 0, owner > 0 { trackedPid = pid_t(owner) }
       }
-      above.append(w)
+      if anchor == nil, trackedPid > 0, pid_t(owner) == trackedPid, !ours.contains(num),
+        ((w[kCGWindowLayer as String] as? Int) ?? 0) == 0,
+        let raw = w[kCGWindowBounds as String] as? NSDictionary,
+        let r = CGRect(dictionaryRepresentation: raw), r.width >= 64, r.height >= 64
+      {
+        anchor = i
+      }
     }
-    if found {
-      for w in above {
+    let at = anchor ?? byNumber
+    let found = at != nil
+    trackedNumberOnScreen = byNumber != nil
+    if let at = at {
+      for w in list.prefix(at) {
         let num = (w[kCGWindowNumber as String] as? Int) ?? -1
         if ours.contains(num) { continue }
         if let owner = (w[kCGWindowOwnerPID as String] as? Int), pid_t(owner) == trackedPid {
@@ -1901,6 +1934,7 @@ final class OverlayController: NSObject {
   /// where the old whole-overlay hide was all-or-nothing at 15% coverage.
   func setOccluders(_ rects: [CGRect]) {
     maskHoles = rects.count
+    lastOccluders = rects
     guard !rects.isEmpty else {
       stage.mask = nil
       return
@@ -2060,6 +2094,8 @@ final class OverlayController: NSObject {
       "hasShadow": panel.hasShadow,
       "level": panel.level.rawValue,
       "trackedWindow": trackedWindow,
+      "trackedPid": Int(trackedPid),
+      "trackedNumberOnScreen": trackedNumberOnScreen,
       "masksNatively": masksNatively,
       "windowNumber": panel.windowNumber,
 
@@ -2079,6 +2115,12 @@ final class OverlayController: NSObject {
       ],
       "cursorVisible": (cursorGroup.presentation() ?? cursorGroup).opacity > 0.5,
       "maskHoles": maskHoles,
+      /* The truth a screenshot would show, computed in the mask's own terms:
+         is the cursor's tip inside one of the holes right now? */
+      "cursorCovered": cursorAX.map { c in lastOccluders.contains { $0.contains(c) } } ?? false,
+      "occluders": lastOccluders.prefix(24).map {
+        ["x": Double($0.minX), "y": Double($0.minY), "w": Double($0.width), "h": Double($0.height)]
+      },
       "reduceMotion": reduceMotion(),
       "press": livePress,
       "glyph": ["w": Double(glyph.box.width), "h": Double(glyph.box.height)],
@@ -2204,10 +2246,14 @@ private func handleOverlay(
       /* Watch the app itself from here: a move or resize is then pushed to us
          the instant it happens, instead of being sampled for. */
       if let pid = doubleValue(params["pid"]) { watchWindowChanges(pid: pid_t(pid)) }
-      /* And sit directly above its window, which is the layering itself. */
+      /* And sit directly above its window, which is the layering itself. The
+         pid alone is enough to mask by (see refreshOcclusion); the number, when
+         known, is the fallback anchor. */
+      let pid = doubleValue(params["pid"]).map { pid_t($0) } ?? 0
       if let win = doubleValue(params["windowNumber"]) {
-        controller.trackWindow(
-          number: Int(win), pid: doubleValue(params["pid"]).map { pid_t($0) } ?? 0)
+        controller.trackWindow(number: Int(win), pid: pid)
+      } else if pid > 0 {
+        controller.trackWindow(number: 0, pid: pid)
       }
     } else {
       controller.setWindowRect(nil)
