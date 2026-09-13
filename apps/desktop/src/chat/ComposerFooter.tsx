@@ -1,7 +1,8 @@
 /**
  * Composer footer cluster: current-model chip (with a menu that switches pi
- * models and downloads/starts local ones), the model-download progress bar, and a
- * turn-stats info popover. When nothing is set up it shows
+ * models and downloads/starts local ones) and a turn-stats info popover. The
+ * download progress that used to sit here lives in the top bar's tray now
+ * (DownloadTray) — the user: "remove all progressbar and such from the input area". When nothing is set up it shows
  * a tasteful "pick a model" affordance that kicks off a download (full model
  * manager is W10).
  *
@@ -13,16 +14,8 @@
  * footer for the ONE thread indicator, so the input bar shows no run state.
  */
 import type { ChatMsg, Model, Usage } from '@pi-desktop/engine';
-import {
-  Button,
-  IconButton,
-  IconChevronDown,
-  IconInfo,
-  ProgressBar,
-  Tooltip,
-} from '@pi-desktop/ui';
-import { formatSpeed, percent } from '../settings/model-manager-logic';
-import { downloadEtaSeconds, downloadFraction, formatEta, useLlmStore } from '../state/llm-store';
+import { Button, IconButton, IconChevronDown, IconInfo, Tooltip } from '@pi-desktop/ui';
+import { useLlmStore } from '../state/llm-store';
 import { usePiStore } from '../state/pi-slice';
 import { useModelSelection, useUserMode } from '../state/settings-store';
 import { AutoDownloadPrompt } from './AutoDownloadPrompt';
@@ -108,7 +101,6 @@ export function ComposerFooter({
   const messages = usePiStore((s) => s.messages);
   const status = useLlmStore((s) => s.status);
   const catalog = useLlmStore((s) => s.catalog);
-  const download = useLlmStore((s) => s.download);
   // Round-12 (W3): the model chip + its picker are mode-aware. The picker itself
   // (Auto + the three capability tiers) is the shared TierPickerMenu; here we
   // only decide the CHIP LABEL from the mode + selection.
@@ -144,82 +136,9 @@ export function ComposerFooter({
 
   return (
     <>
-      {/*
-        THE DOWNLOAD SITS TO THE LEFT OF THE CHIP, and that ordering is the whole
-        point rather than a preference.
-
-        `.pd-composer-footer-spacer` is `flex: 1`, so everything after it is
-        RIGHT-aligned: an element's position depends on the total width of
-        everything to its RIGHT. With the download block on the right of the
-        model chip, MEASURED, the chip jumped 152px sideways the moment a
-        download started — a menu trigger sliding out from under the pointer
-        while you aim at it — and then twitched every time the ETA text changed
-        width. On this side the block grows leftwards into the spacer's empty
-        middle, and the chip never moves.
-
-        It stays in the footer at all (rather than only in settings) because
-        that is where the user IS while a 13 GB pull runs; and it carries a
-        percent and an ETA rather than a bare bar, because "is this stuck?" had
-        no answer without navigating back to the manager.
-      */}
-      {download !== null ? (
-        <Tooltip
-          side="top"
-          align="start"
-          delayDuration={100}
-          label={
-            <span>
-              {download.modelId}
-              {(download.fileCount ?? 1) > 1
-                ? ` · file ${(download.fileIndex ?? 0) + 1} of ${download.fileCount}`
-                : ''}
-              {formatSpeed(download.bytesPerSec) ? ` · ${formatSpeed(download.bytesPerSec)}` : ''}
-            </span>
-          }
-        >
-          <div
-            className="flex items-center gap-1.5 text-caption text-text-muted"
-            data-testid="footer-download"
-          >
-            <div className="w-16">
-              <ProgressBar value={downloadFraction(download)} />
-            </div>
-            {/*
-              FIXED SLOTS FOR BOTH READOUTS.
-
-              "9%" -> "10%" -> "100%" and "5s" -> "1m 20s" -> gone are ordinary
-              things for these to say, and every one of them re-laid the block
-              out: MEASURED 29-42px of sideways travel per change, on a bar
-              somebody is watching precisely because it is not moving fast. The
-              slots are as wide as their widest content and the text is
-              right-aligned inside them, so the numbers change and nothing else
-              does.
-            */}
-            <span className="inline-block w-[4ch] whitespace-nowrap text-right tabular-nums">
-              {download.paused
-                ? ''
-                : percent(downloadFraction(download)) !== null
-                  ? `${percent(downloadFraction(download))}%`
-                  : '…'}
-            </span>
-            {/*
-              Always rendered, so its absence is a blank slot rather than a
-              reflow. `Paused` borrows it — it is the same piece of news.
-
-              Wide enough for the longest thing it can hold ("1m 20s", "Paused"
-              — both 6 characters) and `whitespace-nowrap` so being wrong about
-              that can never wrap instead. MEASURED at 5.5ch: "Paused" wrapped
-              to two lines, the block became 32px against its 28px siblings, and
-              the whole composer stepped 10px up the screen and back every time
-              a download started or stopped.
-            */}
-            <span className="hidden w-[6.5ch] whitespace-nowrap text-right tabular-nums sm:inline">
-              {download.paused ? 'Paused' : (formatEta(downloadEtaSeconds(download)) ?? '')}
-            </span>
-          </div>
-        </Tooltip>
-      ) : null}
-
+      {/* No download bar here any more. the user (2026-09-13): "remove all
+          progressbar and such from the input area, move it up to the top bar"
+          — the downloads tray (DownloadTray, top-left) is the one place. */}
       {/* Anchor for the friendly auto-download card, which floats just above the
           model chip when Auto resolves to an un-downloaded tier. */}
       <span className="relative flex items-center">

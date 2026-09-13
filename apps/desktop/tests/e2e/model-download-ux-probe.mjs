@@ -180,11 +180,20 @@ try {
     }
 
     if (onChatScreen) {
-      const footer = page.locator('[data-testid="footer-download"]');
+      // The chat-screen indicator is the top-left downloads tray (the icon is
+      // up while anything moves; its panel carries the ETA).
+      const footer = page.locator('[data-testid="download-tray"][data-active="1"]');
       if ((await footer.count()) > 0) {
         sawFooter = true;
-        const text = (await footer.textContent())?.trim() ?? '';
-        if (/left/.test(text)) sawEta = true;
+        const text = (await footer.getAttribute('aria-label')) ?? '';
+        const panelOpen = (await page.locator('[data-testid="download-tray-panel"]').count()) > 0;
+        if (!panelOpen) await footer.click().catch(() => {});
+        const panelText =
+          (await page
+            .locator('[data-testid="download-tray-panel"]')
+            .textContent()
+            .catch(() => '')) ?? '';
+        if (/left/.test(panelText)) sawEta = true;
         if (Date.now() - lastLog > 20_000) {
           log(`chat-screen indicator: "${text}"`);
           lastLog = Date.now();

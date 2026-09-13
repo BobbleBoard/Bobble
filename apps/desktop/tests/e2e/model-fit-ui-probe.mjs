@@ -261,18 +261,24 @@ try {
     });
   });
   await page.waitForTimeout(600);
-  const footer = page.locator('[data-testid="footer-download"]');
-  check((await footer.count()) > 0, 'the chat screen shows a download indicator');
+  // The indicator is the top-left downloads tray now (the user: nothing in the
+  // input area); its panel carries the percentage.
+  const footer = page.locator('[data-testid="download-tray"]');
+  check((await footer.count()) > 0, 'the chat screen shows a download indicator (the tray icon)');
   if ((await footer.count()) > 0) {
-    const text = (await footer.textContent())?.trim() ?? '';
-    console.log(`footer indicator: "${text}"`);
+    await footer.click();
+    await page.waitForSelector('[data-testid="download-tray-panel"]', { timeout: 3000 });
+    const text =
+      (await page.locator('[data-testid="download-tray-panel"]').textContent())?.trim() ?? '';
+    console.log(`tray panel: "${text}"`);
     check(/\d+%/.test(text), `the indicator carries a percentage ("${text}")`);
     await page.screenshot({ path: path.join(OUT, '8-footer-download.png') });
     const box = await footer.boundingBox();
     check(
-      box !== null && box.width > 60 && box.height > 8,
+      box !== null && box.width > 16 && box.height > 16,
       `the indicator has real size on screen (${JSON.stringify(box)})`,
     );
+    await page.keyboard.press('Escape');
   }
 } finally {
   await app.close().catch(() => {});

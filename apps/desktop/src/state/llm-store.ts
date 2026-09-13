@@ -18,6 +18,7 @@ import type {
 } from '../../electron/ipc-contract';
 import { defaultEngineSet } from '../settings/engine-catalog';
 import { hostGpuOf } from '../settings/host-gpu';
+import { useDownloadTray } from './download-tray';
 import { useSettingsStore } from './settings-store';
 
 export interface LlmDownloadState {
@@ -494,6 +495,7 @@ export const useLlmStore = create<LlmStoreState>((set, get) => ({
     // Gated HF repos need the saved token; public repos ignore it.
     const hfToken = useSettingsStore.getState().settings.hfToken || undefined;
     const res = await window.piDesktop.invoke('llm:download-model', { modelId, quant, hfToken });
+    const name = get().catalog.find((c) => c.id === modelId)?.displayName ?? modelId;
     if (res.paused === true) {
       // Keep the bar; flip to the paused affordance (Resume).
       set((s) => (s.download ? { download: { ...s.download, paused: true } } : {}));
@@ -502,13 +504,13 @@ export const useLlmStore = create<LlmStoreState>((set, get) => ({
       // A refusal (no room, a gated repo) or a failure is the user's to see —
       // the bar that flashed and vanished used to be the whole message.
       if (res.success !== true && res.cancelled !== true) {
-        set({
-          downloadError: {
-            modelId,
-            error: res.error ?? 'the download did not finish',
-            at: Date.now(),
-          },
-        });
+        const error = res.error ?? 'the download did not finish';
+        set({ downloadError: { modelId, error, at: Date.now() } });
+        useDownloadTray
+          .getState()
+          .note({ key: `llm:${modelId}`, name, kind: 'failed', detail: error });
+      } else if (res.success === true) {
+        useDownloadTray.getState().note({ key: `llm:${modelId}`, name, kind: 'finished' });
       }
     }
     await get().refreshCatalog();

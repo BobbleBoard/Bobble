@@ -67,12 +67,8 @@ export interface DownloadBarProps {
   /** Fill the row it sits in rather than taking a fixed width. */
   readonly grow?: boolean;
   readonly testid?: string;
-  /**
-   * Make the bar itself a control: a press opens the caller's details (the
-   * top bar's popover). the user: "show download progress in the top bar clickable
-   * to show more details." The X stays its own button beside it.
-   */
-  readonly onOpen?: () => void;
+  /** No hover caption — for a row that already writes the numbers beside the bar. */
+  readonly quiet?: boolean;
 }
 
 export function DownloadBar({
@@ -84,7 +80,7 @@ export function DownloadBar({
   label = 'Cancel download',
   grow = false,
   testid = 'download-bar',
-  onOpen,
+  quiet = false,
 }: DownloadBarProps): JSX.Element {
   const [hovered, setHovered] = useState(false);
   const pct = fraction === null ? null : Math.round(Math.max(0, Math.min(1, fraction)) * 100);
@@ -106,22 +102,12 @@ export function DownloadBar({
           positioning context. */}
       {/* Hover reveals the numbers; it adds nothing a keyboard user needs, and
           the bar's own controls carry every action. */}
-      {/* biome-ignore lint/a11y/noStaticElementInteractions: hover-only garnish; the press is on the inner button when there is one. */}
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: hover-only garnish. */}
       <span
         className="pd-dl-slot"
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
       >
-        {onOpen !== undefined ? (
-          <button
-            type="button"
-            className="pd-dl-open pd-focusable"
-            aria-label="Download details"
-            title="Details"
-            data-testid={`${testid}-open`}
-            onClick={onOpen}
-          />
-        ) : null}
         <span
           className="pd-dl-track"
           role="progressbar"
@@ -139,9 +125,11 @@ export function DownloadBar({
             style={pct === null ? undefined : { width: `${pct}%` }}
           />
         </span>
-        <span className="pd-dl-caption" data-testid={`${testid}-caption`} aria-hidden={!hovered}>
-          {caption}
-        </span>
+        {quiet ? null : (
+          <span className="pd-dl-caption" data-testid={`${testid}-caption`} aria-hidden={!hovered}>
+            {caption}
+          </span>
+        )}
       </span>
       <button
         type="button"

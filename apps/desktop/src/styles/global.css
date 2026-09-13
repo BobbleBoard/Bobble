@@ -3054,79 +3054,140 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
   flex: 1;
   min-width: 48px;
 }
-/* The press that opens the details: an invisible button over the whole slot,
-   so the bar reads as one thing and the X beside it stays its own control.
-   Taller than the 6px bar — a hit target, not a hairline. */
-.pd-dl-open {
+/* ── The downloads tray (top-left) ──────────────────────────────────────── */
+.pd-tray-button {
+  position: relative;
+}
+/* Something is moving: a small accent dot on the icon. */
+.pd-tray-dot {
   position: absolute;
-  inset: -8px 0;
-  z-index: 1;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  cursor: pointer;
+  right: 3px;
+  bottom: 3px;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--pd-radius-full);
+  background: var(--pd-accent-primary);
+  box-shadow: 0 0 0 2px var(--pd-bg-base);
 }
-.pd-dl-open:hover ~ .pd-dl-track {
-  filter: brightness(1.15);
+/* News since the tray was last opened: a tiny "!" at the icon's top-right. */
+.pd-tray-badge {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  width: 12px;
+  height: 12px;
+  border-radius: var(--pd-radius-full);
+  background: var(--pd-accent-primary);
+  color: var(--pd-text-on-accent);
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 12px;
+  text-align: center;
+  box-shadow: 0 0 0 2px var(--pd-bg-base);
 }
-.pd-dl-popover {
-  min-width: 260px;
-  max-width: 360px;
-  padding: 12px;
+.pd-tray-badge[data-kind="failed"] {
+  background: var(--pd-status-danger-fg);
+  color: #fff;
 }
-.pd-dl-details {
+.pd-tray-popover {
+  width: 320px;
+  max-width: 90vw;
+  padding: 10px 12px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  font-size: var(--pd-font-size-caption);
+  gap: 10px;
 }
-.pd-dl-details-title {
+.pd-tray-row {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 2px 0;
+}
+.pd-tray-row + .pd-tray-row,
+.pd-tray-row + .pd-tray-notice,
+.pd-tray-notice + .pd-tray-notice,
+.pd-tray-notice + .pd-tray-row {
+  padding-top: 10px;
+  border-top: 1px solid var(--pd-border-subtle);
+}
+.pd-tray-row-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+.pd-tray-row-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--pd-font-size-footnote);
+  font-weight: var(--pd-font-weight-semibold);
+  color: var(--pd-text-primary);
+}
+.pd-tray-row-pct {
+  flex: none;
+  font-size: var(--pd-font-size-caption);
+  color: var(--pd-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+.pd-tray-row-sub {
+  font-size: var(--pd-font-size-caption);
+  color: var(--pd-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.pd-tray-row-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 2px;
+}
+.pd-tray-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.pd-tray-notice-main {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+.pd-tray-notice-title {
   font-size: var(--pd-font-size-footnote);
   font-weight: var(--pd-font-weight-semibold);
   color: var(--pd-text-primary);
   word-break: break-word;
 }
-.pd-dl-details-facts {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: 3px 12px;
-  margin: 0;
+.pd-tray-notice[data-kind="finished"] .pd-tray-notice-title {
+  color: var(--pd-status-success-fg);
 }
-.pd-dl-details-facts dt {
-  color: var(--pd-text-muted);
+.pd-tray-notice[data-kind="failed"] .pd-tray-notice-title {
+  color: var(--pd-status-danger-fg);
 }
-.pd-dl-details-facts dd {
-  margin: 0;
-  min-width: 0;
+.pd-tray-notice-detail {
+  font-size: var(--pd-font-size-caption);
   color: var(--pd-text-secondary);
-  word-break: break-all;
-  font-variant-numeric: tabular-nums;
-}
-.pd-dl-details-actions {
-  display: flex;
-  gap: 6px;
-}
-.pd-dl-details .pd-dl-details-cancel {
-  color: var(--pd-status-danger-fg);
-}
-.pd-dl-details-error {
-  margin: 0;
-  color: var(--pd-status-danger-fg);
   white-space: normal;
 }
-/* When nothing is moving but the last attempt was refused: a chip in the
-   bar's place, in the danger voice, clickable for the whole sentence. */
-.pd-dl-refusal {
-  height: 22px;
-  padding: 0 10px;
-  border: 1px solid color-mix(in srgb, var(--pd-status-danger-fg) 45%, transparent);
+.pd-tray-notice-x {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border: 0;
   border-radius: var(--pd-radius-full);
-  background: color-mix(in srgb, var(--pd-status-danger-fg) 10%, transparent);
-  color: var(--pd-status-danger-fg);
-  font: inherit;
-  font-size: var(--pd-font-size-caption);
-  white-space: nowrap;
+  background: transparent;
+  color: var(--pd-text-muted);
+  font-size: 15px;
+  line-height: 1;
   cursor: pointer;
+}
+.pd-tray-notice-x:hover {
+  background: var(--pd-bg-hover);
+  color: var(--pd-text-primary);
 }
 .pd-dl-track {
   position: relative;
@@ -3160,11 +3221,13 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
  * about the bar's own geometry depends on whether a pointer is over it — see the
  * component docstring.
  */
+/* BELOW the bar (the user: "the hover info should show below") — above, it ran
+   into the top edge of the window from the top bar and was clipped. */
 .pd-dl-caption {
   position: absolute;
-  bottom: calc(100% + 6px);
+  top: calc(100% + 6px);
   left: 50%;
-  transform: translateX(-50%) translateY(2px);
+  transform: translateX(-50%) translateY(-2px);
   z-index: 20;
   padding: 3px 8px;
   border-radius: 8px;

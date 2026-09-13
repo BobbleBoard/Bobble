@@ -29,7 +29,7 @@ import type { ReactNode } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CHROME_LEFT, TOP_BAR_HEIGHT } from '../../electron/window-chrome';
 import { conversationNameFrom } from '../../electron/workspace/project-dir';
-import { TopBarDownloads } from '../models/TopBarDownloads';
+import { DownloadTray } from '../models/DownloadTray';
 import { lazyRoute } from '../RouteBoundary';
 import type { SettingsSection } from '../settings/SettingsView';
 import { registerCanvasController, useCanvasStore } from '../state/canvas-store';
@@ -711,6 +711,13 @@ export function ChatApp({
                         about a conversation, so neither the dial nor the model's
                         state belongs in its bar. */}
                     {contentTitle === undefined ? <EngineMenu /> : null}
+                    {/* The downloads tray, on every route (downloads start on
+                        the hub and are watched from the chat): the icon is up
+                        while anything moves or there is news, and the bars,
+                        the X and the numbers live inside it. the user: "move this
+                        to the top left … with the progressbar and x inside it
+                        shown on click". */}
+                    <DownloadTray />
                   </>
                 }
                 /* The app's own state — starting up, getting ready — lives in
@@ -722,13 +729,7 @@ export function ChatApp({
                   // the brain/gear advanced-params entry to its left. In simple mode
                   // the top-right is exactly the canvas toggle, unchanged.
                   //
-                  // Ahead of both: any download in flight. the user asked for the bar
-                  // to be "pinned to the top bar easily cancellable from anywhere
-                  // and monitorable" — a 25 GB fetch is a background fact you
-                  // start and then walk away from, and until this it could only be
-                  // watched or stopped from the row that started it.
                   <div className="flex items-center gap-2">
-                    <TopBarDownloads />
                     {/* In a studio the canvas has nothing to show and the chat's
                         sampling knobs are not what you are adjusting, so the two
                         buttons keep their positions and change what they open. */}

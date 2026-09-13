@@ -71,6 +71,18 @@ export function IconDownload(props: LocalIconProps) {
   );
 }
 
+/** A down arrow into a tray — the downloads tray in the top bar (the user: "a down
+ * arrow with half square outline below it"). */
+export function IconDownloadTray(props: LocalIconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M8 1.8v7.2" />
+      <path d="M5 6.2 8 9.2l3-3" />
+      <path d="M2.6 9.6v2.9a1.2 1.2 0 0 0 1.2 1.2h8.4a1.2 1.2 0 0 0 1.2-1.2V9.6" />
+    </Svg>
+  );
+}
+
 export function IconTrash(props: LocalIconProps) {
   return (
     <Svg {...props}>

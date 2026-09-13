@@ -18,6 +18,7 @@ import type {
   StoreDownloadRequest,
   StoreDownloadUpdate,
 } from '../../electron/model-store/store-contract';
+import { useDownloadTray } from './download-tray';
 
 export interface StoreModelsState {
   /** Everything on disk, across the store, the GGUF dir and the 3D cache. */
@@ -66,9 +67,16 @@ export const useStoreModels = create<StoreModelsState>((set, get) => ({
     }));
     const res = await window.piDesktop.invoke('store:download', req).catch(() => null);
     if (res === null || res.ok !== true) {
+      const error = res?.error ?? 'the download could not start';
+      useDownloadTray.getState().note({
+        key: `store:${req.repo}`,
+        name: req.name ?? req.repo,
+        kind: 'failed',
+        detail: error,
+      });
       set((s) => {
         const { [req.repo]: _dropped, ...rest } = s.progress;
-        return { progress: rest, error: res?.error ?? 'the download could not start' };
+        return { progress: rest, error };
       });
     }
   },
@@ -104,6 +112,16 @@ export function connectStoreModels(): void {
         // A finished download changes what is on disk; a cancelled one changes
         // it back. Either way the index is now stale.
         void useStoreModels.getState().refresh();
+        // The tray's news: done, or failed with the reason. A cancel is neither.
+        if (p.cancelled !== true) {
+          useDownloadTray
+            .getState()
+            .note(
+              p.error === undefined
+                ? { key: `store:${p.repo}`, name: p.repo, kind: 'finished' }
+                : { key: `store:${p.repo}`, name: p.repo, kind: 'failed', detail: p.error },
+            );
+        }
         return {
           progress: rest,
           error: p.error ?? null,

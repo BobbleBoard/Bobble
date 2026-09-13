@@ -9,9 +9,10 @@
  *
  * Throwaway HOME, and the library on a 64 MB RAM disk so the refusal is the
  * supervisor's real "Not enough space" on any machine: the press shows it
- * under the row and as a chip in the top bar that opens the whole sentence.
- * The progress panel is driven with the store's own progress seam, so no
- * bytes move.
+ * under the row, and the top-left downloads tray gets a "!" and lists it.
+ * A running download (driven through the store's seam, no bytes move) shows
+ * its bar, X and numbers inside the tray, hover caption below the bar, and
+ * nothing in the input area.
  *
  *   SHOT_DIR=/tmp/dlfb node apps/desktop/tests/e2e/download-feedback-probe.mjs
  */
@@ -77,29 +78,59 @@ try {
     await shot('01-tier-refusal');
     await win.keyboard.press('Escape');
     await win.waitForTimeout(300);
-    const chip = await win.evaluate(
-      () => document.querySelector('[data-testid="topbar-download-error"]')?.textContent ?? null,
+    // …and in the tray: the icon is up, top-left, with a "!" (the news is a
+    // failure, so the badge is red); opening it lists the refusal; Dismiss
+    // clears it and the icon goes away again.
+    const tray = await win.evaluate(() => {
+      const b = document.querySelector('[data-testid="download-tray"]');
+      const r = b?.getBoundingClientRect();
+      const badge = document.querySelector('[data-testid="download-tray-badge"]');
+      return {
+        present: b !== null,
+        left: r === undefined ? null : Math.round(r.left),
+        unseen: b?.getAttribute('data-unseen'),
+        badge: badge?.textContent ?? null,
+        badgeKind: badge?.getAttribute('data-kind') ?? null,
+        badgeColor: badge === null ? null : getComputedStyle(badge).backgroundColor,
+        noFooterBar: document.querySelector('[data-testid="footer-download"]') === null,
+      };
+    });
+    log('tray:', JSON.stringify(tray));
+    check(
+      tray.present && tray.left !== null && tray.left < 700,
+      `the tray icon sits top-left (x=${tray.left})`,
     );
     check(
-      chip !== null && /not downloaded/.test(chip),
-      `the top bar carries the refusal chip (${chip})`,
+      tray.badge === '!' && tray.badgeKind === 'failed',
+      `a tiny "!" on the icon (${tray.badge}, ${tray.badgeKind})`,
     );
-    await win.click('[data-testid="topbar-download-error"]');
-    await win.waitForSelector('[data-testid="topbar-download-details"]', { timeout: 3000 });
-    const detail = await win.evaluate(
-      () => document.querySelector('[data-testid="topbar-download-details"]')?.textContent ?? '',
+    check(tray.noFooterBar, 'no progress bar in the input area');
+    await shot('02-tray-badge');
+    await win.click('[data-testid="download-tray"]');
+    await win.waitForSelector('[data-testid="download-tray-panel"]', { timeout: 3000 });
+    await win.waitForTimeout(300);
+    const panel = await win.evaluate(() => ({
+      text: document.querySelector('[data-testid="download-tray-panel"]')?.textContent ?? '',
+      unseen: document.querySelector('[data-testid="download-tray"]')?.getAttribute('data-unseen'),
+      badge: document.querySelector('[data-testid="download-tray-badge"]') !== null,
+    }));
+    check(
+      /Not downloaded/.test(panel.text) && /Not enough space/.test(panel.text),
+      'the tray lists the refusal with the sentence',
     );
-    check(/Not enough space/.test(detail), 'the chip opens the whole sentence');
-    await shot('02-topbar-refusal');
-    await win.click('[data-testid="topbar-download-details"] button');
+    check(panel.unseen === 'no' && !panel.badge, 'opening the tray clears the "!"');
+    await shot('03-tray-refusal');
+    await win.click('[data-testid="download-tray-panel"] .pd-tray-notice-x');
     await win.waitForTimeout(300);
     check(
-      (await win.locator('[data-testid="topbar-download-error"]').count()) === 0,
-      'Dismiss clears the chip',
+      (await win.locator('[data-testid="download-tray"]').count()) === 0,
+      'dismissing the only notice takes the icon away',
     );
   }
 
-  // 2. A running download in the top bar, clickable for the details.
+  // 2. A running download: the icon with its moving dot; the tray shows the
+  //    bar and its X, the file and its place in the job, bytes / speed, Pause.
+  //    Driven through the store's seam, so no bytes move.
   await win.evaluate(() => {
     window.__llm_store().getState().applyDownloadProgress({
       modelId: 'qwen3.5-4b-mtp',
@@ -113,31 +144,62 @@ try {
       jobTotal: 6_100_000_000,
     });
   });
-  await win.waitForSelector('[data-testid="topbar-downloads"]', { timeout: 3000 });
-  await win.click('[data-testid="topbar-download-llm:qwen3.5-4b-mtp-open"]');
-  await win.waitForSelector('[data-testid="topbar-download-details"]', { timeout: 3000 });
-  const d = await win.evaluate(() => ({
-    text: document.querySelector('[data-testid="topbar-download-details"]')?.textContent ?? '',
-    buttons: [...document.querySelectorAll('[data-testid="topbar-download-details"] button')].map(
-      (b) => b.textContent?.trim(),
-    ),
-  }));
-  log('details:', JSON.stringify(d));
+  await win.waitForSelector('[data-testid="download-tray"][data-active="1"]', { timeout: 3000 });
+  await win.click('[data-testid="download-tray"]');
+  await win.waitForSelector('[data-testid="download-tray-panel"]', { timeout: 3000 });
+  await win.waitForTimeout(300);
+  const d = await win.evaluate(() => {
+    const panel = document.querySelector('[data-testid="download-tray-panel"]');
+    const bar = panel?.querySelector('[data-testid="tray-download-llm:qwen3.5-4b-mtp"]');
+    const x = panel?.querySelector('[data-testid="tray-download-llm:qwen3.5-4b-mtp-cancel"]');
+    // The tray writes the numbers beside the bar, so it carries no hover
+    // caption; the hub's bars keep theirs, below the bar now.
+    const cap = panel?.querySelector('[data-testid="tray-download-llm:qwen3.5-4b-mtp-caption"]');
+    const rule = [...document.styleSheets]
+      .flatMap((ss) => {
+        try {
+          return [...ss.cssRules];
+        } catch {
+          return [];
+        }
+      })
+      .find((r) => r.selectorText === '.pd-dl-caption');
+    return {
+      text: panel?.textContent ?? '',
+      bar: bar !== null && bar !== undefined,
+      x: x !== null && x !== undefined,
+      captionBelow:
+        cap === null && rule !== undefined && /top:\s*calc\(100%/.test(rule.style.cssText),
+      buttons: [...(panel?.querySelectorAll('button') ?? [])]
+        .map((b) => b.textContent?.trim())
+        .filter(Boolean),
+    };
+  });
+  log('tray panel:', JSON.stringify(d));
+  check(d.bar && d.x, 'the bar and its X are inside the tray');
   check(
     /Qwen3\.5-4B-Q8_0\.gguf/.test(d.text) && /1 of 3/.test(d.text),
     'the file and its place in the job',
   );
   check(
-    /1\.1 GB \/ 5\.7 GB|1\.2 GB \/ 6\.1 GB|GB \/ .*GB/.test(d.text) && /20%|19%/.test(d.text),
+    /GB \/ .*GB/.test(d.text) && /20%/.test(d.text),
     `bytes and percent (${d.text.slice(0, 90)})`,
   );
+  check(d.buttons.includes('Pause'), `Pause (${d.buttons})`);
   check(
-    d.buttons.includes('Pause') && d.buttons.includes('Cancel'),
-    `Pause and Cancel (${d.buttons})`,
+    d.captionBelow,
+    'no caption in the tray (the numbers are written); elsewhere the hover caption sits BELOW the bar',
   );
-  await shot('03-topbar-details');
+  await win.hover('[data-testid="tray-download-llm:qwen3.5-4b-mtp"]');
+  await win.waitForTimeout(250);
+  await shot('04-tray-progress');
   await win.keyboard.press('Escape');
   await win.evaluate(() => window.__llm_store().getState().settleDownload('qwen3.5-4b-mtp'));
+  await win.waitForTimeout(300);
+  check(
+    (await win.locator('[data-testid="download-tray"]').count()) === 0,
+    'nothing moving and no news → no icon',
+  );
 } finally {
   await finish();
   try {
