@@ -218,6 +218,32 @@ describe('detectBashTerminals', () => {
   });
 });
 
+describe('detectFileWrites — where the tool said it wrote', () => {
+  /* SEEN 2026-09-13 (the user): every written file of a chat opened as "Could not
+   * read this file". The model wrote `hi-8/x.md` inside a working folder that
+   * WAS …/hi-8; the tab resolved the call's path against pi's cwd (one folder
+   * up) while the tool reported the real file. */
+  it("keys the tab by the tool result's absolute path over the call's own", () => {
+    const msgs = [
+      assistant('a1', [call('c1', 'write', { path: 'hi-8/x.md', content: '# x' })]),
+      result('c1', 'Successfully wrote 3 bytes to /Users/user/Bobble/hi-8/x.md'),
+    ];
+    const [ev] = detectFileWrites(msgs, '/Users/user/Bobble');
+    expect(ev?.path).toBe('/Users/user/Bobble/hi-8/x.md');
+    expect(ev?.running).toBe(false);
+  });
+
+  it('reads the path out of write and edit results, and nothing out of other text', async () => {
+    const { reportedWritePath } = await import('../reported-path');
+    expect(reportedWritePath('Successfully wrote 988 bytes to /a/b c/d.md')).toBe('/a/b c/d.md');
+    expect(reportedWritePath('Successfully replaced 2 block(s) in /a/b.ts\n(note)')).toBe(
+      '/a/b.ts',
+    );
+    expect(reportedWritePath('EISDIR: illegal operation on a directory')).toBeUndefined();
+    expect(reportedWritePath('wrote to /x')).toBeUndefined();
+  });
+});
+
 describe('detectFileWrites — a refused write is not a file', () => {
   /* SEEN: the handmade-media guard refused create_illustrations.py and the
    * Activity tab opened "Could not read this file" for it anyway. */

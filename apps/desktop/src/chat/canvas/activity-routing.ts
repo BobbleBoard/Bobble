@@ -55,6 +55,7 @@ import { useCorpStore } from '../../state/corp-store';
 import { usePiStore } from '../../state/pi-slice';
 import { useProjectStore } from '../../state/project-store';
 import { toolStepKind } from '../activity-mapping';
+import { useHarnessStatus } from '../harness-status';
 import { COMMAND_KEYS, partialJsonString } from '../partial-json';
 import { firstCommandWord, isTerminalCommand } from './activity-cli';
 // The tab's identity lives in a leaf module so the browser bridge can ask which
@@ -512,7 +513,11 @@ export function morphActivityTab(
 export function useActivityCanvasRouting(controller: CanvasController): void {
   const messages = usePiStore((s) => s.messages) as ChatMsg[];
   const partials = usePiStore((s) => s.toolOutputPartials);
-  const cwd = usePiStore((s) => s.session?.cwd ?? undefined);
+  // The folder the TOOLS resolve a relative path against — the chat's working
+  // folder, published by the harness — not pi's cwd, which can be its parent.
+  const piCwd = usePiStore((s) => s.session?.cwd ?? undefined);
+  const workspaceRoot = useHarnessStatus()?.workspaceRoot ?? null;
+  const cwd = workspaceRoot ?? piCwd;
   const bgStreaming = usePiStore((s) => s.bgRun?.streaming === true);
   const streaming = usePiStore((s) => s.agent.isStreaming);
   const corpActive = useCorpStore((s) => s.taskId !== null);

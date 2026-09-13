@@ -473,6 +473,7 @@ export function useAttachmentPrefill(attachmentPrefix: string): {
     attachmentPrefix,
     system,
     toolsJson,
+    residentJson,
     serverRunning,
     busy,
     messages,

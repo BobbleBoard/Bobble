@@ -20,7 +20,7 @@
 import { appendFileSync, realpathSync, statSync } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
-import { isAbsolute, join } from 'node:path';
+import { basename, isAbsolute, join } from 'node:path';
 import type {
   ExtensionAPI,
   ExtensionCommandContext,
@@ -2607,6 +2607,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
         path: c.target,
         created: c.backup === null,
       })),
+      workspaceRoot: runtime.workspaceRoot,
     };
   }
 
@@ -3369,9 +3370,18 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     };
     if (same(root, runtime.announcedWorkspace)) return null;
     runtime.announcedWorkspace = root;
+    /*
+     * Say what a relative path looks like from INSIDE it. SEEN 2026-09-13: told
+     * "cwd ~/Bobble" by the prompt and "working folder ~/Bobble/hi-8" by this
+     * note, the model wrote every file as `hi-8/<name>` — the folder's own name
+     * first — and the tools nested the folder inside itself. The example is
+     * the folder's real name, so there is nothing to translate.
+     */
+    const own = basename(root);
     return (
-      `Working folder: ${root}. Relative paths resolve there, and that is where files ` +
-      'belong unless the user names somewhere else.'
+      `Working folder: ${root} — this is your current directory now. Relative paths ` +
+      `resolve inside it (write \`notes.md\`, not \`${own}/notes.md\`), and that is where ` +
+      'files belong unless the user names somewhere else.'
     );
   }
 

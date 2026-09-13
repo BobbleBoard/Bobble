@@ -28,6 +28,7 @@ import { useEffect, useReducer, useRef } from 'react';
 import { usePiStore } from '../../state/pi-slice';
 import { useProjectStore } from '../../state/project-store';
 import { editDiffFile } from '../edit-diff';
+import { useHarnessStatus } from '../harness-status';
 import { pdFileUrl, previewKindForExt } from './file-preview';
 import { basename, detectFileWrites, dirname, type EditHunk } from './file-writes';
 
@@ -469,7 +470,11 @@ export async function openFileInCanvas(
 export function useFileWriteCanvasRouting(): void {
   const { controller } = useCanvasTabs();
   const messages = usePiStore((s) => s.messages) as ChatMsg[];
-  const cwd = usePiStore((s) => s.session?.cwd ?? undefined);
+  // The folder the TOOLS resolve a relative path against — the chat's working
+  // folder, published by the harness — not pi's cwd, which can be its parent.
+  const piCwd = usePiStore((s) => s.session?.cwd ?? undefined);
+  const workspaceRoot = useHarnessStatus()?.workspaceRoot ?? null;
+  const cwd = workspaceRoot ?? piCwd;
 
   const opened = useRef<Set<string>>(new Set());
   const finalized = useRef<Set<string>>(new Set());

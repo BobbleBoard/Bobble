@@ -143,6 +143,15 @@ export interface HarnessStatus extends HarnessConfig {
    * it is a delete — a real state, not a missing value.
    */
   readonly changedFiles: readonly { readonly path: string; readonly created: boolean }[];
+  /**
+   * The folder every relative path a tool receives resolves against — the
+   * chat's working folder, which is NOT always pi's cwd (a projectless chat
+   * gets `~/Bobble/<first words>` on its first message while pi stays rooted
+   * where it was spawned). The canvas resolves a written file's relative path
+   * against this, the same way the write did; SEEN 2026-09-13, resolving it
+   * against pi's cwd opened a tab for a file one folder up that did not exist.
+   */
+  readonly workspaceRoot: string | null;
 }
 
 /** Minimal structural view of a persisted session entry. */

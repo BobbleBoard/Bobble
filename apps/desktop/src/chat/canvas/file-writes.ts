@@ -16,6 +16,7 @@ import {
   PATH_KEYS,
   partialJsonString,
 } from '../partial-json';
+import { reportedWritePath } from '../reported-path';
 
 type ToolCallBlock = Extract<ContentBlock, { type: 'toolCall' }>;
 
@@ -283,10 +284,14 @@ function classifyWrite(
 export function detectFileWrites(messages: ChatMsg[], cwd: string | undefined): FileWriteEvent[] {
   const completed = new Set<string>();
   const failed = new Set<string>();
+  /** The absolute path the tool itself said it wrote, by call id. */
+  const reported = new Map<string, string>();
   for (const m of messages) {
     if (m.kind === 'toolResult') {
       completed.add(m.toolCallId);
       if (m.isError === true) failed.add(m.toolCallId);
+      const at = reportedWritePath(m.text);
+      if (at !== undefined) reported.set(m.toolCallId, at);
     }
   }
   const byPath = new Map<string, FileWriteEvent>();
@@ -306,7 +311,15 @@ export function detectFileWrites(messages: ChatMsg[], cwd: string | undefined): 
        * names a file that exists, so that one stays.
        */
       if (failed.has(block.id) && write.edit === undefined && write.hunks === undefined) continue;
-      const path = resolvePath(cwd, write.path);
+      /*
+       * WHERE THE TOOL SAID IT WROTE, when it has said. The call's own path is
+       * whatever the model typed, relative to a root only the tools know for
+       * sure; the result names the absolute file. SEEN 2026-09-13: the model
+       * wrote `hi-8/x.md` in a working folder that WAS `…/hi-8`, the tab was
+       * keyed one folder up, and "Could not read this file" for every file of
+       * the chat. The tool's own word is the truth of the disk.
+       */
+      const path = reported.get(block.id) ?? resolvePath(cwd, write.path);
       byPath.set(path, {
         callId: block.id,
         path,

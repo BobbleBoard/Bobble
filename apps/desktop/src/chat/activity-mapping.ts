@@ -28,6 +28,7 @@ import { pdFileUrl } from './canvas/file-preview';
 import { cliCommandLabel } from './cli-command-label';
 import { editDiffFile } from './edit-diff';
 import { COMMAND_KEYS, CONTENT_KEYS, PATH_KEYS, partialJsonString } from './partial-json';
+import { reportedWritePath } from './reported-path';
 import { MEDIA_TOOLS } from './thread-media';
 
 type ToolCallBlock = Extract<ContentBlock, { type: 'toolCall' }>;
@@ -1086,13 +1087,21 @@ function mapToolStepData(
       let added = typeof args.addedLines === 'number' ? args.addedLines : undefined;
       let deleted = typeof args.removedLines === 'number' ? args.removedLines : undefined;
       const diff = editDiff(args);
-      let editPath = path;
-      let editName = filename;
+      // Where the tool SAID it wrote, once it has: the call's own path is
+      // relative to a root only the tools know (SEEN 2026-09-13: `hi-8/x.md`
+      // in a working folder that was …/hi-8 — the row opened a tab one folder
+      // up, "Could not read this file", for every file of the chat).
+      const reportedPath = result === undefined ? undefined : reportedWritePath(result.text);
+      let editPath = reportedPath ?? path;
+      let editName = reportedPath === undefined ? filename : baseName(reportedPath);
       // Still streaming (args haven't parsed): read the growing whole-file content
       // out of the raw argsText and count its lines, so +N ticks up in real time
       // and matches the canvas draw. str_replace edits carry no `content` field, so
       // this only fires for whole-file writes; parsed edits keep the real diff.
-      if (diff === undefined && running && block.argsText !== undefined) {
+      // …and not only while running: a call that has finished streaming but
+      // not yet been finalized (toolcall_end pending behind a sibling call)
+      // still has `{}` for arguments and the whole call in argsText.
+      if (diff === undefined && editPath === undefined && block.argsText !== undefined) {
         const p = partialJsonString(block.argsText, PATH_KEYS);
         const c = partialJsonString(block.argsText, CONTENT_KEYS);
         if (p?.complete === true) {
@@ -1391,6 +1400,14 @@ export function chainRunningFlags(
     const isLast = i === lastIdx;
     if (block.type === 'thinking') return opts.streaming && isLast;
     if (opts.runningToolCalls.includes(block.id)) return true;
-    return opts.streaming && isLast && !opts.hasResult(block.id);
+    /*
+     * A call with no result yet has not run. It used to settle to the past
+     * tense the moment a LATER block began — right for a call whose result had
+     * landed (that is what E1 fixed: a new action re-presenting finished
+     * steps), wrong for the second and third of three calls the model wrote
+     * in ONE message: SEEN 2026-09-13, "Wrote a file" with no name for files
+     * that had not been written yet. The result is what settles a call.
+     */
+    return opts.streaming && !opts.hasResult(block.id);
   });
 }

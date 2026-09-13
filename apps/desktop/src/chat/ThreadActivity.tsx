@@ -117,7 +117,11 @@ export function ThreadActivityChain({
   onOpenFile?: (path: string) => void;
 }): ReactNode {
   const canvas = useCanvasTabs();
-  const cwd = usePiStore((s) => s.session?.cwd ?? undefined);
+  // The folder the TOOLS resolve a relative path against (the chat's working
+  // folder, from the harness) — pi's cwd can be its parent.
+  const piCwd = usePiStore((s) => s.session?.cwd ?? undefined);
+  const workspaceRoot = useHarnessStatus()?.workspaceRoot ?? null;
+  const cwd = workspaceRoot ?? piCwd;
 
   // Thinking duration (round-3 #A13/activity): the engine carries no per-block
   // timestamps, so approximate the model's thinking time as the pre-first-tool

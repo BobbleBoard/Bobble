@@ -132,12 +132,51 @@ export function malformedPathComplaint(raw: string): string | null {
  * to the workspace root — NEVER to HOME. This is the load-bearing fix for the
  * reported bug: `resolveWorkspacePath("file1.txt", sandbox)` → `<sandbox>/file1.txt`.
  */
-export function resolveWorkspacePath(raw: string, root: string): string {
+export function resolveWorkspacePath(
+  raw: string,
+  root: string,
+  isDir: (p: string) => boolean = isDirectory,
+): string {
   const expanded = expandUserPath(raw);
   if (path.isAbsolute(expanded)) return path.resolve(expanded);
   const repaired = repairDroppedRootSlash(expanded);
   if (repaired !== undefined) return repaired;
+  const inside = dropOwnRootSegment(expanded, root, isDir);
+  if (inside !== undefined) return path.resolve(root, inside);
   return path.resolve(root, expanded);
+}
+
+function isDirectory(p: string): boolean {
+  try {
+    return fs.statSync(p).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * `hi-8/notes.md` inside a working folder that IS `…/hi-8` → `notes.md`.
+ *
+ * SEEN 2026-09-13 (the user's racing-simulator chat): pi's cwd was ~/Bobble, the
+ * chat's own folder ~/Bobble/hi-8 was created on the first message and
+ * announced as the working folder, and the model — told both — wrote every
+ * file as `hi-8/<name>`. Joined to the root that built ~/Bobble/hi-8/hi-8/…,
+ * so its own `open ~/Bobble/hi-8/<name>` found nothing and the canvas could
+ * not read a file where the call had named it. A folder nested inside itself
+ * is never what was meant; the one case kept is a real `hi-8/hi-8` directory
+ * already on disk. Returns the path without the duplicate segment, or
+ * undefined when the path does not start with the root's own name.
+ */
+export function dropOwnRootSegment(
+  relative: string,
+  root: string,
+  isDir: (p: string) => boolean,
+): string | undefined {
+  const segs = relative.split(/[/\\]+/).filter((s) => s !== '' && s !== '.');
+  const own = path.basename(normalizeRoot(root));
+  if (segs.length < 2 || own.length === 0 || segs[0] !== own) return undefined;
+  if (isDir(path.join(root, own))) return undefined;
+  return segs.slice(1).join(path.sep);
 }
 
 /**
@@ -581,6 +620,13 @@ function fenceTool<S extends TSchema, D>(
       // ls with no `path` → the built-in defaults to "."; make that "." resolve
       // against OUR root by passing the root explicitly.
       const abs = raw === undefined ? root : resolveWorkspacePath(raw, root);
+      // Said in the result when the root's own name was dropped from the path,
+      // so the model learns where things are instead of nesting the folder.
+      const ownName = path.basename(normalizeRoot(root));
+      const droppedOwn =
+        raw !== undefined &&
+        !path.isAbsolute(expandUserPath(raw)) &&
+        dropOwnRootSegment(expandUserPath(raw), root, isDirectory) !== undefined;
       if (
         raw !== undefined &&
         fence &&
@@ -644,12 +690,31 @@ function fenceTool<S extends TSchema, D>(
           }
         }
       }
-      if (base.name !== 'read') return result;
-      const r = result as unknown as Record<string, unknown>;
+      const noted = droppedOwn
+        ? withResultNote(
+            result,
+            `(\`${ownName}/\` is the working folder itself — inside it, \`${path.relative(root, abs)}\` is enough.)`,
+          )
+        : result;
+      if (base.name !== 'read') return noted;
+      const r = noted as unknown as Record<string, unknown>;
       return { ...r, content: withReadPathHeader(abs, r.content) } as typeof result;
     },
   };
   return wrapped;
+}
+
+/** Append a line to a tool result's first text part (a structural no-op otherwise). */
+function withResultNote<T>(result: T, note: string): T {
+  const r = result as unknown as { content?: unknown };
+  if (!Array.isArray(r.content)) return result;
+  const parts = r.content as Array<Record<string, unknown>>;
+  const i = parts.findIndex((p) => p?.type === 'text' && typeof p.text === 'string');
+  if (i === -1) return result;
+  return {
+    ...(result as object),
+    content: parts.map((p, n) => (n === i ? { ...p, text: `${String(p.text)}\n${note}` } : p)),
+  } as T;
 }
 
 /**

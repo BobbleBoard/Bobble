@@ -65,6 +65,29 @@ describe('resolveWorkspacePath', () => {
   it('collapses .. escapes so the fence sees the real target', () => {
     expect(resolveWorkspacePath('../../escape.txt', sandbox)).toBe('/tmp/pi/escape.txt');
   });
+
+  it("does not nest the working folder inside itself when the path starts with the folder's own name", () => {
+    // SEEN 2026-09-13: pi's cwd ~/Bobble, working folder ~/Bobble/hi-8, and
+    // every write came as `hi-8/<name>` → ~/Bobble/hi-8/hi-8/<name>.
+    const root = '/Users/user/Bobble/hi-8';
+    const noDir = () => false;
+    expect(resolveWorkspacePath('hi-8/racing_simulator_mockup.md', root, noDir)).toBe(
+      '/Users/user/Bobble/hi-8/racing_simulator_mockup.md',
+    );
+    expect(resolveWorkspacePath('hi-8/racing-simulator/vite.config.ts', root, noDir)).toBe(
+      '/Users/user/Bobble/hi-8/racing-simulator/vite.config.ts',
+    );
+    // A real hi-8/hi-8 directory on disk is honoured as written.
+    expect(resolveWorkspacePath('hi-8/notes.md', root, () => true)).toBe(
+      '/Users/user/Bobble/hi-8/hi-8/notes.md',
+    );
+    // Only the root's OWN name; another folder name is a genuine subfolder.
+    expect(resolveWorkspacePath('hi-9/notes.md', root, noDir)).toBe(
+      '/Users/user/Bobble/hi-8/hi-9/notes.md',
+    );
+    // The bare name is the root itself, not a file.
+    expect(resolveWorkspacePath('hi-8', root, noDir)).toBe('/Users/user/Bobble/hi-8/hi-8');
+  });
 });
 
 describe('isNamedDestination', () => {

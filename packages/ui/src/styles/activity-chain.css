@@ -198,9 +198,16 @@ button.pd-chain-step-row:hover {
   padding: 0;
 }
 
+/*
+ * The main button takes only its content's width — verb, filename, ±stat —
+ * so the disclose chevron that follows sits right after them. the user
+ * (2026-09-13, three file rows with the > at the far edge): "move the >
+ * arrows all the way next to the end of the tool calls, never pin them right
+ * aligned." It still shrinks (and ellipsizes) on a long filename.
+ */
 .pd-chain-step-open-main {
   display: flex;
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   align-items: center;
   gap: 8px;
   min-width: 0;
@@ -314,10 +321,12 @@ button.pd-chain-step-row:hover .pd-chain-step-detail {
   white-space: nowrap;
 }
 
+/* Right after the row's text, like the chevron — never pinned to the far edge
+ * (the user, 2026-09-13). The row itself is the click target either way. */
 .pd-chain-step-canvas {
   display: inline-flex;
   flex: none;
-  margin-left: auto;
+  margin-left: 2px;
   color: var(--pd-text-muted);
 }
 

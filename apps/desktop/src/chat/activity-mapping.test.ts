@@ -674,23 +674,39 @@ describe('mapThinkingStep', () => {
   });
 });
 
-describe('chainRunningFlags (E1 — only the last live step is present-tense)', () => {
+describe('chainRunningFlags (E1 — a finished step is past-tense; an unrun one is not)', () => {
   const noResults = { hasResult: () => false, runningToolCalls: [] as string[] };
+  const doneC1 = { hasResult: (id: string) => id === 'c1', runningToolCalls: [] as string[] };
 
-  it('marks ONLY the last step running in a live chain — prior steps stay past', () => {
+  it('marks a step whose result landed as past while the next one runs', () => {
     const flags = chainRunningFlags(
       [call('c1', 'edit', { path: 'a.ts' }), call('c2', 'edit', { path: 'b.ts' })],
+      { streaming: true, ...doneC1 },
+    );
+    // The E1 bug: a NEW action used to re-present ALL prior tool calls. The
+    // earlier edit, which has its result, is settled ("Edited a file"); only
+    // the current one runs.
+    expect(flags).toEqual([false, true]);
+  });
+
+  it('keeps every call that has NOT run yet present-tense (three writes in one message)', () => {
+    // SEEN 2026-09-13: the second and third of three writes the model put in one
+    // message read "Wrote a file" (no name) before pi had run any of them.
+    const flags = chainRunningFlags(
+      [
+        call('c1', 'edit', { path: 'a.ts' }),
+        call('c2', 'edit', { path: 'b.ts' }),
+        call('c3', 'edit', { path: 'c.ts' }),
+      ],
       { streaming: true, ...noResults },
     );
-    // The E1 bug: a NEW action used to re-present ALL prior tool calls. Now the
-    // earlier edit is settled (past "Edited a file") and only the current one runs.
-    expect(flags).toEqual([false, true]);
+    expect(flags).toEqual([true, true, true]);
   });
 
   it('keeps a prior tool PAST when a new THOUGHT is the live trailing block', () => {
     const flags = chainRunningFlags([call('c1', 'edit', { path: 'a.ts' }), think('next step')], {
       streaming: true,
-      ...noResults,
+      ...doneC1,
     });
     // The tool ran, then the model started thinking — the tool is "Edited a file"
     // (past), the trailing thought is "Thinking…" (present).
@@ -717,9 +733,9 @@ describe('chainRunningFlags (E1 — only the last live step is present-tense)', 
   it('settles the last tool once its result lands (the current-action-done gap)', () => {
     const flags = chainRunningFlags(
       [call('c1', 'bash', { command: 'ls' }), call('c2', 'edit', { path: 'a.ts' })],
-      { streaming: true, hasResult: (id) => id === 'c2', runningToolCalls: [] },
+      { streaming: true, hasResult: () => true, runningToolCalls: [] },
     );
-    // c2 already has a result → past; c1 is not last and has no result → past.
+    // Both have results → past, whatever the stream is still doing.
     expect(flags).toEqual([false, false]);
   });
 
