@@ -83,6 +83,8 @@ export interface ActivityCommand {
   output: string;
   /** No tool result yet — the command is still running. */
   running: boolean;
+  /** The tool reported an error (non-zero exit, refused) — its output paints red. */
+  failed: boolean;
 }
 
 /**
@@ -212,8 +214,12 @@ export function detectActivity(
   opts: DetectActivityOptions = {},
 ): ActivityStream {
   const resultByCall = new Map<string, string>();
+  const failedCalls = new Set<string>();
   for (const m of messages) {
-    if (m.kind === 'toolResult') resultByCall.set(m.toolCallId, m.text);
+    if (m.kind === 'toolResult') {
+      resultByCall.set(m.toolCallId, m.text);
+      if (m.isError) failedCalls.add(m.toolCallId);
+    }
   }
 
   const commands: ActivityCommand[] = [];
@@ -242,6 +248,7 @@ export function detectActivity(
         command,
         output: output ?? partials[block.id] ?? '',
         running: output === undefined,
+        failed: failedCalls.has(block.id),
       };
       commands.push(entry);
       terminalFocus = { kind: 'terminal', at, command: entry };
@@ -292,7 +299,9 @@ export function detectActivity(
  * output all survive the next command being typed underneath them.
  */
 export function activityMirrorText(commands: readonly ActivityCommand[], cwd?: string): string {
-  return commands.map((c) => mirrorCommandText(c.command, c.output, c.running, cwd)).join('\n');
+  return commands
+    .map((c) => mirrorCommandText(c.command, c.output, c.running, cwd, { failed: c.failed }))
+    .join('\n');
 }
 
 function extname(filename: string): string {

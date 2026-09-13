@@ -87,28 +87,67 @@ export function classifyPresented(p: string): { kind: PresentKind; tab: CanvasTa
   return BY_EXT[ext] ?? { kind: 'file', tab: 'file' };
 }
 
+/** The bucket for a chat that has no session file yet. */
+export const UNSAVED_CHAT = '';
+
 interface PresentState {
-  items: PresentedRecord[];
-  add: (item: { path: string; note?: string; afterMessageId?: string | null }) => PresentedRecord;
+  /**
+   * Presented artefacts PER CHAT, keyed by session file. One flat list used to
+   * serve every chat: a card handed over in one conversation had no anchor in
+   * any other, so it fell to the foot of whichever chat was being viewed —
+   * "pinned to the bottom of a chat" (the user, 2026-09-12), in chats that had
+   * never seen the file.
+   */
+  byChat: Record<string, PresentedRecord[]>;
+  add: (item: {
+    path: string;
+    note?: string;
+    afterMessageId?: string | null;
+    /** The chat the hand-over belongs to (its session file); unsaved → ''. */
+    chat?: string;
+  }) => PresentedRecord;
   /** Attach the apps that can open a presented artefact (async, best-effort). */
   setApps: (path: string, apps: OpenWithChoice[], defaultAppId: string | null) => void;
   clear: () => void;
 }
 
+const NONE: PresentedRecord[] = [];
+
+/** The cards of one chat — a stable empty list when it has none. */
+export function presentedFor(state: PresentState, chat: string): PresentedRecord[] {
+  return state.byChat[chat] ?? NONE;
+}
+
 export const usePresentStore = create<PresentState>((set, get) => ({
-  items: [],
-  add: ({ path, note, afterMessageId = null }) => {
+  byChat: {},
+  add: ({ path, note, afterMessageId = null, chat = UNSAVED_CHAT }) => {
     const { kind } = classifyPresented(path);
+    const have = presentedFor(get(), chat);
     const record: PresentedRecord = {
       path,
       kind,
-      at: get().items.length + 1,
+      at: have.reduce((m, i) => Math.max(m, i.at), 0) + 1,
       afterMessageId,
       ...(note !== undefined ? { note } : {}),
     };
-    // Re-presenting the same artefact REPLACES its row rather than stacking a
-    // duplicate — the model iterating on one file is the normal case.
-    set((s) => ({ items: [...s.items.filter((i) => i.path !== path), record] }));
+    /*
+     * A file presented again from the SAME message (the model iterating within
+     * one turn) replaces its card. Presented again from a later message it is a
+     * NEW card, and the earlier one stays where it was made — the user: "if the
+     * model presents the same file and it has an update that's when a new file
+     * card appears below but they don't travel through a user sent message."
+     */
+    set((s) => ({
+      byChat: {
+        ...s.byChat,
+        [chat]: [
+          ...presentedFor(s, chat).filter(
+            (i) => !(i.path === path && i.afterMessageId === afterMessageId),
+          ),
+          record,
+        ],
+      },
+    }));
     /*
      * Ask the OS which applications can open this, the same way the canvas
      * operation bar does — so the card's Open control offers the same choices
@@ -135,19 +174,24 @@ export const usePresentStore = create<PresentState>((set, get) => ({
   },
   setApps: (path, apps, defaultAppId) =>
     set((s) => ({
-      items: s.items.map((i) =>
-        i.path === path
-          ? {
-              ...i,
-              openApps: apps,
-              ...(defaultAppId !== null
-                ? { defaultApp: apps.find((a) => a.id === defaultAppId) }
-                : {}),
-            }
-          : i,
+      byChat: Object.fromEntries(
+        Object.entries(s.byChat).map(([chat, items]) => [
+          chat,
+          items.map((i) =>
+            i.path === path
+              ? {
+                  ...i,
+                  openApps: apps,
+                  ...(defaultAppId !== null
+                    ? { defaultApp: apps.find((a) => a.id === defaultAppId) }
+                    : {}),
+                }
+              : i,
+          ),
+        ]),
       ),
     })),
-  clear: () => set({ items: [] }),
+  clear: () => set({ byChat: {} }),
 }));
 
 /**
@@ -239,14 +283,21 @@ export function connectPresent(): () => void {
     (window as unknown as { __present_store?: unknown }).__present_store = () => usePresentStore;
   }
   return window.piDesktop.onEvent('present:show', ({ path, note }) => {
-    // Anchor it to the turn that produced it — see `afterMessageId`. Read
-    // lazily off the live store so this module keeps no import on the chat.
-    const messages = usePiStore.getState().messages;
+    // Anchor it to the turn that produced it — see `afterMessageId` — in the
+    // chat that is RUNNING: the one in the background if a turn is going there,
+    // else the one on screen. Read lazily off the live store so this module
+    // keeps no import on the chat.
+    const pi = usePiStore.getState();
+    const bg = pi.bgRun?.streaming === true ? pi.bgRun : null;
+    const messages = bg !== null ? bg.messages : pi.messages;
+    const chat = bg !== null ? bg.sessionFile : (pi.session?.sessionFile ?? UNSAVED_CHAT);
     const anchor = messages[messages.length - 1]?.id ?? null;
     const record = usePresentStore
       .getState()
-      .add({ path, afterMessageId: anchor, ...(note !== undefined ? { note } : {}) });
-    void openPresented(getCanvasController() as never, record);
+      .add({ path, chat, afterMessageId: anchor, ...(note !== undefined ? { note } : {}) });
+    // The canvas belongs to the chat on screen; a background chat's artefact
+    // waits in its card until the user comes back to it.
+    if (bg === null) void openPresented(getCanvasController() as never, record);
   });
 }
 

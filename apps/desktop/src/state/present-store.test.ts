@@ -1,6 +1,12 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it } from 'vitest';
-import { classifyPresented, extOf, usePresentStore } from './present-store';
+import {
+  classifyPresented,
+  extOf,
+  presentedFor,
+  UNSAVED_CHAT,
+  usePresentStore,
+} from './present-store';
 
 describe('classifyPresented', () => {
   it('opens an image as an image', () => {
@@ -37,34 +43,53 @@ describe('extOf', () => {
 
 describe('usePresentStore', () => {
   beforeEach(() => usePresentStore.getState().clear());
+  const items = (chat = UNSAVED_CHAT) => presentedFor(usePresentStore.getState(), chat);
 
   it('records what was presented, with its kind', () => {
     usePresentStore.getState().add({ path: '/a/logo.png', note: 'third pass' });
-    const [item] = usePresentStore.getState().items;
+    const [item] = items();
     expect(item).toMatchObject({ path: '/a/logo.png', kind: 'image', note: 'third pass' });
   });
 
-  /* Iterating on one artefact is the normal case — present, look, fix, present
-   * again. That must update the row, not stack duplicates. */
-  it('replaces a re-presented artefact instead of duplicating it', () => {
+  /* Iterating on one artefact within ONE message is the normal case — present,
+   * look, fix, present again. That must update the row, not stack duplicates. */
+  it('replaces an artefact re-presented from the same message', () => {
     const s = usePresentStore.getState();
-    s.add({ path: '/a/logo.png', note: 'first' });
-    s.add({ path: '/a/other.png' });
-    s.add({ path: '/a/logo.png', note: 'fixed' });
-    const items = usePresentStore.getState().items;
-    expect(items).toHaveLength(2);
-    expect(items[items.length - 1]).toMatchObject({ path: '/a/logo.png', note: 'fixed' });
+    s.add({ path: '/a/logo.png', note: 'first', afterMessageId: 'm1' });
+    s.add({ path: '/a/other.png', afterMessageId: 'm1' });
+    s.add({ path: '/a/logo.png', note: 'fixed', afterMessageId: 'm1' });
+    expect(items()).toHaveLength(2);
+    expect(items()[items().length - 1]).toMatchObject({ path: '/a/logo.png', note: 'fixed' });
   });
 
   it('keeps presentation order', () => {
     const s = usePresentStore.getState();
     s.add({ path: '/a/1.png' });
     s.add({ path: '/a/2.png' });
-    expect(usePresentStore.getState().items.map((i) => i.path)).toEqual(['/a/1.png', '/a/2.png']);
+    expect(items().map((i) => i.path)).toEqual(['/a/1.png', '/a/2.png']);
+  });
+
+  /* the user (2026-09-12): cards from one conversation were falling to the foot of
+   * every other, because there was one list for all of them. */
+  it('keeps each chat’s cards to that chat', () => {
+    const s = usePresentStore.getState();
+    s.add({ path: '/a/1.png', chat: '/s/a.jsonl', afterMessageId: 'a1' });
+    s.add({ path: '/b/2.png', chat: '/s/b.jsonl', afterMessageId: 'b1' });
+    expect(items('/s/a.jsonl').map((i) => i.path)).toEqual(['/a/1.png']);
+    expect(items('/s/b.jsonl').map((i) => i.path)).toEqual(['/b/2.png']);
+    expect(items('/s/c.jsonl')).toEqual([]);
+  });
+
+  it('attaches the open-with apps to the artefact in whichever chat it is in', () => {
+    const s = usePresentStore.getState();
+    s.add({ path: '/a/1.png', chat: '/s/a.jsonl' });
+    s.setApps('/a/1.png', [{ id: 'x', name: 'X' } as never], 'x');
+    expect(items('/s/a.jsonl')[0]?.defaultApp).toMatchObject({ id: 'x' });
   });
 });
 
 describe('a presented card remembers where it was handed over', () => {
+  beforeEach(() => usePresentStore.getState().clear());
   /*
    * the user: "file presentation cards seem pinned to the bottom of the chat for
    * some time instead of staying at the position they were created at." The
@@ -79,12 +104,16 @@ describe('a presented card remembers where it was handed over', () => {
     expect(usePresentStore.getState().add({ path: '/a/two.png' }).afterMessageId).toBeNull();
   });
 
-  it('a RE-present moves the card to the newer turn', () => {
+  /* the user (2026-09-12): "if the model presents the same file and it has an
+   * update that's when a new file card appears below but they don't travel
+   * through a user sent message." */
+  it('a RE-present from a later message is a new card; the earlier one stays put', () => {
     const s = usePresentStore.getState();
     s.add({ path: '/a/logo.png', afterMessageId: 'm1' });
     s.add({ path: '/a/logo.png', afterMessageId: 'm9' });
-    const items = usePresentStore.getState().items.filter((i) => i.path === '/a/logo.png');
-    expect(items).toHaveLength(1);
-    expect(items[0]?.afterMessageId).toBe('m9');
+    const logos = presentedFor(usePresentStore.getState(), UNSAVED_CHAT).filter(
+      (i) => i.path === '/a/logo.png',
+    );
+    expect(logos.map((i) => i.afterMessageId)).toEqual(['m1', 'm9']);
   });
 });

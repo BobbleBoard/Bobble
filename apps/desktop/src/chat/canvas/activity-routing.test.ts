@@ -29,6 +29,7 @@ import {
   detectActivity,
   morphActivityTab,
 } from './activity-routing';
+import { plainMirrorText } from './agent-surfaces';
 
 type ToolCall = Extract<ContentBlock, { type: 'toolCall' }>;
 
@@ -69,7 +70,7 @@ describe('detectActivity — which bash is bash', () => {
       CWD,
     );
     expect(stream.commands).toEqual([
-      { callId: 'c1', command: 'ls -la', output: 'total 8', running: false },
+      { callId: 'c1', command: 'ls -la', output: 'total 8', running: false, failed: false },
     ]);
     expect(stream.focus?.kind).toBe('terminal');
   });
@@ -98,6 +99,7 @@ describe('detectActivity — which bash is bash', () => {
       command: 'npm run build',
       output: 'vite v7…',
       running: true,
+      failed: false,
     });
   });
 
@@ -248,13 +250,13 @@ describe('detectActivity — a refused write is not a file', () => {
 });
 
 describe('activityMirrorText — nothing is lost', () => {
-  const ls = { callId: 'c1', command: 'ls -la', output: '', running: true };
+  const ls = { callId: 'c1', command: 'ls -la', output: '', running: true, failed: false };
 
   it('keeps every command, oldest first', () => {
     const text = activityMirrorText(
       [
         { ...ls, output: 'total 8\na.ts', running: false },
-        { callId: 'c2', command: 'git status', output: '', running: true },
+        { callId: 'c2', command: 'git status', output: '', running: true, failed: false },
       ],
       CWD,
     );
@@ -264,7 +266,7 @@ describe('activityMirrorText — nothing is lost', () => {
   });
 
   it('names the working directory in the prompt, not a bare $', () => {
-    expect(activityMirrorText([ls], CWD)).toContain('bobble proj $ ls -la');
+    expect(plainMirrorText(activityMirrorText([ls], CWD))).toContain('bobble proj $ ls -la');
   });
 
   it('ONLY GROWS as output arrives — the xterm appends instead of resetting', () => {
@@ -278,7 +280,7 @@ describe('activityMirrorText — nothing is lost', () => {
     const after = activityMirrorText(
       [
         { ...ls, output: 'total 8', running: false },
-        { callId: 'c2', command: 'git st', output: '', running: true },
+        { callId: 'c2', command: 'git st', output: '', running: true, failed: false },
       ],
       CWD,
     );

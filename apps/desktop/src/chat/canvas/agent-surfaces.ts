@@ -56,11 +56,28 @@ export function isInteractiveCommand(command: string): boolean {
  * going", and one the corp's own copy of this function used to get wrong: every
  * quiet `mkdir` sat there claiming to be running forever.
  */
+/** ANSI SGR: the mirror is an xterm, so colour is a byte sequence, not CSS. */
+const SGR = {
+  reset: '\x1b[0m',
+  bold: '\x1b[1m',
+  dim: '\x1b[2m',
+  red: '\x1b[31m',
+  green: '\x1b[32m',
+  blue: '\x1b[34m',
+} as const;
+
+/** Strip the colour the mirror adds (its own SGR sequences), for tests and titles. */
+export function plainMirrorText(text: string): string {
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: ANSI escape sequences are control characters by definition
+  return text.replace(/\x1b\[[0-9;]*m/g, '');
+}
+
 export function mirrorCommandText(
   command: string,
   output: string,
   running: boolean,
   cwd?: string,
+  opts: { failed?: boolean } = {},
 ): string {
   /*
    * A REAL PROMPT LINE, not a bare `$`. the user: "would be appreciated if you can
@@ -72,11 +89,26 @@ export function mirrorCommandText(
    * the mirror gave the reader nothing to check it against. Showing where the
    * command actually ran makes the answer visible instead of inferred.
    */
+  /*
+   * COLOUR-CODED, like the shell it mirrors. the user (2026-09-12): "need color
+   * coded text in the terminal in the canvas." The mirror is an xterm, but
+   * what reached it was flat text: a plain prompt, the command, and output
+   * from tools that saw a pipe and printed no colour. So the prompt is the
+   * shell's own colouring (user green, folder blue, a dim `$`, the command
+   * bold), a failed command's output is red, and a quiet one says so dimly.
+   * Output that carries its own escapes (a tool that colours regardless)
+   * passes through untouched — xterm renders it.
+   */
   const where = cwd !== undefined && cwd.length > 0 ? shortCwd(cwd) : '';
-  const prompt = where === '' ? '$' : `bobble ${where} $`;
-  const head = `${prompt} ${command}\n\n`;
-  if (output.length > 0) return `${head}${output}\n`;
-  return running ? head : `${head}(no output)\n`;
+  const prompt =
+    where === ''
+      ? `${SGR.dim}$${SGR.reset}`
+      : `${SGR.bold}${SGR.green}bobble${SGR.reset} ${SGR.bold}${SGR.blue}${where}${SGR.reset} ${SGR.dim}$${SGR.reset}`;
+  const head = `${prompt} ${SGR.bold}${command}${SGR.reset}\n\n`;
+  if (output.length > 0) {
+    return opts.failed === true ? `${head}${SGR.red}${output}${SGR.reset}\n` : `${head}${output}\n`;
+  }
+  return running ? head : `${head}${SGR.dim}(no output)${SGR.reset}\n`;
 }
 
 /** The tail of a path, the way a shell prompt shows it: `~` for home, else the

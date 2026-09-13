@@ -7,13 +7,18 @@
  * every tick and throws away wherever the user had scrolled to.
  */
 import { describe, expect, it } from 'vitest';
-import { isInteractiveCommand, mirrorCommandText, shortCommandTitle } from './agent-surfaces';
+import {
+  isInteractiveCommand,
+  mirrorCommandText,
+  plainMirrorText,
+  shortCommandTitle,
+} from './agent-surfaces';
 
 describe('a mirror only ever grows', () => {
   it('a running command is its prompt line and nothing else', () => {
     // What a real terminal shows while something works — and it means the output
     // that follows is an APPEND, not a rewrite.
-    expect(mirrorCommandText('npm test', '', true)).toBe('$ npm test\n\n');
+    expect(plainMirrorText(mirrorCommandText('npm test', '', true))).toBe('$ npm test\n\n');
   });
 
   it('output arriving EXTENDS the running text', () => {
@@ -27,7 +32,9 @@ describe('a mirror only ever grows', () => {
   it('a finished command that printed nothing SAYS so', () => {
     // Distinct from "still going" — the corp's old copy reported every quiet
     // mkdir as running forever.
-    expect(mirrorCommandText('mkdir -p out', '', false)).toBe('$ mkdir -p out\n\n(no output)\n');
+    expect(plainMirrorText(mirrorCommandText('mkdir -p out', '', false))).toBe(
+      '$ mkdir -p out\n\n(no output)\n',
+    );
     expect(
       mirrorCommandText('mkdir -p out', '', false).startsWith(
         mirrorCommandText('mkdir -p out', '', true),
@@ -42,6 +49,35 @@ describe('a mirror only ever grows', () => {
       mirrorCommandText('npm test', '', true),
     ].join('\n');
     expect(two.startsWith(one)).toBe(true);
+  });
+});
+
+describe('the mirror is colour-coded like the shell it mirrors', () => {
+  // the user (2026-09-12): "need color coded text in the terminal in the canvas."
+  it('paints the prompt: user green, folder blue, a dim $, the command bold', () => {
+    const out = mirrorCommandText('ls', 'a', false, '/w/proj');
+    expect(out).toContain('\x1b[1m\x1b[32mbobble\x1b[0m');
+    expect(out).toContain('\x1b[1m\x1b[34mproj\x1b[0m');
+    expect(out).toContain('\x1b[2m$\x1b[0m \x1b[1mls\x1b[0m');
+    expect(plainMirrorText(out)).toBe('bobble proj $ ls\n\na\n');
+  });
+
+  it('paints a failed command’s output red, and a quiet one dim', () => {
+    expect(mirrorCommandText('false', 'boom', false, undefined, { failed: true })).toContain(
+      '\x1b[31mboom\x1b[0m',
+    );
+    expect(mirrorCommandText('true', '', false)).toContain('\x1b[2m(no output)\x1b[0m');
+  });
+
+  it('lets output that carries its own colour through untouched', () => {
+    const coloured = '\x1b[33mwarn\x1b[0m done';
+    expect(mirrorCommandText('npm test', coloured, false)).toContain(coloured);
+  });
+
+  it('still only grows, colour and all', () => {
+    const running = mirrorCommandText('npm test', '', true, '/w/proj');
+    const done = mirrorCommandText('npm test', 'PASS', false, '/w/proj');
+    expect(done.startsWith(running)).toBe(true);
   });
 });
 
@@ -77,7 +113,9 @@ describe('the terminal mirror shows where the command ran', () => {
    * the reader nothing to check it against.
    */
   it('renders a prompt line with the folder name', () => {
-    const out = mirrorCommandText('ls -la', 'a\nb', false, '/Users/user/bobble-testbed/buggyapp');
+    const out = plainMirrorText(
+      mirrorCommandText('ls -la', 'a\nb', false, '/Users/user/bobble-testbed/buggyapp'),
+    );
     expect(out.startsWith('bobble buggyapp $ ls -la')).toBe(true);
     expect(out).toContain('a\nb');
   });
@@ -85,11 +123,15 @@ describe('the terminal mirror shows where the command ran', () => {
   it('shows ~ for the home directory, the way a shell does', () => {
     const home = process.env.HOME ?? '';
     if (home === '') return;
-    expect(mirrorCommandText('pwd', '', true, home).startsWith('bobble ~ $ pwd')).toBe(true);
+    expect(
+      plainMirrorText(mirrorCommandText('pwd', '', true, home)).startsWith('bobble ~ $ pwd'),
+    ).toBe(true);
   });
 
   it('falls back to a bare $ when there is no cwd to show', () => {
-    expect(mirrorCommandText('echo hi', 'hi', false).startsWith('$ echo hi')).toBe(true);
+    expect(plainMirrorText(mirrorCommandText('echo hi', 'hi', false)).startsWith('$ echo hi')).toBe(
+      true,
+    );
   });
 
   it('still marks a finished command with no output', () => {

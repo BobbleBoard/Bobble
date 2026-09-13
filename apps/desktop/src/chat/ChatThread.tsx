@@ -41,7 +41,13 @@ import { useCorpStore } from '../state/corp-store';
 import { useLlmStore } from '../state/llm-store';
 import { forkAndReprompt, switchBranch } from '../state/pi-connect';
 import { usePiStore } from '../state/pi-slice';
-import { openPresented, type PresentedRecord, usePresentStore } from '../state/present-store';
+import {
+  openPresented,
+  type PresentedRecord,
+  presentedFor,
+  UNSAVED_CHAT,
+  usePresentStore,
+} from '../state/present-store';
 import { useTurnPrefilling } from '../state/running-chats';
 import { AssistantGroup } from './AssistantGroup';
 import { AttachedFileCard } from './AttachedFileCard';
@@ -213,7 +219,8 @@ export function ChatThread() {
     pinnedNode: corpPinnedNode,
   });
   const { controller: canvasController } = useCanvasTabs();
-  const presented = usePresentStore((st) => st.items);
+  const chatKey = usePiStore((s) => s.session?.sessionFile ?? UNSAVED_CHAT);
+  const presented = usePresentStore((st) => presentedFor(st, chatKey));
 
   const [editingId, setEditingId] = useState<string | null>(null);
   /*
@@ -337,13 +344,36 @@ export function ChatThread() {
   // round-8) and re-armed only when they return to the bottom — so a burst of
   // streaming re-renders can never yank the view back down while they read above.
   const pinnedRef = useRef(true);
+  /*
+   * WHICH WAY THE USER LAST MEANT TO GO. the user (2026-09-12): "the slightest bit
+   * of user scrolling up manually, I need to be freed from the auto scroll …
+   * if they tap the bottom at all, then activate the auto scroll, but if they
+   * ever go up, even the tiniest bit (manually) the auto scroll doesn't snap
+   * you down."
+   *
+   * The wheel handler below did release on the first upward tick — and the
+   * scroll event that followed it re-armed the stick, because "within 16px of
+   * the bottom" was the re-arm test and a tiny scroll-up leaves you within
+   * 16px of the bottom. The next streamed line snapped the view down. So the
+   * re-arm now needs BOTH the bottom itself (2px, not 16) and a downward
+   * gesture since the last upward one: a scroll-up of any size stays released
+   * until the user comes back down to the bottom, or presses the jump.
+   */
+  const intentRef = useRef<'up' | 'down'>('down');
+  /** Until when a smooth jump-to-latest is in flight: its intermediate scroll
+   * positions are not the user leaving the bottom. */
+  const jumpUntilRef = useRef(0);
 
-  // Re-arm the stick only when genuinely back at the bottom (tight threshold so
-  // scrolling even slightly up stays released).
   const onScroll = () => {
     const el = scrollRef.current;
     if (el === null) return;
-    pinnedRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 16;
+    const gap = el.scrollHeight - el.scrollTop - el.clientHeight;
+    if (gap > 2) {
+      if (Date.now() > jumpUntilRef.current) pinnedRef.current = false;
+    } else if (intentRef.current === 'down') {
+      pinnedRef.current = true;
+      jumpUntilRef.current = 0;
+    }
     syncAway();
   };
 
@@ -356,12 +386,20 @@ export function ChatThread() {
     if (el === null) return;
     const releaseUp = () => {
       pinnedRef.current = false;
+      intentRef.current = 'up';
+    };
+    const meanDown = () => {
+      intentRef.current = 'down';
     };
     const onWheel = (e: WheelEvent) => {
       if (e.deltaY < 0) releaseUp();
+      else if (e.deltaY > 0) meanDown();
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'ArrowUp' || e.key === 'PageUp' || e.key === 'Home') releaseUp();
+      else if (e.key === 'ArrowDown' || e.key === 'PageDown' || e.key === 'End' || e.key === ' ') {
+        meanDown();
+      }
     };
     let lastY = 0;
     const onTouchStart = (e: TouchEvent) => {
@@ -369,7 +407,9 @@ export function ChatThread() {
     };
     const onTouchMove = (e: TouchEvent) => {
       const y = e.touches[0]?.clientY ?? 0;
-      if (y > lastY + 1) releaseUp(); // finger drags down → content moves up
+      if (y > lastY + 1)
+        releaseUp(); // finger drags down → content moves up
+      else if (y < lastY - 1) meanDown();
       lastY = y;
     };
     el.addEventListener('wheel', onWheel, { passive: true });
@@ -440,6 +480,8 @@ export function ChatThread() {
   const jumpToLatest = (): void => {
     const el = scrollRef.current;
     if (el === null) return;
+    intentRef.current = 'down';
+    jumpUntilRef.current = Date.now() + 700;
     el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
     pinnedRef.current = true;
     applyAway(false);
@@ -508,18 +550,51 @@ export function ChatThread() {
    * record whose anchor is not in this thread (presented before the first
    * message, or its turn edited away) has nowhere to sit and falls to the foot.
    */
-  const anchorIds = new Set(items.map(threadItemId));
+  /*
+   * EVERY message of a row claims the row, not only its last one. the user
+   * (2026-09-12): "file cards pin themselves to the bottom of a chat rather
+   * than the bottom of the message they were called in." The anchor is the
+   * LAST message at the moment of the hand-over — mid-turn that is the
+   * assistant message (or tool result) the `present` call sits in, and the
+   * turn goes on after it. The row was keyed by its last message only, so any
+   * card presented before the turn's final message matched nothing, fell to
+   * the foot, and sank under every later user message. A row now owns every
+   * message id it draws — each assistant message in the group and the tool
+   * results claimed by them — and a card lands under the row that owns its
+   * anchor, whatever the turn did afterwards.
+   */
+  const rowOfMessage = new Map<string, string>();
+  for (const item of items) {
+    const key = threadItemId(item);
+    if (item.kind === 'assistant') {
+      for (const m of item.group) rowOfMessage.set(m.id, key);
+    } else {
+      rowOfMessage.set(item.message.id, key);
+    }
+  }
+  for (const m of messages) {
+    if (m.kind !== 'toolResult' || rowOfMessage.has(m.id)) continue;
+    const owner = m.assistantId !== undefined ? rowOfMessage.get(m.assistantId) : undefined;
+    if (owner !== undefined) rowOfMessage.set(m.id, owner);
+  }
   const presentedByAnchor = new Map<string, PresentedRecord[]>();
   const orphanPresented: PresentedRecord[] = [];
   for (const record of presented) {
-    const id = record.afterMessageId;
-    if (id === null || !anchorIds.has(id)) {
+    const row =
+      record.afterMessageId === null ? undefined : rowOfMessage.get(record.afterMessageId);
+    if (row === undefined) {
       orphanPresented.push(record);
       continue;
     }
-    const bucket = presentedByAnchor.get(id);
-    if (bucket === undefined) presentedByAnchor.set(id, [record]);
-    else bucket.push(record);
+    const bucket = presentedByAnchor.get(row);
+    if (bucket === undefined) presentedByAnchor.set(row, [record]);
+    else {
+      // The same file presented twice within one row (two iterations of one
+      // turn) is one card, the later one; across rows they are two cards.
+      const dup = bucket.findIndex((r) => r.path === record.path);
+      if (dup === -1) bucket.push(record);
+      else bucket[dup] = record;
+    }
   }
 
   return (
