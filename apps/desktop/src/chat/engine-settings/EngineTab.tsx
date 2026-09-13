@@ -22,6 +22,7 @@ import { useSettingsStore } from '../../state/settings-store';
 import { CommandTab } from './CommandTab';
 import { EngineFlagsTab } from './EngineFlagsTab';
 import { emptyConfig, setFlag, shellJoin } from './engine-settings-logic';
+import { CHAT_TEMPLATE_FLAG, type FlagSpec, type PathSource } from './FlagRow';
 import { SpeculativeTab } from './SpeculativeTab';
 
 type SubTab = 'settings' | 'speculative' | 'command' | 'running';
@@ -120,11 +121,34 @@ export function EngineTab() {
     }
   };
 
-  const pickPath = async (): Promise<string | null> => {
-    const r = await window.piDesktop
-      .invoke('llm:pick-gguf', undefined)
-      .catch(() => ({ path: null }));
-    return r.path;
+  /* A path for a path-kind flag: the native picker filtered by what the flag
+     is for, or a dropped file. A chat template is copied into Bobble's storage
+     either way, so the launch line survives the original being moved. */
+  const resolvePath = async (flag: FlagSpec, source: PathSource): Promise<string | null> => {
+    const template = flag.key === CHAT_TEMPLATE_FLAG;
+    let chosen: string | null;
+    if (source.kind === 'drop') chosen = source.path;
+    else {
+      const kind = template
+        ? 'chat-template'
+        : /gguf/i.test(`${flag.placeholder ?? ''} ${flag.description}`)
+          ? 'gguf'
+          : /^(DIR|DIRECTORY|MODEL_DIR|PATH)$/i.test(flag.placeholder ?? '') &&
+              /\b(dir|directory|folder)\b/i.test(flag.description)
+            ? 'directory'
+            : 'file';
+      const r = await window.piDesktop
+        .invoke('llm:pick-path', { kind })
+        .catch(() => ({ path: null }));
+      chosen = r.path;
+    }
+    if (chosen === null || !template) return chosen;
+    const imported = await window.piDesktop
+      .invoke('llm:import-chat-template', { path: chosen })
+      .catch((err: unknown) => ({ path: chosen as string, error: String(err) }));
+    if (imported.error !== undefined) setNote(`Could not copy the template: ${imported.error}`);
+    else setNote('Template copied into Bobble’s storage.');
+    return imported.path;
   };
 
   return (
@@ -181,7 +205,7 @@ export function EngineTab() {
             values={draft.flags}
             status={status}
             onChange={(k, v) => setDraft((d) => ({ ...d, flags: setFlag(d.flags, k, v) }))}
-            onPickPath={pickPath}
+            onPath={resolvePath}
           />
         ) : sub === 'speculative' ? (
           <SpeculativeTab
@@ -192,7 +216,7 @@ export function EngineTab() {
             help={help}
             values={draft.flags}
             onFlag={(k, v) => setDraft((d) => ({ ...d, flags: setFlag(d.flags, k, v) }))}
-            onPickPath={pickPath}
+            onPath={resolvePath}
           />
         ) : sub === 'command' ? (
           <CommandTab

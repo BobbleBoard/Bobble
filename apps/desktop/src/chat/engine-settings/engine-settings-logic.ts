@@ -27,6 +27,8 @@ export const POPULAR_LLAMA_FLAGS: readonly string[] = [
   '--batch-size',
   '--ubatch-size',
   '--jinja',
+  '--chat-template-file',
+  '--chat-template',
   '--mlock',
   '--no-mmap',
   '--cache-ram',

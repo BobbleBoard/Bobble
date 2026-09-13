@@ -65,6 +65,39 @@ describe('parseLlamaHelp — the pinned build, every flag', () => {
     expect(llama.find((f) => f.key === '--reasoning-budget')?.category).toBe('Reasoning & chat');
   });
 
+  it('reads the enumerations llama.cpp writes as prose, and not the lists it writes as prose', () => {
+    // "list of built-in templates: bailing, …" → a select of the names; the
+    // file flag stays a path and neither description carries the 54 names.
+    const named = llama.find((f) => f.key === '--chat-template');
+    expect(named?.control.kind).toBe('select');
+    const names = named?.control.kind === 'select' ? named.control.options : [];
+    expect(names).toContain('chatml');
+    expect(names).toContain('gemma');
+    expect(names.length).toBeGreaterThan(40);
+    expect(named?.description).not.toContain('bailing');
+    const file = llama.find((f) => f.key === '--chat-template-file');
+    expect(file?.control).toEqual({ kind: 'path' });
+    expect(file?.description).not.toContain('bailing');
+    // "one of: - none: … - deepseek: …" bullets, with the default added when
+    // the bullets leave it out; quoted levels ('minimal', 'low', …) too.
+    expect(llama.find((f) => f.key === '--reasoning-format')?.control).toEqual({
+      kind: 'select',
+      options: ['none', 'deepseek', 'deepseek-legacy', 'auto'],
+    });
+    expect(llama.find((f) => f.key === '--split-mode')?.control).toEqual({
+      kind: 'select',
+      options: ['none', 'layer', 'row', 'tensor'],
+    });
+    expect(llama.find((f) => f.key === '--reasoning-effort')?.control).toEqual({
+      kind: 'select',
+      options: ['default', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'],
+    });
+    // `N0,N1,N2,...` and `<dev1,dev2,..>` are lists the user types, not choices.
+    for (const k of ['--tensor-split', '--device', '--fit-target', '--tools']) {
+      expect(llama.find((f) => f.key === k)?.control, k).toEqual({ kind: 'text' });
+    }
+  });
+
   it('has the popular flags the user named', () => {
     for (const k of [
       '--reasoning-budget',

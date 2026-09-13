@@ -79,6 +79,16 @@ function descriptionGap(line: string): number {
   return -1;
 }
 
+/** `N0,N1,N2` / `TOOL1,TOOL2`: one stem, consecutive numbers — a list template, not choices. */
+function numberedRun(tokens: readonly string[]): boolean {
+  if (tokens.length < 2) return false;
+  const parts = tokens.map((t) => t.match(/^([A-Za-z]+)(\d+)$/));
+  if (parts.some((m) => m === null)) return false;
+  const stem = parts[0]?.[1];
+  const first = Number(parts[0]?.[2]);
+  return parts.every((m, i) => m?.[1] === stem && Number(m?.[2]) === first + i);
+}
+
 function controlFor(placeholder: string | null, description: string): FlagControl {
   if (placeholder === null) return { kind: 'switch' };
   const p = placeholder.trim();
@@ -94,8 +104,17 @@ function controlFor(placeholder: string | null, description: string): FlagContro
     }
     // `none,draft-simple,…` (llama.cpp lists the spec types inline) and
     // `{none mean cls last rank}` (a braced, space-separated set).
-    if (/^[\w.+-]+(?:[,\s]+[\w.+-]+)+$/.test(body) && (body.includes(',') || p.startsWith('{'))) {
-      return { kind: 'select', options: body.split(/[,\s]+/).map((o) => o.trim()) };
+    // — but `N0,N1,N2,...` / `<dev1,dev2,..>` / `TOOL1,TOOL2,...` describe a
+    // comma-separated LIST the user types, not a choice: an ellipsis token or a
+    // numbered run of the same stem means text.
+    const tokens = body.split(/[,\s]+/).map((o) => o.trim());
+    const isList = tokens.some((t) => /^\.{2,}$/.test(t)) || numberedRun(tokens);
+    if (
+      !isList &&
+      /^[\w.+-]+(?:[,\s]+[\w.+-]+)+$/.test(body) &&
+      (body.includes(',') || p.startsWith('{'))
+    ) {
+      return { kind: 'select', options: tokens };
     }
   }
   // "allowed values: f32, f16, bf16, q8_0, …" in the description.
@@ -106,6 +125,31 @@ function controlFor(placeholder: string | null, description: string): FlagContro
       .map((o) => o.trim())
       .filter((o) => /^[\w.+-]+$/.test(o));
     if (options.length >= 2) return { kind: 'select', options };
+  }
+  // `--chat-template JINJA_TEMPLATE` enumerates llama.cpp's built-in templates
+  // ("list of built-in templates: bailing, …"); a name from that list is what
+  // the flag is for, so it is a select. (A custom template goes through the
+  // file flag, which is a path and keeps the list out of its description.)
+  const builtIns = builtInList(description);
+  if (builtIns !== null && !/FILE/.test(p)) return { kind: 'select', options: builtIns };
+  // "one of: - none: … - deepseek: … - deepseek-legacy: …" (llama.cpp's
+  // bulleted enumerations, `--reasoning-format`, `--split-mode`); the default
+  // is added when the bullets leave it out ("(default: auto)").
+  const oneOf = description.match(/one of:\s*((?:-\s+[\w.-]+(?:\s+\(default\))?:.*?)+)$/s);
+  if (oneOf !== null) {
+    const options = [
+      ...(oneOf[1] ?? '').matchAll(/(?:^|\s)-\s+([\w.-]+)(?:\s+\(default\))?:/g),
+    ].map((m) => m[1] ?? '');
+    const def = description.match(/\(default:\s*([\w.-]+)\)/)?.[1];
+    if (def !== undefined && !options.includes(def)) options.push(def);
+    if (options.length >= 2) return { kind: 'select', options };
+  }
+  // A bare word placeholder (`LEVEL`) explained by quoted words ('minimal',
+  // 'low', 'medium', …) is an enumeration too.
+  if (/^[A-Z_]+$/.test(p)) {
+    const quoted = [...description.matchAll(/'([\w.-]+)'/g)].map((m) => m[1] ?? '');
+    const options = [...new Set(quoted)];
+    if (options.length >= 3) return { kind: 'select', options };
   }
   if (/^(N|SEED|PORT|K|VALUE|SIZE|MB|BYTES|INT)$/i.test(p) || /^<?\d+(\.\.\.\d+)?>?$/.test(p)) {
     return { kind: 'number' };
@@ -119,8 +163,24 @@ function controlFor(placeholder: string | null, description: string): FlagContro
   return { kind: 'text' };
 }
 
+/** The names after "list of built-in templates:", when a description carries one. */
+function builtInList(description: string): string[] | null {
+  const m = description.match(/list of built-in templates:\s*([\w.,\s-]+)/i);
+  if (m === null) return null;
+  const options = (m[1] ?? '')
+    .split(/[,\s]+/)
+    .map((o) => o.trim())
+    .filter((o) => /^[\w.-]+$/.test(o));
+  return options.length >= 2 ? options : null;
+}
+
 function extractMeta(description: string): { text: string; defaultValue?: string; env?: string } {
   let text = description;
+  // The built-in template list is an enumeration, not prose: it becomes the
+  // control's options (see controlFor) and is dropped from the text.
+  const list = text.match(/\s*list of built-in templates:\s*[\w.,\s-]+/i);
+  const listRemoved = list !== null && builtInList(text) !== null;
+  if (listRemoved) text = text.replace(list[0], ' ');
   let defaultValue: string | undefined;
   let env: string | undefined;
   const envMatch = text.match(/\(env:\s*([A-Z0-9_]+)\)/);
@@ -133,7 +193,10 @@ function extractMeta(description: string): { text: string; defaultValue?: string
     defaultValue = (defMatch[1] ?? '').trim();
     text = text.replace(defMatch[0], '');
   }
-  return { text: text.replace(/\s+/g, ' ').trim(), defaultValue, env };
+  text = text.replace(/\s+/g, ' ').trim();
+  // The list used to follow a colon; without it the colon dangles.
+  if (listRemoved) text = text.replace(/:$/, '');
+  return { text, defaultValue, env };
 }
 
 /**
@@ -155,7 +218,7 @@ export function parseLlamaHelp(help: string): EngineFlag[] {
         key,
         aliases: current.aliases,
         placeholder: current.placeholder,
-        control: controlFor(current.placeholder, meta.text),
+        control: controlFor(current.placeholder, description),
         description: meta.text,
         ...(meta.defaultValue !== undefined ? { defaultValue: meta.defaultValue } : {}),
         ...(meta.env !== undefined ? { env: meta.env } : {}),

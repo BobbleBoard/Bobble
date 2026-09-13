@@ -99,6 +99,18 @@ body,
   height: 100%;
 }
 
+/* Number fields never show the native up/down stepper (the user, 2026-09-12:
+   "never have these buttons show up ever anywhere"). Chromium draws it as a
+   two-arrow widget that ignores the palette; the value is typed. */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
 body {
   margin: 0;
   background-color: var(--pd-bg-base);
@@ -4633,14 +4645,10 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
   width: 68px;
 }
 
-/* NO NATIVE STEPPER. macOS draws a two-arrow widget inside the field that
-   ignores this app's palette entirely, and in the gears dialog it was the
-   brightest thing on the panel. Type the number, or leave it empty. */
-.pd-studio-input::-webkit-inner-spin-button,
-.pd-studio-input::-webkit-outer-spin-button {
-  appearance: none;
-  margin: 0;
-}
+/* NO NATIVE STEPPER — anywhere. macOS draws a two-arrow widget inside every
+   number field that ignores this app's palette entirely; the user (2026-09-12):
+   "never have these buttons show up ever anywhere". The global rule is at the
+   top of this file; nothing per-component is needed any more. */
 
 /* The gears panel: one field per row, full width, so a number and its label do
    not sit in a 68px box in the middle of a 460px dialog. */
@@ -7064,6 +7072,17 @@ body[data-media-expanded="true"] .pd-studio-compose {
 .pd-flag-desc {
   font-size: var(--pd-font-size-caption);
   color: var(--pd-text-secondary);
+}
+/* A path row is a drop target; it says so, and lights up while a file is over it. */
+.pd-flag-drop-hint {
+  margin-top: 2px;
+  font-size: var(--pd-font-size-caption);
+  color: var(--pd-text-muted);
+}
+.pd-flag-row--drop {
+  outline: 1px dashed var(--pd-accent-primary);
+  outline-offset: -1px;
+  background: color-mix(in srgb, var(--pd-accent-primary) 8%, transparent);
 }
 .pd-flag-row[data-set="no"] .pd-flag-desc {
   color: var(--pd-text-muted);

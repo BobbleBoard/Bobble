@@ -36,7 +36,7 @@ import {
   runningValue,
   SPEC_METHODS,
 } from './engine-settings-logic';
-import { FlagRow } from './FlagRow';
+import { FlagRow, type FlagSpec, type PathSource } from './FlagRow';
 
 type LocalGguf = { path: string; name: string; bytes: number; modelId: string; kind: string };
 
@@ -298,7 +298,7 @@ export function SpeculativeTab({
   help,
   values,
   onFlag,
-  onPickPath,
+  onPath,
 }: {
   entry: LlmCatalogEntry | undefined;
   status: LlmStatus;
@@ -307,7 +307,7 @@ export function SpeculativeTab({
   help: EngineFlagsView | null;
   values: FlagValues;
   onFlag: (key: string, value: EngineFlagValue | null) => void;
-  onPickPath: () => Promise<string | null>;
+  onPath: (flag: FlagSpec, source: PathSource) => Promise<string | null>;
 }) {
   const catalog = useLlmStore((s) => s.catalog);
   const record = useLlmStore((s) => s.record);
@@ -403,7 +403,7 @@ export function SpeculativeTab({
               running={runningValue(status, f.aliases)}
               managed={MANAGED_LLAMA_FLAGS[f.key]}
               onChange={(v) => onFlag(f.key, v)}
-              onPickPath={onPickPath}
+              onPath={onPath}
             />
           ))}
         </div>

@@ -222,7 +222,7 @@ describe('catalog', () => {
       expect(m.publisher?.reliable).toBe(isReliablePublisher(m.publisher?.handle ?? ''));
       expect(MODEL_TIERS).toContain(m.tier);
       for (const v of m.variants ?? []) {
-        expect(['mtp', 'eagle3', 'dflash']).toContain(v.method);
+        expect(['mtp', 'eagle3', 'dflash', 'dspark']).toContain(v.method);
       }
     }
   });

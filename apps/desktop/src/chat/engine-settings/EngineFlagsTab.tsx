@@ -15,7 +15,7 @@ import {
   POPULAR_LLAMA_FLAGS,
   runningValue,
 } from './engine-settings-logic';
-import { FlagRow } from './FlagRow';
+import { FlagRow, type FlagSpec, type PathSource } from './FlagRow';
 
 export function EngineFlagsTab({
   engine,
@@ -23,14 +23,14 @@ export function EngineFlagsTab({
   values,
   status,
   onChange,
-  onPickPath,
+  onPath,
 }: {
   engine: string;
   help: EngineFlagsView | null;
   values: FlagValues;
   status: LlmStatus;
   onChange: (key: string, value: EngineFlagValue | null) => void;
-  onPickPath: () => Promise<string | null>;
+  onPath: (flag: FlagSpec, source: PathSource) => Promise<string | null>;
 }) {
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState<Record<string, boolean>>({});
@@ -64,7 +64,7 @@ export function EngineFlagsTab({
       running={runningValue(status, f.aliases)}
       managed={managed[f.key]}
       onChange={(v) => onChange(f.key, v)}
-      onPickPath={onPickPath}
+      onPath={onPath}
     />
   );
   return (

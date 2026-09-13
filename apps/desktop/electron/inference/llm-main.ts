@@ -605,7 +605,67 @@ const handlers: IpcHandlers<LlmInvokeMap> = {
     if (picked.canceled || picked.filePaths.length === 0) return { path: null };
     return { path: picked.filePaths[0] ?? null };
   },
+  'llm:pick-path': async ({ kind }) => {
+    const picked = await dialog.showOpenDialog(
+      kind === 'directory'
+        ? { title: 'Choose a folder', properties: ['openDirectory'] }
+        : kind === 'gguf'
+          ? {
+              title: 'Choose a model (GGUF)',
+              properties: ['openFile'],
+              filters: [{ name: 'GGUF', extensions: ['gguf'] }],
+            }
+          : kind === 'chat-template'
+            ? {
+                title: 'Choose a chat template',
+                properties: ['openFile'],
+                filters: [
+                  {
+                    name: 'Chat template',
+                    extensions: ['jinja', 'jinja2', 'j2', 'txt', 'tmpl', 'template'],
+                  },
+                  { name: 'All files', extensions: ['*'] },
+                ],
+              }
+            : { title: 'Choose a file', properties: ['openFile'] },
+    );
+    if (picked.canceled || picked.filePaths.length === 0) return { path: null };
+    return { path: picked.filePaths[0] ?? null };
+  },
+  'llm:import-chat-template': async ({ path: source }) => importChatTemplate(source),
 };
+
+/**
+ * A chat template the user dropped or picked is COPIED into Bobble's storage
+ * (`<cache>/chat-templates/`): the launch line points at our copy, so the
+ * server keeps starting when the original is moved or deleted. Same name with
+ * different bytes gets a content-hash suffix rather than overwriting.
+ */
+async function importChatTemplate(source: string): Promise<{ path: string; error?: string }> {
+  const { readFile, mkdir, writeFile, stat } = await import('node:fs/promises');
+  const { createHash } = await import('node:crypto');
+  try {
+    const info = await stat(source);
+    if (!info.isFile()) return { path: source, error: 'not a file' };
+    if (info.size > 4 * 1024 * 1024)
+      return { path: source, error: 'a chat template over 4 MB is not one' };
+    const bytes = await readFile(source);
+    const dir = path.join(cacheRoot(), 'chat-templates');
+    await mkdir(dir, { recursive: true });
+    const base = path.basename(source);
+    let target = path.join(dir, base);
+    const existing = await readFile(target).catch(() => null);
+    if (existing !== null && !existing.equals(bytes)) {
+      const hash = createHash('sha256').update(bytes).digest('hex').slice(0, 8);
+      const ext = path.extname(base);
+      target = path.join(dir, `${base.slice(0, base.length - ext.length)}-${hash}${ext}`);
+    }
+    if (existing === null || !existing.equals(bytes)) await writeFile(target, bytes);
+    return { path: target };
+  } catch (err) {
+    return { path: source, error: err instanceof Error ? err.message : String(err) };
+  }
+}
 
 /** Hugging Face browse/register channels — proxied to the same supervisor, which
  * owns hf-search + the discovered-model registry (see supervisor-entry.ts). */

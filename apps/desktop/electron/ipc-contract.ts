@@ -607,6 +607,18 @@ export type LlmInvokeMap = {
   };
   /** A native file dialog for a draft GGUF; null when cancelled. */
   'llm:pick-gguf': { request: undefined; response: { path: string | null } };
+  /** A native file dialog for a flag that takes a path — filtered by what the
+   * flag is for; null when cancelled. */
+  'llm:pick-path': {
+    request: { kind: 'gguf' | 'chat-template' | 'file' | 'directory' };
+    response: { path: string | null };
+  };
+  /** Copy a chat template (a dropped or picked .jinja) into Bobble's own
+   * storage, so the launch keeps working when the original moves. */
+  'llm:import-chat-template': {
+    request: { path: string };
+    response: { path: string; error?: string };
+  };
   /** Every flag an engine accepts, parsed from its own `--help`. */
   'llm:engine-flags': {
     request: { engine: string };
@@ -791,6 +803,8 @@ export const LLM_INVOKE_CHANNELS = [
   'llm:engine-flags',
   'llm:list-local-ggufs',
   'llm:pick-gguf',
+  'llm:pick-path',
+  'llm:import-chat-template',
 ] as const satisfies readonly (keyof LlmInvokeMap)[];
 
 // ---------------------------------------------------------------------------
