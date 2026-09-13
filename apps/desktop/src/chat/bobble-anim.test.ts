@@ -246,13 +246,19 @@ describe('sceneAt — every frame of every variant', () => {
   });
 
   it('never draws outside the icon box', () => {
+    // Collected and asserted once, like the sanity check below: an `expect`
+    // per block per frame is over a million assertions and blew the suite's
+    // timeout whenever the machine was busy. A stray block still names itself.
+    const out: string[] = [];
     for (const v of VARIANTS) {
       for (const t of frames(v, 20)) {
-        for (const b of sceneAt(t, v).blocks) {
-          expect(inBox(b)).toBe(true);
+        const blocks = sceneAt(t, v).blocks;
+        for (let i = 0; i < blocks.length; i++) {
+          if (!inBox(blocks[i] as Block)) out.push(`${v} t=${Math.round(t)} block ${i}`);
         }
       }
     }
+    expect(out.slice(0, 5)).toEqual([]);
   });
 
   it('keeps every block physically sane: non-negative size, radius within it', () => {
@@ -290,6 +296,7 @@ describe('sceneAt — every frame of every variant', () => {
     // out to. A jump here is the one defect that would read as two animations
     // spliced together rather than one continuous life.
     const STEP = 1000 / 60;
+    const jumps: string[] = [];
     for (const v of VARIANTS) {
       let prev = sceneAt(0, v).blocks;
       for (let t = STEP; t < loopMs(v); t += STEP) {
@@ -301,12 +308,18 @@ describe('sceneAt — every frame of every variant', () => {
           // A whole board-width in 16ms would be a teleport; the filmstrip
           // legitimately wraps, so allow one wrap's worth there only.
           const limit = v === 'video' ? BOARD + 1 : 3.2;
-          expect(moved).toBeLessThanOrEqual(limit);
-          expect(Math.abs(a.size - b.size)).toBeLessThanOrEqual(3.2);
+          const grew = Math.abs(a.size - b.size);
+          if (moved > limit || grew > 3.2) {
+            jumps.push(
+              `${v} t=${Math.round(t)} block ${i}: moved ${moved.toFixed(2)}, size ${grew.toFixed(2)}`,
+            );
+          }
         }
         prev = now;
       }
     }
+    // One assertion for the whole sweep (see the sanity check above for why).
+    expect(jumps.slice(0, 5)).toEqual([]);
   });
 
   it('loops seamlessly — the last frame meets the first', () => {
