@@ -23,7 +23,7 @@
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { cacheRoot } from '@pi-desktop/inference';
+import { cacheRoot, libraryRoot } from '@pi-desktop/inference';
 import type { EngineState } from '../ipc-contract';
 import { COMFY_H3_SHIM_DIRNAME, COMFY_H3_SHIM_PY } from './comfy-h3-shim';
 import { engineInstalled, mlxVenvRoot, vllmVenvRoot } from './engine-paths';
@@ -199,6 +199,39 @@ const COMFY_CATEGORIES = [
 export function writeComfyModelPaths(): void {
   const store = path.join(cacheRoot(), 'store');
   /*
+   * ONE ENTRY PER LIBRARY SHELF THAT HOLDS COMFY TYPE FOLDERS. The weights
+   * moved out of the flat store onto the shelves (`Video/Generation/unet/…`,
+   * `Audio/Music/checkpoints/…` — storage/library-migration.ts); ComfyUI
+   * resolves a loader name against every base path listed here, so each shelf
+   * with type folders is a base path of its own, and the legacy store stays
+   * listed for a machine not yet migrated. Names in the graphs are unchanged.
+   */
+  const shelves: string[] = [];
+  const lib = libraryRoot();
+  for (const modality of ['Image', 'Video', 'Audio', '3D', 'Support', 'Unsorted']) {
+    const folder = path.join(lib, modality);
+    let subs: string[];
+    try {
+      subs = readdirSync(folder);
+    } catch {
+      continue;
+    }
+    const candidates =
+      modality === 'Support' || modality === 'Unsorted'
+        ? [folder]
+        : subs.map((s) => path.join(folder, s));
+    for (const dir of candidates) {
+      const hasTypeDir = COMFY_CATEGORIES.some((c) => existsSync(path.join(dir, c)));
+      if (hasTypeDir) shelves.push(dir);
+    }
+  }
+  const entryFor = (name: string, base: string, isDefault: boolean): string[] => [
+    `${name}:`,
+    `  base_path: ${base}`,
+    ...(isDefault ? ['  is_default: true'] : []),
+    ...COMFY_CATEGORIES.map((c) => `  ${c}: ${c}`),
+  ];
+  /*
    * ONE DIRECTORY PER CATEGORY, NAMED THE SAME AS THE CATEGORY.
    *
    * This used to write `checkpoints: image|video` for every row, on the theory
@@ -217,12 +250,11 @@ export function writeComfyModelPaths(): void {
    * vae and text_encoders, and the graphs that reference them run.
    */
   const yaml = [
-    '# Written by Bobble. ComfyUI reads its weights from the app model store.',
+    '# Written by Bobble. ComfyUI reads its weights from the model library',
+    '# (~/Bobble/Models, one entry per shelf) and the legacy store.',
     '# Do not edit by hand; rewritten whenever the engine is prepared.',
-    'bobble:',
-    `  base_path: ${store}`,
-    '  is_default: true',
-    ...COMFY_CATEGORIES.map((c) => `  ${c}: ${c}`),
+    ...entryFor('bobble', store, true),
+    ...shelves.flatMap((dir, i) => entryFor(`bobble_shelf_${i + 1}`, dir, false)),
     '',
   ].join('\n');
   writeFileSync(comfyModelPathsYaml(), yaml, 'utf8');

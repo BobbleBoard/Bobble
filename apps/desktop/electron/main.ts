@@ -70,6 +70,7 @@ import {
   registerSettingsIpc,
 } from './settings/settings-main';
 import { registerSkillsIpc } from './skills/skills-main';
+import { applyLibraryEnv, registerStorageIpc, runLibraryMigration } from './storage/storage-main';
 import { comfyOrigin, disposeStudio, registerStudioIpc } from './studio/studio-main';
 import { disposeAllPtys, registerPtyIpc } from './terminal/pty-manager';
 import {
@@ -744,6 +745,12 @@ function registerAppIpc(): void {
     () => readSettings().hfToken || undefined,
   );
 
+  // Manage Storage: the library tree with sizes, Reveal, Trash, move.
+  registerStorageIpc(ipcMain, allowSender, (channel, payload) => {
+    const wc = mainWindow?.webContents;
+    if (wc !== undefined) events.send(wc, channel, payload);
+  });
+
   /*
    * THE IMAGE & VIDEO STUDIO, on ComfyUI. the user: "let's have comfy as a
    * downloadable inference engine and then wire up a primitive for now
@@ -972,6 +979,18 @@ if (!hasSingleInstanceLock) {
   // Mirror any persisted web-search keys onto the env BEFORE the first pi spawn
   // so the initial session's web-tools extension sees them (it reads env once).
   applySettingsEnvFromDisk();
+  /*
+   * THE MODEL LIBRARY, before anything reads a path: the root goes on the
+   * environment (every engine child inherits it), then whatever is still in
+   * ~/.cache is moved onto the shelves — renames, so it is instant, and the
+   * engines keep their view through links (see storage/library-migration.ts).
+   */
+  applyLibraryEnv();
+  try {
+    runLibraryMigration();
+  } catch (err) {
+    log.error('library migration failed', { error: String(err) });
+  }
 
   void app.whenReady().then(() => {
     /*

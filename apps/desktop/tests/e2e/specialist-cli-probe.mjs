@@ -24,26 +24,45 @@ const PROJECT = path.join(tmpdir(), 'specialist-cli', 'project');
 mkdirSync(PROJECT, { recursive: true });
 const home = probeHome('specialist-cli');
 mkdirSync(path.join(home, '.pi', 'desktop'), { recursive: true });
-writeFileSync(path.join(home, '.pi', 'desktop', 'settings.json'), JSON.stringify({ toolInterface: 'schemas', powerMode: 'low' }));
+writeFileSync(
+  path.join(home, '.pi', 'desktop', 'settings.json'),
+  JSON.stringify({ toolInterface: 'schemas', powerMode: 'low' }),
+);
 const debugLog = path.join(tmpdir(), 'specialist-cli', 'tools.log');
 writeFileSync(debugLog, '');
 
 const app = await _electron.launch({
   args: ['.', `--user-data-dir=${mkdtempSync(path.join(tmpdir(), 'specialist-cli-udd-'))}`],
   cwd: process.cwd(),
-  env: { ...process.env, HOME: home, PI_DESKTOP_CACHE_DIR: path.join(homedir(), '.cache', 'pi-desktop'), PI_E2E: '1', PI_E2E_BACKGROUND: '1', PI_ADV_DEBUG_TOOLS: debugLog },
+  env: {
+    ...process.env,
+    HOME: home,
+    PI_DESKTOP_CACHE_DIR: path.join(homedir(), '.cache', 'pi-desktop'),
+    PI_DESKTOP_MODELS_DIR:
+      process.env.PI_DESKTOP_MODELS_DIR ?? path.join(homedir(), 'Bobble', 'Models'),
+    PI_E2E: '1',
+    PI_E2E_BACKGROUND: '1',
+    PI_ADV_DEBUG_TOOLS: debugLog,
+  },
 });
 const t0 = Date.now();
 const say = (s) => console.log(`${((Date.now() - t0) / 1000).toFixed(1)}s ${s}`);
 let ok = true;
 try {
   const win = await app.firstWindow();
-  await win.waitForFunction(() => typeof window.piDesktop?.invoke === 'function', { timeout: 60000 });
+  await win.waitForFunction(() => typeof window.piDesktop?.invoke === 'function', {
+    timeout: 60000,
+  });
   await win.waitForTimeout(1500);
-  const up = await win.evaluate((id) => window.piDesktop.invoke('llm:start-server', { modelId: id }), MODEL);
+  const up = await win.evaluate(
+    (id) => window.piDesktop.invoke('llm:start-server', { modelId: id }),
+    MODEL,
+  );
   if (up.success !== true) throw new Error(`llm:start-server: ${up.error}`);
   await win.evaluate((p) => window.piDesktop.invoke('pi:restart', { cwd: p }), PROJECT);
-  await win.waitForFunction(() => window.__pi_store().getState().session !== null, { timeout: 60000 });
+  await win.waitForFunction(() => window.__pi_store().getState().session !== null, {
+    timeout: 60000,
+  });
   await win.waitForTimeout(2000);
   const events = [];
   await win.exposeFunction('__probeChildEvent', (e) => events.push(e));
@@ -80,21 +99,36 @@ try {
   }
   // The child's words: the last message_end carries the whole assistant message.
   const ends = events.filter((e) => e.type === 'message_end');
-  const text = ends.map((e) => e.text).join(' ').trim();
+  const text = ends
+    .map((e) => e.text)
+    .join(' ')
+    .trim();
   say(`event types: ${[...new Set(events.map((e) => e.type))].join(',')}`);
-  for (const e of events.filter((x) => x.type === 'tool_execution_start' || x.type === 'message_end').slice(0, 6)) say(`  ${e.raw}`);
+  for (const e of events
+    .filter((x) => x.type === 'tool_execution_start' || x.type === 'message_end')
+    .slice(0, 6))
+    say(`  ${e.raw}`);
   const log = readFileSync(debugLog, 'utf8');
   const runnable = /specialist\((\w+)\) commands\((\d+)\)=([^\n]*)/.exec(log);
   say(`child reply: ${text.slice(0, 600).replace(/\n/g, ' ')}`);
-  say(`cli surface (${runnable ? runnable[1] : '-'}): ${runnable ? runnable[3] : '(no specialist commands line — the child was NOT in CLI mode)'}`);
+  say(
+    `cli surface (${runnable ? runnable[1] : '-'}): ${runnable ? runnable[3] : '(no specialist commands line — the child was NOT in CLI mode)'}`,
+  );
   const cmds = runnable ? runnable[3].split(',') : [];
   const checks = {
     cliMode: runnable !== null,
-    hasOffice: cmds.includes('office_make') && cmds.includes('office_edit') && cmds.includes('office_inspect'),
+    hasOffice:
+      cmds.includes('office_make') &&
+      cmds.includes('office_edit') &&
+      cmds.includes('office_inspect'),
     noSpawn: !cmds.includes('spawn_subagent'),
     answered: text.length > 0,
   };
-  for (const [k, v] of Object.entries(checks)) if (!v) { ok = false; say(`FAIL ${k}`); }
+  for (const [k, v] of Object.entries(checks))
+    if (!v) {
+      ok = false;
+      say(`FAIL ${k}`);
+    }
   say(JSON.stringify(checks));
 } finally {
   await app.close().catch(() => {});

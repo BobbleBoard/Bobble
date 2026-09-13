@@ -100,7 +100,10 @@ export function selectFiles(files: readonly HfRepoFile[], allow?: readonly strin
 const HF_RESOLVE = 'https://huggingface.co';
 
 export async function downloadRepo(opts: RepoDownloadOptions): Promise<StoredModel> {
-  const dir = entryDir(opts.kind, opts.repo, opts.root);
+  const dir = entryDir(opts.kind, opts.repo, opts.root, {
+    ...(opts.tasks === undefined ? {} : { tasks: opts.tasks }),
+    ...(opts.family === undefined ? {} : { family: opts.family }),
+  });
   const listOpts = {
     ...(opts.hfToken === undefined ? {} : { hfToken: opts.hfToken }),
     ...(opts.fetchImpl === undefined ? {} : { fetchImpl: opts.fetchImpl }),

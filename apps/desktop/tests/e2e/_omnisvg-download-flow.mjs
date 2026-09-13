@@ -20,6 +20,9 @@ import { homedir, tmpdir } from 'node:os';
 import path from 'node:path';
 import { _electron as electron } from 'playwright-core';
 
+/** The real model library, beside the real cache (see harness.mjs REAL_LIBRARY). */
+const REAL_LIBRARY_DEFAULT = path.join(homedir(), 'Bobble', 'Models');
+
 const MIRROR = process.env.HF_ENDPOINT;
 if (!MIRROR) throw new Error('HF_ENDPOINT (the mirror) is required');
 const CHAT_MODEL = process.env.MAC_CU_MODEL ?? 'minicpm5-2b';
@@ -50,6 +53,7 @@ const app = await electron.launch({
     ...process.env,
     HOME,
     PI_DESKTOP_CACHE_DIR: CACHE,
+    PI_DESKTOP_MODELS_DIR: process.env.PI_DESKTOP_MODELS_DIR ?? REAL_LIBRARY_DEFAULT,
     HF_ENDPOINT: MIRROR,
     PI_E2E: '1',
     PI_E2E_BACKGROUND: '1',

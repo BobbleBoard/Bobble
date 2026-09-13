@@ -32,7 +32,10 @@ try {
   check(byId['mlx-dspark']?.installed === 'yes', 'mlx-dspark reads installed on this Mac');
   check(byId.omlx?.installed === 'yes', 'oMLX reads installed on this Mac');
   check(byId['mlx-lm']?.installed === 'yes', 'mlx-lm reads installed on this Mac');
-  check(byId.ninfer?.supported === 'no' && /RTX 5090/.test(byId.ninfer?.text ?? ''), 'NInfer is greyed with the card it needs');
+  check(
+    byId.ninfer?.supported === 'no' && /RTX 5090/.test(byId.ninfer?.text ?? ''),
+    'NInfer is greyed with the card it needs',
+  );
   await shot('01-engines-panel');
   const el = await page.$('[data-testid="engine-row-ninfer"]');
   if (el) await el.scrollIntoViewIfNeeded();

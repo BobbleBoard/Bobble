@@ -41,6 +41,7 @@ const base: DesktopSettings = {
   powerMode: 'auto',
   showComputerUseStatusPill: true,
   engineLaunch: {},
+  modelsRoot: null,
   modelSpec: {},
 };
 

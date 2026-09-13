@@ -35,20 +35,53 @@ const feed = (settled) =>
           kind: 'assistant',
           id: 'a1',
           blocks: [
-            { type: 'toolCall', id: 'c1', name: 'edit', arguments: { path: 'site/index.html', edits: [{ oldText: 'Count', newText: 'Clicks' }] } },
+            {
+              type: 'toolCall',
+              id: 'c1',
+              name: 'edit',
+              arguments: {
+                path: 'site/index.html',
+                edits: [{ oldText: 'Count', newText: 'Clicks' }],
+              },
+            },
           ],
           timestamp: now + 1,
           isStreaming: false,
         },
-        { kind: 'toolResult', id: 'r1', toolCallId: 'c1', assistantId: 'a1', toolName: 'edit', text: 'Successfully replaced 1 block(s)', isError: false, timestamp: now + 2 },
+        {
+          kind: 'toolResult',
+          id: 'r1',
+          toolCallId: 'c1',
+          assistantId: 'a1',
+          toolName: 'edit',
+          text: 'Successfully replaced 1 block(s)',
+          isError: false,
+          timestamp: now + 2,
+        },
         {
           kind: 'assistant',
           id: 'a2',
-          blocks: [{ type: 'toolCall', id: 'c2', name: 'bash', arguments: { command: 'cat site/index.html' } }],
+          blocks: [
+            {
+              type: 'toolCall',
+              id: 'c2',
+              name: 'bash',
+              arguments: { command: 'cat site/index.html' },
+            },
+          ],
           timestamp: now + 3,
           isStreaming: false,
         },
-        { kind: 'toolResult', id: 'r2', toolCallId: 'c2', assistantId: 'a2', toolName: 'bash', text: '<!doctype html>…', isError: false, timestamp: now + 4 },
+        {
+          kind: 'toolResult',
+          id: 'r2',
+          toolCallId: 'c2',
+          assistantId: 'a2',
+          toolName: 'bash',
+          text: '<!doctype html>…',
+          isError: false,
+          timestamp: now + 4,
+        },
       ];
       store.setState((s) => ({
         messages: msgs,
@@ -62,21 +95,36 @@ const feed = (settled) =>
 await feed(false);
 await page.waitForTimeout(1200);
 const during = await page.evaluate(() => {
-  const t = window.__pi_canvas().getState().tabs.find((x) => x.key === 'pi:activity');
+  const t = window
+    .__pi_canvas()
+    .getState()
+    .tabs.find((x) => x.key === 'pi:activity');
   return t ? { kind: t.kind, subtitle: t.subtitle } : null;
 });
-check(during?.kind === 'terminal', `while streaming the tab should be the terminal, got ${JSON.stringify(during)}`);
+check(
+  during?.kind === 'terminal',
+  `while streaming the tab should be the terminal, got ${JSON.stringify(during)}`,
+);
 await shot('1-during-turn-terminal');
 
 await feed(true);
 await page.waitForTimeout(1500);
 const after = await page.evaluate(() => {
-  const t = window.__pi_canvas().getState().tabs.find((x) => x.key === 'pi:activity');
+  const t = window
+    .__pi_canvas()
+    .getState()
+    .tabs.find((x) => x.key === 'pi:activity');
   const rendered = document.querySelector('[data-testid="canvas-tabs-panel"] iframe') !== null;
   return t ? { kind: t.kind, subtitle: t.subtitle, filePath: t.filePath, rendered } : null;
 });
-check(after?.kind === 'file', `settled, the tab should be the edited file, got ${JSON.stringify(after)}`);
-check(after?.rendered === true, 'the html file should be shown RENDERED (an iframe), not as source');
+check(
+  after?.kind === 'file',
+  `settled, the tab should be the edited file, got ${JSON.stringify(after)}`,
+);
+check(
+  after?.rendered === true,
+  'the html file should be shown RENDERED (an iframe), not as source',
+);
 await shot('2-settled-page-back');
 console.log(JSON.stringify({ during, after }));
 await finish();

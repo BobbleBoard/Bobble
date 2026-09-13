@@ -16,11 +16,14 @@ import {
   slugFor,
   storeRoot,
 } from './layout.js';
+import { libraryRoot, SHELVES, shelfDir } from './library.js';
 import { parseManifest, type StoredModel, serializeManifest } from './manifest.js';
 
 export interface StoreOptions {
-  /** Cache root; defaults to the app's. */
+  /** Legacy cache root; defaults to the app's. */
   readonly root?: string;
+  /** Library root; defaults to the app's. */
+  readonly library?: string;
 }
 
 /** Write (or rewrite) a model's manifest, creating its directory. */
@@ -47,8 +50,36 @@ export async function readManifest(dir: string): Promise<StoredModel | undefined
  * "model" that is half a download.
  */
 export async function listStore(opts: StoreOptions = {}): Promise<StoredModel[]> {
-  const root = storeRoot(opts.root ?? cacheRoot());
   const found: StoredModel[] = [];
+  const seen = new Set<string>();
+  const take = async (dir: string): Promise<void> => {
+    try {
+      if (!(await stat(dir)).isDirectory()) return;
+    } catch {
+      return;
+    }
+    const model = await readManifest(dir);
+    if (model === undefined || seen.has(model.dir)) return;
+    seen.add(model.dir);
+    found.push(model);
+  };
+  // The library: every shelf, one level of repo folders each.
+  const library = opts.library ?? libraryRoot();
+  for (const shelf of SHELVES) {
+    const dir = shelfDir(shelf, library);
+    let entries: string[];
+    try {
+      entries = await readdir(dir);
+    } catch {
+      continue;
+    }
+    for (const name of entries) {
+      if (shelf === 'LLM' && name === 'MLX') continue; // a shelf of its own
+      await take(join(dir, name));
+    }
+  }
+  // The legacy store, while a machine still has one.
+  const root = storeRoot(opts.root ?? cacheRoot());
   for (const kind of MODEL_KINDS) {
     const kindDir = join(root, kind);
     let entries: string[];
@@ -57,16 +88,7 @@ export async function listStore(opts: StoreOptions = {}): Promise<StoredModel[]>
     } catch {
       continue;
     }
-    for (const name of entries) {
-      const dir = join(kindDir, name);
-      try {
-        if (!(await stat(dir)).isDirectory()) continue;
-      } catch {
-        continue;
-      }
-      const model = await readManifest(dir);
-      if (model !== undefined) found.push(model);
-    }
+    for (const name of entries) await take(join(kindDir, name));
   }
   return found;
 }
@@ -108,5 +130,7 @@ export async function removeStored(id: string, opts: StoreOptions = {}): Promise
 
 /** The directory a repo of this kind would be downloaded into. */
 export function plannedDir(kind: ModelKind, repo: string, opts: StoreOptions = {}): string {
-  return entryDir(kind, repo, opts.root ?? cacheRoot());
+  return entryDir(kind, repo, opts.root ?? cacheRoot(), {
+    ...(opts.library === undefined ? {} : { library: opts.library }),
+  });
 }

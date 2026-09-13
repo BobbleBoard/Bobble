@@ -12,5 +12,7 @@ export default defineConfig({
        for real without doing the very thing it exists to prevent. Only `.test.ts`
        matches, so the `.mjs` probes are not swept in. */
     include: ['src/**/*.test.{ts,tsx}', 'electron/**/*.test.ts', 'tests/**/*.test.ts'],
+    // The library root and cache root pinned to scratch — see the guard.
+    setupFiles: ['../../packages/shared/vitest.library-guard.ts'],
   },
 });

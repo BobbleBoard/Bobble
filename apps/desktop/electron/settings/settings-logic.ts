@@ -139,6 +139,7 @@ export const DEFAULT_SETTINGS: DesktopSettings = {
   advanced: DEFAULT_ADVANCED,
   engineLaunch: {},
   modelSpec: {},
+  modelsRoot: null,
   chatOrg: { projects: [], assignments: {}, pinned: [], titles: {} },
   hideDeleteChatConfirm: false,
   harnessId: 'pi-bundled',
@@ -378,6 +379,12 @@ export function clampSettings(raw: unknown): DesktopSettings {
     advanced: clampAdvanced(o.advanced),
     engineLaunch: clampEngineLaunch(o.engineLaunch),
     modelSpec: clampModelSpec(o.modelSpec),
+    // An absolute path or nothing; a relative one would resolve to wherever
+    // the process happened to start and scatter the library.
+    modelsRoot:
+      typeof o.modelsRoot === 'string' && o.modelsRoot.startsWith('/') && o.modelsRoot.length > 1
+        ? o.modelsRoot.replace(/\/+$/, '')
+        : null,
     chatOrg: clampChatOrg(o.chatOrg),
     hideDeleteChatConfirm: bool(o.hideDeleteChatConfirm, d.hideDeleteChatConfirm),
   };
@@ -404,6 +411,7 @@ export function mergeSettingsPatch(
     // Per-id maps: a patch names the ids it changes and leaves the rest.
     engineLaunch: { ...current.engineLaunch, ...patch.engineLaunch },
     modelSpec: { ...current.modelSpec, ...patch.modelSpec },
+    ...(patch.modelsRoot === undefined ? {} : { modelsRoot: patch.modelsRoot }),
   });
 }
 

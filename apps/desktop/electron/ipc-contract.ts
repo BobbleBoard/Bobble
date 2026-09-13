@@ -58,6 +58,11 @@ import {
 import { SETTINGS_INVOKE_CHANNELS, type SettingsInvokeMap } from './settings/settings-contract';
 import { SKILLS_INVOKE_CHANNELS, type SkillsInvokeMap } from './skills/skills-contract';
 import {
+  STORAGE_INVOKE_CHANNELS,
+  type StorageEventMap,
+  type StorageInvokeMap,
+} from './storage/storage-contract';
+import {
   STUDIO_INVOKE_CHANNELS,
   type StudioEventMap,
   type StudioInvokeMap,
@@ -1047,6 +1052,7 @@ export type AppInvokeMap = CoreInvokeMap &
   GenInvokeMap &
   Gen3dInvokeMap &
   StoreInvokeMap &
+  StorageInvokeMap &
   StudioInvokeMap &
   DictationInvokeMap &
   BrowserInvokeMap &
@@ -1081,6 +1087,7 @@ export const APP_INVOKE_CHANNELS = [
   ...GEN_INVOKE_CHANNELS,
   ...GEN3D_INVOKE_CHANNELS,
   ...STORE_INVOKE_CHANNELS,
+  ...STORAGE_INVOKE_CHANNELS,
   ...STUDIO_INVOKE_CHANNELS,
   ...DICTATION_INVOKE_CHANNELS,
   ...BROWSER_INVOKE_CHANNELS,
@@ -1184,6 +1191,7 @@ export type AppEventMap = {
   GenEventMap &
   Gen3dEventMap &
   StoreEventMap &
+  StorageEventMap &
   StudioEventMap &
   ScheduledEventMap &
   PiEventMap;

@@ -80,6 +80,16 @@ export const TOOL_USE_FIXTURE = path.join(
  * have a throwaway profile AND real weights: `launchApp(name, { realCache: true })`.
  */
 export const REAL_CACHE = path.join(homedir(), '.cache', 'pi-desktop');
+/**
+ * The real MODEL LIBRARY — where the weights live now (`~/Bobble/Models`,
+ * storage/library-migration.ts). A probe with a throwaway HOME would otherwise
+ * look for its models under that HOME's empty `Bobble/Models`; pointing
+ * `PI_DESKTOP_MODELS_DIR` here is the same seam as `PI_DESKTOP_CACHE_DIR`.
+ * The migration itself never runs under PI_E2E (storage-main), so a probe
+ * cannot move anything.
+ */
+export const REAL_LIBRARY =
+  process.env.PI_DESKTOP_MODELS_DIR ?? path.join(homedir(), 'Bobble', 'Models');
 
 /**
  * A throwaway `$HOME` for a probe, seeded the way a real one always is.
@@ -234,7 +244,9 @@ export async function launchApp(name, options = {}) {
       // Before PI_BIN and friends so an explicit `env.HOME` still wins, and
       // before the cache so `realCache` is not undone by it.
       HOME: home,
-      ...(realCache ? { PI_DESKTOP_CACHE_DIR: REAL_CACHE } : {}),
+      ...(realCache
+        ? { PI_DESKTOP_CACHE_DIR: REAL_CACHE, PI_DESKTOP_MODELS_DIR: REAL_LIBRARY }
+        : {}),
       PI_BIN: MOCK_PI,
       MOCK_PI_FIXTURE: fixture,
       PI_E2E: '1',

@@ -1,8 +1,11 @@
 /** The chat half of _omnisvg-download-flow, on a cache that already has the model, with the prompt dumped. */
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { homedir as libraryHomedir, tmpdir } from 'node:os';
 import path from 'node:path';
 import { _electron as electron } from 'playwright-core';
+
+/** The real model library, beside the real cache (see harness.mjs REAL_LIBRARY). */
+const REAL_LIBRARY_DEFAULT = path.join(libraryHomedir(), 'Bobble', 'Models');
 
 const CACHE = process.env.CACHE; // a cache dir that has models/omnisvg-1.1-4b
 const CHAT_MODEL = process.env.MAC_CU_MODEL ?? 'minicpm5-2b';
@@ -29,6 +32,7 @@ const app = await electron.launch({
     ...process.env,
     HOME,
     PI_DESKTOP_CACHE_DIR: CACHE,
+    PI_DESKTOP_MODELS_DIR: process.env.PI_DESKTOP_MODELS_DIR ?? REAL_LIBRARY_DEFAULT,
     PI_E2E: '1',
     PI_E2E_BACKGROUND: '1',
     PI_ADV_DEBUG_PROMPT: path.join(OUT, 'prompt.txt'),

@@ -194,9 +194,12 @@ export function settingsWriteIsFenced(
 
 function writeSettings(settings: DesktopSettings): void {
   if (settingsWriteIsFenced()) {
-    log.warn('settings write REFUSED: PI_E2E run aimed at the real home — give the probe its own HOME', {
-      path: SETTINGS_PATH,
-    });
+    log.warn(
+      'settings write REFUSED: PI_E2E run aimed at the real home — give the probe its own HOME',
+      {
+        path: SETTINGS_PATH,
+      },
+    );
     // The run still gets what it asked for — for as long as it runs.
     fencedOverlay = settings;
     applySearchEnv(settings);
@@ -250,6 +253,19 @@ export function applySettingsEnvFromDisk(): void {
 export function generationExperimentEnabled(): boolean {
   if (process.env.PI_DESKTOP_GEN === '1') return true;
   return readSettings().experimentalGeneration;
+}
+
+/**
+ * A main-side write of one patch, for a setting main itself decides — the
+ * library root after a move (storage-main). No side-effect hooks: those are
+ * for the renderer's own edits.
+ */
+export function writeSettingsPatch(
+  patch: SettingsInvokeMap['settings:set']['request']['patch'],
+): DesktopSettings {
+  const next = mergeSettingsPatch(readSettings(), patch);
+  writeSettings(next);
+  return next;
 }
 
 const handlers: IpcHandlers<SettingsInvokeMap> = {

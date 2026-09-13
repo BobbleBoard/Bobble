@@ -20,6 +20,9 @@ import path from 'node:path';
 import { _electron } from '@playwright/test';
 import { probeHome } from './harness.mjs';
 
+/** The real model library, beside the real cache (see harness.mjs REAL_LIBRARY). */
+const REAL_LIBRARY_DEFAULT = path.join(homedir(), 'Bobble', 'Models');
+
 const MODEL = process.env.MODEL ?? 'qwen3.5-4b-mtp';
 const SHOT_DIR = process.env.SHOT_DIR ?? path.join(tmpdir(), 'engtpl');
 mkdirSync(SHOT_DIR, { recursive: true });
@@ -50,6 +53,7 @@ const app = await _electron.launch({
     ...process.env,
     HOME: home,
     PI_DESKTOP_CACHE_DIR: CACHE,
+    PI_DESKTOP_MODELS_DIR: process.env.PI_DESKTOP_MODELS_DIR ?? REAL_LIBRARY_DEFAULT,
     PI_E2E: '1',
     PI_E2E_BACKGROUND: '1',
   },
@@ -111,23 +115,48 @@ try {
   await row.dispatchEvent('dragover');
   const lit = await row.evaluate((el) => el.classList.contains('pd-flag-row--drop'));
   check(lit, 'a drag over the row lights it up');
-  writeFileSync(path.join(SHOT_DIR, '02-template-row-dragover.png'), await win.screenshot({ clip }));
+  writeFileSync(
+    path.join(SHOT_DIR, '02-template-row-dragover.png'),
+    await win.screenshot({ clip }),
+  );
   await row.dispatchEvent('dragleave');
 
   // 3. The import copies into Bobble's storage; a same-name different-bytes file gets a suffix.
-  const r1 = await win.evaluate((p) => window.piDesktop.invoke('llm:import-chat-template', { path: p }), src);
+  const r1 = await win.evaluate(
+    (p) => window.piDesktop.invoke('llm:import-chat-template', { path: p }),
+    src,
+  );
   log('import 1:', JSON.stringify(r1));
   imported.push(r1.path);
   check(r1.error === undefined, `import has no error (${r1.error})`);
-  check(r1.path === path.join(tplDir, 'probe-template.jinja'), `copied to chat-templates (${r1.path})`);
-  check(existsSync(r1.path) && readFileSync(r1.path, 'utf8') === readFileSync(src, 'utf8'), 'the copy has the same bytes');
+  check(
+    r1.path === path.join(tplDir, 'probe-template.jinja'),
+    `copied to chat-templates (${r1.path})`,
+  );
+  check(
+    existsSync(r1.path) && readFileSync(r1.path, 'utf8') === readFileSync(src, 'utf8'),
+    'the copy has the same bytes',
+  );
   writeFileSync(src, '{{ bos_token }}CHANGED');
-  const r2 = await win.evaluate((p) => window.piDesktop.invoke('llm:import-chat-template', { path: p }), src);
+  const r2 = await win.evaluate(
+    (p) => window.piDesktop.invoke('llm:import-chat-template', { path: p }),
+    src,
+  );
   log('import 2:', JSON.stringify(r2));
   imported.push(r2.path);
-  check(/probe-template-[0-9a-f]{8}\.jinja$/.test(r2.path), `different bytes under the same name get a hash suffix (${r2.path})`);
-  check(readFileSync(r1.path, 'utf8') !== 'CHANGED' && readFileSync(r2.path, 'utf8') === '{{ bos_token }}CHANGED', 'the first copy is untouched');
-  const r3 = await win.evaluate((p) => window.piDesktop.invoke('llm:import-chat-template', { path: p }), '/nonexistent/x.jinja');
+  check(
+    /probe-template-[0-9a-f]{8}\.jinja$/.test(r2.path),
+    `different bytes under the same name get a hash suffix (${r2.path})`,
+  );
+  check(
+    readFileSync(r1.path, 'utf8') !== 'CHANGED' &&
+      readFileSync(r2.path, 'utf8') === '{{ bos_token }}CHANGED',
+    'the first copy is untouched',
+  );
+  const r3 = await win.evaluate(
+    (p) => window.piDesktop.invoke('llm:import-chat-template', { path: p }),
+    '/nonexistent/x.jinja',
+  );
   check(r3.error !== undefined, 'a missing file reports an error instead of throwing');
 
   // 4. Setting the flag lights Apply and shows the value.
@@ -135,7 +164,9 @@ try {
   await win.waitForTimeout(300);
   const after = await win.evaluate(() => ({
     apply: document.querySelector('[data-testid="engine-settings-apply"]')?.disabled,
-    set: document.querySelector('[data-testid="flag---chat-template-file"]')?.getAttribute('data-set'),
+    set: document
+      .querySelector('[data-testid="flag---chat-template-file"]')
+      ?.getAttribute('data-set'),
     count: document.querySelector('[data-testid="engine-flags-set-count"]')?.textContent,
   }));
   log('after set:', JSON.stringify(after));
@@ -164,7 +195,10 @@ try {
   await win.waitForTimeout(150);
   const forced = await win.screenshot({ clip: fieldClip });
   writeFileSync(path.join(SHOT_DIR, '05-number-stepper-forced.png'), forced);
-  check(!shipped.equals(forced), 'forcing the stepper back on changes the field (so the rule is what hides it)');
+  check(
+    !shipped.equals(forced),
+    'forcing the stepper back on changes the field (so the rule is what hides it)',
+  );
   const count = await win.evaluate(() => document.querySelectorAll('input[type="number"]').length);
   log('number inputs on the panel:', count);
   check(count > 0, 'the panel has number inputs');

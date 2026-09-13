@@ -7407,3 +7407,284 @@ body[data-media-expanded="true"] .pd-studio-compose {
   color: var(--pd-text-muted);
   cursor: pointer;
 }
+
+/* ── Manage Storage (Model management → Manage Storage) ─────────────────── */
+.pd-storage {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding-top: 4px;
+}
+.pd-storage-head {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 18px;
+  border: 1px solid var(--pd-border-subtle);
+  border-radius: var(--pd-radius-lg, 14px);
+  background: var(--pd-bg-raised);
+}
+.pd-storage-title {
+  font-size: var(--pd-font-size-caption);
+  color: var(--pd-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.pd-storage-path {
+  display: block;
+  margin-top: 4px;
+  font-family: var(--pd-font-mono);
+  font-size: var(--pd-font-size-body);
+  color: var(--pd-text-primary);
+  word-break: break-all;
+}
+.pd-storage-path-inline {
+  font-family: var(--pd-font-mono);
+  font-size: 0.92em;
+}
+.pd-storage-where-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+/* REVEAL IS THE BUTTON. the user: "always with a 'Reveal' button easy to see and
+   use if desired" — filled, not a ghost, on every row and at the top. */
+.pd-storage-reveal {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: var(--pd-accent-primary);
+  color: var(--pd-text-on-accent);
+  font-size: var(--pd-font-size-caption);
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.pd-storage-reveal:hover {
+  filter: brightness(1.08);
+}
+.pd-storage-reveal--big {
+  padding: 7px 14px;
+  font-size: var(--pd-font-size-footnote);
+}
+.pd-storage-quiet {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--pd-border-subtle);
+  background: var(--pd-bg-inset);
+  color: var(--pd-text-secondary);
+  font-size: var(--pd-font-size-caption);
+  cursor: pointer;
+}
+.pd-storage-quiet:hover:not(:disabled) {
+  color: var(--pd-text-primary);
+  background: var(--pd-bg-hover);
+}
+.pd-storage-quiet:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.pd-storage-danger {
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: var(--pd-color-danger, #c0392b);
+  color: #fff;
+  font-size: var(--pd-font-size-caption);
+  font-weight: 600;
+  cursor: pointer;
+}
+.pd-storage-disk-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  font-size: var(--pd-font-size-footnote);
+  color: var(--pd-text-secondary);
+}
+.pd-storage-disk-line strong {
+  color: var(--pd-text-primary);
+}
+.pd-storage-diskbar {
+  display: flex;
+  height: 8px;
+  margin-top: 8px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--pd-bg-inset);
+}
+.pd-storage-diskbar-lib {
+  background: var(--pd-accent-primary);
+}
+.pd-storage-diskbar-support {
+  background: color-mix(in srgb, var(--pd-accent-primary) 45%, var(--pd-bg-inset));
+}
+.pd-storage-diskbar-other {
+  background: var(--pd-border-default);
+}
+.pd-storage-banner {
+  padding: 8px 12px;
+  border-radius: var(--pd-radius-md);
+  border: 1px solid var(--pd-border-subtle);
+  background: var(--pd-bg-inset);
+  font-size: var(--pd-font-size-footnote);
+  color: var(--pd-text-primary);
+}
+.pd-storage-banner--quiet {
+  color: var(--pd-text-secondary);
+}
+.pd-storage-section {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.pd-storage-h3 {
+  margin: 8px 0 2px;
+  font-size: var(--pd-font-size-footnote);
+  font-weight: 600;
+  color: var(--pd-text-primary);
+}
+.pd-storage-note {
+  margin: 0 0 6px;
+  font-size: var(--pd-font-size-caption);
+  color: var(--pd-text-secondary);
+}
+.pd-storage-foot {
+  margin: 6px 0 0;
+  font-size: var(--pd-font-size-caption);
+  color: var(--pd-text-muted);
+}
+.pd-storage-row {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) 84px auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--pd-radius-md);
+}
+.pd-storage-row:hover {
+  background: var(--pd-bg-hover);
+}
+.pd-storage-children {
+  margin-left: 22px;
+  border-left: 1px solid var(--pd-border-subtle);
+  padding-left: 6px;
+}
+.pd-storage-twisty {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--pd-text-muted);
+  cursor: pointer;
+}
+.pd-storage-twisty:hover {
+  background: var(--pd-bg-active);
+  color: var(--pd-text-primary);
+}
+.pd-storage-twisty--none {
+  cursor: default;
+}
+.pd-storage-twisty svg {
+  transition: transform var(--pd-duration-fast) var(--pd-easing-standard);
+}
+.pd-storage-twisty--open {
+  transform: rotate(90deg);
+}
+.pd-storage-main {
+  min-width: 0;
+}
+.pd-storage-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: var(--pd-font-size-footnote);
+  color: var(--pd-text-primary);
+}
+.pd-storage-name > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pd-storage-chip {
+  flex: none;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--pd-bg-inset);
+  border: 1px solid var(--pd-border-subtle);
+  font-size: 10.5px;
+  color: var(--pd-text-secondary);
+}
+.pd-storage-chip--live {
+  color: var(--pd-accent-primary);
+  border-color: color-mix(in srgb, var(--pd-accent-primary) 40%, transparent);
+}
+.pd-storage-note-line {
+  font-size: var(--pd-font-size-caption);
+  color: var(--pd-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pd-storage-bar {
+  height: 4px;
+  margin-top: 6px;
+  border-radius: 999px;
+  background: var(--pd-bg-inset);
+  overflow: hidden;
+  max-width: 420px;
+}
+.pd-storage-bar-fill {
+  height: 100%;
+  background: var(--pd-accent-primary);
+  border-radius: 999px;
+}
+.pd-storage-size {
+  font-family: var(--pd-font-mono);
+  font-size: var(--pd-font-size-caption);
+  color: var(--pd-text-secondary);
+  text-align: right;
+  white-space: nowrap;
+}
+.pd-storage-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  justify-content: flex-end;
+  min-width: 128px;
+}
+.pd-storage-confirm {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--pd-font-size-caption);
+  color: var(--pd-text-secondary);
+}
+.pd-storage-spin {
+  animation: pd-storage-spin 1s linear infinite;
+}
+@keyframes pd-storage-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+/* The modality rows read as headings; after the row/name rules so they win. */
+.pd-storage-node[data-depth="0"] > .pd-storage-row {
+  padding: 12px 10px;
+}
+.pd-storage-node[data-depth="0"] > .pd-storage-row .pd-storage-name {
+  font-size: var(--pd-font-size-body);
+  font-weight: 600;
+}

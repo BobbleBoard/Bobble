@@ -21,6 +21,9 @@ import { homedir, tmpdir } from 'node:os';
 import path from 'node:path';
 import { _electron } from '@playwright/test';
 
+/** The real model library, beside the real cache (see harness.mjs REAL_LIBRARY). */
+const REAL_LIBRARY_DEFAULT = path.join(homedir(), 'Bobble', 'Models');
+
 const OUT = process.env.OUT ?? '/tmp/low-power-gen';
 const MODEL = process.env.MODEL ?? 'qwen3.5-4b-mtp';
 const POWER = process.env.POWER ?? 'low'; // low | balanced — 'balanced' is the flat-out control
@@ -44,6 +47,7 @@ const app = await _electron.launch({
     ...process.env,
     HOME: home,
     PI_DESKTOP_CACHE_DIR: path.join(homedir(), '.cache', 'pi-desktop'),
+    PI_DESKTOP_MODELS_DIR: process.env.PI_DESKTOP_MODELS_DIR ?? REAL_LIBRARY_DEFAULT,
     // mflux and uv key their caches off HOME: without these the probe pulls a
     // 4 GB model and a Python into the throwaway HOME (SEEN, 6.5 GB in /tmp).
     HF_HOME: path.join(homedir(), '.cache', 'huggingface'),

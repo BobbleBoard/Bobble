@@ -19,8 +19,14 @@ const model = (over: Partial<StoredModel> & { repo: string; dir: string }): Stor
   ...over,
 });
 
+/**
+ * A scratch world: the legacy cache root AND a library root of its own — the
+ * library is otherwise `~/Bobble/Models`, which a unit test must never touch.
+ */
 async function scratch(): Promise<string> {
-  return mkdtemp(join(tmpdir(), 'model-store-'));
+  const root = await mkdtemp(join(tmpdir(), 'model-store-'));
+  process.env.PI_DESKTOP_MODELS_DIR = join(root, 'library');
+  return root;
 }
 
 describe('layout', () => {
@@ -34,10 +40,24 @@ describe('layout', () => {
     expect(slugFor('Qwen/Qwen-Image')).toBe(slugFor('qwen/qwen-image'));
   });
 
-  it('files a model under what it MAKES', () => {
-    expect(entryDir('video', 'Lightricks/LTX-2.5', '/tmp/c')).toBe(
-      '/tmp/c/store/video/lightricks__ltx-2.5',
+  it('files a model under what it MAKES — on the library shelf for it', async () => {
+    const root = await scratch();
+    expect(entryDir('video', 'Lightricks/LTX-2.5', root)).toBe(
+      join(root, 'library', 'Video', 'Generation', 'lightricks__ltx-2.5'),
     );
+    expect(entryDir('text', 'mlx-community/x', root)).toBe(
+      join(root, 'library', 'LLM', 'MLX', 'mlx-community__x'),
+    );
+    expect(entryDir('image', 'microsoft/Mage-Flow-Edit-Turbo', root)).toBe(
+      join(root, 'library', 'Image', 'Editing', 'microsoft__mage-flow-edit-turbo'),
+    );
+    expect(entryDir('audio', 'x/y', root, { tasks: ['text-to-speech'] })).toBe(
+      join(root, 'library', 'Audio', 'Speech', 'x__y'),
+    );
+    // The legacy store still wins while it is the one holding the files.
+    const legacy = join(storeRoot(root), 'video', 'lightricks__ltx-2.5');
+    await mkdir(legacy, { recursive: true });
+    expect(entryDir('video', 'Lightricks/LTX-2.5', root)).toBe(legacy);
   });
 });
 

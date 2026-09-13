@@ -34,6 +34,9 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { _electron as electron } from 'playwright-core';
 
+/** The real model library, beside the real cache (see harness.mjs REAL_LIBRARY). */
+const REAL_LIBRARY_DEFAULT = path.join(homedir(), 'Bobble', 'Models');
+
 const require = createRequire(import.meta.url);
 const electronBinary = require('electron');
 const appRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -160,6 +163,7 @@ async function runMode(mode) {
       HOME: home,
       PI_E2E: '1',
       PI_DESKTOP_CACHE_DIR: realCache,
+      PI_DESKTOP_MODELS_DIR: process.env.PI_DESKTOP_MODELS_DIR ?? REAL_LIBRARY_DEFAULT,
       GEN3D_CACHE_DIR: path.join(realCache, 'gen3d'),
     },
   });

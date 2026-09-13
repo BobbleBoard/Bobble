@@ -75,5 +75,11 @@ if (state.crashCards === 0) {
   check(state.fallback, 'the crash card should carry the reply text');
 }
 await shot('thread-with-broken-reply');
-console.log(JSON.stringify({ ...state, errors: errors.length, messageLogs: errors.filter((e) => e.includes('Bobble message error')).length }));
+console.log(
+  JSON.stringify({
+    ...state,
+    errors: errors.length,
+    messageLogs: errors.filter((e) => e.includes('Bobble message error')).length,
+  }),
+);
 await finish();

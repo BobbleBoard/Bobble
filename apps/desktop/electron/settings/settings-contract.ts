@@ -384,6 +384,13 @@ export interface DesktopSettings {
   engineLaunch: EngineLaunchSettings;
   /** Per-model speculative choice (see ModelSpecChoice), keyed by catalogue id. */
   modelSpec: Record<string, ModelSpecChoice>;
+  /**
+   * Where the model library lives — `null` for the default (`~/Bobble/Models`).
+   * Applied to the environment before any engine reads a path; changing it
+   * moves the library (see storage-main). the user (2026-09-12): the models are not
+   * to be hidden in `~/.cache`.
+   */
+  modelsRoot: string | null;
   /** Power-user advanced inference knobs (sampling + reasoning). Defaults to
    * {@link DEFAULT_ADVANCED} — inert until touched. */
   advanced: AdvancedSettings;
@@ -425,6 +432,7 @@ export interface DesktopSettingsPatch {
   engineLaunch?: EngineLaunchSettings;
   /** Full replacement per model id. */
   modelSpec?: Record<string, ModelSpecChoice>;
+  modelsRoot?: string | null;
   showComputerUseStatusPill?: boolean;
   powerReserveGB?: number;
   capabilities?: Partial<GenerationCapabilities>;

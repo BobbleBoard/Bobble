@@ -16,15 +16,35 @@ await page.waitForFunction(() => typeof window.__pi_canvas === 'function', { tim
 await page.waitForTimeout(400);
 await page.evaluate(() => {
   const ctl = window.__pi_canvas();
-  ctl.openTab({ kind: 'file', title: 'notes.md', artifact: { filename: 'notes.md', content: { kind: 'text', text: '# notes' } } });
-  ctl.openTab({ kind: 'file', title: 'q3-review.pptx', subtitle: 'a 6-slide deck', artifact: { filename: 'q3-review.pptx', content: { kind: 'text', text: 'x' } } });
-  ctl.openTab({ kind: 'file', title: 'after.md', artifact: { filename: 'after.md', content: { kind: 'text', text: 'y' } } });
+  ctl.openTab({
+    kind: 'file',
+    title: 'notes.md',
+    artifact: { filename: 'notes.md', content: { kind: 'text', text: '# notes' } },
+  });
+  ctl.openTab({
+    kind: 'file',
+    title: 'q3-review.pptx',
+    subtitle: 'a 6-slide deck',
+    artifact: { filename: 'q3-review.pptx', content: { kind: 'text', text: 'x' } },
+  });
+  ctl.openTab({
+    kind: 'file',
+    title: 'after.md',
+    artifact: { filename: 'after.md', content: { kind: 'text', text: 'y' } },
+  });
   const tabs = ctl.getState().tabs;
   ctl.focusTab(tabs[1].id);
 });
 await page.waitForTimeout(800);
 for (const mode of ['dark', 'light']) {
-  await page.evaluate((m) => window.__settings_store?.().getState?.().update?.({ theme: { mode: m } }), mode);
+  await page.evaluate(
+    (m) =>
+      window
+        .__settings_store?.()
+        .getState?.()
+        .update?.({ theme: { mode: m } }),
+    mode,
+  );
   await page.waitForTimeout(700);
   const strip = await page.$('.pd-canvas-tabbar');
   const box = await strip.boundingBox();

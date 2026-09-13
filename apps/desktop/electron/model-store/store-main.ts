@@ -16,7 +16,7 @@
  */
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
-import { cacheRoot as inferenceCacheRoot, modelsDir } from '@pi-desktop/inference';
+import { cacheRoot as inferenceCacheRoot, legacyModelsDir, modelsDir } from '@pi-desktop/inference';
 import {
   discardRepo,
   downloadRepo,
@@ -65,36 +65,43 @@ async function walk(dir: string, base = dir): Promise<StoredFile[]> {
  * store's delete from pulling weights out from under a running server.
  */
 async function adaptLlmModels(): Promise<StoredModel[]> {
-  const root = modelsDir();
-  let dirs: string[];
-  try {
-    dirs = await readdir(root);
-  } catch {
-    return [];
-  }
+  // The library's LLM shelf, and the legacy folder while it still has entries.
+  const roots = [modelsDir(), legacyModelsDir()];
   const out: StoredModel[] = [];
-  for (const id of dirs) {
-    const dir = join(root, id);
+  const seen = new Set<string>();
+  for (const root of roots) {
+    let dirs: string[];
     try {
-      if (!(await stat(dir)).isDirectory()) continue;
+      dirs = await readdir(root);
     } catch {
       continue;
     }
-    const files = await walk(dir);
-    if (files.length === 0) continue;
-    out.push({
-      id,
-      repo: id,
-      name: id,
-      org: '',
-      kind: 'text',
-      backend: 'llamacpp',
-      dir,
-      files,
-      bytes: files.reduce((sum, f) => sum + f.bytes, 0),
-      installedAt: new Date(0).toISOString(),
-      source: 'llm',
-    });
+    for (const id of dirs) {
+      // `LLM/MLX` is the twins' shelf, not a catalog model.
+      if (id === 'MLX' || id.startsWith('.') || id === 'README.txt' || seen.has(id)) continue;
+      seen.add(id);
+      const dir = join(root, id);
+      try {
+        if (!(await stat(dir)).isDirectory()) continue;
+      } catch {
+        continue;
+      }
+      const files = await walk(dir);
+      if (files.length === 0) continue;
+      out.push({
+        id,
+        repo: id,
+        name: id,
+        org: '',
+        kind: 'text',
+        backend: 'llamacpp',
+        dir,
+        files,
+        bytes: files.reduce((sum, f) => sum + f.bytes, 0),
+        installedAt: new Date(0).toISOString(),
+        source: 'llm',
+      });
+    }
   }
   return out;
 }

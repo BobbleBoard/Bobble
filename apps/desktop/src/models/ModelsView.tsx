@@ -94,6 +94,7 @@ import {
   type RecommendedVariant,
   recommendedFamilies,
 } from './recommended-catalog';
+import { StorageView } from './StorageView';
 import { useOutsideClose } from './use-outside-close';
 
 /**
@@ -683,7 +684,7 @@ export function ModelsView() {
   const [modelFilters, setModelFilters] = useState<HubFilters>(DEFAULT_FILTERS);
   const [datasetFilters, setDatasetFilters] = useState<HubFilters>(DEFAULT_DATASET_FILTERS);
   const [view, setView] = useState<ViewMode>('compact');
-  const [tab, setTab] = useState<'discover' | 'device'>('discover');
+  const [tab, setTab] = useState<'discover' | 'device' | 'storage'>('discover');
   const [selected, setSelected] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -1545,7 +1546,7 @@ export function ModelsView() {
             kind === 'datasets' && 'hidden',
           )}
         >
-          {(['discover', 'device'] as const).map((t) => (
+          {(['discover', 'device', 'storage'] as const).map((t) => (
             <button
               key={t}
               type="button"
@@ -1556,17 +1557,19 @@ export function ModelsView() {
                 tab === t ? 'bg-bg-raised text-text-primary shadow-sm' : 'text-text-secondary',
               )}
             >
-              {t === 'discover' ? 'Discover' : 'On Device'}
+              {t === 'discover' ? 'Discover' : t === 'device' ? 'On Device' : 'Manage Storage'}
             </button>
           ))}
         </div>
-        <input
-          data-testid="models-search"
-          value={filters.query}
-          onChange={(e) => setFilters((f) => ({ ...f, query: e.target.value }))}
-          placeholder={kind === 'datasets' ? 'Search datasets' : 'Search all models'}
-          className="min-w-0 flex-1 rounded-full border border-border-subtle bg-bg-raised px-4 py-2 text-body text-text-primary shadow-[0_1px_2px_rgba(0,0,0,0.03)] placeholder:text-text-muted pd-focusable"
-        />
+        {tab === 'storage' ? null : (
+          <input
+            data-testid="models-search"
+            value={filters.query}
+            onChange={(e) => setFilters((f) => ({ ...f, query: e.target.value }))}
+            placeholder={kind === 'datasets' ? 'Search datasets' : 'Search all models'}
+            className="min-w-0 flex-1 rounded-full border border-border-subtle bg-bg-raised px-4 py-2 text-body text-text-primary shadow-[0_1px_2px_rgba(0,0,0,0.03)] placeholder:text-text-muted pd-focusable"
+          />
+        )}
       </div>
 
       {/*
@@ -1581,241 +1584,243 @@ export function ModelsView() {
         looking at. The Recommended/All switch is right beside them, so the full
         set is one click away and nothing is buried.
        */}
-      <div className="flex shrink-0 items-center gap-2 px-6 pb-4">
-        {/* A quant format is a model property; datasets have none, so offering
+      {tab === 'storage' ? null : (
+        <div className="flex shrink-0 items-center gap-2 px-6 pb-4">
+          {/* A quant format is a model property; datasets have none, so offering
             the control there is offering a dead end. */}
-        {kind === 'models' && !curated ? (
-          <Dropdown
-            testid="filter-format"
-            value={filters.format}
-            options={formatOptions}
-            onChange={(format) => setFilters((f) => ({ ...f, format }))}
-          />
-        ) : null}
-        {kind === 'models' && !curated ? (
-          <CapabilityFilter
-            selected={filters.capabilities}
-            options={capabilityOptions}
-            onChange={(capabilities) => setFilters((f) => ({ ...f, capabilities }))}
-          />
-        ) : null}
-        {curated ? null : (
-          <Dropdown
-            testid="filter-sort"
-            value={filters.sort}
-            options={SORT_OPTIONS}
-            onChange={(sort) => setFilters((f) => ({ ...f, sort }))}
-            footer={
-              <button
-                type="button"
-                data-testid="filter-only-fits"
-                onClick={() => setFilters((f) => ({ ...f, onlyFits: !f.onlyFits }))}
-                className="flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-left text-body text-text-secondary hover:bg-bg-hover"
-              >
-                <span
-                  className={cx(
-                    'flex h-4 w-4 shrink-0 items-center justify-center rounded-full border',
-                    filters.onlyFits
-                      ? 'border-transparent bg-accent-primary text-text-on-accent'
-                      : 'border-border-strong',
-                  )}
-                >
-                  {filters.onlyFits ? <IconCheck size={11} /> : null}
-                </span>
-                <span className="whitespace-nowrap">Only show models that fit</span>
-              </button>
-            }
-          />
-        )}
-        {/*
-         * RECOMMENDED / ALL. the user: "by default, the 'newest' will show just a
-         * bunch of random models, so if you could just have reputable
-         * organizations shown, for example a 'reccomended/all' toggle".
-         *
-         * A two-state pill rather than another dropdown: it has two values, it
-         * is the single biggest lever over what the list contains, and it should
-         * be visible without opening anything.
-         */}
-        <div
-          className="flex rounded-full border border-border-subtle bg-bg-inset p-0.5"
-          data-testid="hub-scope"
-        >
-          {(['recommended', 'all'] as const).map((v) => (
-            <button
-              key={v}
-              type="button"
-              data-testid={`hub-scope-${v}`}
-              aria-pressed={(filters.scope ?? 'recommended') === v}
-              onClick={() => setFilters((f) => ({ ...f, scope: v }))}
-              className={cx(
-                'rounded-full px-3 py-1 text-footnote transition-colors',
-                (filters.scope ?? 'recommended') === v
-                  ? 'bg-bg-raised text-text-primary shadow-[0_1px_2px_rgba(0,0,0,0.05)]'
-                  : 'text-text-muted hover:text-text-primary',
-              )}
-            >
-              {v === 'recommended' ? 'Recommended' : 'All'}
-            </button>
-          ))}
-        </div>
-
-        {/*
-         * OUTPUT — what a model MAKES. the user: "everything filterable by output
-         * also".
-         *
-         * Pills rather than another dropdown, because this is the axis people
-         * arrive with ("I want to make a video") and there are only five of
-         * them: a menu would hide a five-item choice behind a click. Multi-select
-         * with none-means-all, the same grammar as the capability filter.
-         */}
-        <div className="flex items-center gap-1" data-testid="filter-output">
-          {(['text', 'image', 'video', 'audio', '3d'] as const).map((o) => {
-            const on = (filters.outputs ?? []).includes(o);
-            return (
-              <button
-                key={o}
-                type="button"
-                data-testid={`filter-output-${o}`}
-                aria-pressed={on}
-                onClick={() =>
-                  setFilters((f) => {
-                    const cur = f.outputs ?? [];
-                    return {
-                      ...f,
-                      outputs: cur.includes(o)
-                        ? cur.filter((x) => x !== o)
-                        : ([...cur, o] as readonly OutputModality[]),
-                    };
-                  })
-                }
-                className={cx(
-                  'rounded-full border px-3 py-1.5 text-footnote transition-colors pd-focusable',
-                  on
-                    ? 'border-transparent bg-accent-primary text-text-on-accent'
-                    : 'border-border-subtle bg-bg-raised text-text-secondary hover:bg-bg-hover hover:text-text-primary',
-                )}
-              >
-                {OUTPUT_LABEL[o]}
-              </button>
-            );
-          })}
-        </div>
-
-        {/*
-         * SIZE CAP. A maximum rather than a range: the question a hub gets asked
-         * is "what fits", never "what is at least this big".
-         *
-         * The UNIT follows the rows, and the label says which. Datasets and
-         * on-disk files have real bytes; a Discover repo only has a parameter
-         * count, because its storage is every quant it publishes summed
-         * together. Capping repo bytes would hide a 27B repo that holds a
-         * perfectly good 8GB Q4 — so the axis there is B of parameters.
-         */}
-        {curated ? null : (
-          <label
-            className="flex items-center gap-2 rounded-full border border-border-subtle bg-bg-raised px-3.5 py-1.5 text-footnote text-text-secondary shadow-[0_1px_2px_rgba(0,0,0,0.03)]"
-            data-testid="filter-size"
-          >
-            <span className="whitespace-nowrap">
-              {filters.maxSize === undefined
-                ? 'Any size'
-                : `≤ ${filters.maxSize}${sizeUnit === 'gb' ? ' GB' : 'B params'}`}
-            </span>
-            <input
-              type="range"
-              min={1}
-              max={SIZE_CAP_MAX}
-              step={1}
-              aria-label={sizeUnit === 'gb' ? 'Maximum size in GB' : 'Maximum parameters in B'}
-              value={filters.maxSize ?? SIZE_CAP_MAX}
-              onChange={(e) => {
-                const v = Number(e.target.value);
-                // The top of the range means "no cap", so the slider can be
-                // dismissed without a second control.
-                setFilters((f) => ({ ...f, maxSize: v >= SIZE_CAP_MAX ? undefined : v }));
-              }}
-              className="h-1 w-24 cursor-pointer accent-[var(--pd-accent-primary)]"
+          {kind === 'models' && !curated ? (
+            <Dropdown
+              testid="filter-format"
+              value={filters.format}
+              options={formatOptions}
+              onChange={(format) => setFilters((f) => ({ ...f, format }))}
             />
-          </label>
-        )}
-
-        {isFiltered ? (
-          <button
-            type="button"
-            data-testid="filters-reset"
-            onClick={resetFilters}
-            className="rounded-full border border-border-subtle bg-bg-raised px-3 py-1.5 text-footnote text-text-secondary transition-colors hover:bg-bg-hover hover:text-text-primary pd-focusable"
+          ) : null}
+          {kind === 'models' && !curated ? (
+            <CapabilityFilter
+              selected={filters.capabilities}
+              options={capabilityOptions}
+              onChange={(capabilities) => setFilters((f) => ({ ...f, capabilities }))}
+            />
+          ) : null}
+          {curated ? null : (
+            <Dropdown
+              testid="filter-sort"
+              value={filters.sort}
+              options={SORT_OPTIONS}
+              onChange={(sort) => setFilters((f) => ({ ...f, sort }))}
+              footer={
+                <button
+                  type="button"
+                  data-testid="filter-only-fits"
+                  onClick={() => setFilters((f) => ({ ...f, onlyFits: !f.onlyFits }))}
+                  className="flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-left text-body text-text-secondary hover:bg-bg-hover"
+                >
+                  <span
+                    className={cx(
+                      'flex h-4 w-4 shrink-0 items-center justify-center rounded-full border',
+                      filters.onlyFits
+                        ? 'border-transparent bg-accent-primary text-text-on-accent'
+                        : 'border-border-strong',
+                    )}
+                  >
+                    {filters.onlyFits ? <IconCheck size={11} /> : null}
+                  </span>
+                  <span className="whitespace-nowrap">Only show models that fit</span>
+                </button>
+              }
+            />
+          )}
+          {/*
+           * RECOMMENDED / ALL. the user: "by default, the 'newest' will show just a
+           * bunch of random models, so if you could just have reputable
+           * organizations shown, for example a 'reccomended/all' toggle".
+           *
+           * A two-state pill rather than another dropdown: it has two values, it
+           * is the single biggest lever over what the list contains, and it should
+           * be visible without opening anything.
+           */}
+          <div
+            className="flex rounded-full border border-border-subtle bg-bg-inset p-0.5"
+            data-testid="hub-scope"
           >
-            Reset
-          </button>
-        ) : null}
-        {/*
-         * THE LAYOUT SWITCH HAS NO LAYOUT TO SWITCH ON THE CURATED VIEW.
-         *
-         * the user: "the layout buttons actually don't do anything except they
-         * oddly resize the model card." Exactly right — the curated grid is
-         * hardcoded to list-plus-420px-pane (a card list has nowhere to put a
-         * table), so the only thing these three buttons still reached was the
-         * pane's max-height, which made the card grow and shrink for no stated
-         * reason. They belong to the table, so they appear with it.
-         */}
-        {curated ? null : (
-          <div className="ml-auto flex rounded-lg border border-border-subtle bg-bg-raised p-0.5">
-            {(['split', 'detail', 'compact'] as const).map((v) => (
+            {(['recommended', 'all'] as const).map((v) => (
               <button
                 key={v}
                 type="button"
-                data-testid={`view-${v}`}
-                aria-pressed={view === v}
-                onClick={() => setView(v)}
+                data-testid={`hub-scope-${v}`}
+                aria-pressed={(filters.scope ?? 'recommended') === v}
+                onClick={() => setFilters((f) => ({ ...f, scope: v }))}
                 className={cx(
-                  'rounded-md px-2 py-1 text-footnote',
-                  view === v ? 'bg-bg-active text-text-primary' : 'text-text-muted',
+                  'rounded-full px-3 py-1 text-footnote transition-colors',
+                  (filters.scope ?? 'recommended') === v
+                    ? 'bg-bg-raised text-text-primary shadow-[0_1px_2px_rgba(0,0,0,0.05)]'
+                    : 'text-text-muted hover:text-text-primary',
                 )}
               >
-                <span className="flex h-4 w-4 items-center justify-center">
-                  {v === 'compact' ? (
-                    <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden>
-                      <title>Compact</title>
-                      <rect x="1" y="3" width="14" height="1.6" rx=".8" fill="currentColor" />
-                      <rect x="1" y="7.2" width="14" height="1.6" rx=".8" fill="currentColor" />
-                      <rect x="1" y="11.4" width="14" height="1.6" rx=".8" fill="currentColor" />
-                    </svg>
-                  ) : v === 'split' ? (
-                    <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden>
-                      <title>Split</title>
-                      <rect x="1" y="2" width="8.4" height="12" rx="1.4" fill="currentColor" />
-                      <rect
-                        x="10.8"
-                        y="2"
-                        width="4.2"
-                        height="12"
-                        rx="1.4"
-                        fill="currentColor"
-                        opacity=".45"
-                      />
-                    </svg>
-                  ) : (
-                    <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden>
-                      <title>Detail</title>
-                      <rect
-                        x="1"
-                        y="2"
-                        width="5"
-                        height="12"
-                        rx="1.4"
-                        fill="currentColor"
-                        opacity=".45"
-                      />
-                      <rect x="7.4" y="2" width="7.6" height="12" rx="1.4" fill="currentColor" />
-                    </svg>
-                  )}
-                </span>
+                {v === 'recommended' ? 'Recommended' : 'All'}
               </button>
             ))}
           </div>
-        )}
-      </div>
+
+          {/*
+           * OUTPUT — what a model MAKES. the user: "everything filterable by output
+           * also".
+           *
+           * Pills rather than another dropdown, because this is the axis people
+           * arrive with ("I want to make a video") and there are only five of
+           * them: a menu would hide a five-item choice behind a click. Multi-select
+           * with none-means-all, the same grammar as the capability filter.
+           */}
+          <div className="flex items-center gap-1" data-testid="filter-output">
+            {(['text', 'image', 'video', 'audio', '3d'] as const).map((o) => {
+              const on = (filters.outputs ?? []).includes(o);
+              return (
+                <button
+                  key={o}
+                  type="button"
+                  data-testid={`filter-output-${o}`}
+                  aria-pressed={on}
+                  onClick={() =>
+                    setFilters((f) => {
+                      const cur = f.outputs ?? [];
+                      return {
+                        ...f,
+                        outputs: cur.includes(o)
+                          ? cur.filter((x) => x !== o)
+                          : ([...cur, o] as readonly OutputModality[]),
+                      };
+                    })
+                  }
+                  className={cx(
+                    'rounded-full border px-3 py-1.5 text-footnote transition-colors pd-focusable',
+                    on
+                      ? 'border-transparent bg-accent-primary text-text-on-accent'
+                      : 'border-border-subtle bg-bg-raised text-text-secondary hover:bg-bg-hover hover:text-text-primary',
+                  )}
+                >
+                  {OUTPUT_LABEL[o]}
+                </button>
+              );
+            })}
+          </div>
+
+          {/*
+           * SIZE CAP. A maximum rather than a range: the question a hub gets asked
+           * is "what fits", never "what is at least this big".
+           *
+           * The UNIT follows the rows, and the label says which. Datasets and
+           * on-disk files have real bytes; a Discover repo only has a parameter
+           * count, because its storage is every quant it publishes summed
+           * together. Capping repo bytes would hide a 27B repo that holds a
+           * perfectly good 8GB Q4 — so the axis there is B of parameters.
+           */}
+          {curated ? null : (
+            <label
+              className="flex items-center gap-2 rounded-full border border-border-subtle bg-bg-raised px-3.5 py-1.5 text-footnote text-text-secondary shadow-[0_1px_2px_rgba(0,0,0,0.03)]"
+              data-testid="filter-size"
+            >
+              <span className="whitespace-nowrap">
+                {filters.maxSize === undefined
+                  ? 'Any size'
+                  : `≤ ${filters.maxSize}${sizeUnit === 'gb' ? ' GB' : 'B params'}`}
+              </span>
+              <input
+                type="range"
+                min={1}
+                max={SIZE_CAP_MAX}
+                step={1}
+                aria-label={sizeUnit === 'gb' ? 'Maximum size in GB' : 'Maximum parameters in B'}
+                value={filters.maxSize ?? SIZE_CAP_MAX}
+                onChange={(e) => {
+                  const v = Number(e.target.value);
+                  // The top of the range means "no cap", so the slider can be
+                  // dismissed without a second control.
+                  setFilters((f) => ({ ...f, maxSize: v >= SIZE_CAP_MAX ? undefined : v }));
+                }}
+                className="h-1 w-24 cursor-pointer accent-[var(--pd-accent-primary)]"
+              />
+            </label>
+          )}
+
+          {isFiltered ? (
+            <button
+              type="button"
+              data-testid="filters-reset"
+              onClick={resetFilters}
+              className="rounded-full border border-border-subtle bg-bg-raised px-3 py-1.5 text-footnote text-text-secondary transition-colors hover:bg-bg-hover hover:text-text-primary pd-focusable"
+            >
+              Reset
+            </button>
+          ) : null}
+          {/*
+           * THE LAYOUT SWITCH HAS NO LAYOUT TO SWITCH ON THE CURATED VIEW.
+           *
+           * the user: "the layout buttons actually don't do anything except they
+           * oddly resize the model card." Exactly right — the curated grid is
+           * hardcoded to list-plus-420px-pane (a card list has nowhere to put a
+           * table), so the only thing these three buttons still reached was the
+           * pane's max-height, which made the card grow and shrink for no stated
+           * reason. They belong to the table, so they appear with it.
+           */}
+          {curated ? null : (
+            <div className="ml-auto flex rounded-lg border border-border-subtle bg-bg-raised p-0.5">
+              {(['split', 'detail', 'compact'] as const).map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  data-testid={`view-${v}`}
+                  aria-pressed={view === v}
+                  onClick={() => setView(v)}
+                  className={cx(
+                    'rounded-md px-2 py-1 text-footnote',
+                    view === v ? 'bg-bg-active text-text-primary' : 'text-text-muted',
+                  )}
+                >
+                  <span className="flex h-4 w-4 items-center justify-center">
+                    {v === 'compact' ? (
+                      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden>
+                        <title>Compact</title>
+                        <rect x="1" y="3" width="14" height="1.6" rx=".8" fill="currentColor" />
+                        <rect x="1" y="7.2" width="14" height="1.6" rx=".8" fill="currentColor" />
+                        <rect x="1" y="11.4" width="14" height="1.6" rx=".8" fill="currentColor" />
+                      </svg>
+                    ) : v === 'split' ? (
+                      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden>
+                        <title>Split</title>
+                        <rect x="1" y="2" width="8.4" height="12" rx="1.4" fill="currentColor" />
+                        <rect
+                          x="10.8"
+                          y="2"
+                          width="4.2"
+                          height="12"
+                          rx="1.4"
+                          fill="currentColor"
+                          opacity=".45"
+                        />
+                      </svg>
+                    ) : (
+                      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden>
+                        <title>Detail</title>
+                        <rect
+                          x="1"
+                          y="2"
+                          width="5"
+                          height="12"
+                          rx="1.4"
+                          fill="currentColor"
+                          opacity=".45"
+                        />
+                        <rect x="7.4" y="2" width="7.6" height="12" rx="1.4" fill="currentColor" />
+                      </svg>
+                    )}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {hfError !== null ? (
         <p
@@ -1874,8 +1879,15 @@ export function ModelsView() {
         </p>
       ) : null}
 
-      <ScrollArea className="min-h-0 flex-1">
-        {/*
+      {tab === 'storage' ? (
+        <ScrollArea className="min-h-0 flex-1">
+          <div className="px-6 pb-16">
+            <StorageView />
+          </div>
+        </ScrollArea>
+      ) : (
+        <ScrollArea className="min-h-0 flex-1">
+          {/*
           MORE ROOM AT THE BOTTOM. the user: "I scrolled to the bottom here and the
           stable 3 audio is cut off on the bottom." At max scroll the last card
           cleared the fold by exactly the 40px of padding — and the scroll area
@@ -1883,561 +1895,562 @@ export function ModelsView() {
           a 40px gap with a gradient across half of it. The last row of a long
           list should end well clear of the edge, not just barely inside it.
         */}
-        <div className="px-6 pb-16">
-          {(
-            kind === 'datasets'
-              ? dsLoading && datasets.length === 0
-              : tab === 'discover'
-                ? hfLoading && hits.length === 0
-                : catalog.length === 0
-          ) ? (
-            <div className="flex items-center gap-2 py-10 text-body text-text-muted">
-              <Spinner size={16} />{' '}
-              {kind === 'datasets'
-                ? 'Searching datasets…'
+          <div className="px-6 pb-16">
+            {(
+              kind === 'datasets'
+                ? dsLoading && datasets.length === 0
                 : tab === 'discover'
-                  ? 'Searching Hugging Face…'
-                  : 'Loading models…'}
-            </div>
-          ) : (
-            <>
-              {!curated &&
-              kind === 'models' &&
-              tab === 'discover' &&
-              view !== 'detail' &&
-              trending.length > 0 ? (
-                <section className="mb-7">
-                  <h2 className="mb-3 text-body font-medium text-text-primary">Trending Now</h2>
-                  <div className="grid grid-cols-4 gap-3" data-testid="trending-row">
-                    {trending.map((mdl) => (
-                      <button
-                        key={mdl.id}
-                        type="button"
-                        onClick={() => setSelected(mdl.id)}
-                        className="cursor-pointer rounded-2xl border border-border-subtle bg-bg-raised p-4 text-left shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-all hover:border-border-default hover:bg-bg-hover hover:shadow-[0_2px_8px_rgba(0,0,0,0.07)] pd-focusable"
-                      >
-                        <div className="flex items-start gap-2.5">
-                          <OrgAvatar org={mdl.org} size={36} />
-                          <span className="min-w-0">
-                            <span className="block truncate text-body text-text-primary">
-                              {mdl.name}
-                            </span>
-                            {mdl.org !== '' ? (
-                              <span className="flex items-center gap-1 text-footnote text-text-muted">
-                                {mdl.org}
-                                {mdl.verified === true ? (
-                                  <span className="text-accent-primary">✓</span>
-                                ) : null}
-                              </span>
-                            ) : null}
-                          </span>
-                        </div>
-                        <div className="mt-3 flex items-center gap-3 text-footnote text-text-muted">
-                          {hasCounts ? (
-                            <span className="inline-flex items-center gap-1">
-                              <IconDownload /> {compactCount(mdl.downloads)}
-                            </span>
-                          ) : null}
-                          {hasCounts ? (
-                            <span className="inline-flex items-center gap-1">
-                              <IconHeart /> {compactCount(mdl.likes)}
-                            </span>
-                          ) : null}
-                          {(mdl.params ?? mdl.bytes !== undefined) ? (
-                            <span className="ml-auto rounded-md bg-bg-inset px-2 py-0.5 font-medium text-text-secondary">
-                              {mdl.params ?? compactBytes(mdl.bytes)}
-                            </span>
-                          ) : null}
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </section>
-              ) : null}
-
-              {/*
-               * THREE LAYOUTS, NOT TWO. `split` and `detail` rendered
-               * identically — three buttons, two behaviours, which is worse
-               * than offering two. They now differ in which side gets the room,
-               * matching the reference's own toggle icons: split favours the
-               * list, detail favours the card.
-               */}
-              <section
-                data-testid="models-layout"
-                data-view={view}
-                className={cx(
-                  'grid',
-                  // The curated list is cards, not a table, so it keeps the
-                  // detail pane beside it even in the compact view — otherwise
-                  // clicking a version would have nowhere to show it.
-                  //
-                  // NO GAP THERE. The pane is a panel divided from the list by
-                  // one hairline, not a card floating beside it, so the two
-                  // columns meet and the border does the separating.
-                  curated
-                    ? 'grid-cols-[minmax(0,1fr)_460px] gap-0'
-                    : view === 'compact'
-                      ? 'gap-5'
-                      : view === 'split'
-                        ? 'grid-cols-[minmax(0,1fr)_420px] gap-5'
-                        : 'grid-cols-[300px_minmax(0,1fr)] gap-5',
-                )}
-              >
-                {/* A gutter, so the cards do not run into the divider. With the
-                    columns flush the family cards' right borders sat ~8px from
-                    the panel's hairline and read as one crowded double line. */}
-                <div className={curated ? 'pr-6' : undefined}>
-                  {/*
-                   * TWO HEADINGS ON THE CURATED TAB, not one. the user: "the little
-                   * 'recommended' text shouldn't be there, the 5 cards you show
-                   * should say 'Top Recommended' much larger and then 'More'
-                   * below."
-                   *
-                   * The old single "Recommended · 26 families, smallest first"
-                   * labelled the whole tab, which left the five picks and the
-                   * long browsable list looking like one undifferentiated pile.
-                   * They are different offers — here is what to get, and here is
-                   * everything else — so each gets its own heading and the
-                   * counting furniture goes.
-                   */}
-                  {!curated ? (
-                    <div className="mb-3 flex items-center gap-2">
-                      <h2 className="text-body font-medium text-text-primary">
-                        {kind === 'datasets'
-                          ? 'All datasets'
-                          : tab === 'device'
-                            ? 'On this machine'
-                            : 'All models'}
-                      </h2>
-                      <button
-                        type="button"
-                        aria-label="Refresh"
-                        data-testid="models-refresh"
-                        onClick={() => void refreshCatalog()}
-                        className="rounded-md p-1 text-text-muted transition-colors hover:bg-bg-hover hover:text-text-primary pd-focusable"
-                      >
-                        <IconRefresh size={14} />
-                      </button>
-                      <span className="ml-auto text-footnote text-text-muted">
-                        {`${rows.length} ${kind === 'datasets' ? 'dataset' : 'model'}${rows.length === 1 ? '' : 's'}`}
-                      </span>
-                    </div>
-                  ) : null}
-
-                  {curated ? (
-                    <h2
-                      className="mb-3 text-title font-medium text-text-primary"
-                      data-testid="top-recommended-heading"
-                    >
-                      Top Recommended
-                    </h2>
-                  ) : null}
-
-                  {curated ? (
-                    <BestForYourMachine
-                      hardware={hardware}
-                      downloaded={downloadedRepos}
-                      onSelect={setSelected}
-                      onDownload={(rec) => {
-                        setSelected(rec.variant.repo);
-                        void downloadVariant(rec.family, rec.variant);
-                      }}
-                      onUse={(rec) => void applyRecommendation(rec)}
-                      onCancel={(rec) => void cancelVariant(rec.family, rec.variant)}
-                      progress={storeProgressByRepo}
-                    />
-                  ) : null}
-                  {curated ? (
-                    /*
-                     * The curated list REPLACES the results table here rather
-                     * than sitting above it: two lists of models on one screen,
-                     * one hand-picked and one not, is exactly the ambiguity the
-                     * Recommended/All toggle exists to remove.
-                     */
-                    <div className="flex flex-col gap-2" data-testid="curated-families">
-                      <h2
-                        className="mt-4 mb-1 text-title font-medium text-text-primary"
-                        data-testid="more-heading"
-                      >
-                        More
-                      </h2>
-                      {families.map((family) => (
-                        <FamilyCard
-                          key={family.id}
-                          family={family}
-                          downloaded={downloadedRepos}
-                          selectedRepo={selected}
-                          memoryGB={hw?.ramGiB ?? 0}
-                          progress={storeFractions}
-                          bytes={storeProgressByRepo}
-                          onSelect={setSelected}
-                          onDownload={(variant) => void downloadVariant(family, variant)}
-                          onCancel={(variant) => void cancelVariant(family, variant)}
-                        />
-                      ))}
-                      {families.length === 0 ? (
-                        <p className="py-6 text-body text-text-muted" data-testid="curated-empty">
-                          Nothing recommended makes that yet. Switch to All to search the Hub.
-                        </p>
-                      ) : null}
-                    </div>
-                  ) : view === 'compact' ? (
-                    <div className="overflow-hidden rounded-2xl border border-border-subtle bg-bg-raised shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
-                      {/* Downloads/Likes only exist for HF-sourced entries. A
-                          column of em-dashes is worse than no column: it looks
-                          like the data failed to load rather than never
-                          applying to a bundled catalog. */}
-                      <div
-                        className={cx(
-                          'grid items-center gap-2 border-b border-border-subtle bg-bg-sunken px-4 py-2.5 text-footnote text-text-muted',
-                          COMPACT_GRID[
-                            `${hasCaps ? 'caps' : 'nocaps'}-${hasCounts ? 'counts' : 'nocounts'}`
-                          ],
-                        )}
-                      >
-                        <span>{kind === 'datasets' ? 'Dataset' : 'Model'}</span>
-                        {hasCaps ? <span>Capabilities</span> : null}
-                        <span>Size</span>
-                        {hasCounts ? <span>Downloads</span> : null}
-                        {hasCounts ? <span>Likes</span> : null}
-                        <span className="sr-only">Download</span>
-                        <span className="sr-only">Actions</span>
-                      </div>
-                      {rows.map((mdl) => (
+                  ? hfLoading && hits.length === 0
+                  : catalog.length === 0
+            ) ? (
+              <div className="flex items-center gap-2 py-10 text-body text-text-muted">
+                <Spinner size={16} />{' '}
+                {kind === 'datasets'
+                  ? 'Searching datasets…'
+                  : tab === 'discover'
+                    ? 'Searching Hugging Face…'
+                    : 'Loading models…'}
+              </div>
+            ) : (
+              <>
+                {!curated &&
+                kind === 'models' &&
+                tab === 'discover' &&
+                view !== 'detail' &&
+                trending.length > 0 ? (
+                  <section className="mb-7">
+                    <h2 className="mb-3 text-body font-medium text-text-primary">Trending Now</h2>
+                    <div className="grid grid-cols-4 gap-3" data-testid="trending-row">
+                      {trending.map((mdl) => (
                         <button
                           key={mdl.id}
                           type="button"
-                          data-testid={`model-row-${mdl.id}`}
-                          /* Clicking anywhere on the row opens the card — the user:
-                             "maybe clicking generally on it shows the model
-                             cart". In compact there is no pane, so it switches
-                             to split, which is where the card lives. */
-                          onClick={() => {
-                            setSelected(mdl.id);
-                            if (view === 'compact') setView('split');
-                          }}
-                          className={cx(
-                            'grid w-full cursor-pointer items-center gap-2 border-b border-border-subtle px-4 py-2.5 text-left transition-colors last:border-b-0 hover:bg-bg-hover',
-                            hasCounts
-                              ? 'grid-cols-[1fr_110px_80px_100px_80px_92px_36px]'
-                              : 'grid-cols-[1fr_110px_80px_92px_36px]',
-                            selected === mdl.id ? 'bg-bg-active' : '',
-                          )}
+                          onClick={() => setSelected(mdl.id)}
+                          className="cursor-pointer rounded-2xl border border-border-subtle bg-bg-raised p-4 text-left shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-all hover:border-border-default hover:bg-bg-hover hover:shadow-[0_2px_8px_rgba(0,0,0,0.07)] pd-focusable"
                         >
-                          <span className="flex min-w-0 items-center gap-2.5">
-                            <OrgAvatar org={mdl.org} size={30} />
+                          <div className="flex items-start gap-2.5">
+                            <OrgAvatar org={mdl.org} size={36} />
                             <span className="min-w-0">
                               <span className="block truncate text-body text-text-primary">
                                 {mdl.name}
                               </span>
-                              <span className="flex items-center gap-1.5 text-footnote text-text-muted">
-                                {mdl.org !== '' ? (
-                                  <span className="flex items-center gap-1 truncate">
-                                    {mdl.org}
-                                    {mdl.verified === true ? (
-                                      <span className="text-accent-primary">✓</span>
-                                    ) : null}
-                                  </span>
-                                ) : null}
-                                <PipelineBadge tag={mdl.pipelineTag} />
+                              {mdl.org !== '' ? (
+                                <span className="flex items-center gap-1 text-footnote text-text-muted">
+                                  {mdl.org}
+                                  {mdl.verified === true ? (
+                                    <span className="text-accent-primary">✓</span>
+                                  ) : null}
+                                </span>
+                              ) : null}
+                            </span>
+                          </div>
+                          <div className="mt-3 flex items-center gap-3 text-footnote text-text-muted">
+                            {hasCounts ? (
+                              <span className="inline-flex items-center gap-1">
+                                <IconDownload /> {compactCount(mdl.downloads)}
                               </span>
-                            </span>
-                          </span>
-                          {hasCaps ? (
-                            <CapabilityPills caps={mdl.capabilities} dense max={4} />
-                          ) : null}
-                          {/* The reference's Size column is a PARAMETER COUNT
-                              (27B, 95B); bytes belong to a specific quant and
-                              only exist once a file is chosen. */}
-                          <span className="text-footnote text-text-secondary">
-                            {mdl.params ?? compactBytes(mdl.bytes)}
-                          </span>
-                          {hasCounts ? (
-                            <span className="inline-flex items-center gap-1 text-footnote text-text-secondary">
-                              <IconDownload /> {compactCount(mdl.downloads)}
-                            </span>
-                          ) : null}
-                          {hasCounts ? (
-                            <span className="inline-flex items-center gap-1 text-footnote text-text-secondary">
-                              <IconHeart /> {compactCount(mdl.likes)}
-                            </span>
-                          ) : null}
-                          {/* The compact table is the DEFAULT view and never
-                              renders the detail pane, so without this the hub
-                              had no download affordance at all on first open. */}
-                          {/* A real, prominent button. the user: "maybe a big blue
-                              quick download button on the right". The faint
-                              glyph read as decoration. */}
-                          {/* biome-ignore lint/a11y/useSemanticElements: nested inside the row <button> — button-in-button is invalid */}
-                          <span
-                            role="button"
-                            tabIndex={0}
-                            aria-label={`Download ${mdl.name}`}
-                            data-testid={`row-download-${mdl.id}`}
-                            aria-disabled={mdl.downloaded === true}
-                            onClick={(ev) => {
-                              ev.stopPropagation();
-                              rowAction(mdl);
-                            }}
-                            onKeyDown={(ev) => {
-                              if (ev.key !== 'Enter' && ev.key !== ' ') return;
-                              ev.preventDefault();
-                              ev.stopPropagation();
-                              rowAction(mdl);
-                            }}
-                            className={cx(
-                              'flex h-7 items-center justify-center gap-1 rounded-lg px-2.5 text-caption font-medium transition-opacity',
-                              mdl.downloaded === true
-                                ? 'cursor-default bg-bg-active text-text-muted'
-                                : busyId === mdl.id
-                                  ? 'cursor-default bg-bg-active text-text-muted'
-                                  : 'cursor-pointer bg-accent-primary text-text-on-accent hover:opacity-90',
-                            )}
-                          >
-                            {kind === 'datasets' ? (
-                              <>
-                                <IconExternal size={12} /> Open
-                              </>
-                            ) : mdl.downloaded === true ? (
-                              <>
-                                <IconCheck size={12} /> On disk
-                              </>
-                            ) : busyId === mdl.id ? (
-                              'Starting…'
-                            ) : (
-                              // the user: "the quick 'Get' buttons with the down arrow
-                              // should just be replaced with a no arrow 'Download'
-                              // button."
-                              'Download'
-                            )}
-                          </span>
-                          <RowMenu
-                            model={mdl}
-                            kind={kind}
-                            onDownload={() => void download(mdl.id)}
-                            onOpenHf={() => openOnHf(mdl.id)}
-                            onCopyId={() => copyId(mdl.id)}
-                          />
+                            ) : null}
+                            {hasCounts ? (
+                              <span className="inline-flex items-center gap-1">
+                                <IconHeart /> {compactCount(mdl.likes)}
+                              </span>
+                            ) : null}
+                            {(mdl.params ?? mdl.bytes !== undefined) ? (
+                              <span className="ml-auto rounded-md bg-bg-inset px-2 py-0.5 font-medium text-text-secondary">
+                                {mdl.params ?? compactBytes(mdl.bytes)}
+                              </span>
+                            ) : null}
+                          </div>
                         </button>
                       ))}
-                      {rows.length === 0 ? (
-                        <p
-                          className="px-4 py-6 text-body text-text-muted"
-                          data-testid="models-empty"
-                        >
-                          Nothing matches these filters.
-                        </p>
-                      ) : null}
                     </div>
-                  ) : (
-                    <div className="flex flex-col gap-2">
-                      {rows.map((mdl) => {
-                        const active = detail?.id === mdl.id;
-                        return (
+                  </section>
+                ) : null}
+
+                {/*
+                 * THREE LAYOUTS, NOT TWO. `split` and `detail` rendered
+                 * identically — three buttons, two behaviours, which is worse
+                 * than offering two. They now differ in which side gets the room,
+                 * matching the reference's own toggle icons: split favours the
+                 * list, detail favours the card.
+                 */}
+                <section
+                  data-testid="models-layout"
+                  data-view={view}
+                  className={cx(
+                    'grid',
+                    // The curated list is cards, not a table, so it keeps the
+                    // detail pane beside it even in the compact view — otherwise
+                    // clicking a version would have nowhere to show it.
+                    //
+                    // NO GAP THERE. The pane is a panel divided from the list by
+                    // one hairline, not a card floating beside it, so the two
+                    // columns meet and the border does the separating.
+                    curated
+                      ? 'grid-cols-[minmax(0,1fr)_460px] gap-0'
+                      : view === 'compact'
+                        ? 'gap-5'
+                        : view === 'split'
+                          ? 'grid-cols-[minmax(0,1fr)_420px] gap-5'
+                          : 'grid-cols-[300px_minmax(0,1fr)] gap-5',
+                  )}
+                >
+                  {/* A gutter, so the cards do not run into the divider. With the
+                    columns flush the family cards' right borders sat ~8px from
+                    the panel's hairline and read as one crowded double line. */}
+                  <div className={curated ? 'pr-6' : undefined}>
+                    {/*
+                     * TWO HEADINGS ON THE CURATED TAB, not one. the user: "the little
+                     * 'recommended' text shouldn't be there, the 5 cards you show
+                     * should say 'Top Recommended' much larger and then 'More'
+                     * below."
+                     *
+                     * The old single "Recommended · 26 families, smallest first"
+                     * labelled the whole tab, which left the five picks and the
+                     * long browsable list looking like one undifferentiated pile.
+                     * They are different offers — here is what to get, and here is
+                     * everything else — so each gets its own heading and the
+                     * counting furniture goes.
+                     */}
+                    {!curated ? (
+                      <div className="mb-3 flex items-center gap-2">
+                        <h2 className="text-body font-medium text-text-primary">
+                          {kind === 'datasets'
+                            ? 'All datasets'
+                            : tab === 'device'
+                              ? 'On this machine'
+                              : 'All models'}
+                        </h2>
+                        <button
+                          type="button"
+                          aria-label="Refresh"
+                          data-testid="models-refresh"
+                          onClick={() => void refreshCatalog()}
+                          className="rounded-md p-1 text-text-muted transition-colors hover:bg-bg-hover hover:text-text-primary pd-focusable"
+                        >
+                          <IconRefresh size={14} />
+                        </button>
+                        <span className="ml-auto text-footnote text-text-muted">
+                          {`${rows.length} ${kind === 'datasets' ? 'dataset' : 'model'}${rows.length === 1 ? '' : 's'}`}
+                        </span>
+                      </div>
+                    ) : null}
+
+                    {curated ? (
+                      <h2
+                        className="mb-3 text-title font-medium text-text-primary"
+                        data-testid="top-recommended-heading"
+                      >
+                        Top Recommended
+                      </h2>
+                    ) : null}
+
+                    {curated ? (
+                      <BestForYourMachine
+                        hardware={hardware}
+                        downloaded={downloadedRepos}
+                        onSelect={setSelected}
+                        onDownload={(rec) => {
+                          setSelected(rec.variant.repo);
+                          void downloadVariant(rec.family, rec.variant);
+                        }}
+                        onUse={(rec) => void applyRecommendation(rec)}
+                        onCancel={(rec) => void cancelVariant(rec.family, rec.variant)}
+                        progress={storeProgressByRepo}
+                      />
+                    ) : null}
+                    {curated ? (
+                      /*
+                       * The curated list REPLACES the results table here rather
+                       * than sitting above it: two lists of models on one screen,
+                       * one hand-picked and one not, is exactly the ambiguity the
+                       * Recommended/All toggle exists to remove.
+                       */
+                      <div className="flex flex-col gap-2" data-testid="curated-families">
+                        <h2
+                          className="mt-4 mb-1 text-title font-medium text-text-primary"
+                          data-testid="more-heading"
+                        >
+                          More
+                        </h2>
+                        {families.map((family) => (
+                          <FamilyCard
+                            key={family.id}
+                            family={family}
+                            downloaded={downloadedRepos}
+                            selectedRepo={selected}
+                            memoryGB={hw?.ramGiB ?? 0}
+                            progress={storeFractions}
+                            bytes={storeProgressByRepo}
+                            onSelect={setSelected}
+                            onDownload={(variant) => void downloadVariant(family, variant)}
+                            onCancel={(variant) => void cancelVariant(family, variant)}
+                          />
+                        ))}
+                        {families.length === 0 ? (
+                          <p className="py-6 text-body text-text-muted" data-testid="curated-empty">
+                            Nothing recommended makes that yet. Switch to All to search the Hub.
+                          </p>
+                        ) : null}
+                      </div>
+                    ) : view === 'compact' ? (
+                      <div className="overflow-hidden rounded-2xl border border-border-subtle bg-bg-raised shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
+                        {/* Downloads/Likes only exist for HF-sourced entries. A
+                          column of em-dashes is worse than no column: it looks
+                          like the data failed to load rather than never
+                          applying to a bundled catalog. */}
+                        <div
+                          className={cx(
+                            'grid items-center gap-2 border-b border-border-subtle bg-bg-sunken px-4 py-2.5 text-footnote text-text-muted',
+                            COMPACT_GRID[
+                              `${hasCaps ? 'caps' : 'nocaps'}-${hasCounts ? 'counts' : 'nocounts'}`
+                            ],
+                          )}
+                        >
+                          <span>{kind === 'datasets' ? 'Dataset' : 'Model'}</span>
+                          {hasCaps ? <span>Capabilities</span> : null}
+                          <span>Size</span>
+                          {hasCounts ? <span>Downloads</span> : null}
+                          {hasCounts ? <span>Likes</span> : null}
+                          <span className="sr-only">Download</span>
+                          <span className="sr-only">Actions</span>
+                        </div>
+                        {rows.map((mdl) => (
                           <button
                             key={mdl.id}
                             type="button"
                             data-testid={`model-row-${mdl.id}`}
-                            onClick={() => setSelected(mdl.id)}
+                            /* Clicking anywhere on the row opens the card — the user:
+                             "maybe clicking generally on it shows the model
+                             cart". In compact there is no pane, so it switches
+                             to split, which is where the card lives. */
+                            onClick={() => {
+                              setSelected(mdl.id);
+                              if (view === 'compact') setView('split');
+                            }}
                             className={cx(
-                              'flex cursor-pointer items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-colors',
-                              active
-                                ? 'border-accent-primary bg-bg-active'
-                                : 'border-border-subtle bg-bg-raised shadow-[0_1px_2px_rgba(0,0,0,0.03)] hover:border-border-default',
+                              'grid w-full cursor-pointer items-center gap-2 border-b border-border-subtle px-4 py-2.5 text-left transition-colors last:border-b-0 hover:bg-bg-hover',
+                              hasCounts
+                                ? 'grid-cols-[1fr_110px_80px_100px_80px_92px_36px]'
+                                : 'grid-cols-[1fr_110px_80px_92px_36px]',
+                              selected === mdl.id ? 'bg-bg-active' : '',
                             )}
                           >
-                            <OrgAvatar org={mdl.org} size={view === 'detail' ? 28 : 34} />
-                            <span className="min-w-0 flex-1">
-                              <span className="block truncate text-body text-text-primary">
-                                {mdl.name}
-                              </span>
-                              <span className="block truncate text-footnote text-text-muted">
-                                {mdl.org}
+                            <span className="flex min-w-0 items-center gap-2.5">
+                              <OrgAvatar org={mdl.org} size={30} />
+                              <span className="min-w-0">
+                                <span className="block truncate text-body text-text-primary">
+                                  {mdl.name}
+                                </span>
+                                <span className="flex items-center gap-1.5 text-footnote text-text-muted">
+                                  {mdl.org !== '' ? (
+                                    <span className="flex items-center gap-1 truncate">
+                                      {mdl.org}
+                                      {mdl.verified === true ? (
+                                        <span className="text-accent-primary">✓</span>
+                                      ) : null}
+                                    </span>
+                                  ) : null}
+                                  <PipelineBadge tag={mdl.pipelineTag} />
+                                </span>
                               </span>
                             </span>
-                            {/* The rail is 300px; a size column there would
-                                squeeze the name to nothing. */}
-                            {view === 'split' ? (
-                              <span className="shrink-0 text-footnote text-text-muted">
-                                {mdl.params ?? compactBytes(mdl.bytes)}
+                            {hasCaps ? (
+                              <CapabilityPills caps={mdl.capabilities} dense max={4} />
+                            ) : null}
+                            {/* The reference's Size column is a PARAMETER COUNT
+                              (27B, 95B); bytes belong to a specific quant and
+                              only exist once a file is chosen. */}
+                            <span className="text-footnote text-text-secondary">
+                              {mdl.params ?? compactBytes(mdl.bytes)}
+                            </span>
+                            {hasCounts ? (
+                              <span className="inline-flex items-center gap-1 text-footnote text-text-secondary">
+                                <IconDownload /> {compactCount(mdl.downloads)}
                               </span>
                             ) : null}
+                            {hasCounts ? (
+                              <span className="inline-flex items-center gap-1 text-footnote text-text-secondary">
+                                <IconHeart /> {compactCount(mdl.likes)}
+                              </span>
+                            ) : null}
+                            {/* The compact table is the DEFAULT view and never
+                              renders the detail pane, so without this the hub
+                              had no download affordance at all on first open. */}
+                            {/* A real, prominent button. the user: "maybe a big blue
+                              quick download button on the right". The faint
+                              glyph read as decoration. */}
+                            {/* biome-ignore lint/a11y/useSemanticElements: nested inside the row <button> — button-in-button is invalid */}
+                            <span
+                              role="button"
+                              tabIndex={0}
+                              aria-label={`Download ${mdl.name}`}
+                              data-testid={`row-download-${mdl.id}`}
+                              aria-disabled={mdl.downloaded === true}
+                              onClick={(ev) => {
+                                ev.stopPropagation();
+                                rowAction(mdl);
+                              }}
+                              onKeyDown={(ev) => {
+                                if (ev.key !== 'Enter' && ev.key !== ' ') return;
+                                ev.preventDefault();
+                                ev.stopPropagation();
+                                rowAction(mdl);
+                              }}
+                              className={cx(
+                                'flex h-7 items-center justify-center gap-1 rounded-lg px-2.5 text-caption font-medium transition-opacity',
+                                mdl.downloaded === true
+                                  ? 'cursor-default bg-bg-active text-text-muted'
+                                  : busyId === mdl.id
+                                    ? 'cursor-default bg-bg-active text-text-muted'
+                                    : 'cursor-pointer bg-accent-primary text-text-on-accent hover:opacity-90',
+                              )}
+                            >
+                              {kind === 'datasets' ? (
+                                <>
+                                  <IconExternal size={12} /> Open
+                                </>
+                              ) : mdl.downloaded === true ? (
+                                <>
+                                  <IconCheck size={12} /> On disk
+                                </>
+                              ) : busyId === mdl.id ? (
+                                'Starting…'
+                              ) : (
+                                // the user: "the quick 'Get' buttons with the down arrow
+                                // should just be replaced with a no arrow 'Download'
+                                // button."
+                                'Download'
+                              )}
+                            </span>
+                            <RowMenu
+                              model={mdl}
+                              kind={kind}
+                              onDownload={() => void download(mdl.id)}
+                              onOpenHf={() => openOnHf(mdl.id)}
+                              onCopyId={() => copyId(mdl.id)}
+                            />
                           </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
+                        ))}
+                        {rows.length === 0 ? (
+                          <p
+                            className="px-4 py-6 text-body text-text-muted"
+                            data-testid="models-empty"
+                          >
+                            Nothing matches these filters.
+                          </p>
+                        ) : null}
+                      </div>
+                    ) : (
+                      <div className="flex flex-col gap-2">
+                        {rows.map((mdl) => {
+                          const active = detail?.id === mdl.id;
+                          return (
+                            <button
+                              key={mdl.id}
+                              type="button"
+                              data-testid={`model-row-${mdl.id}`}
+                              onClick={() => setSelected(mdl.id)}
+                              className={cx(
+                                'flex cursor-pointer items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-colors',
+                                active
+                                  ? 'border-accent-primary bg-bg-active'
+                                  : 'border-border-subtle bg-bg-raised shadow-[0_1px_2px_rgba(0,0,0,0.03)] hover:border-border-default',
+                              )}
+                            >
+                              <OrgAvatar org={mdl.org} size={view === 'detail' ? 28 : 34} />
+                              <span className="min-w-0 flex-1">
+                                <span className="block truncate text-body text-text-primary">
+                                  {mdl.name}
+                                </span>
+                                <span className="block truncate text-footnote text-text-muted">
+                                  {mdl.org}
+                                </span>
+                              </span>
+                              {/* The rail is 300px; a size column there would
+                                squeeze the name to nothing. */}
+                              {view === 'split' ? (
+                                <span className="shrink-0 text-footnote text-text-muted">
+                                  {mdl.params ?? compactBytes(mdl.bytes)}
+                                </span>
+                              ) : null}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
 
-                {curated && detail === undefined ? (
-                  /* The pane is pinned and empty until something is picked;
+                  {curated && detail === undefined ? (
+                    /* The pane is pinned and empty until something is picked;
                      saying so beats a 420px hole beside the list. */
-                  <aside
-                    /* Same panel as the filled state, so nothing moves or
+                    <aside
+                      /* Same panel as the filled state, so nothing moves or
                        changes shape when a version is picked. */
-                    className={cx(
-                      'pd-detail-panel sticky top-0 self-start text-footnote text-text-muted',
-                      DETAIL_HEIGHT,
-                    )}
-                    data-testid="curated-detail-hint"
-                  >
-                    Open a family and pick a version to see its card, its quant ladder and what it
-                    needs.
-                  </aside>
-                ) : null}
-                {(curated || view !== 'compact') && detail !== undefined ? (
-                  /*
-                   * PINNED. the user: "the right item showing the model card needs
-                   * to be pinned and not lost as we scroll down otherwise we
-                   * scroll down through the list find something we like, click
-                   * it and nothing appears on the right."
-                   *
-                   * It already had its own max-height and inner scroll, but it
-                   * sat in normal flow — so a list long enough to scroll carried
-                   * the pane off the top of the window with it, and by the time
-                   * you had scrolled to something worth clicking, the place its
-                   * details appear was somewhere above the viewport. `sticky`
-                   * with `self-start` is the whole fix: self-start stops the
-                   * grid stretching it to the row's full height, which is what
-                   * would otherwise leave it nothing to stick within.
-                   */
-                  <aside
-                    className={cx(
-                      // The same edge as every other card on the page. It used
-                      // to carry its own lighter border and a 5%-black shadow
-                      // that vanished on a dark theme, so the one pane that is
-                      // always on screen was the one with no visible edge.
-                      'pd-detail-scroll sticky top-0 self-start overflow-y-auto',
-                      // Curated: a full-height panel. Otherwise: the old card,
-                      // which still floats beside a TABLE and should.
-                      curated
-                        ? cx('pd-detail-panel', DETAIL_HEIGHT)
-                        : cx(
-                            'pd-hub-card p-5',
-                            view === 'detail'
-                              ? 'max-h-[calc(100vh-190px)]'
-                              : 'max-h-[calc(100vh-260px)]',
-                          ),
-                    )}
-                    data-testid="model-detail"
-                    data-view={view}
-                  >
-                    <div className="flex items-start gap-3">
-                      <OrgAvatar org={detail.org} size={48} />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-start gap-1.5">
-                          <h3 className="min-w-0 flex-1 break-words text-body font-medium text-text-primary">
-                            {detail.name}
-                          </h3>
-                          {/* Copy the repo id and open it on the Hub — both are
+                      className={cx(
+                        'pd-detail-panel sticky top-0 self-start text-footnote text-text-muted',
+                        DETAIL_HEIGHT,
+                      )}
+                      data-testid="curated-detail-hint"
+                    >
+                      Open a family and pick a version to see its card, its quant ladder and what it
+                      needs.
+                    </aside>
+                  ) : null}
+                  {(curated || view !== 'compact') && detail !== undefined ? (
+                    /*
+                     * PINNED. the user: "the right item showing the model card needs
+                     * to be pinned and not lost as we scroll down otherwise we
+                     * scroll down through the list find something we like, click
+                     * it and nothing appears on the right."
+                     *
+                     * It already had its own max-height and inner scroll, but it
+                     * sat in normal flow — so a list long enough to scroll carried
+                     * the pane off the top of the window with it, and by the time
+                     * you had scrolled to something worth clicking, the place its
+                     * details appear was somewhere above the viewport. `sticky`
+                     * with `self-start` is the whole fix: self-start stops the
+                     * grid stretching it to the row's full height, which is what
+                     * would otherwise leave it nothing to stick within.
+                     */
+                    <aside
+                      className={cx(
+                        // The same edge as every other card on the page. It used
+                        // to carry its own lighter border and a 5%-black shadow
+                        // that vanished on a dark theme, so the one pane that is
+                        // always on screen was the one with no visible edge.
+                        'pd-detail-scroll sticky top-0 self-start overflow-y-auto',
+                        // Curated: a full-height panel. Otherwise: the old card,
+                        // which still floats beside a TABLE and should.
+                        curated
+                          ? cx('pd-detail-panel', DETAIL_HEIGHT)
+                          : cx(
+                              'pd-hub-card p-5',
+                              view === 'detail'
+                                ? 'max-h-[calc(100vh-190px)]'
+                                : 'max-h-[calc(100vh-260px)]',
+                            ),
+                      )}
+                      data-testid="model-detail"
+                      data-view={view}
+                    >
+                      <div className="flex items-start gap-3">
+                        <OrgAvatar org={detail.org} size={48} />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-start gap-1.5">
+                            <h3 className="min-w-0 flex-1 break-words text-body font-medium text-text-primary">
+                              {detail.name}
+                            </h3>
+                            {/* Copy the repo id and open it on the Hub — both are
                               in the reference beside the title, and both are
                               what someone actually wants from a card. */}
-                          <button
-                            type="button"
-                            aria-label="Copy model id"
-                            data-testid="detail-copy"
-                            onClick={() => copyId(detail.id)}
-                            className="shrink-0 rounded-md p-1 text-text-muted transition-colors hover:bg-bg-hover hover:text-text-primary pd-focusable"
-                          >
-                            <IconCopy size={14} />
-                          </button>
-                          {detail.id.includes('/') ? (
                             <button
                               type="button"
-                              aria-label="Open on Hugging Face"
-                              data-testid="detail-open"
-                              onClick={() => openOnHf(detail.id)}
+                              aria-label="Copy model id"
+                              data-testid="detail-copy"
+                              onClick={() => copyId(detail.id)}
                               className="shrink-0 rounded-md p-1 text-text-muted transition-colors hover:bg-bg-hover hover:text-text-primary pd-focusable"
                             >
-                              <IconExternal size={14} />
+                              <IconCopy size={14} />
                             </button>
-                          ) : null}
-                        </div>
-                        <p className="flex flex-wrap items-center gap-1.5 text-footnote text-text-muted">
-                          <span className="flex items-center gap-1">
-                            {detail.org}
-                            {detail.verified === true ? (
-                              <span className="text-accent-primary">✓</span>
+                            {detail.id.includes('/') ? (
+                              <button
+                                type="button"
+                                aria-label="Open on Hugging Face"
+                                data-testid="detail-open"
+                                onClick={() => openOnHf(detail.id)}
+                                className="shrink-0 rounded-md p-1 text-text-muted transition-colors hover:bg-bg-hover hover:text-text-primary pd-focusable"
+                              >
+                                <IconExternal size={14} />
+                              </button>
                             ) : null}
-                          </span>
-                          {/* The parameter count belongs to the model's NAME, not
+                          </div>
+                          <p className="flex flex-wrap items-center gap-1.5 text-footnote text-text-muted">
+                            <span className="flex items-center gap-1">
+                              {detail.org}
+                              {detail.verified === true ? (
+                                <span className="text-accent-primary">✓</span>
+                              ) : null}
+                            </span>
+                            {/* The parameter count belongs to the model's NAME, not
                               to the popularity stats below. On its own down there
                               it was a single stray tag floating between the
                               Download button and the card. */}
-                          {detail.params !== undefined && !NAME_SAYS_SIZE.test(detail.name) ? (
-                            <span>· {detail.params}</span>
-                          ) : null}
-                          <PipelineBadge tag={detail.pipelineTag} />
-                        </p>
+                            {detail.params !== undefined && !NAME_SAYS_SIZE.test(detail.name) ? (
+                              <span>· {detail.params}</span>
+                            ) : null}
+                            <PipelineBadge tag={detail.pipelineTag} />
+                          </p>
+                        </div>
                       </div>
-                    </div>
 
-                    {detail.capabilities.length > 0 ? (
-                      <div className="mt-3 flex flex-wrap gap-1.5">
-                        <CapabilityPills caps={detail.capabilities} />
-                      </div>
-                    ) : null}
+                      {detail.capabilities.length > 0 ? (
+                        <div className="mt-3 flex flex-wrap gap-1.5">
+                          <CapabilityPills caps={detail.capabilities} />
+                        </div>
+                      ) : null}
 
-                    {kind === 'datasets' ? (
-                      /* No quant ladder exists for a dataset, and the picker's
+                      {kind === 'datasets' ? (
+                        /* No quant ladder exists for a dataset, and the picker's
                          loading state never resolves without one — it would sit
                          on "Loading files…" for as long as the pane is open. */
-                      <button
-                        type="button"
-                        data-testid="dataset-open"
-                        onClick={() => openOnHf(detail.id)}
-                        className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl bg-accent-primary px-3 py-2.5 text-footnote text-text-on-accent transition-opacity hover:opacity-90 pd-focusable"
-                      >
-                        <IconExternal size={14} /> Open on Hugging Face
-                      </button>
-                    ) : curatedPick !== undefined && installKindOf(curatedPick.family) === 'gen' ? (
-                      /*
-                       * A GENERATION MODEL DOWNLOADS FOR REAL, into the store.
-                       * What it does NOT get is the quant ladder below: there is
-                       * no ladder to pick from, because the choice was already
-                       * made in the family card — which transformer, which
-                       * precision, which job — and travels here as the recipe
-                       * this variant names.
-                       */
-                      <>
-                        <DownloadAction
-                          installed={hasRepo(storeModels, detail.id)}
-                          busy={storeProgress[detail.id] !== undefined}
-                          fraction={storeProgress[detail.id]?.fraction ?? null}
-                          received={storeProgress[detail.id]?.received}
-                          total={storeProgress[detail.id]?.total}
-                          onDownload={() =>
-                            void downloadVariant(curatedPick.family, curatedPick.variant)
-                          }
-                          onCancel={() => void storeCancel(detail.id)}
-                          testid="detail-download"
-                        />
-                        {/*
-                         * the user: "that line about 'the whole repository in this
-                         * apps model store' or something is not needed and
-                         * especially not true in this case above." It was both:
-                         * noise on every card, and wrong wherever the variant is
-                         * a recipe rather than the repo. The size is already on
-                         * the row that was clicked; the only thing left worth
-                         * saying is when the machine cannot run what it is about
-                         * to fetch.
-                         */}
-                        {fitFor(curatedPick.variant, hw?.ramGiB ?? 0) === 'too-big' ? (
-                          <p
-                            className="mt-2 text-caption text-status-danger-fg"
-                            data-testid="detail-gen-install"
-                          >
-                            Needs more memory than this computer has. It will download, but not run
-                            here.
-                          </p>
-                        ) : null}
-                      </>
-                    ) : (
-                      <>
-                        {/* The headline action: one click, the recommended file,
+                        <button
+                          type="button"
+                          data-testid="dataset-open"
+                          onClick={() => openOnHf(detail.id)}
+                          className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl bg-accent-primary px-3 py-2.5 text-footnote text-text-on-accent transition-opacity hover:opacity-90 pd-focusable"
+                        >
+                          <IconExternal size={14} /> Open on Hugging Face
+                        </button>
+                      ) : curatedPick !== undefined &&
+                        installKindOf(curatedPick.family) === 'gen' ? (
+                        /*
+                         * A GENERATION MODEL DOWNLOADS FOR REAL, into the store.
+                         * What it does NOT get is the quant ladder below: there is
+                         * no ladder to pick from, because the choice was already
+                         * made in the family card — which transformer, which
+                         * precision, which job — and travels here as the recipe
+                         * this variant names.
+                         */
+                        <>
+                          <DownloadAction
+                            installed={hasRepo(storeModels, detail.id)}
+                            busy={storeProgress[detail.id] !== undefined}
+                            fraction={storeProgress[detail.id]?.fraction ?? null}
+                            received={storeProgress[detail.id]?.received}
+                            total={storeProgress[detail.id]?.total}
+                            onDownload={() =>
+                              void downloadVariant(curatedPick.family, curatedPick.variant)
+                            }
+                            onCancel={() => void storeCancel(detail.id)}
+                            testid="detail-download"
+                          />
+                          {/*
+                           * the user: "that line about 'the whole repository in this
+                           * apps model store' or something is not needed and
+                           * especially not true in this case above." It was both:
+                           * noise on every card, and wrong wherever the variant is
+                           * a recipe rather than the repo. The size is already on
+                           * the row that was clicked; the only thing left worth
+                           * saying is when the machine cannot run what it is about
+                           * to fetch.
+                           */}
+                          {fitFor(curatedPick.variant, hw?.ramGiB ?? 0) === 'too-big' ? (
+                            <p
+                              className="mt-2 text-caption text-status-danger-fg"
+                              data-testid="detail-gen-install"
+                            >
+                              Needs more memory than this computer has. It will download, but not
+                              run here.
+                            </p>
+                          ) : null}
+                        </>
+                      ) : (
+                        <>
+                          {/* The headline action: one click, the recommended file,
                             no question asked. The ladder below is for the people
                             who want to answer that question anyway. */}
-                        {/*
+                          {/*
                           NO "ON DISK" SLAB ABOVE THE LADDER. the user: "there's a
                           'on disk' and 'installed' greyed out here… 'on disk'
                           has no place there." The ladder below already answers
@@ -2445,98 +2458,99 @@ export function ModelsView() {
                           slab was a second, coarser reply to the same question,
                           sitting directly on top of the accurate one.
                         */}
-                        {detail.downloaded === true ? null : (
-                          <DownloadAction
-                            installed={false}
-                            busy={busyId === detail.id}
-                            fraction={progress === null ? null : downloadFraction(progress)}
-                            received={progress?.jobReceived ?? progress?.received}
-                            total={progress?.jobTotal ?? progress?.total}
-                            eta={
-                              progress === null
-                                ? undefined
-                                : formatEta(downloadEtaSeconds(progress))
-                            }
-                            onDownload={() => void download(detail.id)}
-                            onCancel={() => void cancelHere()}
-                            testid="detail-download"
-                          />
-                        )}
-                        <QuantPicker
-                          options={quants?.repo === detail.id ? quants.options : []}
-                          loading={quants?.repo === detail.id ? quants.loading : true}
-                          totalRamGB={hw?.ramGiB ?? 0}
-                          mmprojBytes={quants?.mmprojBytes}
-                          format={detail.formats[0]?.toUpperCase()}
-                          /* The per-QUANT truth. Without it the picker fell back
+                          {detail.downloaded === true ? null : (
+                            <DownloadAction
+                              installed={false}
+                              busy={busyId === detail.id}
+                              fraction={progress === null ? null : downloadFraction(progress)}
+                              received={progress?.jobReceived ?? progress?.received}
+                              total={progress?.jobTotal ?? progress?.total}
+                              eta={
+                                progress === null
+                                  ? undefined
+                                  : formatEta(downloadEtaSeconds(progress))
+                              }
+                              onDownload={() => void download(detail.id)}
+                              onCancel={() => void cancelHere()}
+                              testid="detail-download"
+                            />
+                          )}
+                          <QuantPicker
+                            options={quants?.repo === detail.id ? quants.options : []}
+                            loading={quants?.repo === detail.id ? quants.loading : true}
+                            totalRamGB={hw?.ramGiB ?? 0}
+                            mmprojBytes={quants?.mmprojBytes}
+                            format={detail.formats[0]?.toUpperCase()}
+                            /* The per-QUANT truth. Without it the picker fell back
                              to the repo-level flag and mislabelled every row. */
-                          isDownloaded={quantOnDisk}
-                          downloading={busyId === detail.id}
-                          onDownload={(q) => void download(detail.id, q)}
-                        />
-                      </>
-                    )}
+                            isDownloaded={quantOnDisk}
+                            downloading={busyId === detail.id}
+                            onDownload={(q) => void download(detail.id, q)}
+                          />
+                        </>
+                      )}
 
-                    {/* Only chips we actually have a value for — a row of
+                      {/* Only chips we actually have a value for — a row of
                         em-dashes is the thing this file already argues against
                         for the table columns. */}
-                    <div className="mt-3 flex flex-wrap gap-1.5 text-footnote text-text-muted">
-                      {detail.updatedAt !== undefined ? (
-                        <Chip
-                          icon={<IconClock size={12} />}
-                          value={relativeAge(detail.updatedAt, Date.now())}
-                        />
-                      ) : null}
-                      {detail.downloads !== undefined ? (
-                        <Chip
-                          icon={<IconDownload size={12} />}
-                          value={compactCount(detail.downloads)}
-                        />
-                      ) : null}
-                      {detail.likes !== undefined ? (
-                        <Chip icon={<IconHeart size={12} />} value={compactCount(detail.likes)} />
-                      ) : null}
-                      {detail.formats.map((f) => (
-                        <Chip key={f} value={f.toUpperCase()} />
-                      ))}
-                    </div>
+                      <div className="mt-3 flex flex-wrap gap-1.5 text-footnote text-text-muted">
+                        {detail.updatedAt !== undefined ? (
+                          <Chip
+                            icon={<IconClock size={12} />}
+                            value={relativeAge(detail.updatedAt, Date.now())}
+                          />
+                        ) : null}
+                        {detail.downloads !== undefined ? (
+                          <Chip
+                            icon={<IconDownload size={12} />}
+                            value={compactCount(detail.downloads)}
+                          />
+                        ) : null}
+                        {detail.likes !== undefined ? (
+                          <Chip icon={<IconHeart size={12} />} value={compactCount(detail.likes)} />
+                        ) : null}
+                        {detail.formats.map((f) => (
+                          <Chip key={f} value={f.toUpperCase()} />
+                        ))}
+                      </div>
 
-                    {/* No rule above the card. the user: "that top border with the
+                      {/* No rule above the card. the user: "that top border with the
                         fade out of the model card has no need to happen." The
                         README opens with its own heading, which separates it
                         from the chips better than a hairline that reads as the
                         pane's second top edge. */}
-                    <div className="mt-5" data-testid="model-card">
-                      {/* Spin only while a fetch is EXPLICITLY in flight. The
+                      <div className="mt-5" data-testid="model-card">
+                        {/* Spin only while a fetch is EXPLICITLY in flight. The
                           old condition spun whenever the state held neither a
                           body nor an error, so any path that set nothing left it
                           spinning forever. */}
-                      {card?.repo !== detail.id || card.loading === true ? (
-                        <p className="flex items-center gap-2 text-footnote text-text-muted">
-                          <Spinner size={12} /> Loading model card…
-                        </p>
-                      ) : card.error !== undefined ? (
-                        <p className="text-footnote text-text-muted">{card.error}</p>
-                      ) : (
-                        // Markdown renders its own .pd-prose container; do not
-                        // double-wrap it.
-                        <ModelCard
-                          markdown={card.markdown ?? ''}
-                          onOpenLink={(url) =>
-                            void window.piDesktop
-                              .invoke('canvas:open-external', { url })
-                              .catch(() => undefined)
-                          }
-                        />
-                      )}
-                    </div>
-                  </aside>
-                ) : null}
-              </section>
-            </>
-          )}
-        </div>
-      </ScrollArea>
+                        {card?.repo !== detail.id || card.loading === true ? (
+                          <p className="flex items-center gap-2 text-footnote text-text-muted">
+                            <Spinner size={12} /> Loading model card…
+                          </p>
+                        ) : card.error !== undefined ? (
+                          <p className="text-footnote text-text-muted">{card.error}</p>
+                        ) : (
+                          // Markdown renders its own .pd-prose container; do not
+                          // double-wrap it.
+                          <ModelCard
+                            markdown={card.markdown ?? ''}
+                            onOpenLink={(url) =>
+                              void window.piDesktop
+                                .invoke('canvas:open-external', { url })
+                                .catch(() => undefined)
+                            }
+                          />
+                        )}
+                      </div>
+                    </aside>
+                  ) : null}
+                </section>
+              </>
+            )}
+          </div>
+        </ScrollArea>
+      )}
     </div>
   );
 }

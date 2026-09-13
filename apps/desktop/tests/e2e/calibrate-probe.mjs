@@ -28,6 +28,9 @@ import path from 'node:path';
 import { _electron } from '@playwright/test';
 import { probeHome } from './harness.mjs';
 
+/** The real model library, beside the real cache (see harness.mjs REAL_LIBRARY). */
+const REAL_LIBRARY_DEFAULT = path.join(homedir(), 'Bobble', 'Models');
+
 const MODEL = process.env.MODEL ?? 'qwen3.5-4b-mtp';
 const QUANT = process.env.QUANT ?? 'Q8_0';
 const SHOT_DIR = process.env.SHOT_DIR ?? path.join(tmpdir(), 'calib');
@@ -62,6 +65,7 @@ const app = await _electron.launch({
     ...process.env,
     HOME: home,
     PI_DESKTOP_CACHE_DIR: CACHE,
+    PI_DESKTOP_MODELS_DIR: process.env.PI_DESKTOP_MODELS_DIR ?? REAL_LIBRARY_DEFAULT,
     PI_E2E: '1',
     PI_E2E_BACKGROUND: '1',
   },

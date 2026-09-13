@@ -47,6 +47,7 @@ import { ensureUv } from '@pi-desktop/web-tools';
 import { app, BrowserWindow, type IpcMain, type WebContents } from 'electron';
 import { tieredSpawn } from '../inference/worker-tier';
 import type { AppEventMap } from '../ipc-contract';
+import { runLibraryMigration } from '../storage/storage-main';
 import { DictationSession, transcribe } from './dictation-main';
 import type {
   DictationInvokeMap,
@@ -272,6 +273,16 @@ function wireEventStream(instance: Gen3dSidecar): void {
   }).finally(() => wiredEventUrls.delete(url));
 }
 
+/** The repos the registry lists for these models — what a download writes. */
+function reposOf(ids: readonly string[]): string[] {
+  const out: string[] = [];
+  for (const id of ids) {
+    const spec = GEN3D_MODEL_SPECS.find((m) => m.id === id);
+    for (const r of spec?.repos ?? []) out.push(r.repo);
+  }
+  return out;
+}
+
 function handleSidecarEvent(value: unknown): void {
   if (typeof value !== 'object' || value === null) return;
   const event = value as Record<string, unknown>;
@@ -280,6 +291,16 @@ function handleSidecarEvent(value: unknown): void {
     const done = event.done === true;
     if (done) downloading.delete(id);
     else downloading.add(id);
+    /* A finished download landed in the workers' hub cache; put it on its
+       library shelf now (a link stays behind for the worker), leaving alone
+       whatever is still downloading. */
+    if (done && typeof event.error !== 'string') {
+      try {
+        runLibraryMigration({ skipRepos: reposOf([...downloading]) });
+      } catch (err) {
+        log.warn('could not shelve the download', { id, error: String(err) });
+      }
+    }
     broadcast('gen3d:download', {
       id,
       receivedBytes: Number(event.receivedBytes ?? 0),

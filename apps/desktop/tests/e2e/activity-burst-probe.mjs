@@ -65,13 +65,19 @@ try {
           return { messages: next };
         });
 
-      push({ kind: 'user', id: `u${++n}`, text: 'Open ./docs/pitch.pptx and add a third slide.', timestamp: now() });
+      push({
+        kind: 'user',
+        id: `u${++n}`,
+        text: 'Open ./docs/pitch.pptx and add a third slide.',
+        timestamp: now(),
+      });
       await sleep(gap);
 
       // Zip bytes, as `read` returns them for a .docx: the PK header, then
       // control characters and high bytes.
       const bytes = [];
-      for (let i = 0; i < 3000; i++) bytes.push(String.fromCharCode(i % 7 === 0 ? 80 : i % 5 === 0 ? 3 : 128 + (i % 120)));
+      for (let i = 0; i < 3000; i++)
+        bytes.push(String.fromCharCode(i % 7 === 0 ? 80 : i % 5 === 0 ? 3 : 128 + (i % 120)));
       const zipBytes = bytes.join('');
 
       for (let i = 0; i < calls; i++) {
@@ -79,18 +85,28 @@ try {
         const callId = `call_${i}`;
         const isRead = i % 9 === 4;
         const call = isRead
-          ? { type: 'toolCall', id: callId, name: 'read', arguments: { path: './docs/kitchen-sink.docx' } }
+          ? {
+              type: 'toolCall',
+              id: callId,
+              name: 'read',
+              arguments: { path: './docs/kitchen-sink.docx' },
+            }
           : {
               type: 'toolCall',
               id: callId,
               name: 'bash',
               arguments: {
-                command: "python3 << 'EOF'\nfrom pptx import Presentation\nprs = Presentation('./docs/pitch.pptx')\nprint(len(prs.slides))\nEOF",
+                command:
+                  "python3 << 'EOF'\nfrom pptx import Presentation\nprs = Presentation('./docs/pitch.pptx')\nprint(len(prs.slides))\nEOF",
               },
             };
         upsertAssistant(aid, [{ type: 'thinking', thinking: `Let me try again (${i}).` }], true);
         await sleep(gap / 3);
-        upsertAssistant(aid, [{ type: 'thinking', thinking: `Let me try again (${i}).` }, call], true);
+        upsertAssistant(
+          aid,
+          [{ type: 'thinking', thinking: `Let me try again (${i}).` }, call],
+          true,
+        );
         await sleep(gap / 3);
         push({
           kind: 'toolResult',
@@ -100,11 +116,15 @@ try {
           toolName: isRead ? 'read' : 'bash',
           text: isRead
             ? `/tmp/canvas-assess/project/docs/kitchen-sink.docx\n${zipBytes}`
-            : "Traceback (most recent call last):\n  File \"<stdin>\", line 1, in <module>\nModuleNotFoundError: No module named 'pptx'\n\n\nCommand exited with code 1",
+            : 'Traceback (most recent call last):\n  File "<stdin>", line 1, in <module>\nModuleNotFoundError: No module named \'pptx\'\n\n\nCommand exited with code 1',
           isError: !isRead,
           timestamp: now(),
         });
-        upsertAssistant(aid, [{ type: 'thinking', thinking: `Let me try again (${i}).` }, call], false);
+        upsertAssistant(
+          aid,
+          [{ type: 'thinking', thinking: `Let me try again (${i}).` }, call],
+          false,
+        );
         await sleep(gap / 3);
       }
       await sleep(400);
@@ -142,9 +162,11 @@ try {
   const boundary = await win
     .evaluate(() => document.body.innerText.includes('rendering error'))
     .catch(() => true);
-  if (boundary || errors.some((e) => /#185|Maximum update depth|dimensions/.test(e))) verdict = 'CRASH';
+  if (boundary || errors.some((e) => /#185|Maximum update depth|dimensions/.test(e)))
+    verdict = 'CRASH';
   console.log(JSON.stringify({ ...result, boundary, errors: errors.length }));
-  if (verdict === 'CRASH') await win.screenshot({ path: '/tmp/activity-burst-crash.png' }).catch(() => {});
+  if (verdict === 'CRASH')
+    await win.screenshot({ path: '/tmp/activity-burst-crash.png' }).catch(() => {});
 } finally {
   await app.close().catch(() => {});
 }

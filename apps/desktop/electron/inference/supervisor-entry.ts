@@ -1492,7 +1492,11 @@ async function startExternalEngine(
       mkdirSync(omlxModelRoot(), { recursive: true });
       const link = join(omlxModelRoot(), servedName);
       try {
-        if (existsSync(link)) rmSync(link, { recursive: false, force: true });
+        // `force` covers a link that is already gone; `existsSync` would not
+        // see a DANGLING one (it follows links), and the symlink would then
+        // fail with EEXIST — the state every old link is in once the weights
+        // have moved to the library.
+        rmSync(link, { recursive: false, force: true });
         symlinkSync(modelDirPath, link, 'dir');
       } catch (error) {
         return { success: false, error: `could not link weights for oMLX: ${String(error)}` };

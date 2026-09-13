@@ -15,7 +15,7 @@
  */
 
 import { existsSync, mkdtempSync, readFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import path from 'node:path';
 import { _electron } from '@playwright/test';
 
@@ -28,7 +28,14 @@ const app = await _electron.launch({
   cwd: process.cwd(),
   // A scratch cache root: the probe must never touch the real one, and the
   // store's layout functions all read this.
-  env: { ...process.env, PI_E2E: '1', PI_E2E_BACKGROUND: '1', PI_DESKTOP_CACHE_DIR: CACHE },
+  env: {
+    ...process.env,
+    PI_E2E: '1',
+    PI_E2E_BACKGROUND: '1',
+    PI_DESKTOP_CACHE_DIR: CACHE,
+    PI_DESKTOP_MODELS_DIR:
+      process.env.PI_DESKTOP_MODELS_DIR ?? path.join(homedir(), 'Bobble', 'Models'),
+  },
 });
 const win = await app.firstWindow();
 await win.waitForLoadState('domcontentloaded');

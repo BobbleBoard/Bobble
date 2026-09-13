@@ -39,7 +39,10 @@ const openBroken = () =>
     ctl.openTab({
       kind: 'file',
       title: 'notes.md',
-      artifact: { filename: 'notes.md', content: { kind: 'text', text: '# notes\n\nkept until reset' } },
+      artifact: {
+        filename: 'notes.md',
+        content: { kind: 'text', text: '# notes\n\nkept until reset' },
+      },
     });
     ctl.openTab({ kind: 'model', title: 'broken.glb', mediaType: 5 });
     return ctl.getState().tabs.length;
@@ -51,7 +54,10 @@ const windowIntact = async (label) => {
     composer: document.querySelector('.pd-composer-editor') !== null,
     sidebar: document.querySelector('[data-testid="sidebar"], .pd-sidebar, nav') !== null,
     card: document.querySelector('[data-testid="canvas-crash"]') !== null,
-    tabs: window.__pi_canvas().getState().tabs.map((t) => t.kind),
+    tabs: window
+      .__pi_canvas()
+      .getState()
+      .tabs.map((t) => t.kind),
   }));
   check(!state.appBoundary, `${label}: the APP boundary took the window`);
   check(state.composer, `${label}: the composer is gone`);
@@ -64,7 +70,10 @@ check(opened === 2, `expected two tabs before the failure, got ${opened}`);
 await page.waitForTimeout(800);
 const first = await windowIntact('after the first failure');
 check(!first.card, 'the first failure should have reset silently, not shown the card');
-check(first.tabs.length === 0, `the reset should have emptied the rail, tabs=${first.tabs.join(',')}`);
+check(
+  first.tabs.length === 0,
+  `the reset should have emptied the rail, tabs=${first.tabs.join(',')}`,
+);
 await shot('1-after-auto-reset');
 
 // 2. Failure again inside the window: the card, the window intact.
@@ -86,7 +95,10 @@ const reopened = await page.evaluate(() => {
   ctl.openTab({
     kind: 'file',
     title: 'after-reset.md',
-    artifact: { filename: 'after-reset.md', content: { kind: 'text', text: 'the canvas works again' } },
+    artifact: {
+      filename: 'after-reset.md',
+      content: { kind: 'text', text: 'the canvas works again' },
+    },
   });
   return ctl.getState().tabs.length;
 });
@@ -99,10 +111,15 @@ check(
 await shot('3-after-reset-usable');
 
 const stacks = errors.filter((e) => e.includes('Bobble canvas error'));
-check(stacks.length >= 2, `expected the canvas boundary to log both failures, saw ${stacks.length}`);
+check(
+  stacks.length >= 2,
+  `expected the canvas boundary to log both failures, saw ${stacks.length}`,
+);
 check(
   errors.every((e) => !/Bobble hit a rendering error|AppErrorBoundary/.test(e)),
   'the app-level boundary logged — the failure escaped the rail',
 );
-console.log(JSON.stringify({ errors: errors.length, canvasLogs: stacks.length, first, second, third }));
+console.log(
+  JSON.stringify({ errors: errors.length, canvasLogs: stacks.length, first, second, third }),
+);
 await finish();

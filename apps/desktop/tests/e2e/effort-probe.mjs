@@ -34,6 +34,9 @@ import { homedir, tmpdir } from 'node:os';
 import path from 'node:path';
 import { launchApp } from './harness.mjs';
 
+/** The real model library, beside the real cache (see harness.mjs REAL_LIBRARY). */
+const REAL_LIBRARY_DEFAULT = path.join(homedir(), 'Bobble', 'Models');
+
 /*
  * A THROWAWAY HOME POINTED AT THE REAL MODEL CACHE.
  *
@@ -62,6 +65,7 @@ const { page, check, finish, shot, shotDir } = await launchApp('effort-probe', {
     PI_BIN: undefined,
     MOCK_PI_FIXTURE: undefined,
     PI_DESKTOP_CACHE_DIR: realCache,
+    PI_DESKTOP_MODELS_DIR: process.env.PI_DESKTOP_MODELS_DIR ?? REAL_LIBRARY_DEFAULT,
   },
   args: ['--', '--piE2E=1'],
   timeout: 60_000,

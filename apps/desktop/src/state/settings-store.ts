@@ -71,6 +71,7 @@ const DEFAULTS: DesktopSettings = {
   advanced: DEFAULT_ADVANCED,
   engineLaunch: {},
   modelSpec: {},
+  modelsRoot: null,
   chatOrg: { projects: [], assignments: {}, pinned: [], titles: {} },
   hideDeleteChatConfirm: false,
   harnessId: 'pi-bundled',
@@ -149,6 +150,7 @@ export const useSettingsStore = create<SettingsStoreState>((set, get) => ({
       },
       engineLaunch: { ...get().settings.engineLaunch, ...patch.engineLaunch },
       modelSpec: { ...get().settings.modelSpec, ...patch.modelSpec },
+      ...(patch.modelsRoot === undefined ? {} : { modelsRoot: patch.modelsRoot }),
     };
     set({ settings: optimistic });
     if (patch.theme !== undefined) applyTheme(optimistic);

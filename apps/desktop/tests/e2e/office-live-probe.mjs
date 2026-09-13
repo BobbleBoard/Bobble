@@ -12,11 +12,14 @@
  * Output: $OUT/{01-deck,02-edit}.png, $OUT/canvas-*.png (the office editor's own
  * capture), $OUT/report.json, and the produced files under the project.
  */
-import { mkdirSync, mkdtempSync, writeFileSync, existsSync, readdirSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, writeFileSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import path from 'node:path';
 import { _electron } from '@playwright/test';
 import { probeHome } from './harness.mjs';
+
+/** The real model library, beside the real cache (see harness.mjs REAL_LIBRARY). */
+const REAL_LIBRARY_DEFAULT = path.join(homedir(), 'Bobble', 'Models');
 
 const MODEL = process.env.MODEL ?? 'qwen3.5-4b-mtp';
 const MODE = process.env.MODE ?? 'bash-cli';
@@ -53,6 +56,7 @@ const app = await _electron.launch({
     ...process.env,
     HOME: home,
     PI_DESKTOP_CACHE_DIR: path.join(homedir(), '.cache', 'pi-desktop'),
+    PI_DESKTOP_MODELS_DIR: process.env.PI_DESKTOP_MODELS_DIR ?? REAL_LIBRARY_DEFAULT,
     PI_E2E: '1',
     PI_E2E_BACKGROUND: '1',
   },
@@ -71,31 +75,49 @@ try {
   win.on('console', (m) => {
     if (m.type() === 'error') errors.push(`[console] ${m.text().slice(0, 600)}`);
   });
-  await win.waitForFunction(() => typeof window.piDesktop?.invoke === 'function', { timeout: 60000 });
+  await win.waitForFunction(() => typeof window.piDesktop?.invoke === 'function', {
+    timeout: 60000,
+  });
   await win.waitForTimeout(1500);
   await win.evaluate((p) => window.piDesktop.invoke('project:set', { path: p }), PROJECT);
   await win.reload();
-  await win.waitForFunction(() => typeof window.piDesktop?.invoke === 'function', { timeout: 60000 });
+  await win.waitForFunction(() => typeof window.piDesktop?.invoke === 'function', {
+    timeout: 60000,
+  });
   await win.waitForTimeout(2000);
-  const up = await win.evaluate((id) => window.piDesktop.invoke('llm:start-server', { modelId: id }), MODEL);
+  const up = await win.evaluate(
+    (id) => window.piDesktop.invoke('llm:start-server', { modelId: id }),
+    MODEL,
+  );
   if (up.success !== true) throw new Error(`llm:start-server: ${up.error}`);
   await win.evaluate((p) => window.piDesktop.invoke('pi:restart', { cwd: p }), PROJECT);
   const models = await win.evaluate(() => window.piDesktop.invoke('pi:get-models', undefined));
   const target = models.models.find((m) => m.provider === 'llamacpp');
-  await win.evaluate((t) => window.piDesktop.invoke('pi:set-model', { provider: t.provider, modelId: t.id }), target);
   await win.evaluate(
-    (id) => window.__settings_store?.().getState?.().update?.({ modelSelection: { mode: 'model', modelId: id } }),
+    (t) => window.piDesktop.invoke('pi:set-model', { provider: t.provider, modelId: t.id }),
+    target,
+  );
+  await win.evaluate(
+    (id) =>
+      window
+        .__settings_store?.()
+        .getState?.()
+        .update?.({ modelSelection: { mode: 'model', modelId: id } }),
     MODEL,
   );
   await win.evaluate(() => window.__modality_store?.().getState().setView('chat'));
-  await win.waitForFunction(() => window.__pi_store().getState().session !== null, { timeout: 60000 });
+  await win.waitForFunction(() => window.__pi_store().getState().session !== null, {
+    timeout: 60000,
+  });
   await win.waitForTimeout(3000);
   say(`model up: ${MODEL}, mode ${MODE}, project ${PROJECT}`);
 
   const ready = () =>
     win.evaluate(() => {
       const s = window.__pi_store().getState();
-      return !s.agent.isStreaming && !s.promptInFlight && s.bgRun?.streaming !== true && !s.resuming;
+      return (
+        !s.agent.isStreaming && !s.promptInFlight && s.bgRun?.streaming !== true && !s.resuming
+      );
     });
   const answerDialogs = async () => {
     const found = await win
@@ -103,8 +125,13 @@ try {
         const dlg = document.querySelector('[role="dialog"], [role="alertdialog"]');
         if (!dlg) return null;
         const title = (dlg.querySelector('h1,h2,h3,[id$="title"]')?.textContent ?? '').trim();
-        const cancel = [...dlg.querySelectorAll('button')].find((b) => /don.?t|cancel|not now|dismiss|deny|^no\b/i.test(b.textContent ?? ''));
-        if (cancel) { cancel.click(); return { title, answered: 'Cancel' }; }
+        const cancel = [...dlg.querySelectorAll('button')].find((b) =>
+          /don.?t|cancel|not now|dismiss|deny|^no\b/i.test(b.textContent ?? ''),
+        );
+        if (cancel) {
+          cancel.click();
+          return { title, answered: 'Cancel' };
+        }
         return { title, answered: null };
       })
       .catch(() => null);
@@ -128,11 +155,19 @@ try {
       for (const m of msgs) {
         if (m.kind === 'assistant') {
           for (const blk of m.blocks ?? []) {
-            if (blk.type === 'toolCall') calls.push({ name: blk.name, args: JSON.stringify(blk.arguments).slice(0, 400) });
-            if (blk.type === 'text' && typeof blk.text === 'string' && blk.text.trim()) text = blk.text.trim();
+            if (blk.type === 'toolCall')
+              calls.push({ name: blk.name, args: JSON.stringify(blk.arguments).slice(0, 400) });
+            if (blk.type === 'text' && typeof blk.text === 'string' && blk.text.trim())
+              text = blk.text.trim();
           }
         }
-        if (m.kind === 'toolResult') results.push({ tool: m.toolName, text: String(m.text ?? '').slice(0, 700), isError: m.isError === true, hasImage: Array.isArray(m.images) && m.images.length > 0 });
+        if (m.kind === 'toolResult')
+          results.push({
+            tool: m.toolName,
+            text: String(m.text ?? '').slice(0, 700),
+            isError: m.isError === true,
+            hasImage: Array.isArray(m.images) && m.images.length > 0,
+          });
       }
       return { calls, results, text: text.slice(0, 600) };
     }, before);
@@ -140,7 +175,15 @@ try {
     win.evaluate(() => {
       const c = window.__pi_canvas?.();
       const s = c?.getState();
-      return { tabs: (s?.tabs ?? []).map((t) => ({ id: t.id, kind: t.kind, title: t.title ?? '', filePath: t.filePath ?? '' })), active: s?.activeTabId ?? null };
+      return {
+        tabs: (s?.tabs ?? []).map((t) => ({
+          id: t.id,
+          kind: t.kind,
+          title: t.title ?? '',
+          filePath: t.filePath ?? '',
+        })),
+        active: s?.activeTabId ?? null,
+      };
     });
 
   let n = 0;
@@ -162,10 +205,16 @@ try {
       const chars = await win.evaluate((b) => {
         const msgs = window.__pi_store().getState().messages.slice(b);
         let c = 0;
-        for (const m of msgs) if (m.kind === 'assistant') for (const blk of m.blocks ?? []) c += blk.type === 'toolCall' ? 1 : (blk.text ?? blk.thinking ?? '').length;
+        for (const m of msgs)
+          if (m.kind === 'assistant')
+            for (const blk of m.blocks ?? [])
+              c += blk.type === 'toolCall' ? 1 : (blk.text ?? blk.thinking ?? '').length;
         return c;
       }, before);
-      if (chars > 0) { ttft = Date.now() - sentAt; break; }
+      if (chars > 0) {
+        ttft = Date.now() - sentAt;
+        break;
+      }
       await new Promise((r) => setTimeout(r, 40));
     }
     say(`${tag}: sent; first token ${ttft ?? 'TIMEOUT'}ms`);
@@ -180,17 +229,41 @@ try {
     const officeTab = canvas.tabs.find((t) => t.kind === 'office');
     let captured = false;
     if (officeTab) {
-      const cap = await win.evaluate((id) => window.piDesktop.invoke('office:capture', { tabId: id }), officeTab.id).catch(() => null);
+      const cap = await win
+        .evaluate((id) => window.piDesktop.invoke('office:capture', { tabId: id }), officeTab.id)
+        .catch(() => null);
       if (cap?.dataUrl) {
-        writeFileSync(path.join(OUT, `canvas-${tag}.png`), Buffer.from(cap.dataUrl.split(',')[1], 'base64'));
+        writeFileSync(
+          path.join(OUT, `canvas-${tag}.png`),
+          Buffer.from(cap.dataUrl.split(',')[1], 'base64'),
+        );
         captured = true;
       }
     }
-    const files = existsSync(path.join(PROJECT, 'docs')) ? readdirSync(path.join(PROJECT, 'docs')) : [];
-    const entry = { id: p.id, finished, seconds, ttft, calls: turn.calls, results: turn.results, text: turn.text, canvas, captured, files, errors: errors.length };
+    const files = existsSync(path.join(PROJECT, 'docs'))
+      ? readdirSync(path.join(PROJECT, 'docs'))
+      : [];
+    const entry = {
+      id: p.id,
+      finished,
+      seconds,
+      ttft,
+      calls: turn.calls,
+      results: turn.results,
+      text: turn.text,
+      canvas,
+      captured,
+      files,
+      errors: errors.length,
+    };
     report.turns.push(entry);
-    say(`${tag}: ${finished ? 'done' : 'TIMEOUT'} in ${seconds}s; calls=${turn.calls.map((c) => c.name).join(',')}; files=${files.join(',')}; canvas=${canvas.tabs.map((t) => t.kind).join(',')}; capture=${captured}`);
-    for (const r of turn.results) say(`   result[${r.tool}${r.isError ? ' ERROR' : ''}]: ${r.text.replace(/\n/g, ' ⏎ ').slice(0, 300)}`);
+    say(
+      `${tag}: ${finished ? 'done' : 'TIMEOUT'} in ${seconds}s; calls=${turn.calls.map((c) => c.name).join(',')}; files=${files.join(',')}; canvas=${canvas.tabs.map((t) => t.kind).join(',')}; capture=${captured}`,
+    );
+    for (const r of turn.results)
+      say(
+        `   result[${r.tool}${r.isError ? ' ERROR' : ''}]: ${r.text.replace(/\n/g, ' ⏎ ').slice(0, 300)}`,
+      );
     say(`   reply: ${turn.text.replace(/\n/g, ' ').slice(0, 300)}`);
   }
 } catch (err) {

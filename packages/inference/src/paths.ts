@@ -6,6 +6,7 @@
  *
  * This module imports nothing electron-specific; `homedir()` is plain Node.
  */
+import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
@@ -54,12 +55,43 @@ export function llamacppDir(tag: string): string {
   return join(cacheRoot(), 'llamacpp', tag);
 }
 
-/** Directory holding downloaded GGUF model files. */
+/**
+ * THE MODEL LIBRARY ROOT — `~/Bobble/Models`, a folder a person can open.
+ *
+ * the user (2026-09-12): "all models and such are dumped in .cache … let's not be
+ * like that." Weights live here now, sorted by what they make (see
+ * @pi-desktop/model-store's library.ts for the shelves); the support root
+ * above keeps engines, venvs and scratch. `PI_DESKTOP_MODELS_DIR` overrides it
+ * — the app sets it from the storage setting before anything reads a path,
+ * and a probe points it at the real library while keeping a throwaway HOME.
+ */
+export function libraryRoot(): string {
+  const override = process.env.PI_DESKTOP_MODELS_DIR;
+  if (override !== undefined && override.length > 0) return override;
+  return join(homedir(), 'Bobble', 'Models');
+}
+
+/** Where chat models (GGUF + drafters + mmproj) live: `<library>/LLM`. */
 export function modelsDir(): string {
+  return join(libraryRoot(), 'LLM');
+}
+
+/** The pre-library location of the same thing, read while a cache is unmigrated. */
+export function legacyModelsDir(): string {
   return join(cacheRoot(), 'models');
 }
 
-/** Per-model subdirectory keyed by catalog id (files + siblings live together). */
+/**
+ * Per-model subdirectory keyed by catalog id (files + siblings live together).
+ * The library shelf, unless only the legacy cache holds it — a cache the
+ * migration has not reached yet, or a probe pointed at the old tree.
+ */
 export function modelDir(modelId: string): string {
-  return join(modelsDir(), modelId);
+  // A tool's model rather than a chat model goes on its own shelf: OmniSVG
+  // makes vectors, and belongs under Image/Vector like everything that does.
+  const shelf = /^omnisvg/i.test(modelId) ? join(libraryRoot(), 'Image', 'Vector') : modelsDir();
+  const here = join(shelf, modelId);
+  if (existsSync(here)) return here;
+  const legacy = join(legacyModelsDir(), modelId);
+  return existsSync(legacy) ? legacy : here;
 }

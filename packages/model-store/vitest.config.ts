@@ -7,5 +7,6 @@ export default defineConfig({
     // user's real cache — every test passes its own root.
     environment: 'node',
     include: ['src/**/*.test.ts'],
+    setupFiles: ['../shared/vitest.library-guard.ts'],
   },
 });

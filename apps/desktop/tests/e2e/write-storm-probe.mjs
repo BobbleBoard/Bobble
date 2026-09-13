@@ -56,7 +56,7 @@ try {
   await win.waitForFunction(() => typeof window.__pi_store === 'function', { timeout: 60000 });
   await win.waitForTimeout(1500);
   win.on('console', (msg) => {
-    if (msg.type() === "error") errors.push(`renderer: ${msg.text().slice(0, 4000)}`);
+    if (msg.type() === 'error') errors.push(`renderer: ${msg.text().slice(0, 4000)}`);
   });
   const editor = win.locator('[contenteditable="true"]').first();
   await editor.click();
@@ -92,9 +92,12 @@ try {
     const st = await win.evaluate(() => {
       const s = window.__pi_store().getState();
       let n = 0;
-      for (const m of s.messages)
-        if (m.kind === 'toolResult') n += 1;
-      return { results: n, streaming: s.agent.isStreaming, tab: document.querySelector('[data-testid="canvas-tab"]')?.textContent ?? null };
+      for (const m of s.messages) if (m.kind === 'toolResult') n += 1;
+      return {
+        results: n,
+        streaming: s.agent.isStreaming,
+        tab: document.querySelector('[data-testid="canvas-tab"]')?.textContent ?? null,
+      };
     });
     if (st.results !== writes) {
       writes = st.results;

@@ -13,6 +13,9 @@ import path from 'node:path';
 import { _electron } from '@playwright/test';
 import { probeHome } from './harness.mjs';
 
+/** The real model library, beside the real cache (see harness.mjs REAL_LIBRARY). */
+const REAL_LIBRARY_DEFAULT = path.join(homedir(), 'Bobble', 'Models');
+
 const MODEL = process.env.MODEL ?? 'qwen3.5-4b-mtp';
 const PROJECT = process.env.PROJECT ?? '/tmp/canvas-assess/project';
 const OUT = process.env.OUT ?? '/tmp/canvas-assess/compact';
@@ -27,6 +30,7 @@ const app = await _electron.launch({
     ...process.env,
     HOME: home,
     PI_DESKTOP_CACHE_DIR: path.join(homedir(), '.cache', 'pi-desktop'),
+    PI_DESKTOP_MODELS_DIR: process.env.PI_DESKTOP_MODELS_DIR ?? REAL_LIBRARY_DEFAULT,
     PI_E2E: '1',
     PI_E2E_BACKGROUND: '1',
   },
@@ -38,20 +42,39 @@ try {
   win.on('console', (m) => {
     if (m.type() === 'error') errors.push(`[console] ${m.text()}`);
   });
-  await win.waitForFunction(() => typeof window.piDesktop?.invoke === 'function', { timeout: 60000 });
+  await win.waitForFunction(() => typeof window.piDesktop?.invoke === 'function', {
+    timeout: 60000,
+  });
   await win.evaluate((p) => window.piDesktop.invoke('project:set', { path: p }), PROJECT);
   await win.reload();
-  await win.waitForFunction(() => typeof window.piDesktop?.invoke === 'function', { timeout: 60000 });
+  await win.waitForFunction(() => typeof window.piDesktop?.invoke === 'function', {
+    timeout: 60000,
+  });
   await win.waitForTimeout(2000);
-  const up = await win.evaluate((id) => window.piDesktop.invoke('llm:start-server', { modelId: id }), MODEL);
+  const up = await win.evaluate(
+    (id) => window.piDesktop.invoke('llm:start-server', { modelId: id }),
+    MODEL,
+  );
   if (up.success !== true) throw new Error(`llm:start-server: ${up.error}`);
   await win.evaluate((p) => window.piDesktop.invoke('pi:restart', { cwd: p }), PROJECT);
   const models = await win.evaluate(() => window.piDesktop.invoke('pi:get-models', undefined));
   const target = models.models.find((m) => m.provider === 'llamacpp');
-  await win.evaluate((t) => window.piDesktop.invoke('pi:set-model', { provider: t.provider, modelId: t.id }), target);
-  await win.evaluate((id) => window.__settings_store?.().getState?.().update?.({ modelSelection: { mode: 'model', modelId: id } }), MODEL);
+  await win.evaluate(
+    (t) => window.piDesktop.invoke('pi:set-model', { provider: t.provider, modelId: t.id }),
+    target,
+  );
+  await win.evaluate(
+    (id) =>
+      window
+        .__settings_store?.()
+        .getState?.()
+        .update?.({ modelSelection: { mode: 'model', modelId: id } }),
+    MODEL,
+  );
   await win.evaluate(() => window.__modality_store?.().getState().setView('chat'));
-  await win.waitForFunction(() => window.__pi_store().getState().session !== null, { timeout: 60000 });
+  await win.waitForFunction(() => window.__pi_store().getState().session !== null, {
+    timeout: 60000,
+  });
   await win.waitForTimeout(2500);
 
   const ready = () =>
@@ -73,24 +96,37 @@ try {
     await editor.click();
     await win.keyboard.type(text, { delay: 4 });
     await win.keyboard.press('Enter');
-    await win.waitForFunction((b) => window.__pi_store().getState().messages.length > b, before, { timeout: 45000 }).catch(() => {});
+    await win
+      .waitForFunction((b) => window.__pi_store().getState().messages.length > b, before, {
+        timeout: 45000,
+      })
+      .catch(() => {});
     const ok = await waitReady(240000);
     say(`turn done=${ok}: ${text.slice(0, 40)}`);
   };
 
   await send('Run `ls -la ./data` and `wc -l ./data/*.json`, then tell me the line counts.');
   await send('Now run `head -c 400 ./data/users.json` and `python3 -c "print(sum(range(100)))"`.');
-  const tabs1 = await win.evaluate(() => window.__pi_canvas().getState().tabs.map((t) => t.kind));
+  const tabs1 = await win.evaluate(() =>
+    window
+      .__pi_canvas()
+      .getState()
+      .tabs.map((t) => t.kind),
+  );
   say(`tabs before compaction: ${JSON.stringify(tabs1)} errors=${errors.length}`);
   const res = await win.evaluate(() => window.piDesktop.invoke('pi:compact', undefined));
   say(`compact: ${JSON.stringify(res)}`);
   await waitReady(180000);
   await win.waitForTimeout(2000);
   await win.screenshot({ path: path.join(OUT, 'after-compact.png') });
-  say(`after compaction: errors=${errors.length} msgs=${await win.evaluate(() => window.__pi_store().getState().messages.length)}`);
+  say(
+    `after compaction: errors=${errors.length} msgs=${await win.evaluate(() => window.__pi_store().getState().messages.length)}`,
+  );
   await send('Run `ls ./docs` and tell me how many files there are.');
   await win.waitForTimeout(1500);
-  const boundary = await win.evaluate(() => document.body.innerText.includes('rendering error')).catch(() => true);
+  const boundary = await win
+    .evaluate(() => document.body.innerText.includes('rendering error'))
+    .catch(() => true);
   await win.screenshot({ path: path.join(OUT, 'final.png') });
   say(`final: boundary=${boundary} errors=${errors.length}`);
 } finally {

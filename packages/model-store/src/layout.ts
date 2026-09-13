@@ -29,8 +29,11 @@
  * directory is legible from the outside and two orgs can publish the same model
  * name without colliding.
  */
+import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { libraryRoot, shelfDir, shelfFor } from './library.js';
+import type { ModelTask } from './manifest.js';
 
 /** What a model MAKES — the axis the whole app filters and groups on. */
 export type ModelKind = 'text' | 'image' | 'video' | 'audio' | '3d';
@@ -46,7 +49,10 @@ export function cacheRoot(): string {
   return join(homedir(), '.cache', 'pi-desktop');
 }
 
-/** Root of the unified store — everything downloaded from here on. */
+/**
+ * Root of the LEGACY store (`<cache>/store`), read while a machine has not
+ * been migrated. New entries go to the library shelves — see `entryDir`.
+ */
 export function storeRoot(root = cacheRoot()): string {
   return join(root, 'store');
 }
@@ -69,9 +75,39 @@ export function slugFor(repo: string): string {
     .replace(/^-+|-+$/g, '');
 }
 
-/** The canonical directory for a newly downloaded model. */
-export function entryDir(kind: ModelKind, repo: string, root = cacheRoot()): string {
-  return join(storeRoot(root), kind, slugFor(repo));
+/**
+ * The canonical directory for a downloaded repo: its shelf in the library
+ * (`<library>/LLM/MLX/<slug>`, `<library>/Video/Generation/<slug>`, …), chosen
+ * from what it makes — unless only the legacy store still holds it.
+ *
+ * `root` is the LEGACY cache root (kept for callers and tests that pin it);
+ * `hint.library` pins the library root the same way.
+ */
+export function entryDir(
+  kind: ModelKind,
+  repo: string,
+  root = cacheRoot(),
+  hint: {
+    readonly tasks?: readonly ModelTask[];
+    readonly family?: string;
+    readonly library?: string;
+  } = {},
+): string {
+  const slug = slugFor(repo);
+  // A text REPO is an MLX twin or an MTP head — the LLM shelf's own sub-shelf;
+  // the GGUF catalog entries own `LLM/<id>` themselves.
+  const shelf =
+    kind === 'text'
+      ? 'LLM/MLX'
+      : shelfFor(kind, {
+          repo,
+          ...(hint.tasks === undefined ? {} : { tasks: hint.tasks }),
+          ...(hint.family === undefined ? {} : { family: hint.family }),
+        });
+  const here = join(shelfDir(shelf, hint.library ?? libraryRoot()), slug);
+  if (existsSync(here)) return here;
+  const legacy = join(storeRoot(root), kind, slug);
+  return existsSync(legacy) ? legacy : here;
 }
 
 /** The manifest path inside a model's directory. */
