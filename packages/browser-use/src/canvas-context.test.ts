@@ -2,7 +2,9 @@ import type { ExtensionAPI } from '@mariozechner/pi-coding-agent';
 import { describe, expect, it } from 'vitest';
 import {
   buildCanvasContext,
+  CANVAS_BLOCK_ENTRY,
   CANVAS_STATE_OPEN,
+  CanvasBlockLedger,
   type CanvasContextMessage,
   type CanvasStateSource,
   formatCanvasSummary,
@@ -12,8 +14,9 @@ import {
 } from './canvas-context.js';
 import type { CanvasState } from './protocol.js';
 
-const userMsg = (text: string): CanvasContextMessage =>
-  ({ role: 'user', content: text, timestamp: 0 }) as CanvasContextMessage;
+let clock = 1000;
+const userMsg = (text: string, at?: number): CanvasContextMessage =>
+  ({ role: 'user', content: text, timestamp: at ?? clock++ }) as CanvasContextMessage;
 const asstMsg = (text: string): CanvasContextMessage =>
   ({ role: 'assistant', content: [{ type: 'text', text }], timestamp: 0 }) as CanvasContextMessage;
 
@@ -128,8 +131,10 @@ describe('buildCanvasContext', () => {
   });
 
   it('dedupes across calls (feeding its own output re-yields one block)', async () => {
-    const first = (await buildCanvasContext(source(BROWSER), [userMsg('go')]))?.messages ?? [];
-    const second = (await buildCanvasContext(source(BROWSER), first))?.messages ?? [];
+    const ledger = new CanvasBlockLedger();
+    const first =
+      (await buildCanvasContext(source(BROWSER), [userMsg('go')], ledger))?.messages ?? [];
+    const second = (await buildCanvasContext(source(BROWSER), first, ledger))?.messages ?? [];
     expect(second.filter(isCanvasStateMessage)).toHaveLength(1);
   });
 
@@ -138,19 +143,81 @@ describe('buildCanvasContext', () => {
     expect(res).toBeUndefined();
   });
 
-  it('strips a stale block when the canvas goes empty', async () => {
-    const withBlock = withCanvasBlock(
-      [userMsg('go')],
-      `${CANVAS_STATE_OPEN}\nold\n</canvas_state>`,
-    );
-    const res = await buildCanvasContext(source({ active: null, others: [] }), withBlock);
-    expect(res).toBeDefined();
-    expect(res?.messages.some(isCanvasStateMessage)).toBe(false);
-  });
-
   it('never throws — a bridge failure yields no change', async () => {
     const res = await buildCanvasContext(source(null, { throws: true }), [userMsg('go')]);
     expect(res).toBeUndefined();
+  });
+
+  /*
+   * THE PREFIX-CACHE PROPERTY. MEASURED 2026-09-13 (prompt-diff on llama.cpp
+   * and rapid-mlx): with the block stripped and re-read before every call, the
+   * previous user message changed between turns and the whole previous turn
+   * was prefilled again. A turn's block is read once and stays.
+   */
+  it('a turn keeps the block it was given, byte for byte, on every later call', async () => {
+    const ledger = new CanvasBlockLedger();
+    const turn1 = [userMsg('go', 1)];
+    const first = (await buildCanvasContext(source(BROWSER), turn1, ledger))?.messages ?? [];
+    const block1 = first[0];
+    // Mid-turn the canvas changed (the agent opened a terminal) — the turn's
+    // block does not.
+    const changed: CanvasState = { active: { kind: 'terminal', cwd: '~/x' }, others: [] };
+    const mid = (await buildCanvasContext(source(changed), [...turn1, asstMsg('working')], ledger))
+      ?.messages;
+    expect(mid?.[0]).toEqual(block1);
+    // Next turn: the old turn is still identical; the new turn gets the new state.
+    const turn2 = [...turn1, asstMsg('done'), userMsg('and now?', 2)];
+    const next = (await buildCanvasContext(source(changed), turn2, ledger))?.messages ?? [];
+    expect(next[0]).toEqual(block1);
+    expect(JSON.stringify(next[2])).toContain('Terminal');
+    expect(next.filter(isCanvasStateMessage)).toHaveLength(2);
+  });
+
+  it('a turn that saw an empty canvas never grows a block later', async () => {
+    const ledger = new CanvasBlockLedger();
+    const turn = [userMsg('go', 7)];
+    expect(
+      await buildCanvasContext(source({ active: null, others: [] }), turn, ledger),
+    ).toBeUndefined();
+    // Something opened mid-turn: still nothing for this turn.
+    expect(
+      await buildCanvasContext(source(BROWSER), [...turn, asstMsg('hm')], ledger),
+    ).toBeUndefined();
+  });
+
+  it('a stale block in the messages is replaced by the ledger, never doubled', async () => {
+    const ledger = new CanvasBlockLedger();
+    const withOld = withCanvasBlock(
+      [userMsg('go', 9)],
+      `${CANVAS_STATE_OPEN}\nold\n</canvas_state>`,
+    );
+    const res = await buildCanvasContext(source(BROWSER), withOld, ledger);
+    const blocks = res?.messages.filter(isCanvasStateMessage) ?? [];
+    expect(blocks).toHaveLength(1);
+    expect(JSON.stringify(blocks[0])).toContain('Sandboxels');
+    expect(JSON.stringify(blocks[0])).not.toContain('old');
+  });
+
+  it('the ledger restores from the session and hands out what to persist', async () => {
+    const ledger = new CanvasBlockLedger();
+    await buildCanvasContext(source(BROWSER), [userMsg('go', 11)], ledger);
+    const records = ledger.drain();
+    expect(records).toHaveLength(1);
+    expect(records[0]?.at).toBe(11);
+    expect(ledger.drain()).toHaveLength(0);
+    const reloaded = new CanvasBlockLedger();
+    reloaded.restore([
+      { type: 'custom', customType: CANVAS_BLOCK_ENTRY, data: records[0] },
+      { type: 'custom', customType: 'other', data: { at: 12, block: 'x' } },
+    ]);
+    // Same turn, no canvas read (a source that throws would otherwise yield '').
+    const res = await buildCanvasContext(
+      source(null, { throws: true }),
+      [userMsg('go', 11)],
+      reloaded,
+    );
+    expect(JSON.stringify(res?.messages[0])).toContain('Sandboxels');
+    expect(reloaded.has(12)).toBe(false);
   });
 });
 

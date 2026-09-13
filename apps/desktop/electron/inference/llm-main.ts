@@ -237,7 +237,12 @@ export function getInferenceUtility(): { baseUrl: string; model: string } | null
   ) {
     return null;
   }
-  return { baseUrl: lastStatus.baseUrl, model: lastStatus.model?.id ?? 'utility' };
+  // The id the server answers to — on an external engine that is the served
+  // name, not the catalog id (rapid-mlx 404s on the catalog id).
+  return {
+    baseUrl: lastStatus.baseUrl,
+    model: lastStatus.servedModelId ?? lastStatus.model?.id ?? 'utility',
+  };
 }
 
 /** The model the coordination harness starts when none is already running (the

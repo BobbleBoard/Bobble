@@ -348,6 +348,14 @@ export interface LlmStatus {
    */
   profile?: { engine: string; spec: string };
   provider?: 'llamacpp' | 'mlx';
+  /**
+   * The model id the running server answers to — `<catalog id>@<engine>` on an
+   * external engine (`--served-model-name`), or the path it was given (dflash,
+   * mlx-dspark, mlx-lm). The utility endpoint (warm-up, titler, reviewer) must
+   * send THIS: MEASURED 2026-09-13, rapid-mlx answered 404 to the catalog id and
+   * the warm-up silently never primed an MLX engine.
+   */
+  servedModelId?: string;
   /** A calibration is running: the server is being swapped in and out. */
   calibrating?: boolean;
   /**

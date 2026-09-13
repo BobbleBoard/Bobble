@@ -1,26 +1,34 @@
 /**
- * Canvas-awareness — inject "what is on the canvas RIGHT NOW" into the model's
- * context before every LLM call (the user's gotcha: the model must always know what
- * the user is looking at).
+ * Canvas-awareness — inject "what is on the canvas" into the model's context
+ * (the user's gotcha: the model must always know what the user is looking at).
  *
  * pi's `context` hook (`ContextEvent { messages }` → `{ messages? }`) fires
  * before each LLM call and returns a NON-destructive replacement message list —
  * the persisted session is untouched (same seam the web-tools image sanitizer
- * uses). On each call we fetch the compact {@link CanvasState} MAIN caches (over
- * the existing browser-agent socket) and append a small `<canvas_state>` block
- * as the LAST message, STRIPPING any prior block first so it never accumulates.
+ * uses). The compact {@link CanvasState} MAIN caches (over the existing
+ * browser-agent socket) is rendered as a small `<canvas_state>` block and
+ * merged into the user's turn.
  *
- * Why APPEND (not prepend): llama-server keys its prompt KV cache on the longest
- * common prefix. Keeping the volatile canvas text at the TAIL means the stable
- * prefix (system + history) is reused turn-to-turn; only the short tail is
- * recomputed (round-10 #8).
+ * ONE BLOCK PER USER TURN, AND IT STAYS. The block is read once, at the first
+ * LLM call after a user message, and that exact text is attached to that
+ * message on every later call — this turn's tool steps and every turn after.
+ * It used to be stripped and re-read before every call ("refreshed every
+ * turn"), which MEASURED (2026-09-13, prompt-diff over consecutive requests on
+ * llama.cpp and rapid-mlx) as the conversation tail re-prefilling on every
+ * turn: the previous user message lost its block, so the prefix cache matched
+ * only up to that message's own text and the whole previous turn — reply, tool
+ * calls, results — was computed again. Kept where it was, the history is
+ * byte-identical turn to turn and only the new turn is new. It also stops the
+ * model chasing its own reflection mid-turn (the surfaces it opens itself
+ * appearing as "the user is looking at" between two tool calls).
+ *
+ * The blocks live in a {@link CanvasBlockLedger} (keyed by the user message's
+ * timestamp), persisted as custom session entries so a reload renders the same
+ * bytes.
  *
  * `Message` has no `system` role (system is a separate `systemPrompt`), so the
- * block rides in a trailing `user`-role message — the "ephemeral trailing block"
- * the design calls for.
- *
- * Kept structural (no pi imports beyond the event type) so it unit-tests in
- * plain Node.
+ * block rides in the user's own turn. Structural (no pi imports beyond the
+ * event type) so it unit-tests in plain Node.
  */
 import type { ContextEvent, ExtensionAPI } from '@mariozechner/pi-coding-agent';
 import type { CanvasState, CanvasSurfaceState } from './protocol.js';
@@ -261,35 +269,145 @@ export function stripCanvasBlock(
   return out;
 }
 
+/** The custom session entry a turn's block is persisted under. */
+export const CANVAS_BLOCK_ENTRY = 'bobble-canvas-block';
+
+/** A persisted block: which user turn (its timestamp) said what. */
+export interface CanvasBlockRecord {
+  readonly at: number;
+  /** '' = that turn had nothing on the canvas (and gets no block, ever). */
+  readonly block: string;
+}
+
+/** The shape of a session entry this module reads back (structural). */
+interface EntryLike {
+  readonly type?: string;
+  readonly customType?: string;
+  readonly data?: unknown;
+}
+
 /**
- * Compute the context-hook result for one LLM call: fetch the canvas state and
- * return the message list to use, or `undefined` for "no change" (so pi keeps
- * the original array and the KV cache is untouched). Pure + injectable for tests.
+ * What each user turn was told about the canvas, so that turn renders the same
+ * bytes on every later request. Kept per session; restored from the session's
+ * custom entries on `session_start`; new records are handed to `persist` as they
+ * are made.
+ */
+export class CanvasBlockLedger {
+  private readonly byTurn = new Map<number, string>();
+  private readonly pending: CanvasBlockRecord[] = [];
+
+  /** Forget everything (a session switch) and take the records `entries` carry. */
+  restore(entries: readonly EntryLike[]): void {
+    this.byTurn.clear();
+    this.pending.length = 0;
+    for (const e of entries) {
+      if (e.type !== 'custom' || e.customType !== CANVAS_BLOCK_ENTRY) continue;
+      const d = e.data as Partial<CanvasBlockRecord> | undefined;
+      if (typeof d?.at === 'number' && typeof d.block === 'string') this.byTurn.set(d.at, d.block);
+    }
+  }
+
+  has(at: number): boolean {
+    return this.byTurn.has(at);
+  }
+
+  get(at: number): string | undefined {
+    return this.byTurn.get(at);
+  }
+
+  set(at: number, block: string): void {
+    this.byTurn.set(at, block);
+    this.pending.push({ at, block });
+  }
+
+  /** Records made since the last drain — what to persist. */
+  drain(): CanvasBlockRecord[] {
+    return this.pending.splice(0);
+  }
+}
+
+/** A message's timestamp, the key a turn's block is kept under. */
+function turnKey(msg: CanvasContextMessage): number | undefined {
+  const t = (msg as { timestamp?: unknown }).timestamp;
+  return typeof t === 'number' && Number.isFinite(t) ? t : undefined;
+}
+
+/**
+ * Compute the context-hook result for one LLM call: every user turn carries
+ * the block it was given (from the ledger), and the LAST user turn gets one
+ * now if it has none yet — read from the canvas once, then remembered.
+ * Returns `undefined` for "no change" (so pi keeps the original array).
+ * Pure apart from the ledger + source; injectable for tests.
  */
 export async function buildCanvasContext(
   source: CanvasStateSource,
   messages: readonly CanvasContextMessage[],
+  ledger: CanvasBlockLedger = new CanvasBlockLedger(),
 ): Promise<{ messages: CanvasContextMessage[] } | undefined> {
-  let state: CanvasState | null;
-  try {
-    state = await source.getCanvasState();
-  } catch {
-    state = null;
+  // Defensive: a block that somehow persisted (an old session) is replaced by
+  // the ledger's copy or dropped, never doubled.
+  const kept = stripCanvasBlock(messages);
+  let lastUser = -1;
+  for (let i = kept.length - 1; i >= 0; i--) {
+    if ((kept[i] as { role?: unknown }).role === 'user') {
+      lastUser = i;
+      break;
+    }
   }
-  const block = state !== null ? formatCanvasSummary(state) : null;
-  if (block === null) {
-    // Nothing (new) to say. Only touch the list if a stale block lingers.
-    return messages.some(isCanvasStateMessage)
-      ? { messages: stripCanvasBlock(messages) }
-      : undefined;
+  if (lastUser === -1) return undefined;
+
+  const last = kept[lastUser] as CanvasContextMessage;
+  const key = turnKey(last);
+  if (key !== undefined && !ledger.has(key)) {
+    let state: CanvasState | null;
+    try {
+      state = await source.getCanvasState();
+    } catch {
+      state = null;
+    }
+    ledger.set(key, (state !== null ? formatCanvasSummary(state) : null) ?? '');
   }
-  return { messages: withCanvasBlock(messages, block) };
+
+  let changed = false;
+  const out = kept.map((msg) => {
+    if ((msg as { role?: unknown }).role !== 'user') return msg;
+    const k = turnKey(msg);
+    const block = k === undefined ? undefined : ledger.get(k);
+    if (block === undefined || block === '') return msg;
+    changed = true;
+    return appendBlock(msg, block);
+  });
+  // A turn without a timestamp (a programmatic caller) still gets a fresh read.
+  if (key === undefined) {
+    let state: CanvasState | null;
+    try {
+      state = await source.getCanvasState();
+    } catch {
+      state = null;
+    }
+    const block = state !== null ? formatCanvasSummary(state) : null;
+    if (block !== null) {
+      out[lastUser] = appendBlock(out[lastUser] as CanvasContextMessage, block);
+      changed = true;
+    }
+  }
+  return changed ? { messages: out } : undefined;
 }
 
 /**
  * Register the canvas-awareness `context` hook. Safe to call only when a bridge
- * exists (inside Pi Desktop); outside it there is nothing to report.
+ * exists (inside Pi Desktop); outside it there is nothing to report. The ledger
+ * is restored from the session on `session_start` and its new records are
+ * appended as custom entries when the turn ends.
  */
 export function registerCanvasContext(pi: ExtensionAPI, source: CanvasStateSource): void {
-  pi.on('context', (event) => buildCanvasContext(source, event.messages));
+  const ledger = new CanvasBlockLedger();
+  pi.on('session_start', (_event, ctx) => {
+    const sm = ctx.sessionManager as { getEntries?: () => readonly EntryLike[] } | undefined;
+    ledger.restore(sm?.getEntries?.() ?? []);
+  });
+  pi.on('context', (event) => buildCanvasContext(source, event.messages, ledger));
+  pi.on('agent_end', () => {
+    for (const record of ledger.drain()) pi.appendEntry(CANVAS_BLOCK_ENTRY, record);
+  });
 }

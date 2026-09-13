@@ -75,6 +75,8 @@ const onLog = (d) => {
 app.process().stdout?.on('data', onLog);
 app.process().stderr?.on('data', onLog);
 const results = [];
+/** Every distinct task the llama.cpp slot ran, with its cache stats. */
+const slotLog = [];
 try {
   const win = await app.firstWindow();
   await win.waitForFunction(() => typeof window.__pi_store === 'function', { timeout: 60000 });
@@ -124,6 +126,9 @@ try {
           .slice(0, 200),
         tools: (m.blocks ?? []).filter((b) => b.kind === 'toolCall' || b.type === 'toolCall')
           .length,
+        thoughts: (m.blocks ?? [])
+          .filter((b) => b.type === 'thinking')
+          .reduce((n, b) => n + (b.thinking ?? '').length, 0),
         error: m.errorMessage ?? null,
       }));
     });
@@ -156,10 +161,20 @@ try {
           const res = await fetch(url);
           const slots = await res.json();
           for (const slot of slots) {
-            const key = `${slot.id}|${slot.id_task}|${slot.n_prompt_tokens}|${slot.n_prompt_tokens_processed}`;
-            if (key !== last && slot.n_prompt_tokens > 0) {
+            // b10603: `n_prompt_tokens_processed` (prefilled this task) and
+            // `n_prompt_tokens_cache` (taken from the slot's cache) are the
+            // task's stats; `n_prompt_tokens` is the whole cached sequence.
+            const processed = slot.n_prompt_tokens_processed ?? 0;
+            const cached = slot.n_prompt_tokens_cache ?? 0;
+            const key = `${slot.id}|${slot.id_task}|${processed}|${cached}`;
+            if (key !== last && processed + cached > 0) {
               last = key;
-              sink.push({ total: slot.n_prompt_tokens, processed: slot.n_prompt_tokens_processed });
+              sink.push({ total: processed + cached, processed, cached });
+              // Every distinct task the slot ran, for the log: a prime, a
+              // titler or a warm-up between two turns shows up here.
+              slotLog.push(
+                `${new Date().toISOString().slice(11, 23)} task=${slot.id_task} processed=${processed} cached=${cached} seq=${slot.n_prompt_tokens}`,
+              );
             }
           }
         } catch {
@@ -268,11 +283,17 @@ try {
       stop.done = true;
       if (watcher !== null) await watcher;
       // The biggest prompt this turn sent, and how much of it was already there.
-      const biggest = slotSink.reduce((a, b) => (b.total > (a?.total ?? 0) ? b : a), null);
-      const reuse =
-        biggest === null
-          ? null
-          : { total: biggest.total, reused: biggest.total - biggest.processed };
+      // The slot's LAST word on this turn's prefill: the biggest prompt, and of
+      // its samples the one with the most processed (the count grows while the
+      // prefill runs; the first sample is taken before it has done anything).
+      const biggest = slotSink.reduce(
+        (a, b) =>
+          a === null || b.total > a.total || (b.total === a.total && b.processed > a.processed)
+            ? b
+            : a,
+        null,
+      );
+      const reuse = biggest === null ? null : { total: biggest.total, reused: biggest.cached };
       const after = await messages();
       const fresh = after.slice(before.length);
       const assistant = fresh.filter((m) => m.kind === 'assistant');
@@ -282,6 +303,7 @@ try {
         .trim();
       const error = fresh.map((m) => m.error).find((e) => e !== null) ?? null;
       const tools = fresh.reduce((n, m) => n + m.tools, 0);
+      const thoughts = fresh.reduce((n, m) => n + (m.thoughts ?? 0), 0);
       const lines = mainLog
         .slice(beforeLog)
         .filter((l) =>
@@ -318,6 +340,7 @@ try {
         text: text.slice(0, 160),
         error,
         tools,
+        thoughts,
         rawTag,
         reuse: reuse ?? engineReuse,
         lines,
@@ -325,7 +348,7 @@ try {
       row.turns.push(t);
       const rr = t.reuse;
       log(
-        `  ${turn.id.padEnd(6)} ttft=${ttft === null ? 'NONE' : `${ttft}ms`} total=${total}ms tools=${tools}${
+        `  ${turn.id.padEnd(6)} ttft=${ttft === null ? 'NONE' : `${ttft}ms`} total=${total}ms tools=${tools} thought=${thoughts}ch${
           rr === null ? '' : ` prompt=${rr.total} reused=${rr.reused}`
         } ${
           error !== null
@@ -338,12 +361,19 @@ try {
         log('  (turn did not finish — moving on)');
         break;
       }
+      // Watch the slot through the gap too: what runs between two turns is
+      // exactly what can evict the conversation before the next one.
+      const gapStop = { done: false };
+      const gapWatch = slotsUrl === null ? null : watchSlots(slotsUrl, [], gapStop);
       await win.waitForTimeout(1500);
+      gapStop.done = true;
+      if (gapWatch !== null) await gapWatch;
     }
   }
 } finally {
   writeFileSync(path.join(OUT, 'engine-matrix.json'), JSON.stringify(results, null, 2));
   writeFileSync(path.join(OUT, 'main.log'), mainLog.join('\n'));
+  writeFileSync(path.join(OUT, 'slots.log'), slotLog.join('\n'));
   await app.close().catch(() => {});
 }
 console.log('\n=== SUMMARY ===');
@@ -352,8 +382,8 @@ for (const r of results) {
     .map(
       (t) =>
         `${t.id}:${t.error !== null ? 'ERR' : t.ttft === null ? 'none' : `${t.ttft}ms`}${t.tools > 0 ? '+tool' : ''}${
-          t.reuse ? `(${t.reuse.reused}/${t.reuse.total})` : ''
-        }${t.rawTag ? '!RAW' : ''}`,
+          (t.thoughts ?? 0) > 0 ? '+think' : ''
+        }${t.reuse ? `(${t.reuse.reused}/${t.reuse.total})` : ''}${t.rawTag ? '!RAW' : ''}`,
     )
     .join(' ');
   console.log(

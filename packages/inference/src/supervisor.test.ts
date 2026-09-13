@@ -161,8 +161,11 @@ describe('assembleServerArgs', () => {
   it('adds --reasoning-preserve by default and omits it when disabled', () => {
     const on = assembleServerArgs({ ...base, launchMode: 'fast-text' });
     expect(on).toContain('--reasoning-preserve');
+    // …and the same switch under the name Ling's template reads.
+    expect(on[on.indexOf('--chat-template-kwargs') + 1]).toBe('{"preserved_thinking":true}');
     const off = assembleServerArgs({ ...base, launchMode: 'fast-text', reasoningPreserve: false });
     expect(off).not.toContain('--reasoning-preserve');
+    expect(off).not.toContain('--chat-template-kwargs');
   });
 
   it('defaults reasoning budget to unrestricted (-1) with the wrap-up message', () => {

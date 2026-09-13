@@ -334,6 +334,20 @@ interface HarnessRuntime {
   currentCtx: ExtensionContext | null;
   /** The prompt of the in-flight turn, for the reviewer pass. */
   lastPrompt: string;
+  /**
+   * THE MESSAGES THAT ACTUALLY WENT OVER THE WIRE on the turn's last provider
+   * request — the provider's own shape, after every hook (the canvas block, the
+   * workspace note pi keeps as a hidden custom message, the tool loop's steps).
+   * Anything that later shares the conversation's resident KV — the titler, the
+   * reviewer, the composer's prime of the next message — must send THESE bytes
+   * followed by the reply, not a rendering of its own: MEASURED 2026-09-13, a
+   * prefix rebuilt from the transcript missed the hidden workspace note and
+   * rewrote the single slot from the first user message on, so every second
+   * message of every chat re-read the conversation.
+   */
+  lastRequestMessages: readonly Record<string, unknown>[] | null;
+  /** The finished turn's messages (agent_end), for the reply that followed. */
+  lastTurnMessages: readonly unknown[];
   /** Skip the reviewer for the next turn (it's a revision we ourselves triggered). */
   suppressNextReview: boolean;
   /** The live task checklist from the `update_plan` tool (null before first use). */
@@ -436,6 +450,11 @@ function restoreTitle(entries: readonly StoredEntryLike[]): string | null {
   return title;
 }
 
+/** A content block of the given type (structural). */
+function isBlock(b: unknown, type: string): boolean {
+  return typeof b === 'object' && b !== null && (b as { type?: unknown }).type === type;
+}
+
 /** Flatten a message's content (string | content blocks) to plain text. */
 function messageText(content: unknown): string {
   if (typeof content === 'string') return content;
@@ -471,14 +490,55 @@ function buildConversationPrefix(
 ): TitleMessage[] {
   const messages: TitleMessage[] = [];
   if (systemPrompt.trim().length > 0) messages.push({ role: 'system', content: systemPrompt });
+  /*
+   * THE PROVIDER'S OWN SHAPE, message for message: untrimmed text, the turn's
+   * thoughts as `reasoning_content`, its tool calls, and each tool result as a
+   * `tool` message. This prefix is sent to share the conversation's resident
+   * KV, and it only shares what renders IDENTICALLY — a reply carried as bare
+   * text rendered with an empty think block where the turn had its thoughts,
+   * and the slot was rewritten from there (MEASURED 2026-09-13: 160 tokens
+   * prefilled again on the next turn, every chat).
+   */
   for (const e of entries) {
     if (e.type !== 'message') continue;
     const msg = (e as { message?: { role?: unknown; content?: unknown } }).message;
     const role = msg?.role;
-    if (role !== 'user' && role !== 'assistant') continue;
-    const text = messageText(msg?.content).trim();
-    if (text.length === 0) continue;
-    messages.push({ role, content: text });
+    if (role === 'user') {
+      const text = messageText(msg?.content);
+      if (text.length > 0) messages.push({ role, content: text });
+    } else if (role === 'assistant') {
+      const blocks = Array.isArray(msg?.content) ? (msg.content as unknown[]) : [];
+      const text = messageText(msg?.content);
+      const reasoning = blocks
+        .filter((b): b is { type: 'thinking'; thinking?: string } => isBlock(b, 'thinking'))
+        .map((b) => b.thinking ?? '')
+        .join('');
+      const toolCalls = blocks
+        .filter((b): b is { type: 'toolCall'; id: string; name: string; arguments: unknown } =>
+          isBlock(b, 'toolCall'),
+        )
+        .filter((b) => typeof b.name === 'string' && b.name.length > 0)
+        .map((b) => ({
+          id: String(b.id ?? ''),
+          type: 'function' as const,
+          function: { name: b.name, arguments: JSON.stringify(b.arguments ?? {}) },
+        }));
+      if (text.length === 0 && reasoning.length === 0 && toolCalls.length === 0) continue;
+      messages.push({
+        role,
+        content: text,
+        ...(reasoning.length > 0 ? { reasoning_content: reasoning } : {}),
+        ...(toolCalls.length > 0 ? { tool_calls: toolCalls } : {}),
+      });
+    } else if (role === 'toolResult') {
+      const m = msg as { toolCallId?: unknown; toolName?: unknown; content?: unknown };
+      messages.push({
+        role: 'tool',
+        tool_call_id: typeof m.toolCallId === 'string' ? m.toolCallId : '',
+        name: typeof m.toolName === 'string' ? m.toolName : '',
+        content: messageText(m.content),
+      });
+    }
   }
   // Ensure the current user prompt is the LAST message — pi may not have
   // persisted it as an entry yet when before_agent_start fires.
@@ -539,6 +599,58 @@ function countRepairFailures(entries: readonly StoredEntryLike[]): Record<string
 const POST_TURN_DELAY_MS = 2500;
 
 /** Join the assistant text across a turn's messages (for the reviewer pass). */
+/**
+ * A pi assistant message as provider-llamacpp / provider-mlx put it on the wire
+ * (buildChatCompletionsRequest): joined text (null when empty), the thoughts as
+ * `reasoning_content`, named tool calls as `tool_calls`.
+ */
+function assistantAsWire(msg: { content?: unknown }): Record<string, unknown> | undefined {
+  const blocks = Array.isArray(msg.content) ? (msg.content as unknown[]) : [];
+  const text = blocks
+    .filter((b): b is { type: 'text'; text: string } => isBlock(b, 'text'))
+    .map((b) => b.text)
+    .join('');
+  const reasoning = blocks
+    .filter((b): b is { type: 'thinking'; thinking?: string } => isBlock(b, 'thinking'))
+    .map((b) => b.thinking ?? '')
+    .join('');
+  const toolCalls = blocks
+    .filter((b): b is { type: 'toolCall'; id: string; name: string; arguments: unknown } =>
+      isBlock(b, 'toolCall'),
+    )
+    .filter((b) => typeof b.name === 'string' && b.name.length > 0)
+    .map((b) => ({
+      id: String(b.id ?? ''),
+      type: 'function' as const,
+      function: { name: b.name, arguments: JSON.stringify(b.arguments ?? {}) },
+    }));
+  if (text.length === 0 && reasoning.length === 0 && toolCalls.length === 0) return undefined;
+  return {
+    role: 'assistant',
+    content: text.length > 0 ? text : null,
+    ...(reasoning.length > 0 ? { reasoning_content: reasoning } : {}),
+    ...(toolCalls.length > 0 ? { tool_calls: toolCalls } : {}),
+  };
+}
+
+/**
+ * What the slot holds after a turn: the turn's last request, verbatim, and the
+ * reply that was generated onto it. `null` until a request has gone out.
+ */
+function residentConversation(
+  lastRequest: readonly Record<string, unknown>[] | null,
+  turnMessages: readonly unknown[],
+): Record<string, unknown>[] | null {
+  if (lastRequest === null) return null;
+  const last = [...turnMessages]
+    .reverse()
+    .find((m) => (m as { role?: unknown }).role === 'assistant') as
+    | { content?: unknown }
+    | undefined;
+  const reply = last === undefined ? undefined : assistantAsWire(last);
+  return reply === undefined ? [...lastRequest] : [...lastRequest, reply];
+}
+
 function extractAssistantText(messages: readonly unknown[]): string {
   const parts: string[] = [];
   for (const m of messages) {
@@ -933,6 +1045,8 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     statusTimer: null,
     currentCtx: null,
     lastPrompt: '',
+    lastRequestMessages: null,
+    lastTurnMessages: [],
     suppressNextReview: false,
     plan: null,
     planTitle: null,
@@ -1619,12 +1733,11 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     // follow-ups 4015-8096ms. This runs after EVERY turn from `medium` up, which
     // is the default — so it was costing seconds on essentially every message.
     const reviewContext = {
-      priorMessages: buildConversationPrefix(
-        getEntries(ctx),
-        runtime.canonicalSystemPrompt ?? '',
-        task,
-        false,
-      ),
+      priorMessages:
+        (residentConversation(runtime.lastRequestMessages, runtime.lastTurnMessages) as
+          | TitleMessage[]
+          | null) ??
+        buildConversationPrefix(getEntries(ctx), runtime.canonicalSystemPrompt ?? '', task, false),
       tools: orderedToolDefs(runtime.activeTools),
       ...(signal !== undefined ? { signal } : {}),
     };
@@ -2230,6 +2343,8 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     if (typeof payload !== 'object' || payload === null) return payload;
     const body = payload as Record<string, unknown>;
     if (!Array.isArray(body.messages)) return body;
+    // The bytes on the wire, kept for whoever shares this prefix next.
+    runtime.lastRequestMessages = body.messages as Record<string, unknown>[];
     /*
      * WHAT EACH ADVERTISED TOOL COSTS, IN BYTES, ON EVERY SINGLE REQUEST.
      *
@@ -3038,6 +3153,10 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
      */
     publishedPrefillSystem = null;
     publishedPrefillTools = null;
+    // Another chat's wire bytes are not this one's: until a request goes out
+    // here, the prime renders from the transcript (its fallback).
+    runtime.lastRequestMessages = null;
+    runtime.lastTurnMessages = [];
     /*
      * ...and a new session builds its system prompt again. It is frozen for the
      * life of a session (see maybeWarmPrefix) precisely so it cannot churn under
@@ -3268,6 +3387,21 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
   pi.on('agent_end', (event, ctx) => {
     runtime.currentCtx = ctx;
     runtime.taskStart = null;
+    runtime.lastTurnMessages = event.messages;
+    /*
+     * PUBLISH THE RESIDENT CONVERSATION for the composer's prime of the next
+     * message: the last request's messages + this reply, in the provider's
+     * shape. The renderer used to rebuild the history from its own transcript,
+     * which cannot see a hidden custom message (the workspace note) or a canvas
+     * block — and a prime that differs from the turn does not miss, it evicts.
+     */
+    if (ctx.hasUI === true) {
+      const resident = residentConversation(runtime.lastRequestMessages, event.messages);
+      ctx.ui.setStatus(
+        'harness-prefill-history',
+        resident === null ? '' : JSON.stringify(resident),
+      );
+    }
     // The re-prefill it named is over with the turn.
     runtime.loadingCapability = null;
     /*
@@ -3385,7 +3519,11 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
       const input: TitleInput = {
         prompt: namePrompt,
         turnIndex: 1,
-        priorMessages: buildConversationPrefix(getEntries(ctx), sys, namePrompt, false),
+        // The bytes on the wire + the reply — never a rendering of our own.
+        priorMessages:
+          (residentConversation(runtime.lastRequestMessages, runtime.lastTurnMessages) as
+            | TitleMessage[]
+            | null) ?? buildConversationPrefix(getEntries(ctx), sys, namePrompt, false),
         // Same tools the turn ran with (in the same order) so the naming request's
         // prefix matches the resident slot — cheap and non-evicting (see below).
         tools: orderedToolDefs(runtime.activeTools),

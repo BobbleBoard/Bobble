@@ -97,6 +97,67 @@ describe('createMlxStream — text + CLIENT-side TPS', () => {
   });
 });
 
+describe('createMlxStream — thoughts, whichever key the engine uses', () => {
+  // MEASURED 2026-09-13 on Qwen3.5-4B: mlx_lm.server 0.31 streams `delta.reasoning`;
+  // rapid-mlx, oMLX, mlx-dspark and dflash-mlx stream `delta.reasoning_content`.
+  it("reads mlx-lm's `reasoning` as the same thinking block", async () => {
+    const { fetchImpl } = sseFetch([
+      { choices: [{ delta: { reasoning: 'Let me ' } }] },
+      { choices: [{ delta: { reasoning: 'see.' } }] },
+      { choices: [{ delta: { content: '391' } }] },
+      { choices: [{ delta: {}, finish_reason: 'stop' }], usage: { completion_tokens: 4 } },
+    ]);
+    const { events, final } = await consume(
+      createMlxStream({ fetchImpl })(makeModel(), emptyContext()),
+    );
+    expect(events.filter((e) => e.type === 'thinking_delta')).toHaveLength(2);
+    expect(final.content).toEqual([
+      { type: 'thinking', thinking: 'Let me see.' },
+      { type: 'text', text: '391' },
+    ]);
+  });
+
+  it("drops oMLX's closing repeat of an unfinished thought as content", async () => {
+    const { fetchImpl } = sseFetch([
+      { choices: [{ delta: { reasoning_content: 'Thinking ' } }] },
+      { choices: [{ delta: { reasoning_content: 'hard' } }] },
+      { choices: [{ delta: { content: 'Thinking hard' } }] },
+      { choices: [{ delta: {}, finish_reason: 'length' }], usage: { completion_tokens: 3 } },
+    ]);
+    const { final } = await consume(createMlxStream({ fetchImpl })(makeModel(), emptyContext()));
+    expect(final.content).toEqual([{ type: 'thinking', thinking: 'Thinking hard' }]);
+    // A genuine answer after a thought is still an answer.
+    const real = sseFetch([
+      { choices: [{ delta: { reasoning_content: 'Thinking hard' } }] },
+      { choices: [{ delta: { content: 'Thinking hard is what I did.' } }] },
+      { choices: [{ delta: {}, finish_reason: 'stop' }], usage: { completion_tokens: 3 } },
+    ]);
+    const { final: answered } = await consume(
+      createMlxStream({ fetchImpl: real.fetchImpl })(makeModel(), emptyContext()),
+    );
+    expect(answered.content.find((c) => c.type === 'text')).toEqual({
+      type: 'text',
+      text: 'Thinking hard is what I did.',
+    });
+  });
+
+  it('asks every engine to think and to keep its thoughts, unless the caller said otherwise', async () => {
+    const { fetchImpl, calls } = sseFetch([
+      { choices: [{ delta: {}, finish_reason: 'stop' }], usage: { completion_tokens: 0 } },
+    ]);
+    await consume(createMlxStream({ fetchImpl })(makeModel(), emptyContext()));
+    const sent = JSON.parse(String(calls[0]?.body)) as {
+      chat_template_kwargs: Record<string, unknown>;
+    };
+    expect(sent.chat_template_kwargs).toEqual({
+      enable_thinking: true,
+      preserve_thinking: true,
+      preserved_thinking: true,
+      preserve_reasoning: true,
+    });
+  });
+});
+
 describe('createMlxStream — REUSES the repair ladder (matters more for MLX #1096)', () => {
   const tools: Context['tools'] = [
     { name: 'read', description: 'read a file', parameters: Type.Object({ path: Type.String() }) },
@@ -200,6 +261,16 @@ describe('the host hooks', () => {
 });
 
 describe('shapeForOpenAiServer — the body an OpenAI-shaped engine will take', () => {
+  /** What every request carries unless the caller said otherwise. */
+  const THINKING = {
+    chat_template_kwargs: {
+      enable_thinking: true,
+      preserve_thinking: true,
+      preserved_thinking: true,
+      preserve_reasoning: true,
+    },
+  };
+
   it("drops llama.cpp's array-form logit_bias (string keys the server would have to tokenize)", async () => {
     const { shapeForOpenAiServer } = await import('./stream.js');
     const out = shapeForOpenAiServer({
@@ -208,15 +279,16 @@ describe('shapeForOpenAiServer — the body an OpenAI-shaped engine will take', 
       logit_bias: [['_click', 4.5]],
       return_progress: true,
     });
-    expect(out).toEqual({ model: 'm', messages: [] });
+    expect(out).toEqual({ model: 'm', messages: [], ...THINKING });
   });
 
   it('keeps an object keyed by numeric token ids and strips the rest', async () => {
     const { shapeForOpenAiServer } = await import('./stream.js');
     expect(shapeForOpenAiServer({ logit_bias: { '18070': 4.5, _click: 2 } })).toEqual({
       logit_bias: { '18070': 4.5 },
+      ...THINKING,
     });
-    expect(shapeForOpenAiServer({ logit_bias: { _click: 2 } })).toEqual({});
+    expect(shapeForOpenAiServer({ logit_bias: { _click: 2 } })).toEqual(THINKING);
   });
 
   it('leaves everything else alone', async () => {
@@ -227,6 +299,23 @@ describe('shapeForOpenAiServer — the body an OpenAI-shaped engine will take', 
       tools: [],
       temperature: 0.7,
     };
-    expect(shapeForOpenAiServer(body)).toEqual(body);
+    expect(shapeForOpenAiServer(body)).toEqual({ ...body, ...THINKING });
+  });
+
+  it("thinks by default, like llama.cpp — and keeps a caller's own switch", async () => {
+    // MEASURED 2026-09-13: rapid-mlx answers without thinking unless asked;
+    // the bench and the titler ask for none and must stay that way.
+    const { shapeForOpenAiServer } = await import('./stream.js');
+    const off = shapeForOpenAiServer({ chat_template_kwargs: { enable_thinking: false } });
+    expect(off.chat_template_kwargs).toEqual({
+      enable_thinking: false,
+      preserve_thinking: true,
+      preserved_thinking: true,
+      preserve_reasoning: true,
+    });
+    const custom = shapeForOpenAiServer({ chat_template_kwargs: { preserve_thinking: false } });
+    expect((custom.chat_template_kwargs as { preserve_thinking: boolean }).preserve_thinking).toBe(
+      false,
+    );
   });
 });

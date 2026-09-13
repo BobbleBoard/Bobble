@@ -12,7 +12,7 @@
  * blocks the agent.
  */
 
-import type { CallModel } from '../model-call/call-model.js';
+import type { CallModel, UtilityMessage } from '../model-call/call-model.js';
 
 export interface ReviewInput {
   /** The user's task/prompt for the turn under review. */
@@ -34,10 +34,7 @@ export interface ReviewInput {
    * resident: it prefills only its own instruction, and leaves the conversation
    * in the slot for the next turn.
    */
-  readonly priorMessages?: readonly {
-    readonly role: 'system' | 'user' | 'assistant';
-    readonly content: string;
-  }[];
+  readonly priorMessages?: readonly UtilityMessage[];
   /**
    * The tools the turn ran with, in the SAME order. Chat templates render tools
    * at the START of the prompt, so omitting them diverges the prefix just as

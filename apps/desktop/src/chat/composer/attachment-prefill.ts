@@ -30,6 +30,7 @@
  * one prefill in flight per window (the main handler supersedes); never while a
  * turn streams; aborted the instant a turn is dispatched.
  */
+import type { ContentBlock } from '@pi-desktop/engine';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLlmStore } from '../../state/llm-store';
 import { usePiStore } from '../../state/pi-slice';
@@ -101,7 +102,7 @@ export function abortsOnSend(
 }
 
 /**
- * The live transcript as plain-text OpenAI messages.
+ * The live transcript as the OpenAI messages the turn itself will send.
  *
  * `agentText`, NOT `text`, for a user turn — and this one was expensive. `text`
  * is the ECHO, what the bubble shows; `agentText` is pi's copy, with any pasted
@@ -113,6 +114,16 @@ export function abortsOnSend(
  * paste twice over, on a conversation the server had entirely cached a moment
  * earlier. Long conversations are exactly the ones with pastes and files in
  * them, which is why this showed up as "every follow-up re-prefills".
+ *
+ * THE SAME LESSON, ONE LAYER DOWN (2026-09-13): an assistant turn carried as
+ * bare text is not the turn either. The provider sends its thoughts as
+ * `reasoning_content`, its tool calls as `tool_calls`, and each result as a
+ * `tool` message; with preserved thinking the template renders every one of
+ * them, so a prime without them rendered an EMPTY think block where the turn
+ * had its thoughts and rewrote the slot from the first reply on. MEASURED
+ * (prompt tap + llama.cpp's own cache_n): the second turn of every chat
+ * re-read its first reply, ~160 tokens, and a tool-using chat was never primed
+ * at all. Nothing is trimmed: the bytes must be the provider's bytes.
  */
 export function historyAsMessages(
   messages: ReturnType<typeof usePiStore.getState>['messages'],
@@ -120,28 +131,84 @@ export function historyAsMessages(
   const out: Array<Record<string, unknown>> = [];
   for (const m of messages) {
     if (m.kind === 'user') {
-      const text = (m.agentText ?? m.text).trim();
-      if (text.length > 0) out.push({ role: 'user', content: text });
+      const text = m.agentText ?? m.text;
+      if (text.trim().length > 0) out.push({ role: 'user', content: text });
     } else if (m.kind === 'assistant') {
-      const text = m.blocks
-        .map((b) => (b.type === 'text' ? b.text : ''))
-        .join('')
-        .trim();
-      if (text.length > 0) out.push({ role: 'assistant', content: text });
+      const text = m.blocks.map((b) => (b.type === 'text' ? b.text : '')).join('');
+      const reasoning = m.blocks.map((b) => (b.type === 'thinking' ? b.thinking : '')).join('');
+      const toolCalls = m.blocks
+        .filter(
+          (b): b is Extract<ContentBlock, { type: 'toolCall' }> =>
+            b.type === 'toolCall' && b.name.length > 0,
+        )
+        .map((b) => ({
+          id: b.id,
+          type: 'function',
+          function: { name: b.name, arguments: JSON.stringify(b.arguments) },
+        }));
+      if (text.length === 0 && reasoning.length === 0 && toolCalls.length === 0) continue;
+      out.push({
+        role: 'assistant',
+        content: text.length > 0 ? text : null,
+        ...(reasoning.length > 0 ? { reasoning_content: reasoning } : {}),
+        ...(toolCalls.length > 0 ? { tool_calls: toolCalls } : {}),
+      });
+    } else if (m.kind === 'toolResult') {
+      out.push({
+        role: 'tool',
+        tool_call_id: m.toolCallId,
+        name: m.toolName,
+        content: m.text,
+      });
     }
   }
   return out;
 }
 
 /**
+ * The harness's published wire copy of the conversation, when it describes the
+ * transcript on screen: its last assistant reply must be the transcript's last
+ * assistant reply (a chat switch, or a turn that ended without a request,
+ * would otherwise prime another conversation's bytes). Null → render locally.
+ */
+export function residentHistory(
+  json: string | undefined,
+  messages: ReturnType<typeof usePiStore.getState>['messages'],
+): Array<Record<string, unknown>> | null {
+  if (json === undefined || json.length === 0) return null;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(json);
+  } catch {
+    return null;
+  }
+  if (!Array.isArray(parsed) || parsed.length === 0) return null;
+  const wire = parsed as Array<Record<string, unknown>>;
+  if (wire[0]?.role !== 'system') return null;
+  const lastWire = [...wire].reverse().find((m) => m.role === 'assistant');
+  const lastLocal = [...messages].reverse().find((m) => m.kind === 'assistant');
+  if (lastWire === undefined || lastLocal === undefined || lastLocal.kind !== 'assistant') {
+    return null;
+  }
+  const localText = lastLocal.blocks.map((b) => (b.type === 'text' ? b.text : '')).join('');
+  const wireText = typeof lastWire.content === 'string' ? lastWire.content : '';
+  if (localText !== wireText) return null;
+  // No turn may be in flight (a streaming reply is not on the wire yet).
+  if (lastLocal.isStreaming === true) return null;
+  return wire;
+}
+
+/**
  * Is this transcript one we can render EXACTLY as the turn will?
  *
  * The gate's rule is both halves of the prefix or neither, and it applies to the
- * conversation as much as to the tools. A turn that called a tool puts the call
- * and its result in the model's copy; a turn that carried an image puts the
- * image there. Neither survives the plain-text rendering above, so a prime built
- * over such a history is not an approximation of the real prompt — it is a
- * different prompt, and writing it to the slot costs the whole conversation.
+ * conversation as much as to the tools. A turn that carried an image puts the
+ * image in the model's copy as an `image_url` part (and a tool that returned one
+ * adds a user turn for it) — neither survives the text rendering above, so a
+ * prime built over such a history is not an approximation of the real prompt:
+ * it is a different prompt, and writing it to the slot costs the whole
+ * conversation. Tool calls and results DO render exactly now (see
+ * historyAsMessages), so a tool-using chat is primed like any other.
  *
  * The old comment here said this "degrades gracefully on tool/image turns". It
  * does not degrade. It evicts.
@@ -154,8 +221,13 @@ export function historyIsRenderable(
       if ((m.images ?? []).length > 0) return false;
     } else if (m.kind === 'assistant') {
       for (const b of m.blocks ?? []) {
-        if (b.type !== 'text' && b.type !== 'thinking') return false;
+        if (b.type !== 'text' && b.type !== 'thinking' && b.type !== 'toolCall') return false;
+        // A call still streaming its arguments has nothing exact to render.
+        if (b.type === 'toolCall' && b.name.length === 0) return false;
       }
+    } else if (m.kind === 'toolResult') {
+      // `[image returned by …]` becomes an extra user turn in the provider.
+      if (/^\[image returned by /.test(m.text)) return false;
     }
   }
   return true;
@@ -198,6 +270,16 @@ export function useAttachmentPrefill(attachmentPrefix: string): {
   const messages = usePiStore((s) => s.messages);
   const system = usePiStore((s) => s.extensionStatus['harness-prefill-system']);
   const toolsJson = usePiStore((s) => s.extensionStatus['harness-prefill-tools']);
+  /*
+   * THE CONVERSATION AS IT WENT OVER THE WIRE, published by the harness at the
+   * end of every turn (the last request's messages + the reply, in the
+   * provider's shape). It is what the slot holds. The transcript rendering
+   * below is the fallback for a chat that has not had a turn yet: it cannot
+   * see a hidden custom message (pi's workspace note) or a canvas block, and a
+   * prime built without them rewrote the slot from the first user message on —
+   * MEASURED 2026-09-13, the second message of every chat re-read the reply.
+   */
+  const residentJson = usePiStore((s) => s.extensionStatus['harness-prefill-history']);
   /*
    * SOMEONE ELSE TOUCHED THE SLOT.
    *
@@ -276,7 +358,8 @@ export function useAttachmentPrefill(attachmentPrefix: string): {
 
   useEffect(() => {
     const prefix = attachmentPrefix.trim();
-    const history = historyAsMessages(messages);
+    const resident = residentHistory(residentJson, messages);
+    const history = resident ?? historyAsMessages(messages);
     turnsNow.current = history.length;
     /*
      * THE DECISION IS NOT MADE HERE — see prefill-gate.ts, and read its header
@@ -287,7 +370,7 @@ export function useAttachmentPrefill(attachmentPrefix: string): {
      * back `reused 20`, a complete re-read, because the prime rendered without
      * the tool list the turn would carry.
      */
-    if (!historyIsRenderable(messages)) {
+    if (resident === null && !historyIsRenderable(messages)) {
       note({ what: 'skipped', because: 'the transcript has a turn we cannot render exactly' });
       return;
     }
@@ -307,13 +390,14 @@ export function useAttachmentPrefill(attachmentPrefix: string): {
     }
 
     // Cheap dedupe key (avoid stringifying the whole prefix each render).
-    const sig = `${focusEpoch}|${slotEpoch}|${history.length}|${prefix.length}|${prefix.slice(0, 96)}`;
+    const sig = `${focusEpoch}|${slotEpoch}|${resident === null ? 't' : 'w'}${history.length}|${prefix.length}|${prefix.slice(0, 96)}`;
     if (sig === lastSig.current) return;
 
     const timer = window.setTimeout(() => {
       lastSig.current = sig;
       const oaiMessages: Array<Record<string, unknown>> = [
-        { role: 'system', content: system },
+        // The wire copy carries its own system message; the rendering does not.
+        ...(resident !== null ? [] : [{ role: 'system', content: system }]),
         ...history,
         // Only when there IS one. An empty user turn would render as an empty
         // `<|im_start|>user` block that the real turn does not begin with, so

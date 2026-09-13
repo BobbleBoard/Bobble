@@ -240,3 +240,75 @@ describe('chatTemplateSupported', () => {
     expect(ok).toBe(true);
   });
 });
+
+/*
+ * PRESERVED THINKING — the history must render the bytes it was generated as,
+ * or the prefix cache stops at the previous user message and the whole previous
+ * turn is prefilled again (MEASURED 2026-09-13 on llama.cpp and rapid-mlx).
+ */
+describe('patchPreserveThinking', () => {
+  const QWEN_GATE = `{%- if loop.index0 > ns.last_query_index %}
+    {{- '<|im_start|>' + message.role + '\\n<think>\\n' + reasoning_content + '\\n</think>\\n\\n' + content }}
+{%- else %}
+    {{- '<|im_start|>' + message.role + '\\n' + content }}
+{%- endif %}`;
+
+  it('makes the official Qwen gate read preserve_thinking (after the reasoning_content guard)', async () => {
+    const { patchChatTemplate, patchPreserveThinking } = await import('./chat-template.js');
+    const out = patchChatTemplate(QWEN_GATE);
+    expect(out).toContain(
+      '{%- if (preserve_thinking is defined and preserve_thinking) or (loop.index0 > ns.last_query_index and reasoning_content) %}',
+    );
+    // Idempotent, and the second patch alone does nothing on an already-patched body.
+    expect(patchChatTemplate(out)).toBe(out);
+    expect(patchPreserveThinking(out)).toBe(out);
+  });
+
+  it('leaves templates that already read the variable, or do not gate on it, alone', async () => {
+    const { patchPreserveThinking } = await import('./chat-template.js');
+    const gemma =
+      '{%- set preserve_thinking = preserve_thinking | default(false) -%}\n{%- if loop.index0 > ns.last_query_index and reasoning_content %}x{%- endif %}';
+    expect(patchPreserveThinking(gemma)).toBe(gemma);
+    const minicpm =
+      "{%- if reasoning_content %}\n  {{- '<think>' + reasoning_content + '</think>' }}\n{%- endif %}";
+    expect(patchPreserveThinking(minicpm)).toBe(minicpm);
+  });
+});
+
+describe('patchModelDirTemplate / ensureGgufChatTemplate', () => {
+  const GATE = `{%- if loop.index0 > ns.last_query_index and reasoning_content %}\nA\n{%- else %}\nB\n{%- endif %}`;
+
+  it('patches chat_template.jinja and tokenizer_config.json in a model directory, once', async () => {
+    const { patchModelDirTemplate } = await import('./chat-template.js');
+    const { mkdtemp, readFile, writeFile } = await import('node:fs/promises');
+    const d = await mkdtemp(join(tmpdir(), 'pi-model-dir-'));
+    await writeFile(join(d, 'chat_template.jinja'), GATE);
+    await writeFile(
+      join(d, 'tokenizer_config.json'),
+      JSON.stringify({ chat_template: GATE, eos: 'x' }),
+    );
+    expect(await patchModelDirTemplate(d)).toBe(true);
+    expect(await readFile(join(d, 'chat_template.jinja'), 'utf8')).toContain('preserve_thinking');
+    const cfg = JSON.parse(await readFile(join(d, 'tokenizer_config.json'), 'utf8')) as {
+      chat_template: string;
+      eos: string;
+    };
+    expect(cfg.chat_template).toContain('preserve_thinking');
+    expect(cfg.eos).toBe('x');
+    expect(await patchModelDirTemplate(d)).toBe(false);
+    await rm(d, { recursive: true, force: true });
+  });
+
+  it("writes a GGUF's template, patched, to the cache — and nothing when no patch applies", async () => {
+    const { ensureGgufChatTemplate, ggufTemplatePath } = await import('./chat-template.js');
+    const d = await mkdtemp(join(tmpdir(), 'pi-gguf-tpl-'));
+    const gguf = '/models/Qwen3.5-9B-Q8_0.gguf';
+    const path = await ensureGgufChatTemplate(gguf, { cacheDir: d, template: GATE });
+    expect(path).toBe(ggufTemplatePath(gguf, d));
+    expect(await readFile(path as string, 'utf8')).toContain('preserve_thinking');
+    expect(
+      await ensureGgufChatTemplate(gguf, { cacheDir: d, template: 'no gate here' }),
+    ).toBeUndefined();
+    await rm(d, { recursive: true, force: true });
+  });
+});

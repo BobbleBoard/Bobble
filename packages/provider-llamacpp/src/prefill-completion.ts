@@ -40,6 +40,11 @@
  */
 
 /** A tool definition in the harness's neutral shape (mapped to OpenAI below). */
+import { tapRequest } from './request-tap.js';
+
+/** The marker user turn a reply-ended history is rendered with (never primed). */
+const PRIME_MARK = '\u2063pi-desktop-prime-mark\u2063';
+
 export interface PrefillTool {
   readonly name: string;
   readonly description?: string;
@@ -130,16 +135,40 @@ export async function prefillCompletion(
   const root = llamaServerRoot(opts.baseUrl);
   const signalInit = opts.signal !== undefined ? { signal: opts.signal } : {};
   try {
+    /*
+     * A HISTORY THAT ENDS ON THE REPLY gets a marker user turn appended and is
+     * cut just before the marker. Without it llama.cpp takes the trailing
+     * assistant message as an "assistant prefill" (continue-the-reply) and
+     * renders its reasoning RAW — MEASURED 2026-09-13 as `.\n\n</think>` where
+     * the turn's own history rendering trims to `.\n</think>`; primed that way,
+     * the slot's last tokens were wrong and the next turn re-read the reply. Cut
+     * before the marker, the prime ends `…<|im_end|>\n<|im_start|>user\n`: the
+     * exact bytes the next message begins with.
+     */
+    const lastRole = (opts.messages[opts.messages.length - 1] as { role?: unknown } | undefined)
+      ?.role;
+    const endsOnReply = lastRole === 'assistant';
+    const messages = endsOnReply
+      ? [...opts.messages, { role: 'user', content: PRIME_MARK }]
+      : opts.messages;
     // 1. Render the EXACT prompt for [system, tools, ...history, {user: attachment}].
     const tmplRes = await doFetch(`${root}/apply-template`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
-        messages: opts.messages,
+        messages,
         // No generation prompt: we prime up to (and truncate within) the user
         // message; the assistant framing belongs to the real turn.
         add_generation_prompt: false,
-        chat_template_kwargs: { enable_thinking: false },
+        // Rendered as the turn renders: every past turn keeps its think block
+        // (the server's --reasoning-preserve default; said explicitly so the
+        // prime cannot drift from the turn on an engine without that default).
+        chat_template_kwargs: {
+          enable_thinking: false,
+          preserve_thinking: true,
+          preserved_thinking: true,
+          preserve_reasoning: true,
+        },
         ...(opts.tools !== undefined && opts.tools.length > 0
           ? { tools: toOpenAiTools(opts.tools) }
           : {}),
@@ -151,7 +180,20 @@ export async function prefillCompletion(
     if (typeof rendered.prompt !== 'string' || rendered.prompt.length === 0) {
       throw new Error('prefill: empty apply-template prompt');
     }
-    const rawPrefix = truncateToPrefix(rendered.prompt, opts.messages);
+    const rawPrefix = endsOnReply
+      ? rendered.prompt.slice(0, Math.max(0, rendered.prompt.indexOf(PRIME_MARK)))
+      : truncateToPrefix(rendered.prompt, opts.messages);
+    if (rawPrefix.length === 0) throw new Error('prefill: the marker turn did not render');
+    tapRequest(
+      {
+        messages,
+        ...(opts.tools !== undefined && opts.tools.length > 0
+          ? { tools: toOpenAiTools(opts.tools) }
+          : {}),
+        prefill: { renderedChars: rendered.prompt.length, primedChars: rawPrefix.length },
+      },
+      'prefill',
+    );
 
     // 2. Prime the raw prefix into the slot's KV (one token, discarded).
     const compRes = await doFetch(`${root}/completion`, {

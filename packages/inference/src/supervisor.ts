@@ -264,7 +264,14 @@ export function assembleServerArgs(cfg: LaunchConfig): string[] {
   // A no-op on templates without support, so it's safe to send unconditionally.
   // The client side of this is buildChatCompletionsRequest carrying each
   // assistant turn's reasoning_content back (see provider-llamacpp/stream.ts).
-  if (cfg.reasoningPreserve !== false) args.push('--reasoning-preserve');
+  if (cfg.reasoningPreserve !== false) {
+    args.push('--reasoning-preserve');
+    // `--reasoning-preserve` sets `preserve_thinking` (and clear/drop/
+    // truncate_history_thinking) for the template; Ling's template spells the
+    // same switch `preserved_thinking`. One more variable costs nothing on
+    // templates that never read it.
+    args.push('--chat-template-kwargs', '{"preserved_thinking":true}');
+  }
 
   // Thinking-budget guardrail (llama.cpp `--reasoning-budget`, env
   // LLAMA_ARG_THINK_BUDGET): -1 = unrestricted (default, current behaviour),

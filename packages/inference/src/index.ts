@@ -10,6 +10,7 @@ export * from './accelerator.js';
 export * from './calibrate.js';
 export * from './catalog.js';
 export * from './chat-template.js';
+export * from './gguf-header.js';
 export * from './context-cap.js';
 export * from './download.js';
 export * from './engine-flags.js';

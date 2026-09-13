@@ -24,6 +24,7 @@
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { hfResolveUrl } from './catalog.js';
+import { ggufChatTemplate } from './gguf-header.js';
 import { cacheRoot } from './paths.js';
 
 /** Re-pull a cached template if it is older than this (Google updates them). */
@@ -248,17 +249,127 @@ export function patchReasoningContentGate(content: string): string {
   );
 }
 
-/** Read a cached template, apply {@link patchReasoningContentGate}, rewrite only
- * if it changed. So an ALREADY-cached (unpatched) template gets fixed without a
+/**
+ * PRESERVED THINKING, so the history renders the same bytes it was generated
+ * as — the prefix cache's whole condition.
+ *
+ * The Qwen3.5-family template (also Ling's shape) renders a past assistant
+ * turn's reasoning ONLY inside the current tool loop
+ * (`loop.index0 > ns.last_query_index`): the turn before the last user message
+ * is rendered as `<|im_start|>assistant\n{answer}`, though it was generated as
+ * `<think>\n{thoughts}\n</think>\n\n{answer}`. MEASURED 2026-09-13
+ * (prompt-diff on llama.cpp and rapid-mlx): the cache matched up to the previous
+ * user message and the whole previous turn was prefilled again, every turn.
+ * With thinking off the same happens over five tokens — the generation prompt
+ * ends `<think>\n\n</think>\n\n` and the history omits it.
+ *
+ * llama.cpp's `--reasoning-preserve` sets `preserve_thinking` for the
+ * template, but only templates that read it (Gemma 4, Nanbeige, froggeric's
+ * Qwen-Fixed) honour it. This makes the official Qwen template read it: with
+ * `preserve_thinking`, EVERY assistant turn gets its think block — the thoughts
+ * when there are any, the empty block otherwise — which is exactly what was
+ * generated in either mode. The MLX engines get the same variable per request
+ * (`chat_template_kwargs`, provider-mlx). Idempotent; a no-op on templates that
+ * already know the variable or do not gate on last_query_index.
+ */
+export function patchPreserveThinking(content: string): string {
+  if (/preserve_thinking/.test(content)) return content;
+  return content.replace(
+    /\{%-?\s*if\s+loop\.index0\s*>\s*ns\.last_query_index\s+and\s+reasoning_content\s*-?%\}/g,
+    (m) =>
+      m.replace(
+        /loop\.index0\s*>\s*ns\.last_query_index\s+and\s+reasoning_content/,
+        '(preserve_thinking is defined and preserve_thinking) or (loop.index0 > ns.last_query_index and reasoning_content)',
+      ),
+  );
+}
+
+/** Every patch this module applies to a chat template, in order. Pure. */
+export function patchChatTemplate(content: string): string {
+  return patchPreserveThinking(patchReasoningContentGate(content));
+}
+
+/** Read a cached template, apply {@link patchChatTemplate}, rewrite only if it
+ * changed. So an ALREADY-cached (unpatched) template gets fixed without a
  * re-fetch. Best-effort — a read/write hiccup just leaves the file untouched. */
 async function patchCachedTemplate(tplPath: string): Promise<void> {
   try {
     const body = await readFile(tplPath, 'utf8');
-    const patched = patchReasoningContentGate(body);
+    const patched = patchChatTemplate(body);
     if (patched !== body) await writeFile(tplPath, patched, 'utf8');
   } catch {
     // no file / unreadable — nothing to patch
   }
+}
+
+/**
+ * Patch the chat template INSIDE a model directory (an MLX twin in the app's
+ * own store): `chat_template.jinja` and the `chat_template` field of
+ * `tokenizer_config.json`, whichever the engine reads. The MLX engines render
+ * from the model directory, so this is the only place the preserved-thinking
+ * gate can reach them. Idempotent; returns whether anything changed.
+ */
+export async function patchModelDirTemplate(dir: string): Promise<boolean> {
+  let changed = false;
+  const jinja = join(dir, TEMPLATE_FILE);
+  try {
+    const body = await readFile(jinja, 'utf8');
+    const patched = patchChatTemplate(body);
+    if (patched !== body) {
+      await writeFile(jinja, patched, 'utf8');
+      changed = true;
+    }
+  } catch {
+    // no file
+  }
+  const cfg = join(dir, TOKENIZER_CONFIG);
+  try {
+    const raw = await readFile(cfg, 'utf8');
+    const parsed = JSON.parse(raw) as { chat_template?: unknown };
+    if (typeof parsed.chat_template === 'string') {
+      const patched = patchChatTemplate(parsed.chat_template);
+      if (patched !== parsed.chat_template) {
+        parsed.chat_template = patched;
+        await writeFile(cfg, `${JSON.stringify(parsed, null, 2)}\n`, 'utf8');
+        changed = true;
+      }
+    }
+  } catch {
+    // no file / not json
+  }
+  return changed;
+}
+
+/** Stable cache path for a GGUF's own (patched) template. */
+export function ggufTemplatePath(ggufPath: string, dir: string = chatTemplatesDir()): string {
+  const base = ggufPath.slice(ggufPath.lastIndexOf('/') + 1).replace(/\.gguf$/i, '');
+  return join(dir, `gguf--${repoSlug(base)}.jinja`);
+}
+
+/**
+ * The template a GGUF carries, patched, on disk — for a model with no canonical
+ * base repo. Returns undefined when the GGUF's template needs no patch (the
+ * engine's own copy is then used, unchanged) or carries none.
+ */
+export async function ensureGgufChatTemplate(
+  ggufPath: string,
+  opts: { readonly cacheDir?: string; readonly template?: string } = {},
+): Promise<string | undefined> {
+  const raw = opts.template ?? (await ggufChatTemplate(ggufPath));
+  if (raw === undefined) return undefined;
+  const patched = patchChatTemplate(raw);
+  if (patched === raw) return undefined;
+  const dir = opts.cacheDir ?? chatTemplatesDir();
+  const out = ggufTemplatePath(ggufPath, dir);
+  await mkdir(dir, { recursive: true });
+  let existing: string | undefined;
+  try {
+    existing = await readFile(out, 'utf8');
+  } catch {
+    existing = undefined;
+  }
+  if (existing !== patched) await writeFile(out, patched, 'utf8');
+  return out;
 }
 
 export async function ensureChatTemplate(
@@ -298,7 +409,7 @@ export async function ensureChatTemplate(
   try {
     const fetched = await fetchTemplate(repo, opts);
     await mkdir(dir, { recursive: true });
-    await writeFile(tplPath, patchReasoningContentGate(fetched.content), 'utf8');
+    await writeFile(tplPath, patchChatTemplate(fetched.content), 'utf8');
     await writeMeta(mPath, {
       repo,
       source: fetched.source,

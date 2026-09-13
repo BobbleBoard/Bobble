@@ -32,13 +32,11 @@
  * the fixer/review use. Absent endpoint ⇒ no titles, and nothing else changes.
  */
 
-import type { CallModel } from '../model-call/call-model.js';
+import type { CallModel, UtilityMessage } from '../model-call/call-model.js';
 
-/** One message of the live conversation prefix this request rides on. */
-export interface TitleMessage {
-  readonly role: 'system' | 'user' | 'assistant';
-  readonly content: string;
-}
+/** One message of the live conversation prefix this request rides on — the
+ * provider's own shape, thoughts and tool calls included (see UtilityMessage). */
+export type TitleMessage = UtilityMessage;
 
 /** What the titler needs: the prompt, the live prefix, and the turn's tools. */
 export interface TitleInput {

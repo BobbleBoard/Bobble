@@ -33,6 +33,7 @@ import {
   buildMlxProviderBlock,
   buildProviderBlock,
   CATALOG,
+  type CalibEngine,
   type CalibrationInput,
   type CalibrationRecord,
   type CalibrationResult,
@@ -54,6 +55,7 @@ import {
   effectiveLaunchConfig,
   ensureChatTemplate,
   ensureEngineFor,
+  ensureGgufChatTemplate,
   ensureMlx,
   estimateRamGB,
   flagsToArgs,
@@ -78,6 +80,7 @@ import {
   PINNED_LLAMACPP,
   parseArgparseHelp,
   parseLlamaHelp,
+  patchModelDirTemplate,
   planCandidates,
   powerBudgetGB,
   probeServerFeatures,
@@ -113,7 +116,11 @@ import type {
   LlmStatus,
   LlmTierPick,
 } from '../ipc-contract';
-import type { EngineLaunchSettings, ModelSpecChoice } from '../settings/settings-contract';
+import type {
+  EngineFlagValue,
+  EngineLaunchSettings,
+  ModelSpecChoice,
+} from '../settings/settings-contract';
 import { DownloadCancellation, discardPartials, partialPaths } from './download-cancellation';
 import {
   calibrationDir,
@@ -195,9 +202,34 @@ async function resolveChatTemplateArgs(
   model: CatalogModel,
   hfToken: string | undefined,
   serverPath?: string,
+  ggufPath?: string,
 ): Promise<string[]> {
   const baseRepo = model.baseRepo;
-  if (baseRepo === undefined) return [];
+  if (baseRepo === undefined) {
+    /*
+     * No canonical repo: the GGUF's own template, patched where it needs it
+     * (the preserved-thinking gate — see chat-template.ts). A template the
+     * patch leaves alone is not passed at all, so the launch is unchanged.
+     */
+    if (ggufPath === undefined) return [];
+    try {
+      const patched = await ensureGgufChatTemplate(ggufPath);
+      if (patched === undefined) return [];
+      if (serverPath !== undefined) {
+        const ok = await chatTemplateSupported(serverPath, patched, spawn).catch(() => true);
+        if (!ok) return [];
+      }
+      console.log(
+        `[chat-template] ${model.id}: using the GGUF's own template, patched (${patched})`,
+      );
+      return ['--jinja', '--chat-template-file', patched];
+    } catch (error) {
+      console.log(
+        `[chat-template] ${model.id}: could not read the GGUF's template: ${String(error)}`,
+      );
+      return [];
+    }
+  }
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), CHAT_TEMPLATE_FETCH_TIMEOUT_MS);
   timer.unref?.();
@@ -493,6 +525,7 @@ function status(): LlmStatus {
       ? {
           profile: current.profile,
           provider: current.provider,
+          servedModelId: current.servedModelId,
           launchArgs: current.launchArgs,
           launchCommand: current.launchCommand,
           launchConfigFingerprint: current.launchConfigFingerprint,
@@ -1611,6 +1644,14 @@ async function startExternalEngine(
       modelMaxContext: model.contextWindow,
       totalRamGB: hw.totalRamGB,
     });
+    // The MLX engines render from the model directory: give its template the
+    // preserved-thinking gate (idempotent) so the history renders the bytes it
+    // was generated as and the engine's prefix cache holds across turns.
+    if (await patchModelDirTemplate(modelDirPath).catch(() => false)) {
+      console.log(
+        `[chat-template] ${model.id}: patched the MLX twin's template for preserved thinking`,
+      );
+    }
     const host = '127.0.0.1';
     let servedModelId = servedName;
     const supervisor = new LlamaServerSupervisor({
@@ -2617,6 +2658,7 @@ async function startServerExclusive(
       model,
       persistedHfToken(),
       install.serverPath,
+      modelPath,
     );
 
     // Per-hardware performance args. On Apple Silicon with RAM headroom this is

@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { tapRequest } from '@pi-desktop/provider-llamacpp';
 /**
  * The "call a model" seam.
  *
@@ -26,6 +27,33 @@ import { readFileSync } from 'node:fs';
  * `callModel` to `wireHarness(pi, { callModel })`.
  */
 
+/**
+ * One message of a utility request, in the OpenAI chat shape the chat provider
+ * itself sends — thoughts, tool calls and tool results included. A background
+ * request that shares the conversation's prefix must render the SAME bytes as
+ * the turn did, or the server's single slot is rewritten from the first
+ * difference and the next real turn prefills that tail again (MEASURED
+ * 2026-09-13: the titler carried the reply as bare text, so its empty think
+ * block replaced the turn's thoughts in the cache — 160 tokens re-prefilled on
+ * every second turn of every chat).
+ */
+export interface UtilityMessage {
+  readonly role: 'system' | 'user' | 'assistant' | 'tool';
+  /** The wire content: a string, `null` (an assistant turn that was all tool
+   * calls), or OpenAI content parts — passed through untouched. */
+  readonly content: string | null | readonly unknown[];
+  /** The assistant turn's thoughts, as the provider carries them back. */
+  readonly reasoning_content?: string;
+  readonly tool_calls?: readonly {
+    readonly id: string;
+    readonly type: 'function';
+    readonly function: { readonly name: string; readonly arguments: string };
+  }[];
+  /** `role: 'tool'` — which call this result answers, and the tool's name. */
+  readonly tool_call_id?: string;
+  readonly name?: string;
+}
+
 /** A single utility-model request. Supply `prompt`, or `messages`, or both. */
 export interface CallModelRequest {
   /** Optional system instruction prepended to the message list. */
@@ -33,10 +61,7 @@ export interface CallModelRequest {
   /** A single user prompt (appended after `messages`). */
   readonly prompt?: string;
   /** Explicit multi-turn messages. */
-  readonly messages?: readonly {
-    readonly role: 'system' | 'user' | 'assistant';
-    readonly content: string;
-  }[];
+  readonly messages?: readonly UtilityMessage[];
   readonly temperature?: number;
   readonly maxTokens?: number;
   /**
@@ -113,9 +138,24 @@ export function createOpenAiCompatCallModel(config: OpenAiCompatConfig): CallMod
   const base = config.baseUrl.replace(/\/+$/, '');
   const timeoutMs = config.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   return async (req) => {
-    const messages: { role: string; content: string }[] = [];
+    const messages: Record<string, unknown>[] = [];
     if (req.system !== undefined) messages.push({ role: 'system', content: req.system });
-    for (const m of req.messages ?? []) messages.push({ role: m.role, content: m.content });
+    for (const m of req.messages ?? []) {
+      messages.push({
+        role: m.role,
+        // The provider sends `null` for an assistant turn that was all tool
+        // calls; the same bytes must render here.
+        content: m.role === 'assistant' && m.content === '' ? null : m.content,
+        ...(m.reasoning_content !== undefined && m.reasoning_content.length > 0
+          ? { reasoning_content: m.reasoning_content }
+          : {}),
+        ...(m.tool_calls !== undefined && m.tool_calls.length > 0
+          ? { tool_calls: m.tool_calls }
+          : {}),
+        ...(m.tool_call_id !== undefined ? { tool_call_id: m.tool_call_id } : {}),
+        ...(m.name !== undefined ? { name: m.name } : {}),
+      });
+    }
     if (req.prompt !== undefined) messages.push({ role: 'user', content: req.prompt });
 
     const headers: Record<string, string> = { 'content-type': 'application/json' };
@@ -128,27 +168,39 @@ export function createOpenAiCompatCallModel(config: OpenAiCompatConfig): CallMod
     const timeoutSignal = AbortSignal.timeout(req.timeoutMs ?? timeoutMs);
     const signal =
       req.signal !== undefined ? AbortSignal.any([req.signal, timeoutSignal]) : timeoutSignal;
+    const extra = (req.extraBody ?? {}) as Record<string, unknown>;
+    const body: Record<string, unknown> = {
+      // Provider-specific extras first so the fields this seam sets always win.
+      ...extra,
+      model: config.model,
+      messages,
+      stream: false,
+      temperature: req.temperature ?? 0,
+      ...(req.maxTokens !== undefined ? { max_tokens: req.maxTokens } : {}),
+      ...(req.tools !== undefined && req.tools.length > 0
+        ? {
+            tools: req.tools.map((t) => ({
+              type: 'function',
+              function: { name: t.name, description: t.description, parameters: t.parameters },
+            })),
+          }
+        : {}),
+      ...(req.responseFormat !== undefined ? { response_format: req.responseFormat } : {}),
+      // The history renders with every turn's think block, as the chat's own
+      // requests do (provider-mlx sets the same; llama.cpp has it from
+      // --reasoning-preserve) — a caller's own kwargs win.
+      chat_template_kwargs: {
+        preserve_thinking: true,
+        preserved_thinking: true,
+        preserve_reasoning: true,
+        ...((extra.chat_template_kwargs as Record<string, unknown> | undefined) ?? {}),
+      },
+    };
+    tapRequest(body, 'utility');
     const res = await doFetch(`${base}/chat/completions`, {
       method: 'POST',
       headers,
-      body: JSON.stringify({
-        // Provider-specific extras first so the fields this seam sets always win.
-        ...(req.extraBody ?? {}),
-        model: config.model,
-        messages,
-        stream: false,
-        temperature: req.temperature ?? 0,
-        ...(req.maxTokens !== undefined ? { max_tokens: req.maxTokens } : {}),
-        ...(req.tools !== undefined && req.tools.length > 0
-          ? {
-              tools: req.tools.map((t) => ({
-                type: 'function',
-                function: { name: t.name, description: t.description, parameters: t.parameters },
-              })),
-            }
-          : {}),
-        ...(req.responseFormat !== undefined ? { response_format: req.responseFormat } : {}),
-      }),
+      body: JSON.stringify(body),
       signal,
     });
     if (!res.ok) throw new Error(`utility model HTTP ${res.status}`);

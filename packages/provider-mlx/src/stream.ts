@@ -39,6 +39,7 @@ import {
   repairToolCallArguments,
   type ToolCallFixer,
   type ToolSchemaLike,
+  tapRequest,
   validateAgainstSchema,
   withoutWrittenToolCall,
 } from '@pi-desktop/provider-llamacpp';
@@ -87,6 +88,8 @@ interface OAIToolCallDelta {
 interface OAIDelta {
   content?: string | null;
   reasoning_content?: string | null;
+  /** mlx_lm.server's name for the same thing (0.31: `delta.reasoning`). */
+  reasoning?: string | null;
   tool_calls?: OAIToolCallDelta[];
 }
 interface OAIChoice {
@@ -136,6 +139,30 @@ async function readBody(res: Response): Promise<AsyncIterable<Uint8Array>> {
  */
 export function shapeForOpenAiServer(body: Record<string, unknown>): Record<string, unknown> {
   const out = { ...body };
+  /*
+   * THINKING ON, AND KEPT, LIKE LLAMA.CPP.
+   *
+   * llama.cpp passes `enable_thinking=true` to any template that supports it
+   * (`--reasoning auto`) and `preserve_thinking` under `--reasoning-preserve`.
+   * The MLX engines get it per request, and they disagree when asked nothing:
+   * MEASURED 2026-09-13 on Qwen3.5-4B — rapid-mlx answers WITHOUT thinking
+   * unless told (its own default), mlx-lm / oMLX / mlx-dspark / dflash-mlx
+   * follow the template (on). A caller that set `enable_thinking` itself (the
+   * calibration bench, the titler) is left alone. `preserve_thinking` (and the
+   * spellings Ling's and froggeric's templates use) keeps every past turn's
+   * think block in the rendered history, so the prefix cache holds across turns
+   * — see patchPreserveThinking in @pi-desktop/inference. Templates that never
+   * read a variable ignore it.
+   */
+  const kwargs =
+    out.chat_template_kwargs !== null && typeof out.chat_template_kwargs === 'object'
+      ? { ...(out.chat_template_kwargs as Record<string, unknown>) }
+      : {};
+  if (kwargs.enable_thinking === undefined) kwargs.enable_thinking = true;
+  for (const key of ['preserve_thinking', 'preserved_thinking', 'preserve_reasoning']) {
+    if (kwargs[key] === undefined) kwargs[key] = true;
+  }
+  out.chat_template_kwargs = kwargs;
   const bias = out.logit_bias;
   if (Array.isArray(bias)) {
     delete out.logit_bias;
@@ -216,37 +243,10 @@ export function createMlxStream(deps: MlxStreamDeps = {}): MlxStreamFn {
         }
         // After the hooks, since it is the hooks' llama.cpp-isms this removes.
         body = shapeForOpenAiServer(body);
-        /*
-         * PROMPT SHAPE DIAGNOSTIC (PI_DIAG_PROMPTS=1): one line per request
-         * with every message's role + length and the tool names, so "why did
-         * the prefix cache only reuse N tokens" can be answered by diffing two
-         * consecutive lines instead of guessing which message changed.
-         */
-        const diag = process.env.PI_DIAG_PROMPTS;
-        if (diag !== undefined && diag !== '') {
-          const msgs = (body.messages as Array<{ role: string; content: unknown }>).map((m) => {
-            const c = m.content;
-            const len = typeof c === 'string' ? c.length : JSON.stringify(c ?? '').length;
-            return `${m.role}:${len}`;
-          });
-          const tools = Array.isArray(body.tools)
-            ? (body.tools as Array<{ function?: { name?: string } }>).map(
-                (t) => t.function?.name ?? '?',
-              )
-            : [];
-          const line = `[pi-diag-prompt] msgs=[${msgs.join(' ')}] tools=[${tools.join(',')}] sys=${
-            typeof context.systemPrompt === 'string' ? context.systemPrompt.length : 0
-          }\n`;
-          // A path appends to a file (pi's stderr is not kept); '1' says it there.
-          if (diag.includes('/')) {
-            try {
-              const { appendFileSync } = await import('node:fs');
-              appendFileSync(diag, line);
-            } catch {
-              /* a diagnostic never breaks a turn */
-            }
-          } else process.stderr.write(line);
-        }
+        tapRequest(
+          body,
+          model.id.includes('@') ? model.id.slice(model.id.lastIndexOf('@') + 1) : 'mlx',
+        );
         const res = await doFetch(`${model.baseUrl}/chat/completions`, {
           method: 'POST',
           headers: { 'content-type': 'application/json', ...(model.headers ?? {}) },
@@ -280,15 +280,23 @@ export function createMlxStream(deps: MlxStreamDeps = {}): MlxStreamFn {
             const choice = chunk.choices?.[0];
             if (choice === undefined) continue;
             const delta = choice.delta;
+            // `reasoning_content` (llama.cpp, rapid-mlx, oMLX, mlx-dspark,
+            // dflash-mlx) or `reasoning` (mlx_lm.server) — one stream of thought.
+            const reasoningDelta =
+              delta?.reasoning_content != null && delta.reasoning_content.length > 0
+                ? delta.reasoning_content
+                : delta?.reasoning != null && delta.reasoning.length > 0
+                  ? delta.reasoning
+                  : undefined;
             if (
               (delta?.content != null && delta.content.length > 0) ||
-              (delta?.reasoning_content != null && delta.reasoning_content.length > 0) ||
+              reasoningDelta !== undefined ||
               (delta?.tool_calls?.length ?? 0) > 0
             ) {
               liveTps.tick();
             }
 
-            if (delta?.reasoning_content != null && delta.reasoning_content.length > 0) {
+            if (reasoningDelta !== undefined) {
               if (firstTokenAt === undefined) firstTokenAt = Date.now();
               if (thinkingIndex === undefined) {
                 output.content.push({ type: 'thinking', thinking: '' });
@@ -300,16 +308,33 @@ export function createMlxStream(deps: MlxStreamDeps = {}): MlxStreamFn {
                 });
               }
               const block = output.content[thinkingIndex];
-              if (block?.type === 'thinking') block.thinking += delta.reasoning_content;
+              if (block?.type === 'thinking') block.thinking += reasoningDelta;
               stream.push({
                 type: 'thinking_delta',
                 contentIndex: thinkingIndex,
-                delta: delta.reasoning_content,
+                delta: reasoningDelta,
                 partial: output,
               });
             }
 
             if (delta?.content != null && delta.content.length > 0) {
+              /*
+               * oMLX, cut off by max_tokens INSIDE the think block, hands the
+               * whole thought back once more as content (MEASURED 2026-09-13:
+               * one closing delta equal to everything it had streamed as
+               * reasoning_content). That is not an answer; it is the thought
+               * again, and it would render twice.
+               */
+              const thought =
+                thinkingIndex !== undefined ? output.content[thinkingIndex] : undefined;
+              if (
+                textIndex === undefined &&
+                thought?.type === 'thinking' &&
+                thought.thinking.length > 0 &&
+                delta.content === thought.thinking
+              ) {
+                continue;
+              }
               if (firstTokenAt === undefined) firstTokenAt = Date.now();
               if (textIndex === undefined) {
                 output.content.push({ type: 'text', text: '' });

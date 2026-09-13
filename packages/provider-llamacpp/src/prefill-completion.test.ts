@@ -72,7 +72,12 @@ describe('prefillCompletion', () => {
     ]);
     // apply-template body: no generation prompt, thinking off, tools mapped.
     expect(bodies[0]?.add_generation_prompt).toBe(false);
-    expect(bodies[0]?.chat_template_kwargs).toEqual({ enable_thinking: false });
+    expect(bodies[0]?.chat_template_kwargs).toEqual({
+      enable_thinking: false,
+      preserve_thinking: true,
+      preserved_thinking: true,
+      preserve_reasoning: true,
+    });
     expect(bodies[0]?.tools).toEqual([
       {
         type: 'function',
@@ -84,6 +89,33 @@ describe('prefillCompletion', () => {
     expect(bodies[1]?.cache_prompt).toBe(true);
     expect(bodies[1]?.n_predict).toBe(1);
     expect(result).toEqual({ aborted: false, promptN: 4943 });
+  });
+
+  it("primes a history that ends on the reply up to the next user turn's opening", async () => {
+    // MEASURED 2026-09-13: rendered with the reply last and no generation
+    // prompt, llama.cpp took it as an assistant prefill and rendered the
+    // reasoning raw (`.\n\n</think>` for a history that renders `.\n</think>`).
+    const { fetchImpl, bodies } = makeFetch({
+      prompt:
+        'SYS<user>\nhi<|im_end|>\n<assistant>\n<think>\nhm\n</think>\n\nhello<|im_end|>\n<user>\n\u2063pi-desktop-prime-mark\u2063<|im_end|>\n',
+    });
+    await prefillCompletion({
+      baseUrl: 'http://127.0.0.1:8080/v1',
+      messages: [
+        { role: 'system', content: 'sys' },
+        { role: 'user', content: 'hi' },
+        { role: 'assistant', content: 'hello', reasoning_content: 'hm\n' },
+      ],
+      fetchImpl,
+    });
+    const sent = bodies[0]?.messages as Array<{ role: string; content: string }>;
+    expect(sent[sent.length - 1]).toEqual({
+      role: 'user',
+      content: '\u2063pi-desktop-prime-mark\u2063',
+    });
+    expect(bodies[1]?.prompt).toBe(
+      'SYS<user>\nhi<|im_end|>\n<assistant>\n<think>\nhm\n</think>\n\nhello<|im_end|>\n<user>\n',
+    );
   });
 
   it('omits tools from apply-template when none are given', async () => {

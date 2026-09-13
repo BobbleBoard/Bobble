@@ -43,6 +43,7 @@ import {
   validateAgainstSchema,
   withoutWrittenToolCall,
 } from './repair.js';
+import { tapRequest } from './request-tap.js';
 import { parseSSE } from './sse.js';
 
 /** llama.cpp per-response `timings` block (structurally == inference's). */
@@ -291,17 +292,8 @@ export function contextHasImage(context: Context): boolean {
   return false;
 }
 
-/** Build the OpenAI chat/completions request body from pi's Context. Pure. */
-/**
- * Append one outgoing request to the tap file, if `PI_DESKTOP_PROMPT_TAP` names
- * one.
- *
- * Records the system prompt IN FULL plus the advertised tool names, the message
- * roles and the sampling parameters — the four things worth arguing about, and
- * small enough to append on every request of a long session. Set
- * `PI_DESKTOP_PROMPT_TAP_FULL=1` to keep the whole body when the question is
- * about something this summary drops.
- */
+/** Build the OpenAI chat/completions request body from pi's Context. Pure.
+ * (What goes over the wire is recorded by `tapRequest` — see request-tap.ts.) */
 export function buildChatCompletionsRequest(
   model: Model<Api>,
   context: Context,
@@ -672,6 +664,7 @@ export function createLlamaCppStream(deps: LlamaCppStreamDeps = {}): LlamaCppStr
           if (replaced !== null && typeof replaced === 'object') {
             body = replaced as Record<string, unknown>;
           }
+          tapRequest(body, 'llamacpp');
           res = await fetchWhenBack(`${model.baseUrl}/chat/completions`, {
             method: 'POST',
             headers: { 'content-type': 'application/json', ...(model.headers ?? {}) },

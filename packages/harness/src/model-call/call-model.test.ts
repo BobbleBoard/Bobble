@@ -69,10 +69,64 @@ describe('createOpenAiCompatCallModel', () => {
     });
     const body = JSON.parse(calls[0]?.body as string);
     expect(body.response_format).toEqual({ type: 'json_object' });
-    expect(body.chat_template_kwargs).toEqual({ enable_thinking: false });
+    // The caller's switch stays; the preserved-thinking switches ride along so
+    // the history renders as the chat's own requests render it.
+    expect(body.chat_template_kwargs).toEqual({
+      enable_thinking: false,
+      preserve_thinking: true,
+      preserved_thinking: true,
+      preserve_reasoning: true,
+    });
     // Core fields set by the seam win over extraBody.
     expect(body.model).toBe('gemma');
     expect(body.stream).toBe(false);
+  });
+
+  it('sends a prior turn the way the chat provider does — thoughts, calls, results', async () => {
+    // MEASURED 2026-09-13: a reply carried as bare text rendered with an EMPTY
+    // think block where the turn had its thoughts, and the server's one slot
+    // was rewritten from there — the next turn prefilled the reply again.
+    const { fetchImpl, calls } = jsonFetch('{"title":"x"}');
+    const callModel = createOpenAiCompatCallModel({
+      baseUrl: 'http://h/v1',
+      model: 'm',
+      fetchImpl,
+    });
+    await callModel({
+      messages: [
+        { role: 'user', content: 'run it' },
+        {
+          role: 'assistant',
+          content: '',
+          reasoning_content: 'I should run it.',
+          tool_calls: [
+            {
+              id: 'c1',
+              type: 'function',
+              function: { name: 'bash', arguments: '{"command":"ls"}' },
+            },
+          ],
+        },
+        { role: 'tool', tool_call_id: 'c1', name: 'bash', content: 'a.txt' },
+        { role: 'assistant', content: 'Done: a.txt' },
+      ],
+      prompt: 'name this',
+    });
+    const body = JSON.parse(calls[0]?.body as string);
+    expect(body.messages).toEqual([
+      { role: 'user', content: 'run it' },
+      {
+        role: 'assistant',
+        content: null,
+        reasoning_content: 'I should run it.',
+        tool_calls: [
+          { id: 'c1', type: 'function', function: { name: 'bash', arguments: '{"command":"ls"}' } },
+        ],
+      },
+      { role: 'tool', content: 'a.txt', tool_call_id: 'c1', name: 'bash' },
+      { role: 'assistant', content: 'Done: a.txt' },
+      { role: 'user', content: 'name this' },
+    ]);
   });
 
   it('throws on a non-OK response', async () => {
