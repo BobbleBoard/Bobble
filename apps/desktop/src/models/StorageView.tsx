@@ -438,6 +438,14 @@ export function StorageView() {
           >
             <span className="pd-storage-name-text">{node.name}</span>
             {node.hubLinked ? <span className="pd-storage-chip">linked</span> : null}
+            {node.bytes === 0 && (node.kind === 'model' || node.kind === 'dir') ? (
+              <span
+                className="pd-storage-chip"
+                title="Nothing inside — a download that never finished, or a folder left behind"
+              >
+                empty
+              </span>
+            ) : null}
             {node.inUse ? (
               <span className="pd-storage-chip pd-storage-chip--live">serving now</span>
             ) : null}
