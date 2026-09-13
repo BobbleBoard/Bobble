@@ -185,7 +185,12 @@ async function sizeOf(p: string): Promise<{ bytes: number; files: number }> {
         }
         if (e.isFile()) {
           try {
-            bytes += (await stat(full)).size;
+            // Read `bytes` AFTER the await: `bytes += (await stat()).size`
+            // reads the old total before the await, and with stats running
+            // concurrently every other file's size was lost (MEASURED: a
+            // 16 GB repo summed to 0).
+            const s = await stat(full);
+            bytes += s.size;
             files += 1;
           } catch {
             /* vanished mid-walk */
