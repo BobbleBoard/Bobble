@@ -392,6 +392,38 @@ describe('createPiSessions', () => {
     expect(sessions.bridges().some((b) => b.alive)).toBe(true);
   });
 
+  it('two restarts in the same tick run one after the other, and neither reads as a startup crash', async () => {
+    // A bridge whose readiness takes a tick, so a second attach() can land
+    // while the first fresh bridge is still coming up — the shape that used to
+    // dispose it mid-start and respawn the session with no extensions.
+    const created: Array<{ bridge: FakeBridge; extensionsDisabled: boolean }> = [];
+    const sessions = createPiSessions<FakeSender>({
+      createBridge: (_req, onEvent, opts) => {
+        const bridge = new FakeBridge(onEvent, 6000 + created.length);
+        bridge.ready = () => new Promise((r) => setTimeout(r, 5));
+        created.push({ bridge, extensionsDisabled: opts?.extensionsDisabled === true });
+        return bridge;
+      },
+      sendEvent: () => {},
+      log: { info: () => {}, warn: () => {} },
+    });
+    const sender = new FakeSender(1);
+    await sessions.handlers['pi:start'](sender, { cwd: '/work' });
+
+    const [a, b] = await Promise.all([
+      sessions.handlers['pi:restart'](sender, undefined),
+      sessions.handlers['pi:restart'](sender, { cwd: '/elsewhere' }),
+    ]);
+
+    expect(a.success).toBe(true);
+    expect(b.success).toBe(true);
+    // start + two restarts = three bridges, every one with extensions.
+    expect(created).toHaveLength(3);
+    expect(created.every((c) => !c.extensionsDisabled)).toBe(true);
+    // The last request wins, and exactly one bridge is live at the end.
+    expect(sessions.bridges().filter((x) => x.alive).map((x) => x.pid)).toEqual([6002]);
+  });
+
   it('pi:restart acks pi-not-running when nothing is live', async () => {
     const { sessions } = setup();
     expect(await sessions.handlers['pi:restart'](new FakeSender(9), undefined)).toEqual({

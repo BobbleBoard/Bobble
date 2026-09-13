@@ -115,6 +115,42 @@ async function readBody(res: Response): Promise<AsyncIterable<Uint8Array>> {
 }
 
 /**
+ * ONLY WHAT AN OPENAI-SHAPED SERVER ACCEPTS.
+ *
+ * The request body is built for llama-server and then handed to every hook
+ * that runs on it. Two of those speak llama.cpp's dialect: the intent bias
+ * writes `logit_bias` as `[["_click", 4.5]]` — an ARRAY, with STRING keys the
+ * server tokenizes itself — and the OpenAI shape is `{ "<token id>": bias }`.
+ * MEASURED (2026-09-13, engine-matrix probe on Qwen3.5-4B): rapid-mlx answered
+ * `HTTP 400 Invalid request body: logit_bias: Value error, logit_bias must be
+ * a mapping of token-id (str) → …` on the second turn of a chat, which the
+ * chat showed as "The local model server returned an error" — the user's report.
+ *
+ * No tokenizer lives here to turn a string into an id, so the llama.cpp forms
+ * are DROPPED for these engines (the bias is a nudge, never a requirement);
+ * an object already keyed by numeric ids passes through. `return_progress` is
+ * llama-server's prefill-progress opt-in and is stripped for the same reason,
+ * even though today's engines ignore it.
+ */
+export function shapeForOpenAiServer(body: Record<string, unknown>): Record<string, unknown> {
+  const out = { ...body };
+  const bias = out.logit_bias;
+  if (Array.isArray(bias)) {
+    delete out.logit_bias;
+  } else if (bias !== null && typeof bias === 'object') {
+    const kept = Object.fromEntries(
+      Object.entries(bias as Record<string, unknown>).filter(
+        ([k, v]) => /^\d+$/.test(k) && typeof v === 'number',
+      ),
+    );
+    if (Object.keys(kept).length === 0) delete out.logit_bias;
+    else out.logit_bias = kept;
+  }
+  delete out.return_progress;
+  return out;
+}
+
+/**
  * Create the streamSimple function for an `mlx_lm.server` provider. Mirrors the
  * llamacpp stream's delta→AssistantMessageEventStream translation + repair, but
  * times TPS on the client (MLX sends no `timings`).
@@ -175,6 +211,39 @@ export function createMlxStream(deps: MlxStreamDeps = {}): MlxStreamFn {
         const replaced = await options?.onPayload?.(body, model);
         if (replaced !== null && replaced !== undefined && typeof replaced === 'object') {
           body = replaced as typeof body;
+        }
+        // After the hooks, since it is the hooks' llama.cpp-isms this removes.
+        body = shapeForOpenAiServer(body);
+        /*
+         * PROMPT SHAPE DIAGNOSTIC (PI_DIAG_PROMPTS=1): one line per request
+         * with every message's role + length and the tool names, so "why did
+         * the prefix cache only reuse N tokens" can be answered by diffing two
+         * consecutive lines instead of guessing which message changed.
+         */
+        const diag = process.env.PI_DIAG_PROMPTS;
+        if (diag !== undefined && diag !== '') {
+          const msgs = (body.messages as Array<{ role: string; content: unknown }>).map((m) => {
+            const c = m.content;
+            const len = typeof c === 'string' ? c.length : JSON.stringify(c ?? '').length;
+            return `${m.role}:${len}`;
+          });
+          const tools = Array.isArray(body.tools)
+            ? (body.tools as Array<{ function?: { name?: string } }>).map(
+                (t) => t.function?.name ?? '?',
+              )
+            : [];
+          const line = `[pi-diag-prompt] msgs=[${msgs.join(' ')}] tools=[${tools.join(',')}] sys=${
+            typeof context.systemPrompt === 'string' ? context.systemPrompt.length : 0
+          }\n`;
+          // A path appends to a file (pi's stderr is not kept); '1' says it there.
+          if (diag.includes('/')) {
+            try {
+              const { appendFileSync } = await import('node:fs');
+              appendFileSync(diag, line);
+            } catch {
+              /* a diagnostic never breaks a turn */
+            }
+          } else process.stderr.write(line);
         }
         const res = await doFetch(`${model.baseUrl}/chat/completions`, {
           method: 'POST',

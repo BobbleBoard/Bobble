@@ -156,6 +156,20 @@ async function ack(promise: Promise<unknown>): Promise<{ success: boolean; error
 
 export function createPiSessions<S extends SessionSender>(deps: PiSessionsDeps<S>): PiSessions<S> {
   const entries = new Map<number, SessionEntry>();
+  /**
+   * ONE RESTART AT A TIME PER RENDERER.
+   *
+   * MEASURED (2026-09-13, engine-matrix probe): two `pi:restart`s landing in
+   * the same tick — the model-switch repoint and a workspace change both ask
+   * for one — each disposed the old bridge, each spawned a fresh one, and the
+   * second `attach` disposed the first's still-starting bridge. Its `ready()`
+   * then resolved dead, which reads exactly like an extension crashing pi at
+   * startup, so the session was respawned WITHOUT ANY EXTENSIONS: no tools,
+   * and no provider handler for the local server — every turn after that
+   * aborted or errored. A restart now waits for the one in flight and runs
+   * after it, so the last request still wins and nothing is torn down twice.
+   */
+  const restarting = new Map<number, Promise<unknown>>();
 
   function liveEntry(wcId: number): SessionEntry | undefined {
     const entry = entries.get(wcId);
@@ -511,14 +525,24 @@ export function createPiSessions<S extends SessionSender>(deps: PiSessionsDeps<S
     // bridge unchanged, so a stuck pi can only be recovered through here.
     'pi:restart': async (sender, req) => {
       const wcId = sender.id;
-      const entry = entries.get(wcId);
-      if (entry === undefined) return { success: false, error: 'pi is not running' };
-      const spawnReq = req ?? entry.req;
-      entry.bridge.dispose();
-      await entry.bridge.whenExited();
-      const fresh = await spawnFresh(sender, spawnReq);
-      deps.log.info('pi bridge restarted', { wcId, pid: fresh.bridge.pid });
-      return { success: true, pid: fresh.bridge.pid };
+      const run = async (): Promise<{ success: boolean; error?: string; pid?: number }> => {
+        const entry = entries.get(wcId);
+        if (entry === undefined) return { success: false, error: 'pi is not running' };
+        const spawnReq = req ?? entry.req;
+        entry.bridge.dispose();
+        await entry.bridge.whenExited();
+        const fresh = await spawnFresh(sender, spawnReq);
+        deps.log.info('pi bridge restarted', { wcId, pid: fresh.bridge.pid });
+        return { success: true, pid: fresh.bridge.pid };
+      };
+      const previous = restarting.get(wcId) ?? Promise.resolve();
+      const mine = previous.then(run, run);
+      restarting.set(wcId, mine);
+      try {
+        return await mine;
+      } finally {
+        if (restarting.get(wcId) === mine) restarting.delete(wcId);
+      }
     },
   };
 

@@ -198,3 +198,35 @@ describe('the host hooks', () => {
     expect(statuses).toEqual([200]);
   });
 });
+
+describe('shapeForOpenAiServer — the body an OpenAI-shaped engine will take', () => {
+  it("drops llama.cpp's array-form logit_bias (string keys the server would have to tokenize)", async () => {
+    const { shapeForOpenAiServer } = await import('./stream.js');
+    const out = shapeForOpenAiServer({
+      model: 'm',
+      messages: [],
+      logit_bias: [['_click', 4.5]],
+      return_progress: true,
+    });
+    expect(out).toEqual({ model: 'm', messages: [] });
+  });
+
+  it('keeps an object keyed by numeric token ids and strips the rest', async () => {
+    const { shapeForOpenAiServer } = await import('./stream.js');
+    expect(shapeForOpenAiServer({ logit_bias: { '18070': 4.5, _click: 2 } })).toEqual({
+      logit_bias: { '18070': 4.5 },
+    });
+    expect(shapeForOpenAiServer({ logit_bias: { _click: 2 } })).toEqual({});
+  });
+
+  it('leaves everything else alone', async () => {
+    const { shapeForOpenAiServer } = await import('./stream.js');
+    const body = {
+      model: 'm',
+      messages: [{ role: 'user', content: 'hi' }],
+      tools: [],
+      temperature: 0.7,
+    };
+    expect(shapeForOpenAiServer(body)).toEqual(body);
+  });
+});
