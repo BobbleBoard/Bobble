@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MAC_MONITOR_TAB_KEY, macMonitorTabAction } from './mac-monitor';
+import { MAC_MONITOR_TAB_KEY, macMonitorMayOpen, macMonitorTabAction } from './mac-monitor';
 
 describe('macMonitorTabAction', () => {
   it('opens nothing while nothing is being controlled', () => {
@@ -44,5 +44,32 @@ describe('macMonitorTabAction', () => {
 
   it('keeps a stable upsert key so repeat sessions reuse the one tab', () => {
     expect(MAC_MONITOR_TAB_KEY).toBe('mac-monitor');
+  });
+});
+
+describe('macMonitorMayOpen — the tab stays in the chat that is driving', () => {
+  const base = {
+    owner: '/s/a.jsonl',
+    viewed: '/s/a.jsonl',
+    backgroundRun: false,
+    dismissed: false,
+  };
+  it('opens in the owning chat', () => {
+    expect(macMonitorMayOpen(base)).toBe(true);
+  });
+  it('does not follow the user into another chat', () => {
+    expect(macMonitorMayOpen({ ...base, viewed: '/s/b.jsonl' })).toBe(false);
+  });
+  it('never opens over a chat while the run is in the background', () => {
+    // The viewed chat is not the one driving, whatever the pointers say.
+    expect(macMonitorMayOpen({ ...base, backgroundRun: true })).toBe(false);
+    expect(macMonitorMayOpen({ ...base, viewed: '/s/b.jsonl', backgroundRun: true })).toBe(false);
+  });
+  it('stays closed for the rest of a session the user closed it in', () => {
+    expect(macMonitorMayOpen({ ...base, dismissed: true })).toBe(false);
+  });
+  it('opens when the owner is unknown (a chat with no file yet) and nothing runs in the background', () => {
+    expect(macMonitorMayOpen({ ...base, owner: null, viewed: null })).toBe(true);
+    expect(macMonitorMayOpen({ ...base, owner: null, viewed: '/s/b.jsonl' })).toBe(true);
   });
 });

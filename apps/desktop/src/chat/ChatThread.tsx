@@ -911,8 +911,10 @@ export function ChatThread() {
            */}
           {orphanPresented.length > 0 ? renderPresented(orphanPresented) : null}
           {/* Breathing room so the last message/thought is never jammed against
-              the composer — the user can scroll it up clear of the input bar. */}
-          <div className="h-28 shrink-0" aria-hidden />
+              the composer. the user (2026-09-12): "reduce buffer space between
+              stream and input bar" — it was 112px on top of the message's own
+              action row, ~170px of nothing under a streaming reply. */}
+          <div className="h-6 shrink-0" aria-hidden data-testid="thread-tail-space" />
         </Thread>
       </ScrollArea>
       {away ? (

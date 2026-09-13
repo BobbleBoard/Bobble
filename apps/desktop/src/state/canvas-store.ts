@@ -26,6 +26,13 @@ interface CanvasUiState {
   canvasOpen: boolean;
   setCanvasOpen: (open: boolean) => void;
   toggleCanvasOpen: () => void;
+  /**
+   * Bumped whenever the WHOLE tab set is swapped for another chat's
+   * (restore / reset on a chat switch). A router watching for "my tab is
+   * gone" reads it to tell a swap from the user closing the tab — the two
+   * look identical from the controller.
+   */
+  swapEpoch: number;
 }
 
 const clampWidth = (w: number): number => Math.max(CANVAS_MIN_WIDTH, Math.min(CANVAS_MAX_WIDTH, w));
@@ -36,7 +43,13 @@ export const useCanvasStore = create<CanvasUiState>((set) => ({
   canvasOpen: false,
   setCanvasOpen: (open) => set({ canvasOpen: open }),
   toggleCanvasOpen: () => set((s) => ({ canvasOpen: !s.canvasOpen })),
+  swapEpoch: 0,
 }));
+
+/** A whole-canvas swap is about to happen (see `swapEpoch`). */
+function noteSwap(): void {
+  useCanvasStore.setState((s) => ({ swapEpoch: s.swapEpoch + 1 }));
+}
 
 // ── Canvas controller bridge (per-session isolation) ───────────────────────
 // The canvas TAB set lives in the React-owned CanvasController (@pi-desktop/
@@ -125,6 +138,7 @@ const EMPTY_TABS: CanvasState['tabs'] = [];
  * slide the rail closed so it starts empty. Safe before the shell mounts (no-op).
  */
 export function resetCanvasForNewSession(): void {
+  noteSwap();
   controller?.reset();
   useCanvasStore.getState().setCanvasOpen(false);
 }
@@ -138,6 +152,7 @@ export function snapshotCanvas(): CanvasState | null {
 /** Restore a previously-snapshotted canvas for a returned-to chat, opening the
  * rail only when the snapshot actually had tabs (else it stays closed). */
 export function restoreCanvas(state: CanvasState): void {
+  noteSwap();
   controller?.restore(state);
   useCanvasStore.getState().setCanvasOpen(state.tabs.length > 0);
 }

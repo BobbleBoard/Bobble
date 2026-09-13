@@ -35,6 +35,7 @@ import { IDLE_MAC_MONITOR_SESSION } from '@pi-desktop/canvas';
 import { useEffect, useRef } from 'react';
 import { useCanvasStore } from '../../state/canvas-store';
 import { abortPi, pausePi } from '../../state/pi-connect';
+import { usePiStore } from '../../state/pi-slice';
 import { useSettingsStore } from '../../state/settings-store';
 import { appIconSrc } from '../app-icons';
 
@@ -59,6 +60,9 @@ interface RawFrame {
 
 class MacMonitorFeedImpl implements MacMonitorFeed {
   #session: MacMonitorSessionState = IDLE_MAC_MONITOR_SESSION;
+  /** Counts sessions (inactive → active edges), so a tab closed during one is
+   * not reopened by that same session's next status change. */
+  #sessionSeq = 0;
   #frame: MacMonitorDecodedFrame | null = null;
   /** The Accessibility drawing's source, when the pixels cannot come. Plain
    * JSON off the wire — no decode, so no async and no generation guard. */
@@ -149,8 +153,12 @@ class MacMonitorFeedImpl implements MacMonitorFeed {
     captureDenied?: boolean;
   }): void {
     // A brand-new session is a new story: the user's take-over ended with the
-    // run it interrupted.
-    if (state.active && !this.#session.active) this.#takenOver = false;
+    // run it interrupted — and the tab router starts a new count (see
+    // useMacMonitor, which opens ONE tab per session, in ONE chat).
+    if (state.active && !this.#session.active) {
+      this.#takenOver = false;
+      this.#sessionSeq += 1;
+    }
     this.#session = {
       active: state.active,
       appName: state.appName,
@@ -271,6 +279,11 @@ class MacMonitorFeedImpl implements MacMonitorFeed {
   }
 
   // ── MacMonitorFeed ───────────────────────────────────────────────────────
+
+  /** The current session's ordinal — 0 before any, bumped on each start. */
+  getSessionSeq(): number {
+    return this.#sessionSeq;
+  }
 
   getSession(): MacMonitorSessionState {
     return this.#session;
@@ -451,31 +464,85 @@ export function macMonitorTabAction(
 }
 
 /**
+ * Whether the monitor tab may be OPENED right now — pure, so the rule that
+ * keeps the tab in its own chat is testable without a canvas.
+ *
+ * the user (2026-09-12): "going to other chats, even when computer use is not
+ * active in them after it previously has been in the current chat is pinning
+ * a computer use tab in the canvas that reopens when closed". The session is
+ * app-wide (one controlled app), but the TAB belongs to the chat whose turn is
+ * driving it: every status change used to re-run the open rule against
+ * whichever chat's canvas was showing, so a run left in the background pinned
+ * its tab into every chat the user visited, and closing it only lasted until
+ * the next cursor move.
+ */
+export function macMonitorMayOpen(s: {
+  /** The chat whose turn started the session (its session file), or null when unknown. */
+  readonly owner: string | null;
+  /** The chat on screen (its session file). */
+  readonly viewed: string | null;
+  /** A turn is running in a chat the user is not looking at. */
+  readonly backgroundRun: boolean;
+  /** The user closed this session's tab already. */
+  readonly dismissed: boolean;
+}): boolean {
+  if (s.dismissed) return false;
+  if (s.backgroundRun) return false;
+  if (s.owner !== null && s.viewed !== s.owner) return false;
+  return true;
+}
+
+/**
  * Open/focus the computer-use monitor tab when a session starts, and keep its
  * title on the app being driven. Mirrors `useBrowserAgent`'s auto-open.
  *
  * The tab is NOT closed when the session ends: the surface shows its own idle
  * state, and a tab that vanishes out from under someone who was watching it is
- * worse than one that says "nothing is being controlled".
+ * worse than one that says "nothing is being controlled". It IS left closed
+ * when the user closed it during the session (see macMonitorMayOpen).
  */
 export function useMacMonitor(controller: CanvasController): void {
-  const opened = useRef(false);
+  /** The session (by ordinal) whose owner chat has been decided, and who it is. */
+  const owner = useRef<{ seq: number; chat: string | null }>({ seq: 0, chat: null });
+  /** The session ordinal whose tab the user closed. */
+  const dismissed = useRef(0);
+  /** Whether the tab was in the controller at the last look — a presence →
+   * absence edge during a live session, in the owning chat, is the user
+   * closing it (a chat switch swaps the whole canvas, and is told apart by the
+   * run being in the background by then). */
+  const present = useRef(false);
 
   useEffect(() => {
     macMonitorFeed.start();
     const apply = (): void => {
       const session = macMonitorFeed.getSession();
+      const seq = macMonitorFeed.getSessionSeq();
+      const pi = usePiStore.getState();
+      const viewed = pi.session?.sessionFile ?? null;
+      const backgroundRun = pi.bgRun?.streaming === true;
+      if (session.active && owner.current.seq !== seq) {
+        // The chat driving the app: the one running in the background if
+        // there is one, else the one on screen.
+        owner.current = { seq, chat: backgroundRun ? (pi.bgRun?.sessionFile ?? null) : viewed };
+      }
       const existing = controller.getState().tabs.find((t) => t.key === MAC_MONITOR_TAB_KEY);
       const action = macMonitorTabAction(
         session,
         existing === undefined ? undefined : { id: existing.id, title: existing.title },
       );
-      if (action === null) {
-        if (existing === undefined) opened.current = false;
-        return;
-      }
+      if (action === null) return;
       if (action.kind === 'retitle') {
         controller.updateTab(action.id, { title: action.title });
+        return;
+      }
+      if (
+        !macMonitorMayOpen({
+          owner: owner.current.chat,
+          viewed,
+          backgroundRun,
+          dismissed: dismissed.current === seq,
+        })
+      ) {
         return;
       }
       controller.upsertTab(MAC_MONITOR_TAB_KEY, {
@@ -487,9 +554,48 @@ export function useMacMonitor(controller: CanvasController): void {
       const tab = controller.getState().tabs.find((t) => t.key === MAC_MONITOR_TAB_KEY);
       if (tab !== undefined) controller.focusTab(tab.id);
       useCanvasStore.getState().setCanvasOpen(true);
-      opened.current = true;
+      present.current = true;
     };
+    present.current = controller.getState().tabs.some((t) => t.key === MAC_MONITOR_TAB_KEY);
     apply();
-    return macMonitorFeed.subscribe(apply);
+    const unsubFeed = macMonitorFeed.subscribe(apply);
+    // Returning to the owning chat (its canvas restored without the tab) is a
+    // moment to open it; a chat switch is what a session change means here.
+    let lastFile = usePiStore.getState().session?.sessionFile ?? null;
+    const unsubPi = usePiStore.subscribe((s) => {
+      const file = s.session?.sessionFile ?? null;
+      if (file === lastFile) return;
+      lastFile = file;
+      apply();
+    });
+    // A tab that is gone while its session runs was closed by the user: this
+    // session does not get it back.
+    let swapSeen = useCanvasStore.getState().swapEpoch;
+    const unsubController = controller.subscribe(() => {
+      const here = controller.getState().tabs.some((t) => t.key === MAC_MONITOR_TAB_KEY);
+      const was = present.current;
+      present.current = here;
+      const swap = useCanvasStore.getState().swapEpoch;
+      const swapped = swap !== swapSeen;
+      swapSeen = swap;
+      if (here || !was) return;
+      // A chat switch swaps the whole canvas — the tab leaving with it is not
+      // the user closing it (it comes back with that chat's snapshot).
+      if (swapped) return;
+      const pi = usePiStore.getState();
+      const viewed = pi.session?.sessionFile ?? null;
+      if (
+        macMonitorFeed.getSession().active &&
+        pi.bgRun?.streaming !== true &&
+        (owner.current.chat === null || viewed === owner.current.chat)
+      ) {
+        dismissed.current = macMonitorFeed.getSessionSeq();
+      }
+    });
+    return () => {
+      unsubFeed();
+      unsubPi();
+      unsubController();
+    };
   }, [controller]);
 }

@@ -443,8 +443,36 @@
  * borrow the selected tab's fold.
  */
 .pd-canvas-tab:not([data-active]):hover {
-  background: var(--pd-bg-active);
   color: var(--pd-text-primary);
+}
+
+/*
+ * THE HOVER PILL FLOATS. the user (2026-09-12): "raise the bottom bar of the hover
+ * animation for the canvas tabs." SEEN at 3×: the hover fill was the tab's own
+ * box, and that box sits flush on the strip's seam because the SELECTED tab
+ * folds into the pane from exactly there — so a hovered tab read as a slab
+ * standing on the pane's edge. The box has to stay where it is; the fill does
+ * not. It is a pill painted behind the tab (the slot's ::after, under the label
+ * via a negative z-index inside the slot's own stacking context) that stops
+ * 4px short of the seam — an object floating on the strip, like the label it
+ * highlights.
+ */
+.pd-canvas-tab-slot {
+  isolation: isolate;
+}
+.pd-canvas-tab-slot::after {
+  content: "";
+  position: absolute;
+  inset: 0 0 4px 0;
+  border-radius: var(--pd-radius-md);
+  background: var(--pd-bg-active);
+  opacity: 0;
+  z-index: -1;
+  pointer-events: none;
+  transition: opacity var(--pd-duration-fast) var(--pd-easing-standard);
+}
+.pd-canvas-tab-slot:has(.pd-canvas-tab:not([data-active]):hover)::after {
+  opacity: 1;
 }
 
 /*
