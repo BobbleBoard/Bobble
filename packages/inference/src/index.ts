@@ -12,6 +12,7 @@ export * from './catalog.js';
 export * from './chat-template.js';
 export * from './context-cap.js';
 export * from './download.js';
+export * from './engine-flags.js';
 export * from './engine-launch.js';
 export * from './engine-select.js';
 export * from './guardian.js';

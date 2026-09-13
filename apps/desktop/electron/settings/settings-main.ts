@@ -267,6 +267,12 @@ const handlers: IpcHandlers<SettingsInvokeMap> = {
     if (next.powerMode !== before.powerMode || next.powerReserveGB !== before.powerReserveGB) {
       onPowerSettingsChanged?.();
     }
+    if (
+      JSON.stringify(next.engineLaunch) !== JSON.stringify(before.engineLaunch) ||
+      JSON.stringify(next.modelSpec) !== JSON.stringify(before.modelSpec)
+    ) {
+      onEngineLaunchChanged?.();
+    }
     /* The pill is drawn by the Swift panel, which has no idea a setting exists —
        so the change has to be pushed at it, and it has to take effect on a pill
        that is ALREADY on screen, not just the next one. */
@@ -289,12 +295,15 @@ const handlers: IpcHandlers<SettingsInvokeMap> = {
  * depend on inference — the dependency already runs the other way.
  */
 let onPowerSettingsChanged: (() => void) | undefined;
+/** Same seam for the launch flags + speculative choices (Settings → Advanced → Engine). */
+let onEngineLaunchChanged: (() => void) | undefined;
 
 export function registerSettingsIpc(
   ipcMain: IpcMain,
   allowSender: (event: unknown) => boolean,
-  opts: { onPowerChanged?: () => void } = {},
+  opts: { onPowerChanged?: () => void; onEngineLaunchChanged?: () => void } = {},
 ): void {
   onPowerSettingsChanged = opts.onPowerChanged;
+  onEngineLaunchChanged = opts.onEngineLaunchChanged;
   registerIpcHandlers<SettingsInvokeMap>(ipcMain, handlers, { allowSender });
 }

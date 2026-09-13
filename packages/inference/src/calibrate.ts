@@ -26,12 +26,23 @@ export type CalibEngine =
   | 'vllm';
 
 /** How the engine is asked to speculate. `auto` = the engine's own choice. */
-export type CalibSpec = 'none' | 'mtp' | 'eagle3' | 'dflash' | 'dspark' | 'ngram' | 'auto';
+export type CalibSpec =
+  | 'none'
+  | 'mtp'
+  | 'eagle3'
+  | 'dflash'
+  | 'dspark'
+  | 'ngram'
+  | 'auto'
+  /** The user's own draft GGUF (never planned by calibration; see ModelSpecChoice). */
+  | 'custom';
 
 /** A way to run the model: the thing calibration chooses between and persists. */
 export interface LaunchProfile {
   readonly engine: CalibEngine;
   readonly spec: CalibSpec;
+  /** `custom` only: the user's draft GGUF and the llama.cpp spec type for it. */
+  readonly custom?: { readonly draftPath: string; readonly specType: string };
 }
 
 export interface CalibrationCandidate extends LaunchProfile {
@@ -88,6 +99,7 @@ const SPEC_LABEL: Record<CalibSpec, string> = {
   dspark: 'DSpark',
   ngram: 'n-gram',
   auto: 'auto',
+  custom: 'custom draft',
 };
 
 export function candidateOf(engine: CalibEngine, spec: CalibSpec): CalibrationCandidate {

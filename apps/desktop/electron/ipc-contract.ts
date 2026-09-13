@@ -345,6 +345,17 @@ export interface LlmStatus {
   provider?: 'llamacpp' | 'mlx';
   /** A calibration is running: the server is being swapped in and out. */
   calibrating?: boolean;
+  /**
+   * The command line the running server was launched with — the whole
+   * truth, for the panel's "current command" view — and a fingerprint of
+   * the user's part of it (flags + speculative choice), so the panel's Apply
+   * can light up exactly when the saved settings differ from what is running.
+   */
+  launchArgs?: string[];
+  launchCommand?: string;
+  launchConfigFingerprint?: string;
+  /** The `--spec-type` values the running llama.cpp build accepts. */
+  engineSpecTypes?: string[];
   error?: string;
 }
 
@@ -455,6 +466,8 @@ export interface LlmCatalogEntry {
   source?: 'curated' | 'hf';
   /** True only for HEAD-verified curated repos; false for discovered/reserved adds. */
   verified?: boolean;
+  /** Speculative methods whose draft GGUF is on disk beside the weights. */
+  draftersOnDisk?: string[];
 }
 
 export interface LlmHardware {
@@ -582,6 +595,42 @@ export type LlmInvokeMap = {
   'llm:use-profile': {
     request: { engine: string; spec: string };
     response: { success: boolean; error?: string };
+  };
+  /** Restart the running server so saved launch flags take effect (Apply). */
+  'llm:relaunch': { request: undefined; response: { success: boolean; error?: string } };
+  /** Every GGUF on this machine the app knows about, for the custom-draft picker. */
+  'llm:list-local-ggufs': {
+    request: undefined;
+    response: {
+      files: Array<{ path: string; name: string; bytes: number; modelId: string; kind: string }>;
+    };
+  };
+  /** A native file dialog for a draft GGUF; null when cancelled. */
+  'llm:pick-gguf': { request: undefined; response: { path: string | null } };
+  /** Every flag an engine accepts, parsed from its own `--help`. */
+  'llm:engine-flags': {
+    request: { engine: string };
+    response: {
+      engine: string;
+      command: string;
+      flags: Array<{
+        key: string;
+        aliases: readonly string[];
+        placeholder: string | null;
+        control:
+          | { kind: 'switch' }
+          | { kind: 'number' }
+          | { kind: 'text' }
+          | { kind: 'path' }
+          | { kind: 'select'; options: readonly string[] };
+        description: string;
+        defaultValue?: string;
+        env?: string;
+        section: string;
+        category: string;
+      }>;
+      error?: string;
+    };
   };
 };
 
@@ -738,6 +787,10 @@ export const LLM_INVOKE_CHANNELS = [
   'llm:calibrate-cancel',
   'llm:calibration-record',
   'llm:use-profile',
+  'llm:relaunch',
+  'llm:engine-flags',
+  'llm:list-local-ggufs',
+  'llm:pick-gguf',
 ] as const satisfies readonly (keyof LlmInvokeMap)[];
 
 // ---------------------------------------------------------------------------

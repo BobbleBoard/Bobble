@@ -49,6 +49,7 @@ import {
   getLoadedModel,
   heavyJobEco,
   parkChatModel,
+  pushEngineLaunchSettings,
   pushPowerSettings,
   registerLlmIpc,
   resumeChatModel,
@@ -908,6 +909,7 @@ function registerAppIpc(): void {
     // The power choice acts in the inference worker; settings is only where it
     // is kept. See pushPowerSettings.
     onPowerChanged: () => pushPowerSettings(),
+    onEngineLaunchChanged: () => pushEngineLaunchSettings(),
   });
 
   // Projects (working folders): list/set/new/clear, persisted to projects.json.

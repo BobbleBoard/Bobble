@@ -1,0 +1,181 @@
+usage: mlx-dspark serve [-h] [--mode {auto,dspark,dflash,lookup,baseline}]
+                        [--model MODEL] [--no-model] [--drafter DRAFTER]
+                        [--max-draft MAX_DRAFT]
+                        [--default-max-tokens DEFAULT_MAX_TOKENS]
+                        [--max-tokens-cap MAX_TOKENS_CAP]
+                        [--default-temperature DEFAULT_TEMPERATURE]
+                        [--default-top-p DEFAULT_TOP_P]
+                        [--default-top-k DEFAULT_TOP_K]
+                        [--confidence-threshold CONFIDENCE_THRESHOLD]
+                        [--drafter-bits DRAFTER_BITS] [--kv-bits {0,4,8}]
+                        [--max-batch MAX_BATCH]
+                        [--context-window CONTEXT_WINDOW] [--host HOST]
+                        [--port PORT] [--api-key API_KEY] [--no-thinking]
+                        [--reasoning-effort {low,medium,high,xhigh}]
+                        [--no-prefix-cache] [--wired-limit]
+                        [--prefix-cache-slots PREFIX_CACHE_SLOTS]
+                        [--prefix-cache-rungs N]
+                        [--lookup-drafts | --no-lookup-drafts]
+                        [--lookup-long-draft LOOKUP_LONG_DRAFT]
+                        [--wide-gemm-min N] [--trust-remote-code]
+                        [--cpu-split FRAC] [--small-m | --no-small-m]
+                        [--sdpa-split | --no-sdpa-split]
+                        [--warmup | --no-warmup]
+                        [--memory-guard | --no-memory-guard]
+                        [--prefix-cache-dir PREFIX_CACHE_DIR]
+                        [--prefix-cache-max-ram-mb PREFIX_CACHE_MAX_RAM_MB]
+
+OpenAI-compatible API server.
+
+options:
+  -h, --help            show this help message and exit
+  --mode {auto,dspark,dflash,lookup,baseline}
+                        'auto' (default) picks the target's measured-best
+                        speculation (the registry row's stamped mode, e.g.
+                        DFlash 2 on Qwen3.8-27B; else dspark -> dflash ->
+                        drafter-free lookup), so any repo serves
+  --model MODEL         target model: an HF repo or local path (e.g. mlx-
+                        community/Qwen3-8B-8bit). Matched drafter auto-
+                        resolves for known targets; else pass --drafter. See
+                        `mlx-dspark models`.
+  --no-model            start without loading any model: the server comes up
+                        instantly, generation routes answer 503 until a client
+                        loads one via POST /admin/load (model pickers still
+                        work — /doctor and /admin/models answer model-free)
+  --drafter DRAFTER     drafter repo/path (overrides auto-resolve)
+  --max-draft MAX_DRAFT
+                        cap on tokens verified per round; <=0 = full block;
+                        'auto' = adapt the cap per round. Omit to let
+                        dspark/dflash DERIVE the cap from this
+                        machine+model+quant's measured curves (static_cap, ~5
+                        s once, cached); lookup=6.
+  --default-max-tokens DEFAULT_MAX_TOKENS
+                        max_tokens used when a request doesn't send one
+                        (default 2048)
+  --max-tokens-cap MAX_TOKENS_CAP
+                        hard ceiling on per-request max_tokens (default 32768
+                        — thinking models routinely need >8k)
+  --default-temperature DEFAULT_TEMPERATURE
+                        temperature for requests that don't send one
+                        (overrides the model's generation_config; note many
+                        mlx-community repos ship none, in which case omitted
+                        temperature means greedy unless this is set)
+  --default-top-p DEFAULT_TOP_P
+                        top_p for requests that don't send one (see --default-
+                        temperature)
+  --default-top-k DEFAULT_TOP_K
+                        top_k for requests that don't send one (see --default-
+                        temperature)
+  --confidence-threshold CONFIDENCE_THRESHOLD
+  --drafter-bits DRAFTER_BITS
+  --kv-bits {0,4,8}     quantize the target KV cache (4/8 bits; 0 = off). Cuts
+                        the KV bandwidth bill on long contexts; mlx-lm text
+                        targets only (disables --max-batch)
+  --max-batch MAX_BATCH
+                        micro-batch up to N concurrently-queued requests
+                        through one batched target forward (dense mlx-lm
+                        target + dspark/baseline; ~1.5-2.5x aggregate
+                        throughput at 2-4 concurrent). 1 = serialized
+                        (default)
+  --context-window CONTEXT_WINDOW
+                        cap the prompt length (default: the target's own
+                        trained limit). An over-long request is refused with
+                        the message Claude Code recognises as a context limit,
+                        so it compacts and retries instead of failing; lower
+                        it to keep the KV cache inside your RAM budget.
+  --host HOST
+  --port PORT
+  --api-key API_KEY     if set, requests must send 'Authorization: Bearer
+                        <key>'
+  --no-thinking         default responses to non-thinking mode (Qwen3
+                        enable_thinking=False); clients can still override
+                        per-request
+  --reasoning-effort {low,medium,high,xhigh}
+                        default reasoning depth for models whose chat template
+                        supports it (Qwen3.8-class reasoning_effort; templates
+                        that don't know the kwarg ignore it). Clients can
+                        override per-request; /health reports whether the
+                        loaded model supports it
+  --no-prefix-cache     disable multi-turn prefix caching (reuse the shared
+                        conversation prefix's KV; on by default for
+                        dspark/lookup/baseline on dense or under-window
+                        sliding-window targets)
+  --wired-limit         wire MLX's recommended working set (~75% of RAM) so
+                        weights can't be paged out. OFF by default and rarely
+                        worth it: wired pages cannot be reclaimed, so on a
+                        machine whose working set is already large this can
+                        HANG macOS hard enough to need a power cycle (observed
+                        on an M4 Pro). Short of that it has corrupted the
+                        verify logits on the gemma-4/mlx-vlm route, which can
+                        commit wrong tokens rather than crash. It bought no
+                        measurable speed where tested (<1%). Only consider it
+                        if the model nearly fills your RAM and you actually
+                        see paging stalls - and validate a long run before
+                        trusting it.
+  --prefix-cache-slots PREFIX_CACHE_SLOTS
+                        number of conversations kept in the prefix cache LRU
+                        (default 2, so an agent and a chat don't evict each
+                        other every turn)
+  --prefix-cache-rungs N
+                        checkpoint-mode prefix caching (hybrid/recurrent
+                        targets, wrapped gemma-4): also snapshot the recurrent
+                        state every N prompt tokens, so a request that
+                        diverges mid-prompt (new session on the same system
+                        prompt, compacted history) partially reuses the cache
+                        instead of missing outright (default 8192; 0 disables)
+  --lookup-drafts, --no-lookup-drafts
+                        hybrid n-gram drafting inside dspark mode. Unset =
+                        each loaded pair's measured default (re-resolved on
+                        every /admin/load swap); an explicit value pins it for
+                        the whole server
+  --lookup-long-draft LOOKUP_LONG_DRAFT
+                        match-scaled long-draft ceiling for lookup drafts
+                        (default 32; set to 6 to disable — see `mlx-dspark
+                        generate -h`)
+  --wide-gemm-min N     prefill wide-GEMM crossover row count (default:
+                        calibrated once and cached; 0 disables — see `mlx-
+                        dspark generate -h`)
+  --trust-remote-code   allow a checkpoint to ship Python the loader imports
+                        (config.json model_file / auto_map). Refused by
+                        default: a crafted model repo would run code as you.
+                        Also MLX_DSPARK_TRUST_REMOTE_CODE=1
+  --cpu-split FRAC      prefill CPU co-prefill row fraction (default:
+                        calibrated once and cached; 0 disables — see `mlx-
+                        dspark generate -h`). /health reports the live state;
+                        /admin/load takes a per-swap `cpu_split` override (0 =
+                        off)
+  --small-m, --no-small-m
+                        small-M MMA verify kernel (see `mlx-dspark generate
+                        --help`). Unset = on where the cached probe proves it
+                        faster on this machine; --no-small-m forces the stock
+                        kernel — the serve-side A/B that previously required
+                        downgrading. /health reports the live state;
+                        /admin/load takes a per-swap `small_m` boolean
+                        override.
+  --sdpa-split, --no-sdpa-split
+                        wide-verify SDPA split (see `mlx-dspark generate
+                        --help`). Unset = on where a per-chip probe finds
+                        mlx's multi-row cliff; --no-sdpa-split forces the
+                        single call. /health reports the state.
+  --warmup, --no-warmup
+                        on load, run a tiny throwaway generation to compile
+                        the Metal kernels and ramp the GPU clock so the FIRST
+                        real request is warm instead of eating the ~2 s cold-
+                        start. On by default; --no-warmup skips it. /health
+                        reports 'warming_up' during the pass and a 'warmup'
+                        flag once ready; /admin/load takes a per-swap boolean.
+  --memory-guard, --no-memory-guard
+                        when macOS reports memory pressure, free the prefix
+                        cache's snapshots (WARN: rungs + older slots;
+                        CRITICAL: everything) and return MLX's retained
+                        buffers to the OS, at the next round boundary —
+                        trading a re-prefill for not swapping the model. On by
+                        default; /health reports 'memory_guard'; /admin/load
+                        takes a per-swap boolean.
+  --prefix-cache-dir PREFIX_CACHE_DIR
+                        directory for the L2 SSD spill tier (enables spilling
+                        the cache to disk)
+  --prefix-cache-max-ram-mb PREFIX_CACHE_MAX_RAM_MB
+                        spill the prefix cache to --prefix-cache-dir once it
+                        exceeds this many MB of RAM (0 = never spill; requires
+                        --prefix-cache-dir)

@@ -1,0 +1,146 @@
+usage: dflash serve [-h] [--prefill-step-size INT] [--draft-sink-size INT]
+                    [--draft-window-size INT]
+                    [--draft-full-context-min-ctx INT] [--verify-len-cap INT]
+                    [--clear-cache-boundaries | --no-clear-cache-boundaries]
+                    [--verify-mode {dflash,adaptive,ddtree,off}]
+                    [--copyspec-mode {conservative,off,auto}]
+                    [--max-snapshot-tokens INT]
+                    [--prefix-cache-l2 | --no-prefix-cache-l2]
+                    [--prefix-cache-l2-dir PATH]
+                    [--prefix-cache-l2-max-bytes BYTES]
+                    [--prefix-cache-l2-frontier-stride INT]
+                    [--prefix-cache | --no-prefix-cache]
+                    [--prefix-cache-max-entries INT]
+                    [--prefix-cache-max-bytes BYTES] [--target-fa-window INT]
+                    [--quantize-kv-cache | --no-quantize-kv-cache]
+                    [--dflash-max-ctx INT] [--model MODEL] [--host HOST]
+                    [--port PORT] [--draft-model DRAFT_MODEL]
+                    [--diagnostics {off,basic,full}]
+                    [--diagnostics-dir DIAGNOSTICS_DIR]
+                    [--wired-limit auto|none|BYTES]
+                    [--cache-limit auto|none|BYTES] [--draft-quant SPEC]
+                    [--log-level {DEBUG,INFO,WARNING,ERROR,CRITICAL}]
+                    [--chat-template CHAT_TEMPLATE]
+                    [--use-default-chat-template] [--temp TEMP]
+                    [--top-p TOP_P] [--top-k TOP_K] [--min-p MIN_P]
+                    [--max-tokens MAX_TOKENS]
+                    [--fastpath-max-tokens FASTPATH_MAX_TOKENS]
+                    [--chat-template-args CHAT_TEMPLATE_ARGS]
+                    [--enable-thinking]
+                    [--prompt-cache-size PROMPT_CACHE_SIZE]
+
+DFlash Server.
+
+options:
+  -h, --help            show this help message and exit
+  --prefill-step-size INT
+                        Prompt prefill chunk size.
+  --draft-sink-size INT
+                        Draft context cache sink tokens kept before the
+                        rolling window.
+  --draft-window-size INT
+                        Draft context cache rolling window tokens.
+  --draft-full-context-min-ctx INT
+                        Projected context (prompt + max new tokens) at or
+                        above which the draft full-attention layer attends all
+                        context features instead of the sink+window slice. 0 =
+                        always full-context. Short contexts pay a measured
+                        pure cost with no acceptance gain; deep contexts gain
+                        from matching the draft's full-attention training
+                        condition.
+  --verify-len-cap INT  Max tokens verified per target forward.
+  --clear-cache-boundaries, --no-clear-cache-boundaries
+                        Clear the MLX cache at safe request boundaries.
+  --verify-mode {dflash,adaptive,ddtree,off}
+                        Verify path mode. Default adaptive shortens low-
+                        acceptance blocks; use off only for debug/parity.
+  --copyspec-mode {conservative,off,auto}
+                        Prompt-lookup (copyspec) drafting. Default
+                        'conservative' disables copyspec after one missed copy
+                        block. 'auto' self-gates: periodically A/B-probes
+                        copyspec on vs off and latches to whichever is faster,
+                        resetting adaptive state on disengage (a clear win on
+                        strong-copyspec targets like large MoE; self-disables
+                        where copyspec doesn't pay off). 'off' disables
+                        copyspec entirely.
+  --max-snapshot-tokens INT
+                        Skip prefix-cache snapshot inserts above this token
+                        count; 0 disables the cap.
+  --prefix-cache-l2, --no-prefix-cache-l2
+                        Enable SSD L2 for persistent and spilled prefix
+                        snapshots.
+  --prefix-cache-l2-dir PATH
+                        Directory for prefix-cache L2 files.
+  --prefix-cache-l2-max-bytes BYTES
+                        Byte budget for prefix-cache L2. Accepts raw bytes or
+                        suffixes like 50GB.
+  --prefix-cache-l2-frontier-stride INT
+                        Token stride at which L2 frontier snapshots are
+                        written during cold prefill. 0 = auto (default: 8192,
+                        rounded up to a prefill-step multiple). Values below
+                        8192 are raised to the disk-pressure floor.
+  --prefix-cache, --no-prefix-cache
+                        Enable the DFlash prefix cache that reuses cross-turn
+                        KV state. Default: enabled. Big win on multi-turn
+                        agentic workloads, ~neutral on single-turn.
+  --prefix-cache-max-entries INT
+                        Maximum number of cached prefix snapshots.
+  --prefix-cache-max-bytes BYTES
+                        Maximum total bytes the prefix cache may hold. Accepts
+                        raw bytes or suffixes like 2GB.
+  --target-fa-window INT
+                        Experimental target verifier full-attention KV window.
+                        N>0 uses a rotating KV cache of N tokens for target
+                        full-attention layers only.
+  --quantize-kv-cache, --no-quantize-kv-cache
+                        Quantize the target full-attention KV cache to 8-bit
+                        (group size 64). Halves KV memory growth at long
+                        context; linear (gated-delta) layer state is
+                        unaffected. Trade-off: decode slows as context grows
+                        (no fused quantized-KV attention kernel in MLX yet) —
+                        use when memory is the binding constraint. Default:
+                        disabled. Incompatible with --target-fa-window.
+  --dflash-max-ctx INT  Hard cap on runtime context length.
+  --model MODEL         Target model repo ID or local path.
+  --host HOST
+  --port PORT
+  --draft-model DRAFT_MODEL, --draft DRAFT_MODEL
+                        Draft model repo ID or local path. Omit to use the
+                        DFlash registry.
+  --diagnostics {off,basic,full}
+                        Product diagnostics mode. basic writes structured
+                        request/cache logs; full also enables memory waterfall
+                        and per-cycle profiling.
+  --diagnostics-dir DIAGNOSTICS_DIR
+                        Diagnostics output directory. Default: .artifacts/dfla
+                        sh/diagnostics/<timestamp>-serve-<mode>.
+  --wired-limit auto|none|BYTES
+                        MLX wired memory limit. auto keeps the current device
+                        recommended limit; none skips mx.set_wired_limit;
+                        BYTES accepts suffixes like 48GB.
+  --cache-limit auto|none|BYTES
+                        MLX cache memory limit. Default: 4GB for the serve
+                        runtime; auto uses wired-limit/4; none skips
+                        mx.set_cache_limit; BYTES accepts suffixes like 8GB.
+  --draft-quant SPEC    Draft quantization override, e.g. w4:gs64; use 'none'
+                        to disable model defaults.
+  --log-level {DEBUG,INFO,WARNING,ERROR,CRITICAL}
+  --chat-template CHAT_TEMPLATE
+                        Inline chat template override.
+  --use-default-chat-template
+                        Force the tokenizer default chat template.
+  --temp TEMP           Default request temperature.
+  --top-p TOP_P         Default nucleus sampling cutoff.
+  --top-k TOP_K         Default top-k; 0 disables top-k filtering.
+  --min-p MIN_P         Default minimum probability filter.
+  --max-tokens MAX_TOKENS
+                        Default max generated tokens per request.
+  --fastpath-max-tokens FASTPATH_MAX_TOKENS
+                        Use target-only AR for requests with max_tokens <=
+                        this threshold. Default: 0 (disabled); set a positive
+                        value to enable.
+  --chat-template-args CHAT_TEMPLATE_ARGS
+                        JSON object passed to the chat-template renderer.
+  --enable-thinking     Set chat-template arg enable_thinking=true.
+  --prompt-cache-size PROMPT_CACHE_SIZE
+                        mlx_lm prompt-cache entry count.

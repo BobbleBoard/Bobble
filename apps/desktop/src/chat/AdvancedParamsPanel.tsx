@@ -31,9 +31,10 @@ import {
 } from '@pi-desktop/ui';
 import { type ReactNode, useState } from 'react';
 import { DEFAULT_ADVANCED } from '../../electron/settings/settings-contract';
-import { SettingGroup, SettingRow, SettingSection, SettingSlider } from '../settings/parts';
+import { SettingGroup, SettingSection, SettingSlider } from '../settings/parts';
 import { useGroundTruth } from '../state/advanced-store';
 import { setAdvanced, useAdvancedSettings } from '../state/settings-store';
+import { EngineTab } from './engine-settings/EngineTab';
 
 /** The section-level "Reset", in the app's small ghost-button idiom. */
 function ResetButton({ onClick }: { onClick: () => void }): ReactNode {
@@ -106,6 +107,8 @@ function GroundTruthView(): ReactNode {
   );
 }
 
+type PanelTab = 'engine' | 'sampling' | 'context';
+
 export function AdvancedParamsPanel({
   open,
   onOpenChange,
@@ -115,159 +118,141 @@ export function AdvancedParamsPanel({
 }): ReactNode {
   const adv = useAdvancedSettings();
   const s = adv.sampling;
-  const r = adv.reasoning;
+  const [tab, setTab] = useState<PanelTab>('engine');
 
   const patchSampling = (p: Partial<typeof s>): void =>
     void setAdvanced({ sampling: { ...s, ...p } });
-  const patchReasoning = (p: Partial<typeof r>): void =>
-    void setAdvanced({ reasoning: { ...r, ...p } });
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent aria-label="Advanced parameters" className="pd-adv-panel">
         <DialogHeader>
           <div className="min-w-0 pr-8">
-            <DialogTitle>Advanced parameters</DialogTitle>
+            <DialogTitle>Advanced</DialogTitle>
             <DialogDescription className="mt-1 text-footnote">
-              Power-user knobs and the live context sent to the local model.
+              Every engine flag, speculative decoding, sampling, and the live context sent to the
+              model.
             </DialogDescription>
           </div>
         </DialogHeader>
+        {/*
+         * THREE TABS, engine first. the user: "expand the advanced settings top
+         * right button to expose absolutely everything in an organized good
+         * gui manner, this includes first and foremost llamacpp". The engine
+         * tab is the whole flag surface of the running engine (its own --help,
+         * categorised), speculative decoding with drafters, and a paste-a-
+         * command route; sampling stays the instant, per-request knobs; the
+         * live context is the read-only truth of what the model was sent.
+         */}
+        <div className="pd-adv-tabs" role="tablist">
+          {(
+            [
+              ['engine', 'Engine'],
+              ['sampling', 'Sampling'],
+              ['context', 'Live context'],
+            ] as const
+          ).map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              aria-selected={tab === id}
+              className={`pd-adv-tab${tab === id ? ' pd-adv-tab--on' : ''}`}
+              onClick={() => setTab(id)}
+              data-testid={`advanced-tab-${id}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
 
         <DialogBody className="flex flex-col gap-8">
-          {/* GROUND TRUTH ---------------------------------------------------- */}
-          <SettingSection
-            title="Live context"
-            description="The exact prompt, tools, and messages of the last turn."
-          >
-            <GroundTruthView />
-          </SettingSection>
-
-          {/* SAMPLING (per-request) ----------------------------------------- */}
-          <SettingSection
-            title="Sampling"
-            description="Applied to the next request. No restart."
-            action={<ResetButton onClick={() => patchSampling(DEFAULT_ADVANCED.sampling)} />}
-          >
-            <SettingGroup testId="advanced-sampling">
-              <SettingSlider
-                label="Temperature"
-                value={s.temperature}
-                min={0}
-                max={2}
-                step={0.05}
-                format={(v) => v.toFixed(2)}
-                onChange={(v) => patchSampling({ temperature: v })}
-              />
-              <SettingSlider
-                label="Top P"
-                value={s.topP}
-                min={0}
-                max={1}
-                step={0.01}
-                format={(v) => v.toFixed(2)}
-                onChange={(v) => patchSampling({ topP: v })}
-              />
-              <SettingSlider
-                label="Top K"
-                value={s.topK}
-                min={0}
-                max={200}
-                step={1}
-                format={(v) => (v === 0 ? 'Off' : String(v))}
-                onChange={(v) => patchSampling({ topK: v })}
-              />
-              <SettingSlider
-                label="Min P"
-                value={s.minP}
-                min={0}
-                max={1}
-                step={0.01}
-                format={(v) => v.toFixed(2)}
-                onChange={(v) => patchSampling({ minP: v })}
-              />
-              <SettingSlider
-                label="Repetition penalty"
-                hint="1.00 = off. DRY handles anti-looping; a flat penalty here hurts code."
-                value={s.repetitionPenalty}
-                min={0.8}
-                max={1.5}
-                step={0.01}
-                format={(v) => (v === 1 ? 'Off (1.00)' : v.toFixed(2))}
-                onChange={(v) => patchSampling({ repetitionPenalty: v })}
-              />
-              <SettingSlider
-                label="Presence penalty"
-                value={s.presencePenalty}
-                min={-2}
-                max={2}
-                step={0.1}
-                format={(v) => v.toFixed(1)}
-                onChange={(v) => patchSampling({ presencePenalty: v })}
-              />
-              <SettingSlider
-                label="Max tokens"
-                hint="Per-request output cap. 0 = model default."
-                value={s.maxTokens}
-                min={0}
-                max={32768}
-                step={256}
-                format={(v) => (v === 0 ? 'Model default' : String(v))}
-                onChange={(v) => patchSampling({ maxTokens: v })}
-              />
-            </SettingGroup>
-          </SettingSection>
-
-          {/* REASONING (launch-time) ---------------------------------------- */}
-          <SettingSection
-            title="Reasoning"
-            description="Applied on the next server relaunch."
-            action={<ResetButton onClick={() => patchReasoning(DEFAULT_ADVANCED.reasoning)} />}
-          >
-            <SettingGroup testId="advanced-reasoning">
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex min-w-0 flex-col">
-                  <span className="text-body font-medium text-text-primary">Preserve thinking</span>
-                  <span className="mt-0.5 text-footnote text-text-muted">
-                    Keep &lt;think&gt; across the whole history, not just the last turn.
-                  </span>
-                </div>
-                <SegmentedControl
-                  className="shrink-0"
-                  aria-label="Preserve thinking"
-                  value={r.preserve ? 'on' : 'off'}
-                  onValueChange={(v) => patchReasoning({ preserve: v === 'on' })}
-                  options={[
-                    { value: 'on', label: 'On' },
-                    { value: 'off', label: 'Off' },
-                  ]}
-                />
-              </div>
-              <SettingSlider
-                label="Reasoning budget"
-                hint="Token cap on thinking. -1 = unrestricted; 0 = no thinking."
-                value={r.budget}
-                min={-1}
-                max={8192}
-                step={128}
-                format={(v) => (v === -1 ? 'Unrestricted' : v === 0 ? 'Off' : `${v} tokens`)}
-                onChange={(v) => patchReasoning({ budget: v })}
-              />
-            </SettingGroup>
-
-            <SettingRow
-              label="Budget-reached message"
-              hint="Injected before the end-of-thinking tag when the budget runs out."
+          {tab === 'engine' ? <EngineTab /> : null}
+          {tab === 'context' ? (
+            /* GROUND TRUTH ------------------------------------------------ */
+            <SettingSection
+              title="Live context"
+              description="The exact prompt, tools, and messages of the last turn."
             >
-              <input
-                type="text"
-                aria-label="Budget-reached message"
-                className="pd-input pd-focusable w-full"
-                value={r.budgetMessage}
-                onChange={(e) => patchReasoning({ budgetMessage: e.target.value })}
-              />
-            </SettingRow>
-          </SettingSection>
+              <GroundTruthView />
+            </SettingSection>
+          ) : null}
+          {tab === 'sampling' ? (
+            /* SAMPLING (per-request) --------------------------------------- */
+            <SettingSection
+              title="Sampling"
+              description="Applied to the next request. No restart."
+              action={<ResetButton onClick={() => patchSampling(DEFAULT_ADVANCED.sampling)} />}
+            >
+              <SettingGroup testId="advanced-sampling">
+                <SettingSlider
+                  label="Temperature"
+                  value={s.temperature}
+                  min={0}
+                  max={2}
+                  step={0.05}
+                  format={(v) => v.toFixed(2)}
+                  onChange={(v) => patchSampling({ temperature: v })}
+                />
+                <SettingSlider
+                  label="Top P"
+                  value={s.topP}
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  format={(v) => v.toFixed(2)}
+                  onChange={(v) => patchSampling({ topP: v })}
+                />
+                <SettingSlider
+                  label="Top K"
+                  value={s.topK}
+                  min={0}
+                  max={200}
+                  step={1}
+                  format={(v) => (v === 0 ? 'Off' : String(v))}
+                  onChange={(v) => patchSampling({ topK: v })}
+                />
+                <SettingSlider
+                  label="Min P"
+                  value={s.minP}
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  format={(v) => v.toFixed(2)}
+                  onChange={(v) => patchSampling({ minP: v })}
+                />
+                <SettingSlider
+                  label="Repetition penalty"
+                  hint="1.00 = off. DRY handles anti-looping; a flat penalty here hurts code."
+                  value={s.repetitionPenalty}
+                  min={0.8}
+                  max={1.5}
+                  step={0.01}
+                  format={(v) => (v === 1 ? 'Off (1.00)' : v.toFixed(2))}
+                  onChange={(v) => patchSampling({ repetitionPenalty: v })}
+                />
+                <SettingSlider
+                  label="Presence penalty"
+                  value={s.presencePenalty}
+                  min={-2}
+                  max={2}
+                  step={0.1}
+                  format={(v) => v.toFixed(1)}
+                  onChange={(v) => patchSampling({ presencePenalty: v })}
+                />
+                <SettingSlider
+                  label="Max tokens"
+                  hint="Per-request output cap. 0 = model default."
+                  value={s.maxTokens}
+                  min={0}
+                  max={32768}
+                  step={256}
+                  format={(v) => (v === 0 ? 'Model default' : String(v))}
+                  onChange={(v) => patchSampling({ maxTokens: v })}
+                />
+              </SettingGroup>
+            </SettingSection>
+          ) : null}
         </DialogBody>
       </DialogContent>
     </Dialog>

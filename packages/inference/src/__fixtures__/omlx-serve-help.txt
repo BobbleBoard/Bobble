@@ -1,0 +1,112 @@
+usage: omlx serve [-h] [--model-dir MODEL_DIR] [--host HOST] [--port PORT]
+                  [--log-level {trace,debug,info,warning,error}]
+                  [--sse-keepalive-mode {chunk,comment,off}]
+                  [--max-audio-upload-size MAX_AUDIO_UPLOAD_SIZE]
+                  [--max-concurrent-requests MAX_CONCURRENT_REQUESTS]
+                  [--embedding-batch-size EMBEDDING_BATCH_SIZE]
+                  [--memory-guard {off,safe,balanced,aggressive}]
+                  [--memory-guard-gb MEMORY_GUARD_GB]
+                  [--paged-ssd-cache-dir PAGED_SSD_CACHE_DIR]
+                  [--paged-ssd-cache-max-size PAGED_SSD_CACHE_MAX_SIZE]
+                  [--hot-cache-max-size HOT_CACHE_MAX_SIZE]
+                  [--hot-cache-write-through] [--no-cache]
+                  [--initial-cache-blocks INITIAL_CACHE_BLOCKS]
+                  [--mcp-config MCP_CONFIG] [--hf-endpoint HF_ENDPOINT]
+                  [--hf-cache | --no-hf-cache] [--ms-endpoint MS_ENDPOINT]
+                  [--http-proxy HTTP_PROXY] [--https-proxy HTTPS_PROXY]
+                  [--no-proxy NO_PROXY] [--ca-bundle CA_BUNDLE]
+                  [--base-path BASE_PATH] [--api-key API_KEY]
+
+Start a multi-model inference server with LRU-based memory management.
+
+Models are discovered from subdirectories of --model-dir. Each subdirectory
+should contain a valid model with config.json and *.safetensors files.
+
+Example directory structure:
+  /path/to/models/
+  ├── llama-3b/           → model_id: "llama-3b"
+  │   ├── config.json
+  │   └── model.safetensors
+  ├── qwen-7b/            → model_id: "qwen-7b"
+  └── mistral-7b/         → model_id: "mistral-7b"
+
+options:
+  -h, --help            show this help message and exit
+  --model-dir MODEL_DIR
+                        Directory containing model subdirectories (default:
+                        ~/.omlx/models)
+  --host HOST           Host to bind (default: 127.0.0.1)
+  --port PORT           Port to bind (default: 8000)
+  --log-level {trace,debug,info,warning,error}
+                        Log level (default: info). trace includes full message
+                        content
+  --sse-keepalive-mode {chunk,comment,off}
+                        SSE keepalive emission mode (default: chunk). 'chunk'
+                        emits protocol-aware no-op events compatible with
+                        strict clients like OpenClaw / WorkBuddy; 'comment'
+                        emits the legacy ': keep-alive' SSE comment; 'off'
+                        disables keepalive entirely
+  --max-audio-upload-size MAX_AUDIO_UPLOAD_SIZE
+                        Maximum audio upload size for /v1/audio/transcriptions
+                        and /v1/audio/process (e.g. '100MB', '500MB').
+                        Overrides the value in settings.json (built-in
+                        default: 100MB). Uploads are buffered in memory, so
+                        this is also a per-request RAM cap
+  --max-concurrent-requests MAX_CONCURRENT_REQUESTS
+                        Max requests processed simultaneously. Higher values
+                        increase throughput but use more memory. (default: 8)
+  --embedding-batch-size EMBEDDING_BATCH_SIZE
+                        Max embedding inputs processed in one forward pass.
+                        Higher values increase throughput but use more memory.
+                        (default: 32)
+  --memory-guard {off,safe,balanced,aggressive}
+                        Memory guard tier, or 'off' to disable the guard. safe
+                        reserves more system memory; aggressive allows more
+                        oMLX memory use. Passing a tier also turns the guard
+                        on. (default: balanced)
+  --memory-guard-gb MEMORY_GUARD_GB
+                        Custom memory guard ceiling in GB. Sets memory guard
+                        tier to custom and turns the guard on.
+  --paged-ssd-cache-dir PAGED_SSD_CACHE_DIR
+                        Directory for paged SSD cache storage (enables oMLX
+                        prefix cache)
+  --paged-ssd-cache-max-size PAGED_SSD_CACHE_MAX_SIZE
+                        Maximum paged SSD cache size (e.g., '100GB', '50GB').
+                        Default: 100GB
+  --hot-cache-max-size HOT_CACHE_MAX_SIZE
+                        Maximum in-memory hot cache size (e.g., '8GB', '4GB').
+                        Default: 0 (disabled)
+  --hot-cache-write-through
+                        Persist every hot-cache block to SSD immediately
+                        (write-through). Keeps RAM-speed resume while
+                        retaining SSD durability for all sessions.
+  --no-cache            Disable oMLX paged SSD cache. mlx-lm BatchGenerator
+                        still manages KV states internally.
+  --initial-cache-blocks INITIAL_CACHE_BLOCKS
+                        Number of cache blocks to pre-allocate at startup
+                        (default: 256). Higher values reduce dynamic
+                        allocation overhead for large contexts.
+  --mcp-config MCP_CONFIG
+                        Path to MCP configuration file (JSON/YAML) for tool
+                        integration
+  --hf-endpoint HF_ENDPOINT
+                        Custom HuggingFace Hub endpoint URL (e.g., https://hf-
+                        mirror.com)
+  --hf-cache, --no-hf-cache
+                        Discover models from the standard HuggingFace Hub
+                        local cache (default: enabled)
+  --ms-endpoint MS_ENDPOINT
+                        Custom ModelScope Hub endpoint URL
+  --http-proxy HTTP_PROXY
+                        HTTP proxy URL (e.g., http://proxy.company.com:8080)
+  --https-proxy HTTPS_PROXY
+                        HTTPS proxy URL (e.g., http://proxy.company.com:8080)
+  --no-proxy NO_PROXY   Comma-separated hosts/IPs to bypass proxy (e.g.,
+                        localhost,127.0.0.1)
+  --ca-bundle CA_BUNDLE
+                        Path to CA bundle PEM file for TLS interception
+                        environments
+  --base-path BASE_PATH
+                        Base directory for oMLX data (default: ~/.omlx)
+  --api-key API_KEY     API key for authentication (required for non-loopback
+                        binds)

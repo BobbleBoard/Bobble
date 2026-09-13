@@ -267,9 +267,35 @@ function CalibrationSection({ onUse }: { onUse: (engine: string, spec: string) =
               <span className="pd-engine-row-sub">{k.reason}</span>
             </div>
           ))}
+          {/* A skip for a missing FILE is a download away: fetch what the
+              catalogue names for this model (drafters, MLX twin, MTP head) and
+              the next calibration measures those rows too. */}
+          {rows.skips.some((k) => /not downloaded|on disk/.test(k.reason)) ? (
+            <FetchMissingButton />
+          ) : null}
         </details>
       ) : null}
     </div>
+  );
+}
+
+/** Download every companion the catalogue names for the running model. */
+function FetchMissingButton() {
+  const model = useLlmStore((s) => s.status.model);
+  const download = useLlmStore((s) => s.download);
+  const downloadModel = useLlmStore((s) => s.downloadModel);
+  if (model === null || model === undefined) return null;
+  const busy = download !== null && download.modelId === model.id;
+  return (
+    <button
+      type="button"
+      className="pd-engine-install"
+      data-testid="engine-fetch-missing"
+      disabled={busy}
+      onClick={() => void downloadModel(model.id, model.quant)}
+    >
+      {busy ? 'Fetching…' : 'Fetch the missing drafters'}
+    </button>
   );
 }
 
@@ -339,6 +365,7 @@ export function EngineMenu() {
   const status = useLlmStore((s) => s.status);
   const engines = useLlmStore((s) => s.engines);
   const calibration = useLlmStore((s) => s.calibration);
+  const record = useLlmStore((s) => s.record);
   const refreshEngines = useLlmStore((s) => s.refreshEngines);
   const refreshRecord = useLlmStore((s) => s.refreshRecord);
   const calibrate = useLlmStore((s) => s.calibrate);
@@ -459,10 +486,18 @@ export function EngineMenu() {
                 }
                 onClick={() => void onCalibrate()}
               >
-                Calibrate
+                {record !== null ? 'Recalibrate' : 'Calibrate'}
               </button>
             )}
           </div>
+          {model !== null && model !== undefined && record === null && !running ? (
+            /* Per model: a model that has never been measured says so, whatever
+               another model's verdict was. */
+            <div className="pd-engine-note" data-testid="engine-menu-uncalibrated">
+              Not calibrated yet for {model.displayName} — running on{' '}
+              {engineName(status.profile?.engine ?? 'llamacpp')} by default.
+            </div>
+          ) : null}
           {note !== null ? (
             <div className="pd-engine-note" data-testid="engine-menu-note">
               {note}

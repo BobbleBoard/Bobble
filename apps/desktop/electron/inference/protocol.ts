@@ -3,7 +3,7 @@
  * "inference-supervisor" utilityProcess (supervisor-entry.ts). Kept in its own
  * electron-free module so both bundles share exactly one set of types.
  */
-import type { LaunchProfile } from '@pi-desktop/inference';
+import type { EngineFlag, LaunchProfile } from '@pi-desktop/inference';
 import type {
   HfGgufFileDTO,
   HfModelHitDTO,
@@ -15,6 +15,7 @@ import type {
   LlmRecommendation,
   LlmStatus,
 } from '../ipc-contract';
+import type { EngineLaunchSettings, ModelSpecChoice } from '../settings/settings-contract';
 
 export type LlmRequestBody =
   | { type: 'get-status' }
@@ -52,6 +53,22 @@ export type LlmRequestBody =
   | { type: 'calibration-record'; modelId: string; quant?: string }
   /** Relaunch the running model on a profile the user picked by hand. */
   | { type: 'use-profile'; profile: LaunchProfile }
+  /**
+   * The user's launch flags per engine and speculative choice per model
+   * (Settings → Advanced → Engine). Pushed on change like the power choice;
+   * takes effect at the next launch — `relaunch` is how Apply makes that now.
+   */
+  | {
+      type: 'set-engine-launch';
+      engineLaunch: EngineLaunchSettings;
+      modelSpec: Record<string, ModelSpecChoice>;
+    }
+  /** Restart the running server with the current flags and profile. */
+  | { type: 'relaunch' }
+  /** Every flag an engine's CLI prints in its `--help`, parsed (see engine-flags.ts). */
+  | { type: 'engine-flags'; engine: string }
+  /** Every GGUF under the models directory, with which model it belongs to. */
+  | { type: 'list-local-ggufs' }
   /**
    * MAKE ROOM. Stop the running server's process and keep everything needed
    * to bring it back on the same port — for a generation that fits without the
@@ -131,6 +148,14 @@ export interface HfListFilesReply {
 export interface HfRegisterReply {
   modelId: string;
   entry: LlmCatalogEntry;
+}
+
+export interface EngineFlagsReply {
+  engine: string;
+  flags: EngineFlag[];
+  /** The CLI the help came from, for the panel's title. */
+  command: string;
+  error?: string;
 }
 
 export interface LlmCalibrateReply {

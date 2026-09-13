@@ -15,6 +15,8 @@ import {
   EFFORT_MODES,
   type EffortLevel,
   ENGINE_PREFERENCES,
+  type EngineFlagValue,
+  type EngineLaunchSettings,
   type EnginePreference,
   ICON_STROKE_DEFAULT,
   ICON_STROKE_MAX,
@@ -24,6 +26,7 @@ import {
   MODEL_SELECTION_TIERS,
   type ModelSelection,
   type ModelSelectionTier,
+  type ModelSpecChoice,
   type PermissionMode,
   POWER_MODES,
   type QuickMenuSettings,
@@ -134,6 +137,8 @@ export const DEFAULT_SETTINGS: DesktopSettings = {
   experimentalProductionHarness: false,
   experimentalGeneration: false,
   advanced: DEFAULT_ADVANCED,
+  engineLaunch: {},
+  modelSpec: {},
   chatOrg: { projects: [], assignments: {}, pinned: [], titles: {} },
   hideDeleteChatConfirm: false,
   harnessId: 'pi-bundled',
@@ -202,6 +207,64 @@ function clampChatOrg(value: unknown): ChatOrganization {
     pinned: strArray(o.pinned),
     titles: strMap(o.titles),
   };
+}
+
+/** A flag key is `-x` or `--long-name`; nothing else can be a launch argument. */
+const FLAG_KEY_RE = /^--?[A-Za-z][\w.-]*$/;
+
+/** Normalize the per-engine launch flags: known shapes only, everything else dropped. */
+function clampEngineLaunch(raw: unknown): EngineLaunchSettings {
+  const out: EngineLaunchSettings = {};
+  if (typeof raw !== 'object' || raw === null) return out;
+  for (const [engine, cfg] of Object.entries(raw as Record<string, unknown>)) {
+    if (!/^[a-z][\w-]*$/.test(engine) || typeof cfg !== 'object' || cfg === null) continue;
+    const c = cfg as { flags?: unknown; rawArgs?: unknown };
+    const flags: Record<string, EngineFlagValue> = {};
+    if (typeof c.flags === 'object' && c.flags !== null) {
+      for (const [k, v] of Object.entries(c.flags as Record<string, unknown>)) {
+        if (!FLAG_KEY_RE.test(k)) continue;
+        if (typeof v === 'boolean' || typeof v === 'number' || typeof v === 'string') flags[k] = v;
+      }
+    }
+    const rawArgs = Array.isArray(c.rawArgs)
+      ? c.rawArgs.filter((a): a is string => typeof a === 'string' && a.length > 0).slice(0, 200)
+      : [];
+    if (Object.keys(flags).length > 0 || rawArgs.length > 0) out[engine] = { flags, rawArgs };
+  }
+  return out;
+}
+
+const SPEC_METHODS: readonly ModelSpecChoice['method'][] = [
+  'auto',
+  'none',
+  'mtp',
+  'eagle3',
+  'dflash',
+  'dspark',
+  'ngram',
+  'custom',
+];
+
+/** Normalize the per-model speculative choice; an `auto` entry is the same as none. */
+function clampModelSpec(raw: unknown): Record<string, ModelSpecChoice> {
+  const out: Record<string, ModelSpecChoice> = {};
+  if (typeof raw !== 'object' || raw === null) return out;
+  for (const [modelId, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (typeof v !== 'object' || v === null) continue;
+    const c = v as { method?: unknown; draftPath?: unknown; specType?: unknown };
+    const method = oneOf(c.method, SPEC_METHODS, 'auto');
+    if (method === 'auto') continue;
+    out[modelId] = {
+      method,
+      ...(typeof c.draftPath === 'string' && c.draftPath.length > 0
+        ? { draftPath: c.draftPath }
+        : {}),
+      ...(typeof c.specType === 'string' && /^[a-z0-9-]+$/.test(c.specType)
+        ? { specType: c.specType }
+        : {}),
+    };
+  }
+  return out;
 }
 
 /** Normalize the untrusted advanced knobs (sampling + reasoning) with bounds. */
@@ -313,6 +376,8 @@ export function clampSettings(raw: unknown): DesktopSettings {
     ),
     experimentalGeneration: bool(o.experimentalGeneration, d.experimentalGeneration),
     advanced: clampAdvanced(o.advanced),
+    engineLaunch: clampEngineLaunch(o.engineLaunch),
+    modelSpec: clampModelSpec(o.modelSpec),
     chatOrg: clampChatOrg(o.chatOrg),
     hideDeleteChatConfirm: bool(o.hideDeleteChatConfirm, d.hideDeleteChatConfirm),
   };
@@ -336,6 +401,9 @@ export function mergeSettingsPatch(
       sampling: { ...current.advanced.sampling, ...patch.advanced?.sampling },
       reasoning: { ...current.advanced.reasoning, ...patch.advanced?.reasoning },
     },
+    // Per-id maps: a patch names the ids it changes and leaves the rest.
+    engineLaunch: { ...current.engineLaunch, ...patch.engineLaunch },
+    modelSpec: { ...current.modelSpec, ...patch.modelSpec },
   });
 }
 

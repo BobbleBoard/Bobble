@@ -15,7 +15,14 @@ import {
   type IpcHandlers,
   registerIpcHandlers,
 } from '@pi-desktop/shared';
-import { app, BrowserWindow, type IpcMain, type UtilityProcess, utilityProcess } from 'electron';
+import {
+  app,
+  BrowserWindow,
+  dialog,
+  type IpcMain,
+  type UtilityProcess,
+  utilityProcess,
+} from 'electron';
 import type {
   AppEventMap,
   DatasetInvokeMap,
@@ -34,6 +41,7 @@ import { detectHarnesses } from './harness-main';
 import { fetchModelCard } from './modelcard-main';
 import { cacheRemoteImage, fetchOrgAvatar } from './org-avatar-main';
 import type {
+  EngineFlagsReply,
   HfListFilesReply,
   HfRegisterReply,
   HfSearchReply,
@@ -317,7 +325,10 @@ function ensureChild(): UtilityProcess {
   const proc = utilityProcess.fork(entry, [], { serviceName: 'inference-supervisor' });
   // A fresh worker starts on its own default; tell it what the user chose. Done
   // on the next tick so `child` is set before the request goes out.
-  setTimeout(() => pushPowerSettings(), 0);
+  setTimeout(() => {
+    pushPowerSettings();
+    pushEngineLaunchSettings();
+  }, 0);
 
   proc.on('message', (message: LlmOutbound) => {
     if (message.kind === 'status') {
@@ -437,6 +448,22 @@ export async function shutdownInference(timeoutMs = 1500): Promise<void> {
  * still starting will get it on the next call, and its default ('auto') is the
  * one most people want anyway.
  */
+/**
+ * Push the user's launch flags + speculative choices into the worker. Same
+ * shape as the power push: the choice lives in settings, the decision is made
+ * in the process that assembles the argv.
+ */
+export function pushEngineLaunchSettings(): void {
+  const s = readSettings();
+  void request<{ success: boolean }>({
+    type: 'set-engine-launch',
+    engineLaunch: s.engineLaunch,
+    modelSpec: s.modelSpec,
+  }).catch(() => {
+    // Not up yet, or going down — the next push carries it.
+  });
+}
+
 export function pushPowerSettings(): void {
   const s = readSettings();
   void request<{ success: boolean }>({
@@ -561,6 +588,23 @@ const handlers: IpcHandlers<LlmInvokeMap> = {
       type: 'use-profile',
       profile: { engine: req.engine, spec: req.spec } as LaunchProfile,
     }),
+  'llm:relaunch': () => {
+    // Apply: make sure the worker has the latest flags before it restarts.
+    pushEngineLaunchSettings();
+    return request({ type: 'relaunch' });
+  },
+  'llm:engine-flags': (req) =>
+    request<EngineFlagsReply>({ type: 'engine-flags', engine: req.engine }),
+  'llm:list-local-ggufs': () => request({ type: 'list-local-ggufs' }),
+  'llm:pick-gguf': async () => {
+    const picked = await dialog.showOpenDialog({
+      title: 'Choose a draft model (GGUF)',
+      properties: ['openFile'],
+      filters: [{ name: 'GGUF', extensions: ['gguf'] }],
+    });
+    if (picked.canceled || picked.filePaths.length === 0) return { path: null };
+    return { path: picked.filePaths[0] ?? null };
+  },
 };
 
 /** Hugging Face browse/register channels — proxied to the same supervisor, which

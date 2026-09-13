@@ -522,6 +522,11 @@ export class LlamaServerSupervisor {
     this.emit({ type: 'metrics', metrics: this.metrics });
   }
 
+  /** The command line this supervisor launches (or launched) with — for the panel's "current command" view. */
+  argv(): string[] {
+    return this.buildArgs();
+  }
+
   private buildArgs(): string[] {
     // An alternative engine (MLX) supplies its own argv builder; otherwise
     // assemble the llama-server flags (enforcing the MTP⊥mmproj invariant).

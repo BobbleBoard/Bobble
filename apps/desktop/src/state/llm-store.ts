@@ -12,6 +12,7 @@ import type {
   LlmCalibrationRecord,
   LlmCatalogEntry,
   LlmHardware,
+  LlmInvokeMap,
   LlmRecommendation,
   LlmStatus,
 } from '../../electron/ipc-contract';
@@ -98,6 +99,9 @@ export interface LiveTps {
   at: number;
 }
 
+/** The parsed `--help` of one engine, as `llm:engine-flags` returns it. */
+export type EngineFlagsView = LlmInvokeMap['llm:engine-flags']['response'];
+
 /** What the engine menu draws while (and after) a calibration runs. */
 export interface CalibrationView {
   running: boolean;
@@ -150,6 +154,11 @@ interface LlmStoreState {
   cancelCalibration: () => Promise<void>;
   /** Relaunch the running model on an engine + method picked by hand. */
   switchProfile: (engine: string, spec: string) => Promise<{ success: boolean; error?: string }>;
+  /** Every flag an engine accepts (its own `--help`, parsed), cached per engine. */
+  engineFlags: Record<string, EngineFlagsView>;
+  loadEngineFlags: (engine: string) => Promise<EngineFlagsView>;
+  /** Apply: restart the running server with the saved launch flags. */
+  relaunch: () => Promise<{ success: boolean; error?: string }>;
   applyDownloadProgress: (p: {
     modelId: string;
     file: string;
@@ -219,6 +228,7 @@ export const useLlmStore = create<LlmStoreState>((set, get) => ({
   engines: {},
   calibration: null,
   record: null,
+  engineFlags: {},
 
   // The download lifecycle is owned by the actions (which resolve on
   // finish/pause/cancel), so status transitions must NOT clear the bar — a
@@ -382,6 +392,28 @@ export const useLlmStore = create<LlmStoreState>((set, get) => ({
 
   cancelCalibration: async () => {
     await window.piDesktop.invoke('llm:calibrate-cancel', undefined).catch(() => undefined);
+  },
+
+  loadEngineFlags: async (engine) => {
+    const cached = get().engineFlags[engine];
+    if (cached !== undefined && cached.flags.length > 0) return cached;
+    const res = await window.piDesktop
+      .invoke('llm:engine-flags', { engine })
+      .catch((e: unknown) => ({ engine, command: '', flags: [], error: String(e) }));
+    set((s) => ({ engineFlags: { ...s.engineFlags, [engine]: res } }));
+    return res;
+  },
+
+  relaunch: async () => {
+    const res = await window.piDesktop
+      .invoke('llm:relaunch', undefined)
+      .catch((e: unknown) => ({ success: false, error: String(e) }));
+    if (res.success) {
+      // The server moved to a new port; point pi at it.
+      const { repointPiAtRunningServer } = await import('./local-model');
+      await repointPiAtRunningServer();
+    }
+    return res;
   },
 
   switchProfile: async (engine, spec) => {

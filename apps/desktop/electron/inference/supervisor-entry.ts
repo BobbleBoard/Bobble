@@ -44,6 +44,7 @@ import {
   chooseProfile,
   chooseServerPerfArgs,
   classifyBottleneck,
+  configFingerprint,
   createMlxSupervisor,
   createPowerManager,
   detectAccelerators,
@@ -53,6 +54,7 @@ import {
   ensureEngineFor,
   ensureMlx,
   estimateRamGB,
+  flagsToArgs,
   getCatalogFile,
   getCatalogModel,
   type HfGgufFile,
@@ -67,10 +69,13 @@ import {
   type LlamaSpecType,
   listHfGgufFiles,
   listHfRepoFiles,
+  MANAGED_LLAMA_FLAGS,
   mmprojFileFor,
   modelDir,
   modelEngine,
   PINNED_LLAMACPP,
+  parseArgparseHelp,
+  parseLlamaHelp,
   planCandidates,
   powerBudgetGB,
   probeServerFeatures,
@@ -104,6 +109,7 @@ import type {
   LlmStatus,
   LlmTierPick,
 } from '../ipc-contract';
+import type { EngineLaunchSettings, ModelSpecChoice } from '../settings/settings-contract';
 import { DownloadCancellation, discardPartials, partialPaths } from './download-cancellation';
 import {
   calibrationDir,
@@ -119,6 +125,7 @@ import { modelFitsInRam } from './model-fit';
 import { fastTextSlotLaunch } from './parallel-launch';
 import { setBackgroundPriority } from './process-priority';
 import type {
+  EngineFlagsReply,
   HfListFilesReply,
   HfRegisterReply,
   HfSearchReply,
@@ -335,9 +342,15 @@ interface CurrentServer {
   provider: 'llamacpp' | 'mlx';
   /** The model id requests to this server must carry. */
   servedModelId: string;
+  /** The command line it was launched with, and the user's part of it. */
+  launchCommand: string;
+  launchArgs: string[];
+  launchConfigFingerprint: string;
 }
 
 let current: CurrentServer | null = null;
+/** The pinned build's `--spec-type` list, learned at the first llama.cpp launch. */
+let engineSpecTypes: readonly string[] = [];
 let phase: LlmStatus['phase'] = 'idle';
 /** Set only while an engine VARIANT is compiling — see LlmStatus.engineBuild. */
 let engineBuild: LlmStatus['engineBuild'];
@@ -432,8 +445,17 @@ function status(): LlmStatus {
     /* A projector was attached → the server can read an image, whatever mode it
        was launched in. MLX has no projector path, so it reports false. */
     visionReady: current?.visionReady ?? false,
-    ...(current !== null ? { profile: current.profile, provider: current.provider } : {}),
+    ...(current !== null
+      ? {
+          profile: current.profile,
+          provider: current.provider,
+          launchArgs: current.launchArgs,
+          launchCommand: current.launchCommand,
+          launchConfigFingerprint: current.launchConfigFingerprint,
+        }
+      : {}),
     ...(calibration !== null ? { calibrating: true } : {}),
+    ...(engineSpecTypes.length > 0 ? { engineSpecTypes: [...engineSpecTypes] } : {}),
     error: lastError,
   };
 }
@@ -471,6 +493,7 @@ function catalogEntry(model: CatalogModel, recommendedId: string | null): LlmCat
     gated: model.gated === true,
     source: hfModels.has(model.id) ? 'hf' : 'curated',
     verified: model.verified,
+    draftersOnDisk: draftsOnDisk(model),
   };
 }
 
@@ -1098,6 +1121,9 @@ async function startMlxServer(
       profile: { engine: 'mlx-lm', spec: 'none' },
       provider: 'mlx',
       servedModelId: model.hfRepo,
+      launchCommand: uv.uvPath,
+      launchArgs: supervisor.argv(),
+      launchConfigFingerprint: launchFingerprint('mlx-lm', model.id),
     };
     phase = 'ready';
     await writeModelsJson(
@@ -1114,6 +1140,57 @@ async function startMlxServer(
     emitStatus();
     return { success: false, error: lastError };
   }
+}
+
+// ── the user's launch flags ──────────────────────────────────────────────────
+
+/** Pushed from main (settings) at child creation and on every change. */
+let engineLaunch: EngineLaunchSettings = {};
+let modelSpec: Record<string, ModelSpecChoice> = {};
+
+const REFUSED_LLAMA_FLAGS = Object.keys(MANAGED_LLAMA_FLAGS).filter(
+  (k) => MANAGED_LLAMA_FLAGS[k] === 'refused',
+);
+
+/**
+ * The user's arguments for an engine, in the order they go on the command
+ * line: known flags first, raw tokens after. The three flags a launch cannot
+ * survive are dropped with a log line — the panel never offers them, so a
+ * value here came from a pasted command.
+ */
+function userArgsFor(engine: string): string[] {
+  const cfg = engineLaunch[engine];
+  if (cfg === undefined) return [];
+  const { args, refused } = flagsToArgs(cfg.flags, {
+    refused: engine === 'llamacpp' ? REFUSED_LLAMA_FLAGS : ['--host', '--port', '--model'],
+  });
+  if (refused.length > 0) {
+    console.log(`[engine] ignoring ${refused.join(', ')} for ${engine}: Bobble sets it`);
+  }
+  return [...args, ...cfg.rawArgs];
+}
+
+/** What the fingerprint on the status covers: the user's flags and spec choice for this launch. */
+function launchFingerprint(engine: string, modelId: string): string {
+  return configFingerprint({
+    engine: engineLaunch[engine] ?? { flags: {}, rawArgs: [] },
+    spec: modelSpec[modelId] ?? { method: 'auto' },
+  });
+}
+
+/** The user's speculative choice for a model as a launch profile, or null for `auto`. */
+function userProfileFor(model: CatalogModel): LaunchProfile | null {
+  const choice = modelSpec[model.id];
+  if (choice === undefined || choice.method === 'auto') return null;
+  if (choice.method === 'custom') {
+    if (choice.draftPath === undefined) return null;
+    return {
+      engine: 'llamacpp',
+      spec: 'custom',
+      custom: { draftPath: choice.draftPath, specType: choice.specType ?? 'draft-simple' },
+    };
+  }
+  return { engine: 'llamacpp', spec: choice.method };
 }
 
 // ── engines and profiles ─────────────────────────────────────────────────────
@@ -1135,10 +1212,18 @@ function sameProfile(a: LaunchProfile, b: LaunchProfile): boolean {
 function llamaSpecFor(
   spec: LaunchProfile['spec'],
   model: CatalogModel,
-): { specType: LlamaSpecType; draftMethod?: SpecMethod } {
+  custom?: LaunchProfile['custom'],
+): { specType: LlamaSpecType; draftMethod?: SpecMethod; customDraft?: string } {
   switch (spec) {
     case 'none':
       return { specType: 'none' };
+    case 'custom':
+      // The user's own draft GGUF with the type they picked for it; llama.cpp
+      // also detects DFlash2 / DSpark heads from the file itself.
+      return {
+        specType: (custom?.specType ?? 'draft-simple') as LlamaSpecType,
+        customDraft: custom?.draftPath,
+      };
     case 'eagle3':
       return { specType: 'draft-eagle3', draftMethod: 'eagle3' };
     case 'dflash':
@@ -1329,6 +1414,7 @@ async function startExternalEngine(
   model: CatalogModel,
   file: CatalogFile,
   profile: LaunchProfile,
+  force = false,
 ): Promise<{ success: boolean; baseUrl?: string; error?: string }> {
   const engine = profile.engine as VenvEngine;
   if (engine !== 'vllm' && !isMlxSupported()) {
@@ -1354,10 +1440,12 @@ async function startExternalEngine(
     }
   }
   if (
+    !force &&
     current !== null &&
     current.model.id === model.id &&
     current.file.quant === file.quant &&
-    sameProfile(current.profile, profile)
+    sameProfile(current.profile, profile) &&
+    current.launchConfigFingerprint === launchFingerprint(engine, model.id)
   ) {
     return { success: true, baseUrl: current.baseUrl };
   }
@@ -1421,7 +1509,7 @@ async function startExternalEngine(
           modelRoot: omlxModelRoot(),
         });
         servedModelId = launch.servedModelId;
-        return launch.args;
+        return [...launch.args, ...userArgsFor(engine)];
       },
       env: {
         ...process.env,
@@ -1467,6 +1555,9 @@ async function startExternalEngine(
       profile,
       provider: 'mlx',
       servedModelId,
+      launchCommand: engineCommand(engine),
+      launchArgs: supervisor.argv(),
+      launchConfigFingerprint: launchFingerprint(engine, model.id),
     };
     phase = 'ready';
     console.log(
@@ -1821,6 +1912,118 @@ async function calibrate(modelId?: string, quant?: string): Promise<LlmCalibrate
   }
 }
 
+/**
+ * Every GGUF the app has on disk, labelled with the model it belongs to and
+ * what it is (weights, projector, MTP head, draft) — the custom-draft picker's
+ * "downloaded models" list.
+ */
+function listLocalGgufs(): Array<{
+  path: string;
+  name: string;
+  bytes: number;
+  modelId: string;
+  kind: string;
+}> {
+  const out: Array<{ path: string; name: string; bytes: number; modelId: string; kind: string }> =
+    [];
+  for (const model of allModels()) {
+    const dir = modelDir(model.id);
+    if (!existsSync(dir)) continue;
+    let names: string[] = [];
+    try {
+      names = readdirSync(dir).filter((n) => n.toLowerCase().endsWith('.gguf'));
+    } catch {
+      continue;
+    }
+    for (const name of names) {
+      const full = join(dir, name);
+      let bytes = 0;
+      try {
+        bytes = statSync(full).size;
+      } catch {
+        continue;
+      }
+      const lower = name.toLowerCase();
+      const kind = lower.startsWith('mmproj')
+        ? 'projector'
+        : lower.startsWith('mtp-')
+          ? 'MTP head'
+          : /dflash|dspark|eagle|draft/.test(lower)
+            ? 'draft'
+            : 'weights';
+      out.push({ path: full, name, bytes, modelId: model.id, kind });
+    }
+  }
+  return out;
+}
+
+/** Apply: the same model, mode and profile, launched again with the current flags. */
+async function relaunch(): Promise<{ success: boolean; error?: string }> {
+  if (current === null) return { success: false, error: 'no model is running' };
+  const c = current;
+  const res = await startServer(c.model.id, c.file.quant, c.launchMode, 1, undefined, true);
+  return { success: res.success, ...(res.error !== undefined ? { error: res.error } : {}) };
+}
+
+/** Parsed `--help` per engine, read once per process. */
+const engineFlagsCache = new Map<string, EngineFlagsReply>();
+
+/**
+ * Every flag an engine accepts, from the engine's own `--help`. llama.cpp is
+ * the pinned binary's help (fetched if the binary is not here yet); the MLX
+ * engines are their venv CLIs' argparse help.
+ */
+async function engineFlags(engine: string): Promise<EngineFlagsReply> {
+  const cached = engineFlagsCache.get(engine);
+  if (cached !== undefined) return cached;
+  const helpOf = async (cmd: string, args: string[]): Promise<string> => {
+    const r = await execFileAsync(cmd, args, {
+      timeout: 60_000,
+      maxBuffer: 8 * 1024 * 1024,
+      env: { ...process.env, HF_HUB_OFFLINE: '1', TRANSFORMERS_OFFLINE: '1' },
+    }).catch((e: { stdout?: string; stderr?: string }) => ({
+      stdout: e.stdout ?? '',
+      stderr: e.stderr ?? '',
+    }));
+    return `${r.stdout}\n${r.stderr}`;
+  };
+  try {
+    let reply: EngineFlagsReply;
+    if (engine === 'llamacpp') {
+      const install = await ensureEngineFor(
+        { displayName: 'llama.cpp' },
+        { execFileImpl: execFileAsync },
+      );
+      reply = {
+        engine,
+        command: install.serverPath,
+        flags: parseLlamaHelp(await helpOf(install.serverPath, ['--help'])),
+      };
+    } else {
+      const venv = engine as VenvEngine;
+      if (!engineInstalled(venv)) {
+        return { engine, command: '', flags: [], error: `${engine} is not installed` };
+      }
+      const cmd = engineCommand(venv);
+      const args = engine === 'mlx-lm' ? ['--help'] : ['serve', '--help'];
+      reply = {
+        engine,
+        command: engine === 'mlx-lm' ? cmd : `${cmd} serve`,
+        flags: parseArgparseHelp(await helpOf(cmd, args)),
+      };
+    }
+    if (reply.flags.length > 0) engineFlagsCache.set(engine, reply);
+    return reply;
+  } catch (error) {
+    return {
+      engine,
+      command: '',
+      flags: [],
+      error: String(error instanceof Error ? error.message : error),
+    };
+  }
+}
+
 function cancelCalibration(): { ok: boolean } {
   if (calibration === null) return { ok: false };
   calibration.abort.abort();
@@ -1860,9 +2063,10 @@ function startServer(
   launchMode: LaunchMode = 'fast-text',
   parallel?: number,
   profile?: LaunchProfile,
+  force = false,
 ): Promise<{ success: boolean; baseUrl?: string; error?: string }> {
   const run = (startInFlight ?? Promise.resolve()).then(() =>
-    startServerExclusive(modelId, quant, launchMode, parallel, profile),
+    startServerExclusive(modelId, quant, launchMode, parallel, profile, force),
   );
   // Keep the chain alive even when a start fails, so one failure cannot wedge
   // every later start behind a rejected promise.
@@ -1876,6 +2080,7 @@ async function startServerExclusive(
   launchMode: LaunchMode = 'fast-text',
   parallel?: number,
   requestedProfile?: LaunchProfile,
+  force = false,
 ): Promise<{ success: boolean; baseUrl?: string; error?: string }> {
   const model = getModel(modelId);
   if (model === undefined) return { success: false, error: `unknown model: ${modelId}` };
@@ -1891,12 +2096,20 @@ async function startServerExclusive(
   await ensureHardwareKey();
   const calibrated =
     requestedProfile === undefined ? readRecord(model.id, file.quant)?.chosen : null;
+  /* The user's own speculative choice for this model (Settings → Advanced →
+     Speculative) outranks the calibrated verdict: the verdict is what we
+     measured, the choice is what they asked for. */
+  const chosen = requestedProfile ?? userProfileFor(model) ?? calibrated ?? defaultProfile(model);
   const profile: LaunchProfile =
     launchMode === 'multimodal'
-      ? { engine: 'llamacpp', spec: requestedProfile?.spec ?? defaultProfile(model).spec }
-      : (requestedProfile ?? calibrated ?? defaultProfile(model));
+      ? {
+          engine: 'llamacpp',
+          spec: chosen.spec,
+          ...(chosen.custom !== undefined ? { custom: chosen.custom } : {}),
+        }
+      : chosen;
   if (profile.engine !== 'llamacpp' && modelEngine(model) !== 'mlx') {
-    const external = await startExternalEngine(model, file, profile);
+    const external = await startExternalEngine(model, file, profile, force);
     /*
      * A VERDICT THAT CAN NO LONGER BE HONOURED must not stop the model. The
      * calibrated engine may have been uninstalled or its weights deleted since
@@ -1949,11 +2162,13 @@ async function startServerExclusive(
    * up and returns the same endpoint.
    */
   if (
+    !force &&
     current !== null &&
     current.model.id === model.id &&
     current.file.quant === file.quant &&
     current.launchMode === launchMode &&
-    sameProfile(current.profile, profile)
+    sameProfile(current.profile, profile) &&
+    current.launchConfigFingerprint === launchFingerprint('llamacpp', model.id)
   ) {
     return { success: true, baseUrl: current.baseUrl };
   }
@@ -2076,6 +2291,7 @@ async function startServerExclusive(
       console.log(`[engine] ${model.id} → variant "${install.variantId}" (${install.serverPath})`);
     }
     const features = await probeServerFeatures(install.serverPath);
+    engineSpecTypes = features.specTypes;
     const hw = await getHardware();
     // Per-slot context (the reported/gauge value): a single request/slot sees this.
     // Hardware-adaptive + KV-aware (the user): up to ~64k when RAM allows, stepped down
@@ -2171,11 +2387,15 @@ async function startServerExclusive(
      * file is missing launches plain rather than failing — the calibration
      * planner never proposes one, and a stale record cannot break a launch.
      */
-    const launchSpec = llamaSpecFor(profile.spec, model);
+    const launchSpec = llamaSpecFor(profile.spec, model, profile.custom);
     const draftPath =
-      launchMode === 'fast-text' && launchSpec.draftMethod !== undefined
-        ? draftPathFor(model, launchSpec.draftMethod)
-        : undefined;
+      launchMode !== 'fast-text'
+        ? undefined
+        : launchSpec.customDraft !== undefined
+          ? launchSpec.customDraft
+          : launchSpec.draftMethod !== undefined
+            ? draftPathFor(model, launchSpec.draftMethod)
+            : undefined;
 
     // Force the model's OFFICIAL chat template (from its base repo) so llama.cpp
     // routes to the real chat/tool parser instead of the GGUF's stale embedded
@@ -2232,7 +2452,15 @@ async function startServerExclusive(
       // eslint-disable-next-line no-console
       console.log(`[pi-power] launching ${powerNow.level}: ${powerNow.reason}`);
     }
-    const launchExtraArgs = dedupeFlags([...chatTemplateArgs, ...perf.args, ...powerArgs]);
+    /* THE USER'S FLAGS GO LAST: llama.cpp takes the last value of a repeated
+       flag, so anything they set outranks the perf and power choosers — and
+       anything they set is theirs to set (Settings → Advanced → Engine). */
+    const launchExtraArgs = dedupeFlags([
+      ...chatTemplateArgs,
+      ...perf.args,
+      ...powerArgs,
+      ...userArgsFor('llamacpp'),
+    ]);
 
     const supervisor = new LlamaServerSupervisor({
       serverPath: install.serverPath,
@@ -2314,6 +2542,9 @@ async function startServerExclusive(
       profile,
       provider: 'llamacpp',
       servedModelId: model.id,
+      launchCommand: install.serverPath,
+      launchArgs: supervisor.argv(),
+      launchConfigFingerprint: launchFingerprint('llamacpp', model.id),
     };
     phase = 'ready';
     console.log(`[engine] ${model.id} up on llama.cpp · ${profile.spec} (${baseUrl})`);
@@ -2437,6 +2668,16 @@ async function handle(req: LlmRequest): Promise<unknown> {
     }
     case 'use-profile':
       return applyProfile(req.profile);
+    case 'set-engine-launch':
+      engineLaunch = req.engineLaunch;
+      modelSpec = req.modelSpec;
+      return { success: true };
+    case 'relaunch':
+      return relaunch();
+    case 'engine-flags':
+      return engineFlags(req.engine);
+    case 'list-local-ggufs':
+      return { files: listLocalGgufs() };
     case 'park-server':
       return parkServer();
     case 'resume-server':

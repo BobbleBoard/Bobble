@@ -213,6 +213,44 @@ export const DEFAULT_ADVANCED: AdvancedSettings = {
   },
 };
 
+/**
+ * ENGINE LAUNCH SETTINGS — the flags a user wants on an engine's command line.
+ *
+ * the user: "expose absolutely everything in an organized good gui manner … a
+ * pinned apply button that restarts the server and applies changes … a tab
+ * for also just pasting args/a llama-server command".
+ *
+ * `flags` is keyed by the flag's long form (`--reasoning-budget`) with the
+ * value as typed (`true` for a bare switch); `rawArgs` are tokens the command
+ * tab could not match to a known flag, appended verbatim. Both are launch-time:
+ * nothing here reaches a running server until Apply restarts it. Bobble's own
+ * arguments are assembled first and the user's after, so a repeated flag is
+ * the user's (llama.cpp takes the last value), except the few the launch
+ * cannot survive changing (see MANAGED_LLAMA_FLAGS), which are refused.
+ */
+export type EngineFlagValue = string | number | boolean;
+export interface EngineLaunchConfig {
+  flags: Record<string, EngineFlagValue>;
+  rawArgs: string[];
+}
+/** Per engine id (`llamacpp`, `rapid-mlx`, …). */
+export type EngineLaunchSettings = Record<string, EngineLaunchConfig>;
+
+/**
+ * The user's own choice of speculative method for a model, over the calibrated
+ * or default one. `auto` = whatever calibration chose (or the catalogue's
+ * default); a named method runs it on llama.cpp with the drafter the catalogue
+ * fetched; `custom` runs the user's own draft GGUF with the `--spec-type`
+ * they picked. `none` switches speculation off.
+ */
+export interface ModelSpecChoice {
+  method: 'auto' | 'none' | 'mtp' | 'eagle3' | 'dflash' | 'dspark' | 'ngram' | 'custom';
+  /** `custom`: absolute path of the draft GGUF. */
+  draftPath?: string;
+  /** `custom`: the llama.cpp spec type for that draft (`draft-simple`, `draft-eagle3`, …). */
+  specType?: string;
+}
+
 /** Web-search backend keys. Sensitive — persisted to settings.json (mode 0600)
  * and mirrored into the main process env so a (re)spawned pi's web-tools
  * extension reads them (`PI_BRAVE_API_KEY` / `PI_TAVILY_API_KEY`). Empty string
@@ -342,6 +380,10 @@ export interface DesktopSettings {
    * query param). Sibling to {@link experimentalProductionHarness}.
    */
   experimentalGeneration: boolean;
+  /** Launch flags per engine (see EngineLaunchSettings). Empty by default. */
+  engineLaunch: EngineLaunchSettings;
+  /** Per-model speculative choice (see ModelSpecChoice), keyed by catalogue id. */
+  modelSpec: Record<string, ModelSpecChoice>;
   /** Power-user advanced inference knobs (sampling + reasoning). Defaults to
    * {@link DEFAULT_ADVANCED} — inert until touched. */
   advanced: AdvancedSettings;
@@ -379,6 +421,10 @@ export interface DesktopSettingsPatch {
   specialistToolInterface?: ToolInterface;
   workMode?: WorkMode;
   powerMode?: PowerMode;
+  /** Full replacement per engine id; an absent id keeps its current config. */
+  engineLaunch?: EngineLaunchSettings;
+  /** Full replacement per model id. */
+  modelSpec?: Record<string, ModelSpecChoice>;
   showComputerUseStatusPill?: boolean;
   powerReserveGB?: number;
   capabilities?: Partial<GenerationCapabilities>;

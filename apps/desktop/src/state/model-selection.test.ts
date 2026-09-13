@@ -40,6 +40,8 @@ const base: DesktopSettings = {
   workMode: 'chat',
   powerMode: 'auto',
   showComputerUseStatusPill: true,
+  engineLaunch: {},
+  modelSpec: {},
 };
 
 describe('sliderToLevel / levelToSlider', () => {

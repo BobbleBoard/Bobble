@@ -69,6 +69,8 @@ const DEFAULTS: DesktopSettings = {
   experimentalProductionHarness: false,
   experimentalGeneration: false,
   advanced: DEFAULT_ADVANCED,
+  engineLaunch: {},
+  modelSpec: {},
   chatOrg: { projects: [], assignments: {}, pinned: [], titles: {} },
   hideDeleteChatConfirm: false,
   harnessId: 'pi-bundled',
@@ -145,6 +147,8 @@ export const useSettingsStore = create<SettingsStoreState>((set, get) => ({
         sampling: { ...get().settings.advanced.sampling, ...patch.advanced?.sampling },
         reasoning: { ...get().settings.advanced.reasoning, ...patch.advanced?.reasoning },
       },
+      engineLaunch: { ...get().settings.engineLaunch, ...patch.engineLaunch },
+      modelSpec: { ...get().settings.modelSpec, ...patch.modelSpec },
     };
     set({ settings: optimistic });
     if (patch.theme !== undefined) applyTheme(optimistic);
@@ -554,4 +558,12 @@ export function connectSettings(): void {
   if (isE2E) {
     window.__settings_store = () => useSettingsStore;
   }
+}
+
+/** The per-engine launch flags (Settings → Advanced → Engine). */
+export function useEngineLaunch(): DesktopSettings['engineLaunch'] {
+  return useSettingsStore((s) => s.settings.engineLaunch);
+}
+export function useModelSpec(): DesktopSettings['modelSpec'] {
+  return useSettingsStore((s) => s.settings.modelSpec);
 }
