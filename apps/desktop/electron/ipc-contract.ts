@@ -401,7 +401,7 @@ export interface LlmCalibrationRecord {
   engineBuild: string;
   at: string;
   ranked: LlmCalibrationRow[];
-  skips: Array<{ id: string; engine: string; spec: string; reason: string }>;
+  skips: Array<{ id: string; engine: string; spec: string; reason: string; fix?: string }>;
   chosen: { engine: string; spec: string } | null;
 }
 
@@ -615,6 +615,27 @@ export type LlmInvokeMap = {
     request: { modelId: string; quant?: string };
     response: { companions: LlmCompanion[] };
   };
+  /**
+   * What a calibration would measure RIGHT NOW for a model, and what it would
+   * skip and why — from the disk as it is, not from a stored record. Each skip
+   * says what would fix it (`fetch` a catalogued file, `install` an engine
+   * this machine supports, or nothing exists). `installableEngines` is the
+   * renderer's knowledge of which engines this host could install.
+   */
+  'llm:calibration-plan': {
+    request: { modelId: string; quant?: string; installableEngines?: string[] };
+    response: {
+      candidates: Array<{ id: string; engine: string; spec: string; label: string }>;
+      skips: Array<{
+        id: string;
+        engine: string;
+        spec: string;
+        label: string;
+        reason: string;
+        fix: 'fetch' | 'install' | 'none';
+      }>;
+    };
+  };
   /** Relaunch the running model on an engine + method the user picked. */
   'llm:use-profile': {
     request: { engine: string; spec: string };
@@ -823,6 +844,7 @@ export const LLM_INVOKE_CHANNELS = [
   'llm:calibrate-cancel',
   'llm:calibration-record',
   'llm:companions',
+  'llm:calibration-plan',
   'llm:use-profile',
   'llm:relaunch',
   'llm:engine-flags',

@@ -135,6 +135,15 @@ interface LlmStoreState {
   recommendedModelId: string | null;
   recommendation: LlmRecommendation | null;
   download: LlmDownloadState | null;
+  /**
+   * Why the last download did not start or did not finish — "Not enough
+   * space: …", a 401 on a gated repo — kept until the next attempt, so every
+   * Download button can say it where it was pressed. the user: "clicking download
+   * … does not download them or show any user indication … either that
+   * there's not enough disk space or that it is downloading."
+   */
+  downloadError: { modelId: string; error: string; at: number } | null;
+  clearDownloadError: () => void;
   /** The reply streaming now (or the last one), see LiveTps. */
   live: LiveTps | null;
   /** Engines as main reports them (installed / busy / error), by id. */
@@ -224,6 +233,7 @@ export const useLlmStore = create<LlmStoreState>((set, get) => ({
   recommendedModelId: null,
   recommendation: null,
   download: null,
+  downloadError: null,
   live: null,
   engines: {},
   calibration: null,
@@ -464,9 +474,12 @@ export const useLlmStore = create<LlmStoreState>((set, get) => ({
     set({ status });
   },
 
+  clearDownloadError: () => set({ downloadError: null }),
+
   downloadModel: async (modelId, quant) => {
     lastSample = null;
     set({
+      downloadError: null,
       download: {
         modelId,
         quant,
@@ -486,6 +499,17 @@ export const useLlmStore = create<LlmStoreState>((set, get) => ({
       set((s) => (s.download ? { download: { ...s.download, paused: true } } : {}));
     } else {
       set({ download: null });
+      // A refusal (no room, a gated repo) or a failure is the user's to see —
+      // the bar that flashed and vanished used to be the whole message.
+      if (res.success !== true && res.cancelled !== true) {
+        set({
+          downloadError: {
+            modelId,
+            error: res.error ?? 'the download did not finish',
+            at: Date.now(),
+          },
+        });
+      }
     }
     await get().refreshCatalog();
   },

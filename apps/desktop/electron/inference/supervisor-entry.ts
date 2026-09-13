@@ -1881,6 +1881,130 @@ async function benchServer(
  * servers. Every step is posted as it happens so the menu can show a row
  * filling in, and a cancel puts the previous launch back.
  */
+/**
+ * What the planner needs, read from the disk as it is right now: which files
+ * and twins are here, which engines are installed, what llama.cpp can do — and
+ * what the catalogue NAMES for this model, so a skip can say "a download away"
+ * or "nothing published" instead of a bare "not on disk".
+ */
+async function calibrationInputFor(
+  model: CatalogModel,
+  file: CatalogFile,
+  installableEngines: readonly string[] = [],
+): Promise<{ input: CalibrationInput; specTypes: readonly string[] }> {
+  const hw = await getHardware();
+  const gguf = modelEngine(model) !== 'mlx' && existsSync(modelPathFor(model, file));
+  let specTypes: readonly string[] = [];
+  let mtpSupported = false;
+  if (gguf) {
+    const install = await ensureEngineFor(model, { execFileImpl: execFileAsync });
+    const features = await probeServerFeatures(install.serverPath);
+    specTypes = features.specTypes;
+    mtpSupported = features.mtp;
+  }
+  const mtpSibling =
+    model.mtpFile !== undefined && model.mtpEmbedded !== true
+      ? existsSync(join(modelDir(model.id), model.mtpFile.name))
+      : false;
+  const supportsType = (t: string) => specTypes.includes(t);
+  const drafts = draftsOnDisk(model).filter((m) => supportsType(`draft-${m}`));
+  const mlxDir = await mlxDirFor(model);
+  const mlxDrafts = (
+    await Promise.all(
+      (['dflash', 'dspark'] as const).map(async (m) =>
+        (await mlxDraftDirFor(model, m)) === undefined ? null : m,
+      ),
+    )
+  ).filter((m): m is 'dflash' | 'dspark' => m !== null);
+  const mlxMtp =
+    mlxDir !== undefined &&
+    ((await mlxDraftDirFor(model, 'mtp')) !== undefined || mlxTwinHasMtp(mlxDir));
+  const catalogued: NonNullable<CalibrationInput['catalogued']> = {
+    drafts: (['eagle3', 'dflash', 'dspark'] as const).filter((m) =>
+      model.variants?.some((v) => v.method === m && v.draftModel !== undefined),
+    ),
+    mlx: mlxRepoFor(model) !== undefined,
+    mlxDrafts: (['dflash', 'dspark'] as const).filter((m) =>
+      model.mlxDrafts?.some((d) => d.method === m),
+    ),
+    mlxMtp: model.mlxDrafts?.some((d) => d.method === 'mtp') === true,
+  };
+  const installed: CalibEngine[] = ['llamacpp', ...installedVenvEngines()];
+  const input: CalibrationInput = {
+    platform:
+      process.platform === 'darwin' || process.platform === 'linux' ? process.platform : 'win32',
+    appleSilicon: hw.isAppleSilicon,
+    installedEngines: installed,
+    ggufPresent: gguf,
+    mtpAvailable: gguf && mtpSupported && (model.mtpEmbedded === true || mtpSibling),
+    draftsPresent: drafts,
+    mlxPresent: mlxDir !== undefined,
+    mlxDraftsPresent: mlxDrafts,
+    mlxMtpAvailable: mlxMtp,
+    catalogued,
+    installableEngines: installableEngines.filter(
+      (e): e is CalibEngine => isCalibEngine(e) && !installed.includes(e),
+    ),
+  };
+  return { input, specTypes };
+}
+
+const CALIB_ENGINES: readonly CalibEngine[] = [
+  'llamacpp',
+  'mlx-lm',
+  'rapid-mlx',
+  'dflash-mlx',
+  'mlx-dspark',
+  'omlx',
+  'vllm',
+];
+function isCalibEngine(e: string): e is CalibEngine {
+  return (CALIB_ENGINES as readonly string[]).includes(e);
+}
+
+/** The live plan for the menu: what a calibration would measure now, and what stands in the way of the rest. */
+async function calibrationPlan(
+  modelId: string,
+  quant: string | undefined,
+  installableEngines: readonly string[],
+): Promise<{
+  candidates: Array<{ id: string; engine: string; spec: string; label: string }>;
+  skips: Array<{
+    id: string;
+    engine: string;
+    spec: string;
+    label: string;
+    reason: string;
+    fix: 'fetch' | 'install' | 'none';
+  }>;
+}> {
+  const model = getModel(modelId);
+  if (model === undefined) return { candidates: [], skips: [] };
+  const file = pickFile(
+    model,
+    quant ?? (current?.model.id === modelId ? current.file.quant : undefined),
+  );
+  if (file === undefined) return { candidates: [], skips: [] };
+  const { input } = await calibrationInputFor(model, file, installableEngines);
+  const { candidates, skips } = planCandidates(input);
+  return {
+    candidates: candidates.map((c) => ({
+      id: c.id,
+      engine: c.engine,
+      spec: c.spec,
+      label: c.label,
+    })),
+    skips: skips.map((k) => ({
+      id: k.id,
+      engine: k.engine,
+      spec: k.spec,
+      label: k.label,
+      reason: k.reason,
+      fix: k.fix,
+    })),
+  };
+}
+
 async function calibrate(modelId?: string, quant?: string): Promise<LlmCalibrateReply> {
   if (calibration !== null) return { ok: false, error: 'a calibration is already running' };
   const id = modelId ?? current?.model.id;
@@ -1898,46 +2022,8 @@ async function calibrate(modelId?: string, quant?: string): Promise<LlmCalibrate
   const previous = current !== null && current.model.id === model.id ? current.profile : null;
   emitStatus();
   try {
-    const hw = await getHardware();
     const hwKey = await ensureHardwareKey();
-    const gguf = modelEngine(model) !== 'mlx' && existsSync(modelPathFor(model, file));
-    let specTypes: readonly string[] = [];
-    let mtpSupported = false;
-    if (gguf) {
-      const install = await ensureEngineFor(model, { execFileImpl: execFileAsync });
-      const features = await probeServerFeatures(install.serverPath);
-      specTypes = features.specTypes;
-      mtpSupported = features.mtp;
-    }
-    const mtpSibling =
-      model.mtpFile !== undefined && model.mtpEmbedded !== true
-        ? existsSync(join(modelDir(model.id), model.mtpFile.name))
-        : false;
-    const supportsType = (t: string) => specTypes.includes(t);
-    const drafts = draftsOnDisk(model).filter((m) => supportsType(`draft-${m}`));
-    const mlxDir = await mlxDirFor(model);
-    const mlxDrafts = (
-      await Promise.all(
-        (['dflash', 'dspark'] as const).map(async (m) =>
-          (await mlxDraftDirFor(model, m)) === undefined ? null : m,
-        ),
-      )
-    ).filter((m): m is 'dflash' | 'dspark' => m !== null);
-    const mlxMtp =
-      mlxDir !== undefined &&
-      ((await mlxDraftDirFor(model, 'mtp')) !== undefined || mlxTwinHasMtp(mlxDir));
-    const input: CalibrationInput = {
-      platform:
-        process.platform === 'darwin' || process.platform === 'linux' ? process.platform : 'win32',
-      appleSilicon: hw.isAppleSilicon,
-      installedEngines: ['llamacpp', ...installedVenvEngines()],
-      ggufPresent: gguf,
-      mtpAvailable: gguf && mtpSupported && (model.mtpEmbedded === true || mtpSibling),
-      draftsPresent: drafts,
-      mlxPresent: mlxDir !== undefined,
-      mlxDraftsPresent: mlxDrafts,
-      mlxMtpAvailable: mlxMtp,
-    };
+    const { input } = await calibrationInputFor(model, file);
     const { candidates, skips } = planCandidates(input);
     postCalibration({
       stage: 'planned',
@@ -1953,6 +2039,7 @@ async function calibrate(modelId?: string, quant?: string): Promise<LlmCalibrate
         spec: k.spec,
         label: k.label,
         reason: k.reason,
+        fix: k.fix,
       })),
     });
     if (candidates.length === 0) {
@@ -2787,6 +2874,8 @@ async function handle(req: LlmRequest): Promise<unknown> {
       return cancelCalibration();
     case 'companions':
       return { companions: await companionsOf(req.modelId, req.quant) };
+    case 'calibration-plan':
+      return calibrationPlan(req.modelId, req.quant, req.installableEngines ?? []);
     case 'calibration-record': {
       const model = getModel(req.modelId);
       const file = model === undefined ? undefined : pickFile(model, req.quant);

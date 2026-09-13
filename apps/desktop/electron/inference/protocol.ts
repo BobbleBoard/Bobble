@@ -61,6 +61,8 @@ export type LlmRequestBody =
    * what a "Fetch missing" button has to know before it is worth showing.
    */
   | { type: 'companions'; modelId: string; quant?: string }
+  /** The live plan: candidates + skips from the disk as it is now. */
+  | { type: 'calibration-plan'; modelId: string; quant?: string; installableEngines?: string[] }
   /** Relaunch the running model on a profile the user picked by hand. */
   | { type: 'use-profile'; profile: LaunchProfile }
   /**

@@ -712,6 +712,10 @@ export function ModelsView() {
    */
   const progress = useLlmStore((s) => s.download);
   const cancelDownload = useLlmStore((s) => s.cancelDownload);
+  /* The supervisor's refusal for a download this page did not call directly
+     (the Discover path goes through the HF store) — a bar that flashed and
+     vanished is not a message. */
+  const downloadError = useLlmStore((s) => s.downloadError);
   /*
    * THE STORE — everything that is not one GGUF out of a ladder.
    *
@@ -1941,12 +1945,12 @@ export function ModelsView() {
         </div>
       ) : null}
 
-      {error !== null ? (
+      {error !== null || downloadError !== null ? (
         <p
           className="mx-6 mb-3 rounded-lg border border-border-default bg-bg-inset px-3 py-2 text-footnote text-text-primary"
           data-testid="models-error"
         >
-          {error}
+          {error ?? downloadError?.error}
         </p>
       ) : null}
 

@@ -594,6 +594,13 @@ const handlers: IpcHandlers<LlmInvokeMap> = {
     request({ type: 'calibration-record', modelId: req.modelId, quant: req.quant }),
   'llm:companions': (req) =>
     request({ type: 'companions', modelId: req.modelId, quant: req.quant }),
+  'llm:calibration-plan': (req) =>
+    request({
+      type: 'calibration-plan',
+      modelId: req.modelId,
+      quant: req.quant,
+      installableEngines: req.installableEngines,
+    }),
   // The strings come from the renderer; the supervisor validates them
   // (`profileOf`) before launching anything.
   'llm:use-profile': (req) =>

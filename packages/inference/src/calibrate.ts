@@ -55,6 +55,14 @@ export interface CalibrationCandidate extends LaunchProfile {
 /** A candidate that exists in principle but cannot be measured right now, and why. */
 export interface CalibrationSkip extends CalibrationCandidate {
   readonly reason: string;
+  /**
+   * What would make it measurable: `fetch` (a catalogued twin/drafter is a
+   * download away), `install` (the engine is supported here but not
+   * installed), `none` (nothing exists for it — no drafter published, engine
+   * unsupported on this machine). The menu's one button acts on the first two
+   * and says so honestly about the third.
+   */
+  readonly fix: 'fetch' | 'install' | 'none';
 }
 
 /**
@@ -79,6 +87,20 @@ export interface CalibrationInput {
   /** MTP heads for the MLX twin are on disk — in the twin itself, or as the
    * separate sidecar the catalogue names. */
   readonly mlxMtpAvailable?: boolean;
+  /**
+   * What the catalogue NAMES, whether or not it is on disk — so a skip can say
+   * "a download away" rather than "on disk" for something that exists, and
+   * "none published" for something that does not. Undefined = unknown (the
+   * older phrasing).
+   */
+  readonly catalogued?: {
+    readonly drafts: readonly ('eagle3' | 'dflash' | 'dspark')[];
+    readonly mlx: boolean;
+    readonly mlxDrafts: readonly ('dflash' | 'dspark')[];
+    readonly mlxMtp: boolean;
+  };
+  /** Engines this machine could install (supported here, not installed). */
+  readonly installableEngines?: readonly CalibEngine[];
 }
 
 const LABELS: Record<CalibEngine, string> = {
@@ -127,32 +149,49 @@ export function planCandidates(input: CalibrationInput): {
   const candidates: CalibrationCandidate[] = [];
   const skips: CalibrationSkip[] = [];
   const has = (e: CalibEngine): boolean => input.installedEngines.includes(e);
+  const cat = input.catalogued;
+  const installable = (e: CalibEngine): boolean => (input.installableEngines ?? []).includes(e);
+  const engineSkip = (e: CalibEngine, spec: CalibSpec): CalibrationSkip =>
+    installable(e)
+      ? { ...candidateOf(e, spec), reason: 'engine not installed', fix: 'install' }
+      : { ...candidateOf(e, spec), reason: 'engine not available here', fix: 'none' };
+  /** A missing artifact, said precisely when the catalogue is known. */
+  const missing = (
+    e: CalibEngine,
+    spec: CalibSpec,
+    what: string,
+    catalogued: boolean | undefined,
+  ): CalibrationSkip =>
+    catalogued === undefined
+      ? { ...candidateOf(e, spec), reason: `${what} not downloaded`, fix: 'fetch' }
+      : catalogued
+        ? { ...candidateOf(e, spec), reason: `${what} not downloaded yet`, fix: 'fetch' }
+        : { ...candidateOf(e, spec), reason: `no ${what} published for this model`, fix: 'none' };
 
   if (input.ggufPresent) {
     candidates.push(candidateOf('llamacpp', 'none'));
     if (input.mtpAvailable) candidates.push(candidateOf('llamacpp', 'mtp'));
     for (const m of ['eagle3', 'dflash', 'dspark'] as const) {
       if (input.draftsPresent.includes(m)) candidates.push(candidateOf('llamacpp', m));
-      else
-        skips.push({ ...candidateOf('llamacpp', m), reason: `no ${SPEC_LABEL[m]} draft on disk` });
+      else skips.push(missing('llamacpp', m, `${SPEC_LABEL[m]} drafter`, cat?.drafts.includes(m)));
     }
     // Model-free: the server's own n-gram cache. Costs nothing to try, wins on
     // repetitive text (code, edits) and loses on prose — which is why it is
     // measured rather than assumed.
     candidates.push(candidateOf('llamacpp', 'ngram'));
   } else {
-    skips.push({ ...candidateOf('llamacpp', 'none'), reason: 'GGUF not downloaded' });
+    skips.push({ ...candidateOf('llamacpp', 'none'), reason: 'GGUF not downloaded', fix: 'fetch' });
   }
 
   const mlxEngines: CalibEngine[] = ['mlx-lm', 'rapid-mlx', 'dflash-mlx', 'mlx-dspark', 'omlx'];
   if (input.platform === 'darwin' && input.appleSilicon) {
     for (const e of mlxEngines) {
       if (!has(e)) {
-        skips.push({ ...candidateOf(e, 'none'), reason: 'engine not installed' });
+        skips.push(engineSkip(e, 'none'));
         continue;
       }
       if (!input.mlxPresent) {
-        skips.push({ ...candidateOf(e, 'none'), reason: 'MLX weights not downloaded' });
+        skips.push(missing(e, 'none', 'MLX weights', cat?.mlx));
         continue;
       }
       switch (e) {
@@ -162,7 +201,7 @@ export function planCandidates(input: CalibrationInput): {
         case 'rapid-mlx':
           candidates.push(candidateOf('rapid-mlx', 'none'));
           if (input.mlxMtpAvailable === true) candidates.push(candidateOf('rapid-mlx', 'mtp'));
-          else skips.push({ ...candidateOf('rapid-mlx', 'mtp'), reason: 'no MTP head on disk' });
+          else skips.push(missing('rapid-mlx', 'mtp', 'MTP head (MLX)', cat?.mlxMtp));
           // rapid-mlx's DFlash path is the dflash-mlx package underneath, so
           // it is a candidate exactly when that engine and the drafter are.
           if (has('dflash-mlx') && input.mlxDraftsPresent.includes('dflash'))
@@ -172,10 +211,14 @@ export function planCandidates(input: CalibrationInput): {
           if (input.mlxDraftsPresent.includes('dflash'))
             candidates.push(candidateOf('dflash-mlx', 'dflash'));
           else
-            skips.push({
-              ...candidateOf('dflash-mlx', 'dflash'),
-              reason: 'no DFlash drafter on disk',
-            });
+            skips.push(
+              missing(
+                'dflash-mlx',
+                'dflash',
+                'DFlash drafter (MLX)',
+                cat?.mlxDrafts.includes('dflash'),
+              ),
+            );
           break;
         case 'mlx-dspark':
           // Drafter-free lookup runs on any repo; the drafted modes need their heads.
@@ -183,10 +226,14 @@ export function planCandidates(input: CalibrationInput): {
           for (const m of ['dspark', 'dflash'] as const) {
             if (input.mlxDraftsPresent.includes(m)) candidates.push(candidateOf('mlx-dspark', m));
             else
-              skips.push({
-                ...candidateOf('mlx-dspark', m),
-                reason: `no ${SPEC_LABEL[m]} drafter on disk`,
-              });
+              skips.push(
+                missing(
+                  'mlx-dspark',
+                  m,
+                  `${SPEC_LABEL[m]} drafter (MLX)`,
+                  cat?.mlxDrafts.includes(m),
+                ),
+              );
           }
           break;
         case 'omlx':

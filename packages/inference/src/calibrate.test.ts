@@ -38,7 +38,11 @@ describe('planCandidates — only what runs offline, llama.cpp first', () => {
     expect(ids).toContain('llamacpp/dflash');
     expect(ids).toContain('llamacpp/ngram');
     expect(ids).not.toContain('llamacpp/eagle3');
-    expect(skips.find((s) => s.id === 'llamacpp/eagle3')?.reason).toMatch(/no EAGLE-3 draft/);
+    // The catalogue is unknown here, so the phrasing is the neutral one.
+    expect(skips.find((s) => s.id === 'llamacpp/eagle3')?.reason).toBe(
+      'EAGLE-3 drafter not downloaded',
+    );
+    expect(skips.find((s) => s.id === 'llamacpp/eagle3')?.fix).toBe('fetch');
     expect(ids).toContain('rapid-mlx/none');
     expect(ids).toContain('rapid-mlx/mtp');
     expect(ids).toContain('rapid-mlx/dflash');
@@ -63,7 +67,45 @@ describe('planCandidates — only what runs offline, llama.cpp first', () => {
       'llamacpp/ngram',
     ]);
     expect(skips.find((s) => s.id === 'rapid-mlx/none')?.reason).toBe('MLX weights not downloaded');
-    expect(skips.find((s) => s.id === 'omlx/none')?.reason).toBe('engine not installed');
+    // Without an installable list the engine is only known to be absent.
+    expect(skips.find((s) => s.id === 'omlx/none')?.reason).toBe('engine not available here');
+    expect(skips.find((s) => s.id === 'omlx/none')?.fix).toBe('none');
+  });
+
+  it('says what would fix a skip when the catalogue and the installable engines are known', () => {
+    const { skips } = planCandidates({
+      ...mac,
+      installedEngines: ['llamacpp', 'rapid-mlx'],
+      mlxPresent: false,
+      draftsPresent: [],
+      catalogued: { drafts: ['dflash'], mlx: true, mlxDrafts: ['dflash'], mlxMtp: true },
+      installableEngines: ['omlx', 'mlx-lm'],
+    });
+    const by = (id: string) => skips.find((s) => s.id === id);
+    // A drafter the catalogue names is a download away; one it does not is not.
+    expect(by('llamacpp/dflash')).toMatchObject({
+      reason: 'DFlash drafter not downloaded yet',
+      fix: 'fetch',
+    });
+    expect(by('llamacpp/eagle3')).toMatchObject({
+      reason: 'no EAGLE-3 drafter published for this model',
+      fix: 'none',
+    });
+    expect(by('llamacpp/dspark')).toMatchObject({
+      reason: 'no DSpark drafter published for this model',
+      fix: 'none',
+    });
+    // Installed engine, twin catalogued but absent → fetch; installable engine → install;
+    // an engine this machine cannot run → none.
+    expect(by('rapid-mlx/none')).toMatchObject({
+      reason: 'MLX weights not downloaded yet',
+      fix: 'fetch',
+    });
+    expect(by('omlx/none')).toMatchObject({ reason: 'engine not installed', fix: 'install' });
+    expect(by('dflash-mlx/none')).toMatchObject({
+      reason: 'engine not available here',
+      fix: 'none',
+    });
   });
 
   it('plans nothing MLX on an Intel Mac or Linux, and vLLM only where installed', () => {

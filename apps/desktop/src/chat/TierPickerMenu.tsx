@@ -139,6 +139,7 @@ export function TierPickerMenu({
      download runs at a time, so a single state is all the menu needs to know
      whether THIS row is the one transferring. */
   const download = useLlmStore((s) => s.download);
+  const downloadError = useLlmStore((s) => s.downloadError);
   const downloadModel = useLlmStore((s) => s.downloadModel);
   const cancelDownload = useLlmStore((s) => s.cancelDownload);
   const quickMenu = useQuickMenu();
@@ -324,7 +325,19 @@ export function TierPickerMenu({
              * an apology, not a warning. Below the threshold it says nothing,
              * because at that size the re-read reads as the model thinking.
              */
-            description={describeRow(row.secondary ?? undefined, row.modelId)}
+            description={
+              /* The refusal, where the button was pressed. the user: "clicking
+                 download on the model picker … does not download them or show
+                 any user indication … that there's not enough disk space". The
+                 bar flashed and vanished; the reason stayed in a log. */
+              downloadError !== null && downloadError.modelId === downloadIdFor(row) ? (
+                <span className="pd-tier-download-error" data-testid="tier-download-error">
+                  {downloadError.error}
+                </span>
+              ) : (
+                describeRow(row.secondary ?? undefined, row.modelId)
+              )
+            }
             // Only a DOWNLOADED row can read as the active model (the user #4): one
             // whose model isn't on disk never shows a selected checkmark —
             // picking it opens the download flow instead of pretending it's

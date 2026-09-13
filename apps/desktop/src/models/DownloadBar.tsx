@@ -67,6 +67,12 @@ export interface DownloadBarProps {
   /** Fill the row it sits in rather than taking a fixed width. */
   readonly grow?: boolean;
   readonly testid?: string;
+  /**
+   * Make the bar itself a control: a press opens the caller's details (the
+   * top bar's popover). the user: "show download progress in the top bar clickable
+   * to show more details." The X stays its own button beside it.
+   */
+  readonly onOpen?: () => void;
 }
 
 export function DownloadBar({
@@ -78,6 +84,7 @@ export function DownloadBar({
   label = 'Cancel download',
   grow = false,
   testid = 'download-bar',
+  onOpen,
 }: DownloadBarProps): JSX.Element {
   const [hovered, setHovered] = useState(false);
   const pct = fraction === null ? null : Math.round(Math.max(0, Math.min(1, fraction)) * 100);
@@ -99,12 +106,22 @@ export function DownloadBar({
           positioning context. */}
       {/* Hover reveals the numbers; it adds nothing a keyboard user needs, and
           the bar's own controls carry every action. */}
-      {/* biome-ignore lint/a11y/noStaticElementInteractions: hover-only garnish. */}
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: hover-only garnish; the press is on the inner button when there is one. */}
       <span
         className="pd-dl-slot"
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
       >
+        {onOpen !== undefined ? (
+          <button
+            type="button"
+            className="pd-dl-open pd-focusable"
+            aria-label="Download details"
+            title="Details"
+            data-testid={`${testid}-open`}
+            onClick={onOpen}
+          />
+        ) : null}
         <span
           className="pd-dl-track"
           role="progressbar"

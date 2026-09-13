@@ -168,7 +168,24 @@ function CandidateRow({
   );
 }
 
-function CalibrationSection({ onUse }: { onUse: (engine: string, spec: string) => void }) {
+/** One skip of the live plan, as the menu draws it. */
+type PlanSkip = {
+  id: string;
+  engine: string;
+  spec: string;
+  label: string;
+  reason: string;
+  fix: 'fetch' | 'install' | 'none';
+};
+
+function CalibrationSection({
+  onUse,
+  plan,
+}: {
+  onUse: (engine: string, spec: string) => void;
+  /** The live plan's skips (what a calibration would skip NOW), or null while unknown. */
+  plan: PlanSkip[] | null;
+}) {
   const calibration = useLlmStore((s) => s.calibration);
   const record = useLlmStore((s) => s.record);
   const profile = useLlmStore((s) => s.status.profile);
@@ -185,7 +202,10 @@ function CalibrationSection({ onUse }: { onUse: (engine: string, spec: string) =
           label: c.label,
           view: calibration.rows[c.id],
         })),
-        skips: calibration.skips,
+        skips: calibration.skips.map((k) => ({
+          ...k,
+          fix: ((k as { fix?: string }).fix ?? 'none') as PlanSkip['fix'],
+        })),
         chosen: calibration.chosen,
         error: calibration.error,
       };
@@ -209,15 +229,21 @@ function CalibrationSection({ onUse }: { onUse: (engine: string, spec: string) =
           startupMs: r.startupMs,
         },
       })),
-      skips: rec.skips.map((k) => ({
-        ...k,
-        label: `${engineName(k.engine)} · ${specLabel(k.spec)}`,
-      })),
+      /* A stored record's skips describe the disk as it WAS: the twin that was
+         fetched since would still read "not downloaded". The live plan is what
+         a calibration would skip now, so that is what the list says. */
+      skips:
+        plan ??
+        rec.skips.map((k) => ({
+          ...k,
+          label: `${engineName(k.engine)} · ${specLabel(k.spec)}`,
+          fix: (k.fix ?? 'none') as PlanSkip['fix'],
+        })),
       chosen: rec.chosen,
       error: null,
       at: rec.at,
     };
-  }, [calibration, record]);
+  }, [calibration, record, plan]);
 
   if (rows === null) return null;
   return (
@@ -260,6 +286,7 @@ function CalibrationSection({ onUse }: { onUse: (engine: string, spec: string) =
               key={k.id}
               className="pd-engine-skip"
               data-testid={`calib-skip-${k.id.replace('/', '-')}`}
+              data-fix={k.fix}
             >
               <span>{k.label}</span>
               <span className="pd-engine-row-sub">{k.reason}</span>
@@ -272,31 +299,43 @@ function CalibrationSection({ onUse }: { onUse: (engine: string, spec: string) =
 }
 
 /**
- * FETCH MISSING — the companions the catalogue names for the running model
- * that are not on disk yet (MLX twin, MLX and GGUF drafters, MTP head, vision
- * projector), one small button under Calibrate.
+ * MAKE EVERYTHING MEASURABLE — one little button under Calibrate.
  *
- * the user (2026-09-13): "when I go to minicpm 5 2b in bobble there's no fetch
- * missing button that fetches drafters and models. i'd prefer this as a little
- * button under the recalibrate". It used to live inside a finished
- * calibration's "not measured" list, so a model that was never calibrated —
- * or one whose twins were catalogued after it was downloaded — had no way to
- * ask. The button now asks the supervisor what is missing whenever the menu
- * opens and after a download settles, and is simply absent when nothing is.
+ * the user (2026-09-13): "we need the 'not measured' engines to all be measurable
+ * by clicking a single button to install everything they need to measure
+ * them, for all recommended models." So the button counts BOTH kinds of
+ * missing thing for the running model: the engines this machine could install
+ * but has not (the live plan's `install` skips) and the twins/drafters the
+ * catalogue names that are not on disk (`llm:companions`). One press installs
+ * the engines one after another, then starts the model's own download job
+ * for the files (the GGUF is skipped as present; the extras come down on the
+ * top-bar bar). A row nothing can fix — no drafter published, an engine this
+ * Mac cannot run — is listed with that reason and not counted.
  *
- * The fetch is the model's own download job: the GGUF is skipped as already
- * present and the extras come down on the one bar in the top bar.
+ * Re-asked whenever the menu opens and whenever a download or an install
+ * settles, so the count is the disk's truth and not a stored record's.
  */
-function FetchMissingButton({ open }: { open: boolean }) {
+function FetchMissingButton({
+  open,
+  plan,
+  onNote,
+}: {
+  open: boolean;
+  plan: PlanSkip[] | null;
+  onNote: (text: string | null) => void;
+}) {
   const model = useLlmStore((s) => s.status.model);
   const download = useLlmStore((s) => s.download);
   const downloadModel = useLlmStore((s) => s.downloadModel);
+  const installEngine = useLlmStore((s) => s.installEngine);
+  const engines = useLlmStore((s) => s.engines);
   const [missing, setMissing] = useState<LlmCompanion[]>([]);
+  const [installing, setInstalling] = useState<string | null>(null);
   const modelId = model?.id ?? null;
   const quant = model?.quant;
-  const busy = download !== null && modelId !== null && download.modelId === modelId;
-  // Re-asked when a download of this model settles (`busy` flips false).
-  // biome-ignore lint/correctness/useExhaustiveDependencies: `busy` IS a trigger — the answer changes when a download ends
+  const fetching = download !== null && modelId !== null && download.modelId === modelId;
+  const anyInstalling = Object.values(engines).some((e) => e.busy === 'installing');
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `fetching` and `anyInstalling` ARE triggers — the answer changes when either settles
   useEffect(() => {
     if (!open || modelId === null) {
       setMissing([]);
@@ -312,27 +351,53 @@ function FetchMissingButton({ open }: { open: boolean }) {
     return () => {
       live = false;
     };
-  }, [open, modelId, quant, busy]);
+  }, [open, modelId, quant, fetching, anyInstalling]);
   if (modelId === null) return null;
-  const list = missing.map((c) => c.what).join(', ');
-  const nothing = missing.length === 0 && !busy;
+  const toInstall = [
+    ...new Set((plan ?? []).filter((k) => k.fix === 'install').map((k) => k.engine)),
+  ];
+  const count = missing.length + toInstall.length;
+  const busy = fetching || installing !== null;
+  const nothing = count === 0 && !busy;
+  const what = [
+    ...toInstall.map((e) => `install ${engineName(e)}`),
+    ...missing.map((c) => c.what),
+  ].join(', ');
+  const run = async (): Promise<void> => {
+    onNote(null);
+    for (const e of toInstall) {
+      setInstalling(e);
+      const r = await installEngine(e);
+      if (!r.success) onNote(r.error ?? `could not install ${engineName(e)}`);
+    }
+    setInstalling(null);
+    if (missing.length > 0) await downloadModel(modelId, quant);
+  };
   return (
     <button
       type="button"
       className="pd-engine-install pd-engine-fetch"
       data-testid="engine-fetch-missing"
-      data-missing={missing.length}
+      data-missing={count}
       disabled={busy || nothing}
       title={
-        busy
+        installing !== null
+          ? `Installing ${engineName(installing)}…`
+          : fetching
+            ? 'Fetching…'
+            : nothing
+              ? 'Every engine this Mac can run is installed, and every twin and drafter the catalogue names for this model is on disk'
+              : `Will ${what}`
+      }
+      onClick={() => void run()}
+    >
+      {installing !== null
+        ? `Installing ${engineName(installing)}…`
+        : fetching
           ? 'Fetching…'
           : nothing
-            ? 'Every twin and drafter the catalogue names for this model is on disk'
-            : `Download: ${list}`
-      }
-      onClick={() => void downloadModel(modelId, quant)}
-    >
-      {busy ? 'Fetching…' : nothing ? 'Nothing missing' : `Fetch missing · ${missing.length}`}
+            ? 'Nothing missing'
+            : `Fetch missing · ${count}`}
     </button>
   );
 }
@@ -448,6 +513,39 @@ export function EngineMenu() {
 
   const running = calibration?.running === true;
   const model = status.model;
+
+  /* The live plan: what a calibration would measure now and what stands in
+     the way of the rest — fetched when the menu opens and again whenever a
+     download or an install settles, so a stored verdict's stale "not
+     downloaded" never outlives the download. Engines this host could install
+     are the renderer's knowledge (the engine catalogue), sent along. */
+  const [plan, setPlan] = useState<PlanSkip[] | null>(null);
+  const download = useLlmStore((s) => s.download);
+  const installableKey = rows
+    .filter(({ spec, support }) => support.supported && engines[spec.id]?.installed !== true)
+    .map(({ spec }) => spec.id)
+    .join(',');
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a settled download or install changes the answer
+  useEffect(() => {
+    if (!open || model === null || model === undefined) {
+      setPlan(null);
+      return;
+    }
+    let live = true;
+    void window.piDesktop
+      .invoke('llm:calibration-plan', {
+        modelId: model.id,
+        ...(model.quant === undefined ? {} : { quant: model.quant }),
+        installableEngines: installableKey === '' ? [] : installableKey.split(','),
+      })
+      .then((r) => {
+        if (live) setPlan(r.skips);
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [open, model?.id, model?.quant, installableKey, download === null, anyBusy, running]);
   const canCalibrate =
     model !== null && model !== undefined && status.phase === 'ready' && !running;
 
@@ -528,7 +626,7 @@ export function EngineMenu() {
                   {record !== null ? 'Recalibrate' : 'Calibrate'}
                 </button>
               )}
-              <FetchMissingButton open={open} />
+              <FetchMissingButton open={open} plan={plan} onNote={setNote} />
             </div>
           </div>
           {model !== null && model !== undefined && record === null && !running ? (
@@ -544,7 +642,7 @@ export function EngineMenu() {
               {note}
             </div>
           ) : null}
-          <CalibrationSection onUse={(e, s) => void onUse(e, s)} />
+          <CalibrationSection onUse={(e, s) => void onUse(e, s)} plan={plan} />
           <div className="pd-engine-section pd-engine-section--list">
             <div className="pd-engine-section-title">Available on this machine</div>
             <div className="pd-engine-list" data-testid="engine-menu-list">

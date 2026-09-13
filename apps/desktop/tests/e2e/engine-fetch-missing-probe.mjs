@@ -83,6 +83,25 @@ try {
   await start(COMPLETE);
   const m1 = await openMenu();
   log(COMPLETE, JSON.stringify(m1));
+  // The "not measured" list is the LIVE plan: each skip says what would fix it.
+  await win.click('.pd-engine-skips summary').catch(() => {});
+  await win.waitForTimeout(300);
+  const skips = await win.evaluate(() =>
+    [...document.querySelectorAll('[data-testid^="calib-skip-"]')].map((e) => ({
+      id: e.getAttribute('data-testid').replace('calib-skip-', ''),
+      fix: e.getAttribute('data-fix'),
+      reason: e.querySelector('.pd-engine-row-sub')?.textContent,
+    })),
+  );
+  log('skips:', JSON.stringify(skips));
+  check(
+    skips.some((k) => /no EAGLE-3 drafter published/.test(k.reason ?? '') && k.fix === 'none'),
+    'a drafter nobody published is said to be exactly that, and not counted',
+  );
+  check(
+    !skips.some((k) => /MLX weights not downloaded/.test(k.reason ?? '')),
+    'the twin that IS on disk is no longer reported missing by a stale record',
+  );
   check(
     m1.text === 'Nothing missing' && m1.disabled === true,
     `${COMPLETE}: every companion is on disk → "Nothing missing", disabled (${m1.text})`,

@@ -3054,6 +3054,80 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
   flex: 1;
   min-width: 48px;
 }
+/* The press that opens the details: an invisible button over the whole slot,
+   so the bar reads as one thing and the X beside it stays its own control.
+   Taller than the 6px bar — a hit target, not a hairline. */
+.pd-dl-open {
+  position: absolute;
+  inset: -8px 0;
+  z-index: 1;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+}
+.pd-dl-open:hover ~ .pd-dl-track {
+  filter: brightness(1.15);
+}
+.pd-dl-popover {
+  min-width: 260px;
+  max-width: 360px;
+  padding: 12px;
+}
+.pd-dl-details {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: var(--pd-font-size-caption);
+}
+.pd-dl-details-title {
+  font-size: var(--pd-font-size-footnote);
+  font-weight: var(--pd-font-weight-semibold);
+  color: var(--pd-text-primary);
+  word-break: break-word;
+}
+.pd-dl-details-facts {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 3px 12px;
+  margin: 0;
+}
+.pd-dl-details-facts dt {
+  color: var(--pd-text-muted);
+}
+.pd-dl-details-facts dd {
+  margin: 0;
+  min-width: 0;
+  color: var(--pd-text-secondary);
+  word-break: break-all;
+  font-variant-numeric: tabular-nums;
+}
+.pd-dl-details-actions {
+  display: flex;
+  gap: 6px;
+}
+.pd-dl-details .pd-dl-details-cancel {
+  color: var(--pd-status-danger-fg);
+}
+.pd-dl-details-error {
+  margin: 0;
+  color: var(--pd-status-danger-fg);
+  white-space: normal;
+}
+/* When nothing is moving but the last attempt was refused: a chip in the
+   bar's place, in the danger voice, clickable for the whole sentence. */
+.pd-dl-refusal {
+  height: 22px;
+  padding: 0 10px;
+  border: 1px solid color-mix(in srgb, var(--pd-status-danger-fg) 45%, transparent);
+  border-radius: var(--pd-radius-full);
+  background: color-mix(in srgb, var(--pd-status-danger-fg) 10%, transparent);
+  color: var(--pd-status-danger-fg);
+  font: inherit;
+  font-size: var(--pd-font-size-caption);
+  white-space: nowrap;
+  cursor: pointer;
+}
 .pd-dl-track {
   position: relative;
   display: block;
@@ -6708,6 +6782,20 @@ body[data-media-expanded="true"] .pd-studio-compose {
   height: 22px;
   padding: 0 8px;
   font-size: 11px;
+}
+/* A skip nothing can fix (no drafter published, an engine this Mac cannot
+   run) is listed, quieter. */
+.pd-engine-skip[data-fix="none"] {
+  opacity: 0.6;
+}
+/* The download refusal under a tier row, in the danger voice, wrapping — and
+   bounded, or the menu grows to the sentence's width. */
+.pd-tier-download-error {
+  display: block;
+  max-width: 300px;
+  white-space: normal;
+  line-height: 1.35;
+  color: var(--pd-status-danger-fg);
 }
 .pd-engine-head-title {
   font-weight: var(--pd-font-weight-semibold);
