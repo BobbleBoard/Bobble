@@ -285,6 +285,7 @@ const handlers: IpcHandlers<SettingsInvokeMap> = {
     }
     if (
       JSON.stringify(next.engineLaunch) !== JSON.stringify(before.engineLaunch) ||
+      JSON.stringify(next.portableKnobs) !== JSON.stringify(before.portableKnobs) ||
       JSON.stringify(next.modelSpec) !== JSON.stringify(before.modelSpec)
     ) {
       onEngineLaunchChanged?.();

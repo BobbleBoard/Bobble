@@ -382,6 +382,14 @@ export interface DesktopSettings {
   experimentalGeneration: boolean;
   /** Launch flags per engine (see EngineLaunchSettings). Empty by default. */
   engineLaunch: EngineLaunchSettings;
+  /**
+   * The settings that mean the same thing on every engine (context window, KV
+   * cache quantization, …), kept once and spelled out per engine at launch —
+   * see `@pi-desktop/inference/portable-knobs`. Keyed by knob id. An engine's
+   * own explicit flag for the same thing wins; an engine with no spelling for a
+   * knob ignores it and the value stays for the ones that have one.
+   */
+  portableKnobs: Record<string, EngineFlagValue>;
   /** Per-model speculative choice (see ModelSpecChoice), keyed by catalogue id. */
   modelSpec: Record<string, ModelSpecChoice>;
   /**
@@ -432,6 +440,7 @@ export interface DesktopSettingsPatch {
   powerMode?: PowerMode;
   /** Full replacement per engine id; an absent id keeps its current config. */
   engineLaunch?: EngineLaunchSettings;
+  portableKnobs?: Record<string, EngineFlagValue>;
   /** Full replacement per model id. */
   modelSpec?: Record<string, ModelSpecChoice>;
   modelsRoot?: string | null;

@@ -11,8 +11,10 @@
  * the same → it does not, whatever was clicked on the way.
  */
 import { configFingerprint } from '@pi-desktop/inference/engine-flags';
+import { effectiveLaunchConfig } from '@pi-desktop/inference/portable-knobs';
 import { useEffect, useMemo, useState } from 'react';
 import type {
+  EngineFlagValue,
   EngineLaunchConfig,
   ModelSpecChoice,
 } from '../../../electron/settings/settings-contract';
@@ -23,6 +25,7 @@ import { CommandTab } from './CommandTab';
 import { EngineFlagsTab } from './EngineFlagsTab';
 import { emptyConfig, setFlag, shellJoin } from './engine-settings-logic';
 import { CHAT_TEMPLATE_FLAG, type FlagSpec, type PathSource } from './FlagRow';
+import { SharedKnobsSection } from './SharedKnobsSection';
 import { SpeculativeTab } from './SpeculativeTab';
 
 type SubTab = 'settings' | 'speculative' | 'command' | 'running';
@@ -65,10 +68,17 @@ export function EngineTab() {
   const [spec, setSpec] = useState<ModelSpecChoice>(
     () => (modelId !== null ? settings.modelSpec[modelId] : undefined) ?? { method: 'auto' },
   );
+  // The cross-engine knobs, drafted alongside; '' marks a knob being cleared.
+  const [knobs, setKnobs] = useState<Record<string, EngineFlagValue>>(
+    () => settings.portableKnobs ?? {},
+  );
   // Re-seed when the engine or the model changes under the panel.
   useEffect(() => {
     setDraft(settings.engineLaunch[engine] ?? emptyConfig());
   }, [engine, settings.engineLaunch]);
+  useEffect(() => {
+    setKnobs(settings.portableKnobs ?? {});
+  }, [settings.portableKnobs]);
   useEffect(() => {
     setSpec((modelId !== null ? settings.modelSpec[modelId] : undefined) ?? { method: 'auto' });
   }, [modelId, settings.modelSpec]);
@@ -85,8 +95,14 @@ export function EngineTab() {
 
   /* Apply lights up when what the panel would launch with differs from what
      IS running — computed exactly as the supervisor computes its stamp. */
+  /* What the engine would actually run with — its own flags over the shared
+     knobs spelled for it — fingerprinted exactly as the supervisor stamps it. */
+  const cleanKnobs = Object.fromEntries(Object.entries(knobs).filter(([, v]) => v !== ''));
   const draftFingerprint = configFingerprint({
-    engine: draft,
+    engine: effectiveLaunchConfig(engine, {
+      knobs: cleanKnobs,
+      engineLaunch: { ...settings.engineLaunch, [engine]: draft },
+    }),
     spec: spec.method === 'auto' ? { method: 'auto' } : spec,
   });
   const runningHere = status.serverRunning && runningEngine === engine;
@@ -94,12 +110,18 @@ export function EngineTab() {
     ? draftFingerprint !== (status.launchConfigFingerprint ?? '')
     : draftFingerprint !==
       configFingerprint({
-        engine: settings.engineLaunch[engine] ?? emptyConfig(),
+        engine: effectiveLaunchConfig(engine, {
+          knobs: settings.portableKnobs ?? {},
+          engineLaunch: settings.engineLaunch,
+        }),
         spec: (modelId !== null ? settings.modelSpec[modelId] : undefined) ?? { method: 'auto' },
       });
 
   const save = async (): Promise<void> => {
-    const patch: Parameters<typeof update>[0] = { engineLaunch: { [engine]: draft } };
+    const patch: Parameters<typeof update>[0] = {
+      engineLaunch: { [engine]: draft },
+      portableKnobs: knobs,
+    };
     if (modelId !== null) patch.modelSpec = { [modelId]: spec };
     await update(patch);
   };
@@ -199,14 +221,22 @@ export function EngineTab() {
 
       <div className="pd-engine-tab-body">
         {sub === 'settings' ? (
-          <EngineFlagsTab
-            engine={engine}
-            help={help}
-            values={draft.flags}
-            status={status}
-            onChange={(k, v) => setDraft((d) => ({ ...d, flags: setFlag(d.flags, k, v) }))}
-            onPath={resolvePath}
-          />
+          <>
+            <SharedKnobsSection
+              engine={engine}
+              knobs={cleanKnobs}
+              engineLaunch={{ ...settings.engineLaunch, [engine]: draft }}
+              onChange={(id, v) => setKnobs((k) => ({ ...k, [id]: v === null ? '' : v }))}
+            />
+            <EngineFlagsTab
+              engine={engine}
+              help={help}
+              values={draft.flags}
+              status={status}
+              onChange={(k, v) => setDraft((d) => ({ ...d, flags: setFlag(d.flags, k, v) }))}
+              onPath={resolvePath}
+            />
+          </>
         ) : sub === 'speculative' ? (
           <SpeculativeTab
             entry={entry}
@@ -285,6 +315,7 @@ export function EngineTab() {
             onClick={() => {
               setDraft(emptyConfig());
               setSpec({ method: 'auto' });
+              setKnobs(Object.fromEntries(Object.keys(knobs).map((k) => [k, ''])));
             }}
             data-testid="engine-settings-reset"
           >

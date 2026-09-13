@@ -50,6 +50,7 @@ import {
   detectAccelerators,
   detectHardware,
   downloadModel,
+  effectiveLaunchConfig,
   ensureChatTemplate,
   ensureEngineFor,
   ensureMlx,
@@ -1164,6 +1165,7 @@ async function startMlxServer(
 
 /** Pushed from main (settings) at child creation and on every change. */
 let engineLaunch: EngineLaunchSettings = {};
+let portableKnobs: Record<string, EngineFlagValue> = {};
 let modelSpec: Record<string, ModelSpecChoice> = {};
 
 const REFUSED_LLAMA_FLAGS = Object.keys(MANAGED_LLAMA_FLAGS).filter(
@@ -1177,8 +1179,10 @@ const REFUSED_LLAMA_FLAGS = Object.keys(MANAGED_LLAMA_FLAGS).filter(
  * value here came from a pasted command.
  */
 function userArgsFor(engine: string): string[] {
-  const cfg = engineLaunch[engine];
-  if (cfg === undefined) return [];
+  /* The cross-engine knobs spelled in this engine's own flags, under the
+     engine's explicit ones (portable-knobs.ts: the explicit flag wins). */
+  const cfg = effectiveLaunchConfig(engine, { knobs: portableKnobs, engineLaunch });
+  if (Object.keys(cfg.flags).length === 0 && cfg.rawArgs.length === 0) return [];
   const { args, refused } = flagsToArgs(cfg.flags, {
     refused: engine === 'llamacpp' ? REFUSED_LLAMA_FLAGS : ['--host', '--port', '--model'],
   });
@@ -1191,7 +1195,7 @@ function userArgsFor(engine: string): string[] {
 /** What the fingerprint on the status covers: the user's flags and spec choice for this launch. */
 function launchFingerprint(engine: string, modelId: string): string {
   return configFingerprint({
-    engine: engineLaunch[engine] ?? { flags: {}, rawArgs: [] },
+    engine: effectiveLaunchConfig(engine, { knobs: portableKnobs, engineLaunch }),
     spec: modelSpec[modelId] ?? { method: 'auto' },
   });
 }
@@ -2692,6 +2696,7 @@ async function handle(req: LlmRequest): Promise<unknown> {
       return applyProfile(req.profile);
     case 'set-engine-launch':
       engineLaunch = req.engineLaunch;
+      portableKnobs = req.portableKnobs ?? {};
       modelSpec = req.modelSpec;
       return { success: true };
     case 'relaunch':

@@ -7127,6 +7127,44 @@ body[data-media-expanded="true"] .pd-studio-compose {
 .pd-flag-chip--warn {
   color: var(--pd-status-warning-fg);
 }
+.pd-flag-chip--muted {
+  color: var(--pd-text-muted);
+  border-style: dashed;
+}
+/* Shared knobs (portable-knobs.ts): a row the engine cannot spell is greyed,
+   not hidden — the value is kept for the engines that can. */
+.pd-knob-row[data-supported="no"] .pd-knob-label,
+.pd-knob-row[data-supported="no"] .pd-flag-desc {
+  color: var(--pd-text-muted);
+}
+.pd-knob-row[data-supported="no"] .pd-flag-control {
+  opacity: 0.55;
+}
+.pd-knob-label {
+  font-family: var(--pd-font-sans);
+  font-weight: 600;
+}
+.pd-knobs-sub {
+  margin: 0 12px 6px;
+}
+.pd-knob-engines {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 3px;
+}
+.pd-knob-engine {
+  padding: 0 6px;
+  border-radius: var(--pd-radius-full);
+  background: var(--pd-bg-inset);
+  font-size: 10px;
+  line-height: 16px;
+  color: var(--pd-text-muted);
+}
+.pd-knob-engine[data-here="yes"] {
+  color: var(--pd-text-primary);
+  background: color-mix(in srgb, var(--pd-accent-primary) 14%, transparent);
+}
 .pd-flag-chip--running {
   color: var(--pd-status-success-fg);
   font-family: var(--pd-font-mono);

@@ -459,6 +459,7 @@ export function pushEngineLaunchSettings(): void {
   void request<{ success: boolean }>({
     type: 'set-engine-launch',
     engineLaunch: s.engineLaunch,
+    portableKnobs: s.portableKnobs,
     modelSpec: s.modelSpec,
   }).catch(() => {
     // Not up yet, or going down — the next push carries it.

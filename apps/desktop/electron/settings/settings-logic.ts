@@ -138,6 +138,7 @@ export const DEFAULT_SETTINGS: DesktopSettings = {
   experimentalGeneration: false,
   advanced: DEFAULT_ADVANCED,
   engineLaunch: {},
+  portableKnobs: {},
   modelSpec: {},
   modelsRoot: null,
   chatOrg: { projects: [], assignments: {}, pinned: [], titles: {} },
@@ -232,6 +233,18 @@ function clampEngineLaunch(raw: unknown): EngineLaunchSettings {
       ? c.rawArgs.filter((a): a is string => typeof a === 'string' && a.length > 0).slice(0, 200)
       : [];
     if (Object.keys(flags).length > 0 || rawArgs.length > 0) out[engine] = { flags, rawArgs };
+  }
+  return out;
+}
+
+/** Knob ids are plain words; values are the flag-value primitives. */
+function clampPortableKnobs(raw: unknown): Record<string, EngineFlagValue> {
+  const out: Record<string, EngineFlagValue> = {};
+  if (typeof raw !== 'object' || raw === null) return out;
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (!/^[a-zA-Z][\w]*$/.test(k)) continue;
+    if (v === '') continue;
+    if (typeof v === 'boolean' || typeof v === 'number' || typeof v === 'string') out[k] = v;
   }
   return out;
 }
@@ -379,6 +392,7 @@ export function clampSettings(raw: unknown): DesktopSettings {
     experimentalGeneration: bool(o.experimentalGeneration, d.experimentalGeneration),
     advanced: clampAdvanced(o.advanced),
     engineLaunch: clampEngineLaunch(o.engineLaunch),
+    portableKnobs: clampPortableKnobs(o.portableKnobs),
     modelSpec: clampModelSpec(o.modelSpec),
     // An absolute path or nothing; a relative one would resolve to wherever
     // the process happened to start and scatter the library.
@@ -412,6 +426,13 @@ export function mergeSettingsPatch(
     },
     // Per-id maps: a patch names the ids it changes and leaves the rest.
     engineLaunch: { ...current.engineLaunch, ...patch.engineLaunch },
+    // A knob patched to '' is cleared, so the panel's "use the engine's own
+    // default" is a real choice and not an unpatchable key.
+    portableKnobs: Object.fromEntries(
+      Object.entries({ ...current.portableKnobs, ...patch.portableKnobs }).filter(
+        ([, v]) => v !== '',
+      ),
+    ),
     modelSpec: { ...current.modelSpec, ...patch.modelSpec },
     ...(patch.modelsRoot === undefined ? {} : { modelsRoot: patch.modelsRoot }),
   });

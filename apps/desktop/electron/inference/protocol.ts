@@ -15,7 +15,11 @@ import type {
   LlmRecommendation,
   LlmStatus,
 } from '../ipc-contract';
-import type { EngineLaunchSettings, ModelSpecChoice } from '../settings/settings-contract';
+import type {
+  EngineFlagValue,
+  EngineLaunchSettings,
+  ModelSpecChoice,
+} from '../settings/settings-contract';
 
 export type LlmRequestBody =
   | { type: 'get-status' }
@@ -61,6 +65,8 @@ export type LlmRequestBody =
   | {
       type: 'set-engine-launch';
       engineLaunch: EngineLaunchSettings;
+      /** The cross-engine knobs (portable-knobs.ts), spelled per engine at launch. */
+      portableKnobs?: Record<string, EngineFlagValue>;
       modelSpec: Record<string, ModelSpecChoice>;
     }
   /** Restart the running server with the current flags and profile. */

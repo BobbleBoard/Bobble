@@ -70,6 +70,7 @@ const DEFAULTS: DesktopSettings = {
   experimentalGeneration: false,
   advanced: DEFAULT_ADVANCED,
   engineLaunch: {},
+  portableKnobs: {},
   modelSpec: {},
   modelsRoot: null,
   chatOrg: { projects: [], assignments: {}, pinned: [], titles: {} },
@@ -150,6 +151,12 @@ export const useSettingsStore = create<SettingsStoreState>((set, get) => ({
         reasoning: { ...get().settings.advanced.reasoning, ...patch.advanced?.reasoning },
       },
       engineLaunch: { ...get().settings.engineLaunch, ...patch.engineLaunch },
+      // Same rule as the main-side merge: '' clears a knob.
+      portableKnobs: Object.fromEntries(
+        Object.entries({ ...get().settings.portableKnobs, ...patch.portableKnobs }).filter(
+          ([, v]) => v !== '',
+        ),
+      ),
       modelSpec: { ...get().settings.modelSpec, ...patch.modelSpec },
       ...(patch.modelsRoot === undefined ? {} : { modelsRoot: patch.modelsRoot }),
     };
