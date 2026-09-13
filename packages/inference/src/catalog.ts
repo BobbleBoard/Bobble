@@ -56,6 +56,12 @@ export const MODEL_TIERS: readonly ModelTier[] = ['fast', 'balanced', 'intellige
 export interface CatalogFile {
   /** GGUF file name within the HF repo (`resolve/main/<name>`). */
   readonly name: string;
+  /**
+   * Names this file was catalogued under before, so a copy downloaded then is
+   * still found (and renamed on sight) after the catalog learns the real name.
+   * Same bytes, same sha — only the spelling moved.
+   */
+  readonly previousNames?: readonly string[];
   /** File size in bytes; 0 = unknown/unverified (no size assertion on download). */
   readonly bytes: number;
   /** Quantization label, e.g. "Q4_K_M", "Q6_K", "UD-Q4_K_M". */
@@ -358,15 +364,15 @@ export const GEMMA4_E2B: CatalogModel = {
   files: [
     {
       name: 'gemma-4-E2B-it-Q8_0.gguf',
-      bytes: 5_048_350_848,
+      bytes: 5_048_352_864,
       quant: 'Q8_0',
-      sha256: '0a8488b149e1f700712c35d5bf0a3795f9dcc2563b4944d5ef2fb89375f9483e',
+      sha256: '605d3c2647d7c58c1e4b5375ccb5702acf94c2611b4c8d4877812f8fdd32d053',
     },
     {
       name: 'gemma-4-E2B-it-UD-Q6_K_XL.gguf',
-      bytes: 4_710_086_784,
+      bytes: 4_710_088_800,
       quant: 'UD-Q6_K_XL',
-      sha256: '23b9129abcd9db1df6e35aafeb3e43c65448dac7f114aa02b30fdf29b9db303d',
+      sha256: 'ae15474bc78f68c6a44bd17cad32f672b9501d90c4a0eed2fceeb6878ed530c5',
     },
   ],
   // E2B DOES ship vision (mmproj-F16, 985,654,080 B ≈ 0.918 GiB); sha not
@@ -406,15 +412,15 @@ const GEMMA4_E4B: CatalogModel = {
   files: [
     {
       name: 'gemma-4-E4B-it-Q8_0.gguf',
-      bytes: 8_192_951_456,
+      bytes: 8_192_953_472,
       quant: 'Q8_0',
-      sha256: 'a2232a649523c36bf530f1dc3614eb8c800645c4227390381c8b05d4d6eee05a',
+      sha256: 'f8854aa4480df62585a279e7ca0a881554fc18a41c59c4f62642d16a2ae47012',
     },
     {
       name: 'gemma-4-E4B-it-UD-Q6_K_XL.gguf',
-      bytes: 7_457_760_416,
+      bytes: 7_457_762_432,
       quant: 'UD-Q6_K_XL',
-      sha256: '718b86f1d3e2928df914e7abf83a5342ef752fb7a7e900d5ff036952709ea72f',
+      sha256: '17b9c459b28b420ce20d75bcfc329db4fac1343792a964c3ae2e2680ce768932',
     },
   ],
   mmproj: {
@@ -446,20 +452,28 @@ const GEMMA4_12B: CatalogModel = {
   id: 'gemma-4-12b-it',
   displayName: 'Gemma 4 12B Instruct',
   mlxRepo: 'mlx-community/gemma-4-12B-it-4bit',
+  // z-lab's DFlash adapter (1.5 GB) and DeepSeek's own DSpark head (6.9 GB —
+  // mlx-dspark's registry row, 2.8× measured by them). Google's MTP "assistant"
+  // head exists too (google/gemma-4-12B-it-assistant) but no engine here wires
+  // it on MLX (rapid-mlx's MTP allowlist is Qwen-only), so it is not fetched.
+  mlxDrafts: [
+    { method: 'dflash', repo: 'z-lab/gemma4-12B-it-DFlash' },
+    { method: 'dspark', repo: 'deepseek-ai/dspark_gemma4_12b_block7' },
+  ],
   hfRepo: 'unsloth/gemma-4-12b-it-GGUF',
   baseRepo: 'google/gemma-4-12b-it',
   files: [
     {
       name: 'gemma-4-12b-it-Q4_K_M.gguf',
-      bytes: 7_121_860_000,
+      bytes: 7_121_861_440,
       quant: 'Q4_K_M',
-      sha256: '43fec98c5102b1c446b4ddd0a9439f1db3a2e1f2e0b8cd143ce1ea619a9403d6',
+      sha256: '0a270ec9fe6b34f4a0d33992b6135117b484ebc4766ab76b51d4ae8c457e4c42',
     },
     {
       name: 'gemma-4-12b-it-Q6_K.gguf',
-      bytes: 9_786_021_280,
+      bytes: 9_786_022_720,
       quant: 'Q6_K',
-      sha256: 'e1602ddc224c159584eb4c7d6a6c8d682fc6afb2efb8f76c10bfd63ba71436a2',
+      sha256: '6f394336500bb5409bd68c31aa9d75097b5e6104f6cf30c82a09a7b64df41faf',
     },
   ],
   mmproj: {
@@ -478,6 +492,16 @@ const GEMMA4_12B: CatalogModel = {
   // MTP sibling + a late-June DFlash draft (upstream draft-dflash).
   variants: [
     { method: 'mtp' },
+    {
+      method: 'dspark',
+      draftRepo: 'williamliao/dspark_gemma4_12b-GGUF',
+      draftModel: {
+        name: 'gemma4_12b-DSpark-Q8_0.gguf',
+        bytes: 1_379_192_960,
+        quant: 'Q8_0',
+        sha256: '1c9ddeb4aeae7aea95fe4998efab46c41c3731ba348c8976e07d76a153f2166e',
+      },
+    },
     {
       method: 'dflash',
       draftRepo: 'williamliao/gemma-4-12B-it-DFlash-GGUF',
@@ -501,22 +525,25 @@ const GEMMA4_26B_A4B: CatalogModel = {
   id: 'gemma-4-26b-a4b-it',
   displayName: 'Gemma 4 26B-A4B Instruct',
   mlxRepo: 'mlx-community/gemma-4-26b-a4b-it-4bit',
-  mlxDrafts: [{ method: 'dflash', repo: 'z-lab/gemma-4-26B-A4B-it-DFlash' }],
+  mlxDrafts: [
+    { method: 'dflash', repo: 'z-lab/gemma-4-26B-A4B-it-DFlash' },
+    { method: 'dspark', repo: 'makora-ai/gemma4-26b-a4b-dspark' },
+  ],
   hfRepo: 'unsloth/gemma-4-26B-A4B-it-GGUF',
   baseRepo: 'google/gemma-4-26B-A4B-it',
   // Repo ships only UD-quants at the Q4/Q6 tiers (no plain Q4_K_M/Q6_K).
   files: [
     {
       name: 'gemma-4-26B-A4B-it-UD-Q4_K_M.gguf',
-      bytes: 16_947_539_744,
+      bytes: 16_947_541_728,
       quant: 'UD-Q4_K_M',
-      sha256: '34c746b1d50ab813e29cd46c4796e3f43c741901a582f93a67b55b9fc9687b35',
+      sha256: 'f2c28b3dc4776931ac6f879e11f203dec637ea0f14267a86ec8f6165f63f293f',
     },
     {
       name: 'gemma-4-26B-A4B-it-UD-Q6_K.gguf',
-      bytes: 23_172_476_704,
+      bytes: 23_172_478_688,
       quant: 'UD-Q6_K',
-      sha256: 'd3d9e6a63845bdc83e9f9fc5923e77c023ccc1197c9e145e6a8754bad80b5d75',
+      sha256: '76bf3eee49cca5b076b34a4b575ecd505dabc470512b46f1207b4f9da08385f0',
     },
   ],
   mmproj: {
@@ -537,7 +564,18 @@ const GEMMA4_26B_A4B: CatalogModel = {
   // MTP stays the safe default.
   variants: [
     { method: 'mtp' },
-    { method: 'eagle3', draftRepo: 'RedHatAI/gemma-4-26B-A4B-it-speculator.eagle3' },
+    {
+      // RedHatAI's speculator is safetensors-only (vLLM's format); llama.cpp
+      // needs the GGUF conversion for `--model-draft`.
+      method: 'eagle3',
+      draftRepo: 'williamliao/gemma-4-26B-A4B-it-speculator.eagle3-F16-GGUF',
+      draftModel: {
+        name: 'gemma-4-26B-A4B-it-speculator.eagle3-Q8_0.gguf',
+        bytes: 992_420_384,
+        quant: 'Q8_0',
+        sha256: '7e4eb3e400608378b89a66a3af5707539f54ff64571697af1a8b3779bdd52a24',
+      },
+    },
     {
       method: 'dflash',
       draftRepo: 'Anbeeld/gemma-4-26B-A4B-it-DFlash-GGUF',
@@ -569,21 +607,23 @@ const GEMMA4_31B: CatalogModel = {
   id: 'gemma-4-31b-it',
   displayName: 'Gemma 4 31B Instruct',
   mlxRepo: 'mlx-community/gemma-4-31b-it-4bit',
+  // No MLX DSpark head on purpose: the only one (RedHatAI's speculator) is
+  // 8.4 GB beside an 18.4 GB twin — nothing a 24 GB Mac can hold.
   mlxDrafts: [{ method: 'dflash', repo: 'z-lab/gemma-4-31B-it-DFlash' }],
   hfRepo: 'unsloth/gemma-4-31B-it-GGUF',
   baseRepo: 'google/gemma-4-31B-it',
   files: [
     {
       name: 'gemma-4-31B-it-Q4_K_M.gguf',
-      bytes: 18_323_731_456,
+      bytes: 18_323_733_440,
       quant: 'Q4_K_M',
-      sha256: '9fdf3dc8b0384830b4402d151388c140bd8eb2abf8d60588d8224231198254a1',
+      sha256: '38bd64c852c4b460434cc7162fa9bdcf242faf86502581a754cb72956bb17f84',
     },
     {
       name: 'gemma-4-31B-it-Q6_K.gguf',
-      bytes: 25_201_484_800,
+      bytes: 25_201_486_784,
       quant: 'Q6_K',
-      sha256: 'abd0be03a2bc3f3c9d8e018cbb4ff5b553c340c65d49b6b346c48be5a1efde28',
+      sha256: '4660692bca96f1d9d19c550641088789c8c0c25bb07965a1e2798e3cb16885fb',
     },
   ],
   mmproj: {
@@ -601,7 +641,16 @@ const GEMMA4_31B: CatalogModel = {
   spec: 'mtp',
   variants: [
     { method: 'mtp' },
-    { method: 'eagle3', draftRepo: 'RedHatAI/gemma-4-31B-it-speculator.eagle3' },
+    {
+      method: 'eagle3',
+      draftRepo: 'williamliao/gemma-4-31B-it-EAGLE3-Speculator-GGUF',
+      draftModel: {
+        name: 'gemma-4-31B-it-speculator.eagle3-Q8_0.gguf',
+        bytes: 2_381_602_336,
+        quant: 'Q8_0',
+        sha256: '6d78c33b1dece9806a9b3d6d02ae2cd6df1c46a637bc93eedbf82639643f2370',
+      },
+    },
     {
       method: 'dflash',
       draftRepo: 'williamliao/gemma-4-31B-it-DFlash-GGUF',
@@ -638,13 +687,31 @@ const QWEN35_0_8B_MTP: CatalogModel = {
   id: 'qwen3.5-0.8b-mtp',
   displayName: 'Qwen3.5 0.8B (MTP)',
   hfRepo: 'unsloth/Qwen3.5-0.8B-MTP-GGUF',
+  // MLX runs it plain: no `mlx-community/*-MTP-*` sidecar exists below 4B
+  // (MEASURED 2026-09-13: 0.8B/2B sidecars → 401).
+  mlxRepo: 'mlx-community/Qwen3.5-0.8B-MLX-8bit',
   // Sub-12B quant policy (see GEMMA4_E2B): Q8_0 default, UD-Q6_K_XL dynamic floor.
   // Reserved entry — bytes:0 / verified:false (repo ships both; not HEAD-verified).
   files: [
-    { name: 'Qwen3.5-0.8B-Q8_0.gguf', bytes: 0, quant: 'Q8_0' },
-    { name: 'Qwen3.5-0.8B-UD-Q6_K_XL.gguf', bytes: 0, quant: 'UD-Q6_K_XL' },
+    {
+      name: 'Qwen3.5-0.8B-Q8_0.gguf',
+      bytes: 833_592_736,
+      quant: 'Q8_0',
+      sha256: 'c54f8b67069c70085b98440de696b44da8250250ac69a961b41133def876e262',
+    },
+    {
+      name: 'Qwen3.5-0.8B-UD-Q6_K_XL.gguf',
+      bytes: 790_846_880,
+      quant: 'UD-Q6_K_XL',
+      sha256: '97e5390ba91cec538a570dde30a8b659bbfaf394284427a3de093495c7982fe1',
+    },
   ],
-  mmproj: { name: 'mmproj-F16.gguf', bytes: 0, quant: 'F16' },
+  mmproj: {
+    name: 'mmproj-F16.gguf',
+    bytes: 204_987_104,
+    quant: 'F16',
+    sha256: 'ea8519d0c6240e465a0265d6912f73d750a17ca7d42150281b778b8b59f05798',
+  },
   mtpEmbedded: true,
   spec: 'mtp',
   // No EAGLE3/DFlash drafts exist for <4B models — MTP only.
@@ -653,7 +720,7 @@ const QWEN35_0_8B_MTP: CatalogModel = {
   minRamGB: 4,
   contextWindow: 32_768,
   input: ['text', 'image'],
-  verified: false,
+  verified: true, // sizes + sha256 HEAD-verified 2026-09-13
   engine: 'llamacpp',
   publisher: UNSLOTH,
   tier: 'fast',
@@ -665,13 +732,29 @@ const QWEN35_2B_MTP: CatalogModel = {
   id: 'qwen3.5-2b-mtp',
   displayName: 'Qwen3.5 2B (MTP)',
   hfRepo: 'unsloth/Qwen3.5-2B-MTP-GGUF',
+  mlxRepo: 'mlx-community/Qwen3.5-2B-MLX-8bit',
   // Sub-12B quant policy (see GEMMA4_E2B): Q8_0 default, UD-Q6_K_XL dynamic floor.
   // Reserved entry — bytes:0 / verified:false (repo ships both; not HEAD-verified).
   files: [
-    { name: 'Qwen3.5-2B-Q8_0.gguf', bytes: 0, quant: 'Q8_0' },
-    { name: 'Qwen3.5-2B-UD-Q6_K_XL.gguf', bytes: 0, quant: 'UD-Q6_K_XL' },
+    {
+      name: 'Qwen3.5-2B-Q8_0.gguf',
+      bytes: 2_076_675_488,
+      quant: 'Q8_0',
+      sha256: 'bd1a351aa64e4ff139dc9ff365f923ddadd8915c11bc5e6edadc0132ccf3c84e',
+    },
+    {
+      name: 'Qwen3.5-2B-UD-Q6_K_XL.gguf',
+      bytes: 1_921_346_976,
+      quant: 'UD-Q6_K_XL',
+      sha256: '6928b47807fed7a53de88bc4a82fcaca183277415c27a77261802d92724e0bc4',
+    },
   ],
-  mmproj: { name: 'mmproj-F16.gguf', bytes: 0, quant: 'F16' },
+  mmproj: {
+    name: 'mmproj-F16.gguf',
+    bytes: 668_227_136,
+    quant: 'F16',
+    sha256: '6385ece50b2c6898e417170867b5a05fb8a0bb1c205f2e7e4e0698e51c0b65c8',
+  },
   mtpEmbedded: true,
   spec: 'mtp',
   variants: [{ method: 'mtp', embedded: true }],
@@ -679,7 +762,7 @@ const QWEN35_2B_MTP: CatalogModel = {
   minRamGB: 4,
   contextWindow: 32_768,
   input: ['text', 'image'],
-  verified: false,
+  verified: true, // sizes + sha256 HEAD-verified 2026-09-13
   engine: 'llamacpp',
   publisher: UNSLOTH,
   tier: 'fast',
@@ -825,11 +908,28 @@ const QWEN35_122B_A10B_MTP: CatalogModel = {
   id: 'qwen3.5-122b-a10b-mtp',
   displayName: 'Qwen3.5 122B-A10B (MTP)',
   hfRepo: 'unsloth/Qwen3.5-122B-A10B-MTP-GGUF',
+  // The 69.6 GB twin and its DFlash head are for the 96 GB+ Macs this model is
+  // for; the download's disk guard drops them where they cannot fit.
+  mlxRepo: 'mlx-community/Qwen3.5-122B-A10B-4bit',
+  mlxDrafts: [{ method: 'dflash', repo: 'z-lab/Qwen3.5-122B-A10B-DFlash' }],
+  // On the hub every quant ≥ UD-IQ3_S lives in its own FOLDER, and shard 1 is a
+  // ~10 MB header (the weights are shards 2..n): the bare root names that were
+  // here did not exist. Sizes stay 0 (unknown) until shard-join exists — see
+  // the `sharded` guard in the supervisor.
   files: [
-    { name: 'Qwen3.5-122B-A10B-UD-Q4_K_M-00001-of-00003.gguf', bytes: 0, quant: 'UD-Q4_K_M' },
-    { name: 'Qwen3.5-122B-A10B-UD-Q6_K-00001-of-00004.gguf', bytes: 0, quant: 'UD-Q6_K' },
+    {
+      name: 'UD-Q4_K_M/Qwen3.5-122B-A10B-UD-Q4_K_M-00001-of-00003.gguf',
+      bytes: 0,
+      quant: 'UD-Q4_K_M',
+    },
+    { name: 'UD-Q6_K/Qwen3.5-122B-A10B-UD-Q6_K-00001-of-00004.gguf', bytes: 0, quant: 'UD-Q6_K' },
   ],
-  mmproj: { name: 'mmproj-F16.gguf', bytes: 0, quant: 'F16' },
+  mmproj: {
+    name: 'mmproj-F16.gguf',
+    bytes: 908_724_832,
+    quant: 'F16',
+    sha256: 'de4405930dc6f288546e274ee41945f651fa3673b2ad9044c25fcffc5bb1c56d',
+  },
   mtpEmbedded: true,
   spec: 'mtp',
   variants: [
@@ -863,7 +963,10 @@ const QWEN35_122B_A10B_MTP: CatalogModel = {
 const QWEN36_27B_MTP: CatalogModel = {
   id: 'qwen3.6-27b-mtp',
   displayName: 'Qwen3.6 27B (MTP)',
-  mlxRepo: 'mlx-community/Qwen3.6-27B-OptiQ-4bit',
+  // The plain 4-bit (16.05 GB), not OptiQ (19.98 GB with its bundled mtp/vision):
+  // it is what rapid-mlx and dflash-mlx pair their drafters with, and on a 24 GB
+  // Mac the 4 GB it leaves is the KV window. OptiQ stays its own entry.
+  mlxRepo: 'mlx-community/Qwen3.6-27B-4bit',
   mlxDrafts: [
     { method: 'dflash', repo: 'z-lab/Qwen3.6-27B-DFlash' },
     { method: 'mtp', repo: 'mlx-community/Qwen3.6-27B-MTP-4bit' },
@@ -883,7 +986,12 @@ const QWEN36_27B_MTP: CatalogModel = {
       sha256: '773f1bf0be0589d056ce05476a8a135b50494a3f2ecc3f8f0c4f2c3594bba02e',
     },
   ],
-  mmproj: { name: 'mmproj-F16.gguf', bytes: 0, quant: 'F16' },
+  mmproj: {
+    name: 'mmproj-F16.gguf',
+    bytes: 927_607_360,
+    quant: 'F16',
+    sha256: 'eacf610d1ee4bd5ed0197a0777dd8f4fceb8eefa27009067c7d496cb68fbde45',
+  },
   mtpEmbedded: true,
   spec: 'mtp',
   // The best-tested DFlash target (PR benchmarks it); EAGLE3 is community-only.
@@ -960,21 +1068,23 @@ const QWEN38_27B_MTP: CatalogModel = {
   mlxDrafts: [
     { method: 'mtp', repo: 'mlx-community/Qwen3.8-27B-MTP-4bit' },
     { method: 'dflash', repo: 'z-lab/Qwen3.8-27B-DFlash2' },
+    // mlx-dspark's own registry row for this model (3.7 GB head).
+    { method: 'dspark', repo: 'RadixArk/Qwen3.8-27B-DSpark' },
   ],
   hfRepo: 'unsloth/Qwen3.8-27B-GGUF',
   baseRepo: 'froggeric/Qwen-Fixed-Chat-Templates',
   files: [
     {
       name: 'Qwen3.8-27B-UD-Q3_K_XL.gguf',
-      bytes: 13_441_059_904,
+      bytes: 13_146_393_504,
       quant: 'UD-Q3_K_XL',
-      sha256: '00cf92e666c6af6566996c38c89a44ccdb6449ea25ef0f112a452c853b2a71e2',
+      sha256: '8c2a45ff85e7674ca185ec8eb6cdeab0e617ed9d8018caed0b64380eb2a67a5e',
     },
     {
       name: 'Qwen3.8-27B-UD-Q2_K_XL.gguf',
-      bytes: 10_676_423_744,
+      bytes: 9_828_981_664,
       quant: 'UD-Q2_K_XL',
-      sha256: '46151b52a5cad673d90a00222103254864326c251130b8fc4381d6f34386b3c8',
+      sha256: 'fd4730dd8aad070517978752b63d530aeb1740d2283cab9fa24f1e404032ddb0',
     },
   ],
   mmproj: {
@@ -1059,6 +1169,8 @@ const QWEN36_35B_A3B_MTP: CatalogModel = {
   mlxDrafts: [
     { method: 'dflash', repo: 'z-lab/Qwen3.6-35B-A3B-DFlash' },
     { method: 'mtp', repo: 'mlx-community/Qwen3.6-35B-A3B-MTP-4bit' },
+    // speculators-format head (1.9 GB); mlx-dspark loads that format directly.
+    { method: 'dspark', repo: 'RedHatAI/Qwen3.6-35B-A3B-speculator.dspark' },
   ],
   hfRepo: 'unsloth/Qwen3.6-35B-A3B-MTP-GGUF',
   // Repo ships only UD-quants; plain Q4_K_M/Q6_K do not exist. UD-Q4_K_M is the
@@ -1077,7 +1189,12 @@ const QWEN36_35B_A3B_MTP: CatalogModel = {
       sha256: '49935b04ad883c2f3d4da61f65b609d447dad67d0b08453b90abb09a1bb35464',
     },
   ],
-  mmproj: { name: 'mmproj-F16.gguf', bytes: 0, quant: 'F16' },
+  mmproj: {
+    name: 'mmproj-F16.gguf',
+    bytes: 899_283_584,
+    quant: 'F16',
+    sha256: '71f3cbc1f7cc0f30d09d41cfa924c0060827ebc33bf15ace7e86661e856f0160',
+  },
   mtpEmbedded: true,
   spec: 'mtp',
   // DFlash on a quantized MoE target can regress on weak GPUs (#25117) — MTP safe.
@@ -1125,6 +1242,12 @@ const QWEN36_27B_EAGLE3: CatalogModel = {
   id: 'qwen3.6-27b-eagle3',
   displayName: 'Qwen3.6 27B (EAGLE-3)',
   hfRepo: 'unsloth/Qwen3.6-27B-GGUF',
+  // The same model as qwen3.6-27b-mtp on the MLX side (EAGLE-3 is a GGUF thing).
+  mlxRepo: 'mlx-community/Qwen3.6-27B-4bit',
+  mlxDrafts: [
+    { method: 'dflash', repo: 'z-lab/Qwen3.6-27B-DFlash' },
+    { method: 'mtp', repo: 'mlx-community/Qwen3.6-27B-MTP-4bit' },
+  ],
   files: [
     {
       name: 'Qwen3.6-27B-Q4_K_M.gguf',
@@ -1139,7 +1262,12 @@ const QWEN36_27B_EAGLE3: CatalogModel = {
       sha256: 'ec1805fe87e6519c461c1ed2d179865464a875ed241032ead65a354f979cfe14',
     },
   ],
-  mmproj: { name: 'mmproj-F16.gguf', bytes: 0, quant: 'F16' },
+  mmproj: {
+    name: 'mmproj-F16.gguf',
+    bytes: 927_607_360,
+    quant: 'F16',
+    sha256: 'eacf610d1ee4bd5ed0197a0777dd8f4fceb8eefa27009067c7d496cb68fbde45',
+  },
   spec: 'eagle3',
   draftRepo: 'gelim/Qwen3.6-27B-PRISM-EAGLE3-GGUF',
   draftModel: {
@@ -1188,16 +1316,42 @@ const NEMOTRON3_NANO_30B_A3B: CatalogModel = {
   id: 'nemotron-3-nano-30b-a3b',
   displayName: 'NVIDIA Nemotron-3 Nano 30B-A3B',
   hfRepo: 'unsloth/Nemotron-3-Nano-30B-A3B-GGUF',
+  mlxRepo: 'mlx-community/NVIDIA-Nemotron-3-Nano-30B-A3B-4bit',
+  // MEASURED 2026-09-13: Q4_K_M is 24.6 GB and Q4_K_S 22.0 GB — neither is a
+  // 24 GB-class file. IQ4_XS (18.2 GB) leads; the two originals stay for bigger
+  // machines.
   files: [
-    { name: 'Nemotron-3-Nano-30B-A3B-Q4_K_M.gguf', bytes: 0, quant: 'Q4_K_M' },
-    { name: 'Nemotron-3-Nano-30B-A3B-Q4_K_S.gguf', bytes: 0, quant: 'Q4_K_S' },
+    {
+      name: 'Nemotron-3-Nano-30B-A3B-IQ4_XS.gguf',
+      bytes: 18_168_955_680,
+      quant: 'IQ4_XS',
+      sha256: '0f2cbdc4f578b5a53f521bcb1a5f5297cd54ea72ebf6c8ce80b570cc5645bac1',
+    },
+    {
+      name: 'Nemotron-3-Nano-30B-A3B-UD-Q2_K_XL.gguf',
+      bytes: 19_919_660_832,
+      quant: 'UD-Q2_K_XL',
+      sha256: '401ac37140bf460b4d9502972dc258ce758b2c67d61af979e9a03f1ee6c3d1a3',
+    },
+    {
+      name: 'Nemotron-3-Nano-30B-A3B-Q4_K_S.gguf',
+      bytes: 22_019_698_464,
+      quant: 'Q4_K_S',
+      sha256: '40eb44a5d66ade97d17285aa9f9861a75f48a3bf5c3234bbba3b8f6a8190a076',
+    },
+    {
+      name: 'Nemotron-3-Nano-30B-A3B-Q4_K_M.gguf',
+      bytes: 24_574_373_664,
+      quant: 'Q4_K_M',
+      sha256: '0e7f6e51fdd9039928749d07eed9e846dbfd97681646544c5406bcdd788e5940',
+    },
   ],
   // Text-only; no speculative-decoding variant ships for this model.
   license: 'NVIDIA Open Model License',
   minRamGB: 24,
   contextWindow: 65_536,
   input: ['text'],
-  verified: false,
+  verified: true, // sizes + sha256 HEAD-verified 2026-09-13
   engine: 'llamacpp',
   publisher: UNSLOTH,
   tier: 'balanced',
@@ -1287,6 +1441,10 @@ const LING3_TINY: CatalogModel = {
   id: 'ling-3.0-tiny',
   displayName: 'Ling 3.0 Tiny',
   hfRepo: 'bloomer010/Ling-3.0-tiny-GGUF',
+  // The only engine-backed MLX build: rapid-mlx vendors the `bailing_hybrid`
+  // arch; PyPI mlx-lm 0.31.3 (mlx-lm / oMLX / dflash / dspark) does not know
+  // it until 0.32 — those calibration rows say so rather than run.
+  mlxRepo: 'rapid-mlx/Ling-3.0-tiny-MLX-4bit',
   baseRepo: 'inclusionAI/Ling-3.0-tiny',
   files: [
     {
@@ -1433,12 +1591,30 @@ const NANBEIGE42_3B: CatalogModel = {
   displayName: 'Nanbeige 4.2 3B',
   hfRepo: 'bartowski/Nanbeige_Nanbeige4.2-3B-GGUF',
   baseRepo: 'Nanbeige/Nanbeige4.2-3B',
+  // Loads on mlx-dspark (its own nanbeige_lm) and mlx-lm main; the PyPI mlx-lm
+  // behind mlx-lm/oMLX does not know the arch yet — those rows report so.
+  mlxRepo: 'mlx-community/Nanbeige4.2-3B-OptiQ-4bit',
+  mlxDrafts: [{ method: 'dspark', repo: 'Nanbeige/Nanbeige4.2-3B-DSpark' }],
   files: [
     {
-      name: 'Nanbeige4.2-3B-Q8_0.gguf',
+      // bartowski keeps the org prefix in the file name; the bare name 404s.
+      name: 'Nanbeige_Nanbeige4.2-3B-Q8_0.gguf',
+      previousNames: ['Nanbeige4.2-3B-Q8_0.gguf'],
       bytes: 4_434_787_488,
       quant: 'Q8_0',
       sha256: '837ba713ef3a3b5c9aee82e5dcba07600ea7db36ae392419f982b3bfaec04ef2',
+    },
+  ],
+  variants: [
+    {
+      method: 'dspark',
+      draftRepo: 'Anbeeld/Nanbeige4.2-3B-DSpark-GGUF',
+      draftModel: {
+        name: 'Nanbeige4.2-3B-DSpark-Q8_0.gguf',
+        bytes: 905_017_600,
+        quant: 'Q8_0',
+        sha256: '65a11de7f6d63dd0b8cf00d0386997b0dfae5a93be6e5e82c58ea7434ea2aedd',
+      },
     },
   ],
   license: 'Apache-2.0',

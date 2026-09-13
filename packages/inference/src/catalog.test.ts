@@ -34,8 +34,11 @@ describe('catalog', () => {
     // Sub-12B quant policy: Q8_0 default + UD-Q6_K_XL dynamic floor, no Q4.
     const q8 = getCatalogFile(GEMMA4_E2B, 'Q8_0');
     expect(q8?.name).toBe('gemma-4-E2B-it-Q8_0.gguf');
-    expect(q8?.bytes).toBe(5_048_350_848);
-    expect(getCatalogFile(GEMMA4_E2B, 'UD-Q6_K_XL')?.bytes).toBe(4_710_086_784);
+    // Sizes as the hub serves them since unsloth's 2026-07-17 chat-template
+    // re-upload (+2,016 B each); the old values made every fresh download fail
+    // its size assert.
+    expect(q8?.bytes).toBe(5_048_352_864);
+    expect(getCatalogFile(GEMMA4_E2B, 'UD-Q6_K_XL')?.bytes).toBe(4_710_088_800);
     expect(getCatalogFile(GEMMA4_E2B, 'Q4_K_M')).toBeUndefined();
   });
 

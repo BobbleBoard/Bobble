@@ -212,6 +212,7 @@ export const RECOMMENDED_FAMILIES: readonly RecommendedFamily[] = [
         paramsB: 1.2,
         note: 'Runs anywhere; good for routing and quick edits.',
         minMemoryGB: 3,
+        mlx: true,
       },
       {
         repo: 'LiquidAI/LFM2.5-2.6B-GGUF',
@@ -219,6 +220,7 @@ export const RECOMMENDED_FAMILIES: readonly RecommendedFamily[] = [
         paramsB: 2.6,
         note: 'The sweet spot of this family.',
         minMemoryGB: 4,
+        mlx: true,
       },
       {
         repo: 'LiquidAI/LFM2.5-8B-A1B-GGUF',
@@ -226,12 +228,19 @@ export const RECOMMENDED_FAMILIES: readonly RecommendedFamily[] = [
         paramsB: 8,
         note: 'Mixture-of-experts: 8B of knowledge at ~1B of compute per token.',
         minMemoryGB: 7,
+        mlx: true,
       },
       {
-        repo: 'LiquidAI/LFM2.5-VL-1.6B',
+        // The GGUF repo, not the bf16 safetensors one: nothing here loads
+        // safetensors, so the old repo produced a card for a model that could
+        // not be installed. Q8_0 (1.2 GB) + the F16 mmproj (0.85 GB).
+        repo: 'LiquidAI/LFM2.5-VL-1.6B-GGUF',
         label: 'VL 1.6B',
         paramsB: 1.6,
         note: 'Reads images.',
+        tasks: ['image-text-to-text'],
+        mlx: true,
+        approxBytes: 2_100_000_000,
         minMemoryGB: 5,
       },
     ],
@@ -243,14 +252,21 @@ export const RECOMMENDED_FAMILIES: readonly RecommendedFamily[] = [
     output: 'text',
     blurb: 'The general-purpose ladder, with MTP draft weights for speculative decoding.',
     variants: [
-      { repo: 'unsloth/Qwen3.5-0.8B-MTP-GGUF', label: '0.8B', paramsB: 0.8, minMemoryGB: 3 },
-      { repo: 'unsloth/Qwen3.5-2B-MTP-GGUF', label: '2B', paramsB: 2, minMemoryGB: 4 },
+      {
+        repo: 'unsloth/Qwen3.5-0.8B-MTP-GGUF',
+        label: '0.8B',
+        paramsB: 0.8,
+        minMemoryGB: 3,
+        mlx: true,
+      },
+      { repo: 'unsloth/Qwen3.5-2B-MTP-GGUF', label: '2B', paramsB: 2, minMemoryGB: 4, mlx: true },
       {
         repo: 'unsloth/Qwen3.5-4B-MTP-GGUF',
         label: '4B',
         paramsB: 4,
         note: 'The fast tier on a 16 GB machine.',
         minMemoryGB: 6,
+        mlx: true,
       },
       {
         repo: 'unsloth/Qwen3.5-9B-MTP-GGUF',
@@ -258,6 +274,7 @@ export const RECOMMENDED_FAMILIES: readonly RecommendedFamily[] = [
         paramsB: 9,
         note: 'The balanced tier on 24 GB.',
         minMemoryGB: 9,
+        mlx: true,
       },
       {
         repo: 'mlx-community/Qwen3.5-4B-MLX-4bit',
@@ -306,6 +323,7 @@ export const RECOMMENDED_FAMILIES: readonly RecommendedFamily[] = [
         allow: ['Ling-3.0-tiny-UD-Q4_K_XL.gguf'],
         approxBytes: 5_340_611_552,
         minMemoryGB: 9,
+        mlx: true,
       },
       {
         repo: 'bloomer010/Ling-3.0-tiny-GGUF',
@@ -315,6 +333,7 @@ export const RECOMMENDED_FAMILIES: readonly RecommendedFamily[] = [
         approxBytes: 7_274_546_528,
         note: 'The one to take if it fits.',
         minMemoryGB: 12,
+        mlx: true,
       },
     ],
   },
@@ -325,14 +344,15 @@ export const RECOMMENDED_FAMILIES: readonly RecommendedFamily[] = [
     output: 'text',
     blurb: "Google's open family. The E-series is built for small machines, and 12B reads images.",
     variants: [
-      { repo: 'unsloth/gemma-4-E2B-it-GGUF', label: 'E2B', paramsB: 2, minMemoryGB: 4 },
-      { repo: 'unsloth/gemma-4-E4B-it-GGUF', label: 'E4B', paramsB: 4, minMemoryGB: 6 },
+      { repo: 'unsloth/gemma-4-E2B-it-GGUF', label: 'E2B', paramsB: 2, minMemoryGB: 4, mlx: true },
+      { repo: 'unsloth/gemma-4-E4B-it-GGUF', label: 'E4B', paramsB: 4, minMemoryGB: 6, mlx: true },
       {
         repo: 'unsloth/gemma-4-12B-it-qat-GGUF',
         label: '12B QAT',
         paramsB: 12,
         note: 'Quantization-aware: holds up better at 4-bit than a plain quant.',
         minMemoryGB: 11,
+        mlx: true,
       },
       {
         repo: 'unsloth/gemma-4-26B-A4B-it-GGUF',
@@ -340,8 +360,15 @@ export const RECOMMENDED_FAMILIES: readonly RecommendedFamily[] = [
         paramsB: 26,
         note: 'MoE. 26B of weights, ~4B active.',
         minMemoryGB: 19,
+        mlx: true,
       },
-      { repo: 'unsloth/gemma-4-31B-it-GGUF', label: '31B', paramsB: 31, minMemoryGB: 23 },
+      {
+        repo: 'unsloth/gemma-4-31B-it-GGUF',
+        label: '31B',
+        paramsB: 31,
+        minMemoryGB: 23,
+        mlx: true,
+      },
     ],
   },
   {
@@ -368,6 +395,7 @@ export const RECOMMENDED_FAMILIES: readonly RecommendedFamily[] = [
         paramsB: 27,
         note: 'Q4 on a 32 GB machine, Q3 on 24 GB.',
         minMemoryGB: 20,
+        mlx: true,
       },
     ],
   },
@@ -378,12 +406,22 @@ export const RECOMMENDED_FAMILIES: readonly RecommendedFamily[] = [
     output: 'text',
     blurb: 'The previous generation. The 35B mixture-of-experts decodes like a 3B.',
     variants: [
-      { repo: 'unsloth/Qwen3.6-27B-MTP-GGUF', label: '27B', paramsB: 27, minMemoryGB: 20 },
       {
-        repo: 'unsloth/Qwen3.6-35B-A3B-GGUF',
+        repo: 'unsloth/Qwen3.6-27B-MTP-GGUF',
+        label: '27B',
+        paramsB: 27,
+        minMemoryGB: 20,
+        mlx: true,
+      },
+      {
+        // The -MTP- repo: the plain unsloth/Qwen3.6-35B-A3B-GGUF has no MTP
+        // head (MEASURED: 40 blocks, no nextn key), which made the family's
+        // "with MTP draft weights" untrue for this one. Same catalog entry.
+        repo: 'unsloth/Qwen3.6-35B-A3B-MTP-GGUF',
         label: '35B-A3B',
         paramsB: 35,
         note: 'MoE. Decodes at roughly a 3B model\u2019s speed.',
+        mlx: true,
         minMemoryGB: 25,
       },
     ],
@@ -395,7 +433,13 @@ export const RECOMMENDED_FAMILIES: readonly RecommendedFamily[] = [
     output: 'text',
     blurb: 'Vision-language: hand it screenshots, diagrams or photos and ask about them.',
     variants: [
-      { repo: 'unsloth/Muse-Glimmer-30B-GGUF', label: '30B', paramsB: 30, minMemoryGB: 22 },
+      {
+        repo: 'unsloth/Muse-Glimmer-30B-GGUF',
+        label: '30B',
+        paramsB: 30,
+        minMemoryGB: 22,
+        mlx: true,
+      },
     ],
   },
   {
@@ -410,6 +454,7 @@ export const RECOMMENDED_FAMILIES: readonly RecommendedFamily[] = [
         label: '30B-A3B',
         paramsB: 30,
         minMemoryGB: 22,
+        mlx: true,
       },
     ],
   },
@@ -420,15 +465,36 @@ export const RECOMMENDED_FAMILIES: readonly RecommendedFamily[] = [
     org: 'Qwen',
     output: 'text',
     blurb: 'Reads screenshots, diagrams and photographs, at sizes a laptop can hold.',
+    // GGUF repos (Q8_0 + mmproj-F16), not Qwen's bf16 safetensors: those
+    // installed nothing here. Sizes are the Q8_0 + mmproj pair.
     variants: [
-      { repo: 'Qwen/Qwen3-VL-2B-Instruct', label: '2B', paramsB: 2, minMemoryGB: 6 },
-      { repo: 'Qwen/Qwen3-VL-4B-Instruct', label: '4B', paramsB: 4, minMemoryGB: 10 },
       {
-        repo: 'Qwen/Qwen3-VL-8B-Instruct',
+        repo: 'unsloth/Qwen3-VL-2B-Instruct-GGUF',
+        label: '2B',
+        paramsB: 2,
+        tasks: ['image-text-to-text'],
+        mlx: true,
+        approxBytes: 2_654_000_000,
+        minMemoryGB: 6,
+      },
+      {
+        repo: 'unsloth/Qwen3-VL-4B-Instruct-GGUF',
+        label: '4B',
+        paramsB: 4,
+        tasks: ['image-text-to-text'],
+        mlx: true,
+        approxBytes: 5_117_000_000,
+        minMemoryGB: 10,
+      },
+      {
+        repo: 'unsloth/Qwen3-VL-8B-Instruct-GGUF',
         label: '8B',
         paramsB: 8,
-        note: 'The one worth running if it fits. 17.5 GB of weights.',
-        minMemoryGB: 20,
+        note: 'The one worth running if it fits. 9.9 GB at Q8_0.',
+        tasks: ['image-text-to-text'],
+        mlx: true,
+        approxBytes: 9_869_000_000,
+        minMemoryGB: 14,
       },
     ],
   },
@@ -437,14 +503,20 @@ export const RECOMMENDED_FAMILIES: readonly RecommendedFamily[] = [
     name: 'Qwen3-Omni',
     org: 'Qwen',
     output: 'text',
-    blurb: 'Text, images and audio in; text and speech out. One model for the lot.',
+    // Text OUT only: the GGUF is the "thinker" (text, images and audio in);
+    // the talker that speaks is not in it, and no engine here runs Qwen's
+    // safetensors. Said in the blurb, so the card does not promise speech.
+    blurb: 'Text, images and audio in, text out. One model that listens and looks.',
     variants: [
       {
-        repo: 'Qwen/Qwen3-Omni-30B-A3B-Instruct',
+        repo: 'ggml-org/Qwen3-Omni-30B-A3B-Instruct-GGUF',
         label: '30B-A3B',
         paramsB: 30,
-        note: '70 GB of weights. A Max or Ultra, or a quantised community build.',
-        minMemoryGB: 80,
+        note: 'Q4_K_M is 18.6 GB plus a 1.3 GB projector — a 32 GB machine, comfortably.',
+        tasks: ['image-text-to-text'],
+        mlx: true,
+        approxBytes: 19_882_000_000,
+        minMemoryGB: 26,
       },
     ],
   },
@@ -453,31 +525,31 @@ export const RECOMMENDED_FAMILIES: readonly RecommendedFamily[] = [
     name: 'DeepSeek V4 Flash',
     org: 'unsloth',
     output: 'text',
-    blurb: 'A frontier-class open model. The small quants are the only ones that fit a laptop.',
+    /*
+     * A 284B model, said honestly (2026-09-13). The card used to offer a
+     * "DSpark Q8 — 10.9 GB, the way in on a normal machine": that file is the
+     * DSpark DRAFTER (general.architecture = dflash, 81 tensors), not a model,
+     * and the quant sizes were a fifth of the truth (UD-IQ3_XXS is 104 GB, not
+     * 20; UD-Q4_K_XL 155 GB, not 36). Nothing of it fits under 82 GB.
+     */
+    blurb:
+      'A frontier-class open model. 128 GB of unified memory and up — nothing smaller holds it.',
     variants: [
       {
         repo: 'unsloth/DeepSeek-V4-Flash-0731-GGUF',
-        label: 'DSpark Q8',
-        note: 'The distilled DSpark build. 10.9 GB, and the way in on a normal machine.',
-        allow: ['dspark-DeepSeek-V4-Flash-0731-Q8_0.gguf'],
-        approxBytes: 10_900_000_000,
-        minMemoryGB: 14,
-      },
-      {
-        repo: 'unsloth/DeepSeek-V4-Flash-0731-GGUF',
         label: 'UD-IQ3_XXS',
-        note: 'The full model at its smallest useful quant, in four shards.',
+        note: 'The smallest useful quant: 104 GB in shards.',
         allow: ['UD-IQ3_XXS/*'],
-        approxBytes: 20_000_000_000,
-        minMemoryGB: 32,
+        approxBytes: 104_200_000_000,
+        minMemoryGB: 128,
       },
       {
         repo: 'unsloth/DeepSeek-V4-Flash-0731-GGUF',
         label: 'UD-Q4_K_XL',
-        note: 'Five shards. Workstation territory.',
+        note: '155 GB in shards. Workstation territory.',
         allow: ['UD-Q4_K_XL/*'],
-        approxBytes: 36_000_000_000,
-        minMemoryGB: 64,
+        approxBytes: 155_100_000_000,
+        minMemoryGB: 192,
       },
     ],
   },

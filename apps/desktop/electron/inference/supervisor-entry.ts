@@ -16,6 +16,7 @@ import {
   mkdirSync,
   readdirSync,
   readFileSync,
+  renameSync,
   rmSync,
   statfsSync,
   statSync,
@@ -384,8 +385,31 @@ function post(message: LlmOutbound): void {
   parentPort.postMessage(message);
 }
 
+/**
+ * Where this file lives locally. A file catalogued under an earlier name
+ * (`previousNames`) is renamed to the current one the first time it is seen,
+ * so the catalog can learn a file's real name without orphaning the copy a
+ * user already has — MEASURED on the user's library: bartowski's Nanbeige GGUF was
+ * on disk under the bare name the catalog used to (wrongly) carry.
+ */
 function modelPathFor(model: CatalogModel, file: CatalogFile): string {
-  return join(modelDir(model.id), file.name);
+  const dir = modelDir(model.id);
+  const current = join(dir, file.name);
+  if (!existsSync(current)) {
+    for (const old of file.previousNames ?? []) {
+      const was = join(dir, old);
+      if (!existsSync(was)) continue;
+      try {
+        renameSync(was, current);
+        console.log(`[catalog] renamed ${old} → ${file.name} in ${dir}`);
+      } catch (error) {
+        console.log(`[catalog] could not rename ${old}: ${String(error)}`);
+        return was;
+      }
+      break;
+    }
+  }
+  return current;
 }
 
 function isDownloaded(model: CatalogModel, file: CatalogFile): boolean {

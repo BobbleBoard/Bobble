@@ -32,15 +32,25 @@ import { LlamaServerSupervisor } from './supervisor.js';
  * transformers==4.56.2 … import mlx_lm.server` → OK. (A NAKED `--with mlx-lm`
  * pulls the latest `transformers`, which import-fails mlx-lm's tokenizer
  * registration — hence both pins below.)
+ *
+ * BUMPED 2026-09-13: 0.29.1 predates the `qwen3_5` (0.30.7) and `gemma4`
+ * (0.31.2) model modules — MEASURED from the wheels — so every `engine: 'mlx'`
+ * catalog entry (the Qwen3.5 MLX-4bit twins, the Qwen3.6 OptiQ) failed to load
+ * on this path while the other MLX engines, which all require mlx-lm ≥ 0.31.3,
+ * ran them fine. 0.31.3 is what the engine venv already holds. Verified here:
+ * `uv run --with mlx-lm==0.31.3 --with transformers==5.12.1 python -c "import
+ * mlx_lm.server; from mlx_lm.models import qwen3_5, gemma4"` → OK.
  */
-export const MLX_LM_PIN = '0.29.1';
+export const MLX_LM_PIN = '0.31.3';
 
 /**
  * Pinned `transformers` version. `mlx_lm.server` import-breaks on too-new
  * `transformers` (an `AutoTokenizer.register` API skew), so pin it alongside
- * mlx-lm — the concrete fix a naked `--with mlx-lm` smoke uncovered.
+ * mlx-lm — the concrete fix a naked `--with mlx-lm` smoke uncovered. 5.12.1 is
+ * the version the engine venv resolved beside mlx-lm 0.31.3 (import verified
+ * above).
  */
-export const TRANSFORMERS_PIN = '4.56.2';
+export const TRANSFORMERS_PIN = '5.12.1';
 
 /** MLX is Apple-Silicon-only by construction (Metal). Gate the whole path on it. */
 export function isMlxSupported(
