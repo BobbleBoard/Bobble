@@ -214,3 +214,17 @@ describe('configFingerprint', () => {
     expect(a).toMatch(/^[0-9a-f]{8}$/);
   });
 });
+
+describe('argparseDefault', () => {
+  it('reads the parenthesised default even when the sentence starts with "Default"', async () => {
+    const { argparseDefault } = await import('./engine-flags.js');
+    expect(argparseDefault('Default max tokens for generation (default: 32768).')).toBe('32768');
+    expect(argparseDefault('KV cache dtype (R15 #300, default: bf16). int8/int4 shrink…')).toBe(
+      'bf16',
+    );
+    expect(argparseDefault('Prefill step size (default: 2048; bench-verified profiles…)')).toBe(
+      '2048; bench-verified profiles…',
+    );
+    expect(argparseDefault('Nothing said here')).toBeUndefined();
+  });
+});

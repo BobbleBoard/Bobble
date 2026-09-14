@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { LlmCatalogEntry, LlmStatus } from '../../../electron/ipc-contract';
 import {
+  defaultShown,
   flagMatches,
   methodAvailability,
   runningValue,
@@ -109,5 +110,21 @@ describe('reading the running server', () => {
     expect(flagMatches(f, '-c')).toBe(true);
     expect(flagMatches(f, 'prompt context')).toBe(true);
     expect(flagMatches(f, 'batch')).toBe(false);
+  });
+});
+
+describe("defaultShown — the engine's default as the value in the control", () => {
+  it('takes the number out of a default that explains itself', () => {
+    expect(defaultShown('0, 0 = loaded from model', 'number')).toBe('0');
+    expect(defaultShown('-1, -1 = infinity', 'number')).toBe('-1');
+    expect(defaultShown('8192, -1 - no limit, 0 - disable', 'number')).toBe('8192');
+    expect(defaultShown('2048; bench-verified profiles may recommend less', 'number')).toBe('2048');
+  });
+
+  it('leaves a number control empty for a default that is not a number, and text as it is', () => {
+    expect(defaultShown('auto-detect ~20% of RAM', 'number')).toBe('');
+    expect(defaultShown('auto-detect ~20% of RAM', 'text')).toBe('auto-detect ~20% of RAM');
+    expect(defaultShown(undefined, 'number')).toBe('');
+    expect(defaultShown('f16', 'select')).toBe('f16');
   });
 });

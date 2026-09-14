@@ -1,198 +1,43 @@
 /**
  * THE ENGINE TAB of the advanced panel: which engine's settings (llama.cpp
- * first, then whatever else is installed), three sub-tabs (Settings ·
- * Speculative · Command) and the running command line, with a PINNED footer
- * whose Apply restarts the server — greyed until something that needs a
- * restart has changed.
- *
- * "Needs a restart" is decided honestly: the supervisor stamps the fingerprint
- * of the user's flags + speculative choice it launched with on the status, and
- * the panel fingerprints its draft the same way. Different → Apply lights up;
- * the same → it does not, whatever was clicked on the way.
+ * first, then whatever else is installed) and three sub-tabs — Settings (the
+ * knobs shared across engines), Speculative, Paste a command — plus the
+ * running command line. The draft it edits lives in {@link useEngineDraft}
+ * so the Flags tab and the dialog header's Reset / Apply share it.
  */
-import { configFingerprint } from '@pi-desktop/inference/engine-flags';
-import { effectiveLaunchConfig } from '@pi-desktop/inference/portable-knobs';
-import { useEffect, useMemo, useState } from 'react';
-import type {
-  EngineFlagValue,
-  EngineLaunchConfig,
-  ModelSpecChoice,
-} from '../../../electron/settings/settings-contract';
-import { ENGINES } from '../../settings/engine-catalog';
-import { useLlmStore } from '../../state/llm-store';
-import { useSettingsStore } from '../../state/settings-store';
 import { CommandTab } from './CommandTab';
-import { EngineFlagsTab } from './EngineFlagsTab';
-import { emptyConfig, setFlag, shellJoin } from './engine-settings-logic';
-import { CHAT_TEMPLATE_FLAG, type FlagSpec, type PathSource } from './FlagRow';
+import { EngineSelect } from './EngineSelect';
+import { shellJoin } from './engine-settings-logic';
 import { SharedKnobsSection } from './SharedKnobsSection';
 import { SpeculativeTab } from './SpeculativeTab';
+import type { EngineDraft } from './use-engine-draft';
 
-type SubTab = 'settings' | 'speculative' | 'command' | 'running';
+export type EngineSubTab = 'settings' | 'speculative' | 'command' | 'running';
 
-/** The engines the select offers: llama.cpp always, then the installed text engines. */
-function engineChoices(
-  engines: Record<string, { installed: boolean }>,
-): Array<{ id: string; name: string }> {
-  const out: Array<{ id: string; name: string }> = [{ id: 'llamacpp', name: 'llama.cpp' }];
-  for (const e of ENGINES) {
-    if (e.id === 'llamacpp' || !e.modalities.includes('text')) continue;
-    if (engines[e.id]?.installed === true) out.push({ id: e.id, name: e.name });
-  }
-  return out;
-}
-
-export function EngineTab() {
-  const status = useLlmStore((s) => s.status);
-  const catalog = useLlmStore((s) => s.catalog);
-  const engines = useLlmStore((s) => s.engines);
-  const refreshEngines = useLlmStore((s) => s.refreshEngines);
-  const engineFlags = useLlmStore((s) => s.engineFlags);
-  const loadEngineFlags = useLlmStore((s) => s.loadEngineFlags);
-  const relaunch = useLlmStore((s) => s.relaunch);
-  const settings = useSettingsStore((s) => s.settings);
-  const update = useSettingsStore((s) => s.update);
-
-  const runningEngine = status.profile?.engine ?? 'llamacpp';
-  const [engine, setEngine] = useState(runningEngine);
-  const [sub, setSub] = useState<SubTab>('settings');
-  const [note, setNote] = useState<string | null>(null);
-  const [applying, setApplying] = useState(false);
-  const modelId = status.model?.id ?? null;
-  const entry = useMemo(() => catalog.find((c) => c.id === modelId), [catalog, modelId]);
-
-  // The draft the user edits, seeded from the saved settings.
-  const [draft, setDraft] = useState<EngineLaunchConfig>(
-    () => settings.engineLaunch[engine] ?? emptyConfig(),
-  );
-  const [spec, setSpec] = useState<ModelSpecChoice>(
-    () => (modelId !== null ? settings.modelSpec[modelId] : undefined) ?? { method: 'auto' },
-  );
-  // The cross-engine knobs, drafted alongside; '' marks a knob being cleared.
-  const [knobs, setKnobs] = useState<Record<string, EngineFlagValue>>(
-    () => settings.portableKnobs ?? {},
-  );
-  // Re-seed when the engine or the model changes under the panel.
-  useEffect(() => {
-    setDraft(settings.engineLaunch[engine] ?? emptyConfig());
-  }, [engine, settings.engineLaunch]);
-  useEffect(() => {
-    setKnobs(settings.portableKnobs ?? {});
-  }, [settings.portableKnobs]);
-  useEffect(() => {
-    setSpec((modelId !== null ? settings.modelSpec[modelId] : undefined) ?? { method: 'auto' });
-  }, [modelId, settings.modelSpec]);
-
-  useEffect(() => {
-    void refreshEngines();
-  }, [refreshEngines]);
-  useEffect(() => {
-    void loadEngineFlags(engine);
-  }, [engine, loadEngineFlags]);
-
-  const help = engineFlags[engine] ?? null;
-  const choices = engineChoices(engines);
-
-  /* Apply lights up when what the panel would launch with differs from what
-     IS running — computed exactly as the supervisor computes its stamp. */
-  /* What the engine would actually run with — its own flags over the shared
-     knobs spelled for it — fingerprinted exactly as the supervisor stamps it. */
-  const cleanKnobs = Object.fromEntries(Object.entries(knobs).filter(([, v]) => v !== ''));
-  const draftFingerprint = configFingerprint({
-    engine: effectiveLaunchConfig(engine, {
-      knobs: cleanKnobs,
-      engineLaunch: { ...settings.engineLaunch, [engine]: draft },
-    }),
-    spec: spec.method === 'auto' ? { method: 'auto' } : spec,
-  });
-  const runningHere = status.serverRunning && runningEngine === engine;
-  const dirty = runningHere
-    ? draftFingerprint !== (status.launchConfigFingerprint ?? '')
-    : draftFingerprint !==
-      configFingerprint({
-        engine: effectiveLaunchConfig(engine, {
-          knobs: settings.portableKnobs ?? {},
-          engineLaunch: settings.engineLaunch,
-        }),
-        spec: (modelId !== null ? settings.modelSpec[modelId] : undefined) ?? { method: 'auto' },
-      });
-
-  const save = async (): Promise<void> => {
-    const patch: Parameters<typeof update>[0] = {
-      engineLaunch: { [engine]: draft },
-      portableKnobs: knobs,
-    };
-    if (modelId !== null) patch.modelSpec = { [modelId]: spec };
-    await update(patch);
-  };
-
-  const apply = async (): Promise<void> => {
-    setApplying(true);
-    setNote(null);
-    try {
-      await save();
-      if (status.serverRunning) {
-        const res = await relaunch();
-        if (!res.success) setNote(res.error ?? 'the restart failed');
-        else setNote('Restarted with the new settings.');
-      } else {
-        setNote('Saved — they apply when a model starts.');
-      }
-    } finally {
-      setApplying(false);
-    }
-  };
-
-  /* A path for a path-kind flag: the native picker filtered by what the flag
-     is for, or a dropped file. A chat template is copied into Bobble's storage
-     either way, so the launch line survives the original being moved. */
-  const resolvePath = async (flag: FlagSpec, source: PathSource): Promise<string | null> => {
-    const template = flag.key === CHAT_TEMPLATE_FLAG;
-    let chosen: string | null;
-    if (source.kind === 'drop') chosen = source.path;
-    else {
-      const kind = template
-        ? 'chat-template'
-        : /gguf/i.test(`${flag.placeholder ?? ''} ${flag.description}`)
-          ? 'gguf'
-          : /^(DIR|DIRECTORY|MODEL_DIR|PATH)$/i.test(flag.placeholder ?? '') &&
-              /\b(dir|directory|folder)\b/i.test(flag.description)
-            ? 'directory'
-            : 'file';
-      const r = await window.piDesktop
-        .invoke('llm:pick-path', { kind })
-        .catch(() => ({ path: null }));
-      chosen = r.path;
-    }
-    if (chosen === null || !template) return chosen;
-    const imported = await window.piDesktop
-      .invoke('llm:import-chat-template', { path: chosen })
-      .catch((err: unknown) => ({ path: chosen as string, error: String(err) }));
-    if (imported.error !== undefined) setNote(`Could not copy the template: ${imported.error}`);
-    else setNote('Template copied into Bobble’s storage.');
-    return imported.path;
-  };
-
+export function EngineTab({
+  d,
+  sub,
+  onSub,
+}: {
+  d: EngineDraft;
+  sub: EngineSubTab;
+  onSub: (sub: EngineSubTab) => void;
+}) {
+  const { status, engine, runningEngine, runningHere, draft } = d;
   return (
     <div className="pd-engine-tab" data-testid="engine-settings-tab">
       <div className="pd-engine-tab-head">
-        <label className="pd-engine-tab-select">
+        <div className="pd-engine-tab-select">
           <span className="pd-flags-group-title">Engine</span>
-          <select
-            className="pd-input pd-focusable"
-            aria-label="Engine"
-            value={engine}
-            onChange={(e) => setEngine(e.target.value)}
-            data-testid="engine-settings-engine"
-          >
-            {choices.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-                {c.id === runningEngine && status.serverRunning ? ' · running' : ''}
-              </option>
-            ))}
-          </select>
-        </label>
+          <EngineSelect
+            engine={engine}
+            choices={d.choices}
+            runningEngine={runningEngine}
+            serverRunning={status.serverRunning}
+            onChange={d.setEngine}
+            testId="engine-settings-engine"
+          />
+        </div>
         <div className="pd-engine-subtabs" role="tablist">
           {(
             [
@@ -210,7 +55,7 @@ export function EngineTab() {
                 role="tab"
                 aria-selected={sub === id}
                 className={`pd-engine-subtab${sub === id ? ' pd-engine-subtab--on' : ''}`}
-                onClick={() => setSub(id)}
+                onClick={() => onSub(id)}
                 data-testid={`engine-subtab-${id}`}
               >
                 {label}
@@ -221,43 +66,34 @@ export function EngineTab() {
 
       <div className="pd-engine-tab-body">
         {sub === 'settings' ? (
-          <>
-            <SharedKnobsSection
-              engine={engine}
-              knobs={cleanKnobs}
-              engineLaunch={{ ...settings.engineLaunch, [engine]: draft }}
-              onChange={(id, v) => setKnobs((k) => ({ ...k, [id]: v === null ? '' : v }))}
-            />
-            <EngineFlagsTab
-              engine={engine}
-              help={help}
-              values={draft.flags}
-              status={status}
-              onChange={(k, v) => setDraft((d) => ({ ...d, flags: setFlag(d.flags, k, v) }))}
-              onPath={resolvePath}
-            />
-          </>
+          <SharedKnobsSection
+            engine={engine}
+            knobs={d.cleanKnobs}
+            engineLaunch={d.engineLaunch}
+            defaultFor={d.defaultFor}
+            onChange={d.setKnob}
+          />
         ) : sub === 'speculative' ? (
           <SpeculativeTab
-            entry={entry}
+            entry={d.entry}
             status={status}
-            choice={spec}
-            onChoice={setSpec}
-            help={help}
+            choice={d.spec}
+            onChoice={d.setSpec}
+            help={d.help}
             values={draft.flags}
-            onFlag={(k, v) => setDraft((d) => ({ ...d, flags: setFlag(d.flags, k, v) }))}
-            onPath={resolvePath}
+            onFlag={d.setFlagValue}
+            onPath={d.resolvePath}
           />
         ) : sub === 'command' ? (
           <CommandTab
             engine={engine}
-            help={help}
+            help={d.help}
             onAdd={(flags, raw) => {
-              setDraft((d) => ({
-                flags: { ...d.flags, ...flags },
-                rawArgs: [...d.rawArgs, ...raw],
+              d.setDraft((cur) => ({
+                flags: { ...cur.flags, ...flags },
+                rawArgs: [...cur.rawArgs, ...raw],
               }));
-              setSub('settings');
+              onSub('settings');
             }}
           />
         ) : (
@@ -290,7 +126,10 @@ export function EngineTab() {
                       type="button"
                       aria-label={`Remove ${a}`}
                       onClick={() =>
-                        setDraft((d) => ({ ...d, rawArgs: d.rawArgs.filter((_, j) => j !== i) }))
+                        d.setDraft((cur) => ({
+                          ...cur,
+                          rawArgs: cur.rawArgs.filter((_, j) => j !== i),
+                        }))
                       }
                     >
                       ×
@@ -301,36 +140,6 @@ export function EngineTab() {
             ) : null}
           </div>
         )}
-      </div>
-
-      <div className="pd-engine-tab-foot" data-testid="engine-settings-footer">
-        <span className="pd-engine-row-sub" data-testid="engine-settings-dirty">
-          {note ??
-            (dirty ? 'Changes need a restart to take effect.' : 'Running with these settings.')}
-        </span>
-        <div className="pd-engine-tab-foot-actions">
-          <button
-            type="button"
-            className="pd-engine-install"
-            onClick={() => {
-              setDraft(emptyConfig());
-              setSpec({ method: 'auto' });
-              setKnobs(Object.fromEntries(Object.keys(knobs).map((k) => [k, ''])));
-            }}
-            data-testid="engine-settings-reset"
-          >
-            Reset to Bobble defaults
-          </button>
-          <button
-            type="button"
-            className="pd-engine-calibrate"
-            disabled={!dirty || applying}
-            onClick={() => void apply()}
-            data-testid="engine-settings-apply"
-          >
-            {applying ? 'Restarting…' : status.serverRunning ? 'Apply & restart' : 'Save'}
-          </button>
-        </div>
       </div>
     </div>
   );

@@ -185,6 +185,20 @@ export function shapeForOpenAiServer(body: Record<string, unknown>): Record<stri
   return out;
 }
 
+/**
+ * rapid-mlx's cut-mid-think notice — "[truncated — reasoning incomplete;
+ * raise max_tokens]" followed by the tail of the thought — arrives as content
+ * (or, on some builds, as reasoning). The launch env turns it off
+ * (RAPID_MLX_REASONING_CUTOFF_NOTICE=disabled); this is for an engine that
+ * sends it anyway: the sentence goes, and what follows it is the THOUGHT's
+ * tail, not an answer. finish_reason "length" already says the reply was cut.
+ */
+const CUTOFF_SENTINEL = /\[truncated — reasoning incomplete; raise max_tokens\]\s*/g;
+export function stripCutoffNotice(text: string): { text: string; hit: boolean } {
+  const out = text.replace(CUTOFF_SENTINEL, '');
+  return { text: out, hit: out !== text };
+}
+
 /** The engine behind a served id (`<catalog>@<engine>`), for the request tap. */
 function engineOf(model: { id: string }): string {
   return model.id.includes('@') ? model.id.slice(model.id.lastIndexOf('@') + 1) : 'mlx';
@@ -226,6 +240,8 @@ export function createMlxStream(deps: MlxStreamDeps = {}): MlxStreamFn {
       let finishReason: 'stop' | 'length' | 'toolUse' = 'stop';
       // Client-side TPS timing: first content byte → stream end.
       let firstTokenAt: number | undefined;
+      /** rapid-mlx's cut-mid-think notice arrived: content from here on is the thought's tail. */
+      let cutoffTail = false;
 
       const schemaFor = (name: string): ToolSchemaLike | undefined => {
         const tool = context.tools?.find((t) => t.name === name);
@@ -296,21 +312,41 @@ export function createMlxStream(deps: MlxStreamDeps = {}): MlxStreamFn {
             const delta = choice.delta;
             // `reasoning_content` (llama.cpp, rapid-mlx, oMLX, mlx-dspark,
             // dflash-mlx) or `reasoning` (mlx_lm.server) — one stream of thought.
-            const reasoningDelta =
+            const rawReasoning =
               delta?.reasoning_content != null && delta.reasoning_content.length > 0
                 ? delta.reasoning_content
                 : delta?.reasoning != null && delta.reasoning.length > 0
                   ? delta.reasoning
                   : undefined;
+            const reasoningDelta =
+              rawReasoning === undefined
+                ? undefined
+                : stripCutoffNotice(rawReasoning).text || undefined;
+            // Content that opens with the notice is the thought's tail: it and
+            // everything after it in this stream belong to the thinking block.
+            let contentDelta =
+              delta?.content != null && delta.content.length > 0 ? delta.content : undefined;
+            if (contentDelta !== undefined) {
+              const stripped = stripCutoffNotice(contentDelta);
+              if (stripped.hit) cutoffTail = true;
+              contentDelta = stripped.text.length > 0 ? stripped.text : undefined;
+            }
+            const tailDelta = cutoffTail && contentDelta !== undefined ? contentDelta : undefined;
+            if (tailDelta !== undefined) contentDelta = undefined;
             if (
-              (delta?.content != null && delta.content.length > 0) ||
+              contentDelta !== undefined ||
               reasoningDelta !== undefined ||
+              tailDelta !== undefined ||
               (delta?.tool_calls?.length ?? 0) > 0
             ) {
               liveTps.tick();
             }
 
-            if (reasoningDelta !== undefined) {
+            const thoughtDelta =
+              reasoningDelta !== undefined && tailDelta !== undefined
+                ? reasoningDelta + tailDelta
+                : (reasoningDelta ?? tailDelta);
+            if (thoughtDelta !== undefined) {
               if (firstTokenAt === undefined) firstTokenAt = Date.now();
               if (thinkingIndex === undefined) {
                 output.content.push({ type: 'thinking', thinking: '' });
@@ -322,16 +358,16 @@ export function createMlxStream(deps: MlxStreamDeps = {}): MlxStreamFn {
                 });
               }
               const block = output.content[thinkingIndex];
-              if (block?.type === 'thinking') block.thinking += reasoningDelta;
+              if (block?.type === 'thinking') block.thinking += thoughtDelta;
               stream.push({
                 type: 'thinking_delta',
                 contentIndex: thinkingIndex,
-                delta: reasoningDelta,
+                delta: thoughtDelta,
                 partial: output,
               });
             }
 
-            if (delta?.content != null && delta.content.length > 0) {
+            if (contentDelta !== undefined) {
               /*
                * oMLX, cut off by max_tokens INSIDE the think block, hands the
                * whole thought back once more as content (MEASURED 2026-09-13:
@@ -345,7 +381,7 @@ export function createMlxStream(deps: MlxStreamDeps = {}): MlxStreamFn {
                 textIndex === undefined &&
                 thought?.type === 'thinking' &&
                 thought.thinking.length > 0 &&
-                delta.content === thought.thinking
+                contentDelta === thought.thinking
               ) {
                 continue;
               }
@@ -356,11 +392,11 @@ export function createMlxStream(deps: MlxStreamDeps = {}): MlxStreamFn {
                 stream.push({ type: 'text_start', contentIndex: textIndex, partial: output });
               }
               const block = output.content[textIndex];
-              if (block?.type === 'text') block.text += delta.content;
+              if (block?.type === 'text') block.text += contentDelta;
               stream.push({
                 type: 'text_delta',
                 contentIndex: textIndex,
-                delta: delta.content,
+                delta: contentDelta,
                 partial: output,
               });
             }

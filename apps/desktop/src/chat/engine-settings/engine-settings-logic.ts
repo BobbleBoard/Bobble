@@ -197,3 +197,26 @@ export function flagMatches(
     flag.description.toLowerCase().includes(q)
   );
 }
+
+/**
+ * What an engine's stated default puts IN the control. The help says things
+ * like "0, 0 = loaded from model", "-1, -1 = infinity" or "8192, -1 - no
+ * limit, 0 - disable": the number is the value, the rest is the ⓘ's to
+ * explain. A default that is not a number at all ("auto-detect ~20% of RAM")
+ * leaves a number control empty and a text control showing it as it is.
+ */
+export function defaultShown(
+  defaultValue: string | undefined,
+  kind: 'number' | 'text' | 'select' | 'switch' | 'path' | string,
+): string {
+  if (defaultValue === undefined) return '';
+  if (kind === 'number') {
+    const m = /^\s*(-?\d+(?:\.\d+)?)/.exec(defaultValue);
+    return m?.[1] ?? '';
+  }
+  if (kind === 'select') return defaultValue.split(/[,;\s]/)[0] ?? '';
+  // A path field's "default" is prose ("template taken from model's
+  // metadata"), never a path to edit.
+  if (kind === 'path') return '';
+  return defaultValue;
+}

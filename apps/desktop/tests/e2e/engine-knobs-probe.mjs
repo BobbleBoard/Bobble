@@ -75,6 +75,13 @@ try {
   await win.waitForSelector('[data-testid="engine-knobs"]', { timeout: 10000 });
   await win.waitForTimeout(400);
 
+  /** Pick an option in the app's own dropdown (Radix Select): open, click the row. */
+  const pick = async (triggerTestId, optionText) => {
+    await win.click(`[data-testid="${triggerTestId}"]`);
+    await win.waitForSelector('[role="option"]', { timeout: 5000 });
+    await win.locator('[role="option"]', { hasText: optionText }).first().click();
+    await win.waitForTimeout(300);
+  };
   const readRow = (id) =>
     win.evaluate((id) => {
       const r = document.querySelector(`[data-testid="engine-knob-${id}"]`);
@@ -83,7 +90,7 @@ try {
         : {
             supported: r.getAttribute('data-supported'),
             set: r.getAttribute('data-set'),
-            flag: r.querySelector('.pd-flag-alias')?.textContent ?? null,
+            flag: r.getAttribute('data-flag'),
             unsupported:
               r.querySelector('[data-testid="engine-knob-unsupported"]')?.textContent ?? null,
             inherited:
@@ -93,26 +100,24 @@ try {
           };
     }, id);
 
-  // 1. The section sits above the engine's own flags, with every knob.
+  // 1. The section is the Engine tab's Settings, with every knob (the
+  //    engine's own flags have their own tab now).
   const order = await win.evaluate(() => {
     const knobs = document.querySelector('[data-testid="engine-knobs"]');
-    const flags = document.querySelector('[data-testid="engine-flags-tab"]');
-    const all = [...document.querySelectorAll('[data-testid]')];
+    const flagsTab = document.querySelector('[data-testid="advanced-tab-flags"]');
     return {
-      knobsAt: all.indexOf(knobs),
-      flagsAt: all.indexOf(flags),
-      knobsFirst: knobs !== null && flags !== null && all.indexOf(knobs) < all.indexOf(flags),
+      knobsFirst: knobs !== null && flagsTab !== null,
       ids: [
         ...document.querySelectorAll(
           '[data-testid^="engine-knob-"]:not([data-testid^="engine-knob-input"])',
         ),
       ]
         .map((e) => e.getAttribute('data-testid'))
-        .filter((t) => !/unsupported|inherited/.test(t)),
+        .filter((t) => !/unsupported|inherited|info/.test(t)),
     };
   });
   log('order:', JSON.stringify(order));
-  check(order.knobsFirst, 'the shared section comes before the engine’s own flags');
+  check(order.knobsFirst, 'the shared section is on the Engine tab and Flags has its own tab');
   check(order.ids.length >= 6, `six knobs listed (${order.ids.join(',')})`);
 
   // 2. llama.cpp: the context knob is spelled --ctx-size; the parallel knob reads
@@ -133,14 +138,16 @@ try {
 
   // 3. Switch the engine: the value stays; mlx-dspark spells it --context-window;
   //    mlx-lm has no such flag and says so, greyed.
+  await win.click('[data-testid="engine-settings-engine"]');
+  await win.waitForSelector('[role="option"]', { timeout: 5000 });
   const choices = await win.evaluate(() =>
-    [...document.querySelectorAll('[data-testid="engine-settings-engine"] option')].map(
-      (o) => o.value,
-    ),
+    [...document.querySelectorAll('[role="option"]')].map((o) => o.textContent?.trim() ?? ''),
   );
+  await win.keyboard.press('Escape');
+  await win.waitForTimeout(200);
   log('engines offered:', choices.join(','));
-  if (choices.includes('mlx-dspark')) {
-    await win.selectOption('[data-testid="engine-settings-engine"]', 'mlx-dspark');
+  if (choices.some((c) => c.startsWith('mlx-dspark'))) {
+    await pick('engine-settings-engine', 'mlx-dspark');
     await win.waitForTimeout(500);
     const ctxDspark = await readRow('context');
     const parDspark = await readRow('parallel');
@@ -161,8 +168,8 @@ try {
   } else {
     console.log('mlx-dspark not installed here — its spelling case skipped');
   }
-  if (choices.includes('mlx-lm')) {
-    await win.selectOption('[data-testid="engine-settings-engine"]', 'mlx-lm');
+  if (choices.some((c) => c.startsWith('mlx-lm'))) {
+    await pick('engine-settings-engine', 'mlx-lm');
     await win.waitForTimeout(500);
     const ctxMlx = await readRow('context');
     const ctxRowLlama = ctxLlama;
@@ -182,9 +189,8 @@ try {
 
   // 4. Save: the knob persists, and the effective launch config per engine (the
   //    supervisor's own expansion) carries the spelled flag.
-  await win.selectOption('[data-testid="engine-settings-engine"]', 'llamacpp');
-  await win.waitForTimeout(300);
-  await win.selectOption('[data-testid="engine-knob-input-kvQuant"]', '8');
+  await pick('engine-settings-engine', 'llama.cpp');
+  await pick('engine-knob-input-kvQuant', '8-bit');
   await win.waitForTimeout(200);
   await win.click('[data-testid="engine-settings-apply"]');
   await win.waitForTimeout(1200);

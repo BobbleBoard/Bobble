@@ -1,43 +1,36 @@
 /**
- * Every flag the engine has, organised: a search box, the popular ones on
- * top, then the categories (collapsible, counted). Nothing here is a curated
- * subset — the list is the engine's own `--help`, which is the only way the
- * panel can honestly claim "absolutely everything".
+ * THE FLAGS TAB: every flag the engine has, organised — the search on top
+ * (the user: "make a separate tab for Flags with the search bar at the top"),
+ * which engine beside it, the popular ones first, then the categories
+ * (collapsible, counted). Nothing here is a curated subset — the list is the
+ * engine's own `--help`, which is the only way the panel can honestly claim
+ * "absolutely everything". Each row is a setting with a real name; the flag
+ * itself is in its ⓘ.
  */
 import { groupFlags, MANAGED_LLAMA_FLAGS } from '@pi-desktop/inference/engine-flags';
 import { useMemo, useState } from 'react';
-import type { LlmStatus } from '../../../electron/ipc-contract';
-import type { EngineFlagValue } from '../../../electron/settings/settings-contract';
-import type { EngineFlagsView } from '../../state/llm-store';
-import {
-  type FlagValues,
-  flagMatches,
-  POPULAR_LLAMA_FLAGS,
-  runningValue,
-} from './engine-settings-logic';
-import { FlagRow, type FlagSpec, type PathSource } from './FlagRow';
+import { EngineSelect } from './EngineSelect';
+import { flagMatches, POPULAR_LLAMA_FLAGS, runningValue } from './engine-settings-logic';
+import { FlagRow } from './FlagRow';
+import { flagLabel } from './flag-names';
+import type { EngineDraft } from './use-engine-draft';
 
-export function EngineFlagsTab({
-  engine,
-  help,
-  values,
-  status,
-  onChange,
-  onPath,
-}: {
-  engine: string;
-  help: EngineFlagsView | null;
-  values: FlagValues;
-  status: LlmStatus;
-  onChange: (key: string, value: EngineFlagValue | null) => void;
-  onPath: (flag: FlagSpec, source: PathSource) => Promise<string | null>;
-}) {
+export function EngineFlagsTab({ d }: { d: EngineDraft }) {
+  const { engine, help, status } = d;
+  const values = d.draft.flags;
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const flags = help?.flags ?? [];
   const managed = engine === 'llamacpp' ? MANAGED_LLAMA_FLAGS : {};
   const q = query.trim();
-  const filtered = useMemo(() => flags.filter((f) => flagMatches(f, q)), [flags, q]);
+  // A search matches the name people see as well as the flag they may know.
+  const filtered = useMemo(
+    () =>
+      flags.filter(
+        (f) => flagMatches(f, q) || flagLabel(f).toLowerCase().includes(q.toLowerCase()),
+      ),
+    [flags, q],
+  );
   const groups = useMemo(() => groupFlags(filtered), [filtered]);
   const popular = useMemo(
     () =>
@@ -50,12 +43,6 @@ export function EngineFlagsTab({
   );
   const setCount = Object.keys(values).length;
 
-  if (help === null) {
-    return <p className="pd-engine-note">Reading {engine}’s own --help…</p>;
-  }
-  if (help.error !== undefined && flags.length === 0) {
-    return <p className="pd-engine-note">{help.error}</p>;
-  }
   const row = (f: (typeof flags)[number]) => (
     <FlagRow
       key={f.key}
@@ -63,8 +50,8 @@ export function EngineFlagsTab({
       value={values[f.key]}
       running={runningValue(status, f.aliases)}
       managed={managed[f.key]}
-      onChange={(v) => onChange(f.key, v)}
-      onPath={onPath}
+      onChange={(v) => d.setFlagValue(f.key, v)}
+      onPath={d.resolvePath}
     />
   );
   return (
@@ -73,7 +60,7 @@ export function EngineFlagsTab({
         <input
           type="search"
           className="pd-input pd-focusable pd-flags-search"
-          placeholder={`Search ${flags.length} flags…`}
+          placeholder={flags.length > 0 ? `Search ${flags.length} settings…` : 'Search…'}
           aria-label="Search flags"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -82,7 +69,20 @@ export function EngineFlagsTab({
         <span className="pd-flags-count" data-testid="engine-flags-set-count">
           {setCount === 0 ? 'engine defaults' : `${setCount} set`}
         </span>
+        <EngineSelect
+          engine={engine}
+          choices={d.choices}
+          runningEngine={d.runningEngine}
+          serverRunning={status.serverRunning}
+          onChange={d.setEngine}
+          testId="engine-flags-engine"
+        />
       </div>
+      {help === null ? (
+        <p className="pd-engine-note">Reading {engine}’s own --help…</p>
+      ) : help.error !== undefined && flags.length === 0 ? (
+        <p className="pd-engine-note">{help.error}</p>
+      ) : null}
       {popular.length > 0 ? (
         <section className="pd-flags-group" data-testid="engine-flags-popular">
           <h4 className="pd-flags-group-title">Popular</h4>
@@ -118,7 +118,9 @@ export function EngineFlagsTab({
           </section>
         );
       })}
-      {filtered.length === 0 ? <p className="pd-engine-note">No flag matches “{q}”.</p> : null}
+      {help !== null && filtered.length === 0 && flags.length > 0 ? (
+        <p className="pd-engine-note">No setting matches “{q}”.</p>
+      ) : null}
     </div>
   );
 }

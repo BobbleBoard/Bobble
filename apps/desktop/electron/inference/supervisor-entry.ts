@@ -1685,6 +1685,12 @@ async function startExternalEngine(
         HF_HUB_OFFLINE: '1',
         TRANSFORMERS_OFFLINE: '1',
         TOKENIZERS_PARALLELISM: 'false',
+        /* rapid-mlx writes "[truncated — reasoning incomplete; raise
+           max_tokens]" plus a tail of the thought INTO the reply when a
+           generation is cut mid-think (its R12-8 "rescue"). the user saw it as a
+           thought in the thread. The cut is already said by finish_reason
+           "length"; the words are not for the user. */
+        RAPID_MLX_REASONING_CUTOFF_NOTICE: 'disabled',
         /* A hub cache of our own. mlx_lm.server's `/v1/models` scans the HF
            cache and throws when the directory does not exist — MEASURED under
            a fresh HOME — so give every engine one that does, under the app's

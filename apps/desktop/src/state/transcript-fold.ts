@@ -62,16 +62,33 @@ export function adoptFinalText(
 ): ContentBlock[] {
   if (content === undefined) return blocks;
   const finalTexts = content.filter((c) => c.type === 'text').map((c) => c.text);
-  const streamed = blocks.filter((b) => b.type === 'text');
-  if (finalTexts.length !== streamed.length) return blocks;
+  const finalThoughts = content
+    .filter((c) => c.type === 'thinking')
+    .map((c) => (c as { thinking: string }).thinking);
+  const streamedTexts = blocks.filter((b) => b.type === 'text').length;
+  const streamedThoughts = blocks.filter((b) => b.type === 'thinking').length;
+  const texts = finalTexts.length === streamedTexts;
+  // Thoughts too: a provider that strips an engine's notice out of a thought
+  // (rapid-mlx's cut-mid-think sentinel) settles the block the same way.
+  const thoughts = finalThoughts.length === streamedThoughts;
+  if (!texts && !thoughts) return blocks;
   let i = 0;
+  let j = 0;
   let changed = false;
   const out = blocks.map((b) => {
-    if (b.type !== 'text') return b;
-    const text = finalTexts[i++] ?? b.text;
-    if (text === b.text) return b;
-    changed = true;
-    return { ...b, text };
+    if (b.type === 'text' && texts) {
+      const text = finalTexts[i++] ?? b.text;
+      if (text === b.text) return b;
+      changed = true;
+      return { ...b, text };
+    }
+    if (b.type === 'thinking' && thoughts) {
+      const thinking = finalThoughts[j++] ?? b.thinking;
+      if (thinking === b.thinking) return b;
+      changed = true;
+      return { ...b, thinking };
+    }
+    return b;
   });
   return changed ? out : blocks;
 }

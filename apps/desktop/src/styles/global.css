@@ -1819,12 +1819,52 @@ body {
      control each, and 600px made every row wrap. */
   width: min(860px, 94vw);
   max-width: 94vw;
+  /* ONE SIZE, whatever tab is open. the user (2026-09-13): "never change the size
+     of the popup window area." The body scrolls inside it. */
+  height: 85vh;
 }
-
-/* The last card should not sit on the rounded bottom edge; a dialog with no
- * footer has to find that gap in its own scroll padding. */
 .pd-adv-panel .pd-dialog-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  /* The last card should not sit on the rounded bottom edge. */
   padding-bottom: var(--pd-space-xl);
+}
+/* Reset · Apply live in the header, top right (the footer they sat in did not
+ * stay pinned and covered the last card's bottom). */
+.pd-adv-header {
+  align-items: flex-start;
+  padding-right: 52px;
+}
+.pd-adv-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+}
+.pd-adv-note {
+  max-width: 260px;
+  font-size: var(--pd-font-size-caption);
+  color: var(--pd-text-secondary);
+  text-align: right;
+}
+/* Reset: the same height as Apply, white with black text in dark mode and the
+ * opposite in light — the text/base tokens swap with the mode. */
+.pd-btn-reset {
+  flex: none;
+  height: 28px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--pd-radius-button);
+  background: var(--pd-text-primary);
+  color: var(--pd-bg-base);
+  font: inherit;
+  font-size: var(--pd-font-size-footnote);
+  font-weight: var(--pd-font-weight-medium);
+  cursor: pointer;
+}
+.pd-btn-reset:hover {
+  opacity: 0.88;
 }
 
 /*
@@ -7082,7 +7122,6 @@ body[data-media-expanded="true"] .pd-studio-compose {
   display: flex;
   gap: 4px;
   padding: 0 var(--pd-space-xl);
-  border-bottom: 1px solid var(--pd-border-subtle);
 }
 .pd-adv-tab {
   padding: 8px 12px;
@@ -7116,8 +7155,9 @@ body[data-media-expanded="true"] .pd-studio-compose {
   flex-direction: column;
   gap: 4px;
 }
-.pd-engine-tab-select select {
+.pd-engine-select {
   min-width: 180px;
+  justify-content: space-between;
 }
 .pd-engine-subtabs {
   display: inline-flex;
@@ -7142,24 +7182,6 @@ body[data-media-expanded="true"] .pd-studio-compose {
 }
 .pd-engine-tab-body {
   min-height: 0;
-  /* The dialog body scrolls; the footer below is pinned by staying outside
-     that scroll (see .pd-engine-tab-foot). */
-}
-.pd-engine-tab-foot {
-  position: sticky;
-  bottom: calc(-1 * var(--pd-space-xl));
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin: 0 calc(-1 * var(--pd-space-xl)) calc(-1 * var(--pd-space-xl));
-  padding: 10px var(--pd-space-xl);
-  background: var(--pd-bg-raised);
-  border-top: 1px solid var(--pd-border-subtle);
-}
-.pd-engine-tab-foot-actions {
-  display: flex;
-  gap: 8px;
 }
 
 /* Flags */
@@ -7224,10 +7246,11 @@ body[data-media-expanded="true"] .pd-studio-compose {
 }
 .pd-flag-row {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 8px 12px;
+  min-height: 44px;
+  padding: 6px 12px;
   border-top: 1px solid var(--pd-border-subtle);
 }
 .pd-flag-desc {
@@ -7268,6 +7291,54 @@ body[data-media-expanded="true"] .pd-studio-compose {
   font-family: var(--pd-font-mono);
   font-size: var(--pd-font-size-caption);
   color: var(--pd-text-primary);
+}
+/* A setting's NAME (flag-names.ts); the flag itself lives in the ⓘ. */
+.pd-flag-name {
+  font-size: var(--pd-font-size-footnote);
+  font-weight: var(--pd-font-weight-medium);
+  color: var(--pd-text-primary);
+}
+.pd-info-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  padding: 0;
+  border: 1px solid var(--pd-border-default);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--pd-text-muted);
+  font: inherit;
+  font-size: 10px;
+  font-weight: var(--pd-font-weight-semibold);
+  line-height: 1;
+  cursor: help;
+}
+.pd-info-dot:hover {
+  color: var(--pd-text-primary);
+  border-color: var(--pd-text-secondary);
+}
+.pd-tooltip--wide {
+  max-width: 22rem;
+  padding: 8px 10px;
+}
+.pd-info-tip {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.pd-info-tip p {
+  margin: 0;
+}
+.pd-info-tip-flag {
+  opacity: 0.75;
+  font-family: var(--pd-font-mono);
+  font-size: 11px;
+}
+.pd-flag-unit {
+  font-size: var(--pd-font-size-caption);
+  color: var(--pd-text-muted);
 }
 .pd-flag-alias {
   font-family: var(--pd-font-mono);

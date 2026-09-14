@@ -4,19 +4,26 @@
  * `<0|1>` / `[on|off|auto]` / an "allowed values" list → a select; a file
  * placeholder → a path with a Choose… button; anything else → text.
  *
- * Unset is a real state ("the engine's default"), shown as the default value
- * in the placeholder and a dimmed row — a user should be able to see at a
- * glance which of 250 flags they have touched.
+ * The row reads as a SETTING, not a flag: a real name (flag-names.ts), the
+ * engine's default sitting IN the control as the value to edit, and an ⓘ
+ * that says what it does and which flag is passed. the user (2026-09-13): "show
+ * the defaults, don't write 'default' … so the user can edit rather than
+ * showing them as placeholder text", "don't show … their literal flag names".
+ * Unset is still a real state ("the engine's default"): a row lights up only
+ * once its value differs from that, and × puts it back.
  *
  * A path flag's whole row is a drop target: drop the file on it and the path
  * is filled in (the user: "have a drag and drop or upload custom chat template").
  * The chat-template row says Upload rather than Choose because the file is
  * copied into Bobble's storage on the way (see `llm:import-chat-template`).
  */
-import { IconClose } from '@pi-desktop/ui';
+import { IconClose, Select, SelectContent, SelectItem, SelectTrigger } from '@pi-desktop/ui';
 import { useState } from 'react';
 import type { LlmInvokeMap } from '../../../electron/ipc-contract';
 import type { EngineFlagValue } from '../../../electron/settings/settings-contract';
+import { defaultShown } from './engine-settings-logic';
+import { flagLabel } from './flag-names';
+import { InfoDot } from './InfoDot';
 
 export type FlagSpec = LlmInvokeMap['llm:engine-flags']['response']['flags'][number];
 
@@ -24,6 +31,20 @@ export type FlagSpec = LlmInvokeMap['llm:engine-flags']['response']['flags'][num
 export type PathSource = { kind: 'pick' } | { kind: 'drop'; path: string };
 
 export const CHAT_TEMPLATE_FLAG = '--chat-template-file';
+
+/** The ⓘ contents for a flag: what it does, then the flag itself. */
+export function FlagInfo({ flag, extra }: { flag: FlagSpec; extra?: string }) {
+  return (
+    <>
+      <p>{flag.description}</p>
+      {extra !== undefined ? <p>{extra}</p> : null}
+      <p className="pd-info-tip-flag">
+        <code>{flag.aliases.length > 0 ? flag.aliases.join(', ') : flag.key}</code>
+        {flag.defaultValue !== undefined ? ` · default ${flag.defaultValue}` : ''}
+      </p>
+    </>
+  );
+}
 
 export function FlagRow({
   flag,
@@ -45,7 +66,10 @@ export function FlagRow({
 }) {
   const set = value !== undefined;
   const control = flag.control;
-  const placeholder = flag.defaultValue !== undefined ? `default: ${flag.defaultValue}` : '';
+  const label = flagLabel(flag);
+  // The engine's default sits in the control as the value to edit.
+  const engineDefault = defaultShown(flag.defaultValue, control.kind);
+  const shown = value !== undefined ? String(value) : engineDefault;
   const [dragging, setDragging] = useState(false);
   const isTemplate = flag.key === CHAT_TEMPLATE_FLAG;
   const droppable = control.kind === 'path' && onPath !== undefined && managed !== 'refused';
@@ -54,6 +78,14 @@ export function FlagRow({
     void onPath(flag, source).then((p) => {
       if (p !== null) onChange(p);
     });
+  };
+  /* Typing the default back in is the same as clearing: the row is "set" only
+     when its value differs from the engine's own. */
+  const commit = (raw: string) => {
+    if (raw === '' || raw === engineDefault) onChange(null);
+    else if (control.kind === 'number') {
+      if (Number.isFinite(Number(raw))) onChange(Number(raw));
+    } else onChange(raw);
   };
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: the drop target is the row; the controls inside it are real controls
@@ -87,14 +119,21 @@ export function FlagRow({
     >
       <div className="pd-flag-main">
         <div className="pd-flag-head">
-          <code className="pd-flag-key">{flag.key}</code>
-          {flag.aliases
-            .filter((a) => a !== flag.key)
-            .map((a) => (
-              <code key={a} className="pd-flag-alias">
-                {a}
-              </code>
-            ))}
+          <span className="pd-flag-name" data-testid={`flag-name-${flag.key}`}>
+            {label}
+          </span>
+          <InfoDot label={label} testId={`flag-info-${flag.key}`}>
+            <FlagInfo
+              flag={flag}
+              extra={
+                droppable
+                  ? isTemplate
+                    ? 'Drop a .jinja template on this row or Upload… — Bobble keeps its own copy.'
+                    : 'Drop a file on this row, or Choose…'
+                  : undefined
+              }
+            />
+          </InfoDot>
           {managed === 'refused' ? (
             <span className="pd-flag-chip pd-flag-chip--warn">set by Bobble</span>
           ) : managed === 'override' ? (
@@ -108,14 +147,6 @@ export function FlagRow({
             </span>
           ) : null}
         </div>
-        <div className="pd-flag-desc">{flag.description}</div>
-        {droppable ? (
-          <div className="pd-flag-drop-hint" data-testid={`flag-drop-hint-${flag.key}`}>
-            {isTemplate
-              ? 'Drop a .jinja template on this row or Upload… — Bobble keeps its own copy.'
-              : 'Drop a file on this row, or Choose…'}
-          </div>
-        ) : null}
       </div>
       <div className="pd-flag-control">
         {managed === 'refused' ? (
@@ -124,49 +155,49 @@ export function FlagRow({
           <label className="pd-flag-switch">
             <input
               type="checkbox"
-              aria-label={flag.key}
+              aria-label={label}
               checked={value === true}
               onChange={(e) => onChange(e.target.checked ? true : null)}
             />
-            <span>{value === true ? 'on' : 'default'}</span>
+            <span>{value === true ? 'on' : 'off'}</span>
           </label>
         ) : control.kind === 'select' ? (
-          <select
-            className="pd-input pd-focusable pd-flag-select"
-            aria-label={flag.key}
-            value={value === undefined ? '' : String(value)}
-            onChange={(e) => onChange(e.target.value === '' ? null : e.target.value)}
-          >
-            <option value="">
-              {flag.defaultValue !== undefined ? `default (${flag.defaultValue})` : 'default'}
-            </option>
-            {control.options.map((o) => (
-              <option key={o} value={o}>
-                {o}
-              </option>
-            ))}
-          </select>
+          <Select value={shown} onValueChange={(v) => commit(v)}>
+            <SelectTrigger
+              className="pd-btn--sm pd-flag-select"
+              aria-label={label}
+              placeholder="—"
+              data-testid={`flag-select-${flag.key}`}
+            >
+              {shown === '' ? '—' : shown}
+            </SelectTrigger>
+            <SelectContent align="end">
+              {(control.options.includes(shown) || shown === ''
+                ? control.options
+                : [shown, ...control.options]
+              ).map((o) => (
+                <SelectItem key={o} value={o}>
+                  {o}
+                  {o === engineDefault ? ' (default)' : ''}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         ) : control.kind === 'number' ? (
           <input
             type="number"
             className="pd-input pd-focusable pd-flag-input"
-            aria-label={flag.key}
-            placeholder={placeholder}
-            value={value === undefined ? '' : String(value)}
-            onChange={(e) => {
-              const raw = e.target.value;
-              if (raw === '') onChange(null);
-              else if (Number.isFinite(Number(raw))) onChange(Number(raw));
-            }}
+            aria-label={label}
+            value={shown}
+            onChange={(e) => commit(e.target.value)}
           />
         ) : (
           <input
             type="text"
             className="pd-input pd-focusable pd-flag-input"
-            aria-label={flag.key}
-            placeholder={placeholder}
-            value={value === undefined ? '' : String(value)}
-            onChange={(e) => onChange(e.target.value === '' ? null : e.target.value)}
+            aria-label={label}
+            value={shown}
+            onChange={(e) => commit(e.target.value)}
           />
         )}
         {droppable ? (
@@ -183,7 +214,7 @@ export function FlagRow({
           <button
             type="button"
             className="pd-flag-clear"
-            aria-label={`Clear ${flag.key}`}
+            aria-label={`Clear ${label}`}
             title="Back to the engine default"
             onClick={() => onChange(null)}
           >

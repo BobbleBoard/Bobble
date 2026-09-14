@@ -162,29 +162,31 @@ try {
   // 2. The Engine tab.
   await win.locator('[data-testid="advanced-params-toggle"]').click();
   await win.waitForSelector('[data-testid="engine-settings-tab"]', { timeout: 10000 });
+  // The flags live on their own tab now (the user: "a separate tab for Flags").
+  await win.locator('[data-testid="advanced-tab-flags"]').click();
   await win.waitForFunction(
-    () => document.querySelectorAll('[data-testid^="flag-"]').length > 10,
+    () => document.querySelectorAll('.pd-flag-row[data-testid^="flag-"]').length > 10,
     undefined,
     { timeout: 60000 },
   );
   await win.waitForTimeout(500);
   const t1 = await win.evaluate(() => ({
-    engine: document.querySelector('[data-testid="engine-settings-engine"]')?.value,
+    engine: document.querySelector('[data-testid="engine-flags-engine"]')?.textContent?.trim(),
     popular: document.querySelectorAll(
-      '[data-testid="engine-flags-popular"] [data-testid^="flag-"]',
+      '[data-testid="engine-flags-popular"] .pd-flag-row[data-testid^="flag-"]',
     ).length,
     groups: [...document.querySelectorAll('[data-testid^="engine-flags-group-"]')].map((g) =>
       g.textContent?.replace(/\s+/g, ' ').slice(0, 40),
     ),
     search: document.querySelector('[data-testid="engine-flags-search"]')?.placeholder,
     apply: document.querySelector('[data-testid="engine-settings-apply"]')?.disabled,
-    dirty: document.querySelector('[data-testid="engine-settings-dirty"]')?.textContent,
+    dirty: document.querySelector('[data-testid="engine-settings-note"]')?.textContent,
   }));
   log('engine tab:', JSON.stringify(t1));
-  check(t1.engine === 'llamacpp', `the running engine is selected (${t1.engine})`);
+  check(/^llama\.cpp/.test(t1.engine ?? ''), `the running engine is selected (${t1.engine})`);
   check(t1.popular >= 10, `the Popular group lists the common flags (${t1.popular})`);
   check(
-    /Search \d{3} flags/.test(t1.search ?? ''),
+    /Search \d{3} settings/.test(t1.search ?? ''),
     `the search box counts the build's flags (${t1.search})`,
   );
   check(t1.apply === true, 'Apply is grey with nothing changed');
@@ -196,7 +198,7 @@ try {
   await win.waitForTimeout(300);
   const t2 = await win.evaluate(() => ({
     apply: document.querySelector('[data-testid="engine-settings-apply"]')?.disabled,
-    dirty: document.querySelector('[data-testid="engine-settings-dirty"]')?.textContent,
+    dirty: document.querySelector('[data-testid="engine-settings-note"]')?.textContent,
     setCount: document.querySelector('[data-testid="engine-flags-set-count"]')?.textContent,
   }));
   log('after edit:', JSON.stringify(t2));
@@ -207,7 +209,9 @@ try {
   await win.locator('[data-testid="engine-flags-search"]').fill('cache-type');
   await win.waitForTimeout(300);
   const t3 = await win.evaluate(() =>
-    [...document.querySelectorAll('[data-testid^="flag-"]')].map((r) => r.dataset.testid.slice(5)),
+    [...document.querySelectorAll('.pd-flag-row[data-testid^="flag-"]')].map((r) =>
+      r.dataset.testid.slice(5),
+    ),
   );
   log('search cache-type →', JSON.stringify(t3));
   // Matches on any spelling: `--spec-draft-type-k` is also `--cache-type-k-draft`.
@@ -222,7 +226,7 @@ try {
   await win.waitForFunction(
     () =>
       /Restarted|failed/.test(
-        document.querySelector('[data-testid="engine-settings-dirty"]')?.textContent ?? '',
+        document.querySelector('[data-testid="engine-settings-note"]')?.textContent ?? '',
       ),
     undefined,
     { timeout: 180_000 },
@@ -237,9 +241,11 @@ try {
   check(idx >= 0 && argv[idx + 1] === '512', 'the running server carries --reasoning-budget 512');
   const t4 = await win.evaluate(() => ({
     apply: document.querySelector('[data-testid="engine-settings-apply"]')?.disabled,
-    dirty: document.querySelector('[data-testid="engine-settings-dirty"]')?.textContent,
+    dirty: document.querySelector('[data-testid="engine-settings-note"]')?.textContent,
   }));
   check(t4.apply === true, `Apply is grey again after the restart (${t4.dirty})`);
+  await win.locator('[data-testid="advanced-tab-engine"]').click();
+  await win.waitForTimeout(200);
   await win.locator('[data-testid="engine-subtab-running"]').click();
   await win.waitForTimeout(300);
   const runningText = await win.evaluate(

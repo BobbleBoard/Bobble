@@ -262,6 +262,20 @@ export function parseLlamaHelp(help: string): EngineFlag[] {
  * `options:` (and a positional block), descriptions on the same line after a
  * wide gap or on the following, deeper-indented lines. `{a,b}` is a choice.
  */
+/**
+ * The default an argparse help sentence states. The parenthesised form first
+ * — "Default max tokens for generation (default: 32768)." used to yield
+ * "max tokens for generation (default: 32768)" because a bare "Default …"
+ * matched earlier in the sentence — then the bare form, cut at the sentence's
+ * own punctuation so "(R15 #300, default: bf16)" gives "bf16", not "bf16)".
+ */
+export function argparseDefault(description: string): string | undefined {
+  const paren = description.match(/\(default:\s*([^()]*(?:\([^()]*\)[^()]*)*)\)/i);
+  if (paren?.[1] !== undefined) return paren[1].trim();
+  const bare = description.match(/\b[Dd]efault:?\s+([^.;,)]+)/);
+  return bare?.[1]?.trim();
+}
+
 export function parseArgparseHelp(help: string): EngineFlag[] {
   const out: EngineFlag[] = [];
   let section = 'options';
@@ -271,8 +285,7 @@ export function parseArgparseHelp(help: string): EngineFlag[] {
     const description = current.lines.join(' ').replace(/\s+/g, ' ').trim();
     const key = current.aliases.find((a) => a.startsWith('--')) ?? current.aliases[0] ?? '';
     if (key.length > 0 && key !== '--help') {
-      const def = description.match(/\(default:\s*([^)]+)\)|[Dd]efault:?\s+([^.;,]+)/);
-      const defaultValue = (def?.[1] ?? def?.[2])?.trim();
+      const defaultValue = argparseDefault(description);
       out.push({
         key,
         aliases: current.aliases,

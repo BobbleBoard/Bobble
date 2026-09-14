@@ -34,7 +34,9 @@ import { DEFAULT_ADVANCED } from '../../electron/settings/settings-contract';
 import { SettingGroup, SettingSection, SettingSlider } from '../settings/parts';
 import { useGroundTruth } from '../state/advanced-store';
 import { setAdvanced, useAdvancedSettings } from '../state/settings-store';
-import { EngineTab } from './engine-settings/EngineTab';
+import { EngineFlagsTab } from './engine-settings/EngineFlagsTab';
+import { type EngineSubTab, EngineTab } from './engine-settings/EngineTab';
+import { useEngineDraft } from './engine-settings/use-engine-draft';
 
 /** The section-level "Reset", in the app's small ghost-button idiom. */
 function ResetButton({ onClick }: { onClick: () => void }): ReactNode {
@@ -107,7 +109,7 @@ function GroundTruthView(): ReactNode {
   );
 }
 
-type PanelTab = 'engine' | 'sampling' | 'context';
+type PanelTab = 'engine' | 'flags' | 'sampling' | 'context';
 
 export function AdvancedParamsPanel({
   open,
@@ -119,6 +121,11 @@ export function AdvancedParamsPanel({
   const adv = useAdvancedSettings();
   const s = adv.sampling;
   const [tab, setTab] = useState<PanelTab>('engine');
+  const [sub, setSub] = useState<EngineSubTab>('settings');
+  // One draft for the Engine and Flags tabs, so Reset / Apply in the header
+  // act on both from either.
+  const d = useEngineDraft();
+  const editing = tab === 'engine' || tab === 'flags';
 
   const patchSampling = (p: Partial<typeof s>): void =>
     void setAdvanced({ sampling: { ...s, ...p } });
@@ -126,28 +133,62 @@ export function AdvancedParamsPanel({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent aria-label="Advanced parameters" className="pd-adv-panel">
-        <DialogHeader>
-          <div className="min-w-0 pr-8">
+        <DialogHeader className="pd-adv-header">
+          <div className="min-w-0">
             <DialogTitle>Advanced</DialogTitle>
             <DialogDescription className="mt-1 text-footnote">
               Every engine flag, speculative decoding, sampling, and the live context sent to the
               model.
             </DialogDescription>
           </div>
+          {/*
+           * RESET · APPLY, top right — the pinned footer they used to sit in
+           * did not stay pinned and ate the last card's bottom (the user,
+           * 2026-09-13). Apply lights up only when what the panel would launch
+           * with differs from what is running (see useEngineDraft).
+           */}
+          {editing ? (
+            <div className="pd-adv-actions" data-testid="engine-settings-footer">
+              {d.note !== null ? (
+                <span className="pd-adv-note" data-testid="engine-settings-note">
+                  {d.note}
+                </span>
+              ) : null}
+              <button
+                type="button"
+                className="pd-btn-reset"
+                onClick={d.reset}
+                data-testid="engine-settings-reset"
+              >
+                Reset
+              </button>
+              <button
+                type="button"
+                className="pd-engine-calibrate pd-btn-apply"
+                disabled={!d.dirty || d.applying}
+                onClick={() => void d.apply()}
+                data-testid="engine-settings-apply"
+              >
+                {d.applying ? 'Restarting…' : d.status.serverRunning ? 'Apply & restart' : 'Save'}
+              </button>
+            </div>
+          ) : null}
         </DialogHeader>
         {/*
-         * THREE TABS, engine first. the user: "expand the advanced settings top
+         * FOUR TABS, engine first. the user: "expand the advanced settings top
          * right button to expose absolutely everything in an organized good
          * gui manner, this includes first and foremost llamacpp". The engine
-         * tab is the whole flag surface of the running engine (its own --help,
-         * categorised), speculative decoding with drafters, and a paste-a-
-         * command route; sampling stays the instant, per-request knobs; the
-         * live context is the read-only truth of what the model was sent.
+         * tab is the knobs shared across engines, speculative decoding with
+         * drafters, and a paste-a-command route; Flags is the whole flag
+         * surface of the engine (its own --help, categorised, searchable);
+         * sampling stays the instant, per-request knobs; the live context is
+         * the read-only truth of what the model was sent.
          */}
         <div className="pd-adv-tabs" role="tablist">
           {(
             [
               ['engine', 'Engine'],
+              ['flags', 'Flags'],
               ['sampling', 'Sampling'],
               ['context', 'Live context'],
             ] as const
@@ -167,7 +208,8 @@ export function AdvancedParamsPanel({
         </div>
 
         <DialogBody className="flex flex-col gap-8">
-          {tab === 'engine' ? <EngineTab /> : null}
+          {tab === 'engine' ? <EngineTab d={d} sub={sub} onSub={setSub} /> : null}
+          {tab === 'flags' ? <EngineFlagsTab d={d} /> : null}
           {tab === 'context' ? (
             /* GROUND TRUTH ------------------------------------------------ */
             <SettingSection

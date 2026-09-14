@@ -141,6 +141,34 @@ describe('createMlxStream — thoughts, whichever key the engine uses', () => {
     });
   });
 
+  it("never shows rapid-mlx's cut-mid-think notice; what follows it is the thought's tail", async () => {
+    // SEEN (the user, 2026-09-13): a Thought reading "[truncated — reasoning
+    // incomplete; raise max_tokens]". finish_reason "length" already says it.
+    const { fetchImpl } = sseFetch([
+      { choices: [{ delta: { reasoning_content: 'Let me work it out' } }] },
+      {
+        choices: [
+          {
+            delta: {
+              content: '[truncated — reasoning incomplete; raise max_tokens]\n\nout: 17 × 23 = 391',
+            },
+          },
+        ],
+      },
+      { choices: [{ delta: { content: '. So the' } }] },
+      { choices: [{ delta: {}, finish_reason: 'length' }], usage: { completion_tokens: 9 } },
+    ]);
+    const { events, final } = await consume(
+      createMlxStream({ fetchImpl })(makeModel(), emptyContext()),
+    );
+    expect(final.stopReason).toBe('length');
+    expect(final.content).toEqual([
+      { type: 'thinking', thinking: 'Let me work it outout: 17 × 23 = 391. So the' },
+    ]);
+    expect(events.some((e) => e.type === 'text_delta')).toBe(false);
+    expect(JSON.stringify(final)).not.toContain('truncated');
+  });
+
   it('asks every engine to think and to keep its thoughts, unless the caller said otherwise', async () => {
     const { fetchImpl, calls } = sseFetch([
       { choices: [{ delta: {}, finish_reason: 'stop' }], usage: { completion_tokens: 0 } },

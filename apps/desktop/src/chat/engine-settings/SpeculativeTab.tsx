@@ -17,6 +17,7 @@
  * the engine's own help.
  */
 import { MANAGED_LLAMA_FLAGS } from '@pi-desktop/inference/engine-flags';
+import { Select, SelectContent, SelectItem, SelectTrigger } from '@pi-desktop/ui';
 import { useEffect, useMemo, useState } from 'react';
 import type {
   HfGgufFileDTO,
@@ -37,6 +38,7 @@ import {
   SPEC_METHODS,
 } from './engine-settings-logic';
 import { FlagRow, type FlagSpec, type PathSource } from './FlagRow';
+import { InfoDot } from './InfoDot';
 
 type LocalGguf = { path: string; name: string; bytes: number; modelId: string; kind: string };
 
@@ -267,24 +269,35 @@ function CustomDraftPicker({
         </div>
       )}
       <div className="pd-draft-type">
-        <span className="pd-flag-key">--spec-type</span>
-        <select
-          className="pd-input pd-focusable pd-flag-select"
-          aria-label="Spec type for the custom draft"
+        <span className="pd-flag-name">Draft method</span>
+        <InfoDot label="Draft method">
+          <p>
+            llama.cpp reads DFlash2 and DSpark heads from the file itself; pick the family the draft
+            was made for.
+          </p>
+          <p className="pd-info-tip-flag">
+            <code>--spec-type</code>
+          </p>
+        </InfoDot>
+        <Select
           value={choice.specType ?? 'draft-simple'}
-          onChange={(e) => onChoice({ ...choice, method: 'custom', specType: e.target.value })}
-          data-testid="custom-draft-spec-type"
+          onValueChange={(v) => onChoice({ ...choice, method: 'custom', specType: v })}
         >
-          {SPEC_TYPES.map((t) => (
-            <option key={t} value={t}>
-              {t}
-            </option>
-          ))}
-        </select>
-        <span className="pd-engine-row-sub">
-          llama.cpp reads DFlash2 and DSpark heads from the file itself; pick the family the draft
-          was made for.
-        </span>
+          <SelectTrigger
+            className="pd-btn--sm pd-flag-select"
+            aria-label="Draft method for the custom draft"
+            data-testid="custom-draft-spec-type"
+          >
+            {choice.specType ?? 'draft-simple'}
+          </SelectTrigger>
+          <SelectContent align="end">
+            {SPEC_TYPES.map((t) => (
+              <SelectItem key={t} value={t}>
+                {t}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
     </div>
   );
