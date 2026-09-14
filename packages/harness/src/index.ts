@@ -49,7 +49,7 @@ import {
 } from './permissions/modes.js';
 import { capabilityForTool } from './presets/capabilities.js';
 import { resolveBaseTools } from './presets/presets.js';
-import { augmentSystemPrompt } from './prompt/capability-prompt.js';
+import { augmentSystemPrompt, SHELL_CWD_TRUTH } from './prompt/capability-prompt.js';
 import { sameWording } from './prompt/same-wording.js';
 import { connectRepairBridge, type LiveRepairDeps } from './repair/bridge.js';
 import { createToolCallFixer, withRepairAttempts } from './repair/fixer.js';
@@ -3381,7 +3381,7 @@ export function wireHarness(pi: ExtensionAPI, options: WireHarnessOptions = {}):
     return (
       `Working folder: ${root} — this is your current directory now. Relative paths ` +
       `resolve inside it (write \`notes.md\`, not \`${own}/notes.md\`), and that is where ` +
-      'files belong unless the user names somewhere else.'
+      `files belong unless the user names somewhere else. ${SHELL_CWD_TRUTH}`
     );
   }
 

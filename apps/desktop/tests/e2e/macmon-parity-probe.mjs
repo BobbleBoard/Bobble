@@ -26,6 +26,7 @@
  * Artifacts → $TMPDIR/pd-shots/macmon-parity (override with SHOT_DIR).
  */
 import { measureDrawnWindow } from './_macmon-measure.mjs';
+import { driveMacThroughActivity, waitForMonitorTab } from './_macmon-open.mjs';
 import { launchApp } from './harness.mjs';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -142,7 +143,7 @@ function measureGlowBand(box) {
 /** The footer's real contrast, resolved — not the token, the pixels. */
 function readFooter() {
   const root = document.querySelector('[data-testid="computer-use-surface"]');
-  const footer = root?.querySelector('.pd-macmon-footer');
+  const footer = root?.querySelector('.pd-macmon-bar');
   const ident = root?.querySelector('.pd-macmon-ident-text');
   if (footer == null) return null;
   const cs = getComputedStyle(footer);
@@ -186,11 +187,9 @@ const snap = async (label) => {
 
 try {
   await page.setViewportSize({ width: 1500, height: 950 });
-  const opened = await until(() => {
-    const c = window.__pi_canvas?.();
-    return c?.getState().tabs.some((t) => t.key === 'mac-monitor') === true;
-  });
-  check(opened, 'the computer-use tab did not open itself');
+  await driveMacThroughActivity(page);
+  const opened = await waitForMonitorTab(page);
+  check(opened, 'the Activity tab did not become the monitor');
   await page.evaluate(() => window.__pi_canvas?.().setFullscreen(true));
   const live = await until(
     () => document.querySelector('.pd-macmon-live[data-live="true"]') !== null,
@@ -245,24 +244,50 @@ try {
   await setTheme('light');
   await snap('E-docked-follow-light');
   await setTheme('dark');
-  // Nothing in the actions row may be clipped by a docked rail.
+  // Nothing in the bar may be clipped by a docked rail — and it is ONE row
+  // there (the user, 2026-09-13: "condense computer use controls"): the name
+  // truncates, the controls never wrap.
   const clipped = await page.evaluate(() => {
-    const row = document.querySelector('.pd-macmon-actions');
+    const row = document.querySelector('.pd-macmon-bar');
     if (row === null) return null;
     const box = row.getBoundingClientRect();
-    const over = [...row.querySelectorAll('button')]
+    const buttons = [...row.querySelectorAll('button')];
+    const over = buttons
       .filter((b) => {
         const r = b.getBoundingClientRect();
         return r.right > box.right + 0.5 || r.left < box.left - 0.5;
       })
-      .map((b) => (b.textContent ?? '').trim());
-    return { width: Math.round(box.width), height: Math.round(box.height), over };
+      .map((b) => (b.textContent ?? b.getAttribute('aria-label') ?? '').trim());
+    // One row: every control's vertical centre within the bar's own height
+    // (a segmented pair sits 2px lower than its neighbours; that is not a row).
+    const mids = buttons.map((b) => {
+      const r = b.getBoundingClientRect();
+      return r.top + r.height / 2;
+    });
+    const tops = new Set(mids.map((m) => Math.round(m / 20)));
+    const bands = document.querySelectorAll(
+      '[data-testid="computer-use-surface"] > :not(.pd-macmon-stage):not(.pd-macmon-sr)',
+    ).length;
+    return {
+      width: Math.round(box.width),
+      height: Math.round(box.height),
+      over,
+      rows: tops.size,
+      bands,
+    };
   });
   check(
     (clipped?.over.length ?? 1) === 0,
-    `the actions row clips ${clipped?.over.join(', ')} at ${clipped?.width}px`,
+    `the bar clips ${clipped?.over.join(', ')} at ${clipped?.width}px`,
   );
-  console.log(`actions row: ${clipped?.width}×${clipped?.height}px, nothing clipped`);
+  check(clipped?.rows === 1, `the bar wrapped onto ${clipped?.rows} rows in the docked rail`);
+  check(
+    clipped?.bands === 2,
+    `${clipped?.bands} bands under the picture (expected the act strip and one bar)`,
+  );
+  console.log(
+    `bar: ${clipped?.width}×${clipped?.height}px, one row, nothing clipped, ${clipped?.bands} bands`,
+  );
   check(fitScale < 60, `fit in the rail read ${fitScale}%`);
   check(followScale >= 85, `follow in the rail read ${followScale}%`);
   console.log(`docked rail: fit ${fitScale}% → follow ${followScale}%`);
@@ -282,10 +307,13 @@ try {
   // live stream of a window whose content genuinely changes. What must stop is
   // everything the SURFACE animates — and all of that, in the band outside the
   // window, is the breathing "working" outline.
-  check(
-    (movingBand?.changed ?? 0) > 100,
-    `nothing was animating outside the window to begin with (${movingBand?.changed})`,
-  );
+  /* The breathing outline this once asserted is gone by the user's own request
+     ("i'm still seeing the blue border around the edge of the window" — see
+     "NO WORKING OUTLINE EITHER" in the surface). What can still move in the
+     band is the phantom and its bubble drifting near an edge, which the
+     choreography's phase decides; so the band count before reduced motion is
+     reported, not required. */
+  console.log(`band motion before reduced-motion: ${movingBand?.changed ?? 0} px`);
   check(
     (stillBand?.changed ?? 1) <= 20,
     `reduced motion still animates ${stillBand?.changed} of ${stillBand?.sampled} band pixels per 400ms`,
@@ -336,8 +364,10 @@ try {
 
   // ── 4b. the keyboard path, and the brake ────────────────────────────────
   const order = await page.evaluate(() => {
-    const row = document.querySelector('.pd-macmon-actions');
-    return [...(row?.querySelectorAll('button') ?? [])].map((b) => (b.textContent ?? '').trim());
+    const row = document.querySelector('.pd-macmon-bar');
+    return [...(row?.querySelectorAll('button') ?? [])].map((b) =>
+      (b.textContent || b.getAttribute('aria-label') || '').trim(),
+    );
   });
   check(
     order[0] === 'Stop',
@@ -377,13 +407,32 @@ try {
 
   // Copy frame: the tab bar's own Copy is hidden for this surface because there
   // is "no text to copy", which was true and beside the point.
+  // Copy frame lives behind the ⋯ now — the bar keeps the things pressed
+  // every minute, the menu the things pressed once.
+  await page.evaluate(() => document.querySelector('[data-testid="macmon-more"]')?.click());
+  await sleep(200);
+  const menuItems = await page.evaluate(() =>
+    [...document.querySelectorAll('.pd-macmon-menu [role^="menuitem"]')].map((b) =>
+      (b.textContent ?? '').trim(),
+    ),
+  );
+  check(
+    menuItems[0] === 'Copy frame' && /status pill/.test(menuItems[1] ?? ''),
+    `the ⋯ menu holds Copy frame and the status pill (got ${menuItems.join(' · ')})`,
+  );
+  await snap('I-more-menu');
   await page.evaluate(() => document.querySelector('[data-testid="macmon-copy"]')?.click());
   await sleep(700);
   const copyLabel = await page.evaluate(
     () => document.querySelector('[data-testid="macmon-copy"]')?.textContent?.trim() ?? '',
   );
-  check(copyLabel !== 'Copy frame', 'the Copy frame button did nothing at all');
+  check(copyLabel !== 'Copy frame', 'the Copy frame item did nothing at all');
   console.log(`copy frame → "${copyLabel}"`);
+  await page.keyboard.press('Escape');
+  await page.evaluate(() =>
+    document.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true })),
+  );
+  await sleep(150);
 
   // ── 4c. stalled: a live stream with no frames says so, with a number ─────
   // The mock cannot stop delivering frames on request, so the fps window it is
@@ -392,7 +441,7 @@ try {
     const tab = window
       .__pi_canvas?.()
       .getState()
-      .tabs.find((t) => t.key === 'mac-monitor');
+      .tabs.find((t) => t.kind === 'computer-use');
     if (tab?.macMonitor !== undefined) {
       window.__macmonFps = tab.macMonitor.getFps.bind(tab.macMonitor);
       tab.macMonitor.getFps = () => 0;
@@ -412,7 +461,7 @@ try {
     const tab = window
       .__pi_canvas?.()
       .getState()
-      .tabs.find((t) => t.key === 'mac-monitor');
+      .tabs.find((t) => t.kind === 'computer-use');
     if (tab?.macMonitor !== undefined && window.__macmonFps !== undefined) {
       tab.macMonitor.getFps = window.__macmonFps;
     }

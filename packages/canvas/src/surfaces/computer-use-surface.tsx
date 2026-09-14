@@ -22,7 +22,9 @@
  * visible. Nothing queues: a frame that arrives while an older one is still
  * being drawn replaces it.
  */
+import { IconMore } from '@pi-desktop/ui';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useOutsideClose } from '../tabs/use-outside-close.ts';
 import {
   idleCursorDrift,
   type MonitorSource,
@@ -506,6 +508,10 @@ export function ComputerUseSurface({ feed, className }: ComputerUseSurfaceProps)
   /** The one sentence assistive tech is told, one per act. */
   const [announced, setAnnounced] = useState('');
   const [copied, setCopied] = useState<'ok' | 'fail' | null>(null);
+  /** The ⋯ menu at the end of the bar (Copy frame, the status pill). */
+  const [moreOpen, setMoreOpen] = useState(false);
+  const moreRef = useRef<HTMLDivElement | null>(null);
+  useOutsideClose(moreRef, moreOpen, () => setMoreOpen(false));
   const [reduced, setReduced] = useState(false);
   const paletteRef = useRef<Palette>(FALLBACK_PALETTE);
   const backdropRef = useRef<BackdropCache>({
@@ -898,13 +904,23 @@ export function ComputerUseSurface({ feed, className }: ComputerUseSurfaceProps)
       }
     }
     const mode: 'fit' | 'follow' = viewMode === 'auto' ? autoMode.current : viewMode;
+    /*
+     * A PRESSED "Follow" MEANS ZOOM IN. followWindow keeps the whole window
+     * whenever fitting is still legible — right for the automatic placement,
+     * which only zooms when the window is comically small — but a person who
+     * pressed the button whose tooltip says "zoom in and follow" and saw the
+     * picture not move was pressing a button that did nothing (MEASURED: a
+     * 900×620 window in a 412px rail fits at 46%, so Follow drew the fit).
+     * Chosen by hand, the crop is life-size around the action.
+     */
+    const followScale = viewMode === 'follow' ? 1 : FOLLOW_MIN_SCALE;
     let drawn = fitted;
     if (mode === 'follow') {
       // Pan on the cursor's own easing curve, and only when the point of
       // interest has left the middle of the frame — a camera that chases every
       // 3px of cursor drift is unwatchable.
       const cam = camera.current;
-      const probe = followWindow(rect, viewport, cam?.to ?? focusPoint, FOLLOW_MIN_SCALE, pad);
+      const probe = followWindow(rect, viewport, cam?.to ?? focusPoint, followScale, pad);
       const seen = visibleRegion(rect, viewport, probe);
       const deadX = seen.w * 0.23;
       const deadY = seen.h * 0.23;
@@ -929,7 +945,7 @@ export function ComputerUseSurface({ feed, className }: ComputerUseSurfaceProps)
         x: c.from.x + (c.to.x - c.from.x) * p,
         y: c.from.y + (c.to.y - c.from.y) * p,
       };
-      drawn = followWindow(rect, viewport, at, FOLLOW_MIN_SCALE, pad);
+      drawn = followWindow(rect, viewport, at, followScale, pad);
       if (p < 1) dirty.current = true;
     } else {
       camera.current = null;
@@ -1331,8 +1347,21 @@ export function ComputerUseSurface({ feed, className }: ComputerUseSurfaceProps)
         />
       )}
 
+      {/*
+       * ONE BAR UNDER THE PICTURE — the user (2026-09-13): "critique and improve /
+       * condense computer use controls in the canvas". There were three bands
+       * (an actions row that wrapped onto two lines in a docked rail, then a
+       * footer) carrying seven controls of three different weights. Now one
+       * row, in reading order of what a person reaches for: the brake and the
+       * hand-back on the left (Stop · Pause · Take over), the window's own
+       * name in the middle (it truncates, the buttons never do), and the state
+       * of the picture on the right — Live and how much smaller than life it
+       * is, the Fit / Follow pair, and a ⋯ for the two things nobody presses
+       * twice a minute (Copy frame, the status pill). The docked rail is ~440px
+       * and this row never wraps there.
+       */}
       {!session.active && session.appName === '' ? null : (
-        <div className="pd-macmon-actions">
+        <div className="pd-macmon-bar" data-testid="macmon-bar">
           {caps.stop === true ? (
             <button
               type="button"
@@ -1350,6 +1379,7 @@ export function ComputerUseSurface({ feed, className }: ComputerUseSurfaceProps)
               className="pd-macmon-btn"
               onClick={onPause}
               data-testid="macmon-pause"
+              title="Pause — Bobble waits until you say"
             >
               Pause
             </button>
@@ -1365,17 +1395,35 @@ export function ComputerUseSurface({ feed, className }: ComputerUseSurfaceProps)
               Take over
             </button>
           ) : null}
-          <button
-            type="button"
-            className="pd-macmon-btn"
-            onClick={onCopy}
-            data-testid="macmon-copy"
-            title="Copy this frame as a picture"
+          {session.appName === '' ? (
+            <span className="pd-macmon-spacer" />
+          ) : (
+            <span className="pd-macmon-ident">
+              {ident.edited ? (
+                <span className="pd-macmon-edited" title="Unsaved changes" aria-hidden="true" />
+              ) : null}
+              <span className="pd-macmon-ident-text" title={ident.text}>
+                {ident.text}
+              </span>
+            </span>
+          )}
+          <span
+            className="pd-macmon-live"
+            data-live={live && !stalled ? 'true' : 'false'}
+            data-stalled={stalled ? 'true' : 'false'}
+            title={
+              scaleLabel === '' ? undefined : `The picture is shown at ${scaleLabel} of life size`
+            }
           >
-            {copied === 'ok' ? 'Copied' : copied === 'fail' ? "Couldn't copy" : 'Copy frame'}
-          </button>
-          <span className="pd-macmon-spacer" />
-          <div className="pd-macmon-seg">
+            <span className="pd-macmon-dot" aria-hidden="true" />
+            {stalled
+              ? `Stalled · ${chrome.stalledFor}s`
+              : live
+                ? 'Live'
+                : streamWord(session.stream)}
+            {scaleLabel === '' ? null : <span className="pd-macmon-scale">{scaleLabel}</span>}
+          </span>
+          <div className="pd-macmon-seg" title="Fit the window in the tab, or follow the action">
             <button
               type="button"
               className="pd-macmon-seg-btn"
@@ -1399,63 +1447,50 @@ export function ComputerUseSurface({ feed, className }: ComputerUseSurfaceProps)
               Follow
             </button>
           </div>
-          {pillShown === undefined ? null : (
+          <div className="pd-macmon-more" ref={moreRef}>
             <button
               type="button"
-              className="pd-macmon-btn"
-              data-on={pillShown ? 'true' : 'false'}
-              aria-pressed={pillShown}
-              onClick={() => feed?.setStatusPillShown?.(!pillShown)}
-              data-testid="macmon-pill-toggle"
-              title={
-                pillShown
-                  ? 'Hide the status pill on screen (the cursor keeps moving)'
-                  : 'Show the status pill on screen'
-              }
+              className="pd-macmon-btn pd-macmon-btn--icon"
+              aria-label="More"
+              aria-haspopup="menu"
+              aria-expanded={moreOpen}
+              onClick={() => setMoreOpen((open) => !open)}
+              data-testid="macmon-more"
+              title="Copy frame, status pill"
             >
-              {pillShown ? 'Hide pill' : 'Show pill'}
+              <IconMore size={14} />
             </button>
-          )}
-        </div>
-      )}
-
-      {/* Two groups and a rule. Identity on the left, connection on the right,
-          and nothing that is neither. */}
-      {!session.active && session.appName === '' ? null : (
-        <div className="pd-macmon-footer">
-          {session.appName === '' ? null : (
-            <span className="pd-macmon-ident">
-              {ident.edited ? (
-                <span className="pd-macmon-edited" title="Unsaved changes" aria-hidden="true" />
-              ) : null}
-              <span className="pd-macmon-ident-text" title={ident.text}>
-                {ident.text}
-              </span>
-            </span>
-          )}
-          <span className="pd-macmon-spacer" />
-          {session.appName === '' ? null : (
-            <>
-              {scaleLabel === '' ? null : (
-                <span className="pd-macmon-scale" title="The picture is scaled to fit this tab">
-                  {scaleLabel}
-                </span>
-              )}
-              <span className="pd-macmon-rule" aria-hidden="true" />
-            </>
-          )}
-          <span
-            className="pd-macmon-live"
-            data-live={live && !stalled ? 'true' : 'false'}
-            data-stalled={stalled ? 'true' : 'false'}
-          >
-            <span className="pd-macmon-dot" aria-hidden="true" />
-            {stalled
-              ? `Stalled · ${chrome.stalledFor}s`
-              : live
-                ? 'Live'
-                : streamWord(session.stream)}
-          </span>
+            {moreOpen ? (
+              <div className="pd-menu pd-macmon-menu" role="menu">
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="pd-menu-item"
+                  onClick={() => {
+                    onCopy();
+                  }}
+                  data-testid="macmon-copy"
+                >
+                  {copied === 'ok' ? 'Copied' : copied === 'fail' ? "Couldn't copy" : 'Copy frame'}
+                </button>
+                {pillShown === undefined ? null : (
+                  <button
+                    type="button"
+                    role="menuitemcheckbox"
+                    aria-checked={pillShown}
+                    className="pd-menu-item"
+                    onClick={() => {
+                      feed?.setStatusPillShown?.(!pillShown);
+                      setMoreOpen(false);
+                    }}
+                    data-testid="macmon-pill-toggle"
+                  >
+                    {pillShown ? 'Hide the status pill' : 'Show the status pill'}
+                  </button>
+                )}
+              </div>
+            ) : null}
+          </div>
         </div>
       )}
 

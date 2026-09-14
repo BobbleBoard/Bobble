@@ -138,7 +138,7 @@ ${CAPABILITY_REACH_SCHEMAS}
 
 Choosing where to act — native app vs browser:
 - To OPEN something for the user — an app, a document, a place on a map, a note, a setting — that is the NATIVE macOS app. "Open my mail", "open maps to …", "open notes" mean the Mac app, not a web page.
-- Anything that is genuinely a web task goes in the built-in browser, not in one of the user's own browsers.
+- Anything that is genuinely a web task goes in the built-in browser (the browser tools; the user watches it in the Activity tab), not in one of the user's own browsers. The user's OWN Chrome (the chrome tools) and computer use on a browser window are for when they NAME it — "in Chrome", "in my browser", "the tab I have open" — never just because the task is on the web.
 
 Rules:
 - You CAN reach the user's calendar, mail, messages, contacts, reminders, files, and the web through your tools. Never claim you "cannot access" or "don't have the capability" for anything above — if unsure, call \`capability\` first, then act.
@@ -306,6 +306,19 @@ const SCHEMA_ONLY_LINES: readonly RegExp[] = [
  * Longest name first: `update_plan` must not be rewritten by a `plan` entry.
  */
 /**
+ * WHERE A SHELL COMMAND STARTS. the user (2026-09-13): "make it very clear to the
+ * model if their terminal is in their working directory always or they have
+ * to type cd <working> && <command> on every command — it seems they sometimes
+ * do that a lot." The fact (index.ts, the bash spawnHook): every command runs
+ * in a FRESH shell whose cwd is the working folder. So `cd <folder> &&` is
+ * never needed to get there, and a `cd` never carries to the next command.
+ */
+export const SHELL_CWD_TRUTH =
+  'Every shell command already starts in that folder, in a fresh shell: run `<command>` ' +
+  'as it is, never `cd <that folder> && <command>`. A `cd` lasts only for the one command ' +
+  'it is in.';
+
+/**
  * The same capability section, told in commands.
  *
  * The section's value is the mapping from what the user asks to what this app
@@ -410,7 +423,7 @@ export function augmentSystemPrompt(
   if (opts.workingDirectory !== undefined && opts.workingDirectory.length > 0) {
     trimmed = trimmed.replace(
       /^Current working directory: .*$/m,
-      `Current working directory: ${opts.workingDirectory}`,
+      `Current working directory: ${opts.workingDirectory}\n${SHELL_CWD_TRUTH}`,
     );
   }
   if (opts.guidelines !== undefined) {

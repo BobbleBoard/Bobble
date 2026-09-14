@@ -1,17 +1,21 @@
 /**
- * THE COMPUTER-USE TAB STAYS IN THE CHAT THAT IS DRIVING.
+ * THE COMPUTER-USE VIEW STAYS IN THE CHAT THAT IS DRIVING.
  *
  * the user (2026-09-12): "going to other chats, even when computer use is not
  * active in them after it previously has been in the current chat is pinning
  * a computer use tab in the canvas that reopens when closed, but when closing
  * the canvas entirely it does not reopen."
  *
- * Real app, real pi (chat A needs a real session file), the real helper's
- * monitor session on Notes (opened in the background, never activated — no
- * model drives it, `mac:debug monitor-session` starts the session directly).
- * Then: new chat → no tab there, and none after the monitor's next state
- * push; back to A → the tab is there; close it in A → it stays closed for the
- * rest of that session; a NEW session opens it again.
+ * Since 2026-09-13 the monitor is the ACTIVITY tab, and it opens on the chat's
+ * own `mac …` call (activity-routing), never on the app-wide session by
+ * itself — so the guarantee is structural: a chat whose thread never drove
+ * the Mac can never show the monitor. This probe holds that line against the
+ * real app, real pi (chat A needs a real session file) and the real helper's
+ * monitor session on Notes (opened in the background, never activated; the
+ * `mac:debug monitor-session` seam starts the session, a seeded `mac snapshot`
+ * turn in A stands for the model's call). Then: new chat → no monitor there,
+ * and none after the monitor's next state push; back to A → the Activity tab
+ * is the monitor again; close it in A → it stays closed for that turn.
  *
  *   node apps/desktop/tests/e2e/mac-monitor-chat-scope-probe.mjs
  */
@@ -110,6 +114,47 @@ try {
   check(typeof pid === 'number', `Notes has a pid (${JSON.stringify(b).slice(0, 120)})`);
   const sess = await dbg('monitor-session', { pid, app: 'Notes' });
   check(sess.ok === true, `monitor-session started (${sess.error ?? ''})`);
+  // A session with no call in the thread opens nothing — the tab is the
+  // model's, not the session's.
+  await win.waitForTimeout(1500);
+  const tA0 = await tabs();
+  check(
+    !tA0.some((t) => t.kind === 'computer-use'),
+    `a session alone opens no monitor tab (${JSON.stringify(tA0)})`,
+  );
+  // The model's own call, as the store records it.
+  await win.evaluate(() => {
+    const store = window.__pi_store();
+    const now = Date.now();
+    store.setState((s) => ({
+      messages: [
+        ...s.messages,
+        {
+          kind: 'assistant',
+          id: 'a-mac-scope',
+          blocks: [
+            {
+              type: 'toolCall',
+              id: 'c-mac-scope',
+              name: 'bash',
+              arguments: { command: 'mac snapshot' },
+            },
+          ],
+          timestamp: now,
+          isStreaming: false,
+        },
+        {
+          kind: 'toolResult',
+          id: 'tr-mac-scope',
+          toolCallId: 'c-mac-scope',
+          toolName: 'bash',
+          text: 'You are controlling Notes',
+          isError: false,
+          timestamp: now,
+        },
+      ],
+    }));
+  });
   await win.waitForFunction(
     () =>
       window
@@ -169,17 +214,6 @@ try {
   );
   writeFileSync(path.join(SHOT_DIR, '03-chat-a-closed-stays-closed.png'), await win.screenshot());
 
-  // A NEW session (end + start) opens it again.
-  await dbg('setDriving', { driving: false });
-  await win.waitForTimeout(600);
-  const sess2 = await dbg('monitor-session', { pid, app: 'Notes' });
-  check(sess2.ok === true, 'second monitor-session started');
-  await win.waitForTimeout(1200);
-  const tA4 = await tabs();
-  check(
-    tA4.some((t) => t.kind === 'computer-use'),
-    `a new session opens the tab again (${JSON.stringify(tA4)})`,
-  );
   await dbg('setDriving', { driving: false });
 } finally {
   await app.close().catch(() => {});

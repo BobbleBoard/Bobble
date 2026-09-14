@@ -214,6 +214,65 @@ describe('detectActivity — newest wins, across kinds', () => {
   it('has no focus at all before anything happened', () => {
     expect(detectActivity([user('u1')], {}, CWD).focus).toBeUndefined();
   });
+
+  /*
+   * the user (2026-09-13): "activity tab should be computer use page if the latest
+   * command is something like 'mac snapshot'". Both spellings of the call, and
+   * the manual is not driving.
+   */
+  it('is computer use when the model drives an app — `mac …` through bash, or a mac_ tool', () => {
+    const cli = detectActivity(
+      [...messages, assistant('a4', [call('c4', 'bash', { command: 'mac snapshot' })])],
+      {},
+      CWD,
+    );
+    expect(cli.focus?.kind).toBe('computer-use');
+    expect(cli.focus?.kind === 'computer-use' && cli.focus.label).toBe('mac snapshot');
+    // Not a shell line: the terminal's scrollback does not grow.
+    expect(cli.commands.map((c) => c.command)).toEqual(['ls -la', 'git status']);
+
+    const chrome = detectActivity(
+      [...messages, assistant('a4', [call('c4', 'bash', { command: 'chrome tabs' })])],
+      {},
+      CWD,
+    );
+    expect(chrome.focus?.kind).toBe('computer-use');
+
+    const tool = detectActivity(
+      [...messages, assistant('a4', [call('c4', 'mac_click', { ref: 'e12' })])],
+      {},
+      CWD,
+    );
+    expect(tool.focus?.kind).toBe('computer-use');
+    expect(tool.focus?.kind === 'computer-use' && tool.focus.label).toBe('mac click');
+  });
+
+  it('reading the manual (`mac --help`, bare `mac`) is not driving anything', () => {
+    for (const command of ['mac --help', 'mac', 'mac -h']) {
+      const stream = detectActivity(
+        [...messages, assistant('a4', [call('c4', 'bash', { command })])],
+        {},
+        CWD,
+      );
+      expect(stream.focus?.kind, command).toBe('terminal');
+    }
+  });
+
+  it('goes back to the terminal when a shell command comes after the mac call, and returns for the next one', () => {
+    const drove = assistant('a4', [call('c4', 'bash', { command: 'mac click e12' })]);
+    const then = [
+      ...messages,
+      drove,
+      result('c4', 'clicked'),
+      assistant('a5', [call('c5', 'bash', { command: 'ls' })]),
+      result('c5', 'a.ts'),
+    ];
+    expect(detectActivity(then, {}, CWD).focus?.kind).toBe('terminal');
+    // Settled, the trailing `ls` is a look: the monitor is what was being done.
+    expect(detectActivity(then, {}, CWD, { settled: true }).focus?.kind).toBe('computer-use');
+    const again = [...then, assistant('a6', [call('c6', 'bash', { command: 'mac type "hi"' })])];
+    expect(detectActivity(again, {}, CWD).focus?.kind).toBe('computer-use');
+  });
 });
 
 describe('detectActivity — a refused write is not a file', () => {
@@ -375,6 +434,32 @@ describe('morphActivityTab — one tab, morphing in place', () => {
     expect(c.getState().tabs).toHaveLength(1);
     expect(c.getState().tabs[0]?.kind).toBe('file');
     expect(c.getState().tabs[0]?.title).toBe(ACTIVITY_TITLE);
+  });
+
+  it('a computer-use tab is the Activity tab, and leaving it drops the feed', () => {
+    const c = new CanvasController();
+    const feed = { marker: 'feed' } as unknown as NonNullable<
+      ReturnType<typeof specFor>['macMonitor']
+    >;
+    const drove = specFor([assistant('a1', [call('c1', 'bash', { command: 'mac snapshot' })])]);
+    expect(drove.kind).toBe('computer-use');
+    expect(drove.title).toBe(ACTIVITY_TITLE);
+    const made = morphActivityTab(c, { ...drove, macMonitor: feed });
+    expect(made.created).toBe(true);
+    expect(c.getState().tabs[0]?.macMonitor).toBe(feed);
+
+    morphActivityTab(
+      c,
+      specFor([
+        assistant('a1', [call('c1', 'bash', { command: 'mac snapshot' })]),
+        result('c1', 'ok'),
+        assistant('a2', [call('c2', 'bash', { command: 'ls -la' })]),
+      ]),
+    );
+    const tab = c.getState().tabs[0];
+    expect(tab?.kind).toBe('terminal');
+    expect(tab?.macMonitor).toBeUndefined();
+    expect(c.getState().tabs).toHaveLength(1);
   });
 
   it('drops what the previous surface left behind when the kind changes', () => {

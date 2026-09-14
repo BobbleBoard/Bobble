@@ -253,12 +253,35 @@ try {
   await page.waitForTimeout(600);
   const afterCli = await tabs();
   check(afterCli.length === 1, `a CLI-tool invocation opened no tab (got ${afterCli.length})`);
+  // the user (2026-09-13): a `mac …` call turns the one tab INTO the computer-use
+  // page — the model is driving an app, and that is what there is to watch.
   check(
-    (afterCli[0]?.mirror ?? '').includes('mac snapshot') === false,
+    afterCli[0]?.kind === 'computer-use',
+    `a \`mac …\` line makes the Activity tab the computer-use page (got ${afterCli[0]?.kind})`,
+  );
+  // The next shell command brings the terminal back with NOTHING lost: the
+  // scrollback is derived from the thread, and the mac line was never in it.
+  await setMessages([
+    ...step4,
+    // Not a look (`pwd`, `cat`): settled, a trailing look-only command yields
+    // to the thing that was being done — the monitor. A command that DOES
+    // something is the newest thing, and the terminal is back.
+    assistant('a4t', [call('c4t', 'bash', { command: 'mkdir -p out' })]),
+    result('c4t', ''),
+  ]);
+  await page.waitForTimeout(600);
+  const backToShell = await tabs();
+  check(
+    backToShell.length === 1 && backToShell[0]?.kind === 'terminal',
+    'a shell command after it is the terminal again',
+  );
+  check(
+    (backToShell[0]?.mirror ?? '').includes('mac snapshot') === false,
     'a `mac …` line is the mac tool, not a shell command — it stays out of the terminal',
   );
   check(
-    (afterCli[0]?.mirror ?? '').includes('git status'),
+    (backToShell[0]?.mirror ?? '').includes('git status') &&
+      (backToShell[0]?.mirror ?? '').includes('mkdir -p out'),
     'the real commands are all still in the mirror',
   );
 

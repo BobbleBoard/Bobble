@@ -804,7 +804,18 @@ final class OverlayController: NSObject {
     win.isOpaque = false
     win.backgroundColor = .clear
     win.hasShadow = false
-    win.level = .floating
+    /* THE SAME LEVEL AS THE PHANTOM, or the buttons are never seen.
+       `order(.above, relativeTo:)` only orders within a level band: a window at
+       `.floating` (3) cannot be put above the phantom at popUpMenu + 1 (102),
+       so the controls panel sat BEHIND the phantom's pill — its tracking area
+       still took the hover, the pill hid its words and showed its solid body,
+       and the ✕ / pause / Hide drawn underneath never reached the screen.
+       the user (2026-09-13): "the pill when hovered should show hide/pause/stop
+       buttons however currently it just makes it solid blue". The probe's
+       render never caught it because it composites the controls view into the
+       image itself. Mirrored again in syncControls, since the phantom's level
+       changes in the ordering experiments. */
+    win.level = panel.level
     win.collectionBehavior = [.canJoinAllSpaces, .transient, .ignoresCycle, .fullScreenAuxiliary]
     win.hidesOnDeactivate = false
     win.ignoresMouseEvents = false
@@ -847,6 +858,8 @@ final class OverlayController: NSObject {
       view.frame = CGRect(origin: .zero, size: f.size)
       view.needsDisplay = true
     }
+    // Level first, then order: relative ordering is meaningless across bands.
+    if win.level != panel.level { win.level = panel.level }
     if !win.isVisible {
       win.order(.above, relativeTo: panel.windowNumber)
     }
@@ -2405,6 +2418,11 @@ final class OverlayController: NSObject {
         "clickThrough": win.ignoresMouseEvents,
         "hovered": controlsView?.isHovered ?? false,
         "frame": axRect(win.frame, flipBase: flipBase),
+        // The two levels, so a probe can assert the buttons are not behind
+        // the pill they belong to (see buildControls).
+        "level": win.level.rawValue,
+        "phantomLevel": panel.level.rawValue,
+        "number": win.windowNumber,
       ]
     }
     if let c = cursorAX { d["cursor"] = ["x": Double(c.x), "y": Double(c.y)] }

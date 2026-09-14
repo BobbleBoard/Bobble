@@ -58,6 +58,7 @@ import { toolStepKind } from '../activity-mapping';
 import { useHarnessStatus } from '../harness-status';
 import { COMMAND_KEYS, partialJsonString } from '../partial-json';
 import { firstCommandWord, isTerminalCommand } from './activity-cli';
+import { computerUseLabel, isComputerUseCall } from './activity-computer-use';
 // The tab's identity lives in a leaf module so the browser bridge can ask which
 // tab to drive without importing this one (and dragging the file surface with
 // it). Re-exported below: this module is where it is used.
@@ -72,6 +73,7 @@ import {
   unreadableFileArtifact,
 } from './file-tabs';
 import { basename, detectFileWrites, dirname, type FileWriteEvent } from './file-writes';
+import { macMonitorFeed } from './mac-monitor';
 
 export { ACTIVITY_TAB_KEY, ACTIVITY_TITLE };
 
@@ -95,7 +97,16 @@ export interface ActivityCommand {
 export type ActivityFocus =
   | { kind: 'terminal'; at: number; command: ActivityCommand }
   | { kind: 'file'; at: number; write: FileWriteEvent }
-  | { kind: 'browser'; at: number; label: string };
+  | { kind: 'browser'; at: number; label: string }
+  /**
+   * The model is driving an app on the Mac (`mac …` / `chrome …`, or the
+   * mac_* tools). the user: "activity tab should be computer use page if the
+   * latest command is something like 'mac snapshot'". The tab becomes the
+   * live monitor of the controlled app — the same surface the phantom cursor
+   * is painted on — and, newest wins, goes back to the terminal or a file when
+   * the model does.
+   */
+  | { kind: 'computer-use'; at: number; label: string };
 
 /** Everything the Activity tab renders from: the whole terminal history, plus
  * whichever surface the newest call points at. */
@@ -228,6 +239,7 @@ export function detectActivity(
   let at = 0;
   let terminalFocus: ActivityFocus | undefined;
   let browserFocus: ActivityFocus | undefined;
+  let computerUseFocus: ActivityFocus | undefined;
 
   for (const m of messages) {
     if (m.kind !== 'assistant') continue;
@@ -240,8 +252,17 @@ export function detectActivity(
         browserFocus = { kind: 'browser', at, label: browserLabel(block) };
         continue;
       }
+      const rawCommand = block.name === 'bash' ? commandOf(block) : undefined;
+      if (isComputerUseCall(block.name, rawCommand)) {
+        computerUseFocus = {
+          kind: 'computer-use',
+          at,
+          label: computerUseLabel(block.name, rawCommand),
+        };
+        continue;
+      }
 
-      const command = commandOf(block);
+      const command = rawCommand ?? commandOf(block);
       if (command === undefined || !isTerminalCommand(command)) continue;
       const output = resultByCall.get(block.id);
       const entry: ActivityCommand = {
@@ -267,7 +288,7 @@ export function detectActivity(
   // Newest wins; a tie between a file and the command that wrote it goes to the
   // file (`>=` for the file, `>` for the rest).
   let focus: ActivityFocus | undefined;
-  for (const candidate of [terminalFocus, browserFocus]) {
+  for (const candidate of [terminalFocus, browserFocus, computerUseFocus]) {
     if (candidate !== undefined && (focus === undefined || candidate.at > focus.at)) {
       focus = candidate;
     }
@@ -281,7 +302,7 @@ export function detectActivity(
     !focus.command.running &&
     isReadOnlyCommand(focus.command.command)
   ) {
-    const made = [fileFocus, browserFocus]
+    const made = [fileFocus, browserFocus, computerUseFocus]
       .filter((c): c is ActivityFocus => c !== undefined)
       .sort((a, b) => b.at - a.at)[0];
     if (made !== undefined) focus = made;
@@ -349,6 +370,11 @@ export function activitySpec(stream: ActivityStream, cwd?: string): CanvasTabSpe
   }
   if (focus.kind === 'browser') {
     return { ...base, kind: 'browser', subtitle: focus.label };
+  }
+  if (focus.kind === 'computer-use') {
+    // The feed (the live frames) is attached by the hook: it is app state,
+    // and this stays a pure function of the thread.
+    return { ...base, kind: 'computer-use', subtitle: focus.label };
   }
 
   const path = focus.write.path;
@@ -482,6 +508,7 @@ export function morphActivityTab(
       filePath: undefined,
       breadcrumb: undefined,
       data: undefined,
+      macMonitor: undefined,
       ...spec,
       title: ACTIVITY_TITLE,
     });
@@ -497,6 +524,9 @@ export function morphActivityTab(
   }
   if (spec.data !== undefined && existing.data?.mirrorText !== spec.data.mirrorText) {
     patch.data = spec.data;
+  }
+  if (spec.macMonitor !== undefined && existing.macMonitor !== spec.macMonitor) {
+    patch.macMonitor = spec.macMonitor;
   }
   if (Object.keys(patch).length > 0) controller.updateTab(existing.id, patch);
   return { created: false, id: existing.id };
@@ -560,6 +590,10 @@ export function useActivityCanvasRouting(controller: CanvasController): void {
    * it never runs again, so the tab sits empty until the next stream tick. */
   const [baseTick, rerun] = useReducer((n: number) => n + 1, 0);
 
+  // The monitor's session (which app, whether it is live) settles after the
+  // call that started it; the pass that names the tab after it has to run again.
+  useEffect(() => macMonitorFeed.subscribe(rerun), []);
+
   // A session boundary wipes the slate: the latch, and every id-keyed set, which
   // referred to a thread that is no longer the one on screen.
   // biome-ignore lint/correctness/useExhaustiveDependencies: reset on session change
@@ -588,7 +622,21 @@ export function useActivityCanvasRouting(controller: CanvasController): void {
     }
 
     const stream = detectActivity(messages, partials, cwd, { settled: !streaming });
-    const spec = activitySpec(stream, cwd);
+    const pure = activitySpec(stream, cwd);
+    /*
+     * THE MONITOR RIDES THE ACTIVITY TAB. The frames come from the app-wide
+     * feed, and the subtitle is the app being driven once the session says
+     * which — "TextEdit" reads better under "Activity" than "snapshot" does.
+     */
+    const session = macMonitorFeed.getSession();
+    const spec =
+      pure?.kind === 'computer-use'
+        ? {
+            ...pure,
+            macMonitor: macMonitorFeed,
+            ...(session.active && session.appName !== '' ? { subtitle: session.appName } : {}),
+          }
+        : pure;
     if (spec === undefined) {
       /*
        * NOTHING TO SHOW — and if the tab is still up, it is showing something
@@ -606,6 +654,15 @@ export function useActivityCanvasRouting(controller: CanvasController): void {
     }
 
     const present = controller.getState().tabs.some((t) => t.key === ACTIVITY_TAB_KEY);
+    /*
+     * A tab that is THERE counts as opened this turn, whoever put it there —
+     * the per-chat canvas snapshot restores it on a chat switch without this
+     * pass creating it. MEASURED (mac-monitor-chat-scope-probe, real app):
+     * back in the driving chat the restored monitor was closed by the user and
+     * the next feed tick re-created it, because the latch still read "never
+     * opened".
+     */
+    if (present) opened.current = true;
     if (!present && opened.current) return; // dismissed this turn — respect it.
 
     const { created, id } = morphActivityTab(controller, spec);

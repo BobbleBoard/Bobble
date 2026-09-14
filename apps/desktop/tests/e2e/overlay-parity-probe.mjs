@@ -120,11 +120,37 @@ try {
     c2.controls?.visible === false,
     `…and the controls window is ordered out (${JSON.stringify(c2.controls)})`,
   );
-  const c3 = await at([], { x: 700, y: 500 });
+  await at([], { x: 700, y: 500 });
   await sleep(100);
   const c3b = (await overlay.req('info')).result;
   check(c3b.controls?.visible === true, 'the controls come back once the pill is clear');
   void shown;
+
+  // 2b. The buttons are IN FRONT of the pill they belong to. the user (2026-09-13):
+  //     hovering the pill "just makes it solid blue" — the controls window sat
+  //     at .floating, under the phantom at popUpMenu+1, and relative ordering
+  //     cannot cross a level band. Two proofs: the levels the panel reports,
+  //     and the window server's own front-to-back list while hovered.
+  await overlay.req('controls-hover', { on: true, hot: 0 });
+  await sleep(150);
+  const hov = (await overlay.req('info')).result;
+  console.log(
+    `controls: level=${hov.controls?.level} phantom=${hov.controls?.phantomLevel} hovered=${hov.controls?.hovered} visible=${hov.controls?.visible}`,
+  );
+  check(hov.controls?.hovered === true, 'the controls report the hover');
+  check(
+    typeof hov.controls?.level === 'number' && hov.controls.level === hov.controls.phantomLevel,
+    `the controls window is on the phantom's level (${hov.controls?.level} vs ${hov.controls?.phantomLevel})`,
+  );
+  const order = (await overlay.req('zorder')).result?.windows ?? [];
+  const buttonsAt = order.findIndex((w) => w.number === hov.controls?.number);
+  const pillAt = order.findIndex((w) => w.number === hov.windowNumber);
+  console.log(`window server: controls at ${buttonsAt}, phantom at ${pillAt} (front-to-back)`);
+  check(
+    buttonsAt !== -1 && pillAt !== -1 && buttonsAt < pillAt,
+    `the window server lists the buttons in front of the pill (controls #${hov.controls?.number} at ${buttonsAt}, phantom #${hov.windowNumber} at ${pillAt})`,
+  );
+  await overlay.req('controls-hover', { on: false });
 
   // 3. The real window list, when Notes is up: the Dock's screen-sized window
   //    contributes only its strip, and a tip under other apps is masked.

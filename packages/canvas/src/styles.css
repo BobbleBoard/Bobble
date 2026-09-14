@@ -4914,21 +4914,25 @@
   background: rgb(255 255 255 / 20%);
 }
 
-/* ── band 2: the actions ─────────────────────────────────────────────────
+/* ── the bar ─────────────────────────────────────────────────────────────
  *
- * The surface had `focusableCount: 0` — no stop, no take-over, not one
- * clickable thing anywhere. Text-labelled controls, always present, never
- * appearing on hover, and never over the picture. */
-.pd-macmon-actions {
+ * ONE ROW under the picture (the user, 2026-09-13: "condense computer use
+ * controls"). It replaced an actions band — seven controls that wrapped onto
+ * two lines in a docked rail — and a footer under that. Reading order is
+ * reaching order: the brake and the hand-back on the left, the window's own
+ * name in the middle, the state of the picture and the view on the right.
+ * `flex-wrap: nowrap`: the name truncates, the controls never wrap. */
+.pd-macmon-bar {
   position: relative;
   z-index: 1;
   flex: 0 0 auto;
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 6px;
-  min-height: 40px;
-  padding: 7px var(--pd-space-md);
+  min-height: 36px;
+  padding: 5px var(--pd-space-md);
+  border-top: 1px solid var(--pd-border-subtle);
 }
 
 .pd-macmon-btn {
@@ -4959,6 +4963,15 @@
   outline-offset: 2px;
 }
 
+/* The ⋯: a square, so the glyph is centred. */
+.pd-macmon-btn--icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  padding: 0;
+}
+
 /* The brake. Ghost rather than a filled red button: it is present at all times,
    and a permanently-red bar reads as an alarm rather than as a promise. */
 .pd-macmon-btn--danger {
@@ -4987,14 +5000,14 @@
 }
 
 .pd-macmon-seg-btn {
-  padding: 0 9px;
+  padding: 0 8px;
   border: 0;
   border-radius: 4px;
   background: none;
   color: var(--pd-text-muted);
   font-size: var(--pd-font-size-caption);
   font-weight: 500;
-  line-height: 20px;
+  line-height: 18px;
   white-space: nowrap;
   cursor: pointer;
 }
@@ -5010,37 +5023,34 @@
   outline-offset: 1px;
 }
 
-/* ── band 3: the footer ──────────────────────────────────────────────────
- *
- * TWO GROUPS AND A RULE, and that is enough for one line of chrome under a
- * picture. It used to be six runs in four type treatments and three colours —
- * app name, dot, window title, a bordered pill that looked like a button, a
- * gap, a green dot, a live word, an fps number — with nothing saying which
- * belonged with which.
- *
- * Left: the IDENTITY of what is being watched, one voice, one size.
- * Right: the STATE of the connection. Nothing else lives here — the dialog
- * became a caption under the dialog, and the fps number died. */
-.pd-macmon-footer {
+/* The ⋯ menu, anchored above the button so it never leaves the rail. */
+.pd-macmon-more {
   position: relative;
-  z-index: 1;
   flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  gap: var(--pd-space-xs);
-  height: 30px;
-  padding: 0 var(--pd-space-md);
-  border-top: 1px solid var(--pd-border-subtle);
-  font-size: var(--pd-font-size-caption);
-  line-height: var(--pd-leading-caption);
-  color: var(--pd-text-muted);
+  display: inline-flex;
 }
 
+.pd-macmon-menu {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 6px);
+  min-width: 168px;
+}
+
+/* The identity of what is being watched: one voice, one size, and it gives
+   way first — the name is the only thing here that can shorten. */
 .pd-macmon-ident {
+  flex: 1 1 0;
   display: flex;
   align-items: center;
   gap: 6px;
   min-width: 0;
+  /* In a rail with no room for the name, nothing of it shows — not a lone
+     "edited" dot with the name clipped away beside it. */
+  overflow: hidden;
+  padding: 0 4px;
+  font-size: var(--pd-font-size-caption);
+  line-height: var(--pd-leading-caption);
   color: var(--pd-text-secondary);
 }
 
@@ -5062,35 +5072,21 @@
 }
 
 .pd-macmon-spacer {
-  flex: 1 1 auto;
-}
-
-/* The actions row must never clip a control: a docked rail is ~440px and the
-   six controls only just fit. Wrapping is the safety net; the spacer collapses
-   first so a second line is a last resort rather than the usual case. */
-.pd-macmon-actions .pd-macmon-spacer {
   flex: 1 1 0;
   min-width: 0;
 }
 
-/* The cheapest possible signal that what follows is a different KIND of fact. */
-.pd-macmon-rule {
-  flex: 0 0 auto;
-  width: 1px;
-  height: 14px;
-  margin: 0 var(--pd-space-xs);
-  background: var(--pd-border-subtle);
+/* Not "12 fps" — a number nobody asked for. The one number a user cannot
+   otherwise know is how much smaller than life this picture is; it rides
+   beside Live, muted, and only when the picture is scaled. */
+.pd-macmon-scale {
+  margin-left: 2px;
+  color: var(--pd-text-muted);
+  font-variant-numeric: tabular-nums;
 }
 
-/* Not "12 fps" — a number nobody asked for, in a unit nobody thinks in, whose
-   value is low enough to be actively worrying. The one number a user cannot
-   otherwise know is how much smaller than life this picture is. It reads in the
-   identity's voice rather than the footer's muted one, because it is a fact
-   about the picture and not a label. */
-.pd-macmon-scale {
-  flex: 0 0 auto;
-  color: var(--pd-text-secondary);
-  font-variant-numeric: tabular-nums;
+.pd-macmon-scale::before {
+  content: "· ";
 }
 
 .pd-macmon-live {
@@ -5098,7 +5094,12 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
+  padding: 0 4px;
+  font-size: var(--pd-font-size-caption);
+  line-height: var(--pd-leading-caption);
+  color: var(--pd-text-muted);
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .pd-macmon-dot {

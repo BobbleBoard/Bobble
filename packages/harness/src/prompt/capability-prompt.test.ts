@@ -6,6 +6,7 @@ import {
   CLI_MECHANISM_SWAPS,
   MANAGER_PROMPT_MARKER,
   retargetToolNames,
+  SHELL_CWD_TRUTH,
   stripToolCatalog,
   VERIFY_PROMPT,
 } from './capability-prompt.js';
@@ -257,5 +258,14 @@ describe('the working directory the model is told', () => {
     });
     expect(out).toContain('Current working directory: /Users/user/Bobble/lighthouse-story');
     expect(out).not.toContain('Current working directory: /Users/user\n');
+  });
+
+  it('says that every shell command already starts there, so `cd` is never the first word', () => {
+    // the user: the model kept typing `cd <working> && <command>` on every command.
+    const base = 'Current date: 2026-09-13\nCurrent working directory: /Users/user';
+    const out = augmentSystemPrompt(base, { workingDirectory: '/Users/user/Bobble/x' });
+    expect(out).toContain(`Current working directory: /Users/user/Bobble/x\n${SHELL_CWD_TRUTH}`);
+    expect(SHELL_CWD_TRUTH).toMatch(/fresh shell/);
+    expect(SHELL_CWD_TRUTH).toMatch(/never `cd <that folder> && <command>`/);
   });
 });

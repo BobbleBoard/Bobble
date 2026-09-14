@@ -66,7 +66,16 @@ export interface Capability {
 export const CAPABILITIES: readonly Capability[] = [
   {
     name: 'browser',
-    summary: "Drive the app's own built-in browser: navigate, click, type, read a page.",
+    /*
+     * THE WEB GOES HERE, BY DEFAULT. the user (2026-09-13): the model was reaching
+     * for computer use on the user's Chrome for ordinary web tasks. In bash-CLI
+     * mode this line is all it reads about the group, so the default lives in
+     * the summary: any page, any site, this browser — the user's own Chrome
+     * only when they name it.
+     */
+    summary:
+      "Drive the app's own built-in browser: navigate, click, type, read a page. THE way onto " +
+      "the web for any site or page — not the user's own Chrome, unless they name it.",
     guidance:
       'Your PRIMARY web control. browser_navigate and browser_snapshot are always in your ' +
       'list; this adds the rest — click, type, scroll, read, wait, back, forward, key. Never ' +
@@ -86,8 +95,9 @@ export const CAPABILITIES: readonly Capability[] = [
      */
     summary:
       "Computer use: see and control any app on the user's Mac — its windows, menu bar, and its " +
-      'own dialogs, sheets and file pickers — plus their own Chrome. "Use <app>", "open <app> and…", ' +
-      '"do it in <app>", "click that", "type it in there".',
+      'own dialogs, sheets and file pickers. "Use <app>", "open <app> and…", "do it in <app>", ' +
+      '"click that", "type it in there". Not for the web: a web page is the built-in browser\'s ' +
+      'job unless the user names their own browser.',
     guidance:
       "For work inside the user's OWN applications — Notes, Finder, Photoshop, a game — and " +
       'for their own browsers (Safari, Chrome, Arc) when they ask for those specifically. A web ' +
@@ -119,7 +129,8 @@ export const CAPABILITIES: readonly Capability[] = [
     name: 'chrome',
     summary:
       "The user's OWN Google Chrome — its open tabs, the page in front, and their logged-in " +
-      'session. "in my browser", "the tab I have open", "switch to that tab".',
+      'session. ONLY when they say so: "in Chrome", "in my browser", "the tab I have open". A web ' +
+      "task they did not tie to Chrome is the built-in browser's.",
     guidance:
       'For work in the browser the USER already has open, with their logins and their tabs — ' +
       "not the app's built-in browser (that is `browser`). chrome_tabs lists what is open and " +

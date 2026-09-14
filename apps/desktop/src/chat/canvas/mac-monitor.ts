@@ -34,6 +34,7 @@ import type {
 import { IDLE_MAC_MONITOR_SESSION } from '@pi-desktop/canvas';
 import { useEffect, useRef } from 'react';
 import { useCanvasStore } from '../../state/canvas-store';
+import { useCorpStore } from '../../state/corp-store';
 import { abortPi, pausePi } from '../../state/pi-connect';
 import { usePiStore } from '../../state/pi-slice';
 import { useSettingsStore } from '../../state/settings-store';
@@ -525,6 +526,16 @@ export function useMacMonitor(controller: CanvasController): void {
         // there is one, else the one on screen.
         owner.current = { seq, chat: backgroundRun ? (pi.bgRun?.sessionFile ?? null) : viewed };
       }
+      /*
+       * IN THE ORDINARY CHAT THE ACTIVITY TAB IS THE MONITOR. the user (2026-09-13):
+       * "activity tab should be computer use page if the latest command is
+       * something like 'mac snapshot'" — activity-routing morphs its one tab
+       * into this feed on the model's own `mac …` call, newest wins, and a
+       * second tab pinned beside it was the tab spam that tab replaced. A corp
+       * run routes its activity elsewhere, so the monitor still gets a tab of
+       * its own there.
+       */
+      if (useCorpStore.getState().taskId === null) return;
       const existing = controller.getState().tabs.find((t) => t.key === MAC_MONITOR_TAB_KEY);
       const action = macMonitorTabAction(
         session,

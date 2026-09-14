@@ -37,6 +37,7 @@ import {
   measureDrawnWindow,
   measureWallpaperDetail,
 } from './_macmon-measure.mjs';
+import { driveMacThroughActivity, waitForMonitorTab } from './_macmon-open.mjs';
 import { launchApp } from './harness.mjs';
 
 const run = promisify(execFile);
@@ -121,11 +122,9 @@ function tools({ page, shot, check }) {
   /** Open the monitor tab full-width so the window is drawn at real size. */
   const openMonitor = async () => {
     await page.setViewportSize({ width: 1680, height: 1000 });
-    const opened = await until(() => {
-      const c = window.__pi_canvas?.();
-      return c?.getState().tabs.some((t) => t.key === 'mac-monitor') === true;
-    });
-    check(opened, 'the computer-use tab never appeared');
+    await driveMacThroughActivity(page);
+    const opened = await waitForMonitorTab(page);
+    check(opened, 'the Activity tab never became the monitor');
     await page.evaluate(() => window.__pi_canvas?.().setFullscreen(true));
     await sleep(500);
     return opened;
@@ -246,7 +245,7 @@ async function laneA() {
     check((await info())?.polling === false, 'the 4Hz poll kept running with the tab hidden');
     await page.evaluate(() => {
       const c = window.__pi_canvas?.();
-      const t = c.getState().tabs.find((x) => x.key === 'mac-monitor');
+      const t = c.getState().tabs.find((x) => x.kind === 'computer-use');
       if (t !== undefined) c.focusTab(t.id);
     });
     const resumed = await until(() => {

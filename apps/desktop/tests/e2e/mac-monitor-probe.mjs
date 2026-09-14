@@ -21,6 +21,7 @@
  * Artifacts → $TMPDIR/pd-shots/mac-monitor (override with SHOT_DIR).
  */
 import { measureDrawnWindow } from './_macmon-measure.mjs';
+import { driveMacThroughActivity, monitorTab, waitForMonitorTab } from './_macmon-open.mjs';
 import { launchApp } from './harness.mjs';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -46,20 +47,20 @@ try {
   // and a narrow one proves the scale-down.
   await page.setViewportSize({ width: 1680, height: 1000 });
 
-  // ── 1. the tab opens on its own ────────────────────────────────────────
-  const opened = await until(() => {
-    const c = window.__pi_canvas?.();
-    return c?.getState().tabs.some((t) => t.key === 'mac-monitor') === true;
-  });
-  check(opened, 'the computer-use tab did not open itself when a session started');
+  // ── 1. the Activity tab becomes the monitor on the model's `mac …` call ──
+  await driveMacThroughActivity(page);
+  const opened = await waitForMonitorTab(page);
+  check(opened, 'the Activity tab did not become the monitor on a `mac snapshot` call');
 
-  const tab = await page.evaluate(() => {
-    const c = window.__pi_canvas?.();
-    const t = c?.getState().tabs.find((x) => x.key === 'mac-monitor');
-    return t === undefined ? null : { id: t.id, kind: t.kind, title: t.title };
-  });
+  const tab = await monitorTab(page);
+  check(tab?.key === 'pi:activity', `the monitor is the Activity tab (key ${String(tab?.key)})`);
   check(tab?.kind === 'computer-use', `tab kind was ${String(tab?.kind)}, expected computer-use`);
-  check(tab?.title === 'TextEdit', `tab title was ${String(tab?.title)}, expected the app name`);
+  check(tab?.title === 'Activity', `tab title was ${String(tab?.title)}, expected Activity`);
+  const named = await until(() => {
+    const c = window.__pi_canvas?.();
+    return c?.getState().tabs.find((x) => x.kind === 'computer-use')?.subtitle === 'TextEdit';
+  });
+  check(named, 'the tab is subtitled with the app being driven (TextEdit)');
 
   // FULLSCREEN the canvas so the tab is bigger than the 900x620pt window: that
   // is the case the "real size, never upscaled" rule is about. (The docked rail
@@ -133,8 +134,28 @@ try {
     }, testid);
     await sleep(700);
   };
+  /* The placement is REMEMBERED (localStorage) across launches that share a
+     user-data dir, and each button TOGGLES its mode — so a run after a run
+     that ended in `follow` would switch it off by pressing it. Ask for a mode,
+     press only when the surface is not already in it. */
+  const mode = () =>
+    page.evaluate(
+      () =>
+        document.querySelector('[data-testid="computer-use-surface"]')?.getAttribute('data-mode') ??
+        '',
+    );
+  const setMode = async (want) => {
+    if ((await mode()) === want) return;
+    await press(
+      want === 'auto'
+        ? (await mode()) === 'fit'
+          ? 'macmon-fit'
+          : 'macmon-follow'
+        : `macmon-${want}`,
+    );
+  };
 
-  await press('macmon-fit');
+  await setMode('fit');
   const small = await measure();
   if (small?.found === true && big?.found === true) {
     check(
@@ -153,7 +174,8 @@ try {
   // Follow: the same rail, the same window, drawn big enough to read. The
   // window is now WIDER than the rail, so what is measurable is the crop — it
   // must fill the rail rather than float in it.
-  await press('macmon-follow');
+  await setMode('follow');
+  console.log(`mode after follow: ${await mode()}`);
   const followed = await measure();
   const narrow = await shot('02-scaled-down');
   if (followed?.found === true && small?.found === true) {
@@ -166,7 +188,7 @@ try {
   // Both modes fill the rail's WIDTH, so what separates them is the scale — and
   // the scale is the thing the surface now says out loud (A6).
   const followScale = await scaleReadout();
-  await press('macmon-fit');
+  await setMode('fit');
   const fitScale = await scaleReadout();
   check(
     fitScale > 0 && fitScale < 60,
@@ -174,7 +196,7 @@ try {
   );
   check(followScale >= 85, `following should hold at least 85% of real size, read ${followScale}%`);
   console.log(`scale readout: fit ${fitScale}% · follow ${followScale}%`);
-  await press('macmon-fit'); // back to auto
+  await setMode('auto'); // back to auto
 
   // ── 3b. the surface is not inert ───────────────────────────────────────
   const controls = await page.evaluate(() => {
@@ -251,7 +273,7 @@ try {
   // …and comes back when the tab is focused again.
   await page.evaluate(() => {
     const c = window.__pi_canvas?.();
-    const t = c.getState().tabs.find((x) => x.key === 'mac-monitor');
+    const t = c.getState().tabs.find((x) => x.kind === 'computer-use');
     if (t !== undefined) c.focusTab(t.id);
   });
   const resumed = await until(() => {
