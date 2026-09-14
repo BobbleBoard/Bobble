@@ -47,3 +47,25 @@ export function tapRequest(body: Record<string, unknown>, engine: string): void 
     /* a diagnostic never breaks a turn */
   }
 }
+
+/**
+ * The engine's own account of a finished request — prompt tokens and how many
+ * of them its prefix cache served — appended beside the request lines. The
+ * MLX engines say it in `usage.prompt_tokens_details.cached_tokens`; llama.cpp
+ * in `timings.cache_n`. Never throws.
+ */
+export function tapUsage(
+  engine: string,
+  usage: { prompt?: number | undefined; cached?: number | undefined },
+): void {
+  const diag = process.env.PI_DIAG_PROMPTS;
+  if (diag === undefined || diag === '' || !diag.includes('/')) return;
+  try {
+    appendFileSync(
+      diag,
+      `[pi-diag-usage] engine=${engine} prompt_tokens=${usage.prompt ?? '?'} cached_tokens=${usage.cached ?? '?'}\n`,
+    );
+  } catch {
+    /* a diagnostic never breaks a turn */
+  }
+}

@@ -40,6 +40,7 @@ import {
   type ToolCallFixer,
   type ToolSchemaLike,
   tapRequest,
+  tapUsage,
   validateAgainstSchema,
   withoutWrittenToolCall,
 } from '@pi-desktop/provider-llamacpp';
@@ -98,7 +99,12 @@ interface OAIChoice {
 }
 interface OAIChunk {
   choices?: OAIChoice[];
-  usage?: { prompt_tokens?: number; completion_tokens?: number } | null;
+  usage?: {
+    prompt_tokens?: number;
+    completion_tokens?: number;
+    /** What the engine's prefix cache served (rapid-mlx, mlx_lm.server). */
+    prompt_tokens_details?: { cached_tokens?: number } | null;
+  } | null;
 }
 
 interface ToolState {
@@ -179,6 +185,11 @@ export function shapeForOpenAiServer(body: Record<string, unknown>): Record<stri
   return out;
 }
 
+/** The engine behind a served id (`<catalog>@<engine>`), for the request tap. */
+function engineOf(model: { id: string }): string {
+  return model.id.includes('@') ? model.id.slice(model.id.lastIndexOf('@') + 1) : 'mlx';
+}
+
 /**
  * Create the streamSimple function for an `mlx_lm.server` provider. Mirrors the
  * llamacpp stream's delta→AssistantMessageEventStream translation + repair, but
@@ -243,10 +254,7 @@ export function createMlxStream(deps: MlxStreamDeps = {}): MlxStreamFn {
         }
         // After the hooks, since it is the hooks' llama.cpp-isms this removes.
         body = shapeForOpenAiServer(body);
-        tapRequest(
-          body,
-          model.id.includes('@') ? model.id.slice(model.id.lastIndexOf('@') + 1) : 'mlx',
-        );
+        tapRequest(body, engineOf(model));
         const res = await doFetch(`${model.baseUrl}/chat/completions`, {
           method: 'POST',
           headers: { 'content-type': 'application/json', ...(model.headers ?? {}) },
@@ -275,6 +283,12 @@ export function createMlxStream(deps: MlxStreamDeps = {}): MlxStreamFn {
             if (chunk.usage != null) {
               output.usage.input = chunk.usage.prompt_tokens ?? output.usage.input;
               output.usage.output = chunk.usage.completion_tokens ?? output.usage.output;
+              const cached = chunk.usage.prompt_tokens_details?.cached_tokens;
+              if (typeof cached === 'number') output.usage.cacheRead = cached;
+              tapUsage(engineOf(model), {
+                prompt: chunk.usage.prompt_tokens,
+                cached: typeof cached === 'number' ? cached : undefined,
+              });
             }
 
             const choice = chunk.choices?.[0];

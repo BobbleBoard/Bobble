@@ -43,12 +43,14 @@ import {
   validateAgainstSchema,
   withoutWrittenToolCall,
 } from './repair.js';
-import { tapRequest } from './request-tap.js';
+import { tapRequest, tapUsage } from './request-tap.js';
 import { parseSSE } from './sse.js';
 
 /** llama.cpp per-response `timings` block (structurally == inference's). */
 export interface LlamaCppTimings {
   readonly prompt_n?: number;
+  /** Prompt tokens the slot's cache already held (b10603+). */
+  readonly cache_n?: number;
   readonly prompt_ms?: number;
   readonly prompt_per_second?: number;
   readonly predicted_n?: number;
@@ -726,7 +728,13 @@ export function createLlamaCppStream(deps: LlamaCppStreamDeps = {}): LlamaCppStr
             } catch {
               continue; // skip non-JSON keep-alives
             }
-            if (chunk.timings !== undefined) lastTimings = chunk.timings;
+            if (chunk.timings !== undefined) {
+              lastTimings = chunk.timings;
+              tapUsage('llamacpp', {
+                prompt: (chunk.timings.prompt_n ?? 0) + (chunk.timings.cache_n ?? 0),
+                cached: chunk.timings.cache_n,
+              });
+            }
             if (chunk.usage != null) {
               output.usage.input = chunk.usage.prompt_tokens ?? output.usage.input;
               output.usage.output = chunk.usage.completion_tokens ?? output.usage.output;
