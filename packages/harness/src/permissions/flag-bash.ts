@@ -101,9 +101,22 @@ const VERDICT_CACHE_MAX = 256;
 /** Cap the reason we surface to the user. */
 const MAX_REASON_LEN = 140;
 
-/** Interpret the model's reply: a reason string when flagged, else null. */
+/**
+ * Interpret the model's reply: a reason string when flagged, else null.
+ *
+ * A think block is not a verdict. The request turns thinking off, but an
+ * engine that renders the template its own way (oMLX's vision lane, MEASURED
+ * 2026-09-13) can still hand the thought back as content — 40 tokens of it,
+ * cut mid-sentence — and a stall dressed as "flagged by model: The user wants
+ * to run…" would send every command to the permission prompt. A closed block
+ * is dropped for what follows it; an unclosed one carries no verdict at all,
+ * which is the same fail-open as a timeout.
+ */
 export function interpretFlagReply(reply: string): string | null {
-  const trimmed = reply.trim();
+  const closed = /<think>[\s\S]*?<\/think>\s*/i.exec(reply);
+  let verdict = closed !== null ? reply.slice(closed.index + closed[0].length) : reply;
+  if (/<think>/i.test(verdict)) verdict = '';
+  const trimmed = verdict.trim();
   if (trimmed.length === 0) return null;
   // "SAFE" (optionally punctuated) → not scary.
   if (/^safe[.!]?$/i.test(trimmed)) return null;
@@ -136,6 +149,12 @@ export function createBashFlagger(callModel: CallModel): BashFlagger {
         prompt: `Command:\n${trimmed}`,
         temperature: 0,
         maxTokens: 40,
+        // One word, or twelve: a verdict, not a deliberation. With thinking on
+        // the 40 tokens were all thought — llama.cpp then answered with an
+        // empty content (every command SAFE, the reviewer silently gone) and
+        // oMLX with the thought itself (every command flagged, the turn stuck
+        // on the permission prompt). MEASURED 2026-09-13.
+        extraBody: { chat_template_kwargs: { enable_thinking: false } },
         signal: controller.signal,
       });
       const verdict = interpretFlagReply(reply);

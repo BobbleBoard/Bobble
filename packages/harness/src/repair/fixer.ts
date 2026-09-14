@@ -64,7 +64,13 @@ export function createToolCallFixer(callModel: CallModel): ToolCallFixer {
     ].join('\n');
     let text: string;
     try {
-      text = await callModel({ prompt, temperature: 0 });
+      // A repair is a rewrite, not a deliberation: thinking off, so the JSON
+      // comes first and the turn it is holding up resumes sooner.
+      text = await callModel({
+        prompt,
+        temperature: 0,
+        extraBody: { chat_template_kwargs: { enable_thinking: false } },
+      });
     } catch {
       return undefined;
     }

@@ -370,45 +370,41 @@ describe('shapeForOpenAiServer — the body an OpenAI-shaped engine will take', 
   });
 });
 
-describe("settleReply — the reply as llama.cpp's parser would hand it over", () => {
-  it('drops the newlines the template puts between </think> and the answer, and a whitespace-only text', async () => {
-    const { settleReply } = await import('./stream.js');
-    const thought = { type: 'thinking' as const, thinking: 'Let me look.' };
-    expect(settleReply([thought, { type: 'text', text: '\n\nHere it is.' }])).toEqual([
-      thought,
-      { type: 'text', text: 'Here it is.' },
+describe('the settled reply', () => {
+  it('a turn the model ended with only a thought comes back as the answer', async () => {
+    // MEASURED 2026-09-13 (Qwen3.5-4B on rapid-mlx): the whole answer inside
+    // the <think> the template opened, never closed, finish_reason stop —
+    // an empty turn in the thread until this.
+    const { fetchImpl } = sseFetch([
+      { choices: [{ delta: { reasoning_content: "Here's what it reports: an M5 Pro." } }] },
+      { choices: [{ delta: { content: '\n\n' }, finish_reason: 'stop' }] },
+      { choices: [], usage: { prompt_tokens: 10, completion_tokens: 12 } },
     ]);
-    const call = {
-      type: 'toolCall' as const,
-      id: 'c1',
-      name: 'bash',
-      arguments: { command: 'ls' },
-    };
-    // MEASURED 2026-09-13 rapid-mlx: thinking | text "\n\n" | toolCall.
-    expect(settleReply([thought, { type: 'text', text: '\n\n' }, call])).toEqual([thought, call]);
+    const stream = createMlxStream({ fetchImpl });
+    const { final } = await consume(stream(makeModel(), emptyContext()));
+    expect(final.stopReason).toBe('stop');
+    expect(final.content).toEqual([{ type: 'text', text: "Here's what it reports: an M5 Pro." }]);
   });
 
-  it('keeps a plain answer as it is', async () => {
-    const { settleReply } = await import('./stream.js');
-    const text = { type: 'text' as const, text: '\n\nLeading newlines with no thought stay.' };
-    expect(settleReply([text])).toEqual([text]);
-  });
-
-  it('cuts an unfinished written tool call the engine flushed as content, keeping the prose before it', async () => {
-    // rapid-mlx, stopping a looping call with finish_reason=length, hands the
-    // buffered `<tool_call>` fragment over as content — the user saw it in the bubble.
-    const { settleReply } = await import('./stream.js');
-    const leaked =
-      'Let me check.\n\n<tool_call>\n{"name": "bash", "arguments": {"command"' + ' '.repeat(40);
-    expect(settleReply([{ type: 'text', text: leaked }])).toEqual([
-      { type: 'text', text: 'Let me check.' },
+  it('a thought before a tool call stays a thought, without the newlines the engine left as content', async () => {
+    const { fetchImpl } = sseFetch([
+      { choices: [{ delta: { reasoning_content: 'I will run it.' } }] },
+      { choices: [{ delta: { content: '\n\n' } }] },
+      {
+        choices: [
+          {
+            delta: {
+              tool_calls: [
+                { index: 0, id: 'c1', function: { name: 'bash', arguments: '{"command":"ls"}' } },
+              ],
+            },
+            finish_reason: 'tool_calls',
+          },
+        ],
+      },
     ]);
-    expect(settleReply([{ type: 'text', text: '<tool_call>\n{"name": "bash"' }])).toEqual([]);
-    // A complete written call is rung 0's business, not a leak: left alone here.
-    const whole = {
-      type: 'text' as const,
-      text: '<tool_call>{"name":"bash","arguments":{}}</tool_call>',
-    };
-    expect(settleReply([whole])).toEqual([whole]);
+    const stream = createMlxStream({ fetchImpl });
+    const { final } = await consume(stream(makeModel(), emptyContext()));
+    expect(final.content.map((b) => b.type)).toEqual(['thinking', 'toolCall']);
   });
 });

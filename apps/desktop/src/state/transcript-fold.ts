@@ -67,6 +67,23 @@ export function adoptFinalText(
     .map((c) => (c as { thinking: string }).thinking);
   const streamedTexts = blocks.filter((b) => b.type === 'text').length;
   const streamedThoughts = blocks.filter((b) => b.type === 'thinking').length;
+  /*
+   * A THOUGHT THAT TURNED OUT TO BE THE REPLY. The model wrote its answer into
+   * the think block the template opened and ended without closing it; the
+   * provider settles that into a text block (settle-reply.ts). What streamed
+   * was a thought and nothing else, so the counts can never pair up — the
+   * settled shape is taken whole, or the thread keeps showing an empty turn
+   * with the answer folded inside "Thought for 4s".
+   */
+  if (
+    streamedThoughts > 0 &&
+    streamedTexts === 0 &&
+    finalThoughts.length === 0 &&
+    finalTexts.length > 0 &&
+    !blocks.some((b) => b.type === 'toolCall')
+  ) {
+    return finalTexts.map((text) => ({ type: 'text', text }));
+  }
   const texts = finalTexts.length === streamedTexts;
   // Thoughts too: a provider that strips an engine's notice out of a thought
   // (rapid-mlx's cut-mid-think sentinel) settles the block the same way.

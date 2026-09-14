@@ -96,6 +96,7 @@ export * from './live-tps.js';
 export * from './repair.js';
 export * from './repair-bridge.js';
 export * from './request-tap.js';
+export * from './settle-reply.js';
 export * from './sse.js';
 export * from './stream.js';
 export { headersToRecord } from './stream.js';

@@ -605,6 +605,39 @@ describe('a run that ends without a turn_end still closes its row', () => {
     expect(assistant.blocks).toEqual([{ type: 'thinking', thinking: 'weighing…' }]);
   });
 
+  it('shows a reply the model wrote inside its thought as the reply', () => {
+    // MEASURED 2026-09-13 (Qwen3.5-4B on rapid-mlx): 258 tokens of answer inside
+    // the <think> the template opened, never closed, finish_reason stop. The
+    // provider settles it into a text block; the thread must not keep the
+    // empty turn it streamed.
+    route([
+      { type: 'agent_start' },
+      { type: 'turn_start' },
+      {
+        type: 'message_update',
+        message: { role: 'assistant', content: [] },
+        assistantMessageEvent: {
+          type: 'thinking_delta',
+          contentIndex: 0,
+          delta: "Here's what it reports: an M5 Pro.",
+        },
+      } as unknown as PiBridgeEvent,
+      {
+        type: 'turn_end',
+        message: {
+          role: 'assistant',
+          content: [{ type: 'text', text: "Here's what it reports: an M5 Pro." }],
+          stopReason: 'stop',
+        },
+      } as unknown as PiBridgeEvent,
+    ]);
+    const assistant = usePiStore.getState().messages[0];
+    if (assistant?.kind !== 'assistant') throw new Error('expected assistant');
+    expect(assistant.blocks).toEqual([
+      { type: 'text', text: "Here's what it reports: an M5 Pro." },
+    ]);
+  });
+
   it('takes the settled text from turn_end when the provider rewrote it', () => {
     // SEEN 2026-09-13 (MiniCPM5 on rapid-mlx): the model typed its tool call as
     // `<function name="bash">…</function>`; rung 0 made it a real call and took

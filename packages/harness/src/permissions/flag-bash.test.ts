@@ -15,6 +15,15 @@ describe('interpretFlagReply', () => {
     );
   });
 
+  it('never reads a think block as a verdict', () => {
+    // oMLX's vision lane handed the thought back as content, cut at 40 tokens.
+    expect(interpretFlagReply('<think>\nThe user wants to run screenfetch, which')).toBeNull();
+    expect(interpretFlagReply('<think>\nHarmless.\n</think>\n\nSAFE')).toBeNull();
+    expect(
+      interpretFlagReply('<think>\nrm -rf on root.\n</think>\n\nDANGEROUS: wipes the disk'),
+    ).toBe('flagged by model: wipes the disk');
+  });
+
   it('strips a leading verdict token', () => {
     expect(interpretFlagReply('DANGEROUS: wipes the disk')).toBe(
       'flagged by model: wipes the disk',
