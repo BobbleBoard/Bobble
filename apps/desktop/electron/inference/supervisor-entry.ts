@@ -1691,6 +1691,23 @@ async function startExternalEngine(
            thought in the thread. The cut is already said by finish_reason
            "length"; the words are not for the user. */
         RAPID_MLX_REASONING_CUTOFF_NOTICE: 'disabled',
+        /* THE TOOL-CALL LOOP. rapid-mlx constrains tool calls by default
+           (llguidance, `RAPID_MLX_CONSTRAIN_TOOLS`) to the wire of the parser
+           it auto-picks — `hermes`, the JSON form `{"name": …, "arguments":
+           {…}}` — while the official Qwen3.5 template it renders tells the
+           model to write `<function=NAME><parameter=X>…`. The mask and the
+           model disagree from the first argument on. MEASURED 2026-09-13
+           (Qwen3.5-4B 8-bit, the same request replayed ten times): with the
+           constraint 6/10 replies degenerated into a whitespace loop inside
+           `{"command"` until rapid-mlx's repetition guard cut them at ~1100
+           tokens with finish_reason=length — the buffered `<tool_call>`
+           fragment then flushed into the reply as text (the user's "tool
+           leaking") and the turn ended with nothing said ("thought ending
+           whole turns"); another came back as `>@|@|@|…`. Without it: 10/10
+           clean (seven tool calls, three answers). The free-form parser
+           reads both forms. llama.cpp's own grammar is lazy and follows the
+           template's format, which is why it never showed this. */
+        RAPID_MLX_CONSTRAIN_TOOLS: '0',
         /* A hub cache of our own. mlx_lm.server's `/v1/models` scans the HF
            cache and throws when the directory does not exist — MEASURED under
            a fresh HOME — so give every engine one that does, under the app's

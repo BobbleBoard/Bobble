@@ -920,7 +920,13 @@
   max-height: 360px;
   border: 1px solid var(--pd-border-default);
   border-radius: var(--pd-radius-popover);
-  background: var(--pd-bg-overlay);
+  /* OPAQUE, the menu recipe: `--pd-bg-overlay` is 85% in the bobble flavors,
+     and this picker opens over the file it is choosing for, so a bare use let
+     the document be read straight through the list (the user: "the file picker
+     in the canvas"). */
+  background: linear-gradient(var(--pd-bg-overlay), var(--pd-bg-overlay)), var(--pd-bg-raised);
+  -webkit-backdrop-filter: blur(var(--pd-blur-overlay));
+  backdrop-filter: blur(var(--pd-blur-overlay));
   box-shadow: var(--pd-shadow-edge), var(--pd-shadow-popover);
   overflow: hidden;
 }

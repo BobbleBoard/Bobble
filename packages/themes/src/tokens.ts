@@ -587,7 +587,9 @@ const claudeLight: ThemeTokens = {
     fg: '#141413', // --ui-user-message-primary-text = text.primary
   },
   tooltip: {
-    bg: '#000000cc', // theme-invariant black glass (always-black @ 80%)
+    // Opaque. The reference is black glass at 80%, which reads as this over
+    // a light page; the user: a tooltip must never let the text under it through.
+    bg: '#333333',
     fg: '#ffffff', // always-white
   },
   codeSurface: {
@@ -684,7 +686,7 @@ const claudeDark: ThemeTokens = {
     fg: '#faf9f5',
   },
   tooltip: {
-    bg: '#000000cc', // black glass in both modes
+    bg: '#0a0a0a', // black glass at 80% over a dark page, made opaque
     fg: '#ffffff',
   },
   codeSurface: {
@@ -1087,7 +1089,7 @@ const bobbleLight: ThemeTokens = {
     fg: '#1d1d1f',
   },
   tooltip: {
-    bg: '#2c2c2ee6', // dark glass
+    bg: '#2c2c2e', // dark, opaque — nothing under a tooltip is for reading
     fg: '#ffffff',
   },
   codeSurface: {
@@ -1175,7 +1177,7 @@ const bobbleDark: ThemeTokens = {
     fg: '#f5f5f7',
   },
   tooltip: {
-    bg: '#38383ce6',
+    bg: '#38383c', // opaque, as in light
     fg: '#ffffff',
   },
   codeSurface: {

@@ -21,6 +21,7 @@ import { spawn as spawnCb } from 'node:child_process';
 import { createServer } from 'node:net';
 import { basename } from 'node:path';
 import type { LaunchMode } from './catalog.js';
+import { REASONING_BUDGET_MESSAGE } from './reasoning-budget.js';
 import type { WatchdogHandle } from './watchdog.js';
 
 /** llama.cpp per-request `timings` block (subset we read). */
@@ -114,8 +115,9 @@ export interface LaunchConfig {
   readonly reasoningBudget?: number;
   /**
    * Message injected before the end-of-thinking tag when the reasoning budget is
-   * exhausted (`--reasoning-budget-message`). Default 'time limit for reasoning
-   * reached' so the model wraps up rather than being cut mid-token.
+   * exhausted (`--reasoning-budget-message`). Default
+   * {@link REASONING_BUDGET_MESSAGE} so the model acts rather than being cut
+   * mid-token.
    */
   readonly reasoningBudgetMessage?: string;
   readonly extraArgs?: readonly string[];
@@ -282,10 +284,7 @@ export function assembleServerArgs(cfg: LaunchConfig): string[] {
   // word. These are LAUNCH args (a change needs a server relaunch), unlike the
   // per-request sampling params.
   args.push('--reasoning-budget', String(cfg.reasoningBudget ?? -1));
-  args.push(
-    '--reasoning-budget-message',
-    cfg.reasoningBudgetMessage ?? 'time limit for reasoning reached',
-  );
+  args.push('--reasoning-budget-message', cfg.reasoningBudgetMessage ?? REASONING_BUDGET_MESSAGE);
 
   if (cfg.launchMode === 'fast-text') {
     // Single slot by default; the OOM-aware corp launcher may request K slots

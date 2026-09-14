@@ -172,7 +172,7 @@ describe('assembleServerArgs', () => {
     const args = assembleServerArgs({ ...base, launchMode: 'fast-text' });
     expect(args[args.indexOf('--reasoning-budget') + 1]).toBe('-1');
     expect(args[args.indexOf('--reasoning-budget-message') + 1]).toBe(
-      'time limit for reasoning reached',
+      "I've been thinking too long, let me try to act on something now, before I decide if I should keep thinking.",
     );
   });
 

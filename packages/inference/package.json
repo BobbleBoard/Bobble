@@ -10,7 +10,8 @@
     "./context-cap": "./src/context-cap.ts",
     "./catalog": "./src/catalog.ts",
     "./engine-flags": "./src/engine-flags.ts",
-    "./portable-knobs": "./src/portable-knobs.ts"
+    "./portable-knobs": "./src/portable-knobs.ts",
+    "./reasoning-budget": "./src/reasoning-budget.ts"
   },
   "scripts": {
     "lint": "biome check .",

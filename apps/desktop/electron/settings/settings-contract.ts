@@ -8,6 +8,7 @@
  * settings carry API keys + drive an exec-capable agent, so only the main frame
  * of an app-created window may reach them.
  */
+import { REASONING_BUDGET_MESSAGE } from '@pi-desktop/inference/reasoning-budget';
 
 export type ThemeFlavor = 'claude' | 'codex' | 'bobble';
 /** Settings-level mode adds `system` (resolved to light/dark via the OS pref at
@@ -209,7 +210,7 @@ export const DEFAULT_ADVANCED: AdvancedSettings = {
   reasoning: {
     preserve: true,
     budget: -1,
-    budgetMessage: 'time limit for reasoning reached',
+    budgetMessage: REASONING_BUDGET_MESSAGE,
   },
 };
 

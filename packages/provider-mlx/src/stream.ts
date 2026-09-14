@@ -27,11 +27,15 @@ import {
   createAssistantMessageEventStream,
   type Model,
   type SimpleStreamOptions,
+  type TextContent,
+  type ThinkingContent,
   type ToolCall,
 } from '@mariozechner/pi-ai';
 import {
   buildChatCompletionsRequest,
   createLiveTpsReporter,
+  findToolCallOpener,
+  findWrittenToolCallRegion,
   headersToRecord,
   parseSSE,
   type RepairRung,
@@ -143,8 +147,30 @@ async function readBody(res: Response): Promise<AsyncIterable<Uint8Array>> {
  * llama-server's prefill-progress opt-in and is stripped for the same reason,
  * even though today's engines ignore it.
  */
-export function shapeForOpenAiServer(body: Record<string, unknown>): Record<string, unknown> {
+export function shapeForOpenAiServer(
+  body: Record<string, unknown>,
+  target: { readonly engine?: string; readonly maxTokens?: number } = {},
+): Record<string, unknown> {
   const out = { ...body };
+  /*
+   * NO OUTPUT CAP BY DEFAULT — the reply ends when the model ends it, like
+   * llama.cpp's `n_predict -1`. Four of the engines cap a request that names
+   * no `max_tokens` at a few hundred tokens (mlx_lm.server and dflash-mlx 512,
+   * oMLX and mlx-dspark 2048), which cuts a thought mid-sentence and ends the
+   * turn with nothing said (the user: "never put any cap that by default"). Those
+   * get the model's own ceiling (pi's `maxTokens`: the context less a reply
+   * margin; mlx-dspark clamps it to its `--max-tokens-cap`). rapid-mlx keeps
+   * its own default: it checks `prompt + max_tokens` against the model's
+   * context on every request and would refuse a large one outright.
+   */
+  if (
+    out.max_tokens === undefined &&
+    target.maxTokens !== undefined &&
+    target.maxTokens > 0 &&
+    engineCapsByDefault(target.engine)
+  ) {
+    out.max_tokens = Math.floor(target.maxTokens);
+  }
   /*
    * THINKING ON, AND KEPT, LIKE LLAMA.CPP.
    *
@@ -199,9 +225,57 @@ export function stripCutoffNotice(text: string): { text: string; hit: boolean } 
   return { text: out, hit: out !== text };
 }
 
-/** The engine behind a served id (`<catalog>@<engine>`), for the request tap. */
+/**
+ * The engine behind a served id: `<catalog>@<engine>` for rapid-mlx, oMLX and
+ * vLLM; the others (mlx_lm.server, dflash-mlx, mlx-dspark) serve the model
+ * under its directory path, which is `mlx` here.
+ */
 function engineOf(model: { id: string }): string {
   return model.id.includes('@') ? model.id.slice(model.id.lastIndexOf('@') + 1) : 'mlx';
+}
+
+/** What an assistant reply is made of, as pi types it. */
+type ReplyBlock = TextContent | ThinkingContent | ToolCall;
+
+/** Engines that cut a reply short when the request names no `max_tokens`. */
+function engineCapsByDefault(engine: string | undefined): boolean {
+  return engine !== undefined && engine !== 'rapid-mlx' && engine !== 'vllm';
+}
+
+/**
+ * The parsed reply, made the shape llama.cpp's parser gives: the text after a
+ * thought loses the newlines the template puts between `</think>` and the
+ * answer (MEASURED 2026-09-13, rapid-mlx: every text block began `\n\n`, and
+ * a tool-only turn was `thinking | text "\n\n" | toolCall` where llama.cpp
+ * gives `thinking | toolCall`). Sent back as history, that text renders as
+ * `</think>\n\n` + `\n\n` — bytes the model never generated, so the prefix
+ * cache breaks there and the prompt drifts off-distribution. A text block
+ * that is only whitespace is dropped for the same reason; one that is only
+ * an unfinished written tool call (the engine cut the reply mid-call and
+ * flushed the fragment as content) is cut at the opener — the user: never show
+ * raw tool markup. Pure.
+ */
+export function settleReply(content: readonly ReplyBlock[]): ReplyBlock[] {
+  const hasThought = content.some((b) => b.type === 'thinking');
+  const hasCall = content.some((b) => b.type === 'toolCall');
+  const out: ReplyBlock[] = [];
+  for (const block of content) {
+    if (block.type !== 'text') {
+      out.push(block);
+      continue;
+    }
+    let text = block.text;
+    if (hasThought) text = text.replace(/^\n+/, '');
+    if (!hasCall) {
+      const opener = findToolCallOpener(text);
+      if (opener !== -1 && findWrittenToolCallRegion(text) === null) {
+        text = text.slice(0, opener).trimEnd();
+      }
+    }
+    if (text.trim().length === 0) continue;
+    out.push(text === block.text ? block : { ...block, text });
+  }
+  return out;
 }
 
 /**
@@ -269,7 +343,7 @@ export function createMlxStream(deps: MlxStreamDeps = {}): MlxStreamFn {
           body = replaced as typeof body;
         }
         // After the hooks, since it is the hooks' llama.cpp-isms this removes.
-        body = shapeForOpenAiServer(body);
+        body = shapeForOpenAiServer(body, { engine: engineOf(model), maxTokens: model.maxTokens });
         tapRequest(body, engineOf(model));
         const res = await doFetch(`${model.baseUrl}/chat/completions`, {
           method: 'POST',
@@ -583,6 +657,9 @@ export function createMlxStream(deps: MlxStreamDeps = {}): MlxStreamFn {
           deps.onTps?.({ tps: (output.usage.output / ms) * 1000, tokens: output.usage.output, ms });
         }
 
+        // The final message is what the next prompt carries: settle it the way
+        // llama.cpp's parser would have handed it over (see settleReply).
+        output.content = settleReply(output.content);
         output.stopReason = finishReason;
         stream.push({ type: 'done', reason: finishReason, message: output });
         stream.end();

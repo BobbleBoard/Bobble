@@ -7156,7 +7156,7 @@ body[data-media-expanded="true"] .pd-studio-compose {
   gap: 4px;
 }
 .pd-engine-select {
-  min-width: 180px;
+  min-width: 150px;
   justify-content: space-between;
 }
 .pd-engine-subtabs {
@@ -7410,10 +7410,22 @@ body[data-media-expanded="true"] .pd-studio-compose {
 }
 .pd-flag-input,
 .pd-flag-select {
-  width: 200px;
   max-width: 100%;
   font-family: var(--pd-font-mono);
   font-size: var(--pd-font-size-caption);
+}
+/* Sized to the value, not the row (the user: "shorten the width of some of these
+   input areas/dropdowns they're huge"): a number is a handful of digits, a
+   choice is a word, and a path can scroll inside a still-narrow box. */
+.pd-flag-input[type="number"] {
+  width: 96px;
+}
+.pd-flag-input[type="text"] {
+  width: 168px;
+}
+.pd-flag-select {
+  width: 132px;
+  justify-content: space-between;
 }
 .pd-flag-switch {
   display: inline-flex;
@@ -8208,7 +8220,8 @@ body[data-media-expanded="true"] .pd-studio-compose {
   padding: 6px 12px;
   border-radius: 999px;
   border: 1px solid var(--pd-border-default);
-  background: var(--pd-bg-overlay);
+  /* Opaque (the menu recipe): it floats over the list it counts. */
+  background: linear-gradient(var(--pd-bg-overlay), var(--pd-bg-overlay)), var(--pd-bg-raised);
   font-size: var(--pd-font-size-caption);
   color: var(--pd-text-primary);
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.16);

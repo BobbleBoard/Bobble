@@ -46,15 +46,18 @@ writeFileSync(
       : { toolInterface: process.env.TOOL_INTERFACE }),
   }),
 );
-const TURNS = [
-  { id: 'word', text: 'Reply with exactly one word: ready.' },
-  { id: 'math', text: 'What is 17 times 23? Reply with the number only.' },
-  {
-    id: 'tool',
-    text: 'Use your bash tool to run this exact command: echo hello-from-tool — then tell me exactly what it printed.',
-  },
-  { id: 'follow', text: 'What did that command print? Answer in one short line.' },
-];
+/** `PROMPTS='["…","…"]'` replaces the standard four turns (ids t1, t2, …). */
+const TURNS = process.env.PROMPTS
+  ? JSON.parse(process.env.PROMPTS).map((text, i) => ({ id: `t${i + 1}`, text }))
+  : [
+      { id: 'word', text: 'Reply with exactly one word: ready.' },
+      { id: 'math', text: 'What is 17 times 23? Reply with the number only.' },
+      {
+        id: 'tool',
+        text: 'Use your bash tool to run this exact command: echo hello-from-tool — then tell me exactly what it printed.',
+      },
+      { id: 'follow', text: 'What did that command print? Answer in one short line.' },
+    ];
 const log = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a);
 const mainLog = [];
 const app = await _electron.launch({
@@ -130,6 +133,7 @@ try {
           .filter((b) => b.type === 'thinking')
           .reduce((n, b) => n + (b.thinking ?? '').length, 0),
         error: m.errorMessage ?? null,
+        stop: m.stopReason ?? null,
       }));
     });
   const idle = () =>
@@ -302,6 +306,7 @@ try {
         .join(' ⏎ ')
         .trim();
       const error = fresh.map((m) => m.error).find((e) => e !== null) ?? null;
+      const stops = fresh.filter((m) => m.kind === 'assistant').map((m) => m.stop ?? '?');
       const tools = fresh.reduce((n, m) => n + m.tools, 0);
       const thoughts = fresh.reduce((n, m) => n + (m.thoughts ?? 0), 0);
       const lines = mainLog
@@ -341,6 +346,7 @@ try {
         error,
         tools,
         thoughts,
+        stops,
         rawTag,
         reuse: reuse ?? engineReuse,
         lines,
@@ -348,7 +354,7 @@ try {
       row.turns.push(t);
       const rr = t.reuse;
       log(
-        `  ${turn.id.padEnd(6)} ttft=${ttft === null ? 'NONE' : `${ttft}ms`} total=${total}ms tools=${tools} thought=${thoughts}ch${
+        `  ${turn.id.padEnd(6)} ttft=${ttft === null ? 'NONE' : `${ttft}ms`} total=${total}ms tools=${tools} thought=${thoughts}ch stop=${stops.join('/')}${
           rr === null ? '' : ` prompt=${rr.total} reused=${rr.reused}`
         } ${
           error !== null

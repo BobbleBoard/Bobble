@@ -330,6 +330,28 @@ describe('shapeForOpenAiServer — the body an OpenAI-shaped engine will take', 
     expect(shapeForOpenAiServer(body)).toEqual({ ...body, ...THINKING });
   });
 
+  it("gives an engine that caps a reply by default the model's own ceiling, never rapid-mlx", async () => {
+    // mlx_lm.server / dflash-mlx stop at 512 tokens and oMLX / mlx-dspark at
+    // 2048 when no max_tokens is named — a thought cut mid-sentence and a turn
+    // that ends with nothing said. rapid-mlx checks prompt + max_tokens against
+    // the model's context per request, so it keeps its own default.
+    const { shapeForOpenAiServer } = await import('./stream.js');
+    expect(shapeForOpenAiServer({}, { engine: 'mlx', maxTokens: 258_048 }).max_tokens).toBe(
+      258_048,
+    );
+    expect(shapeForOpenAiServer({}, { engine: 'omlx', maxTokens: 258_048 }).max_tokens).toBe(
+      258_048,
+    );
+    expect(shapeForOpenAiServer({}, { engine: 'rapid-mlx', maxTokens: 258_048 }).max_tokens).toBe(
+      undefined,
+    );
+    // A caller's own cap (the bench's 24, the titler's 40) is kept.
+    expect(
+      shapeForOpenAiServer({ max_tokens: 40 }, { engine: 'mlx', maxTokens: 258_048 }).max_tokens,
+    ).toBe(40);
+    expect(shapeForOpenAiServer({}, { maxTokens: 258_048 }).max_tokens).toBe(undefined);
+  });
+
   it("thinks by default, like llama.cpp — and keeps a caller's own switch", async () => {
     // MEASURED 2026-09-13: rapid-mlx answers without thinking unless asked;
     // the bench and the titler ask for none and must stay that way.
@@ -345,5 +367,48 @@ describe('shapeForOpenAiServer — the body an OpenAI-shaped engine will take', 
     expect((custom.chat_template_kwargs as { preserve_thinking: boolean }).preserve_thinking).toBe(
       false,
     );
+  });
+});
+
+describe("settleReply — the reply as llama.cpp's parser would hand it over", () => {
+  it('drops the newlines the template puts between </think> and the answer, and a whitespace-only text', async () => {
+    const { settleReply } = await import('./stream.js');
+    const thought = { type: 'thinking' as const, thinking: 'Let me look.' };
+    expect(settleReply([thought, { type: 'text', text: '\n\nHere it is.' }])).toEqual([
+      thought,
+      { type: 'text', text: 'Here it is.' },
+    ]);
+    const call = {
+      type: 'toolCall' as const,
+      id: 'c1',
+      name: 'bash',
+      arguments: { command: 'ls' },
+    };
+    // MEASURED 2026-09-13 rapid-mlx: thinking | text "\n\n" | toolCall.
+    expect(settleReply([thought, { type: 'text', text: '\n\n' }, call])).toEqual([thought, call]);
+  });
+
+  it('keeps a plain answer as it is', async () => {
+    const { settleReply } = await import('./stream.js');
+    const text = { type: 'text' as const, text: '\n\nLeading newlines with no thought stay.' };
+    expect(settleReply([text])).toEqual([text]);
+  });
+
+  it('cuts an unfinished written tool call the engine flushed as content, keeping the prose before it', async () => {
+    // rapid-mlx, stopping a looping call with finish_reason=length, hands the
+    // buffered `<tool_call>` fragment over as content — the user saw it in the bubble.
+    const { settleReply } = await import('./stream.js');
+    const leaked =
+      'Let me check.\n\n<tool_call>\n{"name": "bash", "arguments": {"command"' + ' '.repeat(40);
+    expect(settleReply([{ type: 'text', text: leaked }])).toEqual([
+      { type: 'text', text: 'Let me check.' },
+    ]);
+    expect(settleReply([{ type: 'text', text: '<tool_call>\n{"name": "bash"' }])).toEqual([]);
+    // A complete written call is rung 0's business, not a leak: left alone here.
+    const whole = {
+      type: 'text' as const,
+      text: '<tool_call>{"name":"bash","arguments":{}}</tool_call>',
+    };
+    expect(settleReply([whole])).toEqual([whole]);
   });
 });
