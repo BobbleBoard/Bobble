@@ -81,7 +81,7 @@ describe('the gate — a job waits for the button, then continues', () => {
     await new Promise((r) => setTimeout(r, 0));
     m.dismiss('comfy');
     await expect(job).rejects.toBeInstanceOf(GenModuleMissingError);
-    await expect(job).rejects.toThrow(/Video, music and sound-effect generation is not set up/);
+    await expect(job).rejects.toThrow(/Video, music, sound-effect and 3D generation is not set up/);
   });
 
   it('nobody pressing it for the wait ends the job the same way', async () => {
@@ -141,6 +141,64 @@ describe('what the model reads', () => {
       uvLineToDetail('Resolved 96 packages in 1.20s\n\x1b[2mDownloading torch (215MiB)\x1b[0m\n'),
     ).toBe('Downloading torch (215MiB)');
     expect(uvLineToDetail('   \n')).toBeUndefined();
+  });
+});
+
+describe('the press stops the clock', () => {
+  it('a job waits on a running install past MODULE_WAIT_MS, and is told only if the install fails and nobody retries', async () => {
+    const done: { finish: (() => void) | null; failWith: Error | null } = {
+      finish: null,
+      failWith: null,
+    };
+    const ready = new Set<string>();
+    const timers: Array<{ fn: () => void; ms: number; cleared: boolean }> = [];
+    const m = new GenModulesManager({
+      ready: async (id) => ready.has(id),
+      install: (id) =>
+        new Promise<void>((resolve, reject) => {
+          done.finish = () => {
+            if (done.failWith !== null) reject(done.failWith);
+            else {
+              ready.add(id);
+              resolve();
+            }
+          };
+        }),
+      emit: () => undefined,
+      setTimeout: (fn, ms) => {
+        const t = { fn, ms, cleared: false };
+        timers.push(t);
+        return t;
+      },
+      clearTimeout: (h) => {
+        (h as { cleared: boolean }).cleared = true;
+      },
+    });
+    let outcome: 'pending' | 'continued' | 'ended' = 'pending';
+    const job = m.ensure('weights:wan2.1-t2v-1.3b').then(
+      () => {
+        outcome = 'continued';
+      },
+      () => {
+        outcome = 'ended';
+      },
+    );
+    await new Promise((r) => setTimeout(r, 0));
+    expect(timers).toHaveLength(1);
+    // The press: the waiter's clock is cleared; a long download is fine.
+    void m.install('weights:wan2.1-t2v-1.3b').catch(() => undefined);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(timers[0]?.cleared).toBe(true);
+    expect(outcome).toBe('pending');
+    // It fails: the clock is armed again, and firing it ends the job.
+    done.failWith = new Error('no network');
+    done.finish?.();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(outcome).toBe('pending');
+    expect(timers).toHaveLength(2);
+    timers[1]?.fn();
+    await job;
+    expect(outcome).toBe('ended');
   });
 });
 

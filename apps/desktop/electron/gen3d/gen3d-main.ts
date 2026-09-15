@@ -589,7 +589,8 @@ export function comfy3dInfo(): Comfy3dInfo {
     weightsReady,
     ready: runtimeReady && weightsReady,
     modelId: model.id,
-    approxGB: Math.round(((runtimeReady ? 0 : 6) + (weightsReady ? 0 : weightGB)) * 10) / 10,
+    // The runtime is 1.5 GB on this platform (gen-modules GEN_MODULE_META).
+    approxGB: Math.round(((runtimeReady ? 0 : 1.5) + (weightsReady ? 0 : weightGB)) * 10) / 10,
   };
 }
 
@@ -750,8 +751,22 @@ const handlers: IpcHandlers<Gen3dInvokeMap & DictationInvokeMap> = {
       const spec = GEN3D_MODEL_SPECS.find((sp) => sp.id === id);
       return n + (spec === undefined ? 0 : specTotalBytes(spec));
     }, 0);
-    // Either path makes the studio usable; the ComfyUI one costs nothing to ask.
-    return { installed: missing.length === 0 || comfy3dInfo().ready, remainingBytes };
+    /*
+     * Either path makes the studio usable, and the sidebar's number is the
+     * path a fresh Mac will actually take: with none of the engine's core on
+     * disk it quotes the ComfyUI module (10.5 GB), not the engine's 33 GB —
+     * the user's "download module (nGB)" is the button they will press.
+     */
+    const comfy = comfy3dInfo();
+    const engineUntouched = missing.length === CORE_MODULE_MODELS.length;
+    return {
+      installed: missing.length === 0 || comfy.ready,
+      remainingBytes: comfy.ready
+        ? 0
+        : engineUntouched
+          ? Math.round(comfy.approxGB * 1e9)
+          : remainingBytes,
+    };
   },
   'gen3d:catalog': async () => {
     // Report the live catalog ONLY if the sidecar is already up — never block

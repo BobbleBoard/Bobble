@@ -66,6 +66,13 @@ export function ModuleGate({ state, onView }: ModuleGateProps): JSX.Element {
     : comfyWeights?.installing
       ? comfyWeights.percent
       : undefined;
+  /*
+   * The button fires both installs (the invoke returns at once; the cards
+   * carry the outcome) — and the gate lifts when the store says both are
+   * ready, because nothing else would ask main again: the catalog is what
+   * the gate reads, and it is not re-read on its own when a weights module
+   * lands. MEASURED: both modules ready at 135s, the gate still up.
+   */
   const startComfy = () => {
     if (comfy === null) return;
     setStarting(true);
@@ -74,7 +81,6 @@ export function ModuleGate({ state, onView }: ModuleGateProps): JSX.Element {
       try {
         if (!comfy.runtimeReady) await installModule('comfy');
         await installModule(`weights:${comfy.modelId}`);
-        await refreshCatalog();
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err));
       } finally {
@@ -82,6 +88,11 @@ export function ModuleGate({ state, onView }: ModuleGateProps): JSX.Element {
       }
     })();
   };
+  const bothReady = comfyOffered && comfyRuntime?.ready === true && comfyWeights?.ready === true;
+  useEffect(() => {
+    if (bothReady) void refreshCatalog();
+  }, [bothReady, refreshCatalog]);
+  const comfyFailed = comfyRuntime?.error ?? comfyWeights?.error;
 
   // While a download runs the panel should show it moving, not sit on a static
   // "installing…" — the sizes here are tens of gigabytes.
@@ -153,9 +164,9 @@ export function ModuleGate({ state, onView }: ModuleGateProps): JSX.Element {
           </p>
         )}
 
-        {error !== null ? (
+        {error !== null || comfyFailed !== undefined ? (
           <p className="tp-gate-error" data-testid="tp-gate-error">
-            {error}
+            {error ?? comfyFailed}
           </p>
         ) : null}
 

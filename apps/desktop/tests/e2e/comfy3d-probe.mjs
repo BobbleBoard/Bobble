@@ -137,6 +137,8 @@ try {
     const mb = statSync(glb).size / 1e6;
     console.log(`model: ${glb} (${mb.toFixed(1)} MB)`);
     check(mb > 1, 'the GLB has textures in it (> 1 MB)');
+    // The home goes at finish(); the model is the evidence, so it comes out.
+    copyFileSync(glb, path.join(process.env.SHOT_DIR ?? '/tmp', 'model.glb'));
   }
   // The studio took it: an asset in the tree, the viewport showing it.
   await sleep(4000);

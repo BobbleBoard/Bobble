@@ -15,7 +15,14 @@
  *   MODEL=LTX-2.5 … for the big one (needs RESERVE_GB on a 24 GB Mac — measured
  *   20 GB working set, which is why the catalog says 32).
  */
-import { appendFileSync, existsSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import {
+  appendFileSync,
+  copyFileSync,
+  existsSync,
+  readFileSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import path from 'node:path';
 import { launchApp } from './harness.mjs';
 
@@ -155,7 +162,11 @@ try {
   );
   const file = decodeURIComponent(src.replace(/^pd-file:\/\/f/, ''));
   console.log('clip:', file);
-  if (existsSync(file)) console.log(`clip size: ${(statSync(file).size / 1e6).toFixed(2)} MB`);
+  if (existsSync(file)) {
+    console.log(`clip size: ${(statSync(file).size / 1e6).toFixed(2)} MB`);
+    // The home goes at finish(); the clip is the evidence, so it comes out.
+    copyFileSync(file, path.join(process.env.SHOT_DIR ?? '/tmp', 'clip.mp4'));
+  }
   await shot('02-clip');
   console.log(`TOTAL ${elapsed}s through the studio`);
 } finally {

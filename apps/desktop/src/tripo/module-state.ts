@@ -155,15 +155,17 @@ export function formatModuleSize(bytes: number): string {
 
 /** One line explaining the state, for the gate panel. */
 export function moduleHeadline(state: ModuleState): string {
+  // With the ComfyUI path on offer, the engine's own state is not the story
+  // — whether it is starting, missing or half-downloaded, the module is
+  // simply not installed yet, and the button beneath says what to do.
+  if (state.comfy !== undefined && !state.comfy.ready && state.status !== 'ready') {
+    return state.status === 'installing' ? 'Downloading the 3D module…' : '3D module not installed';
+  }
   switch (state.status) {
     case 'checking':
       return 'Starting the 3D engine…';
     case 'no-runtime':
-      // With the ComfyUI path on offer, a missing engine is not the story —
-      // the module is simply not downloaded yet.
-      return state.comfy !== undefined && !state.comfy.ready
-        ? '3D module not installed'
-        : 'The 3D engine runtime is not available';
+      return 'The 3D engine runtime is not available';
     case 'installing':
       return 'Downloading the 3D module…';
     case 'not-installed':

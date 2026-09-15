@@ -19,19 +19,28 @@ import {
   existsSync,
   mkdirSync,
   readFileSync,
+  rmSync,
   statSync,
   writeFileSync,
 } from 'node:fs';
 import path from 'node:path';
-import { launchApp } from './harness.mjs';
+import { launchApp, probeHome } from './harness.mjs';
 
 const IMAGE =
   process.env.COMFY3D_IMAGE ??
   path.join(process.env.HOME ?? '', 'Bobble/generated/a-blue-mug/cand0_seed602697309.png');
 
-const { page, shot, check, finish, home } = await launchApp('comfy3d-fresh', {
+/*
+ * A HOME of our own, and the engine's cache pointed INTO it: the 3D sidecar
+ * resolves its cache from Electron's idea of home, which ignores $HOME — so
+ * without GEN3D_CACHE_DIR a "fresh" probe found this Mac's real engine, with
+ * every model installed, and made the model on it (gen3d-main cacheRoot).
+ */
+const home = probeHome('comfy3d-fresh');
+const { page, shot, check, finish } = await launchApp('comfy3d-fresh', {
   args: ['--', '--piE2E=1'],
   timeout: 60_000,
+  env: { HOME: home, GEN3D_CACHE_DIR: path.join(home, '.cache', 'bobble', 'gen3d') },
 });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const until = async (fn, timeout, arg) => {
@@ -152,8 +161,10 @@ try {
   );
   const glb = last?.artifact?.path;
   check(typeof glb === 'string' && existsSync(glb), `a GLB on disk (${glb})`);
-  if (typeof glb === 'string' && existsSync(glb))
+  if (typeof glb === 'string' && existsSync(glb)) {
     console.log(`model: ${(statSync(glb).size / 1e6).toFixed(1)} MB`);
+    copyFileSync(glb, path.join(process.env.SHOT_DIR ?? '/tmp', 'model.glb'));
+  }
   await sleep(4000);
   const assets = await page.evaluate(
     () => (window.__tripo_store?.().getState().assets ?? []).length,
@@ -163,4 +174,6 @@ try {
   console.log(`TOTAL install ${installSec}s + generate ${genSec}s`);
 } finally {
   await finish();
+  // Ours: launchApp only removes a home it made itself.
+  if (process.env.PI_E2E_KEEP_HOME !== '1') rmSync(home, { recursive: true, force: true });
 }

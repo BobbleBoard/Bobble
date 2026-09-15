@@ -105,9 +105,13 @@ export const GEN_MODULE_META: Record<GenRuntimeModuleId, GenModuleMeta> = {
   },
   comfy: {
     label: 'Video module',
-    blurb: 'ComfyUI — video, music and sound effects. Model packs download on first use.',
-    approxGB: 6,
-    noun: 'Video, music and sound-effect generation',
+    blurb: 'ComfyUI — video, music, sound effects and 3D. Models download on first use.',
+    // MEASURED 2026-09-14 on a fresh cache: the checkout plus a venv of 179
+    // packages is 1.5 GB on Apple Silicon (the Torch wheel has no CUDA in
+    // it), installed in 30 seconds on a fast line. The 6 here was the Linux
+    // figure.
+    approxGB: 1.5,
+    noun: 'Video, music, sound-effect and 3D generation',
   },
   '3d': {
     label: '3D module',
@@ -283,6 +287,19 @@ export class GenModulesManager {
     if (inFlight !== undefined) return inFlight;
     this.#error.delete(id);
     this.#detail.set(id, { detail: 'Starting…' });
+    /*
+     * THE PRESS STOPS THE CLOCK. A waiter's timer is the answer to "nobody
+     * pressed it"; once someone has, the job waits on the install itself,
+     * however long it takes — a 7 GB set of weights on a slow line is many
+     * times MODULE_WAIT_MS, and ending the job at four minutes with "ask the
+     * user to press it" while the bar is moving would be exactly wrong. A
+     * failed install arms the clock again below, so an unretried failure
+     * still ends the job with the sentence.
+     */
+    for (const w of this.#waiters.get(id) ?? []) {
+      if (w.timer !== null) this.#clear(w.timer);
+      w.timer = null;
+    }
     const run = (async () => {
       try {
         await this.#ports.install(id, (detail, percent) => {
@@ -297,13 +314,22 @@ export class GenModulesManager {
         const waiting = this.#waiters.get(id) ?? [];
         this.#waiters.delete(id);
         for (const w of waiting) {
-          this.#clear(w.timer);
+          if (w.timer !== null) this.#clear(w.timer);
           w.resolve();
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         this.#error.set(id, message);
         this.#detail.delete(id);
+        const arm = this.#ports.setTimeout ?? ((fn, ms) => setTimeout(fn, ms));
+        for (const w of this.#waiters.get(id) ?? []) {
+          if (w.timer === null) {
+            w.timer = arm(() => {
+              this.#drop(id, w);
+              w.reject(new GenModuleMissingError(id, this.#meta(id)));
+            }, MODULE_WAIT_MS);
+          }
+        }
         throw err;
       } finally {
         this.#installing.delete(id);
@@ -354,7 +380,7 @@ export class GenModulesManager {
     const waiting = this.#waiters.get(id) ?? [];
     this.#waiters.delete(id);
     for (const w of waiting) {
-      this.#clear(w.timer);
+      if (w.timer !== null) this.#clear(w.timer);
       w.reject(new GenModuleMissingError(id, this.#meta(id)));
     }
     this.#broadcast();

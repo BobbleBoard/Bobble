@@ -43,6 +43,10 @@ export function ModuleCard({ id, place, why }: ModuleCardProps) {
   if (mod === undefined || mod.ready) return null;
 
   const gb = mod.approxGB >= 1 ? `${mod.approxGB} GB` : `${Math.round(mod.approxGB * 1000)} MB`;
+  // "the image module" reads; "the wan2.1 t2v (1.3b) weights" does not — a
+  // model's name keeps its case, and its button says the plain thing.
+  const weights = id.startsWith('weights:');
+  const noun = weights ? mod.label : mod.label.toLowerCase();
   const percent = mod.percent !== undefined ? Math.round(mod.percent * 100) : undefined;
   return (
     <section
@@ -55,9 +59,9 @@ export function ModuleCard({ id, place, why }: ModuleCardProps) {
       <div className="pd-module-card-main">
         <p className="pd-module-card-title">
           {mod.installing
-            ? `Downloading the ${mod.label.toLowerCase()}…`
+            ? `Downloading the ${noun}…`
             : mod.error !== undefined
-              ? `The ${mod.label.toLowerCase()} did not install`
+              ? `The ${noun} did not install`
               : `${mod.label} not installed`}
         </p>
         <p className="pd-module-card-sub">
@@ -91,7 +95,11 @@ export function ModuleCard({ id, place, why }: ModuleCardProps) {
             onClick={() => void install(id)}
             data-testid={`module-install-${id}`}
           >
-            {mod.error !== undefined ? 'Try again' : `Download ${mod.label.toLowerCase()}`}
+            {mod.error !== undefined
+              ? 'Try again'
+              : weights
+                ? `Download weights (${gb})`
+                : `Download ${noun}`}
           </button>
         )}
         {place === 'chat' && !mod.installing ? (
