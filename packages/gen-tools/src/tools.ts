@@ -779,7 +779,10 @@ export async function saveOutputs(
    * `svg` command's `out` already reads (WORKSPACE_ROOT_ENV); a relative
    * `save_to` means the same folder every other relative path means.
    */
-  target = path.resolve(deps.root ?? process.env.PI_DESKTOP_WORKSPACE_ROOT ?? process.cwd(), target);
+  target = path.resolve(
+    deps.root ?? process.env.PI_DESKTOP_WORKSPACE_ROOT ?? process.cwd(),
+    target,
+  );
   /*
    * FILE OR FOLDER. Named with an image extension: a file. A trailing slash,
    * or a directory that already exists: a folder. Otherwise — SEEN (4B): eight
