@@ -30,6 +30,7 @@ const { page, shot, check, finish } = await launchApp('module-gate', {
   },
 });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+let shotOnce = false;
 const until = async (fn, timeout, arg) => {
   try {
     await page.waitForFunction(fn, arg, { timeout, polling: 200 });
@@ -96,6 +97,60 @@ try {
       5_000,
     );
     check(cardGone, 'the card leaves once the module is ready');
+
+    // 3a. While it makes the picture: the card, 25% smaller and rounder, with
+    //     the shimmering phase line at the top inside it (the user, 2026-09-14).
+    const pendingUp = await until(
+      () => document.querySelector('[data-testid="pending-media-card"] .pd-media-frame') !== null,
+      60_000,
+    );
+    check(pendingUp, 'the pending card is up while the picture is made');
+    const phases = new Set();
+    const t0 = Date.now();
+    let frame = null;
+    while (Date.now() - t0 < 25_000) {
+      const now = await page.evaluate(() => {
+        const f = document.querySelector('[data-testid="pending-media-card"] .pd-media-frame');
+        const ph = document.querySelector('[data-testid="pending-phase"]');
+        if (f === null) return null;
+        const r = f.getBoundingClientRect();
+        const cs = getComputedStyle(f);
+        return {
+          w: Math.round(r.width),
+          h: Math.round(r.height),
+          radius: cs.borderTopLeftRadius,
+          phase: ph?.textContent ?? '',
+          shimmer: ph?.querySelector('.pd-shimmer') !== null,
+          phaseTop: ph === null ? null : Math.round(ph.getBoundingClientRect().top - r.top),
+        };
+      });
+      if (now === null) break;
+      frame = now;
+      if (now.phase !== '') phases.add(now.phase);
+      if (phases.size === 1 && Date.now() - t0 > 3_000 && !shotOnce) {
+        shotOnce = true;
+        await shot('03b-pending-phase');
+      }
+      await sleep(400);
+    }
+    console.log('pending card:', JSON.stringify(frame), 'phases:', [...phases].join(' → '));
+    check(
+      frame !== null && frame.w <= 362 && frame.h <= 362,
+      `the card is ~25% smaller (${frame?.w}×${frame?.h})`,
+    );
+    check(frame?.radius === '20px', `the corners are rounder (${frame?.radius})`);
+    check(frame?.shimmer === true, 'the phase line shimmers like a thought');
+    check(
+      frame !== null && frame.phaseTop !== null && frame.phaseTop < 30,
+      `the phase line sits at the top inside the card (${frame?.phaseTop}px)`,
+    );
+    const order = ['Warming up…', 'Creating your image…', 'Drafting…', 'Refining…', 'Finalizing…'];
+    const seen = [...phases];
+    check(
+      seen.length >= 2 &&
+        seen.every((p, i) => i === 0 || order.indexOf(p) > order.indexOf(seen[i - 1])),
+      `the phases advance in order (${seen.join(' → ')})`,
+    );
 
     // 3. The same job continues to a picture.
     const picture = await until(

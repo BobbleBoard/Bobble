@@ -24,12 +24,15 @@ import { spawn } from 'node:child_process';
 import {
   existsSync,
   mkdirSync,
+  mkdtempSync,
   readdirSync,
   readFileSync,
+  renameSync,
   rmSync,
   statSync,
   writeFileSync,
 } from 'node:fs';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { cacheRoot, libraryRoot } from '@pi-desktop/inference';
 import { ensureUv, PINNED_UV, uvDir } from '@pi-desktop/web-tools';
@@ -303,14 +306,38 @@ export function writeComfyModelPaths(): void {
  * installs fine, loads fine, and fails at the first text encode with an
  * ImportError, which is the worst moment to discover a missing dependency.
  */
+/**
+ * A GitHub tree WITHOUT git. `git` on a Mac that has never installed the
+ * Command Line Tools is a stub that pops Apple's install dialog and exits —
+ * so a `git clone` here was the difference between "one click" and "install
+ * Xcode's tools first" for every fresh Mac (the user, 2026-09-14: one-click
+ * modules on any M1–M6 Mac). GitHub serves the same tree as a tarball, and
+ * `tar` ships with macOS. Same tip-of-branch the shallow clone fetched.
+ */
+async function fetchGitHubTree(
+  owner: string,
+  repo: string,
+  branch: string,
+  dest: string,
+): Promise<void> {
+  const url = `https://codeload.github.com/${owner}/${repo}/tar.gz/refs/heads/${branch}`;
+  const res = await fetch(url, { headers: { 'user-agent': 'bobble-engines' } });
+  if (!res.ok) throw new Error(`could not fetch ${owner}/${repo} (${res.status})`);
+  const scratch = mkdtempSync(path.join(tmpdir(), `bobble-${repo}-`));
+  const archive = path.join(scratch, 'tree.tar.gz');
+  writeFileSync(archive, Buffer.from(await res.arrayBuffer()));
+  await run('tar', ['-xzf', archive, '-C', scratch], 10 * 60_000);
+  const extracted = readdirSync(scratch).find((n) => n !== 'tree.tar.gz');
+  if (extracted === undefined) throw new Error(`${owner}/${repo}: empty archive`);
+  mkdirSync(path.dirname(dest), { recursive: true });
+  renameSync(path.join(scratch, extracted), dest);
+  rmSync(scratch, { recursive: true, force: true });
+}
+
 async function installComfyGguf(uv: string): Promise<void> {
   const dir = path.join(comfyRoot(), 'custom_nodes', 'ComfyUI-GGUF');
   if (!existsSync(dir)) {
-    await run(
-      'git',
-      ['clone', '--depth', '1', 'https://github.com/city96/ComfyUI-GGUF.git', dir],
-      10 * 60_000,
-    );
+    await fetchGitHubTree('city96', 'ComfyUI-GGUF', 'main', dir);
   }
   await run(
     uv,
@@ -385,11 +412,7 @@ const OPS: Record<string, EngineOps> = {
       const uv = await ensureUvPath();
       if (!existsSync(comfyMainPy())) {
         rmSync(comfyRoot(), { recursive: true, force: true });
-        await run(
-          'git',
-          ['clone', '--depth', '1', 'https://github.com/comfyanonymous/ComfyUI.git', comfyRoot()],
-          10 * 60_000,
-        );
+        await fetchGitHubTree('comfyanonymous', 'ComfyUI', 'master', comfyRoot());
       }
       if (!existsSync(comfyVenv())) {
         await run(uv, ['venv', comfyVenv(), '--python', '3.12']);

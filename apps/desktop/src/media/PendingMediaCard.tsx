@@ -47,6 +47,52 @@ import { VideoSurface } from './VideoSurface';
 /** What the finished thing will be — the same kinds {@link MediaCard} takes. */
 export type PendingKind = 'image' | 'video' | 'model' | 'audio';
 
+/**
+ * WHAT THE CARD SAYS WHILE IT WAITS — the user (2026-09-14): "inside the card the
+ * shining text similar to the 'thinking' or 'using a tool' shimmering text
+ * that cycles between things like 'creating your image...' 'Drafting...'
+ * 'Finalizing...' of course in a sensical order."
+ *
+ * The order is the job's own order. With the engine's step counter the phase
+ * is READ off the fraction, so the words never run ahead of the work; without
+ * one (the model still loading, a backend with no counter) the words advance
+ * on a clock but stop short of the last phase, which only the result — or a
+ * counter near the end — can earn. Never backwards.
+ */
+export const PENDING_PHASES: Record<PendingKind, readonly string[]> = {
+  image: ['Warming up…', 'Creating your image…', 'Drafting…', 'Refining…', 'Finalizing…'],
+  video: ['Warming up…', 'Creating your clip…', 'Drafting frames…', 'Refining…', 'Finalizing…'],
+  model: ['Warming up…', 'Creating your model…', 'Shaping…', 'Texturing…', 'Finalizing…'],
+  audio: ['Warming up…', 'Creating your sound…', 'Composing…', 'Finalizing…'],
+};
+
+/** How long a phase holds when there is no counter to read it from. */
+const PHASE_CLOCK_MS = 7000;
+
+/**
+ * The phase index for a job: from the fraction when there is one (the last
+ * phase from 92% on), else from the clock — capped at the second-to-last so a
+ * card with no counter never claims to be finalizing. Pure; monotone in both.
+ */
+export function pendingPhase(
+  count: number,
+  progress: number | undefined,
+  elapsedMs: number,
+  revealing: boolean,
+): number {
+  const last = count - 1;
+  if (revealing) return last;
+  if (progress !== undefined) {
+    const f = Math.max(0, Math.min(1, progress));
+    if (f >= 0.92) return last;
+    if (f <= 0.01) return 0;
+    // The middle phases share the 1%–92% run evenly.
+    const middle = Math.max(1, count - 2);
+    return 1 + Math.min(middle - 1, Math.floor(((f - 0.01) / 0.91) * middle));
+  }
+  return Math.min(last - 1, Math.floor(elapsedMs / PHASE_CLOCK_MS));
+}
+
 /** The loader act that belongs to each kind. */
 const VARIANT: Record<PendingKind, LoaderVariant> = {
   image: 'image',
@@ -156,6 +202,22 @@ export function PendingMediaCard({
   const pct =
     progress === undefined ? undefined : Math.round(Math.max(0, Math.min(1, progress)) * 100);
 
+  /* The phase line's clock, ticking only while there is no counter to read. */
+  const startedAt = useRef(Date.now());
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    if (progress !== undefined || revealing) return;
+    const id = setInterval(() => setElapsed(Date.now() - startedAt.current), 1000);
+    return () => clearInterval(id);
+  }, [progress, revealing]);
+  const phases = PENDING_PHASES[kind];
+  /* Never backwards: a counter that dips (a second candidate starting) or a
+     clock that resets keeps the furthest phrase the card has already said. */
+  const furthest = useRef(0);
+  const phaseNow = pendingPhase(phases.length, progress, elapsed, revealing);
+  if (phaseNow > furthest.current) furthest.current = phaseNow;
+  const phrase = phases[furthest.current] ?? phases[0];
+
   return (
     <figure
       className="pd-media-card pd-media-card--pending"
@@ -197,6 +259,13 @@ export function PendingMediaCard({
             />
           </div>
         ) : null}
+        {/* The phase, shimmering like a thought — at the top, inside the frame,
+            and gone with the loader the moment the picture starts to show. */}
+        {revealing ? null : (
+          <div className="pd-pending-phase" data-testid="pending-phase" aria-live="polite">
+            <span className="pd-shimmer">{phrase}</span>
+          </div>
+        )}
         <BobbleLoader
           fill
           bare

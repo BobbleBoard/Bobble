@@ -252,6 +252,16 @@ async function startSidecar(): Promise<Gen3dSidecar | null> {
   const port = await pickFreePort();
   const instance = new Gen3dSidecar({
     uvPath,
+    /*
+     * uv ON THE SIDECAR'S PATH. The Python side finds its own uv with
+     * `shutil.which("uv") or ~/.local/bin/uv` (engine/registry.py) for every
+     * stage it provisions; on a Mac where the only uv is the app's pinned copy,
+     * neither answers, and every stage install died on a path that does not
+     * exist while the sidecar itself was running on that very copy.
+     */
+    env: {
+      PATH: `${path.dirname(uvPath)}${path.delimiter}${process.env.PATH ?? ''}`,
+    },
     serverScript,
     // Behind the pointer — see inference/worker-tier.ts.
     spawnFn: tieredSpawn,

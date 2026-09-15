@@ -3625,7 +3625,8 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
   position: relative;
   isolation: isolate;
   overflow: hidden;
-  border-radius: 14px;
+  /* "round the edges a bit more" — 14 → 20. */
+  border-radius: 20px;
   background: var(--pd-bg-sunken, var(--pd-bg-raised));
   border: 1px solid color-mix(in oklab, var(--pd-text-primary) 10%, transparent);
   min-height: 120px;
@@ -3655,7 +3656,7 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
   min-width: 200px;
 }
 .pd-media-card[data-kind="model"] .pd-media-frame {
-  height: 320px;
+  height: 240px;
 }
 .pd-media-card[data-kind="audio"] .pd-media-frame {
   min-height: 0;
@@ -3680,7 +3681,9 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
 /* ONE cap for the picture and for the pending frame that stands in for it —
    the handover must not change the card's size (see .pd-media-card--pending). */
 :root {
-  --pd-media-max-h: 480px;
+  /* the user (2026-09-14): "make the card ~25% smaller" — 480 → 360, and the
+     pending width below with it. */
+  --pd-media-max-h: 360px;
 }
 
 .pd-media-image {
@@ -6572,7 +6575,7 @@ body[data-media-expanded="true"] .pd-studio-compose {
      through the aspect ratio). SEEN: a 512² request rendered as a 512px
      pending frame and a 480px picture, a 30px step at the handover. */
   width: min(
-    var(--pd-pending-w, 440px),
+    var(--pd-pending-w, 330px),
     calc(var(--pd-media-max-h) * var(--pd-pending-aspect, 1)),
     100%
   );
@@ -6594,14 +6597,14 @@ body[data-media-expanded="true"] .pd-studio-compose {
    collapse to a third of its height the moment the audio landed. */
 .pd-media-card--pending[data-kind="audio"] .pd-media-frame {
   aspect-ratio: auto;
-  height: 132px;
+  height: 100px;
 }
 
 /* 3D results are a fixed-height viewport rather than an aspect box (see
    .pd-media-card[data-kind="model"]), so the pending one is the same height. */
 .pd-media-card--pending[data-kind="model"] .pd-media-frame {
   aspect-ratio: auto;
-  height: 320px;
+  height: 240px;
 }
 
 /* The mark fills the frame; the canvas is sized by the loader itself. */
@@ -6665,9 +6668,27 @@ body[data-media-expanded="true"] .pd-studio-compose {
  * thing on screen while the card waits, and it leaves the moment the sweep
  * starts, because a progress bar over a finished picture is measuring nothing.
  */
+/* The phase line — top-left inside the frame, over the mark, the thinking
+   shimmer (packages/ui shimmer.css). It goes with the loader at the reveal. */
+.pd-pending-phase {
+  position: absolute;
+  top: 12px;
+  left: 14px;
+  z-index: 2;
+  font-size: var(--pd-font-size-caption);
+  line-height: var(--pd-leading-caption);
+  font-weight: var(--pd-font-weight-medium);
+  pointer-events: none;
+}
+.pd-pending-phase .pd-shimmer {
+  /* On the mark's dark plate the floor is near-white; the sweep is the app's own. */
+  --pd-shimmer-base: rgb(255 255 255 / 62%);
+  --pd-shimmer-highlight: rgb(255 255 255 / 100%);
+}
+
 .pd-pending-bar {
   position: relative;
-  width: min(var(--pd-pending-w, 440px), 100%);
+  width: min(var(--pd-pending-w, 330px), 100%);
   height: 3px;
   border-radius: var(--pd-radius-full);
   overflow: hidden;
