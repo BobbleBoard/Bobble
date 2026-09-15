@@ -1,6 +1,7 @@
 import AppKit
 import CoreGraphics
 import Foundation
+import CoreImage
 import ImageIO
 import QuartzCore
 import UniformTypeIdentifiers
@@ -1005,7 +1006,9 @@ final class OverlayController: NSObject {
     // Measured on rendered crops: at 0.38/2.6 the pointer all but vanished on a
     // white app — the old design leaned on its blue halo for that contrast, and
     // dropping the halo means the shadow has to carry it alone.
-    cursorGroup.shadowOpacity = 0.5
+    // Lighter again now that the blue edge glow separates the glyph from a
+    // white page; at 0.5 the two together read as a grey smudge.
+    cursorGroup.shadowOpacity = 0.3
     cursorGroup.shadowRadius = 3.2
     cursorGroup.shadowOffset = CGSize(width: 0, height: -1.4)
 
@@ -1031,12 +1034,15 @@ final class OverlayController: NSObject {
     glyphGlowSoft.path = glyph.path
     glyphGlowSoft.fillColor = GLYPH_GLOW
     glyphGlowSoft.strokeColor = GLYPH_GLOW
-    glyphGlowSoft.lineWidth = glyph.strokeWidth * 1.6
+    // the user: "more subtle further reaching edge glow" — fainter, and blurred
+    // wider: the blur radius carries the reach, the opacity the subtlety.
+    // The band barely peeks past the keyline; the blur is what reaches.
+    glyphGlowSoft.lineWidth = glyph.strokeWidth * 1.15
     glyphGlowSoft.lineJoin = .round
-    glyphGlowSoft.opacity = 0.55
+    glyphGlowSoft.opacity = 0.5
     glyphGlowSoft.shadowColor = GLYPH_GLOW
-    glyphGlowSoft.shadowOpacity = 0.9
-    glyphGlowSoft.shadowRadius = glyph.strokeWidth * 0.9
+    glyphGlowSoft.shadowOpacity = 1
+    glyphGlowSoft.shadowRadius = glyph.strokeWidth * 5
     glyphGlowSoft.shadowOffset = .zero
     cursorGroup.addSublayer(glyphGlowSoft)
 
@@ -2362,7 +2368,22 @@ final class OverlayController: NSObject {
     else { return false }
     ctx.scaleBy(x: s, y: s)
     ctx.translateBy(x: -local.minX, y: -local.minY)
-    (root.presentation() ?? root).render(in: ctx)
+    /*
+     * SHADOWS TOO. `CALayer.render(in:)` draws the layers' CONTENTS and skips
+     * what the window server adds on screen — the shadows. MEASURED 2026-09-15
+     * while tuning the pointer's edge glow: a shadowRadius of 3.8 stroke widths
+     * rendered as a halo that died within two points, because the halo in the
+     * PNG was only the glow layer's own stroke; the blur the user actually sees
+     * was not in the picture at all, and every judgement made from these
+     * renders had been made without it. (CARenderer, the compositor's own path
+     * into a texture, refuses a tree that is hosted in a window.) So the
+     * shadows are painted here the way CoreAnimation paints them — the layer's
+     * alpha, Gaussian-blurred by shadowRadius, tinted, offset — underneath the
+     * contents pass. Our tree keeps its shadows beneath its contents anyway.
+     */
+    let tree = root.presentation() ?? root
+    drawShadows(of: tree, in: ctx, rootLayer: tree)
+    tree.render(in: ctx)
     /* The buttons live on their own window (the phantom must stay
        click-through), so they are not in this layer tree. Draw them in at the
        pill's position, or a render of a hovered pill would show the blur with
@@ -2386,6 +2407,64 @@ final class OverlayController: NSObject {
     else { return false }
     CGImageDestinationAddImage(dest, image, nil)
     return CGImageDestinationFinalize(dest)
+  }
+
+  /// Paint every layer's CoreAnimation shadow into `ctx` (root coordinates),
+  /// depth-first so an inner layer's glow lands over an outer layer's shadow —
+  /// the same order the compositor stacks them.
+  private func drawShadows(of layer: CALayer, in ctx: CGContext, rootLayer: CALayer) {
+    if layer.isHidden || layer.opacity <= 0 { return }
+    if layer.shadowOpacity > 0, let colour = layer.shadowColor, layer.shadowRadius >= 0 {
+      // The shadow's source: the shadowPath when there is one, else the
+      // layer's own composited alpha (a leaf renders only itself; a group with
+      // no path renders with its children, as the compositor composites it).
+      let pad = ceil(layer.shadowRadius * 3 + 2)
+      let boundsInRoot = rootLayer.convert(layer.bounds, from: layer)
+      let src = boundsInRoot.insetBy(dx: -pad, dy: -pad)
+      let w = Int((src.width * 4).rounded()), h = Int((src.height * 4).rounded())
+      if w > 0, h > 0,
+        let mask = CGContext(
+          data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: 0,
+          space: CGColorSpace(name: CGColorSpace.sRGB)!,
+          bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
+      {
+        mask.scaleBy(x: 4, y: 4)
+        mask.translateBy(x: -src.minX, y: -src.minY)
+        if let path = layer.shadowPath {
+          let origin = rootLayer.convert(CGPoint.zero, from: layer)
+          mask.saveGState()
+          mask.translateBy(x: origin.x, y: origin.y)
+          mask.addPath(path)
+          mask.setFillColor(CGColor(gray: 0, alpha: 1))
+          mask.fillPath()
+          mask.restoreGState()
+        } else {
+          let origin = rootLayer.convert(CGPoint.zero, from: layer)
+          mask.saveGState()
+          mask.translateBy(x: origin.x, y: origin.y)
+          layer.render(in: mask)
+          mask.restoreGState()
+        }
+        if let alpha = mask.makeImage() {
+          let ci = CIImage(cgImage: alpha)
+          let blurred =
+            layer.shadowRadius > 0
+            ? ci.applyingGaussianBlur(sigma: Double(layer.shadowRadius * 4)).cropped(to: ci.extent)
+            : ci
+          let cictx = CIContext(options: [.workingColorSpace: NSNull()])
+          if let out = cictx.createCGImage(blurred, from: ci.extent) {
+            ctx.saveGState()
+            ctx.setAlpha(CGFloat(layer.shadowOpacity) * CGFloat(layer.opacity))
+            let at = src.offsetBy(dx: layer.shadowOffset.width, dy: layer.shadowOffset.height)
+            ctx.clip(to: at, mask: out)
+            ctx.setFillColor(colour)
+            ctx.fill(at)
+            ctx.restoreGState()
+          }
+        }
+      }
+    }
+    for sub in layer.sublayers ?? [] { drawShadows(of: sub, in: ctx, rootLayer: rootLayer) }
   }
 
   /// Everything a probe needs to assert the mechanism, since there is no DOM to
