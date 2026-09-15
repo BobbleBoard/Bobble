@@ -276,22 +276,46 @@ export function MediaCard({ item }: MediaCardProps): JSX.Element {
     return () => ac.abort();
   }, [item.path]);
 
+  /*
+   * A SOUND IS A STRIP, AND A STRIP HAS NO CORNERS TO SPARE.
+   *
+   * The controls float in the four corners of a picture because a picture has
+   * room under them. The audio card is 50px tall (the user, 2026-09-14: "shorten
+   * this card vertically") — the transport IS the frame — so a corner control
+   * lands on the play button, and MEASURED, Playwright could not press Play on
+   * hover: "Use as input" intercepts pointer events. So for a sound the same
+   * controls stand BESIDE the strip, in the row with it, and fade in with the
+   * same hover.
+   */
+  const beside = item.kind === 'audio';
+  const frame = (
+    /*
+      Drag is a pointer gesture by nature, which is what the a11y rule warns
+      about — the Export button beside it is the same outcome by keyboard.
+    */
+    // biome-ignore lint/a11y/noStaticElementInteractions: Export is the accessible equivalent.
+    <div
+      className="pd-media-frame"
+      draggable
+      onDragStart={(e) => startFileDrag(e, item.path)}
+      title={`Drag to save · ${item.path}`}
+    >
+      <Surface item={item} large={false} />
+      {beside ? null : <Controls item={item} onExpand={() => setOpen(true)} />}
+    </div>
+  );
   return (
     <figure className="pd-media-card" data-kind={item.kind} data-testid="media-card">
-      {/*
-        Drag is a pointer gesture by nature, which is what the a11y rule warns
-        about — the Export button beside it is the same outcome by keyboard.
-      */}
-      {/* biome-ignore lint/a11y/noStaticElementInteractions: Export is the accessible equivalent. */}
-      <div
-        className="pd-media-frame"
-        draggable
-        onDragStart={(e) => startFileDrag(e, item.path)}
-        title={`Drag to save · ${item.path}`}
-      >
-        <Surface item={item} large={false} />
-        <Controls item={item} onExpand={() => setOpen(true)} />
-      </div>
+      {beside ? (
+        <div className="pd-media-strip">
+          {frame}
+          <div className="pd-media-beside" data-testid="media-beside">
+            <Controls item={item} onExpand={() => setOpen(true)} />
+          </div>
+        </div>
+      ) : (
+        frame
+      )}
       <figcaption className="pd-media-caption">
         <button
           type="button"

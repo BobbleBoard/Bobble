@@ -3663,7 +3663,11 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
   /* A transport is as wide as its own controls, and it has them immediately —
      there is nothing to wait for, so nothing to hold space for. */
   min-width: 0;
-  padding: 12px;
+  /* the user (2026-09-14): "shorten this card vertically". The frame IS the
+     transport's box now — no padding around a bordered box inside a bordered
+     box; the transport below drops its own border and ground when it is in
+     one of these frames. */
+  padding: 0;
 }
 
 /*
@@ -3807,6 +3811,65 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
     transition: none;
     transform: none;
   }
+}
+
+/*
+ * BESIDE THE STRIP, NOT ON IT. The audio card is a 50px transport; a control
+ * laid over it lands on the play button (MEASURED: Playwright could not press
+ * Play — "Use as input" intercepts pointer events). So a sound's controls stand
+ * in the row beside it: static, the app's own quiet icon-button recipe rather
+ * than white-on-a-picture, and revealed by the same hover as the corners.
+ * They keep their room at rest — the card is left-aligned and the space is on
+ * the page's own ground, so what they hold is invisible until they arrive.
+ */
+.pd-media-strip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  min-width: 0;
+}
+.pd-media-strip .pd-media-frame {
+  flex: 0 1 auto;
+}
+.pd-media-beside {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: none;
+}
+.pd-media-beside .pd-media-btn {
+  position: static;
+  transform: none;
+  height: 34px;
+  width: 34px;
+  color: var(--pd-text-secondary);
+  border-color: transparent;
+  background: transparent;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+.pd-media-beside .pd-media-btn--wide {
+  width: auto;
+  padding: 0 12px;
+}
+.pd-media-beside .pd-media-btn > svg {
+  filter: none;
+}
+.pd-media-strip:hover .pd-media-btn,
+.pd-media-strip:has(:focus-visible) .pd-media-btn {
+  opacity: 1;
+  transform: none;
+}
+.pd-media-beside .pd-media-btn:hover,
+.pd-media-beside .pd-media-btn:focus-visible {
+  color: var(--pd-text-primary);
+  background: var(--pd-bg-raised);
+  border-color: color-mix(in oklab, var(--pd-text-primary) 12%, transparent);
+  transform: none;
+}
+.pd-media-beside .pd-media-btn:active {
+  transform: scale(0.97);
 }
 
 /* ── the caption ─────────────────────────────────────────────────────────── */
@@ -4116,7 +4179,9 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
 }
 .pd-media-stage[data-kind="audio"] {
   width: min(680px, 92vw);
-  padding: 18px;
+  /* Room above and below the transport for the corner controls, which on the
+     stage are 38px tall at 10px in — on 18px padding they sat on the strip. */
+  padding: 58px 18px;
 }
 .pd-media-stage .pd-media-image {
   max-height: 78vh;
@@ -4180,10 +4245,18 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 10px 14px;
+  padding: 8px 12px;
   border-radius: 12px;
   background: var(--pd-bg-raised);
   border: 1px solid color-mix(in oklab, var(--pd-text-primary) 12%, var(--pd-bg-raised));
+}
+/* In a media card the frame is the box (see .pd-media-card[data-kind="audio"]
+   .pd-media-frame): the transport drops its own border and ground there. */
+.pd-media-card[data-kind="audio"] .pd-media-frame .pd-thread-audio {
+  border: 0;
+  background: transparent;
+  border-radius: 0;
+  padding: 8px 12px;
 }
 
 .pd-thread-audio-play {
@@ -4217,7 +4290,7 @@ button[aria-label^="Close"]:where(.fixed, .absolute),
   gap: 2px;
   flex: 1;
   min-width: 0;
-  height: 34px;
+  height: 32px;
   cursor: pointer;
   /*
    * THE BARS CLIP; THE CARD DOES NOT GROW.
@@ -6597,7 +6670,9 @@ body[data-media-expanded="true"] .pd-studio-compose {
    collapse to a third of its height the moment the audio landed. */
 .pd-media-card--pending[data-kind="audio"] .pd-media-frame {
   aspect-ratio: auto;
-  height: 100px;
+  /* The strip's own height — the transport is 48px tall in its frame — so the
+     card that waits is the card that arrives, and no taller. */
+  height: 50px;
 }
 
 /* 3D results are a fixed-height viewport rather than an aspect box (see

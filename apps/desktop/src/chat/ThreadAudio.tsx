@@ -70,18 +70,25 @@ export function ThreadAudio({ src, name }: { src: string; name?: string }): JSX.
         data-testid="thread-audio-play"
         onClick={toggle}
       >
+        {/* Rounded glyphs (the user, 2026-09-14): the bars are pills and the
+            triangle takes its corners from a round-joined stroke of its own
+            colour, which is how a rounded triangle is drawn without hand-
+            fitting three arcs. */}
         {playing ? (
           <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
             <title>Pause</title>
-            <rect x="4" y="3" width="3" height="10" rx="1" fill="currentColor" />
-            <rect x="9" y="3" width="3" height="10" rx="1" fill="currentColor" />
+            <rect x="3.5" y="3" width="3.4" height="10" rx="1.7" fill="currentColor" />
+            <rect x="9.1" y="3" width="3.4" height="10" rx="1.7" fill="currentColor" />
           </svg>
         ) : (
           <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
             <title>Play</title>
             <path
-              d="M5 3.2v9.6a.6.6 0 0 0 .92.5l7.2-4.8a.6.6 0 0 0 0-1l-7.2-4.8A.6.6 0 0 0 5 3.2Z"
+              d="M5.6 4.1 12.2 8 5.6 11.9Z"
               fill="currentColor"
+              stroke="currentColor"
+              strokeWidth="2.2"
+              strokeLinejoin="round"
             />
           </svg>
         )}
