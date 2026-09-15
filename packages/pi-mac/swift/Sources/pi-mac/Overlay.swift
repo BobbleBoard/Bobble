@@ -1037,9 +1037,11 @@ final class OverlayController: NSObject {
     // the user: "more subtle further reaching edge glow" — fainter, and blurred
     // wider: the blur radius carries the reach, the opacity the subtlety.
     // The band barely peeks past the keyline; the blur is what reaches.
-    glyphGlowSoft.lineWidth = glyph.strokeWidth * 1.15
+    // the user, on the render: "just less initial glow, same falloff" — so the
+    // opacity comes down and the radius stays.
+    glyphGlowSoft.lineWidth = glyph.strokeWidth * 1.1
     glyphGlowSoft.lineJoin = .round
-    glyphGlowSoft.opacity = 0.5
+    glyphGlowSoft.opacity = 0.36
     glyphGlowSoft.shadowColor = GLYPH_GLOW
     glyphGlowSoft.shadowOpacity = 1
     glyphGlowSoft.shadowRadius = glyph.strokeWidth * 5
